@@ -1,0 +1,147 @@
+{
+	"openapi": "3.0.0",
+	"components": {
+		"examples": {},
+		"headers": {},
+		"parameters": {},
+		"requestBodies": {},
+		"responses": {},
+		"schemas": {
+			"QuoteResponse": {
+				"properties": {
+					"value": {
+						"type": "number",
+						"format": "double"
+					},
+					"expiration_time": {
+						"type": "number",
+						"format": "double"
+					},
+					"quote_id": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"value",
+					"expiration_time",
+					"quote_id"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"Currency": {
+				"enum": [
+					"COP"
+				],
+				"type": "string"
+			},
+			"PaymentMethod": {
+				"enum": [
+					"NEQUI"
+				],
+				"type": "string"
+			},
+			"CryptoCurrency": {
+				"enum": [
+					"USDC"
+				],
+				"type": "string"
+			},
+			"Network": {
+				"enum": [
+					"STELLAR"
+				],
+				"type": "string"
+			},
+			"QuoteRequest": {
+				"properties": {
+					"amount": {
+						"type": "number",
+						"format": "double"
+					},
+					"target_currency": {
+						"$ref": "#/components/schemas/Currency"
+					},
+					"payment_method": {
+						"$ref": "#/components/schemas/PaymentMethod"
+					},
+					"crypto_currency": {
+						"$ref": "#/components/schemas/CryptoCurrency"
+					},
+					"network": {
+						"$ref": "#/components/schemas/Network"
+					}
+				},
+				"required": [
+					"amount",
+					"target_currency",
+					"payment_method",
+					"crypto_currency",
+					"network"
+				],
+				"type": "object",
+				"additionalProperties": false
+			}
+		},
+		"securitySchemes": {}
+	},
+	"info": {
+		"title": "abroad",
+		"version": "1.0.0",
+		"license": {
+			"name": "ISC"
+		},
+		"contact": {}
+	},
+	"paths": {
+		"/quote": {
+			"post": {
+				"operationId": "CreateQuote",
+				"responses": {
+					"200": {
+						"description": "A response object with the calculated value and the expiration time of the quote.",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/QuoteResponse"
+								},
+								"examples": {
+									"Example 1": {
+										"value": {
+											"value": 500,
+											"expiration_time": 1697041800,
+											"quote_id": "123456"
+										}
+									}
+								}
+							}
+						}
+					}
+				},
+				"description": "Creates a quote for a cryptocurrency transaction based on the provided fiat amount and target currency.\nThis endpoint calculates the equivalent cryptocurrency value in USD for a specified amount of fiat currency (COP).\nThe response includes the quote value and expiration time.",
+				"tags": [
+					"Quote"
+				],
+				"security": [],
+				"parameters": [],
+				"requestBody": {
+					"description": "The request payload containing details about the transaction, including fiat amount, target currency, payment method, crypto currency, and network.",
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/QuoteRequest",
+								"description": "The request payload containing details about the transaction, including fiat amount, target currency, payment method, crypto currency, and network."
+							}
+						}
+					}
+				}
+			}
+		}
+	},
+	"servers": [
+		{
+			"url": "/"
+		}
+	]
+}
