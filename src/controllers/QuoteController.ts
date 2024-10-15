@@ -36,6 +36,7 @@ interface QuoteRequest {
   payment_method: PaymentMethod;
   crypto_currency: CryptoCurrency;
   network: Network;
+  account_number: string;
 }
 
 @Route("quote")
