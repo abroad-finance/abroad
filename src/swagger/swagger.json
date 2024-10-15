@@ -7,6 +7,47 @@
 		"requestBodies": {},
 		"responses": {},
 		"schemas": {
+			"TransactionStatusResponse": {
+				"properties": {
+					"transactionId": {
+						"type": "string"
+					},
+					"status": {
+						"type": "string",
+						"enum": [
+							"pending",
+							"completed",
+							"canceled"
+						]
+					}
+				},
+				"required": [
+					"transactionId",
+					"status"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"CancelTransactionResponse": {
+				"properties": {
+					"transactionId": {
+						"type": "string"
+					},
+					"status": {
+						"type": "string",
+						"enum": [
+							"canceled"
+						],
+						"nullable": false
+					}
+				},
+				"required": [
+					"transactionId",
+					"status"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
 			"QuoteResponse": {
 				"properties": {
 					"value": {
@@ -81,6 +122,30 @@
 				],
 				"type": "object",
 				"additionalProperties": false
+			},
+			"AcceptQuoteResponse": {
+				"properties": {
+					"transactionId": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"transactionId"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"AcceptQuoteRequest": {
+				"properties": {
+					"quote_id": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"quote_id"
+				],
+				"type": "object",
+				"additionalProperties": false
 			}
 		},
 		"securitySchemes": {}
@@ -94,6 +159,90 @@
 		"contact": {}
 	},
 	"paths": {
+		"/transaction/{transactionId}/status": {
+			"get": {
+				"operationId": "CheckTransactionStatus",
+				"responses": {
+					"200": {
+						"description": "The status of the transaction.",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/TransactionStatusResponse"
+								}
+							}
+						}
+					}
+				},
+				"description": "Checks the status of a transaction by transaction ID.",
+				"tags": [
+					"Transaction"
+				],
+				"security": [],
+				"parameters": [
+					{
+						"description": "The ID of the transaction to check.",
+						"in": "path",
+						"name": "transactionId",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"description": "The API key used for authentication.",
+						"in": "header",
+						"name": "X-API-KEY",
+						"required": false,
+						"schema": {
+							"type": "string"
+						}
+					}
+				]
+			}
+		},
+		"/transaction/{transactionId}/cancel": {
+			"post": {
+				"operationId": "CancelTransaction",
+				"responses": {
+					"200": {
+						"description": "The updated status of the transaction.",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/CancelTransactionResponse"
+								}
+							}
+						}
+					}
+				},
+				"description": "Cancels a transaction by transaction ID.",
+				"tags": [
+					"Transaction"
+				],
+				"security": [],
+				"parameters": [
+					{
+						"description": "The ID of the transaction to cancel.",
+						"in": "path",
+						"name": "transactionId",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					},
+					{
+						"description": "The API key used for authentication.",
+						"in": "header",
+						"name": "X-API-KEY",
+						"required": false,
+						"schema": {
+							"type": "string"
+						}
+					}
+				]
+			}
+		},
 		"/quote": {
 			"post": {
 				"operationId": "CreateQuote",
@@ -123,7 +272,17 @@
 					"Quote"
 				],
 				"security": [],
-				"parameters": [],
+				"parameters": [
+					{
+						"description": "The API key used for authentication.",
+						"in": "header",
+						"name": "X-API-KEY",
+						"required": false,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
 				"requestBody": {
 					"description": "The request payload containing details about the transaction, including fiat amount, target currency, payment method, crypto currency, and network.",
 					"required": true,
@@ -132,6 +291,58 @@
 							"schema": {
 								"$ref": "#/components/schemas/QuoteRequest",
 								"description": "The request payload containing details about the transaction, including fiat amount, target currency, payment method, crypto currency, and network."
+							}
+						}
+					}
+				}
+			}
+		},
+		"/quote/accept": {
+			"post": {
+				"operationId": "AcceptQuote",
+				"responses": {
+					"200": {
+						"description": "A response object with the generated transaction ID.",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/AcceptQuoteResponse"
+								},
+								"examples": {
+									"Example 1": {
+										"value": {
+											"transactionId": "txn_abc123"
+										}
+									}
+								}
+							}
+						}
+					}
+				},
+				"description": "Accepts a quote based on the provided quote_id and generates a transaction ID.",
+				"tags": [
+					"Quote"
+				],
+				"security": [],
+				"parameters": [
+					{
+						"description": "The API key used for authentication.",
+						"in": "header",
+						"name": "X-API-KEY",
+						"required": false,
+						"schema": {
+							"type": "string"
+						}
+					}
+				],
+				"requestBody": {
+					"description": "The request payload containing the quote ID.",
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/AcceptQuoteRequest",
+								"description": "The request payload containing the quote ID."
 							}
 						}
 					}
