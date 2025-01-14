@@ -6,7 +6,7 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "build:docs": "npx tsoa swagger && npx tsoa routes",
-    "build": "tsoa spec-and-routes && tsc && cp -r src/swagger dist",
+    "build": "tsoa spec-and-routes && tsc",
     "start": "node dist/server.js",
     "dev:tsoa": "concurrently \"tsx watch src/server.ts\" \"nodemon -x tsoa spec-and-routes\"",
     "dev": "tsx watch src/server.ts"

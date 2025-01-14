@@ -1,5 +1,5 @@
 # Step 1: Build the app
-FROM node:16 AS build
+FROM node:23.6.0@sha256:d59184ad9bd55272f5847967574f2e259f8741239c4b5baf2395214b4d991296 AS build
 
 # Create app directory
 WORKDIR /app
@@ -15,7 +15,7 @@ COPY . .
 RUN npm run build
 
 # Step 2: Create a production image
-FROM node:16-alpine
+FROM node:23.6.0@sha256:d59184ad9bd55272f5847967574f2e259f8741239c4b5baf2395214b4d991296
 
 # Set working directory
 WORKDIR /app
@@ -23,7 +23,7 @@ WORKDIR /app
 # Copy only the necessary files from the build stage
 COPY --from=build /app/package*.json ./
 COPY --from=build /app/dist ./dist
-COPY --from=build /app/src/swagger ./src/swagger
+COPY --from=build /app/src/swagger.json ./src/swagger.json
 
 # Install only production dependencies
 RUN npm install --production
