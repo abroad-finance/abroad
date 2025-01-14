@@ -23,7 +23,7 @@ WORKDIR /app
 # Copy only the necessary files from the build stage
 COPY --from=build /app/package*.json ./
 COPY --from=build /app/dist ./dist
-COPY --from=build /app/src/swagger.json ./src/swagger.json
+COPY --from=build /app/src/swagger.json ./dist/swagger.json
 
 # Install only production dependencies
 RUN npm install --production
