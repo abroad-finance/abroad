@@ -1,7 +1,7 @@
 import express, { Request, Response } from "express";
 import bodyParser from "body-parser";
 import cors from "cors";
-import { RegisterRoutes } from "./routes/routes";
+import { RegisterRoutes } from "./routes";
 import fs from "fs";
 import path from "path";
 
@@ -30,7 +30,7 @@ app.get("/docs", (req: Request, res: Response) => {
 
 // Serve the generated OpenAPI spec
 app.get("/swagger.json", (req: Request, res: Response) => {
-  const swaggerPath = path.resolve(__dirname, "./swagger/swagger.json");
+  const swaggerPath = path.resolve(__dirname, "./swagger.json");
   res.sendFile(swaggerPath);
 });
 
@@ -40,7 +40,7 @@ app.use((err: any, req: Request, res: Response, next: any) => {
   });
 });
 
-const port = 3000;
+const port = 3784;
 app.listen(port, () => {
   console.log(`Server running on http://localhost:${port}`);
   console.log(`API documentation available at http://localhost:${port}/docs`);

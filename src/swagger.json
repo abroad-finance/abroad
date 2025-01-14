@@ -1,0 +1,448 @@
+{
+	"openapi": "3.0.0",
+	"components": {
+		"examples": {},
+		"headers": {},
+		"parameters": {},
+		"requestBodies": {},
+		"responses": {},
+		"schemas": {
+			"TransactionStatusResponse": {
+				"properties": {
+					"transaction_reference": {
+						"type": "string"
+					},
+					"status": {
+						"type": "string"
+					},
+					"on_chain_tx_hash": {
+						"type": "string"
+					},
+					"amount": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"transaction_reference",
+					"status",
+					"on_chain_tx_hash",
+					"amount"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"QuoteResponse": {
+				"properties": {
+					"value": {
+						"type": "number",
+						"format": "double"
+					},
+					"expiration_time": {
+						"type": "number",
+						"format": "double"
+					},
+					"quote_id": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"value",
+					"expiration_time",
+					"quote_id"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"QuoteRequest": {
+				"properties": {
+					"amount": {
+						"type": "number",
+						"format": "double"
+					},
+					"target_currency": {
+						"type": "string"
+					},
+					"payment_method": {
+						"type": "string"
+					},
+					"crypto_currency": {
+						"type": "string"
+					},
+					"network": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"amount",
+					"target_currency",
+					"payment_method",
+					"crypto_currency",
+					"network"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"KycResponse": {
+				"properties": {
+					"user_id": {
+						"type": "string"
+					},
+					"kyc_status": {
+						"type": "string"
+					},
+					"kyc_link": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"user_id",
+					"kyc_status",
+					"kyc_link"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"KycRequest": {
+				"properties": {
+					"user_id": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"user_id"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"DecodeQrResponse": {
+				"properties": {
+					"target_currency": {
+						"type": "string"
+					},
+					"payment_method": {
+						"type": "string"
+					},
+					"account_number": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"target_currency",
+					"payment_method",
+					"account_number"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"DecodeQrRequest": {
+				"properties": {
+					"qr_data": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"qr_data"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"AcceptTransactionResponse": {
+				"properties": {
+					"transaction_reference": {
+						"type": "string"
+					},
+					"expiration_time": {
+						"type": "number",
+						"format": "double"
+					}
+				},
+				"required": [
+					"transaction_reference",
+					"expiration_time"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
+			"AcceptTransactionRequest": {
+				"properties": {
+					"quote_id": {
+						"type": "string"
+					},
+					"user_id": {
+						"type": "string"
+					},
+					"account_number": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"quote_id",
+					"user_id",
+					"account_number"
+				],
+				"type": "object",
+				"additionalProperties": false
+			}
+		},
+		"securitySchemes": {
+			"ApiKeyAuth": {
+				"type": "apiKey",
+				"in": "header",
+				"name": "X-API-Key"
+			}
+		}
+	},
+	"info": {
+		"title": "abroad",
+		"version": "1.0.0",
+		"license": {
+			"name": "ISC"
+		},
+		"contact": {}
+	},
+	"paths": {
+		"/transaction-status/{transactionReference}": {
+			"get": {
+				"operationId": "GetTransactionStatus",
+				"responses": {
+					"200": {
+						"description": "Transaction status retrieved",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/TransactionStatusResponse"
+								}
+							}
+						}
+					},
+					"400": {
+						"description": "Bad Request"
+					},
+					"401": {
+						"description": "Unauthorized"
+					},
+					"404": {
+						"description": "Not Found"
+					},
+					"500": {
+						"description": "Internal Server Error"
+					}
+				},
+				"description": "Retrieves the status of a transaction by its reference.",
+				"security": [
+					{
+						"ApiKeyAuth": []
+					}
+				],
+				"parameters": [
+					{
+						"description": "- The unique transaction reference (e.g., TX123REF).",
+						"in": "path",
+						"name": "transactionReference",
+						"required": true,
+						"schema": {
+							"type": "string"
+						}
+					}
+				]
+			}
+		},
+		"/quote": {
+			"post": {
+				"operationId": "GetQuote",
+				"responses": {
+					"200": {
+						"description": "Quote response",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/QuoteResponse"
+								}
+							}
+						}
+					},
+					"400": {
+						"description": "Bad Request"
+					},
+					"401": {
+						"description": "Unauthorized"
+					},
+					"404": {
+						"description": "Not Found"
+					},
+					"500": {
+						"description": "Internal Server Error"
+					}
+				},
+				"description": "Retrieves a quote to convert a given fiat amount into USDC.",
+				"security": [
+					{
+						"ApiKeyAuth": []
+					}
+				],
+				"parameters": [],
+				"requestBody": {
+					"description": "- The details needed to generate a quote (amount, currency, etc.).",
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/QuoteRequest",
+								"description": "- The details needed to generate a quote (amount, currency, etc.)."
+							}
+						}
+					}
+				}
+			}
+		},
+		"/kyc": {
+			"post": {
+				"operationId": "CheckKyc",
+				"responses": {
+					"200": {
+						"description": "KYC status response",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/KycResponse"
+								}
+							}
+						}
+					},
+					"400": {
+						"description": "Bad Request"
+					},
+					"401": {
+						"description": "Unauthorized"
+					},
+					"404": {
+						"description": "Not Found"
+					},
+					"500": {
+						"description": "Internal Server Error"
+					}
+				},
+				"description": "Checks or initiates the KYC flow for a given user.",
+				"security": [
+					{
+						"ApiKeyAuth": []
+					}
+				],
+				"parameters": [],
+				"requestBody": {
+					"description": "- Contains the user identifier (`user_id`).",
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/KycRequest",
+								"description": "- Contains the user identifier (`user_id`)."
+							}
+						}
+					}
+				}
+			}
+		},
+		"/decode-qr": {
+			"post": {
+				"operationId": "DecodeQr",
+				"responses": {
+					"200": {
+						"description": "QR code decoded successfully",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/DecodeQrResponse"
+								}
+							}
+						}
+					},
+					"400": {
+						"description": "Bad Request"
+					},
+					"401": {
+						"description": "Unauthorized"
+					},
+					"404": {
+						"description": "Not Found"
+					},
+					"500": {
+						"description": "Internal Server Error"
+					}
+				},
+				"description": "Decodes the scanned QR data and returns payment details \nrequired for the transaction.",
+				"security": [
+					{
+						"ApiKeyAuth": []
+					}
+				],
+				"parameters": [],
+				"requestBody": {
+					"description": "- The scanned QR data from the user.",
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/DecodeQrRequest",
+								"description": "- The scanned QR data from the user."
+							}
+						}
+					}
+				}
+			}
+		},
+		"/accept-transaction": {
+			"post": {
+				"operationId": "AcceptTransaction",
+				"responses": {
+					"200": {
+						"description": "Transaction accepted",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/AcceptTransactionResponse"
+								}
+							}
+						}
+					},
+					"400": {
+						"description": "Bad Request"
+					},
+					"401": {
+						"description": "Unauthorized"
+					},
+					"404": {
+						"description": "Not Found"
+					},
+					"500": {
+						"description": "Internal Server Error"
+					}
+				},
+				"description": "Accepts a transaction based on a quote.",
+				"security": [
+					{
+						"ApiKeyAuth": []
+					}
+				],
+				"parameters": [],
+				"requestBody": {
+					"description": "- Includes the `quote_id`, `user_id`, and local `account_number`.",
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/AcceptTransactionRequest",
+								"description": "- Includes the `quote_id`, `user_id`, and local `account_number`."
+							}
+						}
+					}
+				}
+			}
+		}
+	},
+	"servers": [
+		{
+			"url": "/"
+		}
+	]
+}

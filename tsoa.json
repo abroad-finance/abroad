@@ -1,12 +1,32 @@
 {
   "entryFile": "src/server.ts",
   "noImplicitAdditionalProperties": "throw-on-extras",
-  "controllerPathGlobs": ["src/controllers/**/*.ts"],
+  "controllerPathGlobs": [
+    "src/controllers/**/*Controller.ts"
+  ],
   "spec": {
-    "outputDirectory": "src/swagger",
-    "specVersion": 3
+    "outputDirectory": "src",
+    "specVersion": 3,
+    "info": {
+      "title": "Abroad API Documentation",
+      "version": "1.0.0",
+      "description": "## API Documentation\n\nHere is the flow diagram:\n\n![Flow Diagram](https://plume-fedora-ef6.notion.site/Proposed-flow-17a7719a7efe80d8874be944736107f6)"
+    },
+    "securityDefinitions": {
+      "ApiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-API-Key"
+      }
+    },
+    "security": [
+      {
+        "ApiKeyAuth": []
+      }
+    ]
   },
   "routes": {
-    "routesDir": "src/routes"
+    "routesDir": "src",
+    "authenticationModule": "./src/authentication.ts"
   }
 }
