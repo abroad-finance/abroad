@@ -28,6 +28,10 @@ app.get("/docs", (req: Request, res: Response) => {
   `);
 });
 
+app.get("/", (req: Request, res: Response) => {
+  res.redirect("/docs");
+});
+
 // Serve the generated OpenAPI spec
 app.get("/swagger.json", (req: Request, res: Response) => {
   const swaggerPath = path.resolve(__dirname, "./swagger.json");

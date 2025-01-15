@@ -8,8 +8,7 @@
     "build:docs": "npx tsoa swagger && npx tsoa routes",
     "build": "tsoa spec-and-routes && tsc",
     "start": "node dist/server.js",
-    "dev:tsoa": "concurrently \"tsx watch src/server.ts\" \"nodemon -x tsoa spec-and-routes\"",
-    "dev": "tsx watch src/server.ts"
+    "dev": "concurrently \"tsx watch src/server.ts\" \"nodemon -x tsoa spec-and-routes\""
   },
   "keywords": [],
   "author": "",
