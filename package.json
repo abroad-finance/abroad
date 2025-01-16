@@ -14,9 +14,13 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@google-cloud/secret-manager": "^5.6.0",
+    "@stellar/stellar-sdk": "^13.1.0",
+    "amqplib": "^0.10.5",
     "axios": "^1.7.7",
     "body-parser": "^1.20.3",
     "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
     "express": "^4.21.1",
     "joi": "^17.13.3",
     "redoc": "^2.1.5",
@@ -24,6 +28,7 @@
     "tsoa": "^6.4.0"
   },
   "devDependencies": {
+    "@types/amqplib": "^0.10.6",
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.0",
     "@types/node": "^22.7.5",
