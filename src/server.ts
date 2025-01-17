@@ -4,6 +4,7 @@ import cors from "cors";
 import { RegisterRoutes } from "./routes";
 import fs from "fs";
 import path from "path";
+import { registerConsumers } from "./stellar";
 
 const app = express();
 app.use(cors());
@@ -11,7 +12,6 @@ app.use(bodyParser.json());
 
 RegisterRoutes(app);
 
-// Serve ReDoc documentation
 app.get("/docs", (req: Request, res: Response) => {
   res.send(`
     <!DOCTYPE html>
@@ -32,7 +32,6 @@ app.get("/", (req: Request, res: Response) => {
   res.redirect("/docs");
 });
 
-// Serve the generated OpenAPI spec
 app.get("/swagger.json", (req: Request, res: Response) => {
   const swaggerPath = path.resolve(__dirname, "./swagger.json");
   res.sendFile(swaggerPath);
@@ -49,3 +48,5 @@ app.listen(port, () => {
   console.log(`Server running on http://localhost:${port}`);
   console.log(`API documentation available at http://localhost:${port}/docs`);
 });
+
+registerConsumers();
