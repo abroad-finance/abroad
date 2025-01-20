@@ -16,6 +16,7 @@
 		"vscode": {
 			"extensions": [
 				"sourcegraph.cody-ai",
+				"Prisma.prisma",
 			],
 			"settings": {
 				"cody.autocomplete.enabled": true

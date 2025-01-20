@@ -1,6 +1,6 @@
 // services/rabbitmq.ts
 import * as amqplib from 'amqplib';
-import { RABBITMQ_URL } from '../environment/ënv';
+import { RABBITMQ_URL } from '../environment/env';
 
 /**
  * Create a RabbitMQ connection and a channel.

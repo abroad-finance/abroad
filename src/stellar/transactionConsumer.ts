@@ -1,4 +1,5 @@
 // services/transactionConsumer.ts
+import { Horizon } from '@stellar/stellar-sdk';
 import type { Channel, ConsumeMessage } from 'amqplib';
 
 /**
@@ -9,9 +10,9 @@ export function consumeTransactions(channel: Channel, queueName: string) {
         if (msg) {
             try {
                 // Convert the message content from Buffer to JSON
-                const content = JSON.parse(msg.content.toString());
+                const content = JSON.parse(msg.content.toString()) as Horizon.ServerApi.TransactionRecord;
 
-                console.log('Received transaction from queue:', content);
+                console.log('Received transaction from queue:', content.paging_token);
 
                 // TODO: handle the transaction data
                 // e.g., store in a database, call external APIs, etc.

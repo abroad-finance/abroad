@@ -53,6 +53,46 @@
 				"type": "object",
 				"additionalProperties": false
 			},
+			"_36_Enums.TargetCurrency": {
+				"type": "string",
+				"enum": [
+					"COP"
+				],
+				"nullable": false
+			},
+			"TargetCurrency": {
+				"$ref": "#/components/schemas/_36_Enums.TargetCurrency"
+			},
+			"_36_Enums.PaymentMethod": {
+				"type": "string",
+				"enum": [
+					"NEQUI"
+				],
+				"nullable": false
+			},
+			"PaymentMethod": {
+				"$ref": "#/components/schemas/_36_Enums.PaymentMethod"
+			},
+			"_36_Enums.CryptoCurrency": {
+				"type": "string",
+				"enum": [
+					"USDC"
+				],
+				"nullable": false
+			},
+			"CryptoCurrency": {
+				"$ref": "#/components/schemas/_36_Enums.CryptoCurrency"
+			},
+			"_36_Enums.BlockchainNetwork": {
+				"type": "string",
+				"enum": [
+					"STELLAR"
+				],
+				"nullable": false
+			},
+			"BlockchainNetwork": {
+				"$ref": "#/components/schemas/_36_Enums.BlockchainNetwork"
+			},
 			"QuoteRequest": {
 				"properties": {
 					"amount": {
@@ -60,16 +100,16 @@
 						"format": "double"
 					},
 					"target_currency": {
-						"type": "string"
+						"$ref": "#/components/schemas/TargetCurrency"
 					},
 					"payment_method": {
-						"type": "string"
+						"$ref": "#/components/schemas/PaymentMethod"
 					},
 					"crypto_currency": {
-						"type": "string"
+						"$ref": "#/components/schemas/CryptoCurrency"
 					},
 					"network": {
-						"type": "string"
+						"$ref": "#/components/schemas/BlockchainNetwork"
 					}
 				},
 				"required": [

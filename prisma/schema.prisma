@@ -1,0 +1,91 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Partner {
+  id        String        @id @default(uuid())
+  name      String
+  createdAt DateTime      @default(now())
+  apiKey    String        @unique
+  users     PartnerUser[]
+  quotes    Quote[]
+}
+
+model PartnerUser {
+  id            String        @id @default(uuid())
+  partnerId     String
+  partner       Partner       @relation(fields: [partnerId], references: [id])
+  partnerUserId String
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  Transaction   Transaction[]
+
+  // Unique constraint to ensure a user is only once per partner
+  @@unique([partnerId, partnerUserId])
+}
+
+model Quote {
+  id             String            @id @default(uuid())
+  targetAmount   Float
+  sourceAmount   Float
+  targetCurrency TargetCurrency
+  paymentMethod  PaymentMethod
+  country        Country
+  cryptoCurrency CryptoCurrency
+  network        BlockchainNetwork
+
+  partnerId String
+  partner   Partner @relation(fields: [partnerId], references: [id])
+
+  expirationDate DateTime
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  transaction    Transaction?
+
+  // If you frequently query by partnerId, add an index:
+  @@index([partnerId])
+}
+
+model Transaction {
+  id            String            @id @default(uuid())
+  partnerUserId String
+  partnerUser   PartnerUser       @relation(fields: [partnerUserId], references: [id])
+  accountNumber String
+  status        TransactionStatus
+  createdAt     DateTime          @default(now())
+  quoteId       String            @unique
+  quote         Quote             @relation(fields: [quoteId], references: [id])
+}
+
+enum TransactionStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  CANCELLED
+  EXPIRED
+}
+
+enum CryptoCurrency {
+  USDC
+}
+
+enum BlockchainNetwork {
+  STELLAR
+}
+
+enum Country {
+  CO
+}
+
+enum PaymentMethod {
+  NEQUI
+}
+
+enum TargetCurrency {
+  COP
+}

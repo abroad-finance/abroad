@@ -1,6 +1,6 @@
 // services/secretManager.ts
 import { SecretManagerServiceClient } from '@google-cloud/secret-manager';
-import { PROJECT_ID } from './ënv';
+import { PROJECT_ID } from './env';
 
 /**
  * Fetch a secret value from Google Cloud Secret Manager.

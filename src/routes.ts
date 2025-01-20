@@ -43,14 +43,54 @@ const models: TsoaRoute.Models = {
         "additionalProperties": false,
     },
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "_36_Enums.TargetCurrency": {
+        "dataType": "refAlias",
+        "type": {"dataType":"enum","enums":["COP"],"validators":{}},
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "TargetCurrency": {
+        "dataType": "refAlias",
+        "type": {"ref":"_36_Enums.TargetCurrency","validators":{}},
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "_36_Enums.PaymentMethod": {
+        "dataType": "refAlias",
+        "type": {"dataType":"enum","enums":["NEQUI"],"validators":{}},
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "PaymentMethod": {
+        "dataType": "refAlias",
+        "type": {"ref":"_36_Enums.PaymentMethod","validators":{}},
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "_36_Enums.CryptoCurrency": {
+        "dataType": "refAlias",
+        "type": {"dataType":"enum","enums":["USDC"],"validators":{}},
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "CryptoCurrency": {
+        "dataType": "refAlias",
+        "type": {"ref":"_36_Enums.CryptoCurrency","validators":{}},
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "_36_Enums.BlockchainNetwork": {
+        "dataType": "refAlias",
+        "type": {"dataType":"enum","enums":["STELLAR"],"validators":{}},
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "BlockchainNetwork": {
+        "dataType": "refAlias",
+        "type": {"ref":"_36_Enums.BlockchainNetwork","validators":{}},
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
     "QuoteRequest": {
         "dataType": "refObject",
         "properties": {
             "amount": {"dataType":"double","required":true},
-            "target_currency": {"dataType":"string","required":true},
-            "payment_method": {"dataType":"string","required":true},
-            "crypto_currency": {"dataType":"string","required":true},
-            "network": {"dataType":"string","required":true},
+            "target_currency": {"ref":"TargetCurrency","required":true},
+            "payment_method": {"ref":"PaymentMethod","required":true},
+            "crypto_currency": {"ref":"CryptoCurrency","required":true},
+            "network": {"ref":"BlockchainNetwork","required":true},
         },
         "additionalProperties": false,
     },
@@ -166,6 +206,7 @@ export function RegisterRoutes(app: Router) {
             async function QuoteController_getQuote(request: ExRequest, response: ExResponse, next: any) {
             const args: Record<string, TsoaRoute.ParameterSchema> = {
                     requestBody: {"in":"body","name":"requestBody","required":true,"ref":"QuoteRequest"},
+                    request: {"in":"request","name":"request","required":true,"dataType":"object"},
             };
 
             // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
