@@ -27,6 +27,7 @@ WORKDIR /app
 COPY --from=build /app/package*.json ./
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/src/swagger.json ./dist/swagger.json
+COPY --from=build /app/prisma ./prisma
 
 # Install only production dependencies
 RUN npm install --production
