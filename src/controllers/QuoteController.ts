@@ -4,6 +4,8 @@ import { prismaClient } from '../infrastructure/db';
 import { Country, CryptoCurrency, } from '@prisma/client';
 import { BlockchainNetwork, PaymentMethod, TargetCurrency } from '.prisma/client';
 import { getExchangeValue } from '../services/exchange';
+import { Request as RequestExpress } from 'express'
+import { getPartnerFromRequest } from '../authentication';
 
 interface QuoteRequest {
     amount: number;
@@ -37,32 +39,16 @@ export class QuoteController extends Controller {
     @Response('500', 'Internal Server Error')
     public async getQuote(
         @Body() requestBody: QuoteRequest,
-        @Request() request: Request
+        @Request() request: RequestExpress
     ): Promise<QuoteResponse> {
         // Get body from request
         const { amount, target_currency: targetCurrency, payment_method: paymentMethod, crypto_currency: cryptoCurrency, network } = requestBody;
 
         // Get partner id from api key
-        const apiKey = request.headers.get('x-api-key');
-
-        if (!apiKey) {
-            this.setStatus(401);
-            throw new Error('Unauthorized');
-        }
-
-        const partner = await prismaClient.partner.findFirst({
-            where: {
-                apiKey
-            }
-        })
-
-        if (!partner) {
-            this.setStatus(404);
-            throw new Error('Partner not found');
-        }
+        const partner = await getPartnerFromRequest(request)
 
         // expiration date equals now + 1 hour
-        const expirationDate = new Date(Date.now() + 3600000);
+        const expirationDate = new Date(Date.now() + 3_600_000);
 
         const sourceAmount = await getExchangeValue(cryptoCurrency, targetCurrency, amount);
 

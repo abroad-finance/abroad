@@ -1,21 +1,30 @@
 // src/authentication.ts
 import { Request } from 'express';
-import { TsoaResponse } from 'tsoa';
+import { prismaClient } from './infrastructure/db';
+import { sha512_224 } from "js-sha512"
 
-export function expressAuthentication(
+export async function expressAuthentication(
   request: Request,
   securityName: string,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  scopes?: string[]
-): Promise<any> {
+) {
   if (securityName === 'ApiKeyAuth') {
-    const apiKey = request.header('X-API-Key');
-    // Perform your real API key checks here...
-    // For now, let's just accept any API key for demonstration:
-    if (!apiKey || apiKey.length === 0) {
-      return Promise.reject(new Error('No API key provided.'));
-    }
-    return Promise.resolve(true);
+    await getPartnerFromRequest(request)
+
   }
-  return Promise.reject(new Error('Unknown security name'));
+  throw new Error('Invalid security scheme');
+}
+
+export const getPartnerFromRequest = async (request: Request) => {
+  const apiKey = request.header('X-API-Key');
+  if (!apiKey) {
+    throw new Error('No API key provided');
+  }
+  const apiKeyHash = sha512_224(apiKey);
+  const partner = await prismaClient.partner.findUnique({
+    where: { apiKey: apiKeyHash }
+  })
+  if (!partner) {
+    throw new Error('Invalid API key');
+  }
+  return partner
 }

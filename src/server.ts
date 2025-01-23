@@ -37,11 +37,11 @@ app.get("/swagger.json", (req: Request, res: Response) => {
   res.sendFile(swaggerPath);
 });
 
-app.use((err: any, req: Request, res: Response, next: any) => {
-  res.status(err.status || 500).json({
-    message: err.message || "An error occurred",
-  });
-});
+// app.use((err: any, req: Request, res: Response, next: any) => {
+//   res.status(err.status || 500).json({
+//     message: err.message || "An error occurred",
+//   });
+// });
 
 const port = process.env.PORT || 3784;
 app.listen(port, () => {

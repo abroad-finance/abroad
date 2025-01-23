@@ -6,6 +6,6 @@ export const getExchangeValue = async (
     amount: number
 ): Promise<number> => {
     // Dummy exchange rate
-    const exchangeRate = 1.2;
+    const exchangeRate = 1 / 4313;
     return amount * exchangeRate;
 };

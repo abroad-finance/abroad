@@ -25,11 +25,12 @@
     "dotenv": "^16.4.7",
     "express": "^4.21.1",
     "joi": "^17.13.3",
+    "js-sha512": "^0.9.0",
+    "prisma": "^6.2.1",
     "redoc": "^2.1.5",
     "swagger-ui-express": "^5.0.1",
     "tsoa": "^6.4.0",
-    "urijs": "^1.19.11",
-    "prisma": "^6.2.1"
+    "urijs": "^1.19.11"
   },
   "devDependencies": {
     "@types/amqplib": "^0.10.6",

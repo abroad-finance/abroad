@@ -47,7 +47,6 @@ model Quote {
   updatedAt      DateTime     @updatedAt
   transaction    Transaction?
 
-  // If you frequently query by partnerId, add an index:
   @@index([partnerId])
 }
 
@@ -60,6 +59,7 @@ model Transaction {
   createdAt     DateTime          @default(now())
   quoteId       String            @unique
   quote         Quote             @relation(fields: [quoteId], references: [id])
+  onChainId     String?
 }
 
 enum TransactionStatus {
