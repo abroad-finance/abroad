@@ -1,3 +1,4 @@
+# ./controllers/TransactionController.ts
 import {
     Controller,
     Get,
@@ -8,12 +9,14 @@ import {
     SuccessResponse,
 } from 'tsoa';
 import { Post, Body } from 'tsoa';
+import { prismaClient } from '../infrastructure/db';
+import { TransactionStatus } from '@prisma/client';
+import { NotFound } from 'http-errors';
 
 interface TransactionStatusResponse {
     transaction_reference: string;
     status: string;
-    on_chain_tx_hash: string;
-    amount: string;
+    on_chain_tx_hash: string | null;
 }
 
 interface AcceptTransactionRequest {
@@ -24,18 +27,17 @@ interface AcceptTransactionRequest {
 
 interface AcceptTransactionResponse {
     transaction_reference: string;
-    expiration_time: number;
 }
 
 @Route('transaction')
 @Security('ApiKeyAuth')
-export class TransactionStatusController extends Controller {
+export class TransactionController extends Controller {
     /**
-   * Retrieves the status of a transaction by its reference.
-   * 
-   * @param transactionReference - The unique transaction reference (e.g., TX123REF).
-   * @returns The transaction status, on-chain tx hash, and amount.
-   */
+     * Retrieves the status of a transaction by its reference.
+     * 
+     * @param transactionReference - The unique transaction reference
+     * @returns The transaction status, on-chain tx hash.
+     */
     @Get('{transactionReference}')
     @SuccessResponse('200', 'Transaction status retrieved')
     @Response('400', 'Bad Request')
@@ -45,16 +47,20 @@ export class TransactionStatusController extends Controller {
     public async getTransactionStatus(
         @Path() transactionReference: string
     ): Promise<TransactionStatusResponse> {
-        // Return dummy data; in a real implementation, you'd fetch
-        // the transaction info from a database or another source.
+        const transaction = await prismaClient.transaction.findUnique({
+            where: { id: transactionReference },
+        });
+
+        if (!transaction) {
+            throw new NotFound('Transaction not found');
+        }
+
         return {
-            transaction_reference: transactionReference,
-            status: 'pending',                // e.g., "pending", "confirmed", "failed"
-            on_chain_tx_hash: '0xabc123...',  // a dummy on-chain hash
-            amount: '12.34',                  // dummy amount
+            transaction_reference: transaction.id,
+            status: transaction.status,
+            on_chain_tx_hash: transaction.onChainId,
         };
     }
-
 
     /**
      * Accepts a transaction based on a quote. 
@@ -71,11 +77,19 @@ export class TransactionStatusController extends Controller {
     public async acceptTransaction(
         @Body() requestBody: AcceptTransactionRequest
     ): Promise<AcceptTransactionResponse> {
+        const { quote_id: quoteId, user_id: userId, account_number: accountNumber } = requestBody;
 
-        // Dummy response
+        const transaction = await prismaClient.transaction.create({
+            data: {
+                accountNumber,
+                status: TransactionStatus.AWAITING_PAYMENT,
+                partnerUserId: userId,
+                quoteId: quoteId,
+            }
+        });
+
         return {
-            transaction_reference: 'TX123REF',
-            expiration_time: 1697041800,
+            transaction_reference: transaction.id
         };
     }
 }

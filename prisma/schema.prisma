@@ -23,7 +23,9 @@ model PartnerUser {
   partnerUserId String
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
-  Transaction   Transaction[]
+  transaction   Transaction[]
+  kycStatus     KycStatus
+
 
   // Unique constraint to ensure a user is only once per partner
   @@unique([partnerId, partnerUserId])
@@ -62,12 +64,15 @@ model Transaction {
   onChainId     String?
 }
 
-enum TransactionStatus {
+enum KycStatus {
   PENDING
-  SUCCESS
-  FAILED
-  CANCELLED
-  EXPIRED
+  APPROVED
+  REJECTED
+  PENDING_APPROVAL
+}
+
+enum TransactionStatus {
+  AWAITING_PAYMENT
 }
 
 enum CryptoCurrency {
