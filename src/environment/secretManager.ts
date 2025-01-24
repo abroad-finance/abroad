@@ -1,4 +1,4 @@
-// services/secretManager.ts
+// src/environment/secretManager.ts
 import { SecretManagerServiceClient } from '@google-cloud/secret-manager';
 import { PROJECT_ID } from './env';
 

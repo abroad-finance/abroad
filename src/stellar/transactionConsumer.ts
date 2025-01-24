@@ -1,4 +1,4 @@
-// services/transactionConsumer.ts
+// src/stellar/transactionConsumer.ts
 import { Horizon } from '@stellar/stellar-sdk';
 import type { Channel, ConsumeMessage } from 'amqplib';
 

@@ -1,4 +1,4 @@
-// services/stellarListener.ts
+// src/stellar/stellarListener.ts
 import { Horizon } from '@stellar/stellar-sdk';
 import type { Channel } from 'amqplib';
 import { sendMessage } from '../infrastructure/rabbitmq';

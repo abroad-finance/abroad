@@ -1,4 +1,5 @@
 #!/usr/bin/env -S npx tsx
+// src/stellar/index.ts
 
 import { getSecret } from '../environment/secretManager';
 import { createRabbitMQConnection, assertQueue } from '../infrastructure/rabbitmq';

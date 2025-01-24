@@ -1,4 +1,4 @@
-// services/rabbitmq.ts
+// src/infrastructure/rabbitmq.ts
 import * as amqplib from 'amqplib';
 import { RABBITMQ_URL } from '../environment/env';
 
