@@ -1,18 +1,25 @@
 // src/infrastructure/rabbitmq.ts
 import * as amqplib from 'amqplib';
 import { RABBITMQ_URL } from '../environment/env';
+import { connect, AmqpConnectionManager, ChannelWrapper } from 'amqp-connection-manager';
 
-/**
- * Create a RabbitMQ connection and a channel.
- */
-export async function createRabbitMQConnection() {
-    if (!RABBITMQ_URL) {
-        throw new Error('Environment variable RABBITMQ_URL is not set.');
+export function createManagedConnection(): AmqpConnectionManager {
+  const connection = connect([RABBITMQ_URL]);
+  
+  connection.on('connect', () => console.log('Connected to RabbitMQ'));
+  connection.on('disconnect', params => {
+    console.error('Disconnected from RabbitMQ. Reconnecting...', params.err);
+  });
+  
+  return connection;
+}
+
+export function setupChannel(connection: AmqpConnectionManager, queueName: string): ChannelWrapper {
+  return connection.createChannel({
+    setup: async (channel: amqplib.Channel) => {
+      await channel.assertQueue(queueName, { durable: true });
     }
-    const connection = await amqplib.connect(RABBITMQ_URL);
-    const channel = await connection.createChannel();
-
-    return { connection, channel };
+  });
 }
 
 /**

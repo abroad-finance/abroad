@@ -132,3 +132,4 @@ dist
 # Generated tsoa files
 src/routes.ts
 src/swagger.json
+concatenated.txt

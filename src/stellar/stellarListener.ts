@@ -2,6 +2,7 @@
 import { Horizon } from '@stellar/stellar-sdk';
 import type { Channel } from 'amqplib';
 import { sendMessage } from '../infrastructure/rabbitmq';
+import { prismaClient } from '../infrastructure/db';
 
 interface ListenOptions {
     accountId: string;
@@ -18,25 +19,36 @@ export async function listenReceivedTransactions(options: ListenOptions) {
     const { accountId, horizonUrl, channel, queueName } = options;
     const server = new Horizon.Server(horizonUrl);
 
-    server
-        .payments()
-        .cursor('now')
+    // Get last saved position
+    const state = await prismaClient.stellarListenerState.findUnique({
+        where: { id: 'singleton' }
+    });
+
+    // Start streaming from last known position
+    const cursorServer = state?.lastPagingToken ? server.payments().cursor(state.lastPagingToken) : server.payments();
+
+    cursorServer
         .forAccount(accountId)
         .stream({
-            onmessage: async (record) => {
-                // We only care about payment operations for our specific account.
-                if (record.type !== 'payment' || record.to !== accountId) {
-                    return;
-                }
+            onmessage: async (payment) => {
+                if (payment.type !== 'payment' || payment.to !== accountId) return;
 
-                // Fetch the transaction associated with this payment.
-                const txResponse = await record.transaction();
+                // Get full transaction details
+                const tx = await payment.transaction();
 
-                // Publish the transaction to RabbitMQ.
-                sendMessage(channel, queueName, txResponse);
+                // Immediately save new position
+                await prismaClient.stellarListenerState.upsert({
+                    where: { id: 'singleton' },
+                    update: { lastPagingToken: tx.paging_token },
+                    create: {
+                        id: 'singleton',
+                        lastPagingToken: tx.paging_token
+                    },
+                });
+
+                // Forward to queue
+                sendMessage(channel, queueName, tx);
             },
-            onerror: (error) => {
-                console.error('Stream error:', error);
-            },
+            onerror: (err) => console.error('Stream error:', err)
         });
 }

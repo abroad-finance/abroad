@@ -1,3 +1,4 @@
+// prisma/schema.prisma
 generator client {
   provider = "prisma-client-js"
 }
@@ -25,7 +26,6 @@ model PartnerUser {
   updatedAt     DateTime      @updatedAt
   transaction   Transaction[]
   kycStatus     KycStatus
-
 
   // Unique constraint to ensure a user is only once per partner
   @@unique([partnerId, partnerUserId])
@@ -62,6 +62,12 @@ model Transaction {
   quoteId       String            @unique
   quote         Quote             @relation(fields: [quoteId], references: [id])
   onChainId     String?
+}
+
+model StellarListenerState {
+  id              String   @id @default("singleton")
+  lastPagingToken String
+  updatedAt       DateTime @updatedAt
 }
 
 enum KycStatus {

@@ -1,8 +1,9 @@
 #!/usr/bin/env -S npx tsx
 // src/stellar/index.ts
 
+import { Channel } from 'amqplib';
 import { getSecret } from '../environment/secretManager';
-import { createRabbitMQConnection, assertQueue } from '../infrastructure/rabbitmq';
+import { createManagedConnection, assertQueue, setupChannel } from '../infrastructure/rabbitmq';
 import { listenReceivedTransactions } from './stellarListener';
 import { consumeTransactions } from './transactionConsumer';
 
@@ -14,19 +15,23 @@ async function startStellarListener() {
     const accountId = await getSecret('stellar-account-id');
     const horizonUrl = await getSecret('horizon-url');
 
-    const { connection, channel } = await createRabbitMQConnection();
+    const connection = await createManagedConnection();
 
     const queueName = 'stellar-transactions';
-    await assertQueue(channel, queueName);
 
-    await listenReceivedTransactions({
-      accountId,
-      horizonUrl,
-      channel,
-      queueName,
+    const channelWrapper = await setupChannel(connection, queueName);
+
+    channelWrapper.addSetup(async (channel: Channel) => {
+
+      await listenReceivedTransactions({
+        accountId,
+        horizonUrl,
+        channel,
+        queueName,
+      });
+
+      console.log(`Listening for payments on account: ${accountId}`);
     });
-
-    console.log(`Listening for payments on account: ${accountId}`);
   } catch (error) {
     console.error('Error fetching received transactions:', error);
   }
@@ -34,14 +39,16 @@ async function startStellarListener() {
 
 export async function registerConsumers() {
   try {
-    const { connection, channel } = await createRabbitMQConnection();
+    const connection = await createManagedConnection();
 
     const queueName = 'stellar-transactions';
-    await assertQueue(channel, queueName);
+    const channelWrapper = await setupChannel(connection, queueName);
 
-    consumeTransactions(channel, queueName);
+    channelWrapper.addSetup(async (channel: Channel) => {
+      consumeTransactions(channel, queueName);
+      console.log('Consumer is now running');
+    });
 
-    console.log('Consumer is now running. Press CTRL+C to exit.');
   } catch (error) {
     console.error('Error in consumer:', error);
   }

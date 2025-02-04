@@ -8,8 +8,7 @@ export async function expressAuthentication(
   securityName: string,
 ) {
   if (securityName === 'ApiKeyAuth') {
-    await getPartnerFromRequest(request)
-
+    return await getPartnerFromRequest(request)
   }
   throw new Error('Invalid security scheme');
 }
