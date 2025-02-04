@@ -54,7 +54,7 @@ steps:
         --labels=managed-by=gcp-cloud-build-deploy-cloud-run,commit-sha=$COMMIT_SHA,gcb-build-id=$BUILD_ID,gcb-trigger-id=$_TRIGGER_ID
       - '--region=$_DEPLOY_REGION'
       - >-
-      --command=["node", "dist/stellar/index.js"]
+        --command=["node", "dist/stellar/index.js"]
       - '--quiet'
     id: Deploy blockchain
     entrypoint: gcloud
