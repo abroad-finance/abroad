@@ -41,23 +41,14 @@ steps:
       - '--quiet'
     id: Deploy
     entrypoint: gcloud
-  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk:slim'
-    args:
-      - run
-      - services
-      - update
-      - $_SERVICE_NAME_BLOCKCHAIN
-      - '--platform=managed'
-      - >-
-        --image=$_AR_HOSTNAME/$PROJECT_ID/cloud-run-source-deploy/$REPO_NAME/$_SERVICE_NAME:$COMMIT_SHA
-      - >-
-        --labels=managed-by=gcp-cloud-build-deploy-cloud-run,commit-sha=$COMMIT_SHA,gcb-build-id=$BUILD_ID,gcb-trigger-id=$_TRIGGER_ID
-      - '--region=$_DEPLOY_REGION'
-      - >-
-        --command=["node", "dist/stellar/index.js"]
-      - '--quiet'
-    id: Deploy blockchain
-    entrypoint: gcloud
+    - name: 'gcr.io/cloud-builders/kubectl'
+      env:
+        - 'CLOUDSDK_COMPUTE_ZONE=$_DEPLOY_REGION'
+        - 'CLOUDSDK_CONTAINER_CLUSTER=$_GKE_CLUSTER'
+      args:
+        - apply
+        - -f
+        - k8s/deployment.yaml
 images:
   - >-
     $_AR_HOSTNAME/$PROJECT_ID/cloud-run-source-deploy/$REPO_NAME/$_SERVICE_NAME:$COMMIT_SHA
@@ -69,8 +60,8 @@ substitutions:
   _AR_HOSTNAME: us-east1-docker.pkg.dev
   _PLATFORM: managed
   _SERVICE_NAME: abroad-api
-  _SERVICE_NAME_BLOCKCHAIN: abroad-api-blockchain 
   _TRIGGER_ID: 07da47e8-9319-46f2-b19e-abcf866c3000
+  _GKE_CLUSTER: abroad-sandbox
 tags:
   - gcp-cloud-build-deploy-cloud-run
   - gcp-cloud-build-deploy-cloud-run-managed

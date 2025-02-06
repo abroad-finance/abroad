@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: abroad-stellar
+  labels:
+    app: abroad-stellar
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: abroad-stellar
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  template:
+    metadata:
+      labels:
+        app: abroad-stellar
+    spec:
+      containers:
+        - name: abroad-stellar
+          image: gcr.io/$PROJECT_ID/abroad-stellar:$COMMIT_SHA
+          imagePullPolicy: Always
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+          livenessProbe:
+            exec:
+              command:
+                - "/bin/sh"
+                - "-c"
+                - "pgrep abroad-stellar || exit 1"
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          readinessProbe:
+            exec:
+              command:
+                - "/bin/sh"
+                - "-c"
+                - "pgrep abroad-stellar || exit 1"
+            initialDelaySeconds: 10
+            periodSeconds: 15
