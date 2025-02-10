@@ -20,8 +20,8 @@ spec:
         app: abroad-stellar
     spec:
       containers:
-        - name: abroad-stellar
-          image: gcr.io/$PROJECT_ID/abroad-stellar:$COMMIT_SHA
+        - name: abroad-stellar-container
+          image: abroad-stellar-container:latest
           imagePullPolicy: Always
           resources:
             requests:
@@ -35,7 +35,7 @@ spec:
               command:
                 - "/bin/sh"
                 - "-c"
-                - "pgrep abroad-stellar || exit 1"
+                - "pgrep abroad-stellar-container || exit 1"
             initialDelaySeconds: 30
             periodSeconds: 30
           readinessProbe:
