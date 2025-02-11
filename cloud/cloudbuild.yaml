@@ -41,14 +41,29 @@ steps:
       - '--quiet'
     id: Deploy
     entrypoint: gcloud
-    - name: 'gcr.io/cloud-builders/kubectl'
-      env:
-        - 'CLOUDSDK_COMPUTE_ZONE=$_DEPLOY_REGION'
-        - 'CLOUDSDK_CONTAINER_CLUSTER=$_GKE_CLUSTER'
-      args:
-        - apply
-        - -f
-        - k8s/deployment.yaml
+  - name: 'gcr.io/cloud-builders/gcloud'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        apt-get update && apt-get install -y gettext-base
+        envsubst < k8s/kustomization.yaml > k8s/kustomization.processed.yaml
+        mv k8s/kustomization.processed.yaml k8s/kustomization.yaml
+    id: Substitute kustomization
+    env:
+      - 'PROJECT_ID=$PROJECT_ID'
+      - 'COMMIT_SHA=$COMMIT_SHA'
+      - 'REPO_NAME=$REPO_NAME'
+      - '_SERVICE_NAME=$_SERVICE_NAME'
+  - name: 'gcr.io/cloud-builders/kubectl'
+    env:
+      - 'CLOUDSDK_COMPUTE_ZONE=$_DEPLOY_REGION'
+      - 'CLOUDSDK_CONTAINER_CLUSTER=$_GKE_CLUSTER'
+    args:
+      - apply
+      - -k
+      - k8s
+    id: Deploy abroad-stellar
 images:
   - >-
     $_AR_HOSTNAME/$PROJECT_ID/cloud-run-source-deploy/$REPO_NAME/$_SERVICE_NAME:$COMMIT_SHA
