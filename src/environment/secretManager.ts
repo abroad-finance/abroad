@@ -7,7 +7,7 @@ import { PROJECT_ID } from './env';
  */
 export async function getSecret(secretName: string,): Promise<string> {
     if (!PROJECT_ID) {
-        throw new Error('Environment variable GCP_PROJECT_ID is not set.');
+        throw new Error('Environment variable PROJECT_ID is not set.');
     }
 
     const client = new SecretManagerServiceClient();
