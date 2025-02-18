@@ -9,9 +9,9 @@ import {
     SuccessResponse,
 } from 'tsoa';
 import { Post, Body } from 'tsoa';
-import { prismaClient } from '../infrastructure/db';
 import { TransactionStatus } from '@prisma/client';
 import { NotFound } from 'http-errors';
+import { prismaClientProvider } from '../container';
 
 interface TransactionStatusResponse {
     transaction_reference: string;
@@ -47,6 +47,7 @@ export class TransactionController extends Controller {
     public async getTransactionStatus(
         @Path() transactionReference: string
     ): Promise<TransactionStatusResponse> {
+        const prismaClient = await prismaClientProvider.getClient();
         const transaction = await prismaClient.transaction.findUnique({
             where: { id: transactionReference },
         });
@@ -78,7 +79,7 @@ export class TransactionController extends Controller {
         @Body() requestBody: AcceptTransactionRequest
     ): Promise<AcceptTransactionResponse> {
         const { quote_id: quoteId, user_id: userId, account_number: accountNumber } = requestBody;
-
+        const prismaClient = await prismaClientProvider.getClient();
         const transaction = await prismaClient.transaction.create({
             data: {
                 accountNumber,

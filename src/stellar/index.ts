@@ -2,18 +2,18 @@
 // src/stellar/index.ts
 
 import { Channel } from 'amqplib';
-import { getSecret } from '../environment/secretManager';
-import { createManagedConnection, assertQueue, setupChannel } from '../infrastructure/rabbitmq';
+import { createManagedConnection, setupChannel } from '../infrastructure/rabbitmq';
 import { listenReceivedTransactions } from './stellarListener';
 import { consumeTransactions } from './transactionConsumer';
+import { secretManager } from '../container';
 
 /**
  * Main function to retrieve Stellar account ID and start listening to transactions.
  */
 async function startStellarListener() {
   try {
-    const accountId = await getSecret('stellar-account-id');
-    const horizonUrl = await getSecret('horizon-url');
+    const accountId = await secretManager.getSecret('stellar-account-id');
+    const horizonUrl = await secretManager.getSecret('horizon-url');
 
     const connection = await createManagedConnection();
 

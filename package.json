@@ -8,7 +8,7 @@
     "build:docs": "npx tsoa swagger && npx tsoa routes",
     "build": "tsoa spec-and-routes && tsc",
     "start": "node dist/server.js",
-    "dev": "concurrently \"tsx watch src/server.ts\" \"nodemon -x tsoa spec-and-routes\"",
+    "dev": "NODE_ENV=development concurrently \"tsx watch src/server.ts\" \"nodemon -x tsoa spec-and-routes\"",
     "migrate:dev": "prisma migrate dev"
   },
   "keywords": [],
@@ -25,6 +25,7 @@
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.1",
+    "gcp-metadata": "^6.1.1",
     "joi": "^17.13.3",
     "js-sha512": "^0.9.0",
     "prisma": "^6.2.1",

@@ -1,11 +1,11 @@
 // src/controllers/QuoteController.ts
 import { Controller, Post, Route, Body, Security, Response, SuccessResponse, Request } from 'tsoa';
-import { prismaClient } from '../infrastructure/db';
 import { Country, CryptoCurrency, } from '@prisma/client';
 import { BlockchainNetwork, PaymentMethod, TargetCurrency } from '.prisma/client';
 import { getExchangeValue } from '../services/exchange';
 import { Request as RequestExpress } from 'express'
 import { getPartnerFromRequest } from '../authentication';
+import { prismaClientProvider } from '../container';
 
 interface QuoteRequest {
     amount: number;
@@ -52,6 +52,7 @@ export class QuoteController extends Controller {
 
         const sourceAmount = await getExchangeValue(cryptoCurrency, targetCurrency, amount);
 
+        const prismaClient = await prismaClientProvider.getClient();
         const quote = await prismaClient.quote.create({
             data: {
                 country: Country.CO,

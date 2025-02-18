@@ -2,7 +2,7 @@
 import { Horizon } from '@stellar/stellar-sdk';
 import type { Channel } from 'amqplib';
 import { sendMessage } from '../infrastructure/rabbitmq';
-import { prismaClient } from '../infrastructure/db';
+import { prismaClientProvider } from '../container';
 
 interface ListenOptions {
     accountId: string;
@@ -18,6 +18,7 @@ interface ListenOptions {
 export async function listenReceivedTransactions(options: ListenOptions) {
     const { accountId, horizonUrl, channel, queueName } = options;
     const server = new Horizon.Server(horizonUrl);
+    const prismaClient = await prismaClientProvider.getClient();
 
     // Get last saved position
     const state = await prismaClient.stellarListenerState.findUnique({

@@ -1,7 +1,7 @@
 // src/authentication.ts
 import { Request } from 'express';
-import { prismaClient } from './infrastructure/db';
 import { sha512_224 } from "js-sha512"
+import { prismaClientProvider } from './container';
 
 export async function expressAuthentication(
   request: Request,
@@ -19,6 +19,7 @@ export const getPartnerFromRequest = async (request: Request) => {
     throw new Error('No API key provided');
   }
   const apiKeyHash = sha512_224(apiKey);
+  const prismaClient = await prismaClientProvider.getClient();
   const partner = await prismaClient.partner.findUnique({
     where: { apiKey: apiKeyHash }
   })

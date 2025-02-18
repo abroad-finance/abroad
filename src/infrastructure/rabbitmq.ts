@@ -1,9 +1,10 @@
 // src/infrastructure/rabbitmq.ts
 import * as amqplib from 'amqplib';
-import { RABBITMQ_URL } from '../environment/env';
 import { connect, AmqpConnectionManager, ChannelWrapper } from 'amqp-connection-manager';
+import { secretManager } from '../container';
 
-export function createManagedConnection(): AmqpConnectionManager {
+export async function createManagedConnection(): Promise<AmqpConnectionManager> {
+  const RABBITMQ_URL = await secretManager.getSecret('RABBITMQ_URL');
   const connection = connect([RABBITMQ_URL]);
   
   connection.on('connect', () => console.log('Connected to RabbitMQ'));

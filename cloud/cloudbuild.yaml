@@ -60,9 +60,6 @@ steps:
       - 'CLOUDSDK_COMPUTE_ZONE=$_DEPLOY_REGION'
       - 'CLOUDSDK_CONTAINER_CLUSTER=$_GKE_CLUSTER'
       - 'PROJECT_ID=$PROJECT_ID'
-    secretEnv:
-      - RABBITMQ_URL
-      - DATABASE_URL
     args:
       - apply
       - -k
@@ -89,5 +86,3 @@ availableSecrets:
   secretManager:
     - versionName: projects/$PROJECT_ID/secrets/DB_CONNECTION_STRING/versions/latest
       env: DATABASE_URL
-    - versionName: projects/$PROJECT_ID/secrets/RABBITMQ_URL/versions/latest
-      env: RABBITMQ_URL
