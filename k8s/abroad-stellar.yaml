@@ -19,6 +19,7 @@ spec:
       labels:
         app: abroad-stellar
     spec:
+      serviceAccountName: abroad-stellar-sa
       containers:
         - name: abroad-stellar-container
           image: abroad-stellar-container:latest
@@ -48,3 +49,11 @@ spec:
                 - "pgrep abroad-stellar-container || exit 1"
             initialDelaySeconds: 10
             periodSeconds: 15
+
+
+---
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: abroad-stellar-sa
