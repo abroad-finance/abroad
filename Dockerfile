@@ -1,5 +1,5 @@
 # Step 1: Build the app
-FROM node:23.6.0@sha256:d59184ad9bd55272f5847967574f2e259f8741239c4b5baf2395214b4d991296 AS build
+FROM node:22.14.0-alpine@sha256:9bef0ef1e268f60627da9ba7d7605e8831d5b56ad07487d24d1aa386336d1944 AS build
 
 # Create app directory
 WORKDIR /app
@@ -18,7 +18,7 @@ RUN npx prisma generate
 RUN npm run build
 
 # Step 2: Create a production image
-FROM node:23.6.0@sha256:d59184ad9bd55272f5847967574f2e259f8741239c4b5baf2395214b4d991296
+FROM node:22.14.0-alpine@sha256:9bef0ef1e268f60627da9ba7d7605e8831d5b56ad07487d24d1aa386336d1944
 
 # Set working directory
 WORKDIR /app
