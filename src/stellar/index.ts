@@ -6,6 +6,29 @@ import { createManagedConnection, setupChannel } from '../infrastructure/rabbitm
 import { listenReceivedTransactions } from './stellarListener';
 import { consumeTransactions } from './transactionConsumer';
 import { secretManager } from '../container';
+import { Logging } from '@google-cloud/logging';
+
+// Initialize Google Cloud Logging
+const logging = new Logging();
+const log = logging.log('stellar-log');
+
+// Helper function to log informational messages
+function logInfo(message: string) {
+  const metadata = { resource: { type: 'global' } };
+  const entry = log.entry(metadata, message);
+  // Write to Google Cloud Logging (non-blocking)
+  log.write(entry).catch(err => console.error('Error writing log entry:', err));
+  // Optionally still log to console
+  console.log(message);
+}
+
+// Helper function to log errors
+function logError(message: string, error?: any) {
+  const metadata = { resource: { type: 'global' } };
+  const entry = log.entry(metadata, { message, error });
+  log.write(entry).catch(err => console.error('Error writing log entry:', err));
+  console.error(message, error);
+}
 
 /**
  * Main function to retrieve Stellar account ID and start listening to transactions.
@@ -22,18 +45,16 @@ async function startStellarListener() {
     const channelWrapper = await setupChannel(connection, queueName);
 
     channelWrapper.addSetup(async (channel: Channel) => {
-
       await listenReceivedTransactions({
         accountId,
         horizonUrl,
         channel,
         queueName,
       });
-
-      console.log(`Listening for payments on account: ${accountId}`);
+      logInfo(`Listening for payments on account: ${accountId}`);
     });
   } catch (error) {
-    console.error('Error fetching received transactions:', error);
+    logError('Error fetching received transactions:', error);
   }
 }
 
@@ -46,11 +67,10 @@ export async function registerConsumers() {
 
     channelWrapper.addSetup(async (channel: Channel) => {
       consumeTransactions(channel, queueName);
-      console.log('Consumer is now running');
+      logInfo('Consumer is now running');
     });
-
   } catch (error) {
-    console.error('Error in consumer:', error);
+    logError('Error in consumer:', error);
   }
 }
 
