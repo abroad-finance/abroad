@@ -35,6 +35,8 @@ function logError(message: string, error?: any) {
  */
 async function startStellarListener() {
   try {
+    console.log('Starting Stellar Listener...');
+    logInfo('Starting Stellar Listener...');
     const accountId = await secretManager.getSecret('stellar-account-id');
     const horizonUrl = await secretManager.getSecret('horizon-url');
 
