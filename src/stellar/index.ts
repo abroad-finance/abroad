@@ -25,13 +25,13 @@ async function startStellarListener() {
     console.log(`Channel for queue ${queueName} created`);
 
     channelWrapper.addSetup(async (channel: Channel) => {
+      console.log(`Listening for payments on account: ${accountId}`);
       await listenReceivedTransactions({
         accountId,
         horizonUrl,
         channel,
         queueName,
       });
-      console.log(`Listening for payments on account: ${accountId}`);
     });
   } catch (error) {
     console.error('Error fetching received transactions:', error);

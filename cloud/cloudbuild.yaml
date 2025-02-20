@@ -41,6 +41,7 @@ steps:
       - '--quiet'
     id: Deploy
     entrypoint: gcloud
+    waitFor: ['Migrate']  # Wait for Migrate to complete
   - name: 'gcr.io/cloud-builders/gcloud'
     entrypoint: 'bash'
     args:
@@ -55,6 +56,7 @@ steps:
       - 'COMMIT_SHA=$COMMIT_SHA'
       - 'REPO_NAME=$REPO_NAME'
       - '_SERVICE_NAME=$_SERVICE_NAME'
+    waitFor: ['Migrate'] # Wait for Migrate to complete
   - name: 'gcr.io/cloud-builders/kubectl'
     env:
       - 'CLOUDSDK_COMPUTE_ZONE=$_DEPLOY_REGION'
@@ -65,6 +67,7 @@ steps:
       - -k
       - k8s
     id: Deploy abroad-stellar
+    waitFor: ['Substitute kustomization']  # Wait for kustomization substitution
 images:
   - >-
     $_AR_HOSTNAME/$PROJECT_ID/cloud-run-source-deploy/$REPO_NAME/$_SERVICE_NAME:$COMMIT_SHA
