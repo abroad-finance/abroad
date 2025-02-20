@@ -33,19 +33,13 @@ spec:
           livenessProbe:
             exec:
               command:
-                - "/bin/sh"
-                - "-c"
-                - "pgrep abroad-stellar-container || exit 1"
-            initialDelaySeconds: 30
-            periodSeconds: 30
-          readinessProbe:
-            exec:
-              command:
-                - "/bin/sh"
-                - "-c"
-                - "pgrep abroad-stellar-container || exit 1"
-            initialDelaySeconds: 10
-            periodSeconds: 15
+                - sh
+                - -c
+                - ps aux | grep '[n]ode dist/stellar/index.js' 
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3 
+            failureThreshold: 3
 
 
 ---
