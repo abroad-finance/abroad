@@ -1,5 +1,5 @@
 // src/environment/CachedSecretManager.ts
-import { ISecretManager, Secret } from './ISecretManager';
+import { ISecretManager, Secret } from "./ISecretManager";
 
 export class CachedSecretManager implements ISecretManager {
   private cache = new Map<string, string>();

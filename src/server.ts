@@ -6,7 +6,7 @@ import { RegisterRoutes } from "./routes";
 import fs from "fs";
 import path from "path";
 import { registerConsumers } from "./stellar";
-import packageJson from '../package.json';
+import packageJson from "../package.json";
 
 const app = express();
 app.use(cors());
@@ -31,22 +31,22 @@ app.get("/docs", (req: Request, res: Response) => {
 });
 
 app.get("/", (req: Request, res: Response) => {
-  const baseUrl = `${req.protocol}://${req.get('host')}`;
+  const baseUrl = `${req.protocol}://${req.get("host")}`;
   res.format({
-    'text/html': () => {
-      res.redirect('/docs');
+    "text/html": () => {
+      res.redirect("/docs");
     },
-    'application/json': () => {
+    "application/json": () => {
       res.json({
-        message: 'Welcome to the API',
+        message: "Welcome to the API",
         documentation: `${baseUrl}/docs`,
         swagger: `${baseUrl}/swagger.json`,
-        version: packageJson.version
+        version: packageJson.version,
       });
     },
     default: () => {
-      res.redirect('/docs');
-    }
+      res.redirect("/docs");
+    },
   });
 });
 

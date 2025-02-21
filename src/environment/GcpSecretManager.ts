@@ -1,8 +1,8 @@
 // src/environment/GcpSecretManager.ts
-import { SecretManagerServiceClient } from '@google-cloud/secret-manager';
-import { isAvailable, project } from 'gcp-metadata';
-import { ISecretManager } from './ISecretManager';
-import dotenv from 'dotenv';
+import { SecretManagerServiceClient } from "@google-cloud/secret-manager";
+import { isAvailable, project } from "gcp-metadata";
+import { ISecretManager } from "./ISecretManager";
+import dotenv from "dotenv";
 
 dotenv.config();
 
@@ -22,18 +22,18 @@ export class GcpSecretManager implements ISecretManager {
       return this.cachedProjectId;
     }
 
-    if (process.env.NODE_ENV === 'development') {
+    if (process.env.NODE_ENV === "development") {
       if (!process.env.PROJECT_ID) {
-        throw new Error('PROJECT_ID is not defined in development mode.');
+        throw new Error("PROJECT_ID is not defined in development mode.");
       }
       return process.env.PROJECT_ID;
     }
 
     if (await isAvailable()) {
-      this.cachedProjectId = await project('project-id');
+      this.cachedProjectId = await project("project-id");
       return this.cachedProjectId;
     } else {
-      throw new Error('GCP not available');
+      throw new Error("GCP not available");
     }
   }
 
@@ -42,7 +42,7 @@ export class GcpSecretManager implements ISecretManager {
    */
   async getSecret(secretName: string): Promise<string> {
     // In development, attempt to fetch from process.env.
-    if (process.env.NODE_ENV === 'development') {
+    if (process.env.NODE_ENV === "development") {
       const secretValue = process.env[secretName];
       if (secretValue) {
         return secretValue;
@@ -52,7 +52,9 @@ export class GcpSecretManager implements ISecretManager {
     // Fetch secret from GCP Secret Manager.
     const projectId = await this.getProjectId();
     const name = `projects/${projectId}/secrets/${secretName}/versions/latest`;
-    const [accessResponse] = await this.secretClient.accessSecretVersion({ name });
+    const [accessResponse] = await this.secretClient.accessSecretVersion({
+      name,
+    });
     const payload = accessResponse.payload?.data?.toString();
 
     if (!payload) {
