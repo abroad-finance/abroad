@@ -80,6 +80,8 @@ enum KycStatus {
 enum TransactionStatus {
   AWAITING_PAYMENT
   PROCESSING_PAYMENT
+  PAYMENT_FAILED
+  PAYMENT_COMPLETED
 }
 
 enum CryptoCurrency {
