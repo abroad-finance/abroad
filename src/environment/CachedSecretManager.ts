@@ -1,5 +1,5 @@
 // src/environment/CachedSecretManager.ts
-import { ISecretManager } from './ISecretManager';
+import { ISecretManager, Secret } from './ISecretManager';
 
 export class CachedSecretManager implements ISecretManager {
   private cache = new Map<string, string>();
@@ -12,7 +12,7 @@ export class CachedSecretManager implements ISecretManager {
   /**
    * Returns a cached secret if available, otherwise fetches it using the underlying secret manager.
    */
-  async getSecret(secretName: string): Promise<string> {
+  async getSecret(secretName: Secret): Promise<string> {
     if (this.cache.has(secretName)) {
       return this.cache.get(secretName)!;
     }

@@ -61,7 +61,7 @@ model Transaction {
   createdAt     DateTime          @default(now())
   quoteId       String            @unique
   quote         Quote             @relation(fields: [quoteId], references: [id])
-  onChainId     String?
+  onChainId     String?           @unique
 }
 
 model StellarListenerState {
@@ -79,6 +79,7 @@ enum KycStatus {
 
 enum TransactionStatus {
   AWAITING_PAYMENT
+  PROCESSING_PAYMENT
 }
 
 enum CryptoCurrency {

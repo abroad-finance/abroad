@@ -2,6 +2,9 @@
 import { SecretManagerServiceClient } from '@google-cloud/secret-manager';
 import { isAvailable, project } from 'gcp-metadata';
 import { ISecretManager } from './ISecretManager';
+import dotenv from 'dotenv';
+
+dotenv.config();
 
 export class GcpSecretManager implements ISecretManager {
   private secretClient: SecretManagerServiceClient;
@@ -15,15 +18,15 @@ export class GcpSecretManager implements ISecretManager {
    * Retrieves the project ID from environment or metadata.
    */
   private async getProjectId(): Promise<string | null> {
+    if (this.cachedProjectId) {
+      return this.cachedProjectId;
+    }
+
     if (process.env.NODE_ENV === 'development') {
       if (!process.env.PROJECT_ID) {
         throw new Error('PROJECT_ID is not defined in development mode.');
       }
       return process.env.PROJECT_ID;
-    }
-
-    if (this.cachedProjectId) {
-      return this.cachedProjectId;
     }
 
     if (await isAvailable()) {
