@@ -92,6 +92,7 @@ function App() {
 
   return (
     <div>
+     <h1 style={{ fontFamily: 'Comic Sans MS', textAlign: 'center' }}>abroad.finance</h1>
       {/* API Key and Base URL Input */}
       <h2>API Configuration</h2>
       <input
