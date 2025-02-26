@@ -35,30 +35,6 @@ function App() {
     }
   };
 
-  const handleGetTransactionStatus = async () => {
-    setTransactionStatus(null);
-    setTransactionError(null);
-
-    if (!transactionReference) {
-      setTransactionError("Transaction Reference is required.");
-      return;
-    }
-
-    try {
-      const response = await fetch(`${baseUrl}transaction/${transactionReference}`, {
-        headers: { 'X-API-Key': apiKey },
-      });
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      const data = await response.json();
-      setTransactionStatus(data);
-    } catch (error) {
-      console.error('Error fetching transaction status:', error);
-      setTransactionError(error.message);
-    }
-  };
-
   const handleGetQuote = async () => {
     setQuoteResponse(null);
     setQuoteError(null);
@@ -82,6 +58,9 @@ function App() {
       }
       const data = await response.json();
       setQuoteResponse(data);
+      // Automatically populate the quote_id for the transaction request.
+      // Adjust "data.id" if the quote ID is returned under a different property.
+      setAcceptTransactionRequest(prev => ({ ...prev, quote_id: data.quote_id }));
     } catch (error) {
       console.error('Error fetching quote:', error);
       setQuoteError(error.message);
@@ -111,83 +90,169 @@ function App() {
       }
       const data = await response.json();
       setAcceptTransactionResponse(data);
+      // Automatically update the transaction reference for fetching status.
+      // Adjust "data.transaction_id" based on the actual response property.
+      setTransactionReference(data.id);
     } catch (error) {
       console.error('Error accepting transaction:', error);
       setAcceptTransactionError(error.message);
     }
   };
 
-  return (
-    <div>
-      <h1 style={{ fontFamily: 'Comic Sans MS', textAlign: 'center' }}>abroad.finance</h1>
+  const handleGetTransactionStatus = async () => {
+    setTransactionStatus(null);
+    setTransactionError(null);
 
-      {/* API Key and Base URL Input */}
+    if (!transactionReference) {
+      setTransactionError("Transaction Reference is required.");
+      return;
+    }
+
+    try {
+      const response = await fetch(`${baseUrl}transaction/${transactionReference}`, {
+        headers: { 'X-API-Key': apiKey },
+      });
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const data = await response.json();
+      setTransactionStatus(data);
+    } catch (error) {
+      console.error('Error fetching transaction status:', error);
+      setTransactionError(error.message);
+    }
+  };
+
+  return (
+    <div className="min-w-screen min-h-screen bg-gray-50 flex flex-col items-center justify-center p-6 text-gray-900">
+      <h1 className="text-4xl font-bold text-center mb-8" style={{ fontFamily: 'Comic Sans MS' }}>
+        abroad.finance
+      </h1>
+
       {!isConfigured ? (
-        <div>
-          <h2>API Configuration</h2>
+        <div className="bg-white shadow-md rounded px-8 py-6 mb-4 w-full max-w-md">
+          <h2 className="text-2xl font-semibold mb-4">API Configuration</h2>
           <input
             type="text"
             placeholder="API Key"
             value={apiKey}
             onChange={(e) => setApiKey(e.target.value)}
+            className="w-full p-3 border border-gray-300 rounded mb-3 focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
           />
           <input
             type="text"
             placeholder="Base URL"
             value={baseUrl}
             onChange={(e) => setBaseUrl(e.target.value)}
+            className="w-full p-3 border border-gray-300 rounded mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
           />
-          <button onClick={handleConfigure}>Configure</button>
+          <button
+            onClick={handleConfigure}
+            className="w-full bg-blue-500 text-white p-3 rounded hover:bg-blue-600 transition-colors"
+          >
+            Configure
+          </button>
         </div>
       ) : (
-        <div>
-          {/* Get Transaction Status */}
-          <h2>Get Transaction Status</h2>
-          <input
-            type="text"
-            placeholder="Transaction Reference"
-            value={transactionReference}
-            onChange={(e) => setTransactionReference(e.target.value)}
-          />
-          <button onClick={handleGetTransactionStatus}>Get Status</button>
-          {transactionStatus && <pre style={{ color: 'green' }}>{JSON.stringify(transactionStatus, null, 2)}</pre>}
-          {transactionError && <p style={{ color: 'red' }}>Error: {transactionError}</p>}
-
+        <div className="w-full max-w-md space-y-6">
           {/* Get Quote */}
-          <h2>Get Quote</h2>
-          <input
-            type="number"
-            placeholder="Amount"
-            value={quoteRequest.amount}
-            onChange={(e) => setQuoteRequest({ ...quoteRequest, amount: parseFloat(e.target.value) })}
-          />
-          <button onClick={handleGetQuote}>Get Quote</button>
-          {quoteResponse && <pre style={{ color: 'green' }}>{JSON.stringify(quoteResponse, null, 2)}</pre>}
-          {quoteError && <p style={{ color: 'red' }}>Error: {quoteError}</p>}
+          <div className="bg-white shadow-md rounded px-8 py-6">
+            <h2 className="text-2xl font-semibold mb-4">Get Quote</h2>
+            <input
+              type="number"
+              placeholder="Amount"
+              value={quoteRequest.amount}
+              onChange={(e) =>
+                setQuoteRequest({ ...quoteRequest, amount: parseFloat(e.target.value) })
+              }
+              className="w-full p-3 border border-gray-300 rounded mb-4 focus:outline-none focus:ring-2 focus:ring-green-500 text-gray-900"
+            />
+            <button
+              onClick={handleGetQuote}
+              className="w-full bg-green-500 text-white p-3 rounded hover:bg-green-600 transition-colors mb-4"
+            >
+              Get Quote
+            </button>
+            {quoteResponse && (
+              <pre className="text-green-600 bg-gray-100 p-3 rounded">
+                {JSON.stringify(quoteResponse, null, 2)}
+              </pre>
+            )}
+            {quoteError && <p className="text-red-600 mt-2">Error: {quoteError}</p>}
+          </div>
 
           {/* Accept Transaction */}
-          <h2>Accept Transaction</h2>
-          <input
-            type="text"
-            placeholder="Quote ID"
-            value={acceptTransactionRequest.quote_id}
-            onChange={(e) => setAcceptTransactionRequest({ ...acceptTransactionRequest, quote_id: e.target.value })}
-          />
-          <input
-            type="text"
-            placeholder="User ID"
-            value={acceptTransactionRequest.user_id}
-            onChange={(e) => setAcceptTransactionRequest({ ...acceptTransactionRequest, user_id: e.target.value })}
-          />
-          <input
-            type="text"
-            placeholder="Account Number"
-            value={acceptTransactionRequest.account_number}
-            onChange={(e) => setAcceptTransactionRequest({ ...acceptTransactionRequest, account_number: e.target.value })}
-          />
-          <button onClick={handleAcceptTransaction}>Accept Transaction</button>
-          {acceptTransactionResponse && <pre style={{ color: 'green' }}>{JSON.stringify(acceptTransactionResponse, null, 2)}</pre>}
-          {acceptTransactionError && <p style={{ color: 'red' }}>Error: {acceptTransactionError}</p>}
+          <div className="bg-white shadow-md rounded px-8 py-6">
+            <h2 className="text-2xl font-semibold mb-4">Accept Transaction</h2>
+            <input
+              type="text"
+              placeholder="Quote ID"
+              value={acceptTransactionRequest.quote_id}
+              onChange={(e) =>
+                setAcceptTransactionRequest({ ...acceptTransactionRequest, quote_id: e.target.value })
+              }
+              className="w-full p-3 border border-gray-300 rounded mb-4 focus:outline-none focus:ring-2 focus:ring-purple-500 text-gray-900"
+              disabled  // Optional: disable editing since it's auto-populated.
+            />
+            <input
+              type="text"
+              placeholder="User ID"
+              value={acceptTransactionRequest.user_id}
+              onChange={(e) =>
+                setAcceptTransactionRequest({ ...acceptTransactionRequest, user_id: e.target.value })
+              }
+              className="w-full p-3 border border-gray-300 rounded mb-4 focus:outline-none focus:ring-2 focus:ring-purple-500 text-gray-900"
+            />
+            <input
+              type="text"
+              placeholder="Account Number"
+              value={acceptTransactionRequest.account_number}
+              onChange={(e) =>
+                setAcceptTransactionRequest({
+                  ...acceptTransactionRequest,
+                  account_number: e.target.value,
+                })
+              }
+              className="w-full p-3 border border-gray-300 rounded mb-4 focus:outline-none focus:ring-2 focus:ring-purple-500 text-gray-900"
+            />
+            <button
+              onClick={handleAcceptTransaction}
+              className="w-full bg-purple-500 text-white p-3 rounded hover:bg-purple-600 transition-colors mb-4"
+            >
+              Accept Transaction
+            </button>
+            {acceptTransactionResponse && (
+              <pre className="text-green-600 bg-gray-100 p-3 rounded">
+                {JSON.stringify(acceptTransactionResponse, null, 2)}
+              </pre>
+            )}
+            {acceptTransactionError && <p className="text-red-600 mt-2">Error: {acceptTransactionError}</p>}
+          </div>
+
+          {/* Get Transaction Status */}
+          <div className="bg-white shadow-md rounded px-8 py-6">
+            <h2 className="text-2xl font-semibold mb-4">Get Transaction Status</h2>
+            <input
+              type="text"
+              placeholder="Transaction Reference"
+              value={transactionReference}
+              onChange={(e) => setTransactionReference(e.target.value)}
+              className="w-full p-3 border border-gray-300 rounded mb-4 focus:outline-none focus:ring-2 focus:ring-yellow-500 text-gray-900"
+              disabled  // Optional: disable editing since it's auto-populated.
+            />
+            <button
+              onClick={handleGetTransactionStatus}
+              className="w-full bg-yellow-500 text-white p-3 rounded hover:bg-yellow-600 transition-colors mb-4"
+            >
+              Get Status
+            </button>
+            {transactionStatus && (
+              <pre className="text-green-600 bg-gray-100 p-3 rounded">
+                {JSON.stringify(transactionStatus, null, 2)}
+              </pre>
+            )}
+            {transactionError && <p className="text-red-600 mt-2">Error: {transactionError}</p>}
+          </div>
         </div>
       )}
     </div>
