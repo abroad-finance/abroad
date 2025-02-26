@@ -3,11 +3,12 @@ import express, { Request, Response } from "express";
 import bodyParser from "body-parser";
 import cors from "cors";
 import { RegisterRoutes } from "./routes";
-import fs from "fs";
 import path from "path";
-import { registerConsumers } from "./stellar";
 import packageJson from "../package.json";
+import dotenv from "dotenv";
+import { registerConsumers } from "./controllers/queue/StellarTransactionsController";
 
+dotenv.config();
 const app = express();
 app.use(cors());
 app.use(bodyParser.json());
@@ -55,11 +56,13 @@ app.get("/swagger.json", (req: Request, res: Response) => {
   res.sendFile(swaggerPath);
 });
 
-app.use((err: any, req: Request, res: Response, next: any) => {
-  res.status(err.status || 500).json({
-    message: err.message || "An error occurred",
+if (process.env.NODE_ENV !== 'development') {
+  app.use((err: any, req: Request, res: Response, next: any) => {
+    res.status(err.status || 500).json({
+      message: err.message || "An error occurred",
+    });
   });
-});
+}
 
 const port = process.env.PORT || 3784;
 app.listen(port, () => {

@@ -84,14 +84,42 @@ export class TransactionController extends Controller {
       account_number: accountNumber,
     } = requestBody;
     const prismaClient = await prismaClientProvider.getClient();
-    const transaction = await prismaClient.transaction.create({
-      data: {
-        accountNumber,
-        status: TransactionStatus.AWAITING_PAYMENT,
-        partnerUserId: userId,
-        quoteId: quoteId,
-      },
-    });
+
+    const transaction = await prismaClient.$transaction(async (prisma) => {
+      const quote = await prisma.quote.findUnique({
+        where: { id: quoteId },
+      });
+
+      if (!quote) {
+        throw new NotFound("Quote not found");
+      }
+
+      const partnerUser = await prisma.partnerUser.upsert({
+        where: {
+          partnerId_partnerUserId: {
+            partnerId: quote.partnerId,
+            partnerUserId: userId,
+          }
+        },
+        create: {
+          partnerId: quote.partnerId,
+          partnerUserId: userId,
+        },
+        update: {},
+      });
+
+      const transaction = await prisma.transaction.create({
+        data: {
+          accountNumber,
+          status: TransactionStatus.AWAITING_PAYMENT,
+          partnerUserId: partnerUser.id,
+          quoteId: quoteId,
+        },
+      });
+
+      return transaction;
+
+    })
 
     return {
       transaction_reference: transaction.id,

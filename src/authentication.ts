@@ -15,10 +15,12 @@ export async function expressAuthentication(
 
 export const getPartnerFromRequest = async (request: Request) => {
   const apiKey = request.header("X-API-Key");
+  console.log("API Key:", apiKey);
   if (!apiKey) {
     throw new Error("No API key provided");
   }
   const apiKeyHash = sha512_224(apiKey);
+  console.log("API Key Hash:", apiKeyHash);
   const prismaClient = await prismaClientProvider.getClient();
   const partner = await prismaClient.partner.findUnique({
     where: { apiKey: apiKeyHash },

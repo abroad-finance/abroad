@@ -132,53 +132,6 @@ class NequiPaymentService implements IPaymentService {
       body,
     ) as Promise<ResponseNequiDispersion>;
   };
-
-  async reversePayment(phoneNumber: string, value: string): Promise<any> {
-    const DISPERSION_CODE_NEQUI = await this.secretManager.getSecret(
-      "DISPERSION_CODE_NEQUI",
-    );
-
-    const messageId = Array.from({ length: 16 }, () =>
-      Math.floor(Math.random() * 10),
-    ).join("");
-    const trackingId =
-      "DAN" +
-      Array.from({ length: 9 }, () => Math.floor(Math.random() * 10)).join("");
-
-    const body = {
-      RequestMessage: {
-        RequestBody: {
-          any: {
-            reverseDispersionRQ: {
-              code: DISPERSION_CODE_NEQUI,
-              phoneNumber,
-              reference1: "Reverso De Pago",
-              reference2: messageId,
-              reference3: messageId,
-              trackingID: trackingId,
-              value,
-            },
-          },
-        },
-        RequestHeader: {
-          Channel: "GLK06-C001",
-          ClientID: messageId,
-          Destination: {
-            ServiceName: "DispersionService",
-            ServiceOperation: "reverseDispersion",
-            ServiceRegion: "C001",
-            ServiceVersion: "1.0.0",
-          },
-          MessageID: messageId,
-          RequestDate: new Date().toJSON(),
-        },
-      },
-    };
-    return this.makeRequest(
-      "/dispersions/v2/-services-dispersionservice-reversedispersion",
-      body,
-    );
-  }
 }
 
 export { NequiPaymentService };

@@ -25,7 +25,7 @@ model PartnerUser {
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
   transaction   Transaction[]
-  kycStatus     KycStatus
+  kycStatus     KycStatus     @default(PENDING)
 
   // Unique constraint to ensure a user is only once per partner
   @@unique([partnerId, partnerUserId])

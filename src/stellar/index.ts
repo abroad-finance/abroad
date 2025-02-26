@@ -7,7 +7,6 @@ import {
   setupChannel,
 } from "../infrastructure/rabbitmq";
 import { listenReceivedTransactions } from "./stellarListener";
-import { consumeTransactions } from "./transactionConsumer";
 import { secretManager } from "../container";
 
 /**
@@ -41,21 +40,7 @@ async function startStellarListener() {
   }
 }
 
-export async function registerConsumers() {
-  try {
-    const connection = await createManagedConnection();
 
-    const queueName = "stellar-transactions";
-    const channelWrapper = await setupChannel(connection, queueName);
-
-    channelWrapper.addSetup(async (channel: Channel) => {
-      consumeTransactions(channel, queueName);
-      console.log("Consumer is now running");
-    });
-  } catch (error) {
-    console.error("Error in consumer:", error);
-  }
-}
 
 if (require.main === module) {
   void startStellarListener();
