@@ -1,3 +1,5 @@
+import { CryptoCurrency, TargetCurrency } from "@prisma/client";
+
 export type ResponseNequiDispersion = {
   ResponseMessage: {
     ResponseHeader: {
@@ -32,4 +34,11 @@ export interface IPaymentService {
     value: number;
     id: string;
   }): Promise<ResponseNequiDispersion>;
+}
+
+export interface IExchangeRateProvider {
+  getExchangeRate(
+    sourceCurrency: CryptoCurrency,
+    targetCurrency: TargetCurrency
+  ): Promise<number>;
 }

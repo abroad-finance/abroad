@@ -27,6 +27,7 @@
   },
   "routes": {
     "routesDir": "src",
-    "authenticationModule": "./src/authentication.ts"
+    "authenticationModule": "./src/authentication.ts",
+    "iocModule": "./src/ioc.ts"
   }
 }

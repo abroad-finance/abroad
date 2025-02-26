@@ -13,6 +13,21 @@ interface ListenOptions {
   queueName: string;
 }
 
+function base64ToUuid(base64: string): string {
+  // Decode the Base64 string into a Buffer
+  const buffer = Buffer.from(base64, 'base64');
+  // Convert the Buffer to a hexadecimal string
+  const hex = buffer.toString('hex');
+  // Insert hyphens to format it as a UUID
+  return [
+    hex.substring(0, 8),
+    hex.substring(8, 12),
+    hex.substring(12, 16),
+    hex.substring(16, 20),
+    hex.substring(20)
+  ].join('-');
+}
+
 /**
  * Listens to "payment" operations for the given accountId and
  * publishes messages to RabbitMQ for each transaction.
@@ -69,29 +84,29 @@ export async function listenReceivedTransactions(options: ListenOptions) {
         return;
       }
 
-      // // Filter for USDC payments
-      // if (
-      //   payment.to !== accountId ||
-      //   payment.asset_type !== "credit_alphanum4" ||
-      //   payment.asset_code !== "USDC" ||
-      //   !payment.asset_issuer
-      // ) {
-      //   console.log(
-      //     `[StellarListener] Skipping message (wrong type, recipient, or asset). Type: ${payment.type}, Asset Type: ${payment.asset_type}, Asset Code: ${payment.asset_code}, Asset Issuer: ${payment.asset_issuer}`,
-      //   );
-      //   return;
-      // }
+      // Filter for USDC payments
+      if (
+        payment.to !== accountId ||
+        payment.asset_type !== "credit_alphanum4" ||
+        payment.asset_code !== "USDC" ||
+        !payment.asset_issuer
+      ) {
+        console.log(
+          `[StellarListener] Skipping message (wrong type, recipient, or asset). Type: ${payment.type}, Asset Type: ${payment.asset_type}, Asset Code: ${payment.asset_code}, Asset Issuer: ${payment.asset_issuer}`,
+        );
+        return;
+      }
 
-      // const usdcAssetIssuers = [
-      //   "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN",
-      // ];
+      const usdcAssetIssuers = [
+        "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN",
+      ];
 
-      // if (!usdcAssetIssuers.includes(payment.asset_issuer)) {
-      //   console.log(
-      //     `[StellarListener] Skipping payment.  USDC Asset Issuer ${payment.asset_issuer} is not in the allowed list.`,
-      //   );
-      //   return;
-      // }
+      if (!usdcAssetIssuers.includes(payment.asset_issuer)) {
+        console.log(
+          `[StellarListener] Skipping payment.  USDC Asset Issuer ${payment.asset_issuer} is not in the allowed list.`,
+        );
+        return;
+      }
 
       const tx = await payment.transaction();
       console.log(`[StellarListener] Fetched full transaction details:`, tx.id);
@@ -103,6 +118,8 @@ export async function listenReceivedTransactions(options: ListenOptions) {
         );
         return;
       }
+
+      const transactionId = base64ToUuid(tx.memo);
 
       const queueMessage = {
         transactionId: tx.memo,

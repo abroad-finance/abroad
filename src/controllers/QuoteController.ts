@@ -15,10 +15,12 @@ import {
   PaymentMethod,
   TargetCurrency,
 } from ".prisma/client";
-import { getExchangeValue } from "../services/exchange";
 import { Request as RequestExpress } from "express";
 import { getPartnerFromRequest } from "../authentication";
 import { prismaClientProvider } from "../container";
+import { inject, injectable } from "inversify";
+import { IExchangeRateProvider } from "../interfaces";
+import { provide } from "inversify-binding-decorators";
 
 interface QuoteRequest {
   amount: number;
@@ -34,9 +36,17 @@ interface QuoteResponse {
   quote_id: string;
 }
 
+@provide(QuoteController)
 @Route("quote")
 @Security("ApiKeyAuth")
 export class QuoteController extends Controller {
+  constructor(
+    @inject("IExchangeRateProvider")
+    private exchangeRateProvider: IExchangeRateProvider,
+  ) {
+    super();
+  }
+
   /**
    * Retrieves a quote to convert a given fiat amount into USDC.
    *
@@ -53,7 +63,6 @@ export class QuoteController extends Controller {
     @Body() requestBody: QuoteRequest,
     @Request() request: RequestExpress,
   ): Promise<QuoteResponse> {
-    // Get body from request
     const {
       amount,
       target_currency: targetCurrency,
@@ -62,17 +71,28 @@ export class QuoteController extends Controller {
       network,
     } = requestBody;
 
-    // Get partner id from api key
+    // Retrieve partner information from the API key
     const partner = await getPartnerFromRequest(request);
 
-    // expiration date equals now + 1 hour
+    // Set the expiration date to one hour from now
     const expirationDate = new Date(Date.now() + 3_600_000);
 
-    const sourceAmount = await getExchangeValue(
+    // Use the injected exchange rate provider to obtain the exchange rate
+    let exchangeRate = await this.exchangeRateProvider.getExchangeRate(
       cryptoCurrency,
       targetCurrency,
-      amount,
     );
+
+    // add bridge fee to the exchange rate
+    const BRIDGE_FEE = 0.002;
+    exchangeRate = exchangeRate * (1 + BRIDGE_FEE);
+
+    // add nequi fee to the amount
+    const NEQUI_FEE = 1354.22
+    const amountWithNequiFee = amount + NEQUI_FEE;
+
+    // Calculate the source amount based on the provided amount and exchange rate
+    const sourceAmount = Number((exchangeRate * amountWithNequiFee).toFixed(2));
 
     const prismaClient = await prismaClientProvider.getClient();
     const quote = await prismaClient.quote.create({

@@ -12,6 +12,7 @@ import { Post, Body } from "tsoa";
 import { TransactionStatus } from "@prisma/client";
 import { NotFound } from "http-errors";
 import { prismaClientProvider } from "../container";
+import { provide } from "inversify-binding-decorators";
 
 interface TransactionStatusResponse {
   transaction_reference: string;
@@ -27,8 +28,19 @@ interface AcceptTransactionRequest {
 
 interface AcceptTransactionResponse {
   transaction_reference: string;
+  id: string;
 }
 
+function uuidToBase64(uuid: string): string {
+  // Remove hyphens from the UUID
+  const hex = uuid.replace(/-/g, '');
+  // Convert hex string to a Buffer
+  const buffer = Buffer.from(hex, 'hex');
+  // Encode the Buffer to a Base64 string
+  return buffer.toString('base64');
+}
+
+@provide(TransactionController)
 @Route("transaction")
 @Security("ApiKeyAuth")
 export class TransactionController extends Controller {
@@ -117,12 +129,15 @@ export class TransactionController extends Controller {
         },
       });
 
-      return transaction;
-
+      return {
+        ...transaction,
+        reference: uuidToBase64(transaction.id),
+      }
     })
 
     return {
-      transaction_reference: transaction.id,
+      transaction_reference: transaction.reference,
+      id: transaction.id,
     };
   }
 }
