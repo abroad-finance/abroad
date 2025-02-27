@@ -13,7 +13,9 @@ class StellarListener {
   private horizonUrl!: string;
   private queueName = QueueName.STELLAR_TRANSACTIONS;
 
-  constructor(@inject(TYPES.IQueueHandler) private queueHandler: IQueueHandler) { }
+  constructor(
+    @inject(TYPES.IQueueHandler) private queueHandler: IQueueHandler,
+  ) {}
 
   /**
    * Converts a Base64 string to a UUID string.

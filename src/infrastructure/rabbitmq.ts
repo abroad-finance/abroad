@@ -1,6 +1,10 @@
 import { injectable } from "inversify";
 import * as amqplib from "amqplib";
-import { connect, AmqpConnectionManager, ChannelWrapper } from "amqp-connection-manager";
+import {
+  connect,
+  AmqpConnectionManager,
+  ChannelWrapper,
+} from "amqp-connection-manager";
 import { IQueueHandler, QueueName } from "../interfaces";
 
 @injectable()
@@ -12,9 +16,7 @@ export class RabbitMQQueueHandler implements IQueueHandler {
     // In a production setting, the URL could be injected or read from a secure source.
     const url = process.env.RABBITMQ_URL || "amqp://localhost";
     this.connection = connect([url]);
-    this.connection.on("connect", () =>
-      console.log("Connected to RabbitMQ")
-    );
+    this.connection.on("connect", () => console.log("Connected to RabbitMQ"));
     this.connection.on("disconnect", (params) => {
       console.error("Disconnected from RabbitMQ. Reconnecting...", params.err);
     });
@@ -41,11 +43,9 @@ export class RabbitMQQueueHandler implements IQueueHandler {
   postMessage(queueName: QueueName, message: Record<string, any>): void {
     this.getChannel(queueName)
       .then((channel) => {
-        channel.sendToQueue(
-          queueName,
-          Buffer.from(JSON.stringify(message)),
-          { persistent: true }
-        );
+        channel.sendToQueue(queueName, Buffer.from(JSON.stringify(message)), {
+          persistent: true,
+        });
       })
       .catch((error) => {
         console.error("Error posting message:", error);
@@ -57,7 +57,7 @@ export class RabbitMQQueueHandler implements IQueueHandler {
    */
   subscribeToQueue(
     queueName: QueueName,
-    callback: (message: Record<string, any>) => void
+    callback: (message: Record<string, any>) => void,
   ): void {
     this.getChannel(queueName)
       .then((channel) => {

@@ -72,5 +72,8 @@ app.listen(port, () => {
   console.log(`API documentation available at http://localhost:${port}/docs`);
 });
 
-const stellarTransactionsController = iocContainer.get<StellarTransactionsController>(TYPES.StellarTransactionsController)
+const stellarTransactionsController =
+  iocContainer.get<StellarTransactionsController>(
+    TYPES.StellarTransactionsController,
+  );
 stellarTransactionsController.registerConsumers();

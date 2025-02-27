@@ -1,15 +1,15 @@
 // src/environment/ISecretManager.ts
 
 export type Secret =
-  | "PROJECT_ID"
-  | "stellar-account-id"
+  | "ACCESS_KEY_NEQUI"
+  | "API_KEY_NEQUI"
+  | "BITSO_API_KEY"
+  | "DATABASE_URL"
+  | "DISPERSION_CODE_NEQUI"
   | "horizon-url"
   | "RABBITMQ_URL"
-  | "DATABASE_URL"
-  | "ACCESS_KEY_NEQUI"
   | "SECRET_KEY_NEQUI"
-  | "API_KEY_NEQUI"
-  | "DISPERSION_CODE_NEQUI"
+  | "stellar-account-id"
   | "URL_NEQUI"
   | "URL_NEQUI_AUTH";
 

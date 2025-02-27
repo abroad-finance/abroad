@@ -7,8 +7,6 @@ import { RabbitMQQueueHandler } from "./infrastructure/rabbitmq";
 import { StellarTransactionsController } from "./controllers/queue/StellarTransactionsController";
 import { TYPES } from "./types";
 
-
-
 const container = new Container();
 container
   .bind<IExchangeRateProvider>(TYPES.IExchangeRateProvider)
