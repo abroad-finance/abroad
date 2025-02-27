@@ -1,11 +1,10 @@
 import { CryptoCurrency, TargetCurrency } from "@prisma/client";
 import { IExchangeRateProvider } from "../interfaces";
 
-
 export class BitsoExchangeRateProvider implements IExchangeRateProvider {
   async getExchangeRate(
     sourceCurrency: CryptoCurrency,
-    targetCurrency: TargetCurrency
+    targetCurrency: TargetCurrency,
   ): Promise<number> {
     const book = `usd_${targetCurrency.toLowerCase()}`;
     const url = `https://api-stage.bitso.com/api/v3/ticker?book=${book}`;

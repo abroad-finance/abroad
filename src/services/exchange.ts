@@ -4,7 +4,7 @@ import { IExchangeRateProvider } from "../interfaces";
 export class BitsoExchangeRateProvider implements IExchangeRateProvider {
   async getExchangeRate(
     sourceCurrency: CryptoCurrency,
-    targetCurrency: TargetCurrency
+    targetCurrency: TargetCurrency,
   ): Promise<number> {
     const book = `${sourceCurrency.toLowerCase()}_${targetCurrency.toLowerCase()}`;
     const url = `https://api.bitso.com/v3/ticker/?book=${book}`;

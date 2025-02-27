@@ -24,7 +24,6 @@ export type TransactionQueueMessage = z.infer<
   typeof TransactionQueueMessageSchema
 >;
 
-
 /**
  * Consumes messages from the specified queue and processes them.
  */

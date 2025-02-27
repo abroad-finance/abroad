@@ -56,7 +56,7 @@ app.get("/swagger.json", (req: Request, res: Response) => {
   res.sendFile(swaggerPath);
 });
 
-if (process.env.NODE_ENV !== 'development') {
+if (process.env.NODE_ENV !== "development") {
   app.use((err: any, req: Request, res: Response, next: any) => {
     res.status(err.status || 500).json({
       message: err.message || "An error occurred",

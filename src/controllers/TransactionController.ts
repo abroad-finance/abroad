@@ -38,11 +38,11 @@ interface AcceptTransactionResponse {
 
 function uuidToBase64(uuid: string): string {
   // Remove hyphens from the UUID
-  const hex = uuid.replace(/-/g, '');
+  const hex = uuid.replace(/-/g, "");
   // Convert hex string to a Buffer
-  const buffer = Buffer.from(hex, 'hex');
+  const buffer = Buffer.from(hex, "hex");
   // Encode the Buffer to a Base64 string
-  return buffer.toString('base64');
+  return buffer.toString("base64");
 }
 
 @provide(TransactionController)
@@ -73,7 +73,7 @@ export class TransactionController extends Controller {
       include: {
         quote: true,
         partnerUser: true,
-      }
+      },
     });
 
     if (!transaction) {
@@ -91,7 +91,7 @@ export class TransactionController extends Controller {
       status: transaction.status,
       on_chain_tx_hash: transaction.onChainId,
       id: transaction.id,
-      user_id: transaction.partnerUser.userId
+      user_id: transaction.partnerUser.userId,
     };
   }
 
@@ -131,7 +131,7 @@ export class TransactionController extends Controller {
           partnerId_userId: {
             partnerId: quote.partnerId,
             userId: userId,
-          }
+          },
         },
         create: {
           partnerId: quote.partnerId,
@@ -152,8 +152,8 @@ export class TransactionController extends Controller {
       return {
         ...transaction,
         reference: uuidToBase64(transaction.id),
-      }
-    })
+      };
+    });
 
     return {
       transaction_reference: transaction.reference,

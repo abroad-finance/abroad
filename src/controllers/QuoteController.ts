@@ -88,7 +88,7 @@ export class QuoteController extends Controller {
     exchangeRate = exchangeRate * (1 + BRIDGE_FEE);
 
     // add nequi fee to the amount
-    const NEQUI_FEE = 1354.22
+    const NEQUI_FEE = 1354.22;
     const amountWithNequiFee = amount + NEQUI_FEE;
 
     // Calculate the source amount based on the provided amount and exchange rate

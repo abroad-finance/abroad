@@ -39,6 +39,19 @@ export interface IPaymentService {
 export interface IExchangeRateProvider {
   getExchangeRate(
     sourceCurrency: CryptoCurrency,
-    targetCurrency: TargetCurrency
+    targetCurrency: TargetCurrency,
   ): Promise<number>;
+}
+
+// The enum and interface definitions:
+export enum QueueName {
+  STELLAR_TRANSACTIONS = "stellar-transactions",
+}
+
+export interface IQueueHandler {
+  postMessage(queueName: QueueName, message: Record<string, any>): void;
+  subscribeToQueue(
+    queueName: QueueName,
+    callback: (message: Record<string, any>) => void,
+  ): void;
 }
