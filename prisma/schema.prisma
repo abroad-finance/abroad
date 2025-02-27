@@ -18,17 +18,17 @@ model Partner {
 }
 
 model PartnerUser {
-  id            String        @id @default(uuid())
-  partnerId     String
-  partner       Partner       @relation(fields: [partnerId], references: [id])
-  partnerUserId String
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
-  transaction   Transaction[]
-  kycStatus     KycStatus     @default(PENDING)
+  id          String        @id @default(uuid())
+  partnerId   String
+  partner     Partner       @relation(fields: [partnerId], references: [id])
+  userId      String
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  transaction Transaction[]
+  kycStatus   KycStatus     @default(PENDING)
 
   // Unique constraint to ensure a user is only once per partner
-  @@unique([partnerId, partnerUserId])
+  @@unique([partnerId, userId])
 }
 
 model Quote {

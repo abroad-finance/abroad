@@ -133,7 +133,7 @@ function App() {
         <div className="bg-white shadow-md rounded px-8 py-6 mb-4 w-full max-w-md">
           <h2 className="text-2xl font-semibold mb-4">API Configuration</h2>
           <input
-            type="text"
+            type="passwrod"
             placeholder="API Key"
             value={apiKey}
             onChange={(e) => setApiKey(e.target.value)}

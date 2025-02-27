@@ -7,17 +7,22 @@ import {
   Security,
   Response,
   SuccessResponse,
+  Request,
 } from "tsoa";
 import { Post, Body } from "tsoa";
 import { TransactionStatus } from "@prisma/client";
 import { NotFound } from "http-errors";
 import { prismaClientProvider } from "../container";
 import { provide } from "inversify-binding-decorators";
+import { getPartnerFromRequest } from "../authentication";
+import { Request as RequestExpress } from "express";
 
 interface TransactionStatusResponse {
   transaction_reference: string;
-  status: string;
+  status: TransactionStatus;
   on_chain_tx_hash: string | null;
+  id: string;
+  user_id: string;
 }
 
 interface AcceptTransactionRequest {
@@ -45,33 +50,48 @@ function uuidToBase64(uuid: string): string {
 @Security("ApiKeyAuth")
 export class TransactionController extends Controller {
   /**
-   * Retrieves the status of a transaction by its reference.
+   * Retrieves the status of a transaction by its id.
    *
-   * @param transactionReference - The unique transaction reference
+   * @param transactionId - The unique transaction id
    * @returns The transaction status, on-chain tx hash.
    */
-  @Get("{transactionReference}")
+  @Get("{transactionId}")
   @SuccessResponse("200", "Transaction status retrieved")
   @Response("400", "Bad Request")
   @Response("401", "Unauthorized")
   @Response("404", "Not Found")
   @Response("500", "Internal Server Error")
   public async getTransactionStatus(
-    @Path() transactionReference: string,
+    @Path() transactionId: string,
+    @Request() request: RequestExpress,
   ): Promise<TransactionStatusResponse> {
+    const partner = await getPartnerFromRequest(request);
+
     const prismaClient = await prismaClientProvider.getClient();
     const transaction = await prismaClient.transaction.findUnique({
-      where: { id: transactionReference },
+      where: { id: transactionId },
+      include: {
+        quote: true,
+        partnerUser: true,
+      }
     });
 
     if (!transaction) {
       throw new NotFound("Transaction not found");
     }
 
+    if (transaction.quote.partnerId !== partner.id) {
+      throw new NotFound("Transaction not found");
+    }
+
+    const transaction_reference = uuidToBase64(transaction.id);
+
     return {
-      transaction_reference: transaction.id,
+      transaction_reference: transaction_reference,
       status: transaction.status,
       on_chain_tx_hash: transaction.onChainId,
+      id: transaction.id,
+      user_id: transaction.partnerUser.userId
     };
   }
 
@@ -108,14 +128,14 @@ export class TransactionController extends Controller {
 
       const partnerUser = await prisma.partnerUser.upsert({
         where: {
-          partnerId_partnerUserId: {
+          partnerId_userId: {
             partnerId: quote.partnerId,
-            partnerUserId: userId,
+            userId: userId,
           }
         },
         create: {
           partnerId: quote.partnerId,
-          partnerUserId: userId,
+          userId: userId,
         },
         update: {},
       });
