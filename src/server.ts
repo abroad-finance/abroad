@@ -6,7 +6,9 @@ import { RegisterRoutes } from "./routes";
 import path from "path";
 import packageJson from "../package.json";
 import dotenv from "dotenv";
-import { registerConsumers } from "./controllers/queue/StellarTransactionsController";
+import { iocContainer } from "./ioc";
+import { StellarTransactionsController } from "./controllers/queue/StellarTransactionsController";
+import { TYPES } from "./types";
 
 dotenv.config();
 const app = express();
@@ -70,4 +72,5 @@ app.listen(port, () => {
   console.log(`API documentation available at http://localhost:${port}/docs`);
 });
 
-registerConsumers();
+const stellarTransactionsController = iocContainer.get<StellarTransactionsController>(TYPES.StellarTransactionsController)
+stellarTransactionsController.registerConsumers();

@@ -1,15 +1,13 @@
-// In your inversify configuration file (e.g., src/inversify/ioc.ts)
 import { IExchangeRateProvider, IQueueHandler } from "./interfaces";
 import { BitsoExchangeRateProvider } from "./services/bitsoExchangeRateProvider";
 import { Container, decorate, injectable } from "inversify";
 import { buildProviderModule } from "inversify-binding-decorators";
 import { Controller } from "tsoa";
 import { RabbitMQQueueHandler } from "./infrastructure/rabbitmq";
+import { StellarTransactionsController } from "./controllers/queue/StellarTransactionsController";
+import { TYPES } from "./types";
 
-export const TYPES = {
-  IQueueHandler: Symbol.for("IQueueHandler"),
-  IExchangeRateProvider: Symbol.for("IExchangeRateProvider"),
-};
+
 
 const container = new Container();
 container
@@ -19,6 +17,11 @@ container
 container
   .bind<IQueueHandler>(TYPES.IQueueHandler)
   .to(RabbitMQQueueHandler)
+  .inSingletonScope();
+
+container
+  .bind<StellarTransactionsController>(TYPES.StellarTransactionsController)
+  .to(StellarTransactionsController)
   .inSingletonScope();
 
 decorate(injectable(), Controller);

@@ -5,7 +5,8 @@ import { BlockchainNetwork, CryptoCurrency } from "@prisma/client";
 import { TransactionQueueMessage } from "../controllers/queue/StellarTransactionsController";
 import { inject } from "inversify";
 import { IQueueHandler, QueueName } from "../interfaces";
-import { iocContainer, TYPES } from "../ioc";
+import { iocContainer } from "../ioc";
+import { TYPES } from "../types";
 
 class StellarListener {
   private accountId!: string;
