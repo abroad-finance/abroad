@@ -2,7 +2,7 @@ import { useState } from 'react';
 
 function App() {
   const [apiKey, setApiKey] = useState('');
-  const [baseUrl, setBaseUrl] = useState('https://api.sandbox.abroad.finance/');
+  const [baseUrl, setBaseUrl] = useState('https://abroad-api-910236263183.us-east1.run.app/');
   const [isConfigured, setIsConfigured] = useState(false);
 
   const [transactionReference, setTransactionReference] = useState('');
