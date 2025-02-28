@@ -121,6 +121,7 @@ export class StellarTransactionsController {
 
   public registerConsumers() {
     try {
+      console.log("Registering consumer for queue:", QueueName.STELLAR_TRANSACTIONS);
       this.queueHandler.subscribeToQueue(
         QueueName.STELLAR_TRANSACTIONS,
         this.onTransactionReceived.bind(this),
