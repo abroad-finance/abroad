@@ -25,7 +25,7 @@ export type TransactionQueueMessage = z.infer<
 export class StellarTransactionsController {
   public constructor(
     @inject(TYPES.IQueueHandler) private queueHandler: IQueueHandler,
-  ) {}
+  ) { }
 
   /**
    * Consumes messages from the specified queue and processes them.
@@ -42,8 +42,7 @@ export class StellarTransactionsController {
       console.log("Received transaction from queue:", message.onChainId);
 
       const prismaClient = await prismaClientProvider.getClient();
-
-      await prismaClient.$transaction(
+      const shouldProceed = await prismaClient.$transaction(
         async (prisma) => {
           // Start transaction
           const dbTransaction = await prisma.transaction.findFirst({
@@ -62,7 +61,7 @@ export class StellarTransactionsController {
               "Transaction not found or already processed:",
               message.transactionId,
             );
-            return;
+            return false;
           }
 
           await prisma.transaction.update({
@@ -74,46 +73,66 @@ export class StellarTransactionsController {
               status: TransactionStatus.PROCESSING_PAYMENT,
             },
           });
-
-          if (message.amount < dbTransaction.quote.sourceAmount) {
-            console.log(
-              "Transaction amount does not match quote:",
-              message.amount,
-              dbTransaction.quote.sourceAmount,
-            );
-            return;
-          }
-
-          const response = await nequiPaymentService.sendPayment({
-            account: dbTransaction.accountNumber,
-            id: dbTransaction.id,
-            value: dbTransaction.quote.targetAmount,
-          });
-
-          if (response.success) {
-            await prismaClient.transaction.update({
-              where: {
-                id: dbTransaction.id,
-              },
-              data: {
-                status: TransactionStatus.PAYMENT_FAILED,
-              },
-            });
-          } else {
-            await prismaClient.transaction.update({
-              where: {
-                id: dbTransaction.id,
-              },
-              data: {
-                status: TransactionStatus.PAYMENT_COMPLETED,
-              },
-            });
-          }
+          return true;
         },
         {
           isolationLevel: "Serializable", // Or 'ReadCommitted', depending on your needs
         },
       );
+
+      if (!shouldProceed) {
+        return;
+      }
+
+      const dbTransaction = await prismaClient.transaction.findFirst({
+        where: {
+          id: message.transactionId,
+        },
+        include: {
+          quote: true,
+        },
+      });
+
+      if (!dbTransaction) {
+        console.log("Transaction not found:", message.transactionId);
+        return;
+      }
+
+      if (message.amount < dbTransaction.quote.sourceAmount) {
+        console.log(
+          "Transaction amount does not match quote:",
+          message.amount,
+          dbTransaction.quote.sourceAmount,
+        );
+        return;
+      }
+
+      const response = await nequiPaymentService.sendPayment({
+        account: dbTransaction.accountNumber,
+        id: dbTransaction.id,
+        value: dbTransaction.quote.targetAmount,
+      });
+
+      if (response.success) {
+        await prismaClient.transaction.update({
+          where: {
+            id: dbTransaction.id,
+          },
+          data: {
+            status: TransactionStatus.PAYMENT_FAILED,
+          },
+        });
+      } else {
+        await prismaClient.transaction.update({
+          where: {
+            id: dbTransaction.id,
+          },
+          data: {
+            status: TransactionStatus.PAYMENT_COMPLETED,
+          },
+        });
+      }
+
     } catch (error) {
       console.error("Error processing message:", error);
     }
