@@ -1,13 +1,13 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 
 function App() {
   const [apiKey, setApiKey] = useState('');
-  const [baseUrl, setBaseUrl] = useState('http://localhost:3784/');
+  const [baseUrl, setBaseUrl] = useState('https://api.sandbox.abroad.finance/');
   const [isConfigured, setIsConfigured] = useState(false);
 
   const [transactionReference, setTransactionReference] = useState('');
   const [transactionStatus, setTransactionStatus] = useState(null);
-  const [transactionError, setTransactionError] = useState(null);
+  const [transactionError, setTransactionError] = useState<string | null>(null);
 
   const [quoteRequest, setQuoteRequest] = useState({
     amount: 0,
@@ -17,7 +17,7 @@ function App() {
     network: 'STELLAR',
   });
   const [quoteResponse, setQuoteResponse] = useState(null);
-  const [quoteError, setQuoteError] = useState(null);
+  const [quoteError, setQuoteError] = useState<string | null>(null);
 
   const [acceptTransactionRequest, setAcceptTransactionRequest] = useState({
     quote_id: '',
@@ -25,7 +25,7 @@ function App() {
     account_number: '',
   });
   const [acceptTransactionResponse, setAcceptTransactionResponse] = useState(null);
-  const [acceptTransactionError, setAcceptTransactionError] = useState(null);
+  const [acceptTransactionError, setAcceptTransactionError] = useState<string | null>(null);
 
   const handleConfigure = () => {
     if (apiKey && baseUrl) {
@@ -63,7 +63,9 @@ function App() {
       setAcceptTransactionRequest(prev => ({ ...prev, quote_id: data.quote_id }));
     } catch (error) {
       console.error('Error fetching quote:', error);
-      setQuoteError(error.message);
+      if (error instanceof Error) {
+        setQuoteError(error.message);
+      }
     }
   };
 
@@ -95,7 +97,9 @@ function App() {
       setTransactionReference(data.id);
     } catch (error) {
       console.error('Error accepting transaction:', error);
-      setAcceptTransactionError(error.message);
+      if (error instanceof Error) {
+        setAcceptTransactionError(error.message);
+      }
     }
   };
 
@@ -119,7 +123,9 @@ function App() {
       setTransactionStatus(data);
     } catch (error) {
       console.error('Error fetching transaction status:', error);
-      setTransactionError(error.message);
+      if (error instanceof Error) {
+        setTransactionError(error.message);
+      }
     }
   };
 
