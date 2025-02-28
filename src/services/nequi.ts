@@ -1,7 +1,31 @@
 // nequi-payment.ts
 import axios, { AxiosResponse } from "axios";
 import { ISecretManager } from "../environment";
-import { IPaymentService, ResponseNequiDispersion } from "../interfaces";
+import { IPaymentService } from "../interfaces";
+
+export type ResponseNequiDispersion = {
+  ResponseMessage: {
+    ResponseHeader: {
+      Channel: string;
+      ResponseDate: string;
+      Status: {
+        StatusCode: string;
+        StatusDesc: string;
+      };
+      MessageID: string;
+      ClientID: string;
+      Destination: {
+        ServiceName: string;
+        ServiceOperation: string;
+        ServiceRegion: string;
+        ServiceVersion: string;
+      };
+    };
+    ResponseBody: {
+      any: unknown;
+    };
+  };
+};
 
 class NequiPaymentService implements IPaymentService {
   private token: string | null = null;
@@ -127,10 +151,15 @@ class NequiPaymentService implements IPaymentService {
         },
       },
     };
-    return this.makeRequest(
+    const response = (await this.makeRequest(
       "/dispersions/v2/-services-dispersionservice-dispersefunds",
       body,
-    ) as Promise<ResponseNequiDispersion>;
+    )) as ResponseNequiDispersion;
+
+    return {
+      success:
+        response.ResponseMessage.ResponseHeader.Status.StatusCode === "SUCCESS",
+    };
   };
 }
 

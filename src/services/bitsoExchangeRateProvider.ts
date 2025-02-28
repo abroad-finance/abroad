@@ -1,6 +1,19 @@
 import { CryptoCurrency, TargetCurrency } from "@prisma/client";
 import { IExchangeRateProvider } from "../interfaces";
 
+type TickerPayload = {
+  high: string;
+  last: string;
+  created_at: string;
+  book: string;
+  volume: string;
+  vwap: string;
+  low: string;
+  ask: string;
+  bid: string;
+  change_24: string;
+};
+
 export class BitsoExchangeRateProvider implements IExchangeRateProvider {
   async getExchangeRate(
     sourceCurrency: CryptoCurrency,
@@ -20,7 +33,9 @@ export class BitsoExchangeRateProvider implements IExchangeRateProvider {
         throw new Error(`Bitso API error: ${data.error || "Unknown error"}`);
       }
 
-      const lastPrice = parseFloat(data.payload.last);
+      const tickerData: TickerPayload = data.payload;
+
+      const lastPrice = parseFloat(tickerData.bid);
       if (isNaN(lastPrice)) {
         throw new Error("Invalid ticker data received from Bitso.");
       }

@@ -90,10 +90,7 @@ export class StellarTransactionsController {
             value: dbTransaction.quote.targetAmount,
           });
 
-          if (
-            response.ResponseMessage.ResponseHeader.Status.StatusDesc !==
-            "SUCCESS"
-          ) {
+          if (response.success) {
             await prismaClient.transaction.update({
               where: {
                 id: dbTransaction.id,
