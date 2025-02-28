@@ -15,7 +15,7 @@ class StellarListener {
 
   constructor(
     @inject(TYPES.IQueueHandler) private queueHandler: IQueueHandler,
-  ) {}
+  ) { }
 
   /**
    * Converts a Base64 string to a UUID string.
@@ -41,6 +41,8 @@ class StellarListener {
 
     this.accountId = await secretManager.getSecret("stellar-account-id");
     this.horizonUrl = await secretManager.getSecret("horizon-url");
+
+    console.log(`[StellarListener] Initializing Horizon server for account:`, this.accountId);
 
     const server = new Horizon.Server(this.horizonUrl);
     const prismaClient = await prismaClientProvider.getClient();
