@@ -36,7 +36,7 @@ export class StellarTransactionsController {
     }
     try {
       const message = TransactionQueueMessageSchema.parse(
-        JSON.parse(msg.content.toString()),
+        msg
       ) satisfies TransactionQueueMessage;
 
       console.log("Received transaction from queue:", message.onChainId);
