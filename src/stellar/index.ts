@@ -54,7 +54,7 @@ class StellarListener {
 
     const cursorServer = state?.lastPagingToken
       ? server.payments().cursor(state.lastPagingToken)
-      : server.payments();
+      : server.payments().cursor("now");
     console.log(
       `[StellarListener] Starting stream. Cursor initialized to:`,
       state?.lastPagingToken ? state.lastPagingToken : "now",

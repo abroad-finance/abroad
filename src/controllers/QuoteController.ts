@@ -21,6 +21,7 @@ import { prismaClientProvider } from "../container";
 import { inject, injectable } from "inversify";
 import { IExchangeRateProvider } from "../interfaces";
 import { provide } from "inversify-binding-decorators";
+import { TYPES } from "../types";
 
 interface QuoteRequest {
   amount: number;
@@ -41,7 +42,7 @@ interface QuoteResponse {
 @Security("ApiKeyAuth")
 export class QuoteController extends Controller {
   constructor(
-    @inject("IExchangeRateProvider")
+    @inject(TYPES.IExchangeRateProvider)
     private exchangeRateProvider: IExchangeRateProvider,
   ) {
     super();
