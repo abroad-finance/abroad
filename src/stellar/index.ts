@@ -1,12 +1,13 @@
 #!/usr/bin/env -S npx tsx
 import { Horizon } from "@stellar/stellar-sdk";
-import { prismaClientProvider, secretManager } from "../container";
 import { BlockchainNetwork, CryptoCurrency } from "@prisma/client";
 import { TransactionQueueMessage } from "../controllers/queue/StellarTransactionsController";
 import { inject } from "inversify";
 import { IQueueHandler, QueueName } from "../interfaces";
 import { iocContainer } from "../ioc";
 import { TYPES } from "../types";
+import { ISecretManager } from "../environment";
+import { IDatabaseClientProvider } from "../infrastructure/db";
 
 class StellarListener {
   private accountId!: string;
@@ -15,6 +16,8 @@ class StellarListener {
 
   constructor(
     @inject(TYPES.IQueueHandler) private queueHandler: IQueueHandler,
+    @inject(TYPES.ISecretManager) private secretManager: ISecretManager,
+    @inject(TYPES.IDatabaseClientProvider) private  dbClientProvider: IDatabaseClientProvider,
   ) {}
 
   /**
@@ -39,8 +42,8 @@ class StellarListener {
   public async start(): Promise<void> {
     console.log(`[StellarListener] Initializing listener`);
 
-    this.accountId = await secretManager.getSecret("stellar-account-id");
-    this.horizonUrl = await secretManager.getSecret("horizon-url");
+    this.accountId = await this.secretManager.getSecret("stellar-account-id");
+    this.horizonUrl = await this.secretManager.getSecret("horizon-url");
 
     console.log(
       `[StellarListener] Initializing Horizon server for account:`,
@@ -48,7 +51,7 @@ class StellarListener {
     );
 
     const server = new Horizon.Server(this.horizonUrl);
-    const prismaClient = await prismaClientProvider.getClient();
+    const prismaClient = await this.dbClientProvider.getClient();
 
     const state = await prismaClient.stellarListenerState.findUnique({
       where: { id: "singleton" },

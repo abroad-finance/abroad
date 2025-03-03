@@ -1,7 +1,8 @@
 // src/authentication.ts
 import { Request } from "express";
 import { sha512_224 } from "js-sha512";
-import { prismaClientProvider } from "./container";
+import { iocContainer } from "./ioc";
+import { IDatabaseClientProvider } from "./infrastructure/db";
 
 export async function expressAuthentication(
   request: Request,
@@ -19,6 +20,9 @@ export const getPartnerFromRequest = async (request: Request) => {
     throw new Error("No API key provided");
   }
   const apiKeyHash = sha512_224(apiKey);
+  const prismaClientProvider = iocContainer.get<IDatabaseClientProvider>(
+    "PrismaClientProvider",
+  );
   const prismaClient = await prismaClientProvider.getClient();
   const partner = await prismaClient.partner.findUnique({
     where: { apiKey: apiKeyHash },

@@ -82,6 +82,7 @@ enum TransactionStatus {
   PROCESSING_PAYMENT
   PAYMENT_FAILED
   PAYMENT_COMPLETED
+  WRONG_AMOUNT
 }
 
 enum CryptoCurrency {

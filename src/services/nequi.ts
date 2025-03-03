@@ -1,7 +1,10 @@
+#!/usr/bin/env -S npx tsx
 // nequi-payment.ts
 import axios, { AxiosResponse } from "axios";
 import { ISecretManager } from "../environment";
 import { IPaymentService } from "../interfaces";
+import { inject } from "inversify";
+import { TYPES } from "../types";
 
 export type ResponseNequiDispersion = {
   ResponseMessage: {
@@ -27,14 +30,11 @@ export type ResponseNequiDispersion = {
   };
 };
 
-class NequiPaymentService implements IPaymentService {
+export class NequiPaymentService implements IPaymentService {
   private token: string | null = null;
   private tokenExpiration: number | null = null;
-  private secretManager: ISecretManager;
 
-  public constructor({ secretManager }: { secretManager: ISecretManager }) {
-    this.secretManager = secretManager;
-  }
+  public constructor(@inject(TYPES.ISecretManager) private secretManager: ISecretManager) { }
 
   private async getAuthToken(): Promise<string> {
     const ACCESS_KEY_NEQUI =
@@ -173,5 +173,3 @@ class NequiPaymentService implements IPaymentService {
     };
   };
 }
-
-export { NequiPaymentService };

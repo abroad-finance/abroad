@@ -12,10 +12,12 @@ import {
 import { Post, Body } from "tsoa";
 import { TransactionStatus } from "@prisma/client";
 import { NotFound } from "http-errors";
-import { prismaClientProvider } from "../container";
 import { provide } from "inversify-binding-decorators";
 import { getPartnerFromRequest } from "../authentication";
 import { Request as RequestExpress } from "express";
+import { IDatabaseClientProvider } from "../infrastructure/db";
+import { inject } from "inversify";
+import { TYPES } from "../types";
 
 interface TransactionStatusResponse {
   transaction_reference: string;
@@ -49,6 +51,14 @@ function uuidToBase64(uuid: string): string {
 @Route("transaction")
 @Security("ApiKeyAuth")
 export class TransactionController extends Controller {
+
+  constructor(
+    @inject(TYPES.IDatabaseClientProvider)
+    private prismaClientProvider: IDatabaseClientProvider,
+  ) {
+    super();
+  }
+
   /**
    * Retrieves the status of a transaction by its id.
    *
@@ -67,7 +77,7 @@ export class TransactionController extends Controller {
   ): Promise<TransactionStatusResponse> {
     const partner = await getPartnerFromRequest(request);
 
-    const prismaClient = await prismaClientProvider.getClient();
+    const prismaClient = await this.prismaClientProvider.getClient();
     const transaction = await prismaClient.transaction.findUnique({
       where: { id: transactionId },
       include: {
@@ -115,7 +125,7 @@ export class TransactionController extends Controller {
       user_id: userId,
       account_number: accountNumber,
     } = requestBody;
-    const prismaClient = await prismaClientProvider.getClient();
+    const prismaClient = await this.prismaClientProvider.getClient();
 
     const transaction = await prismaClient.$transaction(async (prisma) => {
       const quote = await prisma.quote.findUnique({

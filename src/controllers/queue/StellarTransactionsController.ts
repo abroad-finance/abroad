@@ -5,10 +5,10 @@ import {
   TransactionStatus,
 } from "@prisma/client";
 import z from "zod";
-import { nequiPaymentService, prismaClientProvider } from "../../container";
 import { inject } from "inversify";
-import { IQueueHandler, QueueName } from "../../interfaces";
+import { IPaymentService, IQueueHandler, QueueName } from "../../interfaces";
 import { TYPES } from "../../types";
+import { IDatabaseClientProvider } from "../../infrastructure/db";
 
 // Schema definition for validating the queue message
 const TransactionQueueMessageSchema = z.object({
@@ -25,8 +25,10 @@ export type TransactionQueueMessage = z.infer<
 
 export class StellarTransactionsController {
   public constructor(
+    @inject(TYPES.IPaymentService) private paymentService: IPaymentService,
     @inject(TYPES.IQueueHandler) private queueHandler: IQueueHandler,
-  ) {}
+    @inject(TYPES.IDatabaseClientProvider) private dbClientProvider: IDatabaseClientProvider
+  ) { }
 
   /**
    * Processes a transaction message from the queue.
@@ -52,7 +54,7 @@ export class StellarTransactionsController {
       message.onChainId,
     );
 
-    const prismaClient = await prismaClientProvider.getClient();
+    const prismaClient = await this.dbClientProvider.getClient();
 
     // Execute DB operations in a transaction block
     const transactionRecord = await prismaClient.$transaction(
@@ -97,12 +99,16 @@ export class StellarTransactionsController {
         message.amount,
         transactionRecord.quote.sourceAmount,
       );
+      await prismaClient.transaction.update({
+        where: { id: transactionRecord.id },
+        data: { status: TransactionStatus.WRONG_AMOUNT },
+      });
       return;
     }
 
     // Process the payment and update the transaction accordingly
     try {
-      const paymentResponse = await nequiPaymentService.sendPayment({
+      const paymentResponse = await this.paymentService.sendPayment({
         account: transactionRecord.accountNumber,
         id: transactionRecord.id,
         value: transactionRecord.quote.targetAmount,

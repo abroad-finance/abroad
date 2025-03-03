@@ -17,11 +17,11 @@ import {
 } from ".prisma/client";
 import { Request as RequestExpress } from "express";
 import { getPartnerFromRequest } from "../authentication";
-import { prismaClientProvider } from "../container";
-import { inject, injectable } from "inversify";
+import { inject } from "inversify";
 import { IExchangeRateProvider } from "../interfaces";
 import { provide } from "inversify-binding-decorators";
 import { TYPES } from "../types";
+import { IDatabaseClientProvider } from "../infrastructure/db";
 
 interface QuoteRequest {
   amount: number;
@@ -44,6 +44,8 @@ export class QuoteController extends Controller {
   constructor(
     @inject(TYPES.IExchangeRateProvider)
     private exchangeRateProvider: IExchangeRateProvider,
+    @inject(TYPES.IDatabaseClientProvider)
+    private dbClientProvider: IDatabaseClientProvider,
   ) {
     super();
   }
@@ -95,7 +97,7 @@ export class QuoteController extends Controller {
     // Calculate the source amount based on the provided amount and exchange rate
     const sourceAmount = Number((exchangeRate * amountWithNequiFee).toFixed(2));
 
-    const prismaClient = await prismaClientProvider.getClient();
+    const prismaClient = await this.dbClientProvider.getClient();
     const quote = await prismaClient.quote.create({
       data: {
         country: Country.CO,

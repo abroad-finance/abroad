@@ -1,12 +1,13 @@
 // src/environment/CachedSecretManager.ts
+import { GcpSecretManager } from "./GcpSecretManager";
 import { ISecretManager, Secret } from "./ISecretManager";
 
 export class CachedSecretManager implements ISecretManager {
   private cache = new Map<string, string>();
   private decoratedSecretManager: ISecretManager;
 
-  constructor(secretManager: ISecretManager) {
-    this.decoratedSecretManager = secretManager;
+  constructor() {
+    this.decoratedSecretManager = new GcpSecretManager();
   }
 
   /**
