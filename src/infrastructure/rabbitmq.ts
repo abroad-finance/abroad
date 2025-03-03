@@ -21,16 +21,17 @@ export class RabbitMQQueueHandler implements IQueueHandler {
   public async init(): Promise<void> {
     // Retrieve the RabbitMQ URL from the secret manager.
     // If not found, fall back to "amqp://localhost".
-    const url = (await secretManager.getSecret("RABBITMQ_URL")) || "amqp://localhost";
+    const url =
+      (await secretManager.getSecret("RABBITMQ_URL")) || "amqp://localhost";
 
     this.connection = connect([url]);
     this.connection.on("connect", () =>
-      console.log("[IQueueHandler] Connected to RabbitMQ")
+      console.log("[IQueueHandler] Connected to RabbitMQ"),
     );
     this.connection.on("disconnect", (params) => {
       console.error(
         "[IQueueHandler] Disconnected from RabbitMQ. Reconnecting...",
-        params.err
+        params.err,
       );
     });
   }
@@ -58,18 +59,17 @@ export class RabbitMQQueueHandler implements IQueueHandler {
   /**
    * Publishes a message to the specified queue.
    */
-  async postMessage(queueName: QueueName, message: Record<string, any>): Promise<void> {
+  async postMessage(
+    queueName: QueueName,
+    message: Record<string, any>,
+  ): Promise<void> {
     await this.init();
     this.getChannel(queueName)
       .then((channel) => {
         console.log(`[IQueueHandler] Posting message to queue: ${queueName}`);
-        channel.sendToQueue(
-          queueName,
-          Buffer.from(JSON.stringify(message)),
-          {
-            persistent: true,
-          }
-        );
+        channel.sendToQueue(queueName, Buffer.from(JSON.stringify(message)), {
+          persistent: true,
+        });
         console.log(`[IQueueHandler] Message posted to queue: ${queueName}`);
       })
       .catch((error) => {
@@ -82,7 +82,7 @@ export class RabbitMQQueueHandler implements IQueueHandler {
    */
   async subscribeToQueue(
     queueName: QueueName,
-    callback: (message: Record<string, any>) => void
+    callback: (message: Record<string, any>) => void,
   ): Promise<void> {
     await this.init();
     console.log(`[IQueueHandler] Subscribing to queue: ${queueName}`);
@@ -90,30 +90,30 @@ export class RabbitMQQueueHandler implements IQueueHandler {
       .then((channel) => {
         channel.addSetup(async (channel: amqplib.Channel) => {
           console.log(
-            `[IQueueHandler] Setting up consumer for queue: ${queueName}`
+            `[IQueueHandler] Setting up consumer for queue: ${queueName}`,
           );
           await channel.consume(queueName, (msg) => {
             if (msg) {
               try {
                 const message = JSON.parse(msg.content.toString());
                 console.log(
-                  `[IQueueHandler] Received message from queue: ${queueName}`
+                  `[IQueueHandler] Received message from queue: ${queueName}`,
                 );
                 callback(message);
                 channel.ack(msg);
                 console.log(
-                  `[IQueueHandler] Message acknowledged on queue: ${queueName}`
+                  `[IQueueHandler] Message acknowledged on queue: ${queueName}`,
                 );
               } catch (error) {
                 console.error(
                   "[IQueueHandler] Error processing message:",
-                  error
+                  error,
                 );
               }
             }
           });
           console.log(
-            `[IQueueHandler] Consumer set up for queue: ${queueName}`
+            `[IQueueHandler] Consumer set up for queue: ${queueName}`,
           );
         });
       })
