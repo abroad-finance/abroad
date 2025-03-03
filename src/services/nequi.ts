@@ -111,6 +111,12 @@ class NequiPaymentService implements IPaymentService {
       throw new Error("[Nequi]: Value exceeds the maximum allowed");
     }
 
+    console.log("[NequiPaymentService]: Sending payment to Nequi:", {
+      account,
+      id,
+      value,
+    });
+
     const DISPERSION_CODE_NEQUI = await this.secretManager.getSecret(
       "DISPERSION_CODE_NEQUI",
     );
@@ -155,6 +161,11 @@ class NequiPaymentService implements IPaymentService {
       "/dispersions/v2/-services-dispersionservice-dispersefunds",
       body,
     )) as ResponseNequiDispersion;
+    console.log(
+      "[NequiPaymentService]: ",
+      "response ",
+      response.ResponseMessage.ResponseHeader.Status,
+    );
 
     return {
       success:
