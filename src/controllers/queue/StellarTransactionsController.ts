@@ -1,4 +1,4 @@
-//src/controllers/queue/StellarTransactionsController.ts
+// src/controllers/queue/StellarTransactionsController.ts
 import {
   BlockchainNetwork,
   CryptoCurrency,
@@ -6,9 +6,15 @@ import {
 } from "@prisma/client";
 import z from "zod";
 import { inject } from "inversify";
-import { IPaymentService, IQueueHandler, QueueName } from "../../interfaces";
+import {
+  ILogger,
+  IPaymentService,
+  IQueueHandler,
+  QueueName,
+} from "../../interfaces";
 import { TYPES } from "../../types";
 import { IDatabaseClientProvider } from "../../interfaces/IDatabaseClientProvider";
+// Import the logger interface (adjust the path as necessary)
 
 // Schema definition for validating the queue message
 const TransactionQueueMessageSchema = z.object({
@@ -27,15 +33,17 @@ export class StellarTransactionsController {
   public constructor(
     @inject(TYPES.IPaymentService) private paymentService: IPaymentService,
     @inject(TYPES.IQueueHandler) private queueHandler: IQueueHandler,
-    @inject(TYPES.IDatabaseClientProvider) private dbClientProvider: IDatabaseClientProvider
-  ) { }
+    @inject(TYPES.IDatabaseClientProvider)
+    private dbClientProvider: IDatabaseClientProvider,
+    @inject(TYPES.ILogger) private logger: ILogger,
+  ) {}
 
   /**
    * Processes a transaction message from the queue.
    */
   private async onTransactionReceived(msg: Record<string, any>): Promise<void> {
-    if (!msg) {
-      console.warn(
+    if (!msg || Object.keys(msg).length === 0) {
+      this.logger.warn(
         "[Stellar transaction]: Received empty message. Skipping...",
       );
       return;
@@ -46,10 +54,13 @@ export class StellarTransactionsController {
     try {
       message = TransactionQueueMessageSchema.parse(msg);
     } catch (error) {
-      console.error("[Stellar transaction]: Invalid message format:", error);
+      this.logger.error(
+        "[Stellar transaction]: Invalid message format:",
+        error,
+      );
       return;
     }
-    console.info(
+    this.logger.info(
       "[Stellar transaction]: Received transaction from queue:",
       message.onChainId,
     );
@@ -69,7 +80,7 @@ export class StellarTransactionsController {
         });
 
         if (!transaction) {
-          console.warn(
+          this.logger.warn(
             "[Stellar transaction]: Transaction not found or already processed:",
             message.transactionId,
           );
@@ -94,7 +105,7 @@ export class StellarTransactionsController {
 
     // Validate that the amount in the message matches the expected quote
     if (message.amount < transactionRecord.quote.sourceAmount) {
-      console.warn(
+      this.logger.warn(
         "[Stellar transaction]: Transaction amount does not match quote:",
         message.amount,
         transactionRecord.quote.sourceAmount,
@@ -123,12 +134,12 @@ export class StellarTransactionsController {
         data: { status: newStatus },
       });
 
-      console.info(
+      this.logger.info(
         `[Stellar transaction]: Payment ${paymentResponse.success ? "completed" : "failed"} for transaction:`,
         transactionRecord.id,
       );
     } catch (paymentError) {
-      console.error(
+      this.logger.error(
         "[Stellar transaction]: Payment processing error:",
         paymentError,
       );
@@ -141,7 +152,7 @@ export class StellarTransactionsController {
 
   public registerConsumers() {
     try {
-      console.info(
+      this.logger.info(
         "[Stellar transaction]: Registering consumer for queue:",
         QueueName.STELLAR_TRANSACTIONS,
       );
@@ -150,7 +161,7 @@ export class StellarTransactionsController {
         this.onTransactionReceived.bind(this),
       );
     } catch (error) {
-      console.error(
+      this.logger.error(
         "[Stellar transaction]: Error in consumer registration:",
         error,
       );

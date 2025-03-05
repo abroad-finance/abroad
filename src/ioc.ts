@@ -1,4 +1,10 @@
-import { IExchangeRateProvider, IPartnerService, IPaymentService, IQueueHandler } from "./interfaces";
+import {
+  IExchangeRateProvider,
+  ILogger,
+  IPartnerService,
+  IPaymentService,
+  IQueueHandler,
+} from "./interfaces";
 import { BitsoExchangeRateProvider } from "./services/bitsoExchangeRateProvider";
 import { Container, decorate, injectable } from "inversify";
 import { Controller } from "tsoa";
@@ -14,6 +20,7 @@ import { KycController } from "./controllers/KycController";
 import { ISecretManager } from "./interfaces/ISecretManager";
 import { IDatabaseClientProvider } from "./interfaces/IDatabaseClientProvider";
 import { PartnerService } from "./services/partnerService";
+import { ConsoleLogger } from "./services/consoleLogger";
 
 const container = new Container();
 
@@ -44,17 +51,32 @@ container
   .inSingletonScope();
 
 // IPaymentService
-container.bind<IPaymentService>(TYPES.IPaymentService).to(NequiPaymentService).inSingletonScope()
+container
+  .bind<IPaymentService>(TYPES.IPaymentService)
+  .to(NequiPaymentService)
+  .inSingletonScope();
 
 // ISecretManager
-container.bind<ISecretManager>(TYPES.ISecretManager).to(CachedSecretManager).inSingletonScope();
+container
+  .bind<ISecretManager>(TYPES.ISecretManager)
+  .to(CachedSecretManager)
+  .inSingletonScope();
 
 // IPartnerService
-container.bind<IPartnerService>(TYPES.IPartnerService).to(PartnerService).inSingletonScope();
+container
+  .bind<IPartnerService>(TYPES.IPartnerService)
+  .to(PartnerService)
+  .inSingletonScope();
 
 // Controllers
 container.bind<QuoteController>(QuoteController).toSelf().inSingletonScope();
-container.bind<TransactionController>(TransactionController).toSelf().inSingletonScope();
+container
+  .bind<TransactionController>(TransactionController)
+  .toSelf()
+  .inSingletonScope();
 container.bind<KycController>(KycController).toSelf().inSingletonScope();
+
+// ILogger
+container.bind<ILogger>(TYPES.ILogger).to(ConsoleLogger).inSingletonScope();
 
 export { container as iocContainer };

@@ -15,7 +15,7 @@ export class RabbitMQQueueHandler implements IQueueHandler {
 
   // Constructor remains lean; initialization is performed asynchronously.
   constructor(
-    @inject(TYPES.ISecretManager) private secretManager: ISecretManager
+    @inject(TYPES.ISecretManager) private secretManager: ISecretManager,
   ) {}
 
   /**
@@ -26,7 +26,8 @@ export class RabbitMQQueueHandler implements IQueueHandler {
     // Retrieve the RabbitMQ URL from the secret manager.
     // If not found, fall back to "amqp://localhost".
     const url =
-      (await this.secretManager.getSecret("RABBITMQ_URL")) || "amqp://localhost";
+      (await this.secretManager.getSecret("RABBITMQ_URL")) ||
+      "amqp://localhost";
 
     this.connection = connect([url]);
     this.connection.on("connect", () =>

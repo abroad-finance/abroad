@@ -6,4 +6,5 @@ export const TYPES = {
   IDatabaseClientProvider: Symbol.for("IDatabaseClientProvider"),
   ISecretManager: Symbol.for("ISecretManager"),
   IPartnerService: Symbol.for("IPartnerService"),
+  ILogger: Symbol.for("ILogger"),
 };

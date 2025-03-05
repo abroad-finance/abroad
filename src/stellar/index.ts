@@ -17,7 +17,8 @@ class StellarListener {
   constructor(
     @inject(TYPES.IQueueHandler) private queueHandler: IQueueHandler,
     @inject(TYPES.ISecretManager) private secretManager: ISecretManager,
-    @inject(TYPES.IDatabaseClientProvider) private  dbClientProvider: IDatabaseClientProvider,
+    @inject(TYPES.IDatabaseClientProvider)
+    private dbClientProvider: IDatabaseClientProvider,
   ) {}
 
   /**

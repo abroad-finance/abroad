@@ -34,7 +34,9 @@ export class NequiPaymentService implements IPaymentService {
   private token: string | null = null;
   private tokenExpiration: number | null = null;
 
-  public constructor(@inject(TYPES.ISecretManager) private secretManager: ISecretManager) { }
+  public constructor(
+    @inject(TYPES.ISecretManager) private secretManager: ISecretManager,
+  ) {}
 
   private async getAuthToken(): Promise<string> {
     const ACCESS_KEY_NEQUI =

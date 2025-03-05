@@ -49,7 +49,6 @@ function uuidToBase64(uuid: string): string {
 @Route("transaction")
 @Security("ApiKeyAuth")
 export class TransactionController extends Controller {
-
   constructor(
     @inject(TYPES.IDatabaseClientProvider)
     private prismaClientProvider: IDatabaseClientProvider,

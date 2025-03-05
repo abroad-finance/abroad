@@ -5,16 +5,13 @@ import { TYPES } from "../types";
 import { IDatabaseClientProvider } from "../interfaces/IDatabaseClientProvider";
 import { ISecretManager } from "../interfaces/ISecretManager";
 
-
-
 export class PrismaClientProvider implements IDatabaseClientProvider {
   private prismaClient: PrismaClient | null = null;
   private datasourceUrl: string | null = null;
 
   constructor(
     @inject(TYPES.ISecretManager) private secretManager: ISecretManager,
-  ) {
-  }
+  ) {}
 
   public async getClient(): Promise<PrismaClient> {
     // Return the cached client if available.

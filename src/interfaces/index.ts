@@ -38,3 +38,9 @@ export interface IQueueHandler {
 export interface IPartnerService {
   getPartnerFromRequest(request: Request): Promise<Partner>;
 }
+
+export interface ILogger {
+  info(message: string, ...optionalParams: any[]): void;
+  warn(message: string, ...optionalParams: any[]): void;
+  error(message: string, ...optionalParams: any[]): void;
+}
