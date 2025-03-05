@@ -68,40 +68,25 @@ export class StellarTransactionsController {
     const prismaClient = await this.dbClientProvider.getClient();
 
     // Execute DB operations in a transaction block
-    const transactionRecord = await prismaClient.$transaction(
-      async (prisma) => {
-        const transaction = await prisma.transaction.findFirst({
-          where: {
-            id: message.transactionId,
-            onChainId: null,
-            status: TransactionStatus.AWAITING_PAYMENT,
-          },
-          include: { quote: true },
-        });
-
-        if (!transaction) {
-          this.logger.warn(
-            "[Stellar transaction]: Transaction not found or already processed:",
-            message.transactionId,
-          );
-          return null;
-        }
-
-        // Update transaction to indicate that payment is being processed
-        await prisma.transaction.update({
-          where: { id: transaction.id },
-          data: {
-            onChainId: message.onChainId,
-            status: TransactionStatus.PROCESSING_PAYMENT,
-          },
-        });
-
-        return transaction;
+    const transactionRecord = await prismaClient.transaction.update({
+      where: {
+        id: message.transactionId,
+        status: TransactionStatus.AWAITING_PAYMENT,
       },
-      { timeout: 10000 },
-    );
+      include: { quote: true },
+      data: {
+        onChainId: message.onChainId,
+        status: TransactionStatus.PROCESSING_PAYMENT,
+      },
+    });
 
-    if (!transactionRecord) return;
+    if (!transactionRecord) {
+      this.logger.warn(
+        "[Stellar transaction]: Transaction not found or already processed:",
+        message.transactionId,
+      );
+      return;
+    }
 
     // Validate that the amount in the message matches the expected quote
     if (message.amount < transactionRecord.quote.sourceAmount) {

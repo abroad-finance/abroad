@@ -25,6 +25,10 @@ function App() {
       <h1 className="text-4xl font-bold text-center mb-8" style={{ fontFamily: 'Comic Sans MS' }}>
         abroad.finance
       </h1>
+      {isConfigured ? (
+        <div className='m-8'>
+          <p>Stellar wallet address: GCLMP4CYNFN62DDKPRMFWU4FQZFJBUL4CPTJ3JAGIHM72UNB6IX5HUGK<b></b></p>
+        </div>) : null}
       {!isConfigured ? (
         <ApiConfiguration
           apiKey={apiKey}
