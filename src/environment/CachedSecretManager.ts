@@ -1,6 +1,6 @@
 // src/environment/CachedSecretManager.ts
 import { GcpSecretManager } from "./GcpSecretManager";
-import { ISecretManager, Secret } from "./ISecretManager";
+import { ISecretManager, Secret } from "../interfaces/ISecretManager";
 
 export class CachedSecretManager implements ISecretManager {
   private cache = new Map<string, string>();

@@ -6,8 +6,8 @@ import { inject } from "inversify";
 import { IQueueHandler, QueueName } from "../interfaces";
 import { iocContainer } from "../ioc";
 import { TYPES } from "../types";
-import { ISecretManager } from "../environment";
-import { IDatabaseClientProvider } from "../infrastructure/db";
+import { ISecretManager } from "../interfaces/ISecretManager";
+import { IDatabaseClientProvider } from "../interfaces/IDatabaseClientProvider";
 
 class StellarListener {
   private accountId!: string;

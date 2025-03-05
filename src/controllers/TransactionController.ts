@@ -12,12 +12,11 @@ import {
 import { Post, Body } from "tsoa";
 import { TransactionStatus } from "@prisma/client";
 import { NotFound } from "http-errors";
-import { provide } from "inversify-binding-decorators";
-import { getPartnerFromRequest } from "../authentication";
 import { Request as RequestExpress } from "express";
-import { IDatabaseClientProvider } from "../infrastructure/db";
 import { inject } from "inversify";
 import { TYPES } from "../types";
+import { IDatabaseClientProvider } from "../interfaces/IDatabaseClientProvider";
+import { IPartnerService } from "../interfaces";
 
 interface TransactionStatusResponse {
   transaction_reference: string;
@@ -47,7 +46,6 @@ function uuidToBase64(uuid: string): string {
   return buffer.toString("base64");
 }
 
-@provide(TransactionController)
 @Route("transaction")
 @Security("ApiKeyAuth")
 export class TransactionController extends Controller {
@@ -55,6 +53,7 @@ export class TransactionController extends Controller {
   constructor(
     @inject(TYPES.IDatabaseClientProvider)
     private prismaClientProvider: IDatabaseClientProvider,
+    @inject(TYPES.IPartnerService) private partnerService: IPartnerService,
   ) {
     super();
   }
@@ -75,7 +74,7 @@ export class TransactionController extends Controller {
     @Path() transactionId: string,
     @Request() request: RequestExpress,
   ): Promise<TransactionStatusResponse> {
-    const partner = await getPartnerFromRequest(request);
+    const partner = await this.partnerService.getPartnerFromRequest(request);
 
     const prismaClient = await this.prismaClientProvider.getClient();
     const transaction = await prismaClient.transaction.findUnique({

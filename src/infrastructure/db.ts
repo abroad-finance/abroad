@@ -1,18 +1,19 @@
 // src/infrastructure/db.ts
 import { PrismaClient } from "@prisma/client";
-import { ISecretManager } from "../environment";
+import { inject } from "inversify";
+import { TYPES } from "../types";
+import { IDatabaseClientProvider } from "../interfaces/IDatabaseClientProvider";
+import { ISecretManager } from "../interfaces/ISecretManager";
 
-export interface IDatabaseClientProvider {
-  getClient(): Promise<PrismaClient>;
-}
+
 
 export class PrismaClientProvider implements IDatabaseClientProvider {
-  private secretManager: ISecretManager;
   private prismaClient: PrismaClient | null = null;
   private datasourceUrl: string | null = null;
 
-  constructor(secretManager: ISecretManager) {
-    this.secretManager = secretManager;
+  constructor(
+    @inject(TYPES.ISecretManager) private secretManager: ISecretManager,
+  ) {
   }
 
   public async getClient(): Promise<PrismaClient> {

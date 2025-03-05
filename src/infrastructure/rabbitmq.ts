@@ -7,7 +7,7 @@ import {
 import { IQueueHandler, QueueName } from "../interfaces";
 import { inject } from "inversify";
 import { TYPES } from "../types";
-import { ISecretManager } from "../environment";
+import { ISecretManager } from "../interfaces/ISecretManager";
 
 export class RabbitMQQueueHandler implements IQueueHandler {
   private connection!: AmqpConnectionManager;

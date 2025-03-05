@@ -1,10 +1,10 @@
 #!/usr/bin/env -S npx tsx
 // nequi-payment.ts
 import axios, { AxiosResponse } from "axios";
-import { ISecretManager } from "../environment";
 import { IPaymentService } from "../interfaces";
 import { inject } from "inversify";
 import { TYPES } from "../types";
+import { ISecretManager } from "../interfaces/ISecretManager";
 
 export type ResponseNequiDispersion = {
   ResponseMessage: {
@@ -169,7 +169,7 @@ export class NequiPaymentService implements IPaymentService {
 
     return {
       success:
-        response.ResponseMessage.ResponseHeader.Status.StatusCode === "SUCCESS",
+        response.ResponseMessage.ResponseHeader.Status.StatusDesc === "SUCCESS",
     };
   };
 }

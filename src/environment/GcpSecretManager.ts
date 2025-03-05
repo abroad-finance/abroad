@@ -1,7 +1,7 @@
 // src/environment/GcpSecretManager.ts
 import { SecretManagerServiceClient } from "@google-cloud/secret-manager";
 import { isAvailable, project } from "gcp-metadata";
-import { ISecretManager } from "./ISecretManager";
+import { ISecretManager } from "../interfaces/ISecretManager";
 import dotenv from "dotenv";
 
 dotenv.config();

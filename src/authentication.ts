@@ -1,34 +1,17 @@
 // src/authentication.ts
 import { Request } from "express";
-import { sha512_224 } from "js-sha512";
 import { iocContainer } from "./ioc";
-import { IDatabaseClientProvider } from "./infrastructure/db";
+import { TYPES } from "./types";
+import { IPartnerService } from "./interfaces";
+
 
 export async function expressAuthentication(
   request: Request,
   securityName: string,
 ) {
+  const partnerService = iocContainer.get<IPartnerService>(TYPES.IPartnerService);
   if (securityName === "ApiKeyAuth") {
-    return await getPartnerFromRequest(request);
+    return await partnerService.getPartnerFromRequest(request);
   }
   throw new Error("Invalid security scheme");
 }
-
-export const getPartnerFromRequest = async (request: Request) => {
-  const apiKey = request.header("X-API-Key");
-  if (!apiKey) {
-    throw new Error("No API key provided");
-  }
-  const apiKeyHash = sha512_224(apiKey);
-  const prismaClientProvider = iocContainer.get<IDatabaseClientProvider>(
-    "PrismaClientProvider",
-  );
-  const prismaClient = await prismaClientProvider.getClient();
-  const partner = await prismaClient.partner.findUnique({
-    where: { apiKey: apiKeyHash },
-  });
-  if (!partner) {
-    throw new Error("Invalid API key");
-  }
-  return partner;
-};

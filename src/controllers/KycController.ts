@@ -1,6 +1,5 @@
 // src/controllers/KycController.ts
 import { KycStatus } from "@prisma/client";
-import { provide } from "inversify-binding-decorators";
 import {
   Controller,
   Post,
@@ -21,7 +20,6 @@ interface KycResponse {
   kyc_link: string;
 }
 
-@provide(KycController)
 @Route("kyc")
 @Security("ApiKeyAuth")
 export class KycController extends Controller {

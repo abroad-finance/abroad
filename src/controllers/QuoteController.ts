@@ -16,12 +16,10 @@ import {
   TargetCurrency,
 } from ".prisma/client";
 import { Request as RequestExpress } from "express";
-import { getPartnerFromRequest } from "../authentication";
-import { inject } from "inversify";
-import { IExchangeRateProvider } from "../interfaces";
-import { provide } from "inversify-binding-decorators";
+import { inject, injectable } from "inversify";
+import { IExchangeRateProvider, IPartnerService } from "../interfaces";
 import { TYPES } from "../types";
-import { IDatabaseClientProvider } from "../infrastructure/db";
+import { IDatabaseClientProvider } from "../interfaces/IDatabaseClientProvider";
 
 interface QuoteRequest {
   amount: number;
@@ -37,7 +35,6 @@ interface QuoteResponse {
   quote_id: string;
 }
 
-@provide(QuoteController)
 @Route("quote")
 @Security("ApiKeyAuth")
 export class QuoteController extends Controller {
@@ -46,6 +43,7 @@ export class QuoteController extends Controller {
     private exchangeRateProvider: IExchangeRateProvider,
     @inject(TYPES.IDatabaseClientProvider)
     private dbClientProvider: IDatabaseClientProvider,
+    @inject(TYPES.IPartnerService) private partnerService: IPartnerService,
   ) {
     super();
   }
@@ -75,7 +73,7 @@ export class QuoteController extends Controller {
     } = requestBody;
 
     // Retrieve partner information from the API key
-    const partner = await getPartnerFromRequest(request);
+    const partner = await this.partnerService.getPartnerFromRequest(request);
 
     // Set the expiration date to one hour from now
     const expirationDate = new Date(Date.now() + 3_600_000);

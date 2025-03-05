@@ -8,7 +8,7 @@ import z from "zod";
 import { inject } from "inversify";
 import { IPaymentService, IQueueHandler, QueueName } from "../../interfaces";
 import { TYPES } from "../../types";
-import { IDatabaseClientProvider } from "../../infrastructure/db";
+import { IDatabaseClientProvider } from "../../interfaces/IDatabaseClientProvider";
 
 // Schema definition for validating the queue message
 const TransactionQueueMessageSchema = z.object({

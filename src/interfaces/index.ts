@@ -1,4 +1,5 @@
-import { CryptoCurrency, TargetCurrency } from "@prisma/client";
+import { CryptoCurrency, Partner, TargetCurrency } from "@prisma/client";
+import { Request } from "express";
 
 export interface IPaymentService {
   sendPayment({
@@ -32,4 +33,8 @@ export interface IQueueHandler {
     queueName: QueueName,
     callback: (message: Record<string, any>) => void,
   ): void;
+}
+
+export interface IPartnerService {
+  getPartnerFromRequest(request: Request): Promise<Partner>;
 }
