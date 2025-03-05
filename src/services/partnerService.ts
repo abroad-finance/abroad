@@ -20,7 +20,6 @@ export class PartnerService implements IPartnerService {
 
     // Hash the API key using SHA-512/224
     const apiKeyHash = sha512_224(apiKey);
-    console.log("API Key Hash:", apiKeyHash);
 
     // Obtain a database client from the injected provider
     const prismaClient = await this.databaseClientProvider.getClient();

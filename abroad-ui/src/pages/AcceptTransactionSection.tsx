@@ -24,10 +24,11 @@ const AcceptTransactionSection: React.FC<AcceptTransactionSectionProps> = ({
 
   // Update the internal quote_id when the parent-provided quoteId changes.
   useEffect(() => {
-    setAcceptTransactionRequest(prev => ({
-      ...prev,
+    setAcceptTransactionRequest({
       quote_id: quoteId,
-    }));
+      user_id: '',
+      account_number: '',
+    })
   }, [quoteId]);
 
   const handleAcceptTransaction = async () => {
