@@ -2,6 +2,7 @@
 import {
   BlockchainNetwork,
   CryptoCurrency,
+  Prisma,
   TransactionStatus,
 } from "@prisma/client";
 import z from "zod";
@@ -67,23 +68,35 @@ export class StellarTransactionsController {
 
     const prismaClient = await this.dbClientProvider.getClient();
 
-    // Execute DB operations in a transaction block
-    const transactionRecord = await prismaClient.transaction.update({
-      where: {
-        id: message.transactionId,
-        status: TransactionStatus.AWAITING_PAYMENT,
-      },
-      include: { quote: true },
-      data: {
-        onChainId: message.onChainId,
-        status: TransactionStatus.PROCESSING_PAYMENT,
-      },
-    });
-
-    if (!transactionRecord) {
-      this.logger.warn(
-        "[Stellar transaction]: Transaction not found or already processed:",
-        message.transactionId,
+    let transactionRecord: Prisma.TransactionGetPayload<{
+      include: { quote: true };
+    }>;
+    try {
+      // Execute DB operations in a transaction block
+      transactionRecord = await prismaClient.transaction.update({
+        where: {
+          id: message.transactionId,
+          status: TransactionStatus.AWAITING_PAYMENT,
+        },
+        include: { quote: true },
+        data: {
+          onChainId: message.onChainId,
+          status: TransactionStatus.PROCESSING_PAYMENT,
+        },
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError) {
+        if (error.code === "P2025") {
+          this.logger.warn(
+            "[Stellar transaction]: Transaction not found or already processed:",
+            message.transactionId,
+          );
+          return;
+        }
+      }
+      this.logger.error(
+        "[Stellar transaction]: Error updating transaction:",
+        error,
       );
       return;
     }

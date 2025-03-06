@@ -1,248 +1,232 @@
-// __tests__/StellarTransactionsController.spec.ts
-
-import { StellarTransactionsController } from "../../../src/controllers/queue/StellarTransactionsController";
+// __tests__/StellarTransactionsController.test.ts
 import {
-  TransactionStatus,
-  CryptoCurrency,
-  BlockchainNetwork,
-  PrismaClient,
-} from "@prisma/client";
+  StellarTransactionsController,
+  TransactionQueueMessage,
+} from "../../../src/controllers/queue/StellarTransactionsController";
 import {
   IPaymentService,
   IQueueHandler,
   ILogger,
-  QueueName,
 } from "../../../src/interfaces";
+import {
+  TransactionStatus,
+  CryptoCurrency,
+  BlockchainNetwork,
+  Prisma,
+} from "@prisma/client";
 import { IDatabaseClientProvider } from "../../../src/interfaces/IDatabaseClientProvider";
 
-// Define minimal interfaces for the parts of the Prisma client we need to mock.
-interface MockPrismaTransaction {
-  findFirst: jest.Mock<Promise<unknown>, [record: object]>;
-  update: jest.Mock<Promise<unknown>, [record: object]>;
-}
-
-interface MockPrismaClient {
-  $transaction: jest.Mock<
-    Promise<unknown>,
-    [
-      (prisma: { transaction: MockPrismaTransaction }) => Promise<unknown>,
-      { timeout: number },
-    ]
-  >;
-  transaction: {
-    update: jest.Mock<Promise<unknown>, [record: object]>;
-  };
-}
-
-// Define a helper type to access the private method.
-type StellarTransactionsControllerWithPrivate = {
-  onTransactionReceived: (msg: Record<string, unknown>) => Promise<void>;
-};
-
 describe("StellarTransactionsController", () => {
+  let controller: StellarTransactionsController;
   let paymentService: jest.Mocked<IPaymentService>;
   let queueHandler: jest.Mocked<IQueueHandler>;
   let dbClientProvider: jest.Mocked<IDatabaseClientProvider>;
   let logger: jest.Mocked<ILogger>;
-  let controller: StellarTransactionsController;
-  let prismaTransaction: MockPrismaTransaction;
-  let prismaClient: PrismaClient;
+  let prismaClient: { transaction: { update: jest.Mock } };
 
-  beforeEach(() => {
-    // Create a mocked payment service.
+  // We capture the callback function registered via subscribeToQueue
+  let capturedCallback: (msg: Record<string, unknown>) => void;
+
+  beforeEach(async () => {
+    // Create typed mocks for the dependencies
     paymentService = {
       sendPayment: jest.fn(),
     };
 
-    // Create a mocked logger.
+    queueHandler = {
+      subscribeToQueue: jest.fn(),
+      postMessage: jest.fn(),
+    };
+
+    prismaClient = {
+      transaction: {
+        update: jest.fn(),
+      },
+    };
+
+    dbClientProvider = {
+      getClient: jest.fn().mockResolvedValue(prismaClient),
+    };
+
     logger = {
       info: jest.fn(),
       warn: jest.fn(),
       error: jest.fn(),
     };
 
-    // Create mocks for the Prisma transaction methods.
-    prismaTransaction = {
-      findFirst: jest.fn(),
-      update: jest.fn(),
-    };
-
-    // Create a mocked Prisma client with a $transaction method and a transaction property.
-    const partialPrismaClient: Partial<MockPrismaClient> = {
-      $transaction: jest.fn(
-        async (
-          cb: (prisma: {
-            transaction: MockPrismaTransaction;
-          }) => Promise<unknown>,
-          opts: { timeout: number },
-        ) => {
-          return await cb({ transaction: prismaTransaction });
-        },
-      ),
-      transaction: {
-        update: jest.fn(),
-      },
-    };
-
-    // TODO: Create a mocked Prisma client with a $transaction method and a transaction property.
-    prismaClient = partialPrismaClient as unknown as PrismaClient;
-
-    // Create a mocked database client provider.
-    dbClientProvider = {
-      getClient: jest.fn(async () => prismaClient),
-    };
-
-    // Create a mocked queue handler.
-    queueHandler = {
-      subscribeToQueue: jest.fn(),
-      postMessage: jest.fn(),
-    };
-
-    // Instantiate the controller with all mocked dependencies.
+    // Instantiate the controller with the mocks
     controller = new StellarTransactionsController(
       paymentService,
       queueHandler,
       dbClientProvider,
       logger,
     );
+
+    // Call registerConsumers and capture the callback passed to subscribeToQueue
+    controller.registerConsumers();
+    expect(queueHandler.subscribeToQueue).toHaveBeenCalled();
+    capturedCallback = queueHandler.subscribeToQueue.mock.calls[0][1];
+
+    // Clear any previous calls on mocks that might be set during consumer registration
+    prismaClient.transaction.update.mockClear();
+    logger.info.mockClear();
+    logger.warn.mockClear();
+    logger.error.mockClear();
   });
 
-  describe("onTransactionReceived (private method)", () => {
-    // Access the private method via a helper type.
-    const invokeOnTransactionReceived = async (
-      msg: Record<string, unknown>,
-    ): Promise<void> => {
-      return (
-        controller as unknown as StellarTransactionsControllerWithPrivate
-      ).onTransactionReceived(msg);
-    };
-
-    it("should log a warning and return if the message is empty", async () => {
-      await invokeOnTransactionReceived({});
+  describe("onTransactionReceived", () => {
+    it("should log a warning and exit if an empty message is received", async () => {
+      await capturedCallback({});
       expect(logger.warn).toHaveBeenCalledWith(
         "[Stellar transaction]: Received empty message. Skipping...",
       );
+      expect(prismaClient.transaction.update).not.toHaveBeenCalled();
     });
 
-    it("should log an error and return if the message is invalid", async () => {
-      const invalidMsg = { invalid: "data" };
-      await invokeOnTransactionReceived(invalidMsg);
-      expect(logger.error).toHaveBeenCalled(); // Optionally, you could check for specific error details.
+    it("should log an error and exit for an invalid message format", async () => {
+      // Provide a non-empty object that fails schema validation (missing required fields)
+      const invalidMsg = { onChainId: "chain-123" };
+      await capturedCallback(invalidMsg);
+      expect(logger.error).toHaveBeenCalled();
+      expect(prismaClient.transaction.update).not.toHaveBeenCalled();
     });
 
-    it("should warn if no matching transaction is found (or already processed)", async () => {
-      const validMsg = {
+    it("should update transaction status to WRONG_AMOUNT when message amount is less than quote.sourceAmount", async () => {
+      const validMsg: TransactionQueueMessage = {
         onChainId: "chain-123",
-        amount: 100,
-        transactionId: "11111111-1111-1111-1111-111111111111",
+        amount: 50, // too low compared to quote.sourceAmount
+        transactionId: "550e8400-e29b-41d4-a716-446655440000",
         cryptoCurrency: CryptoCurrency.USDC,
         blockchain: BlockchainNetwork.STELLAR,
       };
 
-      // Simulate no transaction found in the DB transaction block.
-      prismaTransaction.findFirst.mockResolvedValue(null);
-
-      await invokeOnTransactionReceived(validMsg);
-      expect(logger.warn).toHaveBeenCalledWith(
-        "[Stellar transaction]: Transaction not found or already processed:",
-        validMsg.transactionId,
-      );
-    });
-
-    it("should update status to WRONG_AMOUNT when the message amount is less than the quote", async () => {
-      const validMsg = {
-        onChainId: "chain-123",
-        amount: 50, // Less than expected source amount
-        transactionId: "22222222-2222-2222-2222-222222222222",
-        cryptoCurrency: CryptoCurrency.USDC,
-        blockchain: BlockchainNetwork.STELLAR,
-      };
-
+      // Simulate the initial DB update returning a transaction record with a higher source amount
       const transactionRecord = {
         id: validMsg.transactionId,
-        onChainId: null,
-        status: TransactionStatus.AWAITING_PAYMENT,
-        accountNumber: "acc-001",
-        quote: { sourceAmount: 100, targetAmount: 150 },
+        accountNumber: "account-123",
+        quote: {
+          sourceAmount: 100,
+          targetAmount: 90,
+        },
       };
+      prismaClient.transaction.update.mockResolvedValueOnce(transactionRecord);
 
-      prismaTransaction.findFirst.mockResolvedValue(transactionRecord);
+      await capturedCallback(validMsg);
 
-      await invokeOnTransactionReceived(validMsg);
+      // Verify the first update call to mark the transaction as PROCESSING_PAYMENT
+      expect(prismaClient.transaction.update).toHaveBeenCalledWith({
+        where: {
+          id: validMsg.transactionId,
+          status: TransactionStatus.AWAITING_PAYMENT,
+        },
+        include: { quote: true },
+        data: {
+          onChainId: validMsg.onChainId,
+          status: TransactionStatus.PROCESSING_PAYMENT,
+        },
+      });
 
+      // Then a warning should be logged for the amount mismatch
       expect(logger.warn).toHaveBeenCalledWith(
         "[Stellar transaction]: Transaction amount does not match quote:",
         validMsg.amount,
         transactionRecord.quote.sourceAmount,
       );
 
-      // Verify that the update outside the transaction is called to mark WRONG_AMOUNT.
+      // And the transaction should be updated with WRONG_AMOUNT
       expect(prismaClient.transaction.update).toHaveBeenCalledWith({
         where: { id: transactionRecord.id },
         data: { status: TransactionStatus.WRONG_AMOUNT },
       });
+
+      // Payment service should not be called
+      expect(paymentService.sendPayment).not.toHaveBeenCalled();
     });
 
-    it("should process payment successfully and update status to PAYMENT_COMPLETED", async () => {
-      const validMsg = {
+    it("should process payment and update transaction as PAYMENT_COMPLETED on successful payment", async () => {
+      const validMsg: TransactionQueueMessage = {
         onChainId: "chain-456",
-        amount: 150, // Meets expected amount (>= sourceAmount)
-        transactionId: "33333333-3333-3333-3333-333333333333",
+        amount: 100,
+        transactionId: "550e8400-e29b-41d4-a716-446655440001",
         cryptoCurrency: CryptoCurrency.USDC,
         blockchain: BlockchainNetwork.STELLAR,
       };
 
       const transactionRecord = {
         id: validMsg.transactionId,
-        onChainId: null,
-        status: TransactionStatus.AWAITING_PAYMENT,
-        accountNumber: "acc-002",
-        quote: { sourceAmount: 100, targetAmount: 200 },
+        accountNumber: "account-456",
+        quote: {
+          sourceAmount: 100,
+          targetAmount: 95,
+        },
       };
 
-      prismaTransaction.findFirst.mockResolvedValue(transactionRecord);
-      paymentService.sendPayment.mockResolvedValue({ success: true });
+      // First DB update returns the transaction record
+      prismaClient.transaction.update.mockResolvedValueOnce(transactionRecord);
+      // Simulate a successful payment
+      paymentService.sendPayment.mockResolvedValueOnce({ success: true });
+      // The final update call resolves as well (its return value is not used)
+      prismaClient.transaction.update.mockResolvedValueOnce(transactionRecord);
 
-      await invokeOnTransactionReceived(validMsg);
+      await capturedCallback(validMsg);
 
+      // Verify the initial update to PROCESSING_PAYMENT
+      expect(prismaClient.transaction.update).toHaveBeenNthCalledWith(1, {
+        where: {
+          id: validMsg.transactionId,
+          status: TransactionStatus.AWAITING_PAYMENT,
+        },
+        include: { quote: true },
+        data: {
+          onChainId: validMsg.onChainId,
+          status: TransactionStatus.PROCESSING_PAYMENT,
+        },
+      });
+
+      // Check that the payment service is called with the proper parameters
       expect(paymentService.sendPayment).toHaveBeenCalledWith({
         account: transactionRecord.accountNumber,
         id: transactionRecord.id,
         value: transactionRecord.quote.targetAmount,
       });
 
-      expect(prismaClient.transaction.update).toHaveBeenCalledWith({
+      // Verify that the final update sets the status to PAYMENT_COMPLETED
+      expect(prismaClient.transaction.update).toHaveBeenNthCalledWith(2, {
         where: { id: transactionRecord.id },
         data: { status: TransactionStatus.PAYMENT_COMPLETED },
       });
 
+      // Confirm that an info log was issued indicating successful payment
       expect(logger.info).toHaveBeenCalledWith(
-        `[Stellar transaction]: Payment completed for transaction:`,
+        "[Stellar transaction]: Payment completed for transaction:",
         transactionRecord.id,
       );
     });
 
-    it("should process payment failure and update status to PAYMENT_FAILED", async () => {
-      const validMsg = {
+    it("should process payment and update transaction as PAYMENT_FAILED on payment failure", async () => {
+      const validMsg: TransactionQueueMessage = {
         onChainId: "chain-789",
-        amount: 150,
-        transactionId: "44444444-4444-4444-4444-444444444444",
+        amount: 100,
+        transactionId: "550e8400-e29b-41d4-a716-446655440002",
         cryptoCurrency: CryptoCurrency.USDC,
         blockchain: BlockchainNetwork.STELLAR,
       };
 
       const transactionRecord = {
         id: validMsg.transactionId,
-        onChainId: null,
-        status: TransactionStatus.AWAITING_PAYMENT,
-        accountNumber: "acc-003",
-        quote: { sourceAmount: 100, targetAmount: 200 },
+        accountNumber: "account-789",
+        quote: {
+          sourceAmount: 100,
+          targetAmount: 95,
+        },
       };
 
-      prismaTransaction.findFirst.mockResolvedValue(transactionRecord);
-      paymentService.sendPayment.mockResolvedValue({ success: false });
+      prismaClient.transaction.update.mockResolvedValueOnce(transactionRecord);
+      // Simulate payment failure
+      paymentService.sendPayment.mockResolvedValueOnce({ success: false });
+      prismaClient.transaction.update.mockResolvedValueOnce(transactionRecord);
 
-      await invokeOnTransactionReceived(validMsg);
+      await capturedCallback(validMsg);
 
       expect(paymentService.sendPayment).toHaveBeenCalledWith({
         account: transactionRecord.accountNumber,
@@ -250,38 +234,42 @@ describe("StellarTransactionsController", () => {
         value: transactionRecord.quote.targetAmount,
       });
 
-      expect(prismaClient.transaction.update).toHaveBeenCalledWith({
+      // Final update should set the status to PAYMENT_FAILED
+      expect(prismaClient.transaction.update).toHaveBeenNthCalledWith(2, {
         where: { id: transactionRecord.id },
         data: { status: TransactionStatus.PAYMENT_FAILED },
       });
 
       expect(logger.info).toHaveBeenCalledWith(
-        `[Stellar transaction]: Payment failed for transaction:`,
+        "[Stellar transaction]: Payment failed for transaction:",
         transactionRecord.id,
       );
     });
 
-    it("should handle payment errors and update status to PAYMENT_FAILED", async () => {
-      const validMsg = {
+    it("should catch payment processing errors and update transaction as PAYMENT_FAILED", async () => {
+      const validMsg: TransactionQueueMessage = {
         onChainId: "chain-101",
-        amount: 150,
-        transactionId: "55555555-5555-5555-5555-555555555555",
+        amount: 100,
+        transactionId: "550e8400-e29b-41d4-a716-446655440003",
         cryptoCurrency: CryptoCurrency.USDC,
         blockchain: BlockchainNetwork.STELLAR,
       };
 
       const transactionRecord = {
         id: validMsg.transactionId,
-        onChainId: null,
-        status: TransactionStatus.AWAITING_PAYMENT,
-        accountNumber: "acc-004",
-        quote: { sourceAmount: 100, targetAmount: 200 },
+        accountNumber: "account-101",
+        quote: {
+          sourceAmount: 100,
+          targetAmount: 95,
+        },
       };
 
-      prismaTransaction.findFirst.mockResolvedValue(transactionRecord);
-      paymentService.sendPayment.mockRejectedValue(new Error("Payment error"));
+      prismaClient.transaction.update.mockResolvedValueOnce(transactionRecord);
+      const paymentError = new Error("Payment error");
+      paymentService.sendPayment.mockRejectedValueOnce(paymentError);
+      prismaClient.transaction.update.mockResolvedValueOnce(transactionRecord);
 
-      await invokeOnTransactionReceived(validMsg);
+      await capturedCallback(validMsg);
 
       expect(paymentService.sendPayment).toHaveBeenCalledWith({
         account: transactionRecord.accountNumber,
@@ -291,38 +279,72 @@ describe("StellarTransactionsController", () => {
 
       expect(logger.error).toHaveBeenCalledWith(
         "[Stellar transaction]: Payment processing error:",
-        expect.any(Error),
+        paymentError,
       );
 
-      expect(prismaClient.transaction.update).toHaveBeenCalledWith({
+      expect(prismaClient.transaction.update).toHaveBeenNthCalledWith(2, {
         where: { id: transactionRecord.id },
         data: { status: TransactionStatus.PAYMENT_FAILED },
       });
     });
+
+    it("should log a warning and exit if the transaction is not found (P2025 error)", async () => {
+      const validMsg: TransactionQueueMessage = {
+        onChainId: "chain-202",
+        amount: 100,
+        transactionId: "550e8400-e29b-41d4-a716-446655440004",
+        cryptoCurrency: CryptoCurrency.USDC,
+        blockchain: BlockchainNetwork.STELLAR,
+      };
+
+      // Create a fake PrismaClientKnownRequestError with code "P2025"
+      const notFoundError = new Error(
+        "Not found",
+      ) as Prisma.PrismaClientKnownRequestError;
+      Object.setPrototypeOf(
+        notFoundError,
+        Prisma.PrismaClientKnownRequestError.prototype,
+      );
+      notFoundError.code = "P2025";
+
+      prismaClient.transaction.update.mockRejectedValueOnce(notFoundError);
+
+      await capturedCallback(validMsg);
+
+      expect(logger.warn).toHaveBeenCalledWith(
+        "[Stellar transaction]: Transaction not found or already processed:",
+        validMsg.transactionId,
+      );
+    });
   });
 
   describe("registerConsumers", () => {
-    it("should subscribe to the correct queue with onTransactionReceived callback", () => {
+    it("should register the consumer and log info", () => {
+      // Clear the previous subscribe mock for this test
+      queueHandler.subscribeToQueue.mockClear();
       controller.registerConsumers();
+
       expect(logger.info).toHaveBeenCalledWith(
         "[Stellar transaction]: Registering consumer for queue:",
-        QueueName.STELLAR_TRANSACTIONS,
+        "stellar-transactions",
       );
       expect(queueHandler.subscribeToQueue).toHaveBeenCalledWith(
-        QueueName.STELLAR_TRANSACTIONS,
+        "stellar-transactions",
         expect.any(Function),
       );
     });
 
-    it("should log an error if subscribeToQueue throws an error", () => {
-      const subscriptionError = new Error("Subscription error");
-      queueHandler.subscribeToQueue.mockImplementation(() => {
-        throw subscriptionError;
+    it("should log an error if subscribeToQueue throws", () => {
+      const subscribeError = new Error("Subscribe error");
+      queueHandler.subscribeToQueue.mockImplementationOnce(() => {
+        throw subscribeError;
       });
+
       controller.registerConsumers();
+
       expect(logger.error).toHaveBeenCalledWith(
         "[Stellar transaction]: Error in consumer registration:",
-        subscriptionError,
+        subscribeError,
       );
     });
   });
