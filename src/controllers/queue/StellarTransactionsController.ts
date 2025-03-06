@@ -11,6 +11,7 @@ import {
   ILogger,
   IPaymentService,
   IQueueHandler,
+  ISlackNotifier,
   QueueName,
 } from "../../interfaces";
 import { TYPES } from "../../types";
@@ -37,6 +38,7 @@ export class StellarTransactionsController {
     @inject(TYPES.IDatabaseClientProvider)
     private dbClientProvider: IDatabaseClientProvider,
     @inject(TYPES.ILogger) private logger: ILogger,
+    @inject(TYPES.ISlackNotifier) private slackNotifier: ISlackNotifier,
   ) {}
 
   /**
@@ -136,6 +138,12 @@ export class StellarTransactionsController {
         `[Stellar transaction]: Payment ${paymentResponse.success ? "completed" : "failed"} for transaction:`,
         transactionRecord.id,
       );
+
+      if (paymentResponse.success) {
+        this.slackNotifier.sendMessage(
+          `Payment completed for transaction: ${transactionRecord.id}, ${transactionRecord.quote.sourceAmount} ${transactionRecord.quote.cryptoCurrency} -> ${transactionRecord.quote.targetAmount} ${transactionRecord.quote.targetCurrency}`,
+        );
+      }
     } catch (paymentError) {
       this.logger.error(
         "[Stellar transaction]: Payment processing error:",

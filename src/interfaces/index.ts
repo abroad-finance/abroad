@@ -44,3 +44,7 @@ export interface ILogger {
   warn(message: string, ...optionalParams: any[]): void;
   error(message: string, ...optionalParams: any[]): void;
 }
+
+export interface ISlackNotifier {
+  sendMessage(message: string): Promise<void>;
+}

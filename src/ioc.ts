@@ -4,6 +4,7 @@ import {
   IPartnerService,
   IPaymentService,
   IQueueHandler,
+  ISlackNotifier,
 } from "./interfaces";
 import { BitsoExchangeRateProvider } from "./services/bitsoExchangeRateProvider";
 import { Container, decorate, injectable } from "inversify";
@@ -21,6 +22,7 @@ import { ISecretManager } from "./interfaces/ISecretManager";
 import { IDatabaseClientProvider } from "./interfaces/IDatabaseClientProvider";
 import { PartnerService } from "./services/partnerService";
 import { ConsoleLogger } from "./services/consoleLogger";
+import { SlackNotifier } from "./services/slackNotifier";
 
 const container = new Container();
 
@@ -78,5 +80,11 @@ container.bind<KycController>(KycController).toSelf().inSingletonScope();
 
 // ILogger
 container.bind<ILogger>(TYPES.ILogger).to(ConsoleLogger).inSingletonScope();
+
+// ISlackNotifier
+container
+  .bind<ISlackNotifier>(TYPES.ISlackNotifier)
+  .to(SlackNotifier)
+  .inSingletonScope();
 
 export { container as iocContainer };

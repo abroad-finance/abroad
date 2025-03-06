@@ -11,7 +11,8 @@ export type Secret =
   | "SECRET_KEY_NEQUI"
   | "stellar-account-id"
   | "URL_NEQUI"
-  | "URL_NEQUI_AUTH";
+  | "URL_NEQUI_AUTH"
+  | "SLACK_WEBHOOK_URL";
 
 export interface ISecretManager {
   getSecret(secretName: Secret): Promise<string>;

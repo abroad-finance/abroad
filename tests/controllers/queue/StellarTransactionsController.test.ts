@@ -7,6 +7,7 @@ import {
   IPaymentService,
   IQueueHandler,
   ILogger,
+  ISlackNotifier,
 } from "../../../src/interfaces";
 import {
   TransactionStatus,
@@ -23,6 +24,7 @@ describe("StellarTransactionsController", () => {
   let dbClientProvider: jest.Mocked<IDatabaseClientProvider>;
   let logger: jest.Mocked<ILogger>;
   let prismaClient: { transaction: { update: jest.Mock } };
+  let slackNotifier: jest.Mocked<ISlackNotifier>;
 
   // We capture the callback function registered via subscribeToQueue
   let capturedCallback: (msg: Record<string, unknown>) => void;
@@ -54,12 +56,17 @@ describe("StellarTransactionsController", () => {
       error: jest.fn(),
     };
 
+    slackNotifier = {
+      sendMessage: jest.fn(),
+    };
+
     // Instantiate the controller with the mocks
     controller = new StellarTransactionsController(
       paymentService,
       queueHandler,
       dbClientProvider,
       logger,
+      slackNotifier,
     );
 
     // Call registerConsumers and capture the callback passed to subscribeToQueue

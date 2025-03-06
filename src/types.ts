@@ -7,4 +7,5 @@ export const TYPES = {
   ISecretManager: Symbol.for("ISecretManager"),
   IPartnerService: Symbol.for("IPartnerService"),
   ILogger: Symbol.for("ILogger"),
+  ISlackNotifier: Symbol.for("ISlackNotifier"),
 };
