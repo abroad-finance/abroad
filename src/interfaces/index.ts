@@ -11,7 +11,10 @@ export interface IPaymentService {
     value: number;
     id: string;
   }): Promise<{
-    success: boolean;
+    success: false
+  } | {
+    success: true;
+    transactionId: string;
   }>;
 }
 
