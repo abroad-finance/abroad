@@ -108,11 +108,6 @@ export class NequiPaymentService implements IPaymentService {
     id,
     value,
   }) => {
-    const MAX_VALUE = 20_000; // COP
-    if (value > MAX_VALUE) {
-      throw new Error("[Nequi]: Value exceeds the maximum allowed");
-    }
-
     console.log("[NequiPaymentService]: Sending payment to Nequi:", {
       account,
       id,
