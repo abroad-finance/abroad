@@ -8,4 +8,5 @@ export const TYPES = {
   IPartnerService: Symbol.for("IPartnerService"),
   ILogger: Symbol.for("ILogger"),
   ISlackNotifier: Symbol.for("ISlackNotifier"),
+  IPaymentServiceFactory: Symbol.for("IPaymentServiceFactory"),
 };

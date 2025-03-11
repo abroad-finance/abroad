@@ -1,10 +1,11 @@
 #!/usr/bin/env -S npx tsx
-// nequi-payment.ts
+// src/services/nequi.ts
 import axios, { AxiosResponse } from "axios";
-import { IPaymentService } from "../interfaces";
 import { inject } from "inversify";
 import { TYPES } from "../types";
 import { ISecretManager } from "../interfaces/ISecretManager";
+import { IPaymentService } from "../interfaces/IPaymentService";
+import { TargetCurrency } from "@prisma/client";
 
 export type ResponseNequiDispersion = {
   ResponseMessage: {
@@ -33,6 +34,11 @@ export type ResponseNequiDispersion = {
 export class NequiPaymentService implements IPaymentService {
   private token: string | null = null;
   private tokenExpiration: number | null = null;
+
+  // Payment service constants
+  public readonly fixedFee = 1354;
+  public readonly percentageFee = 0.0;
+  public readonly currency = TargetCurrency.COP;
 
   public constructor(
     @inject(TYPES.ISecretManager) private secretManager: ISecretManager,
@@ -167,6 +173,12 @@ export class NequiPaymentService implements IPaymentService {
     return {
       success:
         response.ResponseMessage.ResponseHeader.Status.StatusDesc === "SUCCESS",
+      transactionId: response.ResponseMessage.ResponseHeader.MessageID,
     };
+  };
+
+  public verifyAccount: IPaymentService["verifyAccount"] = async () => {
+    // This method can not be implemented for Nequi
+    return Promise.resolve(true);
   };
 }

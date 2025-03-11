@@ -1,23 +1,6 @@
 import { CryptoCurrency, Partner, TargetCurrency } from "@prisma/client";
 import { Request } from "express";
 
-export interface IPaymentService {
-  sendPayment({
-    account,
-    value,
-    id,
-  }: {
-    account: string;
-    value: number;
-    id: string;
-  }): Promise<{
-    success: false
-  } | {
-    success: true;
-    transactionId: string;
-  }>;
-}
-
 export interface IExchangeRateProvider {
   getExchangeRate(
     sourceCurrency: CryptoCurrency,

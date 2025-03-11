@@ -1,18 +1,26 @@
 // src/environment/ISecretManager.ts
 
-export type Secret =
-  | "ACCESS_KEY_NEQUI"
-  | "API_KEY_NEQUI"
-  | "BITSO_API_KEY"
-  | "DATABASE_URL"
-  | "DISPERSION_CODE_NEQUI"
-  | "horizon-url"
-  | "RABBITMQ_URL"
-  | "SECRET_KEY_NEQUI"
-  | "stellar-account-id"
-  | "URL_NEQUI"
-  | "URL_NEQUI_AUTH"
-  | "SLACK_WEBHOOK_URL";
+export const Secrets = {
+  ACCESS_KEY_NEQUI: "ACCESS_KEY_NEQUI",
+  API_KEY_NEQUI: "API_KEY_NEQUI",
+  BITSO_API_KEY: "BITSO_API_KEY",
+  DATABASE_URL: "DATABASE_URL",
+  DISPERSION_CODE_NEQUI: "DISPERSION_CODE_NEQUI",
+  HORIZON_URL: "horizon-url",
+  RABBITMQ_URL: "RABBITMQ_URL",
+  SECRET_KEY_NEQUI: "SECRET_KEY_NEQUI",
+  STELLAR_ACCOUNT_ID: "stellar-account-id",
+  URL_NEQUI: "URL_NEQUI",
+  URL_NEQUI_AUTH: "URL_NEQUI_AUTH",
+  SLACK_WEBHOOK_URL: "SLACK_WEBHOOK_URL",
+  MOVII_API_KEY: "MOVII_API_KEY",
+  MOVII_BASE_URL: "MOVII_BASE_URL",
+  MOVII_CLIENT_ID: "MOVII_CLIENT_ID",
+  MOVII_CLIENT_SECRET: "MOVII_CLIENT_SECRET",
+  MOVII_SIGNER_HANDLER: "MOVII_SIGNER_HANDLER",
+} as const;
+
+export type Secret = (typeof Secrets)[keyof typeof Secrets];
 
 export interface ISecretManager {
   getSecret(secretName: Secret): Promise<string>;

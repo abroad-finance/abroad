@@ -47,7 +47,7 @@ interface QuoteResponse {
   quote_id: string;
 }
 
-const MAX_COP_AMOUNT = 500000;
+const MAX_COP_AMOUNT = 500_000;
 const BRIDGE_FEE = 0.002;
 const NEQUI_FEE = 1354.22;
 const EXPIRATION_DURATION_MS = 3_600_000; // one hour

@@ -4,7 +4,6 @@ import {
   TransactionQueueMessage,
 } from "../../../src/controllers/queue/StellarTransactionsController";
 import {
-  IPaymentService,
   IQueueHandler,
   ILogger,
   ISlackNotifier,
@@ -14,17 +13,21 @@ import {
   CryptoCurrency,
   BlockchainNetwork,
   Prisma,
+  TargetCurrency,
 } from "@prisma/client";
 import { IDatabaseClientProvider } from "../../../src/interfaces/IDatabaseClientProvider";
+import { IPaymentServiceFactory } from "../../../src/interfaces/IPaymentServiceFactory";
+import { IPaymentService } from "../../../src/interfaces/IPaymentService";
 
 describe("StellarTransactionsController", () => {
   let controller: StellarTransactionsController;
-  let paymentService: jest.Mocked<IPaymentService>;
+  let paymentServiceFactory: jest.Mocked<IPaymentServiceFactory>;
   let queueHandler: jest.Mocked<IQueueHandler>;
   let dbClientProvider: jest.Mocked<IDatabaseClientProvider>;
   let logger: jest.Mocked<ILogger>;
   let prismaClient: { transaction: { update: jest.Mock } };
   let slackNotifier: jest.Mocked<ISlackNotifier>;
+  let paymentService: jest.Mocked<IPaymentService>;
 
   // We capture the callback function registered via subscribeToQueue
   let capturedCallback: (msg: Record<string, unknown>) => void;
@@ -33,6 +36,14 @@ describe("StellarTransactionsController", () => {
     // Create typed mocks for the dependencies
     paymentService = {
       sendPayment: jest.fn(),
+      currency: TargetCurrency.COP,
+      fixedFee: 0,
+      percentageFee: 0,
+      verifyAccount: jest.fn(),
+    };
+
+    paymentServiceFactory = {
+      getPaymentService: jest.fn().mockReturnValue(paymentService),
     };
 
     queueHandler = {
@@ -62,7 +73,7 @@ describe("StellarTransactionsController", () => {
 
     // Instantiate the controller with the mocks
     controller = new StellarTransactionsController(
-      paymentService,
+      paymentServiceFactory,
       queueHandler,
       dbClientProvider,
       logger,
@@ -171,7 +182,10 @@ describe("StellarTransactionsController", () => {
       // First DB update returns the transaction record
       prismaClient.transaction.update.mockResolvedValueOnce(transactionRecord);
       // Simulate a successful payment
-      paymentService.sendPayment.mockResolvedValueOnce({ success: true });
+      paymentService.sendPayment.mockResolvedValueOnce({
+        success: true,
+        transactionId: "tx-123",
+      });
       // The final update call resolves as well (its return value is not used)
       prismaClient.transaction.update.mockResolvedValueOnce(transactionRecord);
 

@@ -9,13 +9,13 @@ import z from "zod";
 import { inject } from "inversify";
 import {
   ILogger,
-  IPaymentService,
   IQueueHandler,
   ISlackNotifier,
   QueueName,
 } from "../../interfaces";
 import { TYPES } from "../../types";
 import { IDatabaseClientProvider } from "../../interfaces/IDatabaseClientProvider";
+import { IPaymentServiceFactory } from "../../interfaces/IPaymentServiceFactory";
 // Import the logger interface (adjust the path as necessary)
 
 // Schema definition for validating the queue message
@@ -33,7 +33,8 @@ export type TransactionQueueMessage = z.infer<
 
 export class StellarTransactionsController {
   public constructor(
-    @inject(TYPES.IPaymentService) private paymentService: IPaymentService,
+    @inject(TYPES.IPaymentServiceFactory)
+    private paymentServiceFactory: IPaymentServiceFactory,
     @inject(TYPES.IQueueHandler) private queueHandler: IQueueHandler,
     @inject(TYPES.IDatabaseClientProvider)
     private dbClientProvider: IDatabaseClientProvider,
@@ -117,9 +118,13 @@ export class StellarTransactionsController {
       return;
     }
 
+    const paymentService = this.paymentServiceFactory.getPaymentService(
+      transactionRecord.quote.paymentMethod,
+    );
+
     // Process the payment and update the transaction accordingly
     try {
-      const paymentResponse = await this.paymentService.sendPayment({
+      const paymentResponse = await paymentService.sendPayment({
         account: transactionRecord.accountNumber,
         id: transactionRecord.id,
         value: transactionRecord.quote.targetAmount,

@@ -99,6 +99,7 @@ enum Country {
 
 enum PaymentMethod {
   NEQUI
+  MOVII
 }
 
 enum TargetCurrency {
