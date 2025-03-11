@@ -1,10 +1,11 @@
-import axios from "axios";
-import { inject } from "inversify";
-import { TYPES } from "../types";
-import { ISecretManager } from "../interfaces/ISecretManager";
+import axios from 'axios'
+import { inject } from 'inversify'
+
+import { ISecretManager } from '../interfaces/ISecretManager'
+import { TYPES } from '../types'
 
 export interface ISlackNotifier {
-  sendMessage(message: string): Promise<void>;
+  sendMessage(message: string): Promise<void>
 }
 
 export class SlackNotifier implements ISlackNotifier {
@@ -14,19 +15,19 @@ export class SlackNotifier implements ISlackNotifier {
 
   async sendMessage(message: string): Promise<void> {
     try {
-      const webhookUrl =
-        await this.secretManager.getSecret("SLACK_WEBHOOK_URL");
+      const webhookUrl = await this.secretManager.getSecret('SLACK_WEBHOOK_URL')
 
       if (!webhookUrl) {
-        console.error("Slack webhook URL not found in secrets.");
-        return;
+        console.error('Slack webhook URL not found in secrets.')
+        return
       }
 
-      await axios.post(webhookUrl, { text: message });
-      console.log("Message sent to Slack successfully.");
-    } catch (error) {
-      console.error("Error sending message to Slack:", error);
-      throw error;
+      await axios.post(webhookUrl, { text: message })
+      console.log('Message sent to Slack successfully.')
+    }
+    catch (error) {
+      console.error('Error sending message to Slack:', error)
+      throw error
     }
   }
 }

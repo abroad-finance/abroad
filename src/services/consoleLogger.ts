@@ -1,15 +1,15 @@
-import { ILogger } from "../interfaces";
+import { ILogger } from '../interfaces'
 
 export class ConsoleLogger implements ILogger {
-  info(message: string, ...optionalParams: any[]): void {
-    console.log("INFO:", message, ...optionalParams);
+  error(message: string, ...optionalParams: unknown[]): void {
+    console.log('ERROR:', message, ...optionalParams)
   }
 
-  warn(message: string, ...optionalParams: any[]): void {
-    console.log("WARN:", message, ...optionalParams);
+  info(message: string, ...optionalParams: unknown[]): void {
+    console.log('INFO:', message, ...optionalParams)
   }
 
-  error(message: string, ...optionalParams: any[]): void {
-    console.log("ERROR:", message, ...optionalParams);
+  warn(message: string, ...optionalParams: unknown[]): void {
+    console.log('WARN:', message, ...optionalParams)
   }
 }

@@ -1,12 +1,12 @@
 export const TYPES = {
-  IQueueHandler: Symbol.for("IQueueHandler"),
-  IExchangeRateProvider: Symbol.for("IExchangeRateProvider"),
-  StellarTransactionsController: Symbol.for("StellarTransactionsController"),
-  IPaymentService: Symbol.for("IPaymentService"),
-  IDatabaseClientProvider: Symbol.for("IDatabaseClientProvider"),
-  ISecretManager: Symbol.for("ISecretManager"),
-  IPartnerService: Symbol.for("IPartnerService"),
-  ILogger: Symbol.for("ILogger"),
-  ISlackNotifier: Symbol.for("ISlackNotifier"),
-  IPaymentServiceFactory: Symbol.for("IPaymentServiceFactory"),
-};
+  IDatabaseClientProvider: Symbol.for('IDatabaseClientProvider'),
+  IExchangeRateProvider: Symbol.for('IExchangeRateProvider'),
+  ILogger: Symbol.for('ILogger'),
+  IPartnerService: Symbol.for('IPartnerService'),
+  IPaymentService: Symbol.for('IPaymentService'),
+  IPaymentServiceFactory: Symbol.for('IPaymentServiceFactory'),
+  IQueueHandler: Symbol.for('IQueueHandler'),
+  ISecretManager: Symbol.for('ISecretManager'),
+  ISlackNotifier: Symbol.for('ISlackNotifier'),
+  StellarTransactionsController: Symbol.for('StellarTransactionsController'),
+}

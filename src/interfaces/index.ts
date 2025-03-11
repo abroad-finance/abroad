@@ -1,36 +1,39 @@
-import { CryptoCurrency, Partner, TargetCurrency } from "@prisma/client";
-import { Request } from "express";
+import { CryptoCurrency, Partner, TargetCurrency } from '@prisma/client'
+import { Request } from 'express'
+
+// The enum and interface definitions:
+export enum QueueName {
+  STELLAR_TRANSACTIONS = 'stellar-transactions',
+}
 
 export interface IExchangeRateProvider {
   getExchangeRate(
     sourceCurrency: CryptoCurrency,
     targetCurrency: TargetCurrency,
-  ): Promise<number>;
-}
-
-// The enum and interface definitions:
-export enum QueueName {
-  STELLAR_TRANSACTIONS = "stellar-transactions",
-}
-
-export interface IQueueHandler {
-  postMessage(queueName: QueueName, message: Record<string, any>): void;
-  subscribeToQueue(
-    queueName: QueueName,
-    callback: (message: Record<string, any>) => void,
-  ): void;
-}
-
-export interface IPartnerService {
-  getPartnerFromRequest(request: Request): Promise<Partner>;
+  ): Promise<number>
 }
 
 export interface ILogger {
-  info(message: string, ...optionalParams: any[]): void;
-  warn(message: string, ...optionalParams: any[]): void;
-  error(message: string, ...optionalParams: any[]): void;
+  error(message: string, ...optionalParams: unknown[]): void
+  info(message: string, ...optionalParams: unknown[]): void
+  warn(message: string, ...optionalParams: unknown[]): void
+}
+
+export interface IPartnerService {
+  getPartnerFromRequest(request: Request): Promise<Partner>
+}
+
+export interface IQueueHandler {
+  postMessage(
+    queueName: QueueName,
+    message: Record<string, boolean | number | string>,
+  ): void
+  subscribeToQueue(
+    queueName: QueueName,
+    callback: (message: Record<string, boolean | number | string>) => void,
+  ): void
 }
 
 export interface ISlackNotifier {
-  sendMessage(message: string): Promise<void>;
+  sendMessage(message: string): Promise<void>
 }

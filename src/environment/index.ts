@@ -1,5 +1,5 @@
+import { CachedSecretManager } from './CachedSecretManager'
 // src/environment/index.ts
-import { GcpSecretManager } from "./GcpSecretManager";
-import { CachedSecretManager } from "./CachedSecretManager";
+import { GcpSecretManager } from './GcpSecretManager'
 
-export { GcpSecretManager, CachedSecretManager };
+export { CachedSecretManager, GcpSecretManager }

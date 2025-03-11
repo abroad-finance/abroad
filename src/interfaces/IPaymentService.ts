@@ -1,33 +1,33 @@
-import { TargetCurrency } from "@prisma/client";
+import { TargetCurrency } from '@prisma/client'
 
 export interface IPaymentService {
-  readonly fixedFee: number;
-  readonly percentageFee: number;
-  readonly currency: TargetCurrency;
+  readonly currency: TargetCurrency
+  readonly fixedFee: number
+  readonly percentageFee: number
 
   sendPayment({
     account,
-    value,
     id,
+    value,
   }: {
-    account: string;
-    value: number;
-    id: string;
+    account: string
+    id: string
+    value: number
   }): Promise<
     | {
-        success: false;
-      }
+      success: false
+    }
     | {
-        success: true;
-        transactionId: string;
-      }
-  >;
+      success: true
+      transactionId: string
+    }
+  >
 
   verifyAccount({
     account,
     bankCode,
   }: {
-    account: string;
-    bankCode: string;
-  }): Promise<boolean>;
+    account: string
+    bankCode: string
+  }): Promise<boolean>
 }

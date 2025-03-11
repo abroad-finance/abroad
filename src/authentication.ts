@@ -1,8 +1,9 @@
 // src/authentication.ts
-import { Request } from "express";
-import { iocContainer } from "./ioc";
-import { TYPES } from "./types";
-import { IPartnerService } from "./interfaces";
+import { Request } from 'express'
+
+import { IPartnerService } from './interfaces'
+import { iocContainer } from './ioc'
+import { TYPES } from './types'
 
 export async function expressAuthentication(
   request: Request,
@@ -10,9 +11,9 @@ export async function expressAuthentication(
 ) {
   const partnerService = iocContainer.get<IPartnerService>(
     TYPES.IPartnerService,
-  );
-  if (securityName === "ApiKeyAuth") {
-    return await partnerService.getPartnerFromRequest(request);
+  )
+  if (securityName === 'ApiKeyAuth') {
+    return await partnerService.getPartnerFromRequest(request)
   }
-  throw new Error("Invalid security scheme");
+  throw new Error('Invalid security scheme')
 }
