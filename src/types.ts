@@ -8,5 +8,6 @@ export const TYPES = {
   IQueueHandler: Symbol.for('IQueueHandler'),
   ISecretManager: Symbol.for('ISecretManager'),
   ISlackNotifier: Symbol.for('ISlackNotifier'),
+  QuoteUseCase: Symbol.for('QuoteUseCase'),
   StellarTransactionsController: Symbol.for('StellarTransactionsController'),
 }

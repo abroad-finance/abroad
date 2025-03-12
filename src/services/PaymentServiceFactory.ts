@@ -1,5 +1,5 @@
-import { PaymentMethod } from '@prisma/client'
 // src/services/PaymentServiceFactory.ts
+import { PaymentMethod } from '@prisma/client'
 import { inject, injectable, named } from 'inversify'
 
 import { IPaymentService } from '../interfaces/IPaymentService'
@@ -15,10 +15,10 @@ export class PaymentServiceFactory implements IPaymentServiceFactory {
     @inject(TYPES.IPaymentService)
     @named('nequi')
     private nequiPaymentService: IPaymentService,
-  ) {}
+  ) { }
 
   public getPaymentService(paymentMethod: PaymentMethod): IPaymentService {
-    switch (paymentMethod.toLowerCase()) {
+    switch (paymentMethod) {
       case PaymentMethod.MOVII:
         return this.moviiPaymentService
       case PaymentMethod.NEQUI:

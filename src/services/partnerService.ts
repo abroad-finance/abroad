@@ -10,11 +10,10 @@ export class PartnerService implements IPartnerService {
   constructor(
     @inject(TYPES.IDatabaseClientProvider)
     private databaseClientProvider: IDatabaseClientProvider,
-  ) {}
+  ) { }
 
-  // Retrieves the partner based on the API key found in the request header.
-  public async getPartnerFromRequest(request: Request) {
-    const apiKey = request.header('X-API-Key')
+  public async getPartnerFromApiKey(apiKey: string) {
+    // Hash the API key using SHA-512/224
     if (!apiKey) {
       throw new Error('API key not provided')
     }
@@ -35,5 +34,14 @@ export class PartnerService implements IPartnerService {
     }
 
     return partner
+  }
+
+  // Retrieves the partner based on the API key found in the request header.
+  public async getPartnerFromRequest(request: Request) {
+    const apiKey = request.header('X-API-Key')
+    if (!apiKey) {
+      throw new Error('API key not provided')
+    }
+    return this.getPartnerFromApiKey(apiKey)
   }
 }

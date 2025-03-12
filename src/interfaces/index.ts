@@ -20,6 +20,7 @@ export interface ILogger {
 }
 
 export interface IPartnerService {
+  getPartnerFromApiKey(apiKey: string): Promise<Partner>
   getPartnerFromRequest(request: Request): Promise<Partner>
 }
 

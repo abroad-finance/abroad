@@ -1,8 +1,6 @@
-import { BlockchainNetwork, PaymentMethod, TargetCurrency } from '.prisma/client'
-import { Country, CryptoCurrency } from '@prisma/client'
+import { BlockchainNetwork, CryptoCurrency, PaymentMethod, TargetCurrency } from '.prisma/client'
 import { Request as RequestExpress } from 'express'
 import { inject } from 'inversify'
-// src/controllers/QuoteController.ts
 import {
   Body,
   Controller,
@@ -15,49 +13,38 @@ import {
   SuccessResponse,
   TsoaResponse,
 } from 'tsoa'
+import { z } from 'zod'
 
-import { IExchangeRateProvider, IPartnerService } from '../interfaces'
-import { IDatabaseClientProvider } from '../interfaces/IDatabaseClientProvider'
 import { TYPES } from '../types'
+import { QuoteResponse, QuoteUseCase } from '../useCases/quoteUseCase'
 
-// Request interfaces
-interface QuoteRequest {
-  amount: number
-  crypto_currency: CryptoCurrency
-  network: BlockchainNetwork
-  payment_method: PaymentMethod
-  target_currency: TargetCurrency
-}
+// Zod schemas for validating input data.
+const quoteRequestSchema = z.object({
+  amount: z.number().positive(),
+  crypto_currency: z.nativeEnum(CryptoCurrency),
+  network: z.nativeEnum(BlockchainNetwork),
+  payment_method: z.nativeEnum(PaymentMethod),
+  target_currency: z.nativeEnum(TargetCurrency),
+})
 
-// Response interface
-interface QuoteResponse {
-  expiration_time: number
-  quote_id: string
-  value: number
-}
+type QuoteRequest = z.infer<typeof quoteRequestSchema>
 
-interface ReverseQuoteRequest {
-  crypto_currency: CryptoCurrency
-  network: BlockchainNetwork
-  payment_method: PaymentMethod
-  source_amount: number
-  target_currency: TargetCurrency
-}
+const reverseQuoteRequestSchema = z.object({
+  crypto_currency: z.nativeEnum(CryptoCurrency),
+  network: z.nativeEnum(BlockchainNetwork),
+  payment_method: z.nativeEnum(PaymentMethod),
+  source_amount: z.number().positive(),
+  target_currency: z.nativeEnum(TargetCurrency),
+})
 
-const MAX_COP_AMOUNT = 500_000
-const BRIDGE_FEE = 0.002
-const NEQUI_FEE = 1354.22
-const EXPIRATION_DURATION_MS = 3_600_000 // one hour
+type ReverseQuoteRequest = z.infer<typeof reverseQuoteRequestSchema>
 
 @Route('quote')
 @Security('ApiKeyAuth')
 export class QuoteController extends Controller {
   constructor(
-    @inject(TYPES.IExchangeRateProvider)
-    private exchangeRateProvider: IExchangeRateProvider,
-    @inject(TYPES.IDatabaseClientProvider)
-    private dbClientProvider: IDatabaseClientProvider,
-    @inject(TYPES.IPartnerService) private partnerService: IPartnerService,
+    @inject(TYPES.QuoteUseCase)
+    private quoteUseCase: QuoteUseCase,
   ) {
     super()
   }
@@ -71,66 +58,35 @@ export class QuoteController extends Controller {
   public async getQuote(
     @Body() requestBody: QuoteRequest,
     @Request() request: RequestExpress,
-    @Res() maxLimitResponse: TsoaResponse<400, { reason: string }>,
+    @Res() badRequestResponse: TsoaResponse<400, { reason: string }>,
   ): Promise<QuoteResponse> {
+    const parsed = quoteRequestSchema.safeParse(requestBody)
+    if (!parsed.success) {
+      return badRequestResponse(400, { reason: parsed.error.message })
+    }
+    const { amount, crypto_currency, network, payment_method, target_currency } = parsed.data
+
+    const apiKey = request.header('X-API-Key')
+    if (!apiKey) {
+      return badRequestResponse(400, { reason: 'Missing API key' })
+    }
+
     try {
-      const {
+      const quote = await this.quoteUseCase.createQuote(
         amount,
-        crypto_currency: cryptoCurrency,
+        crypto_currency,
         network,
-        payment_method: paymentMethod,
-        target_currency: targetCurrency,
-      } = requestBody
-
-      // Enforce COP limit
-      if (targetCurrency === TargetCurrency.COP && amount > MAX_COP_AMOUNT) {
-        return maxLimitResponse(400, {
-          reason: `The maximum allowed amount for COP is ${MAX_COP_AMOUNT}`,
-        })
-      }
-
-      const partner = await this.partnerService.getPartnerFromRequest(request)
-      const expirationDate = this.getExpirationDate()
-
-      // Get and adjust exchange rate
-      let exchangeRate = await this.exchangeRateProvider.getExchangeRate(
-        cryptoCurrency,
-        targetCurrency,
+        payment_method,
+        target_currency,
+        apiKey,
       )
-      if (!exchangeRate || isNaN(exchangeRate)) {
-        return maxLimitResponse(400, {
-          reason: 'Invalid exchange rate received',
-        })
-      }
-      exchangeRate = this.applyBridgeFee(exchangeRate)
-
-      const sourceAmount = this.calculateSourceAmount(amount, exchangeRate)
-
-      const prismaClient = await this.dbClientProvider.getClient()
-      const quote = await prismaClient.quote.create({
-        data: {
-          country: Country.CO,
-          cryptoCurrency,
-          expirationDate,
-          network,
-          partnerId: partner.id,
-          paymentMethod,
-          sourceAmount,
-          targetAmount: amount,
-          targetCurrency,
-        },
-      })
-
-      return {
-        expiration_time: expirationDate.getTime(),
-        quote_id: quote.id,
-        value: quote.sourceAmount,
-      }
+      return quote
     }
     catch (error) {
+      if (error instanceof Error) {
+        return badRequestResponse(400, { reason: error.message })
+      }
       this.setStatus(500)
-      // Log error as needed
-      console.error('Error in getQuote:', error)
       return { expiration_time: 0, quote_id: 'error', value: 0 }
     }
   }
@@ -145,98 +101,36 @@ export class QuoteController extends Controller {
   public async getReverseQuote(
     @Body() requestBody: ReverseQuoteRequest,
     @Request() request: RequestExpress,
-    @Res() maxLimitResponse: TsoaResponse<400, { reason: string }>,
+    @Res() badRequestResponse: TsoaResponse<400, { reason: string }>,
   ): Promise<QuoteResponse> {
+    const parsed = reverseQuoteRequestSchema.safeParse(requestBody)
+    if (!parsed.success) {
+      return badRequestResponse(400, { reason: parsed.error.message })
+    }
+    const { crypto_currency, network, payment_method, source_amount, target_currency } = parsed.data
+
+    const apiKey = request.header('X-API-Key')
+    if (!apiKey) {
+      return badRequestResponse(400, { reason: 'Missing API key' })
+    }
+
     try {
-      const {
-        crypto_currency: cryptoCurrency,
+      const quote = await this.quoteUseCase.createReverseQuote(
+        crypto_currency,
         network,
-        payment_method: paymentMethod,
-        source_amount: sourceAmountInput,
-        target_currency: targetCurrency,
-      } = requestBody
-
-      const partner = await this.partnerService.getPartnerFromRequest(request)
-      const expirationDate = this.getExpirationDate()
-
-      // Get and adjust exchange rate
-      let exchangeRate = await this.exchangeRateProvider.getExchangeRate(
-        cryptoCurrency,
-        targetCurrency,
+        payment_method,
+        source_amount,
+        target_currency,
+        apiKey,
       )
-      if (!exchangeRate || isNaN(exchangeRate)) {
-        return maxLimitResponse(400, {
-          reason: 'Invalid exchange rate received',
-        })
-      }
-      exchangeRate = this.applyBridgeFee(exchangeRate)
-
-      const targetAmount = this.calculateTargetAmount(
-        sourceAmountInput,
-        exchangeRate,
-      )
-
-      // Enforce COP limit for reverse quote
-      if (
-        targetCurrency === TargetCurrency.COP
-        && targetAmount > MAX_COP_AMOUNT
-      ) {
-        return maxLimitResponse(400, {
-          reason: `The maximum allowed amount for COP is ${MAX_COP_AMOUNT}`,
-        })
-      }
-
-      const prismaClient = await this.dbClientProvider.getClient()
-      const quote = await prismaClient.quote.create({
-        data: {
-          country: Country.CO,
-          cryptoCurrency,
-          expirationDate,
-          network,
-          partnerId: partner.id,
-          paymentMethod,
-          sourceAmount: sourceAmountInput,
-          targetAmount,
-          targetCurrency,
-        },
-      })
-
-      return {
-        expiration_time: expirationDate.getTime(),
-        quote_id: quote.id,
-        value: quote.targetAmount,
-      }
+      return quote
     }
     catch (error) {
+      if (error instanceof Error) {
+        return badRequestResponse(400, { reason: error.message })
+      }
       this.setStatus(500)
-      console.error('Error in getReverseQuote:', error)
       return { expiration_time: 0, quote_id: 'error', value: 0 }
     }
-  }
-
-  // Helper: Adjust exchange rate by applying the bridge fee
-  private applyBridgeFee(rate: number): number {
-    return rate * (1 + BRIDGE_FEE)
-  }
-
-  // Helper: Calculate crypto amount based on fiat amount and fees
-  private calculateSourceAmount(amount: number, exchangeRate: number): number {
-    const amountWithFee = amount + NEQUI_FEE
-    const result = exchangeRate * amountWithFee
-    return Number(result.toFixed(2))
-  }
-
-  // Helper: Reverse conversion calculation
-  private calculateTargetAmount(
-    sourceAmount: number,
-    exchangeRate: number,
-  ): number {
-    const result = sourceAmount / exchangeRate - NEQUI_FEE
-    return Number(result.toFixed(2))
-  }
-
-  // Helper: Calculate expiration date (one hour from now)
-  private getExpirationDate(): Date {
-    return new Date(Date.now() + EXPIRATION_DURATION_MS)
   }
 }

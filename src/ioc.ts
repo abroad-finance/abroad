@@ -27,6 +27,7 @@ import { PartnerService } from './services/partnerService'
 import { PaymentServiceFactory } from './services/PaymentServiceFactory'
 import { SlackNotifier } from './services/slackNotifier'
 import { TYPES } from './types'
+import { QuoteUseCase } from './useCases/quoteUseCase'
 
 const container = new Container()
 
@@ -98,5 +99,8 @@ container
   .bind<ISlackNotifier>(TYPES.ISlackNotifier)
   .to(SlackNotifier)
   .inSingletonScope()
+
+// QuoteUseCase
+container.bind<QuoteUseCase>(TYPES.QuoteUseCase).to(QuoteUseCase).inSingletonScope()
 
 export { container as iocContainer }
