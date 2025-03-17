@@ -38,7 +38,7 @@ function App() {
           onConfigure={() => setIsConfigured(true)}
         />
       ) : (
-        <div className="w-full max-w-md space-y-6">
+        <div className="w-full w-xl space-y-6">
           <QuoteSection apiKey={apiKey} baseUrl={baseUrl} onQuoteSuccess={handleQuoteSuccess} />
           <AcceptTransactionSection
             apiKey={apiKey}

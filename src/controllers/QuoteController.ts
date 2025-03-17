@@ -16,7 +16,7 @@ import {
 import { z } from 'zod'
 
 import { TYPES } from '../types'
-import { QuoteResponse, QuoteUseCase } from '../useCases/quoteUseCase'
+import { IQuoteUseCase, QuoteResponse } from '../useCases/quoteUseCase'
 
 // Zod schemas for validating input data.
 const quoteRequestSchema = z.object({
@@ -27,7 +27,13 @@ const quoteRequestSchema = z.object({
   target_currency: z.nativeEnum(TargetCurrency),
 })
 
-type QuoteRequest = z.infer<typeof quoteRequestSchema>
+type QuoteRequest = {
+  amount: number
+  crypto_currency: CryptoCurrency
+  network: BlockchainNetwork
+  payment_method: PaymentMethod
+  target_currency: TargetCurrency
+}
 
 const reverseQuoteRequestSchema = z.object({
   crypto_currency: z.nativeEnum(CryptoCurrency),
@@ -37,14 +43,20 @@ const reverseQuoteRequestSchema = z.object({
   target_currency: z.nativeEnum(TargetCurrency),
 })
 
-type ReverseQuoteRequest = z.infer<typeof reverseQuoteRequestSchema>
+type ReverseQuoteRequest = {
+  crypto_currency: CryptoCurrency
+  network: BlockchainNetwork
+  payment_method: PaymentMethod
+  source_amount: number
+  target_currency: TargetCurrency
+}
 
 @Route('quote')
 @Security('ApiKeyAuth')
 export class QuoteController extends Controller {
   constructor(
     @inject(TYPES.QuoteUseCase)
-    private quoteUseCase: QuoteUseCase,
+    private quoteUseCase: IQuoteUseCase,
   ) {
     super()
   }
@@ -72,13 +84,14 @@ export class QuoteController extends Controller {
     }
 
     try {
-      const quote = await this.quoteUseCase.createQuote(
+      const quote = await this.quoteUseCase.createQuote({
         amount,
-        crypto_currency,
-        network,
-        payment_method,
-        target_currency,
         apiKey,
+        cryptoCurrency: crypto_currency,
+        network,
+        paymentMethod: payment_method,
+        targetCurrency: target_currency,
+      },
       )
       return quote
     }
@@ -115,14 +128,14 @@ export class QuoteController extends Controller {
     }
 
     try {
-      const quote = await this.quoteUseCase.createReverseQuote(
-        crypto_currency,
-        network,
-        payment_method,
-        source_amount,
-        target_currency,
+      const quote = await this.quoteUseCase.createReverseQuote({
         apiKey,
-      )
+        cryptoCurrency: crypto_currency,
+        network,
+        paymentMethod: payment_method,
+        sourceAmountInput: source_amount,
+        targetCurrency: target_currency,
+      })
       return quote
     }
     catch (error) {

@@ -33,13 +33,21 @@ const ApiConfiguration: React.FC<ApiConfigurationProps> = ({
         onChange={(e) => setApiKey(e.target.value)}
         className="w-full p-3 border border-gray-300 rounded mb-3 focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
       />
-      <input
-        type="text"
-        placeholder="Base URL"
+      <select
         value={baseUrl}
         onChange={(e) => setBaseUrl(e.target.value)}
         className="w-full p-3 border border-gray-300 rounded mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
-      />
+      >
+        <option value="https://abroad-api-910236263183.us-east1.run.app/">
+          Production
+        </option>
+        <option value="https://sandbox.abroad.finance/">
+          Staging
+        </option>
+        <option value="http://localhost:3784/">
+          Localhost
+        </option>
+      </select>
       <button
         onClick={handleConfigure}
         className="w-full bg-blue-500 text-white p-3 rounded hover:bg-blue-600 transition-colors"

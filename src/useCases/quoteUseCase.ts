@@ -13,6 +13,32 @@ import { IDatabaseClientProvider } from '../interfaces/IDatabaseClientProvider'
 import { IPaymentServiceFactory } from '../interfaces/IPaymentServiceFactory'
 import { TYPES } from '../types'
 
+// Parameter object for createQuote
+export interface CreateQuoteParams {
+  amount: number
+  apiKey: string
+  cryptoCurrency: CryptoCurrency
+  network: BlockchainNetwork
+  paymentMethod: PaymentMethod
+  targetCurrency: TargetCurrency
+}
+
+// Parameter object for createReverseQuote
+export interface CreateReverseQuoteParams {
+  apiKey: string
+  cryptoCurrency: CryptoCurrency
+  network: BlockchainNetwork
+  paymentMethod: PaymentMethod
+  sourceAmountInput: number
+  targetCurrency: TargetCurrency
+}
+
+// Interface for QuoteUseCase
+export interface IQuoteUseCase {
+  createQuote(params: CreateQuoteParams): Promise<QuoteResponse>
+  createReverseQuote(params: CreateReverseQuoteParams): Promise<QuoteResponse>
+}
+
 // Response interface remains unchanged
 export interface QuoteResponse {
   expiration_time: number
@@ -21,10 +47,10 @@ export interface QuoteResponse {
 }
 
 @injectable()
-export class QuoteUseCase {
+export class QuoteUseCase implements IQuoteUseCase {
   private readonly BRIDGE_FEE = 0.002
   private readonly EXPIRATION_DURATION_MS = 3_600_000 // one hour
-  private readonly MAX_COP_AMOUNT = 500_000
+  private readonly MAX_COP_AMOUNT = 20_000
 
   constructor(
     @inject(TYPES.IExchangeRateProvider)
@@ -37,14 +63,9 @@ export class QuoteUseCase {
     private paymentServiceFactory: IPaymentServiceFactory,
   ) { }
 
-  public async createQuote(
-    amount: number,
-    cryptoCurrency: CryptoCurrency,
-    network: BlockchainNetwork,
-    paymentMethod: PaymentMethod,
-    targetCurrency: TargetCurrency,
-    apiKey: string,
-  ): Promise<QuoteResponse> {
+  public async createQuote(params: CreateQuoteParams): Promise<QuoteResponse> {
+    const { amount, apiKey, cryptoCurrency, network, paymentMethod, targetCurrency } = params
+
     // Enforce COP limit
     if (targetCurrency === TargetCurrency.COP && amount > this.MAX_COP_AMOUNT) {
       throw new Error(`The maximum allowed amount for COP is ${this.MAX_COP_AMOUNT}`)
@@ -84,14 +105,9 @@ export class QuoteUseCase {
     }
   }
 
-  public async createReverseQuote(
-    cryptoCurrency: CryptoCurrency,
-    network: BlockchainNetwork,
-    paymentMethod: PaymentMethod,
-    sourceAmountInput: number,
-    targetCurrency: TargetCurrency,
-    apiKey: string,
-  ): Promise<QuoteResponse> {
+  public async createReverseQuote(params: CreateReverseQuoteParams): Promise<QuoteResponse> {
+    const { apiKey, cryptoCurrency, network, paymentMethod, sourceAmountInput, targetCurrency } = params
+
     const partner = await this.partnerService.getPartnerFromApiKey(apiKey)
     const expirationDate = this.getExpirationDate()
 

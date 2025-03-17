@@ -1,6 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { fetchAcceptTransaction } from './../services/apiService';
 
+const banks = [
+  { bankCode: "1507", bankName: 'NEQUI' },
+  { bankCode: "7095", bankName: 'Banco Rojo' },
+];
+
 interface AcceptTransactionSectionProps {
   apiKey: string;
   baseUrl: string;
@@ -18,20 +23,28 @@ const AcceptTransactionSection: React.FC<AcceptTransactionSectionProps> = ({
     quote_id: quoteId,
     user_id: '',
     account_number: '',
+    bank_code: banks[0].bankCode,
   });
   const [acceptTransactionResponse, setAcceptTransactionResponse] = useState(null);
   const [acceptTransactionError, setAcceptTransactionError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [transactionCreated, setTransactionCreated] = useState(false);
 
-  // Update the internal quote_id when the parent-provided quoteId changes.
+  // Reset the request and transactionCreated state when the quoteId changes.
   useEffect(() => {
     setAcceptTransactionRequest({
       quote_id: quoteId,
       user_id: '',
       account_number: '',
-    })
+      bank_code: banks[0].bankCode,
+    });
+    setTransactionCreated(false);
   }, [quoteId]);
 
   const handleAcceptTransaction = async () => {
+    // Prevent creating the transaction if one has already been created.
+    if (transactionCreated) return;
+
     setAcceptTransactionResponse(null);
     setAcceptTransactionError(null);
 
@@ -44,16 +57,19 @@ const AcceptTransactionSection: React.FC<AcceptTransactionSectionProps> = ({
       return;
     }
 
+    setIsLoading(true);
     try {
       const data = await fetchAcceptTransaction(apiKey, baseUrl, acceptTransactionRequest);
       setAcceptTransactionResponse(data);
-      // Assume transaction reference is returned as data.id – adjust as needed.
       onTransactionAccepted(data.id);
+      setTransactionCreated(true); // Mark as created so no further transactions can be made.
     } catch (error) {
       console.error('Error accepting transaction:', error);
       if (error instanceof Error) {
         setAcceptTransactionError(error.message);
       }
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -97,12 +113,39 @@ const AcceptTransactionSection: React.FC<AcceptTransactionSectionProps> = ({
         }
         className="w-full p-3 border border-gray-300 rounded mb-4 focus:outline-none focus:ring-2 focus:ring-purple-500 text-gray-900"
       />
+      {/* Bank Dropdown */}
+      <div className="mb-4">
+        <label className="block text-sm font-medium text-gray-700 mb-1">Bank</label>
+        <select
+          value={acceptTransactionRequest.bank_code}
+          onChange={(e) =>
+            setAcceptTransactionRequest({
+              ...acceptTransactionRequest,
+              bank_code: e.target.value,
+            })
+          }
+          className="w-full p-3 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500 text-gray-900"
+        >
+          {banks.map((bank) => (
+            <option key={bank.bankCode} value={bank.bankCode}>
+              {bank.bankName}
+            </option>
+          ))}
+        </select>
+      </div>
       <button
         onClick={handleAcceptTransaction}
+        disabled={isLoading || transactionCreated}
         className="w-full bg-purple-500 text-white p-3 rounded hover:bg-purple-600 transition-colors mb-4"
       >
-        Accept Transaction
+        {isLoading ? 'Processing...' : transactionCreated ? 'Transaction Accepted' : 'Accept Transaction'}
       </button>
+      {/* Optional: Additional loading spinner */}
+      {isLoading && (
+        <div className="flex justify-center mb-4">
+          <div className="loader"></div>
+        </div>
+      )}
       {acceptTransactionResponse && (
         <pre className="text-green-600 bg-gray-100 p-3 rounded">
           {JSON.stringify(acceptTransactionResponse, null, 2)}

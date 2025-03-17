@@ -34,8 +34,7 @@ const QuoteSection: React.FC<QuoteSectionProps> = ({ apiKey, baseUrl, onQuoteSuc
       payment_method: 'NEQUI',
       crypto_currency: 'USDC',
       network: 'STELLAR',
-    })
-
+    });
     setQuoteResponse(null);
   }, [inputMode]);
 
@@ -118,6 +117,22 @@ const QuoteSection: React.FC<QuoteSectionProps> = ({ apiKey, baseUrl, onQuoteSuc
         }
         className="w-full p-3 border border-gray-300 rounded mb-4 focus:outline-none focus:ring-2 focus:ring-green-500 text-gray-900"
       />
+      {/* Payment Method Dropdown */}
+      <div className="mb-4">
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Payment Method
+        </label>
+        <select
+          value={quoteRequest.payment_method}
+          onChange={(e) =>
+            setQuoteRequest({ ...quoteRequest, payment_method: e.target.value })
+          }
+          className="w-full p-3 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-green-500 text-gray-900"
+        >
+          <option value="NEQUI">NEQUI</option>
+          <option value="MOVII">MOVII</option>
+        </select>
+      </div>
       <button
         onClick={handleGetQuote}
         className="w-full bg-green-500 text-white p-3 rounded hover:bg-green-600 transition-colors mb-4"

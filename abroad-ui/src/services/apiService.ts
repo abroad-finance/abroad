@@ -15,7 +15,7 @@ export async function fetchQuote(
   if (!response.ok) {
     const responseJson = await response.json();
     if (responseJson.reason) {
-      throw new Error(`${responseJson.reason}`);
+      throw new Error(responseJson.reason);
     }
     throw new Error(`HTTP error! status: ${response.status}`);
   }
@@ -36,9 +36,15 @@ export async function fetchAcceptTransaction(
     },
     body: JSON.stringify(payload),
   });
+
   if (!response.ok) {
+    const responseJson = await response.json();
+    if (responseJson.reason) {
+      throw new Error(responseJson.reason);
+    }
     throw new Error(`HTTP error! status: ${response.status}`);
   }
+
   return response.json();
 }
 
@@ -46,9 +52,15 @@ export async function fetchTransactionStatus(apiKey: string, baseUrl: string, tr
   const response = await fetch(`${baseUrl}transaction/${transactionReference}`, {
     headers: { 'X-API-Key': apiKey },
   });
+  
   if (!response.ok) {
+    const responseJson = await response.json();
+    if (responseJson.reason) {
+      throw new Error(responseJson.reason);
+    }
     throw new Error(`HTTP error! status: ${response.status}`);
   }
+  
   return response.json();
 }
 
@@ -65,10 +77,11 @@ export async function fetchReverseQuote(
     },
     body: JSON.stringify(payload),
   });
-   if (!response.ok) {
+
+  if (!response.ok) {
     const responseJson = await response.json();
     if (responseJson.reason) {
-      throw new Error(`${responseJson.reason}`);
+      throw new Error(responseJson.reason);
     }
     throw new Error(`HTTP error! status: ${response.status}`);
   }

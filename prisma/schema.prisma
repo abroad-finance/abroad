@@ -57,6 +57,7 @@ model Transaction {
   partnerUserId String
   partnerUser   PartnerUser       @relation(fields: [partnerUserId], references: [id])
   accountNumber String
+  bankCode      String            @default("")
   status        TransactionStatus
   createdAt     DateTime          @default(now())
   quoteId       String            @unique

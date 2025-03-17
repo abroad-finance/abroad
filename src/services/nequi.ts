@@ -32,16 +32,17 @@ export type ResponseNequiDispersion = {
 }
 
 export class NequiPaymentService implements IPaymentService {
+  public readonly banks = []
   public readonly currency = TargetCurrency.COP
-  // Payment service constants
   public readonly fixedFee = 1354
   public readonly percentageFee = 0.0
+
   private token: null | string = null
   private tokenExpiration: null | number = null
 
   public constructor(
     @inject(TYPES.ISecretManager) private secretManager: ISecretManager,
-  ) {}
+  ) { }
 
   public sendPayment: IPaymentService['sendPayment'] = async ({
     account,

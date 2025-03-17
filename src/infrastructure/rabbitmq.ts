@@ -27,7 +27,7 @@ export class RabbitMQQueueHandler implements IQueueHandler {
 
     this.connection = connect([url])
     this.connection.on('connect', () =>
-      console.log('[IQueueHandler] Connected to RabbitMQ'),
+      console.log('[IQueueHandler] Connected to RabbitMQ', url),
     )
     this.connection.on('disconnect', (params) => {
       console.error(

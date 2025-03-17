@@ -1,5 +1,6 @@
-import { TargetCurrency } from '@prisma/client'
 // src/services/movii.ts
+
+import { TargetCurrency } from '@prisma/client'
 import axios from 'axios'
 import { inject } from 'inversify'
 
@@ -7,17 +8,42 @@ import { IPaymentService } from '../interfaces/IPaymentService'
 import { ISecretManager } from '../interfaces/ISecretManager'
 import { TYPES } from '../types'
 
+const banks = [
+  { bankCode: 1565, bankName: 'Superdigital', routerReference: '$superdigital_prd' },
+  { bankCode: 1507, bankName: 'NEQUI', routerReference: '$nequi' },
+  { bankCode: 1801, bankName: 'Movii', routerReference: '$movii' },
+  { bankCode: 1006, bankName: 'Banco Itau', routerReference: '$itauproduccion' },
+  { bankCode: 1062, bankName: 'Banco Falabella', routerReference: '$falabella_prd' },
+  { bankCode: 1051, bankName: 'DAVIVIENDA', routerReference: '$daviviendaprd' },
+  { bankCode: 1551, bankName: 'DAVIPLATA', routerReference: '$daviplataprd' },
+  { bankCode: 1566, bankName: 'Banco Cooperativo Coopcentral Digital', routerReference: '$coopcentralbdigital' },
+  { bankCode: 1069, bankName: 'Banco Serfinanza', routerReference: '$bancoserfinanza' },
+  { bankCode: 1007, bankName: 'Bancolombia', routerReference: '$bancolombia' },
+  { bankCode: 1063, bankName: 'BANCO FINANDINA', routerReference: '$bancofinandina' },
+  { bankCode: 1013, bankName: 'bancobbva', routerReference: '$bancobbva' },
+  { bankCode: 1032, bankName: 'Banco Caja Social', routerReference: '$bancocajasocial' },
+  { bankCode: 1066, bankName: 'bancocoopcentral', routerReference: '$bancocoopcentral' },
+  { bankCode: 1292, bankName: 'Confiar Cooperativa Financiera', routerReference: '$confiarcoopprd' },
+  { bankCode: 1040, bankName: 'BANCO AGRARIO DE COLOMBIA', routerReference: '$bancoagrario' },
+  { bankCode: 1059, bankName: 'Banco De Las Microfinanzas Bancamia SA', routerReference: '$bancamia' },
+  { bankCode: 1816, bankName: 'Banco Crezcamos', routerReference: '$crezcamos' },
+  { bankCode: 1283, bankName: 'CFA Cooperativa Financiera', routerReference: '$cfa' },
+  { bankCode: 1803, bankName: 'Banco Powwi', routerReference: '$powwi' },
+]
+
 export class MoviiPaymentService implements IPaymentService {
+  public readonly banks = banks
   public readonly currency = TargetCurrency.COP
   public readonly fixedFee = 1190
   public readonly percentageFee = 0.0
 
   public constructor(
     @inject(TYPES.ISecretManager) private secretManager: ISecretManager,
-  ) {}
+  ) { }
 
   public sendPayment: IPaymentService['sendPayment'] = async ({
     account,
+    bankCode,
     value,
   }) => {
     const baseUrl = await this.secretManager.getSecret('MOVII_BASE_URL')
@@ -27,6 +53,13 @@ export class MoviiPaymentService implements IPaymentService {
     const apiKey = await this.secretManager.getSecret('MOVII_API_KEY')
 
     const token = await this.getToken()
+
+    const targetSigner = await this.getSignerHandle(account, bankCode)
+
+    if (!targetSigner) {
+      console.error(`No signer found for account ${account} and bankCode ${bankCode}`)
+      return { success: false }
+    }
 
     const url = `${baseUrl}/transfiya/v2/transfers`
 
@@ -43,7 +76,7 @@ export class MoviiPaymentService implements IPaymentService {
       },
       source: signerHandler,
       symbol: '$tin',
-      target: account,
+      target: targetSigner,
     }
 
     const headers = {
@@ -54,9 +87,18 @@ export class MoviiPaymentService implements IPaymentService {
 
     try {
       const response = await axios.post(url, data, { headers })
-      // Check the response to see if the transfer was created successfully
+      // Check if the transfer was created successfully
       if (response.data?.error?.code === 0) {
-        return { success: true, transactionId: response.data.transferId }
+        const transferId = response.data.transferId
+        // Wait for transaction to be accepted or rejected by polling the provided endpoint
+        const finalTransaction = await this.waitForTransaction(transferId)
+        if (finalTransaction.status === 'ACCEPTED' || finalTransaction.status === 'COMPLETED') {
+          return { success: true, transactionId: transferId }
+        }
+        else {
+          console.error('Transaction rejected:', finalTransaction)
+          return { success: false }
+        }
       }
       else {
         console.error('API returned an error:', response.data)
@@ -69,11 +111,60 @@ export class MoviiPaymentService implements IPaymentService {
     }
   }
 
-  public verifyAccount({}: {
+  public async verifyAccount({ account, bankCode }: {
     account: string
     bankCode: string
   }): Promise<boolean> {
-    throw new Error('Method not implemented.')
+    try {
+      const signerHandler = await this.getSignerHandle(account, bankCode)
+      return !!signerHandler
+    }
+    catch (error) {
+      console.warn('Error verifying account:', error)
+      return false
+    }
+  }
+
+  /**
+ * Retrieves the signer handle for a given wallet and bankCode.
+ * @param wallet - The wallet identifier to be used in the API call.
+ * @param bankCode - The bank code (bankBicfi) to search for.
+ * @returns A promise that resolves with the signer handle or null if no match is found.
+ */
+  private async getSignerHandle(wallet: string, bankCode: string): Promise<null | string> {
+    const baseUrl = await this.secretManager.getSecret('MOVII_BASE_URL')
+    const apiKey = await this.secretManager.getSecret('MOVII_API_KEY')
+    const token = await this.getToken()
+
+    const parsedWallet = `$57${wallet}`
+
+    const url = `${baseUrl}/transfiya/v1/wallet/${parsedWallet}/signers`
+
+    try {
+      const response = await fetch(url, {
+        headers: {
+          'Authorization': 'Bearer ' + token,
+          'x-api-key': apiKey,
+        },
+        method: 'GET',
+      })
+
+      const data = await response.json()
+
+      // Check if the API response contains an error
+      if (data.error && data.error.code !== 0) {
+        throw new Error(data.error.message || 'Error fetching signers')
+      }
+
+      // Find the signer whose bankBicfi matches the bankCode parameter
+      const signer = data.entities.find((entity: { bankBicfi: string, handle: string }) => entity.bankBicfi === bankCode)
+
+      return signer ? signer.handle : null
+    }
+    catch (error) {
+      console.error('Error retrieving signer handle:', error)
+      throw error
+    }
   }
 
   private async getToken(): Promise<string> {
@@ -103,6 +194,46 @@ export class MoviiPaymentService implements IPaymentService {
     catch (error) {
       console.error('Error fetching token:', error)
       throw error
+    }
+  }
+
+  /**
+   * Polls the transaction status until it is no longer pending.
+   * @param transferId The transfer identifier.
+   * @returns The final transaction object.
+   */
+  private async waitForTransaction(transferId: string): Promise<{ status: string }> {
+    const baseUrl = await this.secretManager.getSecret('MOVII_BASE_URL')
+    const apiKey = await this.secretManager.getSecret('MOVII_API_KEY')
+    const token = await this.getToken()
+
+    const pollingUrl = `${baseUrl}/transfiya/v2/transfers/${transferId}`
+    // Headers as provided in the curl command
+    const headers = {
+      'Authorization': 'Bearer ' + token,
+      'x-api-key': apiKey,
+    }
+
+    const startTime = Date.now()
+    const timeout = 5 * 60_000 // 5 minutes in milliseconds
+    while (true) {
+      try {
+        const response = await axios.get(pollingUrl, { headers })
+        const transaction = response.data.entities[0]
+        // If the status is no longer "PENDING", break out of the loop
+        if (transaction && transaction.status !== 'PENDING' && transaction.status !== 'CREATED' && transaction.status !== 'INITIATED') {
+          console.log('Transaction status:', transaction)
+          return transaction
+        }
+      }
+      catch (error) {
+        console.error('Error polling transaction status:', error)
+      }
+      if (Date.now() - startTime > timeout) {
+        throw new Error('Timeout waiting for transaction to complete')
+      }
+      // Wait 5 seconds before polling again
+      await new Promise(resolve => setTimeout(resolve, 5000))
     }
   }
 }

@@ -11,14 +11,13 @@ export interface ISlackNotifier {
 export class SlackNotifier implements ISlackNotifier {
   constructor(
     @inject(TYPES.ISecretManager) private secretManager: ISecretManager,
-  ) {}
+  ) { }
 
   async sendMessage(message: string): Promise<void> {
     try {
       const webhookUrl = await this.secretManager.getSecret('SLACK_WEBHOOK_URL')
 
       if (!webhookUrl) {
-        console.error('Slack webhook URL not found in secrets.')
         return
       }
 
@@ -26,8 +25,10 @@ export class SlackNotifier implements ISlackNotifier {
       console.log('Message sent to Slack successfully.')
     }
     catch (error) {
-      console.error('Error sending message to Slack:', error)
-      throw error
+      if (error instanceof Error) {
+        console.warn('Failed to send message to Slack:', error.message)
+      }
+      return
     }
   }
 }

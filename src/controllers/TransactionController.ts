@@ -1,26 +1,31 @@
+// src/controllers/TransactionController.ts
+
 import { TransactionStatus } from '@prisma/client'
 import { Request as RequestExpress } from 'express'
 import { NotFound } from 'http-errors'
 import { inject } from 'inversify'
-// src/controllers/TransactionController.ts
 import {
   Controller,
   Get,
   Path,
   Request,
+  Res,
   Response,
   Route,
   Security,
   SuccessResponse,
+  TsoaResponse,
 } from 'tsoa'
 import { Body, Post } from 'tsoa'
 
 import { IPartnerService } from '../interfaces'
 import { IDatabaseClientProvider } from '../interfaces/IDatabaseClientProvider'
+import { IPaymentServiceFactory } from '../interfaces/IPaymentServiceFactory'
 import { TYPES } from '../types'
 
 interface AcceptTransactionRequest {
   account_number: string
+  bank_code: string
   quote_id: string
   user_id: string
 }
@@ -54,6 +59,7 @@ export class TransactionController extends Controller {
     @inject(TYPES.IDatabaseClientProvider)
     private prismaClientProvider: IDatabaseClientProvider,
     @inject(TYPES.IPartnerService) private partnerService: IPartnerService,
+    @inject(TYPES.IPaymentServiceFactory) private paymentServiceFactory: IPaymentServiceFactory,
   ) {
     super()
   }
@@ -72,40 +78,58 @@ export class TransactionController extends Controller {
   @SuccessResponse('200', 'Transaction accepted')
   public async acceptTransaction(
     @Body() requestBody: AcceptTransactionRequest,
+    @Request() request: RequestExpress,
+    @Res() badRequestResponse: TsoaResponse<400, { reason: string }>,
   ): Promise<AcceptTransactionResponse> {
     const {
       account_number: accountNumber,
+      bank_code: bankCode,
       quote_id: quoteId,
       user_id: userId,
     } = requestBody
+
+    const apiKey = request.header('X-API-Key')
+    if (!apiKey) {
+      return badRequestResponse(400, { reason: 'Missing API key' })
+    }
+    const partner = await this.partnerService.getPartnerFromApiKey(apiKey)
+
     const prismaClient = await this.prismaClientProvider.getClient()
 
-    const transaction = await prismaClient.$transaction(async (prisma) => {
-      const quote = await prisma.quote.findUnique({
-        where: { id: quoteId },
-      })
+    const quote = await prismaClient.quote.findUnique({
+      where: { id: quoteId, partnerId: partner.id },
+    })
 
-      if (!quote) {
-        throw new NotFound('Quote not found')
-      }
+    if (!quote) {
+      return badRequestResponse(400, { reason: 'Quote not found' })
+    }
 
-      const partnerUser = await prisma.partnerUser.upsert({
-        create: {
+    const paymentService = this.paymentServiceFactory.getPaymentService(quote.paymentMethod)
+    const isAccountValid = await paymentService.verifyAccount({ account: accountNumber, bankCode })
+
+    if (!isAccountValid) {
+      return badRequestResponse(400, { reason: 'Invalid account' })
+    }
+
+    const partnerUser = await prismaClient.partnerUser.upsert({
+      create: {
+        partnerId: quote.partnerId,
+        userId: userId,
+      },
+      update: {},
+      where: {
+        partnerId_userId: {
           partnerId: quote.partnerId,
           userId: userId,
         },
-        update: {},
-        where: {
-          partnerId_userId: {
-            partnerId: quote.partnerId,
-            userId: userId,
-          },
-        },
-      })
+      },
+    })
 
-      const transaction = await prisma.transaction.create({
+    try {
+      const transaction = await prismaClient.transaction.create({
         data: {
           accountNumber,
+          bankCode,
           partnerUserId: partnerUser.id,
           quoteId: quoteId,
           status: TransactionStatus.AWAITING_PAYMENT,
@@ -113,14 +137,13 @@ export class TransactionController extends Controller {
       })
 
       return {
-        ...transaction,
-        reference: uuidToBase64(transaction.id),
+        id: transaction.id,
+        transaction_reference: uuidToBase64(transaction.id),
       }
-    })
-
-    return {
-      id: transaction.id,
-      transaction_reference: transaction.reference,
+    }
+    catch (error) {
+      console.warn('Error creating transaction:', error)
+      return badRequestResponse(400, { reason: 'Transaction creation failed' })
     }
   }
 

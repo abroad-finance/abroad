@@ -137,6 +137,7 @@ export class StellarTransactionsController {
     try {
       const paymentResponse = await paymentService.sendPayment({
         account: transactionRecord.accountNumber,
+        bankCode: transactionRecord.bankCode,
         id: transactionRecord.id,
         value: transactionRecord.quote.targetAmount,
       })

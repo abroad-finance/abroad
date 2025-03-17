@@ -1,37 +1,31 @@
 import { BlockchainNetwork, CryptoCurrency, PaymentMethod, TargetCurrency } from '.prisma/client'
+import { Request as RequestExpress } from 'express'
 
-import { QuoteResponse } from '../useCases/quoteUseCase'
-// src/controllers/quoteController.test.ts
-import { QuoteController } from './quoteController'
+import { QuoteController } from '../../src/controllers/QuoteController'
+import { IQuoteUseCase, QuoteResponse } from '../../src/useCases/quoteUseCase'
 
 describe('QuoteController', () => {
-  let quoteUseCaseMock: {
-    createQuote: jest.Mock
-    createReverseQuote: jest.Mock
-  }
+  let quoteUseCaseMock: IQuoteUseCase
   let quoteController: QuoteController
+  let request: Partial<RequestExpress>
+  // This mock simulates the TSOA bad request response function.
   let badRequestResponse: jest.Mock
-  let requestMock: { header: jest.Mock }
 
   beforeEach(() => {
-    // Create a mock use case with jest.fn for both methods.
     quoteUseCaseMock = {
       createQuote: jest.fn(),
       createReverseQuote: jest.fn(),
-    }
-    // Instantiate the controller with the mocked use case.
+    } as unknown as IQuoteUseCase
+
     quoteController = new QuoteController(quoteUseCaseMock)
-    // Reset the badRequestResponse function and request header mock.
-    badRequestResponse = jest.fn((code: number, payload: { reason: string }) => {
-      return payload
-    })
-    requestMock = {
+    request = {
       header: jest.fn(),
     }
+    badRequestResponse = jest.fn()
   })
 
   describe('getQuote', () => {
-    const validRequestBody = {
+    const validBody = {
       amount: 100,
       crypto_currency: CryptoCurrency.USDC,
       network: BlockchainNetwork.STELLAR,
@@ -39,158 +33,101 @@ describe('QuoteController', () => {
       target_currency: TargetCurrency.COP,
     }
 
-    it('should return bad request if body validation fails', async () => {
-      // Provide an invalid body (e.g., negative amount)
-      const invalidRequestBody = {
-        amount: -100,
-        crypto_currency: CryptoCurrency.USDC,
-        network: BlockchainNetwork.STELLAR,
-        payment_method: PaymentMethod.NEQUI,
-        target_currency: TargetCurrency.COP,
-      }
-      requestMock.header.mockReturnValue('testApiKey')
+    it('should return a quote when input is valid', async () => {
+      // Arrange: Set the API key and expected quote.
+      ; (request.header as jest.Mock).mockReturnValue('dummy-api-key')
+      const expectedQuote: QuoteResponse = { expiration_time: 123, quote_id: 'abc', value: 999 }
+        ; (quoteUseCaseMock.createQuote as jest.Mock).mockResolvedValue(expectedQuote)
 
-      const response = await quoteController.getQuote(
-        invalidRequestBody,
-        requestMock as any,
-        badRequestResponse,
-      )
+      // Act: Call getQuote.
+      const result = await quoteController.getQuote(validBody, request as RequestExpress, badRequestResponse)
 
-      // The badRequestResponse should be called with a 400 status code and a reason from zod.
-      expect(badRequestResponse).toHaveBeenCalledWith(
-        400,
-        expect.objectContaining({ reason: expect.any(String) }),
-      )
-      expect(response).toEqual(expect.objectContaining({ reason: expect.any(String) }))
+      // Assert: Ensure the quote is returned and the use case was called with the correct parameters.
+      expect(result).toEqual(expectedQuote)
+      expect(quoteUseCaseMock.createQuote).toHaveBeenCalledWith({
+        amount: validBody.amount,
+        apiKey: 'dummy-api-key',
+        cryptoCurrency: validBody.crypto_currency,
+        network: validBody.network,
+        paymentMethod: validBody.payment_method,
+        targetCurrency: validBody.target_currency,
+      })
     })
 
-    it('should return bad request if API key is missing', async () => {
-      requestMock.header.mockReturnValue(undefined)
+    it('should return a bad request when API key is missing', async () => {
+      ; (request.header as jest.Mock).mockReturnValue(null)
 
-      const response = await quoteController.getQuote(
-        validRequestBody,
-        requestMock as any,
-        badRequestResponse,
-      )
-
+      await quoteController.getQuote(validBody, request as RequestExpress, badRequestResponse)
       expect(badRequestResponse).toHaveBeenCalledWith(400, { reason: 'Missing API key' })
-      expect(response).toEqual({ reason: 'Missing API key' })
     })
 
-    it('should return bad request if quoteUseCase.createQuote throws an error', async () => {
-      requestMock.header.mockReturnValue('testApiKey')
-      const errorMessage = 'Test error'
-      quoteUseCaseMock.createQuote.mockRejectedValue(new Error(errorMessage))
+    it('should return a bad request when input validation fails', async () => {
+      const invalidBody = { ...validBody, amount: -100 }
+        ; (request.header as jest.Mock).mockReturnValue('dummy-api-key')
 
-      const response = await quoteController.getQuote(
-        validRequestBody,
-        requestMock as any,
-        badRequestResponse,
-      )
+      await quoteController.getQuote(invalidBody, request as RequestExpress, badRequestResponse)
+      // We expect the badRequestResponse to be called with a reason string coming from Zod.
+      expect(badRequestResponse).toHaveBeenCalledWith(400, expect.objectContaining({ reason: expect.any(String) }))
+    })
 
+    it('should return a bad request when createQuote throws an error', async () => {
+      ; (request.header as jest.Mock).mockReturnValue('dummy-api-key')
+      const errorMessage = 'Error occurred'
+        ; (quoteUseCaseMock.createQuote as jest.Mock).mockRejectedValue(new Error(errorMessage))
+
+      await quoteController.getQuote(validBody, request as RequestExpress, badRequestResponse)
       expect(badRequestResponse).toHaveBeenCalledWith(400, { reason: errorMessage })
-      expect(response).toEqual({ reason: errorMessage })
-    })
-
-    it('should return a valid quote response when successful', async () => {
-      requestMock.header.mockReturnValue('testApiKey')
-      const fakeQuote: QuoteResponse = {
-        expiration_time: Date.now() + 3600000,
-        quote_id: 'quoteId',
-        value: 202.4,
-      }
-      quoteUseCaseMock.createQuote.mockResolvedValue(fakeQuote)
-
-      const response = await quoteController.getQuote(
-        validRequestBody,
-        requestMock as any,
-        badRequestResponse,
-      )
-
-      // Ensure badRequestResponse is not called in a successful scenario.
-      expect(badRequestResponse).not.toHaveBeenCalled()
-      expect(response).toEqual(fakeQuote)
     })
   })
 
   describe('getReverseQuote', () => {
-    const validReverseRequestBody = {
+    const validBody = {
       crypto_currency: CryptoCurrency.USDC,
       network: BlockchainNetwork.STELLAR,
-      payment_method: PaymentMethod.MOVII,
-      source_amount: 202.4,
+      payment_method: PaymentMethod.NEQUI,
+      source_amount: 50,
       target_currency: TargetCurrency.COP,
     }
 
-    it('should return bad request if body validation fails', async () => {
-      // Provide an invalid reverse quote body (e.g., non-positive source_amount)
-      const invalidReverseRequestBody = {
-        crypto_currency: CryptoCurrency.USDC,
-        network: BlockchainNetwork.STELLAR,
-        payment_method: PaymentMethod.MOVII,
-        source_amount: 0,
-        target_currency: TargetCurrency.COP,
-      }
-      requestMock.header.mockReturnValue('testApiKey')
+    it('should return a reverse quote when input is valid', async () => {
+      ; (request.header as jest.Mock).mockReturnValue('dummy-api-key')
+      const expectedQuote: QuoteResponse = { expiration_time: 321, quote_id: 'def', value: 555 }
+        ; (quoteUseCaseMock.createReverseQuote as jest.Mock).mockResolvedValue(expectedQuote)
 
-      const response = await quoteController.getReverseQuote(
-        invalidReverseRequestBody,
-        requestMock as any,
-        badRequestResponse,
-      )
-
-      expect(badRequestResponse).toHaveBeenCalledWith(
-        400,
-        expect.objectContaining({ reason: expect.any(String) }),
-      )
-      expect(response).toEqual(expect.objectContaining({ reason: expect.any(String) }))
+      const result = await quoteController.getReverseQuote(validBody, request as RequestExpress, badRequestResponse)
+      expect(result).toEqual(expectedQuote)
+      expect(quoteUseCaseMock.createReverseQuote).toHaveBeenCalledWith({
+        apiKey: 'dummy-api-key',
+        cryptoCurrency: validBody.crypto_currency,
+        network: validBody.network,
+        paymentMethod: validBody.payment_method,
+        sourceAmountInput: validBody.source_amount,
+        targetCurrency: validBody.target_currency,
+      })
     })
 
-    it('should return bad request if API key is missing', async () => {
-      requestMock.header.mockReturnValue(undefined)
+    it('should return a bad request when API key is missing', async () => {
+      ; (request.header as jest.Mock).mockReturnValue(null)
 
-      const response = await quoteController.getReverseQuote(
-        validReverseRequestBody,
-        requestMock as any,
-        badRequestResponse,
-      )
-
+      await quoteController.getReverseQuote(validBody, request as RequestExpress, badRequestResponse)
       expect(badRequestResponse).toHaveBeenCalledWith(400, { reason: 'Missing API key' })
-      expect(response).toEqual({ reason: 'Missing API key' })
     })
 
-    it('should return bad request if quoteUseCase.createReverseQuote throws an error', async () => {
-      requestMock.header.mockReturnValue('testApiKey')
-      const errorMessage = 'Reverse error'
-      quoteUseCaseMock.createReverseQuote.mockRejectedValue(new Error(errorMessage))
+    it('should return a bad request when input validation fails', async () => {
+      const invalidBody = { ...validBody, source_amount: -50 }
+        ; (request.header as jest.Mock).mockReturnValue('dummy-api-key')
 
-      const response = await quoteController.getReverseQuote(
-        validReverseRequestBody,
-        requestMock as any,
-        badRequestResponse,
-      )
+      await quoteController.getReverseQuote(invalidBody, request as RequestExpress, badRequestResponse)
+      expect(badRequestResponse).toHaveBeenCalledWith(400, expect.objectContaining({ reason: expect.any(String) }))
+    })
 
+    it('should return a bad request when createReverseQuote throws an error', async () => {
+      ; (request.header as jest.Mock).mockReturnValue('dummy-api-key')
+      const errorMessage = 'Reverse quote error'
+        ; (quoteUseCaseMock.createReverseQuote as jest.Mock).mockRejectedValue(new Error(errorMessage))
+
+      await quoteController.getReverseQuote(validBody, request as RequestExpress, badRequestResponse)
       expect(badRequestResponse).toHaveBeenCalledWith(400, { reason: errorMessage })
-      expect(response).toEqual({ reason: errorMessage })
-    })
-
-    it('should return a valid reverse quote response when successful', async () => {
-      requestMock.header.mockReturnValue('testApiKey')
-      const fakeQuote: QuoteResponse = {
-        expiration_time: Date.now() + 3600000,
-        quote_id: 'reverseQuoteId',
-        value: 100.0,
-      }
-      quoteUseCaseMock.createReverseQuote.mockResolvedValue(fakeQuote)
-
-      const response = await quoteController.getReverseQuote(
-        validReverseRequestBody,
-        requestMock as any,
-        badRequestResponse,
-      )
-
-      expect(badRequestResponse).not.toHaveBeenCalled()
-      expect(response).toEqual(fakeQuote)
     })
   })
 })
