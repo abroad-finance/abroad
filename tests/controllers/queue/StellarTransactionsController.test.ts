@@ -29,8 +29,14 @@ describe('StellarTransactionsController', () => {
   beforeEach(async () => {
     // Create typed mocks for the dependencies
     paymentService = {
+      banks: [],
       currency: TargetCurrency.COP,
       fixedFee: 0,
+      MAX_TOTAL_AMOUNT_PER_DAY: 1_000_000,
+      MAX_USER_AMOUNT_PER_DAY: 1_000_000,
+      MAX_USER_AMOUNT_PER_TRANSACTION: 1_000_000,
+      MAX_USER_TRANSACTIONS_PER_DAY: 10,
+      onboardUser: jest.fn(),
       percentageFee: 0,
       sendPayment: jest.fn(),
       verifyAccount: jest.fn(),

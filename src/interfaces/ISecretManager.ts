@@ -1,4 +1,4 @@
-// src/environment/ISecretManager.ts
+// src/interfaces/ISecretManager.ts
 
 export const Secrets = {
   ACCESS_KEY_NEQUI: 'ACCESS_KEY_NEQUI',

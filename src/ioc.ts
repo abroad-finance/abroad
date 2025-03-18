@@ -1,7 +1,9 @@
+// src/ioc.ts
 import { Container, decorate, injectable } from 'inversify'
 import { Controller } from 'tsoa'
 
 import { KycController } from './controllers/KycController'
+import { PaymentsController } from './controllers/PaymentsController'
 import { StellarTransactionsController } from './controllers/queue/StellarTransactionsController'
 import { QuoteController } from './controllers/QuoteController'
 import { TransactionController } from './controllers/TransactionController'
@@ -90,6 +92,7 @@ container
   .toSelf()
   .inSingletonScope()
 container.bind<KycController>(KycController).toSelf().inSingletonScope()
+container.bind(PaymentsController).toSelf().inSingletonScope()
 
 // ILogger
 container.bind<ILogger>(TYPES.ILogger).to(ConsoleLogger).inSingletonScope()

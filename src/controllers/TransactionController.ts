@@ -108,7 +108,7 @@ export class TransactionController extends Controller {
     const isAccountValid = await paymentService.verifyAccount({ account: accountNumber, bankCode })
 
     if (!isAccountValid) {
-      return badRequestResponse(400, { reason: 'Invalid account' })
+      return badRequestResponse(400, { reason: 'User account is invalid or not linked to the payment method' })
     }
 
     const partnerUser = await prismaClient.partnerUser.upsert({
@@ -124,6 +124,49 @@ export class TransactionController extends Controller {
         },
       },
     })
+
+    const userTransactionsToday = await prismaClient.transaction.findMany({
+      include: { quote: true },
+      where: {
+        createdAt: {
+          gte: new Date(new Date().setHours(0, 0, 0, 0)),
+        },
+        partnerUserId: partnerUser.id,
+        quote: {
+          paymentMethod: quote.paymentMethod,
+        },
+        status: TransactionStatus.PAYMENT_COMPLETED,
+      },
+    })
+
+    if (userTransactionsToday.length >= paymentService.MAX_USER_TRANSACTIONS_PER_DAY) {
+      return badRequestResponse(400, { reason: 'User has reached the maximum number of transactions for today' })
+    }
+
+    const totalUserAmount = userTransactionsToday.reduce((acc, transaction) => acc + transaction.quote.targetAmount, 0)
+
+    if (totalUserAmount + quote.targetAmount > paymentService.MAX_TOTAL_AMOUNT_PER_DAY) {
+      return badRequestResponse(400, { reason: 'User has reached the maximum amount for today' })
+    }
+
+    const transactionsToday = await prismaClient.transaction.findMany({
+      include: { quote: true },
+      where: {
+        createdAt: {
+          gte: new Date(new Date().setHours(0, 0, 0, 0)),
+        },
+        quote: {
+          paymentMethod: quote.paymentMethod,
+        },
+        status: TransactionStatus.PAYMENT_COMPLETED,
+      },
+    })
+
+    const totalAmountToday = transactionsToday.reduce((acc, transaction) => acc + transaction.quote.targetAmount, 0)
+
+    if (totalAmountToday + quote.targetAmount > paymentService.MAX_TOTAL_AMOUNT_PER_DAY) {
+      return badRequestResponse(400, { reason: 'This payment method has reached the maximum amount for today' })
+    }
 
     try {
       const transaction = await prismaClient.transaction.create({

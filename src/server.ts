@@ -1,7 +1,7 @@
+// src/server.ts
 import bodyParser from 'body-parser'
 import cors from 'cors'
 import dotenv from 'dotenv'
-// src/server.ts
 import express, { Request, Response } from 'express'
 import path from 'path'
 

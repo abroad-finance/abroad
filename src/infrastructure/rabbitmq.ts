@@ -1,3 +1,4 @@
+// src/infrastructure/rabbitmq.ts
 import { AmqpConnectionManager, ChannelWrapper, connect } from 'amqp-connection-manager'
 import * as amqplib from 'amqplib'
 import { inject } from 'inversify'

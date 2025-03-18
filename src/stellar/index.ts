@@ -1,4 +1,5 @@
 #!/usr/bin/env -S npx tsx
+// src/stellar/index.ts
 
 import { BlockchainNetwork, CryptoCurrency } from '@prisma/client'
 import { Horizon } from '@stellar/stellar-sdk'

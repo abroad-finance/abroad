@@ -1,3 +1,4 @@
+// src/types.ts
 export const TYPES = {
   IDatabaseClientProvider: Symbol.for('IDatabaseClientProvider'),
   IExchangeRateProvider: Symbol.for('IExchangeRateProvider'),

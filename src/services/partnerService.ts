@@ -1,3 +1,4 @@
+// src/services/partnerService.ts
 import { Request } from 'express'
 import { inject } from 'inversify'
 import { sha512_224 } from 'js-sha512'

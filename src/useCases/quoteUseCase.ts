@@ -50,7 +50,6 @@ export interface QuoteResponse {
 export class QuoteUseCase implements IQuoteUseCase {
   private readonly BRIDGE_FEE = 0.002
   private readonly EXPIRATION_DURATION_MS = 3_600_000 // one hour
-  private readonly MAX_COP_AMOUNT = 20_000
 
   constructor(
     @inject(TYPES.IExchangeRateProvider)
@@ -66,11 +65,6 @@ export class QuoteUseCase implements IQuoteUseCase {
   public async createQuote(params: CreateQuoteParams): Promise<QuoteResponse> {
     const { amount, apiKey, cryptoCurrency, network, paymentMethod, targetCurrency } = params
 
-    // Enforce COP limit
-    if (targetCurrency === TargetCurrency.COP && amount > this.MAX_COP_AMOUNT) {
-      throw new Error(`The maximum allowed amount for COP is ${this.MAX_COP_AMOUNT}`)
-    }
-
     const partner = await this.partnerService.getPartnerFromApiKey(apiKey)
     const expirationDate = this.getExpirationDate()
 
@@ -81,7 +75,14 @@ export class QuoteUseCase implements IQuoteUseCase {
     const exchangeRateWithFee = this.applyBridgeFee(exchangeRate)
 
     const paymentService = this.paymentServiceFactory.getPaymentService(paymentMethod)
+
+    // Enforce max user amount
+    if (amount > paymentService.MAX_USER_AMOUNT_PER_TRANSACTION) {
+      throw new Error(`The maximum allowed amount for ${targetCurrency} is ${paymentService.MAX_USER_AMOUNT_PER_TRANSACTION} ${targetCurrency}`)
+    }
+
     const sourceAmount = this.calculateSourceAmount(amount, exchangeRateWithFee, paymentService.fixedFee)
+
     const prismaClient = await this.dbClientProvider.getClient()
 
     const quote = await prismaClient.quote.create({
@@ -119,9 +120,10 @@ export class QuoteUseCase implements IQuoteUseCase {
 
     const paymentService = this.paymentServiceFactory.getPaymentService(paymentMethod)
     const targetAmount = this.calculateTargetAmount(sourceAmountInput, exchangeRateWithFee, paymentService.fixedFee)
-    // Enforce COP limit for reverse quote
-    if (targetCurrency === TargetCurrency.COP && targetAmount > this.MAX_COP_AMOUNT) {
-      throw new Error(`The maximum allowed amount for COP is ${this.MAX_COP_AMOUNT}`)
+
+    // Enforce max user amount
+    if (targetAmount > paymentService.MAX_USER_AMOUNT_PER_TRANSACTION) {
+      throw new Error(`The maximum allowed amount for ${targetCurrency} is ${paymentService.MAX_USER_AMOUNT_PER_TRANSACTION} ${targetCurrency}`)
     }
 
     const prismaClient = await this.dbClientProvider.getClient()

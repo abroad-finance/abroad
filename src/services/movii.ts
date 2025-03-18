@@ -34,12 +34,73 @@ const banks = [
 export class MoviiPaymentService implements IPaymentService {
   public readonly banks = banks
   public readonly currency = TargetCurrency.COP
-  public readonly fixedFee = 1190
+  public readonly fixedFee = 1_190
+
+  public readonly MAX_TOTAL_AMOUNT_PER_DAY: number = 5_000_000
+  public readonly MAX_USER_AMOUNT_PER_DAY: number = 5_000_000
+  public readonly MAX_USER_AMOUNT_PER_TRANSACTION: number = 500_000
+  public readonly MAX_USER_TRANSACTIONS_PER_DAY: number = 15
+
   public readonly percentageFee = 0.0
 
   public constructor(
     @inject(TYPES.ISecretManager) private secretManager: ISecretManager,
   ) { }
+
+  public onboardUser: IPaymentService['onboardUser'] = async ({
+    account,
+  }) => {
+    const baseUrl = await this.secretManager.getSecret('MOVII_BASE_URL')
+    const signerHandler = await this.secretManager.getSecret(
+      'MOVII_SIGNER_HANDLER',
+    )
+    const apiKey = await this.secretManager.getSecret('MOVII_API_KEY')
+
+    const token = await this.getToken()
+
+    const url = `${baseUrl}/transfiya/v2/transfers`
+
+    const data = {
+      amount: '1000',
+      labels: {
+        acceptSms: 'Vincula tu cuenta banacaria con transfiya para recibir tus transferencias.',
+        description: 'Send ',
+        domain: 'tin',
+        numberOfTransactions: '1',
+        sourceChannel: 'APP',
+        transactionPurpose: 'ONBOARDING',
+        tx_id: '',
+        type: 'SEND',
+      },
+      source: signerHandler,
+      symbol: '$tin',
+      target: `$57${account}`,
+    }
+
+    const headers = {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+    }
+
+    try {
+      const response = await axios.post(url, data, { headers })
+
+      console.log('Response:', response.data)
+      // Check if the transfer was created successfully
+      if (response.data?.error?.code === 0) {
+        return { message: 'Onboarding started successfully, please make sure the user completes the onboarding process', success: true }
+      }
+      else {
+        console.error('API returned an error:', response.data)
+        return { success: false }
+      }
+    }
+    catch (error) {
+      console.error('Error sending payment:', error)
+      return { success: false }
+    }
+  }
 
   public sendPayment: IPaymentService['sendPayment'] = async ({
     account,

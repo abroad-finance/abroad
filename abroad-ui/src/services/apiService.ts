@@ -88,3 +88,29 @@ export async function fetchReverseQuote(
   
   return response.json();
 }
+
+
+export async function paymentsOnboard(
+  apiKey: string,
+  baseUrl: string,
+  onboardRequest: { account: string }
+){
+  const response = await fetch(`${baseUrl}payments/onboard`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-API-Key': apiKey,
+    },
+    body: JSON.stringify(onboardRequest),
+  });
+
+  if (!response.ok) {
+    const responseJson = await response.json();
+    if (responseJson.reason) {
+      throw new Error(responseJson.reason);
+    }
+    throw new Error(`HTTP error! status: ${response.status}`);
+  }
+
+  return response.json();
+}

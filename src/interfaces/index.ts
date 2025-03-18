@@ -1,3 +1,4 @@
+// src/interfaces/index.ts
 import { CryptoCurrency, Partner, TargetCurrency } from '@prisma/client'
 import { Request } from 'express'
 

@@ -3,6 +3,7 @@ import ApiConfiguration from './pages/ApiConfiguration';
 import QuoteSection from './pages/QuoteSection';
 import AcceptTransactionSection from './pages/AcceptTransactionSection';
 import TransactionStatusSection from './pages/TransactionStatusSection';
+import PaymentsOnboardSection from './pages/PaymentsOnboard';
 
 function App() {
   const [apiKey, setApiKey] = useState('');
@@ -51,6 +52,7 @@ function App() {
             baseUrl={baseUrl}
             transactionReference={transactionReference}
           />
+          <PaymentsOnboardSection apiKey={apiKey} baseUrl={baseUrl} />
         </div>
       )}
     </div>

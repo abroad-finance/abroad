@@ -35,6 +35,12 @@ export class NequiPaymentService implements IPaymentService {
   public readonly banks = []
   public readonly currency = TargetCurrency.COP
   public readonly fixedFee = 1354
+
+  public readonly MAX_TOTAL_AMOUNT_PER_DAY: number = 10_000_000
+  public readonly MAX_USER_AMOUNT_PER_DAY: number = 10_000_000
+  public readonly MAX_USER_AMOUNT_PER_TRANSACTION: number = 500_000
+  public readonly MAX_USER_TRANSACTIONS_PER_DAY: number = 15
+
   public readonly percentageFee = 0.0
 
   private token: null | string = null
@@ -43,6 +49,10 @@ export class NequiPaymentService implements IPaymentService {
   public constructor(
     @inject(TYPES.ISecretManager) private secretManager: ISecretManager,
   ) { }
+
+  onboardUser(): Promise<{ message?: string, success: boolean }> {
+    throw new Error('Method not implemented.')
+  }
 
   public sendPayment: IPaymentService['sendPayment'] = async ({
     account,
