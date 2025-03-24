@@ -18,6 +18,7 @@ import {
   ISlackNotifier,
 } from './interfaces'
 import { IDatabaseClientProvider } from './interfaces/IDatabaseClientProvider'
+import { IKycService } from './interfaces/IKycService'
 import { IPaymentService } from './interfaces/IPaymentService'
 import { IPaymentServiceFactory } from './interfaces/IPaymentServiceFactory'
 import { ISecretManager } from './interfaces/ISecretManager'
@@ -27,6 +28,7 @@ import { MoviiPaymentService } from './services/movii'
 import { NequiPaymentService } from './services/nequi'
 import { PartnerService } from './services/partnerService'
 import { PaymentServiceFactory } from './services/PaymentServiceFactory'
+import { PersonaKycService } from './services/personaKycService'
 import { SlackNotifier } from './services/slackNotifier'
 import { TYPES } from './types'
 import { QuoteUseCase } from './useCases/quoteUseCase'
@@ -83,6 +85,12 @@ container
 container
   .bind<IPartnerService>(TYPES.IPartnerService)
   .to(PartnerService)
+  .inSingletonScope()
+
+// IKycService
+container
+  .bind<IKycService>(TYPES.IKycService)
+  .to(PersonaKycService)
   .inSingletonScope()
 
 // Controllers

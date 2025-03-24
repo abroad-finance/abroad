@@ -26,6 +26,7 @@ model PartnerUser {
   updatedAt   DateTime      @updatedAt
   transaction Transaction[]
   kycStatus   KycStatus     @default(PENDING)
+  kycId       String?
 
   // Unique constraint to ensure a user is only once per partner
   @@unique([partnerId, userId])
