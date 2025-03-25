@@ -31,6 +31,7 @@ import { PaymentServiceFactory } from './services/PaymentServiceFactory'
 import { PersonaKycService } from './services/personaKycService'
 import { SlackNotifier } from './services/slackNotifier'
 import { TYPES } from './types'
+import { KycUseCase } from './useCases/kycUseCase'
 import { QuoteUseCase } from './useCases/quoteUseCase'
 
 const container = new Container()
@@ -113,5 +114,8 @@ container
 
 // QuoteUseCase
 container.bind<QuoteUseCase>(TYPES.QuoteUseCase).to(QuoteUseCase).inSingletonScope()
+
+// KycUseCase
+container.bind<KycUseCase>(TYPES.KycUseCase).to(KycUseCase).inSingletonScope()
 
 export { container as iocContainer }

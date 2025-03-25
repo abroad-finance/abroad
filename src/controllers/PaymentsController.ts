@@ -51,8 +51,6 @@ export class PaymentsController extends Controller {
     }
 
     try {
-      // For example purposes, we use the MOVII payment service.
-      // In a real scenario you might select a service based on some business logic.
       const paymentService = this.paymentServiceFactory.getPaymentService(PaymentMethod.MOVII)
       const result = await paymentService.onboardUser({ account: requestBody.account })
       return result

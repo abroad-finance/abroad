@@ -20,9 +20,9 @@ import { Body, Post } from 'tsoa'
 
 import { IPartnerService } from '../interfaces'
 import { IDatabaseClientProvider } from '../interfaces/IDatabaseClientProvider'
-import { IKycService } from '../interfaces/IKycService'
 import { IPaymentServiceFactory } from '../interfaces/IPaymentServiceFactory'
 import { TYPES } from '../types'
+import { KycUseCase } from '../useCases/kycUseCase'
 
 interface AcceptTransactionRequest {
   account_number: string
@@ -61,7 +61,7 @@ export class TransactionController extends Controller {
     private prismaClientProvider: IDatabaseClientProvider,
     @inject(TYPES.IPartnerService) private partnerService: IPartnerService,
     @inject(TYPES.IPaymentServiceFactory) private paymentServiceFactory: IPaymentServiceFactory,
-    @inject(TYPES.IKycService) private kycService: IKycService,
+    @inject(TYPES.KycUseCase) private kycUseCase: KycUseCase,
   ) {
     super()
   }
@@ -73,10 +73,7 @@ export class TransactionController extends Controller {
    * @returns A `transaction_reference` (used on-chain as a memo) and an `expiration_time`.
    */
   @Post()
-  @Response('400', 'Bad Request')
-  @Response('401', 'Unauthorized')
-  @Response('404', 'Not Found')
-  @Response('500', 'Internal Server Error')
+  @Response<400, { reason: string }>(400, 'Bad Request')
   @SuccessResponse('200', 'Transaction accepted')
   public async acceptTransaction(
     @Body() requestBody: AcceptTransactionRequest,
@@ -127,7 +124,7 @@ export class TransactionController extends Controller {
       },
     })
 
-    const { status } = await this.kycService.getKycStatus(partnerUser.id)
+    const { status } = await this.kycUseCase.getKycStatus({ partnerId: partner.id, userId })
 
     if (status !== KycStatus.APPROVED) {
       return badRequestResponse(400, { reason: 'KYC not approved' })

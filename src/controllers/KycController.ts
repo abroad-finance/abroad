@@ -1,19 +1,28 @@
 // src/controllers/KycController.ts
 import { KycStatus } from '@prisma/client'
+import { Request as RequestExpress } from 'express'
 import { inject } from 'inversify'
 import {
   Body,
   Controller,
   Post,
+  Request,
+  Res,
   Response,
   Route,
   Security,
   SuccessResponse,
+  TsoaResponse,
 } from 'tsoa'
+import { z } from 'zod'
 
-import { IDatabaseClientProvider } from '../interfaces/IDatabaseClientProvider'
-import { IKycService } from '../interfaces/IKycService'
+import { IPartnerService } from '../interfaces'
 import { TYPES } from '../types'
+import { KycUseCase } from '../useCases/kycUseCase'
+
+const kycRequestSchema = z.object({
+  user_id: z.string(),
+})
 
 interface KycRequest {
   user_id: string
@@ -29,8 +38,8 @@ interface KycResponse {
 @Security('ApiKeyAuth')
 export class KycController extends Controller {
   public constructor(
-    @inject(TYPES.IKycService) private kycService: IKycService,
-    @inject(TYPES.IDatabaseClientProvider) private databaseClientProvider: IDatabaseClientProvider,
+    @inject(TYPES.KycUseCase) private kycUseCase: KycUseCase,
+    @inject(TYPES.IPartnerService) private partnerService: IPartnerService,
   ) {
     super()
   }
@@ -42,31 +51,23 @@ export class KycController extends Controller {
    * @returns Current KYC status and a link to complete KYC if needed.
    */
   @Post()
-  @Response('400', 'Bad Request')
-  @Response('401', 'Unauthorized')
-  @Response('404', 'Not Found')
-  @Response('500', 'Internal Server Error')
+  @Response<400, { reason: string }>(400, 'Bad Request')
+  @Security('ApiKeyAuth')
   @SuccessResponse('200', 'KYC status response')
-  public async checkKyc(@Body() requestBody: KycRequest): Promise<KycResponse> {
-    if (!requestBody.user_id) {
-      this.setStatus(400)
-      throw new Error('user_id is required')
+  public async checkKyc(
+    @Body() requestBody: KycRequest,
+    @Request() request: RequestExpress,
+    @Res() badRequestResponse: TsoaResponse<400, { reason: string }>,
+  ): Promise<KycResponse> {
+    const parsed = kycRequestSchema.safeParse(requestBody)
+    if (!parsed.success) {
+      return badRequestResponse(400, { reason: parsed.error.message })
     }
 
     try {
-      const dbClient = await this.databaseClientProvider.getClient()
-      const user = await dbClient.partnerUser.findUnique({
-        where: {
-          id: requestBody.user_id,
-        },
-      })
+      const partner = await this.partnerService.getPartnerFromApiKey(request.header('X-API-Key'))
 
-      if (!user) {
-        this.setStatus(404)
-        throw new Error('User not found')
-      }
-
-      const { kycLink, status } = await this.kycService.getKycStatus(user.id)
+      const { kycLink, status } = await this.kycUseCase.getKycStatus({ partnerId: partner.id, userId: parsed.data.user_id })
 
       return {
         kyc_link: kycLink,
