@@ -114,3 +114,28 @@ export async function paymentsOnboard(
 
   return response.json();
 }
+
+export async function initiateKYC(
+  apiKey: string,
+  baseUrl: string,
+  kycRequest: { user_id: string }
+) {
+  const response = await fetch(`${baseUrl}kyc`, {
+      method: 'POST',
+      headers: {
+          'Content-Type': 'application/json',
+          'X-API-Key': apiKey,
+      },
+      body: JSON.stringify(kycRequest),
+  });
+
+  if (!response.ok) {
+      const responseJson = await response.json();
+      if (responseJson.reason) {
+          throw new Error(responseJson.reason);
+      }
+      throw new Error(`HTTP error! status: ${response.status}`);
+  }
+
+  return response.json();
+}

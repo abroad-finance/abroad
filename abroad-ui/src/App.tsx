@@ -4,6 +4,7 @@ import QuoteSection from './pages/QuoteSection';
 import AcceptTransactionSection from './pages/AcceptTransactionSection';
 import TransactionStatusSection from './pages/TransactionStatusSection';
 import PaymentsOnboardSection from './pages/PaymentsOnboard';
+import KYCSection from './pages/KycSection';
 
 function App() {
   const [apiKey, setApiKey] = useState('');
@@ -53,6 +54,7 @@ function App() {
             transactionReference={transactionReference}
           />
           <PaymentsOnboardSection apiKey={apiKey} baseUrl={baseUrl} />
+          <KYCSection apiKey={apiKey} baseUrl={baseUrl} />
         </div>
       )}
     </div>
