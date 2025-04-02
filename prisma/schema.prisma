@@ -72,6 +72,13 @@ model StellarListenerState {
   updatedAt       DateTime @updatedAt
 }
 
+model SolanaListenerState {
+  id               String    @id
+  lastSignature    String?
+  lastProcessedTime DateTime?
+  lastProcessedSlot Int
+}
+
 enum KycStatus {
   PENDING
   APPROVED
@@ -93,6 +100,7 @@ enum CryptoCurrency {
 
 enum BlockchainNetwork {
   STELLAR
+  SOLANA
 }
 
 enum Country {
