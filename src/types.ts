@@ -12,5 +12,5 @@ export const TYPES = {
   ISlackNotifier: Symbol.for('ISlackNotifier'),
   KycUseCase: Symbol.for('KycUseCase'),
   QuoteUseCase: Symbol.for('QuoteUseCase'),
-  TransactionsController: Symbol.for('StellarTransactionsController'),
+  TransactionsController: Symbol.for('TransactionsController'),
 }
