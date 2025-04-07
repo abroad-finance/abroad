@@ -15,8 +15,9 @@
 	"customizations": {
 		"vscode": {
 			"extensions": [
-				"sourcegraph.cody-ai",
 				"Prisma.prisma",
+				"Github.copilot",
+				"GitHub.copilot-labs",
 			],
 			"settings": {
 				"cody.autocomplete.enabled": true

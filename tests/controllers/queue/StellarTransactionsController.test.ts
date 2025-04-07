@@ -6,15 +6,15 @@ import {
   TransactionStatus,
 } from '@prisma/client'
 
-// __tests__/StellarTransactionsController.test.ts
-import { StellarTransactionsController, TransactionQueueMessage } from '../../../src/controllers/queue/StellarTransactionsController'
+// __tests__/TransactionsController.test.ts
+import { TransactionQueueMessage, TransactionsController } from '../../../src/controllers/queue/TransactionsController'
 import { ILogger, IQueueHandler, ISlackNotifier } from '../../../src/interfaces'
 import { IDatabaseClientProvider } from '../../../src/interfaces/IDatabaseClientProvider'
 import { IPaymentService } from '../../../src/interfaces/IPaymentService'
 import { IPaymentServiceFactory } from '../../../src/interfaces/IPaymentServiceFactory'
 
-describe('StellarTransactionsController', () => {
-  let controller: StellarTransactionsController
+describe('TransactionsController', () => {
+  let controller: TransactionsController
   let paymentServiceFactory: jest.Mocked<IPaymentServiceFactory>
   let queueHandler: jest.Mocked<IQueueHandler>
   let dbClientProvider: jest.Mocked<IDatabaseClientProvider>
@@ -72,7 +72,7 @@ describe('StellarTransactionsController', () => {
     }
 
     // Instantiate the controller with the mocks
-    controller = new StellarTransactionsController(
+    controller = new TransactionsController(
       paymentServiceFactory,
       queueHandler,
       dbClientProvider,

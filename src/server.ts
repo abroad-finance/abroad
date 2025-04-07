@@ -6,7 +6,7 @@ import express, { Request, Response } from 'express'
 import path from 'path'
 
 import packageJson from '../package.json'
-import { StellarTransactionsController } from './controllers/queue/StellarTransactionsController'
+import { TransactionsController } from './controllers/queue/TransactionsController'
 import { iocContainer } from './ioc'
 import { RegisterRoutes } from './routes'
 import { TYPES } from './types'
@@ -74,7 +74,7 @@ app.listen(port, () => {
 })
 
 const stellarTransactionsController
-  = iocContainer.get<StellarTransactionsController>(
-    TYPES.StellarTransactionsController,
+  = iocContainer.get<TransactionsController>(
+    TYPES.TransactionsController,
   )
 stellarTransactionsController.registerConsumers()

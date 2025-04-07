@@ -4,6 +4,7 @@ import { Request } from 'express'
 
 // The enum and interface definitions:
 export enum QueueName {
+  SOLANA_TRANSACTIONS = 'solana-transactions',
   STELLAR_TRANSACTIONS = 'stellar-transactions',
 }
 

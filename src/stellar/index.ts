@@ -5,7 +5,7 @@ import { BlockchainNetwork, CryptoCurrency } from '@prisma/client'
 import { Horizon } from '@stellar/stellar-sdk'
 import { inject } from 'inversify'
 
-import { TransactionQueueMessage } from '../controllers/queue/StellarTransactionsController'
+import { TransactionQueueMessage } from '../controllers/queue/TransactionsController'
 import { IQueueHandler, QueueName } from '../interfaces'
 import { IDatabaseClientProvider } from '../interfaces/IDatabaseClientProvider'
 import { ISecretManager } from '../interfaces/ISecretManager'

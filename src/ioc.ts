@@ -4,7 +4,7 @@ import { Controller } from 'tsoa'
 
 import { KycController } from './controllers/KycController'
 import { PaymentsController } from './controllers/PaymentsController'
-import { StellarTransactionsController } from './controllers/queue/StellarTransactionsController'
+import { TransactionsController } from './controllers/queue/TransactionsController'
 import { QuoteController } from './controllers/QuoteController'
 import { TransactionController } from './controllers/TransactionController'
 import { CachedSecretManager } from './environment'
@@ -50,10 +50,10 @@ container
   .to(RabbitMQQueueHandler)
   .inSingletonScope()
 
-// StellarTransactionsController
+// TransactionsController
 container
-  .bind<StellarTransactionsController>(TYPES.StellarTransactionsController)
-  .to(StellarTransactionsController)
+  .bind<TransactionsController>(TYPES.TransactionsController)
+  .to(TransactionsController)
   .inSingletonScope()
 
 // IDatabaseClientProvider

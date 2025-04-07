@@ -22,7 +22,7 @@ export type TransactionQueueMessage = z.infer<
   typeof TransactionQueueMessageSchema
 >
 
-export class StellarTransactionsController {
+export class TransactionsController {
   public constructor(
     @inject(TYPES.IPaymentServiceFactory)
     private paymentServiceFactory: IPaymentServiceFactory,
