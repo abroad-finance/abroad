@@ -10,14 +10,9 @@ import { TransactionController } from './controllers/TransactionController'
 import { CachedSecretManager } from './environment'
 import { PrismaClientProvider } from './infrastructure/db'
 import { RabbitMQQueueHandler } from './infrastructure/rabbitmq'
-import {
-  IExchangeRateProvider,
-  ILogger,
-  IPartnerService,
-  IQueueHandler,
-  ISlackNotifier,
-} from './interfaces'
+import { ILogger, IPartnerService, IQueueHandler, ISlackNotifier } from './interfaces'
 import { IDatabaseClientProvider } from './interfaces/IDatabaseClientProvider'
+import { IExchangeProvider } from './interfaces/IExchangeProvider'
 import { IKycService } from './interfaces/IKycService'
 import { IPaymentService } from './interfaces/IPaymentService'
 import { IPaymentServiceFactory } from './interfaces/IPaymentServiceFactory'
@@ -40,7 +35,7 @@ decorate(injectable(), Controller)
 
 // ISecretManager
 container
-  .bind<IExchangeRateProvider>(TYPES.IExchangeRateProvider)
+  .bind<IExchangeProvider>(TYPES.IExchangeProvider)
   .to(BitsoExchangeRateProvider)
   .inSingletonScope()
 

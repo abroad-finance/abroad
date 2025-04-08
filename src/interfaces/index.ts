@@ -1,18 +1,11 @@
 // src/interfaces/index.ts
-import { CryptoCurrency, Partner, TargetCurrency } from '@prisma/client'
+import { Partner } from '@prisma/client'
 import { Request } from 'express'
 
 // The enum and interface definitions:
 export enum QueueName {
-  SOLANA_TRANSACTIONS = 'solana-transactions',
-  STELLAR_TRANSACTIONS = 'stellar-transactions',
-}
-
-export interface IExchangeRateProvider {
-  getExchangeRate(
-    sourceCurrency: CryptoCurrency,
-    targetCurrency: TargetCurrency,
-  ): Promise<number>
+  PAYMENT_SENT = 'payment-sent',
+  RECEIVED_CRYTPO_TRANSACTION = 'received-crypto-transaction',
 }
 
 export interface ILogger {

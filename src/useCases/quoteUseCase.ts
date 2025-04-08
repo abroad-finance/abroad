@@ -8,7 +8,7 @@ import {
 } from '.prisma/client'
 import { inject, injectable } from 'inversify'
 
-import { IExchangeRateProvider, IPartnerService } from '../interfaces'
+import { IExchangeProvider, IPartnerService } from '../interfaces'
 import { IDatabaseClientProvider } from '../interfaces/IDatabaseClientProvider'
 import { IPaymentServiceFactory } from '../interfaces/IPaymentServiceFactory'
 import { TYPES } from '../types'
@@ -52,8 +52,8 @@ export class QuoteUseCase implements IQuoteUseCase {
   private readonly EXPIRATION_DURATION_MS = 3_600_000 // one hour
 
   constructor(
-    @inject(TYPES.IExchangeRateProvider)
-    private exchangeRateProvider: IExchangeRateProvider,
+    @inject(TYPES.IExchangeProvider)
+    private exchangeRateProvider: IExchangeProvider,
     @inject(TYPES.IDatabaseClientProvider)
     private dbClientProvider: IDatabaseClientProvider,
     @inject(TYPES.IPartnerService)

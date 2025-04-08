@@ -1,7 +1,7 @@
 // src/services/bitsoExchangeRateProvider.ts
 import { CryptoCurrency, TargetCurrency } from '@prisma/client'
 
-import { IExchangeRateProvider } from '../interfaces'
+import { IExchangeProvider } from '../interfaces/IExchangeProvider'
 
 type TickerPayload = {
   ask: string
@@ -16,7 +16,7 @@ type TickerPayload = {
   vwap: string
 }
 
-export class BitsoExchangeRateProvider implements IExchangeRateProvider {
+export class BitsoExchangeRateProvider implements IExchangeProvider {
   async getExchangeRate(
     sourceCurrency: CryptoCurrency,
     targetCurrency: TargetCurrency,

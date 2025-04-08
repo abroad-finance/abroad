@@ -1,7 +1,7 @@
 // src/types.ts
 export const TYPES = {
   IDatabaseClientProvider: Symbol.for('IDatabaseClientProvider'),
-  IExchangeRateProvider: Symbol.for('IExchangeRateProvider'),
+  IExchangeProvider: Symbol.for('IExchangeProvider'),
   IKycService: Symbol.for('IKycService'),
   ILogger: Symbol.for('ILogger'),
   IPartnerService: Symbol.for('IPartnerService'),
@@ -10,6 +10,7 @@ export const TYPES = {
   IQueueHandler: Symbol.for('IQueueHandler'),
   ISecretManager: Symbol.for('ISecretManager'),
   ISlackNotifier: Symbol.for('ISlackNotifier'),
+  IWalletHandlerFactory: Symbol.for('IWalletHandlerFactory'),
   KycUseCase: Symbol.for('KycUseCase'),
   QuoteUseCase: Symbol.for('QuoteUseCase'),
   TransactionsController: Symbol.for('TransactionsController'),
