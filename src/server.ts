@@ -59,6 +59,12 @@ app.get('/swagger.json', (req: Request, res: Response) => {
   res.sendFile(swaggerPath)
 })
 
+// New Movii webhook endpoint
+app.post('/movii-webhook', (req: Request, res: Response) => {
+  console.log('Received Movii webhook:', JSON.stringify(req.body, null, 2))
+  res.status(200).json({ message: 'Webhook received successfully' })
+})
+
 // if (process.env.NODE_ENV !== "development") {
 //   app.use((err: any, req: Request, res: Response, next: any) => {
 //     res.status(err.status || 500).json({
