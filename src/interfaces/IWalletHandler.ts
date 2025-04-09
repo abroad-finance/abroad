@@ -10,6 +10,7 @@ export interface IWalletHandler {
       address: string
       amount: number
       cryptoCurrency: CryptoCurrency
+      memo?: string
     }
   ): Promise<{ success: boolean, transactionId?: string }>
 }

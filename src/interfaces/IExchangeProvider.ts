@@ -5,7 +5,7 @@ export interface IExchangeProvider {
     blockchain: BlockchainNetwork
     cryptoCurrency: CryptoCurrency
   }
-  ): Promise<string>
+  ): Promise<{ address: string, memo?: string }>
 
   getExchangeRate(params: {
     sourceCurrency: CryptoCurrency

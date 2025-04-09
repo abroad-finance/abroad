@@ -6,6 +6,7 @@ import express, { Request, Response } from 'express'
 import path from 'path'
 
 import packageJson from '../package.json'
+import { PaymentSentController } from './controllers/queue/PaymentSentController'
 import { TransactionsController } from './controllers/queue/TransactionsController'
 import { iocContainer } from './ioc'
 import { RegisterRoutes } from './routes'
@@ -79,8 +80,11 @@ app.listen(port, () => {
   console.log(`API documentation available at http://localhost:${port}/docs`)
 })
 
-const stellarTransactionsController
+const transactionsController
   = iocContainer.get<TransactionsController>(
     TYPES.TransactionsController,
   )
-stellarTransactionsController.registerConsumers()
+transactionsController.registerConsumers()
+
+const paymentSentController = iocContainer.get<PaymentSentController>(TYPES.PaymentSentController)
+paymentSentController.registerConsumers()

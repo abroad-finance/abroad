@@ -57,9 +57,9 @@ export class PaymentSentController {
     const { amount, blockchain, cryptoCurrency, targetCurrency } = message
 
     const walletHandler = this.walletHandlerFactory.getWalletHandler(blockchain)
-    const exchangeAddress = await this.exchangeProvider.getExchangeAddress({ blockchain, cryptoCurrency })
+    const { address, memo } = await this.exchangeProvider.getExchangeAddress({ blockchain, cryptoCurrency })
 
-    const { success, transactionId } = await walletHandler.send({ address: exchangeAddress, amount, cryptoCurrency })
+    const { success, transactionId } = await walletHandler.send({ address, amount, cryptoCurrency, memo })
 
     if (!success) {
       this.logger.error('[PaymentSent Queue]: Error sending payment:', transactionId)
