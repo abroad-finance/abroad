@@ -7,7 +7,7 @@ import path from 'path'
 
 import packageJson from '../package.json'
 import { PaymentSentController } from './controllers/queue/PaymentSentController'
-import { TransactionsController } from './controllers/queue/TransactionsController'
+import { ReceivedCryptoTransactionController } from './controllers/queue/ReceivedCryptoTransactionController'
 import { iocContainer } from './ioc'
 import { RegisterRoutes } from './routes'
 import { TYPES } from './types'
@@ -60,19 +60,16 @@ app.get('/swagger.json', (req: Request, res: Response) => {
   res.sendFile(swaggerPath)
 })
 
-// New Movii webhook endpoint
-app.post('/movii-webhook', (req: Request, res: Response) => {
-  console.log('Received Movii webhook:', JSON.stringify(req.body, null, 2))
-  res.status(200).json({ message: 'Webhook received successfully' })
-})
+interface ApiError extends Error {
+  status?: number
+}
 
-// if (process.env.NODE_ENV !== "development") {
-//   app.use((err: any, req: Request, res: Response, next: any) => {
-//     res.status(err.status || 500).json({
-//       message: err.message || "An error occurred",
-//     });
-//   });
-// }
+app.use((err: ApiError, req: Request, res: Response) => {
+  res.status(err.status || 500).json({
+    message: err.message || 'An error occurred',
+    reason: err.message || 'Internal Server Error',
+  })
+})
 
 const port = process.env.PORT || 3784
 app.listen(port, () => {
@@ -80,11 +77,11 @@ app.listen(port, () => {
   console.log(`API documentation available at http://localhost:${port}/docs`)
 })
 
-const transactionsController
-  = iocContainer.get<TransactionsController>(
-    TYPES.TransactionsController,
+const receivedCryptoTransactionController
+  = iocContainer.get<ReceivedCryptoTransactionController>(
+    TYPES.ReceivedCryptoTransactionController,
   )
-transactionsController.registerConsumers()
+receivedCryptoTransactionController.registerConsumers()
 
 const paymentSentController = iocContainer.get<PaymentSentController>(TYPES.PaymentSentController)
 paymentSentController.registerConsumers()

@@ -14,5 +14,7 @@ export const TYPES = {
   KycUseCase: Symbol.for('KycUseCase'),
   PaymentSentController: Symbol.for('PaymentSentController'),
   QuoteUseCase: Symbol.for('QuoteUseCase'),
-  TransactionsController: Symbol.for('TransactionsController'),
+  ReceivedCryptoTransactionController: Symbol.for('ReceivedCryptoTransactionController'),
+  SolanaWalletHandler: Symbol.for('SolanaWalletHandler'),
+  StellarWalletHandler: Symbol.for('StellarWalletHandler'),
 }

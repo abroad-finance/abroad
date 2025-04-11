@@ -5,7 +5,7 @@ import { BlockchainNetwork, CryptoCurrency } from '@prisma/client'
 import { Horizon } from '@stellar/stellar-sdk'
 import { inject } from 'inversify'
 
-import { TransactionQueueMessage } from '../controllers/queue/TransactionsController'
+import { TransactionQueueMessage } from '../controllers/queue/ReceivedCryptoTransactionController'
 import { IQueueHandler, QueueName } from '../interfaces'
 import { IDatabaseClientProvider } from '../interfaces/IDatabaseClientProvider'
 import { ISecretManager } from '../interfaces/ISecretManager'
@@ -15,7 +15,7 @@ import { TYPES } from '../types'
 class StellarListener {
   private accountId!: string
   private horizonUrl!: string
-  private queueName = QueueName.STELLAR_TRANSACTIONS
+  private queueName = QueueName.RECEIVED_CRYTPO_TRANSACTION
 
   constructor(
     @inject(TYPES.IQueueHandler) private queueHandler: IQueueHandler,
@@ -46,8 +46,8 @@ class StellarListener {
   public async start(): Promise<void> {
     console.log(`[StellarListener] Initializing listener`)
 
-    this.accountId = await this.secretManager.getSecret('stellar-account-id')
-    this.horizonUrl = await this.secretManager.getSecret('horizon-url')
+    this.accountId = await this.secretManager.getSecret('STELLAR_ACCOUNT_ID')
+    this.horizonUrl = await this.secretManager.getSecret('STELLAR_HORIZON_URL')
 
     console.log(
       `[StellarListener] Initializing Horizon server for account:`,

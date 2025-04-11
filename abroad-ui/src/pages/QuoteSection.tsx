@@ -4,7 +4,7 @@ import { fetchQuote, fetchReverseQuote } from './../services/apiService';
 interface QuoteSectionProps {
   apiKey: string;
   baseUrl: string;
-  onQuoteSuccess: (quoteId: string) => void;
+  onQuoteSuccess: (quoteId: string, paymentMethod: string) => void;
 }
 
 // Mode indicates the type of input:
@@ -66,7 +66,7 @@ const QuoteSection: React.FC<QuoteSectionProps> = ({ apiKey, baseUrl, onQuoteSuc
         });
       }
       setQuoteResponse(data);
-      onQuoteSuccess(data.quote_id);
+      onQuoteSuccess(data.quote_id, quoteRequest.payment_method);
     } catch (error) {
       if (!(error instanceof Error)) {
         setQuoteError('An error occurred.');

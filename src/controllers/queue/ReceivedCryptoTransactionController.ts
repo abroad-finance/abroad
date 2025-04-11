@@ -1,4 +1,4 @@
-// src/controllers/queue/StellarTransactionsController.ts
+// src/controllers/queue/StellarReceivedCryptoTransactionController.ts
 import { BlockchainNetwork, CryptoCurrency, Prisma, TransactionStatus } from '@prisma/client'
 import { inject } from 'inversify'
 import z from 'zod'
@@ -23,7 +23,7 @@ export type TransactionQueueMessage = z.infer<
   typeof TransactionQueueMessageSchema
 >
 
-export class TransactionsController {
+export class ReceivedCryptoTransactionController {
   public constructor(
     @inject(TYPES.IPaymentServiceFactory)
     private paymentServiceFactory: IPaymentServiceFactory,

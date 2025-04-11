@@ -5,7 +5,9 @@ import { inject } from 'inversify'
 import {
   Body,
   Controller,
+  Get,
   Post,
+  Query,
   Response,
   Route,
   Security,
@@ -14,6 +16,16 @@ import {
 
 import { IPaymentServiceFactory } from '../interfaces/IPaymentServiceFactory'
 import { TYPES } from '../types'
+
+// Define the response for the banks list endpoint
+interface Bank {
+  bankCode: number
+  bankName: string
+}
+
+interface BanksResponse {
+  banks: Bank[]
+}
 
 // Define the request body schema.
 interface OnboardRequest {
@@ -34,6 +46,31 @@ export class PaymentsController extends Controller {
     private paymentServiceFactory: IPaymentServiceFactory,
   ) {
     super()
+  }
+
+  /**
+   * Lists all banks available for a specific payment method.
+   *
+   * @param paymentMethod - The payment method to get banks for (MOVII, NEQUI, etc.)
+   * @returns List of banks supported by the payment method
+   */
+  @Get('banks')
+  @Response('400', 'Bad Request')
+  @SuccessResponse('200', 'Banks retrieved successfully')
+  public async getBanks(@Query() paymentMethod?: PaymentMethod): Promise<BanksResponse> {
+    try {
+      // If no payment method is provided, default to MOVII
+      const method = paymentMethod || PaymentMethod.MOVII
+
+      const paymentService = this.paymentServiceFactory.getPaymentService(method)
+      return {
+        banks: paymentService.banks,
+      }
+    }
+    catch {
+      this.setStatus(400)
+      return { banks: [] }
+    }
   }
 
   /**

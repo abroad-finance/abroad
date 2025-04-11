@@ -12,7 +12,7 @@ import {
 import { Buffer } from 'buffer'
 import { inject } from 'inversify'
 
-import { TransactionQueueMessage } from '../controllers/queue/TransactionsController'
+import { TransactionQueueMessage } from '../controllers/queue/ReceivedCryptoTransactionController'
 import { IQueueHandler, QueueName } from '../interfaces'
 import { IDatabaseClientProvider } from '../interfaces/IDatabaseClientProvider'
 import { ISecretManager } from '../interfaces/ISecretManager'
@@ -26,7 +26,7 @@ const ALLOWED_USDC_MINTS = [USDC_MINT_ADDRESS]
 class SolanaListener {
   private commitment: Finality = 'confirmed'
   private connection!: Connection
-  private queueName = QueueName.SOLANA_TRANSACTIONS
+  private queueName = QueueName.RECEIVED_CRYTPO_TRANSACTION
   private rpcUrl!: string
   private walletAddress!: PublicKey
   private wsRpcUrl!: string

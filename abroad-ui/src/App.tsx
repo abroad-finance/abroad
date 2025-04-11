@@ -12,10 +12,12 @@ function App() {
   const [isConfigured, setIsConfigured] = useState(false);
   const [transactionReference, setTransactionReference] = useState('');
   const [quoteId, setQuoteId] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState('MOVII');
 
   // When a quote is fetched successfully, store the quote ID.
-  const handleQuoteSuccess = (quoteId: string) => {
+  const handleQuoteSuccess = (quoteId: string, selectedPaymentMethod: string) => {
     setQuoteId(quoteId);
+    setPaymentMethod(selectedPaymentMethod);
   };
 
   const handleTransactionAccepted = (transactionRef: string) => {
@@ -46,6 +48,7 @@ function App() {
             apiKey={apiKey}
             baseUrl={baseUrl}
             quoteId={quoteId}
+            paymentMethod={paymentMethod}
             onTransactionAccepted={handleTransactionAccepted}
           />
           <TransactionStatusSection
