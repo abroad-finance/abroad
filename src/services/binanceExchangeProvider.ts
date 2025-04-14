@@ -51,12 +51,14 @@ export class BinanceExchangeProvider implements IExchangeProvider {
       const queryString = `coin=${coin}&timestamp=${timestamp}&network=${network}`
       const signature = this.generateSignature(queryString, BINANCE_API_SECRET)
 
+      const proxyConfig = await this.getProxyConfig()
       const response = await axios.get<BinanceDepositAddressResponse>(
         `${BINANCE_API_URL}/sapi/v1/capital/deposit/address?${queryString}&signature=${signature}`,
         {
           headers: {
             'X-MBX-APIKEY': BINANCE_API_KEY,
           },
+          proxy: proxyConfig,
         },
       )
 
@@ -89,8 +91,10 @@ export class BinanceExchangeProvider implements IExchangeProvider {
       // Construct the trading pair symbol
       const symbol = `${sourceCurrency}${targetCurrency}`
 
+      const proxyConfig = await this.getProxyConfig()
       const response = await axios.get<BinanceBookTickerResponse>(
         `${BINANCE_API_URL}/api/v3/ticker/bookTicker?symbol=${symbol}`,
+        { proxy: proxyConfig },
       )
 
       const price = parseFloat(response.data.askPrice)
@@ -113,8 +117,10 @@ export class BinanceExchangeProvider implements IExchangeProvider {
         // Try the reverse symbol
         const swappedSymbol = `${targetCurrency}${sourceCurrency}`
 
+        const proxyConfig = await this.getProxyConfig()
         const swappedResponse = await axios.get<BinanceBookTickerResponse>(
           `${BINANCE_API_URL}/api/v3/ticker/bookTicker?symbol=${swappedSymbol}`,
+          { proxy: proxyConfig },
         )
 
         const swappedPrice = parseFloat(swappedResponse.data.askPrice)
@@ -133,15 +139,18 @@ export class BinanceExchangeProvider implements IExchangeProvider {
           console.warn(`Falling back to USDT pairs for ${sourceCurrency} to ${targetCurrency}`)
 
           const BINANCE_API_URL = await this.secretManager.getSecret('BINANCE_API_URL') || 'https://api.binance.com'
+          const proxyConfig = await this.getProxyConfig()
 
           // Get source currency to USDT rate
           const sourceToUSDT = await axios.get<BinanceBookTickerResponse>(
             `${BINANCE_API_URL}/api/v3/ticker/bookTicker?symbol=${sourceCurrency}USDT`,
+            { proxy: proxyConfig },
           )
 
           // Get target currency to USDT rate
           const targetToUSDT = await axios.get<BinanceBookTickerResponse>(
             `${BINANCE_API_URL}/api/v3/ticker/bookTicker?symbol=${targetCurrency}USDT`,
+            { proxy: proxyConfig },
           )
 
           const sourcePrice = parseFloat(sourceToUSDT.data.askPrice)
@@ -173,6 +182,27 @@ export class BinanceExchangeProvider implements IExchangeProvider {
       .createHmac('sha256', apiSecret)
       .update(queryString)
       .digest('hex')
+  }
+
+  /**
+   * Gets proxy configuration for NordVPN
+   * @returns The proxy configuration object for axios
+   */
+  private async getProxyConfig() {
+    const proxyHost = await this.secretManager.getSecret('NORDVPN_PROXY_HOST')
+    const proxyPort = await this.secretManager.getSecret('NORDVPN_PROXY_PORT')
+    const proxyUsername = await this.secretManager.getSecret('NORDVPN_USERNAME')
+    const proxyPassword = await this.secretManager.getSecret('NORDVPN_PASSWORD')
+
+    return {
+      auth: {
+        password: proxyPassword,
+        username: proxyUsername,
+      },
+      host: proxyHost,
+      port: parseInt(proxyPort, 10),
+      protocol: 'https',
+    }
   }
 
   /**
