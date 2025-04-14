@@ -23,11 +23,11 @@ export interface IQueueHandler {
   postMessage(
     queueName: QueueName,
     message: Record<string, boolean | number | string>,
-  ): void
+  ): Promise<void>
   subscribeToQueue(
     queueName: QueueName,
     callback: (message: Record<string, boolean | number | string>) => void,
-  ): void
+  ): Promise<void>
 }
 
 export interface ISlackNotifier {
