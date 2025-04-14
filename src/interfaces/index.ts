@@ -5,7 +5,7 @@ import { Request } from 'express'
 // The enum and interface definitions:
 export enum QueueName {
   PAYMENT_SENT = 'payment-sent',
-  RECEIVED_CRYTPO_TRANSACTION = 'received-crypto-transaction',
+  RECEIVED_CRYPTO_TRANSACTION = 'received-crypto-transaction',
 }
 
 export interface ILogger {

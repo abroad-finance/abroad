@@ -24,7 +24,7 @@ export class PaymentSentController {
         QueueName.PAYMENT_SENT,
       )
       this.queueHandler.subscribeToQueue(
-        QueueName.RECEIVED_CRYTPO_TRANSACTION,
+        QueueName.RECEIVED_CRYPTO_TRANSACTION,
         this.onPaymentSent.bind(this),
       )
     }

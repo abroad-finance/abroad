@@ -38,10 +38,10 @@ export class ReceivedCryptoTransactionController {
     try {
       this.logger.info(
         '[Stellar transaction]: Registering consumer for queue:',
-        QueueName.RECEIVED_CRYTPO_TRANSACTION,
+        QueueName.RECEIVED_CRYPTO_TRANSACTION,
       )
       this.queueHandler.subscribeToQueue(
-        QueueName.RECEIVED_CRYTPO_TRANSACTION,
+        QueueName.RECEIVED_CRYPTO_TRANSACTION,
         this.onTransactionReceived.bind(this),
       )
     }

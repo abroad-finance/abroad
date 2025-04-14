@@ -26,7 +26,7 @@ const ALLOWED_USDC_MINTS = [USDC_MINT_ADDRESS]
 class SolanaListener {
   private commitment: Finality = 'confirmed'
   private connection!: Connection
-  private queueName = QueueName.RECEIVED_CRYTPO_TRANSACTION
+  private queueName = QueueName.RECEIVED_CRYPTO_TRANSACTION
   private rpcUrl!: string
   private walletAddress!: PublicKey
   private wsRpcUrl!: string

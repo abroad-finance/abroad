@@ -15,7 +15,7 @@ import { TYPES } from '../types'
 class StellarListener {
   private accountId!: string
   private horizonUrl!: string
-  private queueName = QueueName.RECEIVED_CRYTPO_TRANSACTION
+  private queueName = QueueName.RECEIVED_CRYPTO_TRANSACTION
   private usdcIssuer!: string
 
   constructor(
