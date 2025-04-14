@@ -8,8 +8,9 @@ import {
 } from '.prisma/client'
 import { inject, injectable } from 'inversify'
 
-import { IExchangeRateProvider, IPartnerService } from '../interfaces'
+import { IPartnerService } from '../interfaces'
 import { IDatabaseClientProvider } from '../interfaces/IDatabaseClientProvider'
+import { IExchangeProvider } from '../interfaces/IExchangeProvider'
 import { IPaymentServiceFactory } from '../interfaces/IPaymentServiceFactory'
 import { TYPES } from '../types'
 
@@ -52,8 +53,8 @@ export class QuoteUseCase implements IQuoteUseCase {
   private readonly EXPIRATION_DURATION_MS = 3_600_000 // one hour
 
   constructor(
-    @inject(TYPES.IExchangeRateProvider)
-    private exchangeRateProvider: IExchangeRateProvider,
+    @inject(TYPES.IExchangeProvider)
+    private exchangeRateProvider: IExchangeProvider,
     @inject(TYPES.IDatabaseClientProvider)
     private dbClientProvider: IDatabaseClientProvider,
     @inject(TYPES.IPartnerService)
@@ -68,7 +69,9 @@ export class QuoteUseCase implements IQuoteUseCase {
     const partner = await this.partnerService.getPartnerFromApiKey(apiKey)
     const expirationDate = this.getExpirationDate()
 
-    const exchangeRate = await this.exchangeRateProvider.getExchangeRate(cryptoCurrency, targetCurrency)
+    const exchangeRate = await this.exchangeRateProvider.getExchangeRate({
+      sourceCurrency: cryptoCurrency, targetCurrency,
+    })
     if (!exchangeRate || isNaN(exchangeRate)) {
       throw new Error('Invalid exchange rate received')
     }
@@ -112,7 +115,7 @@ export class QuoteUseCase implements IQuoteUseCase {
     const partner = await this.partnerService.getPartnerFromApiKey(apiKey)
     const expirationDate = this.getExpirationDate()
 
-    const exchangeRate = await this.exchangeRateProvider.getExchangeRate(cryptoCurrency, targetCurrency)
+    const exchangeRate = await this.exchangeRateProvider.getExchangeRate({ sourceCurrency: cryptoCurrency, targetCurrency })
     if (!exchangeRate || isNaN(exchangeRate)) {
       throw new Error('Invalid exchange rate received')
     }

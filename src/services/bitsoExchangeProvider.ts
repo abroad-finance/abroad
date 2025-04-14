@@ -1,7 +1,5 @@
 // src/services/bitsoExchangeRateProvider.ts
-import { CryptoCurrency, TargetCurrency } from '@prisma/client'
-
-import { IExchangeRateProvider } from '../interfaces'
+import { IExchangeProvider } from '../interfaces/IExchangeProvider'
 
 type TickerPayload = {
   ask: string
@@ -16,11 +14,14 @@ type TickerPayload = {
   vwap: string
 }
 
-export class BitsoExchangeRateProvider implements IExchangeRateProvider {
-  async getExchangeRate(
-    sourceCurrency: CryptoCurrency,
-    targetCurrency: TargetCurrency,
-  ): Promise<number> {
+export class BitsoExchangeRateProvider implements IExchangeProvider {
+  getExchangeAddress: IExchangeProvider['getExchangeAddress'] = async () => {
+    throw new Error('Method not implemented.')
+  }
+
+  getExchangeRate: IExchangeProvider['getExchangeRate'] = async (
+    { targetCurrency },
+  ) => {
     const book = `usd_${targetCurrency.toLowerCase()}`
     const url = `https://api-stage.bitso.com/api/v3/ticker?book=${book}`
 

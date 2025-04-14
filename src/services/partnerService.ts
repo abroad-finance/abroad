@@ -26,7 +26,7 @@ export class PartnerService implements IPartnerService {
     const prismaClient = await this.databaseClientProvider.getClient()
 
     // Find the partner using the hashed API key
-    const partner = await prismaClient.partner.findUnique({
+    const partner = await prismaClient.partner.findFirst({
       where: { apiKey: apiKeyHash },
     })
 

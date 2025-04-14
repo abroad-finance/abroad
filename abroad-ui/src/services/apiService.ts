@@ -139,3 +139,34 @@ export async function initiateKYC(
 
   return response.json();
 }
+
+/**
+ * Fetches the list of banks available for a specific payment method
+ * 
+ * @param apiKey - The API key for authentication
+ * @param baseUrl - The base URL of the API
+ * @param paymentMethod - Optional payment method (defaults to MOVII if not provided)
+ * @returns A promise that resolves to a list of banks
+ */
+export async function fetchBanks(
+  apiKey: string,
+  baseUrl: string,
+  paymentMethod?: string
+) {
+  const queryParams = paymentMethod ? `?paymentMethod=${paymentMethod}` : '';
+  const response = await fetch(`${baseUrl}payments/banks${queryParams}`, {
+    headers: {
+      'X-API-Key': apiKey,
+    },
+  });
+
+  if (!response.ok) {
+    const responseJson = await response.json();
+    if (responseJson.reason) {
+      throw new Error(responseJson.reason);
+    }
+    throw new Error(`HTTP error! status: ${response.status}`);
+  }
+
+  return response.json();
+}
