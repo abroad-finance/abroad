@@ -1,3 +1,4 @@
+import { Wallet } from '@binance/wallet'
 // src/services/binanceExchangeProvider.ts
 import { BlockchainNetwork } from '@prisma/client'
 import axios from 'axios'
@@ -14,14 +15,6 @@ type BinanceBookTickerResponse = {
   bidPrice: string
   bidQty: string
   symbol: string
-}
-
-type BinanceDepositAddressResponse = {
-  address: string
-  coin: string
-  network?: string
-  tag?: string
-  url?: string
 }
 
 const SUPPORTED_SYMBOLS = [
@@ -47,32 +40,31 @@ export class BinanceExchangeProvider implements IExchangeProvider {
     try {
       const BINANCE_API_KEY = await this.secretManager.getSecret('BINANCE_API_KEY')
       const BINANCE_API_SECRET = await this.secretManager.getSecret('BINANCE_API_SECRET')
-      const BINANCE_API_URL = await this.secretManager.getSecret('BINANCE_API_URL')
 
-      const timestamp = Date.now()
       const network = this.mapBlockchainToNetwork(blockchain)
       const coin = cryptoCurrency
 
-      // Generate a signature for Binance API
-      const queryString = `coin=${coin}&timestamp=${timestamp}&network=${network}`
-      const signature = this.generateSignature(queryString, BINANCE_API_SECRET)
+      const configurationRestAPI = {
+        apiKey: BINANCE_API_KEY,
+        apiSecret: BINANCE_API_SECRET,
+      }
 
-      const response = await axios.get<BinanceDepositAddressResponse>(
-        `${BINANCE_API_URL}/sapi/v1/capital/deposit/address?${queryString}&signature=${signature}`,
-        {
-          headers: {
-            'X-MBX-APIKEY': BINANCE_API_KEY,
-          },
-        },
-      )
+      const client = new Wallet({ configurationRestAPI })
 
-      if (!response.data.address) {
+      const response = await client.restAPI.depositAddress({
+        coin,
+        network,
+      })
+
+      const data = await response.data()
+
+      if (!data || !data.address) {
         throw new Error('No deposit address returned from Binance')
       }
 
       return {
-        address: response.data.address,
-        memo: response.data.tag,
+        address: data.address,
+        memo: data.tag,
       }
     }
     catch (error) {
