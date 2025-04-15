@@ -99,7 +99,7 @@ export class BinanceExchangeProvider implements IExchangeProvider {
         throw new Error(`Unsupported symbol: ${symbol}`)
       }
 
-      console.warn('[BinanceExchangeProvider] Falling back to USDT pairs for ${sourceCurrency} to ${targetCurrency}')
+      console.warn(`[BinanceExchangeProvider] Falling back to USDT pairs for ${sourceCurrency} to ${targetCurrency}`)
 
       // Get source currency to USDT rate
       const sourceToUSDT = await axios.get<BinanceBookTickerResponse>(
