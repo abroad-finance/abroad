@@ -49,7 +49,6 @@ export interface QuoteResponse {
 
 @injectable()
 export class QuoteUseCase implements IQuoteUseCase {
-  private readonly BRIDGE_FEE = 0.002
   private readonly EXPIRATION_DURATION_MS = 3_600_000 // one hour
 
   constructor(
@@ -75,7 +74,7 @@ export class QuoteUseCase implements IQuoteUseCase {
     if (!exchangeRate || isNaN(exchangeRate)) {
       throw new Error('Invalid exchange rate received')
     }
-    const exchangeRateWithFee = this.applyBridgeFee(exchangeRate)
+    const exchangeRateWithFee = this.applyExchangeFee(exchangeRate)
 
     const paymentService = this.paymentServiceFactory.getPaymentService(paymentMethod)
 
@@ -119,7 +118,7 @@ export class QuoteUseCase implements IQuoteUseCase {
     if (!exchangeRate || isNaN(exchangeRate)) {
       throw new Error('Invalid exchange rate received')
     }
-    const exchangeRateWithFee = this.applyBridgeFee(exchangeRate)
+    const exchangeRateWithFee = this.applyExchangeFee(exchangeRate)
 
     const paymentService = this.paymentServiceFactory.getPaymentService(paymentMethod)
     const targetAmount = this.calculateTargetAmount(sourceAmountInput, exchangeRateWithFee, paymentService.fixedFee)
@@ -151,8 +150,8 @@ export class QuoteUseCase implements IQuoteUseCase {
     }
   }
 
-  private applyBridgeFee(rate: number): number {
-    return rate * (1 + this.BRIDGE_FEE)
+  private applyExchangeFee(rate: number): number {
+    return rate * (1 + this.exchangeRateProvider.exchangePercentageFee)
   }
 
   // TODO: Add percentage fee calculation when available
