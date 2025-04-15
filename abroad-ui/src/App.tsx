@@ -1,10 +1,9 @@
+import { BrowserRouter as Router, Route, Routes } from "react-router-dom";
+import BusinessDashboardLogin from "./pages/BusinessDashboardLogin";
 import { useState } from 'react';
-import ApiConfiguration from './pages/ApiConfiguration';
-import QuoteSection from './pages/QuoteSection';
-import AcceptTransactionSection from './pages/AcceptTransactionSection';
-import TransactionStatusSection from './pages/TransactionStatusSection';
-import PaymentsOnboardSection from './pages/PaymentsOnboard';
-import KYCSection from './pages/KycSection';
+import { Dashboard } from "./pages/Dashboard";
+import Recipients from "./pages/Recipients";
+import Integrations from "./pages/Integrations";
 
 function App() {
   const [apiKey, setApiKey] = useState('');
@@ -23,41 +22,15 @@ function App() {
   };
 
   return (
-    <div className="min-w-screen min-h-screen bg-gray-50 flex flex-col items-center justify-center p-6 text-gray-900">
-      <h1 className="text-4xl font-bold text-center mb-8" style={{ fontFamily: 'Comic Sans MS' }}>
-        abroad.finance
-      </h1>
-      {isConfigured ? (
-        <div className='m-8'>
-          <p>Stellar wallet address: GCLMP4CYNFN62DDKPRMFWU4FQZFJBUL4CPTJ3JAGIHM72UNB6IX5HUGK<b></b></p>
-        </div>) : null}
-      {!isConfigured ? (
-        <ApiConfiguration
-          apiKey={apiKey}
-          baseUrl={baseUrl}
-          setApiKey={setApiKey}
-          setBaseUrl={setBaseUrl}
-          onConfigure={() => setIsConfigured(true)}
-        />
-      ) : (
-        <div className="w-full w-xl space-y-6">
-          <QuoteSection apiKey={apiKey} baseUrl={baseUrl} onQuoteSuccess={handleQuoteSuccess} />
-          <AcceptTransactionSection
-            apiKey={apiKey}
-            baseUrl={baseUrl}
-            quoteId={quoteId}
-            onTransactionAccepted={handleTransactionAccepted}
-          />
-          <TransactionStatusSection
-            apiKey={apiKey}
-            baseUrl={baseUrl}
-            transactionReference={transactionReference}
-          />
-          <PaymentsOnboardSection apiKey={apiKey} baseUrl={baseUrl} />
-          <KYCSection apiKey={apiKey} baseUrl={baseUrl} />
-        </div>
-      )}
-    </div>
+    <Router>
+      <Routes>
+        <Route path="/" element={<BusinessDashboardLogin />} />
+        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/recipients" element={<Recipients />} />
+        <Route path="/integrations" element={<Integrations />} />
+        {/* Add other routes here if needed */}
+      </Routes>
+    </Router>
   );
 }
 
