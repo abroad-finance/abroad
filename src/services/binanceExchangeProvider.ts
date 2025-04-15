@@ -40,16 +40,18 @@ export class BinanceExchangeProvider implements IExchangeProvider {
     try {
       const BINANCE_API_KEY = await this.secretManager.getSecret('BINANCE_API_KEY')
       const BINANCE_API_SECRET = await this.secretManager.getSecret('BINANCE_API_SECRET')
+      const BINANCE_API_URL = await this.secretManager.getSecret('BINANCE_API_URL')
 
       const network = this.mapBlockchainToNetwork(blockchain)
       const coin = cryptoCurrency
 
-      const configurationRestAPI = {
-        apiKey: BINANCE_API_KEY,
-        apiSecret: BINANCE_API_SECRET,
-      }
-
-      const client = new Wallet({ configurationRestAPI })
+      const client = new Wallet({
+        configurationRestAPI: {
+          apiKey: BINANCE_API_KEY,
+          apiSecret: BINANCE_API_SECRET,
+          basePath: BINANCE_API_URL,
+        },
+      })
 
       const response = await client.restAPI.depositAddress({
         coin,
