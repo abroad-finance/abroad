@@ -24,8 +24,14 @@ type BinanceDepositAddressResponse = {
   url?: string
 }
 
+const SUPPORTED_SYMBOLS = [
+  'USDCCOP',
+]
+
 @injectable()
 export class BinanceExchangeProvider implements IExchangeProvider {
+  public readonly exchangePercentageFee = 0.005 + 0.00075 // 0.5% + 0.075%
+
   constructor(
     @inject(TYPES.ISecretManager) private secretManager: ISecretManager,
   ) { }
@@ -41,7 +47,7 @@ export class BinanceExchangeProvider implements IExchangeProvider {
     try {
       const BINANCE_API_KEY = await this.secretManager.getSecret('BINANCE_API_KEY')
       const BINANCE_API_SECRET = await this.secretManager.getSecret('BINANCE_API_SECRET')
-      const BINANCE_API_URL = await this.secretManager.getSecret('BINANCE_API_URL') || 'https://api.binance.com'
+      const BINANCE_API_URL = await this.secretManager.getSecret('BINANCE_API_URL')
 
       const timestamp = Date.now()
       const network = this.mapBlockchainToNetwork(blockchain)
@@ -51,14 +57,12 @@ export class BinanceExchangeProvider implements IExchangeProvider {
       const queryString = `coin=${coin}&timestamp=${timestamp}&network=${network}`
       const signature = this.generateSignature(queryString, BINANCE_API_SECRET)
 
-      const proxyConfig = await this.getProxyConfig()
       const response = await axios.get<BinanceDepositAddressResponse>(
         `${BINANCE_API_URL}/sapi/v1/capital/deposit/address?${queryString}&signature=${signature}`,
         {
           headers: {
             'X-MBX-APIKEY': BINANCE_API_KEY,
           },
-          proxy: proxyConfig,
         },
       )
 
@@ -72,7 +76,7 @@ export class BinanceExchangeProvider implements IExchangeProvider {
       }
     }
     catch (error) {
-      console.error('Error fetching deposit address from Binance:', error)
+      console.error('[BinanceExchangeProvider] Error fetching deposit address from Binance:', error)
       throw error
     }
   }
@@ -86,88 +90,40 @@ export class BinanceExchangeProvider implements IExchangeProvider {
     { sourceCurrency, targetCurrency },
   ) => {
     try {
-      const BINANCE_API_URL = await this.secretManager.getSecret('BINANCE_API_URL') || 'https://api.binance.com'
+      const BINANCE_API_URL = await this.secretManager.getSecret('BINANCE_API_URL')
 
       // Construct the trading pair symbol
       const symbol = `${sourceCurrency}${targetCurrency}`
 
-      const proxyConfig = await this.getProxyConfig()
-      const response = await axios.get<BinanceBookTickerResponse>(
-        `${BINANCE_API_URL}/api/v3/ticker/bookTicker?symbol=${symbol}`,
-        { proxy: proxyConfig },
+      if (!SUPPORTED_SYMBOLS.includes(symbol)) {
+        throw new Error(`Unsupported symbol: ${symbol}`)
+      }
+
+      console.warn('[BinanceExchangeProvider] Falling back to USDT pairs for ${sourceCurrency} to ${targetCurrency}')
+
+      // Get source currency to USDT rate
+      const sourceToUSDT = await axios.get<BinanceBookTickerResponse>(
+        `${BINANCE_API_URL}/api/v3/ticker/bookTicker?symbol=${sourceCurrency}USDT`,
       )
 
-      const price = parseFloat(response.data.askPrice)
-      if (isNaN(price)) {
+      // Get target currency to USDT rate
+      const targetToUSDT = await axios.get<BinanceBookTickerResponse>(
+        `${BINANCE_API_URL}/api/v3/ticker/bookTicker?symbol=USDT${targetCurrency}`,
+      )
+
+      const sourcePrice = parseFloat(sourceToUSDT.data.askPrice)
+      const targetPrice = parseFloat(targetToUSDT.data.askPrice)
+
+      if (isNaN(sourcePrice) || isNaN(targetPrice)) {
         throw new Error('Invalid price data received from Binance')
       }
 
-      return price
+      // Calculate the cross rate
+      return sourcePrice / targetPrice
     }
-    catch (error) {
-      // Log the original error
-      const errorMessage = error instanceof Error ? error.message : String(error)
-      console.warn(`Error getting direct exchange rate: ${errorMessage}`)
-
-      // Try the swapped pair before falling back to USDT
-      try {
-        console.warn(`Trying swapped pair ${targetCurrency}${sourceCurrency}`)
-        const BINANCE_API_URL = await this.secretManager.getSecret('BINANCE_API_URL') || 'https://api.binance.com'
-
-        // Try the reverse symbol
-        const swappedSymbol = `${targetCurrency}${sourceCurrency}`
-
-        const proxyConfig = await this.getProxyConfig()
-        const swappedResponse = await axios.get<BinanceBookTickerResponse>(
-          `${BINANCE_API_URL}/api/v3/ticker/bookTicker?symbol=${swappedSymbol}`,
-          { proxy: proxyConfig },
-        )
-
-        const swappedPrice = parseFloat(swappedResponse.data.askPrice)
-        if (isNaN(swappedPrice)) {
-          throw new Error('Invalid price data received from Binance for swapped pair')
-        }
-
-        // Return the inverted price for the swapped pair
-        return 1 / swappedPrice
-      }
-      catch (swapError) {
-        console.warn(`Swapped pair also failed: ${swapError instanceof Error ? swapError.message : String(swapError)}`)
-
-        // Fallback to USDT pairs if both direct and swapped pairs are not available
-        try {
-          console.warn(`Falling back to USDT pairs for ${sourceCurrency} to ${targetCurrency}`)
-
-          const BINANCE_API_URL = await this.secretManager.getSecret('BINANCE_API_URL') || 'https://api.binance.com'
-          const proxyConfig = await this.getProxyConfig()
-
-          // Get source currency to USDT rate
-          const sourceToUSDT = await axios.get<BinanceBookTickerResponse>(
-            `${BINANCE_API_URL}/api/v3/ticker/bookTicker?symbol=${sourceCurrency}USDT`,
-            { proxy: proxyConfig },
-          )
-
-          // Get target currency to USDT rate
-          const targetToUSDT = await axios.get<BinanceBookTickerResponse>(
-            `${BINANCE_API_URL}/api/v3/ticker/bookTicker?symbol=${targetCurrency}USDT`,
-            { proxy: proxyConfig },
-          )
-
-          const sourcePrice = parseFloat(sourceToUSDT.data.askPrice)
-          const targetPrice = parseFloat(targetToUSDT.data.askPrice)
-
-          if (isNaN(sourcePrice) || isNaN(targetPrice)) {
-            throw new Error('Invalid price data received from Binance')
-          }
-
-          // Calculate the cross rate
-          return sourcePrice / targetPrice
-        }
-        catch (fallbackError) {
-          console.error('Error fetching exchange rate from Binance:', fallbackError)
-          throw fallbackError
-        }
-      }
+    catch (fallbackError) {
+      console.error('[BinanceExchangeProvider] Error fetching exchange rate from Binance:', fallbackError)
+      throw fallbackError
     }
   }
 
@@ -182,27 +138,6 @@ export class BinanceExchangeProvider implements IExchangeProvider {
       .createHmac('sha256', apiSecret)
       .update(queryString)
       .digest('hex')
-  }
-
-  /**
-   * Gets proxy configuration for NordVPN
-   * @returns The proxy configuration object for axios
-   */
-  private async getProxyConfig() {
-    const proxyHost = await this.secretManager.getSecret('NORDVPN_PROXY_HOST')
-    const proxyPort = await this.secretManager.getSecret('NORDVPN_PROXY_PORT')
-    const proxyUsername = await this.secretManager.getSecret('NORDVPN_USERNAME')
-    const proxyPassword = await this.secretManager.getSecret('NORDVPN_PASSWORD')
-
-    return {
-      auth: {
-        password: proxyPassword,
-        username: proxyUsername,
-      },
-      host: proxyHost,
-      port: parseInt(proxyPort, 10),
-      protocol: 'https',
-    }
   }
 
   /**

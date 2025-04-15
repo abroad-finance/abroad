@@ -15,6 +15,7 @@ type TickerPayload = {
 }
 
 export class BitsoExchangeRateProvider implements IExchangeProvider {
+  exchangePercentageFee: number = 0.0
   getExchangeAddress: IExchangeProvider['getExchangeAddress'] = async () => {
     throw new Error('Method not implemented.')
   }
