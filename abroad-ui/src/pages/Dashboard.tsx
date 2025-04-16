@@ -5,9 +5,11 @@ import Navbar from "../components/navbar";
 import { getQuote, QuoteRequest, QuoteResponse, getReverseQuote, ReverseQuoteRequest } from "../api/apiClient";
 
 export function Dashboard() {
+  const [activeSection, setActiveSection] = useState<string>("dashboard");
+
   return (
     <div className="min-h-screen p-4 bg-gray-50">
-      <Navbar /> {/* Add Navbar here */}
+      <Navbar activeSection={activeSection} setActiveSection={setActiveSection} />
       <DashboardHome />
     </div>
   );

@@ -16,6 +16,7 @@ export default function Recipients() {
   });
   const [banks, setBanks] = useState<Bank[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeSection, setActiveSection] = useState<string>("recipients");
 
   useEffect(() => {
     const fetchBanks = async () => {
@@ -41,7 +42,7 @@ export default function Recipients() {
 
   return (
     <div className="min-h-screen p-4 bg-gray-50">
-      <Navbar />
+      <Navbar activeSection={activeSection} setActiveSection={setActiveSection} />
       <div className="space-y-4 relative">
         <div className="mt-16">
           {/* Add Recipient Form */}
