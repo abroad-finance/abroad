@@ -1,7 +1,8 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Card, CardContent } from "../components/card";
 import { Button } from "../components/button";
 import Navbar from "../components/navbar";
+import { getBanks, type Bank } from "../api/apiClient";
 
 export default function Recipients() {
   const [recipients, setRecipients] = useState([
@@ -13,8 +14,23 @@ export default function Recipients() {
     bank: "",
     bankNumber: "",
   });
+  const [banks, setBanks] = useState<Bank[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const banks = ["Nequi", "Bancolombia", "Daviplata", "Banco Falabella", "NuBank", "BBVA", "Banco de Bogotá", "Banco Popular", "Citibank"]; // Example bank names
+  useEffect(() => {
+    const fetchBanks = async () => {
+      try {
+        const response = await getBanks();
+        setBanks(response.banks);
+      } catch (error) {
+        console.error("Failed to fetch banks:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchBanks();
+  }, []);
 
   const handleAddRecipient = () => {
     if (newRecipient.name && newRecipient.bank && newRecipient.bankNumber) {
@@ -48,17 +64,18 @@ export default function Recipients() {
                     setNewRecipient({ ...newRecipient, bank: e.target.value })
                   }
                   className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                  disabled={loading}
                 >
                   <option value="">Select Bank</option>
-                  {banks.map((bank, index) => (
-                    <option key={index} value={bank}>
-                      {bank}
+                  {banks.map((bank) => (
+                    <option key={bank.bankCode} value={bank.bankName}>
+                      {bank.bankName}
                     </option>
                   ))}
                 </select>
                 <input
                   type="text"
-                  placeholder="Bank Number"
+                  placeholder="Phone Number (Transfiya)"
                   value={newRecipient.bankNumber}
                   onChange={(e) =>
                     setNewRecipient({

@@ -23,38 +23,53 @@ function DashboardHome() {
   const [selectedRecipient, setSelectedRecipient] = useState(recipients[0]);
   const [isConnecting, setIsConnecting] = useState(false);
   const [selectedCurrency, setSelectedCurrency] = useState<'USDC' | 'COP'>('USDC');
-
-  const recentTransactions = [
+  const [hasQuote, setHasQuote] = useState(false);
+  const [recentTransactions, setRecentTransactions] = useState([
     { timestamp: "2024-01-15 14:30", recipient: "ABC Corp", amountUSDC: 1500, amountCOP: 6000000 },
     { timestamp: "2024-01-14 09:15", recipient: "John Doe", amountUSDC: 800, amountCOP: 3200000 },
     { timestamp: "2024-01-13 16:45", recipient: "Example Ltd", amountUSDC: 2000, amountCOP: 8000000 },
     { timestamp: "2024-01-12 11:20", recipient: "ABC Corp", amountUSDC: 1200, amountCOP: 4800000 },
     { timestamp: "2024-01-11 13:50", recipient: "John Doe", amountUSDC: 950, amountCOP: 3800000 },
-  ];
-
-  const formatCOPInput = (value: string) => {
-    // Remove any non-digit characters
-    const numericValue = value.replace(/\D/g, '');
-    // Format with thousand separators
-    return numericValue.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-  };
+  ]);
 
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    if (selectedCurrency === 'COP') {
-      // For COP, store numeric value but display formatted
-      const numericValue = Number(value.replace(/,/g, ''));
-      setUsdcAmount(numericValue);
-      e.target.value = formatCOPInput(value);
-    } else {
-      setUsdcAmount(Number(value));
+    
+    // Remove any non-digit characters except decimal point
+    const sanitizedValue = value.replace(/[^\d.]/g, '');
+    
+    // Ensure only one decimal point
+    const parts = sanitizedValue.split('.');
+    const cleanValue = parts[0] + (parts.length > 1 ? '.' + parts[1] : '');
+    
+    // Convert to number and validate
+    const numericValue = Number(cleanValue);
+    
+    // Reset quote states when amount changes
+    setCopQuote(null);
+    setHasQuote(false);
+    
+    // Only update if it's a valid positive number or empty string
+    if (cleanValue === '' || (numericValue >= 0 && !isNaN(numericValue))) {
+      if (selectedCurrency === 'COP') {
+        // For COP, only allow integers without formatting
+        const intValue = parseInt(cleanValue) || 0;
+        setUsdcAmount(intValue);
+        e.target.value = intValue.toString();
+      } else {
+        // For USDC, allow decimals up to 2 places
+        const formattedValue = numericValue.toString();
+        setUsdcAmount(Number(formattedValue));
+        e.target.value = formattedValue;
+      }
     }
   };
 
   const handleCurrencyChange = (currency: 'USDC' | 'COP') => {
     setSelectedCurrency(currency);
-    setUsdcAmount(0); // Reset amount when changing currency
-    setCopQuote(null); // Clear any existing quote
+    setUsdcAmount(0); // Reset amount
+    setCopQuote(null); // Clear quote
+    setHasQuote(false); // Reset quote status
   };
 
   const handleWalletConnection = async () => {
@@ -75,21 +90,62 @@ function DashboardHome() {
   };
 
   const handleGetQuote = async () => {
-    const reverseQuoteRequest: ReverseQuoteRequest = {
-      target_currency: "COP",
-      source_amount: usdcAmount,
-      payment_method: "NEQUI", // or "MOVII" as needed
-      network: "STELLAR",      // or "SOLANA" if applicable
-      crypto_currency: "USDC",
-    };
+    if (hasQuote) {
+      // Handle transaction acceptance
+      try {
+        setLoading(true);
+        const newTransaction = {
+          timestamp: new Date().toISOString().replace('T', ' ').substring(0, 16),
+          recipient: selectedRecipient,
+          amountUSDC: selectedCurrency === 'USDC' ? usdcAmount : copQuote || 0,
+          amountCOP: selectedCurrency === 'COP' ? usdcAmount : copQuote || 0
+        };
+        
+        setRecentTransactions([newTransaction, ...recentTransactions.slice(0, -1)]);
+        setUsdcAmount(0);
+        setCopQuote(null);
+        setHasQuote(false);
+      } catch (error) {
+        console.error("Failed to process transaction:", error);
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
 
     try {
       setLoading(true);
-      const quoteResponse: QuoteResponse = await getReverseQuote(reverseQuoteRequest);
-      setCopQuote(quoteResponse.value);
+      if (selectedCurrency === 'USDC') {
+        const reverseQuoteRequest: ReverseQuoteRequest = {
+          target_currency: "COP",
+          source_amount: usdcAmount,
+          payment_method: "NEQUI",
+          network: "STELLAR",
+          crypto_currency: "USDC",
+        };
+        const quoteResponse = await getReverseQuote(reverseQuoteRequest);
+        setCopQuote(quoteResponse.value);
+      } else {
+        // When sending COP, correct the target/source currency configuration
+        const quoteRequest: QuoteRequest = {
+          target_currency: "COP",  // The currency we want to receive
+          amount: usdcAmount,  // The COP amount entered by user
+          payment_method: "NEQUI",
+          network: "STELLAR",
+          crypto_currency: "USDC",
+        };
+        const quoteResponse = await getQuote(quoteRequest);
+        if (quoteResponse && quoteResponse.value) {
+          setCopQuote(quoteResponse.value);
+        } else {
+          throw new Error('Invalid quote response');
+        }
+      }
+      setHasQuote(true);
     } catch (error) {
-      console.error("Failed to get reverse quote:", error);
+      console.error("Failed to get quote:", error);
       setCopQuote(null);
+      setHasQuote(false);
     } finally {
       setLoading(false);
     }
@@ -186,9 +242,13 @@ function DashboardHome() {
                   inputMode="decimal"
                   type="text"
                   placeholder="0.00"
-                  value={selectedCurrency === 'COP' ? formatCOPInput(usdcAmount.toString()) : usdcAmount}
+                  value={selectedCurrency === 'COP' 
+                    ? usdcAmount.toString()
+                    : usdcAmount || ''
+                  }
                   onChange={handleAmountChange}
                   className="pl-6 w-full text-5xl font-bold text-gray-900 bg-transparent focus:outline-none"
+                  pattern="[0-9]*[.,]?[0-9]*"
                 />
               </div>
             </div>
@@ -211,17 +271,25 @@ function DashboardHome() {
             <Button
               onClick={handleGetQuote}
               className="w-full rounded-xl text-white bg-gradient-to-r from-[#48b395] to-[#247469] hover:opacity-90"
-              disabled={loading}
+              disabled={loading || (selectedCurrency === 'USDC' && usdcAmount <= 0)}
             >
-              {loading ? "Loading Quote..." : "Get Quote"}
+              {loading ? "Loading..." : hasQuote ? "Accept Transaction" : "Get Quote"}
             </Button>
             {copQuote !== null && (
               <>
                 <p className="mt-4 text-xl font-bold text-gray-600">
-                  Quotation: COP ${copQuote.toLocaleString()}
+                  {selectedCurrency === 'USDC' ? (
+                    `Quotation: COP $${copQuote.toLocaleString()}`
+                  ) : (
+                    `Quotation: USDC $${copQuote.toLocaleString()}`
+                  )}
                 </p>
                 <p className="text-sm text-gray-500">
-                  Exchange Rate: 1 USDC = COP ${(copQuote / usdcAmount).toFixed(2)}
+                  {selectedCurrency === 'USDC' ? (
+                    `Exchange Rate: 1 USDC = COP $${(copQuote / usdcAmount).toFixed(2)}`
+                  ) : (
+                    `Exchange Rate: 1 USDC = COP $${(usdcAmount / copQuote).toFixed(2)}`
+                  )}
                 </p>
               </>
             )}

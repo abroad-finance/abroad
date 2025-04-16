@@ -6,6 +6,7 @@
  * - GetReverseQuote
  * - OnboardUser
  * - CheckKyc
+ * - GetBanks
  *
  * It uses fetch and attaches an API key via the "X-API-Key" header.
  */
@@ -39,26 +40,34 @@ export interface TransactionStatusResponse {
   user_id: string;
 }
 
-export interface QuoteResponse {
-  expiration_time: number;
-  quote_id: string;
-  value: number;
-}
+export type TargetCurrency = "COP";
+export type PaymentMethod = "NEQUI" | "MOVII";
+export type BlockchainNetwork = "STELLAR" | "SOLANA";
+export type CryptoCurrency = "USDC";
 
 export interface QuoteRequest {
-  target_currency: "COP";
-  payment_method: "NEQUI" | "MOVII";
-  network: "STELLAR" | "SOLANA";
-  crypto_currency: "USDC";
+  target_currency: TargetCurrency;
+  payment_method: PaymentMethod;
+  network: BlockchainNetwork;
+  crypto_currency: CryptoCurrency;
   amount: number;
 }
 
 export interface ReverseQuoteRequest {
-  target_currency: "COP";
+  target_currency: TargetCurrency;
   source_amount: number;
-  payment_method: "NEQUI" | "MOVII";
-  network: "STELLAR" | "SOLANA";
-  crypto_currency: "USDC";
+  payment_method: PaymentMethod;
+  network: BlockchainNetwork;
+  crypto_currency: CryptoCurrency;
+}
+
+export interface Bank {
+  bankCode: number;
+  bankName: string;
+}
+
+export interface BanksResponse {
+  banks: Bank[];
 }
 
 export interface OnboardResponse {
@@ -85,10 +94,10 @@ export interface KycRequest {
 // --- End of Type definitions ---
 
 // Base URL for the API (can be set via an environment variable)
-const API_BASE_URL = "https://api.sandbox.abroad.finance";
+const API_BASE_URL = "https://abroad-api-910236263183.us-east1.run.app";
 
 // API key for authentication (replace with your API key or configure via env)
-const API_KEY = "test";
+const API_KEY = "2CcBg9rdjoYxsYAcUpkbCd6PvToAkBLIEBPcbMw3cV6G8yVovrIq3pnuPEsmkSeRPBWCrT2sPqivYU7fQRYhXy3uaD1f0DHa8wTnrqzBgu5NRIfBlCJZKYWuSt9kTwc9";
 
 // Generic function to make API requests
 async function apiRequest<T>(endpoint: string, options: RequestInit): Promise<T> {
@@ -165,5 +174,15 @@ export async function checkKyc(
   return await apiRequest<KycResponse>("/kyc", {
     method: "POST",
     body: JSON.stringify(data)
+  });
+}
+
+// Function to get available banks (GET /payments/banks)
+export async function getBanks(
+  paymentMethod?: PaymentMethod
+): Promise<BanksResponse> {
+  const queryParams = paymentMethod ? `?paymentMethod=${paymentMethod}` : '';
+  return await apiRequest<BanksResponse>(`/payments/banks${queryParams}`, {
+    method: "GET"
   });
 }
