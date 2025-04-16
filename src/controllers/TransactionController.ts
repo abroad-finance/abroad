@@ -37,6 +37,30 @@ interface AcceptTransactionResponse {
   transaction_reference: string
 }
 
+interface PaginatedTransactionList {
+  page: number
+  pageSize: number
+  total: number
+  transactions: Array<{
+    accountNumber: string
+    bankCode: string
+    createdAt: Date
+    id: string
+    onChainId?: null | string
+    quote: {
+      cryptoCurrency: string
+      id: string
+      network: string
+      paymentMethod: string
+      sourceAmount: number
+      targetAmount: number
+      targetCurrency: string
+    }
+    status: TransactionStatus
+    userId: string
+  }>
+}
+
 interface TransactionStatusResponse {
   id: string
   on_chain_tx_hash: null | string
@@ -255,7 +279,7 @@ export class TransactionController extends Controller {
     @Query() pageSize: number = 20,
     @Request() request: RequestExpress,
     @Res() badRequestResponse: TsoaResponse<400, { reason: string }>,
-  ) {
+  ): Promise<PaginatedTransactionList> {
     if (page < 1 || pageSize < 1 || pageSize > 100) {
       return badRequestResponse(400, { reason: 'Invalid pagination parameters' })
     }
