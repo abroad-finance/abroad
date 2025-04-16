@@ -8,6 +8,7 @@ import {
   Controller,
   Get,
   Path,
+  Query,
   Request,
   Res,
   Response,
@@ -238,6 +239,69 @@ export class TransactionController extends Controller {
       status: transaction.status,
       transaction_reference: transaction_reference,
       user_id: transaction.partnerUser.userId,
+    }
+  }
+
+  /**
+   * Lists transactions made by the partner (paginated).
+   * @param page - The page number (1-based)
+   * @param pageSize - The number of transactions per page
+   * @returns Paginated list of transactions
+   */
+  @Get('list')
+  @SuccessResponse('200', 'Transactions retrieved')
+  public async listPartnerTransactions(
+    @Query() page: number = 1,
+    @Query() pageSize: number = 20,
+    @Request() request: RequestExpress,
+    @Res() badRequestResponse: TsoaResponse<400, { reason: string }>,
+  ) {
+    if (page < 1 || pageSize < 1 || pageSize > 100) {
+      return badRequestResponse(400, { reason: 'Invalid pagination parameters' })
+    }
+    const partner = await this.partnerService.getPartnerFromRequest(request)
+    const prismaClient = await this.prismaClientProvider.getClient()
+    // Find all partnerUser ids for this partner
+    const partnerUsers = await prismaClient.partnerUser.findMany({
+      select: { id: true, userId: true },
+      where: { partnerId: partner.id },
+    })
+    const partnerUserIds = partnerUsers.map(u => u.id)
+    // Get paginated transactions
+    const [transactions, total] = await Promise.all([
+      prismaClient.transaction.findMany({
+        include: { partnerUser: true, quote: true },
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        where: { partnerUserId: { in: partnerUserIds } },
+      }),
+      prismaClient.transaction.count({
+        where: { partnerUserId: { in: partnerUserIds } },
+      }),
+    ])
+    return {
+      page,
+      pageSize,
+      total,
+      transactions: transactions.map(tx => ({
+        accountNumber: tx.accountNumber,
+        bankCode: tx.bankCode,
+        createdAt: tx.createdAt,
+        id: tx.id,
+        onChainId: tx.onChainId,
+        quote: {
+          cryptoCurrency: tx.quote.cryptoCurrency,
+          id: tx.quote.id,
+          network: tx.quote.network,
+          paymentMethod: tx.quote.paymentMethod,
+          sourceAmount: tx.quote.sourceAmount,
+          targetAmount: tx.quote.targetAmount,
+          targetCurrency: tx.quote.targetCurrency,
+        },
+        status: tx.status,
+        userId: tx.partnerUser.userId,
+      })),
     }
   }
 }
