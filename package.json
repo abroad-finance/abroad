@@ -19,6 +19,7 @@
   "dependencies": {
     "@binance/wallet": "^3.0.0",
     "@google-cloud/logging": "^11.2.0",
+    "@google-cloud/pubsub": "^4.11.0",
     "@google-cloud/secret-manager": "^6.0.1",
     "@prisma/client": "^6.2.1",
     "@solana/spl-token": "^0.4.13",

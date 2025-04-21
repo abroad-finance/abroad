@@ -11,7 +11,7 @@ import { QuoteController } from './controllers/QuoteController'
 import { TransactionController } from './controllers/TransactionController'
 import { CachedSecretManager } from './environment'
 import { PrismaClientProvider } from './infrastructure/db'
-import { RabbitMQQueueHandler } from './infrastructure/rabbitmq'
+import { GCPPubSubQueueHandler } from './infrastructure/gcpPubSubQueueHandler'
 import { ILogger, IPartnerService, IQueueHandler, ISlackNotifier } from './interfaces'
 import { IDatabaseClientProvider } from './interfaces/IDatabaseClientProvider'
 import { IExchangeProvider } from './interfaces/IExchangeProvider'
@@ -49,7 +49,7 @@ container
 // IQueueHandler
 container
   .bind<IQueueHandler>(TYPES.IQueueHandler)
-  .to(RabbitMQQueueHandler)
+  .to(GCPPubSubQueueHandler)
   .inSingletonScope()
 
 // Queue Controllers
