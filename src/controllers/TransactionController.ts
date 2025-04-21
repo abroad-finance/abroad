@@ -1,6 +1,6 @@
 // src/controllers/TransactionController.ts
 
-import { KycStatus, TransactionStatus } from '@prisma/client'
+import { KycStatus, Transaction, TransactionStatus } from '@prisma/client'
 import { Request as RequestExpress } from 'express'
 import { NotFound } from 'http-errors'
 import { inject } from 'inversify'
@@ -41,12 +41,7 @@ interface PaginatedTransactionList {
   page: number
   pageSize: number
   total: number
-  transactions: Array<{
-    accountNumber: string
-    bankCode: string
-    createdAt: Date
-    id: string
-    onChainId?: null | string
+  transactions: Array<Transaction & {
     quote: {
       cryptoCurrency: string
       id: string
@@ -56,8 +51,6 @@ interface PaginatedTransactionList {
       targetAmount: number
       targetCurrency: string
     }
-    status: TransactionStatus
-    userId: string
   }>
 }
 
@@ -137,10 +130,17 @@ export class TransactionController extends Controller {
 
     const partnerUser = await prismaClient.partnerUser.upsert({
       create: {
+        accountNumber: accountNumber,
+        bank: bankCode,
         partnerId: quote.partnerId,
+        paymentMethod: quote.paymentMethod,
         userId: userId,
       },
-      update: {},
+      update: {
+        accountNumber: accountNumber,
+        bank: bankCode,
+        paymentMethod: quote.paymentMethod,
+      },
       where: {
         partnerId_userId: {
           partnerId: quote.partnerId,
@@ -309,22 +309,7 @@ export class TransactionController extends Controller {
       pageSize,
       total,
       transactions: transactions.map(tx => ({
-        accountNumber: tx.accountNumber,
-        bankCode: tx.bankCode,
-        createdAt: tx.createdAt,
-        id: tx.id,
-        onChainId: tx.onChainId,
-        quote: {
-          cryptoCurrency: tx.quote.cryptoCurrency,
-          id: tx.quote.id,
-          network: tx.quote.network,
-          paymentMethod: tx.quote.paymentMethod,
-          sourceAmount: tx.quote.sourceAmount,
-          targetAmount: tx.quote.targetAmount,
-          targetCurrency: tx.quote.targetCurrency,
-        },
-        status: tx.status,
-        userId: tx.partnerUser.userId,
+        ...tx,
       })),
     }
   }
