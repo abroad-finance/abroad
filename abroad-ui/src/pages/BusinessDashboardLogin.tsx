@@ -272,9 +272,8 @@ export default function LoginPage() {
                   {t.verify}
                 </Button>
                 <p className="text-xs text-gray-500 text-center mt-4">
-                  {t.requestAgainStatic}
                   <span className="text-blue-600 cursor-pointer hover:underline">
-                    {t.requestAgainDynamic}
+                    {t.requestAgain}
                   </span>
                 </p>
               </CardContent>

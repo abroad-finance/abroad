@@ -2,7 +2,7 @@ import { Card, CardContent } from "../components/card";
 import { Button } from "../components/button";
 import Navbar from "../components/navbar";
 import { getBanks, type Bank, createPartnerUser, PaymentMethod, listPartnerUsers, PaginatedPartnerUsers } from "../api/apiClient";
-import React from "react";
+import { useEffect, useState } from "react";
 
 export default function Recipients() {
   const [recipients, setRecipients] = useState([
@@ -181,11 +181,3 @@ export default function Recipients() {
     </div>
   );
 }
-function useState<T>(initialState: T): [T, React.Dispatch<React.SetStateAction<T>>] {
-  const state = React.useState(initialState);
-  return state;
-}
-function useEffect(effect: () => void | (() => void), deps: React.DependencyList) {
-  React.useEffect(effect, deps);
-}
-
