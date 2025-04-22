@@ -1,4 +1,3 @@
-import React from "react";
 import { Card, CardContent } from "../components/card";
 import Navbar from "../components/navbar";
 
@@ -11,7 +10,7 @@ export default function Integrations() {
 
   return (
     <div className="min-h-screen p-4 bg-gray-50">
-      <Navbar />
+      <Navbar activeSection="integrations" setActiveSection={() => {}} />
       <div className="space-y-4 relative">
         <div className="mt-16">
           <Card className="rounded-xl w-full border-0 shadow-lg bg-gray-50">

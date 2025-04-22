@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Card, CardContent } from "../components/card";
 import { Input } from "../components/input";
@@ -29,15 +29,30 @@ function AnimatedDestinations() {
   );
 }
 
+type Language = "en" | "es" | "pt" | "zh";
+
 export default function LoginPage() {
-  const [language, setLanguage] = useState("en");
+  const [language, setLanguage] = useState<Language>("en");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showOTP, setShowOTP] = useState(false);
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
 
-  const translations = {
+  const translations: Record<Language, {
+    otpTitle: string;
+    otpDescription: string;
+    sloganStart: string;
+    sloganEnd: string;
+    welcome: string;
+    loginMessage: string;
+    login: string;
+    email: string;
+    pwd: string;
+    continue: string;
+    verify: string;
+    requestAgain: string;
+  }> = {
     en: {
       otpTitle: "OTP Confirmation",
       otpDescription: "Paste the one time password code we sent to you by email.",
@@ -103,7 +118,7 @@ export default function LoginPage() {
       <div className="absolute top-4 right-4 z-50">
         <select
           value={language}
-          onChange={(e) => setLanguage(e.target.value)}
+          onChange={(e) => setLanguage(e.target.value as Language)}
           className="rounded px-1 py-0.5 text-xs border border-gray-300"
         >
           <option value="en">EN</option>
@@ -239,7 +254,7 @@ export default function LoginPage() {
                     <input
                       key={index}
                       type="text"
-                      maxLength="1"
+                      maxLength={1}
                       value={digit}
                       onChange={(e) => {
                         const newOtp = [...otp];

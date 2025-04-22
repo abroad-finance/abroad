@@ -1,4 +1,4 @@
-import React from "react";
+
 import { useNavigate } from "react-router-dom"; // Import useNavigate
 import {
   Home as HomeIcon,
@@ -20,7 +20,12 @@ const navLinks = [
   { label: "Help & Support", icon: HelpIcon, section: "help" },
 ];
 
-export default function Topbar({ activeSection, setActiveSection }) {
+interface TopbarProps {
+  activeSection: string;
+  setActiveSection: (section: string) => void;
+}
+
+export default function Topbar({ activeSection, setActiveSection }: TopbarProps) {
   const navigate = useNavigate(); // Initialize useNavigate
 
   return (

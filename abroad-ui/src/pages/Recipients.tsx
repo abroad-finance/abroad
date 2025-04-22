@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from "react";
 import { Card, CardContent } from "../components/card";
 import { Button } from "../components/button";
 import Navbar from "../components/navbar";
 import { getBanks, type Bank, createPartnerUser, PaymentMethod, listPartnerUsers, PaginatedPartnerUsers } from "../api/apiClient";
+import React from "react";
 
 export default function Recipients() {
   const [recipients, setRecipients] = useState([
@@ -84,7 +84,10 @@ export default function Recipients() {
 
   return (
     <div className="min-h-screen p-4 bg-gray-50">
-      <Navbar />
+      <Navbar 
+        activeSection="recipients" 
+        setActiveSection={(section) => console.log(`Active section set to: ${section}`)} 
+      />
       <div className="space-y-4 relative">
         <div className="mt-16">
           {/* Add Recipient Form */}
@@ -178,3 +181,11 @@ export default function Recipients() {
     </div>
   );
 }
+function useState<T>(initialState: T): [T, React.Dispatch<React.SetStateAction<T>>] {
+  const state = React.useState(initialState);
+  return state;
+}
+function useEffect(effect: () => void | (() => void), deps: React.DependencyList) {
+  React.useEffect(effect, deps);
+}
+
