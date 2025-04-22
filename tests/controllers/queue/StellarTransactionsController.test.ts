@@ -1,3 +1,5 @@
+// __tests__/ReceivedCryptoTransactionController.test.ts
+
 import {
   BlockchainNetwork,
   CryptoCurrency,
@@ -6,15 +8,14 @@ import {
   TransactionStatus,
 } from '@prisma/client'
 
-// __tests__/StellarTransactionsController.test.ts
-import { StellarTransactionsController, TransactionQueueMessage } from '../../../src/controllers/queue/StellarTransactionsController'
+import { ReceivedCryptoTransactionController, TransactionQueueMessage } from '../../../src/controllers/queue/ReceivedCryptoTransactionController'
 import { ILogger, IQueueHandler, ISlackNotifier } from '../../../src/interfaces'
 import { IDatabaseClientProvider } from '../../../src/interfaces/IDatabaseClientProvider'
 import { IPaymentService } from '../../../src/interfaces/IPaymentService'
 import { IPaymentServiceFactory } from '../../../src/interfaces/IPaymentServiceFactory'
 
-describe('StellarTransactionsController', () => {
-  let controller: StellarTransactionsController
+describe('ReceivedCryptoTransactionController', () => {
+  let controller: ReceivedCryptoTransactionController
   let paymentServiceFactory: jest.Mocked<IPaymentServiceFactory>
   let queueHandler: jest.Mocked<IQueueHandler>
   let dbClientProvider: jest.Mocked<IDatabaseClientProvider>
@@ -72,7 +73,7 @@ describe('StellarTransactionsController', () => {
     }
 
     // Instantiate the controller with the mocks
-    controller = new StellarTransactionsController(
+    controller = new ReceivedCryptoTransactionController(
       paymentServiceFactory,
       queueHandler,
       dbClientProvider,
@@ -348,10 +349,10 @@ describe('StellarTransactionsController', () => {
 
       expect(logger.info).toHaveBeenCalledWith(
         '[Stellar transaction]: Registering consumer for queue:',
-        'stellar-transactions',
+        'received-crypto-transaction',
       )
       expect(queueHandler.subscribeToQueue).toHaveBeenCalledWith(
-        'stellar-transactions',
+        'received-crypto-transaction',
         expect.any(Function),
       )
     })

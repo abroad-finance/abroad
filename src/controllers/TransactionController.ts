@@ -1,6 +1,6 @@
 // src/controllers/TransactionController.ts
 
-import { KycStatus, TransactionStatus } from '@prisma/client'
+import { KycStatus, Transaction, TransactionStatus } from '@prisma/client'
 import { Request as RequestExpress } from 'express'
 import { NotFound } from 'http-errors'
 import { inject } from 'inversify'
@@ -8,6 +8,7 @@ import {
   Controller,
   Get,
   Path,
+  Query,
   Request,
   Res,
   Response,
@@ -34,6 +35,23 @@ interface AcceptTransactionRequest {
 interface AcceptTransactionResponse {
   id: string
   transaction_reference: string
+}
+
+interface PaginatedTransactionList {
+  page: number
+  pageSize: number
+  total: number
+  transactions: Array<Transaction & {
+    quote: {
+      cryptoCurrency: string
+      id: string
+      network: string
+      paymentMethod: string
+      sourceAmount: number
+      targetAmount: number
+      targetCurrency: string
+    }
+  }>
 }
 
 interface TransactionStatusResponse {
@@ -112,10 +130,17 @@ export class TransactionController extends Controller {
 
     const partnerUser = await prismaClient.partnerUser.upsert({
       create: {
+        accountNumber: accountNumber,
+        bank: bankCode,
         partnerId: quote.partnerId,
+        paymentMethod: quote.paymentMethod,
         userId: userId,
       },
-      update: {},
+      update: {
+        accountNumber: accountNumber,
+        bank: bankCode,
+        paymentMethod: quote.paymentMethod,
+      },
       where: {
         partnerId_userId: {
           partnerId: quote.partnerId,
@@ -238,6 +263,54 @@ export class TransactionController extends Controller {
       status: transaction.status,
       transaction_reference: transaction_reference,
       user_id: transaction.partnerUser.userId,
+    }
+  }
+
+  /**
+   * Lists transactions made by the partner (paginated).
+   * @param page - The page number (1-based)
+   * @param pageSize - The number of transactions per page
+   * @returns Paginated list of transactions
+   */
+  @Get('list')
+  @SuccessResponse('200', 'Transactions retrieved')
+  public async listPartnerTransactions(
+    @Query() page: number = 1,
+    @Query() pageSize: number = 20,
+    @Request() request: RequestExpress,
+    @Res() badRequestResponse: TsoaResponse<400, { reason: string }>,
+  ): Promise<PaginatedTransactionList> {
+    if (page < 1 || pageSize < 1 || pageSize > 100) {
+      return badRequestResponse(400, { reason: 'Invalid pagination parameters' })
+    }
+    const partner = await this.partnerService.getPartnerFromRequest(request)
+    const prismaClient = await this.prismaClientProvider.getClient()
+    // Find all partnerUser ids for this partner
+    const partnerUsers = await prismaClient.partnerUser.findMany({
+      select: { id: true, userId: true },
+      where: { partnerId: partner.id },
+    })
+    const partnerUserIds = partnerUsers.map(u => u.id)
+    // Get paginated transactions
+    const [transactions, total] = await Promise.all([
+      prismaClient.transaction.findMany({
+        include: { partnerUser: true, quote: true },
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        where: { partnerUserId: { in: partnerUserIds } },
+      }),
+      prismaClient.transaction.count({
+        where: { partnerUserId: { in: partnerUserIds } },
+      }),
+    ])
+    return {
+      page,
+      pageSize,
+      total,
+      transactions: transactions.map(tx => ({
+        ...tx,
+      })),
     }
   }
 }

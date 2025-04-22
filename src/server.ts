@@ -6,7 +6,8 @@ import express, { Request, Response } from 'express'
 import path from 'path'
 
 import packageJson from '../package.json'
-import { StellarTransactionsController } from './controllers/queue/StellarTransactionsController'
+import { PaymentSentController } from './controllers/queue/PaymentSentController'
+import { ReceivedCryptoTransactionController } from './controllers/queue/ReceivedCryptoTransactionController'
 import { iocContainer } from './ioc'
 import { RegisterRoutes } from './routes'
 import { TYPES } from './types'
@@ -59,13 +60,16 @@ app.get('/swagger.json', (req: Request, res: Response) => {
   res.sendFile(swaggerPath)
 })
 
-// if (process.env.NODE_ENV !== "development") {
-//   app.use((err: any, req: Request, res: Response, next: any) => {
-//     res.status(err.status || 500).json({
-//       message: err.message || "An error occurred",
-//     });
-//   });
-// }
+interface ApiError extends Error {
+  status?: number
+}
+
+app.use((err: ApiError, req: Request, res: Response) => {
+  res.status(err.status || 500).json({
+    message: err.message || 'An error occurred',
+    reason: err.message || 'Internal Server Error',
+  })
+})
 
 const port = process.env.PORT || 3784
 app.listen(port, () => {
@@ -73,8 +77,11 @@ app.listen(port, () => {
   console.log(`API documentation available at http://localhost:${port}/docs`)
 })
 
-const stellarTransactionsController
-  = iocContainer.get<StellarTransactionsController>(
-    TYPES.StellarTransactionsController,
+const receivedCryptoTransactionController
+  = iocContainer.get<ReceivedCryptoTransactionController>(
+    TYPES.ReceivedCryptoTransactionController,
   )
-stellarTransactionsController.registerConsumers()
+receivedCryptoTransactionController.registerConsumers()
+
+const paymentSentController = iocContainer.get<PaymentSentController>(TYPES.PaymentSentController)
+paymentSentController.registerConsumers()

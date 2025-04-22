@@ -1,4 +1,4 @@
-// src/controllers/queue/StellarTransactionsController.ts
+// src/controllers/queue/StellarReceivedCryptoTransactionController.ts
 import { BlockchainNetwork, CryptoCurrency, Prisma, TransactionStatus } from '@prisma/client'
 import { inject } from 'inversify'
 import z from 'zod'
@@ -6,6 +6,7 @@ import z from 'zod'
 import { ILogger, IQueueHandler, ISlackNotifier, QueueName } from '../../interfaces'
 import { IDatabaseClientProvider } from '../../interfaces/IDatabaseClientProvider'
 import { IPaymentServiceFactory } from '../../interfaces/IPaymentServiceFactory'
+import { PaymentSentMessage } from '../../interfaces/queueSchema'
 import { TYPES } from '../../types'
 // Import the logger interface (adjust the path as necessary)
 
@@ -22,7 +23,7 @@ export type TransactionQueueMessage = z.infer<
   typeof TransactionQueueMessageSchema
 >
 
-export class StellarTransactionsController {
+export class ReceivedCryptoTransactionController {
   public constructor(
     @inject(TYPES.IPaymentServiceFactory)
     private paymentServiceFactory: IPaymentServiceFactory,
@@ -37,10 +38,10 @@ export class StellarTransactionsController {
     try {
       this.logger.info(
         '[Stellar transaction]: Registering consumer for queue:',
-        QueueName.STELLAR_TRANSACTIONS,
+        QueueName.RECEIVED_CRYPTO_TRANSACTION,
       )
       this.queueHandler.subscribeToQueue(
-        QueueName.STELLAR_TRANSACTIONS,
+        QueueName.RECEIVED_CRYPTO_TRANSACTION,
         this.onTransactionReceived.bind(this),
       )
     }
@@ -160,6 +161,13 @@ export class StellarTransactionsController {
         this.slackNotifier.sendMessage(
           `Payment completed for transaction: ${transactionRecord.id}, ${transactionRecord.quote.sourceAmount} ${transactionRecord.quote.cryptoCurrency} -> ${transactionRecord.quote.targetAmount} ${transactionRecord.quote.targetCurrency}`,
         )
+
+        this.queueHandler.postMessage(QueueName.PAYMENT_SENT, {
+          amount: transactionRecord.quote.sourceAmount,
+          blockchain: BlockchainNetwork.STELLAR,
+          cryptoCurrency: transactionRecord.quote.cryptoCurrency,
+          targetCurrency: transactionRecord.quote.targetCurrency,
+        } satisfies PaymentSentMessage)
       }
     }
     catch (paymentError) {

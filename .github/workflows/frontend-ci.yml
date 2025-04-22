@@ -1,0 +1,27 @@
+name: Frontend CI
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'abroad-ui/**'
+
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+      - name: Install dependencies
+        working-directory: abroad-ui
+        run: npm ci
+      - name: Lint
+        working-directory: abroad-ui
+        run: npm run lint
+      - name: Build
+        working-directory: abroad-ui
+        run: npm run build

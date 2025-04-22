@@ -1,15 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { fetchAcceptTransaction } from './../services/apiService';
+import { fetchAcceptTransaction, fetchBanks } from './../services/apiService';
 
-const banks = [
-  { bankCode: "1507", bankName: 'NEQUI' },
-  { bankCode: "7095", bankName: 'Banco Rojo' },
-];
+// Define bank interface
+interface Bank {
+  bankCode: number | string;
+  bankName: string;
+}
 
 interface AcceptTransactionSectionProps {
   apiKey: string;
   baseUrl: string;
   quoteId: string;
+  paymentMethod: string;
   onTransactionAccepted: (transactionReference: string) => void;
 }
 
@@ -17,27 +19,73 @@ const AcceptTransactionSection: React.FC<AcceptTransactionSectionProps> = ({
   apiKey,
   baseUrl,
   quoteId,
+  paymentMethod,
   onTransactionAccepted,
 }) => {
   const [acceptTransactionRequest, setAcceptTransactionRequest] = useState({
     quote_id: quoteId,
     user_id: '',
     account_number: '',
-    bank_code: banks[0].bankCode,
+    bank_code: '',
   });
   const [acceptTransactionResponse, setAcceptTransactionResponse] = useState(null);
   const [acceptTransactionError, setAcceptTransactionError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [transactionCreated, setTransactionCreated] = useState(false);
+  const [banks, setBanks] = useState<Bank[]>([]);
+  const [loadingBanks, setLoadingBanks] = useState(false);
+  const [banksError, setBanksError] = useState<string | null>(null);
+
+  // Fetch banks from the API when component mounts or payment method changes
+  useEffect(() => {
+    const getBanks = async () => {
+      if (!paymentMethod) return;
+      
+      setLoadingBanks(true);
+      setBanksError(null);
+      try {
+        const response = await fetchBanks(apiKey, baseUrl, paymentMethod);
+        setBanks(response.banks);
+        // Set default bank code if banks are available
+        if (response.banks.length > 0) {
+          setAcceptTransactionRequest(prev => ({
+            ...prev,
+            bank_code: response.banks[0].bankCode.toString(),
+          }));
+        } else {
+          // Clear bank code if no banks are available
+          setAcceptTransactionRequest(prev => ({
+            ...prev,
+            bank_code: '',
+          }));
+        }
+      } catch (error) {
+        console.error('Error fetching banks:', error);
+        if (error instanceof Error) {
+          setBanksError(error.message);
+        }
+        // Clear banks on error
+        setBanks([]);
+        setAcceptTransactionRequest(prev => ({
+          ...prev,
+          bank_code: '',
+        }));
+      } finally {
+        setLoadingBanks(false);
+      }
+    };
+
+    getBanks();
+  }, [apiKey, baseUrl, paymentMethod]);
 
   // Reset the request and transactionCreated state when the quoteId changes.
   useEffect(() => {
-    setAcceptTransactionRequest({
+    setAcceptTransactionRequest(prev => ({
+      ...prev,
       quote_id: quoteId,
       user_id: '',
       account_number: '',
-      bank_code: banks[0].bankCode,
-    });
+    }));
     setTransactionCreated(false);
   }, [quoteId]);
 
@@ -51,9 +99,10 @@ const AcceptTransactionSection: React.FC<AcceptTransactionSectionProps> = ({
     if (
       !acceptTransactionRequest.quote_id ||
       !acceptTransactionRequest.user_id ||
-      !acceptTransactionRequest.account_number
+      !acceptTransactionRequest.account_number ||
+      !acceptTransactionRequest.bank_code
     ) {
-      setAcceptTransactionError('Quote ID, User ID, and Account Number are required.');
+      setAcceptTransactionError('Quote ID, User ID, Account Number, and Bank are required.');
       return;
     }
 
@@ -76,6 +125,9 @@ const AcceptTransactionSection: React.FC<AcceptTransactionSectionProps> = ({
   return (
     <div className="bg-white shadow-md rounded px-8 py-6">
       <h2 className="text-2xl font-semibold mb-4">Accept Transaction</h2>
+      <div className="mb-4">
+        <p className="text-sm text-gray-500">Payment Method: <span className="font-semibold">{paymentMethod}</span></p>
+      </div>
       <input
         type="text"
         placeholder="Quote ID"
@@ -116,27 +168,40 @@ const AcceptTransactionSection: React.FC<AcceptTransactionSectionProps> = ({
       {/* Bank Dropdown */}
       <div className="mb-4">
         <label className="block text-sm font-medium text-gray-700 mb-1">Bank</label>
-        <select
-          value={acceptTransactionRequest.bank_code}
-          onChange={(e) =>
-            setAcceptTransactionRequest({
-              ...acceptTransactionRequest,
-              bank_code: e.target.value,
-            })
-          }
-          className="w-full p-3 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500 text-gray-900"
-        >
-          {banks.map((bank) => (
-            <option key={bank.bankCode} value={bank.bankCode}>
-              {bank.bankName}
-            </option>
-          ))}
-        </select>
+        {loadingBanks ? (
+          <div className="flex items-center space-x-2">
+            <span className="text-sm text-gray-500">Loading banks...</span>
+            <div className="loader-sm"></div>
+          </div>
+        ) : banksError ? (
+          <p className="text-red-500 text-sm">{banksError}</p>
+        ) : (
+          <select
+            value={acceptTransactionRequest.bank_code}
+            onChange={(e) =>
+              setAcceptTransactionRequest({
+                ...acceptTransactionRequest,
+                bank_code: e.target.value,
+              })
+            }
+            className="w-full p-3 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500 text-gray-900"
+          >
+            {banks.length === 0 ? (
+              <option value="">No banks available</option>
+            ) : (
+              banks.map((bank) => (
+                <option key={bank.bankCode} value={bank.bankCode.toString()}>
+                  {bank.bankName}
+                </option>
+              ))
+            )}
+          </select>
+        )}
       </div>
       <button
         onClick={handleAcceptTransaction}
-        disabled={isLoading || transactionCreated}
-        className="w-full bg-purple-500 text-white p-3 rounded hover:bg-purple-600 transition-colors mb-4"
+        disabled={isLoading || transactionCreated || banks.length === 0}
+        className="w-full bg-purple-500 text-white p-3 rounded hover:bg-purple-600 transition-colors mb-4 disabled:bg-gray-300 disabled:cursor-not-allowed"
       >
         {isLoading ? 'Processing...' : transactionCreated ? 'Transaction Accepted' : 'Accept Transaction'}
       </button>

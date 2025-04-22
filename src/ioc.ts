@@ -3,26 +3,25 @@ import { Container, decorate, injectable } from 'inversify'
 import { Controller } from 'tsoa'
 
 import { KycController } from './controllers/KycController'
+import { PartnerUserController } from './controllers/PartnerUserController'
 import { PaymentsController } from './controllers/PaymentsController'
-import { StellarTransactionsController } from './controllers/queue/StellarTransactionsController'
+import { PaymentSentController } from './controllers/queue/PaymentSentController'
+import { ReceivedCryptoTransactionController } from './controllers/queue/ReceivedCryptoTransactionController'
 import { QuoteController } from './controllers/QuoteController'
 import { TransactionController } from './controllers/TransactionController'
 import { CachedSecretManager } from './environment'
 import { PrismaClientProvider } from './infrastructure/db'
-import { RabbitMQQueueHandler } from './infrastructure/rabbitmq'
-import {
-  IExchangeRateProvider,
-  ILogger,
-  IPartnerService,
-  IQueueHandler,
-  ISlackNotifier,
-} from './interfaces'
+import { GCPPubSubQueueHandler } from './infrastructure/gcpPubSubQueueHandler'
+import { ILogger, IPartnerService, IQueueHandler, ISlackNotifier } from './interfaces'
 import { IDatabaseClientProvider } from './interfaces/IDatabaseClientProvider'
+import { IExchangeProvider } from './interfaces/IExchangeProvider'
 import { IKycService } from './interfaces/IKycService'
 import { IPaymentService } from './interfaces/IPaymentService'
 import { IPaymentServiceFactory } from './interfaces/IPaymentServiceFactory'
 import { ISecretManager } from './interfaces/ISecretManager'
-import { BitsoExchangeRateProvider } from './services/bitsoExchangeRateProvider'
+import { IWalletHandler } from './interfaces/IWalletHandler'
+import { IWalletHandlerFactory } from './interfaces/IWalletHandlerFactory'
+import { BinanceExchangeProvider } from './services/binanceExchangeProvider'
 import { ConsoleLogger } from './services/consoleLogger'
 import { MoviiPaymentService } from './services/movii'
 import { NequiPaymentService } from './services/nequi'
@@ -30,6 +29,9 @@ import { PartnerService } from './services/partnerService'
 import { PaymentServiceFactory } from './services/PaymentServiceFactory'
 import { PersonaKycService } from './services/personaKycService'
 import { SlackNotifier } from './services/slackNotifier'
+import { SolanaWalletHandler } from './services/SolanaWalletHandler'
+import { StellarWalletHandler } from './services/StellarWalletHandler'
+import { WalletHandlerFactory } from './services/WalletHandlerFactory'
 import { TYPES } from './types'
 import { KycUseCase } from './useCases/kycUseCase'
 import { QuoteUseCase } from './useCases/quoteUseCase'
@@ -38,23 +40,24 @@ const container = new Container()
 
 decorate(injectable(), Controller)
 
-// ISecretManager
+// IExchangeProvider
 container
-  .bind<IExchangeRateProvider>(TYPES.IExchangeRateProvider)
-  .to(BitsoExchangeRateProvider)
+  .bind<IExchangeProvider>(TYPES.IExchangeProvider)
+  .to(BinanceExchangeProvider)
   .inSingletonScope()
 
 // IQueueHandler
 container
   .bind<IQueueHandler>(TYPES.IQueueHandler)
-  .to(RabbitMQQueueHandler)
+  .to(GCPPubSubQueueHandler)
   .inSingletonScope()
 
-// StellarTransactionsController
+// Queue Controllers
 container
-  .bind<StellarTransactionsController>(TYPES.StellarTransactionsController)
-  .to(StellarTransactionsController)
+  .bind<ReceivedCryptoTransactionController>(TYPES.ReceivedCryptoTransactionController)
+  .to(ReceivedCryptoTransactionController)
   .inSingletonScope()
+container.bind<PaymentSentController>(TYPES.PaymentSentController).to(PaymentSentController).inSingletonScope()
 
 // IDatabaseClientProvider
 container
@@ -95,6 +98,7 @@ container
   .inSingletonScope()
 
 // Controllers
+container.bind<PartnerUserController>(PartnerUserController).toSelf().inSingletonScope()
 container.bind<QuoteController>(QuoteController).toSelf().inSingletonScope()
 container
   .bind<TransactionController>(TransactionController)
@@ -117,5 +121,22 @@ container.bind<QuoteUseCase>(TYPES.QuoteUseCase).to(QuoteUseCase).inSingletonSco
 
 // KycUseCase
 container.bind<KycUseCase>(TYPES.KycUseCase).to(KycUseCase).inSingletonScope()
+
+// Wallet Handlers
+container
+  .bind<IWalletHandler>(TYPES.SolanaWalletHandler)
+  .to(SolanaWalletHandler)
+  .inSingletonScope()
+
+container
+  .bind<IWalletHandler>(TYPES.StellarWalletHandler)
+  .to(StellarWalletHandler)
+  .inSingletonScope()
+
+// Wallet Handler Factory
+container
+  .bind<IWalletHandlerFactory>(TYPES.IWalletHandlerFactory)
+  .to(WalletHandlerFactory)
+  .inSingletonScope()
 
 export { container as iocContainer }

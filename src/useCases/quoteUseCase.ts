@@ -8,8 +8,9 @@ import {
 } from '.prisma/client'
 import { inject, injectable } from 'inversify'
 
-import { IExchangeRateProvider, IPartnerService } from '../interfaces'
+import { IPartnerService } from '../interfaces'
 import { IDatabaseClientProvider } from '../interfaces/IDatabaseClientProvider'
+import { IExchangeProvider } from '../interfaces/IExchangeProvider'
 import { IPaymentServiceFactory } from '../interfaces/IPaymentServiceFactory'
 import { TYPES } from '../types'
 
@@ -48,12 +49,11 @@ export interface QuoteResponse {
 
 @injectable()
 export class QuoteUseCase implements IQuoteUseCase {
-  private readonly BRIDGE_FEE = 0.002
   private readonly EXPIRATION_DURATION_MS = 3_600_000 // one hour
 
   constructor(
-    @inject(TYPES.IExchangeRateProvider)
-    private exchangeRateProvider: IExchangeRateProvider,
+    @inject(TYPES.IExchangeProvider)
+    private exchangeRateProvider: IExchangeProvider,
     @inject(TYPES.IDatabaseClientProvider)
     private dbClientProvider: IDatabaseClientProvider,
     @inject(TYPES.IPartnerService)
@@ -68,11 +68,13 @@ export class QuoteUseCase implements IQuoteUseCase {
     const partner = await this.partnerService.getPartnerFromApiKey(apiKey)
     const expirationDate = this.getExpirationDate()
 
-    const exchangeRate = await this.exchangeRateProvider.getExchangeRate(cryptoCurrency, targetCurrency)
+    const exchangeRate = await this.exchangeRateProvider.getExchangeRate({
+      sourceCurrency: cryptoCurrency, targetCurrency,
+    })
     if (!exchangeRate || isNaN(exchangeRate)) {
       throw new Error('Invalid exchange rate received')
     }
-    const exchangeRateWithFee = this.applyBridgeFee(exchangeRate)
+    const exchangeRateWithFee = this.applyExchangeFee(exchangeRate)
 
     const paymentService = this.paymentServiceFactory.getPaymentService(paymentMethod)
 
@@ -112,11 +114,11 @@ export class QuoteUseCase implements IQuoteUseCase {
     const partner = await this.partnerService.getPartnerFromApiKey(apiKey)
     const expirationDate = this.getExpirationDate()
 
-    const exchangeRate = await this.exchangeRateProvider.getExchangeRate(cryptoCurrency, targetCurrency)
+    const exchangeRate = await this.exchangeRateProvider.getExchangeRate({ sourceCurrency: cryptoCurrency, targetCurrency })
     if (!exchangeRate || isNaN(exchangeRate)) {
       throw new Error('Invalid exchange rate received')
     }
-    const exchangeRateWithFee = this.applyBridgeFee(exchangeRate)
+    const exchangeRateWithFee = this.applyExchangeFee(exchangeRate)
 
     const paymentService = this.paymentServiceFactory.getPaymentService(paymentMethod)
     const targetAmount = this.calculateTargetAmount(sourceAmountInput, exchangeRateWithFee, paymentService.fixedFee)
@@ -148,8 +150,8 @@ export class QuoteUseCase implements IQuoteUseCase {
     }
   }
 
-  private applyBridgeFee(rate: number): number {
-    return rate * (1 + this.BRIDGE_FEE)
+  private applyExchangeFee(rate: number): number {
+    return rate * (1 + this.exchangeRateProvider.exchangePercentageFee)
   }
 
   // TODO: Add percentage fee calculation when available

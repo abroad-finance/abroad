@@ -3,7 +3,7 @@ import { SecretManagerServiceClient } from '@google-cloud/secret-manager'
 import dotenv from 'dotenv'
 import { isAvailable, project } from 'gcp-metadata'
 
-import { ISecretManager } from '../interfaces/ISecretManager'
+import { ISecretManager, Secret } from '../interfaces/ISecretManager'
 
 dotenv.config()
 
@@ -18,13 +18,21 @@ export class GcpSecretManager implements ISecretManager {
   /**
    * Fetches the secret from GCP Secret Manager or from environment variables in development.
    */
-  async getSecret(secretName: string): Promise<string> {
+  async getSecret(secretName: Secret): Promise<string> {
     // In development, attempt to fetch from process.env.
     if (process.env.NODE_ENV === 'development') {
       const secretValue = process.env[secretName]
       if (secretValue) {
         return secretValue
       }
+    }
+
+    if (secretName === 'GCP_PROJECT_ID') {
+      const projectId = await this.getProjectId()
+      if (!projectId) {
+        throw new Error('Project ID not found in GCP metadata.')
+      }
+      return projectId
     }
 
     // Fetch secret from GCP Secret Manager.
