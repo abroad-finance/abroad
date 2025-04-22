@@ -48,7 +48,7 @@ export default function LoginPage() {
     loginMessage: string;
     login: string;
     email: string;
-    pwd: string;
+    pass_placeholder: string;
     continue: string;
     verify: string;
     requestAgain: string;
@@ -62,7 +62,7 @@ export default function LoginPage() {
       loginMessage: "Log in to your Abroad account",
       login: "Login",
       email: "Email",
-      pwd: "Type your password",
+      pass_placeholder: "Type your password",
       continue: "Continue",
       verify: "Verify",
       requestAgain: "Didn't receive code? Request again",
@@ -76,7 +76,7 @@ export default function LoginPage() {
       loginMessage: "Inicia sesión en tu cuenta de Abroad",
       login: "Iniciar sesión",
       email: "Correo electrónico",
-      pwd: "Digita tu contraseña",
+      pass_placeholder: "Digita tu contraseña",
       continue: "Continuar",
       verify: "Verificar",
       requestAgain: "¿No recibiste el código? Solicítalo nuevamente",
@@ -90,7 +90,7 @@ export default function LoginPage() {
       loginMessage: "Faça login na sua conta Abroad",
       login: "Entrar",
       email: "Email",
-      pwd: "Escreva sua senha",
+      pass_placeholder: "Escreva sua senha",
       continue: "Continuar",
       verify: "Verificar",
       requestAgain: "Não recebeu o código? Solicite novamente",
@@ -104,7 +104,7 @@ export default function LoginPage() {
       loginMessage: "登录您的 Abroad 账户",
       login: "登录",
       email: "电子邮件",
-      pwd: "输入您的密码",
+      pass_placeholder: "输入您的密码",
       continue: "继续",
       verify: "验证",
       requestAgain: "未收到验证码？重新请求",
@@ -165,7 +165,7 @@ export default function LoginPage() {
                       type={showPassword ? "text" : "password"}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      placeholder={t.pwd}
+                      placeholder={t.pass_placeholder}
                       className="rounded-xl border-none focus:ring-2 focus:ring-green-600 pr-10"
                       required
                     />
