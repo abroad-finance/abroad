@@ -3,7 +3,7 @@ import { Card, CardContent } from "../components/card";
 import Navbar from "../components/navbar";
 
 export default function Integrations() {
-  const apiKey = "eU1lcsWwmMMzB3wHC2f08rzgg6bUXpn21Tqfgvkxx8cVgfTLQoUbzFZQAJdZw42LiQHsAJ20h2PRbnQSeYG0p1KV1HbBu0sjzLWhZmUpdskVMJGB2dIAasIB8CIGY5f1";
+  const apiKey = "";
 
   const copyApiKey = () => {
     navigator.clipboard.writeText(apiKey);

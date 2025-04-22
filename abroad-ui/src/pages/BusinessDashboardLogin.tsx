@@ -47,7 +47,7 @@ export default function LoginPage() {
       loginMessage: "Log in to your Abroad account",
       login: "Login",
       email: "Email",
-      password: "Password",
+      password_placeholder: "Password",
       continue: "Continue",
       verify: "Verify",
       requestAgain: "Didn't receive code? Request again",
@@ -61,7 +61,7 @@ export default function LoginPage() {
       loginMessage: "Inicia sesión en tu cuenta de Abroad",
       login: "Iniciar sesión",
       email: "Correo electrónico",
-      password: "Contraseña",
+      password_placeholder: "Contraseña",
       continue: "Continuar",
       verify: "Verificar",
       requestAgain: "¿No recibiste el código? Solicítalo nuevamente",
@@ -75,7 +75,7 @@ export default function LoginPage() {
       loginMessage: "Faça login na sua conta Abroad",
       login: "Entrar",
       email: "Email",
-      password: "Senha",
+      password_placeholder: "Senha",
       continue: "Continuar",
       verify: "Verificar",
       requestAgain: "Não recebeu o código? Solicite novamente",
@@ -89,7 +89,7 @@ export default function LoginPage() {
       loginMessage: "登录您的 Abroad 账户",
       login: "登录",
       email: "电子邮件",
-      password: "密码",
+      password_placeholder: "密码",
       continue: "继续",
       verify: "验证",
       requestAgain: "未收到验证码？重新请求",
@@ -150,7 +150,7 @@ export default function LoginPage() {
                       type={showPassword ? "text" : "password"}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      placeholder={t.password}
+                      placeholder={t.password_placeholder}
                       className="rounded-xl border-none focus:ring-2 focus:ring-green-600 pr-10"
                       required
                     />
