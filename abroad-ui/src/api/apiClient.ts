@@ -166,7 +166,7 @@ export interface PaginatedPartnerUsers {
 // --- End of Type definitions ---
 
 const API_BASE_URL = "https://abroad-api-910236263183.us-east1.run.app";
-const API_KEY = "2CcBg9rdjoYxsYAcUpkbCd6PvToAkBLIEBPcbMw3cV6G8yVovrIq3pnuPEsmkSeRPBWCrT2sPqivYU7fQRYhXy3uaD1f0DHa8wTnrqzBgu5NRIfBlCJZKYWuSt9kTwc9";
+const API_KEY = "";
 
 async function apiRequest<T>(endpoint: string, options: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${endpoint}`, {
