@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Card, CardContent } from "../components/card";
 import { Button } from "../components/button";
 import Navbar from "../components/navbar";
-import { getQuote, QuoteRequest, QuoteResponse, getReverseQuote, ReverseQuoteRequest, listPartnerUsers, PaginatedPartnerUsers, listPartnerTransactions, PaginatedTransactionList } from "../api/apiClient";
+import { getQuote, QuoteRequest, getReverseQuote, ReverseQuoteRequest, listPartnerUsers, PaginatedPartnerUsers, listPartnerTransactions, PaginatedTransactionList } from "../api/apiClient";
 
 export function Dashboard() {
   const [activeSection, setActiveSection] = useState<string>("dashboard");
@@ -22,8 +22,6 @@ function DashboardHome() {
   const [loading, setLoading] = useState(false);
   const [balance, setBalance] = useState(12500.00); // Add balance state
   const [walletStatus, setWalletStatus] = useState("Wallet Connected");
-  const recipients = ["ABC Corp", "Example Ltd", "John Doe"];
-  const [selectedRecipient, setSelectedRecipient] = useState(recipients[0]);
   const [isConnecting, setIsConnecting] = useState(false);
   const [selectedCurrency, setSelectedCurrency] = useState<'USDC' | 'COP'>('USDC');
   const [hasQuote, setHasQuote] = useState(false);

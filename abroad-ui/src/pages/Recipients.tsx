@@ -50,8 +50,6 @@ export default function Recipients() {
     if (newRecipient.name && newRecipient.bank && newRecipient.bankNumber) {
       setAdding(true);
       try {
-        // Find the selected bank object to get the bank code if needed
-        const selectedBank = banks.find(b => b.bankName === newRecipient.bank);
 
         // Use MOVII as default payment method for demo, or let user select if needed
         const payment_method: PaymentMethod = "MOVII";
@@ -70,7 +68,12 @@ export default function Recipients() {
         // Refresh partner users list after adding
         const users = await listPartnerUsers();
         setPartnerUsers(users);
-      } catch (e: any) {
+      } catch (e: unknown) {
+        if (e instanceof Error) {
+          console.error(e.message);
+        } else {
+          console.error("An unknown error occurred.");
+        }
         setError("Failed to add recipient. Please try again.");
         console.error(e);
       } finally {
