@@ -5,12 +5,12 @@ import { BlockchainNetwork, CryptoCurrency } from '@prisma/client'
 import { Horizon } from '@stellar/stellar-sdk'
 import { inject } from 'inversify'
 
-import { TransactionQueueMessage } from '../controllers/queue/ReceivedCryptoTransactionController'
-import { IQueueHandler, QueueName } from '../interfaces'
-import { IDatabaseClientProvider } from '../interfaces/IDatabaseClientProvider'
-import { ISecretManager } from '../interfaces/ISecretManager'
-import { iocContainer } from '../ioc'
-import { TYPES } from '../types'
+import { TransactionQueueMessage } from '../../controllers/queue/ReceivedCryptoTransactionController'
+import { IQueueHandler, QueueName } from '../../interfaces'
+import { IDatabaseClientProvider } from '../../interfaces/IDatabaseClientProvider'
+import { ISecretManager } from '../../interfaces/ISecretManager'
+import { iocContainer } from '../../ioc'
+import { TYPES } from '../../types'
 
 class StellarListener {
   private accountId!: string

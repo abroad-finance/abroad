@@ -28,6 +28,7 @@
     "amqp-connection-manager": "^4.1.14",
     "amqplib": "^0.10.5",
     "axios": "^1.7.7",
+    "binance": "^2.15.16",
     "body-parser": "^2.2.0",
     "bs58": "^6.0.0",
     "cors": "^2.8.5",

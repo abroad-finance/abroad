@@ -12,12 +12,12 @@ import {
 import { Buffer } from 'buffer'
 import { inject } from 'inversify'
 
-import { TransactionQueueMessage } from '../controllers/queue/ReceivedCryptoTransactionController'
-import { IQueueHandler, QueueName } from '../interfaces'
-import { IDatabaseClientProvider } from '../interfaces/IDatabaseClientProvider'
-import { ISecretManager } from '../interfaces/ISecretManager'
-import { iocContainer } from '../ioc'
-import { TYPES } from '../types'
+import { TransactionQueueMessage } from '../../controllers/queue/ReceivedCryptoTransactionController'
+import { IQueueHandler, QueueName } from '../../interfaces'
+import { IDatabaseClientProvider } from '../../interfaces/IDatabaseClientProvider'
+import { ISecretManager } from '../../interfaces/ISecretManager'
+import { iocContainer } from '../../ioc'
+import { TYPES } from '../../types'
 
 const MEMO_PROGRAM_ID = new PublicKey('MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr')
 const USDC_MINT_ADDRESS = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'
