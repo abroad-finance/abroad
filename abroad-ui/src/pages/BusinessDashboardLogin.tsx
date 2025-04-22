@@ -272,9 +272,9 @@ export default function LoginPage() {
                   {t.verify}
                 </Button>
                 <p className="text-xs text-gray-500 text-center mt-4">
-                  {t.requestAgain.split("Request again")[0]}
+                  {t.requestAgainStatic}
                   <span className="text-blue-600 cursor-pointer hover:underline">
-                    Request again
+                    {t.requestAgainDynamic}
                   </span>
                 </p>
               </CardContent>
