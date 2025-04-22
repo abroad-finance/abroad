@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Card, CardContent } from "../components/card";
 import { Button } from "../components/button";
 import Navbar from "../components/navbar";
-import { getQuote, QuoteRequest, QuoteResponse, getReverseQuote, ReverseQuoteRequest } from "../api/apiClient";
+import { getQuote, QuoteRequest, QuoteResponse, getReverseQuote, ReverseQuoteRequest, listPartnerUsers, PaginatedPartnerUsers, listPartnerTransactions, PaginatedTransactionList } from "../api/apiClient";
 
 export function Dashboard() {
   const [activeSection, setActiveSection] = useState<string>("dashboard");
@@ -17,6 +17,7 @@ export function Dashboard() {
 
 function DashboardHome() {
   const [usdcAmount, setUsdcAmount] = useState(0);
+  const [usdcInput, setUsdcInput] = useState<string>("0");
   const [copQuote, setCopQuote] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [balance, setBalance] = useState(12500.00); // Add balance state
@@ -33,43 +34,69 @@ function DashboardHome() {
     { timestamp: "2024-01-12 11:20", recipient: "ABC Corp", amountUSDC: 1200, amountCOP: 4800000 },
     { timestamp: "2024-01-11 13:50", recipient: "John Doe", amountUSDC: 950, amountCOP: 3800000 },
   ]);
+  const [partnerUsers, setPartnerUsers] = useState<PaginatedPartnerUsers | null>(null);
+  const [recipientInput, setRecipientInput] = useState("");
+  const [showRecipientOptions, setShowRecipientOptions] = useState(false);
+  const [transactions, setTransactions] = useState<PaginatedTransactionList | null>(null);
+
+  React.useEffect(() => {
+    const fetchPartnerUsers = async () => {
+      try {
+        const users = await listPartnerUsers();
+        setPartnerUsers(users);
+      } catch (error) {
+        console.error("Failed to fetch partner users:", error);
+      }
+    };
+    fetchPartnerUsers();
+
+    const fetchTransactions = async () => {
+      try {
+        const txs = await listPartnerTransactions();
+        setTransactions(txs);
+      } catch (error) {
+        console.error("Failed to fetch transactions:", error);
+      }
+    };
+    fetchTransactions();
+  }, []);
 
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    
+
     // Remove any non-digit characters except decimal point
-    const sanitizedValue = value.replace(/[^\d.]/g, '');
-    
-    // Ensure only one decimal point
-    const parts = sanitizedValue.split('.');
-    const cleanValue = parts[0] + (parts.length > 1 ? '.' + parts[1] : '');
-    
-    // Convert to number and validate
-    const numericValue = Number(cleanValue);
-    
-    // Reset quote states when amount changes
+    let sanitizedValue = value.replace(/[^\d.]/g, '');
+
+    // Only allow one decimal point
+    const firstDot = sanitizedValue.indexOf('.');
+    if (firstDot !== -1) {
+      sanitizedValue =
+        sanitizedValue.slice(0, firstDot + 1) +
+        sanitizedValue.slice(firstDot + 1).replace(/\./g, '');
+    }
+
+    if (selectedCurrency === 'USDC') {
+      // ...existing code for USDC...
+      const decimalMatch = sanitizedValue.match(/^\d*(\.\d{0,2})?$/);
+      if (decimalMatch) {
+        setUsdcInput(sanitizedValue === "" ? "" : sanitizedValue);
+        setUsdcAmount(sanitizedValue === "" || sanitizedValue === "." ? 0 : Number(sanitizedValue));
+      }
+    } else {
+      // For COP, only allow integers and format with commas
+      const intValue = sanitizedValue.replace(/\./g, "");
+      const numericValue = intValue === "" ? 0 : parseInt(intValue);
+      setUsdcAmount(numericValue);
+      setUsdcInput(intValue === "" ? "" : numericValue.toLocaleString("en-US"));
+    }
     setCopQuote(null);
     setHasQuote(false);
-    
-    // Only update if it's a valid positive number or empty string
-    if (cleanValue === '' || (numericValue >= 0 && !isNaN(numericValue))) {
-      if (selectedCurrency === 'COP') {
-        // For COP, only allow integers without formatting
-        const intValue = parseInt(cleanValue) || 0;
-        setUsdcAmount(intValue);
-        e.target.value = intValue.toString();
-      } else {
-        // For USDC, allow decimals up to 2 places
-        const formattedValue = numericValue.toString();
-        setUsdcAmount(Number(formattedValue));
-        e.target.value = formattedValue;
-      }
-    }
   };
 
   const handleCurrencyChange = (currency: 'USDC' | 'COP') => {
     setSelectedCurrency(currency);
     setUsdcAmount(0); // Reset amount
+    setUsdcInput("0");
     setCopQuote(null); // Clear quote
     setHasQuote(false); // Reset quote status
   };
@@ -98,13 +125,14 @@ function DashboardHome() {
         setLoading(true);
         const newTransaction = {
           timestamp: new Date().toISOString().replace('T', ' ').substring(0, 16),
-          recipient: selectedRecipient,
+          recipient: recipientInput,
           amountUSDC: selectedCurrency === 'USDC' ? usdcAmount : copQuote || 0,
           amountCOP: selectedCurrency === 'COP' ? usdcAmount : copQuote || 0
         };
         
         setRecentTransactions([newTransaction, ...recentTransactions.slice(0, -1)]);
         setUsdcAmount(0);
+        setUsdcInput("0");
         setCopQuote(null);
         setHasQuote(false);
       } catch (error) {
@@ -158,6 +186,12 @@ function DashboardHome() {
       ? "Total balance available for transactions"
       : "Please connect your wallet in order to make transactions";
   };
+
+  // Filter partner users by input
+  const filteredRecipients =
+    partnerUsers?.users.filter((user) =>
+      user.userId.toLowerCase().includes(recipientInput.toLowerCase())
+    ) || [];
 
   return (
     <div className="space-y-4 relative">
@@ -244,10 +278,7 @@ function DashboardHome() {
                   inputMode="decimal"
                   type="text"
                   placeholder="0.00"
-                  value={selectedCurrency === 'COP' 
-                    ? usdcAmount.toString()
-                    : usdcAmount || ''
-                  }
+                  value={usdcInput}
                   onChange={handleAmountChange}
                   className="pl-6 w-full text-5xl font-bold text-gray-900 bg-transparent focus:outline-none"
                   pattern="[0-9]*[.,]?[0-9]*"
@@ -258,17 +289,36 @@ function DashboardHome() {
               <label className="block mb-1 text-sm font-medium text-gray-700">
                 Select recipient
               </label>
-              <select
-                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
-                value={selectedRecipient}
-                onChange={(e) => setSelectedRecipient(e.target.value)}
-              >
-                {recipients.map((recipient, index) => (
-                  <option key={index} value={recipient}>
-                    {recipient}
-                  </option>
-                ))}
-              </select>
+              <div className="relative">
+                <input
+                  type="text"
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                  placeholder="Type recipient name"
+                  value={recipientInput}
+                  onChange={e => {
+                    setRecipientInput(e.target.value);
+                    setShowRecipientOptions(true);
+                  }}
+                  onFocus={() => setShowRecipientOptions(true)}
+                  onBlur={() => setTimeout(() => setShowRecipientOptions(false), 150)}
+                />
+                {showRecipientOptions && filteredRecipients.length > 0 && (
+                  <ul className="absolute z-10 bg-white border border-gray-200 rounded-md mt-1 w-full max-h-48 overflow-auto shadow-lg">
+                    {filteredRecipients.map((user, idx) => (
+                      <li
+                        key={user.id || idx}
+                        className="px-3 py-2 cursor-pointer hover:bg-gray-100"
+                        onMouseDown={() => {
+                          setRecipientInput(user.userId);
+                          setShowRecipientOptions(false);
+                        }}
+                      >
+                        {user.userId} {user.accountNumber ? `(${user.accountNumber})` : ""}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             </div>
             <Button
               onClick={handleGetQuote}
@@ -308,22 +358,42 @@ function DashboardHome() {
                 <thead>
                   <tr className="border-b border-gray-200">
                     <th className="text-left py-3 px-4 text-sm font-medium text-gray-600">Date & Time</th>
-                    <th className="text-left py-3 px-4 text-sm font-medium text-gray-600">Recipient</th>
-                    <th className="text-right py-3 px-4 text-sm font-medium text-gray-600">Amount (USDC)</th>
-                    <th className="text-right py-3 px-4 text-sm font-medium text-gray-600">Amount (COP)</th>
+                    <th className="text-left py-3 px-4 text-sm font-medium text-gray-600">User ID</th>
+                    <th className="text-left py-3 px-4 text-sm font-medium text-gray-600">Account Number</th>
+                    <th className="text-left py-3 px-4 text-sm font-medium text-gray-600">Bank</th>
+                    <th className="text-left py-3 px-4 text-sm font-medium text-gray-600">Status</th>
+                    <th className="text-right py-3 px-4 text-sm font-medium text-gray-600">Source Amount</th>
+                    <th className="text-right py-3 px-4 text-sm font-medium text-gray-600">Target Amount</th>
+                    <th className="text-left py-3 px-4 text-sm font-medium text-gray-600">Payment Method</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {recentTransactions.map((tx, index) => (
-                    <tr key={index} className="border-b border-gray-100">
-                      <td className="py-3 px-4 text-sm text-gray-600">{tx.timestamp}</td>
-                      <td className="py-3 px-4 text-sm text-gray-900">{tx.recipient}</td>
-                      <td className="py-3 px-4 text-sm text-gray-900 text-right">${tx.amountUSDC.toLocaleString()}</td>
-                      <td className="py-3 px-4 text-sm text-gray-900 text-right">
-                        COP ${tx.amountCOP.toLocaleString()}
+                  {transactions && transactions.transactions.length > 0 ? (
+                    transactions.transactions.map((tx, index) => (
+                      <tr key={tx.id || index} className="border-b border-gray-100">
+                        <td className="py-3 px-4 text-sm text-gray-600">
+                          {tx.createdAt ? new Date(tx.createdAt).toLocaleString() : "-"}
+                        </td>
+                        <td className="py-3 px-4 text-sm text-gray-900">{tx.partnerUserId}</td>
+                        <td className="py-3 px-4 text-sm text-gray-900">{tx.accountNumber}</td>
+                        <td className="py-3 px-4 text-sm text-gray-900">{tx.bankCode}</td>
+                        <td className="py-3 px-4 text-sm text-gray-900">{tx.status}</td>
+                        <td className="py-3 px-4 text-sm text-gray-900 text-right">
+                          {tx.quote?.sourceAmount?.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {tx.quote?.cryptoCurrency}
+                        </td>
+                        <td className="py-3 px-4 text-sm text-gray-900 text-right">
+                          {tx.quote?.targetAmount?.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {tx.quote?.targetCurrency}
+                        </td>
+                        <td className="py-3 px-4 text-sm text-gray-900">{tx.quote?.paymentMethod}</td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={8} className="py-3 px-4 text-center text-gray-600">
+                        No transactions found.
                       </td>
                     </tr>
-                  ))}
+                  )}
                 </tbody>
               </table>
             </div>

@@ -11,7 +11,7 @@
  * It uses fetch and attaches an API key via the "X-API-Key" header.
  */
 
-// Define TypeScript interfaces based on the OpenAPI schemas
+// --- TypeScript interfaces generated from OpenAPI schema ---
 
 export interface AcceptTransactionRequest {
   account_number: string;
@@ -25,7 +25,7 @@ export interface AcceptTransactionResponse {
   transaction_reference: string;
 }
 
-export type TransactionStatus = 
+export type TransactionStatus =
   | "AWAITING_PAYMENT"
   | "PROCESSING_PAYMENT"
   | "PAYMENT_FAILED"
@@ -40,10 +40,48 @@ export interface TransactionStatusResponse {
   user_id: string;
 }
 
-export type TargetCurrency = "COP";
-export type PaymentMethod = "NEQUI" | "MOVII";
-export type BlockchainNetwork = "STELLAR" | "SOLANA";
+export interface Transaction {
+  onChainId: string;
+  quoteId: string;
+  createdAt: string;
+  status: TransactionStatus;
+  bankCode: string;
+  accountNumber: string;
+  partnerUserId: string;
+  id: string;
+}
+
+export interface QuoteInTransaction {
+  targetCurrency: string;
+  targetAmount: number;
+  sourceAmount: number;
+  paymentMethod: string;
+  network: string;
+  id: string;
+  cryptoCurrency: string;
+}
+
+export interface TransactionWithQuote extends Transaction {
+  quote: QuoteInTransaction;
+}
+
+export interface PaginatedTransactionList {
+  page: number;
+  pageSize: number;
+  total: number;
+  transactions: TransactionWithQuote[];
+}
+
+export interface QuoteResponse {
+  expiration_time: number;
+  quote_id: string;
+  value: number;
+}
+
 export type CryptoCurrency = "USDC";
+export type BlockchainNetwork = "STELLAR" | "SOLANA";
+export type PaymentMethod = "NEQUI" | "MOVII";
+export type TargetCurrency = "COP";
 
 export interface QuoteRequest {
   target_currency: TargetCurrency;
@@ -91,15 +129,45 @@ export interface KycRequest {
   user_id: string;
 }
 
+export interface CreatePartnerUserRequest {
+  account_number: string;
+  bank: string;
+  payment_method: PaymentMethod;
+  user_id: string;
+}
+
+export interface CreatePartnerUserResponse {
+  accountNumber: string | null;
+  bank: string | null;
+  createdAt: string;
+  id: string;
+  kycStatus: KycStatus;
+  paymentMethod: PaymentMethod | null;
+  updatedAt: string;
+  userId: string;
+}
+
+export interface PaginatedPartnerUsers {
+  page: number;
+  pageSize: number;
+  total: number;
+  users: Array<{
+    userId: string;
+    updatedAt: string;
+    paymentMethod: PaymentMethod | null;
+    kycStatus: KycStatus;
+    id: string;
+    createdAt: string;
+    bank: string | null;
+    accountNumber: string | null;
+  }>;
+}
+
 // --- End of Type definitions ---
 
-// Base URL for the API (can be set via an environment variable)
 const API_BASE_URL = "https://abroad-api-910236263183.us-east1.run.app";
-
-// API key for authentication (replace with your API key or configure via env)
 const API_KEY = "2CcBg9rdjoYxsYAcUpkbCd6PvToAkBLIEBPcbMw3cV6G8yVovrIq3pnuPEsmkSeRPBWCrT2sPqivYU7fQRYhXy3uaD1f0DHa8wTnrqzBgu5NRIfBlCJZKYWuSt9kTwc9";
 
-// Generic function to make API requests
 async function apiRequest<T>(endpoint: string, options: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${endpoint}`, {
     ...options,
@@ -118,7 +186,7 @@ async function apiRequest<T>(endpoint: string, options: RequestInit): Promise<T>
   return (await response.json()) as T;
 }
 
-// Function to accept a transaction (POST /transaction)
+// Accept a transaction (POST /transaction)
 export async function acceptTransaction(
   data: AcceptTransactionRequest
 ): Promise<AcceptTransactionResponse> {
@@ -128,7 +196,7 @@ export async function acceptTransaction(
   });
 }
 
-// Function to get transaction status (GET /transaction/{transactionId})
+// Get transaction status (GET /transaction/{transactionId})
 export async function getTransactionStatus(
   transactionId: string
 ): Promise<TransactionStatusResponse> {
@@ -137,7 +205,21 @@ export async function getTransactionStatus(
   });
 }
 
-// Function to get a quote (POST /quote)
+// List partner transactions (GET /transaction/list)
+export async function listPartnerTransactions(
+  page?: number,
+  pageSize?: number
+): Promise<PaginatedTransactionList> {
+  const params = [];
+  if (page) params.push(`page=${page}`);
+  if (pageSize) params.push(`pageSize=${pageSize}`);
+  const query = params.length ? `?${params.join("&")}` : "";
+  return await apiRequest<PaginatedTransactionList>(`/transaction/list${query}`, {
+    method: "GET"
+  });
+}
+
+// Get a quote (POST /quote)
 export async function getQuote(
   data: QuoteRequest
 ): Promise<QuoteResponse> {
@@ -147,7 +229,7 @@ export async function getQuote(
   });
 }
 
-// Function to get a reverse quote (POST /quote/reverse)
+// Get a reverse quote (POST /quote/reverse)
 export async function getReverseQuote(
   data: ReverseQuoteRequest
 ): Promise<QuoteResponse> {
@@ -157,7 +239,17 @@ export async function getReverseQuote(
   });
 }
 
-// Function to onboard a user (POST /payments/onboard)
+// Get available banks (GET /payments/banks)
+export async function getBanks(
+  paymentMethod?: PaymentMethod
+): Promise<BanksResponse> {
+  const queryParams = paymentMethod ? `?paymentMethod=${paymentMethod}` : '';
+  return await apiRequest<BanksResponse>(`/payments/banks${queryParams}`, {
+    method: "GET"
+  });
+}
+
+// Onboard a user (POST /payments/onboard)
 export async function onboardUser(
   data: OnboardRequest
 ): Promise<OnboardResponse> {
@@ -167,22 +259,36 @@ export async function onboardUser(
   });
 }
 
-// Function to check KYC status (POST /kyc)
+// Create a partner user (POST /partnerUser)
+export async function createPartnerUser(
+  data: CreatePartnerUserRequest
+): Promise<CreatePartnerUserResponse> {
+  return await apiRequest<CreatePartnerUserResponse>("/partnerUser", {
+    method: "POST",
+    body: JSON.stringify(data)
+  });
+}
+
+// List partner users (GET /partnerUser/list)
+export async function listPartnerUsers(
+  page?: number,
+  pageSize?: number
+): Promise<PaginatedPartnerUsers> {
+  const params = [];
+  if (page) params.push(`page=${page}`);
+  if (pageSize) params.push(`pageSize=${pageSize}`);
+  const query = params.length ? `?${params.join("&")}` : "";
+  return await apiRequest<PaginatedPartnerUsers>(`/partnerUser/list${query}`, {
+    method: "GET"
+  });
+}
+
+// Check KYC status (POST /kyc)
 export async function checkKyc(
   data: KycRequest
 ): Promise<KycResponse> {
   return await apiRequest<KycResponse>("/kyc", {
     method: "POST",
     body: JSON.stringify(data)
-  });
-}
-
-// Function to get available banks (GET /payments/banks)
-export async function getBanks(
-  paymentMethod?: PaymentMethod
-): Promise<BanksResponse> {
-  const queryParams = paymentMethod ? `?paymentMethod=${paymentMethod}` : '';
-  return await apiRequest<BanksResponse>(`/payments/banks${queryParams}`, {
-    method: "GET"
   });
 }
