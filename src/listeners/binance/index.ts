@@ -6,7 +6,7 @@ import { TYPES } from '../../types'
 
 export class BinanceListener {
   public constructor(
-        @inject(TYPES.ISecretManager) private secretManager: ISecretManager,
+    @inject(TYPES.ISecretManager) private secretManager: ISecretManager,
   ) { }
 
   public startListener = async () => {
@@ -28,7 +28,7 @@ export class BinanceListener {
 
     // notification when a connection is opened
     wsClient.on('open', (data) => {
-      console.log('connection opened open:', data.wsKey, data.ws.target.url)
+      console.log('connection opened open:', data.wsKey)
     })
 
     // receive formatted events with beautified keys. Any "known" floats stored in strings as parsed as floats.
