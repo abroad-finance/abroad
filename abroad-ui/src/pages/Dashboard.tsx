@@ -25,13 +25,6 @@ function DashboardHome() {
   const [isConnecting, setIsConnecting] = useState(false);
   const [selectedCurrency, setSelectedCurrency] = useState<'USDC' | 'COP'>('USDC');
   const [hasQuote, setHasQuote] = useState(false);
-  const [recentTransactions, setRecentTransactions] = useState([
-    { timestamp: "2024-01-15 14:30", recipient: "ABC Corp", amountUSDC: 1500, amountCOP: 6000000 },
-    { timestamp: "2024-01-14 09:15", recipient: "John Doe", amountUSDC: 800, amountCOP: 3200000 },
-    { timestamp: "2024-01-13 16:45", recipient: "Example Ltd", amountUSDC: 2000, amountCOP: 8000000 },
-    { timestamp: "2024-01-12 11:20", recipient: "ABC Corp", amountUSDC: 1200, amountCOP: 4800000 },
-    { timestamp: "2024-01-11 13:50", recipient: "John Doe", amountUSDC: 950, amountCOP: 3800000 },
-  ]);
   const [partnerUsers, setPartnerUsers] = useState<PaginatedPartnerUsers | null>(null);
   const [recipientInput, setRecipientInput] = useState("");
   const [showRecipientOptions, setShowRecipientOptions] = useState(false);
@@ -121,14 +114,6 @@ function DashboardHome() {
       // Handle transaction acceptance
       try {
         setLoading(true);
-        const newTransaction = {
-          timestamp: new Date().toISOString().replace('T', ' ').substring(0, 16),
-          recipient: recipientInput,
-          amountUSDC: selectedCurrency === 'USDC' ? usdcAmount : copQuote || 0,
-          amountCOP: selectedCurrency === 'COP' ? usdcAmount : copQuote || 0
-        };
-        
-        setRecentTransactions([newTransaction, ...recentTransactions.slice(0, -1)]);
         setUsdcAmount(0);
         setUsdcInput("0");
         setCopQuote(null);

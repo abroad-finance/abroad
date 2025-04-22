@@ -3,6 +3,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Card, CardContent } from "../components/card";
 import { Input } from "../components/input";
 import { Button } from "../components/button";
+import { signInWithEmailAndPassword } from "firebase/auth";
+import { auth } from "../services/firebase";
+import { useAuth } from "../context/AuthContext";
 
 function AnimatedDestinations() {
   const texts = ["🇧🇷 Reales", "🇵🇪 Soles", "🇨🇴 Pesos"];
@@ -33,11 +36,27 @@ type Language = "en" | "es" | "pt" | "zh";
 
 export default function LoginPage() {
   const [language, setLanguage] = useState<Language>("en");
+  const { setUser } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showOTP, setShowOTP] = useState(false);
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
+  const [error, setError] = useState<string>("");
+
+  const handleLogin = () => {
+    setError("");
+    signInWithEmailAndPassword(auth, email, password)
+      .then((userCredential) => {
+        // store user in context
+        setUser(userCredential.user);
+        console.log("User signed in:", userCredential.user.displayName);
+        setShowOTP(true);
+      })
+      .catch((err) => {
+        setError(err.message);
+      });
+  };
 
   const translations: Record<Language, {
     otpTitle: string;
@@ -212,10 +231,11 @@ export default function LoginPage() {
                       )}
                     </button>
                   </div>
+                  {error && <p className="text-red-500 text-sm text-center">{error}</p>}
                   <Button
                     type="button"
                     className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded"
-                    onClick={() => setShowOTP(true)}
+                    onClick={handleLogin}
                   >
                     {t.continue}
                   </Button>
