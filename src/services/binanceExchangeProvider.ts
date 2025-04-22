@@ -1,5 +1,6 @@
-import { Wallet } from '@binance/wallet'
 // src/services/binanceExchangeProvider.ts
+
+import { Wallet } from '@binance/wallet'
 import { BlockchainNetwork } from '@prisma/client'
 import axios from 'axios'
 import crypto from 'crypto'
