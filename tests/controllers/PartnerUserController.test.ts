@@ -2,26 +2,23 @@ import { KycStatus, PaymentMethod } from '@prisma/client'
 import { Request as RequestExpress } from 'express'
 
 import { CreatePartnerUserRequest, PartnerUserController } from '../../src/controllers/PartnerUserController'
-import { IPartnerService } from '../../src/interfaces'
 import { IDatabaseClientProvider } from '../../src/interfaces/IDatabaseClientProvider'
 
 describe('PartnerUserController', () => {
-  let partnerServiceMock: jest.Mocked<IPartnerService>
   let dbProviderMock: jest.Mocked<IDatabaseClientProvider>
   let controller: PartnerUserController
   let request: jest.Mocked<RequestExpress>
   let badRequestResponse: jest.Mock<unknown, [number, { reason: string }]>
+  const partner = { apiKey: 'api-key-123', createdAt: new Date(), id: 'partner-1', name: 'Test Partner' }
 
   beforeEach(() => {
-    partnerServiceMock = { getPartnerFromRequest: jest.fn() } as unknown as jest.Mocked<IPartnerService>
     dbProviderMock = { getClient: jest.fn() } as unknown as jest.Mocked<IDatabaseClientProvider>
-    controller = new PartnerUserController(dbProviderMock, partnerServiceMock)
-    request = { header: jest.fn() } as unknown as jest.Mocked<RequestExpress>
+    controller = new PartnerUserController(dbProviderMock)
+    request = { header: jest.fn(), user: partner } as unknown as jest.Mocked<RequestExpress>
     badRequestResponse = jest.fn()
   })
 
   describe('createPartnerUser', () => {
-    const partner = { id: 'partner-1' }
     const userId = 'user-123'
     const paymentMethod = PaymentMethod.NEQUI
     const bank = 'BANKCODE'
@@ -35,7 +32,6 @@ describe('PartnerUserController', () => {
 
     it('should create partner user when input is valid', async () => {
       ;(request.header as jest.Mock).mockReturnValue('api-key')
-      ;(partnerServiceMock.getPartnerFromRequest as jest.Mock).mockResolvedValue(partner)
       const pu = {
         accountNumber, bank, createdAt: new Date(), id: 'pu-1', kycStatus: KycStatus.PENDING,
         paymentMethod,
@@ -67,7 +63,6 @@ describe('PartnerUserController', () => {
 
     it('should return bad request when prisma.create fails', async () => {
       ;(request.header as jest.Mock).mockReturnValue('api-key')
-      ;(partnerServiceMock.getPartnerFromRequest as jest.Mock).mockResolvedValue(partner)
       const prismaMock = { partnerUser: { create: jest.fn().mockRejectedValue(new Error('fail')) } }
       ;(dbProviderMock.getClient as jest.Mock).mockResolvedValue(prismaMock)
 
@@ -77,8 +72,6 @@ describe('PartnerUserController', () => {
   })
 
   describe('listPartnerUsers', () => {
-    const partner = { id: 'partner-1' }
-
     it('should return bad request for invalid pagination', async () => {
       await controller.listPartnerUsers(0, 101, request as RequestExpress, badRequestResponse)
       expect(badRequestResponse).toHaveBeenCalledWith(400, { reason: 'Invalid pagination parameters' })
@@ -86,7 +79,6 @@ describe('PartnerUserController', () => {
 
     it('should return paginated users', async () => {
       ;(request.header as jest.Mock).mockReturnValue('api-key')
-      ;(partnerServiceMock.getPartnerFromRequest as jest.Mock).mockResolvedValue(partner)
       const us = [
         { accountNumber: 'a', bank: 'b', createdAt: new Date(), id: '1', kycStatus: KycStatus.APPROVED, paymentMethod: PaymentMethod.MOVII, updatedAt: new Date(), userId: 'u1' },
         { accountNumber: null, bank: null, createdAt: new Date(), id: '2', kycStatus: KycStatus.PENDING, paymentMethod: null, updatedAt: new Date(), userId: 'u2' },

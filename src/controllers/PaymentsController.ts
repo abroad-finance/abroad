@@ -40,6 +40,7 @@ interface OnboardResponse {
 
 @Route('payments')
 @Security('ApiKeyAuth')
+@Security('BearerAuth')
 export class PaymentsController extends Controller {
   constructor(
     @inject(TYPES.IPaymentServiceFactory)

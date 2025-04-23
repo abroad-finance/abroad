@@ -55,6 +55,7 @@ function uuidToBase64(uuid: string): string {
 
 @Route('transaction')
 @Security('ApiKeyAuth')
+@Security('BearerAuth')
 export class TransactionController extends Controller {
   constructor(
     @inject(TYPES.IDatabaseClientProvider)
@@ -218,7 +219,7 @@ export class TransactionController extends Controller {
     @Path() transactionId: string,
     @Request() request: RequestExpress,
   ): Promise<TransactionStatusResponse> {
-    const partner = await this.partnerService.getPartnerFromRequest(request)
+    const partner = request.user
 
     const prismaClient = await this.prismaClientProvider.getClient()
     const transaction = await prismaClient.transaction.findUnique({

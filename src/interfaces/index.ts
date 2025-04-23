@@ -1,6 +1,5 @@
 // src/interfaces/index.ts
 import { Partner } from '@prisma/client'
-import { Request } from 'express'
 
 // The enum and interface definitions:
 export enum QueueName {
@@ -16,7 +15,7 @@ export interface ILogger {
 
 export interface IPartnerService {
   getPartnerFromApiKey(apiKey?: string): Promise<Partner>
-  getPartnerFromRequest(request: Request): Promise<Partner>
+  getPartnerFromBearerToken(token: string): Promise<Partner>
 }
 
 export interface IQueueHandler {
@@ -33,3 +32,7 @@ export interface IQueueHandler {
 export interface ISlackNotifier {
   sendMessage(message: string): Promise<void>
 }
+
+export * from './IAuthService'
+export * from './IWalletHandlerFactory'
+export * from './queueSchema'

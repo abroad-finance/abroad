@@ -54,6 +54,7 @@ type ReverseQuoteRequest = {
 
 @Route('quote')
 @Security('ApiKeyAuth')
+@Security('BearerAuth')
 export class QuoteController extends Controller {
   constructor(
     @inject(TYPES.QuoteUseCase)

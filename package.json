@@ -35,6 +35,7 @@
     "dependency-cruiser": "^16.10.0",
     "dotenv": "^16.4.7",
     "express": "^5.1.0",
+    "firebase-admin": "^13.3.0",
     "gcp-metadata": "^6.1.1",
     "inversify": "^7.0.1",
     "joi": "^17.13.3",

@@ -36,6 +36,7 @@ interface KycResponse {
 
 @Route('kyc')
 @Security('ApiKeyAuth')
+@Security('BearerAuth')
 export class KycController extends Controller {
   public constructor(
     @inject(TYPES.KycUseCase) private kycUseCase: KycUseCase,
@@ -65,7 +66,7 @@ export class KycController extends Controller {
     }
 
     try {
-      const partner = await this.partnerService.getPartnerFromApiKey(request.header('X-API-Key'))
+      const partner = request.user
 
       const { kycLink, status } = await this.kycUseCase.getKycStatus({ partnerId: partner.id, userId: parsed.data.user_id })
 

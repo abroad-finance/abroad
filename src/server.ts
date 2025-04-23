@@ -13,6 +13,7 @@ import { RegisterRoutes } from './routes'
 import { TYPES } from './types'
 
 dotenv.config()
+
 const app = express()
 app.use(cors())
 app.use(bodyParser.json())

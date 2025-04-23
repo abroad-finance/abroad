@@ -18,7 +18,6 @@ import {
   TsoaResponse,
 } from 'tsoa'
 
-import { IPartnerService } from '../interfaces'
 import { IDatabaseClientProvider } from '../interfaces/IDatabaseClientProvider'
 import { TYPES } from '../types'
 
@@ -57,12 +56,12 @@ export interface PaginatedPartnerUsers {
 }
 
 @Route('partnerUser')
+@Security('BearerAuth')
 @Security('ApiKeyAuth')
 export class PartnerUserController extends Controller {
   constructor(
-        @inject(TYPES.IDatabaseClientProvider)
-        private dbProvider: IDatabaseClientProvider,
-        @inject(TYPES.IPartnerService) private partnerService: IPartnerService,
+    @inject(TYPES.IDatabaseClientProvider)
+    private dbProvider: IDatabaseClientProvider,
   ) {
     super()
   }
@@ -74,15 +73,15 @@ export class PartnerUserController extends Controller {
   @Response<400, { reason: string }>(400, 'Bad Request')
   @SuccessResponse('200', 'Partner user created')
   public async createPartnerUser(
-        @Body() body: CreatePartnerUserRequest,
-        @Request() request: RequestExpress,
-        @Res() badRequest: TsoaResponse<400, { reason: string }>,
+    @Body() body: CreatePartnerUserRequest,
+    @Request() request: RequestExpress,
+    @Res() badRequest: TsoaResponse<400, { reason: string }>,
   ): Promise<CreatePartnerUserResponse> {
     const { account_number, bank, payment_method, user_id } = body
     if (!user_id) {
       return badRequest(400, { reason: 'user_id is required' })
     }
-    const partner = await this.partnerService.getPartnerFromRequest(request)
+    const partner = request.user
     const prisma = await this.dbProvider.getClient()
     try {
       const pu = await prisma.partnerUser.create({
@@ -117,15 +116,15 @@ export class PartnerUserController extends Controller {
   @Response<400, { reason: string }>(400, 'Bad Request')
   @SuccessResponse('200', 'Partner users retrieved')
   public async listPartnerUsers(
-        @Query() page: number = 1,
-        @Query() pageSize: number = 20,
-        @Request() request: RequestExpress,
-        @Res() badRequest: TsoaResponse<400, { reason: string }>,
+    @Query() page: number = 1,
+    @Query() pageSize: number = 20,
+    @Request() request: RequestExpress,
+    @Res() badRequest: TsoaResponse<400, { reason: string }>,
   ): Promise<PaginatedPartnerUsers> {
     if (page < 1 || pageSize < 1 || pageSize > 100) {
       return badRequest(400, { reason: 'Invalid pagination parameters' })
     }
-    const partner = await this.partnerService.getPartnerFromRequest(request)
+    const partner = request.user
     const prisma = await this.dbProvider.getClient()
     const [users, total] = await Promise.all([
       prisma.partnerUser.findMany({

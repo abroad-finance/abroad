@@ -28,6 +28,7 @@ interface PaginatedTransactionList {
 
 @Route('transactions')
 @Security('ApiKeyAuth')
+@Security('BearerAuth')
 export class TransactionsController extends Controller {
   constructor(
     @inject(TYPES.IDatabaseClientProvider) private prismaClientProvider: IDatabaseClientProvider,
@@ -51,7 +52,7 @@ export class TransactionsController extends Controller {
     if (page < 1 || pageSize < 1 || pageSize > 100) {
       return badRequest(400, { reason: 'Invalid pagination parameters' })
     }
-    const partner = await this.partnerService.getPartnerFromRequest(request)
+    const partner = request.user
     const prismaClient = await this.prismaClientProvider.getClient()
     const [transactions, total] = await Promise.all([
       prismaClient.transaction.findMany({

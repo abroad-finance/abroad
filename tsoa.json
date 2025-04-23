@@ -17,11 +17,19 @@
         "type": "apiKey",
         "in": "header",
         "name": "X-API-Key"
+      },
+      "FirebaseBearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
       }
     },
     "security": [
       {
         "ApiKeyAuth": []
+      },
+      {
+        "FirebaseBearerAuth": []
       }
     ]
   },

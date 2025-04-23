@@ -13,7 +13,13 @@ import { TransactionsController } from './controllers/TransactionsController'
 import { CachedSecretManager } from './environment'
 import { PrismaClientProvider } from './infrastructure/db'
 import { GCPPubSubQueueHandler } from './infrastructure/gcpPubSubQueueHandler'
-import { ILogger, IPartnerService, IQueueHandler, ISlackNotifier } from './interfaces'
+import {
+  IAuthService,
+  ILogger,
+  IPartnerService,
+  IQueueHandler,
+  ISlackNotifier,
+} from './interfaces'
 import { IDatabaseClientProvider } from './interfaces/IDatabaseClientProvider'
 import { IExchangeProvider } from './interfaces/IExchangeProvider'
 import { IKycService } from './interfaces/IKycService'
@@ -24,6 +30,7 @@ import { IWalletHandler } from './interfaces/IWalletHandler'
 import { IWalletHandlerFactory } from './interfaces/IWalletHandlerFactory'
 import { BinanceExchangeProvider } from './services/binanceExchangeProvider'
 import { ConsoleLogger } from './services/consoleLogger'
+import { FirebaseAuthService } from './services/firebaseAuthService'
 import { MoviiPaymentService } from './services/movii'
 import { NequiPaymentService } from './services/nequi'
 import { PartnerService } from './services/partnerService'
@@ -139,6 +146,12 @@ container
 container
   .bind<IWalletHandlerFactory>(TYPES.IWalletHandlerFactory)
   .to(WalletHandlerFactory)
+  .inSingletonScope()
+
+// IFirebaseAuthService
+container
+  .bind<IAuthService>(TYPES.IAuthService)
+  .to(FirebaseAuthService)
   .inSingletonScope()
 
 export { container as iocContainer }
