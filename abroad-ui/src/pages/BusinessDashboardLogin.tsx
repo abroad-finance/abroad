@@ -6,6 +6,7 @@ import { Button } from "../components/button";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from "../services/firebase";
 import { useAuth } from "../context/AuthContext";
+import { useNavigate } from "react-router-dom";
 
 function AnimatedDestinations() {
   const texts = ["🇧🇷 Reales", "🇵🇪 Soles", "🇨🇴 Pesos"];
@@ -35,6 +36,7 @@ function AnimatedDestinations() {
 type Language = "en" | "es" | "pt" | "zh";
 
 export default function LoginPage() {
+  const navigate = useNavigate();
   const [language, setLanguage] = useState<Language>("en");
   const { setUser } = useAuth();
   const [email, setEmail] = useState("");
@@ -51,7 +53,7 @@ export default function LoginPage() {
         // store user in context
         setUser(userCredential.user);
         console.log("User signed in:", userCredential.user.displayName);
-        setShowOTP(true);
+        navigate("/dashboard");
       })
       .catch((err) => {
         setError(err.message);
