@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { User, onAuthStateChanged, signOut } from 'firebase/auth';
 import { auth } from '../services/firebase';
 
@@ -14,17 +14,36 @@ const AuthContext = createContext<AuthContextType>({
   logout: async () => {},
 });
 
+const SESSION_STORAGE_KEY = 'firebaseUser';
+
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<User | null>(() => {
+    const storedUser = sessionStorage.getItem(SESSION_STORAGE_KEY);
+    try {
+      return storedUser ? JSON.parse(storedUser) : null;
+    } catch (error) {
+      console.error("Failed to parse user from session storage", error);
+      sessionStorage.removeItem(SESSION_STORAGE_KEY);
+      return null;
+    }
+  });
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       setUser(firebaseUser);
+      if (firebaseUser) {
+        sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(firebaseUser));
+      } else {
+        sessionStorage.removeItem(SESSION_STORAGE_KEY);
+      }
     });
     return () => unsubscribe();
   }, []);
 
-  const logout = () => signOut(auth);
+  const logout = async () => {
+    await signOut(auth);
+    sessionStorage.removeItem(SESSION_STORAGE_KEY);
+  };
 
   return (
     <AuthContext.Provider value={{ user, setUser, logout }}>

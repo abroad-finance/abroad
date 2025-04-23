@@ -14,7 +14,7 @@ export class FirebaseAuthService implements IAuthService {
 
   initialize(): void {
     if (!this.initialized && !admin.apps.length) {
-      admin.initializeApp()
+      admin.initializeApp({ projectId: process.env.PROJECT_ID })
       console.log('Firebase Admin SDK initialized by FirebaseAuthService.')
       this.initialized = true
     }

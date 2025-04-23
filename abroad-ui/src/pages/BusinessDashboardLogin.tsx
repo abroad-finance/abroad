@@ -50,9 +50,8 @@ export default function LoginPage() {
     setError("");
     signInWithEmailAndPassword(auth, email, password)
       .then((userCredential) => {
-        // store user in context
         setUser(userCredential.user);
-        console.log("User signed in:", userCredential.user.displayName);
+        console.log("User signed in:", userCredential.user.uid);
         navigate("/dashboard");
       })
       .catch((err) => {

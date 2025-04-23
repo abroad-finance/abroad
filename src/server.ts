@@ -8,6 +8,7 @@ import path from 'path'
 import packageJson from '../package.json'
 import { PaymentSentController } from './controllers/queue/PaymentSentController'
 import { ReceivedCryptoTransactionController } from './controllers/queue/ReceivedCryptoTransactionController'
+import { IAuthService } from './interfaces'
 import { iocContainer } from './ioc'
 import { RegisterRoutes } from './routes'
 import { TYPES } from './types'
@@ -86,3 +87,6 @@ receivedCryptoTransactionController.registerConsumers()
 
 const paymentSentController = iocContainer.get<PaymentSentController>(TYPES.PaymentSentController)
 paymentSentController.registerConsumers()
+
+const firebaseAuth = iocContainer.get<IAuthService>(TYPES.IAuthService)
+firebaseAuth.initialize()

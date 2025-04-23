@@ -1,3 +1,5 @@
+import { getAuth } from "firebase/auth";
+
 /**
  * This API client provides functions to call:
  * - AcceptTransaction
@@ -165,25 +167,63 @@ export interface PaginatedPartnerUsers {
 
 // --- End of Type definitions ---
 
-const API_BASE_URL = "https://abroad-api-910236263183.us-east1.run.app";
-const API_KEY = "";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "https://api.aborad.finance";
 
 async function apiRequest<T>(endpoint: string, options: RequestInit): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      "X-API-Key": API_KEY,
-      ...(options.headers || {})
+  const auth = getAuth();
+  const user = auth.currentUser;
+  let token: string | null = null;
+
+  if (user) {
+    try {
+      token = await user.getIdToken();
+    } catch (error) {
+      console.error("Error getting Firebase ID token:", error);
+      // Handle token retrieval error, e.g., redirect to login or show an error message
+      throw new Error("Failed to get authentication token.");
     }
+  }
+
+  // Initialize headers as a Record<string, string> for easier manipulation
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    // Spread existing headers from options if they exist
+    ...(options.headers as Record<string, string> || {})
+  };
+
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`; // Now type-safe
+  }
+
+  // Correctly structure the fetch call
+  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+    ...options, // Spread the original options (method, body, etc.)
+    headers: headers // Pass the modified headers object
   });
 
   if (!response.ok) {
     const errorBody = await response.text();
+    // Consider more specific error handling based on status codes
+    if (response.status === 401 || response.status === 403) {
+      // Handle authentication/authorization errors, e.g., redirect to login
+      console.error("Authentication/Authorization error:", errorBody);
+    }
     throw new Error(`API request failed: ${response.status} ${errorBody}`);
   }
 
-  return (await response.json()) as T;
+  // Handle cases where the response might be empty (e.g., 204 No Content)
+  const responseText = await response.text();
+  try {
+    return JSON.parse(responseText) as T;
+  } catch (e) {
+    // If parsing fails and responseText is empty, return undefined or handle as appropriate
+    if (!responseText) {
+      // Explicitly return undefined if the response is empty and cannot be parsed
+      // Adjust this based on how your API handles empty successful responses
+      return undefined as T;
+    }
+    throw new Error(`Failed to parse API response: ${e}`);
+  }
 }
 
 // Accept a transaction (POST /transaction)
@@ -205,7 +245,7 @@ export async function getTransactionStatus(
   });
 }
 
-// List partner transactions (GET /transaction/list)
+// List partner transactions (GET /transactions/list)
 export async function listPartnerTransactions(
   page?: number,
   pageSize?: number
@@ -214,7 +254,7 @@ export async function listPartnerTransactions(
   if (page) params.push(`page=${page}`);
   if (pageSize) params.push(`pageSize=${pageSize}`);
   const query = params.length ? `?${params.join("&")}` : "";
-  return await apiRequest<PaginatedTransactionList>(`/transaction/list${query}`, {
+  return await apiRequest<PaginatedTransactionList>(`/transactions/list${query}`, {
     method: "GET"
   });
 }
