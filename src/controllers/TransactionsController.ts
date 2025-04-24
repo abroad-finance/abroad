@@ -60,7 +60,7 @@ export class TransactionsController extends Controller {
         orderBy: { createdAt: 'desc' },
         skip: (page - 1) * pageSize,
         take: pageSize,
-        where: { partnerUser: { partnerId: partner.id }, status: TransactionStatus.PAYMENT_COMPLETED },
+        where: { partnerUser: { partnerId: partner.id } },
       }),
       prismaClient.transaction.count({ where: { partnerUser: { partnerId: partner.id }, status: TransactionStatus.PAYMENT_COMPLETED } }),
     ])

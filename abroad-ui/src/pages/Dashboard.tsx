@@ -120,6 +120,21 @@ function DashboardHome() {
     checkFreighterConnection();
   }, [connectWallet]);
 
+  // Polling: fetch balance and transactions every 5 seconds
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      try {
+        const txs = await listPartnerTransactions();
+        setTransactions(txs);
+        if (!publicKey) return;
+        fetchWalletBalance(publicKey);
+      } catch (err) {
+        console.error("Failed to fetch transactions:", err);
+      }
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [publicKey, fetchWalletBalance]);
+
   const handleAmountChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
 
