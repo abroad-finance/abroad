@@ -1,8 +1,10 @@
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { Card, CardContent } from "../components/card";
 import { Button } from "../components/button";
 import Navbar from "../components/navbar";
 import { getQuote, QuoteRequest, getReverseQuote, ReverseQuoteRequest, listPartnerUsers, PaginatedPartnerUsers, listPartnerTransactions, PaginatedTransactionList } from "../api/apiClient";
+import { isConnected, requestAccess, getNetworkDetails } from "@stellar/freighter-api"; // Import Freighter functions
+import { Horizon } from "@stellar/stellar-sdk"
 
 export function Dashboard() {
   const [activeSection, setActiveSection] = useState<string>("dashboard");
@@ -20,8 +22,7 @@ function DashboardHome() {
   const [usdcInput, setUsdcInput] = useState<string>("0");
   const [copQuote, setCopQuote] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
-  const [balance, setBalance] = useState(12500.00); // Add balance state
-  const [walletStatus, setWalletStatus] = useState("Wallet Connected");
+  const [balance, setBalance] = useState(0.00); // Start with 0 balance
   const [isConnecting, setIsConnecting] = useState(false);
   const [selectedCurrency, setSelectedCurrency] = useState<'USDC' | 'COP'>('USDC');
   const [hasQuote, setHasQuote] = useState(false);
@@ -29,8 +30,66 @@ function DashboardHome() {
   const [recipientInput, setRecipientInput] = useState("");
   const [showRecipientOptions, setShowRecipientOptions] = useState(false);
   const [transactions, setTransactions] = useState<PaginatedTransactionList | null>(null);
+  const [publicKey, setPublicKey] = useState<string | null>(null); // State for public key
+  const [connectionError, setConnectionError] = useState<string | null>(null); // State for connection errors
 
-  React.useEffect(() => {
+  const fetchWalletBalance = useCallback(async (address: string) => {
+    if (!(await isConnected())) {
+      return;
+    }
+
+    // Detailed network information
+    const details = await getNetworkDetails();
+    if (details.network !== "PUBLIC") {
+      alert("You are not connected to the public network. Please switch to the public network.");
+    }
+
+    const server = new Horizon.Server(details.networkUrl);
+
+    const account = await server.loadAccount(address!); // Use publicKey from state
+    const balance = account.balances.find((b) => b.asset_type === "credit_alphanum4" && b.asset_code === "USDC" && b.asset_issuer === "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN");
+
+    if (balance) {
+      setBalance(parseFloat(balance.balance));
+    } else {
+      console.error("USDC balance not found for the account.");
+      setBalance(0);
+    }
+  }, []);
+
+  const disconnectWallet = useCallback(async () => {
+    setPublicKey(null);
+    setBalance(0);
+  }, []);
+
+  const connectWallet = useCallback(async () => {
+    setIsConnecting(true);
+    try {
+      const freighterConnected = await isConnected();
+      if (!freighterConnected) {
+        setConnectionError("Freighter extension not detected. Please install it.");
+        setIsConnecting(false);
+        return;
+      }
+
+      const accessObj = await requestAccess();
+      if (accessObj.error) {
+        console.error("Error requesting access:", accessObj.error);
+        setConnectionError(`Failed to connect: ${accessObj.error}`);
+      } else if (accessObj.address) { // Check if address exists
+        setPublicKey(accessObj.address); // Set only the address string
+        // TODO: Fetch actual balance based on publicKey
+        fetchWalletBalance(accessObj.address); // Fetch balance
+      }
+    } catch (error) {
+      console.error("Failed to connect wallet:", error);
+      setConnectionError("An unexpected error occurred during connection.");
+    } finally {
+      setIsConnecting(false);
+    }
+  }, [fetchWalletBalance]);
+
+  useEffect(() => {
     const fetchPartnerUsers = async () => {
       try {
         const users = await listPartnerUsers();
@@ -50,7 +109,16 @@ function DashboardHome() {
       }
     };
     fetchTransactions();
-  }, []);
+
+    // Check connection on load
+    const checkFreighterConnection = async () => {
+      const connected = await isConnected();
+      if (connected) {
+        connectWallet();
+      }
+    };
+    checkFreighterConnection();
+  }, [connectWallet]);
 
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
@@ -67,14 +135,12 @@ function DashboardHome() {
     }
 
     if (selectedCurrency === 'USDC') {
-      // ...existing code for USDC...
       const decimalMatch = sanitizedValue.match(/^\d*(\.\d{0,2})?$/);
       if (decimalMatch) {
         setUsdcInput(sanitizedValue === "" ? "" : sanitizedValue);
         setUsdcAmount(sanitizedValue === "" || sanitizedValue === "." ? 0 : Number(sanitizedValue));
       }
     } else {
-      // For COP, only allow integers and format with commas
       const intValue = sanitizedValue.replace(/\./g, "");
       const numericValue = intValue === "" ? 0 : parseInt(intValue);
       setUsdcAmount(numericValue);
@@ -92,26 +158,18 @@ function DashboardHome() {
     setHasQuote(false); // Reset quote status
   };
 
-  const handleWalletConnection = async () => {
-    if (balance === 0) {
-      setIsConnecting(true);
-      try {
-        // Simulate server response - replace with actual wallet connection
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        setBalance(12500.00);
-        setWalletStatus("Wallet Connected");
-      } finally {
-        setIsConnecting(false);
-      }
+
+  const handleWalletConnection = useCallback(async () => {
+    setConnectionError(null);
+    if (publicKey) {
+      disconnectWallet();
     } else {
-      setBalance(0);
-      setWalletStatus("Wallet Disconnected");
+      await connectWallet();
     }
-  };
+  }, [connectWallet, disconnectWallet, publicKey]);
 
   const handleGetQuote = async () => {
     if (hasQuote) {
-      // Handle transaction acceptance
       try {
         setLoading(true);
         setUsdcAmount(0);
@@ -139,10 +197,9 @@ function DashboardHome() {
         const quoteResponse = await getReverseQuote(reverseQuoteRequest);
         setCopQuote(quoteResponse.value);
       } else {
-        // When sending COP, correct the target/source currency configuration
         const quoteRequest: QuoteRequest = {
-          target_currency: "COP",  // The currency we want to receive
-          amount: usdcAmount,  // The COP amount entered by user
+          target_currency: "COP",
+          amount: usdcAmount,
           payment_method: "NEQUI",
           network: "STELLAR",
           crypto_currency: "USDC",
@@ -165,12 +222,12 @@ function DashboardHome() {
   };
 
   const getWalletMessage = () => {
-    return walletStatus === "Wallet Connected" 
-      ? "Total balance available for transactions"
-      : "Please connect your wallet in order to make transactions";
+    if (connectionError) return connectionError;
+    return publicKey
+      ? `Connected: ${publicKey.substring(0, 6)}...${publicKey.substring(publicKey.length - 4)}`
+      : "Please connect your wallet to make transactions";
   };
 
-  // Filter partner users by input
   const filteredRecipients =
     partnerUsers?.users.filter((user) =>
       user.userId.toLowerCase().includes(recipientInput.toLowerCase())
@@ -186,8 +243,7 @@ function DashboardHome() {
           </div>
         </div>
       )}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-16">  {/* This adds 4rem (64px) top margin */}
-        {/* Balance Card */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-16">
         <Card className="rounded-xl w-full border-0 shadow-lg">
           <CardContent className="flex flex-col items-center justify-center text-center h-full">
             <img
@@ -201,39 +257,35 @@ function DashboardHome() {
             <p className="text-sm text-gray-600 flex items-center justify-center gap-1 mt-1">
               {getWalletMessage()}
             </p>
-            <Button 
+            <Button
               onClick={handleWalletConnection}
               className="mt-4 rounded-xl text-white bg-gradient-to-r from-[#48b395] to-[#247469] hover:opacity-90"
+              disabled={isConnecting}
             >
-              {balance === 0 ? "Connect your wallet" : "Disconnect your wallet"}
+              {isConnecting ? "Connecting..." : publicKey ? "Disconnect Wallet" : "Connect Freighter Wallet"}
             </Button>
           </CardContent>
         </Card>
 
-        {/* Transfer Card */}
         <Card className="rounded-xl w-full border-0 shadow-lg">
           <CardContent className="space-y-4">
             <h3 className="text-xl font-semibold">Make an Instant Transfer</h3>
-            
-            {/* Currency Toggle */}
             <div className="flex rounded-lg border border-gray-200 p-1">
               <button
                 onClick={() => handleCurrencyChange('USDC')}
-                className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
-                  selectedCurrency === 'USDC'
-                    ? 'bg-[#48b395] text-white'
-                    : 'text-gray-500 hover:text-gray-700'
-                }`}
+                className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${selectedCurrency === 'USDC'
+                  ? 'bg-[#48b395] text-white'
+                  : 'text-gray-500 hover:text-gray-700'
+                  }`}
               >
                 Send USDC
               </button>
               <button
                 onClick={() => handleCurrencyChange('COP')}
-                className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
-                  selectedCurrency === 'COP'
-                    ? 'bg-[#48b395] text-white'
-                    : 'text-gray-500 hover:text-gray-700'
-                }`}
+                className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${selectedCurrency === 'COP'
+                  ? 'bg-[#48b395] text-white'
+                  : 'text-gray-500 hover:text-gray-700'
+                  }`}
               >
                 Send COP
               </button>
@@ -241,16 +293,16 @@ function DashboardHome() {
 
             <div className="flex items-center gap-2 border-b border-gray-300 pb-1">
               {selectedCurrency === 'USDC' ? (
-                <img 
-                  src="https://assets.streamlinehq.com/image/private/w_300,h_300,ar_1/f_auto/v1/icons/vectors/usdc-fpxuadmgafrjjy85bgie5.png/usdc-kksfxcrdl3f9pjx0v6jxxp.png?_a=DAJFJtWIZAAC" 
-                  alt="USDC Logo" 
-                  className="h-6 w-6" 
+                <img
+                  src="https://assets.streamlinehq.com/image/private/w_300,h_300,ar_1/f_auto/v1/icons/vectors/usdc-fpxuadmgafrjjy85bgie5.png/usdc-kksfxcrdl3f9pjx0v6jxxp.png?_a=DAJFJtWIZAAC"
+                  alt="USDC Logo"
+                  className="h-6 w-6"
                 />
               ) : (
-                <img 
-                  src="https://vectorflags.s3.amazonaws.com/flags/co-circle-01.png" 
-                  alt="Colombian Flag" 
-                  className="h-6 w-6" 
+                <img
+                  src="https://vectorflags.s3.amazonaws.com/flags/co-circle-01.png"
+                  alt="Colombian Flag"
+                  className="h-6 w-6"
                 />
               )}
               <div className="relative w-full">
@@ -306,7 +358,7 @@ function DashboardHome() {
             <Button
               onClick={handleGetQuote}
               className="w-full rounded-xl text-white bg-gradient-to-r from-[#48b395] to-[#247469] hover:opacity-90"
-              disabled={loading || (selectedCurrency === 'USDC' && usdcAmount <= 0)}
+              disabled={loading || !publicKey || (selectedCurrency === 'USDC' && usdcAmount <= 0)} // Disable if wallet not connected
             >
               {loading ? "Loading..." : hasQuote ? "Accept Transaction" : "Get Quote"}
             </Button>

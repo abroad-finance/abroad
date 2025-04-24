@@ -25,7 +25,7 @@
     "@prisma/client": "^6.2.1",
     "@solana/spl-token": "^0.4.13",
     "@solana/web3.js": "^1.98.0",
-    "@stellar/stellar-sdk": "^13.1.0",
+    "@stellar/stellar-sdk": "^13.3.0",
     "@types/commander": "^2.12.0",
     "amqp-connection-manager": "^4.1.14",
     "amqplib": "^0.10.5",

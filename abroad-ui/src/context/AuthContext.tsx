@@ -6,12 +6,14 @@ type AuthContextType = {
   user: User | null;
   setUser: (user: User | null) => void;
   logout: () => Promise<void>;
+  initializing: boolean; // add initializing flag
 };
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
   setUser: () => {},
   logout: async () => {},
+  initializing: true,
 });
 
 const SESSION_STORAGE_KEY = 'firebaseUser';
@@ -28,6 +30,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   });
 
+  // add initializing state
+  const [initializing, setInitializing] = useState(true);
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       setUser(firebaseUser);
@@ -36,6 +41,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       } else {
         sessionStorage.removeItem(SESSION_STORAGE_KEY);
       }
+      // mark initialization complete
+      setInitializing(false);
     });
     return () => unsubscribe();
   }, []);
@@ -46,7 +53,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, setUser, logout }}>
+    <AuthContext.Provider value={{ user, setUser, logout, initializing }}>
       {children}
     </AuthContext.Provider>
   );
