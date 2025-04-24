@@ -114,7 +114,7 @@ export default function Recipients() {
                 >
                   <option value="">Select Bank</option>
                   {banks.map((bank) => (
-                    <option key={bank.bankCode} value={bank.bankName}>
+                    <option key={bank.bankCode} value={bank.bankCode}>
                       {bank.bankName}
                     </option>
                   ))}
@@ -164,7 +164,7 @@ export default function Recipients() {
                         <tr key={user.id || index} className="border-b border-gray-100">
                           <td className="py-2 px-4">{user.userId}</td>
                           <td className="py-2 px-4">{user.accountNumber || "-"}</td>
-                          <td className="py-2 px-4">{user.bank || "-"}</td>
+                          <td className="py-2 px-4">{banks.find(bank => bank.bankCode.toString() === user.bank)?.bankName || "-"}</td>
                           <td className="py-2 px-4">{user.kycStatus}</td>
                         </tr>
                       ))}

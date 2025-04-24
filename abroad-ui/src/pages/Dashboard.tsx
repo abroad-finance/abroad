@@ -1,10 +1,11 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Card, CardContent } from "../components/card";
 import { Button } from "../components/button";
 import Navbar from "../components/navbar";
-import { getQuote, QuoteRequest, getReverseQuote, ReverseQuoteRequest, listPartnerUsers, PaginatedPartnerUsers, listPartnerTransactions, PaginatedTransactionList } from "../api/apiClient";
-import { isConnected, requestAccess, getNetworkDetails } from "@stellar/freighter-api"; // Import Freighter functions
-import { Horizon } from "@stellar/stellar-sdk"
+import { getQuote, QuoteRequest, getReverseQuote, ReverseQuoteRequest, listPartnerUsers, PaginatedPartnerUsers, listPartnerTransactions, PaginatedTransactionList, QuoteResponse, acceptTransaction, AcceptTransactionRequest } from "../api/apiClient";
+import { isConnected, requestAccess, getNetworkDetails, signTransaction } from "@stellar/freighter-api"; // Import Freighter functions
+import { Memo, Operation, Asset, TransactionBuilder, Transaction as StellarTransaction } from "@stellar/stellar-sdk";
+import { Horizon } from "@stellar/stellar-sdk";
 
 export function Dashboard() {
   const [activeSection, setActiveSection] = useState<string>("dashboard");
@@ -20,12 +21,11 @@ export function Dashboard() {
 function DashboardHome() {
   const [usdcAmount, setUsdcAmount] = useState(0);
   const [usdcInput, setUsdcInput] = useState<string>("0");
-  const [copQuote, setCopQuote] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [balance, setBalance] = useState(0.00); // Start with 0 balance
   const [isConnecting, setIsConnecting] = useState(false);
   const [selectedCurrency, setSelectedCurrency] = useState<'USDC' | 'COP'>('USDC');
-  const [hasQuote, setHasQuote] = useState(false);
+  const [quote, setQuote] = useState<QuoteResponse | null>(null);
   const [partnerUsers, setPartnerUsers] = useState<PaginatedPartnerUsers | null>(null);
   const [recipientInput, setRecipientInput] = useState("");
   const [showRecipientOptions, setShowRecipientOptions] = useState(false);
@@ -120,7 +120,7 @@ function DashboardHome() {
     checkFreighterConnection();
   }, [connectWallet]);
 
-  const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAmountChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
 
     // Remove any non-digit characters except decimal point
@@ -146,17 +146,15 @@ function DashboardHome() {
       setUsdcAmount(numericValue);
       setUsdcInput(intValue === "" ? "" : numericValue.toLocaleString("en-US"));
     }
-    setCopQuote(null);
-    setHasQuote(false);
-  };
+    setQuote(null);
+  }, [selectedCurrency]);
 
-  const handleCurrencyChange = (currency: 'USDC' | 'COP') => {
+  const handleCurrencyChange = useCallback((currency: 'USDC' | 'COP') => {
     setSelectedCurrency(currency);
     setUsdcAmount(0); // Reset amount
     setUsdcInput("0");
-    setCopQuote(null); // Clear quote
-    setHasQuote(false); // Reset quote status
-  };
+    setQuote(null);
+  }, []);
 
 
   const handleWalletConnection = useCallback(async () => {
@@ -168,14 +166,13 @@ function DashboardHome() {
     }
   }, [connectWallet, disconnectWallet, publicKey]);
 
-  const handleGetQuote = async () => {
-    if (hasQuote) {
+  const handleGetQuote = useCallback(async () => {
+    if (quote) {
       try {
         setLoading(true);
         setUsdcAmount(0);
         setUsdcInput("0");
-        setCopQuote(null);
-        setHasQuote(false);
+        setQuote(null);
       } catch (error) {
         console.error("Failed to process transaction:", error);
       } finally {
@@ -190,48 +187,112 @@ function DashboardHome() {
         const reverseQuoteRequest: ReverseQuoteRequest = {
           target_currency: "COP",
           source_amount: usdcAmount,
-          payment_method: "NEQUI",
+          payment_method: "MOVII",
           network: "STELLAR",
           crypto_currency: "USDC",
         };
         const quoteResponse = await getReverseQuote(reverseQuoteRequest);
-        setCopQuote(quoteResponse.value);
+        setQuote(quoteResponse);
       } else {
         const quoteRequest: QuoteRequest = {
           target_currency: "COP",
           amount: usdcAmount,
-          payment_method: "NEQUI",
+          payment_method: "MOVII",
           network: "STELLAR",
           crypto_currency: "USDC",
         };
         const quoteResponse = await getQuote(quoteRequest);
         if (quoteResponse && quoteResponse.value) {
-          setCopQuote(quoteResponse.value);
+          setQuote(quoteResponse);
         } else {
           throw new Error('Invalid quote response');
         }
       }
-      setHasQuote(true);
     } catch (error) {
       console.error("Failed to get quote:", error);
-      setCopQuote(null);
-      setHasQuote(false);
+      setQuote(null);
     } finally {
       setLoading(false);
     }
-  };
+  }, [quote, selectedCurrency, usdcAmount]);
 
-  const getWalletMessage = () => {
+  const handleAcceptTransaction = useCallback(async () => {
+    if (!quote) return;
+    const recipient = partnerUsers?.users.find(u => u.userId === recipientInput);
+    if (!recipient?.accountNumber || !recipient?.bank) {
+      console.error("Recipient account or bank missing");
+      return;
+    }
+    try {
+      setLoading(true);
+      const acceptReq: AcceptTransactionRequest = {
+        account_number: recipient.accountNumber,
+        bank_code: recipient.bank,
+        quote_id: quote.quote_id,
+        user_id: recipient.userId,
+      };
+      const acceptRes = await acceptTransaction(acceptReq);
+      const memoText = acceptRes.transaction_reference;
+      // Build a Stellar payment transaction including memo
+      const details = await getNetworkDetails();
+      const server = new Horizon.Server(details.networkUrl);
+      const sourceAccount = await server.loadAccount(publicKey!);
+      const baseFee = await server.fetchBaseFee();
+      const usdcAsset = new Asset(
+        "USDC",
+        "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN"
+      );
+      const destination = import.meta.env.VITE_ABROAD_STELLAR_ADDRESS
+      const tx = new TransactionBuilder(sourceAccount, {
+        fee: baseFee.toString(),
+        networkPassphrase: details.networkPassphrase,
+        memo: Memo.text(memoText),
+      })
+        .addOperation(
+          Operation.payment({
+            destination,
+            asset: usdcAsset,
+            amount: selectedCurrency === 'USDC' ? usdcAmount.toString() : quote.value.toString()
+          })
+        )
+        .setTimeout(600)
+        .build();
+      // Sign the transaction with Freighter
+      const signResult = await signTransaction(tx.toXDR());
+      if ('error' in signResult) throw new Error(signResult.error);
+      const signedTxXdr = signResult.signedTxXdr;
+      const signedTx = new StellarTransaction(
+        signedTxXdr,
+        "PUBLIC"
+      );
+      // Submit to the network
+      await server.submitTransaction(signedTx);
+      // Refresh transaction list
+      const txs = await listPartnerTransactions();
+      setTransactions(txs);
+      // Reset state
+      setQuote(null);
+      setRecipientInput("");
+    } catch (error) {
+      console.error("Failed to accept transaction:", error);
+      setQuote(null);
+    } finally {
+      setLoading(false);
+    }
+  }, [quote, recipientInput, partnerUsers, selectedCurrency, usdcAmount, publicKey]);
+
+  const getWalletMessage = useCallback(() => {
     if (connectionError) return connectionError;
     return publicKey
       ? `Connected: ${publicKey.substring(0, 6)}...${publicKey.substring(publicKey.length - 4)}`
       : "Please connect your wallet to make transactions";
-  };
+  }, [connectionError, publicKey]);
 
-  const filteredRecipients =
-    partnerUsers?.users.filter((user) =>
+  const filteredRecipients = useMemo(() => {
+    return partnerUsers?.users.filter((user) =>
       user.userId.toLowerCase().includes(recipientInput.toLowerCase())
     ) || [];
+  }, [partnerUsers, recipientInput]);
 
   return (
     <div className="space-y-4 relative">
@@ -355,27 +416,33 @@ function DashboardHome() {
                 )}
               </div>
             </div>
-            <Button
+            {quote ? <Button
+              onClick={handleAcceptTransaction}
+              className="w-full rounded-xl text-white bg-gradient-to-r from-[#48b395] to-[#247469] hover:opacity-90"
+              disabled={loading || !publicKey || (selectedCurrency === 'USDC' && usdcAmount <= 0)} // Disable if wallet not connected
+            >
+              {loading ? "Loading..." : "Accept Transaction"}
+            </Button> : <Button
               onClick={handleGetQuote}
               className="w-full rounded-xl text-white bg-gradient-to-r from-[#48b395] to-[#247469] hover:opacity-90"
               disabled={loading || !publicKey || (selectedCurrency === 'USDC' && usdcAmount <= 0)} // Disable if wallet not connected
             >
-              {loading ? "Loading..." : hasQuote ? "Accept Transaction" : "Get Quote"}
-            </Button>
-            {copQuote !== null && (
+              {loading ? "Loading..." : "Get Quote"}
+            </Button>}
+            {quote !== null && (
               <>
                 <p className="mt-4 text-xl font-bold text-gray-600">
                   {selectedCurrency === 'USDC' ? (
-                    `Quotation: COP $${copQuote.toLocaleString()}`
+                    `Quotation: COP $${quote.value.toLocaleString()}`
                   ) : (
-                    `Quotation: USDC $${copQuote.toLocaleString()}`
+                    `Quotation: USDC $${quote.value.toLocaleString()}`
                   )}
                 </p>
                 <p className="text-sm text-gray-500">
                   {selectedCurrency === 'USDC' ? (
-                    `Exchange Rate: 1 USDC = COP $${(copQuote / usdcAmount).toFixed(2)}`
+                    `Exchange Rate: 1 USDC = COP $${(quote.value / usdcAmount).toFixed(2)}`
                   ) : (
-                    `Exchange Rate: 1 USDC = COP $${(usdcAmount / copQuote).toFixed(2)}`
+                    `Exchange Rate: 1 USDC = COP $${(usdcAmount / quote.value).toFixed(2)}`
                   )}
                 </p>
               </>

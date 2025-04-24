@@ -165,7 +165,7 @@ export interface PaginatedPartnerUsers {
 
 // --- End of Type definitions ---
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "https://api.aborad.finance";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "https://api.abroad.finance";
 
 async function apiRequest<T>(endpoint: string, options: RequestInit): Promise<T> {
   const auth = getAuth();

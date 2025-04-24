@@ -19,9 +19,6 @@
 				"Github.copilot",
 				"GitHub.copilot-labs",
 			],
-			"settings": {
-				"cody.autocomplete.enabled": true
-			}
 		},
 	},
 	"postStartCommand": "npm install",

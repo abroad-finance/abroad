@@ -110,8 +110,8 @@ export class PartnerUserController extends Controller {
   }
 
   /**
-       * List partner users (paginated)
-       */
+ * List partner users (paginated)
+ */
   @Get('list')
   @Response<400, { reason: string }>(400, 'Bad Request')
   @SuccessResponse('200', 'Partner users retrieved')
