@@ -88,11 +88,7 @@ export class TransactionController extends Controller {
       user_id: userId,
     } = requestBody
 
-    const apiKey = request.header('X-API-Key')
-    if (!apiKey) {
-      return badRequestResponse(400, { reason: 'Missing API key' })
-    }
-    const partner = await this.partnerService.getPartnerFromApiKey(apiKey)
+    const partner = request.user
 
     const prismaClient = await this.prismaClientProvider.getClient()
 

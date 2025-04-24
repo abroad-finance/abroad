@@ -9,8 +9,6 @@ import { getAuth } from "firebase/auth";
  * - OnboardUser
  * - CheckKyc
  * - GetBanks
- *
- * It uses fetch and attaches an API key via the "X-API-Key" header.
  */
 
 // --- TypeScript interfaces generated from OpenAPI schema ---

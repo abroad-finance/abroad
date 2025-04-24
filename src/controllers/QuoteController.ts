@@ -80,17 +80,12 @@ export class QuoteController extends Controller {
     }
     const { amount, crypto_currency, network, payment_method, target_currency } = parsed.data
 
-    const apiKey = request.header('X-API-Key')
-    if (!apiKey) {
-      return badRequestResponse(400, { reason: 'Missing API key' })
-    }
-
     try {
       const quote = await this.quoteUseCase.createQuote({
         amount,
-        apiKey,
         cryptoCurrency: crypto_currency,
         network,
+        partner: request.user,
         paymentMethod: payment_method,
         targetCurrency: target_currency,
       },
@@ -124,16 +119,11 @@ export class QuoteController extends Controller {
     }
     const { crypto_currency, network, payment_method, source_amount, target_currency } = parsed.data
 
-    const apiKey = request.header('X-API-Key')
-    if (!apiKey) {
-      return badRequestResponse(400, { reason: 'Missing API key' })
-    }
-
     try {
       const quote = await this.quoteUseCase.createReverseQuote({
-        apiKey,
         cryptoCurrency: crypto_currency,
         network,
+        partner: request.user,
         paymentMethod: payment_method,
         sourceAmountInput: source_amount,
         targetCurrency: target_currency,

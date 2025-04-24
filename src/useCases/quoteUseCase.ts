@@ -3,6 +3,7 @@ import {
   BlockchainNetwork,
   Country,
   CryptoCurrency,
+  Partner,
   PaymentMethod,
   TargetCurrency,
 } from '.prisma/client'
@@ -17,18 +18,18 @@ import { TYPES } from '../types'
 // Parameter object for createQuote
 export interface CreateQuoteParams {
   amount: number
-  apiKey: string
   cryptoCurrency: CryptoCurrency
   network: BlockchainNetwork
+  partner: Partner
   paymentMethod: PaymentMethod
   targetCurrency: TargetCurrency
 }
 
 // Parameter object for createReverseQuote
 export interface CreateReverseQuoteParams {
-  apiKey: string
   cryptoCurrency: CryptoCurrency
   network: BlockchainNetwork
+  partner: Partner
   paymentMethod: PaymentMethod
   sourceAmountInput: number
   targetCurrency: TargetCurrency
@@ -63,9 +64,8 @@ export class QuoteUseCase implements IQuoteUseCase {
   ) { }
 
   public async createQuote(params: CreateQuoteParams): Promise<QuoteResponse> {
-    const { amount, apiKey, cryptoCurrency, network, paymentMethod, targetCurrency } = params
+    const { amount, cryptoCurrency, network, partner, paymentMethod, targetCurrency } = params
 
-    const partner = await this.partnerService.getPartnerFromApiKey(apiKey)
     const expirationDate = this.getExpirationDate()
 
     const exchangeRate = await this.exchangeRateProvider.getExchangeRate({
@@ -109,9 +109,8 @@ export class QuoteUseCase implements IQuoteUseCase {
   }
 
   public async createReverseQuote(params: CreateReverseQuoteParams): Promise<QuoteResponse> {
-    const { apiKey, cryptoCurrency, network, paymentMethod, sourceAmountInput, targetCurrency } = params
+    const { cryptoCurrency, network, partner, paymentMethod, sourceAmountInput, targetCurrency } = params
 
-    const partner = await this.partnerService.getPartnerFromApiKey(apiKey)
     const expirationDate = this.getExpirationDate()
 
     const exchangeRate = await this.exchangeRateProvider.getExchangeRate({ sourceCurrency: cryptoCurrency, targetCurrency })
