@@ -18,6 +18,8 @@ export function Dashboard() {
   );
 }
 
+const FLAT_RATE = 1190
+
 function DashboardHome() {
   const [usdcAmount, setUsdcAmount] = useState(0);
   const [usdcInput, setUsdcInput] = useState<string>("0");
@@ -455,9 +457,9 @@ function DashboardHome() {
                 </p>
                 <p className="text-sm text-gray-500">
                   {selectedCurrency === 'USDC' ? (
-                    `Exchange Rate: 1 USDC = COP $${(quote.value / usdcAmount).toFixed(2)}`
+                    `Exchange Rate: 1 USDC = COP $${((quote.value + FLAT_RATE) / usdcAmount).toFixed(2)} flat rate:${FLAT_RATE} COP`
                   ) : (
-                    `Exchange Rate: 1 USDC = COP $${(usdcAmount / quote.value).toFixed(2)}`
+                    `Exchange Rate: 1 USDC = COP $${((usdcAmount + FLAT_RATE) / (quote.value)).toFixed(2)} flat rate:${FLAT_RATE} COP`
                   )}
                 </p>
               </>
