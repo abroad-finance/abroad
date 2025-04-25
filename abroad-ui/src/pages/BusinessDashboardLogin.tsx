@@ -3,10 +3,29 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Card, CardContent } from "../components/card";
 import { Input } from "../components/input";
 import { Button } from "../components/button";
-import { signInWithEmailAndPassword } from "firebase/auth";
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from "firebase/auth";
 import { auth } from "../services/firebase";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
+
+const countries = [
+  { code: "AR", name: "Argentina", emoji: "🇦🇷" },
+  { code: "BR", name: "Brazil", emoji: "🇧🇷" },
+  { code: "CA", name: "Canada", emoji: "🇨🇦" },
+  { code: "CL", name: "Chile", emoji: "🇨🇱" },
+  { code: "CN", name: "China", emoji: "🇨🇳" },
+  { code: "CO", name: "Colombia", emoji: "🇨🇴" },
+  { code: "EC", name: "Ecuador", emoji: "🇪🇨" },
+  { code: "EU", name: "European Union", emoji: "🇪🇺" },
+  { code: "IN", name: "India", emoji: "🇮🇳" },
+  { code: "MX", name: "Mexico", emoji: "🇲🇽" },
+  { code: "PE", name: "Peru", emoji: "🇵🇪" },
+  { code: "CH", name: "Switzerland", emoji: "🇨🇭" },
+  { code: "GB", name: "United Kingdom", emoji: "🇬🇧" },
+  { code: "US", name: "United States", emoji: "🇺🇸" },
+  { code: "UY", name: "Uruguay", emoji: "🇺🇾" },
+  { code: "OTHER", name: "Other Country/Region", emoji: "🌎" },
+];
 
 function AnimatedDestinations() {
   const texts = ["🇧🇷 Reales", "🇵🇪 Soles", "🇨🇴 Pesos"];
@@ -45,6 +64,12 @@ export default function LoginPage() {
   const [showOTP, setShowOTP] = useState(false);
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
   const [error, setError] = useState<string>("");
+  const [isRegistering, setIsRegistering] = useState(false);
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [country, setCountry] = useState("");
+  const [company, setCompany] = useState("");
+  const [phone, setPhone] = useState("");
 
   const handleLogin = () => {
     setError("");
@@ -52,6 +77,18 @@ export default function LoginPage() {
       .then((userCredential) => {
         setUser(userCredential.user);
         console.log("User signed in:", userCredential.user.uid);
+        navigate("/dashboard");
+      })
+      .catch((err) => {
+        setError(err.message);
+      });
+  };
+
+  const handleRegister = () => {
+    setError("");
+    createUserWithEmailAndPassword(auth, email, password)
+      .then((userCredential) => {
+        setUser(userCredential.user);
         navigate("/dashboard");
       })
       .catch((err) => {
@@ -72,6 +109,17 @@ export default function LoginPage() {
     continue: string;
     verify: string;
     requestAgain: string;
+    register: string;
+    noAccount: string;
+    haveAccount: string;
+    firstName: string;
+    lastName: string;
+    country: string;
+    selectCountry: string;
+    company: string;
+    phone: string;
+    registerTitle: string;
+    registerSubtitle: string;
   }> = {
     en: {
       otpTitle: "OTP Confirmation",
@@ -86,6 +134,17 @@ export default function LoginPage() {
       continue: "Continue",
       verify: "Verify",
       requestAgain: "Didn't receive code? Request again",
+      register: "Register",
+      noAccount: "Don't have an account?",
+      haveAccount: "Already have an account?",
+      firstName: "First Name",
+      lastName: "Last Name",
+      country: "Country",
+      selectCountry: "Select country or region",
+      company: "Company Name",
+      phone: "Phone Number",
+      registerTitle: "Register a new account",
+      registerSubtitle: "Create a new business account to make instant transfers.",
     },
     es: {
       otpTitle: "Confirmación OTP",
@@ -100,6 +159,17 @@ export default function LoginPage() {
       continue: "Continuar",
       verify: "Verificar",
       requestAgain: "¿No recibiste el código? Solicítalo nuevamente",
+      register: "Registrarse",
+      noAccount: "¿No tienes una cuenta?",
+      haveAccount: "¿Ya tienes una cuenta?",
+      firstName: "Nombre",
+      lastName: "Apellido",
+      country: "País",
+      selectCountry: "Selecciona país o región",
+      company: "Nombre de la Empresa",
+      phone: "Número de Teléfono",
+      registerTitle: "Registrar una nueva cuenta",
+      registerSubtitle: "Crea una cuenta de empresa para hacer transferencias instantáneas.",
     },
     pt: {
       otpTitle: "Confirmação OTP",
@@ -114,6 +184,17 @@ export default function LoginPage() {
       continue: "Continuar",
       verify: "Verificar",
       requestAgain: "Não recebeu o código? Solicite novamente",
+      register: "Registrar",
+      noAccount: "Não tem uma conta?",
+      haveAccount: "Já tem uma conta?",
+      firstName: "Nome",
+      lastName: "Sobrenome",
+      country: "País",
+      selectCountry: "Selecione país ou região",
+      company: "Nome da Empresa",
+      phone: "Número de Telefone",
+      registerTitle: "Registrar uma nova conta",
+      registerSubtitle: "Crie uma conta empresarial para fazer transferências instantâneas.",
     },
     zh: {
       otpTitle: "OTP 验证",
@@ -128,6 +209,17 @@ export default function LoginPage() {
       continue: "继续",
       verify: "验证",
       requestAgain: "未收到验证码？重新请求",
+      register: "注册",
+      noAccount: "还没有账户？",
+      haveAccount: "已有账户？",
+      firstName: "名",
+      lastName: "姓",
+      country: "国家",
+      selectCountry: "选择国家或地区",
+      company: "公司名称",
+      phone: "电话号码",
+      registerTitle: "注册新账户",
+      registerSubtitle: "创建商业账户并立即转账。",
     },
   };
 
@@ -141,10 +233,10 @@ export default function LoginPage() {
           onChange={(e) => setLanguage(e.target.value as Language)}
           className="rounded px-1 py-0.5 text-xs border border-gray-300"
         >
-          <option value="en">EN</option>
-          <option value="es">ES</option>
-          <option value="pt">PT</option>
-          <option value="zh">ZH</option>
+          <option value="en">🇬🇧 EN</option>
+          <option value="es">🇪🇸 ES</option>
+          <option value="pt">🇧🇷 PT</option>
+          <option value="zh">🇨🇳 ZH</option>
         </select>
       </div>
       <div className="flex flex-col flex-1 items-start justify-center p-8">
@@ -169,9 +261,62 @@ export default function LoginPage() {
           {!showOTP ? (
             <Card className="rounded-2xl shadow-xl border-none">
               <CardContent className="p-6 min-h-[300px] flex flex-col justify-start">
-                <h2 className="text-2xl font-bold text-center mb-1">{t.welcome}</h2>
-                <p className="text-sm text-gray-500 text-center mb-6">{t.loginMessage}</p>
+                <h2 className="text-2xl font-bold text-center mb-1">
+                  {isRegistering ? t.registerTitle : t.welcome}
+                </h2>
+                <p className="text-sm text-gray-500 text-center mb-6">
+                  {isRegistering ? t.registerSubtitle : t.loginMessage}
+                </p>
                 <form className="flex flex-col space-y-4">
+                  {isRegistering && (
+                    <>
+                      <Input
+                        type="text"
+                        value={firstName}
+                        onChange={(e) => setFirstName(e.target.value)}
+                        placeholder={t.firstName}
+                        className="rounded-xl border-none focus:ring-2 focus:ring-green-600"
+                        required
+                      />
+                      <Input
+                        type="text"
+                        value={lastName}
+                        onChange={(e) => setLastName(e.target.value)}
+                        placeholder={t.lastName}
+                        className="rounded-xl border-none focus:ring-2 focus:ring-green-600"
+                        required
+                      />
+                      <Input
+                        type="text"
+                        value={company}
+                        onChange={(e) => setCompany(e.target.value)}
+                        placeholder={t.company}
+                        className="rounded-xl border-none focus:ring-2 focus:ring-green-600"
+                        required
+                      />
+                      <Input
+                        type="tel"
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        placeholder={t.phone}
+                        className="rounded-xl border-none focus:ring-2 focus:ring-green-600"
+                        required
+                      />
+                      <select
+                        value={country}
+                        onChange={(e) => setCountry(e.target.value)}
+                        className="rounded-xl border-none focus:ring-2 focus:ring-green-600 p-2"
+                        required
+                      >
+                        <option value="">{t.selectCountry}</option>
+                        {countries.map((country) => (
+                          <option key={country.code} value={country.code}>
+                            {country.emoji} {country.name}
+                          </option>
+                        ))}
+                      </select>
+                    </>
+                  )}
                   <Input
                     type="email"
                     value={email}
@@ -235,11 +380,21 @@ export default function LoginPage() {
                   {error && <p className="text-red-500 text-sm text-center">{error}</p>}
                   <Button
                     type="button"
-                    className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded"
-                    onClick={handleLogin}
+                    className="bg-gradient-to-r from-[#356E6A] to-[#73B9A3] hover:from-[#2a5956] hover:to-[#5fa88d] text-white px-4 py-2 rounded"
+                    onClick={isRegistering ? handleRegister : handleLogin}
                   >
-                    {t.continue}
+                    {isRegistering ? t.register : t.continue}
                   </Button>
+                  <p className="text-sm text-center text-gray-600">
+                    {isRegistering ? t.haveAccount : t.noAccount}{" "}
+                    <button
+                      type="button"
+                      onClick={() => setIsRegistering(!isRegistering)}
+                      className="bg-gradient-to-r from-[#356E6A] to-[#73B9A3] bg-clip-text text-transparent font-medium hover:opacity-80"
+                    >
+                      {isRegistering ? t.login : t.register}
+                    </button>
+                  </p>
                 </form>
               </CardContent>
             </Card>
