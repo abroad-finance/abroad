@@ -18,7 +18,7 @@ export function Dashboard() {
   );
 }
 
-const FLAT_RATE = 1190
+const FLAT_RATE = 1354
 
 function DashboardHome() {
   const [usdcAmount, setUsdcAmount] = useState(0);
