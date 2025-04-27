@@ -10,10 +10,12 @@
     "preview": "vite preview --host"
   },
   "dependencies": {
+    "@headlessui/react": "^2.2.2",
     "@stellar/freighter-api": "^4.1.0",
     "@stellar/stellar-sdk": "^13.3.0",
     "@tailwindcss/vite": "^4.0.9",
     "firebase": "^11.6.0",
+    "flag-icons": "^7.3.2",
     "framer-motion": "^12.6.2",
     "lucide-react": "^0.485.0",
     "react": "^19.0.0",

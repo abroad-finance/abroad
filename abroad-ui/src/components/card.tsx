@@ -1,7 +1,17 @@
-import React from "react";
+import React, { MouseEventHandler, ReactNode } from "react";
 
-export function Card({ className = "", children }: { className?: string; children: React.ReactNode }) {
-  return <div className={`bg-white border rounded-lg ${className}`}>{children}</div>;
+interface CardProps {
+  className?: string;
+  children: ReactNode;
+  onClick?: MouseEventHandler<HTMLDivElement>;
+}
+
+export function Card({ className = "", children, onClick }: CardProps) {
+  return (
+    <div className={`bg-white border rounded-lg ${className}`} onClick={onClick}>
+      {children}
+    </div>
+  );
 }
 
 export function CardContent({ className = "", children }: { className?: string; children: React.ReactNode }) {
