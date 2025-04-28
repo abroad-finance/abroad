@@ -83,7 +83,14 @@ export default function Topbar({ activeSection, setActiveSection }: TopbarProps)
           <div className="flex items-center">
             <div
               className="flex-shrink-0 logo-container"
+              role="button"
+              tabIndex={0}
               onClick={() => navigate("/dashboard")}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  navigate("/dashboard");
+                }
+              }}
               style={{ cursor: "pointer" }}
             >
               <img

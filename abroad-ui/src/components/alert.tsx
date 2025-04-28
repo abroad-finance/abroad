@@ -1,4 +1,3 @@
-import React from "react";
 import { Card, CardContent } from "./card";
 import { Button } from "./button";
 import { AlertTriangle } from "lucide-react";
@@ -18,6 +17,14 @@ export function Alert({ title, description, isOpen, onClose }: AlertProps) {
       className="fixed inset-0 flex items-center justify-center backdrop-blur-sm z-50"
       style={{ backgroundColor: 'rgba(0, 0, 0, 0.60)' }}
       onClick={onClose}
+      onKeyDown={(e) => {
+        if (e.key === 'Escape' || e.key === 'Enter' || e.key === ' ') {
+          onClose();
+        }
+      }}
+      tabIndex={0}
+      role="button"
+      aria-label="Close alert"
     >
       <Card
         className="w-11/12 max-w-md bg-white rounded-lg shadow-xl"

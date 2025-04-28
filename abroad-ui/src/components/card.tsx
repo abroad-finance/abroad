@@ -8,7 +8,18 @@ interface CardProps {
 
 export function Card({ className = "", children, onClick }: CardProps) {
   return (
-    <div className={`bg-white border rounded-lg ${className}`} onClick={onClick}>
+    <div
+      role="button"
+      tabIndex={0}
+      className={`bg-white border rounded-lg ${className}`}
+      onClick={onClick}
+      onKeyDown={e => {
+        if (onClick && (e.key === "Enter" || e.key === " ")) {
+          e.preventDefault();
+          onClick(e as unknown as React.MouseEvent<HTMLDivElement>);
+        }
+      }}
+    >
       {children}
     </div>
   );

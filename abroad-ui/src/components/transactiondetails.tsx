@@ -49,6 +49,11 @@ export function TransactionDetails({ transaction, onClose }: TransactionDetailsP
       className="fixed inset-0 flex items-center justify-center backdrop-blur-sm"
       style={{ backgroundColor: 'rgba(0, 0, 0, 0.60)' }}
       onClick={onClose}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') onClose();
+      }}
+      role="button"
+      tabIndex={0}
     >
       <Card
         className="w-11/12 max-w-lg bg-white rounded-lg shadow-xl"
