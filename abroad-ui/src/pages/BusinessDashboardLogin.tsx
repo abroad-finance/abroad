@@ -99,7 +99,7 @@ export default function LoginPage() {
       });
     }
     else {
-      setError(response.statusText)
+      setError(response.data.reason)
     }
   }, [company, country, phone, email, password, firstName, lastName, setUser, navigate]);
 

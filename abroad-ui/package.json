@@ -8,7 +8,7 @@
     "build": "npm run generate:api && tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview --host",
-    "generate:api": "orval --input ../src/swagger.json --output ./src/api/index.ts"
+    "generate:api": "orval --config orval.config.ts"
   },
   "dependencies": {
     "@headlessui/react": "^2.2.2",

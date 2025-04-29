@@ -10,6 +10,8 @@ import {
   HelpCircle as HelpIcon,
   Settings as SettingsIcon  // add Settings icon
 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { getPartnerInfo, PartnerInfoResponse } from "../api";
 
 const navLinks = [
   { label: "Dashboard", icon: HomeIcon, section: "dashboard", path: "/dashboard" },
@@ -17,13 +19,13 @@ const navLinks = [
   { label: "Transactions", icon: BankIcon, section: "transactions" },
   { label: "Recipients", icon: UsersIcon, section: "recipients", path: "/recipients" },
   { label: "Security", icon: SecurityIcon, section: "security" },
- // { label: "API & Integrations", icon: CogIcon, section: "api", path: "/integrations" },
+  // { label: "API & Integrations", icon: CogIcon, section: "api", path: "/integrations" },
   { label: "Help & Support", icon: HelpIcon, section: "help" },
   { label: "Settings", icon: SettingsIcon, section: "settings", path: "/settings" }
 ];
 
 // Add translations for each section and language
-const translations: Record<'en'|'es'|'pt'|'zh', Record<string, string>> = {
+const translations: Record<'en' | 'es' | 'pt' | 'zh', Record<string, string>> = {
   en: {
     dashboard: "Dashboard",
     send: "Send Payment",
@@ -74,6 +76,25 @@ interface TopbarProps {
 export default function Topbar({ activeSection, setActiveSection }: TopbarProps) {
   const navigate = useNavigate();
   const { language } = useLanguage();
+  const [partner, setPartner] = useState<null | PartnerInfoResponse>(null)
+
+  useEffect(() => {
+    const fetchPartnerInfo = async () => {
+      try {
+        const response = await getPartnerInfo();
+        if (response.status === 200) {
+          setPartner(response.data);
+        }
+      } catch (error) {
+        console.error("Failed to fetch partner info:", error);
+      }
+    }
+    fetchPartnerInfo();
+  }, []);
+
+  if (!partner) {
+    return null
+  }
 
   return (
     <header className="w-full bg-white border border-gray-200 shadow-sm rounded-xl mb-4">
@@ -99,7 +120,7 @@ export default function Topbar({ activeSection, setActiveSection }: TopbarProps)
                 className="h-8"
               />
             </div>
-    
+
           </div>
 
           {/* Navigation items in the center */}
@@ -141,11 +162,10 @@ export default function Topbar({ activeSection, setActiveSection }: TopbarProps)
                         setActiveSection(link.section);
                       }
                     }}
-                    className={`flex items-center gap-1 text-sm font-medium transition-colors ${
-                      activeSection === link.section
-                        ? "text-green-700"
-                        : "text-gray-600 hover:text-green-700"
-                    }`}
+                    className={`flex items-center gap-1 text-sm font-medium transition-colors ${activeSection === link.section
+                      ? "text-green-700"
+                      : "text-gray-600 hover:text-green-700"
+                      }`}
                   >
                     <Icon className="w-4 h-4" />
                     {label}
@@ -158,19 +178,21 @@ export default function Topbar({ activeSection, setActiveSection }: TopbarProps)
           <div className="flex items-center gap-2">
             <div className="h-10 w-10 rounded-full bg-gray-200"></div>
             <div className="flex flex-col">
-              <span className="text-sm font-medium text-gray-700">Company Name</span>
-              <span className="relative group inline-flex items-center gap-1 text-xs bg-green-100 text-green-800 border border-green-200 rounded-full px-2 py-0.5 cursor-pointer">
-                ✓ Verified
-                <span className="absolute bottom-full left-1/2 mb-1 w-max -translate-x-1/2 whitespace-nowrap rounded bg-gray-800 px-2 py-1 text-xs text-white opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                  You have performed a KYC/AML check and your account is approved to make payments.
+              <span className="text-sm font-medium text-gray-700">{partner.name}</span>
+              {partner.isKybApproved ?
+                <span className="relative group inline-flex items-center gap-1 text-xs bg-green-100 text-green-800 border border-green-200 rounded-full px-2 py-0.5 cursor-pointer">
+                  ✓ Verified
+                  <span className="absolute bottom-full left-1/2 mb-1 w-max -translate-x-1/2 whitespace-nowrap rounded bg-gray-800 px-2 py-1 text-xs text-white opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                    You have performed a KYC/AML check and your account is approved to make payments.
+                  </span>
                 </span>
-              </span>
-              <span className="relative group inline-flex items-center gap-1 text-xs bg-orange-100 text-orange-800 border border-orange-200 rounded-full px-2 py-0.5 cursor-pointer">
-                ✓ Unverified
-                <span className="absolute top-full left-1/2 mt-1 w-max max-w-xs -translate-x-1/2 whitespace-normal rounded bg-gray-800 px-2 py-1 text-xs text-white opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                  You have not performed a KYC/AML check. Therefore your maximum allowance to make payments is $100. Please perform a KYC/AML check to increase your allowance.
-                </span>
-              </span>
+                :
+                <span className="relative group inline-flex items-center gap-1 text-xs bg-orange-100 text-orange-800 border border-orange-200 rounded-full px-2 py-0.5 cursor-pointer">
+                  ✓ Unverified
+                  <span className="absolute top-full left-1/2 mt-1 w-max max-w-xs -translate-x-1/2 whitespace-normal rounded bg-gray-800 px-2 py-1 text-xs text-white opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                    You have not performed a KYC/AML check. Therefore your maximum allowance to make payments is $100. Please perform a KYC/AML check to increase your allowance.
+                  </span>
+                </span>}
             </div>
           </div>
         </div>

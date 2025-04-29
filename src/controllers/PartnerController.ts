@@ -1,15 +1,19 @@
 // src/controllers/PartnerController.ts
 
 import { Partner } from '@prisma/client'
+import { Request as RequestExpress } from 'express'
 import * as admin from 'firebase-admin'
 import { inject } from 'inversify'
 import {
   Body,
   Controller,
+  Get,
   Post,
+  Request,
   Res,
   Response,
   Route,
+  Security,
   SuccessResponse,
   TsoaResponse,
 } from 'tsoa'
@@ -40,6 +44,20 @@ export interface CreatePartnerRequest {
 
 export interface CreatePartnerResponse {
   id: string
+}
+
+// Add response type for partner info
+export interface PartnerInfoResponse {
+  country?: string
+  createdAt: Date
+  email?: string
+  firstName?: string
+  id: string
+  isKybApproved?: boolean
+  lastName?: string
+  name: string
+  needsKyc?: boolean
+  phone?: string
 }
 
 @Route('partner')
@@ -100,6 +118,31 @@ export class PartnerController extends Controller {
     this.setStatus(201)
     return {
       id: partner.id,
+    }
+  }
+
+  /**
+   * Retrieve the authenticated partner's info
+   */
+  @Get()
+  @Security('BearerAuth')
+  @Security('ApiKeyAuth')
+  @SuccessResponse('200', 'Partner info retrieved')
+  public async getPartnerInfo(
+    @Request() request: RequestExpress,
+  ): Promise<PartnerInfoResponse> {
+    const partner = request.user as Partner
+    return {
+      country: partner.country ?? undefined,
+      createdAt: partner.createdAt,
+      email: partner.email ?? undefined,
+      firstName: partner.firstName ?? undefined,
+      id: partner.id,
+      isKybApproved: partner.isKybApproved ?? false,
+      lastName: partner.lastName ?? undefined,
+      name: partner.name,
+      needsKyc: partner.needsKyc ?? false,
+      phone: partner.phone ?? undefined,
     }
   }
 }
