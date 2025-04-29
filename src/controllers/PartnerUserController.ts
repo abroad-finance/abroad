@@ -19,6 +19,7 @@ import {
 } from 'tsoa'
 
 import { IDatabaseClientProvider } from '../interfaces/IDatabaseClientProvider'
+import { IPaymentServiceFactory } from '../interfaces/IPaymentServiceFactory'
 import { TYPES } from '../types'
 
 export interface CreatePartnerUserRequest {
@@ -62,13 +63,14 @@ export class PartnerUserController extends Controller {
   constructor(
     @inject(TYPES.IDatabaseClientProvider)
     private dbProvider: IDatabaseClientProvider,
+    @inject(TYPES.IPaymentServiceFactory) private paymentServiceFactory: IPaymentServiceFactory,
   ) {
     super()
   }
 
   /**
-       * Create a partner user under the current partner
-       */
+   * Create a partner user under the current partner
+   */
   @Post()
   @Response<400, { reason: string }>(400, 'Bad Request')
   @SuccessResponse('200', 'Partner user created')
@@ -82,6 +84,15 @@ export class PartnerUserController extends Controller {
       return badRequest(400, { reason: 'user_id is required' })
     }
     const partner = request.user
+
+    if (payment_method && account_number && bank) {
+      const paymentService = this.paymentServiceFactory.getPaymentService(payment_method)
+      const isAccountValid = await paymentService.verifyAccount({ account: account_number, bankCode: bank })
+      if (!isAccountValid) {
+        return badRequest(400, { reason: 'User account is not associated with the payment method' })
+      }
+    }
+
     const prisma = await this.dbProvider.getClient()
     try {
       const pu = await prisma.partnerUser.create({
