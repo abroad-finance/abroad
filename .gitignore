@@ -135,3 +135,4 @@ src/swagger.json
 concatenated.txt
 dependency-graph.svg
 .env2
+abroad-ui/src/api/index.ts

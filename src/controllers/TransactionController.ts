@@ -104,7 +104,7 @@ export class TransactionController extends Controller {
     const isAccountValid = await paymentService.verifyAccount({ account: accountNumber, bankCode })
 
     if (!isAccountValid) {
-      return badRequestResponse(400, { reason: 'User account is invalid or not linked to the payment method' })
+      return badRequestResponse(400, { reason: 'User account is invalid.' })
     }
 
     const partnerUser = await prismaClient.partnerUser.upsert({
@@ -128,10 +128,9 @@ export class TransactionController extends Controller {
       },
     })
 
-    // TODO: Uncomment this when KYC is implemented
     // const { status } = await this.kycUseCase.getKycStatus({ partnerId: partner.id, userId })
 
-    // if (status !== KycStatus.APPROVED) {
+    // if (partner.needsKyc && status !== KycStatus.APPROVED) {
     //   return badRequestResponse(400, { reason: 'KYC not approved' })
     // }
 

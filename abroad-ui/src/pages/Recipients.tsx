@@ -89,7 +89,7 @@ export default function Recipients() {
         setActiveSection={(section) => console.log(`Active section set to: ${section}`)} 
       />
       <div className="space-y-4 relative">
-        <div className="mt-16">
+        <div className="mt-4">
           {/* Add Recipient Form */}
           <Card className="rounded-xl w-full border-0 shadow-lg">
             <CardContent className="space-y-4">

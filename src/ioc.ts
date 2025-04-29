@@ -3,6 +3,7 @@ import { Container, decorate, injectable } from 'inversify'
 import { Controller } from 'tsoa'
 
 import { KycController } from './controllers/KycController'
+import { PartnerController } from './controllers/PartnerController'
 import { PartnerUserController } from './controllers/PartnerUserController'
 import { PaymentsController } from './controllers/PaymentsController'
 import { PaymentSentController } from './controllers/queue/PaymentSentController'
@@ -106,6 +107,7 @@ container
   .inSingletonScope()
 
 // Controllers
+container.bind<PartnerController>(PartnerController).toSelf().inSingletonScope()
 container.bind<PartnerUserController>(PartnerUserController).toSelf().inSingletonScope()
 container.bind<QuoteController>(QuoteController).toSelf().inSingletonScope()
 container
