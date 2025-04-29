@@ -9,12 +9,19 @@ datasource db {
 }
 
 model Partner {
-  id        String        @id @default(uuid())
-  name      String
-  createdAt DateTime      @default(now())
-  apiKey    String        @unique
-  users     PartnerUser[]
-  quotes    Quote[]
+  id            String        @id @default(uuid())
+  name          String
+  createdAt     DateTime      @default(now())
+  apiKey        String?       @unique
+  country       String?
+  email         String?       @unique
+  phone         String?
+  firstName     String?
+  lastName      String?
+  isKybApproved Boolean?      @default(false)
+  needsKyc      Boolean?      @default(true)
+  users         PartnerUser[]
+  quotes        Quote[]
 }
 
 model PartnerUser {
@@ -30,8 +37,8 @@ model PartnerUser {
 
   // New fields for partner user payment details
   paymentMethod PaymentMethod?
-  bank           String?
-  accountNumber  String?
+  bank          String?
+  accountNumber String?
 
   // Unique constraint to ensure a user is only once per partner
   @@unique([partnerId, userId])
@@ -78,8 +85,8 @@ model StellarListenerState {
 }
 
 model SolanaListenerState {
-  id               String    @id
-  lastSignature    String?
+  id                String    @id
+  lastSignature     String?
   lastProcessedTime DateTime?
   lastProcessedSlot Int
 }

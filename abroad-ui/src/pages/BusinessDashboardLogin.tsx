@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Card, CardContent } from "../components/card";
 import { Input } from "../components/input";
 import { Button } from "../components/button";
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from "firebase/auth";
+import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from "../services/firebase";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
@@ -86,14 +86,7 @@ export default function LoginPage() {
 
   const handleRegister = () => {
     setError("");
-    createUserWithEmailAndPassword(auth, email, password)
-      .then((userCredential) => {
-        setUser(userCredential.user);
-        navigate("/dashboard");
-      })
-      .catch((err) => {
-        setError(err.message);
-      });
+   
   };
 
   const translations: Record<Language, {
