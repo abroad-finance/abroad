@@ -32,7 +32,7 @@ export class ReceivedCryptoTransactionController {
     private dbClientProvider: IDatabaseClientProvider,
     @inject(TYPES.ILogger) private logger: ILogger,
     @inject(TYPES.ISlackNotifier) private slackNotifier: ISlackNotifier,
-  ) {}
+  ) { }
 
   public registerConsumers() {
     try {
@@ -83,7 +83,7 @@ export class ReceivedCryptoTransactionController {
     const prismaClient = await this.dbClientProvider.getClient()
 
     let transactionRecord: Prisma.TransactionGetPayload<{
-      include: { quote: true }
+      include: { partnerUser: { include: { partner: true } }, quote: true }
     }>
     try {
       // Execute DB operations in a transaction block
@@ -92,7 +92,7 @@ export class ReceivedCryptoTransactionController {
           onChainId: message.onChainId,
           status: TransactionStatus.PROCESSING_PAYMENT,
         },
-        include: { quote: true },
+        include: { partnerUser: { include: { partner: true } }, quote: true },
         where: {
           id: message.transactionId,
           status: TransactionStatus.AWAITING_PAYMENT,
@@ -159,7 +159,7 @@ export class ReceivedCryptoTransactionController {
 
       if (paymentResponse.success) {
         this.slackNotifier.sendMessage(
-          `Payment completed for transaction: ${transactionRecord.id}, ${transactionRecord.quote.sourceAmount} ${transactionRecord.quote.cryptoCurrency} -> ${transactionRecord.quote.targetAmount} ${transactionRecord.quote.targetCurrency}`,
+          `Payment completed for transaction: ${transactionRecord.id}, ${transactionRecord.quote.sourceAmount} ${transactionRecord.quote.cryptoCurrency} -> ${transactionRecord.quote.targetAmount} ${transactionRecord.quote.targetCurrency}, Partner: ${transactionRecord.partnerUser.partner.name}`,
         )
 
         this.queueHandler.postMessage(QueueName.PAYMENT_SENT, {
