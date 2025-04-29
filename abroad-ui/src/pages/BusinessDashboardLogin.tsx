@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Card, CardContent } from "../components/card";
 import { Input } from "../components/input";
@@ -7,6 +7,7 @@ import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from "../services/firebase";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
+import { createPartner } from "../api";
 
 const countries = [
   { code: "AR", name: "Argentina", emoji: "🇦🇷" },
@@ -76,7 +77,6 @@ export default function LoginPage() {
     signInWithEmailAndPassword(auth, email, password)
       .then((userCredential) => {
         setUser(userCredential.user);
-        console.log("User signed in:", userCredential.user.uid);
         navigate("/dashboard");
       })
       .catch((err) => {
@@ -84,10 +84,24 @@ export default function LoginPage() {
       });
   };
 
-  const handleRegister = () => {
+  const handleRegister = useCallback(async () => {
     setError("");
-   
-  };
+    const response = await createPartner({company,country,phone,email,password,firstName,lastName})
+    
+    if (response.status === 201) {
+      signInWithEmailAndPassword(auth, email, password)
+      .then((userCredential) => {
+        setUser(userCredential.user);
+        navigate("/dashboard");
+      })
+      .catch((err) => {
+        setError(err.message);
+      });
+    }
+    else {
+      setError(response.statusText)
+    }
+  }, [company, country, phone, email, password, firstName, lastName, setUser, navigate]);
 
   const translations: Record<Language, {
     otpTitle: string;

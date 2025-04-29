@@ -1,3 +1,5 @@
+// @deprecated This file is deprecated. Use the new API client in src/api/index.ts instead.
+
 import { getAuth } from "firebase/auth";
 
 /**
