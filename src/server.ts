@@ -2,7 +2,7 @@
 import bodyParser from 'body-parser'
 import cors from 'cors'
 import dotenv from 'dotenv'
-import express, { Request, Response } from 'express'
+import express, { NextFunction, Request, Response } from 'express'
 import path from 'path'
 
 import packageJson from '../package.json'
@@ -66,7 +66,8 @@ interface ApiError extends Error {
   status?: number
 }
 
-app.use((err: ApiError, req: Request, res: Response) => {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+app.use((err: ApiError, req: Request, res: Response, _next: NextFunction) => {
   res.status(err.status || 500).json({
     message: err.message || 'An error occurred',
     reason: err.message || 'Internal Server Error',

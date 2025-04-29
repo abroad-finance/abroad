@@ -1,12 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import Navbar from "../components/navbar";
-import { getQuote, QuoteRequest, getReverseQuote, ReverseQuoteRequest, listPartnerUsers, PaginatedPartnerUsers, listPartnerTransactions, PaginatedTransactionList, QuoteResponse, acceptTransaction, AcceptTransactionRequest } from "../api/apiClient";
+import { getQuote, QuoteRequest, getReverseQuote, ReverseQuoteRequest, listPartnerUsers, PaginatedPartnerUsers, listPartnerTransactions, PaginatedTransactionList, QuoteResponse, } from "../api/apiClient";
 import { isConnected, requestAccess, getNetworkDetails, signTransaction } from "@stellar/freighter-api"; // Import Freighter functions
 import { Memo, Operation, Asset, TransactionBuilder, Transaction as StellarTransaction } from "@stellar/stellar-sdk";
 import { Horizon } from "@stellar/stellar-sdk";
 import { TransactionList } from "../components/transactionlist";
 import { Quotation } from "../components/quotation";
 import { WalletBalance } from "../components/wallet_balance";
+import { acceptTransaction, AcceptTransactionRequest } from "../api";
 
 export function Dashboard() {
   const [activeSection, setActiveSection] = useState<string>("dashboard");
@@ -250,7 +251,11 @@ function DashboardHome() {
         user_id: recipient.userId,
       };
       const acceptRes = await acceptTransaction(acceptReq);
-      const memoText = acceptRes.transaction_reference;
+      if(acceptRes.status !== 200) {
+        alert("Error accepting transaction: " + acceptRes.data.reason);
+        return;
+      }
+      const memoText = acceptRes.data.transaction_reference;
       // Build a Stellar payment transaction including memo
       const details = await getNetworkDetails();
       const server = new Horizon.Server(details.networkUrl);
