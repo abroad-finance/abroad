@@ -77,6 +77,7 @@ export class PartnerController extends Controller {
   public async createPartner(
     @Body() body: CreatePartnerRequest,
     @Res() badRequest: TsoaResponse<400, { reason: string }>,
+    @Res() created: TsoaResponse<201, CreatePartnerResponse>,
   ): Promise<CreatePartnerResponse> {
     const parsedBody = createPartnerRequestSchema.safeParse(body)
     if (!parsedBody.success) {
@@ -114,11 +115,9 @@ export class PartnerController extends Controller {
     catch {
       return badRequest(400, { reason: 'Failed to create Firebase user' })
     }
-
-    this.setStatus(201)
-    return {
+    return created(201, {
       id: partner.id,
-    }
+    })
   }
 
   /**
