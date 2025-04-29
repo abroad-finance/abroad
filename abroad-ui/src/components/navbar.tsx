@@ -82,7 +82,9 @@ export default function Topbar({ activeSection, setActiveSection }: TopbarProps)
     const fetchPartnerInfo = async () => {
       try {
         const response = await getPartnerInfo();
+        console.log("Response from getPartnerInfo:", response);
         if (response.status === 200) {
+          console.log("Partner info fetched successfully:", response.data);
           setPartner(response.data);
         }
       } catch (error) {

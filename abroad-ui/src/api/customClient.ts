@@ -49,7 +49,11 @@ export const customClient = async <T>(
         headers
     });
 
-    return response.json();
+    return {
+        status: response.status,
+        statusText: response.statusText,
+        data: await response.json(),
+    } as unknown as T;
 };
 
 export default customClient;
