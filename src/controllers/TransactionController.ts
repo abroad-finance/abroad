@@ -177,6 +177,21 @@ export class TransactionController extends Controller {
       return badRequestResponse(400, { reason: 'This payment method has reached the maximum amount for today' })
     }
 
+    // Enforce max total for partners without KYB approval
+    if (!partner.isKybApproved) {
+      const partnerTransactions = await prismaClient.transaction.findMany({
+        include: { partnerUser: true, quote: true },
+        where: {
+          partnerUser: { partnerId: partner.id },
+          status: TransactionStatus.PAYMENT_COMPLETED,
+        },
+      })
+      const partnerTotalAmount = partnerTransactions.reduce((sum, tx) => sum + tx.quote.targetAmount, 0)
+      if (partnerTotalAmount + quote.targetAmount > 100) {
+        return badRequestResponse(400, { reason: 'Partner KYB not approved. Maximum total amount of $100 allowed.' })
+      }
+    }
+
     try {
       const transaction = await prismaClient.transaction.create({
         data: {
