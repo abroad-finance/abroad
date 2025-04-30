@@ -35,12 +35,32 @@ function DashboardHome() {
   const [showRecipientOptions, setShowRecipientOptions] = useState(false);
   const [transactions, setTransactions] = useState<PaginatedTransactionList | null>(null);
   const [publicKey, setPublicKey] = useState<string | null>(null); // State for public key
-  const [connectionError, setConnectionError] = useState<string | null>(null); // State for connection errors
-  
-  const fetchWalletBalance = useCallback(async (address: string) => {
-    if (!(await isConnected())) {
-      return;
+  const [connectionError, setConnectionError] = useState<string | null>(null);
+
+  // Unify Freighter connection logic
+  const checkAndRequestAccess = useCallback(async (): Promise<string | null> => {
+    const freighterConnected = await isConnected();
+    if (!freighterConnected.isConnected) {
+      setConnectionError("Freighter extension not detected. Please install it.");
+      return null;
     }
+    const accessObj = await requestAccess();
+    if (accessObj.error) {
+      console.error("Error requesting access:", accessObj.error);
+      setConnectionError(`Failed to connect: ${accessObj.error}`);
+      return null;
+    }
+    return accessObj.address ?? null;
+  }, []);
+
+  // Check if Freighter extension is available
+  const isFreighterAvailable = useCallback(async (): Promise<boolean> => {
+    const result = await isConnected();
+    return result.isConnected;
+  }, []);
+
+  const fetchWalletBalance = useCallback(async (address: string) => {
+    if (!(await isFreighterAvailable())) return;
 
     // Detailed network information
     const details = await getNetworkDetails();
@@ -59,39 +79,24 @@ function DashboardHome() {
       console.error("USDC balance not found for the account.");
       setBalance(0);
     }
-  }, []);
+  }, [isFreighterAvailable]);
+
+  // Simplified connectWallet using centralized helper
+  const connectWallet = useCallback(async () => {
+    setIsConnecting(true);
+    setConnectionError(null);
+    const address = await checkAndRequestAccess();
+    if (address) {
+      setPublicKey(address);
+      fetchWalletBalance(address);
+    }
+    setIsConnecting(false);
+  }, [checkAndRequestAccess, fetchWalletBalance]);
 
   const disconnectWallet = useCallback(async () => {
     setPublicKey(null);
     setBalance(0);
   }, []);
-
-  const connectWallet = useCallback(async () => {
-    setIsConnecting(true);
-    try {
-      const freighterConnected = await isConnected();
-      if (!freighterConnected) {
-        setConnectionError("Freighter extension not detected. Please install it.");
-        setIsConnecting(false);
-        return;
-      }
-
-      const accessObj = await requestAccess();
-      if (accessObj.error) {
-        console.error("Error requesting access:", accessObj.error);
-        setConnectionError(`Failed to connect: ${accessObj.error}`);
-      } else if (accessObj.address) { // Check if address exists
-        setPublicKey(accessObj.address); // Set only the address string
-        // TODO: Fetch actual balance based on publicKey
-        fetchWalletBalance(accessObj.address); // Fetch balance
-      }
-    } catch (error) {
-      console.error("Failed to connect wallet:", error);
-      setConnectionError("An unexpected error occurred during connection.");
-    } finally {
-      setIsConnecting(false);
-    }
-  }, [fetchWalletBalance]);
 
   useEffect(() => {
     const fetchPartnerUsers = async () => {
@@ -116,13 +121,12 @@ function DashboardHome() {
 
     // Check connection on load
     const checkFreighterConnection = async () => {
-      const connected = await isConnected();
-      if (connected) {
+      if (await isFreighterAvailable()) {
         connectWallet();
       }
     };
     checkFreighterConnection();
-  }, [connectWallet]);
+  }, [connectWallet, isFreighterAvailable]);
 
   // Polling: fetch balance and transactions every 5 seconds
   useEffect(() => {
