@@ -91,6 +91,16 @@ model SolanaListenerState {
   lastProcessedSlot Int
 }
 
+model PendingConversions {
+  source SupportedCurrency
+  target SupportedCurrency
+  amount Float
+  symbol String
+  side   OrderSide
+
+  @@id([source, target])
+}
+
 enum KycStatus {
   PENDING
   APPROVED
@@ -106,8 +116,19 @@ enum TransactionStatus {
   WRONG_AMOUNT
 }
 
+enum OrderSide {
+  BUY
+  SELL
+}
+
 enum CryptoCurrency {
   USDC
+}
+
+enum SupportedCurrency {
+  USDC
+  USDT
+  COP
 }
 
 enum BlockchainNetwork {

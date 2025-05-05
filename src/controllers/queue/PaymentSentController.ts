@@ -1,6 +1,8 @@
+import { SupportedCurrency } from '@prisma/client'
 import { inject } from 'inversify'
 
 import { ILogger, IQueueHandler, ISlackNotifier, QueueName } from '../../interfaces'
+import { IDatabaseClientProvider } from '../../interfaces/IDatabaseClientProvider'
 import { IExchangeProvider } from '../../interfaces/IExchangeProvider'
 import { IWalletHandlerFactory } from '../../interfaces/IWalletHandlerFactory'
 import { PaymentSentMessage, PaymentSentMessageSchema } from '../../interfaces/queueSchema'
@@ -13,6 +15,7 @@ export class PaymentSentController {
         @inject(TYPES.IWalletHandlerFactory) private walletHandlerFactory: IWalletHandlerFactory,
         @inject(TYPES.IExchangeProvider) private exchangeProvider: IExchangeProvider,
         @inject(TYPES.ISlackNotifier) private slackNotifier: ISlackNotifier,
+        @inject(TYPES.IDatabaseClientProvider) private dbClientProvider: IDatabaseClientProvider,
   ) {
 
   }
@@ -67,6 +70,42 @@ export class PaymentSentController {
         `[PaymentSent Queue]: Error exchanging ${amount} ${cryptoCurrency} to ${targetCurrency}.`,
       )
       return
+    }
+
+    const clientDb = await this.dbClientProvider.getClient()
+
+    if (cryptoCurrency === SupportedCurrency.USDC && targetCurrency === SupportedCurrency.COP) {
+      await clientDb.pendingConversions.upsert({
+        create: {
+          amount,
+          side: 'SELL',
+          source: cryptoCurrency,
+          symbol: 'USDCUSDT',
+          target: SupportedCurrency.USDT,
+        },
+        update: {
+          amount: { increment: amount },
+        },
+        where: {
+          source_target: { source: cryptoCurrency, target: targetCurrency },
+        },
+      })
+
+      await clientDb.pendingConversions.upsert({
+        create: {
+          amount,
+          side: 'BUY',
+          source: SupportedCurrency.USDT,
+          symbol: 'USDTCOP',
+          target: targetCurrency,
+        },
+        update: {
+          amount: { increment: amount },
+        },
+        where: {
+          source_target: { source: SupportedCurrency.USDT, target: targetCurrency },
+        },
+      })
     }
 
     this.logger.info(
