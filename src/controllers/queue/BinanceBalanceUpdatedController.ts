@@ -95,9 +95,10 @@ export class BinanceBalanceUpdatedController {
             where: { source_target: { source: pendingConversion.source, target: pendingConversion.target } },
           })
         }
-        catch {
+        catch (error) {
           this.logger.error(
-            `[BinanceBalanceUpdated queue]: Error placing market order for ${pendingConversion.source} to ${pendingConversion.target}`,
+            `[BinanceBalanceUpdated queue]: Error placing market order for ${pendingConversion.source} to ${pendingConversion.target}:`,
+            error,
           )
         }
       }
