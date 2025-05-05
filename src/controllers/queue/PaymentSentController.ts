@@ -87,7 +87,7 @@ export class PaymentSentController {
           amount: { increment: amount },
         },
         where: {
-          source_target: { source: cryptoCurrency, target: targetCurrency },
+          source_target: { source: cryptoCurrency, target: SupportedCurrency.USDT },
         },
       })
 

@@ -5,7 +5,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+  url      = "postgres://postgres:yW6hCtZU9BKhuJU4VvEsvgEnZjUyNLLi@34.73.195.71:5432/abroad?connection_limit=100&pool_timeout=20"
 }
 
 model Partner {
