@@ -81,18 +81,25 @@ export class BinanceBalanceUpdatedController {
           )
           return
         }
-        // --- Place market order ----------------------------------------------------------
-        await this.placeMarketOrder(client, pendingConversion.symbol, pendingConversion.side, qty)
-        this.logger.info(
-          `[BinanceBalanceUpdated queue]: Converted ${qty} ${pendingConversion.source} to ${pendingConversion.target}`,
-        )
-        // --- Update pending conversion in DB ------------------------------------------
-        await clientDb.pendingConversions.update({
-          data: {
-            amount: { decrement: qty },
-          },
-          where: { source_target: { source: pendingConversion.source, target: pendingConversion.target } },
-        })
+        try {
+          // --- Place market order ----------------------------------------------------------
+          await this.placeMarketOrder(client, pendingConversion.symbol, pendingConversion.side, qty)
+          this.logger.info(
+            `[BinanceBalanceUpdated queue]: Converted ${qty} ${pendingConversion.source} to ${pendingConversion.target}`,
+          )
+          // --- Update pending conversion in DB ------------------------------------------
+          await clientDb.pendingConversions.update({
+            data: {
+              amount: { decrement: qty },
+            },
+            where: { source_target: { source: pendingConversion.source, target: pendingConversion.target } },
+          })
+        }
+        catch {
+          this.logger.error(
+            `[BinanceBalanceUpdated queue]: Error placing market order for ${pendingConversion.source} to ${pendingConversion.target}`,
+          )
+        }
       }
     }
     catch (error) {
