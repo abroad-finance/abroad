@@ -33,7 +33,7 @@ export class BinanceListener {
       {
         api_key: BINANCE_API_KEY,
         api_secret: BINANCE_API_SECRET,
-        requestOptions: { baseURL: BINANCE_API_URL },
+        restOptions: { baseUrl: BINANCE_API_URL },
         wsUrl: websocketBinanceUrl,
       },
     )
