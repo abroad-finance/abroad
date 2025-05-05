@@ -1,0 +1,4 @@
+{
+    "entry": ["src/server.ts", "src/listeners/index.ts", "src/scripts/index.ts", "src/listeners/solana/index.ts"],
+    "project": ["src/**/*.ts"]
+  }

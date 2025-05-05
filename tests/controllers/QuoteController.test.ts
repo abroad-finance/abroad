@@ -1,4 +1,4 @@
-import { BlockchainNetwork, CryptoCurrency, PaymentMethod, TargetCurrency } from '.prisma/client'
+import { BlockchainNetwork, CryptoCurrency, PaymentMethod, TargetCurrency } from '@prisma/client'
 import { Request as RequestExpress } from 'express'
 
 import { QuoteController } from '../../src/controllers/QuoteController'
