@@ -44,7 +44,7 @@ COPY --from=build /app/dist ./dist
 # Copy Prisma schema needed at runtime
 COPY --from=build /app/prisma ./prisma
 # Copy other necessary static assets
-COPY --from=build /app/dist/swagger.json ./dist/swagger.json
+COPY --from=build /app/src/swagger.json ./dist/swagger.json
 
 # Expose the application port
 EXPOSE 3000
