@@ -110,23 +110,12 @@ export class BinanceBalanceUpdatedController {
     quantity: number,
   ) {
     this.logger.info(`Placing MARKET ${side} order on ${symbol} for ${quantity}`)
-    // TODO: improve this logic to handle the step size and minimum notional limits
-    if (side === 'SELL') {
-      return client.submitNewOrder({
-        quantity: quantity,
-        side,
-        symbol,
-        type: 'MARKET',
-      })
-    }
-    else {
-      return client.submitNewOrder({
-        quoteOrderQty: quantity,
-        side,
-        symbol,
-        type: 'MARKET',
-      })
-    }
+    return client.submitNewOrder({
+      quantity: quantity,
+      side,
+      symbol,
+      type: 'MARKET',
+    })
   }
 
   /**
