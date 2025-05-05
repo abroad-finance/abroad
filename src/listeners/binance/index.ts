@@ -40,6 +40,7 @@ export class BinanceListener {
     // receive raw events
     wsClient.on('message', (data) => {
       console.log('[Binance WS]: raw message received ', JSON.stringify(data, null, 2))
+      this.queueHandler.postMessage(QueueName.BINANCE_BALANCE_UPDATED, {})
     })
 
     // notification when a connection is opened
@@ -50,6 +51,7 @@ export class BinanceListener {
 
     // receive formatted events with beautified keys. Any "known" floats stored in strings as parsed as floats.
     wsClient.on('formattedMessage', (data) => {
+      // TODO: check if this is a user data event
       if (isWsFormattedUserDataEvent(data)) {
         console.log('[Binance WS]: formatted message received ', JSON.stringify(data, null, 2))
         this.handleSpotUserDataStream(data)

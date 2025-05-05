@@ -94,7 +94,7 @@ export class PaymentSentController {
       await clientDb.pendingConversions.upsert({
         create: {
           amount,
-          side: 'BUY',
+          side: 'SELL',
           source: SupportedCurrency.USDT,
           symbol: 'USDTCOP',
           target: targetCurrency,
