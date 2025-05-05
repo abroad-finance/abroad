@@ -1,4 +1,4 @@
-import { isWsFormattedSpotUserDataEvent, WebsocketClient, WsMessageSpotUserDataEventFormatted } from 'binance'
+import { isWsFormattedUserDataEvent, WebsocketClient, WsUserDataEvents } from 'binance'
 import { inject } from 'inversify'
 
 import { IQueueHandler, QueueName } from '../../interfaces'
@@ -15,7 +15,7 @@ export class BinanceListener {
     await this.startListener()
   }
 
-  private handleSpotUserDataStream = (data: WsMessageSpotUserDataEventFormatted) => {
+  private handleSpotUserDataStream = (data: WsUserDataEvents) => {
     if (data.eventType === 'balanceUpdate') {
       console.log('[Binance WS]: balanceUpdate event received: ', data)
       this.queueHandler.postMessage(QueueName.BINANCE_BALANCE_UPDATED, {})
@@ -50,7 +50,7 @@ export class BinanceListener {
 
     // receive formatted events with beautified keys. Any "known" floats stored in strings as parsed as floats.
     wsClient.on('formattedMessage', (data) => {
-      if (isWsFormattedSpotUserDataEvent(data)) {
+      if (isWsFormattedUserDataEvent(data)) {
         console.log('[Binance WS]: formatted message received ', JSON.stringify(data, null, 2))
         this.handleSpotUserDataStream(data)
       }
