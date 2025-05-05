@@ -74,7 +74,7 @@ export class BinanceBalanceUpdatedController {
           return
         }
         // Ensure we respect Binance step size: keep 2 decimals for stable‑coin pairs
-        const qty = this.roundToStep(balanceToConvert, 0.01)
+        const qty = Math.floor(balanceToConvert)
         if (qty <= 0) {
           this.logger.warn(
             `[BinanceBalanceUpdated queue]: ${pendingConversion.source} balance below minimum tradable size`,
@@ -110,12 +110,23 @@ export class BinanceBalanceUpdatedController {
     quantity: number,
   ) {
     this.logger.info(`Placing MARKET ${side} order on ${symbol} for ${quantity}`)
-    return client.submitNewOrder({
-      quantity: quantity,
-      side,
-      symbol,
-      type: 'MARKET',
-    })
+    // TODO: improve this logic to handle the step size and minimum notional limits
+    if (side === 'SELL') {
+      return client.submitNewOrder({
+        quantity: quantity,
+        side,
+        symbol,
+        type: 'MARKET',
+      })
+    }
+    else {
+      return client.submitNewOrder({
+        quoteOrderQty: quantity,
+        side,
+        symbol,
+        type: 'MARKET',
+      })
+    }
   }
 
   /**
