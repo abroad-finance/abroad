@@ -9,10 +9,9 @@ import { TransactionQueueMessage } from '../../controllers/queue/ReceivedCryptoT
 import { IQueueHandler, QueueName } from '../../interfaces'
 import { IDatabaseClientProvider } from '../../interfaces/IDatabaseClientProvider'
 import { ISecretManager } from '../../interfaces/ISecretManager'
-import { iocContainer } from '../../ioc'
 import { TYPES } from '../../types'
 
-class StellarListener {
+export class StellarListener {
   private accountId!: string
   private horizonUrl!: string
   private queueName = QueueName.RECEIVED_CRYPTO_TRANSACTION
@@ -176,10 +175,4 @@ class StellarListener {
       },
     })
   }
-}
-
-if (require.main === module) {
-  iocContainer.bind<StellarListener>('StellarListener').to(StellarListener)
-  const stellarListener = iocContainer.get<StellarListener>('StellarListener')
-  stellarListener.start()
 }

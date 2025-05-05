@@ -21,7 +21,7 @@ spec:
         - name: abroad-stellar-container
           image: abroad-stellar-container:latest
           command: ["node"]
-          args: ["dist/listeners/stellar/index.js"]
+          args: ["dist/listeners/index.js"]
           imagePullPolicy: Always
           resources:
             requests:
@@ -35,7 +35,7 @@ spec:
               command:
                 - sh
                 - -c
-                - ps aux | grep '[n]ode dist/listeners/stellar/index.js' 
+                - ps aux | grep '[n]ode dist/listeners/index.js' 
             initialDelaySeconds: 5
             periodSeconds: 10
             timeoutSeconds: 3 

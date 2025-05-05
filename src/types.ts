@@ -1,5 +1,6 @@
 // src/types.ts
 export const TYPES = {
+  BinanceBalanceUpdatedController: Symbol.for('BinanceBalanceUpdatedController'),
   IAuthService: Symbol.for('IAuthService'),
   IDatabaseClientProvider: Symbol.for('IDatabaseClientProvider'),
   IExchangeProvider: Symbol.for('IExchangeProvider'),

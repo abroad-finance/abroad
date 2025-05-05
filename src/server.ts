@@ -6,6 +6,7 @@ import express, { NextFunction, Request, Response } from 'express'
 import path from 'path'
 
 import packageJson from '../package.json'
+import { BinanceBalanceUpdatedController } from './controllers/queue/BinanceBalanceUpdatedController'
 import { PaymentSentController } from './controllers/queue/PaymentSentController'
 import { ReceivedCryptoTransactionController } from './controllers/queue/ReceivedCryptoTransactionController'
 import { IAuthService } from './interfaces'
@@ -88,6 +89,11 @@ receivedCryptoTransactionController.registerConsumers()
 
 const paymentSentController = iocContainer.get<PaymentSentController>(TYPES.PaymentSentController)
 paymentSentController.registerConsumers()
+
+const binanceBalanceUpdatedController = iocContainer.get<BinanceBalanceUpdatedController>(
+  TYPES.BinanceBalanceUpdatedController,
+)
+binanceBalanceUpdatedController.registerConsumers()
 
 const firebaseAuth = iocContainer.get<IAuthService>(TYPES.IAuthService)
 firebaseAuth.initialize()

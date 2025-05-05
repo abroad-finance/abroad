@@ -6,6 +6,7 @@ import { KycController } from './controllers/KycController'
 import { PartnerController } from './controllers/PartnerController'
 import { PartnerUserController } from './controllers/PartnerUserController'
 import { PaymentsController } from './controllers/PaymentsController'
+import { BinanceBalanceUpdatedController } from './controllers/queue/BinanceBalanceUpdatedController'
 import { PaymentSentController } from './controllers/queue/PaymentSentController'
 import { ReceivedCryptoTransactionController } from './controllers/queue/ReceivedCryptoTransactionController'
 import { QuoteController } from './controllers/QuoteController'
@@ -67,6 +68,10 @@ container
   .to(ReceivedCryptoTransactionController)
   .inSingletonScope()
 container.bind<PaymentSentController>(TYPES.PaymentSentController).to(PaymentSentController).inSingletonScope()
+container
+  .bind<BinanceBalanceUpdatedController>(TYPES.BinanceBalanceUpdatedController)
+  .to(BinanceBalanceUpdatedController)
+  .inSingletonScope()
 
 // IDatabaseClientProvider
 container

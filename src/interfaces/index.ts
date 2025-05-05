@@ -3,6 +3,7 @@ import { Partner } from '@prisma/client'
 
 // The enum and interface definitions:
 export enum QueueName {
+  BINANCE_BALANCE_UPDATED = 'binance-balance-updated',
   PAYMENT_SENT = 'payment-sent',
   RECEIVED_CRYPTO_TRANSACTION = 'received-crypto-transaction',
 }
