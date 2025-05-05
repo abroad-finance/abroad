@@ -16,7 +16,7 @@ export class BinanceListener {
   }
 
   private handleSpotUserDataStream = (data: WsUserDataEvents) => {
-    if (data.eventType === 'balanceUpdate') {
+    if (data.eventType === 'outboundAccountPosition') {
       console.log('[Binance WS]: balanceUpdate event received: ', data)
       this.queueHandler.postMessage(QueueName.BINANCE_BALANCE_UPDATED, {})
     }
