@@ -11,10 +11,20 @@ import { TYPES } from '../../types'
  * USDC to USDT and then to COP (Colombian peso) using market orders on the Binance Spot
  * market (symbols **USDCUSDT** and **USDTCOP** respectively).
  *
- * ⚠️ This logic assumes that:
+ * Idempotency strategy
+ * --------------------
+ *  1. Every conversion is guarded by a single atomic UPDATE (`amount >= :qty`) that
+ *     reserves the quantity to convert. If the UPDATE affects **zero** rows we know that
+ *     another consumer has already processed that slice and we skip the order.
+ *  2. The UPDATE + order placement run inside a SERIALIZABLE DB transaction. When a
+ *     failure occurs after the UPDATE but before the order placement the transaction is
+ *     rolled back, restoring the previous `amount` so the job can be retried safely.
+ *  3. We fetch balances **once** per callback to minimise API calls.
+ *
+ * ⚠️ This logic still assumes that:
  *   • Both trading pairs are enabled on the connected account.
- *   • The account has sufficient balance to satisfy the minimum notional & step‑size rules
- *     for each pair.
+ *   • The account has sufficient balance to satisfy the minimum notional & step‑size
+ *     rules for each pair.
  *   • Market orders are acceptable for the conversion (they take taker fees).
  *
  * Consider enriching the logic with dynamic lot‑size/step‑size handling via `exchangeInfo`
@@ -23,11 +33,11 @@ import { TYPES } from '../../types'
 @injectable()
 export class BinanceBalanceUpdatedController {
   constructor(
-    @inject(TYPES.ILogger) private logger: ILogger,
-    @inject(TYPES.IQueueHandler) private queueHandler: IQueueHandler,
-    @inject(TYPES.ISecretManager) private secretManager: ISecretManager,
-    @inject(TYPES.IDatabaseClientProvider) private dbClientProvider: IDatabaseClientProvider,
-  ) { }
+    @inject(TYPES.ILogger) private readonly logger: ILogger,
+    @inject(TYPES.IQueueHandler) private readonly queueHandler: IQueueHandler,
+    @inject(TYPES.ISecretManager) private readonly secretManager: ISecretManager,
+    @inject(TYPES.IDatabaseClientProvider) private readonly dbClientProvider: IDatabaseClientProvider,
+  ) {}
 
   public registerConsumers(): void {
     this.logger.info(
@@ -44,63 +54,58 @@ export class BinanceBalanceUpdatedController {
    * Handler for the balance‑updated event coming from the queue.
    */
   private async onBalanceUpdated(): Promise<void> {
+    let client: MainClient | null = null
     try {
-      // --- Initialise REST client ---------------------------------------------------------
-      const apiKey = await this.secretManager.getSecret('BINANCE_API_KEY')
-      const apiSecret = await this.secretManager.getSecret('BINANCE_API_SECRET')
-      const apiUrl = await this.secretManager.getSecret('BINANCE_API_URL')
+      // --- Initialise REST client -------------------------------------------------------
+      const [apiKey, apiSecret, apiUrl] = await Promise.all([
+        this.secretManager.getSecret('BINANCE_API_KEY'),
+        this.secretManager.getSecret('BINANCE_API_SECRET'),
+        this.secretManager.getSecret('BINANCE_API_URL'),
+      ])
 
-      const client = new MainClient({
+      client = new MainClient({
         api_key: apiKey,
         api_secret: apiSecret,
         baseUrl: apiUrl,
       })
 
-      // --- Fetch current balances --------------------------------------------------------
+      // --- Fetch current balances ------------------------------------------------------
       const balances = await client.getBalances()
 
-      const clientDb = await this.dbClientProvider.getClient()
-      const pendingConversions = await clientDb.pendingConversions.findMany({ where: { amount: { gt: 0 } } })
+      const db = await this.dbClientProvider.getClient()
+      const pending = await db.pendingConversions.findMany({
+        where: { amount: { gt: 0 } },
+      })
 
-      for (const pendingConversion of pendingConversions) {
-        const balanceRaw = balances.find(b => b.coin === pendingConversion.source)?.free ?? '0'
-        const balance = typeof balanceRaw === 'string' ? parseFloat(balanceRaw) : balanceRaw
+      for (const pc of pending) {
+        const balanceRaw = balances.find(b => b.coin === pc.source)?.free ?? '0'
+        const available = typeof balanceRaw === 'string' ? parseFloat(balanceRaw) : balanceRaw
 
-        const balanceToConvert = Math.min(balance, pendingConversion.amount)
-        if (balanceToConvert <= 0) {
-          this.logger.info(
-            `[BinanceBalanceUpdated queue]: No ${pendingConversion.source} to convert – exiting`,
-          )
-          return
-        }
-        // Ensure we respect Binance step size: keep 2 decimals for stable‑coin pairs
-        const qty = Math.floor(balanceToConvert)
-        if (qty <= 0) {
-          this.logger.warn(
-            `[BinanceBalanceUpdated queue]: ${pendingConversion.source} balance below minimum tradable size`,
-          )
-          return
-        }
-        try {
-          // --- Place market order ----------------------------------------------------------
-          await this.placeMarketOrder(client, pendingConversion.symbol, pendingConversion.side, qty)
-          this.logger.info(
-            `[BinanceBalanceUpdated queue]: Converted ${qty} ${pendingConversion.source} to ${pendingConversion.target}`,
-          )
-          // --- Update pending conversion in DB ------------------------------------------
-          await clientDb.pendingConversions.update({
-            data: {
-              amount: { decrement: qty },
+        // Keep 0‑decimals for stable‑coin pairs → use Math.floor
+        const qty = Math.floor(Math.min(available, pc.amount))
+        if (qty <= 0) continue
+
+        // ----------------- Idempotent conversion block -------------------------------
+        await db.$transaction(async (tx) => {
+          // 1️⃣ Reserve the quantity atomically. If another worker got it first the UPDATE returns 0.
+          const { count } = await tx.pendingConversions.updateMany({
+            data: { amount: { decrement: qty } },
+            where: {
+              amount: { gte: qty },
+              source: pc.source,
+              target: pc.target,
             },
-            where: { source_target: { source: pendingConversion.source, target: pendingConversion.target } },
           })
-        }
-        catch (error) {
-          this.logger.error(
-            `[BinanceBalanceUpdated queue]: Error placing market order for ${pendingConversion.source} to ${pendingConversion.target}:`,
-            error,
-          )
-        }
+
+          if (count === 0) {
+            this.logger.info(`[BinanceBalanceUpdated queue]: ${pc.source}→${pc.target} already processed by another consumer`)
+            return
+          }
+
+          // 2️⃣ Place the market order
+          await this.placeMarketOrder(client!, pc.symbol, pc.side, qty)
+          this.logger.info(`[BinanceBalanceUpdated queue]: Converted ${qty} ${pc.source} to ${pc.target}`)
+        }, { isolationLevel: 'Serializable' })
       }
     }
     catch (error) {
@@ -119,17 +124,10 @@ export class BinanceBalanceUpdatedController {
   ) {
     this.logger.info(`Placing MARKET ${side} order on ${symbol} for ${quantity}`)
     return client.submitNewOrder({
-      quantity: quantity,
+      quantity,
       side,
       symbol,
       type: 'MARKET',
     })
-  }
-
-  /**
-   * Helper: rounds a number down to the nearest step size (e.g. 0.01).
-   */
-  private roundToStep(value: number, step: number): number {
-    return Math.floor(value / step) * step
   }
 }
