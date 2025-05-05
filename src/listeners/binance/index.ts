@@ -13,7 +13,6 @@ export class BinanceListener {
 
   public start = async () => {
     await this.startListener()
-    await this.queueHandler.postMessage(QueueName.BINANCE_BALANCE_UPDATED, {})
   }
 
   private handleSpotUserDataStream = (data: WsMessageSpotUserDataEventFormatted) => {
@@ -34,6 +33,7 @@ export class BinanceListener {
       {
         api_key: BINANCE_API_KEY,
         api_secret: BINANCE_API_SECRET,
+        requestOptions: { baseURL: BINANCE_API_URL },
         wsUrl: websocketBinanceUrl,
       },
     )
@@ -45,6 +45,7 @@ export class BinanceListener {
     // notification when a connection is opened
     wsClient.on('open', (data) => {
       console.log('[Binance WS]: connection opened open:', data.wsKey)
+      this.queueHandler.postMessage(QueueName.BINANCE_BALANCE_UPDATED, {})
     })
 
     // receive formatted events with beautified keys. Any "known" floats stored in strings as parsed as floats.
