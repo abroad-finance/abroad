@@ -39,6 +39,8 @@ ENV NODE_ENV=production
 COPY --from=dependencies /app/package*.json ./
 # Install *only* production dependencies using npm ci --omit=dev
 RUN npm ci --omit=dev
+# Copy the generated client code from the build stage AFTER installing prod dependencies
+COPY --from=build /app/node_modules/.prisma ./node_modules/.prisma
 # Copy built application artifacts from the build stage
 COPY --from=build /app/dist ./dist
 # Copy Prisma schema needed at runtime
