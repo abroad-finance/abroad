@@ -12,6 +12,7 @@ steps:
       - "-f"
       - Dockerfile
     id: Build
+    waitFor: ["-"]
 
   - name: "debian:stable-slim"
     entrypoint: "bash"
@@ -27,6 +28,7 @@ steps:
       - "COMMIT_SHA=$COMMIT_SHA"
       - "REPO_NAME=$REPO_NAME"
       - "_SERVICE_NAME=$_SERVICE_NAME"
+    waitFor: ["-"]
 
   - name: gcr.io/cloud-builders/docker
     args:
