@@ -1,54 +1,38 @@
 steps:
-  - name: gcr.io/cloud-builders/docker
-    env:
-      - DOCKER_BUILDKIT=1
-      - BUILDKIT_INLINE_CACHE=1
+  - id: Build and Push
+    name: gcr.io/kaniko-project/executor:latest
     args:
-      - build
-      - "-t"
-      - >-
-        $_AR_HOSTNAME/$PROJECT_ID/cloud-run-source-deploy/$REPO_NAME/$_SERVICE_NAME:$COMMIT_SHA
-      - "."
-      - "-f"
-      - Dockerfile
-    id: Build
+      - --context=.
+      - --dockerfile=Dockerfile
+      - --destination=$_AR_HOSTNAME/$PROJECT_ID/cloud-run-source-deploy/$REPO_NAME/$_SERVICE_NAME:$COMMIT_SHA
+      - --destination=$_AR_HOSTNAME/$PROJECT_ID/cloud-run-source-deploy/$REPO_NAME/$_SERVICE_NAME:latest
+      - --cache=true
+    env:
+      - "DOCKER_CONFIG=/kaniko/.docker"
     waitFor: ["-"]
 
-  - name: "debian:stable-slim"
-    entrypoint: "bash"
+  - id: Substitute kustomization
+    name: docker.io/jmalloc/envsubst:latest
+    entrypoint: sh
     args:
-      - "-c"
+      - -c
       - |
-        apt-get update > /dev/null && apt-get install -y gettext-base --no-install-recommends > /dev/null || true
         envsubst < k8s/kustomization.yaml > k8s/kustomization.processed.yaml
         mv k8s/kustomization.processed.yaml k8s/kustomization.yaml
-    id: Substitute kustomization
     env:
-      - "PROJECT_ID=$PROJECT_ID"
-      - "COMMIT_SHA=$COMMIT_SHA"
-      - "REPO_NAME=$REPO_NAME"
-      - "_SERVICE_NAME=$_SERVICE_NAME"
+      - 'PROJECT_ID=$PROJECT_ID'
+      - 'COMMIT_SHA=$COMMIT_SHA'
+      - 'REPO_NAME=$REPO_NAME'
+      - '_SERVICE_NAME=$_SERVICE_NAME'
     waitFor: ["-"]
 
-  - name: gcr.io/cloud-builders/docker
-    args:
-      - push
-      - >-
-        $_AR_HOSTNAME/$PROJECT_ID/cloud-run-source-deploy/$REPO_NAME/$_SERVICE_NAME:$COMMIT_SHA
-    id: Push
-    waitFor: ["Build"]
-
-  - name: >-
-      $_AR_HOSTNAME/$PROJECT_ID/cloud-run-source-deploy/$REPO_NAME/$_SERVICE_NAME:$COMMIT_SHA
-    args:
-      - prisma
-      - migrate
-      - deploy
-    id: Migrate
+  - id: Migrate
+    name: $_AR_HOSTNAME/$PROJECT_ID/cloud-run-source-deploy/$REPO_NAME/$_SERVICE_NAME:$COMMIT_SHA
     entrypoint: npx
+    args: ["prisma", "migrate", "deploy"]
     secretEnv:
       - DATABASE_URL
-    waitFor: ["Push"]
+    waitFor: ["Build and Push"]
 
   - name: "gcr.io/google.com/cloudsdktool/cloud-sdk:slim"
     args:
@@ -80,8 +64,8 @@ steps:
     waitFor: ["Substitute kustomization", "Migrate"]
 
 images:
-  - >-
-    $_AR_HOSTNAME/$PROJECT_ID/cloud-run-source-deploy/$REPO_NAME/$_SERVICE_NAME:$COMMIT_SHA
+  - $_AR_HOSTNAME/$PROJECT_ID/cloud-run-source-deploy/$REPO_NAME/$_SERVICE_NAME:$COMMIT_SHA
+  - $_AR_HOSTNAME/$PROJECT_ID/cloud-run-source-deploy/$REPO_NAME/$_SERVICE_NAME:latest
 
 options:
   substitutionOption: ALLOW_LOOSE

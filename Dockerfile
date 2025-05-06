@@ -1,6 +1,4 @@
-# syntax=docker/dockerfile:1.7          <- 1️⃣ Turn BuildKit features on
-#   build with:  docker buildx build --cache-from=type=local,src=.docker-cache \
-#                                  --cache-to=type=local,dest=.docker-cache .
+# syntax=docker/dockerfile:1.7
 
 ##########  BASE IMAGE  #######################################################
 # “slim” is a little larger than Alpine but avoids native-addon recompiles,
