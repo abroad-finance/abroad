@@ -1,14 +1,32 @@
 steps:
   - name: gcr.io/cloud-builders/docker
+    env:
+      - DOCKER_BUILDKIT=1
+      - BUILDKIT_INLINE_CACHE=1
     args:
       - build
-      - '-t'
+      - "-t"
       - >-
         $_AR_HOSTNAME/$PROJECT_ID/cloud-run-source-deploy/$REPO_NAME/$_SERVICE_NAME:$COMMIT_SHA
-      - '.'
-      - '-f'
+      - "."
+      - "-f"
       - Dockerfile
     id: Build
+
+  - name: "debian:stable-slim"
+    entrypoint: "bash"
+    args:
+      - "-c"
+      - |
+        apt-get update > /dev/null && apt-get install -y gettext-base --no-install-recommends > /dev/null || true
+        envsubst < k8s/kustomization.yaml > k8s/kustomization.processed.yaml
+        mv k8s/kustomization.processed.yaml k8s/kustomization.yaml
+    id: Substitute kustomization
+    env:
+      - "PROJECT_ID=$PROJECT_ID"
+      - "COMMIT_SHA=$COMMIT_SHA"
+      - "REPO_NAME=$REPO_NAME"
+      - "_SERVICE_NAME=$_SERVICE_NAME"
 
   - name: gcr.io/cloud-builders/docker
     args:
@@ -16,6 +34,7 @@ steps:
       - >-
         $_AR_HOSTNAME/$PROJECT_ID/cloud-run-source-deploy/$REPO_NAME/$_SERVICE_NAME:$COMMIT_SHA
     id: Push
+    waitFor: ["Build"]
 
   - name: >-
       $_AR_HOSTNAME/$PROJECT_ID/cloud-run-source-deploy/$REPO_NAME/$_SERVICE_NAME:$COMMIT_SHA
@@ -27,52 +46,36 @@ steps:
     entrypoint: npx
     secretEnv:
       - DATABASE_URL
-    waitFor: ['Push']
+    waitFor: ["Push"]
 
-  - name: 'debian:stable-slim'
-    entrypoint: 'bash'
-    args:
-      - '-c'
-      - |
-        apt-get update > /dev/null && apt-get install -y gettext-base --no-install-recommends > /dev/null || true
-        envsubst < k8s/kustomization.yaml > k8s/kustomization.processed.yaml
-        mv k8s/kustomization.processed.yaml k8s/kustomization.yaml
-    id: Substitute kustomization
-    env:
-      - 'PROJECT_ID=$PROJECT_ID'
-      - 'COMMIT_SHA=$COMMIT_SHA'
-      - 'REPO_NAME=$REPO_NAME'
-      - '_SERVICE_NAME=$_SERVICE_NAME'
-    waitFor: ['Push']
-
-  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk:slim'
+  - name: "gcr.io/google.com/cloudsdktool/cloud-sdk:slim"
     args:
       - run
       - services
       - update
       - $_SERVICE_NAME
-      - '--platform=managed'
+      - "--platform=managed"
       - >-
         --image=$_AR_HOSTNAME/$PROJECT_ID/cloud-run-source-deploy/$REPO_NAME/$_SERVICE_NAME:$COMMIT_SHA
       - >-
         --labels=managed-by=gcp-cloud-build-deploy-cloud-run,commit-sha=$COMMIT_SHA,gcb-build-id=$BUILD_ID,gcb-trigger-id=$_TRIGGER_ID
-      - '--region=$_DEPLOY_REGION'
-      - '--quiet'
+      - "--region=$_DEPLOY_REGION"
+      - "--quiet"
     id: Deploy Cloud Run
     entrypoint: gcloud
-    waitFor: ['Migrate']
+    waitFor: ["Migrate"]
 
-  - name: 'gcr.io/cloud-builders/kubectl'
+  - name: "gcr.io/cloud-builders/kubectl"
     env:
-      - 'CLOUDSDK_COMPUTE_REGION=$_DEPLOY_REGION'
-      - 'CLOUDSDK_CONTAINER_CLUSTER=$_GKE_CLUSTER'
-      - 'PROJECT_ID=$PROJECT_ID'
+      - "CLOUDSDK_COMPUTE_REGION=$_DEPLOY_REGION"
+      - "CLOUDSDK_CONTAINER_CLUSTER=$_GKE_CLUSTER"
+      - "PROJECT_ID=$PROJECT_ID"
     args:
       - apply
-      - '-k'
+      - "-k"
       - k8s
     id: Deploy GKE
-    waitFor: ['Substitute kustomization']
+    waitFor: ["Substitute kustomization", "Migrate"]
 
 images:
   - >-
@@ -81,15 +84,15 @@ images:
 options:
   substitutionOption: ALLOW_LOOSE
   logging: CLOUD_LOGGING_ONLY
-  machineType: 'E2_HIGHCPU_8'
+  machineType: "E2_HIGHCPU_8"
 
 substitutions:
   _DEPLOY_REGION: us-east1
   _AR_HOSTNAME: us-east1-docker.pkg.dev
   _PLATFORM: managed
   _SERVICE_NAME: abroad-api
-  _TRIGGER_ID: ''
-  _GKE_CLUSTER: ''
+  _TRIGGER_ID: ""
+  _GKE_CLUSTER: ""
 
 tags:
   - gcp-cloud-build-deploy-cloud-run
