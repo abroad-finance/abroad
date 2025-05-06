@@ -80,10 +80,13 @@ export class BinanceBalanceUpdatedController {
       for (const pc of pending) {
         const balanceRaw = balances.find(b => b.coin === pc.source)?.free ?? '0'
         const available = typeof balanceRaw === 'string' ? parseFloat(balanceRaw) : balanceRaw
+        this.logger.info(`[BinanceBalanceUpdated queue]: ${pc.source} balance: ${available}`)
 
         // Keep 0‑decimals for stable‑coin pairs → use Math.floor
         const qty = Math.floor(Math.min(available, pc.amount))
         if (qty <= 0) continue
+
+        this.logger.info(`[BinanceBalanceUpdated queue]: ${pc.source}→${pc.target} qty: ${qty}`)
 
         // ----------------- Idempotent conversion block -------------------------------
         await db.$transaction(async (tx) => {
@@ -122,7 +125,7 @@ export class BinanceBalanceUpdatedController {
     side: 'BUY' | 'SELL',
     quantity: number,
   ) {
-    this.logger.info(`Placing MARKET ${side} order on ${symbol} for ${quantity}`)
+    this.logger.info(`[BinanceBalanceUpdated queue]: Placing market order: ${side} ${quantity} ${symbol}`)
     return client.submitNewOrder({
       quantity,
       side,
