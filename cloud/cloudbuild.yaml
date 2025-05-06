@@ -1,68 +1,101 @@
 steps:
-  - id: Build and Push
-    name: gcr.io/kaniko-project/executor:latest
-    args:
-      - --context=.
-      - --dockerfile=Dockerfile
-      - --destination=$_AR_HOSTNAME/$PROJECT_ID/cloud-run-source-deploy/$REPO_NAME/$_SERVICE_NAME:$COMMIT_SHA
-      - --destination=$_AR_HOSTNAME/$PROJECT_ID/cloud-run-source-deploy/$REPO_NAME/$_SERVICE_NAME:latest
-      - --cache=true
-    env:
-      - "DOCKER_CONFIG=/kaniko/.docker"
-    waitFor: ["-"]
-
-  - id: Substitute kustomization
-    name: "debian:stable-slim"
-    entrypoint: "bash"
+  # 0. Try to pull the most-recent image so its layers can be reused as cache
+  - id: Pull cache
+    name: gcr.io/cloud-builders/docker
+    entrypoint: bash
     args:
       - -c
       - |
-        apt-get update > /dev/null && apt-get install -y gettext-base --no-install-recommends > /dev/null || true
+        docker pull $_AR_HOSTNAME/$PROJECT_ID/cloud-run-source-deploy/$REPO_NAME/$_SERVICE_NAME:latest || true
+
+  # 1. Build the image, tagging :$COMMIT_SHA and :latest, and point BuildKit at the pulled cache
+  - id: Build
+    name: gcr.io/cloud-builders/docker
+    env:
+      - DOCKER_BUILDKIT=1
+      - BUILDKIT_INLINE_CACHE=1
+    args:
+      - build
+      - -t
+      - $_AR_HOSTNAME/$PROJECT_ID/cloud-run-source-deploy/$REPO_NAME/$_SERVICE_NAME:$COMMIT_SHA
+      - -t
+      - $_AR_HOSTNAME/$PROJECT_ID/cloud-run-source-deploy/$REPO_NAME/$_SERVICE_NAME:latest
+      - --cache-from
+      - $_AR_HOSTNAME/$PROJECT_ID/cloud-run-source-deploy/$REPO_NAME/$_SERVICE_NAME:latest
+      - -f
+      - Dockerfile
+      - .
+    waitFor: ["Pull cache"]
+
+  # 2. Push both tags so this build becomes the next build’s cache source
+  - id: Push commit
+    name: gcr.io/cloud-builders/docker
+    args:
+      - push
+      - $_AR_HOSTNAME/$PROJECT_ID/cloud-run-source-deploy/$REPO_NAME/$_SERVICE_NAME:$COMMIT_SHA
+    waitFor: ["Build"]
+
+  - id: Push latest
+    name: gcr.io/cloud-builders/docker
+    args:
+      - push
+      - $_AR_HOSTNAME/$PROJECT_ID/cloud-run-source-deploy/$REPO_NAME/$_SERVICE_NAME:latest
+    waitFor: ["Build"]
+
+  # 3. Render kustomization (runs in parallel; unchanged)
+  - id: Substitute kustomization
+    name: debian:stable-slim
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        apt-get update -qq && apt-get install -y gettext-base --no-install-recommends -qq || true
         envsubst < k8s/kustomization.yaml > k8s/kustomization.processed.yaml
         mv k8s/kustomization.processed.yaml k8s/kustomization.yaml
     env:
-      - 'PROJECT_ID=$PROJECT_ID'
-      - 'COMMIT_SHA=$COMMIT_SHA'
-      - 'REPO_NAME=$REPO_NAME'
-      - '_SERVICE_NAME=$_SERVICE_NAME'
+      - PROJECT_ID=$PROJECT_ID
+      - COMMIT_SHA=$COMMIT_SHA
+      - REPO_NAME=$REPO_NAME
+      - _SERVICE_NAME=$_SERVICE_NAME
     waitFor: ["-"]
 
+  # 4. Apply database migrations with the freshly-built image
   - id: Migrate
     name: $_AR_HOSTNAME/$PROJECT_ID/cloud-run-source-deploy/$REPO_NAME/$_SERVICE_NAME:$COMMIT_SHA
     entrypoint: npx
     args: ["prisma", "migrate", "deploy"]
-    secretEnv:
-      - DATABASE_URL
-    waitFor: ["Build and Push"]
+    secretEnv: ["DATABASE_URL"]
+    waitFor: ["Push commit"]
 
-  - name: "gcr.io/google.com/cloudsdktool/cloud-sdk:slim"
+  # 5. Deploy to Cloud Run after migrations
+  - id: Deploy Cloud Run
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    entrypoint: gcloud
     args:
       - run
       - services
       - update
       - $_SERVICE_NAME
-      - "--platform=managed"
-      - >-
-        --image=$_AR_HOSTNAME/$PROJECT_ID/cloud-run-source-deploy/$REPO_NAME/$_SERVICE_NAME:$COMMIT_SHA
-      - >-
-        --labels=managed-by=gcp-cloud-build-deploy-cloud-run,commit-sha=$COMMIT_SHA,gcb-build-id=$BUILD_ID,gcb-trigger-id=$_TRIGGER_ID
-      - "--region=$_DEPLOY_REGION"
-      - "--quiet"
-    id: Deploy Cloud Run
-    entrypoint: gcloud
+      - --platform=managed
+      - --image=$_AR_HOSTNAME/$PROJECT_ID/cloud-run-source-deploy/$REPO_NAME/$_SERVICE_NAME:$COMMIT_SHA
+      - --labels=managed-by=gcp-cloud-build-deploy-cloud-run,commit-sha=$COMMIT_SHA,gcb-build-id=$BUILD_ID,gcb-trigger-id=$_TRIGGER_ID
+      - --region=$_DEPLOY_REGION
+      - --quiet
     waitFor: ["Migrate"]
 
-  - name: "gcr.io/cloud-builders/kubectl"
+  # 6. Deploy to GKE (after manifests & migrations)
+  - id: Deploy GKE
+    name: gcr.io/cloud-builders/kubectl
     env:
-      - "CLOUDSDK_COMPUTE_REGION=$_DEPLOY_REGION"
-      - "CLOUDSDK_CONTAINER_CLUSTER=$_GKE_CLUSTER"
-      - "PROJECT_ID=$PROJECT_ID"
-    args:
-      - apply
-      - "-k"
-      - k8s
-    id: Deploy GKE
+      - CLOUDSDK_COMPUTE_REGION=$_DEPLOY_REGION
+      - CLOUDSDK_CONTAINER_CLUSTER=$_GKE_CLUSTER
+      - PROJECT_ID=$PROJECT_ID
+    args: ["apply", "-k", "k8s"]
     waitFor: ["Substitute kustomization", "Migrate"]
+
+images:
+  - $_AR_HOSTNAME/$PROJECT_ID/cloud-run-source-deploy/$REPO_NAME/$_SERVICE_NAME:$COMMIT_SHA
+  - $_AR_HOSTNAME/$PROJECT_ID/cloud-run-source-deploy/$REPO_NAME/$_SERVICE_NAME:latest
 
 options:
   substitutionOption: ALLOW_LOOSE
