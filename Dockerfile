@@ -1,54 +1,47 @@
-# Dockerfile Optimized for Build Speed
+# syntax=docker/dockerfile:1.7          <- 1️⃣ Turn BuildKit features on
+#   build with:  docker buildx build --cache-from=type=local,src=.docker-cache \
+#                                  --cache-to=type=local,dest=.docker-cache .
 
-# ---- Base Stage ----
-# Use a specific Node.js Alpine version for consistency and smaller size.
-# Using SHA ensures the base image doesn't change unexpectedly.
-FROM node:22.14.0-alpine@sha256:9bef0ef1e268f60627da9ba7d7605e8831d5b56ad07487d24d1aa386336d1944 AS base
+##########  BASE IMAGE  #######################################################
+# “slim” is a little larger than Alpine but avoids native-addon recompiles,
+# so npm ci is usually 2-3× faster.
+FROM node:22.14.0-slim AS base
 WORKDIR /app
 
+##########  DEPENDENCY LAYER  (rarely changes)  ###############################
+FROM base AS deps
+COPY package-lock.json package.json ./
 
-# ---- Dependencies Stage ----
-# This stage focuses only on installing dependencies.
-# It leverages caching: this layer only rebuilds if package*.json changes.
-FROM base AS dependencies
-# Copy package.json and package-lock.json (or yarn.lock)
-COPY package*.json ./
-# Install all dependencies (including devDependencies needed for build)
-# Using npm ci is generally faster and more reliable for CI/CD
-RUN npm ci
+# Cache the npm directory – 100 % hit-rate when the lock-file is unchanged.
+RUN --mount=type=cache,id=npm,target=/root/.npm \
+    npm ci --ignore-scripts
 
-
-# ---- Build Stage ----
-# This stage builds the application using the installed dependencies.
-FROM dependencies AS build
-# Copy the rest of the application code
-# This layer rebuilds whenever source code changes.
-COPY . .
-# Generate Prisma client - needs schema and dependencies
+##########  PRISMA LAYER  (changes when schema.prisma changes)  ###############
+FROM deps AS prisma
+COPY prisma/schema.prisma ./prisma/
+# Generates node_modules/.prisma; re-runs ONLY when schema changes
 RUN npx prisma generate
-# Compile the application
-RUN npm run build
 
+##########  BUILD LAYER  (changes when src/ changes)  #########################
+FROM prisma AS build
+# Copy build-time configs first (keeps cache hits high)
+# - tsconfig*.json  – TypeScript compiler options
+# - tsoa.json      – OpenAPI & route generation config
+COPY tsconfig*.json tsoa.json ./
+COPY src ./src
+# Re-use the npm cache again while compiling
+RUN --mount=type=cache,id=npm,target=/root/.npm \
+    npm run build
 
-# ---- Production Stage ----
-# This stage creates the final, lean production image.
+##########  FINAL RUNTIME IMAGE  ##############################################
 FROM base AS production
-# Set NODE_ENV to production
+# Lightweight copy—only the artefacts required at runtime
 ENV NODE_ENV=production
-# Copy necessary package files for production dependencies
-COPY --from=dependencies /app/package*.json ./
-# Install *only* production dependencies using npm ci --omit=dev
-RUN npm ci --omit=dev
-# Copy the generated client code from the build stage AFTER installing prod dependencies
-COPY --from=build /app/node_modules/.prisma ./node_modules/.prisma
-# Copy built application artifacts from the build stage
-COPY --from=build /app/dist ./dist
-# Copy Prisma schema needed at runtime
-COPY --from=build /app/prisma ./prisma
-# Copy other necessary static assets
-COPY --from=build /app/src/swagger.json ./dist/swagger.json
+COPY --from=deps      /app/node_modules        ./node_modules
+COPY --from=prisma    /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=build     /app/dist                ./dist
+COPY --from=build     /app/src/swagger.json     ./dist/swagger.json
+COPY prisma/schema.prisma ./prisma/schema.prisma
 
-# Expose the application port
 EXPOSE 3000
-# Define the command to run the application
-CMD ["node", "dist/server.js"]
+CMD ["node","dist/server.js"]

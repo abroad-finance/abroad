@@ -18,6 +18,7 @@
 				"Prisma.prisma",
 				"Github.copilot",
 				"GitHub.copilot-labs",
+				"ms-azuretools.vscode-docker"
 			],
 		},
 	},
