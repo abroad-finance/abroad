@@ -64,14 +64,9 @@ steps:
     id: Deploy GKE
     waitFor: ["Substitute kustomization", "Migrate"]
 
-images:
-  - $_AR_HOSTNAME/$PROJECT_ID/cloud-run-source-deploy/$REPO_NAME/$_SERVICE_NAME:$COMMIT_SHA
-  - $_AR_HOSTNAME/$PROJECT_ID/cloud-run-source-deploy/$REPO_NAME/$_SERVICE_NAME:latest
-
 options:
   substitutionOption: ALLOW_LOOSE
   logging: CLOUD_LOGGING_ONLY
-  machineType: "E2_HIGHCPU_8"
 
 substitutions:
   _DEPLOY_REGION: us-east1
