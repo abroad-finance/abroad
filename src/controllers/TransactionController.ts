@@ -186,8 +186,8 @@ export class TransactionController extends Controller {
           status: TransactionStatus.PAYMENT_COMPLETED,
         },
       })
-      const partnerTotalAmount = partnerTransactions.reduce((sum, tx) => sum + tx.quote.targetAmount, 0)
-      if (partnerTotalAmount + quote.targetAmount > 100) {
+      const partnerTotalAmount = partnerTransactions.reduce((sum, tx) => sum + tx.quote.sourceAmount, 0)
+      if (partnerTotalAmount + quote.sourceAmount > 100) {
         return badRequestResponse(400, { reason: 'Partner KYB not approved. Maximum total amount of $100 allowed.' })
       }
     }
