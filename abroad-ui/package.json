@@ -8,7 +8,8 @@
     "build": "npm run generate:api && tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview --host",
-    "generate:api": "orval --config orval.config.ts"
+    "generate:api": "orval --config orval.config.ts",
+    "depcruise:tree": "depcruise src --include-only '^src' --config --output-type dot | dot -T svg > dependency-graph.svg && open dependency-graph.svg"
   },
   "dependencies": {
     "@headlessui/react": "^2.2.2",
@@ -29,6 +30,7 @@
     "@types/react": "^19.0.8",
     "@types/react-dom": "^19.0.3",
     "@vitejs/plugin-react": "^4.3.4",
+    "dependency-cruiser": "^16.10.2",
     "eslint": "^9.19.0",
     "eslint-plugin-react-hooks": "^5.0.0",
     "eslint-plugin-react-refresh": "^0.4.18",

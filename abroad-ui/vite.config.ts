@@ -4,6 +4,10 @@ import tailwindcss from '@tailwindcss/vite'
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
-  cacheDir: 'node_modules/.vite-cache',
+  plugins: [react({ include: "**/*.tsx" }), tailwindcss()],
+  server: {
+    watch: {
+      usePolling: true,
+    }
+  },
 })

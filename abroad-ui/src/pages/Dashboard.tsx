@@ -8,6 +8,7 @@ import { TransactionList } from "../components/transactionlist";
 import { Quotation } from "../components/quotation";
 import { WalletBalance } from "../components/wallet_balance";
 import { acceptTransaction, AcceptTransactionRequest } from "../api";
+import { FreighterGuide } from "../components/freighter_guide";
 
 export function Dashboard() {
   const [activeSection, setActiveSection] = useState<string>("dashboard");
@@ -36,14 +37,17 @@ function DashboardHome() {
   const [transactions, setTransactions] = useState<PaginatedTransactionList | null>(null);
   const [publicKey, setPublicKey] = useState<string | null>(null); // State for public key
   const [connectionError, setConnectionError] = useState<string | null>(null);
+  const [isFreighterAvailable, setIsFreighterAvailable] = useState(false);
 
   // Unify Freighter connection logic
   const checkAndRequestAccess = useCallback(async (): Promise<string | null> => {
     const freighterConnected = await isConnected();
     if (!freighterConnected.isConnected) {
+      setIsFreighterAvailable(false);
       setConnectionError("Freighter extension not detected. Please install it.");
       return null;
     }
+    setIsFreighterAvailable(true);
     const accessObj = await requestAccess();
     if (accessObj.error) {
       console.error("Error requesting access:", accessObj.error);
@@ -53,14 +57,9 @@ function DashboardHome() {
     return accessObj.address ?? null;
   }, []);
 
-  // Check if Freighter extension is available
-  const isFreighterAvailable = useCallback(async (): Promise<boolean> => {
-    const result = await isConnected();
-    return result.isConnected;
-  }, []);
 
   const fetchWalletBalance = useCallback(async (address: string) => {
-    if (!(await isFreighterAvailable())) return;
+    if (!(await checkAndRequestAccess())) return;
 
     // Detailed network information
     const details = await getNetworkDetails();
@@ -79,7 +78,7 @@ function DashboardHome() {
       console.error("USDC balance not found for the account.");
       setBalance(0);
     }
-  }, [isFreighterAvailable]);
+  }, [checkAndRequestAccess]);
 
   // Simplified connectWallet using centralized helper
   const connectWallet = useCallback(async () => {
@@ -121,12 +120,12 @@ function DashboardHome() {
 
     // Check connection on load
     const checkFreighterConnection = async () => {
-      if (await isFreighterAvailable()) {
+      if (await checkAndRequestAccess()) {
         connectWallet();
       }
     };
     checkFreighterConnection();
-  }, [connectWallet, isFreighterAvailable]);
+  }, [connectWallet, checkAndRequestAccess]);
 
   // Polling: fetch balance and transactions every 5 seconds
   useEffect(() => {
@@ -255,7 +254,7 @@ function DashboardHome() {
         user_id: recipient.userId,
       };
       const acceptRes = await acceptTransaction(acceptReq);
-      if(acceptRes.status !== 200) {
+      if (acceptRes.status !== 200) {
         alert("Error accepting transaction: " + acceptRes.data.reason);
         return;
       }
@@ -327,7 +326,7 @@ function DashboardHome() {
 
   return (
     <div className="space-y-4 relative">
-            {isConnecting && (  
+      {isConnecting && (
         <div className="fixed inset-0 bg-black bg-opacity-10 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 flex flex-col items-center space-y-4">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#48b395]"></div>
@@ -336,13 +335,14 @@ function DashboardHome() {
         </div>
       )}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-        <WalletBalance
-          balance={balance}
-          isConnecting={isConnecting}
-          publicKey={publicKey}
-          handleWalletConnection={handleWalletConnection}
-          getWalletMessage={getWalletMessage}
-        />
+        {isFreighterAvailable ?
+          <WalletBalance
+            balance={balance}
+            isConnecting={isConnecting}
+            publicKey={publicKey}
+            handleWalletConnection={handleWalletConnection}
+            getWalletMessage={getWalletMessage}
+          /> : <FreighterGuide />}
         <Quotation
           loading={loading}
           publicKey={publicKey}
