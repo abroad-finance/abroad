@@ -55,7 +55,7 @@ export class MoviiPaymentService implements IPaymentService {
     const qsPassword = await this.secretManager.getSecret('MOVII_QS_PASSWORD')
 
     const browser = await puppeteer.launch({
-      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-features=site-per-process'],
       defaultViewport: { height: 768, width: 1366 },
       headless: true,
     })
