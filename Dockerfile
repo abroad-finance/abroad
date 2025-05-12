@@ -4,6 +4,8 @@
 # “slim” is a little larger than Alpine but avoids native-addon recompiles,
 # so npm ci is usually 2-3× faster.
 FROM node:22.14.0-slim AS base
+RUN apt-get update && \
+    apt-get install -y chromium
 WORKDIR /app
 
 ##########  DEPENDENCY LAYER  (rarely changes)  ###############################
@@ -33,8 +35,6 @@ RUN --mount=type=cache,id=npm,target=/root/.npm \
 
 ##########  FINAL RUNTIME IMAGE  ##############################################
 FROM base AS production
-RUN apt-get update && \
-    apt-get install -y chromium
 # Lightweight copy—only the artefacts required at runtime
 ENV NODE_ENV=production
 COPY --from=deps      /app/node_modules        ./node_modules
