@@ -50,6 +50,13 @@ export class NequiPaymentService implements IPaymentService {
     @inject(TYPES.ISecretManager) private secretManager: ISecretManager,
   ) { }
 
+  public async getLiquidity(): Promise<number> {
+    // Nequi does not provide a direct endpoint to get liquidity.
+    // Returning a large number as a placeholder.
+    // This should be replaced with actual logic if available in the future.
+    return Promise.resolve(this.MAX_TOTAL_AMOUNT_PER_DAY)
+  }
+
   onboardUser(): Promise<{ message?: string, success: boolean }> {
     throw new Error('Method not implemented.')
   }

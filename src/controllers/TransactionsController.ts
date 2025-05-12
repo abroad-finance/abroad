@@ -38,6 +38,40 @@ export class TransactionsController extends Controller {
   }
 
   /**
+   * List confirmed partner transactions (paginated)
+   */
+  @Get('list/confirmed')
+  @Response<400, { reason: string }>(400, 'Bad Request')
+  @SuccessResponse('200', 'Confirmed transactions retrieved')
+  public async listConfirmedPartnerTransactions(
+    @Query() page: number = 1,
+    @Query() pageSize: number = 20,
+    @Request() request: RequestExpress,
+    @Res() badRequest: TsoaResponse<400, { reason: string }>,
+  ): Promise<PaginatedTransactionList> {
+    if (page < 1 || pageSize < 1 || pageSize > 100) {
+      return badRequest(400, { reason: 'Invalid pagination parameters' })
+    }
+    const partner = request.user
+    const prismaClient = await this.prismaClientProvider.getClient()
+    const whereClause = {
+      partnerUser: { partnerId: partner.id },
+      status: TransactionStatus.PAYMENT_COMPLETED,
+    }
+    const [transactions, total] = await Promise.all([
+      prismaClient.transaction.findMany({
+        include: { quote: true },
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        where: whereClause,
+      }),
+      prismaClient.transaction.count({ where: whereClause }),
+    ])
+    return { page, pageSize, total, transactions }
+  }
+
+  /**
    * List partner transactions (paginated)
    */
   @Get('list')
@@ -62,7 +96,7 @@ export class TransactionsController extends Controller {
         take: pageSize,
         where: { partnerUser: { partnerId: partner.id } },
       }),
-      prismaClient.transaction.count({ where: { partnerUser: { partnerId: partner.id }, status: TransactionStatus.PAYMENT_COMPLETED } }),
+      prismaClient.transaction.count({ where: { partnerUser: { partnerId: partner.id } } }),
     ])
     return { page, pageSize, total, transactions }
   }

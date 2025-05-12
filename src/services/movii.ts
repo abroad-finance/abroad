@@ -3,6 +3,7 @@
 import { TargetCurrency } from '@prisma/client'
 import axios from 'axios'
 import { inject } from 'inversify'
+import puppeteer from 'puppeteer'
 
 import { IPaymentService } from '../interfaces/IPaymentService'
 import { ISecretManager } from '../interfaces/ISecretManager'
@@ -46,6 +47,54 @@ export class MoviiPaymentService implements IPaymentService {
   public constructor(
     @inject(TYPES.ISecretManager) private secretManager: ISecretManager,
   ) { }
+
+  public getLiquidity: IPaymentService['getLiquidity'] = async () => {
+    const loginUrl = await this.secretManager.getSecret('MOVII_QS_LOGIN_URL')
+    const qsAccount = await this.secretManager.getSecret('MOVII_QS_ACCOUNT')
+    const qsUser = await this.secretManager.getSecret('MOVII_QS_USER')
+    const qsPassword = await this.secretManager.getSecret('MOVII_QS_PASSWORD')
+
+    const browser = await puppeteer.launch({
+      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+      defaultViewport: { height: 768, width: 1366 },
+      headless: true,
+    })
+    console.log('Browser launched successfully.')
+
+    const page = await browser.newPage()
+    console.log('Navigating to login page...')
+    await page.goto(loginUrl, { waitUntil: 'networkidle2' })
+    console.log('Successfully navigated to login page.')
+
+    /* ------- Step 1: account name ------- */
+    await page.waitForSelector('input[id="account-name-input"]')
+    await page.type('input[id="account-name-input"]', qsAccount, { delay: 50 })
+    await page.keyboard.press('Enter')
+
+    /* ------- Step 2: user credentials ------- */
+    await page.waitForSelector('input[id="username-input"]')
+    await page.type('input[id="username-input"]', qsUser, { delay: 50 })
+    await page.keyboard.press('Enter')
+
+    await page.waitForSelector('input[type="password"]')
+    await page.type('input[type="password"]', qsPassword, { delay: 50 })
+    await page.keyboard.press('Enter')
+
+    // Wait for the dashboard to load
+    await page.waitForSelector('div[data-automation-context="KPI - Final balance"] [data-automation-id="kpi-actual-value"] span', { timeout: 60000 })
+
+    // Extract the final balance from div[data-automation-context="kpi-actual-value"] inside div[data-automation-context="KPI - Final balance"]
+    const finalBalance = await page.evaluate(() => {
+      const element = document
+        .querySelector('div[data-automation-context="KPI - Final balance"] [data-automation-id="kpi-actual-value"] span')
+        ?.textContent?.trim().replaceAll(',', '')
+      return element ? element : null
+    })
+    // Close the browser when done
+    await browser.close()
+
+    return finalBalance ? parseFloat(finalBalance) : 0
+  }
 
   public onboardUser: IPaymentService['onboardUser'] = async ({
     account,

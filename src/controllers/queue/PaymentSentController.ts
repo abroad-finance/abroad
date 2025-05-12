@@ -1,21 +1,30 @@
-import { SupportedCurrency } from '@prisma/client'
+import {
+  BlockchainNetwork,
+  Country,
+  CryptoCurrency,
+  PaymentMethod,
+  SupportedCurrency,
+  TargetCurrency,
+} from '@prisma/client'
 import { inject } from 'inversify'
 
 import { ILogger, IQueueHandler, ISlackNotifier, QueueName } from '../../interfaces'
 import { IDatabaseClientProvider } from '../../interfaces/IDatabaseClientProvider'
 import { IExchangeProvider } from '../../interfaces/IExchangeProvider'
+import { IPaymentServiceFactory } from '../../interfaces/IPaymentServiceFactory'
 import { IWalletHandlerFactory } from '../../interfaces/IWalletHandlerFactory'
 import { PaymentSentMessage, PaymentSentMessageSchema } from '../../interfaces/queueSchema'
 import { TYPES } from '../../types'
 
 export class PaymentSentController {
   public constructor(
-        @inject(TYPES.ILogger) private logger: ILogger,
-        @inject(TYPES.IQueueHandler) private queueHandler: IQueueHandler,
-        @inject(TYPES.IWalletHandlerFactory) private walletHandlerFactory: IWalletHandlerFactory,
-        @inject(TYPES.IExchangeProvider) private exchangeProvider: IExchangeProvider,
-        @inject(TYPES.ISlackNotifier) private slackNotifier: ISlackNotifier,
-        @inject(TYPES.IDatabaseClientProvider) private dbClientProvider: IDatabaseClientProvider,
+    @inject(TYPES.ILogger) private logger: ILogger,
+    @inject(TYPES.IQueueHandler) private queueHandler: IQueueHandler,
+    @inject(TYPES.IWalletHandlerFactory) private walletHandlerFactory: IWalletHandlerFactory,
+    @inject(TYPES.IExchangeProvider) private exchangeProvider: IExchangeProvider,
+    @inject(TYPES.ISlackNotifier) private slackNotifier: ISlackNotifier,
+    @inject(TYPES.IDatabaseClientProvider) private dbClientProvider: IDatabaseClientProvider,
+    @inject(TYPES.IPaymentServiceFactory) private paymentServiceFactory: IPaymentServiceFactory,
   ) {
 
   }
@@ -59,6 +68,32 @@ export class PaymentSentController {
 
     const { amount, blockchain, cryptoCurrency, targetCurrency } = message
 
+    await Promise.all([
+      this.sendToExchangeAndUpdatePendingConversions({
+        amount,
+        blockchain,
+        cryptoCurrency,
+        targetCurrency,
+      }),
+      this.updatePaymentLiquidityCache({ paymentMethod: message.paymentMethod }),
+    ])
+
+    this.logger.info(
+      '[PaymentSent Queue]: Payment sent successfully',
+    )
+  }
+
+  private sendToExchangeAndUpdatePendingConversions = async ({
+    amount,
+    blockchain,
+    cryptoCurrency,
+    targetCurrency,
+  }: {
+    amount: number
+    blockchain: BlockchainNetwork
+    cryptoCurrency: CryptoCurrency
+    targetCurrency: TargetCurrency
+  }) => {
     const walletHandler = this.walletHandlerFactory.getWalletHandler(blockchain)
     const { address, memo } = await this.exchangeProvider.getExchangeAddress({ blockchain, cryptoCurrency })
 
@@ -107,10 +142,26 @@ export class PaymentSentController {
         },
       })
     }
+  }
 
-    this.logger.info(
-      '[PaymentSent Queue]: Payment sent successfully:',
-      transactionId,
-    )
+  private updatePaymentLiquidityCache = async ({ paymentMethod }: { paymentMethod: PaymentMethod }) => {
+    const clientDb = await this.dbClientProvider.getClient()
+
+    const paymentService = await this.paymentServiceFactory.getPaymentService(paymentMethod)
+    const liquidity = await paymentService.getLiquidity()
+    if (liquidity) {
+      await clientDb.paymentProvider.upsert({
+        create: {
+          country: Country.CO,
+          id: paymentMethod,
+          liquidity: 0,
+          name: paymentMethod,
+        },
+        update: { liquidity },
+        where: {
+          id: paymentMethod,
+        },
+      })
+    }
   }
 }

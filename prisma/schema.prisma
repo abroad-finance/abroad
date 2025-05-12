@@ -148,3 +148,12 @@ enum PaymentMethod {
 enum TargetCurrency {
   COP
 }
+
+model PaymentProvider {
+  id        String   @id
+  name      String
+  liquidity Float
+  country   Country
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

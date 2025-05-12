@@ -166,6 +166,7 @@ export class ReceivedCryptoTransactionController {
           amount: transactionRecord.quote.sourceAmount,
           blockchain: BlockchainNetwork.STELLAR,
           cryptoCurrency: transactionRecord.quote.cryptoCurrency,
+          paymentMethod: transactionRecord.quote.paymentMethod,
           targetCurrency: transactionRecord.quote.targetCurrency,
         } satisfies PaymentSentMessage)
       }

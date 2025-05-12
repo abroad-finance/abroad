@@ -11,7 +11,7 @@ import {
   Settings as SettingsIcon  // add Settings icon
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { getPartnerInfo, PartnerInfoResponse } from "../api";
+import { getLiquidity, getPartnerInfo, PartnerInfoResponse } from "../api";
 
 const navLinks = [
   { label: "Dashboard", icon: HomeIcon, section: "dashboard", path: "/dashboard" },
@@ -77,6 +77,7 @@ export default function Topbar({ activeSection, setActiveSection }: TopbarProps)
   const navigate = useNavigate();
   const { language } = useLanguage();
   const [partner, setPartner] = useState<null | PartnerInfoResponse>(null)
+  const [totalLiquidity, setTotalLiquidity] = useState<number | null>(null);
 
   useEffect(() => {
     const fetchPartnerInfo = async () => {
@@ -92,6 +93,22 @@ export default function Topbar({ activeSection, setActiveSection }: TopbarProps)
       }
     }
     fetchPartnerInfo();
+  }, []);
+
+  useEffect(() => {
+    const fetchLiquidity = async () => {
+      try {
+        const response = await getLiquidity({ paymentMethod: 'MOVII' })
+        console.log("Response from getLiquidity:", response);
+        if (response.status === 200) {
+          console.log("Liquidity fetched successfully:", response.data);
+          setTotalLiquidity(response.data.liquidity);
+        }
+      } catch (error) {
+        console.error("Failed to fetch liquidity:", error);
+      }
+    }
+    fetchLiquidity();
   }, []);
 
   if (!partner) {
@@ -121,6 +138,17 @@ export default function Topbar({ activeSection, setActiveSection }: TopbarProps)
                 alt="Abroad Logo"
                 className="h-8"
               />
+            </div>
+
+            {/* Liquidity */}
+            <div className="ml-4 text-sm font-medium text-gray-600">
+              {totalLiquidity !== null ? (
+                <span>
+                  Liquidity: ${totalLiquidity.toLocaleString()}
+                </span>
+              ) : (
+                <span>Loading liquidity...</span>
+              )}
             </div>
 
           </div>
