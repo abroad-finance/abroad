@@ -33,7 +33,9 @@ RUN --mount=type=cache,id=npm,target=/root/.npm \
 
 ##########  FINAL RUNTIME IMAGE  ##############################################
 FROM base AS production
-RUN apt install chromium -y
+RUN apt-get update && \
+    apt-get install -y chromium --no-install-recommends && \
+    rm -rf /var/lib/apt/lists/*
 # Lightweight copy—only the artefacts required at runtime
 ENV NODE_ENV=production
 COPY --from=deps      /app/node_modules        ./node_modules
