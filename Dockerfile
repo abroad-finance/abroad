@@ -44,5 +44,7 @@ COPY --from=build     /app/src/swagger.json     ./dist/swagger.json
 COPY --from=build     /app/package.json        ./package.json
 COPY prisma/schema.prisma ./prisma/schema.prisma
 
+RUN npx puppeteer browsers install chrome
+
 EXPOSE 3000
 CMD ["node","dist/server.js"]
