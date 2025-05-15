@@ -8,7 +8,7 @@
     "build": "npm run generate:api && tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview --host",
-    "generate:api": "orval --config orval.config.ts",
+    "generate:api": "cd .. && npm i && npm run build && cd abroad-ui && orval --config orval.config.ts",
     "depcruise:tree": "depcruise src --include-only '^src' --config --output-type dot | dot -T svg > dependency-graph.svg && open dependency-graph.svg"
   },
   "dependencies": {
