@@ -4,11 +4,12 @@ import { getQuote, QuoteRequest, getReverseQuote, ReverseQuoteRequest, listPartn
 import { isConnected, requestAccess, getNetworkDetails, signTransaction } from "@stellar/freighter-api"; // Import Freighter functions
 import { Memo, Operation, Asset, TransactionBuilder, Transaction as StellarTransaction } from "@stellar/stellar-sdk";
 import { Horizon } from "@stellar/stellar-sdk";
-import { TransactionList } from "../components/transactionlist";
+import { TransactionList } from "../components/TransactionList";
 import { Quotation } from "../components/quotation";
-import { WalletBalance } from "../components/wallet_balance";
+import { WalletBalance } from "../components/WalletBallance";
 import { acceptTransaction, AcceptTransactionRequest } from "../api";
-import { FreighterGuide } from "../components/freighter_guide";
+import { FreighterGuide } from "../components/FreighterGuide";
+import { Liquidity } from "../components/Liquidity";
 
 export function Dashboard() {
   const [activeSection, setActiveSection] = useState<string>("dashboard");
@@ -323,8 +324,9 @@ function DashboardHome() {
       accountNumber: user.accountNumber || undefined
     }));
   }, [partnerUsers, recipientInput]);
-
+  
   return (
+    
     <div className="space-y-4 relative">
       {isConnecting && (
         <div className="fixed inset-0 bg-black bg-opacity-10 flex items-center justify-center z-50">
@@ -334,16 +336,17 @@ function DashboardHome() {
           </div>
         </div>
       )}
+      <Liquidity />
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
         {isFreighterAvailable ?
-          <WalletBalance
+        <WalletBalance
             balance={balance}
             isConnecting={isConnecting}
             publicKey={publicKey}
             handleWalletConnection={handleWalletConnection}
             getWalletMessage={getWalletMessage}
           /> : <FreighterGuide />}
-        <Quotation
+       <Quotation
           loading={loading}
           publicKey={publicKey}
           selectedCurrency={selectedCurrency}

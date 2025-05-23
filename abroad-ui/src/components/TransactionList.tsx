@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Card, CardContent } from "./card";
 import { PaginatedTransactionList, Transaction } from "../api/apiClient";
-import { TransactionDetails } from "./transactiondetails";
+import { TransactionDetails } from "./TransactionDetails";
 import { useLanguage } from '../contexts/LanguageContext';
 
 const translations = {
@@ -116,10 +116,28 @@ export function TransactionList({ transactions }: TransactionListProps) {
                         )}
                       </td>
                       <td className="py-3 px-4 text-sm text-gray-900 text-right">
-                        {tx.quote?.sourceAmount?.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {tx.quote?.cryptoCurrency}
+                        {tx.quote?.sourceAmount != null && (
+                          <div className="flex items-center justify-end space-x-1">
+                            <img
+                              src="https://payload-marketing.moonpay.com/api/media/file/mk1bgycpph-K6MWcviP8ndwcJ5yNIrpI"
+                              alt="USDC Icon"
+                              className="w-4 h-4"
+                            />
+                            <span>${tx.quote.sourceAmount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                          </div>
+                        )}
                       </td>
                       <td className="py-3 px-4 text-sm text-gray-900 text-right">
-                        {tx.quote?.targetAmount?.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {tx.quote?.targetCurrency}
+                        {tx.quote?.targetAmount != null && (
+                          <div className="flex items-center justify-end space-x-1">
+                            <img
+                              src="https://vectorflags.s3.amazonaws.com/flags/co-circle-01.png"
+                              alt="USDC Icon"
+                              className="w-4 h-4"
+                            />
+                            <span>${tx.quote.targetCurrency} ${tx.quote.targetAmount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                          </div>
+                        )}
                       </td>
                     </tr>
                   ))

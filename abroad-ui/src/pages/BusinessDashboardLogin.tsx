@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Card, CardContent } from "../components/card";
 import { Input } from "../components/input";
@@ -8,6 +8,7 @@ import { auth } from "../services/firebase";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { createPartner } from "../api";
+import { Listbox } from '@headlessui/react';
 
 const countries = [
   { code: "AR", name: "Argentina", emoji: "🇦🇷" },
@@ -25,7 +26,7 @@ const countries = [
   { code: "GB", name: "United Kingdom", emoji: "🇬🇧" },
   { code: "US", name: "United States", emoji: "🇺🇸" },
   { code: "UY", name: "Uruguay", emoji: "🇺🇾" },
-  { code: "OTHER", name: "Other Country/Region", emoji: "🌎" },
+  { code: "AQ", name: "Another Country/Region", emoji: "🌎" },
 ];
 
 function AnimatedDestinations() {
@@ -309,19 +310,40 @@ export default function LoginPage() {
                         className="rounded-xl border-none focus:ring-2 focus:ring-green-600"
                         required
                       />
-                      <select
-                        value={country}
-                        onChange={(e) => setCountry(e.target.value)}
-                        className="rounded-xl border-none focus:ring-2 focus:ring-green-600 p-2"
-                        required
-                      >
-                        <option value="">{t.selectCountry}</option>
-                        {countries.map((country) => (
-                          <option key={country.code} value={country.code}>
-                            {country.emoji} {country.name}
-                          </option>
-                        ))}
-                      </select>
+                      <div className="relative">
+                        <Listbox value={country} onChange={setCountry}>
+                          <Listbox.Button className="w-full rounded-xl border-none focus:ring-2 focus:ring-green-600 p-2 flex items-center space-x-2 bg-white text-sm">
+                            {country ? (
+                              <>
+                                <img
+                                  src={`https://hatscripts.github.io/circle-flags/flags/${country.toLowerCase()}.svg`}
+                                  alt={`${countries.find(c=>c.code===country)?.name} flag`}
+                                  className="w-5 h-5 rounded-full"
+                                />
+                                <span>{countries.find(c=>c.code===country)?.name}</span>
+                              </>
+                            ) : (
+                              <span className="text-gray-500">{t.selectCountry}</span>
+                            )}
+                          </Listbox.Button>
+                          <Listbox.Options className="absolute z-10 w-full mt-1 border border-gray-200 rounded-md bg-white shadow-lg max-h-40 overflow-auto">
+                            {countries.map((c) => (
+                              <Listbox.Option
+                                key={c.code}
+                                value={c.code}
+                                className="cursor-pointer px-2 py-1 flex items-center space-x-2 hover:bg-gray-100"
+                              >
+                                <img
+                                  src={`https://hatscripts.github.io/circle-flags/flags/${c.code.toLowerCase()}.svg`}
+                                  alt={`${c.name} flag`}
+                                  className="w-5 h-5 rounded-full"
+                                />
+                                <span>{c.name}</span>
+                              </Listbox.Option>
+                            ))}
+                          </Listbox.Options>
+                        </Listbox>
+                      </div>
                     </>
                   )}
                   <Input
