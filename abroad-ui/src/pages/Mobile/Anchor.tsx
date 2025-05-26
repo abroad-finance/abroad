@@ -1,15 +1,16 @@
 import { useState } from 'react';
 import Swap from '../../components/Swap/Swap';
 import BankDetailsRoute from '../../components/Swap/BankDetailsRoute';
+import TxStatus from '../../components/Swap/TxStatus';
 
 export default function Anchor() {
-  const [currentView, setCurrentView] = useState<'swap' | 'bankDetails'>('swap');
-  const [quoteId, setQuoteId] = useState<string>('');
+  const [currentView, setCurrentView] = useState<'swap' | 'bankDetails' | 'txStatus'>('swap');
+  const [quote_id, setquote_id] = useState<string>('');
   const [sourceAmount, setSourceAmount] = useState<string>('');
   const [targetAmount, setTargetAmount] = useState<string>('');
 
   const handleSwapContinue = (qId: string, srcAmount: string, tgtAmount: string) => {
-    setQuoteId(qId);
+    setquote_id(qId);
     setSourceAmount(srcAmount);
     setTargetAmount(tgtAmount);
     setCurrentView('bankDetails');
@@ -27,6 +28,17 @@ export default function Anchor() {
   const handleAmountsChange = (srcAmount: string, tgtAmount: string) => {
     setSourceAmount(srcAmount);
     setTargetAmount(tgtAmount);
+  };
+
+  const handleNewTransaction = () => {
+    setquote_id('');
+    setSourceAmount('');
+    setTargetAmount('');
+    setCurrentView('swap');
+  };
+
+  const handleRetry = () => {
+    setCurrentView('bankDetails');
   };
 
   return (
@@ -50,11 +62,13 @@ export default function Anchor() {
          {currentView === 'bankDetails' && 
            <BankDetailsRoute 
              onBackClick={handleBankDetailsBack} 
-             quoteId={quoteId}
+             onTransactionComplete={() => setCurrentView('txStatus')}
+             quote_id={quote_id}
              sourceAmount={sourceAmount}
              targetAmount={targetAmount}
            />
          }
+         {currentView === 'txStatus' && <TxStatus onNewTransaction={handleNewTransaction} onRetry={handleRetry} />}
       </div>
       {/* Social footer */}
       {/* make footer part of the normal flow so on small screens you scroll to see it */}

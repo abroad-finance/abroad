@@ -5,14 +5,16 @@ import { getBanks, Bank, getBanksResponse200 } from '../../api';
 
 interface BankDetailsRouteProps {
   onBackClick: () => void;
-  quoteId: string;
+  onTransactionComplete: () => void;
+  quote_id: string;
   sourceAmount: string;
   targetAmount: string;
 }
 
-export default function BankDetailsRoute({ onBackClick, quoteId, targetAmount }: BankDetailsRouteProps): React.JSX.Element {
-  const [bankAccountNumber, setBankAccountNumber] = useState('');
-  const [selectedBank, setSelectedBank] = useState<string>('');
+
+export default function BankDetailsRoute({ onBackClick, quote_id, targetAmount, onTransactionComplete }: BankDetailsRouteProps): React.JSX.Element {
+  const [account_number, setaccount_number] = useState('');
+  const [bank_code, setbank_code] = useState<string>('');
   const [loadingSubmit, setLoadingSubmit] = useState(false);
 
   const [apiBanks, setApiBanks] = useState<Bank[]>([]);
@@ -43,22 +45,24 @@ export default function BankDetailsRoute({ onBackClick, quoteId, targetAmount }:
     fetchBanks();
   }, []);
 
-  const handleBankAccountNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const input = e.target.value.replace(/[^\d]/g, '').slice(0, 20);
-    setBankAccountNumber(input);
+  const handleaccount_numberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const input = e.target.value.replace(/[^\d]/g, '').slice(0, 10); // MODIFIED: Limit to 10 digits
+    setaccount_number(input);
   };
 
   const handleBankChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setSelectedBank(e.target.value);
+    setbank_code(e.target.value);
   };
 
   const handleSubmit = () => {
     setLoadingSubmit(true);
-    console.log('Bank Details:', { selectedBank, bankAccountNumber, quoteId });
+    console.log('Bank Details:', { bank_code, account_number, quote_id });
     setTimeout(() => {
       setLoadingSubmit(false);
+      onTransactionComplete();
     }, 1500);
   };
+  
 
 
   return (
@@ -76,6 +80,7 @@ export default function BankDetailsRoute({ onBackClick, quoteId, targetAmount }:
           >
             <ArrowLeft className="w-6 h-6" />
           </button>
+
           <div id="Tittle" className="text-2xl font-bold text-[#356E6A] flex-grow text-center">Datos de Transacción</div> 
         </div>
         
@@ -89,8 +94,8 @@ export default function BankDetailsRoute({ onBackClick, quoteId, targetAmount }:
               inputMode="numeric" 
               pattern="[0-9]*"  
               placeholder="Número Transfiya"
-              value={bankAccountNumber}
-              onChange={handleBankAccountNumberChange}
+              value={account_number}
+              onChange={handleaccount_numberChange}
               className="w-full bg-transparent font-semibold focus:outline-none text-lg text-[#356E6A] placeholder-[#356E6A]/70"
             />
           </div>
@@ -103,7 +108,7 @@ export default function BankDetailsRoute({ onBackClick, quoteId, targetAmount }:
             {!loadingBanks && !errorBanks && apiBanks.length === 0 && <p className="text-[#356E6A]/70">No hay bancos disponibles.</p>}
             {!loadingBanks && !errorBanks && apiBanks.length > 0 && (
               <select
-                value={selectedBank}
+                value={bank_code}
                 onChange={handleBankChange}
                 className="w-full bg-transparent font-semibold focus:outline-none text-lg text-[#356E6A] appearance-none"
               >
@@ -144,7 +149,7 @@ export default function BankDetailsRoute({ onBackClick, quoteId, targetAmount }:
       <Button 
         className="mt-4 w-[90%] max-w-[50vh] py-4"
         onClick={handleSubmit}
-        disabled={loadingSubmit || !selectedBank || !bankAccountNumber || loadingBanks}
+        disabled={loadingSubmit || !bank_code || account_number.length !== 10 || loadingBanks} // MODIFIED: Added check for 10 digits
       >
         {loadingSubmit ? <Loader className="animate-spin w-5 h-5" /> : 'Continuar'}
       </Button>

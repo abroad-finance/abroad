@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 // Define props for Swap component
 interface SwapProps {
-  onContinue: (quoteId: string, srcAmount: string, tgtAmount: string) => void;
+  onContinue: (quote_id: string, srcAmount: string, tgtAmount: string) => void;
   initialSourceAmount?: string;
   initialTargetAmount?: string;
   onAmountsChange?: (srcAmount: string, tgtAmount: string) => void;
@@ -18,7 +18,7 @@ export default function Swap({ onContinue, initialSourceAmount = '', initialTarg
     // state for source (USD) and target (COP) amounts
     const [sourceAmount, setSourceAmount] = useState(initialSourceAmount);
     const [targetAmount, setTargetAmount] = useState(initialTargetAmount || '');
-    const [quoteId, setQuoteId] = useState<string>('');
+    const [quote_id, setquote_id] = useState<string>('');
     // loading state for source quote
     const [loadingSource, setLoadingSource] = useState(false);
     // loading state for reverse quote
@@ -65,6 +65,7 @@ export default function Swap({ onContinue, initialSourceAmount = '', initialTarg
          if (response.status === 200) {
            const formatted = formatCOPNumber(response.data.value);
            setTargetAmount(formatted);
+           setquote_id(response.data.quote_id); // Add this line
            onAmountsChange?.(input, formatted);
          }
        } catch (error) {
@@ -117,7 +118,7 @@ export default function Swap({ onContinue, initialSourceAmount = '', initialTarg
          if (response.status === 200) {
            const src = response.data.value.toFixed(2);
            setSourceAmount(src);
-           setQuoteId(response.data.quote_id);
+           setquote_id(response.data.quote_id);
            onAmountsChange?.(src, raw);
          }
        } catch (error) {
@@ -230,7 +231,7 @@ export default function Swap({ onContinue, initialSourceAmount = '', initialTarg
        </div>
        <Button
          className="mt-4 w-[90%] max-w-[50vh] py-4"
-         onClick={() => onContinue(quoteId, sourceAmount, targetAmount)}
+         onClick={() => onContinue(quote_id, sourceAmount, targetAmount)}
          disabled={isButtonDisabled()}
        >
          Continuar
