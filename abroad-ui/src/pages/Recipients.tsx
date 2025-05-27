@@ -3,8 +3,77 @@ import { Button } from "../components/button";
 import Navbar from "../components/navbar";
 import { getBanks, type Bank, createPartnerUser, PaymentMethod, listPartnerUsers, PaginatedPartnerUsers } from "../api/apiClient";
 import { useEffect, useState } from "react";
+import { useLanguage } from '../contexts/LanguageContext';
 
 export default function Recipients() {
+  const { language } = useLanguage();
+  const t = {
+    en: {
+      addTitle: 'Add a New Recipient',
+      listTitle: 'Recipients List',
+      namePlaceholder: 'Name',
+      bankPlaceholder: 'Select Bank',
+      numberPlaceholder: 'Phone Number (Transfiya)',
+      addButton: 'Add Recipient',
+      adding: 'Adding...',
+      noRecipients: 'No recipients added yet.',
+      table: {
+        userId: 'User ID',
+        accountNumber: 'Account Number',
+        bank: 'Bank',
+        kycStatus: 'KYC Status'
+      }
+    },
+    es: {
+      addTitle: 'Agregar un nuevo destinatario',
+      listTitle: 'Lista de destinatarios',
+      namePlaceholder: 'Nombre',
+      bankPlaceholder: 'Seleccionar banco',
+      numberPlaceholder: 'Número de teléfono (Transfiya)',
+      addButton: 'Agregar destinatario',
+      adding: 'Agregando...',
+      noRecipients: 'No hay destinatarios aún.',
+      table: {
+        userId: 'ID de usuario',
+        accountNumber: 'Número de cuenta',
+        bank: 'Banco',
+        kycStatus: 'Estado KYC'
+      }
+    },
+    pt: {
+      addTitle: 'Adicionar novo destinatário',
+      listTitle: 'Lista de destinatários',
+      namePlaceholder: 'Nome',
+      bankPlaceholder: 'Selecionar banco',
+      numberPlaceholder: 'Número de telefone (Transfiya)',
+      addButton: 'Adicionar destinatário',
+      adding: 'Adicionando...',
+      noRecipients: 'Nenhum destinatário ainda.',
+      table: {
+        userId: 'ID do usuário',
+        accountNumber: 'Número da conta',
+        bank: 'Banco',
+        kycStatus: 'Status KYC'
+      }
+    },
+    zh: {
+      addTitle: '添加新收件人',
+      listTitle: '收件人列表',
+      namePlaceholder: '姓名',
+      bankPlaceholder: '选择银行',
+      numberPlaceholder: '电话号码（Transfiya）',
+      addButton: '添加收件人',
+      adding: '正在添加...',
+      noRecipients: '暂时没有收件人。',
+      table: {
+        userId: '用户 ID',
+        accountNumber: '账户号码',
+        bank: '银行',
+        kycStatus: 'KYC 状态'
+      }
+    }
+  }[language];
+
   const [recipients, setRecipients] = useState([
     { name: "Juanito Perez", bank: "Nequi", bankNumber: "3102345674" },
     { name: "Emiliano Buendia", bank: "Bancolombia", bankNumber: "987654321" },
@@ -84,20 +153,20 @@ export default function Recipients() {
 
   return (
     <div className="min-h-screen p-4 bg-gray-50">
-      <Navbar 
-        activeSection="recipients" 
-        setActiveSection={(section) => console.log(`Active section set to: ${section}`)} 
+      <Navbar
+        activeSection="recipients"
+        setActiveSection={(section) => console.log(`Active section set to: ${section}`)}
       />
       <div className="space-y-4 relative">
         <div className="mt-4">
           {/* Add Recipient Form */}
           <Card className="rounded-xl w-full border-0 shadow-lg">
             <CardContent className="space-y-4">
-              <h3 className="text-xl font-semibold">Add a New Recipient</h3>
+              <h3 className="text-xl font-semibold">{t.addTitle}</h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <input
                   type="text"
-                  placeholder="Name"
+                  placeholder={t.namePlaceholder}
                   value={newRecipient.name}
                   onChange={(e) =>
                     setNewRecipient({ ...newRecipient, name: e.target.value })
@@ -112,7 +181,7 @@ export default function Recipients() {
                   className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
                   disabled={loading}
                 >
-                  <option value="">Select Bank</option>
+                  <option value="">{t.bankPlaceholder}</option>
                   {banks.map((bank) => (
                     <option key={bank.bankCode} value={bank.bankCode}>
                       {bank.bankName}
@@ -121,7 +190,7 @@ export default function Recipients() {
                 </select>
                 <input
                   type="text"
-                  placeholder="Phone Number (Transfiya)"
+                  placeholder={t.numberPlaceholder}
                   value={newRecipient.bankNumber}
                   onChange={(e) =>
                     setNewRecipient({
@@ -137,7 +206,7 @@ export default function Recipients() {
                 className="w-full rounded-xl text-white bg-gradient-to-r from-[#48b395] to-[#247469] hover:opacity-90"
                 disabled={adding}
               >
-                {adding ? "Adding..." : "Add Recipient"}
+                {adding ? t.adding : t.addButton}
               </Button>
               {error && <p className="text-red-500 text-sm">{error}</p>}
             </CardContent>
@@ -147,16 +216,16 @@ export default function Recipients() {
           <div className="mt-8" /> {/* Add vertical space between the two cards */}
           <Card className="rounded-xl w-full border-0 shadow-lg">
             <CardContent>
-              <h3 className="text-xl font-semibold mb-4">Recipients List</h3>
+              <h3 className="text-xl font-semibold mb-4">{t.listTitle}</h3>
               {partnerUsers && partnerUsers.users.length > 0 ? (
                 <div className="overflow-x-auto">
                   <table className="min-w-full text-sm text-left">
                     <thead>
                       <tr className="border-b border-gray-200">
-                        <th className="py-2 px-4 font-medium">User ID</th>
-                        <th className="py-2 px-4 font-medium">Account Number</th>
-                        <th className="py-2 px-4 font-medium">Bank</th>
-                        <th className="py-2 px-4 font-medium">KYC Status</th>
+                        <th className="py-2 px-4 font-medium">{t.table.userId}</th>
+                        <th className="py-2 px-4 font-medium">{t.table.accountNumber}</th>
+                        <th className="py-2 px-4 font-medium">{t.table.bank}</th>
+                        <th className="py-2 px-4 font-medium">{t.table.kycStatus}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -164,7 +233,17 @@ export default function Recipients() {
                         <tr key={user.id || index} className="border-b border-gray-100">
                           <td className="py-2 px-4">{user.userId}</td>
                           <td className="py-2 px-4">{user.accountNumber || "-"}</td>
-                          <td className="py-2 px-4">{banks.find(bank => bank.bankCode.toString() === user.bank)?.bankName || "-"}</td>
+                          <td className="py-2 px-4">
+                            {Number(user.bank) === 1007 ? (
+                              <img
+                                src="https://upload.wikimedia.org/wikipedia/commons/thumb/d/dc/Bancolombia_S.A._logo.svg/2560px-Bancolombia_S.A._logo.svg.png"
+                                alt="Bancolombia"
+                                className="w-40 h-6"
+                              />
+                            ) : (
+                              banks.find(bank => bank.bankCode.toString() === user.bank)?.bankName || "-"
+                            )}
+                          </td>
                           <td className="py-2 px-4">{user.kycStatus}</td>
                         </tr>
                       ))}
@@ -172,7 +251,7 @@ export default function Recipients() {
                   </table>
                 </div>
               ) : (
-                <p className="text-gray-600">No recipients added yet.</p>
+                <p className="text-gray-600">{t.noRecipients}</p>
               )}
             </CardContent>
           </Card>

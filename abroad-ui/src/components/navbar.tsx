@@ -8,13 +8,15 @@ import {
   ShieldAlert as SecurityIcon,
   // Cog as CogIcon,
   HelpCircle as HelpIcon,
-  Settings as SettingsIcon  // add Settings icon
+  Settings as SettingsIcon,
+  WavesLadder as PoolIcon  // Pool icon
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { getLiquidity, getPartnerInfo, PartnerInfoResponse } from "../api";
+import { getPartnerInfo, PartnerInfoResponse } from "../api";
 
 const navLinks = [
   { label: "Dashboard", icon: HomeIcon, section: "dashboard", path: "/dashboard" },
+  { label: "Pool", icon: PoolIcon, section: "pool", path: "/pool" },
   { label: "Send Payment", icon: SendIcon, section: "send" },
   { label: "Transactions", icon: BankIcon, section: "transactions" },
   { label: "Recipients", icon: UsersIcon, section: "recipients", path: "/recipients" },
@@ -28,6 +30,7 @@ const navLinks = [
 const translations: Record<'en' | 'es' | 'pt' | 'zh', Record<string, string>> = {
   en: {
     dashboard: "Dashboard",
+    pool: "Pool",
     send: "Send Payment",
     transactions: "Transactions",
     recipients: "Recipients",
@@ -38,6 +41,7 @@ const translations: Record<'en' | 'es' | 'pt' | 'zh', Record<string, string>> = 
   },
   es: {
     dashboard: "Dashboard",
+    pool: "Pool",
     send: "Enviar Pago",
     transactions: "Transacciones",
     recipients: "Destinatarios",
@@ -48,6 +52,7 @@ const translations: Record<'en' | 'es' | 'pt' | 'zh', Record<string, string>> = 
   },
   pt: {
     dashboard: "Painel",
+    pool: "Pool",
     send: "Enviar Pagamento",
     transactions: "Transações",
     recipients: "Destinatários",
@@ -58,6 +63,7 @@ const translations: Record<'en' | 'es' | 'pt' | 'zh', Record<string, string>> = 
   },
   zh: {
     dashboard: "仪表板",
+    pool: "池",
     send: "发送付款",
     transactions: "交易",
     recipients: "收件人",
@@ -77,7 +83,6 @@ export default function Topbar({ activeSection, setActiveSection }: TopbarProps)
   const navigate = useNavigate();
   const { language } = useLanguage();
   const [partner, setPartner] = useState<null | PartnerInfoResponse>(null)
-  const [totalLiquidity, setTotalLiquidity] = useState<number | null>(null);
 
   useEffect(() => {
     const fetchPartnerInfo = async () => {
@@ -95,21 +100,6 @@ export default function Topbar({ activeSection, setActiveSection }: TopbarProps)
     fetchPartnerInfo();
   }, []);
 
-  useEffect(() => {
-    const fetchLiquidity = async () => {
-      try {
-        const response = await getLiquidity({ paymentMethod: 'MOVII' })
-        console.log("Response from getLiquidity:", response);
-        if (response.status === 200) {
-          console.log("Liquidity fetched successfully:", response.data);
-          setTotalLiquidity(response.data.liquidity);
-        }
-      } catch (error) {
-        console.error("Failed to fetch liquidity:", error);
-      }
-    }
-    fetchLiquidity();
-  }, []);
 
   if (!partner) {
     return null
@@ -117,7 +107,7 @@ export default function Topbar({ activeSection, setActiveSection }: TopbarProps)
 
   return (
     <header className="w-full bg-white border border-gray-200 shadow-sm rounded-xl mb-4">
-      <div className="max-w-7xl mx-auto px-4">
+      <div className=" px-6">
         <div className="flex items-center justify-between h-16">
           {/* Logo on the left */}
           <div className="flex items-center">
@@ -138,17 +128,6 @@ export default function Topbar({ activeSection, setActiveSection }: TopbarProps)
                 alt="Abroad Logo"
                 className="h-8"
               />
-            </div>
-
-            {/* Liquidity */}
-            <div className="ml-4 text-sm font-medium text-gray-600">
-              {totalLiquidity !== null ? (
-                <span>
-                  Liquidity: ${totalLiquidity.toLocaleString()}
-                </span>
-              ) : (
-                <span>Loading liquidity...</span>
-              )}
             </div>
 
           </div>
@@ -206,7 +185,10 @@ export default function Topbar({ activeSection, setActiveSection }: TopbarProps)
 
           {/* Moved account section to the top‑right */}
           <div className="flex items-center gap-2">
-            <div className="h-10 w-10 rounded-full bg-gray-200"></div>
+            {/* replace the empty placeholder with the first letter of the partner name */}
+            <div className="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center text-sm font-medium text-gray-700">
+              {partner.name.charAt(0).toUpperCase()}
+            </div>
             <div className="flex flex-col">
               <span className="text-sm font-medium text-gray-700">{partner.name}</span>
               {partner.isKybApproved ?

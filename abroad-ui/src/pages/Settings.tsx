@@ -1,11 +1,27 @@
 import React from "react";
 import { useLanguage } from "../contexts/LanguageContext";
 import Navbar from "../components/navbar";
-import { Listbox } from '@headlessui/react';               // add
+import { Listbox } from '@headlessui/react';
+import { getPartnerInfo, PartnerInfoResponse } from "../api";
 
 export function Settings() {
   const [activeSection, setActiveSection] = React.useState<string>("settings");
   const { language, setLanguage } = useLanguage();
+  const [partner, setPartner] = React.useState<PartnerInfoResponse | null>(null);
+
+  React.useEffect(() => {
+    const fetchPartner = async () => {
+      try {
+        const response = await getPartnerInfo();
+        if (response.status === 200) {
+          setPartner(response.data);
+        }
+      } catch (error) {
+        console.error("Failed to fetch partner info:", error);
+      }
+    };
+    fetchPartner();
+  }, []);
 
   const languages = [
     { code: 'en', name: 'English', flag: 'gb' },
@@ -22,6 +38,11 @@ export function Settings() {
     zh: { languageConfig: "语言设置：", unverified: "未验证", verified: "已验证" },
   };
 
+  if (!partner) {
+    // partner data not yet loaded
+    return <div>Loading...</div>;
+  }
+
   return (
     <div className="min-h-screen p-4 space-y-4 bg-gray-50">
       <Navbar activeSection={activeSection} setActiveSection={setActiveSection} />
@@ -32,7 +53,7 @@ export function Settings() {
           <div className="w-28 h-28 bg-gray-300 rounded-full" />
           <div>
             <div className="flex flex-col space-y-1">
-              <h1 className="text-xl font-semibold">Company Name</h1>
+              <h1 className="text-xl font-semibold">{partner.name}</h1>
               <span 
                 className="inline-flex items-center space-x-1 px-1 py-0.5 rounded-full text-sm font-medium text-orange-800 bg-orange-100 border border-orange-800"
               >
