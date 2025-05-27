@@ -161,9 +161,9 @@ export default function Swap({ onContinue, initialSourceAmount = '', initialTarg
      // Removed the outermost div and institutional logo
      // Centered white card covering 60% of screen
      <div className="flex-1 flex items-center justify-center w-full flex flex-col">
-       <div id="bg-container" className="w-[90%] max-w-[50vh] h-[60vh] bg-[#356E6A]/5 backdrop-blur-xl rounded-4xl p-6 flex flex-col items-center justify-center space-y-1">
+       <div id="background-container" className="w-[90%] max-w-[50vh] h-[60vh] bg-[#356E6A]/5 backdrop-blur-xl rounded-4xl p-6 flex flex-col items-center justify-center space-y-1">
          {/* Here starts Swap as a component */}
-         <div id="Tittle" className="text-2xl font-bold mb-8 text-[#356E6A]">¿Cuanto deseas Retirar?</div>
+         <div id="Title" className="text-2xl font-bold mb-8 text-[#356E6A]">¿Cuanto deseas Retirar?</div>
          <div id="source-amount" className="w-full h-[60vh] bg-white/60 backdrop-blur-xl rounded-4xl p-6 flex items-center justify-start">
            {/* number input area: always show $ prefix, then spinner or input */}
            <div className="w-3/4 h-full flex items-center space-x-2">
@@ -187,7 +187,7 @@ export default function Swap({ onContinue, initialSourceAmount = '', initialTarg
            <TokenBadge iconSrc="https://storage.cloud.google.com/cdn-abroad/Icons/Tokens/USDC%20Token.svg" alt="USDC Token Logo" symbol="USDC"/>
          </div>
          <div id="target-amount" className="relative w-full h-[60vh] bg-white/60 backdrop-blur-xl rounded-4xl p-6 flex items-center justify-start">
-           {/* circular cutout effect matching bg-container */}
+           {/* circular cutout effect matching bg-container-1 */}
            <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 w-8 h-8 bg-[#356E6A]/5 rounded-full flex items-center justify-center">
              <ChevronsDown color="#356E6A" className="w-4 h-4" />
            </div>

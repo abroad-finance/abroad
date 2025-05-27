@@ -1,5 +1,3 @@
-import React from 'react';
-
 interface BalanceCardProps {
   imageSrc?: string;
   /** Optional small overlay image source */

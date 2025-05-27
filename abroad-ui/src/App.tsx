@@ -21,7 +21,7 @@ function App() {
           {/* Wrap protected routes with ProtectedRoute */} 
           <Route element={<ProtectedRoute />}>
             <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/Pool" element={<Pool />} />
+            <Route path="/pool" element={<Pool />} />
             <Route path="/recipients" element={<Recipients />} />
             <Route path="/integrations" element={<Integrations />} />
             <Route path="/settings" element={<Settings />} />

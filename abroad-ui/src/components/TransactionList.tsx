@@ -132,7 +132,7 @@ export function TransactionList({ transactions }: TransactionListProps) {
                           <div className="flex items-center justify-end space-x-1">
                             <img
                               src="https://vectorflags.s3.amazonaws.com/flags/co-circle-01.png"
-                              alt="USDC Icon"
+                              alt="Colombia Flag Icon"
                               className="w-4 h-4"
                             />
                             <span>${tx.quote.targetCurrency} ${tx.quote.targetAmount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
