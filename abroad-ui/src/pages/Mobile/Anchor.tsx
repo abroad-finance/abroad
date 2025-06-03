@@ -41,13 +41,20 @@ export default function Anchor() {
     setCurrentView('bankDetails');
   };
 
+  const handleVerifyAccount = () => {
+    // Placeholder for KYC verification logic
+    // For example, navigate to a KYC verification view or open a modal
+    console.log('Redirecting to KYC verification...');
+    // setCurrentView('kycVerification'); // If such a view exists
+  };
+
   return (
-    <div className="min-h-screen bg-green-50 flex flex-col items-center">
+    <div className="min-h-screen bg-green-50 flex flex-col items-center px-2 min-w-[360px]">
       {/* Institutional logo */}
       <img
         src="https://cdn.prod.website-files.com/66d73974e0b6f2e9c06130a7/67bdb92323f0bb399db3754c_abroad-logo.svg"
         alt="Abroad Logo"
-        className="h-12 mt-18 mb-6"
+        className="h-12 mt-12 mb-4"
       />
       {/* Centered white card covering 60% of screen */}
       <div className="flex-1 flex items-center justify-center w-full flex-col">
@@ -68,7 +75,7 @@ export default function Anchor() {
              targetAmount={targetAmount}
            />
          }
-         {currentView === 'txStatus' && <TxStatus onNewTransaction={handleNewTransaction} onRetry={handleRetry} />}
+         {currentView === 'txStatus' && <TxStatus onNewTransaction={handleNewTransaction} onRetry={handleRetry} onVerifyAccount={handleVerifyAccount} />}
       </div>
       {/* Social footer */}
       {/* make footer part of the normal flow so on small screens you scroll to see it */}

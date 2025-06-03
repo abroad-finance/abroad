@@ -1,11 +1,13 @@
 import AnimatedCheck from '../assets/animated/AnimatedCheck.json'
 import Coins from '../assets/animated/Coins.json'
 import Denied from '../assets/animated/Denied.json'
+import Nokyc from '../assets/animated/Nokyc.json'
+import Ghost from '../assets/animated/Ghost.json'
 import { useRef, useEffect } from 'react'
 import { Player } from '@lordicon/react'
 
 const Icons = {
-    AnimatedCheck, Coins, Denied
+    AnimatedCheck, Coins, Denied, Nokyc, Ghost
 }
 
 type Props = {

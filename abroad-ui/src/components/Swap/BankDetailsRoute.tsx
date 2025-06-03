@@ -81,7 +81,7 @@ export default function BankDetailsRoute({ onBackClick, quote_id, targetAmount, 
             <ArrowLeft className="w-6 h-6" />
           </button>
 
-          <div id="Tittle" className="text-2xl font-bold text-[#356E6A] flex-grow text-center">Datos de Transacción</div> 
+          <div id="Title" className="text-2xl font-bold text-[#356E6A] flex-grow text-center">Datos de Transacción</div> 
         </div>
         
         {/* Centered Content Wrapper */}

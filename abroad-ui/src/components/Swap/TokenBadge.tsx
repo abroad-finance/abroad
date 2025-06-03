@@ -11,7 +11,7 @@ export const TokenBadge: React.FC<TokenBadgeProps> = ({ iconSrc, symbol, alt }) 
     <img
       src={iconSrc}
       alt={alt || symbol}
-      className="w-8 h-8 sm:w-12 sm:h-12 lg:w-8 lg:h-8 mr-2"
+      className="w-8 h-8 sm:w-10 sm:h-10 lg:w-8 lg:h-8 mr-2"
     />
     <span>{symbol}</span>
   </div>

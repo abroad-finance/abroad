@@ -3,24 +3,27 @@ import { Button } from '../button';
 import { IconAnimated } from '../IconAnimated';
 
 // Mock statuses for visualization purposes
-type TransactionStatus = 'inProgress' | 'accepted' | 'denied';
+type TransactionStatus = 'inProgress' | 'accepted' | 'denied' | 'nokyc';
 
 interface TxStatusProps {
   onNewTransaction: () => void;
   onRetry: () => void;
+  onVerifyAccount: () => void;
 }
 
-export default function TxStatus({ onNewTransaction, onRetry }: TxStatusProps): React.JSX.Element {
-  const [status, setStatus] = useState<TransactionStatus>('inProgress');
+export default function TxStatus({ onNewTransaction, onRetry, onVerifyAccount }: TxStatusProps): React.JSX.Element {
+  const [status, setStatus] = useState<TransactionStatus>('denied');
 
   const renderIcon = () => {
     switch (status) {
       case 'inProgress':
         return <IconAnimated icon='Coins' size={150} loop/>;
       case 'accepted':
-        return <IconAnimated icon='AnimatedCheck' size={150} timer={300} />;
+        return <IconAnimated icon='AnimatedCheck' size={150} />;
       case 'denied':
-        return <IconAnimated icon='Denied' size={150} timer={300} />;
+        return <IconAnimated icon='Denied' size={150} />;
+        case 'nokyc':
+        return <IconAnimated icon='Ghost' size={150} loop/>;
     }
   };
 
@@ -29,6 +32,7 @@ export default function TxStatus({ onNewTransaction, onRetry }: TxStatusProps): 
       case 'inProgress': return 'Procesando Transacción';
       case 'accepted': return 'Retiro Realizado';
       case 'denied': return 'Transacción Rechazada';
+      case 'nokyc': return 'Aún no sabemos quién eres';
     }
   };
 
@@ -40,6 +44,8 @@ export default function TxStatus({ onNewTransaction, onRetry }: TxStatusProps): 
         return <>¡Super! <br /> Todo salió bien y tu retiro ha sido exitoso.</>;
       case 'denied':
         return <>La solicitud ha sido rechazada y tus fondos han sido devueltos. Puedes intentar nuevamente más tarde.</>;
+        case 'nokyc':
+        return <>Para procesar tu transacción necesitamos realizar un proceso de verificación de identidad. No te preocupes, sólo te pediremos esto una vez.</>;
     }
   };
 
@@ -57,6 +63,7 @@ export default function TxStatus({ onNewTransaction, onRetry }: TxStatusProps): 
           <option value="inProgress">In Progress</option>
           <option value="accepted">Accepted</option>
           <option value="denied">Denied</option>
+          <option value="nokyc">No KYC</option>
         </select>
       </div>
 
@@ -79,12 +86,22 @@ export default function TxStatus({ onNewTransaction, onRetry }: TxStatusProps): 
         </div>
       </div>
 
-      {(status === 'accepted' || status === 'denied') && (
+      {(status === 'accepted' || status === 'denied' || status === 'nokyc') && (
         <Button
-          onClick={status === 'accepted' ? onNewTransaction : onRetry}
+          onClick={
+            status === 'accepted' 
+              ? onNewTransaction 
+              : status === 'denied' 
+              ? onRetry 
+              : onVerifyAccount
+          }
           className="mt-4 w-[90%] max-w-[50vh] py-4"
         >
-          {status === 'accepted' ? 'Realizar otra transacción' : 'Intentar Nuevamente'}
+          {status === 'accepted'
+            ? 'Realizar otra transacción'
+            : status === 'denied'
+            ? 'Intentar Nuevamente'
+            : 'Verificar cuenta'}
         </Button>
       )}
     </div>
