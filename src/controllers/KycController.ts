@@ -54,6 +54,7 @@ export class KycController extends Controller {
   @Post()
   @Response<400, { reason: string }>(400, 'Bad Request')
   @Security('ApiKeyAuth')
+  @Security('BearerAuth')
   @SuccessResponse('200', 'KYC status response')
   public async checkKyc(
     @Body() requestBody: KycRequest,
