@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from "../../components/button";
 import { Loader, Landmark, Hash, ArrowLeft, Rotate3d } from 'lucide-react';
-import { getBanks, Bank, getBanksResponse200, acceptTransaction } from '../../api';
+import { getBanks, Bank, getBanksResponse200, acceptTransaction, checkKyc } from '../../api';
 
 interface BankDetailsRouteProps {
   onBackClick: () => void;
@@ -57,6 +57,26 @@ export default function BankDetailsRoute({ userId, onBackClick, quote_id, target
 
   const handleSubmit = useCallback(async () => {
     setLoadingSubmit(true);
+
+    // // KYC
+    // const responseKYC = await checkKyc({user_id: userId});
+
+    // if (responseKYC.status !== 200) {
+    //   console.error('Error checking KYC:', responseKYC);
+    //   alert(`Error: ${responseKYC.data.reason}`);
+    //   setLoadingSubmit(false);
+    //   return;
+    // }
+
+    // if (responseKYC.data.kyc_status !== 'APPROVED') {
+    //   // open KYC link in a new tab
+    //   window.open(responseKYC.data.kyc_link, '_blank');
+    //   alert('Por favor completa el proceso de KYC antes de continuar.');
+    //   setLoadingSubmit(false);
+    //   return;
+    // }
+
+
     console.log('Bank Details:', { bank_code, account_number, quote_id });
     const response = await acceptTransaction({ account_number, bank_code, quote_id, user_id: userId });
     if (response.status === 200) {

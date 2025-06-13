@@ -20,7 +20,7 @@ export default function Anchor() {
 
   useEffect(() => {
     const queryParams = new URLSearchParams(window.location.search);
-    setSepTransactionId(queryParams.get('sep_transaction_id') || '');
+    setSepTransactionId(queryParams.get('transaction_id') || '');
     setCallbackUrl(queryParams.get('callback'));
     console.log('Callback URL from query:', queryParams.get('callback'));
     const lang = queryParams.get('lang');
@@ -79,14 +79,9 @@ export default function Anchor() {
 
   const handleTransactionAccepted = useCallback(async ({ memo }: { memo: string }) => {
     // make a get request
-    await fetch(`http://localhost:8000/sep24/transactions/withdraw/interactive/complete?amount_expected=${sourceAmount}&transaction_id=${sepTransactionId}&memo=${memo}`)
-    // Return to the callback URL if provided
-    if (callbackUrl) {
-      window.location.href = callbackUrl;
-    } else {
-      // If no callback URL, go to the transaction status view
-      setCurrentView('txStatus');
-    }
+    const sepBaseUrl = import.meta.env.VITE_SEP_BASE_URL || 'http://localhost:8000';
+    const url = encodeURI(`${sepBaseUrl}/sep24/transactions/withdraw/interactive/complete?amount_expected=${sourceAmount}&transaction_id=${sepTransactionId}&memo=${memo}&callback=${callbackUrl || 'https://app.abroad.finance'}`);
+    window.location.href = url;
   }, [callbackUrl, sepTransactionId, sourceAmount]);
 
   return (
