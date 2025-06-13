@@ -21,6 +21,30 @@ export class StellarWalletHandler implements IWalletHandler {
         @inject(TYPES.ISecretManager) private secretManager: ISecretManager,
   ) { }
 
+  async getAddressFromTransaction({
+    onChainId,
+  }: {
+    onChainId?: string
+  }): Promise<string> {
+    if (!onChainId) {
+      throw new Error('onChainId is required to get address from transaction')
+    }
+
+    const horizonUrl = await this.secretManager.getSecret('STELLAR_HORIZON_URL')
+    const server = new Horizon.Server(horizonUrl)
+    try {
+      // Fetch the transaction details from the Stellar network
+      const transaction = await server.operations().operation(onChainId).call()
+
+      // Extract the source account address from the transaction
+      return transaction.source_account || ''
+    }
+    catch (error) {
+      console.error('Error fetching Stellar transaction:', error, onChainId)
+      throw new Error(`Failed to fetch transaction with ID ${onChainId}`)
+    }
+  }
+
   /**
      * Send cryptocurrency to the specified address on the Stellar network
      * @param params The parameters for the transaction

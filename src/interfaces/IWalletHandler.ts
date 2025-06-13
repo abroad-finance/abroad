@@ -1,6 +1,10 @@
 import { CryptoCurrency } from '@prisma/client'
 
 export interface IWalletHandler {
+  getAddressFromTransaction(
+    transaction: { onChainId?: string }
+  ): Promise<string>
+
   send(
     {
       address,

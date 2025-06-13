@@ -178,6 +178,7 @@ class SolanaListener {
     let usdcPaymentFound = false
     let transactionId: null | string = null
     let paymentAmount = 0
+    let addressFrom: null | string = null
 
     for (const instruction of transaction.message.instructions) {
       if ('programId' in instruction && instruction.programId.equals(MEMO_PROGRAM_ID)) {
@@ -223,6 +224,7 @@ class SolanaListener {
               isAllowedUSDC = true
               decimals = transferInfo.tokenAmount.decimals
               paymentAmount = parseFloat(transferInfo.tokenAmount.uiAmountString ?? transferInfo.tokenAmount.amount) / Math.pow(10, decimals)
+              addressFrom = transferInfo.source
 
               if (isAllowedUSDC && paymentAmount > 0) {
                 console.log(`[SolanaListener] Confirmed USDC transfer of ${paymentAmount} (decimals: ${decimals}) in ${signature}.`)
@@ -240,6 +242,7 @@ class SolanaListener {
 
     if (usdcPaymentFound && transactionId) {
       const queueMessage: TransactionQueueMessage = {
+        addressFrom: addressFrom || '',
         amount: paymentAmount,
         blockchain: BlockchainNetwork.SOLANA,
         cryptoCurrency: CryptoCurrency.USDC,

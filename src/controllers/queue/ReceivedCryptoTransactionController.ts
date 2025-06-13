@@ -3,7 +3,13 @@ import { BlockchainNetwork, CryptoCurrency, Prisma, TransactionStatus } from '@p
 import { inject } from 'inversify'
 import z from 'zod'
 
-import { ILogger, IQueueHandler, ISlackNotifier, QueueName } from '../../interfaces'
+import {
+  ILogger,
+  IQueueHandler,
+  ISlackNotifier,
+  IWalletHandlerFactory,
+  QueueName,
+} from '../../interfaces'
 import { IDatabaseClientProvider } from '../../interfaces/IDatabaseClientProvider'
 import { IPaymentServiceFactory } from '../../interfaces/IPaymentServiceFactory'
 import { PaymentSentMessage } from '../../interfaces/queueSchema'
@@ -12,6 +18,7 @@ import { TYPES } from '../../types'
 
 // Schema definition for validating the queue message
 const TransactionQueueMessageSchema = z.object({
+  addressFrom: z.string().min(1, 'Address from is required'),
   amount: z.number().positive(),
   blockchain: z.nativeEnum(BlockchainNetwork),
   cryptoCurrency: z.nativeEnum(CryptoCurrency),
@@ -32,6 +39,7 @@ export class ReceivedCryptoTransactionController {
     private dbClientProvider: IDatabaseClientProvider,
     @inject(TYPES.ILogger) private logger: ILogger,
     @inject(TYPES.ISlackNotifier) private slackNotifier: ISlackNotifier,
+    @inject(TYPES.IWalletHandlerFactory) private walletHandlerFactory: IWalletHandlerFactory,
   ) { }
 
   public registerConsumers() {
@@ -127,6 +135,13 @@ export class ReceivedCryptoTransactionController {
         data: { status: TransactionStatus.WRONG_AMOUNT },
         where: { id: transactionRecord.id },
       })
+
+      const walletHandler = this.walletHandlerFactory.getWalletHandler(message.blockchain)
+      await walletHandler.send({
+        address: message.addressFrom,
+        amount: message.amount,
+        cryptoCurrency: message.cryptoCurrency,
+      })
       return
     }
 
@@ -179,6 +194,15 @@ export class ReceivedCryptoTransactionController {
       await prismaClient.transaction.update({
         data: { status: TransactionStatus.PAYMENT_FAILED },
         where: { id: transactionRecord.id },
+      })
+
+      const walletHandler = this.walletHandlerFactory.getWalletHandler(
+        message.blockchain,
+      )
+      await walletHandler.send({
+        address: message.addressFrom,
+        amount: message.amount,
+        cryptoCurrency: message.cryptoCurrency,
       })
     }
   }
