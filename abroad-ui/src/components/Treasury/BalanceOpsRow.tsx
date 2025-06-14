@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ArrowUp, ArrowDown, Plus } from 'lucide-react'; // icons for buttons
-import { Button } from '../Button'; // Import the Button component
+import { Button } from '../button'; // Import the Button component
 import { AddLiquidity } from './AddLiquidity'; // Import AddLiquidity component
 import { useLanguage } from '../../contexts/LanguageContext';
 

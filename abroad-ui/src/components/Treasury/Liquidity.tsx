@@ -17,7 +17,8 @@ interface LiquidityProps {
   customCards: CardItem[];
 }
 
-export function Liquidity({ customCards }: LiquidityProps) {
+// eslint-disable-next-line no-empty-pattern
+export function Liquidity({ }: LiquidityProps) {
   // state to hold Movii liquidity
   const [moviiLiquidity, setMoviiLiquidity] = React.useState<number>(0);
 
@@ -50,17 +51,6 @@ export function Liquidity({ customCards }: LiquidityProps) {
           <BalanceCard title="USDC" subtitle='on Stellar' value={1000} imageSrc="https://payload-marketing.moonpay.com/api/media/file/mk1bgycpph-K6MWcviP8ndwcJ5yNIrpI" overlaySrc="https://s2.coinmarketcap.com/static/img/coins/200x200/512.png" accountId='HJJK..12332'/>
           <BalanceCard title="USDC" subtitle='on Solana' value={1000} imageSrc="https://payload-marketing.moonpay.com/api/media/file/mk1bgycpph-K6MWcviP8ndwcJ5yNIrpI" overlaySrc="https://www.chainalysis.com/wp-content/uploads/2022/08/shutterstock-2176242673-scaled-1-1500x970.jpg" accountId='HJJK..12332'/>
           <BalanceCard title="USDT" subtitle='on Tron' value={1000} imageSrc="https://bitcoinp2p.com.br/wp-content/uploads/2024/08/USDT.png" overlaySrc="https://s2.coinmarketcap.com/static/img/coins/200x200/1958.png" accountId='HJJK..12332'/>
-          {customCards.map((c, idx) => (
-            <BalanceCard
-              key={`custom-${idx}`}
-              title={c.accountName}
-              subtitle={c.bank.text}
-              value={c.value}
-              imageSrc={c.currency.image}
-              overlaySrc={c.bank.image}
-              accountId={c.accountId}
-            />
-          ))}
         </div>
       </div>
     </>

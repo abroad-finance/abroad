@@ -10,6 +10,7 @@ import { WalletBalance } from "../components/WalletBallance";
 import { acceptTransaction, AcceptTransactionRequest } from "../api";
 import { FreighterGuide } from "../components/FreighterGuide";
 import { Liquidity } from "../components/Liquidity";
+import { Balance } from "../components/Treasury/BalanceOpsRow";
 
 export function Dashboard() {
   const [activeSection, setActiveSection] = useState<string>("dashboard");
@@ -325,6 +326,16 @@ function DashboardHome() {
     }));
   }, [partnerUsers, recipientInput]);
   
+  const handleSend = () => {
+    // Placeholder for send functionality
+    console.log("Send action triggered");
+  };
+
+  const handleReceive = () => {
+    // Placeholder for receive functionality
+    console.log("Receive action triggered");
+  };
+
   return (
     
     <div className="space-y-4 relative">
@@ -336,6 +347,7 @@ function DashboardHome() {
           </div>
         </div>
       )}
+      <Balance balance={balance} onSend={handleSend} onReceive={handleReceive} />
       <Liquidity />
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
         {isFreighterAvailable ?

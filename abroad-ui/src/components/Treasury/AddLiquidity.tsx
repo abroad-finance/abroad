@@ -1,15 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { X } from 'lucide-react';
-import { Button } from '../ui/button';
-import { DropSelector } from '../DropSelector';
-
-// Export the Option interface
-export interface Option {
-  value: string;
-  label: string;
-  icon?: React.ReactNode;
-  disabled?: boolean;
-}
+import { Button } from '../button';
+import { DropSelector, Option } from '../DropSelector'; // Import Option from DropSelector
 
 interface AddLiquidityProps {
   isOpen: boolean;
