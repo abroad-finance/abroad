@@ -4,7 +4,7 @@ import React from 'react';
 export interface Option {
   value: string;
   label: string;
-  icon?: React.ReactNode;
+  icon?: React.ReactNode; // Icons are expected to be scaled by the parent providing them
   disabled?: boolean;
 }
 
@@ -46,20 +46,20 @@ export function DropSelector({
         type="button"
         onClick={handleToggle}
         disabled={disabled}
-        className="w-full p-2 border border-gray-300 rounded-md focus:ring-0 focus:border-gray-300 text-left flex items-center justify-between bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
+        className="w-full p-3 text-lg border border-gray-300 rounded-md focus:ring-0 focus:border-gray-300 text-left flex items-center justify-between bg-white disabled:bg-gray-100 disabled:cursor-not-allowed" /* Increased padding and text size */
       >
         <span className="flex items-center truncate">
           {selectedOption ? (
             <>
-              {selectedOption.icon && <span className="mr-2 flex-shrink-0">{selectedOption.icon}</span>}
+              {selectedOption.icon && <span className="mr-3 flex-shrink-0">{selectedOption.icon}</span>} {/* Increased margin */}
               <span className="truncate">{selectedOption.label}</span>
             </>
           ) : (
-            <span className="text-gray-500">{placeholder}</span>
+            <span className="text-gray-500 text-lg">{placeholder}</span> /* Ensured placeholder text size */
           )}
         </span>
         <svg
-          className={`w-5 h-5 text-gray-500 transform transition-transform flex-shrink-0 ${isOpen ? 'rotate-180' : ''}`}
+          className={`w-7 h-7 text-gray-500 transform transition-transform flex-shrink-0 ${isOpen ? 'rotate-180' : ''}`} /* Increased icon size */
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -70,22 +70,22 @@ export function DropSelector({
       </button>
 
       {isOpen && !disabled && (
-        <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto">
+        <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-72 overflow-auto"> {/* Increased max-h slightly */}
           {options.length > 0 ? (
             options.map((option) => (
               <div
                 key={option.value}
                 onClick={() => handleSelect(option)}
-                className={`flex items-center p-2 cursor-pointer hover:bg-gray-100 ${
+                className={`flex items-center p-3 cursor-pointer hover:bg-gray-100 ${ /* Increased padding */
                   option.disabled ? 'opacity-50 cursor-not-allowed' : ''
                 } ${selectedOption?.value === option.value ? 'bg-gray-200 font-semibold' : 'hover:bg-gray-50'}`}
               >
-                {option.icon && <span className="mr-2 flex-shrink-0">{option.icon}</span>}
-                <span className="text-gray-700 text-sm truncate">{option.label}</span>
+                {option.icon && <span className="mr-3 flex-shrink-0">{option.icon}</span>} {/* Increased margin */}
+                <span className="text-gray-700 text-lg truncate">{option.label}</span> {/* Increased text size */}
               </div>
             ))
           ) : (
-            <div className="p-2 text-gray-500 text-sm">No options available</div>
+            <div className="p-3 text-gray-500 text-lg">No options available</div> /* Increased padding and text size */
           )}
         </div>
       )}

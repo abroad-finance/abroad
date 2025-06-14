@@ -7,7 +7,7 @@ interface SwapProps {
   onAmountsChange?: (srcAmount: string, tgtAmount: string) => void;
 }
 
-import { Button } from "../../components/button";
+import { Button } from "../Button";
 import { ChevronsDown, Loader, CircleDollarSign, Landmark, Timer } from 'lucide-react';
 import { TokenBadge } from './TokenBadge';
 import { getQuote, getReverseQuote, _36EnumsTargetCurrency, _36EnumsPaymentMethod, _36EnumsBlockchainNetwork, _36EnumsCryptoCurrency } from '../../api/index';

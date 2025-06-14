@@ -1,6 +1,6 @@
 import { useLanguage } from '../../contexts/LanguageContext'; // add language hook
 import { Card, CardContent } from "../card";
-import { Button } from "../Button";
+import { Button } from "../ButtonOutlined";
 
 interface WalletBalanceProps {
   balance: number;

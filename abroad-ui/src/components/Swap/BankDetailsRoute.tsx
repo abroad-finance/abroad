@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Button } from "../../components/button";
+import { Button } from "../Button";
 import { Loader, Landmark, Hash, ArrowLeft, Rotate3d} from 'lucide-react';
 import { getBanks, Bank, getBanksResponse200 } from '../../api';
 

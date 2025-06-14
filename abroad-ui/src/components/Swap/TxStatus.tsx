@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Button } from '../button';
+import { Button } from '../Button';
 import { IconAnimated } from '../IconAnimated';
 
 // Mock statuses for visualization purposes

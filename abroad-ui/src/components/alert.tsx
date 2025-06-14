@@ -1,5 +1,5 @@
 import { Card, CardContent } from "./card";
-import { Button } from "./button";
+import { Button } from "./Button";
 import { AlertTriangle } from "lucide-react";
 
 interface AlertProps {

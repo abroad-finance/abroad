@@ -4,15 +4,16 @@ export function Button({
   className = "",
   children,
   disabled,
-  active,
   ...props
-}: React.ButtonHTMLAttributes<HTMLButtonElement> & { active?: boolean }) {
+}: React.ButtonHTMLAttributes<HTMLButtonElement>) {
+  // Determine background style: disabled, gradient override, or default green
+  const hasGradient = className.includes('bg-gradient-to-r');
+  const defaultGradient = 'bg-gradient-to-r from-[#356E6A] to-[#73B9A3] hover:from-[#2a5956] hover:to-[#5fa88d] text-white';
   const baseStyle = disabled
     ? 'bg-transparent text-[#356E6A] cursor-not-allowed border border-[#356E6A]'
-    : active
-    ? 'bg-gradient-to-r from-[#356E6A] to-[#73B9A3] text-white'
-    : 'bg-transparent border border-gray-200 hover:shadow-md hover:bg-gradient-to-r hover:from-[#356E6A] hover:to-[#73B9A3] hover:text-white';
-
+    : hasGradient
+    ? 'text-white'
+    : defaultGradient;
   return (
     <button
       disabled={disabled}
