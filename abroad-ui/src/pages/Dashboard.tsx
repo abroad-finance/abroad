@@ -9,8 +9,9 @@ import { Quotation } from "../components/quotation";
 import { WalletBalance } from "../components/WalletBallance";
 import { acceptTransaction, AcceptTransactionRequest } from "../api";
 import { FreighterGuide } from "../components/FreighterGuide";
-import { Liquidity } from "../components/Liquidity";
 import { Balance } from "../components/Treasury/BalanceOpsRow";
+import { Liquidity } from "../components/Liquidity";
+import { LiquidityCards, CardItem } from "../components/Treasury/LiquidityCards";
 
 export function Dashboard() {
   const [activeSection, setActiveSection] = useState<string>("dashboard");
@@ -40,6 +41,7 @@ function DashboardHome() {
   const [publicKey, setPublicKey] = useState<string | null>(null); // State for public key
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const [isFreighterAvailable, setIsFreighterAvailable] = useState(false);
+  const [liquidityCards, setLiquidityCards] = useState<CardItem[]>([]); // Add liquidity cards state
 
   // Unify Freighter connection logic
   const checkAndRequestAccess = useCallback(async (): Promise<string | null> => {
@@ -326,6 +328,11 @@ function DashboardHome() {
     }));
   }, [partnerUsers, recipientInput]);
   
+  const handleAddLiquidity = useCallback((item: CardItem) => {
+    setLiquidityCards(prev => [...prev, item]);
+    console.log('Liquidity card added to Dashboard:', item);
+  }, []);
+
   const handleSend = () => {
     // Placeholder for send functionality
     console.log("Send action triggered");
@@ -347,8 +354,9 @@ function DashboardHome() {
           </div>
         </div>
       )}
-      <Balance balance={balance} onSend={handleSend} onReceive={handleReceive} />
+      <Balance balance={balance} onSend={handleSend} onReceive={handleReceive} onAddLiquidity={handleAddLiquidity} />
       <Liquidity />
+      <LiquidityCards customCards={liquidityCards} />
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
         {isFreighterAvailable ?
         <WalletBalance

@@ -106,7 +106,7 @@ export default function Topbar({ activeSection, setActiveSection }: TopbarProps)
   }
 
   return (
-    <header className="w-full bg-white border border-gray-200 rounded-xl mb-4">
+    <header className="w-full bg-white rounded-xl mb-4">
       <div className=" px-6">
         <div className="flex items-center justify-between h-18">
           {/* Logo on the left */}

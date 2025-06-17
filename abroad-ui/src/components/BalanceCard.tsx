@@ -11,7 +11,7 @@ interface BalanceCardProps {
 
 export function BalanceCard({ imageSrc, overlaySrc, title, subtitle, value, accountId }: BalanceCardProps) {
   return (
-    <div className="relative bg-white rounded-lg p-4 flex flex-col sm:flex-row items-center shadow-md hover:shadow-xl transition-shadow">
+    <div className="relative bg-white rounded-lg p-4 flex flex-col sm:flex-row items-center hover:shadow-xl transition-shadow">
       {/* account ID badge */}
       {accountId && (
         <div className="absolute top-2 right-2 bg-gray-200 text-xs text-gray-700 rounded px-2 py-1">

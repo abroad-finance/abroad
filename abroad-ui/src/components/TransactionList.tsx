@@ -68,6 +68,20 @@ export function TransactionList({ transactions }: TransactionListProps) {
   const t = translations[language as keyof typeof translations] || translations.en;
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
 
+  const getBankLogo = (bankCode: string) => {
+    switch (bankCode) {
+      case '1507':
+        return 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Nequi_Logo_Full.svg';
+      case '1551':
+        return 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/daviplata.svg';
+        case '1007':
+        return 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Bancolombia_Full.svg';
+        
+      default:
+        return null;
+    }
+  };
+
   return (
     <div className="grid grid-cols-1">
       <Card className="rounded-xl w-full border-0 shadow-lg">
@@ -99,7 +113,17 @@ export function TransactionList({ transactions }: TransactionListProps) {
                       </td>
                       <td className="py-3 px-4 text-sm text-gray-900">{tx.partnerUserId}</td>
                       <td className="py-3 px-4 text-sm text-gray-900">{tx.accountNumber}</td>
-                      <td className="py-3 px-4 text-sm text-gray-900">{tx.bankCode}</td>
+                      <td className="py-3 px-4 text-sm text-gray-900">
+                        {getBankLogo(tx.bankCode) ? (
+                          <img
+                            src={getBankLogo(tx.bankCode)!}
+                            alt={`Bank ${tx.bankCode}`}
+                            className="h-6 w-auto"
+                          />
+                        ) : (
+                          tx.bankCode
+                        )}
+                      </td>
                       <td className="py-3 px-4 text-sm">
                         {tx.status === 'PAYMENT_COMPLETED' ? (
                           <span className="px-2 py-1 text-xs font-medium rounded-full border border-green-400 bg-green-100 text-green-800">
@@ -119,7 +143,7 @@ export function TransactionList({ transactions }: TransactionListProps) {
                         {tx.quote?.sourceAmount != null && (
                           <div className="flex items-center justify-end space-x-1">
                             <img
-                              src="https://payload-marketing.moonpay.com/api/media/file/mk1bgycpph-K6MWcviP8ndwcJ5yNIrpI"
+                              src="https://storage.googleapis.com/cdn-abroad/Icons/Tokens/USDC%20Token.svg"
                               alt="USDC Icon"
                               className="w-4 h-4"
                             />

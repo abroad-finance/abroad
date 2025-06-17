@@ -3,11 +3,22 @@ import { ArrowUp, ArrowDown, Plus } from 'lucide-react'; // icons for buttons
 import { Button } from '../ButtonOutlined'; // Import the Button component
 import { AddLiquidity } from './AddLiquidity'; // Import AddLiquidity component
 import { useLanguage } from '../../contexts/LanguageContext';
+import { Option } from '../DropSelector';
+
+// Define card item type
+export interface CardItem {
+  accountName: string;
+  accountId: string;
+  currency: Option;
+  bank: Option;
+  value: number;
+}
 
 interface BalanceProps {
   balance: number;
   onSend: () => void;
   onReceive: () => void;
+  onAddLiquidity?: (item: CardItem) => void; // Add callback for liquidity
 }
 
 const translations: Record<'en' | 'es' | 'pt' | 'zh', Record<string, string>> = {
@@ -37,7 +48,7 @@ const translations: Record<'en' | 'es' | 'pt' | 'zh', Record<string, string>> = 
   },
 };
 
-export const Balance: React.FC<BalanceProps> = ({ balance, onSend, onReceive }) => {
+export const Balance: React.FC<BalanceProps> = ({ balance, onSend, onReceive, onAddLiquidity }) => {
   const [isAddLiquidityOpen, setAddLiquidityOpen] = useState(false);
   const { language } = useLanguage();
 
@@ -81,6 +92,9 @@ export const Balance: React.FC<BalanceProps> = ({ balance, onSend, onReceive }) 
         onAdd={(item) => {
           // handle the added liquidity item
           console.log('Liquidity added:', item);
+          if (onAddLiquidity) {
+            onAddLiquidity(item);
+          }
           setAddLiquidityOpen(false);
         }}
       />

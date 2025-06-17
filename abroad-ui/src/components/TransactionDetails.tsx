@@ -1,5 +1,57 @@
 import { Card, CardContent } from "./card";
 import { Transaction } from "../api/apiClient";
+import { useLanguage } from '../contexts/LanguageContext';
+
+const translations = {
+  en: {
+    transactionDetails: "Transaction Details",
+    dateTime: "Date & Time",
+    userId: "User ID",
+    accountNumber: "Account Number",
+    bank: "Bank",
+    status: "Status",
+    sourceAmount: "Source Amount",
+    targetAmount: "Target Amount",
+    completed: "Completed",
+    pending: "Pending"
+  },
+  es: {
+    transactionDetails: "Detalles de Transacción",
+    dateTime: "Fecha y Hora",
+    userId: "ID de Usuario",
+    accountNumber: "Número de Cuenta",
+    bank: "Banco",
+    status: "Estado",
+    sourceAmount: "Monto Origen",
+    targetAmount: "Monto Destino",
+    completed: "Completado",
+    pending: "Pendiente"
+  },
+  pt: {
+    transactionDetails: "Detalhes da Transação",
+    dateTime: "Data e Hora",
+    userId: "ID do Usuário",
+    accountNumber: "Número da Conta",
+    bank: "Banco",
+    status: "Status",
+    sourceAmount: "Valor de Origem",
+    targetAmount: "Valor de Destino",
+    completed: "Concluído",
+    pending: "Pendente"
+  },
+  zh: {
+    transactionDetails: "交易详情",
+    dateTime: "日期和时间",
+    userId: "用户ID",
+    accountNumber: "账号",
+    bank: "银行",
+    status: "状态",
+    sourceAmount: "源金额",
+    targetAmount: "目标金额",
+    completed: "已完成",
+    pending: "待处理"
+  }
+};
 
 // Add Quote interface if not already defined in apiClient
 interface Quote {
@@ -20,6 +72,22 @@ export interface TransactionDetailsProps {
 }
 
 export function TransactionDetails({ transaction, onClose }: TransactionDetailsProps) {
+  const { language } = useLanguage();
+  const t = translations[language as keyof typeof translations] || translations.en;
+
+  const getBankLogo = (bankCode: string) => {
+    switch (bankCode) {
+      case '1507':
+        return 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Nequi_Logo_Full.svg';
+      case '1551':
+        return 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/daviplata.svg';
+      case '1007':
+        return 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Bancolombia_Full.svg';
+      default:
+        return null;
+    }
+  };
+
   const formatNumber = (value?: number) => {
     if (value === undefined) return "-";
     try {
@@ -61,27 +129,56 @@ export function TransactionDetails({ transaction, onClose }: TransactionDetailsP
       >
         <CardContent>
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg font-semibold">Transaction Details</h2>
+            <h2 className="text-lg font-semibold">{t.transactionDetails}</h2>
             <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
               ✕
             </button>
           </div>
           <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-            <dt className="font-medium">Date & Time</dt>
+            <dt className="font-medium">{t.dateTime}</dt>
             <dd>{formatDate(transaction.createdAt)}</dd>
-            <dt className="font-medium">User ID</dt>
+            <dt className="font-medium">{t.userId}</dt>
             <dd>{transaction.partnerUserId}</dd>
-            <dt className="font-medium">Account Number</dt>
+            <dt className="font-medium">{t.accountNumber}</dt>
             <dd>{transaction.accountNumber}</dd>
-            <dt className="font-medium">Bank</dt>
-            <dd>{transaction.bankCode}</dd>
-            <dt className="font-medium">Status</dt>
-            <dd>{transaction.status}</dd>
-            <dt className="font-medium">Source Amount</dt>
+            <dt className="font-medium">{t.bank}</dt>
             <dd>
-              {formatNumber(transaction.quote?.sourceAmount)} {transaction.quote?.cryptoCurrency || '-'}
+              {getBankLogo(transaction.bankCode) ? (
+                <img
+                  src={getBankLogo(transaction.bankCode)!}
+                  alt={`Bank ${transaction.bankCode}`}
+                  className="h-6 w-auto"
+                />
+              ) : (
+                transaction.bankCode
+              )}
             </dd>
-            <dt className="font-medium">Target Amount</dt>
+            <dt className="font-medium">{t.status}</dt>
+            <dd>
+              {transaction.status === 'PAYMENT_COMPLETED' ? (
+                <span className="px-2 py-1 text-xs font-medium rounded-full border border-green-400 bg-green-100 text-green-800">
+                  {t.completed}
+                </span>
+              ) : transaction.status === 'AWAITING_PAYMENT' ? (
+                <span className="px-2 py-1 text-xs font-medium rounded-full border border-blue-400 bg-blue-100 text-blue-800">
+                  {t.pending}
+                </span>
+              ) : (
+                <span className="px-2 py-1 text-xs font-medium rounded-full border border-gray-300 bg-gray-100 text-gray-800">
+                  {transaction.status}
+                </span>
+              )}
+            </dd>
+            <dt className="font-medium">{t.sourceAmount}</dt>
+            <dd className="flex items-center space-x-1">
+              <img
+                src="https://storage.googleapis.com/cdn-abroad/Icons/Tokens/USDC%20Token.svg"
+                alt="USDC Icon"
+                className="w-4 h-4"
+              />
+              <span>{formatNumber(transaction.quote?.sourceAmount)} {transaction.quote?.cryptoCurrency || '-'}</span>
+            </dd>
+            <dt className="font-medium">{t.targetAmount}</dt>
             <dd>
               {formatNumber(transaction.quote?.targetAmount)} {transaction.quote?.targetCurrency || '-'}
             </dd>

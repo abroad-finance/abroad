@@ -6,24 +6,30 @@ import { DropSelector, Option } from '../DropSelector'; // Import Option from Dr
 interface AddLiquidityProps {
   isOpen: boolean;
   onClose: () => void;
-  onAdd: (data: { accountName: string; accountId: string; currency: Option; bank: Option }) => void;
+  onAdd: (data: { accountName: string; accountId: string; currency: Option; bank: Option; value: number }) => void;
 }
 
 const currencyOptions: Option[] = [
-  { value: 'COP', label: 'Colombian Peso', icon: <img src="https://hatscripts.github.io/circle-flags/flags/co.svg" alt="COP" className="w-6 h-6 mr-3 inline" /> },
-  { value: 'BRL', label: 'Brazilian Real', icon: <img src="https://hatscripts.github.io/circle-flags/flags/br.svg" alt="BRL" className="w-6 h-6 mr-3 inline" /> },
-  { value: 'ARS', label: 'Argentinian Peso', icon: <img src="https://hatscripts.github.io/circle-flags/flags/ar.svg" alt="ARS" className="w-6 h-6 mr-3 inline" /> },
+  { value: 'COP', label: 'Colombian Peso', iconUrl: "https://hatscripts.github.io/circle-flags/flags/co.svg" },
+  { value: 'BRL', label: 'Brazilian Real', iconUrl: "https://hatscripts.github.io/circle-flags/flags/br.svg" },
+  { value: 'ARS', label: 'Argentinian Peso', iconUrl: "https://hatscripts.github.io/circle-flags/flags/ar.svg" },
+  { value: 'USDC', label: 'USDC', iconUrl: "https://storage.googleapis.com/cdn-abroad/Icons/Tokens/USDC%20Token.svg" },
+  { value: 'USDT', label: 'USDT', iconUrl: "https://storage.googleapis.com/cdn-abroad/Icons/Tokens/USDT-token.svg" },
 ];
 
 const bankOptions: Option[] = [
-  { value: 'Coink', label: 'Coink', icon: <img src="https://storage.googleapis.com/cdn-abroad/Icons/Banks/coink_badge.png" alt="Coink" className="w-6 h-6 mr-3 inline" /> },
-  { value: 'Iris', label: 'Iris', icon: <img src="https://storage.googleapis.com/cdn-abroad/Icons/Banks/iris_badge.webp" alt="Iris" className="w-6 h-6 mr-3 inline" /> },
-  { value: 'Mono', label: 'Mono', icon: <img src="https://storage.googleapis.com/cdn-abroad/Icons/Banks/mono_badge.jpg" alt="Mono" className="w-6 h-6 mr-3 inline" /> },
-  { value: 'Movii', label: 'Movii', icon: <img src="https://storage.googleapis.com/cdn-abroad/Icons/Banks/movii_badge.png" alt="Movii" className="w-6 h-6 mr-3 inline" /> },
+  { value: 'Coink', label: 'Coink', iconUrl: "https://storage.googleapis.com/cdn-abroad/Icons/Banks/coink_badge.png" },
+  { value: 'Iris', label: 'Iris', iconUrl: "https://storage.googleapis.com/cdn-abroad/Icons/Banks/iris_badge.webp" },
+  { value: 'Mono', label: 'Mono', iconUrl: "https://storage.googleapis.com/cdn-abroad/Icons/Banks/mono_badge.jpg" },
+  { value: 'Movii', label: 'Movii', iconUrl: "https://storage.googleapis.com/cdn-abroad/Icons/Banks/movii_badge.png" },
+  { value: 'Binance', label: 'Binance', iconUrl: "https://storage.googleapis.com/cdn-abroad/Icons/Banks/Binance_Black_Icon.svg" },
+  { value: 'TrustWallet', label: 'TrustWallet', iconUrl: "https://storage.googleapis.com/cdn-abroad/Icons/Banks/Trust_Wallet_Shield.svg" },
+  { value: 'SqualaPay', label: 'SqualaPay', iconUrl: "https://storage.googleapis.com/cdn-abroad/Icons/Banks/sqalatech_badge.jpeg" },
+  { value: 'Transfero', label: 'Transfero', iconUrl: "https://storage.googleapis.com/cdn-abroad/Icons/Banks/transfero_badge.jpeg" },
+  // Add other bank options as needed, ensuring they use iconUrl
 ];
 
 export function AddLiquidity({ isOpen, onClose, onAdd }: AddLiquidityProps) {
-  const [liquidityType, setLiquidityType] = useState<'cash' | 'crypto' | 'mobile' | null>(null);
   const [accountName, setAccountName] = useState('');
   const [accountId, setAccountId] = useState('');
   const [currencyOpen, setCurrencyOpen] = useState(false);
@@ -37,7 +43,6 @@ export function AddLiquidity({ isOpen, onClose, onAdd }: AddLiquidityProps) {
     setAccountId('');
     setSelectedCurrency(null);
     setSelectedBank(null);
-    setLiquidityType(null);
     setCurrencyOpen(false);
     setBankOpen(false);
   }, []);
@@ -63,10 +68,16 @@ export function AddLiquidity({ isOpen, onClose, onAdd }: AddLiquidityProps) {
 
   const currentBankOptions = useMemo(() => {
     if (selectedCurrency?.value === 'COP') {
-      return bankOptions.filter(b => b.value !== 'Bitso' && b.value !== 'Binance');
+      return bankOptions.filter(b => ['Coink', 'Iris', 'Mono', 'Movii'].includes(b.value));
     }
-    if (selectedCurrency?.value === 'USD') {
-      return bankOptions.filter(b => b.value !== 'Nequi' && b.value !== 'DaviPlata');
+    if (selectedCurrency?.value === 'USDC' || selectedCurrency?.value === 'USDT') {
+      return bankOptions.filter(b => ['Binance', 'TrustWallet'].includes(b.value));
+    }
+    if (selectedCurrency?.value === 'BRL') {
+      return bankOptions.filter(b => ['SqualaPay', 'Transfero'].includes(b.value));
+    }
+    if (selectedCurrency?.value === 'ARS') {
+      return bankOptions; // Show all options for ARS or add specific filtering if needed
     }
     return bankOptions;
   }, [selectedCurrency]);
@@ -78,35 +89,45 @@ export function AddLiquidity({ isOpen, onClose, onAdd }: AddLiquidityProps) {
   }, [selectedCurrency]);
 
   useEffect(() => {
-    if (selectedBank) {
-      // If a bank is selected, ensure the currency is compatible or reset currency
-      if (selectedBank.value === 'Bitso' || selectedBank.value === 'Binance') {
-        if (selectedCurrency?.value === 'COP') setSelectedCurrency(null);
-      } else if (selectedBank.value === 'Nequi' || selectedBank.value === 'DaviPlata') {
-        if (selectedCurrency?.value === 'USD') setSelectedCurrency(null);
+    if (selectedBank && selectedCurrency) {
+      // Reset bank if it's not compatible with the selected currency
+      const compatibleBanks = currentBankOptions.map(b => b.value);
+      if (!compatibleBanks.includes(selectedBank.value)) {
+        setSelectedBank(null);
       }
     }
-  }, [selectedBank, selectedCurrency]);
+  }, [selectedBank, selectedCurrency, currentBankOptions]);
 
   const handleAddClick = () => {
+    console.log('handleAddClick called with:', {
+      accountName,
+      accountId,
+      selectedCurrency,
+      selectedBank
+    });
     if (selectedCurrency && selectedBank && accountName && accountId) {
+      console.log('Calling onAdd with data');
       onAdd({
         accountName,
         accountId,
         currency: selectedCurrency,
         bank: selectedBank,
+        value: Math.floor(Math.random() * (100000000 - 20000000) + 20000000), // Generate random value
       });
       resetForm(); 
       // If the modal should close after adding, call internalHandleClose() or onClose() directly.
       // Based on the prompt "when the user close the component", adding liquidity itself doesn't trigger this specific close+reset logic.
       // So, only resetting the form here is fine, and the parent can decide to call onClose if needed.
     }
+    else {
+      console.log('Validation failed - missing required fields');
+    }
   };
 
   const handleAccountIdChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    // Allow only numbers
-    if (/^\d*$/.test(value)) {
+    // Allow numbers and special characters like @, -, *, etc., but not letters
+    if (/^[\d@\-*.,;:!#$%&()+={}[\]|\\/?<>~`^_]*$/.test(value)) {
       setAccountId(value);
     }
   };
@@ -137,13 +158,6 @@ export function AddLiquidity({ isOpen, onClose, onAdd }: AddLiquidityProps) {
         </button>
         <h2 className="text-3xl font-semibold mb-6">Add Liquidity</h2> 
 
-        <div className="mb-6"> 
-          <label className="block text-lg font-medium text-gray-700 mb-2">Liquidity Type</label> 
-          <div className="flex space-x-3"> 
-            {/* ... Liquidity type buttons ... (These would also need scaling if implemented) */}
-          </div>
-        </div>
-
         <div className="grid grid-cols-2 gap-6 mb-6"> 
           <div>
             <label htmlFor="accountName" className="block text-lg font-medium text-gray-700 mb-2">Account Name</label> 
@@ -169,7 +183,7 @@ export function AddLiquidity({ isOpen, onClose, onAdd }: AddLiquidityProps) {
           </div>
         </div>
         
-<div className="grid grid-cols-2 gap-6 mb-6"> {/* New row for Currency and Bank/Exchange */}
+        <div className="grid grid-cols-2 gap-6 mb-6"> {/* New row for Currency and Bank/Exchange */}
           <div>
             <label className="block text-lg font-medium text-gray-700 mb-2">Currency</label>
             <DropSelector

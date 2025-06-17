@@ -10,9 +10,9 @@ export function Button({
   const hasGradient = className.includes('bg-gradient-to-r');
   const defaultGradient = 'bg-gradient-to-r from-[#356E6A] to-[#73B9A3] hover:from-[#2a5956] hover:to-[#5fa88d] text-white';
   const baseStyle = disabled
-    ? 'bg-transparent text-[#356E6A] cursor-not-allowed border border-[#356E6A]'
+    ? 'bg-transparent !text-gray-400 cursor-not-allowed border border-[#356E6A]' // Ensure grey text when disabled
     : hasGradient
-    ? 'text-white'
+    ? 'text-gray-500'
     : defaultGradient;
   return (
     <button

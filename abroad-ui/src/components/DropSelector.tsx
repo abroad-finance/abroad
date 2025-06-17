@@ -5,6 +5,7 @@ export interface Option {
   value: string;
   label: string;
   icon?: React.ReactNode; // Icons are expected to be scaled by the parent providing them
+  iconUrl?: string; // URL for image icons
   disabled?: boolean;
 }
 
@@ -51,7 +52,8 @@ export function DropSelector({
         <span className="flex items-center truncate">
           {selectedOption ? (
             <>
-              {selectedOption.icon && <span className="mr-3 flex-shrink-0">{selectedOption.icon}</span>} {/* Increased margin */}
+              {selectedOption.icon && !selectedOption.iconUrl && <span className="mr-3 flex-shrink-0">{selectedOption.icon}</span>} {/* Increased margin */}
+              {selectedOption.iconUrl && <img src={selectedOption.iconUrl} alt="" className="w-6 h-6 mr-3 rounded-full flex-shrink-0" />} {/* Added image icon */}
               <span className="truncate">{selectedOption.label}</span>
             </>
           ) : (
@@ -80,7 +82,8 @@ export function DropSelector({
                   option.disabled ? 'opacity-50 cursor-not-allowed' : ''
                 } ${selectedOption?.value === option.value ? 'bg-gray-200 font-semibold' : 'hover:bg-gray-50'}`}
               >
-                {option.icon && <span className="mr-3 flex-shrink-0">{option.icon}</span>} {/* Increased margin */}
+                {option.icon && !option.iconUrl && <span className="mr-3 flex-shrink-0">{option.icon}</span>} {/* Increased margin */}
+                {option.iconUrl && <img src={option.iconUrl} alt="" className="w-6 h-6 mr-3 rounded-full flex-shrink-0" />} {/* Added image icon */}
                 <span className="text-gray-700 text-lg truncate">{option.label}</span> {/* Increased text size */}
               </div>
             ))
