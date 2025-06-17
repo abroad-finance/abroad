@@ -1,5 +1,5 @@
 import { Card, CardContent } from "../components/card";
-import Navbar from "../components/navbar";
+import Navbar from "../components/Navbar";
 import { useLanguage } from "../contexts/LanguageContext";
 
 export default function Integrations() {

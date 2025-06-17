@@ -73,7 +73,7 @@ export function TransactionList({ transactions }: TransactionListProps) {
       case '1507':
         return 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Nequi_Logo_Full.svg';
       case '1551':
-        return 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/daviplata.svg';
+        return 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Daviplata_Full.svg';
         case '1007':
         return 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Bancolombia_Full.svg';
         

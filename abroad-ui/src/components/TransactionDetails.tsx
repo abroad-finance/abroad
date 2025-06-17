@@ -1,6 +1,7 @@
 import { Card, CardContent } from "./card";
 import { Transaction } from "../api/apiClient";
 import { useLanguage } from '../contexts/LanguageContext';
+import { useEffect } from 'react';
 
 const translations = {
   en: {
@@ -80,7 +81,7 @@ export function TransactionDetails({ transaction, onClose }: TransactionDetailsP
       case '1507':
         return 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Nequi_Logo_Full.svg';
       case '1551':
-        return 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/daviplata.svg';
+        return 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Daviplata_Full.svg';
       case '1007':
         return 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Bancolombia_Full.svg';
       default:
@@ -111,6 +112,20 @@ export function TransactionDetails({ transaction, onClose }: TransactionDetailsP
       return new Date(date).toString();
     }
   };
+
+  useEffect(() => {
+    const handleEscapeKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        onClose();
+      }
+    };
+
+    document.addEventListener('keydown', handleEscapeKey);
+
+    return () => {
+      document.removeEventListener('keydown', handleEscapeKey);
+    };
+  }, [onClose]);
 
   return (
     <div

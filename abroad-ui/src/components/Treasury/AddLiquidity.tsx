@@ -1,7 +1,55 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { X } from 'lucide-react';
 import { Button } from '../Button';
-import { DropSelector, Option } from '../DropSelector'; // Import Option from DropSelector
+import { DropSelector, Option } from '../DropSelector';
+import { useLanguage } from '../../contexts/LanguageContext';
+
+const translations = {
+  en: {
+    addLiquidity: "Add Liquidity",
+    accountName: "Account Name",
+    accountId: "Account ID",
+    currency: "Currency",
+    bankExchange: "Bank/Exchange",
+    selectCurrency: "Select Currency",
+    selectBankExchange: "Select Bank/Exchange",
+    accountNamePlaceholder: "e.g., My Savings",
+    accountIdPlaceholder: "e.g., 123-4567-890"
+  },
+  es: {
+    addLiquidity: "Agregar Liquidez",
+    accountName: "Nombre de Cuenta",
+    accountId: "ID de Cuenta",
+    currency: "Moneda",
+    bankExchange: "Banco/Exchange",
+    selectCurrency: "Seleccionar Moneda",
+    selectBankExchange: "Seleccionar Banco/Exchange",
+    accountNamePlaceholder: "ej., Mis Ahorros",
+    accountIdPlaceholder: "ej., 123-4567-890"
+  },
+  pt: {
+    addLiquidity: "Adicionar Liquidez",
+    accountName: "Nome da Conta",
+    accountId: "ID da Conta",
+    currency: "Moeda",
+    bankExchange: "Banco/Exchange",
+    selectCurrency: "Selecionar Moeda",
+    selectBankExchange: "Selecionar Banco/Exchange",
+    accountNamePlaceholder: "ex., Minhas Economias",
+    accountIdPlaceholder: "ex., 123-4567-890"
+  },
+  zh: {
+    addLiquidity: "添加流动性",
+    accountName: "账户名称",
+    accountId: "账户ID",
+    currency: "货币",
+    bankExchange: "银行/交易所",
+    selectCurrency: "选择货币",
+    selectBankExchange: "选择银行/交易所",
+    accountNamePlaceholder: "例如，我的储蓄",
+    accountIdPlaceholder: "例如，123-4567-890"
+  }
+};
 
 interface AddLiquidityProps {
   isOpen: boolean;
@@ -30,6 +78,9 @@ const bankOptions: Option[] = [
 ];
 
 export function AddLiquidity({ isOpen, onClose, onAdd }: AddLiquidityProps) {
+  const { language } = useLanguage();
+  const t = translations[language as keyof typeof translations] || translations.en;
+
   const [accountName, setAccountName] = useState('');
   const [accountId, setAccountId] = useState('');
   const [currencyOpen, setCurrencyOpen] = useState(false);
@@ -139,12 +190,20 @@ export function AddLiquidity({ isOpen, onClose, onAdd }: AddLiquidityProps) {
       }
     };
 
+    const handleEscapeKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        internalHandleClose();
+      }
+    };
+
     if (isOpen) {
       document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('keydown', handleEscapeKey);
     }
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscapeKey);
     };
   }, [isOpen, internalHandleClose]);
 
@@ -156,55 +215,55 @@ export function AddLiquidity({ isOpen, onClose, onAdd }: AddLiquidityProps) {
         <button onClick={internalHandleClose} className="absolute top-6 right-6 text-gray-500 hover:text-gray-700"> 
           <X size={36} /> 
         </button>
-        <h2 className="text-3xl font-semibold mb-6">Add Liquidity</h2> 
+        <h2 className="text-3xl font-semibold mb-6">{t.addLiquidity}</h2> 
 
         <div className="grid grid-cols-2 gap-6 mb-6"> 
           <div>
-            <label htmlFor="accountName" className="block text-lg font-medium text-gray-700 mb-2">Account Name</label> 
+            <label htmlFor="accountName" className="block text-lg font-medium text-gray-700 mb-2">{t.accountName}</label> 
             <input
               type="text"
               id="accountName"
               value={accountName}
               onChange={(e) => setAccountName(e.target.value)}
               className="w-full p-3 text-lg border border-gray-300 rounded-md focus:ring-0 focus:border-gray-300" 
-              placeholder="e.g., My Savings"
+              placeholder={t.accountNamePlaceholder}
             />
           </div>
           <div>
-            <label htmlFor="accountId" className="block text-lg font-medium text-gray-700 mb-2">Account ID</label> 
+            <label htmlFor="accountId" className="block text-lg font-medium text-gray-700 mb-2">{t.accountId}</label> 
             <input
-              type="text" // Keep as text to allow regex, but pattern enforces numeric
+              type="text"
               id="accountId"
               value={accountId}
               onChange={handleAccountIdChange}
               className="w-full p-3 text-lg border border-gray-300 rounded-md focus:ring-0 focus:border-gray-300" 
-              placeholder="e.g., 1234567890"
+              placeholder={t.accountIdPlaceholder}
             />
           </div>
         </div>
         
-        <div className="grid grid-cols-2 gap-6 mb-6"> {/* New row for Currency and Bank/Exchange */}
+        <div className="grid grid-cols-2 gap-6 mb-6">
           <div>
-            <label className="block text-lg font-medium text-gray-700 mb-2">Currency</label>
+            <label className="block text-lg font-medium text-gray-700 mb-2">{t.currency}</label>
             <DropSelector
               options={currencyOptions}
               selectedOption={selectedCurrency}
               onSelectOption={setSelectedCurrency}
               isOpen={currencyOpen}
               setIsOpen={handleCurrencyOpen}
-              placeholder="Select Currency"
+              placeholder={t.selectCurrency}
             />
           </div>
           <div>
-            <label className="block text-lg font-medium text-gray-700 mb-2">Bank/Exchange</label>
+            <label className="block text-lg font-medium text-gray-700 mb-2">{t.bankExchange}</label>
             <DropSelector
               options={currentBankOptions}
               selectedOption={selectedBank}
               onSelectOption={setSelectedBank}
               isOpen={bankOpen}
               setIsOpen={handleBankOpen}
-              placeholder="Select Bank/Exchange"
-              disabled={!selectedCurrency} // Disable if no currency is selected
+              placeholder={t.selectBankExchange}
+              disabled={!selectedCurrency}
             />
           </div>
         </div>
@@ -214,7 +273,7 @@ export function AddLiquidity({ isOpen, onClose, onAdd }: AddLiquidityProps) {
           className="w-full text-white text-xl py-3 px-5" 
           disabled={!selectedCurrency || !selectedBank || !accountName || !accountId}
         >
-          Add Liquidity
+          {t.addLiquidity}
         </Button>
       </div>
     </div>

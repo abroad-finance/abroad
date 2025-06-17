@@ -1,6 +1,6 @@
 import { Card, CardContent } from "../components/card";
 import { Button } from "../components/Button";
-import Navbar from "../components/navbar";
+import Navbar from "../components/Navbar";
 import { getBanks, type Bank, createPartnerUser, PaymentMethod, listPartnerUsers, PaginatedPartnerUsers } from "../api/apiClient";
 import { useEffect, useState } from "react";
 import { useLanguage } from '../contexts/LanguageContext';
