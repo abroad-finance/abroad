@@ -3,7 +3,6 @@ import Navbar from "../components/Navbar";
 import { listPartnerUsers, PaginatedPartnerUsers, listPartnerTransactions, PaginatedTransactionList } from "../api/apiClient";
 import { TransactionList } from "../components/TransactionList";
 import { Balance } from "../components/Treasury/BalanceOpsRow";
-import { Liquidity } from "../components/Liquidity";
 import { LiquidityCards, CardItem } from "../components/Treasury/LiquidityCards";
 
 export function Dashboard() {
@@ -77,9 +76,8 @@ function DashboardHome() {
   return (
     
     <div className="space-y-4 relative">
-      <Balance balance={0} onSend={handleSend} onReceive={handleReceive} onAddLiquidity={handleAddLiquidity} />
-      <Liquidity />
-      <LiquidityCards customCards={liquidityCards} />
+      <Balance balance={0} onSend={handleSend} onReceive={handleReceive} onAddLiquidity={handleAddLiquidity} availableAccounts={liquidityCards} />
+      <LiquidityCards customCards={liquidityCards} onAddLiquidity={handleAddLiquidity} />
       <TransactionList transactions={transactions} />
     </div>
   );

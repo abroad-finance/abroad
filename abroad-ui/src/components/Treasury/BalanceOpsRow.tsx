@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ArrowUp, ArrowDown, Plus } from 'lucide-react'; // icons for buttons
 import { Button } from '../ButtonOutlined'; // Import the Button component
 import { AddLiquidity } from './AddLiquidity'; // Import AddLiquidity component
+import { SendTx } from './SendTx'; // Import SendTx component
 import { useLanguage } from '../../contexts/LanguageContext';
 import { Option } from '../DropSelector';
 
@@ -19,6 +20,7 @@ interface BalanceProps {
   onSend: () => void;
   onReceive: () => void;
   onAddLiquidity?: (item: CardItem) => void; // Add callback for liquidity
+  availableAccounts?: CardItem[]; // Add available accounts for sending
 }
 
 const translations: Record<'en' | 'es' | 'pt' | 'zh', Record<string, string>> = {
@@ -48,9 +50,13 @@ const translations: Record<'en' | 'es' | 'pt' | 'zh', Record<string, string>> = 
   },
 };
 
-export const Balance: React.FC<BalanceProps> = ({ balance, onSend, onReceive, onAddLiquidity }) => {
+export const Balance: React.FC<BalanceProps> = ({ onSend, onReceive, onAddLiquidity, availableAccounts = [] }) => {
   const [isAddLiquidityOpen, setAddLiquidityOpen] = useState(false);
+  const [isSendTxOpen, setSendTxOpen] = useState(false);
   const { language } = useLanguage();
+
+  // Calculate total balance from all liquidity cards
+  const totalBalance = availableAccounts.reduce((sum, account) => sum + account.value, 0);
 
   return (
     <div className="flex items-center justify-between p-4 rounded"> {/* Removed bg-white */}
@@ -58,13 +64,13 @@ export const Balance: React.FC<BalanceProps> = ({ balance, onSend, onReceive, on
       <div>
         <h4 className="text-md text-gray-500">{translations[language].totalBalance}</h4>
         <p className="text-5xl font-bold text-gray-700">
-          {balance.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
+          {totalBalance.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
         </p>
       </div>
       {/* action buttons */}
       <div className="flex space-x-2">
         <Button
-          onClick={onSend}
+          onClick={() => setSendTxOpen(true)}
           className="flex items-center bg-transparent hover:shadow-md text-gray-500 hover:text-white"
         >
           <ArrowUp className="mr-2" />
@@ -97,6 +103,18 @@ export const Balance: React.FC<BalanceProps> = ({ balance, onSend, onReceive, on
           }
           setAddLiquidityOpen(false);
         }}
+      />
+      {/* SendTx component */}
+      <SendTx
+        isOpen={isSendTxOpen}
+        onClose={() => setSendTxOpen(false)}
+        onSend={(data) => {
+          // handle the send transaction
+          console.log('Send transaction:', data);
+          onSend(); // Call the original onSend callback
+          setSendTxOpen(false);
+        }}
+        availableAccounts={availableAccounts}
       />
     </div>
   );
