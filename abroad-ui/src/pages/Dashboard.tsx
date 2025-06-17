@@ -4,6 +4,8 @@ import { listPartnerUsers, PaginatedPartnerUsers, listPartnerTransactions, Pagin
 import { TransactionList } from "../components/TransactionList";
 import { Balance } from "../components/Treasury/BalanceOpsRow";
 import { LiquidityCards, CardItem } from "../components/Treasury/LiquidityCards";
+import { StreamData } from "../components/Treasury/DataAnalytics/AllocationData";
+import { TransactionalData } from "../components/Treasury/DataAnalytics/TransactionalData";
 
 export function Dashboard() {
   const [activeSection, setActiveSection] = useState<string>("dashboard");
@@ -77,7 +79,17 @@ function DashboardHome() {
     
     <div className="space-y-4 relative">
       <Balance balance={0} onSend={handleSend} onReceive={handleReceive} onAddLiquidity={handleAddLiquidity} availableAccounts={liquidityCards} />
+      
+      {/* LiquidityCards - Single column */}
       <LiquidityCards customCards={liquidityCards} onAddLiquidity={handleAddLiquidity} />
+      
+      {/* Data Analytics - 2 column layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <StreamData liquidityCards={liquidityCards} />
+        <TransactionalData liquidityCards={liquidityCards} />
+      </div>
+      
+      {/* TransactionList - Full width */}
       <TransactionList transactions={transactions} />
     </div>
   );
