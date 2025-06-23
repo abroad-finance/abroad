@@ -158,12 +158,23 @@ export function AddLiquidity({ isOpen, onClose, onAdd }: AddLiquidityProps) {
     });
     if (selectedCurrency && selectedBank && accountName && accountId) {
       console.log('Calling onAdd with data');
+      
+      // Generate different value ranges based on currency type
+      let randomValue: number;
+      if (selectedCurrency.value === 'USDC' || selectedCurrency.value === 'USDT') {
+        // For USDC/USDT: between 5,000 and 98,000
+        randomValue = Math.floor(Math.random() * (98000 - 5000) + 5000);
+      } else {
+        // For other currencies: between 20,000,000 and 100,000,000
+        randomValue = Math.floor(Math.random() * (100000000 - 20000000) + 20000000);
+      }
+      
       onAdd({
         accountName,
         accountId,
         currency: selectedCurrency,
         bank: selectedBank,
-        value: Math.floor(Math.random() * (100000000 - 20000000) + 20000000), // Generate random value
+        value: randomValue,
       });
       resetForm(); 
       // If the modal should close after adding, call internalHandleClose() or onClose() directly.
