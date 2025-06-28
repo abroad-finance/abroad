@@ -5,9 +5,9 @@ import axios from 'axios'
 import { inject } from 'inversify'
 import puppeteer from 'puppeteer'
 
-import { IPaymentService } from '../interfaces/IPaymentService'
-import { ISecretManager } from '../interfaces/ISecretManager'
-import { TYPES } from '../types'
+import { IPaymentService } from '../../interfaces/IPaymentService'
+import { ISecretManager } from '../../interfaces/ISecretManager'
+import { TYPES } from '../../types'
 
 const banks = [
   { bankCode: 1565, bankName: 'Superdigital', routerReference: '$superdigital_prd' },

@@ -60,10 +60,19 @@ export const Secrets = {
   STELLAR_SEP_JWT_SECRET: 'STELLAR_SEP_JWT_SECRET',
   STELLAR_SEP_PARTNER_ID: 'STELLAR_SEP_PARTNER_ID',
   STELLAR_USDC_ISSUER: 'STELLAR_USDC_ISSUER',
+
+  // Transfero related secrets
+  TRANSFERO_ACCOUNT_ID: 'TRANSFERO_ACCOUNT_ID',
+  TRANSFERO_BASE_URL: 'TRANSFERO_BASE_URL',
+  TRANSFERO_CLIENT_ID: 'TRANSFERO_CLIENT_ID',
+  TRANSFERO_CLIENT_SECRET: 'TRANSFERO_CLIENT_SECRET',
 } as const
 
 export interface ISecretManager {
   getSecret(secretName: Secret): Promise<string>
+  getSecrets<T extends readonly Secret[]>(
+    secretNames: T
+  ): Promise<Record<T[number], string>>
 }
 
 export type Secret = (typeof Secrets)[keyof typeof Secrets]

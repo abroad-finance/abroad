@@ -3,9 +3,9 @@ import { TargetCurrency } from '@prisma/client'
 import axios, { AxiosResponse } from 'axios'
 import { inject } from 'inversify'
 
-import { IPaymentService } from '../interfaces/IPaymentService'
-import { ISecretManager } from '../interfaces/ISecretManager'
-import { TYPES } from '../types'
+import { IPaymentService } from '../../interfaces/IPaymentService'
+import { ISecretManager } from '../../interfaces/ISecretManager'
+import { TYPES } from '../../types'
 
 export type ResponseNequiDispersion = {
   ResponseMessage: {

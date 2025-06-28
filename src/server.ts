@@ -67,13 +67,15 @@ interface ApiError extends Error {
   status?: number
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-app.use((err: ApiError, req: Request, res: Response, _next: NextFunction) => {
-  res.status(err.status || 500).json({
-    message: err.message || 'An error occurred',
-    reason: err.message || 'Internal Server Error',
+if (process.env.NODE_ENV === 'production') {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  app.use((err: ApiError, req: Request, res: Response, _next: NextFunction) => {
+    res.status(err.status || 500).json({
+      message: err.message || 'An error occurred',
+      reason: err.message || 'Internal Server Error',
+    })
   })
-})
+}
 
 const port = process.env.PORT || 3784
 app.listen(port, () => {

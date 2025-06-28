@@ -6,9 +6,9 @@ import axios from 'axios'
 import crypto from 'crypto'
 import { inject, injectable } from 'inversify'
 
-import { IExchangeProvider } from '../interfaces/IExchangeProvider'
-import { ISecretManager } from '../interfaces/ISecretManager'
-import { TYPES } from '../types'
+import { IExchangeProvider } from '../../interfaces/IExchangeProvider'
+import { ISecretManager } from '../../interfaces/ISecretManager'
+import { TYPES } from '../../types'
 
 type BinanceBookTickerResponse = {
   askPrice: string

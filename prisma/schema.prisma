@@ -20,6 +20,7 @@ model Partner {
   lastName      String?
   isKybApproved Boolean?      @default(false)
   needsKyc      Boolean?      @default(true)
+  webhookUrl    String?
   users         PartnerUser[]
   quotes        Quote[]
 }
@@ -76,6 +77,7 @@ model Transaction {
   quoteId       String            @unique
   quote         Quote             @relation(fields: [quoteId], references: [id])
   onChainId     String?           @unique
+  taxId         String?
 }
 
 model StellarListenerState {
@@ -129,6 +131,7 @@ enum SupportedCurrency {
   USDC
   USDT
   COP
+  BRL
 }
 
 enum BlockchainNetwork {
@@ -143,10 +146,12 @@ enum Country {
 enum PaymentMethod {
   NEQUI
   MOVII
+  PIX
 }
 
 enum TargetCurrency {
   COP
+  BRL
 }
 
 model PaymentProvider {

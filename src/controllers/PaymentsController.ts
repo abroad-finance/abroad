@@ -6,6 +6,7 @@ import {
   Body,
   Controller,
   Get,
+  Hidden,
   Post,
   Query,
   Response,
@@ -143,6 +144,7 @@ export class PaymentsController extends Controller {
    * @param requestBody - Contains the account string.
    * @returns The result of the onboardUser operation.
    */
+  @Hidden()
   @Post('onboard')
   @Response('400', 'Bad Request')
   @SuccessResponse('200', 'User onboarded')

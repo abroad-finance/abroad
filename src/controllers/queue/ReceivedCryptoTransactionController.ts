@@ -12,6 +12,7 @@ import {
 } from '../../interfaces'
 import { IDatabaseClientProvider } from '../../interfaces/IDatabaseClientProvider'
 import { IPaymentServiceFactory } from '../../interfaces/IPaymentServiceFactory'
+import { IWebhookNotifier, WebhookEvent } from '../../interfaces/IWebhookNotifier'
 import { PaymentSentMessage } from '../../interfaces/queueSchema'
 import { TYPES } from '../../types'
 // Import the logger interface (adjust the path as necessary)
@@ -40,6 +41,7 @@ export class ReceivedCryptoTransactionController {
     @inject(TYPES.ILogger) private logger: ILogger,
     @inject(TYPES.ISlackNotifier) private slackNotifier: ISlackNotifier,
     @inject(TYPES.IWalletHandlerFactory) private walletHandlerFactory: IWalletHandlerFactory,
+    @inject(TYPES.IWebhookNotifier) private webhookNotifier: IWebhookNotifier,
   ) { }
 
   public registerConsumers() {
@@ -106,6 +108,7 @@ export class ReceivedCryptoTransactionController {
           status: TransactionStatus.AWAITING_PAYMENT,
         },
       })
+      this.webhookNotifier.notifyWebhook(transactionRecord.partnerUser.partner.webhookUrl, { data: transactionRecord, event: WebhookEvent.TRANSACTION_CREATED })
     }
     catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError) {
@@ -131,10 +134,11 @@ export class ReceivedCryptoTransactionController {
         message.amount,
         transactionRecord.quote.sourceAmount,
       )
-      await prismaClient.transaction.update({
+      const transaction = await prismaClient.transaction.update({
         data: { status: TransactionStatus.WRONG_AMOUNT },
         where: { id: transactionRecord.id },
       })
+      this.webhookNotifier.notifyWebhook(transactionRecord.partnerUser.partner.webhookUrl, { data: transaction, event: WebhookEvent.TRANSACTION_CREATED })
 
       const walletHandler = this.walletHandlerFactory.getWalletHandler(message.blockchain)
       await walletHandler.send({
@@ -162,10 +166,11 @@ export class ReceivedCryptoTransactionController {
         ? TransactionStatus.PAYMENT_COMPLETED
         : TransactionStatus.PAYMENT_FAILED
 
-      await prismaClient.transaction.update({
+      const transaction = await prismaClient.transaction.update({
         data: { status: newStatus },
         where: { id: transactionRecord.id },
       })
+      this.webhookNotifier.notifyWebhook(transactionRecord.partnerUser.partner.webhookUrl, { data: transaction, event: WebhookEvent.TRANSACTION_CREATED })
 
       this.logger.info(
         `[Stellar transaction]: Payment ${paymentResponse.success ? 'completed' : 'failed'} for transaction:`,
@@ -185,16 +190,30 @@ export class ReceivedCryptoTransactionController {
           targetCurrency: transactionRecord.quote.targetCurrency,
         } satisfies PaymentSentMessage)
       }
+      else {
+        this.slackNotifier.sendMessage(
+          `Payment failed for transaction: ${transactionRecord.id}, ${transactionRecord.quote.sourceAmount} ${transactionRecord.quote.cryptoCurrency} -> ${transactionRecord.quote.targetAmount} ${transactionRecord.quote.targetCurrency}, Partner: ${transactionRecord.partnerUser.partner.name}`,
+        )
+        const walletHandler = this.walletHandlerFactory.getWalletHandler(
+          message.blockchain,
+        )
+        await walletHandler.send({
+          address: message.addressFrom,
+          amount: message.amount,
+          cryptoCurrency: message.cryptoCurrency,
+        })
+      }
     }
     catch (paymentError) {
       this.logger.error(
         '[Stellar transaction]: Payment processing error:',
         paymentError,
       )
-      await prismaClient.transaction.update({
+      const transaction = await prismaClient.transaction.update({
         data: { status: TransactionStatus.PAYMENT_FAILED },
         where: { id: transactionRecord.id },
       })
+      this.webhookNotifier.notifyWebhook(transactionRecord.partnerUser.partner.webhookUrl, { data: transaction, event: WebhookEvent.TRANSACTION_CREATED })
 
       const walletHandler = this.walletHandlerFactory.getWalletHandler(
         message.blockchain,

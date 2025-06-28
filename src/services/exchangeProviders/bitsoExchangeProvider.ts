@@ -1,5 +1,5 @@
 // src/services/bitsoExchangeRateProvider.ts
-import { IExchangeProvider } from '../interfaces/IExchangeProvider'
+import { IExchangeProvider } from '../../interfaces/IExchangeProvider'
 
 type TickerPayload = {
   ask: string

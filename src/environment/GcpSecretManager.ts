@@ -50,6 +50,20 @@ export class GcpSecretManager implements ISecretManager {
     return payload
   }
 
+  getSecrets<T extends readonly Secret[]>(secretNames: T): Promise<Record<T[number], string>> {
+    return Promise.all(secretNames.map(name => this.getSecret(name)))
+      .then((secrets) => {
+        const result: Record<string, string> = {}
+        secretNames.forEach((name, index) => {
+          result[name] = secrets[index]
+        })
+        return result as Record<T[number], string>
+      })
+      .catch((error) => {
+        throw new Error(`Failed to retrieve secrets: ${error.message}`)
+      })
+  }
+
   /**
    * Retrieves the project ID from environment or metadata.
    */

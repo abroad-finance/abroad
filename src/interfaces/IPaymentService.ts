@@ -1,6 +1,11 @@
 // src/interfaces/IPaymentService.ts
 import { TargetCurrency } from '@prisma/client'
 
+export interface Bank {
+  bankCode: number
+  bankName: string
+}
+
 export interface IPaymentService {
   readonly banks: Bank[]
   readonly currency: TargetCurrency
@@ -53,9 +58,4 @@ export interface IPaymentService {
     account: string
     bankCode: string
   }): Promise<boolean>
-}
-
-interface Bank {
-  bankCode: number
-  bankName: string
 }
