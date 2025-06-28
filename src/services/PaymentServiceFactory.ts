@@ -15,6 +15,9 @@ export class PaymentServiceFactory implements IPaymentServiceFactory {
     @inject(TYPES.IPaymentService)
     @named('nequi')
     private nequiPaymentService: IPaymentService,
+    @named('transfero')
+    @inject(TYPES.IPaymentService)
+    private transferoPaymentService: IPaymentService,
   ) { }
 
   public getPaymentService(paymentMethod: PaymentMethod): IPaymentService {
@@ -23,6 +26,8 @@ export class PaymentServiceFactory implements IPaymentServiceFactory {
         return this.moviiPaymentService
       case PaymentMethod.NEQUI:
         return this.nequiPaymentService
+      case PaymentMethod.PIX:
+        return this.transferoPaymentService
       default:
         throw new Error(`Unsupported payment method: ${paymentMethod}`)
     }

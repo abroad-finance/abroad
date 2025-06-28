@@ -10,7 +10,7 @@ import { inject } from 'inversify'
 
 import { ILogger, IQueueHandler, ISlackNotifier, QueueName } from '../../interfaces'
 import { IDatabaseClientProvider } from '../../interfaces/IDatabaseClientProvider'
-import { IExchangeProvider } from '../../interfaces/IExchangeProvider'
+import { IExchangeProviderFactory } from '../../interfaces/IExchangeProviderFactory'
 import { IPaymentServiceFactory } from '../../interfaces/IPaymentServiceFactory'
 import { IWalletHandlerFactory } from '../../interfaces/IWalletHandlerFactory'
 import { PaymentSentMessage, PaymentSentMessageSchema } from '../../interfaces/queueSchema'
@@ -21,10 +21,10 @@ export class PaymentSentController {
     @inject(TYPES.ILogger) private logger: ILogger,
     @inject(TYPES.IQueueHandler) private queueHandler: IQueueHandler,
     @inject(TYPES.IWalletHandlerFactory) private walletHandlerFactory: IWalletHandlerFactory,
-    @inject(TYPES.IExchangeProvider) private exchangeProvider: IExchangeProvider,
     @inject(TYPES.ISlackNotifier) private slackNotifier: ISlackNotifier,
     @inject(TYPES.IDatabaseClientProvider) private dbClientProvider: IDatabaseClientProvider,
     @inject(TYPES.IPaymentServiceFactory) private paymentServiceFactory: IPaymentServiceFactory,
+    @inject(TYPES.IExchangeProviderFactory) private exchangeProviderFactory: IExchangeProviderFactory,
   ) {
 
   }
@@ -95,12 +95,13 @@ export class PaymentSentController {
     targetCurrency: TargetCurrency
   }) => {
     const walletHandler = this.walletHandlerFactory.getWalletHandler(blockchain)
-    const { address, memo } = await this.exchangeProvider.getExchangeAddress({ blockchain, cryptoCurrency })
+    const exchangeProvider = this.exchangeProviderFactory.getExchangeProvider(targetCurrency)
+    const { address, memo } = await exchangeProvider.getExchangeAddress({ blockchain, cryptoCurrency })
 
     const { success, transactionId } = await walletHandler.send({ address, amount, cryptoCurrency, memo })
 
     if (!success) {
-      this.logger.error('[PaymentSent Queue]: Error sending payment:', transactionId)
+      this.logger.error('[PaymentSent Queue]: Error sending payment to exchange:', transactionId)
       this.slackNotifier.sendMessage(
         `[PaymentSent Queue]: Error exchanging ${amount} ${cryptoCurrency} to ${targetCurrency}.`,
       )
@@ -139,6 +140,23 @@ export class PaymentSentController {
         },
         where: {
           source_target: { source: SupportedCurrency.USDT, target: targetCurrency },
+        },
+      })
+    }
+    else if (cryptoCurrency === SupportedCurrency.USDC && targetCurrency === SupportedCurrency.BRL) {
+      await clientDb.pendingConversions.upsert({
+        create: {
+          amount,
+          side: 'SELL',
+          source: cryptoCurrency,
+          symbol: 'USDCBRL',
+          target: targetCurrency,
+        },
+        update: {
+          amount: { increment: amount },
+        },
+        where: {
+          source_target: { source: cryptoCurrency, target: targetCurrency },
         },
       })
     }
