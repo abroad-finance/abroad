@@ -60,6 +60,9 @@ export const Secrets = {
   STELLAR_SEP_JWT_SECRET: 'STELLAR_SEP_JWT_SECRET',
   STELLAR_SEP_PARTNER_ID: 'STELLAR_SEP_PARTNER_ID',
   STELLAR_USDC_ISSUER: 'STELLAR_USDC_ISSUER',
+
+  // Generic webhook notifications
+  WEBHOOK_URL: 'WEBHOOK_URL',
 } as const
 
 export interface ISecretManager {

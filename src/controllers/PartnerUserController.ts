@@ -20,6 +20,7 @@ import {
 
 import { IDatabaseClientProvider } from '../interfaces/IDatabaseClientProvider'
 import { IPaymentServiceFactory } from '../interfaces/IPaymentServiceFactory'
+import { IWebhookNotifier } from '../interfaces/IWebhookNotifier'
 import { TYPES } from '../types'
 
 export interface CreatePartnerUserRequest {
@@ -64,6 +65,7 @@ export class PartnerUserController extends Controller {
     @inject(TYPES.IDatabaseClientProvider)
     private dbProvider: IDatabaseClientProvider,
     @inject(TYPES.IPaymentServiceFactory) private paymentServiceFactory: IPaymentServiceFactory,
+    @inject(TYPES.IWebhookNotifier) private webhookNotifier: IWebhookNotifier,
   ) {
     super()
   }
@@ -104,6 +106,7 @@ export class PartnerUserController extends Controller {
           userId: user_id,
         },
       })
+      await this.webhookNotifier.notify(partner.id, 'partner_user.created', pu)
       return {
         accountNumber: pu.accountNumber,
         bank: pu.bank,

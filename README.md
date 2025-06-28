@@ -48,6 +48,12 @@ npm run dev          # starts Vite development server
 
 Run both servers concurrently or in separate terminals.
 
+## API Documentation
+
+Once the API server is running, open `http://localhost:3784/docs` to view the
+generated documentation. This page also contains details about the webhook
+events available from the platform.
+
 ## Testing & Linting
 
 - Run tests:

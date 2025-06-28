@@ -44,6 +44,7 @@ app.get('/', (req: Request, res: Response) => {
     'application/json': () => {
       res.json({
         documentation: `${baseUrl}/docs`,
+        webhooks: `${baseUrl}/docs#webhooks`,
         message: 'Welcome to the API',
         swagger: `${baseUrl}/swagger.json`,
         version: packageJson.version,

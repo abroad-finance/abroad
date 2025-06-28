@@ -9,7 +9,7 @@ import {
 } from '@prisma/client'
 
 import { ReceivedCryptoTransactionController, TransactionQueueMessage } from '../../../src/controllers/queue/ReceivedCryptoTransactionController'
-import { ILogger, IQueueHandler, ISlackNotifier } from '../../../src/interfaces'
+import { ILogger, IQueueHandler, ISlackNotifier, IWebhookNotifier, IWalletHandlerFactory } from '../../../src/interfaces'
 import { IDatabaseClientProvider } from '../../../src/interfaces/IDatabaseClientProvider'
 import { IPaymentService } from '../../../src/interfaces/IPaymentService'
 import { IPaymentServiceFactory } from '../../../src/interfaces/IPaymentServiceFactory'
@@ -22,7 +22,10 @@ describe('ReceivedCryptoTransactionController', () => {
   let logger: jest.Mocked<ILogger>
   let prismaClient: { transaction: { update: jest.Mock } }
   let slackNotifier: jest.Mocked<ISlackNotifier>
+  let webhookNotifier: jest.Mocked<IWebhookNotifier>
+  let walletHandlerFactory: jest.Mocked<IWalletHandlerFactory>
   let paymentService: jest.Mocked<IPaymentService>
+  const partnerId = 'partner-1'
 
   // We capture the callback function registered via subscribeToQueue
   let capturedCallback: (msg: Record<string, unknown>) => void
@@ -72,6 +75,12 @@ describe('ReceivedCryptoTransactionController', () => {
       sendMessage: jest.fn(),
     }
 
+    walletHandlerFactory = {
+      getWalletHandler: jest.fn(),
+    } as unknown as jest.Mocked<IWalletHandlerFactory>
+
+    webhookNotifier = { notify: jest.fn() }
+
     // Instantiate the controller with the mocks
     controller = new ReceivedCryptoTransactionController(
       paymentServiceFactory,
@@ -79,6 +88,8 @@ describe('ReceivedCryptoTransactionController', () => {
       dbClientProvider,
       logger,
       slackNotifier,
+      walletHandlerFactory,
+      webhookNotifier,
     )
 
     // Call registerConsumers and capture the callback passed to subscribeToQueue
@@ -124,6 +135,7 @@ describe('ReceivedCryptoTransactionController', () => {
       const transactionRecord = {
         accountNumber: 'account-123',
         id: validMsg.transactionId,
+        partnerUser: { partner: { id: partnerId } },
         quote: {
           sourceAmount: 100,
           targetAmount: 90,
@@ -139,7 +151,7 @@ describe('ReceivedCryptoTransactionController', () => {
           onChainId: validMsg.onChainId,
           status: TransactionStatus.PROCESSING_PAYMENT,
         },
-        include: { quote: true },
+        include: { partnerUser: { include: { partner: true } }, quote: true },
         where: {
           id: validMsg.transactionId,
           status: TransactionStatus.AWAITING_PAYMENT,
@@ -156,8 +168,15 @@ describe('ReceivedCryptoTransactionController', () => {
       // And the transaction should be updated with WRONG_AMOUNT
       expect(prismaClient.transaction.update).toHaveBeenCalledWith({
         data: { status: TransactionStatus.WRONG_AMOUNT },
+        include: { partnerUser: { include: { partner: true } }, quote: true },
         where: { id: transactionRecord.id },
       })
+
+      expect(webhookNotifier.notify).toHaveBeenCalledWith(
+        partnerId,
+        'transaction.updated',
+        transactionRecord,
+      )
 
       // Payment service should not be called
       expect(paymentService.sendPayment).not.toHaveBeenCalled()
@@ -175,6 +194,7 @@ describe('ReceivedCryptoTransactionController', () => {
       const transactionRecord = {
         accountNumber: 'account-456',
         id: validMsg.transactionId,
+        partnerUser: { partner: { id: partnerId } },
         quote: {
           sourceAmount: 100,
           targetAmount: 95,
@@ -199,7 +219,7 @@ describe('ReceivedCryptoTransactionController', () => {
           onChainId: validMsg.onChainId,
           status: TransactionStatus.PROCESSING_PAYMENT,
         },
-        include: { quote: true },
+        include: { partnerUser: { include: { partner: true } }, quote: true },
         where: {
           id: validMsg.transactionId,
           status: TransactionStatus.AWAITING_PAYMENT,
@@ -216,6 +236,7 @@ describe('ReceivedCryptoTransactionController', () => {
       // Verify that the final update sets the status to PAYMENT_COMPLETED
       expect(prismaClient.transaction.update).toHaveBeenNthCalledWith(2, {
         data: { status: TransactionStatus.PAYMENT_COMPLETED },
+        include: { partnerUser: { include: { partner: true } }, quote: true },
         where: { id: transactionRecord.id },
       })
 
@@ -223,6 +244,11 @@ describe('ReceivedCryptoTransactionController', () => {
       expect(logger.info).toHaveBeenCalledWith(
         '[Stellar transaction]: Payment completed for transaction:',
         transactionRecord.id,
+      )
+      expect(webhookNotifier.notify).toHaveBeenCalledWith(
+        partnerId,
+        'transaction.updated',
+        transactionRecord,
       )
     })
 
@@ -238,6 +264,7 @@ describe('ReceivedCryptoTransactionController', () => {
       const transactionRecord = {
         accountNumber: 'account-789',
         id: validMsg.transactionId,
+        partnerUser: { partner: { id: partnerId } },
         quote: {
           sourceAmount: 100,
           targetAmount: 95,
@@ -260,12 +287,18 @@ describe('ReceivedCryptoTransactionController', () => {
       // Final update should set the status to PAYMENT_FAILED
       expect(prismaClient.transaction.update).toHaveBeenNthCalledWith(2, {
         data: { status: TransactionStatus.PAYMENT_FAILED },
+        include: { partnerUser: { include: { partner: true } }, quote: true },
         where: { id: transactionRecord.id },
       })
 
       expect(logger.info).toHaveBeenCalledWith(
         '[Stellar transaction]: Payment failed for transaction:',
         transactionRecord.id,
+      )
+      expect(webhookNotifier.notify).toHaveBeenCalledWith(
+        partnerId,
+        'transaction.updated',
+        transactionRecord,
       )
     })
 
@@ -281,6 +314,7 @@ describe('ReceivedCryptoTransactionController', () => {
       const transactionRecord = {
         accountNumber: 'account-101',
         id: validMsg.transactionId,
+        partnerUser: { partner: { id: partnerId } },
         quote: {
           sourceAmount: 100,
           targetAmount: 95,
@@ -307,8 +341,14 @@ describe('ReceivedCryptoTransactionController', () => {
 
       expect(prismaClient.transaction.update).toHaveBeenNthCalledWith(2, {
         data: { status: TransactionStatus.PAYMENT_FAILED },
+        include: { partnerUser: { include: { partner: true } }, quote: true },
         where: { id: transactionRecord.id },
       })
+      expect(webhookNotifier.notify).toHaveBeenCalledWith(
+        partnerId,
+        'transaction.updated',
+        transactionRecord,
+      )
     })
 
     it('should log a warning and exit if the transaction is not found (P2025 error)', async () => {

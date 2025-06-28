@@ -7,6 +7,7 @@ import {
   ILogger,
   IQueueHandler,
   ISlackNotifier,
+  IWebhookNotifier,
   IWalletHandlerFactory,
   QueueName,
 } from '../../interfaces'
@@ -40,6 +41,7 @@ export class ReceivedCryptoTransactionController {
     @inject(TYPES.ILogger) private logger: ILogger,
     @inject(TYPES.ISlackNotifier) private slackNotifier: ISlackNotifier,
     @inject(TYPES.IWalletHandlerFactory) private walletHandlerFactory: IWalletHandlerFactory,
+    @inject(TYPES.IWebhookNotifier) private webhookNotifier: IWebhookNotifier,
   ) { }
 
   public registerConsumers() {
@@ -106,6 +108,11 @@ export class ReceivedCryptoTransactionController {
           status: TransactionStatus.AWAITING_PAYMENT,
         },
       })
+      await this.webhookNotifier.notify(
+        transactionRecord.partnerUser.partner.id,
+        'transaction.updated',
+        transactionRecord,
+      )
     }
     catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError) {
@@ -131,10 +138,16 @@ export class ReceivedCryptoTransactionController {
         message.amount,
         transactionRecord.quote.sourceAmount,
       )
-      await prismaClient.transaction.update({
+      transactionRecord = await prismaClient.transaction.update({
         data: { status: TransactionStatus.WRONG_AMOUNT },
+        include: { partnerUser: { include: { partner: true } }, quote: true },
         where: { id: transactionRecord.id },
       })
+      await this.webhookNotifier.notify(
+        transactionRecord.partnerUser.partner.id,
+        'transaction.updated',
+        transactionRecord,
+      )
 
       const walletHandler = this.walletHandlerFactory.getWalletHandler(message.blockchain)
       await walletHandler.send({
@@ -162,10 +175,16 @@ export class ReceivedCryptoTransactionController {
         ? TransactionStatus.PAYMENT_COMPLETED
         : TransactionStatus.PAYMENT_FAILED
 
-      await prismaClient.transaction.update({
+      transactionRecord = await prismaClient.transaction.update({
         data: { status: newStatus },
+        include: { partnerUser: { include: { partner: true } }, quote: true },
         where: { id: transactionRecord.id },
       })
+      await this.webhookNotifier.notify(
+        transactionRecord.partnerUser.partner.id,
+        'transaction.updated',
+        transactionRecord,
+      )
 
       this.logger.info(
         `[Stellar transaction]: Payment ${paymentResponse.success ? 'completed' : 'failed'} for transaction:`,
@@ -191,10 +210,16 @@ export class ReceivedCryptoTransactionController {
         '[Stellar transaction]: Payment processing error:',
         paymentError,
       )
-      await prismaClient.transaction.update({
+      transactionRecord = await prismaClient.transaction.update({
         data: { status: TransactionStatus.PAYMENT_FAILED },
+        include: { partnerUser: { include: { partner: true } }, quote: true },
         where: { id: transactionRecord.id },
       })
+      await this.webhookNotifier.notify(
+        transactionRecord.partnerUser.partner.id,
+        'transaction.updated',
+        transactionRecord,
+      )
 
       const walletHandler = this.walletHandlerFactory.getWalletHandler(
         message.blockchain,

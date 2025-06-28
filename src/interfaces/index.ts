@@ -35,6 +35,8 @@ export interface ISlackNotifier {
   sendMessage(message: string): Promise<void>
 }
 
+export * from './IWebhookNotifier'
+
 export * from './IAuthService'
 export * from './IWalletHandlerFactory'
 export * from './queueSchema'

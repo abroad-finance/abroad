@@ -18,6 +18,7 @@ model Partner {
   phone         String?
   firstName     String?
   lastName      String?
+  webhookUrl    String?
   isKybApproved Boolean?      @default(false)
   needsKyc      Boolean?      @default(true)
   users         PartnerUser[]

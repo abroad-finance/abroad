@@ -21,6 +21,7 @@ import {
   IPartnerService,
   IQueueHandler,
   ISlackNotifier,
+  IWebhookNotifier,
 } from './interfaces'
 import { IDatabaseClientProvider } from './interfaces/IDatabaseClientProvider'
 import { IExchangeProvider } from './interfaces/IExchangeProvider'
@@ -39,6 +40,7 @@ import { PartnerService } from './services/partnerService'
 import { PaymentServiceFactory } from './services/PaymentServiceFactory'
 import { PersonaKycService } from './services/personaKycService'
 import { SlackNotifier } from './services/slackNotifier'
+import { WebhookNotifier } from './services/webhookNotifier'
 import { SolanaWalletHandler } from './services/SolanaWalletHandler'
 import { StellarWalletHandler } from './services/StellarWalletHandler'
 import { WalletHandlerFactory } from './services/WalletHandlerFactory'
@@ -130,6 +132,10 @@ container.bind<ILogger>(TYPES.ILogger).to(ConsoleLogger).inSingletonScope()
 container
   .bind<ISlackNotifier>(TYPES.ISlackNotifier)
   .to(SlackNotifier)
+  .inSingletonScope()
+container
+  .bind<IWebhookNotifier>(TYPES.IWebhookNotifier)
+  .to(WebhookNotifier)
   .inSingletonScope()
 
 // QuoteUseCase

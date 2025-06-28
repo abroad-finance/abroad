@@ -21,6 +21,7 @@ import { Body, Post } from 'tsoa'
 import { IPartnerService } from '../interfaces'
 import { IDatabaseClientProvider } from '../interfaces/IDatabaseClientProvider'
 import { IPaymentServiceFactory } from '../interfaces/IPaymentServiceFactory'
+import { IWebhookNotifier } from '../interfaces/IWebhookNotifier'
 import { TYPES } from '../types'
 import { KycUseCase } from '../useCases/kycUseCase'
 
@@ -63,6 +64,7 @@ export class TransactionController extends Controller {
     @inject(TYPES.IPartnerService) private partnerService: IPartnerService,
     @inject(TYPES.IPaymentServiceFactory) private paymentServiceFactory: IPaymentServiceFactory,
     @inject(TYPES.KycUseCase) private kycUseCase: KycUseCase,
+    @inject(TYPES.IWebhookNotifier) private webhookNotifier: IWebhookNotifier,
   ) {
     super()
   }
@@ -202,6 +204,12 @@ export class TransactionController extends Controller {
           status: TransactionStatus.AWAITING_PAYMENT,
         },
       })
+
+      await this.webhookNotifier.notify(
+        partner.id,
+        'transaction.created',
+        transaction,
+      )
 
       return {
         id: transaction.id,

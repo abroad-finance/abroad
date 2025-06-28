@@ -3,9 +3,13 @@ import { Request as RequestExpress } from 'express'
 
 import { CreatePartnerUserRequest, PartnerUserController } from '../../src/controllers/PartnerUserController'
 import { IDatabaseClientProvider } from '../../src/interfaces/IDatabaseClientProvider'
+import { IPaymentServiceFactory } from '../../src/interfaces/IPaymentServiceFactory'
+import { IWebhookNotifier } from '../../src/interfaces/IWebhookNotifier'
 
 describe('PartnerUserController', () => {
   let dbProviderMock: jest.Mocked<IDatabaseClientProvider>
+  let webhookNotifier: jest.Mocked<IWebhookNotifier>
+  let paymentServiceFactory: jest.Mocked<IPaymentServiceFactory>
   let controller: PartnerUserController
   let request: jest.Mocked<RequestExpress>
   let badRequestResponse: jest.Mock<unknown, [number, { reason: string }]>
@@ -13,7 +17,9 @@ describe('PartnerUserController', () => {
 
   beforeEach(() => {
     dbProviderMock = { getClient: jest.fn() } as unknown as jest.Mocked<IDatabaseClientProvider>
-    controller = new PartnerUserController(dbProviderMock)
+    webhookNotifier = { notify: jest.fn() } as unknown as jest.Mocked<IWebhookNotifier>
+    paymentServiceFactory = {} as unknown as jest.Mocked<IPaymentServiceFactory>
+    controller = new PartnerUserController(dbProviderMock, paymentServiceFactory, webhookNotifier)
     request = { header: jest.fn(), user: partner } as unknown as jest.Mocked<RequestExpress>
     badRequestResponse = jest.fn()
   })
@@ -59,6 +65,11 @@ describe('PartnerUserController', () => {
       expect(prismaMock.partnerUser.create).toHaveBeenCalledWith({
         data: { accountNumber, bank, partnerId: partner.id, paymentMethod, userId },
       })
+      expect(webhookNotifier.notify).toHaveBeenCalledWith(
+        partner.id,
+        'partner_user.created',
+        pu,
+      )
     })
 
     it('should return bad request when prisma.create fails', async () => {

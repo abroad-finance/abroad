@@ -12,6 +12,7 @@ export const TYPES = {
   IQueueHandler: Symbol.for('IQueueHandler'),
   ISecretManager: Symbol.for('ISecretManager'),
   ISlackNotifier: Symbol.for('ISlackNotifier'),
+  IWebhookNotifier: Symbol.for('IWebhookNotifier'),
   IWalletHandlerFactory: Symbol.for('IWalletHandlerFactory'),
   KycUseCase: Symbol.for('KycUseCase'),
   PaymentSentController: Symbol.for('PaymentSentController'),
