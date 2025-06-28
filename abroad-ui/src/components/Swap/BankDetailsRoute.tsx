@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from "../../components/button";
 import { Loader, Landmark, Hash, ArrowLeft, Rotate3d } from 'lucide-react';
-import { getBanks, Bank, getBanksResponse200, acceptTransaction, checkKyc } from '../../api';
+import { getBanks, Bank, getBanksResponse200, acceptTransaction } from '../../api';
 
 interface BankDetailsRouteProps {
   onBackClick: () => void;

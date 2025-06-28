@@ -137,3 +137,4 @@ dependency-graph.svg
 .env*
 abroad-ui/src/api/index.ts
 transactions-report.csv
+.DS_Store
