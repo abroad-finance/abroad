@@ -16,15 +16,22 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({ className = '' }) =
 
   return (
     <nav className={`w-full px-4 pt-4 ${className}`}>
-      <div className="max-w-8xl mx-auto bg-[#356E6A]/5 backdrop-blur-md rounded-2xl">
+      <div className="max-w-8xl mx-auto bg-black/10 md:bg-[#356E6A]/5 backdrop-blur-md rounded-2xl">
         <div className="px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <div className="flex-shrink-0">
+            {/* Mobile Logo - Colored */}
+            <img
+              src="/src/assets/Logos/AbroadLogoColored.svg"
+              alt="Abroad Logo"
+              className="h-8 w-auto md:hidden"
+            />
+            {/* Desktop Logo - White */}
             <img
               src="/src/assets/Logos/AbroadLogoWhite.svg"
               alt="Abroad Logo"
-              className="h-8 w-auto"
+              className="h-8 w-auto hidden md:block"
             />
           </div>
 
