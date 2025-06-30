@@ -5,6 +5,7 @@ interface SwapProps {
   initialSourceAmount?: string;
   initialTargetAmount?: string;
   onAmountsChange?: (srcAmount: string, tgtAmount: string) => void;
+  textColor?: string;
 }
 
 import { Button } from "../Button";
@@ -14,7 +15,7 @@ import { getQuote, getReverseQuote, _36EnumsTargetCurrency, _36EnumsPaymentMetho
 
 const TransferFee = 1354;
 
-export default function Swap({ onContinue, initialSourceAmount = '', initialTargetAmount = '', onAmountsChange }: SwapProps) {
+export default function Swap({ onContinue, initialSourceAmount = '', initialTargetAmount = '', onAmountsChange, textColor = '#356E6A' }: SwapProps) {
     // state for source (USD) and target (COP) amounts
     const [sourceAmount, setSourceAmount] = useState(initialSourceAmount);
     const [targetAmount, setTargetAmount] = useState(initialTargetAmount || '');
@@ -163,7 +164,7 @@ export default function Swap({ onContinue, initialSourceAmount = '', initialTarg
      <div className="flex-1 flex items-center justify-center w-full flex flex-col">
        <div id="background-container" className="w-[90%] max-w-[50vh] h-[60vh] bg-[#356E6A]/5 backdrop-blur-xl rounded-4xl p-6 flex flex-col items-center justify-center space-y-1">
          {/* Here starts Swap as a component */}
-         <div id="Title" className="text-2xl font-bold mb-8 text-[#356E6A]">¿Cuanto deseas Retirar?</div>
+         <div id="Title" className="text-2xl font-bold mb-8" style={{ color: textColor }}>¿Cuanto deseas Retirar?</div>
          <div id="source-amount" className="w-full h-[60vh] bg-white/60 backdrop-blur-xl rounded-4xl p-6 flex items-center justify-start">
            {/* number input area: always show $ prefix, then spinner or input */}
            <div className="w-3/4 h-full flex items-center space-x-2">
@@ -212,7 +213,7 @@ export default function Swap({ onContinue, initialSourceAmount = '', initialTarg
            <TokenBadge iconSrc="https://storage.cloud.google.com/cdn-abroad/Icons/Tokens/COP-Token.svg" alt="COP Token Logo" symbol="COP" />
          </div>
 
-         <div id="tx-info" className="relative w-full h-[60vh] text-[#356E6A] pt-6 pl-4 flex items-center justify-start">
+         <div id="tx-info" className="relative w-full h-[60vh] pt-6 pl-4 flex items-center justify-start" style={{ color: textColor }}>
            <div className="h-full flex-col items-center space-x-2">
            <div  id="trm" className="flex items-center space-x-2 pb-2">
                <CircleDollarSign className="w-5 h-5" />

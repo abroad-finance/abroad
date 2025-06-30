@@ -1,5 +1,6 @@
 import React from 'react';
 import Swap from '../../components/Swap/Swap';
+import NavBarResponsive from '../../components/WebSwap/NavBarResponsive';
 
 const WebSwap: React.FC = () => {
   const [currentCurrency, setCurrentCurrency] = React.useState(0);
@@ -38,14 +39,20 @@ const WebSwap: React.FC = () => {
         margin: 0,
         padding: 0,
         overflow: 'hidden',
-        display: 'flex'
+        display: 'flex',
+        flexDirection: 'column'
       }}
     >
-      {/* LEFT COLUMN - Marketing text and attribution */}
+      {/* Navigation Bar */}
+      <NavBarResponsive />
+      
+      {/* Main Content */}
+      <div style={{ flex: 1, display: 'flex' }}>
+        {/* LEFT COLUMN - Marketing text and attribution */}
       <div 
         style={{
           width: '50%',
-          height: '100vh',
+          flex: 1,
           display: 'flex',
           flexDirection: 'column',
           position: 'relative'
@@ -151,7 +158,7 @@ const WebSwap: React.FC = () => {
       <div 
         style={{
           width: '50%',
-          height: '100vh',
+          flex: 1,
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'center',
@@ -171,6 +178,7 @@ const WebSwap: React.FC = () => {
               console.log('Amounts changed:', { srcAmount, tgtAmount });
               // Handle amount changes here
             }}
+            textColor="white"
           />
         </div>
 
@@ -184,7 +192,7 @@ const WebSwap: React.FC = () => {
             alignItems: 'center',
             gap: '12px',
             color: 'white',
-            fontSize: '18px',
+            fontSize: '15px',
             fontFamily: 'Airbnb Cereal'
           }}
         >
@@ -195,6 +203,7 @@ const WebSwap: React.FC = () => {
             style={{ height: '36px', width: 'auto' }}
           />
         </div>
+      </div>
       </div>
     </div>
   );

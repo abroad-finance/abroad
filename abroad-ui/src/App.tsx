@@ -30,7 +30,7 @@ function App() {
           {/* Add other public routes here if needed */}
           <Route path="/mobile/splash" element={<Splash />} />
           <Route path="/mobile/anchor" element={<Anchor />} />
-          <Route path="/webswap" element={<WebSwap />} />
+          <Route path="/web-swap" element={<WebSwap />} />
 
         </Routes>
       </Router>
