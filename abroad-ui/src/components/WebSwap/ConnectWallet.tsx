@@ -46,24 +46,26 @@ const ConnectWallet: React.FC<ConnectWalletProps> = ({ onWalletSelect, onClose }
 
   return (
     <motion.div 
-      className="w-full max-w-sm mx-auto md:mx-0 md:ml-auto md:h-[95vh] md:max-w-md md:flex md:items-center"
-      initial={{ x: '100%', opacity: 1 }}
-      animate={{ x: 0, opacity: 1 }}
-      exit={{ opacity: 0 }}
+      className="w-screen md:w-auto md:mx-0 md:ml-auto md:h-[95vh] md:max-w-md md:flex md:items-center fixed md:relative left-0 md:left-auto top-auto md:top-auto bottom-0 md:bottom-auto"
+      initial={{ 
+        x: window.innerWidth >= 768 ? '100%' : 0,
+        y: window.innerWidth >= 768 ? 0 : '100%',
+        opacity: 1 
+      }}
+      animate={{ x: 0, y: 0, opacity: 1 }}
+      exit={{ 
+        x: window.innerWidth >= 768 ? '100%' : 0,
+        y: window.innerWidth >= 768 ? 0 : '100%',
+        opacity: window.innerWidth >= 768 ? 1 : 0 
+      }}
       transition={{ 
-        x: {
-          type: 'spring',
-          stiffness: 400,
-          damping: 25,
-          duration: 0.2
-        },
-        opacity: {
-          duration: 0.2,
-          ease: 'easeOut'
-        }
+        type: 'spring',
+        stiffness: 800,
+        damping: 35,
+        duration: 0.12
       }}
     >
-      <div className="bg-white rounded-4xl shadow-lg border border-gray-200 p-6 relative md:w-full md:h-full md:flex md:flex-col">
+      <div className="bg-white rounded-t-4xl md:rounded-4xl shadow-lg border border-gray-200 p-6 relative w-full md:h-full md:flex md:flex-col min-h-fit">
         {/* Close Button */}
         {onClose && (
           <button
@@ -75,7 +77,7 @@ const ConnectWallet: React.FC<ConnectWalletProps> = ({ onWalletSelect, onClose }
         )}
 
         {/* Header */}
-        <div className="mb-6 pr-8 text-center mt-15">
+        <div className="mb-3 pr-8 text-center mt-5 md:mt-15">
           <h2 className="text-2xl font-semibold text-gray-900 mb-2">
             Connect your wallet
           </h2>
@@ -85,7 +87,7 @@ const ConnectWallet: React.FC<ConnectWalletProps> = ({ onWalletSelect, onClose }
         </div>
 
         {/* Wallet Options */}
-        <div className="space-y-3 mb-6 md:flex-1 md:flex md:flex-col md:justify-center -mt-94">
+        <div className="space-y-3 mb-6 md:flex-1 md:flex md:flex-col md:justify-center md:-mt-94">
           {walletOptions.map((wallet) => (
             <button
               key={wallet.id}

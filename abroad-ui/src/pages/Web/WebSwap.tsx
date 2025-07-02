@@ -1,5 +1,5 @@
 import React from 'react';
-import { AnimatePresence } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import Swap from '../../components/Swap/Swap';
 import NavBarResponsive from '../../components/WebSwap/NavBarResponsive';
 import ConnectWallet from '../../components/WebSwap/ConnectWallet';
@@ -382,10 +382,14 @@ const WebSwap: React.FC = () => {
       {/* Wallet Modal - Rendered at top level */}
       <AnimatePresence>
         {isWalletModalOpen && (
-          <div 
+          <motion.div 
             className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[99999] flex items-center justify-center md:justify-end p-4 md:pr-8"
             onClick={handleWalletClose}
             style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.12, ease: 'easeOut' }}
           >
             <div onClick={(e) => e.stopPropagation()}>
               <ConnectWallet 
@@ -393,7 +397,7 @@ const WebSwap: React.FC = () => {
                 onClose={handleWalletClose}
               />
             </div>
-          </div>
+          </motion.div>
         )}
       </AnimatePresence>
     </div>
