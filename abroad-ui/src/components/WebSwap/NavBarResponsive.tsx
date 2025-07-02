@@ -3,9 +3,10 @@ import { Settings, Info, Menu, X } from 'lucide-react';
 
 interface NavBarResponsiveProps {
   className?: string;
+  onWalletConnect?: () => void;
 }
 
-const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({ className = '' }) => {
+const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({ className = '', onWalletConnect }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const toggleMobileMenu = () => {
@@ -15,10 +16,11 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({ className = '' }) =
   const menuItems = ['Trade', 'Pool', 'About'];
 
   return (
-    <nav className={`w-full px-4 pt-4 ${className}`}>
-      <div className="max-w-8xl mx-auto bg-black/10 md:bg-[#356E6A]/5 backdrop-blur-md rounded-2xl">
-        <div className="px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
+    <>
+      <nav className={`w-full px-4 pt-4 ${className}`}>
+        <div className="max-w-8xl mx-auto bg-black/10 md:bg-[#356E6A]/5 backdrop-blur-md rounded-2xl">
+          <div className="px-4 sm:px-6 lg:px-8">
+            <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <div className="flex-shrink-0">
             {/* Mobile Logo - Colored */}
@@ -53,14 +55,17 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({ className = '' }) =
           {/* Desktop Right Side */}
           <div className="hidden md:flex items-center space-x-4">
             {/* Wallet Badge */}
-            <div className="flex items-center space-x-2 bg-white/20 backdrop-blur-sm rounded-full px-4 py-2 border border-white/30">
+            <button 
+              onClick={onWalletConnect}
+              className="flex items-center space-x-2 bg-white/20 backdrop-blur-sm rounded-full px-4 py-2 border border-white/30 hover:bg-white/30 transition-colors duration-200"
+            >
               <img
                 src="https://storage.googleapis.com/cdn-abroad/Icons/Banks/Trust_Wallet_Shield.svg"
                 alt="Trust Wallet"
                 className="w-5 h-5"
               />
-              <span className="text-white text-sm font-medium">0x1059...1408</span>
-            </div>
+              <span className="text-white text-md font-medium">Connect Wallet</span>
+            </button>
 
             {/* Settings Icon */}
             <button className="p-2 rounded-full bg-white/20 hover:bg-white/30 transition-colors duration-200">
@@ -103,14 +108,17 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({ className = '' }) =
               ))}
               
               {/* Mobile Wallet Badge */}
-              <div className="flex items-center justify-center space-x-2 bg-white/20 backdrop-blur-sm rounded-full px-4 py-2 border border-white/30 mx-3 mt-4">
+              <button 
+                onClick={onWalletConnect}
+                className="flex items-center justify-center space-x-2 bg-white/20 backdrop-blur-sm rounded-full px-4 py-2 border border-white/30 mx-3 mt-4 hover:bg-white/30 transition-colors duration-200"
+              >
                 <img
                   src="https://storage.googleapis.com/cdn-abroad/Icons/Banks/Trust_Wallet_Shield.svg"
                   alt="Trust Wallet"
                   className="w-5 h-5"
                 />
                 <span className="text-white text-sm font-medium">0x1059...1408</span>
-              </div>
+              </button>
 
               {/* Mobile Action Buttons */}
               <div className="flex justify-center space-x-4 mt-4 pb-2">
@@ -126,7 +134,8 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({ className = '' }) =
         )}
         </div>
       </div>
-    </nav>
+      </nav>
+    </>
   );
 };
 

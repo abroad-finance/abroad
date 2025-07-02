@@ -1,10 +1,13 @@
 import React from 'react';
+import { AnimatePresence } from 'framer-motion';
 import Swap from '../../components/Swap/Swap';
 import NavBarResponsive from '../../components/WebSwap/NavBarResponsive';
+import ConnectWallet from '../../components/WebSwap/ConnectWallet';
 
 const WebSwap: React.FC = () => {
   const [currentCurrency, setCurrentCurrency] = React.useState(0);
   const [isVisible, setIsVisible] = React.useState(true);
+  const [isWalletModalOpen, setIsWalletModalOpen] = React.useState(false);
   
   const currencies = [
     { flag: 'co', name: 'Pesos' },
@@ -25,6 +28,19 @@ const WebSwap: React.FC = () => {
 
     return () => clearInterval(interval);
   }, [currencies.length]);
+
+  const handleWalletConnect = () => {
+    setIsWalletModalOpen(true);
+  };
+
+  const handleWalletClose = () => {
+    setIsWalletModalOpen(false);
+  };
+
+  const handleWalletSelect = (walletType: 'trust' | 'stellar') => {
+    console.log('Wallet selected:', walletType);
+    setIsWalletModalOpen(false);
+  };
 
   return (
     <div 
@@ -49,7 +65,7 @@ const WebSwap: React.FC = () => {
       />
       {/* Navigation Bar */}
       <div className="relative z-10 bg-green-50 md:bg-transparent">
-        <NavBarResponsive />
+        <NavBarResponsive onWalletConnect={handleWalletConnect} />
       </div>
       
       {/* Main Content */}
@@ -362,6 +378,24 @@ const WebSwap: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Wallet Modal - Rendered at top level */}
+      <AnimatePresence>
+        {isWalletModalOpen && (
+          <div 
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[99999] flex items-center justify-center md:justify-end p-4 md:pr-8"
+            onClick={handleWalletClose}
+            style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}
+          >
+            <div onClick={(e) => e.stopPropagation()}>
+              <ConnectWallet 
+                onWalletSelect={handleWalletSelect} 
+                onClose={handleWalletClose}
+              />
+            </div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
