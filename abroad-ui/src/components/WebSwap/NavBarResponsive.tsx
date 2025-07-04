@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { Settings, Info, Menu, X } from 'lucide-react';
+import { useBlux } from '@bluxcc/react';
 
 interface NavBarResponsiveProps {
   className?: string;
@@ -8,10 +9,96 @@ interface NavBarResponsiveProps {
 
 const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({ className = '', onWalletConnect }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const { user, isAuthenticated } = useBlux();
 
-  const toggleMobileMenu = () => {
+  // Debug: Log user object to see available properties
+  React.useEffect(() => {
+    if (user) {
+      console.log('User object:', user);
+      console.log('User properties:', Object.keys(user));
+      console.log('User JSON:', JSON.stringify(user, null, 2));
+    }
+  }, [user]);
+
+  const toggleMobileMenu = useCallback(() => {
     setIsMobileMenuOpen(!isMobileMenuOpen);
-  };
+  }, [isMobileMenuOpen]);
+
+  // Helper function to format wallet address
+  const formatWalletAddress = useCallback((address: string) => {
+    if (!address || address === 'Connected') return 'Connected';
+    return `${address.slice(0, 6)}...${address.slice(-4)}`;
+  }, []);
+
+  // Get public key from user object - focus on stellar address
+  const publicKey = useMemo(() => {
+    if (!user) return null;
+    
+    // Log the entire user object for debugging
+    console.log('Getting public key from user:', user);
+    
+    // Try different possible property names and nested properties
+    const userObj = user as unknown as Record<string, unknown>;
+    
+    // Check direct properties first
+    let pk = userObj.stellarAddress || 
+                   userObj.publicKey || 
+                   userObj.address || 
+                   userObj.walletAddress || 
+                   userObj.accountId ||
+                   userObj.id ||
+                   null;
+    
+    // If not found, check nested properties
+    if (!pk && userObj.wallet && typeof userObj.wallet === 'object') {
+      const wallet = userObj.wallet as Record<string, unknown>;
+      pk = wallet.stellarAddress ||
+                 wallet.publicKey ||
+                 wallet.address ||
+                 null;
+    }
+    
+    // Check if there's an account object
+    if (!pk && userObj.account && typeof userObj.account === 'object') {
+      const account = userObj.account as Record<string, unknown>;
+      pk = account.stellarAddress ||
+                 account.publicKey ||
+                 account.address ||
+                 account.id ||
+                 null;
+    }
+    
+    // Check profile object
+    if (!pk && userObj.profile && typeof userObj.profile === 'object') {
+      const profile = userObj.profile as Record<string, unknown>;
+      pk = profile.stellarAddress ||
+                 profile.publicKey ||
+                 profile.address ||
+                 null;
+    }
+    
+    console.log('Found public key:', pk);
+    console.log('All user object keys recursively:');
+    
+    // Log all nested keys
+    const logNestedKeys = (obj: Record<string, unknown>, prefix = '') => {
+      Object.keys(obj).forEach(key => {
+        const fullKey = prefix ? `${prefix}.${key}` : key;
+        console.log(`  ${fullKey}: ${typeof obj[key]} = ${obj[key]}`);
+        if (typeof obj[key] === 'object' && obj[key] !== null && !Array.isArray(obj[key])) {
+          logNestedKeys(obj[key] as Record<string, unknown>, fullKey);
+        }
+      });
+    };
+    
+    logNestedKeys(userObj);
+    
+    return pk;
+  }, [user]);
+
+  const walletAddress = useMemo(() => (
+    publicKey ? formatWalletAddress(String(publicKey)) : 'Connected'
+  ), [publicKey, formatWalletAddress]);
 
   const menuItems = ['Trade', 'Pool', 'About'];
 
@@ -64,7 +151,9 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({ className = '', onW
                 alt="Trust Wallet"
                 className="w-5 h-5"
               />
-              <span className="text-white text-md font-medium">Connect Wallet</span>
+              <span className="text-white text-md font-medium">
+                {isAuthenticated && user ? walletAddress : 'Connect Wallet'}
+              </span>
             </button>
 
             {/* Settings Icon */}
@@ -117,7 +206,9 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({ className = '', onW
                   alt="Trust Wallet"
                   className="w-5 h-5"
                 />
-                <span className="text-white text-sm font-medium">0x1059...1408</span>
+                <span className="text-white text-sm font-medium">
+                  {isAuthenticated && user ? walletAddress : 'Connect Wallet'}
+                </span>
               </button>
 
               {/* Mobile Action Buttons */}

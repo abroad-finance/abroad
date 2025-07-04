@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { useBlux } from '@bluxcc/react';
 import TrustWalletIcon from '../../assets/Logos/Wallets/TrustWalletShield.svg';
 import StellarLogo from '../../assets/Logos/Blockchains/StellarLogo.svg';
 
@@ -11,6 +12,7 @@ interface ConnectWalletProps {
 
 const ConnectWallet: React.FC<ConnectWalletProps> = ({ onWalletSelect, onClose }) => {
   const [selectedWallet, setSelectedWallet] = useState<'trust' | 'stellar' | null>(null);
+  const { login, isReady } = useBlux();
 
   // Handle escape key press
   useEffect(() => {
@@ -28,7 +30,16 @@ const ConnectWallet: React.FC<ConnectWalletProps> = ({ onWalletSelect, onClose }
 
   const handleWalletSelect = (walletType: 'trust' | 'stellar') => {
     setSelectedWallet(walletType);
-    onWalletSelect?.(walletType);
+    
+    if (walletType === 'stellar') {
+      // Use Blux for Stellar wallet connections
+      if (isReady) {
+        login();
+      }
+    } else {
+      // Handle Trust Wallet or other wallet types
+      onWalletSelect?.(walletType);
+    }
   };
 
   const walletOptions = [

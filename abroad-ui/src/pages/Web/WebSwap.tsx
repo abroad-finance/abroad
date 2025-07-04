@@ -4,16 +4,16 @@ import Swap from '../../components/Swap/Swap';
 import NavBarResponsive from '../../components/WebSwap/NavBarResponsive';
 import ConnectWallet from '../../components/WebSwap/ConnectWallet';
 
+const currencies = [
+  { flag: 'co', name: 'Pesos' },
+  { flag: 'br', name: 'Reales' }
+];
+
 const WebSwap: React.FC = () => {
   const [currentCurrency, setCurrentCurrency] = React.useState(0);
   const [isVisible, setIsVisible] = React.useState(true);
   const [isWalletModalOpen, setIsWalletModalOpen] = React.useState(false);
   
-  const currencies = [
-    { flag: 'co', name: 'Pesos' },
-    { flag: 'br', name: 'Reales' }
-  ];
-
   React.useEffect(() => {
     const interval = setInterval(() => {
       // Start fade out
@@ -27,20 +27,30 @@ const WebSwap: React.FC = () => {
     }, 3000); // Slower interval for more gentle feel
 
     return () => clearInterval(interval);
-  }, [currencies.length]);
+  }, []);
 
-  const handleWalletConnect = () => {
+  const handleWalletConnect = React.useCallback(() => {
     setIsWalletModalOpen(true);
-  };
+  }, []);
 
-  const handleWalletClose = () => {
+  const handleWalletClose = React.useCallback(() => {
     setIsWalletModalOpen(false);
-  };
+  }, []);
 
-  const handleWalletSelect = (walletType: 'trust' | 'stellar') => {
+  const handleWalletSelect = React.useCallback((walletType: 'trust' | 'stellar') => {
     console.log('Wallet selected:', walletType);
     setIsWalletModalOpen(false);
-  };
+  }, []);
+
+  const handleSwapContinue = React.useCallback((quote_id: string, srcAmount: string, tgtAmount: string) => {
+    console.log('Continue clicked:', { quote_id, srcAmount, tgtAmount });
+    // Handle the continue action here
+  }, []);
+
+  const handleAmountsChange = React.useCallback((srcAmount: string, tgtAmount: string) => {
+    console.log('Amounts changed:', { srcAmount, tgtAmount });
+    // Handle amount changes here
+  }, []);
 
   return (
     <div 
@@ -79,14 +89,8 @@ const WebSwap: React.FC = () => {
           >
             <div className="w-full max-w-md">
               <Swap
-                onContinue={(quote_id: string, srcAmount: string, tgtAmount: string) => {
-                  console.log('Continue clicked:', { quote_id, srcAmount, tgtAmount });
-                  // Handle the continue action here
-                }}
-                onAmountsChange={(srcAmount: string, tgtAmount: string) => {
-                  console.log('Amounts changed:', { srcAmount, tgtAmount });
-                  // Handle amount changes here
-                }}
+                onContinue={handleSwapContinue}
+                onAmountsChange={handleAmountsChange}
               />
             </div>
           </div>
@@ -352,14 +356,8 @@ const WebSwap: React.FC = () => {
           {/* Swap component */}
           <div className="flex-1 flex items-center w-full">
             <Swap
-              onContinue={(quote_id: string, srcAmount: string, tgtAmount: string) => {
-                console.log('Continue clicked:', { quote_id, srcAmount, tgtAmount });
-                // Handle the continue action here
-              }}
-              onAmountsChange={(srcAmount: string, tgtAmount: string) => {
-                console.log('Amounts changed:', { srcAmount, tgtAmount });
-                // Handle amount changes here
-              }}
+              onContinue={handleSwapContinue}
+              onAmountsChange={handleAmountsChange}
               textColor="white"
             />
           </div>
