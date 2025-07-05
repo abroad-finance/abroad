@@ -5,9 +5,10 @@ import { useBlux } from '@bluxcc/react';
 interface NavBarResponsiveProps {
   className?: string;
   onWalletConnect?: () => void;
+  onWalletDetails?: () => void;
 }
 
-const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({ className = '', onWalletConnect }) => {
+const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({ className = '', onWalletConnect, onWalletDetails }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { user, isAuthenticated } = useBlux();
 
@@ -30,31 +31,31 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({ className = '', onW
     return `${address.slice(0, 6)}...${address.slice(-4)}`;
   }, []);
 
-  // Get public key from user object - focus on stellar address
+  // Get public key from user object - focus on stellar address using Blux documentation
   const publicKey = useMemo(() => {
     if (!user) return null;
     
     // Log the entire user object for debugging
     console.log('Getting public key from user:', user);
     
-    // Try different possible property names and nested properties
+    // According to Blux docs, user object contains wallet address
     const userObj = user as unknown as Record<string, unknown>;
     
-    // Check direct properties first
+    // Check properties in order of preference based on Blux documentation
     let pk = userObj.stellarAddress || 
-                   userObj.publicKey || 
-                   userObj.address || 
-                   userObj.walletAddress || 
-                   userObj.accountId ||
-                   userObj.id ||
-                   null;
+             userObj.address || 
+             userObj.walletAddress || 
+             userObj.publicKey || 
+             userObj.accountId ||
+             userObj.id ||
+             null;
     
-    // If not found, check nested properties
+    // If not found, check nested properties as fallback
     if (!pk && userObj.wallet && typeof userObj.wallet === 'object') {
       const wallet = userObj.wallet as Record<string, unknown>;
       pk = wallet.stellarAddress ||
-                 wallet.publicKey ||
                  wallet.address ||
+                 wallet.publicKey ||
                  null;
     }
     
@@ -62,18 +63,9 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({ className = '', onW
     if (!pk && userObj.account && typeof userObj.account === 'object') {
       const account = userObj.account as Record<string, unknown>;
       pk = account.stellarAddress ||
-                 account.publicKey ||
                  account.address ||
+                 account.publicKey ||
                  account.id ||
-                 null;
-    }
-    
-    // Check profile object
-    if (!pk && userObj.profile && typeof userObj.profile === 'object') {
-      const profile = userObj.profile as Record<string, unknown>;
-      pk = profile.stellarAddress ||
-                 profile.publicKey ||
-                 profile.address ||
                  null;
     }
     
@@ -99,6 +91,16 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({ className = '', onW
   const walletAddress = useMemo(() => (
     publicKey ? formatWalletAddress(String(publicKey)) : 'Connected'
   ), [publicKey, formatWalletAddress]);
+
+  const handleWalletClick = useCallback(() => {
+    if (isAuthenticated && user) {
+      // If wallet is connected, show wallet details
+      onWalletDetails?.();
+    } else {
+      // If wallet is not connected, show connect wallet modal
+      onWalletConnect?.();
+    }
+  }, [isAuthenticated, user, onWalletDetails, onWalletConnect]);
 
   const menuItems = ['Trade', 'Pool', 'About'];
 
@@ -143,7 +145,7 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({ className = '', onW
           <div className="hidden md:flex items-center space-x-4">
             {/* Wallet Badge */}
             <button 
-              onClick={onWalletConnect}
+              onClick={handleWalletClick}
               className="flex items-center space-x-2 bg-white/20 backdrop-blur-sm rounded-full px-4 py-2 border border-white/30 hover:bg-white/30 transition-colors duration-200"
             >
               <img
@@ -198,7 +200,7 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({ className = '', onW
               
               {/* Mobile Wallet Badge */}
               <button 
-                onClick={onWalletConnect}
+                onClick={handleWalletClick}
                 className="flex items-center justify-center space-x-2 bg-white/20 backdrop-blur-sm rounded-full px-4 py-2 border border-white/30 mx-3 mt-4 hover:bg-white/30 transition-colors duration-200"
               >
                 <img

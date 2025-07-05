@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import Swap from '../../components/Swap/Swap';
 import NavBarResponsive from '../../components/WebSwap/NavBarResponsive';
 import ConnectWallet from '../../components/WebSwap/ConnectWallet';
+import WalletDetails from '../../components/WebSwap/WalletDetails';
 
 const currencies = [
   { flag: 'co', name: 'Pesos' },
@@ -13,6 +14,7 @@ const WebSwap: React.FC = () => {
   const [currentCurrency, setCurrentCurrency] = React.useState(0);
   const [isVisible, setIsVisible] = React.useState(true);
   const [isWalletModalOpen, setIsWalletModalOpen] = React.useState(false);
+  const [isWalletDetailsOpen, setIsWalletDetailsOpen] = React.useState(false);
   
   React.useEffect(() => {
     const interval = setInterval(() => {
@@ -35,6 +37,14 @@ const WebSwap: React.FC = () => {
 
   const handleWalletClose = React.useCallback(() => {
     setIsWalletModalOpen(false);
+  }, []);
+
+  const handleWalletDetails = React.useCallback(() => {
+    setIsWalletDetailsOpen(true);
+  }, []);
+
+  const handleWalletDetailsClose = React.useCallback(() => {
+    setIsWalletDetailsOpen(false);
   }, []);
 
   const handleWalletSelect = React.useCallback((walletType: 'trust' | 'stellar') => {
@@ -75,7 +85,10 @@ const WebSwap: React.FC = () => {
       />
       {/* Navigation Bar */}
       <div className="relative z-10 bg-green-50 md:bg-transparent">
-        <NavBarResponsive onWalletConnect={handleWalletConnect} />
+        <NavBarResponsive 
+          onWalletConnect={handleWalletConnect} 
+          onWalletDetails={handleWalletDetails} 
+        />
       </div>
       
       {/* Main Content */}
@@ -393,6 +406,27 @@ const WebSwap: React.FC = () => {
               <ConnectWallet 
                 onWalletSelect={handleWalletSelect} 
                 onClose={handleWalletClose}
+              />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Wallet Details Modal - Rendered at top level */}
+      <AnimatePresence>
+        {isWalletDetailsOpen && (
+          <motion.div 
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[99999] flex items-center justify-center md:justify-end p-4 md:pr-8"
+            onClick={handleWalletDetailsClose}
+            style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.12, ease: 'easeOut' }}
+          >
+            <div onClick={(e) => e.stopPropagation()}>
+              <WalletDetails 
+                onClose={handleWalletDetailsClose}
               />
             </div>
           </motion.div>
