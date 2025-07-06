@@ -1,5 +1,8 @@
+import { injectable } from 'inversify'
+
 import { IPixQrDecoder, PixDecoded } from '../interfaces/IQrDecoder'
 
+@injectable()
 export class PixQrDecoder implements IPixQrDecoder {
   public decode(brCode: string): PixDecoded {
     const raw: Record<string, string> = {}

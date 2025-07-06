@@ -33,6 +33,7 @@ import { IPixQrDecoder } from './interfaces/IQrDecoder'
 import { ISecretManager } from './interfaces/ISecretManager'
 import { IWalletHandler } from './interfaces/IWalletHandler'
 import { IWalletHandlerFactory } from './interfaces/IWalletHandlerFactory'
+import { IWebhookNotifier } from './interfaces/IWebhookNotifier'
 import { ConsoleLogger } from './services/consoleLogger'
 import { ExchangeProviderFactory } from './services/ExchangeProviderFactory'
 import { BinanceExchangeProvider } from './services/exchangeProviders/binanceExchangeProvider'
@@ -50,6 +51,7 @@ import { SlackNotifier } from './services/slackNotifier'
 import { SolanaWalletHandler } from './services/SolanaWalletHandler'
 import { StellarWalletHandler } from './services/StellarWalletHandler'
 import { WalletHandlerFactory } from './services/WalletHandlerFactory'
+import { WebhookNotifier } from './services/WebhookNotifier'
 import { TYPES } from './types'
 import { KycUseCase } from './useCases/kycUseCase'
 import { QuoteUseCase } from './useCases/quoteUseCase'
@@ -190,6 +192,12 @@ container
 container
   .bind<IPixQrDecoder>(TYPES.IPixQrDecoder)
   .to(PixQrDecoder)
+  .inSingletonScope()
+
+// IWebhookNotifier
+container
+  .bind<IWebhookNotifier>(TYPES.IWebhookNotifier)
+  .to(WebhookNotifier)
   .inSingletonScope()
 
 export { container as iocContainer }
