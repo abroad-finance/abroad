@@ -10,6 +10,8 @@ import perfectionist from 'eslint-plugin-perfectionist'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+const tsconfigRootDir = path.dirname(new URL(import.meta.url).pathname)
+
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 const compat = new FlatCompat({
@@ -29,8 +31,13 @@ export default [
     ),
   ),
   {
+    files: ['src/**/*.{ts,tsx}'],
     languageOptions: {
       parser: tsParser,
+      parserOptions: {
+        project: ['./tsconfig.json'],
+        tsconfigRootDir,
+      },
     },
 
     plugins: {
@@ -39,6 +46,7 @@ export default [
     },
 
     rules: {
+      '@typescript-eslint/switch-exhaustiveness-check': 'error',
       'import-newlines/enforce': 'error',
     },
 

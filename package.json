@@ -12,7 +12,7 @@
     "depcruise:tree": "depcruise src --include-only '^src' --config --output-type dot | dot -T svg > dependency-graph.svg && open dependency-graph.svg",
     "test": "jest",
     "create:firebase-user": "tsx src/scripts/createFirebaseUser.ts",
-    "format": "eslint --fix src tests",
+    "format": "eslint --fix src",
     "hygiene": "npx depcheck && npx knip --config knip.json"
   },
   "keywords": [],
