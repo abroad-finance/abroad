@@ -17,6 +17,7 @@ export interface ILogger {
 export interface IPartnerService {
   getPartnerFromApiKey(apiKey?: string): Promise<Partner>
   getPartnerFromBearerToken(token: string): Promise<Partner>
+  getPartnerFromSepJwt(token: string): Promise<Partner>
 }
 
 export interface IQueueHandler {

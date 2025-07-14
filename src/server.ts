@@ -6,7 +6,7 @@ import express, { NextFunction, Request, Response } from 'express'
 import path from 'path'
 
 import packageJson from '../package.json'
-// import { BinanceBalanceUpdatedController } from './controllers/queue/BinanceBalanceUpdatedController'
+import { BinanceBalanceUpdatedController } from './controllers/queue/BinanceBalanceUpdatedController'
 import { PaymentSentController } from './controllers/queue/PaymentSentController'
 import { ReceivedCryptoTransactionController } from './controllers/queue/ReceivedCryptoTransactionController'
 import { IAuthService } from './interfaces'
@@ -67,13 +67,15 @@ interface ApiError extends Error {
   status?: number
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-app.use((err: ApiError, req: Request, res: Response, _next: NextFunction) => {
-  res.status(err.status || 500).json({
-    message: err.message || 'An error occurred',
-    reason: err.message || 'Internal Server Error',
+if (process.env.NODE_ENV === 'production') {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  app.use((err: ApiError, req: Request, res: Response, _next: NextFunction) => {
+    res.status(err.status || 500).json({
+      message: err.message || 'An error occurred',
+      reason: err.message || 'Internal Server Error',
+    })
   })
-})
+}
 
 const port = process.env.PORT || 3784
 app.listen(port, () => {
@@ -90,10 +92,10 @@ receivedCryptoTransactionController.registerConsumers()
 const paymentSentController = iocContainer.get<PaymentSentController>(TYPES.PaymentSentController)
 paymentSentController.registerConsumers()
 
-// const binanceBalanceUpdatedController = iocContainer.get<BinanceBalanceUpdatedController>(
-//   TYPES.BinanceBalanceUpdatedController,
-// )
-// binanceBalanceUpdatedController.registerConsumers()
+const binanceBalanceUpdatedController = iocContainer.get<BinanceBalanceUpdatedController>(
+  TYPES.BinanceBalanceUpdatedController,
+)
+binanceBalanceUpdatedController.registerConsumers()
 
 const firebaseAuth = iocContainer.get<IAuthService>(TYPES.IAuthService)
 firebaseAuth.initialize()

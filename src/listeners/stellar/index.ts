@@ -152,6 +152,7 @@ export class StellarListener {
         const transactionId = StellarListener.base64ToUuid(tx.memo)
 
         const queueMessage: TransactionQueueMessage = {
+          addressFrom: payment.from,
           amount: parseFloat(payment.amount),
           blockchain: BlockchainNetwork.STELLAR,
           cryptoCurrency: CryptoCurrency.USDC,

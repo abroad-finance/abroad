@@ -22,6 +22,13 @@ export class SolanaWalletHandler implements IWalletHandler {
     @inject(TYPES.ISecretManager) private secretManager: ISecretManager,
   ) {}
 
+  async getAddressFromTransaction({
+  }: {
+    onChainId?: string
+  }): Promise<string> {
+    throw new Error('Solana does not support fetching address from transaction ID')
+  }
+
   /**
    * Send cryptocurrency to the specified address on the Solana network
    * @param params The parameters for the transaction

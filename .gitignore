@@ -134,5 +134,7 @@ src/routes.ts
 src/swagger.json
 concatenated.txt
 dependency-graph.svg
-.env2
+.env*
 abroad-ui/src/api/index.ts
+transactions-report.csv
+.DS_Store

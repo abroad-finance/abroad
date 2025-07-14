@@ -17,17 +17,28 @@ import {
   TsoaResponse,
 } from 'tsoa'
 import { Body, Post } from 'tsoa'
+import { z } from 'zod'
 
 import { IPartnerService } from '../interfaces'
 import { IDatabaseClientProvider } from '../interfaces/IDatabaseClientProvider'
 import { IPaymentServiceFactory } from '../interfaces/IPaymentServiceFactory'
+import { IWebhookNotifier, WebhookEvent } from '../interfaces/IWebhookNotifier'
 import { TYPES } from '../types'
 import { KycUseCase } from '../useCases/kycUseCase'
+
+const acceptTransactionRequestSchema = z.object({
+  account_number: z.string().min(1, 'Account number is required'),
+  bank_code: z.string().min(1, 'Bank code is required'),
+  quote_id: z.string().min(1, 'Quote ID is required'),
+  tax_id: z.string().optional(),
+  user_id: z.string().min(1, 'User ID is required'),
+})
 
 interface AcceptTransactionRequest {
   account_number: string
   bank_code: string
   quote_id: string
+  tax_id?: string
   user_id: string
 }
 
@@ -63,6 +74,7 @@ export class TransactionController extends Controller {
     @inject(TYPES.IPartnerService) private partnerService: IPartnerService,
     @inject(TYPES.IPaymentServiceFactory) private paymentServiceFactory: IPaymentServiceFactory,
     @inject(TYPES.KycUseCase) private kycUseCase: KycUseCase,
+    @inject(TYPES.IWebhookNotifier) private webhookNotifier: IWebhookNotifier,
   ) {
     super()
   }
@@ -81,12 +93,17 @@ export class TransactionController extends Controller {
     @Request() request: RequestExpress,
     @Res() badRequestResponse: TsoaResponse<400, { reason: string }>,
   ): Promise<AcceptTransactionResponse> {
+    const parsed = acceptTransactionRequestSchema.safeParse(requestBody)
+    if (!parsed.success) {
+      return badRequestResponse(400, { reason: parsed.error.message })
+    }
     const {
       account_number: accountNumber,
       bank_code: bankCode,
       quote_id: quoteId,
+      tax_id: taxId,
       user_id: userId,
-    } = requestBody
+    } = parsed.data
 
     const partner = request.user
 
@@ -200,8 +217,10 @@ export class TransactionController extends Controller {
           partnerUserId: partnerUser.id,
           quoteId: quoteId,
           status: TransactionStatus.AWAITING_PAYMENT,
+          taxId,
         },
       })
+      this.webhookNotifier.notifyWebhook(partner.webhookUrl, { data: transaction, event: WebhookEvent.TRANSACTION_CREATED })
 
       return {
         id: transaction.id,

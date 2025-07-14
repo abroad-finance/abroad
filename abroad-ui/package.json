@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite --host",
     "build": "npm run generate:api && tsc -b && vite build",
+    "build:code": "vite build",
     "lint": "eslint .",
     "preview": "vite preview --host",
     "generate:api": "cd .. && npm i && npm run build && cd abroad-ui && orval --config orval.config.ts",
@@ -24,6 +25,7 @@
     "flag-icons": "^7.3.2",
     "framer-motion": "^12.6.2",
     "lottie-web": "^5.13.0",
+    "jsonwebtoken": "^9.0.2",
     "lucide-react": "^0.485.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
@@ -44,6 +46,7 @@
     "orval": "^7.9.0",
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.22.0",
-    "vite": "^6.1.0"
+    "vite": "^6.1.0",
+    "vite-plugin-node-polyfills": "^0.23.0"
   }
 }

@@ -4,7 +4,7 @@ import { getAuth } from "firebase/auth";
 const baseURL = import.meta.env.VITE_API_URL || 'https://api.abroad.finance';
 
 export const customClient = async <T>(
-    url:string,
+    url: string,
     {
         method,
         params,
@@ -40,6 +40,15 @@ export const customClient = async <T>(
         } catch (error) {
             console.error("Error getting Firebase ID token:", error);
             throw new Error("Failed to get authentication token.");
+        }
+    } else {
+        const tokenFromStorage = localStorage.getItem('token');
+        if (tokenFromStorage) {
+            token = tokenFromStorage;
+            headers = {
+                ...headers,
+                Authorization: `Bearer ${token}`
+            };
         }
     }
 

@@ -1,18 +1,19 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from "../Button";
 import { Loader, Landmark, Hash, ArrowLeft, Rotate3d} from 'lucide-react';
-import { getBanks, Bank, getBanksResponse200 } from '../../api';
+import { getBanks, Bank, getBanksResponse200, acceptTransaction } from '../../api';
 
 interface BankDetailsRouteProps {
   onBackClick: () => void;
-  onTransactionComplete: () => void;
+  onTransactionComplete: ({ memo }: { memo: string }) => Promise<void>;
   quote_id: string;
   sourceAmount: string;
   targetAmount: string;
+  userId: string;
 }
 
 
-export default function BankDetailsRoute({ onBackClick, quote_id, targetAmount, onTransactionComplete }: BankDetailsRouteProps): React.JSX.Element {
+export default function BankDetailsRoute({ userId, onBackClick, quote_id, targetAmount, onTransactionComplete }: BankDetailsRouteProps): React.JSX.Element {
   const [account_number, setaccount_number] = useState('');
   const [bank_code, setbank_code] = useState<string>('');
   const [loadingSubmit, setLoadingSubmit] = useState(false);
@@ -54,45 +55,70 @@ export default function BankDetailsRoute({ onBackClick, quote_id, targetAmount, 
     setbank_code(e.target.value);
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = useCallback(async () => {
     setLoadingSubmit(true);
+
+    // // KYC
+    // const responseKYC = await checkKyc({user_id: userId});
+
+    // if (responseKYC.status !== 200) {
+    //   console.error('Error checking KYC:', responseKYC);
+    //   alert(`Error: ${responseKYC.data.reason}`);
+    //   setLoadingSubmit(false);
+    //   return;
+    // }
+
+    // if (responseKYC.data.kyc_status !== 'APPROVED') {
+    //   // open KYC link in a new tab
+    //   window.open(responseKYC.data.kyc_link, '_blank');
+    //   alert('Por favor completa el proceso de KYC antes de continuar.');
+    //   setLoadingSubmit(false);
+    //   return;
+    // }
+
+
     console.log('Bank Details:', { bank_code, account_number, quote_id });
-    setTimeout(() => {
-      setLoadingSubmit(false);
-      onTransactionComplete();
-    }, 1500);
-  };
-  
+    const response = await acceptTransaction({ account_number, bank_code, quote_id, user_id: userId });
+    if (response.status === 200) {
+      console.log('Transaction accepted successfully:', response.data);
+      await onTransactionComplete({ memo: response.data.transaction_reference });
+    } else {
+      console.error('Error accepting transaction:', response);
+      alert(`Error: ${response.data.reason}`);
+    }
+    setLoadingSubmit(false);
+  }, [account_number, bank_code, quote_id, userId, onTransactionComplete]);
+
 
 
   return (
     <div className="flex-1 flex items-center justify-center w-full flex-col">
-      <div 
-        id="bg-container" 
+      <div
+        id="bg-container"
         className="relative w-[90%] max-w-[50vh] h-[60vh] bg-[#356E6A]/5 backdrop-blur-xl rounded-4xl p-6 flex flex-col items-center justify-between space-y-4" // MODIFIED: Changed justify-start to justify-between
       >
         {/* Header Row: Back button and Title */}
         <div className="w-full flex items-center space-x-3 mb-4">
-          <button 
-            onClick={onBackClick} 
+          <button
+            onClick={onBackClick}
             className="text-[#356E6A] hover:text-[#2a5956] transition-colors"
             aria-label="Go back"
           >
             <ArrowLeft className="w-6 h-6" />
           </button>
 
-          <div id="Tittle" className="text-2xl font-bold text-[#356E6A] flex-grow text-center">Datos de Transacción</div> 
+          <div id="Tittle" className="text-2xl font-bold text-[#356E6A] flex-grow text-center">Datos de Transacción</div>
         </div>
-        
+
         {/* Centered Content Wrapper */}
         <div className="flex-grow flex flex-col items-center justify-center w-full space-y-4">
           {/* Bank Account Number Input */}
           <div id="bank-account-input" className="w-full bg-white/60 backdrop-blur-xl rounded-2xl p-4 flex items-center space-x-3">
             <Hash className="w-6 h-6 text-[#356E6A]" />
-            <input 
-              type="text" 
-              inputMode="numeric" 
-              pattern="[0-9]*"  
+            <input
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
               placeholder="Número Transfiya"
               value={account_number}
               onChange={handleaccount_numberChange}
@@ -127,26 +153,26 @@ export default function BankDetailsRoute({ onBackClick, quote_id, targetAmount, 
           </div>
         </div>
 
-        {/* Transfer Disclaimer */}      
+        {/* Transfer Disclaimer */}
         <div id="transfer-disclaimer" className="relative w-full text-[#356E6A] bg-[#356E6A]/10 backdrop-blur-xl rounded-2xl p-4 flex flex-col items-start space-y-2 justify-start">
-          <div className="flex items-center space-x-2"> 
+          <div className="flex items-center space-x-2">
             <Rotate3d className="w-5 h-5 text-[#356E6A]" />
             <span className="font-medium text-sm text-[#356E6A]">Red:</span>
-            <div 
-              id="transfer-network-badge" 
+            <div
+              id="transfer-network-badge"
               className="bg-white/70 backdrop-blur-md rounded-lg px-2 py-1 flex items-center"
             >
-              <img 
-                src="https://vectorseek.com/wp-content/uploads/2023/11/Transfiya-Logo-Vector.svg-.png" 
-                alt="Transfiya Logo" 
+              <img
+                src="https://vectorseek.com/wp-content/uploads/2023/11/Transfiya-Logo-Vector.svg-.png"
+                alt="Transfiya Logo"
                 className="h-4 w-auto"
               />
-            </div> 
+            </div>
           </div>
-          <span id='transfer-disclaimer-text' className="font-medium text-xs text-[#356E6A]/90 pl-1">Tu transacción será procesada de inmediato y llegará instantáneamente. Ten presente que el receptor debe tener activado Transfiya en el banco indicado.</span>         
+          <span id='transfer-disclaimer-text' className="font-medium text-xs text-[#356E6A]/90 pl-1">Tu transacción será procesada de inmediato y llegará instantáneamente. Ten presente que el receptor debe tener activado Transfiya en el banco indicado.</span>
         </div>
       </div>
-      <Button 
+      <Button
         className="mt-4 w-[90%] max-w-[50vh] py-4"
         onClick={handleSubmit}
         disabled={loadingSubmit || !bank_code || account_number.length !== 10 || loadingBanks} // MODIFIED: Added check for 10 digits

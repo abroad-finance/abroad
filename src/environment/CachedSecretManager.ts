@@ -21,4 +21,15 @@ export class CachedSecretManager implements ISecretManager {
     this.cache.set(secretName, secret)
     return secret
   }
+
+  getSecrets<T extends readonly Secret[]>(secretNames: T): Promise<Record<T[number], string>> {
+    return Promise.all(secretNames.map(name => this.getSecret(name)))
+      .then((secrets) => {
+        const result: Record<string, string> = {}
+        secretNames.forEach((name, index) => {
+          result[name] = secrets[index]
+        })
+        return result as Record<T[number], string>
+      })
+  }
 }

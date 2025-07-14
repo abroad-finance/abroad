@@ -5,6 +5,7 @@ import { inject } from 'inversify'
 import {
   Controller,
   Get,
+  Hidden,
   Query,
   Request,
   Res,
@@ -41,6 +42,7 @@ export class TransactionsController extends Controller {
    * List confirmed partner transactions (paginated)
    */
   @Get('list/confirmed')
+  @Hidden()
   @Response<400, { reason: string }>(400, 'Bad Request')
   @SuccessResponse('200', 'Confirmed transactions retrieved')
   public async listConfirmedPartnerTransactions(
