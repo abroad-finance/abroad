@@ -14,6 +14,7 @@ interface Transaction {
   usdcAmount: string;
   copAmount: string;
   type: 'sent' | 'received';
+  status: 'processing' | 'completed' | 'refunded' | 'canceled';
 }
 
 const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
@@ -33,7 +34,8 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
       destination: "GDQP2K...VWXY",
       usdcAmount: "100.00",
       copAmount: "432,500",
-      type: "sent"
+      type: "sent",
+      status: "completed"
     },
     {
       id: "2", 
@@ -41,7 +43,8 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
       destination: "GAQX5L...MNOP",
       usdcAmount: "50.25",
       copAmount: "216,830",
-      type: "received"
+      type: "received",
+      status: "processing"
     },
     {
       id: "3",
@@ -49,7 +52,17 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
       destination: "GBRT8M...QRST",
       usdcAmount: "200.00",
       copAmount: "865,000",
-      type: "sent"
+      type: "sent",
+      status: "refunded"
+    },
+    {
+      id: "4",
+      date: "2024-07-02", 
+      destination: "GCXY9Z...ABCD",
+      usdcAmount: "75.00",
+      copAmount: "324,750",
+      type: "sent",
+      status: "canceled"
     }
   ];
 
@@ -158,57 +171,53 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
         </div>
 
         {/* Wallet Address & Balance Card */}
-        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4 mb-6">
+        <div 
+          className="border border-gray-200 rounded-xl p-6 py-8 mb-6 bg-cover bg-center bg-no-repeat"
+          style={{
+            backgroundImage: 'url(https://static.vecteezy.com/system/resources/previews/026/493/927/non_2x/abstract-gradient-dark-green-liquid-wave-background-free-vector.jpg)'
+          }}
+        >
           {/* Wallet Address Section */}
           <div className="flex items-center justify-between mb-4">
-            <span className="text-blue-800 font-medium text-sm">Wallet Address</span>
+            <span className="text-white font-mono text-sm break-all">{formatWalletAddress(walletAddress)}</span>
             <div className="flex space-x-2">
               <button
                 onClick={handleDisconnectWallet}
-                className="p-1 hover:bg-red-100 rounded transition-colors duration-200"
+                className="p-1 hover:bg-red-100 hover:bg-opacity-20 rounded transition-colors duration-200"
                 title="Disconnect wallet"
               >
-                <svg className="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 text-red-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
                 </svg>
               </button>
               <button
                 onClick={() => copyToClipboard(walletAddress)}
-                className="p-1 hover:bg-blue-100 rounded transition-colors duration-200"
+                className="p-1 hover:bg-white hover:bg-opacity-20 rounded transition-colors duration-200"
                 title="Copy address"
               >
-                <Copy className="w-4 h-4 text-blue-600" />
+                <Copy className="w-4 h-4 text-white" />
               </button>
               <button
                 onClick={() => window.open(`https://stellar.expert/explorer/public/account/${walletAddress}`, '_blank')}
-                className="p-1 hover:bg-blue-100 rounded transition-colors duration-200"
+                className="p-1 hover:bg-white hover:bg-opacity-20 rounded transition-colors duration-200"
                 title="View on explorer"
               >
-                <ExternalLink className="w-4 h-4 text-blue-600" />
+                <ExternalLink className="w-4 h-4 text-white" />
               </button>
             </div>
           </div>
-          <div className="text-blue-900 font-mono text-sm break-all mb-4">
-            {formatWalletAddress(walletAddress)}
-          </div>
           {copiedAddress && (
-            <div className="text-green-600 text-xs mb-4">Address copied!</div>
+            <div className="text-green-300 text-xs mb-4">Address copied!</div>
           )}
 
           {/* Balance Section */}
-          <div className="border-t border-blue-200 pt-4">
-            <h3 className="text-blue-800 font-medium text-sm mb-3">Current Balance</h3>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <img
-                  src="https://storage.googleapis.com/cdn-abroad/Icons/Tokens/USDC%20Token.svg"
-                  alt="USDC"
-                  className="w-5 h-5"
-                />
-                <span className="text-gray-700 font-medium text-sm">USDC</span>
-              </div>
-              <span className="text-blue-700 font-bold text-lg">${mockBalance.usdc}</span>
-            </div>
+          <div className="flex items-center space-x-3">
+            <img
+              src="https://storage.googleapis.com/cdn-abroad/Icons/Tokens/USDC%20Token.svg"
+              alt="USDC"
+              className="w-5 h-5"
+            />
+            <span className="text-white font-bold text-4xl">${mockBalance.usdc}</span>
           </div>
         </div>
 
@@ -223,17 +232,18 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
               >
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center space-x-2">
-                    <div className={`w-3 h-3 rounded-full ${
-                      transaction.type === 'sent' ? 'bg-red-400' : 'bg-green-400'
-                    }`}></div>
                     <span className="text-gray-600 text-sm">{formatDate(transaction.date)}</span>
                   </div>
                   <span className={`text-xs px-2 py-1 rounded-full ${
-                    transaction.type === 'sent' 
-                      ? 'bg-red-100 text-red-700' 
-                      : 'bg-green-100 text-green-700'
+                    transaction.status === 'completed' ? 'bg-green-100 text-green-700' :
+                    transaction.status === 'processing' ? 'bg-blue-100 text-blue-700' :
+                    transaction.status === 'refunded' ? 'bg-orange-100 text-orange-700' :
+                    transaction.status === 'canceled' ? 'bg-red-100 text-red-700' : ''
                   }`}>
-                    {transaction.type === 'sent' ? 'Sent' : 'Received'}
+                    {transaction.status === 'completed' ? 'Completed' :
+                     transaction.status === 'processing' ? 'Processing' :
+                     transaction.status === 'refunded' ? 'Refunded' :
+                     transaction.status === 'canceled' ? 'Canceled' : transaction.status}
                   </span>
                 </div>
                 
@@ -253,7 +263,7 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
                       alt="USDC"
                       className="w-4 h-4"
                     />
-                    <span className="text-gray-700 text-sm font-medium">
+                    <span className="text-gray-700 text-xl font-bold">
                       ${transaction.usdcAmount}
                     </span>
                   </div>
@@ -263,7 +273,7 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
                       alt="COP"
                       className="w-4 h-4 rounded-full"
                     />
-                    <span className="text-gray-700 text-sm font-medium">
+                    <span className="text-gray-700 text-xl font-bold">
                       ${transaction.copAmount}
                     </span>
                   </div>
@@ -281,7 +291,7 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
 
         {/* Footer */}
         <div className="text-xs text-gray-500 leading-relaxed text-center mt-6 pt-4 border-t border-gray-200">
-          Transaction data is updated in real-time from the Stellar network
+          Transaction data is updated in real-time
         </div>
       </div>
     </motion.div>

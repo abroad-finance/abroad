@@ -33,11 +33,10 @@ const ConnectWallet: React.FC<ConnectWalletProps> = ({ onWalletSelect, onClose }
     setSelectedWallet(walletType);
     
     if (walletType === 'stellar') {
-      // Show Blux modal within the card
-      setShowBluxModal(true);
       if (isReady) {
         login();
       }
+      onClose?.();
     } else {
       // Handle Trust Wallet or other wallet types
       onWalletSelect?.(walletType);
