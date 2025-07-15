@@ -120,7 +120,7 @@ const WebSwap: React.FC = () => {
             }}
           >
             {/* Image credits */}
-            <div 
+            <button
               onClick={() => window.open('https://www.flickr.com/photos/pedrosz/36132013403', '_blank')}
               style={{
                 backgroundColor: 'rgba(0, 0, 0, 0.4)',
