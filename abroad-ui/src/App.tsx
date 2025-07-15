@@ -1,6 +1,5 @@
 import { BrowserRouter as Router, Route, Routes } from "react-router-dom";
 import { BluxProvider, networks, url } from "@bluxcc/react";
-import BusinessDashboardLogin from "./pages/BusinessDashboardLogin";
 import { Dashboard } from "./pages/Dashboard";
 import Recipients from "./pages/Recipients";
 import Integrations from "./pages/Integrations";
@@ -37,7 +36,7 @@ function App() {
       <LanguageProvider>
         <Router>
           <Routes>
-            <Route path="/" element={<BusinessDashboardLogin />} />
+            <Route path="/" element={<WebSwap />} />
             {/* Wrap protected routes with ProtectedRoute */} 
             <Route element={<ProtectedRoute />}>
               <Route path="/dashboard" element={<Dashboard />} />
