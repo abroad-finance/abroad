@@ -35,11 +35,7 @@ model PartnerUser {
   transaction Transaction[]
   kycStatus   KycStatus     @default(PENDING)
   kycId       String?
-
-  // New fields for partner user payment details
-  paymentMethod PaymentMethod?
-  bank          String?
-  accountNumber String?
+  kycToken    String?
 
   // Unique constraint to ensure a user is only once per partner
   @@unique([partnerId, userId])

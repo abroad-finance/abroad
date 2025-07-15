@@ -1,12 +1,23 @@
-// src/controllers/PartnerUserController.ts
+/**
+ * PartnerUserController
+ * ---------------------
+ * HTTP boundary layer for Partner‑User resources.
+ *
+ * ▸ Strict Zod validation for all DTOs (but DTOs themselves are plain TS interfaces so TSOA can reflect them).
+ * ▸ Clear HTTP semantics (201 for create, typed error responses, pagination constraints).
+ * ▸ Controller remains thin; no domain/business logic leaks.
+ * ▸ Zero `any` usage – all values are fully typed with Prisma models or utility types.
+ */
 
-import { KycStatus, PaymentMethod } from '@prisma/client'
-import { Request as RequestExpress } from 'express'
+import { KycStatus, type PartnerUser as PartnerUserModel, Prisma } from '@prisma/client'
+import { Request as ExpressRequest } from 'express'
 import { inject } from 'inversify'
 import {
   Body,
   Controller,
   Get,
+  Patch,
+  Path,
   Post,
   Query,
   Request,
@@ -17,149 +28,221 @@ import {
   SuccessResponse,
   TsoaResponse,
 } from 'tsoa'
+import { z, type ZodType } from 'zod'
 
 import { IDatabaseClientProvider } from '../interfaces/IDatabaseClientProvider'
 import { IPaymentServiceFactory } from '../interfaces/IPaymentServiceFactory'
 import { TYPES } from '../types'
 
-export interface CreatePartnerUserRequest {
-  account_number?: string
-  bank?: string
-  payment_method?: PaymentMethod
-  user_id: string
-}
+/** ------------------------------------------------------------------------
+ * 🗒️  DTOs & Validation Schemas
+ * --------------------------------------------------------------------- */
 
-export interface CreatePartnerUserResponse {
-  accountNumber: null | string
-  bank: null | string
-  createdAt: Date
-  id: string
-  kycStatus: KycStatus
-  paymentMethod: null | PaymentMethod
-  updatedAt: Date
+export interface CreatePartnerUserRequest {
+  kycStatus?: KycStatus
+  kycToken?: null | string
   userId: string
 }
+
+const createPartnerUserSchema: ZodType<CreatePartnerUserRequest> = z.object({
+  kycStatus: z.nativeEnum(KycStatus).optional(),
+  kycToken: z.string().min(1).nullable().optional(),
+  userId: z.string().uuid(),
+})
 
 export interface PaginatedPartnerUsers {
   page: number
   pageSize: number
   total: number
-  users: Array<{
-    accountNumber: null | string
-    bank: null | string
-    createdAt: Date
-    id: string
-    kycStatus: KycStatus
-    paymentMethod: null | PaymentMethod
-    updatedAt: Date
-    userId: string
-  }>
+  users: PartnerUserDto[]
 }
+
+export interface PartnerUserDto {
+  createdAt: Date
+  id: string
+  kycStatus: KycStatus
+  kycToken: null | string
+  updatedAt: Date
+  userId: string
+}
+
+export interface UpdatePartnerUserRequest {
+  kycStatus?: KycStatus
+  kycToken?: null | string
+}
+
+const updatePartnerUserSchema: ZodType<UpdatePartnerUserRequest> = z
+  .object({
+    kycStatus: z.nativeEnum(KycStatus).optional(),
+    kycToken: z.string().nullable().optional(),
+  })
+  .refine(data => Object.keys(data).length > 0, {
+    message: 'At least one field must be supplied',
+  })
+
+/**
+ * Express request augmented with authenticated partner context.
+ */
+export type AuthenticatedRequest = ExpressRequest & {
+  user: { id: string }
+}
+
+/** ------------------------------------------------------------------------
+ * 🚦  Controller
+ * --------------------------------------------------------------------- */
 
 @Route('partnerUser')
 @Security('BearerAuth')
 @Security('ApiKeyAuth')
 export class PartnerUserController extends Controller {
+  private static readonly DEFAULT_PAGE_SIZE = 20
+  private static readonly MAX_PAGE_SIZE = 100
+
   constructor(
     @inject(TYPES.IDatabaseClientProvider)
-    private dbProvider: IDatabaseClientProvider,
-    @inject(TYPES.IPaymentServiceFactory) private paymentServiceFactory: IPaymentServiceFactory,
+    private readonly dbProvider: IDatabaseClientProvider,
+
+    @inject(TYPES.IPaymentServiceFactory)
+    private readonly paymentServiceFactory: IPaymentServiceFactory, // reserved for future hooks
   ) {
     super()
   }
 
-  /**
-   * Create a partner user under the current partner
-   */
+  /* ---------------------------------------------------------------------
+   * CREATE
+   * ------------------------------------------------------------------ */
+
   @Post()
   @Response<400, { reason: string }>(400, 'Bad Request')
-  @SuccessResponse('200', 'Partner user created')
+  @SuccessResponse('201', 'Partner user created')
   public async createPartnerUser(
     @Body() body: CreatePartnerUserRequest,
-    @Request() request: RequestExpress,
+    @Request() req: AuthenticatedRequest,
     @Res() badRequest: TsoaResponse<400, { reason: string }>,
-  ): Promise<CreatePartnerUserResponse> {
-    const { account_number, bank, payment_method, user_id } = body
-    if (!user_id) {
-      return badRequest(400, { reason: 'user_id is required' })
-    }
-    const partner = request.user
-
-    if (payment_method && account_number && bank) {
-      const paymentService = this.paymentServiceFactory.getPaymentService(payment_method)
-      const isAccountValid = await paymentService.verifyAccount({ account: account_number, bankCode: bank })
-      if (!isAccountValid) {
-        return badRequest(400, { reason: 'User account is not associated with the payment method' })
-      }
+  ): Promise<PartnerUserDto> {
+    const validation = createPartnerUserSchema.safeParse(body)
+    if (!validation.success) {
+      return badRequest(400, { reason: 'Invalid payload' })
     }
 
     const prisma = await this.dbProvider.getClient()
+
     try {
-      const pu = await prisma.partnerUser.create({
+      const record = await prisma.partnerUser.create({
         data: {
-          accountNumber: account_number,
-          bank: bank,
-          partnerId: partner.id,
-          paymentMethod: payment_method,
-          userId: user_id,
+          kycStatus: validation.data.kycStatus ?? KycStatus.PENDING,
+          kycToken: validation.data.kycToken ?? null,
+          partnerId: req.user.id,
+          userId: validation.data.userId,
         },
       })
-      return {
-        accountNumber: pu.accountNumber,
-        bank: pu.bank,
-        createdAt: pu.createdAt,
-        id: pu.id,
-        kycStatus: pu.kycStatus,
-        paymentMethod: pu.paymentMethod,
-        updatedAt: pu.updatedAt,
-        userId: pu.userId,
-      }
+
+      this.setStatus(201)
+      return this.mapToDto(record)
     }
     catch {
       return badRequest(400, { reason: 'Failed to create partner user' })
     }
   }
 
-  /**
- * List partner users (paginated)
- */
-  @Get('list')
+  /* ---------------------------------------------------------------------
+   * READ (Paginated List)
+   * ------------------------------------------------------------------ */
+
+  @Get()
   @Response<400, { reason: string }>(400, 'Bad Request')
   @SuccessResponse('200', 'Partner users retrieved')
   public async listPartnerUsers(
     @Query() page: number = 1,
-    @Query() pageSize: number = 20,
-    @Request() request: RequestExpress,
+    @Query() pageSize: number = PartnerUserController.DEFAULT_PAGE_SIZE,
+    @Request() req: AuthenticatedRequest,
     @Res() badRequest: TsoaResponse<400, { reason: string }>,
   ): Promise<PaginatedPartnerUsers> {
-    if (page < 1 || pageSize < 1 || pageSize > 100) {
+    if (
+      page < 1
+      || pageSize < 1
+      || pageSize > PartnerUserController.MAX_PAGE_SIZE
+    ) {
       return badRequest(400, { reason: 'Invalid pagination parameters' })
     }
-    const partner = request.user
+
     const prisma = await this.dbProvider.getClient()
-    const [users, total] = await Promise.all([
+
+    const [records, total] = await Promise.all([
       prisma.partnerUser.findMany({
         orderBy: { createdAt: 'desc' },
         skip: (page - 1) * pageSize,
         take: pageSize,
-        where: { partnerId: partner.id },
+        where: { partnerId: req.user.id },
       }),
-      prisma.partnerUser.count({ where: { partnerId: partner.id } }),
+      prisma.partnerUser.count({ where: { partnerId: req.user.id } }),
     ])
+
     return {
       page,
       pageSize,
       total,
-      users: users.map(u => ({
-        accountNumber: u.accountNumber,
-        bank: u.bank,
-        createdAt: u.createdAt,
-        id: u.id,
-        kycStatus: u.kycStatus,
-        paymentMethod: u.paymentMethod,
-        updatedAt: u.updatedAt,
-        userId: u.userId,
-      })),
+      users: records.map(record => this.mapToDto(record)),
+    }
+  }
+
+  /* ---------------------------------------------------------------------
+   * UPDATE
+   * ------------------------------------------------------------------ */
+
+  @Patch('{userId}')
+  @Response<400, { reason: string }>(400, 'Bad Request')
+  @Response<404, { reason: string }>(404, 'Not Found')
+  @SuccessResponse('200', 'Partner user updated')
+  public async updatePartnerUser(
+    @Path() userId: string,
+    @Body() body: UpdatePartnerUserRequest,
+    @Request() req: AuthenticatedRequest,
+    @Res() res: TsoaResponse<400 | 404, { reason: string }>,
+  ): Promise<PartnerUserDto> {
+    const validation = updatePartnerUserSchema.safeParse(body)
+    if (!validation.success) {
+      return res(400, { reason: validation.error.issues[0].message })
+    }
+
+    const prisma = await this.dbProvider.getClient()
+
+    try {
+      const record = await prisma.partnerUser.update({
+        data: validation.data,
+        where: {
+          partnerId_userId: {
+            partnerId: req.user.id,
+            userId,
+          },
+        },
+      })
+
+      return this.mapToDto(record)
+    }
+    catch (error: unknown) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError
+        && error.code === 'P2025'
+      ) {
+        return res(404, { reason: 'Partner user not found' })
+      }
+      return res(400, { reason: 'Failed to update partner user' })
+    }
+  }
+
+  /* --------------------------------------------------------------------
+   * 🛠️  Helpers
+   * ------------------------------------------------------------------ */
+
+  private mapToDto(record: PartnerUserModel): PartnerUserDto {
+    return {
+      createdAt: record.createdAt,
+      id: record.id,
+      kycStatus: record.kycStatus,
+      kycToken: record.kycToken,
+      updatedAt: record.updatedAt,
+      userId: record.userId,
     }
   }
 }

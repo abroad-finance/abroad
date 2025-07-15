@@ -126,16 +126,10 @@ export class TransactionController extends Controller {
 
     const partnerUser = await prismaClient.partnerUser.upsert({
       create: {
-        accountNumber: accountNumber,
-        bank: bankCode,
         partnerId: quote.partnerId,
-        paymentMethod: quote.paymentMethod,
         userId: userId,
       },
       update: {
-        accountNumber: accountNumber,
-        bank: bankCode,
-        paymentMethod: quote.paymentMethod,
       },
       where: {
         partnerId_userId: {
