@@ -89,7 +89,7 @@ const ConnectWallet: React.FC<ConnectWalletProps> = ({ onWalletSelect, onClose }
         )}
 
         {/* Header */}
-        <div className="mb-3 pr-8 text-center mt-5 md:mt-15">
+        <div className="mb-3 pr-8 text-center mt-5 md:mt-14">
           <h2 className="text-2xl font-semibold text-gray-900 mb-2">
             {showBluxModal ? 'Connect Stellar Wallet' : 'Connect your wallet'}
           </h2>

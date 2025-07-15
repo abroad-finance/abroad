@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import Navbar from "../components/Navbar";
-import { listPartnerUsers, PaginatedPartnerUsers, listPartnerTransactions, PaginatedTransactionList } from "../api/apiClient";
+import { listPartnerTransactions, PaginatedTransactionList } from "../api/apiClient";
 import { TransactionList } from "../components/TransactionList";
 import { Balance } from "../components/Treasury/BalanceOpsRow";
 import { LiquidityCards, CardItem } from "../components/Treasury/LiquidityCards";
@@ -20,21 +20,10 @@ export function Dashboard() {
 
 
 function DashboardHome() {
-  const [, setPartnerUsers] = useState<PaginatedPartnerUsers | null>(null);
   const [transactions, setTransactions] = useState<PaginatedTransactionList | null>(null);
   const [liquidityCards, setLiquidityCards] = useState<CardItem[]>([]); // Add liquidity cards state
 
   useEffect(() => {
-    const fetchPartnerUsers = async () => {
-      try {
-        const users = await listPartnerUsers();
-        setPartnerUsers(users);
-      } catch (error) {
-        console.error("Failed to fetch partner users:", error);
-      }
-    };
-    fetchPartnerUsers();
-
     const fetchTransactions = async () => {
       try {
         const txs = await listPartnerTransactions();

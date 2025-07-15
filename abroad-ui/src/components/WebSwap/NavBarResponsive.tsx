@@ -12,15 +12,6 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({ className = '', onW
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { user, isAuthenticated } = useBlux();
 
-  // Debug: Log user object to see available properties
-  React.useEffect(() => {
-    if (user) {
-      console.log('User object:', user);
-      console.log('User properties:', Object.keys(user));
-      console.log('User JSON:', JSON.stringify(user, null, 2));
-    }
-  }, [user]);
-
   const toggleMobileMenu = useCallback(() => {
     setIsMobileMenuOpen(!isMobileMenuOpen);
   }, [isMobileMenuOpen]);
@@ -34,9 +25,6 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({ className = '', onW
   // Get public key from user object - focus on stellar address using Blux documentation
   const publicKey = useMemo(() => {
     if (!user) return null;
-    
-    // Log the entire user object for debugging
-    console.log('Getting public key from user:', user);
     
     // According to Blux docs, user object contains wallet address
     const userObj = user as unknown as Record<string, unknown>;
@@ -68,22 +56,6 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({ className = '', onW
                  account.id ||
                  null;
     }
-    
-    console.log('Found public key:', pk);
-    console.log('All user object keys recursively:');
-    
-    // Log all nested keys
-    const logNestedKeys = (obj: Record<string, unknown>, prefix = '') => {
-      Object.keys(obj).forEach(key => {
-        const fullKey = prefix ? `${prefix}.${key}` : key;
-        console.log(`  ${fullKey}: ${typeof obj[key]} = ${obj[key]}`);
-        if (typeof obj[key] === 'object' && obj[key] !== null && !Array.isArray(obj[key])) {
-          logNestedKeys(obj[key] as Record<string, unknown>, fullKey);
-        }
-      });
-    };
-    
-    logNestedKeys(userObj);
     
     return pk;
   }, [user]);

@@ -147,7 +147,7 @@ const WebSwap: React.FC = () => {
               }}
             >
               Rio Guayabero, Macarena, Colombia. by Pedro Szekely, CC BY-SA 2.0
-            </div>
+            </button>
 
             {/* Animated text */}
             <div 
@@ -215,7 +215,7 @@ const WebSwap: React.FC = () => {
             </div>
 
             {/* Image credits */}
-            <div 
+            <button 
               onClick={() => window.open('https://www.flickr.com/photos/pedrosz/36132013403', '_blank')}
               style={{
                 backgroundColor: 'rgba(0, 0, 0, 0.4)',
@@ -242,7 +242,7 @@ const WebSwap: React.FC = () => {
               }}
             >
               Rio Guayabero, Macarena, Colombia. by Pedro Szekely, CC BY-SA 2.0
-            </div>
+            </button>
 
             {/* Powered by logo */}
             <div 
