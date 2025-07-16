@@ -168,9 +168,9 @@ export default function Swap({ onContinue, initialSourceAmount = '', initialTarg
          <div id="source-amount" className="w-full h-[60vh] bg-white/60 backdrop-blur-xl rounded-4xl p-6 flex items-center justify-start">
            {/* number input area: always show $ prefix, then spinner or input */}
            <div className="w-3/4 h-full flex items-center space-x-2">
-             <span className="text-2xl text-[#356E6A] font-bold">$</span>
+             <span className="text-2xl font-bold" style={{ color: textColor }}>$</span>
              {loadingSource ? (
-               <Loader className="animate-spin w-6 h-6 text-[#356E6A]" />
+               <Loader className="animate-spin w-6 h-6" style={{ color: textColor }} />
              ) : (
                <input
                  type="text"
@@ -181,7 +181,8 @@ export default function Swap({ onContinue, initialSourceAmount = '', initialTarg
                  onFocus={handleSourceFocus}
                  onBlur={handleSourceBlur}
                  placeholder="0.00"
-                 className="w-full h-full bg-transparent font-bold focus:outline-none text-2xl text-[#356E6A] text-left"
+                 className="w-full h-full bg-transparent font-bold focus:outline-none text-2xl text-left"
+                 style={{ color: textColor }}
                />
              )}
            </div>
@@ -194,9 +195,9 @@ export default function Swap({ onContinue, initialSourceAmount = '', initialTarg
            </div>
            {/* number input area: loader or input, centered */}
            <div className="w-3/4 h-full flex items-center space-x-2">
-             <span className="text-2xl text-[#356E6A] font-bold">$</span>
+             <span className="text-2xl font-bold" style={{ color: textColor }}>$</span>
              {loadingTarget ? (
-               <Loader className="animate-spin w-6 h-6 text-[#356E6A]" />
+               <Loader className="animate-spin w-6 h-6" style={{ color: textColor }} />
              ) : (
                <input
                  type="text"
@@ -206,7 +207,8 @@ export default function Swap({ onContinue, initialSourceAmount = '', initialTarg
                  onChange={handleTargetChange}
                  onBlur={handleTargetBlur}
                  placeholder="0,00"
-                 className="w-full h-full bg-transparent font-bold focus:outline-none text-2xl text-[#356E6A] text-left"
+                 className="w-full h-full bg-transparent font-bold focus:outline-none text-2xl text-left"
+                 style={{ color: textColor }}
                />
              )}
            </div>

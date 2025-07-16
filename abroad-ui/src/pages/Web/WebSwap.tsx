@@ -19,6 +19,8 @@ const WebSwap: React.FC = () => {
   const [isWalletDetailsOpen, setIsWalletDetailsOpen] = React.useState(false);
   const [view, setView] = React.useState<'swap' | 'bankDetails'>('swap');
   const [swapData, setSwapData] = React.useState<{ quote_id: string; srcAmount: string; tgtAmount: string } | null>(null);
+  const [sourceAmount, setSourceAmount] = React.useState('');
+  const [targetAmount, setTargetAmount] = React.useState('');
   const { user } = useBlux();
   
   React.useEffect(() => {
@@ -63,8 +65,8 @@ const WebSwap: React.FC = () => {
   }, []);
 
   const handleAmountsChange = React.useCallback((srcAmount: string, tgtAmount: string) => {
-    console.log('Amounts changed:', { srcAmount, tgtAmount });
-    // Handle amount changes here
+    setSourceAmount(srcAmount);
+    setTargetAmount(tgtAmount);
   }, []);
 
   const handleBackToSwap = React.useCallback(() => {
@@ -119,6 +121,8 @@ const WebSwap: React.FC = () => {
               {view === 'swap' && (
                 <Swap
                   onContinue={handleSwapContinue}
+                  initialSourceAmount={sourceAmount}
+                  initialTargetAmount={targetAmount}
                   onAmountsChange={handleAmountsChange}
                 />
               )}
@@ -398,6 +402,8 @@ const WebSwap: React.FC = () => {
             {view === 'swap' && (
               <Swap
                 onContinue={handleSwapContinue}
+                initialSourceAmount={sourceAmount}
+                initialTargetAmount={targetAmount}
                 onAmountsChange={handleAmountsChange}
                 textColor="white"
               />
