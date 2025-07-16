@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo } from 'react';
-import { Settings, Info, Menu, X } from 'lucide-react';
+import { Settings, Info, Menu, X, Wallet } from 'lucide-react';
 import { useBlux } from '@bluxcc/react';
 
 interface NavBarResponsiveProps {
@@ -64,6 +64,15 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({ className = '', onW
     publicKey ? formatWalletAddress(String(publicKey)) : 'Connected'
   ), [publicKey, formatWalletAddress]);
 
+  const connectedWalletName = useMemo(() => {
+    if (!isAuthenticated || !user) return null;
+    const wallet = (user as { wallet?: { name?: string } }).wallet;
+    if (wallet && typeof wallet.name === 'string') {
+      return wallet.name.toLowerCase();
+    }
+    return null;
+  }, [isAuthenticated, user]);
+
   const handleWalletClick = useCallback(() => {
     if (isAuthenticated && user) {
       // If wallet is connected, show wallet details
@@ -120,11 +129,35 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({ className = '', onW
               onClick={handleWalletClick}
               className="flex items-center space-x-2 bg-white/20 backdrop-blur-sm rounded-full px-4 py-2 border border-white/30 hover:bg-white/30 transition-colors duration-200"
             >
-              <img
-                src="https://storage.googleapis.com/cdn-abroad/Icons/Banks/Trust_Wallet_Shield.svg"
-                alt="Trust Wallet"
-                className="w-5 h-5"
-              />
+              {isAuthenticated && user ? (
+                connectedWalletName?.includes('freighter') ? (
+                  <img
+                    src="/src/assets/Logos/Wallets/Freighter.svg"
+                    alt="Freighter Wallet"
+                    className="w-8 h-8"
+                  />
+                ) : connectedWalletName?.includes('hana') ? (
+                  <img
+                    src="/src/assets/Logos/Wallets/Hana.svg"
+                    alt="Hana Wallet"
+                    className="w-8 h-8"
+                  />
+                ) : connectedWalletName?.includes('lobstr') ? (
+                  <img
+                    src="/src/assets/Logos/Wallets/Lobstr.svg"
+                    alt="Lobstr Wallet"
+                    className="w-8 h-8"
+                  />
+                ) : (
+                  <img
+                    src="https://storage.googleapis.com/cdn-abroad/Icons/Banks/Trust_Wallet_Shield.svg"
+                    alt="Trust Wallet"
+                    className="w-5 h-5"
+                  />
+                )
+              ) : (
+                <Wallet className="w-5 h-5 text-white" />
+              )}
               <span className="text-white text-md font-medium">
                 {isAuthenticated && user ? walletAddress : 'Connect Wallet'}
               </span>
@@ -175,11 +208,35 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({ className = '', onW
                 onClick={handleWalletClick}
                 className="flex items-center justify-center space-x-2 bg-white/20 backdrop-blur-sm rounded-full px-4 py-2 border border-white/30 mx-3 mt-4 hover:bg-white/30 transition-colors duration-200"
               >
-                <img
-                  src="https://storage.googleapis.com/cdn-abroad/Icons/Banks/Trust_Wallet_Shield.svg"
-                  alt="Trust Wallet"
-                  className="w-5 h-5"
-                />
+                {isAuthenticated && user ? (
+                  connectedWalletName?.includes('freighter') ? (
+                    <img
+                      src="/src/assets/Logos/Wallets/Freighter.svg"
+                      alt="Freighter Wallet"
+                      className="w-8 h-8"
+                    />
+                  ) : connectedWalletName?.includes('hana') ? (
+                    <img
+                      src="/src/assets/Logos/Wallets/Hana.svg"
+                      alt="Hana Wallet"
+                      className="w-5 h-5"
+                    />
+                  ) : connectedWalletName?.includes('lobstr') ? (
+                    <img
+                      src="/src/assets/Logos/Wallets/Lobstr.svg"
+                      alt="Lobstr Wallet"
+                      className="w-5 h-5"
+                    />
+                  ) : (
+                    <img
+                      src="https://storage.googleapis.com/cdn-abroad/Icons/Banks/Trust_Wallet_Shield.svg"
+                      alt="Trust Wallet"
+                      className="w-5 h-5"
+                    />
+                  )
+                ) : (
+                  <Wallet className="w-5 h-5 text-white" />
+                )}
                 <span className="text-white text-sm font-medium">
                   {isAuthenticated && user ? walletAddress : 'Connect Wallet'}
                 </span>

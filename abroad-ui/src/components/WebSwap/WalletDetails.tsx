@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { X, Copy, ExternalLink } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useBlux } from '@bluxcc/react';
@@ -21,17 +21,25 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
   const { user, logout } = useBlux();
   const [copiedAddress, setCopiedAddress] = useState(false);
 
+  const generateRandomPhoneNumber = () => {
+    const prefixes = ['310', '311', '312', '313', '314', '315'];
+    const prefix = prefixes[Math.floor(Math.random() * prefixes.length)];
+    const rest = Math.floor(Math.random() * 10000000).toString().padStart(7, '0');
+    const number = `${prefix}${rest}`;
+    return `${number.slice(0, 3)} ${number.slice(3, 6)} ${number.slice(6, 10)}`;
+  };
+
   // Mock data for demonstration
   const mockBalance = {
     usdc: "1,234.56",
     cop: "5,432,100"
   };
 
-  const mockTransactions: Transaction[] = [
+  const mockTransactions: Transaction[] = useMemo(() => [
     {
       id: "1",
       date: "2024-07-05",
-      destination: "GDQP2K...VWXY",
+      destination: generateRandomPhoneNumber(),
       usdcAmount: "100.00",
       copAmount: "432,500",
       type: "sent",
@@ -49,7 +57,7 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
     {
       id: "3",
       date: "2024-07-03", 
-      destination: "GBRT8M...QRST",
+      destination: generateRandomPhoneNumber(),
       usdcAmount: "200.00",
       copAmount: "865,000",
       type: "sent",
@@ -58,13 +66,13 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
     {
       id: "4",
       date: "2024-07-02", 
-      destination: "GCXY9Z...ABCD",
+      destination: generateRandomPhoneNumber(),
       usdcAmount: "75.00",
       copAmount: "324,750",
       type: "sent",
       status: "canceled"
     }
-  ];
+  ], []);
 
   // Helper function to format wallet address
   const formatWalletAddress = (address: string) => {

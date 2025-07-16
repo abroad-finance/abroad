@@ -4,6 +4,8 @@ import Swap from '../../components/Swap/Swap';
 import NavBarResponsive from '../../components/WebSwap/NavBarResponsive';
 import ConnectWallet from '../../components/WebSwap/ConnectWallet';
 import WalletDetails from '../../components/WebSwap/WalletDetails';
+import BankDetailsRoute from '../../components/Swap/BankDetailsRoute';
+import { useBlux } from '@bluxcc/react';
 
 const currencies = [
   { flag: 'co', name: 'Pesos' },
@@ -15,6 +17,9 @@ const WebSwap: React.FC = () => {
   const [isVisible, setIsVisible] = React.useState(true);
   const [isWalletModalOpen, setIsWalletModalOpen] = React.useState(false);
   const [isWalletDetailsOpen, setIsWalletDetailsOpen] = React.useState(false);
+  const [view, setView] = React.useState<'swap' | 'bankDetails'>('swap');
+  const [swapData, setSwapData] = React.useState<{ quote_id: string; srcAmount: string; tgtAmount: string } | null>(null);
+  const { user } = useBlux();
   
   React.useEffect(() => {
     const interval = setInterval(() => {
@@ -53,13 +58,23 @@ const WebSwap: React.FC = () => {
   }, []);
 
   const handleSwapContinue = React.useCallback((quote_id: string, srcAmount: string, tgtAmount: string) => {
-    console.log('Continue clicked:', { quote_id, srcAmount, tgtAmount });
-    // Handle the continue action here
+    setSwapData({ quote_id, srcAmount, tgtAmount });
+    setView('bankDetails');
   }, []);
 
   const handleAmountsChange = React.useCallback((srcAmount: string, tgtAmount: string) => {
     console.log('Amounts changed:', { srcAmount, tgtAmount });
     // Handle amount changes here
+  }, []);
+
+  const handleBackToSwap = React.useCallback(() => {
+    setView('swap');
+  }, []);
+
+  const handleTransactionComplete = React.useCallback(async ({ memo }: { memo: string }) => {
+    console.log('Transaction complete with memo:', memo);
+    // Here you can navigate to a success page or show a success message
+    setView('swap'); // Go back to swap view for now
   }, []);
 
   return (
@@ -101,10 +116,22 @@ const WebSwap: React.FC = () => {
             style={{ height: 'calc(100vh - 80px)' }}
           >
             <div className="w-full max-w-md">
-              <Swap
-                onContinue={handleSwapContinue}
-                onAmountsChange={handleAmountsChange}
-              />
+              {view === 'swap' && (
+                <Swap
+                  onContinue={handleSwapContinue}
+                  onAmountsChange={handleAmountsChange}
+                />
+              )}
+              {view === 'bankDetails' && swapData && user && (
+                <BankDetailsRoute
+                  onBackClick={handleBackToSwap}
+                  onTransactionComplete={handleTransactionComplete}
+                  quote_id={swapData.quote_id}
+                  sourceAmount={swapData.srcAmount}
+                  targetAmount={swapData.tgtAmount}
+                  userId={(user as any).publicKey || ''}
+                />
+              )}
             </div>
           </div>
 
@@ -368,11 +395,24 @@ const WebSwap: React.FC = () => {
         >
           {/* Swap component */}
           <div className="flex-1 flex items-center w-full">
-            <Swap
-              onContinue={handleSwapContinue}
-              onAmountsChange={handleAmountsChange}
-              textColor="white"
-            />
+            {view === 'swap' && (
+              <Swap
+                onContinue={handleSwapContinue}
+                onAmountsChange={handleAmountsChange}
+                textColor="white"
+              />
+            )}
+            {view === 'bankDetails' && swapData && user && (
+              <BankDetailsRoute
+                onBackClick={handleBackToSwap}
+                onTransactionComplete={handleTransactionComplete}
+                quote_id={swapData.quote_id}
+                sourceAmount={swapData.srcAmount}
+                targetAmount={swapData.tgtAmount}
+                userId={(user as any).publicKey || ''}
+                textColor="white"
+              />
+            )}
           </div>
 
           {/* Powered by logo for desktop only */}

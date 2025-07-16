@@ -225,7 +225,7 @@ export default function Swap({ onContinue, initialSourceAmount = '', initialTarg
              </div>  
            <div id="time" className="flex items-center space-x-2 pb-2">
                <Timer className="w-5 h-5" />
-               <span>Tiempo: <b>1 - 3 minutos</b></span>
+               <span>Tiempo: <b>10 - 30 segundos</b></span>
              </div>
            </div>
          </div>
