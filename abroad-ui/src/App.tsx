@@ -10,7 +10,7 @@ import Pool from "./pages/Pool";
 // Mobile pages
 import Splash from "./pages/Mobile/Splash";
 import Anchor from "./pages/Mobile/Anchor";
-import WebSwap from "./pages/Web/WebSwap";
+import WebSwap from "./pages/WebSwap/WebSwap";
 
 
 function App() {  
