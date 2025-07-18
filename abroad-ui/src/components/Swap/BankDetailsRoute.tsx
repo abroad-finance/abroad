@@ -153,7 +153,7 @@ export default function BankDetailsRoute({ userId, onBackClick, quote_id, target
           </div>
           {/* Transaction Info */}
           <div id="tx-info" className="relative font-medium w-full flex items-center justify-start space-x-1" style={{ color: textColor }}> {/* MODIFIED: items-center, justify-start, space-x-1 */}
-            Monto a recibir: <img className='w-5 h-5' src="https://storage.cloud.google.com/cdn-abroad/Icons/Tokens/COP-Token.svg" alt="COP_Token" /> <b> ${targetAmount}</b>
+            Monto a recibir: <img className='w-5 h-5' src="https://storage.googleapis.com/cdn-abroad/Icons/Tokens/COP-Token.svg" alt="COP_Token" /> <b> ${targetAmount}</b>
           </div>
         </div>
 

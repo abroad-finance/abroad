@@ -14,8 +14,8 @@ const DesktopLayout: React.FC<LayoutProps> = (props) => {
   return (
     <div className="hidden md:flex flex-row w-full h-full">
       {/* Left Column - Marketing */}
-      <div className="w-1/2 flex flex-col justify-center relative p-10">
-        <div className="text-6xl max-w-xl mx-auto">
+      <div className="w-1/2 flex flex-col justify-center relative px-4 py-10 sm:px-6 lg:px-8">
+        <div className="text-6xl max-w-xl">
           <AnimatedHeroText />
         </div>
         <ImageAttribution className="absolute bottom-5 left-5" />

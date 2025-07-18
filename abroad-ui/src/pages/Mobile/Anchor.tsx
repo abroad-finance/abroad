@@ -90,7 +90,7 @@ export default function Anchor() {
       <img
         src="https://cdn.prod.website-files.com/66d73974e0b6f2e9c06130a7/67bdb92323f0bb399db3754c_abroad-logo.svg"
         alt="Abroad Logo"
-        className="h-12 mt-18 mb-6"
+        className="h-8 md:h-12 mt-12 md:mt-18 mb-6"
       />
       {/* Centered white card covering 60% of screen */}
       <div className="flex-1 flex items-center justify-center w-full flex-col">
@@ -123,7 +123,7 @@ export default function Anchor() {
           rel="noopener noreferrer"
         >
           <img
-            src="https://storage.cloud.google.com/cdn-abroad/Icons/Socials/icon-x.svg"
+            src="https://storage.googleapis.com/cdn-abroad/Icons/Socials/icon-x.svg"
             alt="X"
             className="w-5 h-5 text-[#356E6A]"
             style={{ filter: 'invert(33%) sepia(14%) saturate(1833%) hue-rotate(121deg) brightness(90%) contrast(85%)' }}
@@ -135,7 +135,7 @@ export default function Anchor() {
           rel="noopener noreferrer"
         >
           <img
-            src="https://storage.cloud.google.com/cdn-abroad/Icons/Socials/icon-discord.svg"
+            src="https://storage.googleapis.com/cdn-abroad/Icons/Socials/icon-discord.svg"
             alt="Discord"
             className="w-5 h-5 text-[#356E6A]"
             style={{ filter: 'invert(33%) sepia(14%) saturate(1833%) hue-rotate(121deg) brightness(90%) contrast(85%)' }}
