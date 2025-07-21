@@ -1,7 +1,6 @@
-import React, { useState, useCallback, useMemo, useEffect } from 'react';
-import { Settings, Info, Menu, X, Wallet } from 'lucide-react';
+import React, { useState, useCallback, useMemo } from 'react';
+import { Info, Menu, X, Wallet } from 'lucide-react';
 import { useBlux } from '@bluxcc/react';
-import SwapSettings from './SwapSettings';
 
 interface NavBarResponsiveProps {
   className?: string;
@@ -11,34 +10,11 @@ interface NavBarResponsiveProps {
 
 const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({ className = '', onWalletConnect, onWalletDetails }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const { user, isAuthenticated } = useBlux();
 
   const toggleMobileMenu = useCallback(() => {
     setIsMobileMenuOpen(!isMobileMenuOpen);
   }, [isMobileMenuOpen]);
-
-  const toggleSettings = useCallback(() => {
-    setIsSettingsOpen(!isSettingsOpen);
-  }, [isSettingsOpen]);
-
-  const handleLanguageChange = useCallback((language: string) => {
-    console.log('Language changed to:', language);
-    // TODO: Implement actual language change logic
-    // This could involve updating a context, localStorage, or API call
-  }, []);
-
-  // Handle Escape key to close settings modal
-  useEffect(() => {
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && isSettingsOpen) {
-        setIsSettingsOpen(false);
-      }
-    };
-
-    document.addEventListener('keydown', handleEscape);
-    return () => document.removeEventListener('keydown', handleEscape);
-  }, [isSettingsOpen]);
 
   // Helper function to format wallet address
   const formatWalletAddress = useCallback((address: string) => {
@@ -183,20 +159,15 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({ className = '', onW
                 <Wallet className="w-5 h-5 text-white" />
               )}
               <span className="text-white text-md font-medium">
-                {isAuthenticated && user ? walletAddress : 'Connect Wallet'}
+                {isAuthenticated && user ? walletAddress : 'Conectar Billetera'}
               </span>
             </button>
 
-            {/* Settings Icon */}
+            {/* Info Icon */}
             <button 
-              onClick={toggleSettings}
+              onClick={() => window.open('https://linktr.ee/Abroad.finance', '_blank')}
               className="p-2 rounded-full bg-white/20 hover:bg-white/30 transition-colors duration-200"
             >
-              <Settings className="w-5 h-5 text-white" />
-            </button>
-
-            {/* Info Icon */}
-            <button className="p-2 rounded-full bg-white/20 hover:bg-white/30 transition-colors duration-200">
               <Info className="w-5 h-5 text-white" />
             </button>
           </div>
@@ -265,19 +236,16 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({ className = '', onW
                   <Wallet className="w-5 h-5 text-white" />
                 )}
                 <span className="text-white text-sm font-medium">
-                  {isAuthenticated && user ? walletAddress : 'Connect Wallet'}
+                  {isAuthenticated && user ? walletAddress : 'Conectar Billetera'}
                 </span>
               </button>
 
               {/* Mobile Action Buttons */}
               <div className="flex justify-center space-x-4 mt-4 pb-2">
                 <button 
-                  onClick={toggleSettings}
+                  onClick={() => window.open('https://linktr.ee/Abroad.finance', '_blank')}
                   className="p-2 rounded-full bg-white/20 hover:bg-white/30 transition-colors duration-200"
                 >
-                  <Settings className="w-5 h-5 text-white" />
-                </button>
-                <button className="p-2 rounded-full bg-white/20 hover:bg-white/30 transition-colors duration-200">
                   <Info className="w-5 h-5 text-white" />
                 </button>
               </div>
@@ -287,25 +255,6 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({ className = '', onW
         </div>
       </div>
       </nav>
-
-      {/* Settings Modal */}
-      {isSettingsOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          {/* Backdrop */}
-          <div 
-            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-            onClick={toggleSettings}
-          />
-          
-          {/* Modal Content */}
-          <div className="relative z-20 w-full max-w-md mx-4">
-            <SwapSettings 
-              onLanguageChange={handleLanguageChange}
-              onClose={toggleSettings}
-            />
-          </div>
-        </div>
-      )}
     </>
   );
 };

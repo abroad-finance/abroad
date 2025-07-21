@@ -52,7 +52,7 @@ const ConnectWallet: React.FC<ConnectWalletProps> = ({ onWalletSelect, onClose }
     {
       id: 'stellar' as const,
       icon: StellarLogo,
-      name: 'Stellar Wallets',
+      name: 'Billeteras Stellar',
     },
   ];
 
@@ -91,10 +91,10 @@ const ConnectWallet: React.FC<ConnectWalletProps> = ({ onWalletSelect, onClose }
         {/* Header */}
         <div className="mb-3 pr-8 text-center mt-5 md:mt-14">
           <h2 className="text-2xl font-semibold text-gray-900 mb-2">
-            {showBluxModal ? 'Connect Stellar Wallet' : 'Connect your wallet'}
+            {showBluxModal ? 'Conectar Billetera Stellar' : 'Conecta tu billetera'}
           </h2>
           <p className="text-md text-gray-600">
-            {showBluxModal ? 'Choose your Stellar wallet to connect' : 'Connect your wallet to make transactions Abroad'}
+            {showBluxModal ? 'Elige tu billetera Stellar para conectar' : 'Conecta tu billetera para hacer transacciones en Abroad'}
           </p>
         </div>
 
@@ -106,7 +106,7 @@ const ConnectWallet: React.FC<ConnectWalletProps> = ({ onWalletSelect, onClose }
               onClick={() => setShowBluxModal(false)}
               className="mb-4 text-blue-600 hover:text-blue-800 text-sm font-medium"
             >
-              ← Back to wallet selection
+              ← Volver a la selección de billetera
             </button>
             
             {/* Stellar Wallet Options */}
@@ -118,10 +118,10 @@ const ConnectWallet: React.FC<ConnectWalletProps> = ({ onWalletSelect, onClose }
                     alt="Stellar Logo"
                     className="w-6 h-6 mr-2"
                   />
-                  <span className="text-blue-800 font-medium text-sm">Stellar Network</span>
+                  <span className="text-blue-800 font-medium text-sm">Red Stellar</span>
                 </div>
                 <p className="text-blue-600 text-sm">
-                  Connect to any Stellar wallet including Freighter, Rabet, xBull, Lobstr, and Albedo.
+                  Conecta a cualquier billetera Stellar incluyendo Freighter, Rabet, xBull, Lobstr y Albedo.
                 </p>
               </div>
 
@@ -141,15 +141,15 @@ const ConnectWallet: React.FC<ConnectWalletProps> = ({ onWalletSelect, onClose }
                     </svg>
                   </div>
                   <span className="text-blue-700 font-medium">
-                    {isReady ? 'Connect Stellar Wallet' : 'Loading Blux...'}
+                    {isReady ? 'Conectar Billetera Stellar' : 'Cargando Blux...'}
                   </span>
                 </div>
               </button>
 
               <div className="text-center mt-4">
                 <p className="text-gray-500 text-xs">
-                  A wallet selection modal will appear after clicking the button above.
-                  Make sure you have a Stellar wallet extension installed.
+                  Aparecerá un modal de selección de billetera después de hacer clic en el botón de arriba.
+                  Asegúrate de tener una extensión de billetera Stellar instalada.
                 </p>
               </div>
             </div>
@@ -182,23 +182,23 @@ const ConnectWallet: React.FC<ConnectWalletProps> = ({ onWalletSelect, onClose }
 
         {/* Terms and Privacy */}
         <div className="text-xs text-gray-500 leading-relaxed text-center md:mt-auto">
-          By connecting your wallet, you agree to our{' '}
+          Al conectar tu billetera, aceptas nuestros{' '}
           <a
             href="https://cdn.prod.website-files.com/66d73974e0b6f2e9c06130a7/682e16447c330447a92a6323_TERMS%20AND%20CONDITIONS%20ABROAD%20-%20MAY%202025.pdf"
             target="_blank"
             rel="noopener noreferrer"
             className="text-blue-600 hover:text-blue-800 underline cursor-pointer"
           >
-            Terms of Service
+            Términos de Servicio
           </a>{' '}
-          and{' '}
+          y{' '}
           <a
             href="https://cdn.prod.website-files.com/66d73974e0b6f2e9c06130a7/67c30e575c78a99c968adf81_Data%20Privacy%20Policy%20Abroad.pdf"
             target="_blank"
             rel="noopener noreferrer"
             className="text-blue-600 hover:text-blue-800 underline cursor-pointer"
           >
-            Privacy Policy
+            Política de Privacidad
           </a>
           .
         </div>

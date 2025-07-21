@@ -76,7 +76,7 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
 
   // Helper function to format wallet address
   const formatWalletAddress = (address: string) => {
-    if (!address) return 'Not connected';
+    if (!address) return 'No conectado';
     return `${address.slice(0, 6)}...${address.slice(-4)}`;
   };
 
@@ -169,12 +169,12 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
         )}
 
         {/* Header */}
-        <div className="mb-6 pr-8 text-center mt-5 md:mt-15">
+        <div className="mb-6 pr-8 text-center mt-2 md:mt-4">
           <h2 className="text-2xl font-semibold text-gray-900 mb-2">
-            Account Details
+            Tu Cuenta
           </h2>
           <p className="text-md text-gray-600">
-            Manage your wallet and view transaction history
+            Gestiona tu billetera y consulta el historial de transacciones
           </p>
         </div>
 
@@ -192,7 +192,7 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
               <button
                 onClick={handleDisconnectWallet}
                 className="p-1 hover:bg-red-100 hover:bg-opacity-20 rounded transition-colors duration-200"
-                title="Disconnect wallet"
+                title="Desconectar billetera"
               >
                 <svg className="w-4 h-4 text-red-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
@@ -201,21 +201,21 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
               <button
                 onClick={() => copyToClipboard(walletAddress)}
                 className="p-1 hover:bg-white hover:bg-opacity-20 rounded transition-colors duration-200"
-                title="Copy address"
+                title="Copiar dirección"
               >
                 <Copy className="w-4 h-4 text-white" />
               </button>
               <button
                 onClick={() => window.open(`https://stellar.expert/explorer/public/account/${walletAddress}`, '_blank')}
                 className="p-1 hover:bg-white hover:bg-opacity-20 rounded transition-colors duration-200"
-                title="View on explorer"
+                title="Ver en explorador"
               >
                 <ExternalLink className="w-4 h-4 text-white" />
               </button>
             </div>
           </div>
           {copiedAddress && (
-            <div className="text-green-300 text-xs mb-4">Address copied!</div>
+            <div className="text-green-300 text-xs mb-4">¡Dirección copiada!</div>
           )}
 
           {/* Balance Section */}
@@ -231,7 +231,7 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
 
         {/* Transaction History */}
         <div className="flex-1">
-          <h3 className="text-gray-800 font-medium text-lg mb-4">Transaction History</h3>
+          <h3 className="text-gray-800 font-medium text-lg mb-4">Historial de Transacciones</h3>
           <div className="space-y-3">
             {mockTransactions.map((transaction) => (
               <div 
@@ -248,16 +248,16 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
                     transaction.status === 'refunded' ? 'bg-orange-100 text-orange-700' :
                     transaction.status === 'canceled' ? 'bg-red-100 text-red-700' : ''
                   }`}>
-                    {transaction.status === 'completed' ? 'Completed' :
-                     transaction.status === 'processing' ? 'Processing' :
-                     transaction.status === 'refunded' ? 'Refunded' :
-                     transaction.status === 'canceled' ? 'Canceled' : transaction.status}
+                    {transaction.status === 'completed' ? 'Completado' :
+                     transaction.status === 'processing' ? 'Procesando' :
+                     transaction.status === 'refunded' ? 'Reembolsado' :
+                     transaction.status === 'canceled' ? 'Cancelado' : transaction.status}
                   </span>
                 </div>
                 
                 <div className="mb-2">
                   <span className="text-gray-500 text-xs">
-                    {transaction.type === 'sent' ? 'To: ' : 'From: '}
+                    {transaction.type === 'sent' ? 'Para: ' : 'De: '}
                   </span>
                   <span className="text-gray-700 font-mono text-sm">
                     {transaction.destination}
@@ -292,14 +292,14 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
 
           {mockTransactions.length === 0 && (
             <div className="text-center py-8">
-              <div className="text-gray-400 text-sm">No transactions yet</div>
+              <div className="text-gray-400 text-sm">No hay transacciones aún</div>
             </div>
           )}
         </div>
 
         {/* Footer */}
         <div className="text-xs text-gray-500 leading-relaxed text-center mt-6 pt-4 border-t border-gray-200">
-          Transaction data is updated in real-time
+          Los datos de transacciones se actualizan en tiempo real
         </div>
       </div>
     </motion.div>
