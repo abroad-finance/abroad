@@ -80,7 +80,10 @@ export default function Anchor() {
   const handleTransactionAccepted = useCallback(async ({ memo }: { memo: string }) => {
     // make a get request
     const sepBaseUrl = import.meta.env.VITE_SEP_BASE_URL || 'http://localhost:8000';
-    const url = encodeURI(`${sepBaseUrl}/sep24/transactions/withdraw/interactive/complete?amount_expected=${sourceAmount}&transaction_id=${sepTransactionId}&memo=${memo}`);
+    let url = encodeURI(`${sepBaseUrl}/sep24/transactions/withdraw/interactive/complete?amount_expected=${sourceAmount}&transaction_id=${sepTransactionId}&memo=${memo}`);
+    if (callbackUrl && callbackUrl.toLowerCase() !== 'none') {
+      url += `&callback=${encodeURIComponent(callbackUrl)}`;
+    }
     window.location.href = url;
   }, [callbackUrl, sepTransactionId, sourceAmount]);
 
