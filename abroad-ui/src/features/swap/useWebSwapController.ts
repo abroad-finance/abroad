@@ -57,7 +57,7 @@ export const useWebSwapController = () => {
     isWalletModalOpen,
     isWalletDetailsOpen,
     initialAmounts: { source: sourceAmount, target: targetAmount },
-    user: user as BluxUser | null,
+    user: user as unknown as BluxUser | null,
 
     // Handlers
     handleWalletConnectOpen,
