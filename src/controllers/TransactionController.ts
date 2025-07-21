@@ -1,6 +1,6 @@
 // src/controllers/TransactionController.ts
 
-import { TransactionStatus } from '@prisma/client'
+import { KycStatus, TransactionStatus } from '@prisma/client'
 import { Request as RequestExpress } from 'express'
 import { NotFound } from 'http-errors'
 import { inject } from 'inversify'
@@ -139,11 +139,11 @@ export class TransactionController extends Controller {
       },
     })
 
-    // const { status } = await this.kycUseCase.getKycStatus({ partnerId: partner.id, userId })
+    const { status } = await this.kycUseCase.getKycStatus({ partnerId: partner.id, userId })
 
-    // if (partner.needsKyc && status !== KycStatus.APPROVED) {
-    //   return badRequestResponse(400, { reason: 'KYC not approved' })
-    // }
+    if (partner.needsKyc && status !== KycStatus.APPROVED) {
+      return badRequestResponse(400, { reason: 'KYC not approved' })
+    }
 
     const userTransactionsToday = await prismaClient.transaction.findMany({
       include: { quote: true },
