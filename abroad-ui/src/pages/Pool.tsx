@@ -1,6 +1,6 @@
 import React from 'react';
 import { useLanguage } from '../contexts/LanguageContext';
-import Navbar from '../components/navbar';
+import Navbar from '../components/Navbar';
 import { InfoCard } from '../components/InfoCard';
 
 // Translation strings

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Button } from '../button';
+import { Button } from '../Button';
 import { IconAnimated } from '../IconAnimated';
 
 // Mock statuses for visualization purposes
@@ -16,11 +16,11 @@ export default function TxStatus({ onNewTransaction, onRetry }: TxStatusProps): 
   const renderIcon = () => {
     switch (status) {
       case 'inProgress':
-        return <IconAnimated icon='Coins' size={150} loop/>;
+        return <IconAnimated icon='Coins' size={150} trigger='loop'/>;
       case 'accepted':
-        return <IconAnimated icon='AnimatedCheck' size={150} timer={300} />;
+        return <IconAnimated icon='AnimatedCheck' size={150} trigger='loop'/>;
       case 'denied':
-        return <IconAnimated icon='Denied' size={150} timer={300} />;
+        return <IconAnimated icon='Denied' size={150} trigger='loop'/>;
     }
   };
 

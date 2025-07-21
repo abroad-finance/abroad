@@ -9,7 +9,8 @@ import {
   // Cog as CogIcon,
   HelpCircle as HelpIcon,
   Settings as SettingsIcon,
-  WavesLadder as PoolIcon  // Pool icon
+  WavesLadder as PoolIcon,  // Pool icon
+  FileBarChart as ReportsIcon  // Reports icon
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { getPartnerInfo, PartnerInfoResponse } from "../api";
@@ -20,6 +21,7 @@ const navLinks = [
   { label: "Send Payment", icon: SendIcon, section: "send" },
   { label: "Transactions", icon: BankIcon, section: "transactions" },
   { label: "Recipients", icon: UsersIcon, section: "recipients", path: "/recipients" },
+  { label: "Reports", icon: ReportsIcon, section: "reports", path: "/reports" },
   { label: "Security", icon: SecurityIcon, section: "security" },
   // { label: "API & Integrations", icon: CogIcon, section: "api", path: "/integrations" },
   { label: "Help & Support", icon: HelpIcon, section: "help" },
@@ -34,6 +36,7 @@ const translations: Record<'en' | 'es' | 'pt' | 'zh', Record<string, string>> = 
     send: "Send Payment",
     transactions: "Transactions",
     recipients: "Recipients",
+    reports: "Reports",
     security: "Security",
     api: "API & Integrations",
     help: "Help & Support",
@@ -45,6 +48,7 @@ const translations: Record<'en' | 'es' | 'pt' | 'zh', Record<string, string>> = 
     send: "Enviar Pago",
     transactions: "Transacciones",
     recipients: "Destinatarios",
+    reports: "Reportes",
     security: "Seguridad",
     api: "API e Integraciones",
     help: "Ayuda y Soporte",
@@ -56,6 +60,7 @@ const translations: Record<'en' | 'es' | 'pt' | 'zh', Record<string, string>> = 
     send: "Enviar Pagamento",
     transactions: "Transações",
     recipients: "Destinatários",
+    reports: "Relatórios",
     security: "Segurança",
     api: "API e Integrações",
     help: "Ajuda e Suporte",
@@ -67,6 +72,7 @@ const translations: Record<'en' | 'es' | 'pt' | 'zh', Record<string, string>> = 
     send: "发送付款",
     transactions: "交易",
     recipients: "收件人",
+    reports: "报告",
     security: "安全",
     api: "API和集成",
     help: "帮助与支持",
@@ -106,7 +112,7 @@ export default function Topbar({ activeSection, setActiveSection }: TopbarProps)
   }
 
   return (
-    <header className="w-full bg-white border border-gray-200 shadow-sm rounded-xl mb-4">
+    <header className="w-full bg-white border border-gray-200 rounded-xl mb-4">
       <div className=" px-6">
         <div className="flex items-center justify-between h-16">
           {/* Logo on the left */}

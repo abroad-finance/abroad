@@ -1,0 +1,32 @@
+/* Airbnb Cereal Font */
+@font-face {
+  font-family: 'Airbnb Cereal';
+  src: url('/fonts/AirbnbCerealLight.otf') format('opentype');
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Airbnb Cereal';
+  src: url('/fonts/AirbnbCerealBook.otf') format('opentype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Airbnb Cereal';
+  src: url('/fonts/AirbnbCerealMedium.otf') format('opentype');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Airbnb Cereal';
+  src: url('/fonts/AirbnbCerealBold.otf') format('opentype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}

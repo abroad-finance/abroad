@@ -1,6 +1,6 @@
 import React from "react";
 import { useLanguage } from "../contexts/LanguageContext";
-import Navbar from "../components/navbar";
+import Navbar from "../components/Navbar";
 import { Listbox } from '@headlessui/react';
 import { getPartnerInfo, PartnerInfoResponse } from "../api";
 

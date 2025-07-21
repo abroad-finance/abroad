@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Button } from '../../components/button';
+import { Button } from '../../components/Button';
 
 type Language = 'en' | 'es' | 'pt' | 'zh';
 // Translations for slogans and terms

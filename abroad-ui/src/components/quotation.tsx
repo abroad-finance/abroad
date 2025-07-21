@@ -1,6 +1,6 @@
 import React from 'react';
 import { Card, CardContent } from "./card";
-import { Button } from "./button";
+import { Button } from "./Button";
 import { QuoteResponse } from "../api/apiClient";
 import { useLanguage } from '../contexts/LanguageContext';
 

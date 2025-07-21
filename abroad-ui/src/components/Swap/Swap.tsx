@@ -5,16 +5,17 @@ interface SwapProps {
   initialSourceAmount?: string;
   initialTargetAmount?: string;
   onAmountsChange?: (srcAmount: string, tgtAmount: string) => void;
+  textColor?: string;
 }
 
-import { Button } from "../../components/button";
+import { Button } from "../Button";
 import { ChevronsDown, Loader, CircleDollarSign, Landmark, Timer } from 'lucide-react';
 import { TokenBadge } from './TokenBadge';
 import { getQuote, getReverseQuote, _36EnumsTargetCurrency, _36EnumsPaymentMethod, _36EnumsBlockchainNetwork, _36EnumsCryptoCurrency } from '../../api/index';
 
 const TransferFee = 1354;
 
-export default function Swap({ onContinue, initialSourceAmount = '', initialTargetAmount = '', onAmountsChange }: SwapProps) {
+export default function Swap({ onContinue, initialSourceAmount = '', initialTargetAmount = '', onAmountsChange, textColor = '#356E6A' }: SwapProps) {
     // state for source (USD) and target (COP) amounts
     const [sourceAmount, setSourceAmount] = useState(initialSourceAmount);
     const [targetAmount, setTargetAmount] = useState(initialTargetAmount || '');
@@ -161,15 +162,17 @@ export default function Swap({ onContinue, initialSourceAmount = '', initialTarg
      // Removed the outermost div and institutional logo
      // Centered white card covering 60% of screen
      <div className="flex-1 flex items-center justify-center w-full flex flex-col">
-       <div id="background-container" className="w-[90%] max-w-[50vh] h-[60vh] bg-[#356E6A]/5 backdrop-blur-xl rounded-4xl p-6 flex flex-col items-center justify-center space-y-1">
+       <div id="background-container" className="w-[90%] max-w-md min-h-[60vh] h-auto bg-[#356E6A]/5 backdrop-blur-xl rounded-4xl p-4 md:p-6 flex flex-col items-center justify-center space-y-1 lg:space-y-4">
          {/* Here starts Swap as a component */}
-         <div id="Title" className="text-2xl font-bold mb-8 text-[#356E6A]">¿Cuanto deseas Retirar?</div>
-         <div id="source-amount" className="w-full h-[60vh] bg-white/60 backdrop-blur-xl rounded-4xl p-6 flex items-center justify-start">
+         <div className="flex-1 flex items-center justify-center">
+           <div id="Title" className="text-xl md:text-2xl font-bold text-center" style={{ color: textColor }}>¿Cuanto deseas Transferir?</div>
+         </div>
+         <div id="source-amount" className="w-full bg-white/60 backdrop-blur-xl rounded-2xl p-4 md:p-6 lg:py-6 xl:py-6 min-h-[800px]:py-16 flex items-center justify-start">
            {/* number input area: always show $ prefix, then spinner or input */}
            <div className="w-3/4 h-full flex items-center space-x-2">
-             <span className="text-2xl text-[#356E6A] font-bold">$</span>
+             <span className="text-xl md:text-2xl font-bold" style={{ color: textColor }}>$</span>
              {loadingSource ? (
-               <Loader className="animate-spin w-6 h-6 text-[#356E6A]" />
+               <Loader className="animate-spin w-6 h-6" style={{ color: textColor }} />
              ) : (
                <input
                  type="text"
@@ -180,22 +183,23 @@ export default function Swap({ onContinue, initialSourceAmount = '', initialTarg
                  onFocus={handleSourceFocus}
                  onBlur={handleSourceBlur}
                  placeholder="0.00"
-                 className="w-full h-full bg-transparent font-bold focus:outline-none text-2xl text-[#356E6A] text-left"
+                 className="w-full h-full bg-transparent font-bold focus:outline-none text-xl md:text-2xl text-left"
+                 style={{ color: textColor }}
                />
              )}
            </div>
-           <TokenBadge iconSrc="https://storage.cloud.google.com/cdn-abroad/Icons/Tokens/USDC%20Token.svg" alt="USDC Token Logo" symbol="USDC"/>
+           <TokenBadge iconSrc="https://storage.googleapis.com/cdn-abroad/Icons/Tokens/USDC%20Token.svg" alt="USDC Token Logo" symbol="USDC"/>
          </div>
-         <div id="target-amount" className="relative w-full h-[60vh] bg-white/60 backdrop-blur-xl rounded-4xl p-6 flex items-center justify-start">
+         <div id="target-amount" className="relative w-full bg-white/60 backdrop-blur-xl rounded-2xl p-4 md:p-6 lg:py-6 xl:py-6 min-h-[800px]:py-16 flex items-center justify-start">
            {/* circular cutout effect matching bg-container-1 */}
            <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 w-8 h-8 bg-[#356E6A]/5 rounded-full flex items-center justify-center">
              <ChevronsDown color="#356E6A" className="w-4 h-4" />
            </div>
            {/* number input area: loader or input, centered */}
            <div className="w-3/4 h-full flex items-center space-x-2">
-             <span className="text-2xl text-[#356E6A] font-bold">$</span>
+             <span className="text-xl md:text-2xl font-bold" style={{ color: textColor }}>$</span>
              {loadingTarget ? (
-               <Loader className="animate-spin w-6 h-6 text-[#356E6A]" />
+               <Loader className="animate-spin w-6 h-6" style={{ color: textColor }} />
              ) : (
                <input
                  type="text"
@@ -205,32 +209,35 @@ export default function Swap({ onContinue, initialSourceAmount = '', initialTarg
                  onChange={handleTargetChange}
                  onBlur={handleTargetBlur}
                  placeholder="0,00"
-                 className="w-full h-full bg-transparent font-bold focus:outline-none text-2xl text-[#356E6A] text-left"
+                 className="w-full h-full bg-transparent font-bold focus:outline-none text-xl md:text-2xl text-left"
+                 style={{ color: textColor }}
                />
              )}
            </div>
-           <TokenBadge iconSrc="https://storage.cloud.google.com/cdn-abroad/Icons/Tokens/COP-Token.svg" alt="COP Token Logo" symbol="COP" />
+           <TokenBadge iconSrc="https://storage.googleapis.com/cdn-abroad/Icons/Tokens/COP-Token.svg" alt="COP Token Logo" symbol="COP" />
          </div>
 
-         <div id="tx-info" className="relative w-full h-[60vh] text-[#356E6A] pt-6 pl-4 flex items-center justify-start">
-           <div className="h-full flex-col items-center space-x-2">
-           <div  id="trm" className="flex items-center space-x-2 pb-2">
-               <CircleDollarSign className="w-5 h-5" />
-               <span>Tasa de Cambio: <b>${displayedTRM === 0 ? '-' : formatCOPNumber(displayedTRM)}</b> </span>
-             </div>  
-             <div id="transfer-fee" className="flex items-center space-x-2 pb-2">
-               <Landmark className="w-5 h-5" />
-               <span>Costo de Transferencia: <b>${formatCOPNumber(TransferFee)}</b></span>
-             </div>  
-           <div id="time" className="flex items-center space-x-2 pb-2">
-               <Timer className="w-5 h-5" />
-               <span>Tiempo: <b>1 - 3 minutos</b></span>
+         <div className="flex-1 flex items-center justify-center w-full">
+           <div id="tx-info" className="w-full" style={{ color: textColor }}>
+             <div className="flex flex-col space-y-2">
+               <div id="trm" className="flex items-center space-x-2">
+                 <CircleDollarSign className="w-5 h-5" />
+                 <span>Tasa de Cambio: <b>${displayedTRM === 0 ? '-' : formatCOPNumber(displayedTRM)}</b></span>
+               </div>  
+               <div id="transfer-fee" className="flex items-center space-x-2">
+                 <Landmark className="w-5 h-5" />
+                 <span>Costo de Transferencia: <b>${formatCOPNumber(TransferFee)}</b></span>
+               </div>  
+               <div id="time" className="flex items-center space-x-2">
+                 <Timer className="w-5 h-5" />
+                 <span>Tiempo: <b>10 - 30 segundos</b></span>
+               </div>
              </div>
            </div>
          </div>
        </div>
        <Button
-         className="mt-4 w-[90%] max-w-[50vh] py-4"
+         className="mt-4 w-[90%] max-w-md py-4"
          onClick={() => onContinue(quote_id, sourceAmount, targetAmount)}
          disabled={isButtonDisabled()}
        >

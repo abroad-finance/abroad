@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Button } from "../../components/button";
-import { Loader, Landmark, Hash, ArrowLeft, Rotate3d } from 'lucide-react';
+import { Button } from "../Button";
+import { Loader, Landmark, Hash, ArrowLeft, Rotate3d} from 'lucide-react';
 import { getBanks, Bank, getBanksResponse200, acceptTransaction } from '../../api';
 
 interface BankDetailsRouteProps {
@@ -10,10 +10,11 @@ interface BankDetailsRouteProps {
   sourceAmount: string;
   targetAmount: string;
   userId: string;
+  textColor?: string;
 }
 
 
-export default function BankDetailsRoute({ userId, onBackClick, quote_id, targetAmount, onTransactionComplete }: BankDetailsRouteProps): React.JSX.Element {
+export default function BankDetailsRoute({ userId, onBackClick, quote_id, targetAmount, onTransactionComplete, textColor = '#356E6A' }: BankDetailsRouteProps): React.JSX.Element {
   const [account_number, setaccount_number] = useState('');
   const [bank_code, setbank_code] = useState<string>('');
   const [loadingSubmit, setLoadingSubmit] = useState(false);
@@ -101,20 +102,21 @@ export default function BankDetailsRoute({ userId, onBackClick, quote_id, target
         <div className="w-full flex items-center space-x-3 mb-4">
           <button
             onClick={onBackClick}
-            className="text-[#356E6A] hover:text-[#2a5956] transition-colors"
+            className="hover:text-opacity-80 transition-colors"
+            style={{ color: textColor }}
             aria-label="Go back"
           >
             <ArrowLeft className="w-6 h-6" />
           </button>
 
-          <div id="Tittle" className="text-2xl font-bold text-[#356E6A] flex-grow text-center">Datos de Transacción</div>
+          <div id="Tittle" className="text-2xl font-bold flex-grow text-center" style={{ color: textColor }}>Datos de Transacción</div>
         </div>
 
         {/* Centered Content Wrapper */}
         <div className="flex-grow flex flex-col items-center justify-center w-full space-y-4">
           {/* Bank Account Number Input */}
           <div id="bank-account-input" className="w-full bg-white/60 backdrop-blur-xl rounded-2xl p-4 flex items-center space-x-3">
-            <Hash className="w-6 h-6 text-[#356E6A]" />
+            <Hash className="w-6 h-6" style={{ color: textColor }} />
             <input
               type="text"
               inputMode="numeric"
@@ -122,21 +124,23 @@ export default function BankDetailsRoute({ userId, onBackClick, quote_id, target
               placeholder="Número Transfiya"
               value={account_number}
               onChange={handleaccount_numberChange}
-              className="w-full bg-transparent font-semibold focus:outline-none text-lg text-[#356E6A] placeholder-[#356E6A]/70"
+              className="w-full bg-transparent font-semibold focus:outline-none text-lg"
+              style={{ color: textColor }}
             />
           </div>
 
           {/* Bank Selector Dropdown */}
           <div id="bank-selector" className="w-full bg-white/60 backdrop-blur-xl rounded-2xl p-4 flex items-center space-x-3">
-            <Landmark className="w-6 h-6 text-[#356E6A]" />
-            {loadingBanks && <Loader className="animate-spin w-5 h-5 text-[#356E6A]" />}
+            <Landmark className="w-6 h-6" style={{ color: textColor }} />
+            {loadingBanks && <Loader className="animate-spin w-5 h-5" style={{ color: textColor }} />}
             {errorBanks && <p className="text-red-500 text-sm">{errorBanks}</p>}
             {!loadingBanks && !errorBanks && apiBanks.length === 0 && <p className="text-[#356E6A]/70">No hay bancos disponibles.</p>}
             {!loadingBanks && !errorBanks && apiBanks.length > 0 && (
               <select
                 value={bank_code}
                 onChange={handleBankChange}
-                className="w-full bg-transparent font-semibold focus:outline-none text-lg text-[#356E6A] appearance-none"
+                className="w-full bg-transparent font-semibold focus:outline-none text-lg appearance-none"
+                style={{ color: textColor }}
               >
                 <option value="" disabled className="text-[#356E6A]/70">Selecciona un banco</option>
                 {apiBanks.map((bank: Bank) => (
@@ -148,16 +152,16 @@ export default function BankDetailsRoute({ userId, onBackClick, quote_id, target
             )}
           </div>
           {/* Transaction Info */}
-          <div id="tx-info" className="relative font-medium w-full text-[#356E6A] flex items-center justify-start space-x-1"> {/* MODIFIED: items-center, justify-start, space-x-1 */}
-            Monto a recibir: <img className='w-5 h-5' src="https://storage.cloud.google.com/cdn-abroad/Icons/Tokens/COP-Token.svg" alt="COP_Token" /> <b> ${targetAmount}</b>
+          <div id="tx-info" className="relative font-medium w-full flex items-center justify-start space-x-1" style={{ color: textColor }}> {/* MODIFIED: items-center, justify-start, space-x-1 */}
+            Monto a recibir: <img className='w-5 h-5' src="https://storage.googleapis.com/cdn-abroad/Icons/Tokens/COP-Token.svg" alt="COP_Token" /> <b> ${targetAmount}</b>
           </div>
         </div>
 
         {/* Transfer Disclaimer */}
-        <div id="transfer-disclaimer" className="relative w-full text-[#356E6A] bg-[#356E6A]/10 backdrop-blur-xl rounded-2xl p-4 flex flex-col items-start space-y-2 justify-start">
+        <div id="transfer-disclaimer" className="relative w-full bg-white/10 backdrop-blur-xl rounded-2xl p-4 flex flex-col items-start space-y-2 justify-start" style={{ color: textColor }}>
           <div className="flex items-center space-x-2">
-            <Rotate3d className="w-5 h-5 text-[#356E6A]" />
-            <span className="font-medium text-sm text-[#356E6A]">Red:</span>
+            <Rotate3d className="w-5 h-5" />
+            <span className="font-medium text-sm">Red:</span>
             <div
               id="transfer-network-badge"
               className="bg-white/70 backdrop-blur-md rounded-lg px-2 py-1 flex items-center"
@@ -169,7 +173,7 @@ export default function BankDetailsRoute({ userId, onBackClick, quote_id, target
               />
             </div>
           </div>
-          <span id='transfer-disclaimer-text' className="font-medium text-xs text-[#356E6A]/90 pl-1">Tu transacción será procesada de inmediato y llegará instantáneamente. Ten presente que el receptor debe tener activado Transfiya en el banco indicado.</span>
+          <span id='transfer-disclaimer-text' className="font-medium text-xs text-opacity-90 pl-1" style={{ color: textColor }}>Tu transacción será procesada de inmediato y llegará instantáneamente. Ten presente que el receptor debe tener activado Transfiya en el banco indicado.</span>
         </div>
       </div>
       <Button
