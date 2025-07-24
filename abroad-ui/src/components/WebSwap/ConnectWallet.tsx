@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useBlux } from '@bluxcc/react';
-import TrustWalletIcon from '../../assets/Logos/Wallets/TrustWalletShield.svg';
+// import TrustWalletIcon from '../../assets/Logos/Wallets/TrustWalletShield.svg';
 import StellarLogo from '../../assets/Logos/Blockchains/StellarLogo.svg';
 
 interface ConnectWalletProps {
@@ -44,11 +44,11 @@ const ConnectWallet: React.FC<ConnectWalletProps> = ({ onWalletSelect, onClose }
   };
 
   const walletOptions = [
-    {
+    /* {
       id: 'trust' as const,
       icon: TrustWalletIcon,
       name: 'Trust Wallet',
-    },
+    }, */
     {
       id: 'stellar' as const,
       icon: StellarLogo,
@@ -89,12 +89,12 @@ const ConnectWallet: React.FC<ConnectWalletProps> = ({ onWalletSelect, onClose }
         )}
 
         {/* Header */}
-        <div className="mb-3 pr-8 text-center mt-5 md:mt-14">
+        <div className="mb-8 pr-8 text-center mt-5 md:mt-14">
           <h2 className="text-2xl font-semibold text-gray-900 mb-2">
             {showBluxModal ? 'Conectar Billetera Stellar' : 'Conecta tu billetera'}
           </h2>
           <p className="text-md text-gray-600">
-            {showBluxModal ? 'Elige tu billetera Stellar para conectar' : 'Conecta tu billetera para hacer transacciones en Abroad'}
+            {showBluxModal ? 'Elige tu billetera Stellar para conectar' : 'Elige la billetera de tu elección para comenzar a hacer transacciones'}
           </p>
         </div>
 
@@ -156,7 +156,7 @@ const ConnectWallet: React.FC<ConnectWalletProps> = ({ onWalletSelect, onClose }
           </div>
         ) : (
           /* Wallet Options */
-          <div className="space-y-3 mb-6 md:flex-1 md:flex md:flex-col md:justify-center md:-mt-94">
+          <div className="space-y-3 mb-6 md:flex-1 md:flex md:flex-col">
             {walletOptions.map((wallet) => (
               <button
                 key={wallet.id}

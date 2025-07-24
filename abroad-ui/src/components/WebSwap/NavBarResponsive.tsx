@@ -1,6 +1,11 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import { Info, Menu, X, Wallet } from 'lucide-react';
 import { useBlux } from '@bluxcc/react';
+import AbroadLogoColored from '/src/assets/Logos/AbroadLogoColored.svg';
+import AbroadLogoWhite from '/src/assets/Logos/AbroadLogoWhite.svg';
+import FreighterLogo from '/src/assets/Logos/Wallets/Freighter.svg';
+import HanaLogo from '/src/assets/Logos/Wallets/Hana.svg';
+import LobstrLogo from '/src/assets/Logos/Wallets/Lobstr.svg';
 
 interface NavBarResponsiveProps {
   className?: string;
@@ -95,13 +100,13 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({ className = '', onW
           <div className="flex-shrink-0">
             {/* Mobile Logo - Colored */}
             <img
-              src="/src/assets/Logos/AbroadLogoColored.svg"
+              src={AbroadLogoColored}
               alt="Abroad Logo"
               className="h-8 w-auto md:hidden"
             />
             {/* Desktop Logo - White */}
             <img
-              src="/src/assets/Logos/AbroadLogoWhite.svg"
+              src={AbroadLogoWhite}
               alt="Abroad Logo"
               className="h-8 w-auto hidden md:block"
             />
@@ -132,19 +137,19 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({ className = '', onW
               {isAuthenticated && user ? (
                 connectedWalletName?.includes('freighter') ? (
                   <img
-                    src="/src/assets/Logos/Wallets/Freighter.svg"
+                    src={FreighterLogo}
                     alt="Freighter Wallet"
                     className="w-8 h-8"
                   />
                 ) : connectedWalletName?.includes('hana') ? (
                   <img
-                    src="/src/assets/Logos/Wallets/Hana.svg"
+                    src={HanaLogo}
                     alt="Hana Wallet"
                     className="w-8 h-8"
                   />
                 ) : connectedWalletName?.includes('lobstr') ? (
                   <img
-                    src="/src/assets/Logos/Wallets/Lobstr.svg"
+                    src={LobstrLogo}
                     alt="Lobstr Wallet"
                     className="w-8 h-8"
                   />
@@ -209,19 +214,19 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({ className = '', onW
                 {isAuthenticated && user ? (
                   connectedWalletName?.includes('freighter') ? (
                     <img
-                      src="/src/assets/Logos/Wallets/Freighter.svg"
+                      src={FreighterLogo}
                       alt="Freighter Wallet"
                       className="w-8 h-8"
                     />
                   ) : connectedWalletName?.includes('hana') ? (
                     <img
-                      src="/src/assets/Logos/Wallets/Hana.svg"
+                      src={HanaLogo}
                       alt="Hana Wallet"
                       className="w-5 h-5"
                     />
                   ) : connectedWalletName?.includes('lobstr') ? (
                     <img
-                      src="/src/assets/Logos/Wallets/Lobstr.svg"
+                      src={LobstrLogo}
                       alt="Lobstr Wallet"
                       className="w-5 h-5"
                     />

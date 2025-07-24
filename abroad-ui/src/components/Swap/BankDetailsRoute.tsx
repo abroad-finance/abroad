@@ -96,10 +96,10 @@ export default function BankDetailsRoute({ userId, onBackClick, quote_id, target
     <div className="flex-1 flex items-center justify-center w-full flex-col">
       <div
         id="bg-container"
-        className="relative w-[90%] max-w-[50vh] h-[60vh] bg-[#356E6A]/5 backdrop-blur-xl rounded-4xl p-6 flex flex-col items-center justify-between space-y-4" // MODIFIED: Changed justify-start to justify-between
+        className="relative w-[90%] max-w-md min-h-[60vh] h-auto bg-[#356E6A]/5 backdrop-blur-xl rounded-4xl p-4 md:p-6 flex flex-col items-center space-y-4"
       >
         {/* Header Row: Back button and Title */}
-        <div className="w-full flex items-center space-x-3 mb-4">
+        <div className="w-full flex items-center space-x-3 mb-2 flex-shrink-0">
           <button
             onClick={onBackClick}
             className="hover:text-opacity-80 transition-colors"
@@ -109,14 +109,14 @@ export default function BankDetailsRoute({ userId, onBackClick, quote_id, target
             <ArrowLeft className="w-6 h-6" />
           </button>
 
-          <div id="Tittle" className="text-2xl font-bold flex-grow text-center" style={{ color: textColor }}>Datos de Transacción</div>
+          <div id="Tittle" className="text-xl sm:text-2xl font-bold flex-grow text-center" style={{ color: textColor }}>Datos de Transacción</div>
         </div>
 
         {/* Centered Content Wrapper */}
-        <div className="flex-grow flex flex-col items-center justify-center w-full space-y-4">
+        <div className="flex-1 flex flex-col items-center justify-center w-full space-y-3 py-2">
           {/* Bank Account Number Input */}
-          <div id="bank-account-input" className="w-full bg-white/60 backdrop-blur-xl rounded-2xl p-4 flex items-center space-x-3">
-            <Hash className="w-6 h-6" style={{ color: textColor }} />
+          <div id="bank-account-input" className="w-full bg-white/60 backdrop-blur-xl rounded-2xl p-4 md:p-6 lg:py-6 xl:py-6 min-h-[800px]:py-16 flex items-center space-x-3 flex-shrink-0">
+            <Hash className="w-5 h-5 sm:w-6 sm:h-6" style={{ color: textColor }} />
             <input
               type="text"
               inputMode="numeric"
@@ -124,22 +124,22 @@ export default function BankDetailsRoute({ userId, onBackClick, quote_id, target
               placeholder="Número Transfiya"
               value={account_number}
               onChange={handleaccount_numberChange}
-              className="w-full bg-transparent font-semibold focus:outline-none text-lg"
+              className="w-full bg-transparent font-semibold focus:outline-none text-base sm:text-lg"
               style={{ color: textColor }}
             />
           </div>
 
           {/* Bank Selector Dropdown */}
-          <div id="bank-selector" className="w-full bg-white/60 backdrop-blur-xl rounded-2xl p-4 flex items-center space-x-3">
-            <Landmark className="w-6 h-6" style={{ color: textColor }} />
-            {loadingBanks && <Loader className="animate-spin w-5 h-5" style={{ color: textColor }} />}
-            {errorBanks && <p className="text-red-500 text-sm">{errorBanks}</p>}
-            {!loadingBanks && !errorBanks && apiBanks.length === 0 && <p className="text-[#356E6A]/70">No hay bancos disponibles.</p>}
+          <div id="bank-selector" className="w-full bg-white/60 backdrop-blur-xl rounded-2xl p-4 md:p-6 lg:py-6 xl:py-6 min-h-[800px]:py-16 flex items-center space-x-3 flex-shrink-0">
+            <Landmark className="w-5 h-5 sm:w-6 sm:h-6" style={{ color: textColor }} />
+            {loadingBanks && <Loader className="animate-spin w-4 h-4 sm:w-5 sm:h-5" style={{ color: textColor }} />}
+            {errorBanks && <p className="text-red-500 text-xs sm:text-sm">{errorBanks}</p>}
+            {!loadingBanks && !errorBanks && apiBanks.length === 0 && <p className="text-[#356E6A]/70 text-xs sm:text-sm">No hay bancos disponibles.</p>}
             {!loadingBanks && !errorBanks && apiBanks.length > 0 && (
               <select
                 value={bank_code}
                 onChange={handleBankChange}
-                className="w-full bg-transparent font-semibold focus:outline-none text-lg appearance-none"
+                className="w-full bg-transparent font-semibold focus:outline-none text-base sm:text-lg appearance-none"
                 style={{ color: textColor }}
               >
                 <option value="" disabled className="text-[#356E6A]/70">Selecciona un banco</option>
@@ -152,16 +152,16 @@ export default function BankDetailsRoute({ userId, onBackClick, quote_id, target
             )}
           </div>
           {/* Transaction Info */}
-          <div id="tx-info" className="relative font-medium w-full flex items-center justify-start space-x-1" style={{ color: textColor }}> {/* MODIFIED: items-center, justify-start, space-x-1 */}
-            Monto a recibir: <img className='w-5 h-5' src="https://storage.googleapis.com/cdn-abroad/Icons/Tokens/COP-Token.svg" alt="COP_Token" /> <b> ${targetAmount}</b>
+          <div id="tx-info" className="relative font-medium w-full flex items-center justify-start space-x-1 flex-shrink-0" style={{ color: textColor }}>
+            <span className="text-sm sm:text-base">Monto a recibir:</span> <img className='w-4 h-4 sm:w-5 sm:h-5' src="https://storage.googleapis.com/cdn-abroad/Icons/Tokens/COP-Token.svg" alt="COP_Token" /> <b className="text-sm sm:text-base"> ${targetAmount}</b>
           </div>
         </div>
 
         {/* Transfer Disclaimer */}
-        <div id="transfer-disclaimer" className="relative w-full bg-white/10 backdrop-blur-xl rounded-2xl p-4 flex flex-col items-start space-y-2 justify-start" style={{ color: textColor }}>
+        <div id="transfer-disclaimer" className="relative w-full bg-white/10 backdrop-blur-xl rounded-2xl p-3 sm:p-4 flex flex-col items-start space-y-2 justify-start flex-shrink-0" style={{ color: textColor }}>
           <div className="flex items-center space-x-2">
-            <Rotate3d className="w-5 h-5" />
-            <span className="font-medium text-sm">Red:</span>
+            <Rotate3d className="w-4 h-4 sm:w-5 sm:h-5" />
+            <span className="font-medium text-xs sm:text-sm">Red:</span>
             <div
               id="transfer-network-badge"
               className="bg-white/70 backdrop-blur-md rounded-lg px-2 py-1 flex items-center"
@@ -169,7 +169,7 @@ export default function BankDetailsRoute({ userId, onBackClick, quote_id, target
               <img
                 src="https://vectorseek.com/wp-content/uploads/2023/11/Transfiya-Logo-Vector.svg-.png"
                 alt="Transfiya Logo"
-                className="h-4 w-auto"
+                className="h-3 sm:h-4 w-auto"
               />
             </div>
           </div>
@@ -177,11 +177,11 @@ export default function BankDetailsRoute({ userId, onBackClick, quote_id, target
         </div>
       </div>
       <Button
-        className="mt-4 w-[90%] max-w-[50vh] py-4"
+        className="mt-4 w-[90%] max-w-md py-4"
         onClick={handleSubmit}
-        disabled={loadingSubmit || !bank_code || account_number.length !== 10 || loadingBanks} // MODIFIED: Added check for 10 digits
+        disabled={loadingSubmit || !bank_code || account_number.length !== 10 || loadingBanks}
       >
-        {loadingSubmit ? <Loader className="animate-spin w-5 h-5" /> : 'Continuar'}
+        {loadingSubmit ? <Loader className="animate-spin w-4 h-4 sm:w-5 sm:h-5" /> : 'Continuar'}
       </Button>
     </div>
   );

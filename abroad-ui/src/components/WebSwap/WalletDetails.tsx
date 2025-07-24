@@ -1,33 +1,18 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Copy, ExternalLink } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useBlux } from '@bluxcc/react';
+import { listPartnerTransactions, PaginatedTransactionListTransactionsItem, _36EnumsTransactionStatus } from '../../api';
 
 interface WalletDetailsProps {
   onClose?: () => void;
 }
 
-interface Transaction {
-  id: string;
-  date: string;
-  destination: string;
-  usdcAmount: string;
-  copAmount: string;
-  type: 'sent' | 'received';
-  status: 'processing' | 'completed' | 'refunded' | 'canceled';
-}
-
 const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
   const { user, logout } = useBlux();
   const [copiedAddress, setCopiedAddress] = useState(false);
-
-  const generateRandomPhoneNumber = () => {
-    const prefixes = ['310', '311', '312', '313', '314', '315'];
-    const prefix = prefixes[Math.floor(Math.random() * prefixes.length)];
-    const rest = Math.floor(Math.random() * 10000000).toString().padStart(7, '0');
-    const number = `${prefix}${rest}`;
-    return `${number.slice(0, 3)} ${number.slice(3, 6)} ${number.slice(6, 10)}`;
-  };
+  const [transactions, setTransactions] = useState<PaginatedTransactionListTransactionsItem[]>([]);
+  const [loading, setLoading] = useState(true);
 
   // Mock data for demonstration
   const mockBalance = {
@@ -35,49 +20,75 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
     cop: "5,432,100"
   };
 
-  const mockTransactions: Transaction[] = useMemo(() => [
-    {
-      id: "1",
-      date: "2024-07-05",
-      destination: generateRandomPhoneNumber(),
-      usdcAmount: "100.00",
-      copAmount: "432,500",
-      type: "sent",
-      status: "completed"
-    },
-    {
-      id: "2", 
-      date: "2024-07-04",
-      destination: "GAQX5L...MNOP",
-      usdcAmount: "50.25",
-      copAmount: "216,830",
-      type: "received",
-      status: "processing"
-    },
-    {
-      id: "3",
-      date: "2024-07-03", 
-      destination: generateRandomPhoneNumber(),
-      usdcAmount: "200.00",
-      copAmount: "865,000",
-      type: "sent",
-      status: "refunded"
-    },
-    {
-      id: "4",
-      date: "2024-07-02", 
-      destination: generateRandomPhoneNumber(),
-      usdcAmount: "75.00",
-      copAmount: "324,750",
-      type: "sent",
-      status: "canceled"
-    }
-  ], []);
+  useEffect(() => {
+    const fetchTransactions = async () => {
+      if (!user) {
+        setLoading(false);
+        return;
+      }
+
+      setLoading(true);
+      try {
+        const response = await listPartnerTransactions({ page: 1, pageSize: 50 });
+        if (response.data && 'transactions' in response.data) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const userObj = user as any;
+          const currentUserId = userObj.id || userObj.userId;
+
+          if (currentUserId) {
+            const userTransactions = response.data.transactions.filter(
+              (tx) => tx.partnerUserId === currentUserId
+            );
+            setTransactions(userTransactions);
+          } else {
+            setTransactions(response.data.transactions);
+          }
+        }
+      } catch (error) {
+        console.error("Failed to fetch transactions:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchTransactions();
+  }, [user]);
 
   // Helper function to format wallet address
   const formatWalletAddress = (address: string) => {
     if (!address) return 'No conectado';
     return `${address.slice(0, 6)}...${address.slice(-4)}`;
+  };
+
+  const formatNumber = (value?: number) => {
+    if (value === undefined) return "-";
+    try {
+      return value.toLocaleString(undefined, {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
+    } catch {
+      return value.toFixed(2);
+    }
+  };
+
+  type UiStatus = 'processing' | 'completed' | 'refunded' | 'canceled';
+
+  const getStatus = (status: _36EnumsTransactionStatus): { type: UiStatus, label: string } => {
+    switch (status) {
+      case 'PAYMENT_COMPLETED':
+        return { type: 'completed', label: 'Completado' };
+      case 'PROCESSING_PAYMENT':
+        return { type: 'processing', label: 'Procesando' };
+      case 'AWAITING_PAYMENT':
+        return { type: 'processing', label: 'Procesando' };
+      case 'PAYMENT_FAILED':
+        return { type: 'canceled', label: 'Cancelado' };
+      case 'WRONG_AMOUNT':
+        return { type: 'refunded', label: 'Reembolsado' };
+      default:
+        return { type: 'processing', label: status };
+    }
   };
 
   // Get public key from user object using Blux documentation
@@ -107,6 +118,56 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
   };
 
   const walletAddress = getPublicKey();
+
+  const TransactionSkeleton: React.FC = () => (
+    <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 animate-pulse">
+      <div className="flex items-center justify-between mb-3">
+        <div className="h-3 bg-gray-200 rounded w-1/4"></div>
+        <div className="h-4 bg-gray-200 rounded-full w-16"></div>
+      </div>
+      <div className="mb-3">
+        <div className="h-3 bg-gray-200 rounded w-1/5 mb-1.5"></div>
+        <div className="h-4 bg-gray-200 rounded w-2/5"></div>
+      </div>
+      <div className="flex justify-between items-center">
+        <div className="flex items-center space-x-2 w-1/2">
+          <div className="w-5 h-5 bg-gray-200 rounded-full"></div>
+          <div className="h-6 bg-gray-200 rounded w-2/3"></div>
+        </div>
+        <div className="flex items-center space-x-2 w-1/2 justify-end">
+          <div className="w-5 h-5 bg-gray-200 rounded-full"></div>
+          <div className="h-6 bg-gray-200 rounded w-2/3"></div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const EmptyTransactionPlaceholder: React.FC = () => (
+    <div className="bg-gray-50 border border-gray-200 rounded-lg p-2 w-1/2 mx-auto opacity-30 mb-4 relative">
+      {/* Alert icon */}
+      <div className="absolute -top-1 -right-1 w-4 h-4 bg-orange-400 rounded-full flex items-center justify-center">
+        <span className="text-white text-xs font-bold">!</span>
+      </div>
+      <div className="flex items-center justify-between mb-1">
+        <div className="h-1.5 bg-gray-200 rounded w-1/4"></div>
+        <div className="h-2 bg-gray-200 rounded-full w-8"></div>
+      </div>
+      <div className="mb-1">
+        <div className="h-1.5 bg-gray-200 rounded w-1/5 mb-0.5"></div>
+        <div className="h-2 bg-gray-200 rounded w-2/5"></div>
+      </div>
+      <div className="flex justify-between items-center">
+        <div className="flex items-center space-x-1 w-1/2">
+          <div className="w-3 h-3 bg-gray-200 rounded-full"></div>
+          <div className="h-2.5 bg-gray-200 rounded w-2/3"></div>
+        </div>
+        <div className="flex items-center space-x-1 w-1/2 justify-end">
+          <div className="w-3 h-3 bg-gray-200 rounded-full"></div>
+          <div className="h-2.5 bg-gray-200 rounded w-2/3"></div>
+        </div>
+      </div>
+    </div>
+  );
 
   const copyToClipboard = async (text: string) => {
     try {
@@ -233,68 +294,74 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
         <div className="flex-1">
           <h3 className="text-gray-800 font-medium text-lg mb-4">Historial de Transacciones</h3>
           <div className="space-y-3">
-            {mockTransactions.map((transaction) => (
-              <div 
-                key={transaction.id}
-                className="bg-gray-50 border border-gray-200 rounded-xl p-4 hover:bg-gray-100 transition-colors duration-200"
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center space-x-2">
-                    <span className="text-gray-600 text-sm">{formatDate(transaction.date)}</span>
-                  </div>
-                  <span className={`text-xs px-2 py-1 rounded-full ${
-                    transaction.status === 'completed' ? 'bg-green-100 text-green-700' :
-                    transaction.status === 'processing' ? 'bg-blue-100 text-blue-700' :
-                    transaction.status === 'refunded' ? 'bg-orange-100 text-orange-700' :
-                    transaction.status === 'canceled' ? 'bg-red-100 text-red-700' : ''
-                  }`}>
-                    {transaction.status === 'completed' ? 'Completado' :
-                     transaction.status === 'processing' ? 'Procesando' :
-                     transaction.status === 'refunded' ? 'Reembolsado' :
-                     transaction.status === 'canceled' ? 'Cancelado' : transaction.status}
-                  </span>
-                </div>
-                
-                <div className="mb-2">
-                  <span className="text-gray-500 text-xs">
-                    {transaction.type === 'sent' ? 'Para: ' : 'De: '}
-                  </span>
-                  <span className="text-gray-700 font-mono text-sm">
-                    {transaction.destination}
-                  </span>
-                </div>
+            {loading ? (
+              <>
+                <TransactionSkeleton />
+                <TransactionSkeleton />
+              </>
+            ) : transactions.length > 0 ? (
+              transactions.map((transaction) => {
+                const uiStatus = getStatus(transaction.status);
+                return (
+                  <div
+                    key={transaction.id}
+                    className="bg-gray-50 border border-gray-200 rounded-xl p-4 hover:bg-gray-100 transition-colors duration-200"
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center space-x-2">
+                        <span className="text-gray-600 text-sm">{formatDate(transaction.createdAt)}</span>
+                      </div>
+                      <span className={`text-xs px-2 py-1 rounded-full ${
+                        uiStatus.type === 'completed' ? 'bg-green-100 text-green-700' :
+                        uiStatus.type === 'processing' ? 'bg-blue-100 text-blue-700' :
+                        uiStatus.type === 'refunded' ? 'bg-orange-100 text-orange-700' :
+                        uiStatus.type === 'canceled' ? 'bg-red-100 text-red-700' : ''
+                      }`}>
+                        {uiStatus.label}
+                      </span>
+                    </div>
+                    
+                    <div className="mb-2">
+                      <span className="text-gray-500 text-xs">
+                        Para: 
+                      </span>
+                      <span className="text-gray-700 font-mono text-sm">
+                        {transaction.accountNumber}
+                      </span>
+                    </div>
 
-                <div className="flex justify-between items-center">
-                  <div className="flex items-center space-x-1">
-                    <img
-                      src="https://storage.googleapis.com/cdn-abroad/Icons/Tokens/USDC%20Token.svg"
-                      alt="USDC"
-                      className="w-4 h-4"
-                    />
-                    <span className="text-gray-700 text-xl font-bold">
-                      ${transaction.usdcAmount}
-                    </span>
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center space-x-1">
+                        <img
+                          src="https://storage.googleapis.com/cdn-abroad/Icons/Tokens/USDC%20Token.svg"
+                          alt="USDC"
+                          className="w-4 h-4"
+                        />
+                        <span className="text-gray-700 text-xl font-bold">
+                          ${formatNumber(transaction.quote.sourceAmount)}
+                        </span>
+                      </div>
+                      <div className="flex items-center space-x-1">
+                        <img
+                          src={`https://hatscripts.github.io/circle-flags/flags/${transaction.quote.targetCurrency.slice(0, 2).toLowerCase()}.svg`}
+                          alt={transaction.quote.targetCurrency}
+                          className="w-4 h-4 rounded-full"
+                        />
+                        <span className="text-gray-700 text-xl font-bold">
+                          ${formatNumber(transaction.quote.targetAmount)}
+                        </span>
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex items-center space-x-1">
-                    <img
-                      src="https://hatscripts.github.io/circle-flags/flags/co.svg"
-                      alt="COP"
-                      className="w-4 h-4 rounded-full"
-                    />
-                    <span className="text-gray-700 text-xl font-bold">
-                      ${transaction.copAmount}
-                    </span>
-                  </div>
-                </div>
+                )
+              })
+            ) : (
+              <div className="text-center py-8">
+                <EmptyTransactionPlaceholder />
+                <div className="text-gray-400 text-sm">No hay transacciones aún</div>
               </div>
-            ))}
+            )}
           </div>
-
-          {mockTransactions.length === 0 && (
-            <div className="text-center py-8">
-              <div className="text-gray-400 text-sm">No hay transacciones aún</div>
-            </div>
-          )}
         </div>
 
         {/* Footer */}
