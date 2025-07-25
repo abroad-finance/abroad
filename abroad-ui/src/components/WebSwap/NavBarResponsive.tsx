@@ -1,6 +1,7 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { Info, Menu, X, Wallet } from 'lucide-react';
 import { useBlux } from '@bluxcc/react';
+import { Horizon } from '@stellar/stellar-sdk';
 import AbroadLogoColored from '/src/assets/Logos/AbroadLogoColored.svg';
 import AbroadLogoWhite from '/src/assets/Logos/AbroadLogoWhite.svg';
 import FreighterLogo from '/src/assets/Logos/Wallets/Freighter.svg';
@@ -15,11 +16,46 @@ interface NavBarResponsiveProps {
 
 const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({ className = '', onWalletConnect, onWalletDetails }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [usdcBalance, setUsdcBalance] = useState<string>('');
+  const [isLoadingBalance, setIsLoadingBalance] = useState(false);
   const { user, isAuthenticated } = useBlux();
 
   const toggleMobileMenu = useCallback(() => {
     setIsMobileMenuOpen(!isMobileMenuOpen);
   }, [isMobileMenuOpen]);
+
+  // Function to fetch USDC balance
+  const fetchUSDCBalance = useCallback(async (stellarAddress: string) => {
+    try {
+      setIsLoadingBalance(true);
+      const server = new Horizon.Server('https://horizon.stellar.org');
+      const account = await server.loadAccount(stellarAddress);
+      
+      // USDC on Stellar: USDC:GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN
+      
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const usdcBalance = account.balances.find((balance: any) => 
+        balance.asset_type === 'credit_alphanum4' && 
+        balance.asset_code === 'USDC' &&
+        balance.asset_issuer === 'GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN'
+      );
+      
+      if (usdcBalance) {
+        const numericBalance = parseFloat(usdcBalance.balance);
+        const formattedBalance = numericBalance >= 1000 
+          ? (numericBalance / 1000).toFixed(1) + 'k'
+          : numericBalance.toFixed(2);
+        setUsdcBalance(formattedBalance);
+      } else {
+        setUsdcBalance('0.00');
+      }
+    } catch (error) {
+      console.error('Error fetching USDC balance:', error);
+      setUsdcBalance('0.00');
+    } finally {
+      setIsLoadingBalance(false);
+    }
+  }, []);
 
   // Helper function to format wallet address
   const formatWalletAddress = useCallback((address: string) => {
@@ -64,6 +100,15 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({ className = '', onW
     
     return pk;
   }, [user]);
+
+  // Effect to fetch balance when wallet is connected
+  useEffect(() => {
+    if (isAuthenticated && publicKey && typeof publicKey === 'string') {
+      fetchUSDCBalance(publicKey);
+    } else {
+      setUsdcBalance('');
+    }
+  }, [isAuthenticated, publicKey, fetchUSDCBalance]);
 
   const walletAddress = useMemo(() => (
     publicKey ? formatWalletAddress(String(publicKey)) : 'Connected'
@@ -132,40 +177,61 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({ className = '', onW
             {/* Wallet Badge */}
             <button 
               onClick={handleWalletClick}
-              className="flex items-center space-x-2 bg-white/20 backdrop-blur-sm rounded-2xl px-4 py-2 border border-white/30 hover:bg-white/30 transition-colors duration-200"
+              className="flex items-center space-x-3 bg-white/20 backdrop-blur-sm rounded-2xl px-4 py-2 border border-white/30 hover:bg-white/30 transition-colors duration-200"
             >
               {isAuthenticated && user ? (
-                connectedWalletName?.includes('freighter') ? (
-                  <img
-                    src={FreighterLogo}
-                    alt="Freighter Wallet"
-                    className="w-8 h-8"
-                  />
-                ) : connectedWalletName?.includes('hana') ? (
-                  <img
-                    src={HanaLogo}
-                    alt="Hana Wallet"
-                    className="w-8 h-8"
-                  />
-                ) : connectedWalletName?.includes('lobstr') ? (
-                  <img
-                    src={LobstrLogo}
-                    alt="Lobstr Wallet"
-                    className="w-8 h-8"
-                  />
-                ) : (
-                  <img
-                    src="https://storage.googleapis.com/cdn-abroad/Icons/Banks/Trust_Wallet_Shield.svg"
-                    alt="Trust Wallet"
-                    className="w-5 h-5"
-                  />
-                )
+                <>
+                  {connectedWalletName?.includes('freighter') ? (
+                    <img
+                      src={FreighterLogo}
+                      alt="Freighter Wallet"
+                      className="w-8 h-8"
+                    />
+                  ) : connectedWalletName?.includes('hana') ? (
+                    <img
+                      src={HanaLogo}
+                      alt="Hana Wallet"
+                      className="w-8 h-8"
+                    />
+                  ) : connectedWalletName?.includes('lobstr') ? (
+                    <img
+                      src={LobstrLogo}
+                      alt="Lobstr Wallet"
+                      className="w-8 h-8"
+                    />
+                  ) : (
+                    <img
+                      src="https://storage.googleapis.com/cdn-abroad/Icons/Banks/Trust_Wallet_Shield.svg"
+                      alt="Trust Wallet"
+                      className="w-5 h-5"
+                    />
+                  )}
+                  <div className="flex items-center space-x-2">
+                    <span className="text-white text-md font-medium">
+                      {walletAddress}
+                    </span>
+                    {usdcBalance && (
+                      <div className="flex items-center space-x-1 bg-white/10 rounded-full px-2 py-1">
+                        <img
+                          src="https://storage.googleapis.com/cdn-abroad/Icons/Tokens/USDC%20Token.svg"
+                          alt="USDC"
+                          className="w-4 h-4"
+                        />
+                        <span className="text-white/90 text-sm font-medium">
+                          {isLoadingBalance ? '...' : `${usdcBalance}`}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </>
               ) : (
-                <Wallet className="w-5 h-5 text-white" />
+                <>
+                  <Wallet className="w-5 h-5 text-white" />
+                  <span className="text-white text-md font-medium">
+                    Conectar Billetera
+                  </span>
+                </>
               )}
-              <span className="text-white text-md font-medium">
-                {isAuthenticated && user ? walletAddress : 'Conectar Billetera'}
-              </span>
             </button>
 
             {/* Info Icon */}
@@ -209,40 +275,61 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({ className = '', onW
               {/* Mobile Wallet Badge */}
               <button 
                 onClick={handleWalletClick}
-                className="flex items-center justify-center space-x-2 bg-white/20 backdrop-blur-sm rounded-full px-4 py-2 border border-white/30 mx-3 mt-4 hover:bg-white/30 transition-colors duration-200"
+                className="flex items-center justify-center space-x-3 bg-white/20 backdrop-blur-sm rounded-full px-4 py-2 border border-white/30 mx-3 mt-4 hover:bg-white/30 transition-colors duration-200"
               >
                 {isAuthenticated && user ? (
-                  connectedWalletName?.includes('freighter') ? (
-                    <img
-                      src={FreighterLogo}
-                      alt="Freighter Wallet"
-                      className="w-8 h-8"
-                    />
-                  ) : connectedWalletName?.includes('hana') ? (
-                    <img
-                      src={HanaLogo}
-                      alt="Hana Wallet"
-                      className="w-5 h-5"
-                    />
-                  ) : connectedWalletName?.includes('lobstr') ? (
-                    <img
-                      src={LobstrLogo}
-                      alt="Lobstr Wallet"
-                      className="w-5 h-5"
-                    />
-                  ) : (
-                    <img
-                      src="https://storage.googleapis.com/cdn-abroad/Icons/Banks/Trust_Wallet_Shield.svg"
-                      alt="Trust Wallet"
-                      className="w-5 h-5"
-                    />
-                  )
+                  <>
+                    {connectedWalletName?.includes('freighter') ? (
+                      <img
+                        src={FreighterLogo}
+                        alt="Freighter Wallet"
+                        className="w-8 h-8"
+                      />
+                    ) : connectedWalletName?.includes('hana') ? (
+                      <img
+                        src={HanaLogo}
+                        alt="Hana Wallet"
+                        className="w-5 h-5"
+                      />
+                    ) : connectedWalletName?.includes('lobstr') ? (
+                      <img
+                        src={LobstrLogo}
+                        alt="Lobstr Wallet"
+                        className="w-5 h-5"
+                      />
+                    ) : (
+                      <img
+                        src="https://storage.googleapis.com/cdn-abroad/Icons/Banks/Trust_Wallet_Shield.svg"
+                        alt="Trust Wallet"
+                        className="w-5 h-5"
+                      />
+                    )}
+                    <div className="flex items-center space-x-2">
+                      <span className="text-white text-sm font-medium">
+                        {walletAddress}
+                      </span>
+                      {usdcBalance && (
+                        <div className="flex items-center space-x-1 bg-white/10 rounded-full px-2 py-1">
+                          <img
+                            src="https://storage.googleapis.com/cdn-abroad/Icons/Tokens/USDC%20Token.svg"
+                            alt="USDC"
+                            className="w-4 h-4"
+                          />
+                          <span className="text-white/90 text-sm font-medium">
+                            {isLoadingBalance ? '...' : `${usdcBalance}`}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </>
                 ) : (
-                  <Wallet className="w-5 h-5 text-white" />
+                  <>
+                    <Wallet className="w-5 h-5 text-white" />
+                    <span className="text-white text-sm font-medium">
+                      Conectar Billetera
+                    </span>
+                  </>
                 )}
-                <span className="text-white text-sm font-medium">
-                  {isAuthenticated && user ? walletAddress : 'Conectar Billetera'}
-                </span>
               </button>
 
               {/* Mobile Action Buttons */}

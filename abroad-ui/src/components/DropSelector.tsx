@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 
 // Define Option interface
 export interface Option {
@@ -17,6 +17,8 @@ interface DropSelectorProps {
   setIsOpen: (isOpen: boolean) => void;
   placeholder: string;
   disabled?: boolean;
+  textColor?: string;
+  placeholderIcons?: string[];
 }
 
 export function DropSelector({
@@ -27,7 +29,26 @@ export function DropSelector({
   setIsOpen,
   placeholder,
   disabled = false,
+  textColor,
+  placeholderIcons = [],
 }: DropSelectorProps) {
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isOpen, setIsOpen]);
   const handleToggle = () => {
     if (!disabled) {
       setIsOpen(!isOpen);
@@ -42,22 +63,40 @@ export function DropSelector({
   };
 
   return (
-    <div className="relative w-full">
+    <div ref={dropdownRef} className="relative w-full">
       <button
         type="button"
         onClick={handleToggle}
         disabled={disabled}
-        className="w-full p-3 text-lg border border-gray-300 rounded-md focus:ring-0 focus:border-gray-300 text-left flex items-center justify-between bg-white disabled:bg-gray-100 disabled:cursor-not-allowed" /* Increased padding and text size */
+        className="w-full p-3 text-lg font-semibold border-none rounded-none focus:ring-0 focus:outline-none text-left flex items-center justify-between bg-transparent disabled:bg-transparent disabled:cursor-not-allowed" /* Removed background and border */
       >
         <span className="flex items-center truncate">
           {selectedOption ? (
             <>
               {selectedOption.icon && !selectedOption.iconUrl && <span className="mr-3 flex-shrink-0">{selectedOption.icon}</span>} {/* Increased margin */}
               {selectedOption.iconUrl && <img src={selectedOption.iconUrl} alt="" className="w-6 h-6 mr-3 rounded-full flex-shrink-0" />} {/* Added image icon */}
-              <span className="truncate">{selectedOption.label}</span>
+              <span className="truncate font-semibold" style={{ color: textColor }}>{selectedOption.label}</span>
             </>
           ) : (
-            <span className="text-gray-500 text-lg">{placeholder}</span> /* Ensured placeholder text size */
+            <>
+              {placeholderIcons.length > 0 && (
+                <div className="flex items-center mr-3 relative">
+                  {placeholderIcons.map((iconUrl, index) => (
+                    <img 
+                      key={index} 
+                      src={iconUrl} 
+                      alt="" 
+                      className="w-6 h-6 rounded-full flex-shrink-0 border border-white" 
+                      style={{ 
+                        marginLeft: index > 0 ? '-3px' : '0',
+                        zIndex: placeholderIcons.length - index 
+                      }}
+                    />
+                  ))}
+                </div>
+              )}
+              <span className="text-lg font-semibold" style={{ color: textColor || '#9CA3AF' }}>{placeholder}</span>
+            </>
           )}
         </span>
         <svg
@@ -72,7 +111,7 @@ export function DropSelector({
       </button>
 
       {isOpen && !disabled && (
-        <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-72 overflow-auto"> {/* Increased max-h slightly */}
+        <div className="absolute z-10 mt-1 inset-x-0 bg-white border border-gray-300 rounded-md shadow-lg max-h-72 overflow-auto" style={{ left: '-3.5rem', right: '-3.5rem' }}> {/* Match the full container width */}
           {options.length > 0 ? (
             options.map((option) => (
               <div
@@ -83,8 +122,8 @@ export function DropSelector({
                 } ${selectedOption?.value === option.value ? 'bg-gray-200 font-semibold' : 'hover:bg-gray-50'}`}
               >
                 {option.icon && !option.iconUrl && <span className="mr-3 flex-shrink-0">{option.icon}</span>} {/* Increased margin */}
-                {option.iconUrl && <img src={option.iconUrl} alt="" className="w-6 h-6 mr-3 rounded-full flex-shrink-0" />} {/* Added image icon */}
-                <span className="text-gray-700 text-lg truncate">{option.label}</span> {/* Increased text size */}
+                {option.iconUrl && <img src={option.iconUrl} alt="" className="w-7 h-7 mr-3 rounded-full flex-shrink-0" />} {/* Made 25% bigger */}
+                <span className="text-gray-700 text-lg font-semibold truncate">{option.label}</span> {/* Increased text size */}
               </div>
             ))
           ) : (

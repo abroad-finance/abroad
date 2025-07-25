@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { X, Copy, ExternalLink } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useBlux } from '@bluxcc/react';
+import { Horizon } from '@stellar/stellar-sdk';
 import { listPartnerTransactions, PaginatedTransactionListTransactionsItem, _36EnumsTransactionStatus } from '../../api';
 
 interface WalletDetailsProps {
@@ -13,12 +14,52 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
   const [copiedAddress, setCopiedAddress] = useState(false);
   const [transactions, setTransactions] = useState<PaginatedTransactionListTransactionsItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [usdcBalance, setUsdcBalance] = useState<string>('');
+  const [isLoadingBalance, setIsLoadingBalance] = useState(false);
 
-  // Mock data for demonstration
-  const mockBalance = {
-    usdc: "1,234.56",
-    cop: "5,432,100"
-  };
+  // Function to fetch USDC balance from Stellar network
+  const fetchUSDCBalance = useCallback(async (stellarAddress: string) => {
+    try {
+      console.log('Fetching USDC balance for address:', stellarAddress);
+      setIsLoadingBalance(true);
+      const server = new Horizon.Server('https://horizon.stellar.org');
+      const account = await server.loadAccount(stellarAddress);
+      
+      console.log('Account loaded successfully, balances:', account.balances);
+      
+      // USDC on Stellar mainnet: USDC:GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN
+      const usdcAssetCode = 'USDC';
+      const usdcIssuer = 'GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN';
+      
+      const usdcBalance = account.balances.find((balance) => {
+        // Check if it's a credit_alphanum4 asset (USDC is 4 characters)
+        if (balance.asset_type === 'credit_alphanum4') {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const assetBalance = balance as any; // Type assertion for the balance structure
+          return assetBalance.asset_code === usdcAssetCode && assetBalance.asset_issuer === usdcIssuer;
+        }
+        return false;
+      });
+      
+      console.log('USDC balance found:', usdcBalance);
+      
+      if (usdcBalance) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const numericBalance = parseFloat((usdcBalance as any).balance);
+        setUsdcBalance(numericBalance.toLocaleString('en-US', { 
+          minimumFractionDigits: 2, 
+          maximumFractionDigits: 2 
+        }));
+      } else {
+        setUsdcBalance('0.00');
+      }
+    } catch (error) {
+      console.error('Error fetching USDC balance:', error);
+      setUsdcBalance('0.00');
+    } finally {
+      setIsLoadingBalance(false);
+    }
+  }, []);
 
   useEffect(() => {
     const fetchTransactions = async () => {
@@ -93,7 +134,12 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
 
   // Get public key from user object using Blux documentation
   const getPublicKey = (): string => {
-    if (!user) return 'GDQP2KPLX4V2M8N9JKHL6RTGF3SWQAZ7UXCV8BNMLKJHGF4DSAQWERTY'; // Mock address for demo
+    if (!user) {
+      console.log('No user found');
+      return 'GDQP2KPLX4V2M8N9JKHL6RTGF3SWQAZ7UXCV8BNMLKJHGF4DSAQWERTY'; // Mock address for demo
+    }
+    
+    console.log('Blux user object:', user);
     
     // According to Blux docs, use wallet.address property
     const userObj = user as unknown as Record<string, unknown>;
@@ -101,7 +147,9 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
     // First check for wallet.address as specified
     if (userObj.wallet && typeof userObj.wallet === 'object') {
       const wallet = userObj.wallet as Record<string, unknown>;
+      console.log('Wallet object:', wallet);
       if (typeof wallet.address === 'string') {
+        console.log('Found wallet.address:', wallet.address);
         return wallet.address;
       }
     }
@@ -113,11 +161,20 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
            userObj.publicKey || 
            userObj.accountId ||
            userObj.id;
+    
+    console.log('Fallback public key found:', publicKey);
            
     return typeof publicKey === 'string' ? publicKey : 'GDQP2KPLX4V2M8N9JKHL6RTGF3SWQAZ7UXCV8BNMLKJHGF4DSAQWERTY';
   };
 
   const walletAddress = getPublicKey();
+
+  // Effect to fetch USDC balance when component mounts
+  useEffect(() => {
+    if (walletAddress && walletAddress !== 'GDQP2KPLX4V2M8N9JKHL6RTGF3SWQAZ7UXCV8BNMLKJHGF4DSAQWERTY') {
+      fetchUSDCBalance(walletAddress);
+    }
+  }, [walletAddress, fetchUSDCBalance]);
 
   const TransactionSkeleton: React.FC = () => (
     <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 animate-pulse">
@@ -198,7 +255,29 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
   };
 
   return (
-    <motion.div 
+    <>
+      <style>
+        {`
+          .custom-scrollbar::-webkit-scrollbar {
+            width: 4px;
+          }
+          .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+          }
+          .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: transparent;
+            border-radius: 2px;
+            transition: background 0.3s ease;
+          }
+          .custom-scrollbar:hover::-webkit-scrollbar-thumb {
+            background: #d1d5db;
+          }
+          .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #9ca3af;
+          }
+        `}
+      </style>
+      <motion.div 
       className="w-screen md:w-auto md:mx-0 md:ml-auto md:max-w-md md:flex md:items-center fixed md:relative left-0 md:left-auto top-auto md:top-auto bottom-0 md:bottom-auto h-[80vh] md:h-[95vh]"
       initial={{ 
         x: window.innerWidth >= 768 ? '100%' : 0,
@@ -218,7 +297,7 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
         duration: 0.12
       }}
     >
-      <div className="bg-white rounded-t-4xl md:rounded-4xl shadow-lg border border-gray-200 p-6 relative w-full h-full md:h-full md:flex md:flex-col overflow-y-auto">
+      <div className="bg-white rounded-t-4xl md:rounded-4xl shadow-lg border border-gray-200 px-6 pt-6 relative w-full h-full md:h-full md:flex md:flex-col overflow-y-auto">
         {/* Close Button */}
         {onClose && (
           <button
@@ -241,7 +320,7 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
 
         {/* Wallet Address & Balance Card */}
         <div 
-          className="border border-gray-200 rounded-xl p-6 py-8 mb-6 bg-cover bg-center bg-no-repeat"
+          className="border border-gray-200 rounded-xl p-6 mb-6 bg-cover bg-center bg-no-repeat"
           style={{
             backgroundImage: 'url(https://static.vecteezy.com/system/resources/previews/026/493/927/non_2x/abstract-gradient-dark-green-liquid-wave-background-free-vector.jpg)'
           }}
@@ -286,90 +365,111 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
               alt="USDC"
               className="w-5 h-5"
             />
-            <span className="text-white font-bold text-4xl">${mockBalance.usdc}</span>
-          </div>
-        </div>
-
-        {/* Transaction History */}
-        <div className="flex-1">
-          <h3 className="text-gray-800 font-medium text-lg mb-4">Historial de Transacciones</h3>
-          <div className="space-y-3">
-            {loading ? (
-              <>
-                <TransactionSkeleton />
-                <TransactionSkeleton />
-              </>
-            ) : transactions.length > 0 ? (
-              transactions.map((transaction) => {
-                const uiStatus = getStatus(transaction.status);
-                return (
-                  <div
-                    key={transaction.id}
-                    className="bg-gray-50 border border-gray-200 rounded-xl p-4 hover:bg-gray-100 transition-colors duration-200"
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center space-x-2">
-                        <span className="text-gray-600 text-sm">{formatDate(transaction.createdAt)}</span>
-                      </div>
-                      <span className={`text-xs px-2 py-1 rounded-full ${
-                        uiStatus.type === 'completed' ? 'bg-green-100 text-green-700' :
-                        uiStatus.type === 'processing' ? 'bg-blue-100 text-blue-700' :
-                        uiStatus.type === 'refunded' ? 'bg-orange-100 text-orange-700' :
-                        uiStatus.type === 'canceled' ? 'bg-red-100 text-red-700' : ''
-                      }`}>
-                        {uiStatus.label}
-                      </span>
-                    </div>
-                    
-                    <div className="mb-2">
-                      <span className="text-gray-500 text-xs">
-                        Para: 
-                      </span>
-                      <span className="text-gray-700 font-mono text-sm">
-                        {transaction.accountNumber}
-                      </span>
-                    </div>
-
-                    <div className="flex justify-between items-center">
-                      <div className="flex items-center space-x-1">
-                        <img
-                          src="https://storage.googleapis.com/cdn-abroad/Icons/Tokens/USDC%20Token.svg"
-                          alt="USDC"
-                          className="w-4 h-4"
-                        />
-                        <span className="text-gray-700 text-xl font-bold">
-                          ${formatNumber(transaction.quote.sourceAmount)}
-                        </span>
-                      </div>
-                      <div className="flex items-center space-x-1">
-                        <img
-                          src={`https://hatscripts.github.io/circle-flags/flags/${transaction.quote.targetCurrency.slice(0, 2).toLowerCase()}.svg`}
-                          alt={transaction.quote.targetCurrency}
-                          className="w-4 h-4 rounded-full"
-                        />
-                        <span className="text-gray-700 text-xl font-bold">
-                          ${formatNumber(transaction.quote.targetAmount)}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                )
-              })
-            ) : (
-              <div className="text-center py-8">
-                <EmptyTransactionPlaceholder />
-                <div className="text-gray-400 text-sm">No hay transacciones aún</div>
+            {isLoadingBalance ? (
+              <div className="flex items-center space-x-2">
+                <div className="h-9 bg-white/20 rounded w-8 animate-pulse"></div>
+                <div className="h-9 bg-white/20 rounded w-20 animate-pulse"></div>
               </div>
+            ) : (
+              <span className="text-white font-bold text-4xl">
+                ${usdcBalance || '0.00'}
+              </span>
             )}
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="text-xs text-gray-500 leading-relaxed text-center mt-6 pt-4 border-t border-gray-200">
-          Los datos de transacciones se actualizan en tiempo real
+        {/* Divider Line */}
+        <div className="border-t border-gray-200 mb-6"></div>
+
+        {/* Transaction History */}
+        <div className="flex-1 flex flex-col min-h-0">
+          <h3 className="text-gray-800 font-medium text-lg mb-4 flex-shrink-0">Historial de Transacciones</h3>
+          <div 
+            className="flex-1 overflow-y-auto custom-scrollbar flex flex-col" 
+            style={{
+              scrollbarWidth: 'thin',
+              scrollbarColor: '#d1d5db transparent'
+            }}
+          >
+            <div className="space-y-3 flex-1">
+              {loading ? (
+                <>
+                  <TransactionSkeleton />
+                  <TransactionSkeleton />
+                </>
+              ) : transactions.length > 0 ? (
+                transactions.map((transaction) => {
+                  const uiStatus = getStatus(transaction.status);
+                  return (
+                    <div
+                      key={transaction.id}
+                      className="bg-gray-50 border border-gray-200 rounded-xl p-4 hover:bg-gray-100 transition-colors duration-200"
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center space-x-2">
+                          <span className="text-gray-600 text-sm">{formatDate(transaction.createdAt)}</span>
+                        </div>
+                        <span className={`text-xs px-2 py-1 rounded-full ${
+                          uiStatus.type === 'completed' ? 'bg-green-100 text-green-700' :
+                          uiStatus.type === 'processing' ? 'bg-blue-100 text-blue-700' :
+                          uiStatus.type === 'refunded' ? 'bg-orange-100 text-orange-700' :
+                          uiStatus.type === 'canceled' ? 'bg-red-100 text-red-700' : ''
+                        }`}>
+                          {uiStatus.label}
+                        </span>
+                      </div>
+                      
+                      <div className="mb-2">
+                        <span className="text-gray-500 text-xs">
+                          Para: 
+                        </span>
+                        <span className="text-gray-700 font-mono text-sm">
+                          {transaction.accountNumber}
+                        </span>
+                      </div>
+
+                      <div className="flex justify-between items-center">
+                        <div className="flex items-center space-x-1">
+                          <img
+                            src="https://storage.googleapis.com/cdn-abroad/Icons/Tokens/USDC%20Token.svg"
+                            alt="USDC"
+                            className="w-4 h-4"
+                          />
+                          <span className="text-gray-700 text-xl font-bold">
+                            ${formatNumber(transaction.quote.sourceAmount)}
+                          </span>
+                        </div>
+                        <div className="flex items-center space-x-1">
+                          <img
+                            src={`https://hatscripts.github.io/circle-flags/flags/${transaction.quote.targetCurrency.slice(0, 2).toLowerCase()}.svg`}
+                            alt={transaction.quote.targetCurrency}
+                            className="w-4 h-4 rounded-full"
+                          />
+                          <span className="text-gray-700 text-xl font-bold">
+                            ${formatNumber(transaction.quote.targetAmount)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })
+              ) : (
+                <div className="text-center py-8">
+                  <EmptyTransactionPlaceholder />
+                  <div className="text-gray-400 text-sm">No hay transacciones aún</div>
+                </div>
+              )}
+            </div>
+            
+            {/* Footer at bottom of scrollable area */}
+            <div className="text-xs text-gray-500 leading-relaxed text-center pt-4 border-t border-gray-200 mt-6 mb-4 flex-shrink-0">
+              Los datos de transacciones se actualizan en tiempo real
+            </div>
+          </div>
         </div>
       </div>
     </motion.div>
+    </>
   );
 };
 

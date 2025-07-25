@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from "../Button";
-import { Loader, Landmark, Hash, ArrowLeft, Rotate3d} from 'lucide-react';
+import { Loader, Hash, ArrowLeft, Rotate3d} from 'lucide-react';
 import { getBanks, Bank, getBanksResponse200, acceptTransaction } from '../../api';
+import { DropSelector, Option } from '../DropSelector';
 
 interface BankDetailsRouteProps {
   onBackClick: () => void;
@@ -18,6 +19,8 @@ export default function BankDetailsRoute({ userId, onBackClick, quote_id, target
   const [account_number, setaccount_number] = useState('');
   const [bank_code, setbank_code] = useState<string>('');
   const [loadingSubmit, setLoadingSubmit] = useState(false);
+  const [bankOpen, setBankOpen] = useState(false);
+  const [selectedBank, setSelectedBank] = useState<Option | null>(null);
 
   const [apiBanks, setApiBanks] = useState<Bank[]>([]);
   const [loadingBanks, setLoadingBanks] = useState<boolean>(false);
@@ -52,9 +55,88 @@ export default function BankDetailsRoute({ userId, onBackClick, quote_id, target
     setaccount_number(input);
   };
 
-  const handleBankChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setbank_code(e.target.value);
+  const handleBankSelect = (option: Option) => {
+    setSelectedBank(option);
+    setbank_code(option.value);
   };
+
+  // Convert API banks to DropSelector options
+  const bankOptions: Option[] = apiBanks
+    .filter((bank: Bank) => {
+      const bankNameUpper = bank.bankName.toUpperCase();
+      // Hide specific banks
+      return bankNameUpper !== 'CFA COOPERATIVA FINANCIERA' && 
+             bankNameUpper !== 'CONFIAR COOPERATIVA FINANCIERA' && 
+             bankNameUpper !== 'BANCOCOOPCENTRAL';
+    })
+    .map((bank: Bank) => {
+    const bankNameUpper = bank.bankName.toUpperCase();
+    let iconUrl: string | undefined;
+    let displayLabel = bank.bankName;
+    
+    if (bankNameUpper === 'NEQUI') {
+      iconUrl = 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Nequi_Badge.webp';
+      displayLabel = 'Nequi';
+    } else if (bankNameUpper === 'MOVII') {
+      iconUrl = 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/movii_badge.png';
+    } else if (bankNameUpper === 'DAVIPLATA') {
+      iconUrl = 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Daviplata_Badge.png';
+      displayLabel = 'Daviplata';
+    } else if (bankNameUpper === 'DAVIVIENDA') {
+      iconUrl = 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Davivienda_Badge.png';
+      displayLabel = 'Davivienda';
+    } else if (bankNameUpper === 'BANCOLOMBIA') {
+      iconUrl = 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Bancolombia_Badge.png';
+    } else if (bankNameUpper === 'SUPERDIGITAL') {
+      iconUrl = 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Superdigital_Badge.png';
+    } else if (bankNameUpper === 'BANCO ITAU') {
+      iconUrl = 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Itau_Badge.png';
+      displayLabel = 'Itau';
+    } else if (bankNameUpper === 'BANCO FALABELLA') {
+      iconUrl = 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Falabella_Badge.png';
+    }
+    else if (bankNameUpper === 'BANCO COOPERATIVO COOPCENTRAL DIGITAL') {
+      iconUrl = 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Bcc_Badge.jpg';
+      displayLabel = 'Coopcentral';
+    }
+    else if (bankNameUpper === 'BANCO SERFINANZA') {
+      iconUrl = 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Bancoserfinanza_badge.jpg';
+      displayLabel = 'Serfinanza';
+    }
+    else if (bankNameUpper === 'BANCOBBVA') {
+      iconUrl = 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/BBVA_Badge.jpg';
+      displayLabel = 'BBVA';
+    }
+    else if (bankNameUpper === 'BANCO POWWI') {
+      iconUrl = 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Powwico_Badge.jpg';
+      displayLabel = 'Powwi';
+    }
+    else if (bankNameUpper === 'BANCO CAJA SOCIAL') {
+      iconUrl = 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/CajaSocial_Badge.webp';
+      displayLabel = 'Banco Caja Social';
+    }
+    else if (bankNameUpper === 'BANCO AGRARIO DE COLOMBIA') {
+      iconUrl = 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/BancoAgrario_Badge.jpg';
+      displayLabel = 'Banco Agrario';
+    }
+    else if (bankNameUpper === 'BANCO DE LAS MICROFINANZAS BANCAMIA SA') {
+      iconUrl = 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Bancamia_Badge.jpg';
+      displayLabel = 'Bancamia';
+    }
+    else if (bankNameUpper === 'BANCO CREZCAMOS') {
+      iconUrl = 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/BancoCrezcamos_Badge.png';
+      displayLabel = 'Banco Crezcamos';
+    }
+    else if (bankNameUpper === 'BANCO FINANDINA') {
+      iconUrl = 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/BancoFinandina_Badge.png';
+      displayLabel = 'Banco Finandina';
+    }
+    return {
+      value: String(bank.bankCode),
+      label: displayLabel,
+      iconUrl,
+    };
+  }).sort((a, b) => a.label.localeCompare(b.label));
 
   const handleSubmit = useCallback(async () => {
     setLoadingSubmit(true);
@@ -130,25 +212,42 @@ export default function BankDetailsRoute({ userId, onBackClick, quote_id, target
           </div>
 
           {/* Bank Selector Dropdown */}
-          <div id="bank-selector" className="w-full bg-white/60 backdrop-blur-xl rounded-2xl p-4 md:p-6 lg:py-6 xl:py-6 min-h-[800px]:py-16 flex items-center space-x-3 flex-shrink-0">
-            <Landmark className="w-5 h-5 sm:w-6 sm:h-6" style={{ color: textColor }} />
-            {loadingBanks && <Loader className="animate-spin w-4 h-4 sm:w-5 sm:h-5" style={{ color: textColor }} />}
-            {errorBanks && <p className="text-red-500 text-xs sm:text-sm">{errorBanks}</p>}
-            {!loadingBanks && !errorBanks && apiBanks.length === 0 && <p className="text-[#356E6A]/70 text-xs sm:text-sm">No hay bancos disponibles.</p>}
+          <div id="bank-selector" className="w-full bg-white/60 backdrop-blur-xl rounded-2xl flex-shrink-0 relative z-50">
+            {loadingBanks && (
+              <div className="p-6 flex items-center space-x-3">
+                <Loader className="animate-spin w-4 h-4 sm:w-5 sm:h-5" style={{ color: textColor }} />
+              </div>
+            )}
+            {errorBanks && (
+              <div className="p-6 flex items-center space-x-3">
+                <p className="text-red-500 text-xs sm:text-sm">{errorBanks}</p>
+              </div>
+            )}
+            {!loadingBanks && !errorBanks && apiBanks.length === 0 && (
+              <div className="p-6 flex items-center space-x-3">
+                <p className="text-[#356E6A]/70 text-xs sm:text-sm">No hay bancos disponibles.</p>
+              </div>
+            )}
             {!loadingBanks && !errorBanks && apiBanks.length > 0 && (
-              <select
-                value={bank_code}
-                onChange={handleBankChange}
-                className="w-full bg-transparent font-semibold focus:outline-none text-base sm:text-lg appearance-none"
-                style={{ color: textColor }}
-              >
-                <option value="" disabled className="text-[#356E6A]/70">Selecciona un banco</option>
-                {apiBanks.map((bank: Bank) => (
-                  <option key={bank.bankCode} value={String(bank.bankCode)} className="text-[#356E6A]">
-                    {bank.bankName}
-                  </option>
-                ))}
-              </select>
+              <div className="p-6 flex items-center space-x-3 w-full">
+                <div className="flex-1">
+                  <DropSelector
+                    options={bankOptions}
+                    selectedOption={selectedBank}
+                    onSelectOption={handleBankSelect}
+                    isOpen={bankOpen}
+                    setIsOpen={setBankOpen}
+                    placeholder="Banco"
+                    disabled={loadingBanks || errorBanks !== null}
+                    textColor={textColor}
+                    placeholderIcons={[
+                      'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Nequi_Badge.webp',
+                      'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Daviplata_Badge.png',
+                      'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Bancolombia_Badge.png'
+                    ]}
+                  />
+                </div>
+              </div>
             )}
           </div>
           {/* Transaction Info */}
