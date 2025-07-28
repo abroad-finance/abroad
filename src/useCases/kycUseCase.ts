@@ -7,6 +7,7 @@ import { TYPES } from '../types'
 
 export interface GetKycStatusRequest {
   partnerId: string
+  redirectUrl?: string
   userId: string
 }
 
@@ -22,7 +23,7 @@ export class KycUseCase {
         @inject(TYPES.IDatabaseClientProvider) private databaseClientProvider: IDatabaseClientProvider,
   ) { }
 
-  public async getKycStatus({ partnerId, userId }: GetKycStatusRequest): Promise<GetKycStatusResponse> {
+  public async getKycStatus({ partnerId, redirectUrl, userId }: GetKycStatusRequest): Promise<GetKycStatusResponse> {
     const dbClient = await this.databaseClientProvider.getClient()
 
     const partnerUser = await dbClient.partnerUser.upsert({
@@ -41,7 +42,7 @@ export class KycUseCase {
     // TODO: Check for expired KYC
 
     if (!partnerUser.kycId) {
-      const { inquiryId, kycLink, status } = await this.kycService.startKyc({ userId: partnerUser.id })
+      const { inquiryId, kycLink, status } = await this.kycService.startKyc({ redirectUrl, userId: partnerUser.id })
 
       await dbClient.partnerUser.update({
         data: {
@@ -54,7 +55,7 @@ export class KycUseCase {
       return { inquiryId, kycLink, status }
     }
 
-    const { inquiryId, kycLink, status } = await this.kycService.getKycStatus({ inquiryId: partnerUser.kycId })
+    const { inquiryId, kycLink, status } = await this.kycService.getKycStatus({ inquiryId: partnerUser.kycId, redirectUrl })
     return { inquiryId, kycLink, status }
   }
 }

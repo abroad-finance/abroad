@@ -21,10 +21,12 @@ import { TYPES } from '../types'
 import { KycUseCase } from '../useCases/kycUseCase'
 
 const kycRequestSchema = z.object({
+  redirect_url: z.string().optional(),
   user_id: z.string(),
 })
 
 interface KycRequest {
+  redirect_url?: string
   user_id: string
 }
 
@@ -69,7 +71,7 @@ export class KycController extends Controller {
     try {
       const partner = request.user
 
-      const { kycLink, status } = await this.kycUseCase.getKycStatus({ partnerId: partner.id, userId: parsed.data.user_id })
+      const { kycLink, status } = await this.kycUseCase.getKycStatus({ partnerId: partner.id, redirectUrl: parsed.data.redirect_url, userId: parsed.data.user_id })
 
       return {
         kyc_link: kycLink,
