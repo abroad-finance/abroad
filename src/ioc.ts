@@ -7,6 +7,7 @@ import { PartnerController } from './controllers/PartnerController'
 import { PartnerUserController } from './controllers/PartnerUserController'
 import { PaymentsController } from './controllers/PaymentsController'
 import { QrDecoderController } from './controllers/QrDecoderController'
+import { WalletAuthController } from './controllers/WalletAuthController'
 import { BinanceBalanceUpdatedController } from './controllers/queue/BinanceBalanceUpdatedController'
 import { PaymentSentController } from './controllers/queue/PaymentSentController'
 import { ReceivedCryptoTransactionController } from './controllers/queue/ReceivedCryptoTransactionController'
@@ -149,6 +150,7 @@ container.bind<TransactionsController>(TransactionsController).toSelf().inSingle
 container.bind<KycController>(KycController).toSelf().inSingletonScope()
 container.bind(PaymentsController).toSelf().inSingletonScope()
 container.bind(QrDecoderController).toSelf().inSingletonScope()
+container.bind(WalletAuthController).toSelf().inSingletonScope()
 
 // ILogger
 container.bind<ILogger>(TYPES.ILogger).to(ConsoleLogger).inSingletonScope()

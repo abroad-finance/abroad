@@ -5,6 +5,7 @@ import Recipients from "./pages/Recipients";
 import Integrations from "./pages/Integrations";
 import ProtectedRoute from "./components/ProtectedRoute"; // Import the ProtectedRoute component
 import { LanguageProvider } from './contexts/LanguageContext';
+import { WalletAuthProvider } from './context/WalletAuthContext';
 import { Settings } from "./pages/Settings";
 import Pool from "./pages/Pool";
 // Mobile pages
@@ -34,7 +35,8 @@ function App() {
       }}
     >
       <LanguageProvider>
-        <Router>
+        <WalletAuthProvider>
+          <Router>
           <Routes>
             <Route path="/" element={<WebSwap />} />
             {/* Wrap protected routes with ProtectedRoute */} 
@@ -52,6 +54,7 @@ function App() {
 
           </Routes>
         </Router>
+        </WalletAuthProvider>
       </LanguageProvider>
     </BluxProvider>
   );
