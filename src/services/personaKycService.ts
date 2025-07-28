@@ -8,31 +8,46 @@ import { TYPES } from '../types'
 
 type PersonaKycResponse = {
   data: {
-    attributes: {
-      status:
-        'approved' |
-        'completed' |
-        'created' |
-        'declined' |
-        'expired' |
-        'failed' |
-        'needs_review' |
-        'pending'
-    }
+    attributes: { status: 'approved' | 'completed' | 'created' | 'declined' | 'expired' | 'failed' | 'needs_review' | 'pending' }
     id: string
+  }
+}
+
+const mapPersonaStatus = (status: PersonaKycResponse['data']['attributes']['status']): KycStatus => {
+  switch (status) {
+    case 'approved':
+    case 'completed':
+      return KycStatus.APPROVED
+    case 'created':
+    case 'needs_review':
+    case 'pending':
+      return KycStatus.PENDING
+    case 'declined':
+    case 'expired':
+    case 'failed':
+      return KycStatus.REJECTED
   }
 }
 
 export class PersonaKycService implements IKycService {
   public constructor(
-        @inject(TYPES.ISecretManager) private secretManager: ISecretManager,
-  ) { }
+    @inject(TYPES.ISecretManager) private readonly secretManager: ISecretManager,
+  ) {}
 
-  public async getKycStatus({ inquiryId }: { inquiryId: string }): Promise<{ inquiryId: string, kycLink: string, status: KycStatus }> {
-    const personaApiKey: string = await this.secretManager.getSecret('PERSONA_API_KEY')
+  /** Retrieve the latest status for an existing inquiry */
+  public async getKycStatus(
+    {
+      inquiryId,
+      redirectUrl,
+    }: {
+      inquiryId: string
+      /** where Persona should send the user once they finish (same URL you used when you started the KYC flow) */
+      redirectUrl: string
+    },
+  ): Promise<{ inquiryId: string, kycLink: string, status: KycStatus }> {
+    const personaApiKey = await this.secretManager.getSecret('PERSONA_API_KEY')
 
-    // Create a Persona inquiry
-    const response = await axios.get(
+    const { data } = await axios.get<PersonaKycResponse>(
       `https://api.withpersona.com/api/v1/inquiries/${inquiryId}`,
       {
         headers: {
@@ -42,53 +57,44 @@ export class PersonaKycService implements IKycService {
           'Persona-Version': '2023-01-05',
         },
       },
-    ) as { data: PersonaKycResponse }
+    )
 
-    const inquiryStatus = response.data.data.attributes.status
+    const status = mapPersonaStatus(data.data.attributes.status)
 
-    // Convert Persona’s status (e.g. "created", "pending", etc.) to our KycStatus (assuming uppercase values)
-    let mappedStatus: KycStatus
-    switch (inquiryStatus) {
-      case 'approved':
-      case 'completed':
-        mappedStatus = KycStatus.APPROVED
-        break
-      case 'created':
-      case 'needs_review':
-      case 'pending':
-        mappedStatus = KycStatus.PENDING
-        break
-      case 'declined':
-      case 'expired':
-      case 'failed':
-        mappedStatus = KycStatus.REJECTED
-    }
+    const kycLink
+      = `https://withpersona.com/verify?inquiry-id=${inquiryId}`
+        + `&redirect-uri=${encodeURIComponent(redirectUrl)}`
 
-    // Construct a KYC link.
-    const kycLink = `https://withpersona.com/verify?inquiry-id=${inquiryId}`
-
-    return {
-      inquiryId,
-      kycLink,
-      status: mappedStatus,
-    }
+    return { inquiryId, kycLink, status }
   }
 
-  public async startKyc({ userId }: { userId: string }): Promise<{ inquiryId: string, kycLink: string, status: KycStatus }> {
-    const inquiryTemplateId: string = await this.secretManager.getSecret('PERSONA_INQUIRY_TEMPLATE_ID')
-    const personaApiKey: string = await this.secretManager.getSecret('PERSONA_API_KEY')
+  /** Start a brand‑new KYC inquiry for the given user */
+  public async startKyc(
+    {
+      redirectUrl,
+      userId,
+    }: {
+      /** where Persona should redirect when the user is done */
+      redirectUrl: string
+      userId: string
+    },
+  ): Promise<{ inquiryId: string, kycLink: string, status: KycStatus }> {
+    const [inquiryTemplateId, personaApiKey] = await Promise.all([
+      this.secretManager.getSecret('PERSONA_INQUIRY_TEMPLATE_ID'),
+      this.secretManager.getSecret('PERSONA_API_KEY'),
+    ])
 
-    // Create a Persona inquiry
-    const response = await axios.post(
+    const { data } = await axios.post<PersonaKycResponse>(
       'https://api.withpersona.com/api/v1/inquiries',
       {
         data: {
           attributes: {
             'inquiry-template-id': inquiryTemplateId,
+            'redirect-uri': redirectUrl, // <-- tell Persona to use this callback
           },
-        },
-        meta: {
-          'auto-create-account-reference-id': userId,
+          meta: {
+            'auto-create-account-reference-id': userId,
+          },
         },
       },
       {
@@ -99,36 +105,15 @@ export class PersonaKycService implements IKycService {
           'Persona-Version': '2023-01-05',
         },
       },
-    ) as { data: PersonaKycResponse }
+    )
 
-    const inquiryId = response.data.data.id
-    const inquiryStatus = response.data.data.attributes.status
+    const inquiryId = data.data.id
+    const status = mapPersonaStatus(data.data.attributes.status)
 
-    // Convert Persona’s status (e.g. "created", "pending", etc.) to our KycStatus (assuming uppercase values)
-    let mappedStatus: KycStatus
-    switch (inquiryStatus) {
-      case 'approved':
-      case 'completed':
-        mappedStatus = KycStatus.APPROVED
-        break
-      case 'created':
-      case 'needs_review':
-      case 'pending':
-        mappedStatus = KycStatus.PENDING
-        break
-      case 'declined':
-      case 'expired':
-      case 'failed':
-        mappedStatus = KycStatus.REJECTED
-    }
+    const kycLink
+      = `https://withpersona.com/verify?inquiry-id=${inquiryId}`
+        + `&redirect-uri=${encodeURIComponent(redirectUrl)}`
 
-    // Construct a KYC link.
-    const kycLink = `https://withpersona.com/verify?inquiry-id=${inquiryId}`
-
-    return {
-      inquiryId,
-      kycLink,
-      status: mappedStatus,
-    }
+    return { inquiryId, kycLink, status }
   }
 }
