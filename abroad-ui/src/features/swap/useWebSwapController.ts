@@ -22,9 +22,33 @@ export const useWebSwapController = () => {
   const handleWalletDetailsOpen = useCallback(() => setIsWalletDetailsOpen(true), []);
   const handleWalletDetailsClose = useCallback(() => setIsWalletDetailsOpen(false), []);
 
-  const handleWalletSelect = useCallback((walletType: 'trust' | 'stellar') => {
+  const handleWalletSelect = useCallback(async (walletType: 'trust' | 'stellar') => {
     console.log('Wallet selected:', walletType);
-    // Add wallet connection logic here
+    if (walletType === 'trust') {
+      const eth = (window as any).ethereum;
+      if (!eth) {
+        alert('Ethereum provider not found');
+        return;
+      }
+      const [address] = await eth.request({ method: 'eth_requestAccounts' });
+      const nonceRes = await fetch('/walletAuth/challenge', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ address }),
+      });
+      const { nonce } = await nonceRes.json();
+      const signature = await eth.request({
+        method: 'personal_sign',
+        params: [nonce, address],
+      });
+      const verifyRes = await fetch('/walletAuth/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ address, signature }),
+      });
+      const { token } = await verifyRes.json();
+      localStorage.setItem('walletToken', token);
+    }
     setIsWalletModalOpen(false);
   }, []);
 
