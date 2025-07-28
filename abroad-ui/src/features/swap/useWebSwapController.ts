@@ -25,21 +25,21 @@ export const useWebSwapController = () => {
   const handleWalletSelect = useCallback(async (walletType: 'trust' | 'stellar') => {
     console.log('Wallet selected:', walletType);
     if (walletType === 'trust') {
-      const eth = (window as any).ethereum;
-      if (!eth) {
-        alert('Ethereum provider not found');
+      const stellar = (window as any).trustwallet?.stellar;
+      if (!stellar) {
+        alert('Trust Wallet Stellar provider not found');
         return;
       }
-      const [address] = await eth.request({ method: 'eth_requestAccounts' });
+      const address: string = await stellar.request({ method: 'stellar_getPublicKey' });
       const nonceRes = await fetch('/walletAuth/challenge', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ address }),
       });
       const { nonce } = await nonceRes.json();
-      const signature = await eth.request({
-        method: 'personal_sign',
-        params: [nonce, address],
+      const signature: string = await stellar.request({
+        method: 'stellar_signMessage',
+        params: [nonce],
       });
       const verifyRes = await fetch('/walletAuth/verify', {
         method: 'POST',

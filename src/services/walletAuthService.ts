@@ -1,6 +1,6 @@
 import crypto from 'crypto'
 import jwt from 'jsonwebtoken'
-import { verifyMessage } from 'ethers'
+import { Keypair } from '@stellar/stellar-sdk'
 import { injectable } from 'inversify'
 import 'reflect-metadata'
 
@@ -31,13 +31,15 @@ export class WalletAuthService implements IWalletAuthService {
       this.challenges.delete(address.toLowerCase())
       return false
     }
-    let recovered: string
+    let valid = false
     try {
-      recovered = verifyMessage(record.nonce, signature)
+      const keypair = Keypair.fromPublicKey(address)
+      const sigBuf = Buffer.from(signature, 'base64')
+      const msgBuf = Buffer.from(record.nonce)
+      valid = keypair.verify(msgBuf, sigBuf)
     } catch {
       return false
     }
-    const valid = recovered.toLowerCase() === address.toLowerCase()
     if (valid) {
       this.challenges.delete(address.toLowerCase())
     }
