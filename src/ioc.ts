@@ -22,6 +22,7 @@ import {
   IPartnerService,
   IQueueHandler,
   ISlackNotifier,
+  IWalletAuthService,
 } from './interfaces'
 import { IDatabaseClientProvider } from './interfaces/IDatabaseClientProvider'
 import { IExchangeProvider } from './interfaces/IExchangeProvider'
@@ -48,6 +49,7 @@ import { TransferoPaymentService } from './services/paymentServices/transferoPay
 import { PersonaKycService } from './services/personaKycService'
 import { PixQrDecoder } from './services/PixQrDecoder'
 import { SlackNotifier } from './services/slackNotifier'
+import { WalletAuthService } from './services/walletAuthService'
 import { SolanaWalletHandler } from './services/SolanaWalletHandler'
 import { StellarWalletHandler } from './services/StellarWalletHandler'
 import { WalletHandlerFactory } from './services/WalletHandlerFactory'
@@ -186,6 +188,12 @@ container
 container
   .bind<IAuthService>(TYPES.IAuthService)
   .to(FirebaseAuthService)
+  .inSingletonScope()
+
+// WalletAuthService
+container
+  .bind<IWalletAuthService>(TYPES.IWalletAuthService)
+  .to(WalletAuthService)
   .inSingletonScope()
 
 // IPixQrDecoder

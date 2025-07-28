@@ -38,3 +38,4 @@ export interface ISlackNotifier {
 export * from './IAuthService'
 export * from './IWalletHandlerFactory'
 export * from './queueSchema'
+export * from './IWalletAuthService'
