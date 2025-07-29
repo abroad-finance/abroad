@@ -71,8 +71,7 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
       try {
         const response = await listPartnerTransactions({ page: 1, pageSize: 50 });
         if (response.data && 'transactions' in response.data) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const userObj = user as any;
+          const userObj = user as BluxUser;
           const currentUserId = userObj.id || userObj.userId;
 
           if (currentUserId) {
