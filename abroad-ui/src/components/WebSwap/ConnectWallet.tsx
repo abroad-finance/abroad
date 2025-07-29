@@ -1,9 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { motion } from 'framer-motion';
+<<<<<<< HEAD
 import { useBlux } from '@bluxcc/react';
 // import TrustWalletIcon from '../../assets/Logos/Wallets/TrustWalletShield.svg';
+=======
+>>>>>>> bfffb03 (feat: integrate Stellar Wallets Kit and implement wallet authentication)
 import StellarLogo from '../../assets/Logos/Blockchains/StellarLogo.svg';
+import { kit } from '../../services/stellarKit';
+import { useWalletAuth } from '../../context/WalletAuthContext';
 
 interface ConnectWalletProps {
   onWalletSelect?: (walletType: 'trust' | 'stellar') => void;
@@ -12,8 +17,7 @@ interface ConnectWalletProps {
 
 const ConnectWallet: React.FC<ConnectWalletProps> = ({ onWalletSelect, onClose }) => {
   const [selectedWallet, setSelectedWallet] = useState<'trust' | 'stellar' | null>(null);
-  const [showBluxModal, setShowBluxModal] = useState(false);
-  const { login, isReady } = useBlux();
+  const { authenticateWithWallet } = useWalletAuth();
 
   // Handle escape key press
   useEffect(() => {
@@ -30,25 +34,25 @@ const ConnectWallet: React.FC<ConnectWalletProps> = ({ onWalletSelect, onClose }
   }, [onClose]);
 
   const handleWalletSelect = (walletType: 'trust' | 'stellar') => {
+    onWalletSelect?.(walletType);
     setSelectedWallet(walletType);
-    
-    if (walletType === 'stellar') {
-      if (isReady) {
-        login();
-      }
-      onClose?.();
-    } else {
-      // Handle Trust Wallet or other wallet types
-      onWalletSelect?.(walletType);
-    }
+    kit.openModal({
+      onWalletSelected: async (option) => {
+        kit.setWallet(option.id);
+        authenticateWithWallet();
+      },
+    })
   };
 
   const walletOptions = [
+<<<<<<< HEAD
     /* {
       id: 'trust' as const,
       icon: TrustWalletIcon,
       name: 'Trust Wallet',
     }, */
+=======
+>>>>>>> bfffb03 (feat: integrate Stellar Wallets Kit and implement wallet authentication)
     {
       id: 'stellar' as const,
       icon: StellarLogo,
@@ -57,20 +61,20 @@ const ConnectWallet: React.FC<ConnectWalletProps> = ({ onWalletSelect, onClose }
   ];
 
   return (
-    <motion.div 
+    <motion.div
       className="w-screen md:w-auto md:mx-0 md:ml-auto md:h-[95vh] md:max-w-md md:flex md:items-center fixed md:relative left-0 md:left-auto top-auto md:top-auto bottom-0 md:bottom-auto"
-      initial={{ 
+      initial={{
         x: window.innerWidth >= 768 ? '100%' : 0,
         y: window.innerWidth >= 768 ? 0 : '100%',
-        opacity: 1 
+        opacity: 1
       }}
       animate={{ x: 0, y: 0, opacity: 1 }}
-      exit={{ 
+      exit={{
         x: window.innerWidth >= 768 ? '100%' : 0,
         y: window.innerWidth >= 768 ? 0 : '100%',
-        opacity: window.innerWidth >= 768 ? 1 : 0 
+        opacity: window.innerWidth >= 768 ? 1 : 0
       }}
-      transition={{ 
+      transition={{
         type: 'spring',
         stiffness: 800,
         damping: 35,
@@ -91,18 +95,21 @@ const ConnectWallet: React.FC<ConnectWalletProps> = ({ onWalletSelect, onClose }
         {/* Header */}
         <div className="mb-8 pr-8 text-center mt-5 md:mt-14">
           <h2 className="text-2xl font-semibold text-gray-900 mb-2">
-            {showBluxModal ? 'Conectar Billetera Stellar' : 'Conecta tu billetera'}
+            {'Conecta tu billetera'}
           </h2>
           <p className="text-md text-gray-600">
+<<<<<<< HEAD
             {showBluxModal ? 'Elige tu billetera Stellar para conectar' : 'Elige la billetera de tu elección para comenzar a hacer transacciones'}
+=======
+            {'Conecta tu billetera para hacer transacciones en Abroad'}
+>>>>>>> bfffb03 (feat: integrate Stellar Wallets Kit and implement wallet authentication)
           </p>
         </div>
 
-        {/* Conditional Content */}
-        {showBluxModal ? (
-          <div className="space-y-3 mb-6 md:flex-1 md:flex md:flex-col md:justify-center md:-mt-94">
-            {/* Back button */}
+        <div className="space-y-3 mb-6 md:flex-1 md:flex md:flex-col md:justify-center md:-mt-94">
+          {walletOptions.map((wallet) => (
             <button
+<<<<<<< HEAD
               onClick={() => setShowBluxModal(false)}
               className="mb-4 text-blue-600 hover:text-blue-800 text-sm font-medium"
             >
@@ -165,20 +172,26 @@ const ConnectWallet: React.FC<ConnectWalletProps> = ({ onWalletSelect, onClose }
                   selectedWallet === wallet.id
                     ? 'border-blue-500 bg-blue-50'
                     : 'border-gray-200'
+=======
+              key={wallet.id}
+              onClick={() => handleWalletSelect(wallet.id)}
+              className={`w-full flex items-center p-4 rounded-xl border-2 transition-all duration-200 hover:bg-gray-50 cursor-pointer ${selectedWallet === wallet.id
+                ? 'border-blue-500 bg-blue-50'
+                : 'border-gray-200'
+>>>>>>> bfffb03 (feat: integrate Stellar Wallets Kit and implement wallet authentication)
                 }`}
-              >
-                <img
-                  src={wallet.icon}
-                  alt={`${wallet.name} icon`}
-                  className="w-8 h-8 mr-3"
-                />
-                <span className="text-left font-medium text-gray-900">
-                  {wallet.name}
-                </span>
-              </button>
-            ))}
-          </div>
-        )}
+            >
+              <img
+                src={wallet.icon}
+                alt={`${wallet.name} icon`}
+                className="w-8 h-8 mr-3"
+              />
+              <span className="text-left font-medium text-gray-900">
+                {wallet.name}
+              </span>
+            </button>
+          ))}
+        </div>
 
         {/* Terms and Privacy */}
         <div className="text-xs text-gray-500 leading-relaxed text-center md:mt-auto">

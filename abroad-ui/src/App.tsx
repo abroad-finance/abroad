@@ -1,10 +1,10 @@
 import { BrowserRouter as Router, Route, Routes } from "react-router-dom";
-import { BluxProvider, networks, url } from "@bluxcc/react";
 import { Dashboard } from "./pages/Dashboard";
 import Recipients from "./pages/Recipients";
 import Integrations from "./pages/Integrations";
 import ProtectedRoute from "./components/ProtectedRoute"; // Import the ProtectedRoute component
 import { LanguageProvider } from './contexts/LanguageContext';
+import { WalletAuthProvider } from './context/WalletAuthContext';
 import { Settings } from "./pages/Settings";
 import Pool from "./pages/Pool";
 // Mobile pages
@@ -16,6 +16,7 @@ import QrAnchor from "./pages/Mobile/QrAnchor";
 
 function App() {  
   return (
+<<<<<<< HEAD
     <BluxProvider
       config={{
         lang: "es",
@@ -35,8 +36,11 @@ function App() {
         },
       }}
     >
+=======
+>>>>>>> bfffb03 (feat: integrate Stellar Wallets Kit and implement wallet authentication)
       <LanguageProvider>
-        <Router>
+        <WalletAuthProvider>
+          <Router>
           <Routes>
             <Route path="/" element={<WebSwap />} />
             {/* Wrap protected routes with ProtectedRoute */} 
@@ -55,8 +59,8 @@ function App() {
 
           </Routes>
         </Router>
+        </WalletAuthProvider>
       </LanguageProvider>
-    </BluxProvider>
   );
 }
 

@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { Info, Menu, X, Wallet } from 'lucide-react';
+<<<<<<< HEAD
 import { useBlux } from '@bluxcc/react';
 import { Horizon } from '@stellar/stellar-sdk';
 import AbroadLogoColored from '/src/assets/Logos/AbroadLogoColored.svg';
@@ -7,6 +8,9 @@ import AbroadLogoWhite from '/src/assets/Logos/AbroadLogoWhite.svg';
 import FreighterLogo from '/src/assets/Logos/Wallets/Freighter.svg';
 import HanaLogo from '/src/assets/Logos/Wallets/Hana.svg';
 import LobstrLogo from '/src/assets/Logos/Wallets/Lobstr.svg';
+=======
+import { useWalletAuth } from '../../context/WalletAuthContext';
+>>>>>>> bfffb03 (feat: integrate Stellar Wallets Kit and implement wallet authentication)
 
 interface NavBarResponsiveProps {
   className?: string;
@@ -14,16 +18,27 @@ interface NavBarResponsiveProps {
   onWalletDetails?: () => void;
 }
 
+  // Helper function to format wallet address
+  const formatWalletAddress = (address: string) => {
+    if (!address || address === 'Connected') return 'Connected';
+    return `${address.slice(0, 6)}...${address.slice(-4)}`;
+  }
+
 const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({ className = '', onWalletConnect, onWalletDetails }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+<<<<<<< HEAD
   const [usdcBalance, setUsdcBalance] = useState<string>('');
   const [isLoadingBalance, setIsLoadingBalance] = useState(false);
   const { user, isAuthenticated } = useBlux();
 
+=======
+  const { address } = useWalletAuth(); 
+>>>>>>> bfffb03 (feat: integrate Stellar Wallets Kit and implement wallet authentication)
   const toggleMobileMenu = useCallback(() => {
     setIsMobileMenuOpen(!isMobileMenuOpen);
   }, [isMobileMenuOpen]);
 
+<<<<<<< HEAD
   // Function to fetch USDC balance
   const fetchUSDCBalance = useCallback(async (stellarAddress: string) => {
     try {
@@ -119,25 +134,26 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({ className = '', onW
   const walletAddress = useMemo(() => (
     publicKey ? formatWalletAddress(String(publicKey)) : 'Connected'
   ), [publicKey, formatWalletAddress]);
+=======
+>>>>>>> bfffb03 (feat: integrate Stellar Wallets Kit and implement wallet authentication)
 
   const connectedWalletName = useMemo(() => {
-    if (!isAuthenticated || !user) return null;
-    const wallet = (user as { wallet?: { name?: string } }).wallet;
-    if (wallet && typeof wallet.name === 'string') {
-      return wallet.name.toLowerCase();
+    if (!address) return null;
+    if (address && typeof address === 'string') {
+      return address.toLowerCase();
     }
     return null;
-  }, [isAuthenticated, user]);
+  }, [address]);
 
   const handleWalletClick = useCallback(() => {
-    if (isAuthenticated && user) {
+    if (address) {
       // If wallet is connected, show wallet details
       onWalletDetails?.();
     } else {
       // If wallet is not connected, show connect wallet modal
       onWalletConnect?.();
     }
-  }, [isAuthenticated, user, onWalletDetails, onWalletConnect]);
+  }, [address, onWalletDetails, onWalletConnect]);
 
   const menuItems = ['Trade', 'Pool', 'About'];
 
@@ -185,6 +201,7 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({ className = '', onW
               onClick={handleWalletClick}
               className="flex items-center space-x-3 bg-white/20 backdrop-blur-sm rounded-2xl px-4 py-2 border border-white/30 hover:bg-white/30 transition-colors duration-200"
             >
+<<<<<<< HEAD
               {isAuthenticated && user ? (
                 <>
                   {connectedWalletName?.includes('freighter') ? (
@@ -230,6 +247,34 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({ className = '', onW
                     )}
                   </div>
                 </>
+=======
+              {address ? (
+                connectedWalletName?.includes('freighter') ? (
+                  <img
+                    src="/src/assets/Logos/Wallets/Freighter.svg"
+                    alt="Freighter Wallet"
+                    className="w-8 h-8"
+                  />
+                ) : connectedWalletName?.includes('hana') ? (
+                  <img
+                    src="/src/assets/Logos/Wallets/Hana.svg"
+                    alt="Hana Wallet"
+                    className="w-8 h-8"
+                  />
+                ) : connectedWalletName?.includes('lobstr') ? (
+                  <img
+                    src="/src/assets/Logos/Wallets/Lobstr.svg"
+                    alt="Lobstr Wallet"
+                    className="w-8 h-8"
+                  />
+                ) : (
+                  <img
+                    src="https://storage.googleapis.com/cdn-abroad/Icons/Banks/Trust_Wallet_Shield.svg"
+                    alt="Trust Wallet"
+                    className="w-5 h-5"
+                  />
+                )
+>>>>>>> bfffb03 (feat: integrate Stellar Wallets Kit and implement wallet authentication)
               ) : (
                 <>
                   <Wallet className="w-5 h-5 text-white" />
@@ -238,6 +283,12 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({ className = '', onW
                   </span>
                 </>
               )}
+<<<<<<< HEAD
+=======
+              <span className="text-white text-md font-medium">
+                {address ? formatWalletAddress(address) : 'Conectar Billetera'}
+              </span>
+>>>>>>> bfffb03 (feat: integrate Stellar Wallets Kit and implement wallet authentication)
             </button>
 
             {/* Info Icon */}
@@ -283,6 +334,7 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({ className = '', onW
                 onClick={handleWalletClick}
                 className="flex items-center justify-center space-x-3 bg-white/20 backdrop-blur-sm rounded-full px-4 py-2 border border-white/30 mx-3 mt-4 hover:bg-white/30 transition-colors duration-200"
               >
+<<<<<<< HEAD
                 {isAuthenticated && user ? (
                   <>
                     {connectedWalletName?.includes('freighter') ? (
@@ -328,6 +380,34 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({ className = '', onW
                       )}
                     </div>
                   </>
+=======
+                {address ? (
+                  connectedWalletName?.includes('freighter') ? (
+                    <img
+                      src="/src/assets/Logos/Wallets/Freighter.svg"
+                      alt="Freighter Wallet"
+                      className="w-8 h-8"
+                    />
+                  ) : connectedWalletName?.includes('hana') ? (
+                    <img
+                      src="/src/assets/Logos/Wallets/Hana.svg"
+                      alt="Hana Wallet"
+                      className="w-5 h-5"
+                    />
+                  ) : connectedWalletName?.includes('lobstr') ? (
+                    <img
+                      src="/src/assets/Logos/Wallets/Lobstr.svg"
+                      alt="Lobstr Wallet"
+                      className="w-5 h-5"
+                    />
+                  ) : (
+                    <img
+                      src="https://storage.googleapis.com/cdn-abroad/Icons/Banks/Trust_Wallet_Shield.svg"
+                      alt="Trust Wallet"
+                      className="w-5 h-5"
+                    />
+                  )
+>>>>>>> bfffb03 (feat: integrate Stellar Wallets Kit and implement wallet authentication)
                 ) : (
                   <>
                     <Wallet className="w-5 h-5 text-white" />
@@ -336,6 +416,12 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({ className = '', onW
                     </span>
                   </>
                 )}
+<<<<<<< HEAD
+=======
+                <span className="text-white text-sm font-medium">
+                  {address ? formatWalletAddress(address) : 'Conectar Billetera'}
+                </span>
+>>>>>>> bfffb03 (feat: integrate Stellar Wallets Kit and implement wallet authentication)
               </button>
 
               {/* Mobile Action Buttons */}

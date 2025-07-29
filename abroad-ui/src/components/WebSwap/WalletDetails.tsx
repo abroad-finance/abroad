@@ -1,21 +1,28 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { X, Copy, ExternalLink } from 'lucide-react';
 import { motion } from 'framer-motion';
+<<<<<<< HEAD
 import { useBlux } from '@bluxcc/react';
 import { Horizon } from '@stellar/stellar-sdk';
 import { listPartnerTransactions, PaginatedTransactionListTransactionsItem, _36EnumsTransactionStatus } from '../../api';
+=======
+import { useWalletAuth } from '../../context/WalletAuthContext';
+>>>>>>> bfffb03 (feat: integrate Stellar Wallets Kit and implement wallet authentication)
 
 interface WalletDetailsProps {
   onClose?: () => void;
 }
 
 const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
-  const { user, logout } = useBlux();
   const [copiedAddress, setCopiedAddress] = useState(false);
+<<<<<<< HEAD
   const [transactions, setTransactions] = useState<PaginatedTransactionListTransactionsItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [usdcBalance, setUsdcBalance] = useState<string>('');
   const [isLoadingBalance, setIsLoadingBalance] = useState(false);
+=======
+  const { address, logout } = useWalletAuth();
+>>>>>>> bfffb03 (feat: integrate Stellar Wallets Kit and implement wallet authentication)
 
   // Function to fetch USDC balance from Stellar network
   const fetchUSDCBalance = useCallback(async (stellarAddress: string) => {
@@ -94,11 +101,12 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
   }, [user]);
 
   // Helper function to format wallet address
-  const formatWalletAddress = (address: string) => {
+  const formatWalletAddress = (address: string | null) => {
     if (!address) return 'No conectado';
     return `${address.slice(0, 6)}...${address.slice(-4)}`;
   };
 
+<<<<<<< HEAD
   const formatNumber = (value?: number) => {
     if (value === undefined) return "-";
     try {
@@ -225,10 +233,15 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
   );
 
   const copyToClipboard = async (text: string) => {
+=======
+  const copyToClipboard = async (text: string | null) => {
+>>>>>>> bfffb03 (feat: integrate Stellar Wallets Kit and implement wallet authentication)
     try {
-      await navigator.clipboard.writeText(text);
-      setCopiedAddress(true);
-      setTimeout(() => setCopiedAddress(false), 2000);
+      if (text) {
+        await navigator.clipboard.writeText(text);
+        setCopiedAddress(true);
+        setTimeout(() => setCopiedAddress(false), 2000);
+      }
     } catch (err) {
       console.error('Failed to copy address:', err);
     }
@@ -325,7 +338,7 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
         >
           {/* Wallet Address Section */}
           <div className="flex items-center justify-between mb-4">
-            <span className="text-white font-mono text-sm break-all">{formatWalletAddress(walletAddress)}</span>
+            <span className="text-white font-mono text-sm break-all">{formatWalletAddress(address)}</span>
             <div className="flex space-x-2">
               <button
                 onClick={handleDisconnectWallet}
@@ -337,14 +350,14 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
                 </svg>
               </button>
               <button
-                onClick={() => copyToClipboard(walletAddress)}
+                onClick={() => copyToClipboard(address)}
                 className="p-1 hover:bg-white hover:bg-opacity-20 rounded transition-colors duration-200"
                 title="Copiar dirección"
               >
                 <Copy className="w-4 h-4 text-white" />
               </button>
               <button
-                onClick={() => window.open(`https://stellar.expert/explorer/public/account/${walletAddress}`, '_blank')}
+                onClick={() => window.open(`https://stellar.expert/explorer/public/account/${address}`, '_blank')}
                 className="p-1 hover:bg-white hover:bg-opacity-20 rounded transition-colors duration-200"
                 title="Ver en explorador"
               >
