@@ -41,7 +41,7 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
         return false;
       });
       
-      console.log('USDC balance found:', usdcBalance);
+      // USDC balance found, proceed with processing
       
       if (usdcBalance) {
         const numericBalance = parseFloat((usdcBalance as StellarBalance).balance);
