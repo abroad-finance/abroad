@@ -60,83 +60,90 @@ export default function BankDetailsRoute({ userId, onBackClick, quote_id, target
     setbank_code(option.value);
   };
 
+  // Bank configuration mapping
+  const bankConfig: Record<string, { iconUrl: string; displayLabel?: string }> = {
+    'NEQUI': {
+      iconUrl: 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Nequi_Badge.webp',
+      displayLabel: 'Nequi'
+    },
+    'MOVII': {
+      iconUrl: 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/movii_badge.png'
+    },
+    'DAVIPLATA': {
+      iconUrl: 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Daviplata_Badge.png',
+      displayLabel: 'Daviplata'
+    },
+    'DAVIVIENDA': {
+      iconUrl: 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Davivienda_Badge.png',
+      displayLabel: 'Davivienda'
+    },
+    'BANCOLOMBIA': {
+      iconUrl: 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Bancolombia_Badge.png'
+    },
+    'SUPERDIGITAL': {
+      iconUrl: 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Superdigital_Badge.png'
+    },
+    'BANCO ITAU': {
+      iconUrl: 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Itau_Badge.png',
+      displayLabel: 'Itau'
+    },
+    'BANCO FALABELLA': {
+      iconUrl: 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Falabella_Badge.png'
+    },
+    'BANCO COOPERATIVO COOPCENTRAL DIGITAL': {
+      iconUrl: 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Bcc_Badge.jpg',
+      displayLabel: 'Coopcentral'
+    },
+    'BANCO SERFINANZA': {
+      iconUrl: 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Bancoserfinanza_badge.jpg',
+      displayLabel: 'Serfinanza'
+    },
+    'BANCOBBVA': {
+      iconUrl: 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/BBVA_Badge.jpg',
+      displayLabel: 'BBVA'
+    },
+    'BANCO POWWI': {
+      iconUrl: 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Powwico_Badge.jpg',
+      displayLabel: 'Powwi'
+    },
+    'BANCO CAJA SOCIAL': {
+      iconUrl: 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/CajaSocial_Badge.webp',
+      displayLabel: 'Banco Caja Social'
+    },
+    'BANCO AGRARIO DE COLOMBIA': {
+      iconUrl: 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/BancoAgrario_Badge.jpg',
+      displayLabel: 'Banco Agrario'
+    },
+    'BANCO DE LAS MICROFINANZAS BANCAMIA SA': {
+      iconUrl: 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Bancamia_Badge.jpg',
+      displayLabel: 'Bancamia'
+    },
+    'BANCO CREZCAMOS': {
+      iconUrl: 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/BancoCrezcamos_Badge.png',
+      displayLabel: 'Banco Crezcamos'
+    },
+    'BANCO FINANDINA': {
+      iconUrl: 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/BancoFinandina_Badge.png',
+      displayLabel: 'Banco Finandina'
+    }
+  };
+
+  // Banks to exclude from the list
+  const excludedBanks = ['CFA COOPERATIVA FINANCIERA', 'CONFIAR COOPERATIVA FINANCIERA', 'BANCOCOOPCENTRAL'];
+
   // Convert API banks to DropSelector options
   const bankOptions: Option[] = apiBanks
-    .filter((bank: Bank) => {
-      const bankNameUpper = bank.bankName.toUpperCase();
-      // Hide specific banks
-      return bankNameUpper !== 'CFA COOPERATIVA FINANCIERA' && 
-             bankNameUpper !== 'CONFIAR COOPERATIVA FINANCIERA' && 
-             bankNameUpper !== 'BANCOCOOPCENTRAL';
-    })
+    .filter((bank: Bank) => !excludedBanks.includes(bank.bankName.toUpperCase()))
     .map((bank: Bank) => {
-    const bankNameUpper = bank.bankName.toUpperCase();
-    let iconUrl: string | undefined;
-    let displayLabel = bank.bankName;
-    
-    if (bankNameUpper === 'NEQUI') {
-      iconUrl = 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Nequi_Badge.webp';
-      displayLabel = 'Nequi';
-    } else if (bankNameUpper === 'MOVII') {
-      iconUrl = 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/movii_badge.png';
-    } else if (bankNameUpper === 'DAVIPLATA') {
-      iconUrl = 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Daviplata_Badge.png';
-      displayLabel = 'Daviplata';
-    } else if (bankNameUpper === 'DAVIVIENDA') {
-      iconUrl = 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Davivienda_Badge.png';
-      displayLabel = 'Davivienda';
-    } else if (bankNameUpper === 'BANCOLOMBIA') {
-      iconUrl = 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Bancolombia_Badge.png';
-    } else if (bankNameUpper === 'SUPERDIGITAL') {
-      iconUrl = 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Superdigital_Badge.png';
-    } else if (bankNameUpper === 'BANCO ITAU') {
-      iconUrl = 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Itau_Badge.png';
-      displayLabel = 'Itau';
-    } else if (bankNameUpper === 'BANCO FALABELLA') {
-      iconUrl = 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Falabella_Badge.png';
-    }
-    else if (bankNameUpper === 'BANCO COOPERATIVO COOPCENTRAL DIGITAL') {
-      iconUrl = 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Bcc_Badge.jpg';
-      displayLabel = 'Coopcentral';
-    }
-    else if (bankNameUpper === 'BANCO SERFINANZA') {
-      iconUrl = 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Bancoserfinanza_badge.jpg';
-      displayLabel = 'Serfinanza';
-    }
-    else if (bankNameUpper === 'BANCOBBVA') {
-      iconUrl = 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/BBVA_Badge.jpg';
-      displayLabel = 'BBVA';
-    }
-    else if (bankNameUpper === 'BANCO POWWI') {
-      iconUrl = 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Powwico_Badge.jpg';
-      displayLabel = 'Powwi';
-    }
-    else if (bankNameUpper === 'BANCO CAJA SOCIAL') {
-      iconUrl = 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/CajaSocial_Badge.webp';
-      displayLabel = 'Banco Caja Social';
-    }
-    else if (bankNameUpper === 'BANCO AGRARIO DE COLOMBIA') {
-      iconUrl = 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/BancoAgrario_Badge.jpg';
-      displayLabel = 'Banco Agrario';
-    }
-    else if (bankNameUpper === 'BANCO DE LAS MICROFINANZAS BANCAMIA SA') {
-      iconUrl = 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Bancamia_Badge.jpg';
-      displayLabel = 'Bancamia';
-    }
-    else if (bankNameUpper === 'BANCO CREZCAMOS') {
-      iconUrl = 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/BancoCrezcamos_Badge.png';
-      displayLabel = 'Banco Crezcamos';
-    }
-    else if (bankNameUpper === 'BANCO FINANDINA') {
-      iconUrl = 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/BancoFinandina_Badge.png';
-      displayLabel = 'Banco Finandina';
-    }
-    return {
-      value: String(bank.bankCode),
-      label: displayLabel,
-      iconUrl,
-    };
-  }).sort((a, b) => a.label.localeCompare(b.label));
+      const bankNameUpper = bank.bankName.toUpperCase();
+      const config = bankConfig[bankNameUpper];
+      
+      return {
+        value: String(bank.bankCode),
+        label: config?.displayLabel || bank.bankName,
+        iconUrl: config?.iconUrl,
+      };
+    }).sort((a, b) => a.label.localeCompare(b.label));
 
   const handleSubmit = useCallback(async () => {
     setLoadingSubmit(true);
