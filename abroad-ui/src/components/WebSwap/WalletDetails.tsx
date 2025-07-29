@@ -1,21 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { X, Copy, ExternalLink } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { useBlux } from '@bluxcc/react';
-import { Horizon } from '@stellar/stellar-sdk';
-import { listPartnerTransactions, PaginatedTransactionListTransactionsItem, _36EnumsTransactionStatus } from '../../api';
 
 interface WalletDetailsProps {
   onClose?: () => void;
 }
 
 const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
-  const { user, logout } = useBlux();
   const [copiedAddress, setCopiedAddress] = useState(false);
-  const [transactions, setTransactions] = useState<PaginatedTransactionListTransactionsItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [usdcBalance, setUsdcBalance] = useState<string>('');
-  const [isLoadingBalance, setIsLoadingBalance] = useState(false);
 
   // Function to fetch USDC balance from Stellar network
   const fetchUSDCBalance = useCallback(async (stellarAddress: string) => {
@@ -94,141 +86,16 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
   }, [user]);
 
   // Helper function to format wallet address
-  const formatWalletAddress = (address: string) => {
+  const formatWalletAddress = (address: string | null) => {
     if (!address) return 'No conectado';
     return `${address.slice(0, 6)}...${address.slice(-4)}`;
   };
-
-  const formatNumber = (value?: number) => {
-    if (value === undefined) return "-";
     try {
-      return value.toLocaleString(undefined, {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      });
-    } catch {
-      return value.toFixed(2);
-    }
-  };
-
-  type UiStatus = 'processing' | 'completed' | 'refunded' | 'canceled';
-
-  const getStatus = (status: _36EnumsTransactionStatus): { type: UiStatus, label: string } => {
-    switch (status) {
-      case 'PAYMENT_COMPLETED':
-        return { type: 'completed', label: 'Completado' };
-      case 'PROCESSING_PAYMENT':
-        return { type: 'processing', label: 'Procesando' };
-      case 'AWAITING_PAYMENT':
-        return { type: 'processing', label: 'Procesando' };
-      case 'PAYMENT_FAILED':
-        return { type: 'canceled', label: 'Cancelado' };
-      case 'WRONG_AMOUNT':
-        return { type: 'refunded', label: 'Reembolsado' };
-      default:
-        return { type: 'processing', label: status };
-    }
-  };
-
-  // Get public key from user object using Blux documentation
-  const getPublicKey = (): string => {
-    if (!user) {
-      console.log('No user found');
-      return 'GDQP2KPLX4V2M8N9JKHL6RTGF3SWQAZ7UXCV8BNMLKJHGF4DSAQWERTY'; // Mock address for demo
-    }
-    
-    console.log('Blux user object:', user);
-    
-    // According to Blux docs, use wallet.address property
-    const userObj = user as unknown as Record<string, unknown>;
-    
-    // First check for wallet.address as specified
-    if (userObj.wallet && typeof userObj.wallet === 'object') {
-      const wallet = userObj.wallet as Record<string, unknown>;
-      console.log('Wallet object:', wallet);
-      if (typeof wallet.address === 'string') {
-        console.log('Found wallet.address:', wallet.address);
-        return wallet.address;
+      if (text) {
+        await navigator.clipboard.writeText(text);
+        setCopiedAddress(true);
+        setTimeout(() => setCopiedAddress(false), 2000);
       }
-    }
-    
-    // Fallback to other properties
-    const publicKey = userObj.stellarAddress || 
-           userObj.address || 
-           userObj.walletAddress || 
-           userObj.publicKey || 
-           userObj.accountId ||
-           userObj.id;
-    
-    console.log('Fallback public key found:', publicKey);
-           
-    return typeof publicKey === 'string' ? publicKey : 'GDQP2KPLX4V2M8N9JKHL6RTGF3SWQAZ7UXCV8BNMLKJHGF4DSAQWERTY';
-  };
-
-  const walletAddress = getPublicKey();
-
-  // Effect to fetch USDC balance when component mounts
-  useEffect(() => {
-    if (walletAddress && walletAddress !== 'GDQP2KPLX4V2M8N9JKHL6RTGF3SWQAZ7UXCV8BNMLKJHGF4DSAQWERTY') {
-      fetchUSDCBalance(walletAddress);
-    }
-  }, [walletAddress, fetchUSDCBalance]);
-
-  const TransactionSkeleton: React.FC = () => (
-    <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 animate-pulse">
-      <div className="flex items-center justify-between mb-3">
-        <div className="h-3 bg-gray-200 rounded w-1/4"></div>
-        <div className="h-4 bg-gray-200 rounded-full w-16"></div>
-      </div>
-      <div className="mb-3">
-        <div className="h-3 bg-gray-200 rounded w-1/5 mb-1.5"></div>
-        <div className="h-4 bg-gray-200 rounded w-2/5"></div>
-      </div>
-      <div className="flex justify-between items-center">
-        <div className="flex items-center space-x-2 w-1/2">
-          <div className="w-5 h-5 bg-gray-200 rounded-full"></div>
-          <div className="h-6 bg-gray-200 rounded w-2/3"></div>
-        </div>
-        <div className="flex items-center space-x-2 w-1/2 justify-end">
-          <div className="w-5 h-5 bg-gray-200 rounded-full"></div>
-          <div className="h-6 bg-gray-200 rounded w-2/3"></div>
-        </div>
-      </div>
-    </div>
-  );
-
-  const EmptyTransactionPlaceholder: React.FC = () => (
-    <div className="bg-gray-50 border border-gray-200 rounded-lg p-2 w-1/2 mx-auto opacity-30 mb-4 relative">
-      {/* Alert icon */}
-      <div className="absolute -top-1 -right-1 w-4 h-4 bg-orange-400 rounded-full flex items-center justify-center">
-        <span className="text-white text-xs font-bold">!</span>
-      </div>
-      <div className="flex items-center justify-between mb-1">
-        <div className="h-1.5 bg-gray-200 rounded w-1/4"></div>
-        <div className="h-2 bg-gray-200 rounded-full w-8"></div>
-      </div>
-      <div className="mb-1">
-        <div className="h-1.5 bg-gray-200 rounded w-1/5 mb-0.5"></div>
-        <div className="h-2 bg-gray-200 rounded w-2/5"></div>
-      </div>
-      <div className="flex justify-between items-center">
-        <div className="flex items-center space-x-1 w-1/2">
-          <div className="w-3 h-3 bg-gray-200 rounded-full"></div>
-          <div className="h-2.5 bg-gray-200 rounded w-2/3"></div>
-        </div>
-        <div className="flex items-center space-x-1 w-1/2 justify-end">
-          <div className="w-3 h-3 bg-gray-200 rounded-full"></div>
-          <div className="h-2.5 bg-gray-200 rounded w-2/3"></div>
-        </div>
-      </div>
-    </div>
-  );
-
-  const copyToClipboard = async (text: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopiedAddress(true);
-      setTimeout(() => setCopiedAddress(false), 2000);
     } catch (err) {
       console.error('Failed to copy address:', err);
     }
@@ -325,7 +192,7 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
         >
           {/* Wallet Address Section */}
           <div className="flex items-center justify-between mb-4">
-            <span className="text-white font-mono text-sm break-all">{formatWalletAddress(walletAddress)}</span>
+            <span className="text-white font-mono text-sm break-all">{formatWalletAddress(address)}</span>
             <div className="flex space-x-2">
               <button
                 onClick={handleDisconnectWallet}
@@ -337,14 +204,14 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
                 </svg>
               </button>
               <button
-                onClick={() => copyToClipboard(walletAddress)}
+                onClick={() => copyToClipboard(address)}
                 className="p-1 hover:bg-white hover:bg-opacity-20 rounded transition-colors duration-200"
                 title="Copiar dirección"
               >
                 <Copy className="w-4 h-4 text-white" />
               </button>
               <button
-                onClick={() => window.open(`https://stellar.expert/explorer/public/account/${walletAddress}`, '_blank')}
+                onClick={() => window.open(`https://stellar.expert/explorer/public/account/${address}`, '_blank')}
                 className="p-1 hover:bg-white hover:bg-opacity-20 rounded transition-colors duration-200"
                 title="Ver en explorador"
               >

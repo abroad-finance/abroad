@@ -1,12 +1,12 @@
 import { useState, useCallback } from 'react';
-import { useBlux } from '@bluxcc/react';
-import { SwapData, SwapView, BluxUser } from './webSwap.types';
+import { SwapData, SwapView } from './webSwap.types';
+import { useWalletAuth } from '../../context/WalletAuthContext';
 
 export const useWebSwapController = () => {
-  const { user } = useBlux();
-
+  const {address } = useWalletAuth();
   const [view, setView] = useState<SwapView>('swap');
   const [swapData, setSwapData] = useState<SwapData | null>(null);
+
 
   // Modal visibility state
   const [isWalletModalOpen, setIsWalletModalOpen] = useState(false);
@@ -57,7 +57,7 @@ export const useWebSwapController = () => {
     isWalletModalOpen,
     isWalletDetailsOpen,
     initialAmounts: { source: sourceAmount, target: targetAmount },
-    user: user as unknown as BluxUser | null,
+    address,
 
     // Handlers
     handleWalletConnectOpen,

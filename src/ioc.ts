@@ -13,6 +13,7 @@ import { ReceivedCryptoTransactionController } from './controllers/queue/Receive
 import { QuoteController } from './controllers/QuoteController'
 import { TransactionController } from './controllers/TransactionController'
 import { TransactionsController } from './controllers/TransactionsController'
+import { WalletAuthController } from './controllers/WalletAuthController'
 import { CachedSecretManager } from './environment'
 import { PrismaClientProvider } from './infrastructure/db'
 import { GCPPubSubQueueHandler } from './infrastructure/gcpPubSubQueueHandler'
@@ -149,6 +150,7 @@ container.bind<TransactionsController>(TransactionsController).toSelf().inSingle
 container.bind<KycController>(KycController).toSelf().inSingletonScope()
 container.bind(PaymentsController).toSelf().inSingletonScope()
 container.bind(QrDecoderController).toSelf().inSingletonScope()
+container.bind(WalletAuthController).toSelf().inSingletonScope()
 
 // ILogger
 container.bind<ILogger>(TYPES.ILogger).to(ConsoleLogger).inSingletonScope()

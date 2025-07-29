@@ -1,12 +1,5 @@
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { Info, Menu, X, Wallet } from 'lucide-react';
-import { useBlux } from '@bluxcc/react';
-import { Horizon } from '@stellar/stellar-sdk';
-import AbroadLogoColored from '/src/assets/Logos/AbroadLogoColored.svg';
-import AbroadLogoWhite from '/src/assets/Logos/AbroadLogoWhite.svg';
-import FreighterLogo from '/src/assets/Logos/Wallets/Freighter.svg';
-import HanaLogo from '/src/assets/Logos/Wallets/Hana.svg';
-import LobstrLogo from '/src/assets/Logos/Wallets/Lobstr.svg';
 
 interface NavBarResponsiveProps {
   className?: string;
@@ -14,130 +7,35 @@ interface NavBarResponsiveProps {
   onWalletDetails?: () => void;
 }
 
+  // Helper function to format wallet address
+  const formatWalletAddress = (address: string) => {
+    if (!address || address === 'Connected') return 'Connected';
+    return `${address.slice(0, 6)}...${address.slice(-4)}`;
+  }
+
 const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({ className = '', onWalletConnect, onWalletDetails }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [usdcBalance, setUsdcBalance] = useState<string>('');
-  const [isLoadingBalance, setIsLoadingBalance] = useState(false);
-  const { user, isAuthenticated } = useBlux();
-
   const toggleMobileMenu = useCallback(() => {
     setIsMobileMenuOpen(!isMobileMenuOpen);
   }, [isMobileMenuOpen]);
 
-  // Function to fetch USDC balance
-  const fetchUSDCBalance = useCallback(async (stellarAddress: string) => {
-    try {
-      setIsLoadingBalance(true);
-      const server = new Horizon.Server('https://horizon.stellar.org');
-      const account = await server.loadAccount(stellarAddress);
-      
-      // USDC on Stellar: USDC:GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN
-      
-      interface StellarBalance {
-        asset_type: string;
-        asset_code: string;
-        asset_issuer: string;
-        balance: string;
-      }
-      
-      const usdcBalance = account.balances.find((balance: StellarBalance) => 
-        balance.asset_type === 'credit_alphanum4' && 
-        balance.asset_code === 'USDC' &&
-        balance.asset_issuer === 'GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN'
-      );
-      
-      if (usdcBalance) {
-        const numericBalance = parseFloat(usdcBalance.balance);
-        const formattedBalance = numericBalance >= 1000 
-          ? (numericBalance / 1000).toFixed(1) + 'k'
-          : numericBalance.toFixed(2);
-        setUsdcBalance(formattedBalance);
-      } else {
-        setUsdcBalance('0.00');
-      }
-    } catch (error) {
-      console.error('Error fetching USDC balance:', error);
-      setUsdcBalance('0.00');
-    } finally {
-      setIsLoadingBalance(false);
-    }
-  }, []);
-
-  // Helper function to format wallet address
-  const formatWalletAddress = useCallback((address: string) => {
-    if (!address || address === 'Connected') return 'Connected';
-    return `${address.slice(0, 6)}...${address.slice(-4)}`;
-  }, []);
-
-  // Get public key from user object - focus on stellar address using Blux documentation
-  const publicKey = useMemo(() => {
-    if (!user) return null;
-    
-    // According to Blux docs, user object contains wallet address
-    const userObj = user as unknown as Record<string, unknown>;
-    
-    // Check properties in order of preference based on Blux documentation
-    let pk = userObj.stellarAddress || 
-             userObj.address || 
-             userObj.walletAddress || 
-             userObj.publicKey || 
-             userObj.accountId ||
-             userObj.id ||
-             null;
-    
-    // If not found, check nested properties as fallback
-    if (!pk && userObj.wallet && typeof userObj.wallet === 'object') {
-      const wallet = userObj.wallet as Record<string, unknown>;
-      pk = wallet.stellarAddress ||
-                 wallet.address ||
-                 wallet.publicKey ||
-                 null;
-    }
-    
-    // Check if there's an account object
-    if (!pk && userObj.account && typeof userObj.account === 'object') {
-      const account = userObj.account as Record<string, unknown>;
-      pk = account.stellarAddress ||
-                 account.address ||
-                 account.publicKey ||
-                 account.id ||
-                 null;
-    }
-    
-    return pk;
-  }, [user]);
-
-  // Effect to fetch balance when wallet is connected
-  useEffect(() => {
-    if (isAuthenticated && publicKey && typeof publicKey === 'string') {
-      fetchUSDCBalance(publicKey);
-    } else {
-      setUsdcBalance('');
-    }
-  }, [isAuthenticated, publicKey, fetchUSDCBalance]);
-
-  const walletAddress = useMemo(() => (
-    publicKey ? formatWalletAddress(String(publicKey)) : 'Connected'
-  ), [publicKey, formatWalletAddress]);
-
   const connectedWalletName = useMemo(() => {
-    if (!isAuthenticated || !user) return null;
-    const wallet = (user as { wallet?: { name?: string } }).wallet;
-    if (wallet && typeof wallet.name === 'string') {
-      return wallet.name.toLowerCase();
+    if (!address) return null;
+    if (address && typeof address === 'string') {
+      return address.toLowerCase();
     }
     return null;
-  }, [isAuthenticated, user]);
+  }, [address]);
 
   const handleWalletClick = useCallback(() => {
-    if (isAuthenticated && user) {
+    if (address) {
       // If wallet is connected, show wallet details
       onWalletDetails?.();
     } else {
       // If wallet is not connected, show connect wallet modal
       onWalletConnect?.();
     }
-  }, [isAuthenticated, user, onWalletDetails, onWalletConnect]);
+  }, [address, onWalletDetails, onWalletConnect]);
 
   const menuItems = ['Trade', 'Pool', 'About'];
 
@@ -185,51 +83,6 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({ className = '', onW
               onClick={handleWalletClick}
               className="flex items-center space-x-3 bg-white/20 backdrop-blur-sm rounded-2xl px-4 py-2 border border-white/30 hover:bg-white/30 transition-colors duration-200"
             >
-              {isAuthenticated && user ? (
-                <>
-                  {connectedWalletName?.includes('freighter') ? (
-                    <img
-                      src={FreighterLogo}
-                      alt="Freighter Wallet"
-                      className="w-8 h-8"
-                    />
-                  ) : connectedWalletName?.includes('hana') ? (
-                    <img
-                      src={HanaLogo}
-                      alt="Hana Wallet"
-                      className="w-8 h-8"
-                    />
-                  ) : connectedWalletName?.includes('lobstr') ? (
-                    <img
-                      src={LobstrLogo}
-                      alt="Lobstr Wallet"
-                      className="w-8 h-8"
-                    />
-                  ) : (
-                    <img
-                      src="https://storage.googleapis.com/cdn-abroad/Icons/Banks/Trust_Wallet_Shield.svg"
-                      alt="Trust Wallet"
-                      className="w-5 h-5"
-                    />
-                  )}
-                  <div className="flex items-center space-x-2">
-                    <span className="text-white text-md font-medium">
-                      {walletAddress}
-                    </span>
-                    {usdcBalance && (
-                      <div className="flex items-center space-x-1 bg-white/10 rounded-full px-2 py-1">
-                        <img
-                          src="https://storage.googleapis.com/cdn-abroad/Icons/Tokens/USDC%20Token.svg"
-                          alt="USDC"
-                          className="w-4 h-4"
-                        />
-                        <span className="text-white/90 text-sm font-medium">
-                          {isLoadingBalance ? '...' : `${usdcBalance}`}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                </>
               ) : (
                 <>
                   <Wallet className="w-5 h-5 text-white" />
@@ -283,51 +136,7 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({ className = '', onW
                 onClick={handleWalletClick}
                 className="flex items-center justify-center space-x-3 bg-white/20 backdrop-blur-sm rounded-full px-4 py-2 border border-white/30 mx-3 mt-4 hover:bg-white/30 transition-colors duration-200"
               >
-                {isAuthenticated && user ? (
-                  <>
-                    {connectedWalletName?.includes('freighter') ? (
-                      <img
-                        src={FreighterLogo}
-                        alt="Freighter Wallet"
-                        className="w-8 h-8"
-                      />
-                    ) : connectedWalletName?.includes('hana') ? (
-                      <img
-                        src={HanaLogo}
-                        alt="Hana Wallet"
-                        className="w-5 h-5"
-                      />
-                    ) : connectedWalletName?.includes('lobstr') ? (
-                      <img
-                        src={LobstrLogo}
-                        alt="Lobstr Wallet"
-                        className="w-5 h-5"
-                      />
-                    ) : (
-                      <img
-                        src="https://storage.googleapis.com/cdn-abroad/Icons/Banks/Trust_Wallet_Shield.svg"
-                        alt="Trust Wallet"
-                        className="w-5 h-5"
-                      />
-                    )}
-                    <div className="flex items-center space-x-2">
-                      <span className="text-white text-sm font-medium">
-                        {walletAddress}
-                      </span>
-                      {usdcBalance && (
-                        <div className="flex items-center space-x-1 bg-white/10 rounded-full px-2 py-1">
-                          <img
-                            src="https://storage.googleapis.com/cdn-abroad/Icons/Tokens/USDC%20Token.svg"
-                            alt="USDC"
-                            className="w-4 h-4"
-                          />
-                          <span className="text-white/90 text-sm font-medium">
-                            {isLoadingBalance ? '...' : `${usdcBalance}`}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  </>
+
                 ) : (
                   <>
                     <Wallet className="w-5 h-5 text-white" />
