@@ -37,7 +37,10 @@ const swaggerDocument = JSON.parse(fs.readFileSync(swaggerPath, 'utf8'))
  * Add a tag to each operation whose `tags` array is empty or missing.
  * The tag is the first path segment (e.g. `/payments/send` → `payments`).
  */
-function ensureTagsPerFirstSegment(doc: any) {
+function ensureTagsPerFirstSegment(doc: {
+  paths: Record<string, Record<string, { tags: string[] }>>
+  tags: { name: string }[]
+}) {
   const knownTags = new Set<string>(
     (doc.tags ?? []).map((t: { name: string }) => t.name),
   )
@@ -52,7 +55,9 @@ function ensureTagsPerFirstSegment(doc: any) {
       doc.tags.push({ name: firstSegment })
     }
 
-    Object.values(methods as Record<string, any>).forEach((op) => {
+    Object.values(
+      methods as Record<string, { tags: string[] }>,
+    ).forEach((op) => {
       if (!op.tags || op.tags.length === 0) {
         op.tags = [firstSegment]
       }
