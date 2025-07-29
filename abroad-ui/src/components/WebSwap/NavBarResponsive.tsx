@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import { Info, Menu, X, Wallet } from 'lucide-react';
-import { useBlux } from '@bluxcc/react';
+import { useWalletAuth } from '../../context/WalletAuthContext';
 
 interface NavBarResponsiveProps {
   className?: string;
@@ -8,80 +8,37 @@ interface NavBarResponsiveProps {
   onWalletDetails?: () => void;
 }
 
+  // Helper function to format wallet address
+  const formatWalletAddress = (address: string) => {
+    if (!address || address === 'Connected') return 'Connected';
+    return `${address.slice(0, 6)}...${address.slice(-4)}`;
+  }
+
 const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({ className = '', onWalletConnect, onWalletDetails }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const { user, isAuthenticated } = useBlux();
-
+  const { address } = useWalletAuth(); 
   const toggleMobileMenu = useCallback(() => {
     setIsMobileMenuOpen(!isMobileMenuOpen);
   }, [isMobileMenuOpen]);
 
-  // Helper function to format wallet address
-  const formatWalletAddress = useCallback((address: string) => {
-    if (!address || address === 'Connected') return 'Connected';
-    return `${address.slice(0, 6)}...${address.slice(-4)}`;
-  }, []);
-
-  // Get public key from user object - focus on stellar address using Blux documentation
-  const publicKey = useMemo(() => {
-    if (!user) return null;
-    
-    // According to Blux docs, user object contains wallet address
-    const userObj = user as unknown as Record<string, unknown>;
-    
-    // Check properties in order of preference based on Blux documentation
-    let pk = userObj.stellarAddress || 
-             userObj.address || 
-             userObj.walletAddress || 
-             userObj.publicKey || 
-             userObj.accountId ||
-             userObj.id ||
-             null;
-    
-    // If not found, check nested properties as fallback
-    if (!pk && userObj.wallet && typeof userObj.wallet === 'object') {
-      const wallet = userObj.wallet as Record<string, unknown>;
-      pk = wallet.stellarAddress ||
-                 wallet.address ||
-                 wallet.publicKey ||
-                 null;
-    }
-    
-    // Check if there's an account object
-    if (!pk && userObj.account && typeof userObj.account === 'object') {
-      const account = userObj.account as Record<string, unknown>;
-      pk = account.stellarAddress ||
-                 account.address ||
-                 account.publicKey ||
-                 account.id ||
-                 null;
-    }
-    
-    return pk;
-  }, [user]);
-
-  const walletAddress = useMemo(() => (
-    publicKey ? formatWalletAddress(String(publicKey)) : 'Connected'
-  ), [publicKey, formatWalletAddress]);
 
   const connectedWalletName = useMemo(() => {
-    if (!isAuthenticated || !user) return null;
-    const wallet = (user as { wallet?: { name?: string } }).wallet;
-    if (wallet && typeof wallet.name === 'string') {
-      return wallet.name.toLowerCase();
+    if (!address) return null;
+    if (address && typeof address === 'string') {
+      return address.toLowerCase();
     }
     return null;
-  }, [isAuthenticated, user]);
+  }, [address]);
 
   const handleWalletClick = useCallback(() => {
-    if (isAuthenticated && user) {
+    if (address) {
       // If wallet is connected, show wallet details
       onWalletDetails?.();
     } else {
       // If wallet is not connected, show connect wallet modal
       onWalletConnect?.();
     }
-  }, [isAuthenticated, user, onWalletDetails, onWalletConnect]);
+  }, [address, onWalletDetails, onWalletConnect]);
 
   const menuItems = ['Trade', 'Pool', 'About'];
 
@@ -129,7 +86,7 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({ className = '', onW
               onClick={handleWalletClick}
               className="flex items-center space-x-2 bg-white/20 backdrop-blur-sm rounded-2xl px-4 py-2 border border-white/30 hover:bg-white/30 transition-colors duration-200"
             >
-              {isAuthenticated && user ? (
+              {address ? (
                 connectedWalletName?.includes('freighter') ? (
                   <img
                     src="/src/assets/Logos/Wallets/Freighter.svg"
@@ -159,7 +116,7 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({ className = '', onW
                 <Wallet className="w-5 h-5 text-white" />
               )}
               <span className="text-white text-md font-medium">
-                {isAuthenticated && user ? walletAddress : 'Conectar Billetera'}
+                {address ? formatWalletAddress(address) : 'Conectar Billetera'}
               </span>
             </button>
 
@@ -206,7 +163,7 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({ className = '', onW
                 onClick={handleWalletClick}
                 className="flex items-center justify-center space-x-2 bg-white/20 backdrop-blur-sm rounded-full px-4 py-2 border border-white/30 mx-3 mt-4 hover:bg-white/30 transition-colors duration-200"
               >
-                {isAuthenticated && user ? (
+                {address ? (
                   connectedWalletName?.includes('freighter') ? (
                     <img
                       src="/src/assets/Logos/Wallets/Freighter.svg"
@@ -236,7 +193,7 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({ className = '', onW
                   <Wallet className="w-5 h-5 text-white" />
                 )}
                 <span className="text-white text-sm font-medium">
-                  {isAuthenticated && user ? walletAddress : 'Conectar Billetera'}
+                  {address ? formatWalletAddress(address) : 'Conectar Billetera'}
                 </span>
               </button>
 

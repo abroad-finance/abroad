@@ -1,66 +1,88 @@
-import { Body, Controller, Post, Route } from 'tsoa';
-import { randomBytes } from 'crypto';
-import { ethers } from 'ethers';
-import jwt from 'jsonwebtoken';
+import { Keypair, WebAuth } from '@stellar/stellar-sdk'
+import { inject } from 'inversify'
+import jwt from 'jsonwebtoken'
+import { Body, Controller, Post, Route } from 'tsoa'
 
-const challenges = new Map<string, string>();
+import { ISecretManager } from '../interfaces/ISecretManager'
+import { TYPES } from '../types'
 
-interface ChallengeRequest {
-  address: string;
-}
+const challenges = new Map<string, string>()
 
-interface ChallengeResponse {
-  nonce: string;
-}
+interface ChallengeRequest { address: string }
+interface ChallengeResponse { xdr: string }
 
-interface VerifyRequest {
-  address: string;
-  signature: string;
-}
-
-interface VerifyResponse {
-  token: string;
-}
+interface VerifyRequest { address: string, signedXDR: string }
+interface VerifyResponse { token: string }
 
 @Route('walletAuth')
 export class WalletAuthController extends Controller {
-  /**
-   * Request a nonce challenge for the provided wallet address.
-   */
+  constructor(
+    @inject(TYPES.ISecretManager)
+    private secretManager: ISecretManager,
+  ) {
+    super()
+  }
+
   @Post('challenge')
   public async challenge(
     @Body() body: ChallengeRequest,
   ): Promise<ChallengeResponse> {
-    const nonce = `0x${randomBytes(16).toString('hex')}`;
-    challenges.set(body.address.toLowerCase(), nonce);
-    return { nonce };
+    const { STELLAR_HOME_DOMAIN, STELLAR_NETWORK_PASSPHRASE, STELLAR_SERVER_KP, STELLAR_WEB_AUTH_DOMAIN } = await this.getSecrets()
+    const xdr = WebAuth.buildChallengeTx(
+      STELLAR_SERVER_KP,
+      body.address,
+      STELLAR_HOME_DOMAIN,
+      300,
+      STELLAR_NETWORK_PASSPHRASE,
+      STELLAR_WEB_AUTH_DOMAIN,
+    )
+    challenges.set(body.address, xdr)
+    return { xdr }
   }
 
-  /**
-   * Verify a signed challenge and issue a JWT token if valid.
-   */
   @Post('verify')
   public async verify(
     @Body() body: VerifyRequest,
   ): Promise<VerifyResponse> {
-    const expectedNonce = challenges.get(body.address.toLowerCase());
-    if (!expectedNonce) {
-      this.setStatus(400);
-      throw new Error('No challenge for address');
+    const outstanding = challenges.get(body.address)
+    if (!outstanding) {
+      this.setStatus(400)
+      throw new Error('No outstanding challenge for this account')
     }
 
-    const recovered = ethers.verifyMessage(expectedNonce, body.signature);
-    if (recovered.toLowerCase() !== body.address.toLowerCase()) {
-      this.setStatus(401);
-      throw new Error('Invalid signature');
-    }
+    const { STELLAR_HOME_DOMAIN, STELLAR_NETWORK_PASSPHRASE, STELLAR_SEP_JWT_SECRET, STELLAR_SERVER_KP, STELLAR_WEB_AUTH_DOMAIN } = await this.getSecrets()
 
-    challenges.delete(body.address.toLowerCase());
-    const secret = process.env.JWT_SECRET || 'secret';
-    const token = jwt.sign({ address: body.address.toLowerCase() }, secret, {
-      expiresIn: '1h',
-    });
-    return { token };
+    const signers = WebAuth.verifyChallengeTxSigners(
+      body.signedXDR,
+      STELLAR_SERVER_KP.publicKey(),
+      STELLAR_NETWORK_PASSPHRASE,
+      [body.address],
+      STELLAR_HOME_DOMAIN,
+      STELLAR_WEB_AUTH_DOMAIN,
+    )
+    if (signers.length === 0) {
+      this.setStatus(401)
+      throw new Error('Missing or invalid client signature')
+    }
+    challenges.delete(body.address)
+    const token = jwt.sign(
+      { signers, sub: body.address },
+      STELLAR_SEP_JWT_SECRET,
+      { expiresIn: '1h' },
+    )
+    return { token }
+  }
+
+  private async getSecrets() {
+    const secrets = await this.secretManager.getSecrets([
+      'STELLAR_PRIVATE_KEY',
+      'STELLAR_NETWORK_PASSPHRASE',
+      'STELLAR_HOME_DOMAIN',
+      'STELLAR_WEB_AUTH_DOMAIN',
+      'STELLAR_SEP_JWT_SECRET',
+    ])
+    const STELLAR_SERVER_KP = Keypair.fromSecret(secrets.STELLAR_PRIVATE_KEY)
+    return {
+      STELLAR_SERVER_KP, ...secrets }
   }
 }
-

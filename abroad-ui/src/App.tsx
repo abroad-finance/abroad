@@ -1,5 +1,4 @@
 import { BrowserRouter as Router, Route, Routes } from "react-router-dom";
-import { BluxProvider, networks, url } from "@bluxcc/react";
 import { Dashboard } from "./pages/Dashboard";
 import Recipients from "./pages/Recipients";
 import Integrations from "./pages/Integrations";
@@ -16,24 +15,6 @@ import WebSwap from "./pages/WebSwap/WebSwap";
 
 function App() {  
   return (
-    <BluxProvider
-      config={{
-        appName: "Abroad",
-        networks: [networks.mainnet],
-        defaultNetwork: networks.mainnet,
-        transports: {
-          [networks.mainnet]: {
-            horizon: url("https://horizon.stellar.org"),
-            soroban: url("https://soroban-rpc.mainnet.stellar.gateway.fm"),
-          },
-        },
-        explorer: 'stellarexpert',
-        loginMethods: ['wallet'],
-        appearance: {
-          theme: "light",
-        },
-      }}
-    >
       <LanguageProvider>
         <WalletAuthProvider>
           <Router>
@@ -56,7 +37,6 @@ function App() {
         </Router>
         </WalletAuthProvider>
       </LanguageProvider>
-    </BluxProvider>
   );
 }
 
