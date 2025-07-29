@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { walletAuth } from '../services/walletAuth';
 import { kit } from '../services/stellarKit';
 import { WalletNetwork } from '@creit.tech/stellar-wallets-kit';
@@ -19,7 +19,6 @@ const signMessage = async (message: string): Promise<string> => {
 export const WalletAuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [token, setToken] = useState<string | null>(() => localStorage.getItem('token'));
   const [address, setAddress] = useState<string | null>(null);
-
 
   const authenticateWithWallet = useCallback(async () => {
     if (
@@ -45,6 +44,21 @@ export const WalletAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setAddress(null);
     kit.disconnect();
   }, []);
+
+  useEffect(() => {
+    kit.getAddress().then(({ address }) => {
+      if (!address) return;
+      authenticateWithWallet()
+    }).catch(err => {
+      console.error('Failed to get address from StellarKit', err);
+      logout();
+    });
+  }, [authenticateWithWallet, logout]);
+
+
+
+
+
 
   return (
     <WalletAuthContext.Provider value={{ token, authenticateWithWallet, address, logout }}>

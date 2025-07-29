@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { X, Copy, ExternalLink } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { useWalletAuth } from '../../context/WalletAuthContext';
 
 interface WalletDetailsProps {
   onClose?: () => void;
@@ -8,6 +9,7 @@ interface WalletDetailsProps {
 
 const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
   const [copiedAddress, setCopiedAddress] = useState(false);
+  const { address, logout } = useWalletAuth();
 
   // Function to fetch USDC balance from Stellar network
   const fetchUSDCBalance = useCallback(async (stellarAddress: string) => {
@@ -90,6 +92,8 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
     if (!address) return 'No conectado';
     return `${address.slice(0, 6)}...${address.slice(-4)}`;
   };
+
+  const copyToClipboard = async (text: string | null) => {
     try {
       if (text) {
         await navigator.clipboard.writeText(text);

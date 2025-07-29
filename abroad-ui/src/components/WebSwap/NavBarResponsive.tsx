@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { Info, Menu, X, Wallet } from 'lucide-react';
+import { useWalletAuth } from '../../context/WalletAuthContext';
 
 interface NavBarResponsiveProps {
   className?: string;
@@ -15,6 +16,7 @@ interface NavBarResponsiveProps {
 
 const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({ className = '', onWalletConnect, onWalletDetails }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const { address } = useWalletAuth(); 
   const toggleMobileMenu = useCallback(() => {
     setIsMobileMenuOpen(!isMobileMenuOpen);
   }, [isMobileMenuOpen]);
@@ -83,6 +85,32 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({ className = '', onW
               onClick={handleWalletClick}
               className="flex items-center space-x-3 bg-white/20 backdrop-blur-sm rounded-2xl px-4 py-2 border border-white/30 hover:bg-white/30 transition-colors duration-200"
             >
+              {address ? (
+                connectedWalletName?.includes('freighter') ? (
+                  <img
+                    src="/src/assets/Logos/Wallets/Freighter.svg"
+                    alt="Freighter Wallet"
+                    className="w-8 h-8"
+                  />
+                ) : connectedWalletName?.includes('hana') ? (
+                  <img
+                    src="/src/assets/Logos/Wallets/Hana.svg"
+                    alt="Hana Wallet"
+                    className="w-8 h-8"
+                  />
+                ) : connectedWalletName?.includes('lobstr') ? (
+                  <img
+                    src="/src/assets/Logos/Wallets/Lobstr.svg"
+                    alt="Lobstr Wallet"
+                    className="w-8 h-8"
+                  />
+                ) : (
+                  <img
+                    src="https://storage.googleapis.com/cdn-abroad/Icons/Banks/Trust_Wallet_Shield.svg"
+                    alt="Trust Wallet"
+                    className="w-5 h-5"
+                  />
+                )
               ) : (
                 <>
                   <Wallet className="w-5 h-5 text-white" />
@@ -91,6 +119,9 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({ className = '', onW
                   </span>
                 </>
               )}
+              <span className="text-white text-md font-medium">
+                {address ? formatWalletAddress(address) : 'Conectar Billetera'}
+              </span>
             </button>
 
             {/* Info Icon */}
@@ -136,7 +167,32 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({ className = '', onW
                 onClick={handleWalletClick}
                 className="flex items-center justify-center space-x-3 bg-white/20 backdrop-blur-sm rounded-full px-4 py-2 border border-white/30 mx-3 mt-4 hover:bg-white/30 transition-colors duration-200"
               >
-
+                {address ? (
+                  connectedWalletName?.includes('freighter') ? (
+                    <img
+                      src="/src/assets/Logos/Wallets/Freighter.svg"
+                      alt="Freighter Wallet"
+                      className="w-8 h-8"
+                    />
+                  ) : connectedWalletName?.includes('hana') ? (
+                    <img
+                      src="/src/assets/Logos/Wallets/Hana.svg"
+                      alt="Hana Wallet"
+                      className="w-5 h-5"
+                    />
+                  ) : connectedWalletName?.includes('lobstr') ? (
+                    <img
+                      src="/src/assets/Logos/Wallets/Lobstr.svg"
+                      alt="Lobstr Wallet"
+                      className="w-5 h-5"
+                    />
+                  ) : (
+                    <img
+                      src="https://storage.googleapis.com/cdn-abroad/Icons/Banks/Trust_Wallet_Shield.svg"
+                      alt="Trust Wallet"
+                      className="w-5 h-5"
+                    />
+                  )
                 ) : (
                   <>
                     <Wallet className="w-5 h-5 text-white" />
@@ -145,6 +201,9 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({ className = '', onW
                     </span>
                   </>
                 )}
+                <span className="text-white text-sm font-medium">
+                  {address ? formatWalletAddress(address) : 'Conectar Billetera'}
+                </span>
               </button>
 
               {/* Mobile Action Buttons */}

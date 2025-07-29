@@ -85,6 +85,7 @@ const ConnectWallet: React.FC<ConnectWalletProps> = ({ onWalletSelect, onClose }
             {'Conecta tu billetera'}
           </h2>
           <p className="text-md text-gray-600">
+            {'Conecta tu billetera para hacer transacciones en Abroad'}
           </p>
         </div>
 
@@ -107,6 +108,9 @@ const ConnectWallet: React.FC<ConnectWalletProps> = ({ onWalletSelect, onClose }
                 {wallet.name}
               </span>
             </button>
+          ))}
+        </div>
+
         {/* Terms and Privacy */}
         <div className="text-xs text-gray-500 leading-relaxed text-center md:mt-auto">
           Al conectar tu billetera, aceptas nuestros{' '}
