@@ -25,7 +25,7 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
       const server = new Horizon.Server('https://horizon.stellar.org');
       const account = await server.loadAccount(stellarAddress);
       
-      console.log('Account loaded successfully, balances:', account.balances);
+      // Account loaded successfully, balances retrieved.
       
       // USDC on Stellar mainnet: USDC:GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN
       const usdcAssetCode = 'USDC';
