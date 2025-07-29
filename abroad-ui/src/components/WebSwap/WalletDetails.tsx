@@ -44,8 +44,7 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
       console.log('USDC balance found:', usdcBalance);
       
       if (usdcBalance) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const numericBalance = parseFloat((usdcBalance as any).balance);
+        const numericBalance = parseFloat((usdcBalance as StellarBalance).balance);
         setUsdcBalance(numericBalance.toLocaleString('en-US', { 
           minimumFractionDigits: 2, 
           maximumFractionDigits: 2 
