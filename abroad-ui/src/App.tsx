@@ -11,6 +11,7 @@ import Pool from "./pages/Pool";
 import Splash from "./pages/Mobile/Splash";
 import Anchor from "./pages/Mobile/Anchor";
 import WebSwap from "./pages/WebSwap/WebSwap";
+import QrAnchor from "./pages/Mobile/QrAnchor";
 
 
 function App() {  
@@ -49,6 +50,7 @@ function App() {
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/mobile/splash" element={<Splash />} />
             <Route path="/mobile/anchor" element={<Anchor />} />
+            <Route path="/mobile/qr-anchor" element={<QrAnchor />} />
             <Route path="/web-swap" element={<WebSwap />} />
 
           </Routes>
