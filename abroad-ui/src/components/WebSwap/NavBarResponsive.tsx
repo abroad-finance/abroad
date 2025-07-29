@@ -33,8 +33,14 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({ className = '', onW
       
       // USDC on Stellar: USDC:GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN
       
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const usdcBalance = account.balances.find((balance: any) => 
+      interface StellarBalance {
+        asset_type: string;
+        asset_code: string;
+        asset_issuer: string;
+        balance: string;
+      }
+      
+      const usdcBalance = account.balances.find((balance: StellarBalance) => 
         balance.asset_type === 'credit_alphanum4' && 
         balance.asset_code === 'USDC' &&
         balance.asset_issuer === 'GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN'
