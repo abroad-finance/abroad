@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { X, Copy, ExternalLink } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { useBlux } from '@bluxcc/react';
+import { useWalletAuth } from '../../context/WalletAuthContext';
 
 interface WalletDetailsProps {
   onClose?: () => void;
@@ -18,8 +18,8 @@ interface Transaction {
 }
 
 const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
-  const { user, logout } = useBlux();
   const [copiedAddress, setCopiedAddress] = useState(false);
+  const { address, logout } = useWalletAuth();
 
   const generateRandomPhoneNumber = () => {
     const prefixes = ['310', '311', '312', '313', '314', '315'];
@@ -75,44 +75,18 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
   ], []);
 
   // Helper function to format wallet address
-  const formatWalletAddress = (address: string) => {
+  const formatWalletAddress = (address: string | null) => {
     if (!address) return 'No conectado';
     return `${address.slice(0, 6)}...${address.slice(-4)}`;
   };
 
-  // Get public key from user object using Blux documentation
-  const getPublicKey = (): string => {
-    if (!user) return 'GDQP2KPLX4V2M8N9JKHL6RTGF3SWQAZ7UXCV8BNMLKJHGF4DSAQWERTY'; // Mock address for demo
-    
-    // According to Blux docs, use wallet.address property
-    const userObj = user as unknown as Record<string, unknown>;
-    
-    // First check for wallet.address as specified
-    if (userObj.wallet && typeof userObj.wallet === 'object') {
-      const wallet = userObj.wallet as Record<string, unknown>;
-      if (typeof wallet.address === 'string') {
-        return wallet.address;
-      }
-    }
-    
-    // Fallback to other properties
-    const publicKey = userObj.stellarAddress || 
-           userObj.address || 
-           userObj.walletAddress || 
-           userObj.publicKey || 
-           userObj.accountId ||
-           userObj.id;
-           
-    return typeof publicKey === 'string' ? publicKey : 'GDQP2KPLX4V2M8N9JKHL6RTGF3SWQAZ7UXCV8BNMLKJHGF4DSAQWERTY';
-  };
-
-  const walletAddress = getPublicKey();
-
-  const copyToClipboard = async (text: string) => {
+  const copyToClipboard = async (text: string | null) => {
     try {
-      await navigator.clipboard.writeText(text);
-      setCopiedAddress(true);
-      setTimeout(() => setCopiedAddress(false), 2000);
+      if (text) {
+        await navigator.clipboard.writeText(text);
+        setCopiedAddress(true);
+        setTimeout(() => setCopiedAddress(false), 2000);
+      }
     } catch (err) {
       console.error('Failed to copy address:', err);
     }
@@ -187,7 +161,7 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
         >
           {/* Wallet Address Section */}
           <div className="flex items-center justify-between mb-4">
-            <span className="text-white font-mono text-sm break-all">{formatWalletAddress(walletAddress)}</span>
+            <span className="text-white font-mono text-sm break-all">{formatWalletAddress(address)}</span>
             <div className="flex space-x-2">
               <button
                 onClick={handleDisconnectWallet}
@@ -199,14 +173,14 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
                 </svg>
               </button>
               <button
-                onClick={() => copyToClipboard(walletAddress)}
+                onClick={() => copyToClipboard(address)}
                 className="p-1 hover:bg-white hover:bg-opacity-20 rounded transition-colors duration-200"
                 title="Copiar dirección"
               >
                 <Copy className="w-4 h-4 text-white" />
               </button>
               <button
-                onClick={() => window.open(`https://stellar.expert/explorer/public/account/${walletAddress}`, '_blank')}
+                onClick={() => window.open(`https://stellar.expert/explorer/public/account/${address}`, '_blank')}
                 className="p-1 hover:bg-white hover:bg-opacity-20 rounded transition-colors duration-200"
                 title="Ver en explorador"
               >

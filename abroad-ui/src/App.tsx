@@ -1,10 +1,10 @@
 import { BrowserRouter as Router, Route, Routes } from "react-router-dom";
-import { BluxProvider, networks, url } from "@bluxcc/react";
 import { Dashboard } from "./pages/Dashboard";
 import Recipients from "./pages/Recipients";
 import Integrations from "./pages/Integrations";
 import ProtectedRoute from "./components/ProtectedRoute"; // Import the ProtectedRoute component
 import { LanguageProvider } from './contexts/LanguageContext';
+import { WalletAuthProvider } from './context/WalletAuthContext';
 import { Settings } from "./pages/Settings";
 import Pool from "./pages/Pool";
 // Mobile pages
@@ -15,26 +15,9 @@ import WebSwap from "./pages/WebSwap/WebSwap";
 
 function App() {  
   return (
-    <BluxProvider
-      config={{
-        appName: "Abroad",
-        networks: [networks.mainnet],
-        defaultNetwork: networks.mainnet,
-        transports: {
-          [networks.mainnet]: {
-            horizon: url("https://horizon.stellar.org"),
-            soroban: url("https://soroban-rpc.mainnet.stellar.gateway.fm"),
-          },
-        },
-        explorer: 'stellarexpert',
-        loginMethods: ['wallet'],
-        appearance: {
-          theme: "light",
-        },
-      }}
-    >
       <LanguageProvider>
-        <Router>
+        <WalletAuthProvider>
+          <Router>
           <Routes>
             <Route path="/" element={<WebSwap />} />
             {/* Wrap protected routes with ProtectedRoute */} 
@@ -52,8 +35,8 @@ function App() {
 
           </Routes>
         </Router>
+        </WalletAuthProvider>
       </LanguageProvider>
-    </BluxProvider>
   );
 }
 
