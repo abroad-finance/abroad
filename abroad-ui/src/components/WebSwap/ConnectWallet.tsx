@@ -31,12 +31,37 @@ const ConnectWallet: React.FC<ConnectWalletProps> = ({ onWalletSelect, onClose }
   const handleWalletSelect = (walletType: 'trust' | 'stellar') => {
     onWalletSelect?.(walletType);
     setSelectedWallet(walletType);
-    kit.openModal({
-      onWalletSelected: async (option) => {
-        kit.setWallet(option.id);
-        authenticateWithWallet();
-      },
-    })
+    
+    try {
+      kit.openModal({
+        onWalletSelected: async (option) => {
+          try {
+            console.log('Wallet selected:', option); // Debug log
+            
+            // Check if option has the required properties
+            if (!option || !option.id) {
+              console.error('Invalid wallet option:', option);
+              return;
+            }
+            
+            await kit.setWallet(option.id);
+            
+            // Store the selected wallet ID in localStorage (prioritize ID over name)
+            // Use option.id as primary identifier, fallback to option.name
+            const walletIdentifier = option.id || option.name;
+            console.log('Storing wallet identifier:', walletIdentifier); // Debug log
+            localStorage.setItem('selectedWalletName', walletIdentifier);
+            
+            await authenticateWithWallet();
+            onClose?.(); // Close the modal after successful connection
+          } catch (error) {
+            console.error('Error in wallet selection:', error);
+          }
+        }
+      });
+    } catch (error) {
+      console.error('Error opening wallet modal:', error);
+    }
   };
 
   const walletOptions = [

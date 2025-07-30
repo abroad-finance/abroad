@@ -13,7 +13,7 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
   const [copiedAddress, setCopiedAddress] = useState(false);
   const [usdcBalance, setUsdcBalance] = useState<string>('0.00');
   const [isLoadingBalance, setIsLoadingBalance] = useState(false);
-  const { address, logout } = useWalletAuth();
+  const { address, walletName, logout } = useWalletAuth();
 
   // Function to fetch USDC balance from Stellar network using StellarSDK
   const fetchUSDCBalance = useCallback(async (stellarAddress: string) => {
