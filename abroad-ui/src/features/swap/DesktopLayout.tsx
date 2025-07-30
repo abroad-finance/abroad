@@ -18,7 +18,7 @@ const DesktopLayout: React.FC<LayoutProps> = (props) => {
         <div className="text-6xl max-w-xl">
           <AnimatedHeroText />
         </div>
-        <ImageAttribution className="absolute bottom-5 left-5" />
+        <ImageAttribution className="fixed bottom-5 left-5" />
       </div>
       
       {/* Right Column - Swap Interface */}
@@ -45,7 +45,7 @@ const DesktopLayout: React.FC<LayoutProps> = (props) => {
             />
           )}
         </div>
-        <div className="absolute bottom-5 right-5 flex items-center gap-3 text-white font-sans text-base">
+        <div className="fixed bottom-5 right-5 flex items-center gap-3 text-white font-sans text-base">
           <span>powered by</span>
           <img src={ASSET_URLS.STELLAR_LOGO} alt="Stellar" className="h-9 w-auto" />
         </div>

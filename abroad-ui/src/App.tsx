@@ -22,13 +22,13 @@ function App() {
             <Route path="/" element={<WebSwap />} />
             {/* Wrap protected routes with ProtectedRoute */} 
             <Route element={<ProtectedRoute />}>
-              <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/pool" element={<Pool />} />
               <Route path="/recipients" element={<Recipients />} />
               <Route path="/integrations" element={<Integrations />} />
               <Route path="/settings" element={<Settings />} />
             </Route>
             {/* Add other public routes here if needed */}
+            <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/mobile/splash" element={<Splash />} />
             <Route path="/mobile/anchor" element={<Anchor />} />
             <Route path="/web-swap" element={<WebSwap />} />
