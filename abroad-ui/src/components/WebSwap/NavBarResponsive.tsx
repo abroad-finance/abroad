@@ -114,12 +114,7 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({ className = '', onW
                   />
                 )
               ) : (
-                <>
-                  <Wallet className="w-5 h-5 text-white" />
-                  <span className="text-white text-md font-medium">
-                    Conectar Billetera
-                  </span>
-                </>
+                <Wallet className="w-5 h-5 text-white" />
               )}
               <span className="text-white text-md font-medium">
                 {address ? formatWalletAddress(address) : 'Conectar Billetera'}

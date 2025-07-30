@@ -78,7 +78,9 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
 
   const handleDisconnectWallet = async () => {
     try {
+      console.log('Disconnect button clicked');
       await logout();
+      console.log('Logout completed');
       onClose?.(); // Close the modal after disconnect
     } catch (err) {
       console.error('Failed to disconnect wallet:', err);

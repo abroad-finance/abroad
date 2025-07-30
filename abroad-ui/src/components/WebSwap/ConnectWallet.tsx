@@ -68,7 +68,7 @@ const ConnectWallet: React.FC<ConnectWalletProps> = ({ onWalletSelect, onClose }
         duration: 0.12
       }}
     >
-      <div className="bg-white rounded-t-4xl md:rounded-4xl shadow-lg border border-gray-200 p-6 relative w-full md:h-full md:flex md:flex-col min-h-fit">
+      <div className="bg-white rounded-t-4xl md:rounded-4xl shadow-lg border border-gray-200 p-4 md:p-6 relative w-full md:h-full md:flex md:flex-col min-h-fit">
         {/* Close Button */}
         {onClose && (
           <button
@@ -80,11 +80,11 @@ const ConnectWallet: React.FC<ConnectWalletProps> = ({ onWalletSelect, onClose }
         )}
 
         {/* Header */}
-        <div className="mb-8 pr-8 text-center mt-5 md:mt-14">
-          <h2 className="text-2xl font-semibold text-gray-900 mb-2">
+        <div className="mb-3 md:mb-8 pr-8 text-center mt-2 md:mt-14">
+          <h2 className="text-lg md:text-2xl font-semibold text-gray-900 mb-1 md:mb-2">
             {'Conecta tu billetera'}
           </h2>
-          <p className="text-md text-gray-600">
+          <p className="text-xs md:text-md text-gray-600">
             {'Conecta tu billetera para hacer transacciones en Abroad'}
           </p>
         </div>

@@ -7,10 +7,10 @@ interface WalletAuthState {
   token: string | null;
   authenticateWithWallet: () => Promise<void>;
   address: string | null;
-  logout: () => void;
+  logout: () => Promise<void>;
 }
 
-const WalletAuthContext = createContext<WalletAuthState>({ token: null, authenticateWithWallet: async () => { }, address: null, logout: () => { } });
+const WalletAuthContext = createContext<WalletAuthState>({ token: null, authenticateWithWallet: async () => { }, address: null, logout: async () => { } });
 
 const signMessage = async (message: string): Promise<string> => {
   const response = await kit.signTransaction(message, { networkPassphrase: WalletNetwork.PUBLIC })
@@ -38,22 +38,49 @@ export const WalletAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
   }, [token]);
 
-  const logout = useCallback(() => {
-    localStorage.removeItem('token');
-    setToken(null);
-    setAddress(null);
-    kit.disconnect();
+  const logout = useCallback(async () => {
+    try {
+      console.log('Starting wallet logout process...');
+      
+      // Clear local storage first
+      localStorage.removeItem('token');
+      console.log('Token removed from localStorage');
+      
+      // Reset state
+      setToken(null);
+      setAddress(null);
+      console.log('State reset');
+      
+      // Disconnect wallet kit
+      try {
+        await kit.disconnect();
+        console.log('StellarKit disconnected successfully');
+      } catch (kitError) {
+        console.warn('StellarKit disconnect failed, but continuing logout:', kitError);
+      }
+      
+      console.log('Wallet disconnected successfully');
+    } catch (err) {
+      console.error('Error during logout:', err);
+      // Still clear local state even if other operations fail
+      localStorage.removeItem('token');
+      setToken(null);
+      setAddress(null);
+    }
   }, []);
 
   useEffect(() => {
-    kit.getAddress().then(({ address }) => {
-      if (!address) return;
-      authenticateWithWallet()
-    }).catch(err => {
-      console.error('Failed to get address from StellarKit', err);
-      logout();
-    });
-  }, [authenticateWithWallet, logout]);
+    // Only try to reconnect if we have a token and no current address
+    if (token && !address) {
+      kit.getAddress().then(({ address }) => {
+        if (!address) return;
+        setAddress(address);
+      }).catch(err => {
+        console.error('Failed to get address from StellarKit', err);
+        logout();
+      });
+    }
+  }, [address, token, logout]);
 
 
 
