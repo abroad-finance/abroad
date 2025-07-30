@@ -13,7 +13,7 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
   const [copiedAddress, setCopiedAddress] = useState(false);
   const [usdcBalance, setUsdcBalance] = useState<string>('0.00');
   const [isLoadingBalance, setIsLoadingBalance] = useState(false);
-  const { address, walletName, logout } = useWalletAuth();
+  const { address, logout } = useWalletAuth();
 
   // Function to fetch USDC balance from Stellar network using StellarSDK
   const fetchUSDCBalance = useCallback(async (stellarAddress: string) => {
@@ -58,34 +58,78 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
     }
   }, [address, fetchUSDCBalance]);
 
-  // Helper function to format wallet address
+  // Helper: format wallet address
   const formatWalletAddress = (address: string | null) => {
     if (!address) return 'No conectado';
     return `${address.slice(0, 6)}...${address.slice(-4)}`;
   };
 
-  const copyToClipboard = async (text: string | null) => {
-    try {
-      if (text) {
-        await navigator.clipboard.writeText(text);
-        setCopiedAddress(true);
-        setTimeout(() => setCopiedAddress(false), 2000);
-      }
-    } catch (err) {
-      console.error('Failed to copy address:', err);
-    }
-  };
+  // Reusable: wallet address actions (disconnect, copy, explorer)
+  const WalletAddressActions = ({ address }: { address: string | null }) => (
+    <div className="flex space-x-2">
+      <button
+        onClick={async () => {
+          try {
+            await logout();
+            onClose?.();
+          } catch (err) {
+            console.error('Failed to disconnect wallet:', err);
+          }
+        }}
+        className="p-1 hover:bg-red-100 hover:bg-opacity-20 rounded transition-colors duration-200"
+        title="Desconectar billetera"
+      >
+        <svg className="w-4 h-4 text-red-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+        </svg>
+      </button>
+      <button
+        onClick={async () => {
+          if (address) {
+            try {
+              await navigator.clipboard.writeText(address);
+              setCopiedAddress(true);
+              setTimeout(() => setCopiedAddress(false), 2000);
+            } catch (err) {
+              console.error('Failed to copy address:', err);
+            }
+          }
+        }}
+        className="p-1 hover:bg-white hover:bg-opacity-20 rounded transition-colors duration-200"
+        title="Copiar dirección"
+      >
+        <Copy className="w-4 h-4 text-white" />
+      </button>
+      <button
+        onClick={() => window.open(`https://stellar.expert/explorer/public/account/${address}`, '_blank')}
+        className="p-1 hover:bg-white hover:bg-opacity-20 rounded transition-colors duration-200"
+        title="Ver en explorador"
+      >
+        <ExternalLink className="w-4 h-4 text-white" />
+      </button>
+    </div>
+  );
 
-  const handleDisconnectWallet = async () => {
-    try {
-      console.log('Disconnect button clicked');
-      await logout();
-      console.log('Logout completed');
-      onClose?.(); // Close the modal after disconnect
-    } catch (err) {
-      console.error('Failed to disconnect wallet:', err);
-    }
-  };
+  // Reusable: USDC balance display
+  const USDCBalance = () => (
+    <div className="flex items-center space-x-3">
+      <img
+        src="https://storage.googleapis.com/cdn-abroad/Icons/Tokens/USDC%20Token.svg"
+        alt="USDC"
+        className="w-5 h-5"
+      />
+      {isLoadingBalance ? (
+        <div className="flex items-center space-x-2">
+          <div className="h-9 bg-white/20 rounded w-8 animate-pulse"></div>
+          <div className="h-9 bg-white/20 rounded w-20 animate-pulse"></div>
+        </div>
+      ) : (
+        <span className="text-white font-bold text-4xl">
+          ${usdcBalance || '0.00'}
+        </span>
+      )}
+    </div>
+  );
 
   return (
     <>
@@ -140,54 +184,12 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
           {/* Wallet Address Section */}
           <div className="flex items-center justify-between mb-4">
             <span className="text-white font-mono text-sm break-all">{formatWalletAddress(address)}</span>
-            <div className="flex space-x-2">
-              <button
-                onClick={handleDisconnectWallet}
-                className="p-1 hover:bg-red-100 hover:bg-opacity-20 rounded transition-colors duration-200"
-                title="Desconectar billetera"
-              >
-                <svg className="w-4 h-4 text-red-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                </svg>
-              </button>
-              <button
-                onClick={() => copyToClipboard(address)}
-                className="p-1 hover:bg-white hover:bg-opacity-20 rounded transition-colors duration-200"
-                title="Copiar dirección"
-              >
-                <Copy className="w-4 h-4 text-white" />
-              </button>
-              <button
-                onClick={() => window.open(`https://stellar.expert/explorer/public/account/${address}`, '_blank')}
-                className="p-1 hover:bg-white hover:bg-opacity-20 rounded transition-colors duration-200"
-                title="Ver en explorador"
-              >
-                <ExternalLink className="w-4 h-4 text-white" />
-              </button>
-            </div>
+            <WalletAddressActions address={address} />
           </div>
           {copiedAddress && (
             <div className="text-green-300 text-xs mb-4">¡Dirección copiada!</div>
           )}
-
-          {/* Balance Section */}
-          <div className="flex items-center space-x-3">
-            <img
-              src="https://storage.googleapis.com/cdn-abroad/Icons/Tokens/USDC%20Token.svg"
-              alt="USDC"
-              className="w-5 h-5"
-            />
-            {isLoadingBalance ? (
-              <div className="flex items-center space-x-2">
-                <div className="h-9 bg-white/20 rounded w-8 animate-pulse"></div>
-                <div className="h-9 bg-white/20 rounded w-20 animate-pulse"></div>
-              </div>
-            ) : (
-              <span className="text-white font-bold text-4xl">
-                ${usdcBalance || '0.00'}
-              </span>
-            )}
-          </div>
+          <USDCBalance />
         </div>
 
         {/* Divider Line */}

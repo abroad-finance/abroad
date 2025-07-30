@@ -163,6 +163,58 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({ className = '', onW
     }
   }, [address, onWalletDetails, onWalletConnect]);
 
+  // Reusable wallet icon component
+  const renderWalletIcon = useCallback(() => {
+    if (address) {
+      return connectedWalletInfo.icon ? (
+        <img
+          src={connectedWalletInfo.icon}
+          alt={`${connectedWalletInfo.name} Wallet`}
+          className="w-8 h-8"
+        />
+      ) : (
+        <Wallet className="w-5 h-5 text-white" />
+      );
+    }
+    return <Wallet className="w-5 h-5 text-white" />;
+  }, [address, connectedWalletInfo]);
+
+  // Reusable USDC balance badge component
+  const renderUSDCBadge = useCallback((isMobile = false) => {
+    if (!address) return null;
+    
+    const iconSize = isMobile ? "w-3 h-3" : "w-4 h-4";
+    const textSize = isMobile ? "text-xs" : "text-sm";
+    const loadingSize = isMobile ? "w-10 h-3" : "w-12 h-4";
+    
+    return (
+      <div className="flex items-center space-x-1 bg-white/30 rounded-lg px-2 py-1">
+        <img
+          src="https://storage.googleapis.com/cdn-abroad/Icons/Tokens/USDC%20Token.svg"
+          alt="USDC"
+          className={iconSize}
+        />
+        {isLoadingBalance ? (
+          <div className={`${loadingSize} bg-white/20 rounded animate-pulse`}></div>
+        ) : (
+          <span className={`text-white ${textSize} font-medium`}>
+            ${usdcBalance}
+          </span>
+        )}
+      </div>
+    );
+  }, [address, isLoadingBalance, usdcBalance]);
+
+  // Reusable info button component
+  const renderInfoButton = useCallback(() => (
+    <button 
+      onClick={() => window.open('https://linktr.ee/Abroad.finance', '_blank')}
+      className="p-2 rounded-full bg-white/20 hover:bg-white/30 transition-colors duration-200"
+    >
+      <Info className="w-5 h-5 text-white" />
+    </button>
+  ), []);
+
   // const menuItems = ['Trade', 'Pool', 'About']; // Hidden for now
 
   return (
@@ -209,47 +261,15 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({ className = '', onW
               onClick={handleWalletClick}
               className="flex items-center space-x-3 bg-white/20 backdrop-blur-sm rounded-2xl px-4 py-2 border border-white/30 hover:bg-white/30 transition-colors duration-200"
             >
-              {address ? (
-                connectedWalletInfo.icon ? (
-                  <img
-                    src={connectedWalletInfo.icon}
-                    alt={`${connectedWalletInfo.name} Wallet`}
-                    className="w-8 h-8"
-                  />
-                ) : (
-                  <Wallet className="w-5 h-5 text-white" />
-                )
-              ) : (
-                <Wallet className="w-5 h-5 text-white" />
-              )}
+              {renderWalletIcon()}
               <span className="text-white text-md font-medium">
                 {address ? formatWalletAddress(address) : 'Conectar Billetera'}
               </span>
-              {address && (
-                <div className="flex items-center space-x-1 bg-white/30 rounded-lg px-2 py-1">
-                  <img
-                    src="https://storage.googleapis.com/cdn-abroad/Icons/Tokens/USDC%20Token.svg"
-                    alt="USDC"
-                    className="w-4 h-4"
-                  />
-                  {isLoadingBalance ? (
-                    <div className="w-12 h-4 bg-white/20 rounded animate-pulse"></div>
-                  ) : (
-                    <span className="text-white text-sm font-medium">
-                      ${usdcBalance}
-                    </span>
-                  )}
-                </div>
-              )}
+              {renderUSDCBadge()}
             </button>
 
             {/* Info Icon */}
-            <button 
-              onClick={() => window.open('https://linktr.ee/Abroad.finance', '_blank')}
-              className="p-2 rounded-full bg-white/20 hover:bg-white/30 transition-colors duration-200"
-            >
-              <Info className="w-5 h-5 text-white" />
-            </button>
+            {renderInfoButton()}
           </div>
 
           {/* Mobile menu button */}
@@ -288,15 +308,7 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({ className = '', onW
                 className="flex items-center justify-center space-x-3 bg-white/20 backdrop-blur-sm rounded-full px-4 py-2 border border-white/30 mx-3 mt-4 hover:bg-white/30 transition-colors duration-200"
               >
                 {address ? (
-                  connectedWalletInfo.icon ? (
-                    <img
-                      src={connectedWalletInfo.icon}
-                      alt={`${connectedWalletInfo.name} Wallet`}
-                      className="w-8 h-8"
-                    />
-                  ) : (
-                    <Wallet className="w-5 h-5 text-white" />
-                  )
+                  renderWalletIcon()
                 ) : (
                   <>
                     <Wallet className="w-5 h-5 text-white" />
@@ -308,32 +320,12 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({ className = '', onW
                 <span className="text-white text-sm font-medium">
                   {address ? formatWalletAddress(address) : 'Conectar Billetera'}
                 </span>
-                {address && (
-                  <div className="flex items-center space-x-1 bg-white/30 rounded-lg px-2 py-1">
-                    <img
-                      src="https://storage.googleapis.com/cdn-abroad/Icons/Tokens/USDC%20Token.svg"
-                      alt="USDC"
-                      className="w-3 h-3"
-                    />
-                    {isLoadingBalance ? (
-                      <div className="w-10 h-3 bg-white/20 rounded animate-pulse"></div>
-                    ) : (
-                      <span className="text-white text-xs font-medium">
-                        ${usdcBalance}
-                      </span>
-                    )}
-                  </div>
-                )}
+                {renderUSDCBadge(true)}
               </button>
 
               {/* Mobile Action Buttons */}
               <div className="flex justify-center space-x-4 mt-4 pb-2">
-                <button 
-                  onClick={() => window.open('https://linktr.ee/Abroad.finance', '_blank')}
-                  className="p-2 rounded-full bg-white/20 hover:bg-white/30 transition-colors duration-200"
-                >
-                  <Info className="w-5 h-5 text-white" />
-                </button>
+                {renderInfoButton()}
               </div>
             </div>
           </div>
