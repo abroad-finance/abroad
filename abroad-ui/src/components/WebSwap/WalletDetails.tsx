@@ -2,8 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { X, Copy, ExternalLink } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useWalletAuth } from '../../context/WalletAuthContext';
+import { formatWalletAddress, fetchUSDCBalance } from '../../utils/walletUtils';
 import '../../styles/scrollbar.css';
-import * as StellarSdk from '@stellar/stellar-sdk';
 
 interface WalletDetailsProps {
   onClose?: () => void;
@@ -15,35 +15,12 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
   const [isLoadingBalance, setIsLoadingBalance] = useState(false);
   const { address, logout } = useWalletAuth();
 
-  // Function to fetch USDC balance from Stellar network using StellarSDK
-  const fetchUSDCBalance = useCallback(async (stellarAddress: string) => {
+  // Use shared USDC balance fetching logic
+  const fetchUSDCBalanceWithLoading = useCallback(async (stellarAddress: string) => {
     try {
-      console.log('Fetching USDC balance for address:', stellarAddress);
       setIsLoadingBalance(true);
-      const server = new StellarSdk.Horizon.Server('https://horizon.stellar.org');
-      const account = await server.loadAccount(stellarAddress);
-      
-      // USDC on Stellar mainnet: USDC:GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN
-      const usdcAssetCode = 'USDC';
-      const usdcIssuer = 'GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN';
-      
-      const usdcBalance = account.balances.find((balance: StellarSdk.Horizon.HorizonApi.BalanceLine) => {
-        // Check if it's a credit_alphanum4 asset (USDC is 4 characters)
-        if (balance.asset_type === 'credit_alphanum4') {
-          return balance.asset_code === usdcAssetCode && balance.asset_issuer === usdcIssuer;
-        }
-        return false;
-      });
-      
-      if (usdcBalance) {
-        const numericBalance = parseFloat(usdcBalance.balance);
-        setUsdcBalance(numericBalance.toLocaleString('en-US', { 
-          minimumFractionDigits: 2, 
-          maximumFractionDigits: 2 
-        }));
-      } else {
-        setUsdcBalance('0.00');
-      }
+      const balance = await fetchUSDCBalance(stellarAddress);
+      setUsdcBalance(balance);
     } catch (error) {
       console.error('Error fetching USDC balance:', error);
       setUsdcBalance('0.00');
@@ -54,15 +31,9 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
 
   useEffect(() => {
     if (address) {
-      fetchUSDCBalance(address);
+      fetchUSDCBalanceWithLoading(address);
     }
-  }, [address, fetchUSDCBalance]);
-
-  // Helper: format wallet address
-  const formatWalletAddress = (address: string | null) => {
-    if (!address) return 'No conectado';
-    return `${address.slice(0, 6)}...${address.slice(-4)}`;
-  };
+  }, [address, fetchUSDCBalanceWithLoading]);
 
   // Reusable: wallet address actions (disconnect, copy, explorer)
   const WalletAddressActions = ({ address }: { address: string | null }) => (

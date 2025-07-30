@@ -2,24 +2,18 @@ import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { Info, Menu, X, Wallet } from 'lucide-react';
 import { useWalletAuth } from '../../context/WalletAuthContext';
 import { kit } from '../../services/stellarKit';
+import { formatWalletAddress, fetchUSDCBalance } from '../../utils/walletUtils';
 import AbroadLogoColored from '../../assets/Logos/AbroadLogoColored.svg';
 import AbroadLogoWhite from '../../assets/Logos/AbroadLogoWhite.svg';
 import FreighterLogo from '../../assets/Logos/Wallets/Freighter.svg';
 import HanaLogo from '../../assets/Logos/Wallets/Hana.svg';
 import LobstrLogo from '../../assets/Logos/Wallets/Lobstr.svg';
-import * as StellarSdk from '@stellar/stellar-sdk';
 
 interface NavBarResponsiveProps {
   className?: string;
   onWalletConnect?: () => void;
   onWalletDetails?: () => void;
 }
-
-  // Helper function to format wallet address
-  const formatWalletAddress = (address: string) => {
-    if (!address || address === 'Connected') return 'Connected';
-    return `${address.slice(0, 6)}...${address.slice(-4)}`;
-  }
 
 const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({ className = '', onWalletConnect, onWalletDetails }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -28,33 +22,12 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({ className = '', onW
   const [walletUpdateTrigger, setWalletUpdateTrigger] = useState(0);
   const { address, walletName } = useWalletAuth(); 
   
-  // Function to fetch USDC balance from Stellar network
-  const fetchUSDCBalance = useCallback(async (stellarAddress: string) => {
+  // Use shared USDC balance fetching logic
+  const fetchUSDCBalanceWithLoading = useCallback(async (stellarAddress: string) => {
     try {
       setIsLoadingBalance(true);
-      const server = new StellarSdk.Horizon.Server('https://horizon.stellar.org');
-      const account = await server.loadAccount(stellarAddress);
-      
-      // USDC on Stellar mainnet: USDC:GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN
-      const usdcAssetCode = 'USDC';
-      const usdcIssuer = 'GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN';
-      
-      const usdcBalance = account.balances.find((balance: StellarSdk.Horizon.HorizonApi.BalanceLine) => {
-        if (balance.asset_type === 'credit_alphanum4') {
-          return balance.asset_code === usdcAssetCode && balance.asset_issuer === usdcIssuer;
-        }
-        return false;
-      });
-      
-      if (usdcBalance) {
-        const numericBalance = parseFloat(usdcBalance.balance);
-        setUsdcBalance(numericBalance.toLocaleString('en-US', { 
-          minimumFractionDigits: 2, 
-          maximumFractionDigits: 2 
-        }));
-      } else {
-        setUsdcBalance('0.00');
-      }
+      const balance = await fetchUSDCBalance(stellarAddress);
+      setUsdcBalance(balance);
     } catch (error) {
       console.error('Error fetching USDC balance:', error);
       setUsdcBalance('0.00');
@@ -65,9 +38,9 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({ className = '', onW
 
   useEffect(() => {
     if (address) {
-      fetchUSDCBalance(address);
+      fetchUSDCBalanceWithLoading(address);
     }
-  }, [address, fetchUSDCBalance]);
+  }, [address, fetchUSDCBalanceWithLoading]);
 
   // Effect to trigger wallet info update when wallet changes
   useEffect(() => {
