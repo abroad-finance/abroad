@@ -20,7 +20,6 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({ className = '', onW
   const toggleMobileMenu = useCallback(() => {
     setIsMobileMenuOpen(!isMobileMenuOpen);
   }, [isMobileMenuOpen]);
-
   const connectedWalletName = useMemo(() => {
     if (!address) return null;
     if (address && typeof address === 'string') {
