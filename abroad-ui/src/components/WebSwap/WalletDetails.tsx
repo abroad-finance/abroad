@@ -2,6 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { X, Copy, ExternalLink } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useWalletAuth } from '../../context/WalletAuthContext';
+import '../../styles/scrollbar.css';
+import * as StellarSdk from '@stellar/stellar-sdk';
 
 interface WalletDetailsProps {
   onClose?: () => void;
@@ -9,36 +11,32 @@ interface WalletDetailsProps {
 
 const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
   const [copiedAddress, setCopiedAddress] = useState(false);
+  const [usdcBalance, setUsdcBalance] = useState<string>('0.00');
+  const [isLoadingBalance, setIsLoadingBalance] = useState(false);
   const { address, logout } = useWalletAuth();
 
-  // Function to fetch USDC balance from Stellar network
+  // Function to fetch USDC balance from Stellar network using StellarSDK
   const fetchUSDCBalance = useCallback(async (stellarAddress: string) => {
     try {
       console.log('Fetching USDC balance for address:', stellarAddress);
       setIsLoadingBalance(true);
-      const server = new Horizon.Server('https://horizon.stellar.org');
+      const server = new StellarSdk.Horizon.Server('https://horizon.stellar.org');
       const account = await server.loadAccount(stellarAddress);
-      
-      // Account loaded successfully, balances retrieved.
       
       // USDC on Stellar mainnet: USDC:GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN
       const usdcAssetCode = 'USDC';
       const usdcIssuer = 'GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN';
       
-      const usdcBalance = account.balances.find((balance) => {
+      const usdcBalance = account.balances.find((balance: StellarSdk.Horizon.HorizonApi.BalanceLine) => {
         // Check if it's a credit_alphanum4 asset (USDC is 4 characters)
         if (balance.asset_type === 'credit_alphanum4') {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const assetBalance = balance as any; // Type assertion for the balance structure
-          return assetBalance.asset_code === usdcAssetCode && assetBalance.asset_issuer === usdcIssuer;
+          return balance.asset_code === usdcAssetCode && balance.asset_issuer === usdcIssuer;
         }
         return false;
       });
       
-      // USDC balance found, proceed with processing
-      
       if (usdcBalance) {
-        const numericBalance = parseFloat((usdcBalance as StellarBalance).balance);
+        const numericBalance = parseFloat(usdcBalance.balance);
         setUsdcBalance(numericBalance.toLocaleString('en-US', { 
           minimumFractionDigits: 2, 
           maximumFractionDigits: 2 
@@ -55,37 +53,10 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
   }, []);
 
   useEffect(() => {
-    const fetchTransactions = async () => {
-      if (!user) {
-        setLoading(false);
-        return;
-      }
-
-      setLoading(true);
-      try {
-        const response = await listPartnerTransactions({ page: 1, pageSize: 50 });
-        if (response.data && 'transactions' in response.data) {
-          const userObj = user as BluxUser;
-          const currentUserId = userObj.id || userObj.userId;
-
-          if (currentUserId) {
-            const userTransactions = response.data.transactions.filter(
-              (tx) => tx.partnerUserId === currentUserId
-            );
-            setTransactions(userTransactions);
-          } else {
-            setTransactions(response.data.transactions);
-          }
-        }
-      } catch (error) {
-        console.error("Failed to fetch transactions:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchTransactions();
-  }, [user]);
+    if (address) {
+      fetchUSDCBalance(address);
+    }
+  }, [address, fetchUSDCBalance]);
 
   // Helper function to format wallet address
   const formatWalletAddress = (address: string | null) => {
@@ -114,38 +85,8 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
     }
   };
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { 
-      month: 'short', 
-      day: 'numeric',
-      year: 'numeric'
-    });
-  };
-
   return (
     <>
-      <style>
-        {`
-          .custom-scrollbar::-webkit-scrollbar {
-            width: 4px;
-          }
-          .custom-scrollbar::-webkit-scrollbar-track {
-            background: transparent;
-          }
-          .custom-scrollbar::-webkit-scrollbar-thumb {
-            background: transparent;
-            border-radius: 2px;
-            transition: background 0.3s ease;
-          }
-          .custom-scrollbar:hover::-webkit-scrollbar-thumb {
-            background: #d1d5db;
-          }
-          .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-            background: #9ca3af;
-          }
-        `}
-      </style>
       <motion.div 
       className="w-screen md:w-auto md:mx-0 md:ml-auto md:max-w-md md:flex md:items-center fixed md:relative left-0 md:left-auto top-auto md:top-auto bottom-0 md:bottom-auto h-[80vh] md:h-[95vh]"
       initial={{ 
@@ -250,89 +191,29 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
         {/* Divider Line */}
         <div className="border-t border-gray-200 mb-6"></div>
 
-        {/* Transaction History */}
+        {/* Wallet Information */}
         <div className="flex-1 flex flex-col min-h-0">
           <h3 className="text-gray-800 font-medium text-lg mb-4 flex-shrink-0">Historial de Transacciones</h3>
           <div 
-            className="flex-1 overflow-y-auto custom-scrollbar flex flex-col" 
-            style={{
-              scrollbarWidth: 'thin',
-              scrollbarColor: '#d1d5db transparent'
-            }}
+            className="flex-1 overflow-y-auto wallet-details-scroll flex flex-col"
           >
             <div className="space-y-3 flex-1">
-              {loading ? (
-                <>
-                  <TransactionSkeleton />
-                  <TransactionSkeleton />
-                </>
-              ) : transactions.length > 0 ? (
-                transactions.map((transaction) => {
-                  const uiStatus = getStatus(transaction.status);
-                  return (
-                    <div
-                      key={transaction.id}
-                      className="bg-gray-50 border border-gray-200 rounded-xl p-4 hover:bg-gray-100 transition-colors duration-200"
-                    >
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center space-x-2">
-                          <span className="text-gray-600 text-sm">{formatDate(transaction.createdAt)}</span>
-                        </div>
-                        <span className={`text-xs px-2 py-1 rounded-full ${
-                          uiStatus.type === 'completed' ? 'bg-green-100 text-green-700' :
-                          uiStatus.type === 'processing' ? 'bg-blue-100 text-blue-700' :
-                          uiStatus.type === 'refunded' ? 'bg-orange-100 text-orange-700' :
-                          uiStatus.type === 'canceled' ? 'bg-red-100 text-red-700' : ''
-                        }`}>
-                          {uiStatus.label}
-                        </span>
-                      </div>
-                      
-                      <div className="mb-2">
-                        <span className="text-gray-500 text-xs">
-                          Para: 
-                        </span>
-                        <span className="text-gray-700 font-mono text-sm">
-                          {transaction.accountNumber}
-                        </span>
-                      </div>
-
-                      <div className="flex justify-between items-center">
-                        <div className="flex items-center space-x-1">
-                          <img
-                            src="https://storage.googleapis.com/cdn-abroad/Icons/Tokens/USDC%20Token.svg"
-                            alt="USDC"
-                            className="w-4 h-4"
-                          />
-                          <span className="text-gray-700 text-xl font-bold">
-                            ${formatNumber(transaction.quote.sourceAmount)}
-                          </span>
-                        </div>
-                        <div className="flex items-center space-x-1">
-                          <img
-                            src={`https://hatscripts.github.io/circle-flags/flags/${transaction.quote.targetCurrency.slice(0, 2).toLowerCase()}.svg`}
-                            alt={transaction.quote.targetCurrency}
-                            className="w-4 h-4 rounded-full"
-                          />
-                          <span className="text-gray-700 text-xl font-bold">
-                            ${formatNumber(transaction.quote.targetAmount)}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  )
-                })
-              ) : (
-                <div className="text-center py-8">
-                  <EmptyTransactionPlaceholder />
-                  <div className="text-gray-400 text-sm">No hay transacciones aún</div>
+              <div className="text-center py-8">
+                <div className="mx-auto w-16 h-16 mb-4 bg-gray-100 rounded-full flex items-center justify-center">
+                  <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
                 </div>
-              )}
+                <div className="text-gray-400 text-sm">No hay transacciones aún</div>
+                <div className="text-gray-500 text-xs mt-2">
+                  Tus transacciones aparecerán aquí una vez que realices tu primera operación
+                </div>
+              </div>
             </div>
             
             {/* Footer at bottom of scrollable area */}
             <div className="text-xs text-gray-500 leading-relaxed text-center pt-4 border-t border-gray-200 mt-6 mb-4 flex-shrink-0">
-              Los datos de transacciones se actualizan en tiempo real
+              Los datos de balance se actualizan en tiempo real
             </div>
           </div>
         </div>

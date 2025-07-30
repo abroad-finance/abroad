@@ -1,6 +1,8 @@
-import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { Info, Menu, X, Wallet } from 'lucide-react';
 import { useWalletAuth } from '../../context/WalletAuthContext';
+import AbroadLogoColored from '../../assets/Logos/AbroadLogoColored.svg';
+import AbroadLogoWhite from '../../assets/Logos/AbroadLogoWhite.svg';
 
 interface NavBarResponsiveProps {
   className?: string;
@@ -20,6 +22,7 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({ className = '', onW
   const toggleMobileMenu = useCallback(() => {
     setIsMobileMenuOpen(!isMobileMenuOpen);
   }, [isMobileMenuOpen]);
+
   const connectedWalletName = useMemo(() => {
     if (!address) return null;
     if (address && typeof address === 'string') {
