@@ -1,7 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { walletAuth } from '../services/walletAuth';
 import { kit } from '../services/stellarKit';
-import { WalletNetwork } from '@creit.tech/stellar-wallets-kit';
 
 interface WalletAuthState {
   token: string | null;
@@ -12,10 +11,6 @@ interface WalletAuthState {
 
 const WalletAuthContext = createContext<WalletAuthState>({ token: null, authenticateWithWallet: async () => { }, address: null, logout: async () => { } });
 
-const signMessage = async (message: string): Promise<string> => {
-  const response = await kit.signTransaction(message, { networkPassphrase: WalletNetwork.PUBLIC })
-  return response.signedTxXdr;
-}
 export const WalletAuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [token, setToken] = useState<string | null>(() => localStorage.getItem('token'));
   const [address, setAddress] = useState<string | null>(null);
@@ -26,9 +21,7 @@ export const WalletAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     ) {
       try {
         const { address } = await kit.getAddress();
-        const newToken = await walletAuth(address, {
-          signMessage
-        });
+        const newToken = await walletAuth(address);
         localStorage.setItem('token', newToken);
         setToken(newToken);
         setAddress(address);
