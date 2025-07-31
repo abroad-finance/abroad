@@ -6,16 +6,20 @@ interface SwapProps {
   initialTargetAmount?: string;
   onAmountsChange?: (srcAmount: string, tgtAmount: string) => void;
   textColor?: string;
+  onWalletConnect?: () => void;
 }
 
 import { Button } from "../Button";
-import { ChevronsDown, Loader, CircleDollarSign, Landmark, Timer } from 'lucide-react';
+import { ChevronsDown, Loader, CircleDollarSign, Landmark, Timer, Wallet } from 'lucide-react';
 import { TokenBadge } from './TokenBadge';
+import { IconAnimated } from '../IconAnimated';
 import { getQuote, getReverseQuote, _36EnumsTargetCurrency, _36EnumsPaymentMethod, _36EnumsBlockchainNetwork, _36EnumsCryptoCurrency } from '../../api/index';
+import { useWalletAuth } from '../../context/WalletAuthContext';
 
 const TransferFee = 1354;
 
-export default function Swap({ onContinue, initialSourceAmount = '', initialTargetAmount = '', onAmountsChange, textColor = '#356E6A' }: SwapProps) {
+export default function Swap({ onContinue, initialSourceAmount = '', initialTargetAmount = '', onAmountsChange, textColor = '#356E6A', onWalletConnect }: SwapProps) {
+    const { token } = useWalletAuth();
     // state for source (USD) and target (COP) amounts
     const [sourceAmount, setSourceAmount] = useState(initialSourceAmount);
     const [targetAmount, setTargetAmount] = useState(initialTargetAmount || '');
@@ -69,8 +73,23 @@ export default function Swap({ onContinue, initialSourceAmount = '', initialTarg
            setquote_id(response.data.quote_id); // Add this line
            onAmountsChange?.(input, formatted);
          }
-       } catch (error) {
+       } catch (error: unknown) {
          console.error('Reverse quote error', error);
+         
+         // Check if it's an error with status 401
+         if (error && typeof error === 'object' && 'status' in error) {
+           const statusError = error as { status?: number };
+           if (statusError.status === 401) {
+             // Handle 401 error - wallet authentication needed
+           }
+         }
+         // Check if it's a response with 401 status (backup check)
+         else if (error && typeof error === 'object' && 'response' in error) {
+           const errorResponse = error as { response?: { status?: number } };
+           if (errorResponse.response?.status === 401) {
+             // Handle 401 error - wallet authentication needed
+           }
+         }
        } finally {
          setLoadingTarget(false);
        }
@@ -122,8 +141,23 @@ export default function Swap({ onContinue, initialSourceAmount = '', initialTarg
            setquote_id(response.data.quote_id);
            onAmountsChange?.(src, raw);
          }
-       } catch (error) {
+       } catch (error: unknown) {
          console.error('Quote error', error);
+         
+         // Check if it's an error with status 401
+         if (error && typeof error === 'object' && 'status' in error) {
+           const statusError = error as { status?: number };
+           if (statusError.status === 401) {
+             // Handle 401 error - wallet authentication needed
+           }
+         }
+         // Check if it's a response with 401 status (backup check)
+         else if (error && typeof error === 'object' && 'response' in error) {
+           const errorResponse = error as { response?: { status?: number } };
+           if (errorResponse.response?.status === 401) {
+             // Handle 401 error - wallet authentication needed
+           }
+         }
        } finally {
          setLoadingSource(false);
        }
@@ -158,9 +192,14 @@ export default function Swap({ onContinue, initialSourceAmount = '', initialTarg
      // If loadingSource or loadingTarget is true, displayedTRM remains unchanged.
    }, [sourceAmount, targetAmount, loadingSource, loadingTarget]); // TransferFee is a module-level const
 
+   // Reset state when user gets authenticated
+   useEffect(() => {
+     if (token) {
+       // User is authenticated, reset any error states if needed
+     }
+   }, [token]);
+
    return (
-     // Removed the outermost div and institutional logo
-     // Centered white card covering 60% of screen
      <div className="flex-1 flex items-center justify-center w-full flex flex-col">
        <div id="background-container" className="w-[90%] max-w-md min-h-[60vh] h-auto bg-[#356E6A]/5 backdrop-blur-xl rounded-4xl p-4 md:p-6 flex flex-col items-center justify-center space-y-1 lg:space-y-4">
          {/* Here starts Swap as a component */}
@@ -190,32 +229,47 @@ export default function Swap({ onContinue, initialSourceAmount = '', initialTarg
            </div>
            <TokenBadge iconSrc="https://storage.googleapis.com/cdn-abroad/Icons/Tokens/USDC%20Token.svg" alt="USDC Token Logo" symbol="USDC"/>
          </div>
-         <div id="target-amount" className="relative w-full bg-white/60 backdrop-blur-xl rounded-2xl p-4 md:p-6 lg:py-6 xl:py-6 min-h-[800px]:py-16 flex items-center justify-start">
-           {/* circular cutout effect matching bg-container-1 */}
-           <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 w-8 h-8 bg-[#356E6A]/5 rounded-full flex items-center justify-center">
-             <ChevronsDown color="#356E6A" className="w-4 h-4" />
+         
+         {token ? (
+           <div id="target-amount" className="relative w-full bg-white/60 backdrop-blur-xl rounded-2xl p-4 md:p-6 lg:py-6 xl:py-6 min-h-[800px]:py-16 flex items-center justify-start">
+             {/* circular cutout effect matching bg-container-1 */}
+             <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 w-8 h-8 bg-[#356E6A]/5 rounded-full flex items-center justify-center">
+               <ChevronsDown color="#356E6A" className="w-4 h-4" />
+             </div>
+             {/* number input area: loader or input, centered */}
+             <div className="w-3/4 h-full flex items-center space-x-2">
+               <span className="text-xl md:text-2xl font-bold" style={{ color: textColor }}>$</span>
+               {loadingTarget ? (
+                 <Loader className="animate-spin w-6 h-6" style={{ color: textColor }} />
+               ) : (
+                 <input
+                   type="text"
+                   inputMode="decimal"
+                   pattern="[0-9.,]*"
+                   value={targetAmount}
+                   onChange={handleTargetChange}
+                   onBlur={handleTargetBlur}
+                   placeholder="0,00"
+                   className="w-full h-full bg-transparent font-bold focus:outline-none text-xl md:text-2xl text-left"
+                   style={{ color: textColor }}
+                 />
+               )}
+             </div>
+             <TokenBadge iconSrc="https://storage.googleapis.com/cdn-abroad/Icons/Tokens/COP-Token.svg" alt="COP Token Logo" symbol="COP" />
            </div>
-           {/* number input area: loader or input, centered */}
-           <div className="w-3/4 h-full flex items-center space-x-2">
-             <span className="text-xl md:text-2xl font-bold" style={{ color: textColor }}>$</span>
-             {loadingTarget ? (
-               <Loader className="animate-spin w-6 h-6" style={{ color: textColor }} />
-             ) : (
-               <input
-                 type="text"
-                 inputMode="decimal"
-                 pattern="[0-9.,]*"
-                 value={targetAmount}
-                 onChange={handleTargetChange}
-                 onBlur={handleTargetBlur}
-                 placeholder="0,00"
-                 className="w-full h-full bg-transparent font-bold focus:outline-none text-xl md:text-2xl text-left"
-                 style={{ color: textColor }}
-               />
-             )}
+         ) : (
+           <div className="w-full bg-white/60 backdrop-blur-xl rounded-2xl p-4 md:p-6 lg:py-6 xl:py-6 min-h-[800px]:py-16 flex items-center justify-center space-x-4">
+             <div className="flex-shrink-0">
+               <IconAnimated icon='Denied' size={40} trigger='once'/>
+             </div>
+             <div className="flex flex-col space-y-1">
+                 <span className="text-lg font-semibold" style={{ color: textColor }}>
+                 Conecta tu billetera para poder cotizar
+                 </span>
+
+             </div>
            </div>
-           <TokenBadge iconSrc="https://storage.googleapis.com/cdn-abroad/Icons/Tokens/COP-Token.svg" alt="COP Token Logo" symbol="COP" />
-         </div>
+         )}
 
          <div className="flex-1 flex items-center justify-center w-full">
            <div id="tx-info" className="w-full" style={{ color: textColor }}>
@@ -238,12 +292,24 @@ export default function Swap({ onContinue, initialSourceAmount = '', initialTarg
        </div>
        <Button
          className="mt-4 w-[90%] max-w-md py-4"
-         onClick={() => onContinue(quote_id, sourceAmount, targetAmount)}
-         disabled={isButtonDisabled()}
+         onClick={() => {
+           if (!token) {
+             onWalletConnect?.();
+           } else {
+             onContinue(quote_id, sourceAmount, targetAmount);
+           }
+         }}
+         disabled={!!token && isButtonDisabled()}
        >
-         Continuar
+         {!token ? (
+             <div className="flex items-center justify-center space-x-2">
+             <Wallet className="w-5 h-5" />
+             <span>Conectar Billetera</span>
+             </div>
+         ) : (
+           'Continuar'
+         )}
        </Button>
-     </div> // This div closes the "flex-1" container
-     // Removed the "Continue" Button from here
+     </div>
    );
 }

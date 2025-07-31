@@ -58,6 +58,28 @@ export const customClient = async <T>(
         headers
     });
 
+    // Handle error responses by throwing
+    if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        const error = new Error(`HTTP ${response.status}: ${response.statusText}`) as Error & {
+            status: number;
+            statusText: string;
+            response: {
+                status: number;
+                statusText: string;
+                data: unknown;
+            };
+        };
+        error.status = response.status;
+        error.statusText = response.statusText;
+        error.response = {
+            status: response.status,
+            statusText: response.statusText,
+            data: errorData
+        };
+        throw error;
+    }
+
     return {
         status: response.status,
         statusText: response.statusText,

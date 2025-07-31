@@ -9,7 +9,7 @@ import { useWebSwapController } from './useWebSwapController'; // For prop types
 type LayoutProps = ReturnType<typeof useWebSwapController>;
 
 const DesktopLayout: React.FC<LayoutProps> = (props) => {
-  const { view, swapData, address, initialAmounts, handleSwapContinue, handleBackToSwap, handleTransactionComplete, handleAmountsChange } = props;
+  const { view, swapData, address, initialAmounts, handleSwapContinue, handleBackToSwap, handleTransactionComplete, handleAmountsChange, handleWalletConnectOpen } = props;
 
   return (
     <div className="hidden md:flex flex-row w-full h-full">
@@ -30,6 +30,7 @@ const DesktopLayout: React.FC<LayoutProps> = (props) => {
               initialSourceAmount={initialAmounts.source}
               initialTargetAmount={initialAmounts.target}
               onAmountsChange={handleAmountsChange}
+              onWalletConnect={handleWalletConnectOpen}
               textColor="white"
             />
           )}

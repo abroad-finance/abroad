@@ -9,7 +9,7 @@ import { useWebSwapController } from './useWebSwapController'; // For prop types
 type LayoutProps = ReturnType<typeof useWebSwapController>;
 
 const MobileLayout: React.FC<LayoutProps> = (props) => {
-  const { view, swapData, initialAmounts, address, handleSwapContinue, handleBackToSwap, handleTransactionComplete, handleAmountsChange } = props;
+  const { view, swapData, initialAmounts, address, handleSwapContinue, handleBackToSwap, handleTransactionComplete, handleAmountsChange, handleWalletConnectOpen } = props;
 
   return (
     <div className="md:hidden flex flex-col w-full min-h-screen">
@@ -22,6 +22,7 @@ const MobileLayout: React.FC<LayoutProps> = (props) => {
               initialSourceAmount={initialAmounts.source}
               initialTargetAmount={initialAmounts.target}
               onAmountsChange={handleAmountsChange}
+              onWalletConnect={handleWalletConnectOpen}
             />
           )}
           {view === 'bankDetails' && swapData && address && (
