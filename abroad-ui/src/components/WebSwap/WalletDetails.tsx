@@ -1,7 +1,52 @@
-import React, { useState, useMemo } from 'react';
-import { X, Copy, ExternalLink } from 'lucide-react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import { X, Copy, ExternalLink, RefreshCw } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useWalletAuth } from '../../context/WalletAuthContext';
+import { Horizon } from '@stellar/stellar-sdk';
+
+// Stellar network configuration
+const STELLAR_HORIZON_URL = 'https://horizon.stellar.org';
+const USDC_ISSUER = 'GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN'; // Circle's USDC issuer on Stellar mainnet
+
+// Utility function to fetch USDC balance
+const fetchUSDCBalance = async (stellarAddress: string): Promise<string> => {
+  try {
+    console.log('Fetching USDC balance for WalletDetails:', stellarAddress);
+    
+    // Create Horizon server instance
+    const server = new Horizon.Server(STELLAR_HORIZON_URL);
+    
+    // Load account information
+    const account = await server.loadAccount(stellarAddress);
+    
+    // Find USDC balance in account balances
+    const usdcBalance = account.balances.find(balance => {
+      // Check if it's a credit asset (not native XLM)
+      if (balance.asset_type === 'native') return false;
+      
+      // Type guard to ensure we have asset_code and asset_issuer properties
+      if ('asset_code' in balance && 'asset_issuer' in balance) {
+        return balance.asset_code === 'USDC' && balance.asset_issuer === USDC_ISSUER;
+      }
+      
+      return false;
+    });
+    
+    if (usdcBalance && 'balance' in usdcBalance) {
+      // Format balance to 2 decimal places with thousand separators
+      const balanceValue = parseFloat(usdcBalance.balance);
+      return balanceValue.toLocaleString('en-US', { 
+        minimumFractionDigits: 2, 
+        maximumFractionDigits: 2 
+      });
+    } else {
+      return '0.00';
+    }
+  } catch (error) {
+    console.error('Error fetching USDC balance in WalletDetails:', error);
+    return '0.00';
+  }
+};
 
 interface WalletDetailsProps {
   onClose?: () => void;
@@ -19,7 +64,37 @@ interface Transaction {
 
 const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
   const [copiedAddress, setCopiedAddress] = useState(false);
+  const [usdcBalance, setUsdcBalance] = useState<string>('0.00');
+  const [isLoadingBalance, setIsLoadingBalance] = useState(false);
   const { address, logout } = useWalletAuth();
+
+  // Fetch USDC balance with loading state
+  const fetchUSDCBalanceWithLoading = useCallback(async (stellarAddress: string) => {
+    try {
+      setIsLoadingBalance(true);
+      const balance = await fetchUSDCBalance(stellarAddress);
+      setUsdcBalance(balance);
+    } catch (error) {
+      console.error('Error fetching USDC balance in WalletDetails:', error);
+      setUsdcBalance('0.00');
+    } finally {
+      setIsLoadingBalance(false);
+    }
+  }, []);
+
+  // Fetch balance when component mounts or address changes
+  useEffect(() => {
+    if (address) {
+      fetchUSDCBalanceWithLoading(address);
+    }
+  }, [address, fetchUSDCBalanceWithLoading]);
+
+  // Handle manual balance refresh
+  const handleRefreshBalance = useCallback(() => {
+    if (address && !isLoadingBalance) {
+      fetchUSDCBalanceWithLoading(address);
+    }
+  }, [address, isLoadingBalance, fetchUSDCBalanceWithLoading]);
 
   const generateRandomPhoneNumber = () => {
     const prefixes = ['310', '311', '312', '313', '314', '315'];
@@ -29,12 +104,7 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
     return `${number.slice(0, 3)} ${number.slice(3, 6)} ${number.slice(6, 10)}`;
   };
 
-  // Mock data for demonstration
-  const mockBalance = {
-    usdc: "1,234.56",
-    cop: "5,432,100"
-  };
-
+  // Mock data for demonstration (keeping transactions as mock for now)
   const mockTransactions: Transaction[] = useMemo(() => [
     {
       id: "1",
@@ -193,13 +263,28 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
           )}
 
           {/* Balance Section */}
-          <div className="flex items-center space-x-3">
-            <img
-              src="https://storage.googleapis.com/cdn-abroad/Icons/Tokens/USDC%20Token.svg"
-              alt="USDC"
-              className="w-5 h-5"
-            />
-            <span className="text-white font-bold text-4xl">${mockBalance.usdc}</span>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <img
+                src="https://storage.googleapis.com/cdn-abroad/Icons/Tokens/USDC%20Token.svg"
+                alt="USDC"
+                className="w-5 h-5"
+              />
+              {isLoadingBalance ? (
+                <div className="w-32 h-9 bg-white/20 rounded animate-pulse"></div>
+              ) : (
+                <span className="text-white font-bold text-4xl">${usdcBalance}</span>
+              )}
+            </div>
+            {/* Refresh Balance Button */}
+            <button
+              onClick={handleRefreshBalance}
+              disabled={isLoadingBalance}
+              className="p-2 hover:bg-white hover:bg-opacity-20 rounded-full transition-colors duration-200 disabled:opacity-50"
+              title="Actualizar balance"
+            >
+              <RefreshCw className={`w-4 h-4 text-white ${isLoadingBalance ? 'animate-spin' : ''}`} />
+            </button>
           </div>
         </div>
 
