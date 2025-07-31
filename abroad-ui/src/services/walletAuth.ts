@@ -10,4 +10,3 @@ export async function walletAuth(address: string, signer: { signMessage: (msg: s
   const { token } = await verifyRes.data;
   return token as string;
 }
-

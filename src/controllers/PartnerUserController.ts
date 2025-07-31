@@ -9,7 +9,7 @@
  * ▸ Zero `any` usage – all values are fully typed with Prisma models or utility types.
  */
 
-import { KycStatus, type PartnerUser as PartnerUserModel, Prisma } from '@prisma/client'
+import { type PartnerUser as PartnerUserModel, Prisma } from '@prisma/client'
 import { Request as ExpressRequest } from 'express'
 import { inject } from 'inversify'
 import {
@@ -39,13 +39,12 @@ import { TYPES } from '../types'
  * --------------------------------------------------------------------- */
 
 export interface CreatePartnerUserRequest {
-  kycStatus?: KycStatus
-  kycToken?: null | string
+  kycExternalToken?: null | string
   userId: string
 }
 
 const createPartnerUserSchema: ZodType<CreatePartnerUserRequest> = z.object({
-  kycStatus: z.nativeEnum(KycStatus).optional(),
+  kycExternalToken: z.string().min(1).nullable().optional(),
   kycToken: z.string().min(1).nullable().optional(),
   userId: z.string().uuid(),
 })
@@ -60,21 +59,18 @@ export interface PaginatedPartnerUsers {
 export interface PartnerUserDto {
   createdAt: Date
   id: string
-  kycStatus: KycStatus
   kycToken: null | string
   updatedAt: Date
   userId: string
 }
 
 export interface UpdatePartnerUserRequest {
-  kycStatus?: KycStatus
-  kycToken?: null | string
+  kycExternalToken?: null | string
 }
 
 const updatePartnerUserSchema: ZodType<UpdatePartnerUserRequest> = z
   .object({
-    kycStatus: z.nativeEnum(KycStatus).optional(),
-    kycToken: z.string().nullable().optional(),
+    kycExternalToken: z.string().min(1).nullable().optional(),
   })
   .refine(data => Object.keys(data).length > 0, {
     message: 'At least one field must be supplied',
@@ -130,8 +126,7 @@ export class PartnerUserController extends Controller {
     try {
       const record = await prisma.partnerUser.create({
         data: {
-          kycStatus: validation.data.kycStatus ?? KycStatus.PENDING,
-          kycToken: validation.data.kycToken ?? null,
+          kycExternalToken: validation.data.kycExternalToken ?? null,
           partnerId: req.user.id,
           userId: validation.data.userId,
         },
@@ -239,8 +234,7 @@ export class PartnerUserController extends Controller {
     return {
       createdAt: record.createdAt,
       id: record.id,
-      kycStatus: record.kycStatus,
-      kycToken: record.kycToken,
+      kycToken: record.kycExternalToken,
       updatedAt: record.updatedAt,
       userId: record.userId,
     }

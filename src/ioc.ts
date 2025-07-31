@@ -2,7 +2,6 @@
 import { Container, decorate, injectable } from 'inversify'
 import { Controller } from 'tsoa'
 
-import { KycController } from './controllers/KycController'
 import { PartnerController } from './controllers/PartnerController'
 import { PartnerUserController } from './controllers/PartnerUserController'
 import { PaymentsController } from './controllers/PaymentsController'
@@ -41,12 +40,12 @@ import { BinanceExchangeProvider } from './services/exchangeProviders/binanceExc
 import { BitsoExchangeRateProvider } from './services/exchangeProviders/bitsoExchangeProvider'
 import { TransferoExchangeProvider } from './services/exchangeProviders/transferoExchangeProvider'
 import { FirebaseAuthService } from './services/firebaseAuthService'
+import { GuardLineKycService } from './services/GuardlineKycService'
 import { PartnerService } from './services/partnerService'
 import { PaymentServiceFactory } from './services/PaymentServiceFactory'
 import { MoviiPaymentService } from './services/paymentServices/movii'
 import { NequiPaymentService } from './services/paymentServices/nequi'
 import { TransferoPaymentService } from './services/paymentServices/transferoPaymentService'
-import { PersonaKycService } from './services/personaKycService'
 import { PixQrDecoder } from './services/PixQrDecoder'
 import { SlackNotifier } from './services/slackNotifier'
 import { SolanaWalletHandler } from './services/SolanaWalletHandler'
@@ -54,7 +53,6 @@ import { StellarWalletHandler } from './services/StellarWalletHandler'
 import { WalletHandlerFactory } from './services/WalletHandlerFactory'
 import { WebhookNotifier } from './services/WebhookNotifier'
 import { TYPES } from './types'
-import { KycUseCase } from './useCases/kycUseCase'
 import { QuoteUseCase } from './useCases/quoteUseCase'
 
 const container = new Container()
@@ -135,7 +133,7 @@ container
 // IKycService
 container
   .bind<IKycService>(TYPES.IKycService)
-  .to(PersonaKycService)
+  .to(GuardLineKycService)
   .inSingletonScope()
 
 // Controllers
@@ -147,7 +145,6 @@ container
   .toSelf()
   .inSingletonScope()
 container.bind<TransactionsController>(TransactionsController).toSelf().inSingletonScope()
-container.bind<KycController>(KycController).toSelf().inSingletonScope()
 container.bind(PaymentsController).toSelf().inSingletonScope()
 container.bind(QrDecoderController).toSelf().inSingletonScope()
 container.bind(WalletAuthController).toSelf().inSingletonScope()
@@ -163,9 +160,6 @@ container
 
 // QuoteUseCase
 container.bind<QuoteUseCase>(TYPES.QuoteUseCase).to(QuoteUseCase).inSingletonScope()
-
-// KycUseCase
-container.bind<KycUseCase>(TYPES.KycUseCase).to(KycUseCase).inSingletonScope()
 
 // Wallet Handlers
 container

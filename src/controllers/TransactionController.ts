@@ -1,6 +1,6 @@
 // src/controllers/TransactionController.ts
 
-import { KycStatus, TransactionStatus } from '@prisma/client'
+import { TransactionStatus } from '@prisma/client'
 import { Request as RequestExpress } from 'express'
 import { NotFound } from 'http-errors'
 import { inject } from 'inversify'
@@ -19,17 +19,17 @@ import {
 import { Body, Post } from 'tsoa'
 import { z } from 'zod'
 
-import { IPartnerService } from '../interfaces'
 import { IDatabaseClientProvider } from '../interfaces/IDatabaseClientProvider'
+import { IKycService } from '../interfaces/IKycService'
 import { IPaymentServiceFactory } from '../interfaces/IPaymentServiceFactory'
 import { IWebhookNotifier, WebhookEvent } from '../interfaces/IWebhookNotifier'
 import { TYPES } from '../types'
-import { KycUseCase } from '../useCases/kycUseCase'
 
 const acceptTransactionRequestSchema = z.object({
   account_number: z.string().min(1, 'Account number is required'),
   bank_code: z.string().min(1, 'Bank code is required'),
   quote_id: z.string().min(1, 'Quote ID is required'),
+  redirectUrl: z.string().optional(),
   tax_id: z.string().optional(),
   user_id: z.string().min(1, 'User ID is required'),
 })
@@ -38,17 +38,20 @@ interface AcceptTransactionRequest {
   account_number: string
   bank_code: string
   quote_id: string
+  redirectUrl?: string
   tax_id?: string
   user_id: string
 }
 
 interface AcceptTransactionResponse {
-  id: string
-  transaction_reference: string
+  id: null | string
+  kycLink: null | string
+  transaction_reference: null | string
 }
 
 interface TransactionStatusResponse {
   id: string
+  kycLink: null | string
   on_chain_tx_hash: null | string
   status: TransactionStatus
   transaction_reference: string
@@ -71,9 +74,8 @@ export class TransactionController extends Controller {
   constructor(
     @inject(TYPES.IDatabaseClientProvider)
     private prismaClientProvider: IDatabaseClientProvider,
-    @inject(TYPES.IPartnerService) private partnerService: IPartnerService,
     @inject(TYPES.IPaymentServiceFactory) private paymentServiceFactory: IPaymentServiceFactory,
-    @inject(TYPES.KycUseCase) private kycUseCase: KycUseCase,
+    @inject(TYPES.IKycService) private kycService: IKycService,
     @inject(TYPES.IWebhookNotifier) private webhookNotifier: IWebhookNotifier,
   ) {
     super()
@@ -101,6 +103,7 @@ export class TransactionController extends Controller {
       account_number: accountNumber,
       bank_code: bankCode,
       quote_id: quoteId,
+      redirectUrl: redirectUrl,
       tax_id: taxId,
       user_id: userId,
     } = parsed.data
@@ -139,10 +142,35 @@ export class TransactionController extends Controller {
       },
     })
 
-    const { status } = await this.kycUseCase.getKycStatus({ partnerId: partner.id, userId })
+    const userTransactionsMonthly = await prismaClient.transaction.findMany({
+      include: { quote: true },
+      where: {
+        createdAt: {
+          gte: new Date(new Date().setDate(new Date().getDate() - 30)),
+        },
+        partnerUserId: partnerUser.id,
+        quote: {
+          paymentMethod: quote.paymentMethod,
+        },
+        status: TransactionStatus.PAYMENT_COMPLETED,
+      },
+    })
 
-    if (partner.needsKyc && status !== KycStatus.APPROVED) {
-      return badRequestResponse(400, { reason: 'KYC not approved' })
+    const totalUserAmountMonthly = userTransactionsMonthly.reduce((acc, transaction) => acc + transaction.quote.sourceAmount, 0) + quote.sourceAmount
+    console.log('Total user amount monthly:', totalUserAmountMonthly)
+    const link = await this.kycService.getKycLink({
+      amount: totalUserAmountMonthly,
+      country: quote.country,
+      redirectUrl: redirectUrl,
+      userId: partnerUser.id,
+    })
+
+    if (partner.needsKyc && link) {
+      return {
+        id: null,
+        kycLink: link,
+        transaction_reference: null,
+      }
     }
 
     const userTransactionsToday = await prismaClient.transaction.findMany({
@@ -218,6 +246,7 @@ export class TransactionController extends Controller {
 
       return {
         id: transaction.id,
+        kycLink: null,
         transaction_reference: uuidToBase64(transaction.id),
       }
     }
@@ -264,8 +293,14 @@ export class TransactionController extends Controller {
 
     const transaction_reference = uuidToBase64(transaction.id)
 
+    const kyc = await prismaClient.partnerUserKyc.findFirst({
+      orderBy: { createdAt: 'desc' },
+      where: { partnerUserId: transaction.partnerUserId },
+    })
+
     return {
       id: transaction.id,
+      kycLink: kyc?.status !== 'APPROVED' ? kyc?.link ?? null : null,
       on_chain_tx_hash: transaction.onChainId,
       status: transaction.status,
       transaction_reference: transaction_reference,

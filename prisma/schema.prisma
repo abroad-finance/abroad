@@ -26,19 +26,35 @@ model Partner {
 }
 
 model PartnerUser {
-  id          String        @id @default(uuid())
-  partnerId   String
-  partner     Partner       @relation(fields: [partnerId], references: [id])
-  userId      String
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
-  transaction Transaction[]
-  kycStatus   KycStatus     @default(PENDING)
-  kycId       String?
-  kycToken    String?
+  id               String        @id @default(uuid())
+  partnerId        String
+  partner          Partner       @relation(fields: [partnerId], references: [id])
+  userId           String
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  transaction      Transaction[]
+  kyc              PartnerUserKyc[]
+  kycExternalToken String?
 
   // Unique constraint to ensure a user is only once per partner
   @@unique([partnerId, userId])
+}
+
+model PartnerUserKyc {
+  id          String      @id @default(uuid())
+  partnerUser PartnerUser @relation(fields: [partnerUserId], references: [id])
+  partnerUserId String
+
+  externalId  String
+  status      KycStatus   @default(PENDING)
+  tier        KYCTier     @default(NONE)
+  link       String
+
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@unique([partnerUserId, externalId])
+  @@unique([partnerUserId, tier])
 }
 
 model Quote {
@@ -121,6 +137,13 @@ enum OrderSide {
 
 enum CryptoCurrency {
   USDC
+}
+
+enum KYCTier {
+  BASIC
+  ENHANCED
+  NONE
+  STANDARD
 }
 
 enum SupportedCurrency {

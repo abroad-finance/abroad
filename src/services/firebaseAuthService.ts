@@ -28,8 +28,7 @@ export class FirebaseAuthService implements IAuthService {
       const decodedToken = await admin.auth().verifyIdToken(token)
       return { userId: decodedToken.uid }
     }
-    catch (error) {
-      console.error('Firebase auth error:', error)
+    catch {
       throw new Error('Firebase token verification failed')
     }
   }
