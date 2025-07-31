@@ -1,6 +1,5 @@
 export const CURRENCIES = [
-  { flag: 'co', name: 'Pesos' },
-  { flag: 'br', name: 'Reales' }
+  { flag: 'co', name: 'Pesos' }
 ];
 
 export const ASSET_URLS = {
