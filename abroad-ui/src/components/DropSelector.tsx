@@ -111,7 +111,7 @@ export function DropSelector({
       </button>
 
       {isOpen && !disabled && (
-        <div className="absolute z-10 mt-2.5 -mx-6 left-0 right-0 bg-white border border-gray-300 rounded-xl shadow-lg max-h-72 overflow-auto">
+        <div className="absolute z-10 mt-2.5 inset-x-0 bg-white border border-gray-300 rounded-xl shadow-lg max-h-72 overflow-auto">
           {options.length > 0 ? (
             options.map((option) => (
               <div
