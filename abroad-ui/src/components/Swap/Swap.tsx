@@ -165,7 +165,7 @@ export default function Swap({ onContinue, initialSourceAmount = '', initialTarg
        <div id="background-container" className="w-[90%] max-w-md min-h-[60vh] h-auto bg-[#356E6A]/5 backdrop-blur-xl rounded-4xl p-4 md:p-6 flex flex-col items-center justify-center space-y-1 lg:space-y-4">
          {/* Here starts Swap as a component */}
          <div className="flex-1 flex items-center justify-center">
-           <div id="Title" className="text-xl md:text-2xl font-bold text-center" style={{ color: textColor }}>¿Cuanto deseas Transferir?</div>
+           <div id="Title" className="text-xl md:text-2xl font-bold text-center" style={{ color: textColor }}>¿Cuanto deseas Cambiar?</div>
          </div>
          <div id="source-amount" className="w-full bg-white/60 backdrop-blur-xl rounded-2xl p-4 md:p-6 lg:py-6 xl:py-6 min-h-[800px]:py-16 flex items-center justify-start">
            {/* number input area: always show $ prefix, then spinner or input */}
