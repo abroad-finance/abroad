@@ -4,6 +4,77 @@ import { Loader, Hash, ArrowLeft, Rotate3d } from 'lucide-react';
 import { getBanks, Bank, getBanksResponse200, acceptTransaction } from '../../api';
 import { DropSelector, Option } from '../DropSelector';
 
+// Bank configuration mapping
+const BANK_CONFIG: Record<string, { iconUrl: string; displayLabel?: string }> = {
+  'NEQUI': {
+    iconUrl: 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Nequi_Badge.webp',
+    displayLabel: 'Nequi'
+  },
+  'MOVII': {
+    iconUrl: 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/movii_badge.png'
+  },
+  'DAVIPLATA': {
+    iconUrl: 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Daviplata_Badge.png',
+    displayLabel: 'Daviplata'
+  },
+  'DAVIVIENDA': {
+    iconUrl: 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Davivienda_Badge.png',
+    displayLabel: 'Davivienda'
+  },
+  'BANCOLOMBIA': {
+    iconUrl: 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Bancolombia_Badge.png'
+  },
+  'SUPERDIGITAL': {
+    iconUrl: 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Superdigital_Badge.png'
+  },
+  'BANCO ITAU': {
+    iconUrl: 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Itau_Badge.png',
+    displayLabel: 'Itau'
+  },
+  'BANCO FALABELLA': {
+    iconUrl: 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Falabella_Badge.png'
+  },
+  'BANCO COOPERATIVO COOPCENTRAL DIGITAL': {
+    iconUrl: 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Bcc_Badge.jpg',
+    displayLabel: 'Coopcentral'
+  },
+  'BANCO SERFINANZA': {
+    iconUrl: 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Bancoserfinanza_badge.jpg',
+    displayLabel: 'Serfinanza'
+  },
+  'BANCOBBVA': {
+    iconUrl: 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/BBVA_Badge.jpg',
+    displayLabel: 'BBVA'
+  },
+  'BANCO POWWI': {
+    iconUrl: 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Powwico_Badge.jpg',
+    displayLabel: 'Powwi'
+  },
+  'BANCO CAJA SOCIAL': {
+    iconUrl: 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/CajaSocial_Badge.webp',
+    displayLabel: 'Banco Caja Social'
+  },
+  'BANCO AGRARIO DE COLOMBIA': {
+    iconUrl: 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/BancoAgrario_Badge.jpg',
+    displayLabel: 'Banco Agrario'
+  },
+  'BANCO DE LAS MICROFINANZAS BANCAMIA SA': {
+    iconUrl: 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Bancamia_Badge.jpg',
+    displayLabel: 'Bancamia'
+  },
+  'BANCO CREZCAMOS': {
+    iconUrl: 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/BancoCrezcamos_Badge.png',
+    displayLabel: 'Banco Crezcamos'
+  },
+  'BANCO FINANDINA': {
+    iconUrl: 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/BancoFinandina_Badge.png',
+    displayLabel: 'Banco Finandina'
+  }
+};
+
+// Banks to exclude from the dropdown list
+const EXCLUDED_BANKS = ['CFA COOPERATIVA FINANCIERA', 'CONFIAR COOPERATIVA FINANCIERA', 'BANCOCOOPCENTRAL'];
+
 interface BankDetailsRouteProps {
   onBackClick: () => void;
   onTransactionComplete: ({ memo }: { memo: string }) => Promise<void>;
@@ -60,83 +131,12 @@ export default function BankDetailsRoute({ userId, onBackClick, quote_id, target
     setbank_code(option.value);
   };
 
-  // Bank configuration mapping
-  const bankConfig: Record<string, { iconUrl: string; displayLabel?: string }> = {
-    'NEQUI': {
-      iconUrl: 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Nequi_Badge.webp',
-      displayLabel: 'Nequi'
-    },
-    'MOVII': {
-      iconUrl: 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/movii_badge.png'
-    },
-    'DAVIPLATA': {
-      iconUrl: 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Daviplata_Badge.png',
-      displayLabel: 'Daviplata'
-    },
-    'DAVIVIENDA': {
-      iconUrl: 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Davivienda_Badge.png',
-      displayLabel: 'Davivienda'
-    },
-    'BANCOLOMBIA': {
-      iconUrl: 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Bancolombia_Badge.png'
-    },
-    'SUPERDIGITAL': {
-      iconUrl: 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Superdigital_Badge.png'
-    },
-    'BANCO ITAU': {
-      iconUrl: 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Itau_Badge.png',
-      displayLabel: 'Itau'
-    },
-    'BANCO FALABELLA': {
-      iconUrl: 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Falabella_Badge.png'
-    },
-    'BANCO COOPERATIVO COOPCENTRAL DIGITAL': {
-      iconUrl: 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Bcc_Badge.jpg',
-      displayLabel: 'Coopcentral'
-    },
-    'BANCO SERFINANZA': {
-      iconUrl: 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Bancoserfinanza_badge.jpg',
-      displayLabel: 'Serfinanza'
-    },
-    'BANCOBBVA': {
-      iconUrl: 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/BBVA_Badge.jpg',
-      displayLabel: 'BBVA'
-    },
-    'BANCO POWWI': {
-      iconUrl: 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Powwico_Badge.jpg',
-      displayLabel: 'Powwi'
-    },
-    'BANCO CAJA SOCIAL': {
-      iconUrl: 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/CajaSocial_Badge.webp',
-      displayLabel: 'Banco Caja Social'
-    },
-    'BANCO AGRARIO DE COLOMBIA': {
-      iconUrl: 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/BancoAgrario_Badge.jpg',
-      displayLabel: 'Banco Agrario'
-    },
-    'BANCO DE LAS MICROFINANZAS BANCAMIA SA': {
-      iconUrl: 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Bancamia_Badge.jpg',
-      displayLabel: 'Bancamia'
-    },
-    'BANCO CREZCAMOS': {
-      iconUrl: 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/BancoCrezcamos_Badge.png',
-      displayLabel: 'Banco Crezcamos'
-    },
-    'BANCO FINANDINA': {
-      iconUrl: 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/BancoFinandina_Badge.png',
-      displayLabel: 'Banco Finandina'
-    }
-  };
-
-  // Banks to exclude from the list
-  const excludedBanks = ['CFA COOPERATIVA FINANCIERA', 'CONFIAR COOPERATIVA FINANCIERA', 'BANCOCOOPCENTRAL'];
-
   // Convert API banks to DropSelector options
   const bankOptions: Option[] = apiBanks
-    .filter((bank: Bank) => !excludedBanks.includes(bank.bankName.toUpperCase()))
+    .filter((bank: Bank) => !EXCLUDED_BANKS.includes(bank.bankName.toUpperCase()))
     .map((bank: Bank) => {
       const bankNameUpper = bank.bankName.toUpperCase();
-      const config = bankConfig[bankNameUpper];
+      const config = BANK_CONFIG[bankNameUpper];
       
       return {
         value: String(bank.bankCode),
