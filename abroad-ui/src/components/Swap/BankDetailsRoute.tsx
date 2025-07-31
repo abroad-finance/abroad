@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from "../Button";
-import { Loader, Hash, ArrowLeft, Rotate3d} from 'lucide-react';
+import { Loader, Hash, ArrowLeft, Rotate3d } from 'lucide-react';
 import { getBanks, Bank, getBanksResponse200, acceptTransaction } from '../../api';
 import { DropSelector, Option } from '../DropSelector';
 
