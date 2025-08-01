@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from "../Button";
 import { ChevronsDown, Loader, CircleDollarSign, Landmark, Timer, Wallet } from 'lucide-react';
-import { TokenBadge } from './TokenBadge';
+import { TokenBadge } from './tokenBadge';
 import { IconAnimated } from '../IconAnimated';
 import { getQuote, getReverseQuote, _36EnumsTargetCurrency, _36EnumsPaymentMethod, _36EnumsBlockchainNetwork, _36EnumsCryptoCurrency } from '../../api/index';
 import { useWalletAuth } from '../../context/WalletAuthContext';
@@ -28,21 +28,6 @@ export default function Swap({ onContinue, initialSourceAmount = '', initialTarg
     const [displayedTRM, setDisplayedTRM] = useState(0.000);
     const sourceDebounceRef = useRef<NodeJS.Timeout | null>(null);
     const targetDebounceRef = useRef<NodeJS.Timeout | null>(null);
-
-    // Shared error handler for 401 responses
-    const handleApiError = (error: unknown) => {
-      if (error && typeof error === 'object' && 'status' in error) {
-        const statusError = error as { status?: number };
-        if (statusError.status === 401) {
-          // Handle 401 error - wallet authentication needed
-        }
-      } else if (error && typeof error === 'object' && 'response' in error) {
-        const errorResponse = error as { response?: { status?: number } };
-        if (errorResponse.response?.status === 401) {
-          // Handle 401 error - wallet authentication needed
-        }
-      }
-    };
 
     const isButtonDisabled = () => {
       const numericSource = parseFloat(String(sourceAmount));
@@ -85,7 +70,6 @@ export default function Swap({ onContinue, initialSourceAmount = '', initialTarg
           }
         } catch (error: unknown) {
           console.error('Reverse quote error', error);
-          handleApiError(error);
         } finally {
           setLoadingTarget(false);
         }
@@ -139,7 +123,6 @@ export default function Swap({ onContinue, initialSourceAmount = '', initialTarg
           }
         } catch (error: unknown) {
           console.error('Quote error', error);
-          handleApiError(error);
         } finally {
           setLoadingSource(false);
         }
