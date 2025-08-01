@@ -67,7 +67,7 @@ export class GuardlineWebhookController extends Controller {
   @Response('500', 'Internal Server Error')
   @SuccessResponse('200', 'Webhook processed successfully')
   public async handleGuardlineWebhook(
-    @Body() body: GuardlineWebhookRequest,
+    @Body() body: unknown,
     @Request() request: RequestExpress,
     @Res() badRequest: TsoaResponse<400, { message: string, success: false }>,
     @Res() notFound: TsoaResponse<404, { message: string, success: false }>,
