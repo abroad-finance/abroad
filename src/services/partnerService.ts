@@ -60,8 +60,7 @@ export class PartnerService implements IPartnerService {
 
       return partner
     }
-    catch (error) {
-      console.error('Error verifying token:', error)
+    catch {
       throw new Error('Firebase token verification failed')
     }
   }
@@ -88,8 +87,7 @@ export class PartnerService implements IPartnerService {
 
       return partner
     }
-    catch (error) {
-      console.error('Error verifying SEP JWT:', error)
+    catch {
       throw new Error('SEP JWT verification failed')
     }
   }

@@ -74,6 +74,12 @@ export class GuardlineWebhookController extends Controller {
     @Res() serverError: TsoaResponse<500, { message: string, success: false }>,
   ): Promise<GuardlineWebhookResponse> {
     try {
+      // Log the incoming webhook payload
+      this.logger.info('Received Guardline webhook', {
+        headers: request.headers,
+        payload: body,
+      })
+
       // Validate the webhook payload
       const validation = guardlineWebhookSchema.safeParse(body)
       if (!validation.success) {
