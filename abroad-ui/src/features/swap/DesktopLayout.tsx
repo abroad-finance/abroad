@@ -9,7 +9,7 @@ import { useWebSwapController } from './useWebSwapController'; // For prop types
 type LayoutProps = ReturnType<typeof useWebSwapController>;
 
 const DesktopLayout: React.FC<LayoutProps> = (props) => {
-  const { view, swapData, address, initialAmounts, handleSwapContinue, handleBackToSwap, handleTransactionComplete, handleAmountsChange } = props;
+  const { view, swapData, address, initialAmounts, handleSwapContinue, handleBackToSwap, handleTransactionComplete, handleAmountsChange, handleWalletConnectOpen } = props;
 
   return (
     <div className="hidden md:flex flex-row w-full h-full">
@@ -26,23 +26,30 @@ const DesktopLayout: React.FC<LayoutProps> = (props) => {
         <div className="w-full max-w-md">
           {view === 'swap' && (
             <Swap
-              onContinue={(quote_id, srcAmount, tgtAmount) => handleSwapContinue({ quote_id, srcAmount, tgtAmount })}
+              onContinue={(quote_id, srcAmount, tgtAmount) => {
+                console.log('DesktopLayout onContinue called with:', { quote_id, srcAmount, tgtAmount });
+                handleSwapContinue({ quote_id, srcAmount, tgtAmount });
+              }}
               initialSourceAmount={initialAmounts.source}
               initialTargetAmount={initialAmounts.target}
               onAmountsChange={handleAmountsChange}
+              onWalletConnect={handleWalletConnectOpen}
               textColor="white"
             />
           )}
           {view === 'bankDetails' && swapData && address && (
-            <BankDetailsRoute
-              onBackClick={handleBackToSwap}
-              onTransactionComplete={handleTransactionComplete}
-              quote_id={swapData.quote_id}
-              sourceAmount={swapData.srcAmount}
-              targetAmount={swapData.tgtAmount}
-              userId={address}
-              textColor="white"
-            />
+            <>
+              {console.log('DesktopLayout rendering BankDetailsRoute with swapData:', swapData)}
+              <BankDetailsRoute
+                onBackClick={handleBackToSwap}
+                onTransactionComplete={handleTransactionComplete}
+                quote_id={swapData.quote_id}
+                sourceAmount={swapData.srcAmount}
+                targetAmount={swapData.tgtAmount}
+                userId={address}
+                textColor="white"
+              />
+            </>
           )}
         </div>
         <div className="absolute bottom-5 right-5 flex items-center gap-3 text-white font-sans text-base">

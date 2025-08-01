@@ -9,7 +9,7 @@ import { useWebSwapController } from './useWebSwapController'; // For prop types
 type LayoutProps = ReturnType<typeof useWebSwapController>;
 
 const MobileLayout: React.FC<LayoutProps> = (props) => {
-  const { view, swapData, initialAmounts, address, handleSwapContinue, handleBackToSwap, handleTransactionComplete, handleAmountsChange } = props;
+  const { view, swapData, initialAmounts, address, handleSwapContinue, handleBackToSwap, handleTransactionComplete, handleAmountsChange, handleWalletConnectOpen } = props;
 
   return (
     <div className="md:hidden flex flex-col w-full min-h-screen">
@@ -18,21 +18,28 @@ const MobileLayout: React.FC<LayoutProps> = (props) => {
         <div className="w-full max-w-md">
           {view === 'swap' && (
              <Swap
-              onContinue={(quote_id, srcAmount, tgtAmount) => handleSwapContinue({ quote_id, srcAmount, tgtAmount })}
+              onContinue={(quote_id, srcAmount, tgtAmount) => {
+                console.log('MobileLayout onContinue called with:', { quote_id, srcAmount, tgtAmount });
+                handleSwapContinue({ quote_id, srcAmount, tgtAmount });
+              }}
               initialSourceAmount={initialAmounts.source}
               initialTargetAmount={initialAmounts.target}
               onAmountsChange={handleAmountsChange}
+              onWalletConnect={handleWalletConnectOpen}
             />
           )}
           {view === 'bankDetails' && swapData && address && (
-            <BankDetailsRoute
-              onBackClick={handleBackToSwap}
-              onTransactionComplete={handleTransactionComplete}
-              quote_id={swapData.quote_id}
-              sourceAmount={swapData.srcAmount}
-              targetAmount={swapData.tgtAmount}
-              userId={address}
-            />
+            <>
+              {console.log('MobileLayout rendering BankDetailsRoute with swapData:', swapData)}
+              <BankDetailsRoute
+                onBackClick={handleBackToSwap}
+                onTransactionComplete={handleTransactionComplete}
+                quote_id={swapData.quote_id}
+                sourceAmount={swapData.srcAmount}
+                targetAmount={swapData.tgtAmount}
+                userId={address}
+              />
+            </>
           )}
         </div>
       </div>

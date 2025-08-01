@@ -1,8 +1,9 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { X, Copy, ExternalLink, RefreshCw } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useWalletAuth } from '../../context/WalletAuthContext';
 import { Horizon } from '@stellar/stellar-sdk';
+import { listPartnerTransactions, PaginatedTransactionListTransactionsItem } from '../../api/index';
 
 // Stellar network configuration
 const STELLAR_HORIZON_URL = 'https://horizon.stellar.org';
@@ -52,21 +53,17 @@ interface WalletDetailsProps {
   onClose?: () => void;
 }
 
-interface Transaction {
-  id: string;
-  date: string;
-  destination: string;
-  usdcAmount: string;
-  copAmount: string;
-  type: 'sent' | 'received';
-  status: 'processing' | 'completed' | 'refunded' | 'canceled';
-}
+// Use the API transaction type
+type Transaction = PaginatedTransactionListTransactionsItem;
 
 const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
   const [copiedAddress, setCopiedAddress] = useState(false);
   const [usdcBalance, setUsdcBalance] = useState<string>('0.00');
   const [isLoadingBalance, setIsLoadingBalance] = useState(false);
-  const { address, logout } = useWalletAuth();
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [isLoadingTransactions, setIsLoadingTransactions] = useState(false);
+  const [transactionError, setTransactionError] = useState<string | null>(null);
+  const { address, logout, token } = useWalletAuth();
 
   // Fetch USDC balance with loading state
   const fetchUSDCBalanceWithLoading = useCallback(async (stellarAddress: string) => {
@@ -82,12 +79,48 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
     }
   }, []);
 
-  // Fetch balance when component mounts or address changes
+  // Fetch transactions from API
+  const fetchTransactions = useCallback(async () => {
+    if (!token) {
+      setTransactionError('No authentication token available');
+      return;
+    }
+
+    try {
+      setIsLoadingTransactions(true);
+      setTransactionError(null);
+      
+      const response = await listPartnerTransactions(
+        { page: 1, pageSize: 10 }, // Get first 10 transactions
+        { 
+          headers: { 
+            'Authorization': `Bearer ${token}` 
+          } 
+        }
+      );
+
+      if (response.status === 200) {
+        setTransactions(response.data.transactions);
+      } else {
+        setTransactionError('Failed to fetch transactions');
+      }
+    } catch (error) {
+      console.error('Error fetching transactions:', error);
+      setTransactionError('Error loading transactions');
+    } finally {
+      setIsLoadingTransactions(false);
+    }
+  }, [token]);
+
+  // Fetch balance and transactions when component mounts or token changes
   useEffect(() => {
     if (address) {
       fetchUSDCBalanceWithLoading(address);
     }
-  }, [address, fetchUSDCBalanceWithLoading]);
+    if (token) {
+      fetchTransactions();
+    }
+  }, [address, token, fetchUSDCBalanceWithLoading, fetchTransactions]);
 
   // Handle manual balance refresh
   const handleRefreshBalance = useCallback(() => {
@@ -96,61 +129,52 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
     }
   }, [address, isLoadingBalance, fetchUSDCBalanceWithLoading]);
 
-  const generateRandomPhoneNumber = () => {
-    const prefixes = ['310', '311', '312', '313', '314', '315'];
-    const prefix = prefixes[Math.floor(Math.random() * prefixes.length)];
-    const rest = Math.floor(Math.random() * 10000000).toString().padStart(7, '0');
-    const number = `${prefix}${rest}`;
-    return `${number.slice(0, 3)} ${number.slice(3, 6)} ${number.slice(6, 10)}`;
+  // Handle manual transactions refresh
+  const handleRefreshTransactions = useCallback(() => {
+    if (token && !isLoadingTransactions) {
+      fetchTransactions();
+    }
+  }, [token, isLoadingTransactions, fetchTransactions]);
+
+  // Helper function to format transaction status
+  const getStatusStyle = (status: string) => {
+    switch (status) {
+      case 'PAYMENT_COMPLETED':
+        return 'bg-green-100 text-green-700';
+      case 'PROCESSING_PAYMENT':
+      case 'AWAITING_PAYMENT':
+        return 'bg-blue-100 text-blue-700';
+      case 'PAYMENT_FAILED':
+      case 'WRONG_AMOUNT':
+        return 'bg-red-100 text-red-700';
+      default:
+        return 'bg-gray-100 text-gray-700';
+    }
   };
 
-  // Mock data for demonstration (keeping transactions as mock for now)
-  const mockTransactions: Transaction[] = useMemo(() => [
-    {
-      id: "1",
-      date: "2024-07-05",
-      destination: generateRandomPhoneNumber(),
-      usdcAmount: "100.00",
-      copAmount: "432,500",
-      type: "sent",
-      status: "completed"
-    },
-    {
-      id: "2", 
-      date: "2024-07-04",
-      destination: "GAQX5L...MNOP",
-      usdcAmount: "50.25",
-      copAmount: "216,830",
-      type: "received",
-      status: "processing"
-    },
-    {
-      id: "3",
-      date: "2024-07-03", 
-      destination: generateRandomPhoneNumber(),
-      usdcAmount: "200.00",
-      copAmount: "865,000",
-      type: "sent",
-      status: "refunded"
-    },
-    {
-      id: "4",
-      date: "2024-07-02", 
-      destination: generateRandomPhoneNumber(),
-      usdcAmount: "75.00",
-      copAmount: "324,750",
-      type: "sent",
-      status: "canceled"
+  // Helper function to translate transaction status
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case 'PAYMENT_COMPLETED':
+        return 'Completado';
+      case 'PROCESSING_PAYMENT':
+        return 'Procesando Pago';
+      case 'AWAITING_PAYMENT':
+        return 'Esperando Pago';
+      case 'PAYMENT_FAILED':
+        return 'Pago Fallido';
+      case 'WRONG_AMOUNT':
+        return 'Monto Incorrecto';
+      default:
+        return status;
     }
-  ], []);
+  };
 
   // Helper function to format wallet address
   const formatWalletAddress = (address: string | null) => {
     if (!address) return 'No conectado';
     return `${address.slice(0, 6)}...${address.slice(-4)}`;
-  };
-
-  const copyToClipboard = async (text: string | null) => {
+  };  const copyToClipboard = async (text: string | null) => {
     try {
       if (text) {
         await navigator.clipboard.writeText(text);
@@ -290,66 +314,93 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
 
         {/* Transaction History */}
         <div className="flex-1">
-          <h3 className="text-gray-800 font-medium text-lg mb-4">Historial de Transacciones</h3>
-          <div className="space-y-3">
-            {mockTransactions.map((transaction) => (
-              <div 
-                key={transaction.id}
-                className="bg-gray-50 border border-gray-200 rounded-xl p-4 hover:bg-gray-100 transition-colors duration-200"
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center space-x-2">
-                    <span className="text-gray-600 text-sm">{formatDate(transaction.date)}</span>
-                  </div>
-                  <span className={`text-xs px-2 py-1 rounded-full ${
-                    transaction.status === 'completed' ? 'bg-green-100 text-green-700' :
-                    transaction.status === 'processing' ? 'bg-blue-100 text-blue-700' :
-                    transaction.status === 'refunded' ? 'bg-orange-100 text-orange-700' :
-                    transaction.status === 'canceled' ? 'bg-red-100 text-red-700' : ''
-                  }`}>
-                    {transaction.status === 'completed' ? 'Completado' :
-                     transaction.status === 'processing' ? 'Procesando' :
-                     transaction.status === 'refunded' ? 'Reembolsado' :
-                     transaction.status === 'canceled' ? 'Cancelado' : transaction.status}
-                  </span>
-                </div>
-                
-                <div className="mb-2">
-                  <span className="text-gray-500 text-xs">
-                    {transaction.type === 'sent' ? 'Para: ' : 'De: '}
-                  </span>
-                  <span className="text-gray-700 font-mono text-sm">
-                    {transaction.destination}
-                  </span>
-                </div>
-
-                <div className="flex justify-between items-center">
-                  <div className="flex items-center space-x-1">
-                    <img
-                      src="https://storage.googleapis.com/cdn-abroad/Icons/Tokens/USDC%20Token.svg"
-                      alt="USDC"
-                      className="w-4 h-4"
-                    />
-                    <span className="text-gray-700 text-xl font-bold">
-                      ${transaction.usdcAmount}
-                    </span>
-                  </div>
-                  <div className="flex items-center space-x-1">
-                    <img
-                      src="https://hatscripts.github.io/circle-flags/flags/co.svg"
-                      alt="COP"
-                      className="w-4 h-4 rounded-full"
-                    />
-                    <span className="text-gray-700 text-xl font-bold">
-                      ${transaction.copAmount}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            ))}
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-gray-800 font-medium text-lg">Historial de Transacciones</h3>
+            <button
+              onClick={handleRefreshTransactions}
+              disabled={isLoadingTransactions}
+              className="p-2 hover:bg-gray-100 rounded-full transition-colors duration-200 disabled:opacity-50"
+              title="Actualizar transacciones"
+            >
+              <RefreshCw className={`w-4 h-4 text-gray-600 ${isLoadingTransactions ? 'animate-spin' : ''}`} />
+            </button>
           </div>
 
-          {mockTransactions.length === 0 && (
+          {transactionError && (
+            <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-4">
+              <p className="text-red-700 text-sm">{transactionError}</p>
+            </div>
+          )}
+
+          {isLoadingTransactions ? (
+            <div className="space-y-3">
+              {[...Array(3)].map((_, index) => (
+                <div key={index} className="bg-gray-50 border border-gray-200 rounded-xl p-4">
+                  <div className="animate-pulse">
+                    <div className="flex justify-between items-center mb-2">
+                      <div className="h-4 bg-gray-200 rounded w-24"></div>
+                      <div className="h-6 bg-gray-200 rounded w-20"></div>
+                    </div>
+                    <div className="h-4 bg-gray-200 rounded w-32 mb-3"></div>
+                    <div className="flex justify-between items-center">
+                      <div className="h-6 bg-gray-200 rounded w-20"></div>
+                      <div className="h-6 bg-gray-200 rounded w-24"></div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {transactions.map((transaction) => (
+                <div 
+                  key={transaction.id}
+                  className="bg-gray-50 border border-gray-200 rounded-xl p-4 hover:bg-gray-100 transition-colors duration-200"
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center space-x-2">
+                      <span className="text-gray-600 text-sm">{formatDate(transaction.createdAt)}</span>
+                    </div>
+                    <span className={`text-xs px-2 py-1 rounded-full ${getStatusStyle(transaction.status)}`}>
+                      {getStatusText(transaction.status)}
+                    </span>
+                  </div>
+                  
+                  <div className="mb-2">
+                    <span className="text-gray-500 text-xs">Para: </span>
+                    <span className="text-gray-700 font-mono text-sm">
+                      {transaction.accountNumber}
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center space-x-1">
+                      <img
+                        src="https://storage.googleapis.com/cdn-abroad/Icons/Tokens/USDC%20Token.svg"
+                        alt="USDC"
+                        className="w-4 h-4"
+                      />
+                      <span className="text-gray-700 text-xl font-bold">
+                        ${transaction.quote.sourceAmount.toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="flex items-center space-x-1">
+                      <img
+                        src="https://hatscripts.github.io/circle-flags/flags/co.svg"
+                        alt="COP"
+                        className="w-4 h-4 rounded-full"
+                      />
+                      <span className="text-gray-700 text-xl font-bold">
+                        ${transaction.quote.targetAmount.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {!isLoadingTransactions && transactions.length === 0 && !transactionError && (
             <div className="text-center py-8">
               <div className="text-gray-400 text-sm">No hay transacciones aún</div>
             </div>
