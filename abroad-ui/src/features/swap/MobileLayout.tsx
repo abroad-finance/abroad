@@ -18,7 +18,10 @@ const MobileLayout: React.FC<LayoutProps> = (props) => {
         <div className="w-full max-w-md">
           {view === 'swap' && (
              <Swap
-              onContinue={(quote_id, srcAmount, tgtAmount) => handleSwapContinue({ quote_id, srcAmount, tgtAmount })}
+              onContinue={(quote_id, srcAmount, tgtAmount) => {
+                console.log('MobileLayout onContinue called with:', { quote_id, srcAmount, tgtAmount });
+                handleSwapContinue({ quote_id, srcAmount, tgtAmount });
+              }}
               initialSourceAmount={initialAmounts.source}
               initialTargetAmount={initialAmounts.target}
               onAmountsChange={handleAmountsChange}
@@ -26,14 +29,17 @@ const MobileLayout: React.FC<LayoutProps> = (props) => {
             />
           )}
           {view === 'bankDetails' && swapData && address && (
-            <BankDetailsRoute
-              onBackClick={handleBackToSwap}
-              onTransactionComplete={handleTransactionComplete}
-              quote_id={swapData.quote_id}
-              sourceAmount={swapData.srcAmount}
-              targetAmount={swapData.tgtAmount}
-              userId={address}
-            />
+            <>
+              {console.log('MobileLayout rendering BankDetailsRoute with swapData:', swapData)}
+              <BankDetailsRoute
+                onBackClick={handleBackToSwap}
+                onTransactionComplete={handleTransactionComplete}
+                quote_id={swapData.quote_id}
+                sourceAmount={swapData.srcAmount}
+                targetAmount={swapData.tgtAmount}
+                userId={address}
+              />
+            </>
           )}
         </div>
       </div>

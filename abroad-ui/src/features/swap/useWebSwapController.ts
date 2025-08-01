@@ -29,6 +29,7 @@ export const useWebSwapController = () => {
   }, []);
 
   const handleSwapContinue = useCallback((data: SwapData) => {
+    console.log('handleSwapContinue called with data:', data);
     setSwapData(data);
     setView('bankDetails');
   }, []);

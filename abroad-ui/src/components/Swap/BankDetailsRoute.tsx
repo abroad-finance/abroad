@@ -3,6 +3,8 @@ import { Button } from "../Button";
 import { Loader, Hash, ArrowLeft, Rotate3d } from 'lucide-react';
 import { getBanks, Bank, getBanksResponse200, acceptTransaction } from '../../api';
 import { DropSelector, Option } from '../DropSelector';
+import { kit } from '../../services/stellarKit';
+import { useWalletAuth } from '../../context/WalletAuthContext';
 
 // Bank configuration mapping
 const BANK_CONFIG: Record<string, { iconUrl: string; displayLabel?: string }> = {
@@ -87,6 +89,7 @@ interface BankDetailsRouteProps {
 
 
 export default function BankDetailsRoute({ userId, onBackClick, quote_id, targetAmount, onTransactionComplete, textColor = '#356E6A' }: BankDetailsRouteProps): React.JSX.Element {
+  const { walletId } = useWalletAuth();
   const [account_number, setaccount_number] = useState('');
   const [bank_code, setbank_code] = useState<string>('');
   const [loadingSubmit, setLoadingSubmit] = useState(false);
@@ -115,7 +118,7 @@ export default function BankDetailsRoute({ userId, onBackClick, quote_id, target
         console.error(err);
       } finally {
         setLoadingBanks(false);
-      }
+      } 
     };
 
     fetchBanks();
@@ -147,30 +150,81 @@ export default function BankDetailsRoute({ userId, onBackClick, quote_id, target
 
   const handleSubmit = useCallback(async () => {
     setLoadingSubmit(true);
-    // remove http or https from the URL
-    const redirectUrl = window.location.href.replace(/^https?:\/\//, '');
+    
+    try {
+      // Validate quote_id before proceeding
+      if (!quote_id || quote_id.trim() === '') {
+        throw new Error('Quote ID is required. Please go back and get a new quote.');
+      }
 
-    console.log('Bank Details:', { bank_code, account_number, quote_id });
-    const response = await acceptTransaction({ account_number, bank_code, quote_id, user_id: userId, redirectUrl: encodeURIComponent(redirectUrl) });
-    setLoadingSubmit(false);
+      // remove http or https from the URL
+      const redirectUrl = window.location.href.replace(/^https?:\/\//, '');
 
-    if (response.status !== 200) {
-      console.error('Error accepting transaction:', response);
-      alert(`Error: ${response.data.reason}`);
-      return;
+      console.log('Bank Details:', { bank_code, account_number, quote_id });
+      const response = await acceptTransaction({ 
+        account_number, 
+        bank_code, 
+        quote_id, 
+        user_id: userId, 
+        redirectUrl: encodeURIComponent(redirectUrl) 
+      });
+
+      if (response.status !== 200) {
+        console.error('Error accepting transaction:', response);
+        alert(`Error: ${response.data.reason}`);
+        return;
+      }
+      
+      console.log('Transaction accepted:', response.data);
+
+      if (response.data.kycLink) {
+        // open link in the same tab
+        window.location.href = response.data.kycLink;
+        return;
+      }
+
+      console.log('Transaction accepted successfully, requesting signature...');
+      
+      // Check if wallet is connected via context
+      if (!walletId) {
+        throw new Error('Wallet not connected. Please connect your wallet first.');
+      }
+
+      // Get the XDR from the response (check if API provides transaction XDR)
+      const transactionXDR = response.data.transaction_reference; // Adjust this based on actual API response
+      
+      if (!transactionXDR) {
+        console.warn('No transaction XDR provided, completing without signature');
+        await onTransactionComplete({ memo: response.data.transaction_reference });
+        return;
+      }
+
+      console.log('Requesting transaction signature...');
+      
+      try {
+        // Request user to sign the transaction
+        const signedTransaction = await kit.signTransaction(transactionXDR);
+        console.log('Transaction signed successfully:', signedTransaction);
+      } catch (signError) {
+        console.error('Failed to sign transaction:', signError);
+        // Continue with completion even if signing fails
+      }
+
+      // Complete the transaction 
+      await onTransactionComplete({ memo: response.data.transaction_reference });
+
+    } catch (error) {
+      console.error('Error in transaction flow:', error);
+      if (error instanceof Error) {
+        alert(`Transaction error: ${error.message}`);
+      } else {
+        alert('An unknown error occurred during the transaction');
+      }
+    } finally {
+      setLoadingSubmit(false);
     }
-    console.log('Transaction accepted:', response.data);
-
-    if (response.data.kycLink) {
-      // open link in the same tab
-      window.location.href = response.data.kycLink;
-      return;
-    }
-
-    console.log('Transaction accepted successfully:', response.data);
-    await onTransactionComplete({ memo: response.data.transaction_reference });
-    setLoadingSubmit(false);
-  }, [account_number, bank_code, quote_id, userId, onTransactionComplete]);
+  }, [account_number, bank_code, quote_id, userId, onTransactionComplete, walletId]);
+  
 
 
 

@@ -258,10 +258,15 @@ export default function Swap({ onContinue, initialSourceAmount = '', initialTarg
             if (!token) {
               onWalletConnect?.();
             } else {
+              console.log('Continue clicked with quote_id:', quote_id);
+              if (!quote_id) {
+                alert('Please wait for the quote to load before continuing');
+                return;
+              }
               onContinue(quote_id, sourceAmount, targetAmount);
             }
           }}
-          disabled={!!token && isButtonDisabled()}
+          disabled={!!token && (isButtonDisabled() || !quote_id)}
         >
           {!token ? (
             <div className="flex items-center justify-center space-x-2">
