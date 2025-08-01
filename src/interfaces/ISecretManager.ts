@@ -16,6 +16,9 @@ export const Secrets = {
   GCP_KEY_FILENAME: 'GCP_KEY_FILENAME',
   GCP_PROJECT_ID: 'GCP_PROJECT_ID',
 
+  // Guardline related secrets
+  GUARDLINE_TENANT_ID: 'GUARDLINE_TENANT_ID',
+
   // Movii related secrets
   MOVII_API_KEY: 'MOVII_API_KEY',
   MOVII_BASE_URL: 'MOVII_BASE_URL',

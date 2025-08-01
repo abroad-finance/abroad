@@ -77,7 +77,7 @@ const EXCLUDED_BANKS = ['CFA COOPERATIVA FINANCIERA', 'CONFIAR COOPERATIVA FINAN
 
 interface BankDetailsRouteProps {
   onBackClick: () => void;
-  onTransactionComplete: ({ memo }: { memo: string }) => Promise<void>;
+  onTransactionComplete: ({ memo }: { memo: string | null}) => Promise<void>;
   quote_id: string;
   sourceAmount: string;
   targetAmount: string;
@@ -137,7 +137,7 @@ export default function BankDetailsRoute({ userId, onBackClick, quote_id, target
     .map((bank: Bank) => {
       const bankNameUpper = bank.bankName.toUpperCase();
       const config = BANK_CONFIG[bankNameUpper];
-      
+
       return {
         value: String(bank.bankCode),
         label: config?.displayLabel || bank.bankName,
@@ -147,35 +147,28 @@ export default function BankDetailsRoute({ userId, onBackClick, quote_id, target
 
   const handleSubmit = useCallback(async () => {
     setLoadingSubmit(true);
-
-    // // KYC
-    // const responseKYC = await checkKyc({user_id: userId});
-
-    // if (responseKYC.status !== 200) {
-    //   console.error('Error checking KYC:', responseKYC);
-    //   alert(`Error: ${responseKYC.data.reason}`);
-    //   setLoadingSubmit(false);
-    //   return;
-    // }
-
-    // if (responseKYC.data.kyc_status !== 'APPROVED') {
-    //   // open KYC link in a new tab
-    //   window.open(responseKYC.data.kyc_link, '_blank');
-    //   alert('Por favor completa el proceso de KYC antes de continuar.');
-    //   setLoadingSubmit(false);
-    //   return;
-    // }
-
+    // remove http or https from the URL
+    const redirectUrl = window.location.href.replace(/^https?:\/\//, '');
 
     console.log('Bank Details:', { bank_code, account_number, quote_id });
-    const response = await acceptTransaction({ account_number, bank_code, quote_id, user_id: userId });
-    if (response.status === 200) {
-      console.log('Transaction accepted successfully:', response.data);
-      await onTransactionComplete({ memo: response.data.transaction_reference });
-    } else {
+    const response = await acceptTransaction({ account_number, bank_code, quote_id, user_id: userId, redirectUrl: encodeURIComponent(redirectUrl) });
+    setLoadingSubmit(false);
+
+    if (response.status !== 200) {
       console.error('Error accepting transaction:', response);
       alert(`Error: ${response.data.reason}`);
+      return;
     }
+    console.log('Transaction accepted:', response.data);
+
+    if (response.data.kycLink) {
+      // open link in the same tab
+      window.location.href = response.data.kycLink;
+      return;
+    }
+
+    console.log('Transaction accepted successfully:', response.data);
+    await onTransactionComplete({ memo: response.data.transaction_reference });
     setLoadingSubmit(false);
   }, [account_number, bank_code, quote_id, userId, onTransactionComplete]);
 

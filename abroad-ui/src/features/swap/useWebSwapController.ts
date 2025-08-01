@@ -42,7 +42,7 @@ export const useWebSwapController = () => {
     setView('swap');
   }, []);
 
-  const handleTransactionComplete = useCallback(async ({ memo }: { memo: string }) => {
+  const handleTransactionComplete = useCallback(async ({ memo }: { memo: string | null }) => {
     console.log('Transaction complete with memo:', memo);
     // Ideally, navigate to a dedicated success route
     // For now, reset to the initial swap view
