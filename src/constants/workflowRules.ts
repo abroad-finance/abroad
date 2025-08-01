@@ -2,8 +2,18 @@ import { KYCTier } from '@prisma/client'
 
 /* ---------------------------------------------------------------------------
  * Lookup tables
+ *
+ * Note: KYCTier enum has numerical ordering for proper comparison
  * ------------------------------------------------------------------------- */
 type Country = 'BR' | 'CO'
+
+// Numerical mapping for KYC tier comparison
+const tierOrder: Record<KYCTier, number> = {
+  [KYCTier.BASIC]: 1,
+  [KYCTier.ENHANCED]: 3,
+  [KYCTier.NONE]: 0,
+  [KYCTier.STANDARD]: 2,
+}
 
 const tierRule: Record<Country, (amount: number) => KYCTier> = {
   BR: amt => (amt <= 10_000 ? KYCTier.BASIC : KYCTier.ENHANCED),
@@ -52,7 +62,7 @@ export function nextWorkflowId(
   if (amount < 0) throw new Error('Amount cannot be negative')
 
   const requiredTier = tierRule[country](amount)
-  if (existingTier >= requiredTier) return null // Skip redundant KYC 🎉
+  if (tierOrder[existingTier] >= tierOrder[requiredTier]) return null
 
   return workflowByTier[country][requiredTier]
 }
