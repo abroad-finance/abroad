@@ -77,7 +77,7 @@ const EXCLUDED_BANKS = ['CFA COOPERATIVA FINANCIERA', 'CONFIAR COOPERATIVA FINAN
 
 interface BankDetailsRouteProps {
   onBackClick: () => void;
-  onTransactionComplete: ({ memo }: { memo: string }) => Promise<void>;
+  onTransactionComplete: ({ memo }: { memo: string | null}) => Promise<void>;
   quote_id: string;
   sourceAmount: string;
   targetAmount: string;

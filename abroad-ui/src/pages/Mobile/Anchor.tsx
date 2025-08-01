@@ -77,12 +77,15 @@ export default function Anchor() {
     setCurrentView('bankDetails');
   };
 
-  const handleTransactionAccepted = useCallback(async ({ memo }: { memo: string }) => {
+  const handleTransactionAccepted = useCallback(async ({ memo }: { memo: string | null }) => {
     // make a get request
     const sepBaseUrl = import.meta.env.VITE_SEP_BASE_URL || 'http://localhost:8000';
-    let url = encodeURI(`${sepBaseUrl}/sep24/transactions/withdraw/interactive/complete?amount_expected=${sourceAmount}&transaction_id=${sepTransactionId}&memo=${memo}`);
+    let url = encodeURI(`${sepBaseUrl}/sep24/transactions/withdraw/interactive/complete?amount_expected=${sourceAmount}&transaction_id=${sepTransactionId}`);
     if (callbackUrl && callbackUrl.toLowerCase() !== 'none') {
       url += `&callback=${encodeURIComponent(callbackUrl)}`;
+    }
+    if (memo) {
+      url += `&memo=${encodeURIComponent(memo)}`;
     }
     window.location.href = url;
   }, [callbackUrl, sepTransactionId, sourceAmount]);
