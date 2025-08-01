@@ -12,7 +12,7 @@ interface ConnectWalletProps {
 
 const ConnectWallet: React.FC<ConnectWalletProps> = ({ onWalletSelect, onClose }) => {
   const [selectedWallet, setSelectedWallet] = useState<'trust' | 'stellar' | null>(null);
-  const { authenticateWithWallet, setWalletId } = useWalletAuth();
+  const { authenticateWithWallet } = useWalletAuth();
 
   // Handle escape key press
   useEffect(() => {
@@ -33,9 +33,7 @@ const ConnectWallet: React.FC<ConnectWalletProps> = ({ onWalletSelect, onClose }
     setSelectedWallet(walletType);
     kit.openModal({
       onWalletSelected: async (option) => {
-        kit.setWallet(option.id);
-        setWalletId(option.id); // Store the wallet ID
-        authenticateWithWallet();
+        authenticateWithWallet(option.id);
       },
     })
   };
