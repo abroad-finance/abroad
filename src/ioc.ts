@@ -2,6 +2,7 @@
 import { Container, decorate, injectable } from 'inversify'
 import { Controller } from 'tsoa'
 
+import { GuardlineWebhookController } from './controllers/GuardlineWebhookController'
 import { PartnerController } from './controllers/PartnerController'
 import { PartnerUserController } from './controllers/PartnerUserController'
 import { PaymentsController } from './controllers/PaymentsController'
@@ -137,6 +138,7 @@ container
   .inSingletonScope()
 
 // Controllers
+container.bind(GuardlineWebhookController).toSelf().inSingletonScope()
 container.bind<PartnerController>(PartnerController).toSelf().inSingletonScope()
 container.bind<PartnerUserController>(PartnerUserController).toSelf().inSingletonScope()
 container.bind<QuoteController>(QuoteController).toSelf().inSingletonScope()
