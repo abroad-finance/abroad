@@ -3,7 +3,7 @@ import { Button } from "../Button";
 import { ChevronsDown, Loader, CircleDollarSign, Landmark, Timer, Wallet } from 'lucide-react';
 import { TokenBadge } from './tokenBadge';
 import { IconAnimated } from '../IconAnimated';
-import { getQuote, getReverseQuote, _36EnumsTargetCurrency, _36EnumsPaymentMethod, _36EnumsBlockchainNetwork, _36EnumsCryptoCurrency } from '../../api/index';
+import { getQuote, getReverseQuote, _36EnumsTargetCurrency as TargetCurrency, _36EnumsPaymentMethod as PaymentMethod, _36EnumsBlockchainNetwork as BlockchainNetwork, _36EnumsCryptoCurrency as CryptoCurrency } from '../../api/index';
 import { useWalletAuth } from '../../context/WalletAuthContext';
 
 // Define props for Swap component
@@ -56,11 +56,11 @@ export default function Swap({ onContinue, initialSourceAmount = '', initialTarg
       sourceDebounceRef.current = setTimeout(async () => {
         try {
           const response = await getReverseQuote({
-            target_currency: _36EnumsTargetCurrency.COP,
+            target_currency: TargetCurrency.COP,
             source_amount: num,
-            payment_method: _36EnumsPaymentMethod.MOVII,
-            network: _36EnumsBlockchainNetwork.STELLAR,
-            crypto_currency: _36EnumsCryptoCurrency.USDC,
+            payment_method: PaymentMethod.MOVII,
+            network: BlockchainNetwork.STELLAR,
+            crypto_currency: CryptoCurrency.USDC,
           });
           if (response.status === 200) {
             const formatted = formatCOPNumber(response.data.value);
@@ -109,10 +109,10 @@ export default function Swap({ onContinue, initialSourceAmount = '', initialTarg
       targetDebounceRef.current = setTimeout(async () => {
         try {
           const response = await getQuote({
-            target_currency: _36EnumsTargetCurrency.COP,
-            payment_method: _36EnumsPaymentMethod.MOVII,
-            network: _36EnumsBlockchainNetwork.STELLAR,
-            crypto_currency: _36EnumsCryptoCurrency.USDC,
+            target_currency: TargetCurrency.COP,
+            payment_method: PaymentMethod.MOVII,
+            network: BlockchainNetwork.STELLAR,
+            crypto_currency: CryptoCurrency.USDC,
             amount: num,
           });
           if (response.status === 200) {
@@ -159,9 +159,6 @@ export default function Swap({ onContinue, initialSourceAmount = '', initialTarg
 
     // Reset state when user gets authenticated
     useEffect(() => {
-      if (token) {
-        // User is authenticated, reset any error states if needed
-      }
     }, [token]);
 
     return (
