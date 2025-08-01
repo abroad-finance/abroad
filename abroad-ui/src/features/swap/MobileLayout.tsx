@@ -1,6 +1,6 @@
 import React from 'react';
-import Swap from '../../components/Swap/swap';
-import BankDetailsRoute from '../../components/Swap/bankDetailsRoute';
+import Swap from '../../components/Swap/Swap';
+import BankDetailsRoute from '../../components/Swap/BankDetailsRoute';
 import AnimatedHeroText from '../../components/common/AnimatedHeroText';
 import ImageAttribution from '../../components/common/ImageAttribution';
 import { ASSET_URLS } from './webSwap.constants';

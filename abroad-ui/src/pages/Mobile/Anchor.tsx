@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
-import Swap from '../../components/Swap/swap';
-import BankDetailsRoute from '../../components/Swap/bankDetailsRoute';
 import TxStatus from '../../components/Swap/TxStatus';
+import Swap from '../../components/Swap/Swap';
+import BankDetailsRoute from '../../components/BankDetailsRoute';
 import { useLanguage } from '../../contexts/LanguageContext';
 import jwt from 'jsonwebtoken';
 
