@@ -43,7 +43,7 @@ export interface GuardlineWebhookResponse {
   success: boolean
 }
 
-@Route('webhook')
+@Route('webhook2')
 export class GuardlineWebhookController extends Controller {
   constructor(
     @inject(TYPES.IDatabaseClientProvider)

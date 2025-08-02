@@ -53,7 +53,7 @@ export class GuardLineKycService implements IKycService {
     const { data } = await axios.post<{
       first_step_name: string
       workflow_instance_id: string
-    }>(`https://onboarding.guardline.io/api/workflow-executor//${tenantId}/WorkflowInstance`, {
+    }>(`https://onboarding.guardline.io/api/workflow-executor/${tenantId}/WorkflowInstance`, {
       workflow_definition_id: workflowDefinitionId,
     })
 
@@ -89,7 +89,7 @@ export class GuardLineKycService implements IKycService {
   ): string {
     const base = `https://onboarding.guardline.io/${tenantId}/${instanceId}/${firstStep}`
     return redirectUrl
-      ? `${base}?redirect_uri=${encodeURIComponent(redirectUrl)}`
+      ? `${base}?redirect_uri=${redirectUrl}`
       : base
   }
 

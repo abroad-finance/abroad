@@ -4,8 +4,6 @@
 # “slim” is a little larger than Alpine but avoids native-addon recompiles,
 # so npm ci is usually 2-3× faster.
 FROM node:22.14.0-slim AS base
-RUN apt-get update && \
-    apt-get install -y chromium
 WORKDIR /app
 
 ##########  DEPENDENCY LAYER  (rarely changes)  ###############################
@@ -43,8 +41,6 @@ COPY --from=build     /app/dist                ./dist
 COPY --from=build     /app/src/swagger.json     ./dist/swagger.json
 COPY --from=build     /app/package.json        ./package.json
 COPY prisma/schema.prisma ./prisma/schema.prisma
-
-RUN npx puppeteer browsers install chrome
 
 EXPOSE 3000
 CMD ["node","dist/server.js"]

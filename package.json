@@ -44,7 +44,6 @@
     "joi": "^17.13.3",
     "js-sha512": "^0.9.0",
     "jsonwebtoken": "^9.0.2",
-    "puppeteer": "^24.8.2",
     "react-number-format": "^5.4.4",
     "swagger-ui-express": "^5.0.1",
     "tsoa": "^6.4.0",
