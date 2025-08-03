@@ -2,6 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useState } fr
 import { walletAuth } from '../services/walletAuth';
 import { kit } from '../services/stellarKit';
 import { WalletNetwork } from '@creit.tech/stellar-wallets-kit';
+import { PENDING_TX_KEY } from '../constants';
 
 interface WalletAuthState {
   token: string | null;
@@ -81,6 +82,7 @@ export const WalletAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setToken(null);
     setAddress(null);
     setWalletId(null);
+    localStorage.getItem(PENDING_TX_KEY);
     kit.disconnect();
   }, [setAddress, setToken, setWalletId]);
 
@@ -93,8 +95,9 @@ export const WalletAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       setAddress(address);
     }).catch(err => {
       console.error('Failed to get address from StellarKit', err);
+      logout();
     });
-  }, [setAddress, token, walletId]);
+  }, [logout, setAddress, token, walletId]);
 
   return (
     <WalletAuthContext.Provider value={{ token, authenticateWithWallet, address, walletId, setWalletId: handleSetWalletId, logout }}>

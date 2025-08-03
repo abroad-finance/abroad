@@ -1,9 +1,11 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { SwapData, SwapView } from './webSwap.types';
 import { useWalletAuth } from '../../context/WalletAuthContext';
 
+const PENDING_TX_KEY = 'pendingTransaction';
+
 export const useWebSwapController = () => {
-  const {address } = useWalletAuth();
+  const { address, token } = useWalletAuth();
   const [view, setView] = useState<SwapView>('swap');
   const [swapData, setSwapData] = useState<SwapData | null>(null);
 
@@ -11,10 +13,26 @@ export const useWebSwapController = () => {
   // Modal visibility state
   const [isWalletModalOpen, setIsWalletModalOpen] = useState(false);
   const [isWalletDetailsOpen, setIsWalletDetailsOpen] = useState(false);
-  
+
   // Persist amounts between views
   const [sourceAmount, setSourceAmount] = useState('');
   const [targetAmount, setTargetAmount] = useState('');
+
+  // Restore state if user returns from KYC
+  useEffect(() => {
+    const stored = localStorage.getItem(PENDING_TX_KEY);
+    if (stored && token) {
+      try {
+        const parsed = JSON.parse(stored);
+        setSwapData({ quote_id: parsed.quote_id, srcAmount: parsed.srcAmount, tgtAmount: parsed.tgtAmount });
+        setSourceAmount(parsed.srcAmount);
+        setTargetAmount(parsed.tgtAmount);
+        setView('bankDetails');
+      } catch (e) {
+        console.error('Failed to restore pending transaction', e);
+      }
+    }
+  }, [token]);
 
   const handleWalletConnectOpen = useCallback(() => setIsWalletModalOpen(true), []);
   const handleWalletConnectClose = useCallback(() => setIsWalletModalOpen(false), []);
@@ -33,13 +51,14 @@ export const useWebSwapController = () => {
     setSwapData(data);
     setView('bankDetails');
   }, []);
-  
+
   const handleAmountsChange = useCallback((src: string, tgt: string) => {
     setSourceAmount(src);
     setTargetAmount(tgt);
   }, []);
 
   const handleBackToSwap = useCallback(() => {
+    localStorage.removeItem(PENDING_TX_KEY);
     setView('swap');
   }, []);
 
@@ -47,6 +66,7 @@ export const useWebSwapController = () => {
     console.log('Transaction complete with memo:', memo);
     // Ideally, navigate to a dedicated success route
     // For now, reset to the initial swap view
+    localStorage.removeItem(PENDING_TX_KEY);
     setView('swap');
     setSwapData(null);
   }, []);
