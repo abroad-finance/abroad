@@ -72,7 +72,7 @@ export class GuardLineKycService implements IKycService {
         link: kycLink,
         partnerUserId: userId,
         status: KycStatus.PENDING,
-        tier: existingTier,
+        tier: nextTier,
       },
     })
 
