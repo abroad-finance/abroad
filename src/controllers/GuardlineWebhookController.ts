@@ -22,7 +22,7 @@ import { TYPES } from '../types'
 // Guardline webhook payload validation schema
 const guardlineWebhookSchema = z.object({
   workflow_instance_id: z.string().min(1).optional(),
-})
+}).passthrough() // Allow excess properties
 
 export interface GuardlineWebhookRequest {
   workflow_instance_id?: string
