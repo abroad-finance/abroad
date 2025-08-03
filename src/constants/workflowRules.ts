@@ -25,7 +25,7 @@ const tierRule: Record<Country, (amount: number) => KYCTier> = {
         : KYCTier.ENHANCED,
 }
 
-const workflowByTier: Record<Country, Record<KYCTier, null | string>> = {
+export const workflowByTier: Record<Country, Record<KYCTier, null | string>> = {
   BR: {
     [KYCTier.BASIC]: '39ab7843d047521e', // ≤ 10 000 BRL :contentReference[oaicite:9]{index=9}
     [KYCTier.ENHANCED]: 'be9d1560c0b88e24',
@@ -54,15 +54,15 @@ const workflowByTier: Record<Country, Record<KYCTier, null | string>> = {
  *          → `workflowDefinitionId` to launch if *more* KYC is needed
  *          → `null` if the existing data already satisfies this operation
  */
-export function nextWorkflowId(
+export function getNextTier(
   country: Country,
   amount: number,
   existingTier: KYCTier = KYCTier.NONE,
-): null | string {
+): KYCTier | null {
   if (amount < 0) throw new Error('Amount cannot be negative')
 
   const requiredTier = tierRule[country](amount)
   if (tierOrder[existingTier] >= tierOrder[requiredTier]) return null
 
-  return workflowByTier[country][requiredTier]
+  return requiredTier
 }
