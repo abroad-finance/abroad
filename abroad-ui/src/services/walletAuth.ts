@@ -1,4 +1,5 @@
 import { challenge, verify } from "../api";
+import customClient from "../api/customClient";
 
 export async function walletAuth(address: string, signer: { signMessage: (msg: string) => Promise<string> }): Promise<string> {
   const res = await challenge({address});
@@ -9,4 +10,14 @@ export async function walletAuth(address: string, signer: { signMessage: (msg: s
   if (verifyRes.status !== 200) throw new Error('Failed to verify signature');
   const { token } = await verifyRes.data;
   return token as string;
+}
+
+export async function refreshWalletAuthToken(token: string): Promise<string> {
+  const res = await customClient<{ token: string }>("/walletAuth/refresh", {
+    method: "POST",
+    body: JSON.stringify({ token }),
+    headers: { "Content-Type": "application/json" },
+  });
+  if (res.status !== 200) throw new Error("Failed to refresh token");
+  return res.data.token as string;
 }

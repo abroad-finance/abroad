@@ -1,5 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
-import { walletAuth } from '../services/walletAuth';
+import { walletAuth, refreshWalletAuthToken } from '../services/walletAuth';
 import { kit } from '../services/stellarKit';
 import { WalletNetwork } from '@creit.tech/stellar-wallets-kit';
 import { PENDING_TX_KEY } from '../constants';
@@ -86,6 +86,17 @@ export const WalletAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     kit.disconnect();
   }, [setAddress, setToken, setWalletId]);
 
+  const refreshToken = useCallback(async () => {
+    if (!token) return;
+    try {
+      const newToken = await refreshWalletAuthToken(token);
+      setToken(newToken);
+    } catch (err) {
+      console.error('Failed to refresh wallet token', err);
+      logout();
+    }
+  }, [logout, setToken, token]);
+
   useEffect(() => {
     if (!token || !walletId) {
       return;
@@ -98,6 +109,23 @@ export const WalletAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       logout();
     });
   }, [logout, setAddress, token, walletId]);
+
+  useEffect(() => {
+    if (!token) {
+      return;
+    }
+    const payload = JSON.parse(atob(token.split('.')[1])) as { exp?: number };
+    if (!payload.exp) {
+      return;
+    }
+    const timeout = payload.exp * 1000 - Date.now() - 60000;
+    if (timeout <= 0) {
+      refreshToken();
+      return;
+    }
+    const id = setTimeout(refreshToken, timeout);
+    return () => clearTimeout(id);
+  }, [refreshToken, token]);
 
   return (
     <WalletAuthContext.Provider value={{ token, authenticateWithWallet, address, walletId, setWalletId: handleSetWalletId, logout }}>
