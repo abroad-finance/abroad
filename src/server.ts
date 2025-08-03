@@ -21,6 +21,8 @@ dotenv.config()
 const app = express()
 app.use(cors())
 app.use(bodyParser.json())
+// Handle text/json content-type for webhooks like Guardline
+app.use(bodyParser.json({ type: 'text/json' }))
 
 // ---------------------------
 // tsoa‑generated application routes
