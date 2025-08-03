@@ -273,7 +273,7 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({ className = '', onW
             {/* Wallet Badge */}
             <button 
               onClick={handleWalletClick}
-              className="flex items-center space-x-3 bg-white/20 backdrop-blur-sm rounded-2xl px-4 py-2 border border-white/30 hover:bg-white/30 transition-colors duration-200"
+              className="cursor-pointer flex items-center space-x-3 bg-white/20 backdrop-blur-sm rounded-2xl px-4 py-2 border border-white/30 hover:bg-white/30 transition-colors duration-200"
             >
               {renderWalletIcon()}
               <span className="text-white text-md font-medium">
