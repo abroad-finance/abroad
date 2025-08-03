@@ -106,8 +106,7 @@ app.get('/', (req: Request, res: Response) => {
 
 app.post('/webhook/guardline', (_req: Request, res: Response) => {
   console.log('Guardline webhook endpoint hit', JSON.stringify({
-    requestBody: _req.body,
-    requestHeaders: _req.headers,
+    request: _req,
   }, null, 2))
   res.status(200).send('Guardline webhook endpoint hit')
 })
