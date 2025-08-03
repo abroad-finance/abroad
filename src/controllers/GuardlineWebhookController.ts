@@ -25,6 +25,7 @@ const guardlineWebhookSchema = z.object({
 }).passthrough() // Allow excess properties
 
 export interface GuardlineWebhookRequest {
+  [key: string]: unknown // Allow excess properties
   workflow_instance_id?: string
 }
 
