@@ -5,6 +5,8 @@ import BankDetailsRoute from '../../components/Swap/BankDetailsRoute';
 import { useLanguage } from '../../contexts/LanguageContext';
 import jwt from 'jsonwebtoken';
 
+const PENDING_TX_KEY = 'pendingTransaction';
+
 export default function Anchor() {
   const { setLanguage } = useLanguage();
 
@@ -43,6 +45,21 @@ export default function Anchor() {
         console.error('Error decoding token:', error);
       }
     }
+
+    // Restore pending transaction if returning from KYC
+    const stored = localStorage.getItem(PENDING_TX_KEY);
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        setquote_id(parsed.quote_id);
+        setSourceAmount(parsed.srcAmount);
+        setTargetAmount(parsed.tgtAmount);
+        setUserId(parsed.userId || '');
+        setCurrentView('bankDetails');
+      } catch (e) {
+        console.error('Failed to restore pending transaction', e);
+      }
+    }
   }, [setLanguage]);
 
   const handleSwapContinue = (qId: string, srcAmount: string, tgtAmount: string) => {
@@ -53,6 +70,7 @@ export default function Anchor() {
   };
 
   const handleBankDetailsBack = () => {
+    localStorage.removeItem(PENDING_TX_KEY);
     setCurrentView('swap');
     // Optionally clear the data if needed when going back
     // setQuoteId('');
@@ -67,6 +85,7 @@ export default function Anchor() {
   };
 
   const handleNewTransaction = () => {
+    localStorage.removeItem(PENDING_TX_KEY);
     setquote_id('');
     setSourceAmount('');
     setTargetAmount('');
@@ -87,6 +106,7 @@ export default function Anchor() {
     if (memo) {
       url += `&memo=${encodeURIComponent(memo)}`;
     }
+    localStorage.removeItem(PENDING_TX_KEY);
     window.location.href = url;
   }, [callbackUrl, sepTransactionId, sourceAmount]);
 

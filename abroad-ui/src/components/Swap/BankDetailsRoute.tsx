@@ -77,6 +77,8 @@ const BANK_CONFIG: Record<string, { iconUrl: string; displayLabel?: string }> = 
 // Banks to exclude from the dropdown list
 const EXCLUDED_BANKS = ['CFA COOPERATIVA FINANCIERA', 'CONFIAR COOPERATIVA FINANCIERA', 'BANCOCOOPCENTRAL'];
 
+const PENDING_TX_KEY = 'pendingTransaction';
+
 interface BankDetailsRouteProps {
   onBackClick: () => void;
   onTransactionComplete: ({ memo }: { memo: string | null}) => Promise<void>;
@@ -88,7 +90,7 @@ interface BankDetailsRouteProps {
 }
 
 
-export default function BankDetailsRoute({ userId, onBackClick, quote_id, targetAmount, onTransactionComplete, textColor = '#356E6A' }: BankDetailsRouteProps): React.JSX.Element {
+export default function BankDetailsRoute({ userId, onBackClick, quote_id, sourceAmount, targetAmount, onTransactionComplete, textColor = '#356E6A' }: BankDetailsRouteProps): React.JSX.Element {
   const { walletId } = useWalletAuth();
   const [account_number, setaccount_number] = useState('');
   const [bank_code, setbank_code] = useState<string>('');
@@ -99,6 +101,21 @@ export default function BankDetailsRoute({ userId, onBackClick, quote_id, target
   const [apiBanks, setApiBanks] = useState<Bank[]>([]);
   const [loadingBanks, setLoadingBanks] = useState<boolean>(false);
   const [errorBanks, setErrorBanks] = useState<string | null>(null);
+
+  // Restore saved bank details if returning from KYC
+  useEffect(() => {
+    const stored = localStorage.getItem(PENDING_TX_KEY);
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        if (parsed.account_number) setaccount_number(parsed.account_number);
+        if (parsed.bank_code) setbank_code(parsed.bank_code);
+        if (parsed.selectedBank) setSelectedBank(parsed.selectedBank);
+      } catch (e) {
+        console.error('Failed to restore pending transaction', e);
+      }
+    }
+  }, []);
 
   useEffect(() => {
     const fetchBanks = async () => {
@@ -178,6 +195,19 @@ export default function BankDetailsRoute({ userId, onBackClick, quote_id, target
       console.log('Transaction accepted:', response.data);
 
       if (response.data.kycLink) {
+        // Persist transaction data before redirecting to KYC
+        localStorage.setItem(
+          PENDING_TX_KEY,
+          JSON.stringify({
+            quote_id,
+            srcAmount: sourceAmount,
+            tgtAmount: targetAmount,
+            account_number,
+            bank_code,
+            userId,
+            selectedBank,
+          }),
+        );
         // open link in the same tab
         window.location.href = response.data.kycLink;
         return;
@@ -210,7 +240,9 @@ export default function BankDetailsRoute({ userId, onBackClick, quote_id, target
         // Continue with completion even if signing fails
       }
 
-      // Complete the transaction 
+      // Complete the transaction
+      // Clear persisted data on success
+      localStorage.removeItem(PENDING_TX_KEY);
       await onTransactionComplete({ memo: response.data.transaction_reference });
 
     } catch (error) {
@@ -223,7 +255,7 @@ export default function BankDetailsRoute({ userId, onBackClick, quote_id, target
     } finally {
       setLoadingSubmit(false);
     }
-  }, [account_number, bank_code, quote_id, userId, onTransactionComplete, walletId]);
+  }, [account_number, bank_code, quote_id, userId, sourceAmount, targetAmount, selectedBank, onTransactionComplete, walletId]);
   
 
 
