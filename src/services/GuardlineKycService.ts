@@ -2,7 +2,7 @@ import { KycStatus, KYCTier } from '@prisma/client'
 import axios from 'axios'
 import { inject } from 'inversify'
 
-import { nextWorkflowId } from '../constants/workflowRules'
+import { getNextTier, workflowByTier } from '../constants/workflowRules'
 import { IDatabaseClientProvider } from '../interfaces/IDatabaseClientProvider'
 import { IKycService } from '../interfaces/IKycService'
 import { ISecretManager } from '../interfaces/ISecretManager'
@@ -42,11 +42,13 @@ export class GuardLineKycService implements IKycService {
       return highestKyc.link
     }
 
-    const workflowDefinitionId = nextWorkflowId(country, amount, existingTier)
+    const nextTier = getNextTier(country, amount, existingTier)
 
-    if (!workflowDefinitionId) {
+    if (!nextTier) {
       return null
     }
+
+    const workflowDefinitionId = workflowByTier[country][nextTier]
 
     const tenantId = await this.secretManager.getSecret('GUARDLINE_TENANT_ID')
 
@@ -70,7 +72,7 @@ export class GuardLineKycService implements IKycService {
         link: kycLink,
         partnerUserId: userId,
         status: KycStatus.PENDING,
-        tier: existingTier,
+        tier: nextTier,
       },
     })
 
