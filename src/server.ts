@@ -106,16 +106,6 @@ app.get('/', (req: Request, res: Response) => {
   })
 })
 
-app.post('/webhook/guardline', (req: Request, res: Response) => {
-  console.log('Guardline webhook endpoint hit')
-  console.log('Guardline Request headers:', JSON.stringify(req.headers, null, 2))
-  console.log('Guardline Request body:', JSON.stringify(req.body, null, 2))
-  console.log('Guardline Raw body type:', typeof req.body)
-  console.log('Guardline Body keys:', req.body ? Object.keys(req.body) : 'No body')
-
-  res.status(200).send('Guardline webhook endpoint hit')
-})
-
 // ---------------
 // Error handling
 // ---------------

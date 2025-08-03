@@ -21,21 +21,11 @@ import { TYPES } from '../types'
 
 // Guardline webhook payload validation schema
 const guardlineWebhookSchema = z.object({
-  instance_id: z.string().min(1).optional(),
-  metadata: z.record(z.unknown()).optional(),
-  process_id: z.string().min(1).optional(),
-  results: z.record(z.unknown()).optional(),
-  status: z.enum(['CANCELED', 'COMPLETED_FAILURE', 'COMPLETED_SUCCESS', 'INCOMPLETE']),
-  timestamp: z.string().optional(),
+  workflow_instance_id: z.string().min(1).optional(),
 })
 
 export interface GuardlineWebhookRequest {
-  instance_id?: string
-  metadata?: Record<string, unknown>
-  process_id?: string
-  results?: Record<string, unknown>
-  status: 'CANCELED' | 'COMPLETED_FAILURE' | 'COMPLETED_SUCCESS' | 'INCOMPLETE'
-  timestamp?: string
+  workflow_instance_id?: string
 }
 
 export interface GuardlineWebhookResponse {
@@ -43,7 +33,7 @@ export interface GuardlineWebhookResponse {
   success: boolean
 }
 
-@Route('webhook2')
+@Route('webhook')
 export class GuardlineWebhookController extends Controller {
   constructor(
     @inject(TYPES.IDatabaseClientProvider)
@@ -67,7 +57,7 @@ export class GuardlineWebhookController extends Controller {
   @Response('500', 'Internal Server Error')
   @SuccessResponse('200', 'Webhook processed successfully')
   public async handleGuardlineWebhook(
-    @Body() body: unknown,
+    @Body() body: GuardlineWebhookRequest,
     @Request() request: RequestExpress,
     @Res() badRequest: TsoaResponse<400, { message: string, success: false }>,
     @Res() notFound: TsoaResponse<404, { message: string, success: false }>,
@@ -93,11 +83,11 @@ export class GuardlineWebhookController extends Controller {
         })
       }
 
-      const { instance_id, process_id, results, status, timestamp } = validation.data
-      const externalId = instance_id || process_id
+      const { workflow_instance_id } = validation.data
+      const externalId = workflow_instance_id
 
       if (!externalId) {
-        this.logger.error('Missing instance_id or process_id in Guardline webhook', { payload: body })
+        this.logger.error('Missing workflow_instance_id in Guardline webhook', { payload: body })
         return badRequest(400, {
           message: 'Missing instance_id or process_id',
           success: false,
@@ -106,8 +96,6 @@ export class GuardlineWebhookController extends Controller {
 
       this.logger.info('Processing Guardline webhook', {
         externalId,
-        status,
-        timestamp,
       })
 
       const prisma = await this.dbProvider.getClient()
@@ -133,7 +121,8 @@ export class GuardlineWebhookController extends Controller {
       }
 
       // Map Guardline status to internal KYC status
-      const kycStatus = this.mapGuardlineStatusToKycStatus(status)
+      // TODO: Implement a more comprehensive mapping if needed
+      const kycStatus = KycStatus.APPROVED
 
       // Update the KYC record with the new status
       await prisma.partnerUserKyc.update({
@@ -146,21 +135,12 @@ export class GuardlineWebhookController extends Controller {
 
       this.logger.info('Updated KYC status from Guardline webhook', {
         externalId,
-        guardlineStatus: status,
         kycRecordId: kycRecord.id,
         newStatus: kycStatus,
         oldStatus: kycRecord.status,
         partnerId: kycRecord.partnerUser.partner.id,
         partnerUserId: kycRecord.partnerUserId,
       })
-
-      // Log additional details if available
-      if (results) {
-        this.logger.info('Guardline KYC results', {
-          externalId,
-          results,
-        })
-      }
 
       this.setStatus(200)
       return {
