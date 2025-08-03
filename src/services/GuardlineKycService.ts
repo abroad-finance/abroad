@@ -64,7 +64,7 @@ export class GuardLineKycService implements IKycService {
       redirectUrl,
     )
 
-    client.partnerUserKyc.create({
+    await client.partnerUserKyc.create({
       data: {
         externalId: data.workflow_instance_id,
         link: kycLink,
