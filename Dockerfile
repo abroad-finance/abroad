@@ -3,7 +3,9 @@
 ##########  BASE IMAGE  #######################################################
 # “slim” is a little larger than Alpine but avoids native-addon recompiles,
 # so npm ci is usually 2-3× faster.
-FROM node:22.14.0-slim AS base
+FROM node:22-bullseye-slim AS base
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends build-essential python3
 WORKDIR /app
 
 ##########  DEPENDENCY LAYER  (rarely changes)  ###############################
