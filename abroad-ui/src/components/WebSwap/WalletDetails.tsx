@@ -90,8 +90,13 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
       setIsLoadingTransactions(true);
       setTransactionError(null);
       
+      if (!address) {
+        setTransactionError('No wallet address connected');
+        return;
+      }
+
       const response = await listPartnerTransactions(
-        { page: 1, pageSize: 10 }, // Get first 10 transactions
+        { page: 1, pageSize: 10, externalUserId: address }, // Get first 10 transactions
         { 
           headers: { 
             'Authorization': `Bearer ${token}` 

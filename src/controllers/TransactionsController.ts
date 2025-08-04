@@ -82,6 +82,7 @@ export class TransactionsController extends Controller {
   public async listPartnerTransactions(
     @Query() page: number = 1,
     @Query() pageSize: number = 20,
+    @Query() externalUserId: string,
     @Request() request: RequestExpress,
     @Res() badRequest: TsoaResponse<400, { reason: string }>,
   ): Promise<PaginatedTransactionList> {
@@ -96,9 +97,9 @@ export class TransactionsController extends Controller {
         orderBy: { createdAt: 'desc' },
         skip: (page - 1) * pageSize,
         take: pageSize,
-        where: { partnerUser: { partnerId: partner.id } },
+        where: { partnerUser: { partnerId: partner.id, userId: externalUserId } },
       }),
-      prismaClient.transaction.count({ where: { partnerUser: { partnerId: partner.id } } }),
+      prismaClient.transaction.count({ where: { partnerUser: { partnerId: partner.id, userId: externalUserId } } }),
     ])
     return { page, pageSize, total, transactions }
   }
