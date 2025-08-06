@@ -407,7 +407,30 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
 
           {!isLoadingTransactions && transactions.length === 0 && !transactionError && (
             <div className="text-center py-8">
-              <div className="text-gray-400 text-sm">No hay transacciones aún</div>
+              {/* Skeleton card - 60% smaller than regular transaction cards */}
+              <div className="bg-gray-50 border border-gray-200 rounded-xl p-2.5 mb-4 mx-auto max-w-[60%] relative">
+                <div>
+                  <div className="flex justify-between items-center mb-1.5">
+                    <div className="h-3 bg-gray-200 rounded w-16"></div>
+                    <div className="h-4 bg-gray-200 rounded w-12"></div>
+                  </div>
+                  <div className="h-3 bg-gray-200 rounded w-20 mb-2"></div>
+                  <div className="flex justify-between items-center">
+                    <div className="h-4 bg-gray-200 rounded w-12"></div>
+                    <div className="h-4 bg-gray-200 rounded w-16"></div>
+                  </div>
+                </div>
+                {/* Alert sign overlay - top right corner */}
+                <div className="absolute -top-2 -right-2">
+                  <div className="bg-orange-200 text-white rounded-full w-5 h-5 flex items-center justify-center text-sm font-bold">
+                    !
+                  </div>
+                </div>
+              </div>
+              <div className="text-gray-400 text-sm">
+                <div className="font-medium mb-1">No hay transacciones aún</div>
+                <div className="text-xs">Cuando hagas tu primera transacción, aparecerá aquí.</div>
+              </div>
             </div>
           )}
         </div>

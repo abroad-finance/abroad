@@ -5,6 +5,7 @@ import { TokenBadge } from './TokenBadge';
 import { IconAnimated } from '../IconAnimated';
 import { getQuote, getReverseQuote, _36EnumsTargetCurrency as TargetCurrency, _36EnumsPaymentMethod as PaymentMethod, _36EnumsBlockchainNetwork as BlockchainNetwork, _36EnumsCryptoCurrency as CryptoCurrency } from '../../api/index';
 import { useWalletAuth } from '../../context/WalletAuthContext';
+import { kit } from '../../services/stellarKit';
 
 // Define props for Swap component
 interface SwapProps {
@@ -19,7 +20,7 @@ interface SwapProps {
 const TransferFee = 1354;
 
 export default function Swap({ onContinue, initialSourceAmount = '', initialTargetAmount = '', onAmountsChange, textColor = '#356E6A', onWalletConnect }: SwapProps) {
-    const { token } = useWalletAuth();
+    const { token, authenticateWithWallet } = useWalletAuth();
     const [sourceAmount, setSourceAmount] = useState(initialSourceAmount);
     const [targetAmount, setTargetAmount] = useState(initialTargetAmount || '');
     const [quote_id, setquote_id] = useState<string>('');
@@ -161,6 +162,15 @@ export default function Swap({ onContinue, initialSourceAmount = '', initialTarg
     useEffect(() => {
     }, [token]);
 
+    // Direct wallet connection handler
+    const handleDirectWalletConnect = () => {
+      kit.openModal({
+        onWalletSelected: async (option) => {
+          authenticateWithWallet(option.id);
+        },
+      });
+    };
+
     return (
       <div className="flex-1 flex items-center justify-center w-full flex flex-col">
         <div id="background-container" className="w-[90%] max-w-md min-h-[60vh] h-auto bg-[#356E6A]/5 backdrop-blur-xl rounded-4xl p-4 md:p-6 flex flex-col items-center justify-center space-y-1 lg:space-y-4">
@@ -256,7 +266,8 @@ export default function Swap({ onContinue, initialSourceAmount = '', initialTarg
           className="mt-4 w-[90%] max-w-md py-4"
           onClick={() => {
             if (!token) {
-              onWalletConnect?.();
+              // Always use direct wallet connection - prioritize the internal handler
+              handleDirectWalletConnect();
             } else {
               console.log('Continue clicked with quote_id:', quote_id);
               if (!quote_id) {

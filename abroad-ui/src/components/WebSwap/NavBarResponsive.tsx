@@ -2,6 +2,7 @@ import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { Info, Menu, X, Wallet } from 'lucide-react';
 import { useWalletAuth } from '../../context/WalletAuthContext';
 import { Horizon } from '@stellar/stellar-sdk';
+import { kit } from '../../services/stellarKit';
 import AbroadLogoColored from '../../assets/Logos/AbroadLogoColored.svg';
 import AbroadLogoWhite from '../../assets/Logos/AbroadLogoWhite.svg';
 import FreighterLogo from '../../assets/Logos/Wallets/Freighter.svg';
@@ -94,8 +95,17 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({ className = '', onW
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [usdcBalance, setUsdcBalance] = useState<string>('0.00');
   const [isLoadingBalance, setIsLoadingBalance] = useState(false);
-  const { address, walletId } = useWalletAuth(); 
+  const { address, walletId, authenticateWithWallet } = useWalletAuth(); 
   
+  // Direct wallet connection handler
+  const handleDirectWalletConnect = useCallback(() => {
+    kit.openModal({
+      onWalletSelected: async (option) => {
+        authenticateWithWallet(option.id);
+      },
+    });
+  }, [authenticateWithWallet]);
+
   // Use shared USDC balance fetching logic
   const fetchUSDCBalanceWithLoading = useCallback(async (stellarAddress: string) => {
     try {
@@ -172,10 +182,14 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({ className = '', onW
       // If wallet is connected, show wallet details
       onWalletDetails?.();
     } else {
-      // If wallet is not connected, show connect wallet modal
-      onWalletConnect?.();
+      // If wallet is not connected, use direct Stellar kit connection
+      if (onWalletConnect) {
+        onWalletConnect();
+      } else {
+        handleDirectWalletConnect();
+      }
     }
-  }, [address, onWalletDetails, onWalletConnect]);
+  }, [address, onWalletDetails, onWalletConnect, handleDirectWalletConnect]);
 
   // Reusable wallet icon component
   const renderWalletIcon = useCallback(() => {
