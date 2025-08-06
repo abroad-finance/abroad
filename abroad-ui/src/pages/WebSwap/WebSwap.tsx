@@ -2,28 +2,28 @@ import React from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useWebSwapController } from '../../features/swap/useWebSwapController';
 import { ASSET_URLS } from '../../features/swap/webSwap.constants';
-import { kit } from '../../services/stellarKit';
-import { useWalletAuth } from '../../context/WalletAuthContext';
+// import { kit } from '../../services/stellarKit';
+// import { useWalletAuth } from '../../context/WalletAuthContext';
 
 // Child Components
 import NavBarResponsive from '../../components/WebSwap/NavBarResponsive';
-import ConnectWallet from '../../components/WebSwap/ConnectWallet';
+// import ConnectWallet from '../../components/WebSwap/ConnectWallet';
 import WalletDetails from '../../components/WebSwap/WalletDetails';
 import DesktopLayout from '../../features/swap/DesktopLayout';
 import MobileLayout from '../../features/swap/MobileLayout';
 
 const WebSwap: React.FC = () => {
   const controller = useWebSwapController();
-  const { authenticateWithWallet } = useWalletAuth();
+  // const { authenticateWithWallet } = useWalletAuth();
 
-  // Direct wallet connection handler
-  const handleDirectWalletConnect = () => {
-    kit.openModal({
-      onWalletSelected: async (option) => {
-        authenticateWithWallet(option.id);
-      },
-    });
-  };
+  // Direct wallet connection handler - Commented out, components handle internally
+  // const handleDirectWalletConnect = () => {
+  //   kit.openModal({
+  //     onWalletSelected: async (option) => {
+  //       authenticateWithWallet(option.id);
+  //     },
+  //   });
+  // };
 
   return (
     <div className="w-screen min-h-screen md:h-screen md:overflow-hidden flex flex-col">
@@ -36,15 +36,14 @@ const WebSwap: React.FC = () => {
       {/* Shared Navigation */}
       <div className="relative z-10 bg-green-50 md:bg-transparent">
         <NavBarResponsive 
-          onWalletConnect={handleDirectWalletConnect} 
           onWalletDetails={controller.handleWalletDetailsOpen} 
         />
       </div>
 
       {/* Main Content Area */}
       <main className="flex-1 relative z-10 flex">
-        <DesktopLayout {...controller} onWalletConnect={handleDirectWalletConnect} />
-        <MobileLayout {...controller} onWalletConnect={handleDirectWalletConnect} />
+        <DesktopLayout {...controller} />
+        <MobileLayout {...controller} />
       </main>
 
       {/* Top-level Modals */}

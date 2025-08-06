@@ -19,7 +19,7 @@ interface SwapProps {
 
 const TransferFee = 1354;
 
-export default function Swap({ onContinue, initialSourceAmount = '', initialTargetAmount = '', onAmountsChange, textColor = '#356E6A', onWalletConnect }: SwapProps) {
+export default function Swap({ onContinue, initialSourceAmount = '', initialTargetAmount = '', onAmountsChange, textColor = '#356E6A' }: SwapProps) {
     const { token, authenticateWithWallet } = useWalletAuth();
     const [sourceAmount, setSourceAmount] = useState(initialSourceAmount);
     const [targetAmount, setTargetAmount] = useState(initialTargetAmount || '');

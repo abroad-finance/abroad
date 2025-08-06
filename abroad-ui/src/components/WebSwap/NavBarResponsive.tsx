@@ -183,9 +183,11 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({ className = '', onW
       onWalletDetails?.();
     } else {
       // If wallet is not connected, use direct Stellar kit connection
+      // Note: onWalletConnect may be commented out in parent components
       if (onWalletConnect) {
         onWalletConnect();
       } else {
+        // Fallback to direct connection when prop is not provided
         handleDirectWalletConnect();
       }
     }

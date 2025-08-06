@@ -138,3 +138,12 @@ const ConnectWallet: React.FC<ConnectWalletProps> = ({ onWalletSelect, onClose }
 };
 
 export default ConnectWallet;
+
+// This component is temporarily unused - using direct Stellar wallet kit integration
+// Keep this file for future use when we want to add more wallet options
+
+// Note: To reactivate this component:
+// 1. Uncomment import in WebSwap.tsx
+// 2. Uncomment onWalletConnect props
+// 3. Uncomment ConnectWallet modal in AnimatePresence
+// 4. Add back handleDirectWalletConnect function if needed
