@@ -5,11 +5,23 @@ import AnimatedHeroText from '../../components/common/AnimatedHeroText';
 import ImageAttribution from '../../components/common/ImageAttribution';
 import { ASSET_URLS } from './webSwap.constants';
 import { useWebSwapController } from './useWebSwapController'; // For prop types
+import { kit } from '../../services/stellarKit';
+import { useWalletAuth } from '../../context/WalletAuthContext';
 
 type LayoutProps = ReturnType<typeof useWebSwapController>;
 
 const MobileLayout: React.FC<LayoutProps> = (props) => {
-  const { view, swapData, initialAmounts, address, handleSwapContinue, handleBackToSwap, handleTransactionComplete, handleAmountsChange, handleWalletConnectOpen } = props;
+  const { view, swapData, initialAmounts, address, handleSwapContinue, handleBackToSwap, handleTransactionComplete, handleAmountsChange } = props;
+  const { authenticateWithWallet } = useWalletAuth();
+
+  // Direct wallet connection handler
+  const handleDirectWalletConnect = () => {
+    kit.openModal({
+      onWalletSelected: async (option) => {
+        authenticateWithWallet(option.id);
+      },
+    });
+  };
 
   return (
     <div className="md:hidden flex flex-col w-full min-h-screen">
@@ -25,7 +37,7 @@ const MobileLayout: React.FC<LayoutProps> = (props) => {
               initialSourceAmount={initialAmounts.source}
               initialTargetAmount={initialAmounts.target}
               onAmountsChange={handleAmountsChange}
-              onWalletConnect={handleWalletConnectOpen}
+              onWalletConnect={handleDirectWalletConnect}
             />
           )}
           {view === 'bankDetails' && swapData && address && (

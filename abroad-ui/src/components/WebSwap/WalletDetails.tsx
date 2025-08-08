@@ -115,7 +115,7 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
     } finally {
       setIsLoadingTransactions(false);
     }
-  }, [token]);
+  }, [token, address]);
 
   // Fetch balance and transactions when component mounts or token changes
   useEffect(() => {
