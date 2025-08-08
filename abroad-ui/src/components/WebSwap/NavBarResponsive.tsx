@@ -209,8 +209,8 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({ className = '', onW
   const renderUSDCBadge = useCallback((isMobile = false) => {
     if (!address) return null;
     
-    const iconSize = isMobile ? "w-4 h-4" : "w-4 h-4";
-    const textSize = isMobile ? "text-sm" : "text-sm";
+    const iconSize = "w-4 h-4";
+    const textSize = "text-sm";
     const loadingSize = isMobile ? "w-10 h-3" : "w-12 h-4";
     const textColor = isMobile ? "text-[#356E6A]" : "text-white";
     
