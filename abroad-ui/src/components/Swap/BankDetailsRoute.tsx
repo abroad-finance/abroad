@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import PixFull from '../../assets/Logos/networks/PixFull.svg';
 import { Button } from "../Button";
 import { Loader, Hash, ArrowLeft, Rotate3d } from 'lucide-react';
 import { getBanks, Bank, getBanksResponse200, acceptTransaction, _36EnumsTargetCurrency as TargetCurrency } from '../../api';
@@ -503,9 +504,13 @@ export default function BankDetailsRoute({
           >
             <span className="text-sm sm:text-base">Monto a recibir:</span>
             <img
-              className="w-4 h-4 sm:w-5 sm:h-5"
-              src={targetCurrency === TargetCurrency.BRL ? 'https://storage.googleapis.com/cdn-abroad/Icons/Tokens/BRL-Token.svg' : 'https://storage.googleapis.com/cdn-abroad/Icons/Tokens/COP-Token.svg'}
-              alt={targetCurrency === TargetCurrency.BRL ? 'BRL_Token' : 'COP_Token'}
+              className="w-4 h-4 sm:w-5 sm:h-5 rounded-full"
+              src={
+                targetCurrency === TargetCurrency.BRL
+                  ? 'https://hatscripts.github.io/circle-flags/flags/br.svg'
+                  : 'https://hatscripts.github.io/circle-flags/flags/co.svg'
+              }
+              alt={targetCurrency === TargetCurrency.BRL ? 'Brazil flag' : 'Colombia flag'}
             />
             <b className="text-sm sm:text-base"> {targetCurrency === TargetCurrency.BRL ? 'R$' : '$'}{targetAmount}</b>
           </div>
@@ -521,17 +526,17 @@ export default function BankDetailsRoute({
             <>
               <div className="flex items-center space-x-2">
                 <Rotate3d className="w-4 h-4 sm:w-5 sm:h-5" />
-                <span className="font-medium text-xs sm:text-sm">Rede:</span>
+                <span className="font-medium text-xs sm:text-sm">Red:</span>
                 <div className="bg-white/70 backdrop-blur-md rounded-lg px-2 py-1 flex items-center">
                   <img
-                    src="https://upload.wikimedia.org/wikipedia/commons/0/04/PIX_Logo.png"
+                    src={PixFull}
                     alt="PIX Logo"
                     className="h-3 sm:h-4 w-auto"
                   />
                 </div>
               </div>
               <span className="font-medium text-xs pl-1" style={{ color: textColor }}>
-                Sua transação via PIX será processada imediatamente. Certifique-se de que a chave PIX e o CPF do recebedor estão corretos.
+                Tu transacción será procesada de inmediato. Asegúrate de que la llave PIX y el CPF del destinatario sean correctos. Esta transacción no se puede reversar.
               </span>
             </>
           ) : (

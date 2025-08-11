@@ -46,13 +46,64 @@ const WebSwap: React.FC = () => {
     }
   };
 
+  // Smooth crossfade desktop background (page-level only)
+  const BRL_BG_URL = 'https://storage.googleapis.com/cdn-abroad/bg/6193481566_1a304e3aa3_o.jpg';
+  const currentBgUrl = controller.targetCurrency === 'BRL' ? BRL_BG_URL : ASSET_URLS.BACKGROUND_IMAGE;
+  const [baseBgUrl, setBaseBgUrl] = React.useState<string>(currentBgUrl);
+  const [overlayBgUrl, setOverlayBgUrl] = React.useState<string | null>(null);
+
+  // When currency changes, preload the new image, then trigger overlay fade-in; commit to base after fade completes
+  React.useEffect(() => {
+    if (currentBgUrl === baseBgUrl) return;
+    let canceled = false;
+    const img = new Image();
+    img.src = currentBgUrl;
+    const startOverlay = () => {
+      if (!canceled) setOverlayBgUrl(currentBgUrl);
+    };
+    if (img.complete) {
+      // Already cached
+      startOverlay();
+    } else {
+      img.onload = startOverlay;
+      img.onerror = () => {
+        // On error, fall back to hard swap without animation
+        if (!canceled) {
+          setBaseBgUrl(currentBgUrl);
+          setOverlayBgUrl(null);
+        }
+      };
+    }
+    return () => {
+      canceled = true;
+    };
+  }, [currentBgUrl, baseBgUrl]);
+
+  const handleOverlayComplete = React.useCallback(() => {
+    if (overlayBgUrl) {
+      setBaseBgUrl(overlayBgUrl);
+      setOverlayBgUrl(null);
+    }
+  }, [overlayBgUrl]);
+
   return (
     <div className="w-screen min-h-screen md:h-screen md:overflow-hidden flex flex-col">
-      {/* Shared Background for Desktop */}
+      {/* Desktop page background with crossfade (no white flash) */}
       <div
         className="hidden md:block absolute inset-0 z-0 bg-cover bg-center bg-no-repeat bg-fixed"
-        style={{ backgroundImage: `url(${ASSET_URLS.BACKGROUND_IMAGE})` }}
+        style={{ backgroundImage: `url(${baseBgUrl})` }}
       />
+      {overlayBgUrl && (
+        <motion.div
+          key={overlayBgUrl}
+          className="hidden md:block absolute inset-0 z-0 bg-cover bg-center bg-no-repeat bg-fixed pointer-events-none"
+          style={{ backgroundImage: `url(${overlayBgUrl})` }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.35, ease: 'easeOut' }}
+          onAnimationComplete={handleOverlayComplete}
+        />
+      )}
       
       {/* Shared Navigation */}
       <div className="relative z-10 bg-green-50 md:bg-transparent">

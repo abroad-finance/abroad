@@ -1,18 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { CURRENCIES, ASSET_URLS } from '../../features/swap/webSwap.constants';
+import { ASSET_URLS } from '../../features/swap/webSwap.constants';
 
-const AnimatedHeroText: React.FC = () => {
-  const [currentIndex, setCurrentIndex] = useState(0);
+type Props = {
+  currency?: 'COP' | 'BRL';
+};
 
-  useEffect(() => {
-    const intervalId = setInterval(() => {
-      setCurrentIndex((prev) => (prev + 1) % CURRENCIES.length);
-    }, 3000);
-    return () => clearInterval(intervalId);
-  }, []);
-
-  const currency = CURRENCIES[currentIndex];
+const AnimatedHeroText: React.FC<Props> = ({ currency = 'COP' }) => {
+  const flag = currency === 'BRL' ? 'br' : 'co';
+  const displayName = currency === 'BRL' ? 'Reales' : 'Pesos';
 
   return (
     <div className="font-bold text-white text-shadow-lg leading-tight">
@@ -29,7 +25,7 @@ const AnimatedHeroText: React.FC = () => {
           <span>a</span>
           <AnimatePresence mode="wait">
             <motion.div
-              key={currency.name}
+              key={currency}
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
@@ -37,11 +33,11 @@ const AnimatedHeroText: React.FC = () => {
               className="flex items-center gap-2"
             >
               <img
-                src={`https://hatscripts.github.io/circle-flags/flags/${currency.flag}.svg`}
-                alt={`${currency.name} flag`}
+                src={`https://hatscripts.github.io/circle-flags/flags/${flag}.svg`}
+                alt={`${displayName} flag`}
                 className="h-14 w-14 md:h-16 md:w-16 rounded-full flex-shrink-0"
               />
-              <span className="whitespace-nowrap">{currency.name}</span>
+              <span className="whitespace-nowrap">{displayName}</span>
             </motion.div>
           </AnimatePresence>
         </div>
@@ -61,7 +57,7 @@ const AnimatedHeroText: React.FC = () => {
           <span>a</span>
           <AnimatePresence mode="wait">
             <motion.div
-              key={currency.name}
+              key={currency}
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
@@ -69,11 +65,11 @@ const AnimatedHeroText: React.FC = () => {
               className="flex items-center gap-2"
             >
               <img
-                src={`https://hatscripts.github.io/circle-flags/flags/${currency.flag}.svg`}
-                alt={`${currency.name} flag`}
+                src={`https://hatscripts.github.io/circle-flags/flags/${flag}.svg`}
+                alt={`${displayName} flag`}
                 className="h-10 w-10 md:h-14 md:w-14 rounded-full flex-shrink-0"
               />
-              <span className="whitespace-nowrap">{currency.name}</span>
+              <span className="whitespace-nowrap">{displayName}</span>
             </motion.div>
           </AnimatePresence>
           <span className="whitespace-nowrap">en segundos</span>

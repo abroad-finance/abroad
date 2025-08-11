@@ -207,13 +207,14 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({ className = '', onW
 
   // Reusable USDC balance badge component
   const renderUSDCBadge = useCallback((isMobile = false) => {
-    if (!address) return null;
-    
+    // On desktop, don't show the badge when not connected; on mobile, still show with $0.00
+    if (!address && !isMobile) return null;
+
     const iconSize = "w-4 h-4";
     const textSize = "text-sm";
     const loadingSize = isMobile ? "w-10 h-3" : "w-12 h-4";
     const textColor = isMobile ? "text-[#356E6A]" : "text-white";
-    
+
     return (
       <div className="flex items-center space-x-1 bg-white/30 rounded-lg px-2 py-1">
         <img
@@ -221,11 +222,11 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({ className = '', onW
           alt="USDC"
           className={iconSize}
         />
-        {isLoadingBalance ? (
+        {isLoadingBalance && address ? (
           <div className={`${loadingSize} bg-white/20 rounded animate-pulse`}></div>
         ) : (
           <span className={`${textColor} ${textSize} font-medium`}>
-            ${usdcBalance}
+            ${address ? usdcBalance : '0.00'}
           </span>
         )}
       </div>
@@ -295,23 +296,12 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({ className = '', onW
             <div className="md:hidden">
             {/* Mobile Wallet Badge and Info Button Side by Side */}
             <div className="flex items-center space-x-3">
-              {/* Info Button */}
-              {renderInfoButton(true)}
               <button 
-              onClick={handleWalletClick}
-              className="flex items-center justify-center bg-[#356E6A]/5 backdrop-blur-xl rounded-xl px-4 py-2 border border-white/30 hover:bg-white/30 transition-colors duration-200 flex-1"
+                onClick={handleWalletClick}
+                className="flex items-center justify-center bg-[#356E6A]/5 backdrop-blur-xl rounded-xl px-4 py-2 border border-white/30 hover:bg-white/30 transition-colors duration-200 flex-1"
               >
-              {address ? (
-                renderWalletIcon()
-              ) : (
-                <>
-                <Wallet className="w-8 h-8 text-[#356E6A]" />
-                <span className="text-[#356E6A] text-sm font-medium">
-                  Conectar Billetera
-                </span>
-                </>
-              )}
-              {renderUSDCBadge(true)}
+                {/* Mobile: show only the balance badge */}
+                {renderUSDCBadge(true)}
               </button>
             </div>
             </div>

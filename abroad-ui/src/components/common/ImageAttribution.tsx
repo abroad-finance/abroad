@@ -1,8 +1,23 @@
 import React from 'react';
 import { ATTRIBUTION_URL } from '../../features/swap/webSwap.constants';
 
-const ImageAttribution: React.FC<{ className?: string }> = ({ className }) => {
-  const handleClick = () => window.open(ATTRIBUTION_URL, '_blank');
+type Props = {
+  className?: string;
+  currency?: string; // 'COP' | 'BRL'
+};
+
+const ImageAttribution: React.FC<Props> = ({ className, currency }) => {
+  const isBRL = currency === 'BRL';
+
+  const creditText = isBRL
+    ? 'Cumbuco, Brasil by Otávio Nogueira, CC BY 2.0'
+    : 'Rio Guayabero, Colombia by Pedro Szekely, CC BY-SA 2.0';
+
+  const creditUrl = isBRL
+    ? 'https://www.flickr.com/photos/55953988@N00/6193481566'
+    : ATTRIBUTION_URL;
+
+  const handleClick = () => window.open(creditUrl, '_blank');
 
   return (
     <button
@@ -15,7 +30,7 @@ const ImageAttribution: React.FC<{ className?: string }> = ({ className }) => {
         ${className}
       `}
     >
-      Rio Guayabero, Colombia by Pedro Szekely, CC BY-SA 2.0
+      {creditText}
     </button>
   );
 };
