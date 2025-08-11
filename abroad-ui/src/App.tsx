@@ -8,8 +8,6 @@ import { WalletAuthProvider } from './context/WalletAuthContext';
 import { Settings } from "./pages/Settings";
 import Pool from "./pages/Pool";
 // Mobile pages
-import Splash from "./pages/Mobile/Splash";
-import Anchor from "./pages/Mobile/Anchor";
 import WebSwap from "./pages/WebSwap/WebSwap";
 
 
@@ -29,8 +27,6 @@ function App() {
               <Route path="/settings" element={<Settings />} />
             </Route>
             {/* Add other public routes here if needed */}
-            <Route path="/mobile/splash" element={<Splash />} />
-            <Route path="/mobile/anchor" element={<Anchor />} />
             <Route path="/web-swap" element={<WebSwap />} />
 
           </Routes>
