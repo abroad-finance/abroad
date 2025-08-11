@@ -2,28 +2,15 @@ import React from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useWebSwapController } from '../../features/swap/useWebSwapController';
 import { ASSET_URLS } from '../../features/swap/webSwap.constants';
-// import { kit } from '../../services/stellarKit';
-// import { useWalletAuth } from '../../context/WalletAuthContext';
 
 // Child Components
 import NavBarResponsive from '../../components/WebSwap/NavBarResponsive';
-// import ConnectWallet from '../../components/WebSwap/ConnectWallet';
 import WalletDetails from '../../components/WebSwap/WalletDetails';
 import DesktopLayout from '../../features/swap/DesktopLayout';
 import MobileLayout from '../../features/swap/MobileLayout';
 
 const WebSwap: React.FC = () => {
   const controller = useWebSwapController();
-  // const { authenticateWithWallet } = useWalletAuth();
-
-  // Direct wallet connection handler - Commented out, components handle internally
-  // const handleDirectWalletConnect = () => {
-  //   kit.openModal({
-  //     onWalletSelected: async (option) => {
-  //       authenticateWithWallet(option.id);
-  //     },
-  //   });
-  // };
 
   return (
     <div className="w-screen min-h-screen md:h-screen md:overflow-hidden flex flex-col">
@@ -48,16 +35,6 @@ const WebSwap: React.FC = () => {
 
       {/* Top-level Modals */}
       <AnimatePresence>
-        {/* Commented out for direct wallet connection
-        {controller.isWalletModalOpen && (
-          <ModalOverlay onClose={controller.handleWalletConnectClose}>
-            <ConnectWallet 
-              onWalletSelect={controller.handleWalletSelect} 
-              onClose={controller.handleWalletConnectClose} 
-            />
-          </ModalOverlay>
-        )}
-        */}
         {controller.isWalletDetailsOpen && (
           <ModalOverlay onClose={controller.handleWalletDetailsClose}>
             <WalletDetails onClose={controller.handleWalletDetailsClose} />

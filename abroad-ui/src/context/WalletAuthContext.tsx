@@ -98,7 +98,7 @@ export const WalletAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   }, [logout, setToken, token]);
 
   useEffect(() => {
-    if (!token || !walletId) {
+    if (!token || !walletId || address) {
       return;
     }
     kit.setWallet(walletId);
@@ -108,7 +108,7 @@ export const WalletAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       console.error('Failed to get address from StellarKit', err);
       logout();
     });
-  }, [logout, setAddress, token, walletId]);
+  }, [address, logout, setAddress, token, walletId]);
 
   useEffect(() => {
     if (!token) {
@@ -126,6 +126,22 @@ export const WalletAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     const id = setTimeout(refreshToken, timeout);
     return () => clearTimeout(id);
   }, [refreshToken, token]);
+
+  // at mount check the url params for token
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlToken = urlParams.get('token');
+    const address = urlParams.get('address');
+    if (urlToken && address) {
+      setToken(urlToken);
+      setAddress(address);
+      localStorage.setItem('token', urlToken);
+      localStorage.setItem('address', address);
+      urlParams.delete('token');
+      urlParams.delete('address');
+      window.history.replaceState({}, '', `${window.location.pathname}?${urlParams.toString()}`);
+    }
+  }, [setAddress, setToken]);
 
   return (
     <WalletAuthContext.Provider value={{ token, authenticateWithWallet, address, walletId, setWalletId: handleSetWalletId, logout }}>
