@@ -1,10 +1,11 @@
 import React from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useWebSwapController } from '../../features/swap/useWebSwapController';
-import { ASSET_URLS } from '../../features/swap/webSwap.constants';
+import { ASSET_URLS, BRL_BACKGROUND_IMAGE } from '../../features/swap/webSwap.constants';
 import QrScannerFullScreen from '../../components/WebSwap/QrScannerFullScreen';
 import { useSearchParams } from 'react-router-dom';
 import { decodePixQrCode } from '../../utils/PixQrDecoder';
+import BackgroundCrossfade from '../../components/common/BackgroundCrossfade';
 
 // Child Components
 import NavBarResponsive from '../../components/WebSwap/NavBarResponsive';
@@ -46,64 +47,21 @@ const WebSwap: React.FC = () => {
     }
   };
 
-  // Smooth crossfade desktop background (page-level only)
-  const BRL_BG_URL = 'https://storage.googleapis.com/cdn-abroad/bg/6193481566_1a304e3aa3_o.jpg';
-  const currentBgUrl = controller.targetCurrency === 'BRL' ? BRL_BG_URL : ASSET_URLS.BACKGROUND_IMAGE;
-  const [baseBgUrl, setBaseBgUrl] = React.useState<string>(currentBgUrl);
-  const [overlayBgUrl, setOverlayBgUrl] = React.useState<string | null>(null);
+  // Determine desired desktop background URL based on currency
+  const currentBgUrl = controller.targetCurrency === 'BRL' ? BRL_BACKGROUND_IMAGE : ASSET_URLS.BACKGROUND_IMAGE;
 
-  // When currency changes, preload the new image, then trigger overlay fade-in; commit to base after fade completes
-  React.useEffect(() => {
-    if (currentBgUrl === baseBgUrl) return;
-    let canceled = false;
-    const img = new Image();
-    img.src = currentBgUrl;
-    const startOverlay = () => {
-      if (!canceled) setOverlayBgUrl(currentBgUrl);
-    };
-    if (img.complete) {
-      // Already cached
-      startOverlay();
-    } else {
-      img.onload = startOverlay;
-      img.onerror = () => {
-        // On error, fall back to hard swap without animation
-        if (!canceled) {
-          setBaseBgUrl(currentBgUrl);
-          setOverlayBgUrl(null);
-        }
-      };
-    }
-    return () => {
-      canceled = true;
-    };
-  }, [currentBgUrl, baseBgUrl]);
-
-  const handleOverlayComplete = React.useCallback(() => {
-    if (overlayBgUrl) {
-      setBaseBgUrl(overlayBgUrl);
-      setOverlayBgUrl(null);
-    }
-  }, [overlayBgUrl]);
+  // background crossfade handled by BackgroundCrossfade component
 
   return (
     <div className="w-screen min-h-screen md:h-screen md:overflow-hidden flex flex-col">
       {/* Desktop page background with crossfade (no white flash) */}
-      <div
-        className="hidden md:block absolute inset-0 z-0 bg-cover bg-center bg-no-repeat bg-fixed"
-        style={{ backgroundImage: `url(${baseBgUrl})` }}
+      <BackgroundCrossfade
+        imageUrl={currentBgUrl}
+        visibilityClass="hidden md:block"
+        positionClass="absolute inset-0"
+        zIndexClass="z-0"
+        backgroundAttachment="fixed"
       />
-      {overlayBgUrl && (
-        <motion.div
-          key={overlayBgUrl}
-          className="hidden md:block absolute inset-0 z-0 bg-cover bg-center bg-no-repeat bg-fixed pointer-events-none"
-          style={{ backgroundImage: `url(${overlayBgUrl})` }}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.35, ease: 'easeOut' }}
-          onAnimationComplete={handleOverlayComplete}
-        />
-      )}
       
       {/* Shared Navigation */}
       <div className="relative z-10 bg-green-50 md:bg-transparent">
