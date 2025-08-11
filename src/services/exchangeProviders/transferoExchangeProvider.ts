@@ -29,8 +29,8 @@ interface Account {
 @injectable()
 export class TransferoExchangeProvider implements IExchangeProvider {
   /**
-             * 0.70 % pay-in + 0.30 % FX spread (customise if your contract differs)
-             */
+   * 0.70 % pay-in + 0.30 % FX spread (customise if your contract differs)
+   */
   readonly exchangePercentageFee = 0.007 + 0.003
 
   private cachedToken?: { exp: number, value: string }
@@ -38,7 +38,7 @@ export class TransferoExchangeProvider implements IExchangeProvider {
   /** ---------- Public API implementation ---------- */
 
   constructor(
-        @inject(TYPES.ISecretManager) private readonly secretManager: ISecretManager,
+    @inject(TYPES.ISecretManager) private readonly secretManager: ISecretManager,
   ) { }
 
   /**
@@ -84,31 +84,40 @@ export class TransferoExchangeProvider implements IExchangeProvider {
   /** ---------- Internals ---------- */
 
   /**
-             * Uses “request quote” with `fromSize = 1` to obtain the unit price.
-             */
+ * Uses “request quote” with `fromSize = 1` to obtain the unit price.
+ */
   getExchangeRate: IExchangeProvider['getExchangeRate'] = async ({
     sourceCurrency,
     targetCurrency,
   }) => {
-    const token = await this.getAccessToken()
-    const apiUrl = await this.secretManager.getSecret('TRANSFERO_BASE_URL')
+    try {
+      const token = await this.getAccessToken()
+      const apiUrl = await this.secretManager.getSecret('TRANSFERO_BASE_URL')
 
-    const { data } = await axios.post(
-      `${apiUrl}/api/quote/v2.0/requestquote`,
-      {
-        fromCurrency: sourceCurrency,
-        fromSize: 1,
-        toCurrency: targetCurrency,
-        toSize: 0,
-      },
-      { headers: { Authorization: `Bearer ${token}` } },
-    ) /* :contentReference[oaicite:1]{index=1} */
+      const { data } = await axios.post(
+        `${apiUrl}/api/quote/v2.0/requestquote`,
+        {
+          baseCurrency: sourceCurrency,
+          baseCurrencySize: 0,
+          quoteCurrency: targetCurrency,
+          quoteCurrencySize: 1,
+          side: 'buy',
+        },
+        { headers: { 'Accept': 'application/json', 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' } },
+      )
 
-    const price = Number(data.price ?? data.Price)
-    if (!price || Number.isNaN(price))
-      throw new Error('Invalid price returned from Transfero')
+      const price = Number(data[0].price ?? data[0].Price)
+      if (!price || Number.isNaN(price))
+        throw new Error('Invalid price returned from Transfero')
 
-    return price
+      console.log(`Exchange rate from ${sourceCurrency} to ${targetCurrency}: ${price}`)
+
+      return price
+    }
+    catch (error) {
+      console.error('Error getting exchange rate:', error)
+      throw new Error(`Failed to get exchange rate: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
   }
 
   /** OAuth2 client-credentials flow */
@@ -123,12 +132,16 @@ export class TransferoExchangeProvider implements IExchangeProvider {
     const clientSecret = await this.secretManager.getSecret(
       'TRANSFERO_CLIENT_SECRET',
     )
+    const clientScope = await this.secretManager.getSecret('TRANSFERO_CLIENT_SCOPE')
 
     const { data } = await axios.post(`${apiUrl}/auth/token`, {
       client_id: clientId,
       client_secret: clientSecret,
       grant_type: 'client_credentials',
-    }) /* :contentReference[oaicite:2]{index=2} */
+      scope: clientScope,
+    }, {
+      headers: { 'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
+    })
 
     const value = data.access_token ?? data
     const seconds = Number(data.expires_in ?? 900) // default 15 min

@@ -69,8 +69,6 @@ export class PartnerService implements IPartnerService {
     try {
       const sepJwtSecret = await this.secretManager.getSecret('STELLAR_SEP_JWT_SECRET')
       const sepPartnerId = await this.secretManager.getSecret('STELLAR_SEP_PARTNER_ID')
-      console.log('Verifying SEP JWT with secret:', sepJwtSecret)
-      console.log('Using SEP Partner ID:', sepPartnerId)
 
       // Verify and decode the JWT token
       jwt.verify(token, sepJwtSecret)

@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { SwapData, SwapView } from './webSwap.types';
+import { _36EnumsTargetCurrency as TargetCurrency } from '../../api';
 import { useWalletAuth } from '../../context/WalletAuthContext';
 
 const PENDING_TX_KEY = 'pendingTransaction';
@@ -17,6 +18,7 @@ export const useWebSwapController = () => {
   // Persist amounts between views
   const [sourceAmount, setSourceAmount] = useState('');
   const [targetAmount, setTargetAmount] = useState('');
+  const [targetCurrency, setTargetCurrency] = useState<(typeof TargetCurrency)[keyof typeof TargetCurrency]>(TargetCurrency.COP);
 
   // Restore state if user returns from KYC
   useEffect(() => {
@@ -24,9 +26,10 @@ export const useWebSwapController = () => {
     if (stored && token) {
       try {
         const parsed = JSON.parse(stored);
-        setSwapData({ quote_id: parsed.quote_id, srcAmount: parsed.srcAmount, tgtAmount: parsed.tgtAmount });
+        setSwapData({ quote_id: parsed.quote_id, srcAmount: parsed.srcAmount, tgtAmount: parsed.tgtAmount, targetCurrency: parsed.targetCurrency || TargetCurrency.COP });
         setSourceAmount(parsed.srcAmount);
         setTargetAmount(parsed.tgtAmount);
+        setTargetCurrency(parsed.targetCurrency || TargetCurrency.COP);
         setView('bankDetails');
       } catch (e) {
         console.error('Failed to restore pending transaction', e);
@@ -49,12 +52,14 @@ export const useWebSwapController = () => {
   const handleSwapContinue = useCallback((data: SwapData) => {
     console.log('handleSwapContinue called with data:', data);
     setSwapData(data);
+    setTargetCurrency(data.targetCurrency || TargetCurrency.COP);
     setView('bankDetails');
   }, []);
 
-  const handleAmountsChange = useCallback((src: string, tgt: string) => {
+  const handleAmountsChange = useCallback((src: string, tgt: string, currency?: (typeof TargetCurrency)[keyof typeof TargetCurrency]) => {
     setSourceAmount(src);
     setTargetAmount(tgt);
+    if (currency) setTargetCurrency(currency);
   }, []);
 
   const handleBackToSwap = useCallback(() => {
@@ -79,6 +84,7 @@ export const useWebSwapController = () => {
     isWalletDetailsOpen,
     initialAmounts: { source: sourceAmount, target: targetAmount },
     address,
+    targetCurrency,
 
     // Handlers
     handleWalletConnectOpen,

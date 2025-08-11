@@ -26,9 +26,9 @@ const DesktopLayout: React.FC<LayoutProps> = (props) => {
         <div className="w-full max-w-md">
           {view === 'swap' && (
             <Swap
-              onContinue={(quote_id, srcAmount, tgtAmount) => {
-                console.log('DesktopLayout onContinue called with:', { quote_id, srcAmount, tgtAmount });
-                handleSwapContinue({ quote_id, srcAmount, tgtAmount });
+              onContinue={(quote_id, srcAmount, tgtAmount, targetCurrency) => {
+                console.log('DesktopLayout onContinue called with:', { quote_id, srcAmount, tgtAmount, targetCurrency });
+                handleSwapContinue({ quote_id, srcAmount, tgtAmount, targetCurrency });
               }}
               initialSourceAmount={initialAmounts.source}
               initialTargetAmount={initialAmounts.target}
@@ -48,6 +48,7 @@ const DesktopLayout: React.FC<LayoutProps> = (props) => {
                 targetAmount={swapData.tgtAmount}
                 userId={address}
                 textColor="white"
+                targetCurrency={swapData.targetCurrency}
               />
             </>
           )}

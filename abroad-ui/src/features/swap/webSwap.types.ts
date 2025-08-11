@@ -1,7 +1,10 @@
+import { _36EnumsTargetCurrency as TargetCurrency } from '../../api';
+
 export interface SwapData {
   quote_id: string;
   srcAmount: string;
   tgtAmount: string;
+  targetCurrency: typeof TargetCurrency[keyof typeof TargetCurrency];
 }
 
 // Define a proper type for the user object instead of using `any`

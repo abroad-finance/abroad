@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from "../Button";
 import { Loader, Hash, ArrowLeft, Rotate3d } from 'lucide-react';
-import { getBanks, Bank, getBanksResponse200, acceptTransaction } from '../../api';
+import { getBanks, Bank, getBanksResponse200, acceptTransaction, _36EnumsTargetCurrency as TargetCurrency } from '../../api';
 import { DropSelector, Option } from '../DropSelector';
 import { kit } from '../../services/stellarKit';
 import { useWalletAuth } from '../../context/WalletAuthContext';
@@ -20,12 +20,6 @@ import { WalletNetwork } from '@creit.tech/stellar-wallets-kit';
 const networkPassphrase = Networks.PUBLIC;
 const horizonUrl = 'https://horizon.stellar.org';
 const server = new Horizon.Server(horizonUrl);
-
-// ----------------------------------------------------------------------------------
-//  IMPORTANT – The anchor now returns **transaction_reference** (memo) instead of   
-//  a fully‑built XDR. We therefore build the transaction locally with stellar‑sdk,  
-//  sign it via StellarWalletsKit, and submit it to Horizon.                        
-// ----------------------------------------------------------------------------------
 
 // Bank configuration mapping -------------------------------------------------------
 const BANK_CONFIG: Record<string, { iconUrl: string; displayLabel?: string }> = {
@@ -112,6 +106,7 @@ interface BankDetailsRouteProps {
   targetAmount: string; // Amount receiver gets (COP)
   userId: string;
   textColor?: string;
+  targetCurrency?: (typeof TargetCurrency)[keyof typeof TargetCurrency];
 }
 
 export default function BankDetailsRoute({
@@ -122,6 +117,7 @@ export default function BankDetailsRoute({
   targetAmount,
   onTransactionComplete,
   textColor = '#356E6A',
+  targetCurrency = TargetCurrency.COP,
 }: BankDetailsRouteProps): React.JSX.Element {
   const { walletId, token, address } = useWalletAuth();
 
@@ -131,6 +127,9 @@ export default function BankDetailsRoute({
   const [loadingSubmit, setLoadingSubmit] = useState(false);
   const [bankOpen, setBankOpen] = useState(false);
   const [selectedBank, setSelectedBank] = useState<Option | null>(null);
+  // BRL specific fields
+  const [pixKey, setPixKey] = useState('');
+  const [cpf, setCpf] = useState('');
 
   // ------------------------------ BANKS API -----------------------------------
   const [apiBanks, setApiBanks] = useState<Bank[]>([]);
@@ -145,6 +144,8 @@ export default function BankDetailsRoute({
         const parsed = JSON.parse(stored);
         if (parsed.account_number) setaccount_number(parsed.account_number);
         if (parsed.bank_code) setbank_code(parsed.bank_code);
+        if (parsed.pixKey) setPixKey(parsed.pixKey);
+        if (parsed.cpf) setCpf(parsed.cpf);
         if (parsed.selectedBank) setSelectedBank(parsed.selectedBank);
       } catch (e) {
         console.error('Failed to restore pending transaction', e);
@@ -155,6 +156,7 @@ export default function BankDetailsRoute({
   // Fetch banks once -----------------------------------------------------------
   useEffect(() => {
     (async () => {
+      if (targetCurrency !== TargetCurrency.COP) return; // Only fetch banks for COP flow
       setLoadingBanks(true);
       setErrorBanks(null);
       try {
@@ -183,7 +185,7 @@ export default function BankDetailsRoute({
         setLoadingBanks(false);
       }
     })();
-  }, []);
+  }, [targetCurrency]);
 
   // --------------------------- INPUT HANDLERS ---------------------------------
   const handleaccount_numberChange = (
@@ -191,6 +193,10 @@ export default function BankDetailsRoute({
   ) => {
     const input = e.target.value.replace(/[^\d]/g, '').slice(0, 10); // 10 digits max
     setaccount_number(input);
+  };
+  const handleCpfChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const input = e.target.value.replace(/[^\d]/g, '').slice(0, 11); // 11 digits
+    setCpf(input);
   };
 
   const handleBankSelect = (option: Option) => {
@@ -257,15 +263,16 @@ export default function BankDetailsRoute({
 
     try {
       if (!quote_id) throw new Error('Quote ID missing.');
-      if (!walletId) throw new Error('Wallet not connected.');
+
 
       // 1️⃣  Reserve quote & obtain details ------------------------------------
       const redirectUrl = encodeURIComponent(
         window.location.href.replace(/^https?:\/\//, ''),
       );
       const response = await acceptTransaction({
-        account_number,
-        bank_code,
+        account_number: targetCurrency === TargetCurrency.BRL ? pixKey : account_number,
+        bank_code: targetCurrency === TargetCurrency.BRL ? 'PIX' : bank_code,
+        tax_id: targetCurrency === TargetCurrency.BRL ? cpf : undefined,
         quote_id,
         user_id: userId,
         redirectUrl,
@@ -292,13 +299,36 @@ export default function BankDetailsRoute({
             quote_id,
             srcAmount: sourceAmount,
             tgtAmount: targetAmount,
-            account_number,
-            bank_code,
+            account_number: targetCurrency === TargetCurrency.BRL ? pixKey : account_number,
+            bank_code: targetCurrency === TargetCurrency.BRL ? 'PIX' : bank_code,
+            pixKey: targetCurrency === TargetCurrency.BRL ? pixKey : undefined,
+            cpf: targetCurrency === TargetCurrency.BRL ? cpf : undefined,
             userId,
             selectedBank,
+            targetCurrency,
           }),
         );
         window.location.href = kycLink;
+        return;
+      }
+
+      // 6️⃣  Cleanup ------------------------------------------------------------
+      localStorage.removeItem(PENDING_TX_KEY);
+
+      if (!walletId) {
+        const queryParams = new URLSearchParams(window.location.search);
+        const callbackUrl = queryParams.get('callback');
+        const sepTransactionId = queryParams.get('transaction_id');
+        const sepBaseUrl = import.meta.env.VITE_SEP_BASE_URL || 'http://localhost:8000';
+        let url = encodeURI(`${sepBaseUrl}/sep24/transactions/withdraw/interactive/complete?amount_expected=${sourceAmount}&transaction_id=${sepTransactionId}`);
+        if (callbackUrl && callbackUrl.toLowerCase() !== 'none') {
+          url += `&callback=${encodeURIComponent(callbackUrl)}`;
+        }
+        if (transaction_reference) {
+          url += `&memo=${encodeURIComponent(transaction_reference)}`;
+        }
+        localStorage.removeItem(PENDING_TX_KEY);
+        window.location.href = url;
         return;
       }
 
@@ -327,8 +357,7 @@ export default function BankDetailsRoute({
       const tx = new Transaction(signedTxXdr, networkPassphrase);
       await server.submitTransaction(tx);
 
-      // 6️⃣  Cleanup ------------------------------------------------------------
-      localStorage.removeItem(PENDING_TX_KEY);
+
       await onTransactionComplete({ memo: transaction_reference });
     } catch (err) {
       console.error(err);
@@ -336,7 +365,7 @@ export default function BankDetailsRoute({
     } finally {
       setLoadingSubmit(false);
     }
-  }, [quote_id, walletId, account_number, bank_code, userId, address, buildPaymentXdr, sourceAmount, onTransactionComplete, targetAmount, selectedBank]);
+  }, [quote_id, walletId, account_number, bank_code, userId, address, buildPaymentXdr, sourceAmount, onTransactionComplete, targetAmount, selectedBank, pixKey, cpf, targetCurrency]);
 
   // ------------------------------- RENDER -------------------------------------
   return (
@@ -366,71 +395,105 @@ export default function BankDetailsRoute({
 
         {/* Inputs */}
         <div className="flex-1 flex flex-col items-center justify-center w-full space-y-3 py-2">
-          {/* Transfiya number */}
-          <div
-            id="bank-account-input"
-            className="w-full bg-white/60 backdrop-blur-xl rounded-2xl p-4 md:p-6 flex items-center space-x-3"
-          >
-            <Hash className="w-5 h-5 sm:w-6 sm:h-6" style={{ color: textColor }} />
-            <input
-              type="text"
-              inputMode="numeric"
-              pattern="[0-9]*"
-              placeholder="Número Transfiya"
-              value={account_number}
-              onChange={handleaccount_numberChange}
-              className="w-full bg-transparent font-semibold focus:outline-none text-base sm:text-lg"
-              style={{ color: textColor }}
-            />
-          </div>
-
-          {/* Bank selector */}
-          <div
-            id="bank-selector"
-            className="w-full bg-white/60 backdrop-blur-xl rounded-2xl flex-shrink-0 relative z-50"
-          >
-            {loadingBanks && (
-              <div className="p-6 flex items-center space-x-3">
-                <Loader
-                  className="animate-spin w-4 h-4 sm:w-5 sm:h-5"
+          {targetCurrency === TargetCurrency.BRL ? (
+            <>
+              {/* PIX Key */}
+              <div id="pix-key-input" className="w-full bg-white/60 backdrop-blur-xl rounded-2xl p-4 md:p-6 flex items-center space-x-3">
+                <Hash className="w-5 h-5 sm:w-6 sm:h-6" style={{ color: textColor }} />
+                <input
+                  type="text"
+                  inputMode="text"
+                  placeholder="PIX Key"
+                  value={pixKey}
+                  onChange={(e) => setPixKey(e.target.value)}
+                  className="w-full bg-transparent font-semibold focus:outline-none text-base sm:text-lg"
                   style={{ color: textColor }}
                 />
               </div>
-            )}
-            {errorBanks && (
-              <div className="p-6 flex items-center space-x-3">
-                <p className="text-red-500 text-xs sm:text-sm">{errorBanks}</p>
+              {/* CPF */}
+              <div id="cpf-input" className="w-full bg-white/60 backdrop-blur-xl rounded-2xl p-4 md:p-6 flex items-center space-x-3">
+                <Hash className="w-5 h-5 sm:w-6 sm:h-6" style={{ color: textColor }} />
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  placeholder="CPF"
+                  value={cpf}
+                  onChange={handleCpfChange}
+                  className="w-full bg-transparent font-semibold focus:outline-none text-base sm:text-lg"
+                  style={{ color: textColor }}
+                />
               </div>
-            )}
-            {!loadingBanks && !errorBanks && apiBanks.length === 0 && (
-              <div className="p-6 flex items-center space-x-3">
-                <p className="text-[#356E6A]/70 text-xs sm:text-sm">
-                  No hay bancos disponibles.
-                </p>
+            </>
+          ) : (
+            <>
+              {/* Transfiya number */}
+              <div
+                id="bank-account-input"
+                className="w-full bg-white/60 backdrop-blur-xl rounded-2xl p-4 md:p-6 flex items-center space-x-3"
+              >
+                <Hash className="w-5 h-5 sm:w-6 sm:h-6" style={{ color: textColor }} />
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  placeholder="Número Transfiya"
+                  value={account_number}
+                  onChange={handleaccount_numberChange}
+                  className="w-full bg-transparent font-semibold focus:outline-none text-base sm:text-lg"
+                  style={{ color: textColor }}
+                />
               </div>
-            )}
-            {!loadingBanks && !errorBanks && apiBanks.length > 0 && (
-              <div className="p-6 flex items-center space-x-3 w-full">
-                <div className="flex-1">
-                  <DropSelector
-                    options={bankOptions}
-                    selectedOption={selectedBank}
-                    onSelectOption={handleBankSelect}
-                    isOpen={bankOpen}
-                    setIsOpen={setBankOpen}
-                    placeholder="Banco"
-                    disabled={loadingBanks || errorBanks !== null}
-                    textColor={textColor}
-                    placeholderIcons={[
-                      'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Nequi_Badge.webp',
-                      'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Daviplata_Badge.png',
-                      'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Bancolombia_Badge.png',
-                    ]}
-                  />
-                </div>
+
+              {/* Bank selector */}
+              <div
+                id="bank-selector"
+                className="w-full bg-white/60 backdrop-blur-xl rounded-2xl flex-shrink-0 relative z-50"
+              >
+                {loadingBanks && (
+                  <div className="p-6 flex items-center space-x-3">
+                    <Loader
+                      className="animate-spin w-4 h-4 sm:w-5 sm:h-5"
+                      style={{ color: textColor }}
+                    />
+                  </div>
+                )}
+                {errorBanks && (
+                  <div className="p-6 flex items-center space-x-3">
+                    <p className="text-red-500 text-xs sm:text-sm">{errorBanks}</p>
+                  </div>
+                )}
+                {!loadingBanks && !errorBanks && apiBanks.length === 0 && (
+                  <div className="p-6 flex items-center space-x-3">
+                    <p className="text-[#356E6A]/70 text-xs sm:text-sm">
+                      No hay bancos disponibles.
+                    </p>
+                  </div>
+                )}
+                {!loadingBanks && !errorBanks && apiBanks.length > 0 && (
+                  <div className="p-6 flex items-center space-x-3 w-full">
+                    <div className="flex-1">
+                      <DropSelector
+                        options={bankOptions}
+                        selectedOption={selectedBank}
+                        onSelectOption={handleBankSelect}
+                        isOpen={bankOpen}
+                        setIsOpen={setBankOpen}
+                        placeholder="Banco"
+                        disabled={loadingBanks || errorBanks !== null}
+                        textColor={textColor}
+                        placeholderIcons={[
+                          'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Nequi_Badge.webp',
+                          'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Daviplata_Badge.png',
+                          'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Bancolombia_Badge.png',
+                        ]}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
+            </>
+          )}
 
           {/* Amount info */}
           <div
@@ -441,10 +504,10 @@ export default function BankDetailsRoute({
             <span className="text-sm sm:text-base">Monto a recibir:</span>
             <img
               className="w-4 h-4 sm:w-5 sm:h-5"
-              src="https://storage.googleapis.com/cdn-abroad/Icons/Tokens/COP-Token.svg"
-              alt="COP_Token"
+              src={targetCurrency === TargetCurrency.BRL ? 'https://storage.googleapis.com/cdn-abroad/Icons/Tokens/BRL-Token.svg' : 'https://storage.googleapis.com/cdn-abroad/Icons/Tokens/COP-Token.svg'}
+              alt={targetCurrency === TargetCurrency.BRL ? 'BRL_Token' : 'COP_Token'}
             />
-            <b className="text-sm sm:text-base"> ${targetAmount}</b>
+            <b className="text-sm sm:text-base"> {targetCurrency === TargetCurrency.BRL ? 'R$' : '$'}{targetAmount}</b>
           </div>
         </div>
 
@@ -454,22 +517,43 @@ export default function BankDetailsRoute({
           className="relative w-full bg-white/10 backdrop-blur-xl rounded-2xl p-3 sm:p-4 flex flex-col space-y-2"
           style={{ color: textColor }}
         >
-          <div className="flex items-center space-x-2">
-            <Rotate3d className="w-4 h-4 sm:w-5 sm:h-5" />
-            <span className="font-medium text-xs sm:text-sm">Red:</span>
-            <div className="bg-white/70 backdrop-blur-md rounded-lg px-2 py-1 flex items-center">
-              <img
-                src="https://vectorseek.com/wp-content/uploads/2023/11/Transfiya-Logo-Vector.svg-.png"
-                alt="Transfiya Logo"
-                className="h-3 sm:h-4 w-auto"
-              />
-            </div>
-          </div>
-          <span className="font-medium text-xs pl-1" style={{ color: textColor }}>
-            Tu transacción será procesada de inmediato y llegará instantáneamente. Ten
-            presente que el receptor debe tener activado Transfiya en el banco
-            indicado.
-          </span>
+          {targetCurrency === TargetCurrency.BRL ? (
+            <>
+              <div className="flex items-center space-x-2">
+                <Rotate3d className="w-4 h-4 sm:w-5 sm:h-5" />
+                <span className="font-medium text-xs sm:text-sm">Rede:</span>
+                <div className="bg-white/70 backdrop-blur-md rounded-lg px-2 py-1 flex items-center">
+                  <img
+                    src="https://upload.wikimedia.org/wikipedia/commons/0/04/PIX_Logo.png"
+                    alt="PIX Logo"
+                    className="h-3 sm:h-4 w-auto"
+                  />
+                </div>
+              </div>
+              <span className="font-medium text-xs pl-1" style={{ color: textColor }}>
+                Sua transação via PIX será processada imediatamente. Certifique-se de que a chave PIX e o CPF do recebedor estão corretos.
+              </span>
+            </>
+          ) : (
+            <>
+              <div className="flex items-center space-x-2">
+                <Rotate3d className="w-4 h-4 sm:w-5 sm:h-5" />
+                <span className="font-medium text-xs sm:text-sm">Red:</span>
+                <div className="bg-white/70 backdrop-blur-md rounded-lg px-2 py-1 flex items-center">
+                  <img
+                    src="https://vectorseek.com/wp-content/uploads/2023/11/Transfiya-Logo-Vector.svg-.png"
+                    alt="Transfiya Logo"
+                    className="h-3 sm:h-4 w-auto"
+                  />
+                </div>
+              </div>
+              <span className="font-medium text-xs pl-1" style={{ color: textColor }}>
+                Tu transacción será procesada de inmediato y llegará instantáneamente. Ten
+                presente que el receptor debe tener activado Transfiya en el banco
+                indicado.
+              </span>
+            </>
+          )}
         </div>
       </div>
 
@@ -479,9 +563,9 @@ export default function BankDetailsRoute({
         onClick={handleSubmit}
         disabled={
           loadingSubmit ||
-          !bank_code ||
-          account_number.length !== 10 ||
-          loadingBanks
+          (targetCurrency === TargetCurrency.BRL
+            ? !(pixKey && cpf && cpf.length === 11)
+            : (!bank_code || account_number.length !== 10 || loadingBanks))
         }
       >
         {loadingSubmit ? (
