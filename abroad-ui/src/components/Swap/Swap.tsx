@@ -30,6 +30,19 @@ export default function Swap({ onContinue, initialSourceAmount = '', initialTarg
     const sourceDebounceRef = useRef<NodeJS.Timeout | null>(null);
     const targetDebounceRef = useRef<NodeJS.Timeout | null>(null);
 
+    // Reflect external changes to initial amounts (e.g., from QR scan)
+    useEffect(() => {
+      if (initialSourceAmount !== undefined && initialSourceAmount !== sourceAmount) {
+        setSourceAmount(initialSourceAmount);
+      }
+    }, [initialSourceAmount, sourceAmount]);
+
+    useEffect(() => {
+      if (initialTargetAmount !== undefined && initialTargetAmount !== targetAmount) {
+        setTargetAmount(initialTargetAmount);
+      }
+    }, [initialTargetAmount, targetAmount]);
+
     const isButtonDisabled = () => {
       const numericSource = parseFloat(String(sourceAmount));
       // Clean targetAmount: remove thousands separators (.), change decimal separator (,) to .
