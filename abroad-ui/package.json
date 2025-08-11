@@ -18,6 +18,7 @@
     "@lordicon/react": "^1.11.0",
     "@stellar/stellar-sdk": "^13.3.0",
     "@tailwindcss/vite": "^4.0.9",
+    "@yudiel/react-qr-scanner": "^2.3.1",
     "firebase": "^11.6.0",
     "flag-icons": "^7.3.2",
     "framer-motion": "^12.6.2",
