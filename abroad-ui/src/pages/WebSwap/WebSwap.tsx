@@ -1,10 +1,11 @@
 import React from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useWebSwapController } from '../../features/swap/useWebSwapController';
-import { ASSET_URLS } from '../../features/swap/webSwap.constants';
+import { ASSET_URLS, BRL_BACKGROUND_IMAGE } from '../../features/swap/webSwap.constants';
 import QrScannerFullScreen from '../../components/WebSwap/QrScannerFullScreen';
 import { useSearchParams } from 'react-router-dom';
 import { decodePixQrCode } from '../../utils/PixQrDecoder';
+import BackgroundCrossfade from '../../components/common/BackgroundCrossfade';
 
 // Child Components
 import NavBarResponsive from '../../components/WebSwap/NavBarResponsive';
@@ -46,12 +47,20 @@ const WebSwap: React.FC = () => {
     }
   };
 
+  // Determine desired desktop background URL based on currency
+  const currentBgUrl = controller.targetCurrency === 'BRL' ? BRL_BACKGROUND_IMAGE : ASSET_URLS.BACKGROUND_IMAGE;
+
+  // background crossfade handled by BackgroundCrossfade component
+
   return (
     <div className="w-screen min-h-screen md:h-screen md:overflow-hidden flex flex-col">
-      {/* Shared Background for Desktop */}
-      <div
-        className="hidden md:block absolute inset-0 z-0 bg-cover bg-center bg-no-repeat bg-fixed"
-        style={{ backgroundImage: `url(${ASSET_URLS.BACKGROUND_IMAGE})` }}
+      {/* Desktop page background with crossfade (no white flash) */}
+      <BackgroundCrossfade
+        imageUrl={currentBgUrl}
+        visibilityClass="hidden md:block"
+        positionClass="absolute inset-0"
+        zIndexClass="z-0"
+        backgroundAttachment="fixed"
       />
       
       {/* Shared Navigation */}

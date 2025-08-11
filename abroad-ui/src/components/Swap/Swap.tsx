@@ -17,7 +17,11 @@ interface SwapProps {
   ) => void;
   initialSourceAmount?: string;
   initialTargetAmount?: string;
-  onAmountsChange?: (srcAmount: string, tgtAmount: string) => void;
+  onAmountsChange?: (
+    srcAmount: string,
+    tgtAmount: string,
+    currency?: (typeof TargetCurrency)[keyof typeof TargetCurrency]
+  ) => void;
   textColor?: string;
   onWalletConnect?: () => void;
 }
@@ -311,43 +315,53 @@ export default function Swap({ onContinue, initialSourceAmount = '', initialTarg
                 <TokenBadge
                   iconSrc={
                     targetCurrency === TargetCurrency.BRL
-                      ? 'https://storage.googleapis.com/cdn-abroad/Icons/Tokens/BRL-Token.svg'
-                      : 'https://storage.googleapis.com/cdn-abroad/Icons/Tokens/COP-Token.svg'
+                      ? 'https://hatscripts.github.io/circle-flags/flags/br.svg'
+                      : 'https://hatscripts.github.io/circle-flags/flags/co.svg'
                   }
-                  alt={`${targetCurrency} Token Logo`}
+                  alt={`${targetCurrency} Flag`}
                   symbol={targetCurrency}
                 />
               </button>
 
               {currencyMenuOpen && (
                 <div
-                  className="absolute left-0 top-[calc(100%+8px)] z-50 bg-white/95 backdrop-blur-xl rounded-xl shadow-lg p-2 space-y-1 min-w-[180px]"
+                  className="absolute left-0 top-[calc(100%+8px)] z-50 bg-white/95 backdrop-blur-xl rounded-xl shadow-lg p-2 space-y-1 min-w-[100px]"
                   role="listbox"
                 >
                   <button
                     type="button"
-                    onClick={() => { setTargetCurrency(TargetCurrency.COP); setCurrencyMenuOpen(false); }}
+                    onClick={() => {
+                      setTargetCurrency(TargetCurrency.COP);
+                      setCurrencyMenuOpen(false);
+                      // Notify parent about currency change to update global state (e.g., background)
+                      onAmountsChange?.(sourceAmount, targetAmount, TargetCurrency.COP);
+                    }}
                     className="w-full text-left hover:bg-black/5 rounded-lg px-1 py-1"
                     role="option"
                     aria-selected={targetCurrency === TargetCurrency.COP}
                   >
                     <TokenBadge
-                      iconSrc="https://storage.googleapis.com/cdn-abroad/Icons/Tokens/COP-Token.svg"
-                      alt="COP Token Logo"
+                      iconSrc="https://hatscripts.github.io/circle-flags/flags/co.svg"
+                      alt="Colombia flag"
                       symbol="COP"
                     />
                   </button>
 
                   <button
                     type="button"
-                    onClick={() => { setTargetCurrency(TargetCurrency.BRL); setCurrencyMenuOpen(false); }}
+                    onClick={() => {
+                      setTargetCurrency(TargetCurrency.BRL);
+                      setCurrencyMenuOpen(false);
+                      // Notify parent about currency change to update global state (e.g., background)
+                      onAmountsChange?.(sourceAmount, targetAmount, TargetCurrency.BRL);
+                    }}
                     className="w-full text-left hover:bg-black/5 rounded-lg px-1 py-1"
                     role="option"
                     aria-selected={targetCurrency === TargetCurrency.BRL}
                   >
                     <TokenBadge
-                      iconSrc="https://storage.googleapis.com/cdn-abroad/Icons/Tokens/BRL-Token.svg"
-                      alt="BRL Token Logo"
+                      iconSrc="https://hatscripts.github.io/circle-flags/flags/br.svg"
+                      alt="Brazil flag"
                       symbol="BRL"
                     />
                   </button>

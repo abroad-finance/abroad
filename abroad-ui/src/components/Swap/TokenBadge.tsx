@@ -7,7 +7,7 @@ export interface TokenBadgeProps {
 }
 
 export const TokenBadge: React.FC<TokenBadgeProps> = ({ iconSrc, symbol, alt }) => (
-  <div className="bg-white/60 backdrop-blur-xl rounded-4xl px-6 py-2 flex items-center justify-center">
+  <div className="bg-white/60 backdrop-blur-xl rounded-4xl px-4 py-2 flex items-center justify-center">
     <img
       src={iconSrc}
       alt={alt || symbol}

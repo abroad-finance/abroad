@@ -16,9 +16,9 @@ const DesktopLayout: React.FC<LayoutProps> = (props) => {
       {/* Left Column - Marketing */}
       <div className="w-1/2 flex flex-col justify-center relative px-4 py-10 sm:px-6 lg:px-8">
         <div className="text-6xl max-w-xl">
-          <AnimatedHeroText />
+          <AnimatedHeroText currency={props.targetCurrency as 'COP' | 'BRL'} />
         </div>
-        <ImageAttribution className="absolute bottom-5 left-5" />
+  <ImageAttribution className="absolute bottom-5 left-5" currency={String(props.targetCurrency)} />
       </div>
       
       {/* Right Column - Swap Interface */}

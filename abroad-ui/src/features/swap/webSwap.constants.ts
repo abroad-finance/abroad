@@ -9,3 +9,6 @@ export const ASSET_URLS = {
 };
 
 export const ATTRIBUTION_URL = 'https://www.flickr.com/photos/pedrosz/36132013403';
+
+// Background used when BRL is selected
+export const BRL_BACKGROUND_IMAGE = 'https://storage.googleapis.com/cdn-abroad/bg/6193481566_1a304e3aa3_o.jpg';

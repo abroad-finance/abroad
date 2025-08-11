@@ -3,16 +3,20 @@ import Swap from '../../components/Swap/Swap';
 import BankDetailsRoute from '../../components/Swap/BankDetailsRoute';
 import AnimatedHeroText from '../../components/common/AnimatedHeroText';
 import ImageAttribution from '../../components/common/ImageAttribution';
-import { ASSET_URLS } from './webSwap.constants';
+import { ASSET_URLS, BRL_BACKGROUND_IMAGE } from './webSwap.constants';
 import { useWebSwapController } from './useWebSwapController'; // For prop types
 import { kit } from '../../services/stellarKit';
 import { useWalletAuth } from '../../context/WalletAuthContext';
+import BackgroundCrossfade from '../../components/common/BackgroundCrossfade';
 
 type LayoutProps = ReturnType<typeof useWebSwapController>;
 
 const MobileLayout: React.FC<LayoutProps> = (props) => {
   const { view, swapData, initialAmounts, address, handleSwapContinue, handleBackToSwap, handleTransactionComplete, handleAmountsChange } = props;
   const { authenticateWithWallet } = useWalletAuth();
+
+  // Determine desired marketing section background URL based on currency
+  const currentBgUrl = props.targetCurrency === 'BRL' ? BRL_BACKGROUND_IMAGE : ASSET_URLS.BACKGROUND_IMAGE;
 
   // Direct wallet connection handler
   const handleDirectWalletConnect = () => {
@@ -57,14 +61,17 @@ const MobileLayout: React.FC<LayoutProps> = (props) => {
         </div>
       </div>
 
-      {/* Below the fold: Marketing Content */}
-      <div
-        className="min-h-screen flex flex-col justify-between items-center p-5 text-center"
-        style={{ backgroundImage: `url(${ASSET_URLS.BACKGROUND_IMAGE})`, backgroundSize: 'cover', backgroundAttachment: 'fixed' }}
-      >
-        <ImageAttribution />
-        <div className="text-3xl">
-            <AnimatedHeroText />
+      <div className="relative min-h-screen flex flex-col justify-between items-center p-5 text-center overflow-hidden">
+        <BackgroundCrossfade
+          imageUrl={currentBgUrl}
+          visibilityClass="block"
+          positionClass="absolute inset-0"
+          zIndexClass="-z-10"
+          backgroundAttachment="fixed"
+        />
+  <ImageAttribution currency={String(props.targetCurrency)} />
+    <div className="text-3xl">
+      <AnimatedHeroText currency={props.targetCurrency as 'COP' | 'BRL'} />
         </div>
         <div className="flex items-center gap-3 text-white font-sans text-sm">
           <span>powered by</span>
