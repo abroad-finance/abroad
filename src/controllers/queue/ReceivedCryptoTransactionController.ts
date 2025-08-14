@@ -89,8 +89,25 @@ export class ReceivedCryptoTransactionController {
       '[Stellar transaction]: Received transaction from queue:',
       message.onChainId,
     )
-
-    const prismaClient = await this.dbClientProvider.getClient()
+    let prismaClient: Awaited<ReturnType<IDatabaseClientProvider['getClient']>>
+    try {
+      prismaClient = await this.dbClientProvider.getClient()
+    }
+    catch (paymentError) {
+      this.logger.error(
+        '[Stellar transaction]: Payment processing error:',
+        paymentError,
+      )
+      const walletHandler = this.walletHandlerFactory.getWalletHandler(
+        message.blockchain,
+      )
+      await walletHandler.send({
+        address: message.addressFrom,
+        amount: message.amount,
+        cryptoCurrency: message.cryptoCurrency,
+      })
+      return
+    }
 
     let transactionRecord: Prisma.TransactionGetPayload<{
       include: { partnerUser: { include: { partner: true } }, quote: true }
