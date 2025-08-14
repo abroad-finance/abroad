@@ -12,7 +12,7 @@ const TRANSFERO_BANKS: Bank[] = [{ bankCode: 1, bankName: 'PIX' }]
 export class TransferoPaymentService implements IPaymentService {
   banks = TRANSFERO_BANKS
   currency: TargetCurrency = TargetCurrency.BRL
-  fixedFee = 0
+  fixedFee = 0.5
   readonly MAX_TOTAL_AMOUNT_PER_DAY = 25_000_000
 
   readonly MAX_USER_AMOUNT_PER_DAY = 25_000_000

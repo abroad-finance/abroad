@@ -24,7 +24,7 @@ const SUPPORTED_SYMBOLS = [
 
 @injectable()
 export class BinanceExchangeProvider implements IExchangeProvider {
-  public readonly exchangePercentageFee = 0.005 + 0.00075 // 0.5% + 0.075%
+  public readonly exchangePercentageFee = 0.0
 
   constructor(
     @inject(TYPES.ISecretManager) private secretManager: ISecretManager,

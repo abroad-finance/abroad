@@ -9,7 +9,6 @@ import {
 } from '.prisma/client'
 import { inject, injectable } from 'inversify'
 
-import { IPartnerService } from '../interfaces'
 import { IDatabaseClientProvider } from '../interfaces/IDatabaseClientProvider'
 import { IExchangeProviderFactory } from '../interfaces/IExchangeProviderFactory'
 import { IPaymentServiceFactory } from '../interfaces/IPaymentServiceFactory'
@@ -56,7 +55,6 @@ export class QuoteUseCase implements IQuoteUseCase {
     @inject(TYPES.IDatabaseClientProvider)
     private dbClientProvider: IDatabaseClientProvider,
     @inject(TYPES.IPartnerService)
-    private partnerService: IPartnerService,
     @inject(TYPES.IPaymentServiceFactory)
     private paymentServiceFactory: IPaymentServiceFactory,
     @inject(TYPES.IExchangeProviderFactory) private exchangeProviderFactory: IExchangeProviderFactory,

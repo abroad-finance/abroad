@@ -26,7 +26,8 @@ interface SwapProps {
   onWalletConnect?: () => void;
 }
 
-const COP_TRANSFER_FEE = 1354;
+const COP_TRANSFER_FEE = 1190;
+const BRL_TRANSFER_FEE = 0.5; // Transfer fee for BRL is fixed at 0.5
 
 export default function Swap({ onContinue, initialSourceAmount = '', initialTargetAmount = '', onAmountsChange, textColor = '#356E6A' }: SwapProps) {
   const { token, authenticateWithWallet } = useWalletAuth();
@@ -49,7 +50,7 @@ export default function Swap({ onContinue, initialSourceAmount = '', initialTarg
   const targetSymbol = targetCurrency === TargetCurrency.BRL ? 'R$' : '$';
   const targetPaymentMethod = targetCurrency === TargetCurrency.BRL ? PaymentMethod.PIX : PaymentMethod.MOVII;
   // Dynamic transfer fee: BRL = 0, COP = 1354
-  const transferFee = targetCurrency === TargetCurrency.BRL ? 0 : COP_TRANSFER_FEE;
+  const transferFee = targetCurrency === TargetCurrency.BRL ? BRL_TRANSFER_FEE : COP_TRANSFER_FEE;
 
   // Close currency dropdown on outside click
   useEffect(() => {

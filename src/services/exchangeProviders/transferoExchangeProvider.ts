@@ -31,7 +31,7 @@ export class TransferoExchangeProvider implements IExchangeProvider {
   /**
    * 0.70 % pay-in + 0.30 % FX spread (customise if your contract differs)
    */
-  readonly exchangePercentageFee = 0.007 + 0.003
+  readonly exchangePercentageFee = 0.0
 
   private cachedToken?: { exp: number, value: string }
 
