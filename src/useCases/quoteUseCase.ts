@@ -54,10 +54,10 @@ export class QuoteUseCase implements IQuoteUseCase {
   constructor(
     @inject(TYPES.IDatabaseClientProvider)
     private dbClientProvider: IDatabaseClientProvider,
-    @inject(TYPES.IPartnerService)
     @inject(TYPES.IPaymentServiceFactory)
     private paymentServiceFactory: IPaymentServiceFactory,
-    @inject(TYPES.IExchangeProviderFactory) private exchangeProviderFactory: IExchangeProviderFactory,
+    @inject(TYPES.IExchangeProviderFactory)
+    private exchangeProviderFactory: IExchangeProviderFactory,
   ) { }
 
   public async createQuote(params: CreateQuoteParams): Promise<QuoteResponse> {

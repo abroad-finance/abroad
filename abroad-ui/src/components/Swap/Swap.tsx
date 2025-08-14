@@ -26,8 +26,8 @@ interface SwapProps {
   onWalletConnect?: () => void;
 }
 
-const COP_TRANSFER_FEE = 1190;
-const BRL_TRANSFER_FEE = 0.5; // Transfer fee for BRL is fixed at 0.5
+const COP_TRANSFER_FEE = 0.0;
+const BRL_TRANSFER_FEE = 0.0;
 
 export default function Swap({ onContinue, initialSourceAmount = '', initialTargetAmount = '', onAmountsChange, textColor = '#356E6A' }: SwapProps) {
   const { token, authenticateWithWallet } = useWalletAuth();

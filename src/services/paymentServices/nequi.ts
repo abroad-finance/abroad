@@ -34,7 +34,7 @@ export type ResponseNequiDispersion = {
 export class NequiPaymentService implements IPaymentService {
   public readonly banks = []
   public readonly currency = TargetCurrency.COP
-  public readonly fixedFee = 1_190
+  public readonly fixedFee = 0.0
 
   public readonly MAX_TOTAL_AMOUNT_PER_DAY: number = 10_000_000
   public readonly MAX_USER_AMOUNT_PER_DAY: number = 10_000_000
