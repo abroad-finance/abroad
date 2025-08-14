@@ -10,8 +10,7 @@ import BackgroundCrossfade from '../../components/common/BackgroundCrossfade';
 // Child Components
 import NavBarResponsive from '../../components/WebSwap/NavBarResponsive';
 import WalletDetails from '../../components/WebSwap/WalletDetails';
-import DesktopLayout from '../../features/swap/DesktopLayout';
-import MobileLayout from '../../features/swap/MobileLayout';
+import WebSwapLayout from '../../features/swap/WebSwapLayout';
 
 type ControllerWithQr = ReturnType<typeof useWebSwapController> & {
   handleQrScanned?: (text: string) => void;
@@ -72,8 +71,7 @@ const WebSwap: React.FC = () => {
 
       {/* Main Content Area */}
       <main className="flex-1 relative z-10 flex">
-        <DesktopLayout {...controller} />
-        <MobileLayout {...controller} />
+        <WebSwapLayout {...controller} />
 
         {/* Floating Scan Button */}
         <button
