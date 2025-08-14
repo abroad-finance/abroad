@@ -58,26 +58,6 @@ export class BinanceListener {
       }
     })
 
-    // read response to command sent via WS stream (e.g LIST_SUBSCRIPTIONS)
-    wsClient.on('reply', (data) => {
-      console.log('[Binance WS]: log reply: ', JSON.stringify(data, null, 2))
-    })
-
-    // receive notification when a ws connection is reconnecting automatically
-    wsClient.on('reconnecting', (data) => {
-      console.log('[Binance WS]: ws automatically reconnecting.... ', data?.wsKey)
-    })
-
-    // receive notification that a reconnection completed successfully (e.g use REST to check for missing data)
-    wsClient.on('reconnected', (data) => {
-      console.log('[Binance WS]: ws has reconnected ', data?.wsKey)
-    })
-
-    // Recommended: receive error events (e.g. first reconnection failed)
-    wsClient.on('error', (data) => {
-      console.log('[Binance WS]: ws saw error ', data?.wsKey)
-    })
-
     wsClient.subscribeSpotUserDataStream()
   }
 }
