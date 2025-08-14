@@ -21,6 +21,8 @@ export interface IPartnerService {
 }
 
 export interface IQueueHandler {
+  /** Optional: allow implementations to close subscriptions on shutdown. */
+  closeAllSubscriptions?: () => Promise<void>
   postMessage(
     queueName: QueueName,
     message: Record<string, boolean | number | string>,
