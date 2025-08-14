@@ -1,16 +1,20 @@
-#!/usr/bin/env -S npx tsx
 // src/listeners/index.ts
 
 import { iocContainer } from '../ioc'
 import { BinanceListener } from './binance'
 import { StellarListener } from './stellar'
 
-if (require.main === module) {
+/**
+ * Register and start all listeners.
+ */
+export function startListeners(): void {
   iocContainer.bind<StellarListener>('StellarListener').to(StellarListener)
-  const stellarListener = iocContainer.get<StellarListener>('StellarListener')
-  stellarListener.start()
+  iocContainer.get<StellarListener>('StellarListener').start()
 
   iocContainer.bind<BinanceListener>('BinanceListener').to(BinanceListener)
-  const binanceListener = iocContainer.get<BinanceListener>('BinanceListener')
-  binanceListener.start()
+  iocContainer.get<BinanceListener>('BinanceListener').start()
+}
+
+if (require.main === module) {
+  startListeners()
 }

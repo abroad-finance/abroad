@@ -73,7 +73,7 @@ steps:
     waitFor: ["Migrate"]
 
   # 6. Deploy to GKE (after manifests & migrations)
-  - id: Deploy GKE
+  - id: Deploy GKE workloads
     name: gcr.io/cloud-builders/kubectl
     env:
       - CLOUDSDK_COMPUTE_REGION=$_DEPLOY_REGION
@@ -81,6 +81,21 @@ steps:
       - PROJECT_ID=$PROJECT_ID
     args: ["apply", "-k", "k8s"]
     waitFor: ["Substitute kustomization", "Migrate"]
+
+  # 7. Wait for listener and consumer rollouts
+  - id: Verify GKE rollouts
+    name: gcr.io/cloud-builders/kubectl
+    entrypoint: bash
+    env:
+      - CLOUDSDK_COMPUTE_REGION=$_DEPLOY_REGION
+      - CLOUDSDK_CONTAINER_CLUSTER=$_GKE_CLUSTER
+      - PROJECT_ID=$PROJECT_ID
+    args:
+      - -c
+      - |
+        kubectl rollout status deployment/abroad-listeners
+        kubectl rollout status deployment/abroad-consumers
+    waitFor: ["Deploy GKE workloads"]
 
 images:
   - $_AR_HOSTNAME/$PROJECT_ID/cloud-run-source-deploy/$REPO_NAME/$_SERVICE_NAME:$COMMIT_SHA

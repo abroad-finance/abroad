@@ -8,9 +8,6 @@ import path from 'path'
 import swaggerUi from 'swagger-ui-express'
 
 import packageJson from '../package.json'
-import { BinanceBalanceUpdatedController } from './controllers/queue/BinanceBalanceUpdatedController'
-import { PaymentSentController } from './controllers/queue/PaymentSentController'
-import { ReceivedCryptoTransactionController } from './controllers/queue/ReceivedCryptoTransactionController'
 import { IAuthService } from './interfaces'
 import { iocContainer } from './ioc'
 import { RegisterRoutes } from './routes'
@@ -133,21 +130,7 @@ app.listen(port, () => {
   console.log(`API docs at      http://localhost:${port}/docs`)
 })
 
-// -------------------------------------------------
-// Start queue consumers and initialise auth service
-// -------------------------------------------------
-iocContainer
-  .get<ReceivedCryptoTransactionController>(
-    TYPES.ReceivedCryptoTransactionController,
-  )
-  .registerConsumers()
-
-iocContainer
-  .get<PaymentSentController>(TYPES.PaymentSentController)
-  .registerConsumers()
-
-iocContainer
-  .get<BinanceBalanceUpdatedController>(TYPES.BinanceBalanceUpdatedController)
-  .registerConsumers()
-
+// ----------------------------
+// Initialize auth service
+// ----------------------------
 iocContainer.get<IAuthService>(TYPES.IAuthService).initialize()
