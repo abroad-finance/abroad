@@ -1,6 +1,6 @@
 import React from 'react';
 import { Scanner } from '@yudiel/react-qr-scanner';
-import { X } from 'lucide-react';
+import { X, ScanLine } from 'lucide-react';
 
 interface QrScannerFullScreenProps {
   onClose: () => void;
@@ -26,7 +26,10 @@ const QrScannerFullScreen: React.FC<QrScannerFullScreenProps> = ({ onClose, onRe
   return (
     <div className="fixed inset-0 z-[1000] bg-black/90 text-white flex flex-col">
       <div className="flex items-center justify-between p-4">
-        <h2 className="text-lg font-semibold">Scan QR Code</h2>
+        <div className="flex items-center gap-2">
+          <ScanLine className="h-6 w-6" />
+          <h2 className="text-lg font-semibold">Escane un código QR</h2>
+        </div>
         <button aria-label="Close scanner" onClick={onClose} className="p-2 rounded hover:bg-white/10">
           <X className="h-6 w-6" />
         </button>
@@ -44,7 +47,7 @@ const QrScannerFullScreen: React.FC<QrScannerFullScreenProps> = ({ onClose, onRe
 
         {/* Bottom help text */}
         <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/70 to-transparent text-center">
-          <p className="text-sm">Point your camera at a QR code to scan.</p>
+          <p className="text-sm">Asegurate de que sea un código QR de Pix</p>
         </div>
       </div>
     </div>
