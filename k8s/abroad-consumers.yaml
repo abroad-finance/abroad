@@ -16,7 +16,7 @@ spec:
       labels:
         app: abroad-consumers
     spec:
-      serviceAccountName: abroad-consumers-sa
+      serviceAccountName: abroad-stellar-sa
       containers:
         - name: abroad-consumers-container
           image: abroad-consumers-container:latest
