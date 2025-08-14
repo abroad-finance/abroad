@@ -1,7 +1,3 @@
-export const CURRENCIES = [
-  { flag: 'co', name: 'Pesos' }
-];
-
 export const ASSET_URLS = {
   BACKGROUND_IMAGE: 'https://storage.googleapis.com/cdn-abroad/bg/36132013403_56c8daad31_3k.jpg',
   USDC_TOKEN_ICON: 'https://storage.googleapis.com/cdn-abroad/Icons/Tokens/USDC%20Token.svg',

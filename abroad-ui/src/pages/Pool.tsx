@@ -35,7 +35,7 @@ const poolInfoCardTitles: Record<string, { card1: string; card2: string; card3: 
   },
 };
 
-export function Pool() {
+function Pool() {
   const [activeSection, setActiveSection] = React.useState<string>('pool');
   const { language } = useLanguage();
   const t = poolTranslations[language] || poolTranslations.en;

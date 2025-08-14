@@ -1,7 +1,5 @@
 // @deprecated This file is deprecated. Use the new API client in src/api/index.ts instead.
 
-import { getAuth } from "firebase/auth";
-
 /**
  * This API client provides functions to call:
  * - AcceptTransaction
@@ -170,30 +168,12 @@ export interface PaginatedPartnerUsers {
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "https://api.abroad.finance";
 
 async function apiRequest<T>(endpoint: string, options: RequestInit): Promise<T> {
-  const auth = getAuth();
-  const user = auth.currentUser;
-  let token: string | null = null;
-
-  if (user) {
-    try {
-      token = await user.getIdToken();
-    } catch (error) {
-      console.error("Error getting Firebase ID token:", error);
-      // Handle token retrieval error, e.g., redirect to login or show an error message
-      throw new Error("Failed to get authentication token.");
-    }
-  }
-
   // Initialize headers as a Record<string, string> for easier manipulation
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     // Spread existing headers from options if they exist
     ...(options.headers as Record<string, string> || {})
   };
-
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`; // Now type-safe
-  }
 
   // Correctly structure the fetch call
   const response = await fetch(`${API_BASE_URL}${endpoint}`, {

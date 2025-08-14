@@ -1,15 +1,12 @@
 import React from 'react';
 import { Navigate, Outlet } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useWalletAuth } from '../context/WalletAuthContext';
 
 const ProtectedRoute: React.FC = () => {
-  const { user, initializing } = useAuth();
+  const { token } = useWalletAuth();
 
-  if (initializing) {
-    return null; // wait for auth initialization before deciding route
-  }
 
-  if (!user) {
+  if (!token) {
     // User not logged in, redirect to login page
     return <Navigate to="/" replace />;
   }

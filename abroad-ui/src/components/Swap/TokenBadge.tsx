@@ -16,5 +16,3 @@ export const TokenBadge: React.FC<TokenBadgeProps> = ({ iconSrc, symbol, alt }) 
     <span>{symbol}</span>
   </div>
 );
-
-export default TokenBadge;
