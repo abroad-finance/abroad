@@ -47,7 +47,29 @@ export class MoviiPaymentService implements IPaymentService {
     @inject(TYPES.ISecretManager) private secretManager: ISecretManager,
   ) { }
 
-  public getLiquidity: () => Promise<number> = async () => { return 0 }
+  // Fetch current liquidity from Movii "traguatan" endpoint
+  public getLiquidity: () => Promise<number> = async () => {
+    try {
+      const apiKey = await this.secretManager.getSecret('MOVII_BALANCE_API_KEY')
+      const accountId = await this.secretManager.getSecret('MOVII_BALANCE_ACCOUNT_ID')
+
+      const url = `https://apigw-data.movii.com.co/traguatan/?id=${encodeURIComponent(accountId)}`
+      const headers = {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+      }
+
+      const { data } = await axios.get(url, { headers })
+      // Expected shape: { statusCode: 200, body: [{ saldo: "11027573.120000" }] }
+      const saldoStr = data?.body?.[0]?.saldo
+      const saldo = typeof saldoStr === 'string' ? parseFloat(saldoStr) : NaN
+      return Number.isFinite(saldo) ? saldo : 0
+    }
+    catch (err) {
+      console.error('Error fetching Movii liquidity:', err)
+      return 0
+    }
+  }
 
   public onboardUser: IPaymentService['onboardUser'] = async ({
     account,
