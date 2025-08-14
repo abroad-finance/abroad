@@ -11,12 +11,18 @@ import { IDatabaseClientProvider } from '../../interfaces/IDatabaseClientProvide
 import { ISecretManager } from '../../interfaces/ISecretManager'
 import { TYPES } from '../../types'
 
+// Minimal stream handle types returned by stellar-sdk stream()
+type StreamHandle = (() => void) | { close: () => void }
+
 export class StellarListener {
   private accountId!: string
   private horizonUrl!: string
+  private keepAlive?: ReturnType<typeof setInterval>
   private queueName = QueueName.RECEIVED_CRYPTO_TRANSACTION
+  private server?: Horizon.Server
+  // Keep strong references so the stream isn't GC'd.
+  private stream?: StreamHandle
   private usdcIssuer!: string
-  private stream?: EventSource
 
   constructor(
     @inject(TYPES.IQueueHandler) private queueHandler: IQueueHandler,
@@ -57,6 +63,7 @@ export class StellarListener {
     )
 
     const server = new Horizon.Server(this.horizonUrl)
+    this.server = server
     const prismaClient = await this.dbClientProvider.getClient()
 
     const state = await prismaClient.stellarListenerState.findUnique({
@@ -72,6 +79,7 @@ export class StellarListener {
       state?.lastPagingToken ? state.lastPagingToken : 'now',
     )
 
+    // Keep a reference to the stream handle returned by SDK
     this.stream = cursorServer.forAccount(this.accountId).stream({
       onerror: (err) => {
         console.error('[StellarListener] Stream error:', err)
@@ -176,5 +184,34 @@ export class StellarListener {
         }
       },
     })
+
+    // Prevent GC of the stream by touching it periodically and keep event loop active
+    this.keepAlive = setInterval(() => {
+      // no-op; reference the stream so it's strongly reachable
+      if (!this.stream) return
+    }, 60_000)
+  }
+
+  /** Gracefully stop the stream and clear keep-alive. */
+  public stop(): void {
+    try {
+      // SDKs may return an EventSource-like with close(), or a function to cancel
+      if (typeof this.stream === 'function') {
+        this.stream()
+      }
+      else if (this.stream && typeof this.stream.close === 'function') {
+        this.stream.close()
+      }
+    }
+    catch (err) {
+      console.error('[StellarListener] Error while stopping stream:', err)
+    }
+    finally {
+      if (this.keepAlive) {
+        clearInterval(this.keepAlive)
+        this.keepAlive = undefined
+      }
+      this.stream = undefined
+    }
   }
 }

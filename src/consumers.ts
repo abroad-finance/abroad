@@ -9,18 +9,57 @@ import { TYPES } from './types'
 
 dotenv.config()
 
-iocContainer
-  .get<ReceivedCryptoTransactionController>(
+// Keep module-level strong references to prevent GC
+const running: {
+  binance?: BinanceBalanceUpdatedController
+  payment?: PaymentSentController
+  received?: ReceivedCryptoTransactionController
+} = {}
+
+export function startConsumers(): void {
+  const received = iocContainer.get<ReceivedCryptoTransactionController>(
     TYPES.ReceivedCryptoTransactionController,
   )
-  .registerConsumers()
+  const payment = iocContainer.get<PaymentSentController>(
+    TYPES.PaymentSentController,
+  )
+  const binance = iocContainer.get<BinanceBalanceUpdatedController>(
+    TYPES.BinanceBalanceUpdatedController,
+  )
 
-iocContainer
-  .get<PaymentSentController>(TYPES.PaymentSentController)
-  .registerConsumers()
+  running.received = received
+  running.payment = payment
+  running.binance = binance
 
-iocContainer
-  .get<BinanceBalanceUpdatedController>(TYPES.BinanceBalanceUpdatedController)
-  .registerConsumers()
+  received.registerConsumers()
+  payment.registerConsumers()
+  binance.registerConsumers()
 
-iocContainer.get<IAuthService>(TYPES.IAuthService).initialize()
+  iocContainer.get<IAuthService>(TYPES.IAuthService).initialize()
+}
+
+export async function stopConsumers(): Promise<void> {
+  try {
+    const qh = iocContainer.get<import('./interfaces').IQueueHandler>(
+      TYPES.IQueueHandler,
+    )
+    if (qh.closeAllSubscriptions) await qh.closeAllSubscriptions()
+  }
+  finally {
+    running.received = undefined
+    running.payment = undefined
+    running.binance = undefined
+  }
+}
+
+if (require.main === module) {
+  startConsumers()
+  process.on('SIGINT', async () => {
+    await stopConsumers()
+    process.exit(0)
+  })
+  process.on('SIGTERM', async () => {
+    await stopConsumers()
+    process.exit(0)
+  })
+}
