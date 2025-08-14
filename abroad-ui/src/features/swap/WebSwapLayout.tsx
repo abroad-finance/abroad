@@ -16,13 +16,20 @@ const WebSwapLayout: React.FC<LayoutProps> = (props) => {
   const {
     view,
     swapData,
-    initialAmounts,
     address,
     handleSwapContinue,
     handleBackToSwap,
     handleTransactionComplete,
     handleAmountsChange,
     handleWalletConnectOpen,
+    sourceAmount,
+    targetAmount,
+    targetCurrency,
+    handleTargetChange,
+    quoteId,
+    setQuoteId,
+    pixKey,
+    setPixKey,
   } = props;
 
   const { authenticateWithWallet } = useWalletAuth();
@@ -60,10 +67,14 @@ const WebSwapLayout: React.FC<LayoutProps> = (props) => {
               );
               handleSwapContinue({ quote_id, srcAmount, tgtAmount, targetCurrency });
             }}
-            initialSourceAmount={initialAmounts.source}
-            initialTargetAmount={initialAmounts.target}
             onAmountsChange={handleAmountsChange}
             onWalletConnect={isDesktop ? onDesktopWalletConnect : handleDirectWalletConnect}
+            sourceAmount={sourceAmount}
+            targetAmount={targetAmount}
+            targetCurrency={targetCurrency}
+            onTargetChange={handleTargetChange}
+            quoteId={quoteId}
+            setQuoteId={setQuoteId}
             {...(textColorProps ?? {})}
           />
         )}
@@ -82,6 +93,8 @@ const WebSwapLayout: React.FC<LayoutProps> = (props) => {
               targetAmount={swapData.tgtAmount}
               userId={address}
               targetCurrency={swapData.targetCurrency}
+              pixKey={pixKey}
+              setPixKey={setPixKey}
               {...(textColorProps ?? {})}
             />
           </>

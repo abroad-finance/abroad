@@ -108,6 +108,8 @@ interface BankDetailsRouteProps {
   userId: string;
   textColor?: string;
   targetCurrency?: (typeof TargetCurrency)[keyof typeof TargetCurrency];
+  pixKey: string; // For BRL transfers
+  setPixKey: (key: string) => void;
 }
 
 export default function BankDetailsRoute({
@@ -119,6 +121,8 @@ export default function BankDetailsRoute({
   onTransactionComplete,
   textColor = '#356E6A',
   targetCurrency = TargetCurrency.COP,
+  pixKey,
+  setPixKey
 }: BankDetailsRouteProps): React.JSX.Element {
   const { walletId, token, address } = useWalletAuth();
 
@@ -129,7 +133,6 @@ export default function BankDetailsRoute({
   const [bankOpen, setBankOpen] = useState(false);
   const [selectedBank, setSelectedBank] = useState<Option | null>(null);
   // BRL specific fields
-  const [pixKey, setPixKey] = useState('');
   const [cpf, setCpf] = useState('');
 
   // ------------------------------ BANKS API -----------------------------------

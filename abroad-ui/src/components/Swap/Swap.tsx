@@ -3,7 +3,7 @@ import { Button } from "../Button";
 import { ChevronsDown, Loader, CircleDollarSign, Landmark, Timer, Wallet } from 'lucide-react';
 import { TokenBadge } from './TokenBadge';
 import { IconAnimated } from '../IconAnimated';
-import { getQuote, getReverseQuote, _36EnumsTargetCurrency as TargetCurrency, _36EnumsPaymentMethod as PaymentMethod, _36EnumsBlockchainNetwork as BlockchainNetwork, _36EnumsCryptoCurrency as CryptoCurrency } from '../../api/index';
+import { getReverseQuote, _36EnumsTargetCurrency as TargetCurrency, _36EnumsPaymentMethod as PaymentMethod, _36EnumsBlockchainNetwork as BlockchainNetwork, _36EnumsCryptoCurrency as CryptoCurrency } from '../../api/index';
 import { useWalletAuth } from '../../context/WalletAuthContext';
 import { kit } from '../../services/stellarKit';
 
@@ -17,30 +17,42 @@ interface SwapProps {
   ) => void;
   initialSourceAmount?: string;
   initialTargetAmount?: string;
-  onAmountsChange?: (
-    srcAmount: string,
-    tgtAmount: string,
-    currency?: (typeof TargetCurrency)[keyof typeof TargetCurrency]
-  ) => void;
+  onAmountsChange?: (params: {
+    src?: string;
+    tgt?: string;
+    currency?: (typeof TargetCurrency)[keyof typeof TargetCurrency];
+  }) => void;
   textColor?: string;
   onWalletConnect?: () => void;
+  sourceAmount: string;
+  targetAmount: string;
+  targetCurrency: (typeof TargetCurrency)[keyof typeof TargetCurrency];
+  onTargetChange: (amount: number) => Promise<void>;
+  quoteId: string;
+  setQuoteId: (id: string) => void;
 }
 
 const COP_TRANSFER_FEE = 0.0;
 const BRL_TRANSFER_FEE = 0.0;
 
-export default function Swap({ onContinue, initialSourceAmount = '', initialTargetAmount = '', onAmountsChange, textColor = '#356E6A' }: SwapProps) {
+export default function Swap({
+  sourceAmount,
+  targetAmount,
+  targetCurrency,
+  onContinue,
+  onAmountsChange,
+  textColor = '#356E6A',
+  onTargetChange,
+  quoteId,
+  setQuoteId
+}: SwapProps) {
   const { token, authenticateWithWallet } = useWalletAuth();
-  const [sourceAmount, setSourceAmount] = useState(initialSourceAmount);
-  const [targetAmount, setTargetAmount] = useState(initialTargetAmount || '');
-  const [quote_id, setquote_id] = useState<string>('');
   const [loadingSource, setLoadingSource] = useState(false);
   const [loadingTarget, setLoadingTarget] = useState(false);
   const [displayedTRM, setDisplayedTRM] = useState(0.000);
   const sourceDebounceRef = useRef<NodeJS.Timeout | null>(null);
   const targetDebounceRef = useRef<NodeJS.Timeout | null>(null);
   // New: selected target currency (COP | BRL)
-  const [targetCurrency, setTargetCurrency] = useState<(typeof TargetCurrency)[keyof typeof TargetCurrency]>(TargetCurrency.COP);
   // Dropdown state for currency selection
   const [currencyMenuOpen, setCurrencyMenuOpen] = useState(false);
   const currencyMenuRef = useRef<HTMLDivElement | null>(null);
@@ -63,29 +75,17 @@ export default function Swap({ onContinue, initialSourceAmount = '', initialTarg
     return () => document.removeEventListener('mousedown', onDocClick);
   }, []);
 
-  // Reflect external changes to initial amounts (e.g., from QR scan)
-  useEffect(() => {
-    if (initialSourceAmount !== undefined && initialSourceAmount !== sourceAmount) {
-      setSourceAmount(initialSourceAmount);
-    }
-  }, [initialSourceAmount, sourceAmount]);
 
-  useEffect(() => {
-    if (initialTargetAmount !== undefined && initialTargetAmount !== targetAmount) {
-      setTargetAmount(initialTargetAmount);
-    }
-  }, [initialTargetAmount, targetAmount]);
 
   // Reset values when switching target currency to avoid stale quotes
   useEffect(() => {
-    setSourceAmount('');
-    setTargetAmount('');
-    setquote_id('');
+    setQuoteId('');
     setDisplayedTRM(0);
+    onAmountsChange?.({ src: '', tgt: '', currency: targetCurrency });
     // clear any pending debounce
     if (sourceDebounceRef.current) clearTimeout(sourceDebounceRef.current);
     if (targetDebounceRef.current) clearTimeout(targetDebounceRef.current);
-  }, [targetCurrency]);
+  }, [onAmountsChange, setQuoteId, targetCurrency])
 
   const isButtonDisabled = () => {
     const numericSource = parseFloat(String(sourceAmount));
@@ -102,17 +102,18 @@ export default function Swap({ onContinue, initialSourceAmount = '', initialTarg
     // clear any pending debounce
     if (sourceDebounceRef.current) clearTimeout(sourceDebounceRef.current);
     // update state and notify parent
-    setSourceAmount(input);
-    onAmountsChange?.(input, targetAmount);
+    onAmountsChange?.({ src: input });
     const num = parseFloat(input);
     if (isNaN(num)) {
-      setTargetAmount('');
+      onAmountsChange?.({ src: '' });
       return;
     }
     setLoadingTarget(true);
     // debounce reverse quote API call
+    console.log('Setting sourceDebounceRef');
     sourceDebounceRef.current = setTimeout(async () => {
       try {
+        console.log('Fetching reverse quote for source amount:', num);
         const response = await getReverseQuote({
           target_currency: targetCurrency,
           source_amount: num,
@@ -122,9 +123,8 @@ export default function Swap({ onContinue, initialSourceAmount = '', initialTarg
         });
         if (response.status === 200) {
           const formatted = formatTargetNumber(response.data.value);
-          setTargetAmount(formatted);
-          setquote_id(response.data.quote_id); // Add this line
-          onAmountsChange?.(input, formatted);
+          setQuoteId(response.data.quote_id); // Add this line
+          onAmountsChange?.({ src: input, tgt: formatted });
         }
       } catch (error: unknown) {
         console.error('Reverse quote error', error);
@@ -136,16 +136,15 @@ export default function Swap({ onContinue, initialSourceAmount = '', initialTarg
 
   const handleSourceFocus = () => {
     // strip any formatting to show raw numbers
-    setSourceAmount(prev => prev.replace(/[^0-9.]/g, ''));
+    onAmountsChange?.({ src: sourceAmount.replace(/[^0-9.]/g, '') });
   };
 
   const handleSourceBlur = () => {
     const num = parseFloat(sourceAmount);
     if (isNaN(num)) {
-      setSourceAmount('');
+      onAmountsChange?.({ src: '' });
     } else {
-      // store only numeric string; dollar prefix is static
-      setSourceAmount(num.toFixed(2));
+      onAmountsChange?.({ src: num.toFixed(2) });
     }
   };
 
@@ -156,29 +155,17 @@ export default function Swap({ onContinue, initialSourceAmount = '', initialTarg
     const num = parseFloat(normalized);
     // clear any pending debounce
     if (targetDebounceRef.current) clearTimeout(targetDebounceRef.current);
-    setTargetAmount(raw);
-    onAmountsChange?.(sourceAmount, raw);
+    onAmountsChange?.({ tgt: raw });
+    console.log('Setting targetDebounceRef', raw);
     if (isNaN(num)) {
-      setSourceAmount('');
+      onAmountsChange?.({ src: '' });
       return;
     }
     setLoadingSource(true);
     // debounce quote API call
     targetDebounceRef.current = setTimeout(async () => {
       try {
-        const response = await getQuote({
-          target_currency: targetCurrency,
-          payment_method: targetPaymentMethod,
-          network: BlockchainNetwork.STELLAR,
-          crypto_currency: CryptoCurrency.USDC,
-          amount: num,
-        });
-        if (response.status === 200) {
-          const src = response.data.value.toFixed(2);
-          setSourceAmount(src);
-          setquote_id(response.data.quote_id);
-          onAmountsChange?.(src, raw);
-        }
+        await onTargetChange(num);
       } catch (error: unknown) {
         console.error('Quote error', error);
       } finally {
@@ -192,10 +179,10 @@ export default function Swap({ onContinue, initialSourceAmount = '', initialTarg
     const normalized = clean.replace(/\./g, '').replace(/,/g, '.');
     const num = parseFloat(normalized);
     if (isNaN(num)) {
-      setTargetAmount('');
+      onAmountsChange?.({ tgt: '' });
     } else {
       // final numeric format with separators
-      setTargetAmount(formatTargetNumber(num));
+      onAmountsChange?.({ tgt: formatTargetNumber(num) });
     }
   };
 
@@ -214,10 +201,6 @@ export default function Swap({ onContinue, initialSourceAmount = '', initialTarg
     }
     // If loadingSource or loadingTarget is true, displayedTRM remains unchanged.
   }, [sourceAmount, targetAmount, loadingSource, loadingTarget, transferFee]); // TransferFee is a module-level const
-
-  // Reset state when user gets authenticated
-  useEffect(() => {
-  }, [token]);
 
   // Direct wallet connection handler
   const handleDirectWalletConnect = () => {
@@ -332,10 +315,9 @@ export default function Swap({ onContinue, initialSourceAmount = '', initialTarg
                   <button
                     type="button"
                     onClick={() => {
-                      setTargetCurrency(TargetCurrency.COP);
                       setCurrencyMenuOpen(false);
                       // Notify parent about currency change to update global state (e.g., background)
-                      onAmountsChange?.(sourceAmount, targetAmount, TargetCurrency.COP);
+                      onAmountsChange?.({ src: sourceAmount, tgt: targetAmount, currency: TargetCurrency.COP });
                     }}
                     className="w-full text-left hover:bg-black/5 rounded-lg px-1 py-1"
                     role="option"
@@ -351,10 +333,9 @@ export default function Swap({ onContinue, initialSourceAmount = '', initialTarg
                   <button
                     type="button"
                     onClick={() => {
-                      setTargetCurrency(TargetCurrency.BRL);
                       setCurrencyMenuOpen(false);
                       // Notify parent about currency change to update global state (e.g., background)
-                      onAmountsChange?.(sourceAmount, targetAmount, TargetCurrency.BRL);
+                      onAmountsChange?.({ src: sourceAmount, tgt: targetAmount, currency: TargetCurrency.BRL });
                     }}
                     className="w-full text-left hover:bg-black/5 rounded-lg px-1 py-1"
                     role="option"
@@ -412,15 +393,15 @@ export default function Swap({ onContinue, initialSourceAmount = '', initialTarg
             // Always use direct wallet connection - prioritize the internal handler
             handleDirectWalletConnect();
           } else {
-            console.log('Continue clicked with quote_id:', quote_id);
-            if (!quote_id) {
+            console.log('Continue clicked with quote_id:', quoteId);
+            if (!quoteId) {
               alert('Please wait for the quote to load before continuing');
               return;
             }
-            onContinue(quote_id, sourceAmount, targetAmount, targetCurrency);
+            onContinue(quoteId, sourceAmount, targetAmount, targetCurrency);
           }
         }}
-        disabled={!!token && (isButtonDisabled() || !quote_id)}
+        disabled={!!token && (isButtonDisabled() || !quoteId)}
       >
         {!token ? (
           <div className="flex items-center justify-center space-x-2">

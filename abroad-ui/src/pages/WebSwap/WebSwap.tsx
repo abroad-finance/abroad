@@ -1,10 +1,7 @@
 import React from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useWebSwapController } from '../../features/swap/useWebSwapController';
-import { ASSET_URLS, BRL_BACKGROUND_IMAGE } from '../../features/swap/webSwap.constants';
 import QrScannerFullScreen from '../../components/WebSwap/QrScannerFullScreen';
-import { useSearchParams } from 'react-router-dom';
-import { decodePixQrCode } from '../../utils/PixQrDecoder';
 import BackgroundCrossfade from '../../components/common/BackgroundCrossfade';
 
 // Child Components
@@ -12,50 +9,15 @@ import NavBarResponsive from '../../components/WebSwap/NavBarResponsive';
 import WalletDetails from '../../components/WebSwap/WalletDetails';
 import WebSwapLayout from '../../features/swap/WebSwapLayout';
 
-type ControllerWithQr = ReturnType<typeof useWebSwapController> & {
-  handleQrScanned?: (text: string) => void;
-};
 
 const WebSwap: React.FC = () => {
-  const controller = useWebSwapController() as ControllerWithQr;
-  const [isQrOpen, setIsQrOpen] = React.useState(false);
-  const [searchParams] = useSearchParams();
-
-  React.useEffect(() => {
-    if (searchParams.has('qr_scanner')) setIsQrOpen(true);
-  }, [searchParams]);
-
-  const handleQrResult = (text: string) => {
-    setIsQrOpen(false);
-    // Optionally expose raw scan to controller
-    controller.handleQrScanned?.(text);
-
-    // Try to decode PIX QR and prefill amount
-    try {
-      const decoded = decodePixQrCode(text);
-      const amount = decoded.transactionAmount;
-      if (amount) {
-        controller.handleAmountsChange(amount, controller.initialAmounts.target);
-      }
-    } catch (e) {
-      console.warn('Failed to decode PIX QR', e);
-    }
-
-    if (!controller.handleQrScanned) {
-      console.log('Scanned QR:', text);
-    }
-  };
-
-  // Determine desired desktop background URL based on currency
-  const currentBgUrl = controller.targetCurrency === 'BRL' ? BRL_BACKGROUND_IMAGE : ASSET_URLS.BACKGROUND_IMAGE;
-
-  // background crossfade handled by BackgroundCrossfade component
+  const controller = useWebSwapController();
 
   return (
     <div className="w-screen min-h-screen md:h-screen md:overflow-hidden flex flex-col">
       {/* Desktop page background with crossfade (no white flash) */}
       <BackgroundCrossfade
-        imageUrl={currentBgUrl}
+        imageUrl={controller.currentBgUrl}
         visibilityClass="hidden md:block"
         positionClass="absolute inset-0"
         zIndexClass="z-0"
@@ -76,7 +38,7 @@ const WebSwap: React.FC = () => {
         {/* Floating Scan Button */}
         <button
           type="button"
-          onClick={() => setIsQrOpen(true)}
+          onClick={controller.openQr}
           className="fixed bottom-6 right-6 z-[1001] rounded-full bg-green-600 text-white px-5 py-3 shadow-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-white/50"
         >
           Scan QR
@@ -93,8 +55,8 @@ const WebSwap: React.FC = () => {
       </AnimatePresence>
 
       {/* Full-screen QR Scanner */}
-      {isQrOpen && (
-        <QrScannerFullScreen onClose={() => setIsQrOpen(false)} onResult={handleQrResult} />
+      {controller.isQrOpen && (
+        <QrScannerFullScreen onClose={controller.closeQr} onResult={controller.handleQrResult} />
       )}
     </div>
   );

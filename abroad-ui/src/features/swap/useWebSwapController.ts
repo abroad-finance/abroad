@@ -1,7 +1,10 @@
 import { useState, useCallback, useEffect } from 'react';
 import { SwapData, SwapView } from './webSwap.types';
-import { _36EnumsTargetCurrency as TargetCurrency } from '../../api';
 import { useWalletAuth } from '../../context/WalletAuthContext';
+import { useSearchParams } from 'react-router-dom';
+import { decodePixQrCode } from '../../utils/PixQrDecoder';
+import { ASSET_URLS, BRL_BACKGROUND_IMAGE } from './webSwap.constants';
+import { getQuote, _36EnumsTargetCurrency as TargetCurrency, _36EnumsPaymentMethod as PaymentMethod, _36EnumsBlockchainNetwork as BlockchainNetwork, _36EnumsCryptoCurrency as CryptoCurrency } from '../../api/index';
 
 const PENDING_TX_KEY = 'pendingTransaction';
 
@@ -9,7 +12,6 @@ export const useWebSwapController = () => {
   const { address, token } = useWalletAuth();
   const [view, setView] = useState<SwapView>('swap');
   const [swapData, setSwapData] = useState<SwapData | null>(null);
-
 
   // Modal visibility state
   const [isWalletModalOpen, setIsWalletModalOpen] = useState(false);
@@ -19,6 +21,23 @@ export const useWebSwapController = () => {
   const [sourceAmount, setSourceAmount] = useState('');
   const [targetAmount, setTargetAmount] = useState('');
   const [targetCurrency, setTargetCurrency] = useState<(typeof TargetCurrency)[keyof typeof TargetCurrency]>(TargetCurrency.COP);
+
+  // QR scanner state and URL param handling
+  const [isQrOpen, setIsQrOpen] = useState(false);
+  const [searchParams] = useSearchParams();
+  const [quote_id, setquote_id] = useState<string>('');
+  const [pixKey, setPixKey] = useState<string>('');
+
+
+  const targetPaymentMethod = targetCurrency === TargetCurrency.BRL ? PaymentMethod.PIX : PaymentMethod.MOVII;
+
+
+  useEffect(() => {
+    if (searchParams.has('qr_scanner')) {
+      setIsQrOpen(true);
+      setTargetCurrency(TargetCurrency.BRL);
+    }
+  }, [searchParams]);
 
   // Restore state if user returns from KYC
   useEffect(() => {
@@ -56,11 +75,44 @@ export const useWebSwapController = () => {
     setView('bankDetails');
   }, []);
 
-  const handleAmountsChange = useCallback((src: string, tgt: string, currency?: (typeof TargetCurrency)[keyof typeof TargetCurrency]) => {
-    setSourceAmount(src);
-    setTargetAmount(tgt);
-    if (currency) setTargetCurrency(currency);
+  const handleAmountsChange = useCallback(({ src, tgt, currency }: { src?: string, tgt?: string, currency?: (typeof TargetCurrency)[keyof typeof TargetCurrency] }) => {
+    if (typeof src === 'string') setSourceAmount(src || '');
+    if (typeof tgt === 'string') setTargetAmount(tgt || '');
+    if (typeof currency === 'string') setTargetCurrency(currency);
   }, []);
+
+  const handleTargetChange = useCallback(async (targetAmount: number) => {
+    console.log('handleTargetChange called with:', { targetCurrency, targetPaymentMethod, targetAmount });
+    const response = await getQuote({
+      target_currency: targetCurrency,
+      payment_method: targetPaymentMethod,
+      network: BlockchainNetwork.STELLAR,
+      crypto_currency: CryptoCurrency.USDC,
+      amount: targetAmount
+    });
+    if (response.status === 200) {
+      const src = response.data.value.toFixed(2);
+      handleAmountsChange?.({ src });
+      setquote_id(response.data.quote_id);
+    }
+
+  }, [targetCurrency, targetPaymentMethod, handleAmountsChange]);
+
+  // Handle QR results (PIX) and prefill amount
+  const handleQrResult = useCallback((text: string) => {
+    setIsQrOpen(false);
+    try {
+      const decoded = decodePixQrCode(text);
+      const amount = decoded.transactionAmount;
+      if (amount) {
+        handleAmountsChange({ tgt: amount });
+        handleTargetChange(parseFloat(amount));
+        setPixKey(decoded.merchantAccount.key || '')
+      }
+    } catch (e) {
+      console.warn('Failed to decode PIX QR', e);
+    }
+  }, [handleAmountsChange, handleTargetChange]);
 
   const handleBackToSwap = useCallback(() => {
     localStorage.removeItem(PENDING_TX_KEY);
@@ -76,15 +128,28 @@ export const useWebSwapController = () => {
     setSwapData(null);
   }, []);
 
+  // Determine desired desktop background URL based on currency
+  const currentBgUrl = targetCurrency === 'BRL' ? BRL_BACKGROUND_IMAGE : ASSET_URLS.BACKGROUND_IMAGE;
+
+
+
+  const onOpenQr = useCallback(() => {
+    setIsQrOpen(true);
+    setTargetCurrency(TargetCurrency.BRL);
+  }, []);
+
   return {
     // State
     view,
     swapData,
     isWalletModalOpen,
     isWalletDetailsOpen,
-    initialAmounts: { source: sourceAmount, target: targetAmount },
-    address,
+    sourceAmount,
+    targetAmount,
     targetCurrency,
+    address,
+    isQrOpen,
+    currentBgUrl,
 
     // Handlers
     handleWalletConnectOpen,
@@ -96,5 +161,13 @@ export const useWebSwapController = () => {
     handleAmountsChange,
     handleBackToSwap,
     handleTransactionComplete,
+    handleQrResult,
+    openQr: onOpenQr,
+    closeQr: () => setIsQrOpen(false),
+    handleTargetChange,
+    quoteId: quote_id,
+    setQuoteId: setquote_id,
+    pixKey,
+    setPixKey
   };
 };
