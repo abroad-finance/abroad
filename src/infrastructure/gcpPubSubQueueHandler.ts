@@ -1,4 +1,4 @@
-import { PubSub } from '@google-cloud/pubsub'
+import { PubSub, Subscription } from '@google-cloud/pubsub'
 import { inject, injectable } from 'inversify'
 
 import { IQueueHandler, QueueName } from '../interfaces'
@@ -8,6 +8,7 @@ import { TYPES } from '../types'
 @injectable()
 export class GCPPubSubQueueHandler implements IQueueHandler {
   private pubsub!: PubSub
+  private subscriptions = new Map<QueueName, Subscription>()
 
   constructor(
         @inject(TYPES.ISecretManager) private secretManager: ISecretManager,
@@ -40,6 +41,7 @@ export class GCPPubSubQueueHandler implements IQueueHandler {
     }
     const subscriptionName = `${queueName}-subscription`
     const subscription = this.pubsub.subscription(subscriptionName)
+    this.subscriptions.set(queueName, subscription)
     const [subExists] = await subscription.exists()
     if (!subExists) {
       await topic.createSubscription(subscriptionName)
@@ -57,6 +59,13 @@ export class GCPPubSubQueueHandler implements IQueueHandler {
       }
     })
     console.log(`[IQueueHandler] Subscribed to PubSub topic: ${queueName}`)
+  }
+
+  public async closeAllSubscriptions(): Promise<void> {
+    for (const subscription of this.subscriptions.values()) {
+      await subscription.close()
+    }
+    this.subscriptions.clear()
   }
 
   private async ensureClient(): Promise<void> {

@@ -16,6 +16,7 @@ export class StellarListener {
   private horizonUrl!: string
   private queueName = QueueName.RECEIVED_CRYPTO_TRANSACTION
   private usdcIssuer!: string
+  private stream?: EventSource
 
   constructor(
     @inject(TYPES.IQueueHandler) private queueHandler: IQueueHandler,
@@ -71,7 +72,7 @@ export class StellarListener {
       state?.lastPagingToken ? state.lastPagingToken : 'now',
     )
 
-    cursorServer.forAccount(this.accountId).stream({
+    this.stream = cursorServer.forAccount(this.accountId).stream({
       onerror: (err) => {
         console.error('[StellarListener] Stream error:', err)
       },
