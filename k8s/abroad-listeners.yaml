@@ -25,11 +25,11 @@ spec:
           imagePullPolicy: Always
           resources:
             requests:
-              cpu: "100m"
-              memory: "128Mi"
+              cpu: "1"
+              memory: "1Gi"
             limits:
-              cpu: "500m"
-              memory: "512Mi"
+              cpu: "2"
+              memory: "2Gi"
           livenessProbe:
             exec:
               command:

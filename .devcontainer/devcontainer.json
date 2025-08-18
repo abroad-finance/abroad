@@ -22,8 +22,8 @@
 			],
 		},
 	},
-	"postStartCommand": "npm install",
-	"postCreateCommand": "gcloud auth login && gcloud auth application-default login",
+	// "postStartCommand": "npm install",
+	// "postCreateCommand": "gcloud auth login && gcloud auth application-default login",
 	// Uncomment to connect as root instead. More info: https://aka.ms/dev-containers-non-root.
 	"remoteUser": "root",
 	"forwardPorts": [
