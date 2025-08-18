@@ -12,13 +12,16 @@ const TRANSFERO_BANKS: Bank[] = [{ bankCode: 1, bankName: 'PIX' }]
 export class TransferoPaymentService implements IPaymentService {
   banks = TRANSFERO_BANKS
   currency: TargetCurrency = TargetCurrency.BRL
-  fixedFee = 0.5
-  readonly MAX_TOTAL_AMOUNT_PER_DAY = 25_000_000
+  fixedFee = 0.0
 
+  readonly MAX_TOTAL_AMOUNT_PER_DAY = 25_000_000
   readonly MAX_USER_AMOUNT_PER_DAY = 25_000_000
   readonly MAX_USER_AMOUNT_PER_TRANSACTION = 5_000_000
   readonly MAX_USER_TRANSACTIONS_PER_DAY = 15
-  percentageFee = 0
+
+  percentageFee = 0.0
+
+  private cachedToken?: { exp: number, value: string }
 
   public constructor(
     @inject(TYPES.ISecretManager) private secretManager: ISecretManager,
@@ -35,7 +38,6 @@ export class TransferoPaymentService implements IPaymentService {
 
   async sendPayment({
     account,
-    bankCode,
     id,
     value,
   }: {
@@ -46,7 +48,7 @@ export class TransferoPaymentService implements IPaymentService {
   }): Promise<
     | { success: false }
     | { success: true, transactionId: string }
-    > {
+  > {
     try {
       const dbClient = await this.databaseClientProvider.getClient()
       const transaction = await dbClient.transaction.findUnique({
@@ -55,9 +57,9 @@ export class TransferoPaymentService implements IPaymentService {
       if (!transaction || !transaction.taxId) {
         throw new Error('Partner user not found or tax ID is missing.')
       }
-      const token = await this.getTransferoToken()
+      const token = await this.getAccessToken()
 
-      const contract = buildContract({ account, bankCode, taxId: transaction.taxId, value })
+      const contract = buildContract({ account, taxId: transaction.taxId, value })
 
       const { TRANSFERO_ACCOUNT_ID, TRANSFERO_BASE_URL } = await this.secretManager.getSecrets([
         'TRANSFERO_ACCOUNT_ID',
@@ -95,53 +97,55 @@ export class TransferoPaymentService implements IPaymentService {
     return Promise.resolve(true)
   }
 
-  /** Obtains (or refreshes) a JWT for the BaaSiC API. */
-  private async getTransferoToken(): Promise<string> {
-    const { TRANSFERO_BASE_URL, TRANSFERO_CLIENT_ID, TRANSFERO_CLIENT_SECRET }
-      = await this.secretManager.getSecrets([
-        'TRANSFERO_BASE_URL',
-        'TRANSFERO_CLIENT_ID',
-        'TRANSFERO_CLIENT_SECRET',
-      ])
+  /** OAuth2 client-credentials flow */
+  private async getAccessToken(): Promise<string> {
+    const now = Date.now()
+    if (this.cachedToken && now < this.cachedToken.exp - 60_000) {
+      return this.cachedToken.value
+    }
 
-    const { data } = await axios.post(
-      `${TRANSFERO_BASE_URL}/auth/token`,
-      {
-        client_id: TRANSFERO_CLIENT_ID,
-        client_secret: TRANSFERO_CLIENT_SECRET,
-        grant_type: 'client_credentials',
-      },
-      { headers: { 'Content-Type': 'application/json' } },
+    const apiUrl = await this.secretManager.getSecret('TRANSFERO_BASE_URL')
+    const clientId = await this.secretManager.getSecret('TRANSFERO_CLIENT_ID')
+    const clientSecret = await this.secretManager.getSecret(
+      'TRANSFERO_CLIENT_SECRET',
     )
+    const clientScope = await this.secretManager.getSecret('TRANSFERO_CLIENT_SCOPE')
 
-    return data?.access_token ?? ''
+    const { data } = await axios.post(`${apiUrl}/auth/token`, {
+      client_id: clientId,
+      client_secret: clientSecret,
+      grant_type: 'client_credentials',
+      scope: clientScope,
+    }, {
+      headers: { 'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
+    })
+
+    const value = data.access_token ?? data
+    const seconds = Number(data.expires_in ?? 900) // default 15 min
+    this.cachedToken = { exp: now + seconds * 1000, value }
+
+    return value
   }
 }
 
 /** Shapes the request body expected by /paymentgroup. */
 function buildContract({
   account,
-  bankCode,
   taxId,
   value,
 }: {
   account: string
-  bankCode: string
   taxId: string
   value: number
 }) {
-  if (bankCode === 'PIX') {
-    return [
-      {
-        amount: value,
-        currency: 'BRL',
-        name: 'Recipient',
-        pixKey: account,
-        taxId,
-        taxIdCountry: 'BRA',
-      },
-    ]
-  }
-
-  throw new Error(`Unsupported bank code: ${bankCode}`)
+  return [
+    {
+      amount: value,
+      currency: 'BRL',
+      name: 'Recipient',
+      pixKey: account,
+      taxId,
+      taxIdCountry: 'BRA',
+    },
+  ]
 }

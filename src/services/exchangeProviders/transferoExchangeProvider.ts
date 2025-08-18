@@ -39,9 +39,9 @@ export class TransferoExchangeProvider implements IExchangeProvider {
   ) { }
 
   /**
-             * Retrieves (or creates) the deposit wallet for the partner account.
-             * Falls back to the first wallet that matches both currency and chain.
-             */
+           * Retrieves (or creates) the deposit wallet for the partner account.
+           * Falls back to the first wallet that matches both currency and chain.
+           */
   getExchangeAddress: IExchangeProvider['getExchangeAddress'] = async ({
     blockchain,
     cryptoCurrency,
