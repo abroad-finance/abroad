@@ -391,12 +391,20 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
                     </div>
                     <div className="flex items-center space-x-1">
                       <img
-                        src="https://hatscripts.github.io/circle-flags/flags/co.svg"
-                        alt="COP"
+                        src={
+                          transaction.quote.targetCurrency === 'BRL'
+                            ? 'https://hatscripts.github.io/circle-flags/flags/br.svg'
+                            : 'https://hatscripts.github.io/circle-flags/flags/co.svg'
+                        }
+                        alt={transaction.quote.targetCurrency}
                         className="w-4 h-4 rounded-full"
                       />
                       <span className="text-gray-700 text-xl font-bold">
-                        ${transaction.quote.targetAmount.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        {transaction.quote.targetCurrency === 'BRL' ? 'R$' : '$'}
+                        {transaction.quote.targetAmount.toLocaleString(
+                          transaction.quote.targetCurrency === 'BRL' ? 'pt-BR' : 'es-CO',
+                          { minimumFractionDigits: 2, maximumFractionDigits: 2 }
+                        )}
                       </span>
                     </div>
                   </div>
