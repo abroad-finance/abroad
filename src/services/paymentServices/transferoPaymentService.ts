@@ -158,12 +158,41 @@ function buildContract({
   taxId: string
   value: number
 }) {
+  // Normalize Pix key if it's a Brazilian phone number to E.164 (+55...) format
+  const normalizeBrazilPhonePixKey = (raw: string): string => {
+    const trimmed = (raw || '').trim()
+    if (!trimmed) return raw
+
+    // Already has +55
+    if (trimmed.startsWith('+55')) {
+      // strip non-digits except leading +
+      const digits = trimmed.replace(/[^\d+]/g, '')
+      return digits
+    }
+
+    // If it starts with 55 and has 12-13 digits, consider it's missing the plus
+    const onlyDigits = trimmed.replace(/\D/g, '')
+    if (onlyDigits.startsWith('55') && (onlyDigits.length === 12 || onlyDigits.length === 13)) {
+      return `+${onlyDigits}`
+    }
+
+    // If it contains formatting chars and ends up 10-11 digits, consider local BR number
+    const hadFormatting = /[()\s-]/.test(trimmed)
+    if (hadFormatting && (onlyDigits.length === 10 || onlyDigits.length === 11)) {
+      return `+55${onlyDigits}`
+    }
+
+    // Otherwise, leave as-is
+    return raw
+  }
+
+  const pixKey = normalizeBrazilPhonePixKey(account)
   return [
     {
       amount: value,
       currency: 'BRL',
       name: 'Recipient',
-      pixKey: account,
+      pixKey,
       taxId,
       taxIdCountry: 'BRA',
     },

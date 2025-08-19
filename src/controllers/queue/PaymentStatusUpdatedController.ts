@@ -42,24 +42,25 @@ export class PaymentStatusUpdatedController {
   }
 
   private mapProviderStatus(status: string): TransactionStatus {
-    const normalized = status.toLowerCase()
+    const normalized = (status || '').toLowerCase()
+    // Use substring matching to handle statuses that contain extra words
     if ([
       'completed',
       'processed',
       'settled',
       'success',
-    ].includes(normalized)) return TransactionStatus.PAYMENT_COMPLETED
+    ].some(word => normalized.includes(word))) return TransactionStatus.PAYMENT_COMPLETED
     if ([
       'canceled',
       'cancelled',
       'error',
       'failed',
-    ].includes(normalized)) return TransactionStatus.PAYMENT_FAILED
+    ].some(word => normalized.includes(word))) return TransactionStatus.PAYMENT_FAILED
     if ([
       'pending',
       'processing',
       'queued',
-    ].includes(normalized)) return TransactionStatus.PROCESSING_PAYMENT
+    ].some(word => normalized.includes(word))) return TransactionStatus.PROCESSING_PAYMENT
     return TransactionStatus.PROCESSING_PAYMENT
   }
 

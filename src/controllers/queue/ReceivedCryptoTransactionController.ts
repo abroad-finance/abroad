@@ -177,6 +177,15 @@ export class ReceivedCryptoTransactionController {
         value: transactionRecord.quote.targetAmount,
       })
 
+      if (paymentResponse.success && paymentResponse.transactionId) {
+        await prismaClient.transaction.update({
+          data: {
+            externalId: paymentResponse.transactionId,
+          },
+          where: { id: transactionRecord.id },
+        })
+      }
+
       if (paymentService.isAsync) {
         return
       }

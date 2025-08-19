@@ -189,29 +189,26 @@ export class WebhookController extends Controller {
       // Validate minimum fields from provided example
       const schema = z.object({
         Amount: z.number().optional(),
-        AmountNet: z.number().optional(),
         Currency: z.enum(TargetCurrency),
-        ExternalId: z.string().min(1),
-        PaymentId: z.string().min(1).optional(),
+        PaymentId: z.string().min(1),
         PaymentStatus: z.string().min(1),
       }).loose()
 
       const parsed = schema.safeParse(body)
       if (!parsed.success) {
         this.logger.warn('Invalid Transfero webhook payload', {
-          errors: parsed.error.issues,
+          errors: JSON.stringify(parsed.error.issues),
         })
         return badRequest(400, { message: 'Invalid webhook payload', success: false })
       }
 
-      const { Amount, Currency, ExternalId, PaymentId, PaymentStatus } = parsed.data as z.output<typeof schema>
+      const { Amount, Currency, PaymentId, PaymentStatus } = parsed.data as z.output<typeof schema>
 
       // Publish a normalized message to the queue for async processing
       await this.queueHandler.postMessage(QueueName.PAYMENT_STATUS_UPDATED, {
         amount: typeof Amount === 'number' ? Amount : 0,
         currency: Currency ?? 'BRL',
-        externalId: ExternalId,
-        paymentId: PaymentId ?? '',
+        externalId: PaymentId,
         provider: 'transfero',
         status: PaymentStatus,
       } satisfies PaymentStatusUpdatedMessage)

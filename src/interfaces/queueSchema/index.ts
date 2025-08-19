@@ -16,7 +16,6 @@ export const PaymentStatusUpdatedMessageSchema = z.object({
   amount: z.number().nonnegative().optional(),
   currency: z.enum(TargetCurrency),
   externalId: z.string().min(1), // e.g., Transfero ExternalId to correlate
-  paymentId: z.string().min(1).optional(),
   provider: z.enum(['transfero']).default('transfero'),
   status: z.string().min(1), // raw provider status, e.g., Processing, Completed
 })
