@@ -1,11 +1,7 @@
 # syntax=docker/dockerfile:1.7
 
 ##########  BASE IMAGE  #######################################################
-# “slim” is a little larger than Alpine but avoids native-addon recompiles,
-# so npm ci is usually 2-3× faster.
-FROM node:22-bullseye-slim AS base
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends build-essential python3
+FROM node:22-alpine AS base
 WORKDIR /app
 
 ##########  DEPENDENCY LAYER  (rarely changes)  ###############################

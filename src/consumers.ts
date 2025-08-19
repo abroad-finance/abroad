@@ -1,4 +1,5 @@
 import dotenv from 'dotenv'
+import http from 'http'
 
 import { BinanceBalanceUpdatedController } from './controllers/queue/BinanceBalanceUpdatedController'
 import { PaymentSentController } from './controllers/queue/PaymentSentController'
@@ -9,6 +10,12 @@ import { iocContainer } from './ioc'
 import { TYPES } from './types'
 
 dotenv.config()
+
+// Simple in-process health state
+const health = {
+  live: true,
+  ready: false,
+}
 
 // Keep module-level strong references to prevent GC
 const running: {
@@ -43,6 +50,9 @@ export function startConsumers(): void {
   binance.registerConsumers()
 
   iocContainer.get<IAuthService>(TYPES.IAuthService).initialize()
+
+  // Mark ready after consumers and auth init are set up
+  health.ready = true
 }
 
 export async function stopConsumers(): Promise<void> {
@@ -60,12 +70,38 @@ export async function stopConsumers(): Promise<void> {
 }
 
 if (require.main === module) {
+  // Start a tiny HTTP server for k8s health checks
+  const port = Number(process.env.HEALTH_PORT || process.env.PORT || 3000)
+  const server = http.createServer((req, res) => {
+    const url = req.url || '/'
+    if (url.startsWith('/healthz') || url === '/') {
+      res.statusCode = 200
+      res.setHeader('content-type', 'text/plain')
+      res.end('ok')
+      return
+    }
+    if (url.startsWith('/readyz')) {
+      const ok = health.live && health.ready
+      res.statusCode = ok ? 200 : 503
+      res.setHeader('content-type', 'text/plain')
+      res.end(ok ? 'ready' : 'not ready')
+      return
+    }
+    res.statusCode = 404
+    res.end('not found')
+  })
+  server.listen(port, () => {
+    console.log(`[consumers] health server listening on :${port}`)
+  })
+
   startConsumers()
   process.on('SIGINT', async () => {
+    health.ready = false
     await stopConsumers()
     process.exit(0)
   })
   process.on('SIGTERM', async () => {
+    health.ready = false
     await stopConsumers()
     process.exit(0)
   })
