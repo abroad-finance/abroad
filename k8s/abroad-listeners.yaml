@@ -16,7 +16,7 @@ spec:
       labels:
         app: abroad-listeners
     spec:
-      serviceAccountName: abroad-listeners-sa
+      serviceAccountName: abroad-stellar-sa
       containers:
         - name: abroad-listeners-container
           image: abroad-listeners-container:latest
