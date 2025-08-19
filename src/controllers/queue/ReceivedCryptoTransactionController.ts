@@ -15,9 +15,7 @@ import { IPaymentServiceFactory } from '../../interfaces/IPaymentServiceFactory'
 import { IWebhookNotifier, WebhookEvent } from '../../interfaces/IWebhookNotifier'
 import { PaymentSentMessage } from '../../interfaces/queueSchema'
 import { TYPES } from '../../types'
-// Import the logger interface (adjust the path as necessary)
 
-// Schema definition for validating the queue message
 const TransactionQueueMessageSchema = z.object({
   addressFrom: z.string().min(1, 'Address from is required'),
   amount: z.number().positive(),
@@ -178,6 +176,10 @@ export class ReceivedCryptoTransactionController {
         id: transactionRecord.id,
         value: transactionRecord.quote.targetAmount,
       })
+
+      if (paymentService.isAsync) {
+        return
+      }
 
       const newStatus = paymentResponse.success
         ? TransactionStatus.PAYMENT_COMPLETED

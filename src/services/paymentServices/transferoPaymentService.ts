@@ -3,16 +3,38 @@ import axios from 'axios'
 import { inject } from 'inversify'
 
 import { IDatabaseClientProvider } from '../../interfaces/IDatabaseClientProvider'
-import { Bank, IPaymentService } from '../../interfaces/IPaymentService'
+import { IPaymentService } from '../../interfaces/IPaymentService'
 import { ISecretManager } from '../../interfaces/ISecretManager'
 import { TYPES } from '../../types'
 
-const TRANSFERO_BANKS: Bank[] = [{ bankCode: 1, bankName: 'PIX' }]
+interface Payment {
+  amount: number
+  currency: string
+  name: string
+  paymentId: string
+  pixKey: string
+  taxId: string
+  taxIdCountry: number
+}
+
+interface TransactionTransfero {
+  createdAt: string
+  numberOfPayments: number
+  numberOfPaymentsCompletedWithError: number
+  numberOfPaymentsCompletedWithSuccess: number
+  numberOfPaymentsPending: number
+  numberOfPaymentsProcessing: number
+  paymentGroupId: string
+  payments: Payment[]
+  totalAmount: number
+  totalAmountPaymentsCompletedWithSuccess: number
+}
 
 export class TransferoPaymentService implements IPaymentService {
-  banks = TRANSFERO_BANKS
+  banks = []
   currency: TargetCurrency = TargetCurrency.BRL
   fixedFee = 0.0
+  isAsync: boolean = true
 
   readonly MAX_TOTAL_AMOUNT_PER_DAY = 25_000_000
   readonly MAX_USER_AMOUNT_PER_DAY = 25_000_000
@@ -75,14 +97,12 @@ export class TransferoPaymentService implements IPaymentService {
             'Content-Type': 'application/json',
           },
         },
-      )
+      ) as { data: TransactionTransfero }
 
-      // Successful response: grab the paymentGroupId (or id)
-      const transactionId
-        = data?.paymentGroupId ?? data?.id ?? data?.[0]?.id ?? null
+      const paymentId = data.payments[0].paymentId || null
 
-      return transactionId
-        ? { success: true, transactionId }
+      return paymentId
+        ? { success: true, transactionId: paymentId }
         : { success: false }
     }
     catch (err) {

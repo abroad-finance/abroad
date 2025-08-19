@@ -90,6 +90,7 @@ model Transaction {
   quote         Quote             @relation(fields: [quoteId], references: [id])
   onChainId     String?           @unique
   taxId         String?
+  externalId    String?           @unique
 }
 
 model StellarListenerState {

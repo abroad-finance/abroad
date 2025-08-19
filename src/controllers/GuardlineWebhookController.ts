@@ -1,4 +1,4 @@
-import { KycStatus } from '@prisma/client'
+import { KycStatus, TargetCurrency } from '@prisma/client'
 import { Request as RequestExpress } from 'express'
 import { inject } from 'inversify'
 import {
@@ -15,14 +15,14 @@ import {
 } from 'tsoa'
 import { z } from 'zod'
 
-import { ILogger } from '../interfaces'
+import { ILogger, IQueueHandler, PaymentStatusUpdatedMessage, QueueName } from '../interfaces'
 import { IDatabaseClientProvider } from '../interfaces/IDatabaseClientProvider'
 import { TYPES } from '../types'
 
 // Guardline webhook payload validation schema
 const guardlineWebhookSchema = z.object({
   workflow_instance_id: z.string().min(1).optional(),
-}).passthrough() // Allow excess properties
+}).loose() // Allow excess properties
 
 export interface GuardlineWebhookRequest {
   [key: string]: unknown // Allow excess properties
@@ -35,12 +35,14 @@ export interface GuardlineWebhookResponse {
 }
 
 @Route('webhook')
-export class GuardlineWebhookController extends Controller {
+export class WebhookController extends Controller {
   constructor(
     @inject(TYPES.IDatabaseClientProvider)
     private dbProvider: IDatabaseClientProvider,
     @inject(TYPES.ILogger)
     private logger: ILogger,
+  @inject(TYPES.IQueueHandler)
+  private queueHandler: IQueueHandler,
   ) {
     super()
   }
@@ -156,6 +158,72 @@ export class GuardlineWebhookController extends Controller {
         stack: error instanceof Error ? error.stack : undefined,
       })
 
+      return serverError(500, {
+        message: 'Internal server error',
+        success: false,
+      })
+    }
+  }
+
+  /**
+   * Handle payment status webhook notifications from Transfero
+   * Accepts the provider payload and forwards a normalized message to a queue.
+   */
+  @Hidden()
+  @Post('transfero')
+  @Response('400', 'Bad Request - Invalid payload')
+  @Response('500', 'Internal Server Error')
+  @SuccessResponse('200', 'Webhook processed successfully')
+  public async handleTransferoWebhook(
+    @Body() body: Record<string, unknown>,
+    @Request() request: RequestExpress,
+    @Res() badRequest: TsoaResponse<400, { message: string, success: false }>,
+    @Res() serverError: TsoaResponse<500, { message: string, success: false }>,
+  ): Promise<GuardlineWebhookResponse> {
+    try {
+      this.logger.info('Received Transfero webhook', {
+        headers: request.headers,
+        payload: body,
+      })
+
+      // Validate minimum fields from provided example
+      const schema = z.object({
+        Amount: z.number().optional(),
+        AmountNet: z.number().optional(),
+        Currency: z.enum(TargetCurrency),
+        ExternalId: z.string().min(1),
+        PaymentId: z.string().min(1).optional(),
+        PaymentStatus: z.string().min(1),
+      }).loose()
+
+      const parsed = schema.safeParse(body)
+      if (!parsed.success) {
+        this.logger.warn('Invalid Transfero webhook payload', {
+          errors: parsed.error.issues,
+        })
+        return badRequest(400, { message: 'Invalid webhook payload', success: false })
+      }
+
+      const { Amount, Currency, ExternalId, PaymentId, PaymentStatus } = parsed.data as z.output<typeof schema>
+
+      // Publish a normalized message to the queue for async processing
+      await this.queueHandler.postMessage(QueueName.PAYMENT_STATUS_UPDATED, {
+        amount: typeof Amount === 'number' ? Amount : 0,
+        currency: Currency ?? 'BRL',
+        externalId: ExternalId,
+        paymentId: PaymentId ?? '',
+        provider: 'transfero',
+        status: PaymentStatus,
+      } satisfies PaymentStatusUpdatedMessage)
+      this.setStatus(200)
+      return { message: 'Webhook processed successfully', success: true }
+    }
+    catch (error) {
+      this.logger.error('Error processing Transfero webhook', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        payload: body,
+        stack: error instanceof Error ? error.stack : undefined,
+      })
       return serverError(500, {
         message: 'Internal server error',
         success: false,

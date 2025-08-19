@@ -5,6 +5,7 @@ import { Partner } from '@prisma/client'
 export enum QueueName {
   BINANCE_BALANCE_UPDATED = 'binance-balance-updated',
   PAYMENT_SENT = 'payment-sent',
+  PAYMENT_STATUS_UPDATED = 'payment-status-updated',
   RECEIVED_CRYPTO_TRANSACTION = 'received-crypto-transaction',
 }
 

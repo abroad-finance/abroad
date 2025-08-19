@@ -2,13 +2,14 @@
 import { Container, decorate, injectable } from 'inversify'
 import { Controller } from 'tsoa'
 
-import { GuardlineWebhookController } from './controllers/GuardlineWebhookController'
+import { WebhookController } from './controllers/GuardlineWebhookController'
 import { PartnerController } from './controllers/PartnerController'
 import { PartnerUserController } from './controllers/PartnerUserController'
 import { PaymentsController } from './controllers/PaymentsController'
 import { QrDecoderController } from './controllers/QrDecoderController'
 import { BinanceBalanceUpdatedController } from './controllers/queue/BinanceBalanceUpdatedController'
 import { PaymentSentController } from './controllers/queue/PaymentSentController'
+import { PaymentStatusUpdatedController } from './controllers/queue/PaymentStatusUpdatedController'
 import { ReceivedCryptoTransactionController } from './controllers/queue/ReceivedCryptoTransactionController'
 import { QuoteController } from './controllers/QuoteController'
 import { TransactionController } from './controllers/TransactionController'
@@ -72,6 +73,10 @@ container
   .to(ReceivedCryptoTransactionController)
   .inSingletonScope()
 container.bind<PaymentSentController>(TYPES.PaymentSentController).to(PaymentSentController).inSingletonScope()
+container
+  .bind<PaymentStatusUpdatedController>(TYPES.PaymentStatusUpdatedController)
+  .to(PaymentStatusUpdatedController)
+  .inSingletonScope()
 container
   .bind<BinanceBalanceUpdatedController>(TYPES.BinanceBalanceUpdatedController)
   .to(BinanceBalanceUpdatedController)
@@ -138,7 +143,7 @@ container
   .inSingletonScope()
 
 // Controllers
-container.bind(GuardlineWebhookController).toSelf().inSingletonScope()
+container.bind(WebhookController).toSelf().inSingletonScope()
 container.bind<PartnerController>(PartnerController).toSelf().inSingletonScope()
 container.bind<PartnerUserController>(PartnerUserController).toSelf().inSingletonScope()
 container.bind<QuoteController>(QuoteController).toSelf().inSingletonScope()

@@ -2,6 +2,7 @@ import dotenv from 'dotenv'
 
 import { BinanceBalanceUpdatedController } from './controllers/queue/BinanceBalanceUpdatedController'
 import { PaymentSentController } from './controllers/queue/PaymentSentController'
+import { PaymentStatusUpdatedController } from './controllers/queue/PaymentStatusUpdatedController'
 import { ReceivedCryptoTransactionController } from './controllers/queue/ReceivedCryptoTransactionController'
 import { IAuthService } from './interfaces'
 import { iocContainer } from './ioc'
@@ -13,6 +14,7 @@ dotenv.config()
 const running: {
   binance?: BinanceBalanceUpdatedController
   payment?: PaymentSentController
+  paymentStatus?: PaymentStatusUpdatedController
   received?: ReceivedCryptoTransactionController
 } = {}
 
@@ -23,16 +25,21 @@ export function startConsumers(): void {
   const payment = iocContainer.get<PaymentSentController>(
     TYPES.PaymentSentController,
   )
+  const paymentStatus = iocContainer.get<PaymentStatusUpdatedController>(
+    TYPES.PaymentStatusUpdatedController,
+  )
   const binance = iocContainer.get<BinanceBalanceUpdatedController>(
     TYPES.BinanceBalanceUpdatedController,
   )
 
   running.received = received
   running.payment = payment
+  running.paymentStatus = paymentStatus
   running.binance = binance
 
   received.registerConsumers()
   payment.registerConsumers()
+  paymentStatus.registerConsumers()
   binance.registerConsumers()
 
   iocContainer.get<IAuthService>(TYPES.IAuthService).initialize()

@@ -32,8 +32,6 @@ export class TransferoExchangeProvider implements IExchangeProvider {
 
   private cachedToken?: { exp: number, value: string }
 
-  /** ---------- Public API implementation ---------- */
-
   constructor(
     @inject(TYPES.ISecretManager) private readonly secretManager: ISecretManager,
   ) { }

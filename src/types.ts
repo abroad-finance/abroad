@@ -18,6 +18,7 @@ export const TYPES = {
   IWebhookNotifier: Symbol.for('IWebhookNotifier'),
   KycUseCase: Symbol.for('KycUseCase'),
   PaymentSentController: Symbol.for('PaymentSentController'),
+  PaymentStatusUpdatedController: Symbol.for('PaymentStatusUpdatedController'),
   QuoteUseCase: Symbol.for('QuoteUseCase'),
   ReceivedCryptoTransactionController: Symbol.for('ReceivedCryptoTransactionController'),
   SolanaWalletHandler: Symbol.for('SolanaWalletHandler'),

@@ -10,12 +10,13 @@ export interface IPaymentService {
   readonly banks: Bank[]
   readonly currency: TargetCurrency
   readonly fixedFee: number
-
   /**
    * Gets the current liquidity for the payment service.
    * @returns A promise that resolves to the liquidity amount.
    */
   getLiquidity: () => Promise<number>
+
+  readonly isAsync: boolean
   readonly MAX_TOTAL_AMOUNT_PER_DAY: number
   readonly MAX_USER_AMOUNT_PER_DAY: number
   readonly MAX_USER_AMOUNT_PER_TRANSACTION: number
