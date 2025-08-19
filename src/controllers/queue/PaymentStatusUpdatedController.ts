@@ -19,12 +19,12 @@ import { TYPES } from '../../types'
  */
 export class PaymentStatusUpdatedController {
   public constructor(
-        @inject(TYPES.ILogger) private logger: ILogger,
-        @inject(TYPES.IQueueHandler) private queueHandler: IQueueHandler,
-        @inject(TYPES.IDatabaseClientProvider) private dbClientProvider: IDatabaseClientProvider,
-        @inject(TYPES.IWebhookNotifier) private webhookNotifier: IWebhookNotifier,
-        @inject(TYPES.ISlackNotifier) private slackNotifier: ISlackNotifier,
-        @inject(TYPES.IWalletHandlerFactory) private walletHandlerFactory: IWalletHandlerFactory,
+    @inject(TYPES.ILogger) private logger: ILogger,
+    @inject(TYPES.IQueueHandler) private queueHandler: IQueueHandler,
+    @inject(TYPES.IDatabaseClientProvider) private dbClientProvider: IDatabaseClientProvider,
+    @inject(TYPES.IWebhookNotifier) private webhookNotifier: IWebhookNotifier,
+    @inject(TYPES.ISlackNotifier) private slackNotifier: ISlackNotifier,
+    @inject(TYPES.IWalletHandlerFactory) private walletHandlerFactory: IWalletHandlerFactory,
 
   ) { }
 
@@ -45,17 +45,17 @@ export class PaymentStatusUpdatedController {
     const normalized = (status || '').toLowerCase()
     // Use substring matching to handle statuses that contain extra words
     if ([
-      'completed',
-      'processed',
-      'settled',
-      'success',
-    ].some(word => normalized.includes(word))) return TransactionStatus.PAYMENT_COMPLETED
-    if ([
       'canceled',
       'cancelled',
       'error',
       'failed',
     ].some(word => normalized.includes(word))) return TransactionStatus.PAYMENT_FAILED
+    if ([
+      'processed',
+      'settled',
+      'success',
+    ].some(word => normalized.includes(word))) return TransactionStatus.PAYMENT_COMPLETED
+
     if ([
       'pending',
       'processing',

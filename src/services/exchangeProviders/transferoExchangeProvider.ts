@@ -1,11 +1,13 @@
+import { BlockchainNetwork } from '@prisma/client'
 // src/services/transferoExchangeProvider.ts
-import axios, { AxiosRequestConfig } from 'axios'
+import axios from 'axios'
 import { inject, injectable } from 'inversify'
 
 import { IExchangeProvider } from '../../interfaces/IExchangeProvider'
 import { ISecretManager } from '../../interfaces/ISecretManager'
 import { TYPES } from '../../types'
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 interface Account {
   accountId: string
   bankAccount: null
@@ -42,37 +44,15 @@ export class TransferoExchangeProvider implements IExchangeProvider {
            */
   getExchangeAddress: IExchangeProvider['getExchangeAddress'] = async ({
     blockchain,
-    cryptoCurrency,
   }) => {
-    const token = await this.getAccessToken()
-    const apiUrl = await this.secretManager.getSecret('TRANSFERO_BASE_URL')
-
-    const cfg: AxiosRequestConfig = {
-      headers: { Authorization: `Bearer ${token}` },
+    if (blockchain !== BlockchainNetwork.STELLAR) {
+      throw new Error(`Unsupported blockchain: ${blockchain}`)
     }
 
-    // GET /accounts ⇒ array with `wallet` objects
-    const { data: accounts } = await axios.get(
-      `${apiUrl}/api/v2.0/accounts`,
-      cfg,
-    ) as { data: Account[] } /* :contentReference[oaicite:1]{index=1} */
-
-    const account = accounts.find((account: Account) => {
-      if (account.currency !== cryptoCurrency) return false
-      const networks = Object.keys(account.depositAddress)
-      return networks.some(
-        network => network.toLowerCase() === blockchain.toLowerCase(),
-      )
-    })
-
-    if (!account) {
-      throw new Error(
-        `No account found for ${cryptoCurrency} on ${blockchain} network`,
-      )
-    }
+    const transferoStellarWallet = await this.secretManager.getSecret('TRANSFERO_STELLAR_WALLET')
 
     return {
-      address: account.depositAddress[blockchain.toLowerCase()],
+      address: transferoStellarWallet,
     }
   }
 

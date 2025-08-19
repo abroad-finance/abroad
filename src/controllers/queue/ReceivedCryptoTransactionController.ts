@@ -177,7 +177,7 @@ export class ReceivedCryptoTransactionController {
         value: transactionRecord.quote.targetAmount,
       })
 
-      if (paymentResponse.success && paymentResponse.transactionId) {
+      if (paymentResponse.success) {
         await prismaClient.transaction.update({
           data: {
             externalId: paymentResponse.transactionId,
@@ -186,7 +186,8 @@ export class ReceivedCryptoTransactionController {
         })
       }
 
-      if (paymentService.isAsync) {
+      if (paymentService.isAsync && paymentResponse.success) {
+        // Handle async payment success via webhook
         return
       }
 
