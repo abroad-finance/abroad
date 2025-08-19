@@ -14,26 +14,6 @@ import { IExchangeProviderFactory } from '../interfaces/IExchangeProviderFactory
 import { IPaymentServiceFactory } from '../interfaces/IPaymentServiceFactory'
 import { TYPES } from '../types'
 
-// Parameter object for createQuote
-export interface CreateQuoteParams {
-  amount: number
-  cryptoCurrency: CryptoCurrency
-  network: BlockchainNetwork
-  partner: Partner
-  paymentMethod: PaymentMethod
-  targetCurrency: TargetCurrency
-}
-
-// Parameter object for createReverseQuote
-export interface CreateReverseQuoteParams {
-  cryptoCurrency: CryptoCurrency
-  network: BlockchainNetwork
-  partner: Partner
-  paymentMethod: PaymentMethod
-  sourceAmountInput: number
-  targetCurrency: TargetCurrency
-}
-
 // Interface for QuoteUseCase
 export interface IQuoteUseCase {
   createQuote(params: CreateQuoteParams): Promise<QuoteResponse>
@@ -45,6 +25,26 @@ export interface QuoteResponse {
   expiration_time: number
   quote_id: string
   value: number
+}
+
+// Parameter object for createQuote
+interface CreateQuoteParams {
+  amount: number
+  cryptoCurrency: CryptoCurrency
+  network: BlockchainNetwork
+  partner: Partner
+  paymentMethod: PaymentMethod
+  targetCurrency: TargetCurrency
+}
+
+// Parameter object for createReverseQuote
+interface CreateReverseQuoteParams {
+  cryptoCurrency: CryptoCurrency
+  network: BlockchainNetwork
+  partner: Partner
+  paymentMethod: PaymentMethod
+  sourceAmountInput: number
+  targetCurrency: TargetCurrency
 }
 
 @injectable()

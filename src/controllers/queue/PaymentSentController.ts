@@ -1,17 +1,9 @@
-import {
-  BlockchainNetwork,
-  Country,
-  CryptoCurrency,
-  PaymentMethod,
-  SupportedCurrency,
-  TargetCurrency,
-} from '@prisma/client'
+import { BlockchainNetwork, CryptoCurrency, SupportedCurrency, TargetCurrency } from '@prisma/client'
 import { inject } from 'inversify'
 
 import { ILogger, IQueueHandler, ISlackNotifier, QueueName } from '../../interfaces'
 import { IDatabaseClientProvider } from '../../interfaces/IDatabaseClientProvider'
 import { IExchangeProviderFactory } from '../../interfaces/IExchangeProviderFactory'
-import { IPaymentServiceFactory } from '../../interfaces/IPaymentServiceFactory'
 import { IWalletHandlerFactory } from '../../interfaces/IWalletHandlerFactory'
 import { PaymentSentMessage, PaymentSentMessageSchema } from '../../interfaces/queueSchema'
 import { TYPES } from '../../types'
@@ -23,7 +15,6 @@ export class PaymentSentController {
     @inject(TYPES.IWalletHandlerFactory) private walletHandlerFactory: IWalletHandlerFactory,
     @inject(TYPES.ISlackNotifier) private slackNotifier: ISlackNotifier,
     @inject(TYPES.IDatabaseClientProvider) private dbClientProvider: IDatabaseClientProvider,
-    @inject(TYPES.IPaymentServiceFactory) private paymentServiceFactory: IPaymentServiceFactory,
     @inject(TYPES.IExchangeProviderFactory) private exchangeProviderFactory: IExchangeProviderFactory,
   ) {
 
@@ -68,15 +59,12 @@ export class PaymentSentController {
 
     const { amount, blockchain, cryptoCurrency, targetCurrency } = message
 
-    await Promise.all([
-      this.sendToExchangeAndUpdatePendingConversions({
-        amount,
-        blockchain,
-        cryptoCurrency,
-        targetCurrency,
-      }),
-      this.updatePaymentLiquidityCache({ paymentMethod: message.paymentMethod }),
-    ])
+    await this.sendToExchangeAndUpdatePendingConversions({
+      amount,
+      blockchain,
+      cryptoCurrency,
+      targetCurrency,
+    })
 
     this.logger.info(
       '[PaymentSent Queue]: Payment sent successfully',
@@ -157,27 +145,6 @@ export class PaymentSentController {
         },
         where: {
           source_target: { source: cryptoCurrency, target: targetCurrency },
-        },
-      })
-    }
-  }
-
-  private updatePaymentLiquidityCache = async ({ paymentMethod }: { paymentMethod: PaymentMethod }) => {
-    const clientDb = await this.dbClientProvider.getClient()
-
-    const paymentService = await this.paymentServiceFactory.getPaymentService(paymentMethod)
-    const liquidity = await paymentService.getLiquidity()
-    if (liquidity) {
-      await clientDb.paymentProvider.upsert({
-        create: {
-          country: Country.CO,
-          id: paymentMethod,
-          liquidity: 0,
-          name: paymentMethod,
-        },
-        update: { liquidity },
-        where: {
-          id: paymentMethod,
         },
       })
     }

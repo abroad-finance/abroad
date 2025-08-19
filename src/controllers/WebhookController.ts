@@ -24,12 +24,12 @@ const guardlineWebhookSchema = z.object({
   workflow_instance_id: z.string().min(1).optional(),
 }).loose() // Allow excess properties
 
-export interface GuardlineWebhookRequest {
+interface GuardlineWebhookRequest {
   [key: string]: unknown // Allow excess properties
   workflow_instance_id?: string
 }
 
-export interface GuardlineWebhookResponse {
+interface GuardlineWebhookResponse {
   message?: string
   success: boolean
 }

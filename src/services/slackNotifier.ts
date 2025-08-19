@@ -2,12 +2,9 @@
 import axios from 'axios'
 import { inject } from 'inversify'
 
+import { ISlackNotifier } from '../interfaces'
 import { ISecretManager } from '../interfaces/ISecretManager'
 import { TYPES } from '../types'
-
-export interface ISlackNotifier {
-  sendMessage(message: string): Promise<void>
-}
 
 export class SlackNotifier implements ISlackNotifier {
   constructor(

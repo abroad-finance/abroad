@@ -38,7 +38,7 @@ import { TYPES } from '../types'
  * 🗒️  DTOs & Validation Schemas
  * --------------------------------------------------------------------- */
 
-export interface CreatePartnerUserRequest {
+interface CreatePartnerUserRequest {
   kycExternalToken?: null | string
   userId: string
 }
@@ -49,14 +49,14 @@ const createPartnerUserSchema: ZodType<CreatePartnerUserRequest> = z.object({
   userId: z.string().uuid(),
 })
 
-export interface PaginatedPartnerUsers {
+interface PaginatedPartnerUsers {
   page: number
   pageSize: number
   total: number
   users: PartnerUserDto[]
 }
 
-export interface PartnerUserDto {
+interface PartnerUserDto {
   createdAt: Date
   id: string
   kycToken: null | string
@@ -64,7 +64,7 @@ export interface PartnerUserDto {
   userId: string
 }
 
-export interface UpdatePartnerUserRequest {
+interface UpdatePartnerUserRequest {
   kycExternalToken?: null | string
 }
 
@@ -79,7 +79,7 @@ const updatePartnerUserSchema: ZodType<UpdatePartnerUserRequest> = z
 /**
  * Express request augmented with authenticated partner context.
  */
-export type AuthenticatedRequest = ExpressRequest & {
+type AuthenticatedRequest = ExpressRequest & {
   user: { id: string }
 }
 

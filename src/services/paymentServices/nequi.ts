@@ -7,7 +7,7 @@ import { IPaymentService } from '../../interfaces/IPaymentService'
 import { ISecretManager } from '../../interfaces/ISecretManager'
 import { TYPES } from '../../types'
 
-export type ResponseNequiDispersion = {
+type ResponseNequiDispersion = {
   ResponseMessage: {
     ResponseBody: {
       any: unknown

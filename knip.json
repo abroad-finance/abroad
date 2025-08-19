@@ -2,11 +2,12 @@
   "entry": [
     "src/server.ts",
     "src/consumers.ts",
-    "src/listeners.ts",
-    "src/scripts/index.ts",
-    "src/listeners/solana/index.ts"
+    "src/listeners.ts"
   ],
   "project": [
     "src/**/*.ts"
+  ],
+  "ignore": [
+    "src/scripts/**"
   ]
 }
