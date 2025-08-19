@@ -28,7 +28,7 @@ export function startListeners(): void {
 /** Keep module-level references to prevent GC. */
 const running: { stellar?: StellarListener } = {}
 
-export function stopListeners(): void {
+function stopListeners(): void {
   try {
     running.stellar?.stop()
   }

@@ -14,6 +14,13 @@ export class GCPPubSubQueueHandler implements IQueueHandler {
         @inject(TYPES.ISecretManager) private secretManager: ISecretManager,
   ) { }
 
+  public async closeAllSubscriptions(): Promise<void> {
+    for (const subscription of this.subscriptions.values()) {
+      await subscription.close()
+    }
+    this.subscriptions.clear()
+  }
+
   public async postMessage(
     queueName: QueueName,
     message: Record<string, boolean | number | string>,
@@ -59,13 +66,6 @@ export class GCPPubSubQueueHandler implements IQueueHandler {
       }
     })
     console.log(`[IQueueHandler] Subscribed to PubSub topic: ${queueName}`)
-  }
-
-  public async closeAllSubscriptions(): Promise<void> {
-    for (const subscription of this.subscriptions.values()) {
-      await subscription.close()
-    }
-    this.subscriptions.clear()
   }
 
   private async ensureClient(): Promise<void> {

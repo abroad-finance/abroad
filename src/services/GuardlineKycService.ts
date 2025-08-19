@@ -8,11 +8,11 @@ import { IKycService } from '../interfaces/IKycService'
 import { ISecretManager } from '../interfaces/ISecretManager'
 import { TYPES } from '../types'
 
-type GuardlineKycStatus =
-  | 'CANCELED'
-  | 'COMPLETED_FAILURE'
-  | 'COMPLETED_SUCCESS'
-  | 'INCOMPLETE'
+type GuardlineKycStatus
+  = | 'CANCELED'
+    | 'COMPLETED_FAILURE'
+    | 'COMPLETED_SUCCESS'
+    | 'INCOMPLETE'
 
 export class GuardLineKycService implements IKycService {
   constructor(

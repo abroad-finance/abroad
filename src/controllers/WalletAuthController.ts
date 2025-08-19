@@ -11,11 +11,11 @@ const challenges = new Map<string, string>()
 interface ChallengeRequest { address: string }
 interface ChallengeResponse { xdr: string }
 
-interface VerifyRequest { address: string, signedXDR: string }
-interface VerifyResponse { token: string }
-
 interface RefreshRequest { token: string }
 interface RefreshResponse { token: string }
+
+interface VerifyRequest { address: string, signedXDR: string }
+interface VerifyResponse { token: string }
 
 @Route('walletAuth')
 export class WalletAuthController extends Controller {
@@ -41,6 +41,26 @@ export class WalletAuthController extends Controller {
     )
     challenges.set(body.address, xdr)
     return { xdr }
+  }
+
+  @Post('refresh')
+  public async refresh(
+    @Body() body: RefreshRequest,
+  ): Promise<RefreshResponse> {
+    const { STELLAR_SEP_JWT_SECRET } = await this.getSecrets()
+    try {
+      const payload = jwt.verify(body.token, STELLAR_SEP_JWT_SECRET) as jwt.JwtPayload
+      const newToken = jwt.sign(
+        { signers: payload.signers, sub: payload.sub },
+        STELLAR_SEP_JWT_SECRET,
+        { expiresIn: '1h' },
+      )
+      return { token: newToken }
+    }
+    catch {
+      this.setStatus(401)
+      throw new Error('Invalid token')
+    }
   }
 
   @Post('verify')
@@ -74,25 +94,6 @@ export class WalletAuthController extends Controller {
       { expiresIn: '1h' },
     )
     return { token }
-  }
-
-  @Post('refresh')
-  public async refresh(
-    @Body() body: RefreshRequest,
-  ): Promise<RefreshResponse> {
-    const { STELLAR_SEP_JWT_SECRET } = await this.getSecrets()
-    try {
-      const payload = jwt.verify(body.token, STELLAR_SEP_JWT_SECRET) as jwt.JwtPayload
-      const newToken = jwt.sign(
-        { signers: payload.signers, sub: payload.sub },
-        STELLAR_SEP_JWT_SECRET,
-        { expiresIn: '1h' },
-      )
-      return { token: newToken }
-    } catch {
-      this.setStatus(401)
-      throw new Error('Invalid token')
-    }
   }
 
   private async getSecrets() {

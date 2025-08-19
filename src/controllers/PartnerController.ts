@@ -33,7 +33,7 @@ const createPartnerRequestSchema = z.object({
   phone: z.string().optional(),
 })
 
-export interface CreatePartnerRequest {
+interface CreatePartnerRequest {
   company: string
   country: string
   email: string
@@ -43,12 +43,12 @@ export interface CreatePartnerRequest {
   phone: string
 }
 
-export interface CreatePartnerResponse {
+interface CreatePartnerResponse {
   id: string
 }
 
 // Add response type for partner info
-export interface PartnerInfoResponse {
+interface PartnerInfoResponse {
   country?: string
   createdAt: Date
   email?: string
