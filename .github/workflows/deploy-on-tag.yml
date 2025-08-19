@@ -3,39 +3,84 @@ name: Deploy on Tag
 on:
   push:
     tags:
-      - '*'  # any tag
-    branches:
-      - main
+      - '*'  
 
 jobs:
+  precheck:
+    runs-on: ubuntu-latest
+    outputs:
+      on_main: ${{ steps.check.outputs.on_main }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: check
+        name: Verify tag points to a commit contained in main
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG_REF="${GITHUB_REF#refs/tags/}"
+          TAG_SHA="$(git rev-list -n 1 "$TAG_REF")"
+          echo "Tag: $TAG_REF -> $TAG_SHA"
+          git fetch --no-tags origin main
+          if git merge-base --is-ancestor "$TAG_SHA" origin/main; then
+            echo "on_main=true" >> "$GITHUB_OUTPUT"
+            echo "Tag commit is contained in main. Proceeding."
+          else
+            echo "on_main=false" >> "$GITHUB_OUTPUT"
+            echo "Tag commit is NOT contained in main. Skipping workflow."
+          fi
+
   build:
+    needs: precheck
+    if: needs.precheck.outputs.on_main == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '22'
           cache: 'npm'
-      - name: Install backend deps
-        run: npm ci
-      - name: Build backend
-        run: npm run build
-      - name: Install and Build UI
+      - name: Create .env for UI
+        working-directory: abroad-ui
         run: |
-          cd abroad-ui
-          npm ci
-          npm run build
+          # Create the .env file required for the Vite build from a single multi-line secret
+          # Set the repo secret UI_DOTENV to the full contents of the .env file
+          if [ -z "${{ secrets.UI_DOTENV }}" ]; then
+            echo "::error::UI_DOTENV secret is not set or empty"
+            exit 1
+          fi
+          cat > .env << 'EOF'
+          ${{ secrets.UI_DOTENV }}
+          EOF
+      - name: Install UI deps
+        working-directory: abroad-ui
+        run: npm ci
+      - name: Build UI
+        working-directory: abroad-ui
+        run: npm run build
+      - name: Upload UI dist artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-dist
+          path: abroad-ui/dist
 
   deploy-ui:
     needs: build
     runs-on: ubuntu-latest
+    if: needs.build.result == 'success'
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '22'
+      - name: Download UI dist artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ui-dist
+          path: abroad-ui/dist
       - name: Deploy to Firebase Hosting
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
@@ -43,3 +88,4 @@ jobs:
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
           projectId: ${{ secrets.FIREBASE_PROJECT_ID }}
           channelId: live
+          entryPoint: abroad-ui
