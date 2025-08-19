@@ -17,7 +17,6 @@ export interface ILogger {
 
 export interface IPartnerService {
   getPartnerFromApiKey(apiKey?: string): Promise<Partner>
-  getPartnerFromBearerToken(token: string): Promise<Partner>
   getPartnerFromSepJwt(token: string): Promise<Partner>
 }
 
@@ -38,6 +37,5 @@ export interface ISlackNotifier {
   sendMessage(message: string): Promise<void>
 }
 
-export * from './IAuthService'
 export * from './IWalletHandlerFactory'
 export * from './queueSchema'

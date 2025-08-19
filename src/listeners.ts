@@ -1,10 +1,7 @@
 import dotenv from 'dotenv'
 import http from 'http'
 
-import { IAuthService } from './interfaces'
-import { iocContainer } from './ioc'
 import { startListeners } from './listeners/index'
-import { TYPES } from './types'
 
 dotenv.config()
 
@@ -36,7 +33,6 @@ server.listen(port, () => {
 
 startListeners()
 
-iocContainer.get<IAuthService>(TYPES.IAuthService).initialize()
 health.ready = true
 
 process.on('SIGINT', () => {

@@ -5,7 +5,7 @@ import { inject } from 'inversify'
 import { sha512_224 } from 'js-sha512'
 import jwt from 'jsonwebtoken'
 
-import { IAuthService, IPartnerService } from '../interfaces'
+import { IPartnerService } from '../interfaces'
 import { IDatabaseClientProvider } from '../interfaces/IDatabaseClientProvider'
 import { ISecretManager } from '../interfaces/ISecretManager'
 import { TYPES } from '../types'
@@ -14,7 +14,6 @@ export class PartnerService implements IPartnerService {
   constructor(
     @inject(TYPES.IDatabaseClientProvider)
     private databaseClientProvider: IDatabaseClientProvider,
-    @inject(TYPES.IAuthService) private authService: IAuthService,
     @inject(TYPES.ISecretManager) private secretManager: ISecretManager,
   ) { }
 
@@ -40,29 +39,6 @@ export class PartnerService implements IPartnerService {
     }
 
     return partner
-  }
-
-  // Retrieves the partner based on the API key found in the request header.
-  public async getPartnerFromBearerToken(token: string): Promise<Partner> {
-    try {
-      const decodedToken = await this.authService.verifyToken(token)
-      const userId = decodedToken.userId
-
-      const prismaClient = await this.databaseClientProvider.getClient()
-
-      const partner = await prismaClient.partner.findFirst({
-        where: { id: userId },
-      })
-
-      if (!partner) {
-        throw new Error('Partner not found')
-      }
-
-      return partner
-    }
-    catch {
-      throw new Error('Firebase token verification failed')
-    }
   }
 
   public async getPartnerFromSepJwt(token: string): Promise<Partner> {

@@ -5,7 +5,6 @@ import { BinanceBalanceUpdatedController } from './controllers/queue/BinanceBala
 import { PaymentSentController } from './controllers/queue/PaymentSentController'
 import { PaymentStatusUpdatedController } from './controllers/queue/PaymentStatusUpdatedController'
 import { ReceivedCryptoTransactionController } from './controllers/queue/ReceivedCryptoTransactionController'
-import { IAuthService } from './interfaces'
 import { iocContainer } from './ioc'
 import { TYPES } from './types'
 
@@ -48,8 +47,6 @@ export function startConsumers(): void {
   payment.registerConsumers()
   paymentStatus.registerConsumers()
   binance.registerConsumers()
-
-  iocContainer.get<IAuthService>(TYPES.IAuthService).initialize()
 
   // Mark ready after consumers and auth init are set up
   health.ready = true

@@ -8,10 +8,7 @@ import path from 'path'
 import swaggerUi from 'swagger-ui-express'
 
 import packageJson from '../package.json'
-import { IAuthService } from './interfaces'
-import { iocContainer } from './ioc'
 import { RegisterRoutes } from './routes'
-import { TYPES } from './types'
 
 dotenv.config()
 
@@ -129,8 +126,3 @@ app.listen(port, () => {
   console.log(`Server running on http://localhost:${port}`)
   console.log(`API docs at      http://localhost:${port}/docs`)
 })
-
-// ----------------------------
-// Initialize auth service
-// ----------------------------
-iocContainer.get<IAuthService>(TYPES.IAuthService).initialize()

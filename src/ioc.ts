@@ -18,13 +18,7 @@ import { WalletAuthController } from './controllers/WalletAuthController'
 import { CachedSecretManager } from './environment'
 import { PrismaClientProvider } from './infrastructure/db'
 import { GCPPubSubQueueHandler } from './infrastructure/gcpPubSubQueueHandler'
-import {
-  IAuthService,
-  ILogger,
-  IPartnerService,
-  IQueueHandler,
-  ISlackNotifier,
-} from './interfaces'
+import { ILogger, IPartnerService, IQueueHandler, ISlackNotifier } from './interfaces'
 import { IDatabaseClientProvider } from './interfaces/IDatabaseClientProvider'
 import { IExchangeProvider } from './interfaces/IExchangeProvider'
 import { IExchangeProviderFactory } from './interfaces/IExchangeProviderFactory'
@@ -41,7 +35,6 @@ import { ExchangeProviderFactory } from './services/ExchangeProviderFactory'
 import { BinanceExchangeProvider } from './services/exchangeProviders/binanceExchangeProvider'
 import { BitsoExchangeRateProvider } from './services/exchangeProviders/bitsoExchangeProvider'
 import { TransferoExchangeProvider } from './services/exchangeProviders/transferoExchangeProvider'
-import { FirebaseAuthService } from './services/firebaseAuthService'
 import { GuardLineKycService } from './services/GuardlineKycService'
 import { PartnerService } from './services/partnerService'
 import { PaymentServiceFactory } from './services/PaymentServiceFactory'
@@ -183,12 +176,6 @@ container
 container
   .bind<IWalletHandlerFactory>(TYPES.IWalletHandlerFactory)
   .to(WalletHandlerFactory)
-  .inSingletonScope()
-
-// IFirebaseAuthService
-container
-  .bind<IAuthService>(TYPES.IAuthService)
-  .to(FirebaseAuthService)
   .inSingletonScope()
 
 // IPixQrDecoder

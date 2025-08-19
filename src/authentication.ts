@@ -30,17 +30,11 @@ export async function expressAuthentication(
     }
 
     try {
-      const partner = await partnerService.getPartnerFromBearerToken(token)
+      const partner = await partnerService.getPartnerFromSepJwt(token)
       return partner
     }
     catch {
-      try {
-        const partner = await partnerService.getPartnerFromSepJwt(token)
-        return partner
-      }
-      catch {
-        throw new Error('Invalid token or partner not found')
-      }
+      throw new Error('Invalid token or partner not found')
     }
   }
 
