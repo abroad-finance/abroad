@@ -23,6 +23,7 @@ export const useWebSwapController = () => {
 
   // QR scanner state and URL param handling
   const [isQrOpen, setIsQrOpen] = useState(false);
+  const [isDecodingQr, setIsDecodingQr] = useState(false);
   const [searchParams] = useSearchParams();
   const [quote_id, setquote_id] = useState<string>('');
   const [pixKey, setPixKey] = useState<string>('');
@@ -101,6 +102,7 @@ export const useWebSwapController = () => {
   // Handle QR results (PIX) and prefill amount
   const handleQrResult = useCallback(async (text: string) => {
     setIsQrOpen(false);
+    setIsDecodingQr(true);
     try {
       const responseDecoder = await decodeQrCodeBR({ qrCode: text });
       if (responseDecoder.status !== 200) {
@@ -122,6 +124,8 @@ export const useWebSwapController = () => {
       }
     } catch (e) {
       console.warn('Failed to decode PIX QR', e);
+    } finally {
+      setIsDecodingQr(false);
     }
   }, [fetchQuote, handleAmountsChange]);
 
@@ -161,6 +165,7 @@ export const useWebSwapController = () => {
     address,
     isQrOpen,
     currentBgUrl,
+  isDecodingQr,
 
     // Handlers
     handleWalletConnectOpen,

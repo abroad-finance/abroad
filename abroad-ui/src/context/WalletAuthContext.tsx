@@ -9,11 +9,10 @@ interface WalletAuthState {
   authenticateWithWallet: (walletId: string) => Promise<void>;
   address: string | null;
   walletId: string | null;
-  setWalletId: (walletId: string) => void;
   logout: () => void;
 }
 
-const WalletAuthContext = createContext<WalletAuthState>({ token: null, authenticateWithWallet: async () => { }, address: null, walletId: null, setWalletId: () => { }, logout: () => { } });
+const WalletAuthContext = createContext<WalletAuthState>({ token: null, authenticateWithWallet: async () => { }, address: null, walletId: null, logout: () => { } });
 
 const signMessage = async (message: string): Promise<string> => {
   const response = await kit.signTransaction(message, { networkPassphrase: WalletNetwork.PUBLIC })
@@ -21,7 +20,7 @@ const signMessage = async (message: string): Promise<string> => {
 }
 export const WalletAuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [token, _setToken] = useState<string | null>(() => localStorage.getItem('token'));
-  const [address, _setAddress] = useState<string | null>(null);
+  const [address, _setAddress] = useState<string | null>(() => localStorage.getItem('address'));
   const [walletId, _setWalletId] = useState<string | null>(() => localStorage.getItem('selectedWalletId'));
 
   const setToken = useCallback((newToken: string | null) => {
@@ -73,16 +72,11 @@ export const WalletAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
   }, [setAddress, setToken, setWalletId, token]);
 
-  const handleSetWalletId = useCallback((newWalletId: string) => {
-    setWalletId(newWalletId);
-    localStorage.setItem('selectedWalletId', newWalletId);
-  }, [setWalletId]);
-
   const logout = useCallback(() => {
     setToken(null);
     setAddress(null);
     setWalletId(null);
-    localStorage.getItem(PENDING_TX_KEY);
+    localStorage.removeItem(PENDING_TX_KEY);
     kit.disconnect();
   }, [setAddress, setToken, setWalletId]);
 
@@ -99,17 +93,12 @@ export const WalletAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
 
   useEffect(() => {
-    if (!token || !walletId || address) {
+    if (!walletId) {
+      logout()
       return;
     }
     kit.setWallet(walletId);
-    kit.getAddress().then(({ address }) => {
-      setAddress(address);
-    }).catch(err => {
-      console.error('Failed to get address from StellarKit', err);
-      logout();
-    });
-  }, [address, logout, setAddress, token, walletId]);
+  }, [walletId, logout]);
 
   useEffect(() => {
     if (!token) {
@@ -145,7 +134,7 @@ export const WalletAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   }, [setAddress, setToken]);
 
   return (
-    <WalletAuthContext.Provider value={{ token, authenticateWithWallet, address, walletId, setWalletId: handleSetWalletId, logout }}>
+    <WalletAuthContext.Provider value={{ token, authenticateWithWallet, address, walletId, logout }}>
       {children}
     </WalletAuthContext.Provider>
   );

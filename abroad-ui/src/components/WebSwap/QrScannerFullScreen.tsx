@@ -25,7 +25,7 @@ const QrScannerFullScreen: React.FC<QrScannerFullScreenProps> = ({ onClose, onRe
 
   return (
     <div className="fixed inset-0 z-[1000] bg-black/90 text-white flex flex-col">
-      <div className="flex items-center justify-between p-4">
+      <div className="flex items-center justify-between p-4 max-h-[85vh]">
         <div className="flex items-center gap-2">
           <ScanLine className="h-6 w-6" />
           <h2 className="text-lg font-semibold">Escane un código QR</h2>
@@ -42,7 +42,7 @@ const QrScannerFullScreen: React.FC<QrScannerFullScreenProps> = ({ onClose, onRe
           onError={() => { /* ignore camera errors */ }}
           components={{ finder: true }}
           constraints={{ facingMode: 'environment' }}
-          styles={{ container: { width: '100%', height: '100%' }, video: { width: '100%', height: '100%', objectFit: 'cover' } }}
+          styles={{ container: { width: '100%', height: '100%', maxHeight:"85vh" }, video: { width: '100%', height: '100%', objectFit: 'cover' } }}
         />
 
         {/* Bottom help text */}
