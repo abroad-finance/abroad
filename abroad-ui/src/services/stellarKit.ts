@@ -23,10 +23,10 @@ export const kit: StellarWalletsKit = new StellarWalletsKit({
     new AlbedoModule(),
     new LedgerModule(),
     new WalletConnectModule({
-      description: 'Abroad Wallet Connect',
-      icons: ['https://cdn.prod.website-files.com/66d73974e0b6f2e9c06130a7/67bdb92323f0bb399db3754c_abroad-logo.svg'],
+      description: 'Abroad bridges USDC on Stellar with real-time payment networks around the world, enabling seamless crypto-fiat payments. You will be able to pay anywhere in Brazil and Colombia with your USDC.',
+      icons: ['https://storage.googleapis.com/cdn-abroad/Icons/Favicon/Abroad_Badge_transparent.png'],
       method: WalletConnectAllowedMethods.SIGN,
-      name: 'Abroad Wallet Connect',
+      name: 'Abroad',
       network: WalletNetwork.PUBLIC,
       projectId: '5686074a7981cd147a5f0d7434a6d4b7',
       url: 'https://app.abroad.finance',
