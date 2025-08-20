@@ -1,90 +1,105 @@
-import { injectable } from 'inversify'
+import axios from 'axios'
+import { inject, injectable } from 'inversify'
 
 import { IPixQrDecoder, PixDecoded } from '../interfaces/IQrDecoder'
+import { ISecretManager } from '../interfaces/ISecretManager'
+import { TYPES } from '../types'
+
+export interface BrCode {
+  accountType: string
+  bankCode: string
+  description: string
+  keyId: string
+  nominalAmount: number
+  reconciliationId: string
+  reductionAmount: number
+}
+
+export interface TransferoQrResponse {
+  amount: number
+  brCode: BrCode
+  discountAmount: number
+  fineAmount: number
+  id: string
+  interestAmount: number
+  name: string
+  scheduled: null
+  status: string
+  taxId: string
+  type: string
+}
 
 @injectable()
 export class PixQrDecoder implements IPixQrDecoder {
-  public decode(brCode: string): PixDecoded {
-    const raw: Record<string, string> = {}
-    let i = 0
+  private cachedToken?: { exp: number, value: string }
 
-    const readTLV = () => {
-      const tag = brCode.slice(i, i + 2)
-      const len = parseInt(brCode.slice(i + 2, i + 4), 10)
-      const value = brCode.slice(i + 4, i + 4 + len)
-      i += 4 + len
-      return { tag, value }
-    }
+  public constructor(
+    @inject(TYPES.ISecretManager) private secretManager: ISecretManager,
+  ) { }
 
-    while (i < brCode.length) {
-      const { tag, value } = readTLV()
-      raw[tag] = value
-    }
+  decode = async (qrCode: string): Promise<null | PixDecoded> => {
+    try {
+      const token = await this.getAccessToken()
 
-    const parseNested = (block: string) => {
-      const out: Record<string, string> = {}
-      let idx = 0
-      while (idx < block.length) {
-        const t = block.slice(idx, idx + 2)
-        const l = parseInt(block.slice(idx + 2, idx + 4), 10)
-        const v = block.slice(idx + 4, idx + 4 + l)
-        out[t] = v
-        idx += 4 + l
-      }
-      return out
-    }
+      const { TRANSFERO_ACCOUNT_ID, TRANSFERO_BASE_URL } = await this.secretManager.getSecrets([
+        'TRANSFERO_ACCOUNT_ID',
+        'TRANSFERO_BASE_URL',
+      ])
 
-    const mAccount = parseNested(raw['26'] ?? '')
-    const additional = parseNested(raw['62'] ?? '')
+      const { data } = await axios.post(
+        `${TRANSFERO_BASE_URL}/api/v2.0/accounts/${TRANSFERO_ACCOUNT_ID}/paymentpreview`,
+        {
+          Id: qrCode,
+        },
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        },
+      ) as { data: TransferoQrResponse }
 
-    const decoded: PixDecoded = {
-      countryCode: raw['58'],
-      crc16: raw['63'],
-      merchantAccount: {
-        description: mAccount['02'],
-        gui: mAccount['00'],
-        key: mAccount['01'],
-        url: mAccount['25'],
-      },
-      merchantCategoryCode: raw['52'],
-      merchantCity: raw['60'],
-      merchantName: raw['59'],
-      payloadFormatIndicator: raw['00'],
-      pointOfInitiationMethod:
-        raw['01'] === '11'
-          ? 'static'
-          : raw['01'] === '12'
-            ? 'dynamic'
-            : undefined,
-      raw,
-      transactionAmount: raw['54'],
-      transactionCurrency: raw['53'],
-      txid: additional['05'],
-    }
-
-    if (decoded.crc16 && !this.verifyCRC(brCode)) {
-      throw new Error('CRC-16 check failed – corrupted or incomplete BRCode')
-    }
-
-    return decoded
-  }
-
-  private crc16ccitt(data: string): string {
-    let crc = 0xffff
-    for (const c of data) {
-      crc ^= c.charCodeAt(0) << 8
-      for (let k = 0; k < 8; k++) {
-        crc = (crc & 0x8000) !== 0 ? (crc << 1) ^ 0x1021 : crc << 1
-        crc &= 0xffff
+      return {
+        account: data.brCode.keyId,
+        amount: data.amount.toFixed(2),
+        currency: 'BRL',
+        taxId: data.taxId,
       }
     }
-    return crc.toString(16).padStart(4, '0')
+    catch (err) {
+      // Log / handle error as preferred
+      console.error('Transfero sendPayment error:', err)
+      return null
+    }
   }
 
-  private verifyCRC(brCode: string): boolean {
-    const payload = brCode.slice(0, -4) // …6304
-    const given = brCode.slice(-4).toUpperCase()
-    const calc = this.crc16ccitt(payload).toUpperCase()
-    return given === calc
+  /** OAuth2 client-credentials flow */
+  private async getAccessToken(): Promise<string> {
+    const now = Date.now()
+    if (this.cachedToken && now < this.cachedToken.exp - 60_000) {
+      return this.cachedToken.value
+    }
+
+    const apiUrl = await this.secretManager.getSecret('TRANSFERO_BASE_URL')
+    const clientId = await this.secretManager.getSecret('TRANSFERO_CLIENT_ID')
+    const clientSecret = await this.secretManager.getSecret(
+      'TRANSFERO_CLIENT_SECRET',
+    )
+    const clientScope = await this.secretManager.getSecret('TRANSFERO_CLIENT_SCOPE')
+
+    const { data } = await axios.post(`${apiUrl}/auth/token`, {
+      client_id: clientId,
+      client_secret: clientSecret,
+      grant_type: 'client_credentials',
+      scope: clientScope,
+    }, {
+      headers: { 'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
+    })
+
+    const value = data.access_token ?? data
+    const seconds = Number(data.expires_in ?? 900) // default 15 min
+    this.cachedToken = { exp: now + seconds * 1000, value }
+
+    return value
   }
 }

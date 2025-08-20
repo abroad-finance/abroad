@@ -49,7 +49,7 @@ export class WalletAuthController extends Controller {
   ): Promise<RefreshResponse> {
     const { STELLAR_SEP_JWT_SECRET } = await this.getSecrets()
     try {
-      const payload = jwt.verify(body.token, STELLAR_SEP_JWT_SECRET) as jwt.JwtPayload
+      const payload = jwt.verify(body.token, STELLAR_SEP_JWT_SECRET, { ignoreExpiration: true }) as jwt.JwtPayload
       const newToken = jwt.sign(
         { signers: payload.signers, sub: payload.sub },
         STELLAR_SEP_JWT_SECRET,
@@ -106,6 +106,7 @@ export class WalletAuthController extends Controller {
     ])
     const STELLAR_SERVER_KP = Keypair.fromSecret(secrets.STELLAR_PRIVATE_KEY)
     return {
-      STELLAR_SERVER_KP, ...secrets }
+      STELLAR_SERVER_KP, ...secrets,
+    }
   }
 }

@@ -2,40 +2,39 @@ import { inject } from 'inversify'
 import {
   Get,
   Query,
+  Res,
   Response,
   Route,
-  Security,
+  TsoaResponse,
 } from 'tsoa'
 
 import { IPixQrDecoder, PixDecoded } from '../interfaces/IQrDecoder'
 import { TYPES } from '../types'
 
 @Route('qr-decoder')
-@Security('BearerAuth')
-@Security('ApiKeyAuth')
 export class QrDecoderController {
   constructor(
-        @inject(TYPES.IPixQrDecoder) private pixQrDecoder: IPixQrDecoder,
+    @inject(TYPES.IPixQrDecoder) private pixQrDecoder: IPixQrDecoder,
   ) { }
 
   @Get('/br')
   @Response<200, { decoded: string }>(200, 'QR Code Decoded')
-  @Response<400, { reason: string }>(400, 'Bad Request')
   public async decodeQrCodeBR(
-    @Query() brCode: string,
-  ): Promise<{ decoded: PixDecoded }> {
-    if (!brCode || typeof brCode !== 'string') {
-      throw new Error('Invalid BR Code provided')
+    @Res() badRequestResponse: TsoaResponse<400, { reason: string }>,
+    @Query() qrCode: string,
+  ): Promise<{ decoded: null | PixDecoded }> {
+    if (!qrCode || typeof qrCode !== 'string') {
+      return badRequestResponse(400, { reason: 'Invalid QR Code provided' })
     }
     try {
-      const decoded = this.pixQrDecoder.decode(brCode)
+      const decoded = await this.pixQrDecoder.decode(qrCode)
       return { decoded }
     }
     catch (error) {
       if (error instanceof Error) {
-        throw new Error(`Decoding failed: ${error.message}`)
+        return badRequestResponse(400, { reason: error.message })
       }
-      throw new Error('An unknown error occurred during decoding')
+      return badRequestResponse(400, { reason: 'An unknown error occurred during decoding' })
     }
   }
 }

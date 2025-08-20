@@ -110,6 +110,8 @@ interface BankDetailsRouteProps {
   targetCurrency?: (typeof TargetCurrency)[keyof typeof TargetCurrency];
   pixKey: string; // For BRL transfers
   setPixKey: (key: string) => void;
+  taxId: string;
+  setTaxId: (id: string) => void;
 }
 
 export default function BankDetailsRoute({
@@ -122,7 +124,9 @@ export default function BankDetailsRoute({
   textColor = '#356E6A',
   targetCurrency = TargetCurrency.COP,
   pixKey,
-  setPixKey
+  setPixKey,
+  taxId,
+  setTaxId,
 }: BankDetailsRouteProps): React.JSX.Element {
   const { walletId, token, address } = useWalletAuth();
 
@@ -132,8 +136,6 @@ export default function BankDetailsRoute({
   const [loadingSubmit, setLoadingSubmit] = useState(false);
   const [bankOpen, setBankOpen] = useState(false);
   const [selectedBank, setSelectedBank] = useState<Option | null>(null);
-  // BRL specific fields
-  const [cpf, setCpf] = useState('');
 
   // ------------------------------ BANKS API -----------------------------------
   const [apiBanks, setApiBanks] = useState<Bank[]>([]);
@@ -149,13 +151,13 @@ export default function BankDetailsRoute({
         if (parsed.account_number) setaccount_number(parsed.account_number);
         if (parsed.bank_code) setbank_code(parsed.bank_code);
         if (parsed.pixKey) setPixKey(parsed.pixKey);
-        if (parsed.cpf) setCpf(parsed.cpf);
+        if (parsed.taxId) setTaxId(parsed.taxId);
         if (parsed.selectedBank) setSelectedBank(parsed.selectedBank);
       } catch (e) {
         console.error('Failed to restore pending transaction', e);
       }
     }
-  }, [token]);
+  }, [setPixKey, setTaxId, token]);
 
   // Fetch banks once -----------------------------------------------------------
   useEffect(() => {
@@ -198,9 +200,9 @@ export default function BankDetailsRoute({
     const input = e.target.value.replace(/[^\d]/g, '').slice(0, 10); // 10 digits max
     setaccount_number(input);
   };
-  const handleCpfChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleTaxIdChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const input = e.target.value.replace(/[^\d]/g, '').slice(0, 11); // 11 digits
-    setCpf(input);
+    setTaxId(input);
   };
 
   const handleBankSelect = (option: Option) => {
@@ -276,7 +278,7 @@ export default function BankDetailsRoute({
       const response = await acceptTransaction({
         account_number: targetCurrency === TargetCurrency.BRL ? pixKey : account_number,
         bank_code: targetCurrency === TargetCurrency.BRL ? 'PIX' : bank_code,
-        tax_id: targetCurrency === TargetCurrency.BRL ? cpf : undefined,
+        tax_id: targetCurrency === TargetCurrency.BRL ? taxId : undefined,
         quote_id,
         user_id: userId,
         redirectUrl,
@@ -306,7 +308,7 @@ export default function BankDetailsRoute({
             account_number: targetCurrency === TargetCurrency.BRL ? pixKey : account_number,
             bank_code: targetCurrency === TargetCurrency.BRL ? 'PIX' : bank_code,
             pixKey: targetCurrency === TargetCurrency.BRL ? pixKey : undefined,
-            cpf: targetCurrency === TargetCurrency.BRL ? cpf : undefined,
+            taxId: targetCurrency === TargetCurrency.BRL ? taxId : undefined,
             userId,
             selectedBank,
             targetCurrency,
@@ -369,7 +371,7 @@ export default function BankDetailsRoute({
     } finally {
       setLoadingSubmit(false);
     }
-  }, [quote_id, walletId, account_number, bank_code, userId, address, buildPaymentXdr, sourceAmount, onTransactionComplete, targetAmount, selectedBank, pixKey, cpf, targetCurrency]);
+  }, [quote_id, targetCurrency, pixKey, account_number, bank_code, taxId, userId, walletId, address, buildPaymentXdr, sourceAmount, onTransactionComplete, targetAmount, selectedBank]);
 
   // ------------------------------- RENDER -------------------------------------
   return (
@@ -422,8 +424,8 @@ export default function BankDetailsRoute({
                   inputMode="numeric"
                   pattern="[0-9]*"
                   placeholder="CPF"
-                  value={cpf}
-                  onChange={handleCpfChange}
+                  value={taxId}
+                  onChange={handleTaxIdChange}
                   className="w-full bg-transparent font-semibold focus:outline-none text-base sm:text-lg"
                   style={{ color: textColor }}
                 />
@@ -572,7 +574,7 @@ export default function BankDetailsRoute({
         disabled={
           loadingSubmit ||
           (targetCurrency === TargetCurrency.BRL
-            ? !(pixKey && cpf && cpf.length === 11)
+            ? !(pixKey && taxId)
             : (!bank_code || account_number.length !== 10 || loadingBanks))
         }
       >

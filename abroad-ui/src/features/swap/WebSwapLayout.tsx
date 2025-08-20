@@ -96,6 +96,8 @@ const WebSwapLayout: React.FC<LayoutProps> = (props) => {
               pixKey={pixKey}
               setPixKey={setPixKey}
               {...(textColorProps ?? {})}
+              taxId={props.taxId}
+              setTaxId={props.setTaxId}
             />
           </>
         )}

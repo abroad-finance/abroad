@@ -166,11 +166,9 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({ className = '', onW
 
   const connectedWalletInfo = useMemo(() => {
     // Use the walletId from the context, stored when wallet was selected
-    const walletIdentifier = walletId || localStorage.getItem('selectedWalletId') || null;
+    console.log('Using wallet identifier:', walletId); // Debug log
     
-    console.log('Using wallet identifier:', walletIdentifier); // Debug log
-    
-    return getWalletInfo(walletIdentifier);
+    return getWalletInfo(walletId);
   }, [walletId, getWalletInfo]);
 
   const handleWalletClick = useCallback(() => {

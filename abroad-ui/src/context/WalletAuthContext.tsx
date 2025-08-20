@@ -97,6 +97,7 @@ export const WalletAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
   }, [logout, setToken, token]);
 
+
   useEffect(() => {
     if (!token || !walletId || address) {
       return;

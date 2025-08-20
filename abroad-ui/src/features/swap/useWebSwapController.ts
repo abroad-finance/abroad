@@ -2,9 +2,8 @@ import { useState, useCallback, useEffect } from 'react';
 import { SwapData, SwapView } from './webSwap.types';
 import { useWalletAuth } from '../../context/WalletAuthContext';
 import { useSearchParams } from 'react-router-dom';
-import { decodePixQrCode } from '../../utils/PixQrDecoder';
 import { ASSET_URLS, BRL_BACKGROUND_IMAGE } from './webSwap.constants';
-import { getQuote, _36EnumsTargetCurrency as TargetCurrency, _36EnumsPaymentMethod as PaymentMethod, _36EnumsBlockchainNetwork as BlockchainNetwork, _36EnumsCryptoCurrency as CryptoCurrency } from '../../api/index';
+import { getQuote, _36EnumsTargetCurrency as TargetCurrency, _36EnumsPaymentMethod as PaymentMethod, _36EnumsBlockchainNetwork as BlockchainNetwork, _36EnumsCryptoCurrency as CryptoCurrency, decodeQrCodeBR } from '../../api/index';
 
 const PENDING_TX_KEY = 'pendingTransaction';
 
@@ -27,6 +26,7 @@ export const useWebSwapController = () => {
   const [searchParams] = useSearchParams();
   const [quote_id, setquote_id] = useState<string>('');
   const [pixKey, setPixKey] = useState<string>('');
+  const [taxId, setTaxId] = useState<string>('');
 
 
   const targetPaymentMethod = targetCurrency === TargetCurrency.BRL ? PaymentMethod.PIX : PaymentMethod.MOVII;
@@ -81,7 +81,7 @@ export const useWebSwapController = () => {
     if (typeof currency === 'string') setTargetCurrency(currency);
   }, []);
 
-  const handleTargetChange = useCallback(async (targetAmount: number) => {
+  const fetchQuote = useCallback(async (targetAmount: number) => {
     console.log('handleTargetChange called with:', { targetCurrency, targetPaymentMethod, targetAmount });
     const response = await getQuote({
       target_currency: targetCurrency,
@@ -99,20 +99,31 @@ export const useWebSwapController = () => {
   }, [targetCurrency, targetPaymentMethod, handleAmountsChange]);
 
   // Handle QR results (PIX) and prefill amount
-  const handleQrResult = useCallback((text: string) => {
+  const handleQrResult = useCallback(async (text: string) => {
     setIsQrOpen(false);
     try {
-      const decoded = decodePixQrCode(text);
-      const amount = decoded.transactionAmount;
+      const responseDecoder = await decodeQrCodeBR({ qrCode: text });
+      if (responseDecoder.status !== 200) {
+        alert(responseDecoder.data.reason)
+        return
+      }
+      const amount = responseDecoder.data?.decoded?.amount;
+      const pixKey = responseDecoder.data.decoded?.account;
+      const taxIdDecoded = responseDecoder.data.decoded?.taxId;
       if (amount) {
         handleAmountsChange({ tgt: amount });
-        handleTargetChange(parseFloat(amount));
-        setPixKey(decoded.merchantAccount.key || '')
+        fetchQuote(parseFloat(amount));
+      }
+      if (pixKey) {
+        setPixKey(pixKey)
+      }
+      if (taxIdDecoded) {
+        setTaxId(taxIdDecoded)
       }
     } catch (e) {
       console.warn('Failed to decode PIX QR', e);
     }
-  }, [handleAmountsChange, handleTargetChange]);
+  }, [fetchQuote, handleAmountsChange]);
 
   const handleBackToSwap = useCallback(() => {
     localStorage.removeItem(PENDING_TX_KEY);
@@ -164,10 +175,12 @@ export const useWebSwapController = () => {
     handleQrResult,
     openQr: onOpenQr,
     closeQr: () => setIsQrOpen(false),
-    handleTargetChange,
+    handleTargetChange: fetchQuote,
     quoteId: quote_id,
     setQuoteId: setquote_id,
     pixKey,
-    setPixKey
+    setPixKey,
+    taxId,
+    setTaxId
   };
 };
