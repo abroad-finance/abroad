@@ -1,6 +1,7 @@
 import { BalanceCard } from '../BalanceCard';
 import { Option } from '../DropSelector';
-import { IconAnimated } from '../IconAnimated';
+import { lazy, Suspense } from 'react';
+const IconAnimated = lazy(() => import('../IconAnimated').then(m => ({ default: m.IconAnimated })));
 import { useLanguage } from '../../contexts/LanguageContext';
 import { AddLiquidity } from './AddLiquidity';
 import { useState } from 'react';
@@ -49,7 +50,9 @@ export function LiquidityCards({ customCards = [], onAddLiquidity }: LiquidityCa
         >
           <div className="flex justify-center mb-4" style={{ pointerEvents: 'none' }}>
             <div style={{ pointerEvents: 'auto' }}>
-              <IconAnimated icon="PlusCircleHoverSwirl" size={60} trigger="hover"/>
+              <Suspense fallback={null}>
+                <IconAnimated icon="PlusCircleHoverSwirl" size={60} trigger="hover"/>
+              </Suspense>
             </div>
           </div>
           <p className="text-lg text-gray-500">{t.connectLiquidityStream}</p>

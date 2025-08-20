@@ -1,4 +1,4 @@
-// @deprecated This file is deprecated. Use the new API client in src/api/index.ts instead.
+/**  @deprecated This file is deprecated. Use the new API client in src/api/index.ts instead. */
 
 /**
  * This API client provides functions to call:

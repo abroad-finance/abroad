@@ -1,6 +1,7 @@
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { useLanguage } from '../../../contexts/LanguageContext';
-import { IconAnimated } from '../../IconAnimated';
+import { lazy, Suspense } from 'react';
+const IconAnimated = lazy(() => import('../../IconAnimated').then(m => ({ default: m.IconAnimated })));
 import { CardItem } from '../LiquidityCards';
 
 const translations = {
@@ -121,7 +122,9 @@ export function StreamData({ liquidityCards }: StreamDataProps) {
         <h3 className="text-xl font-semibold text-gray-800 mb-4">{t.liquidityAllocation}</h3>
         <div className="flex flex-col items-center justify-center py-12">
           <div className="mb-4">
-            <IconAnimated icon="SphereInReveal" size={80} trigger="once" />
+            <Suspense fallback={null}>
+              <IconAnimated icon="SphereInReveal" size={80} trigger="once" />
+            </Suspense>
           </div>
           <h4 className="text-lg font-medium text-gray-600 mb-2">{t.noLiquidityData}</h4>
           <p className="text-gray-500 text-center">{t.addLiquidityToSeeChart}</p>

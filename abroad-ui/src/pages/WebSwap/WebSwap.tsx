@@ -1,7 +1,8 @@
 import React from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useWebSwapController } from '../../features/swap/useWebSwapController';
-import QrScannerFullScreen from '../../components/WebSwap/QrScannerFullScreen';
+import { lazy, Suspense } from 'react';
+const QrScannerFullScreen = lazy(() => import('../../components/WebSwap/QrScannerFullScreen'));
 import BackgroundCrossfade from '../../components/common/BackgroundCrossfade';
 
 // Child Components
@@ -56,7 +57,9 @@ const WebSwap: React.FC = () => {
 
       {/* Full-screen QR Scanner */}
       {controller.isQrOpen && (
-        <QrScannerFullScreen onClose={controller.closeQr} onResult={controller.handleQrResult} />
+        <Suspense fallback={null}>
+          <QrScannerFullScreen onClose={controller.closeQr} onResult={controller.handleQrResult} />
+        </Suspense>
       )}
     </div>
   );

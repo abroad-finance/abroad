@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Button } from "../Button";
 import { ChevronsDown, Loader, CircleDollarSign, Landmark, Timer, Wallet } from 'lucide-react';
 import { TokenBadge } from './TokenBadge';
-import { IconAnimated } from '../IconAnimated';
+import { lazy, Suspense } from 'react';
+const IconAnimated = lazy(() => import('../IconAnimated').then(m => ({ default: m.IconAnimated })));
 import { getReverseQuote, _36EnumsTargetCurrency as TargetCurrency, _36EnumsPaymentMethod as PaymentMethod, _36EnumsBlockchainNetwork as BlockchainNetwork, _36EnumsCryptoCurrency as CryptoCurrency } from '../../api/index';
 import { useWalletAuth } from '../../context/WalletAuthContext';
 import { kit } from '../../services/stellarKit';
@@ -221,7 +222,7 @@ export default function Swap({
           <div id="Title" className="text-xl md:text-2xl font-bold text-center" style={{ color: textColor }}>
             ¿Cuánto deseas cambiar?
           </div>
-        </div>
+  </div>
 
         {/* SOURCE */}
         <div
@@ -352,10 +353,11 @@ export default function Swap({
             </div>
           </div>
         ) : (
-          // sin cambios funcionales, pero quité la clase inválida
           <div className="w-full bg-white/60 backdrop-blur-xl rounded-2xl p-4 md:py-6 md:px-6 flex items-center justify-center gap-4">
             <div className="flex-shrink-0">
-              <IconAnimated icon="Denied" size={40} trigger="once" />
+              <Suspense fallback={null}>
+                <IconAnimated icon="Denied" size={40} trigger="once" />
+              </Suspense>
             </div>
             <div className="flex flex-col space-y-1">
               <span className="text-lg font-semibold" style={{ color: textColor }}>
