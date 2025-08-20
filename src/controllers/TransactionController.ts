@@ -157,7 +157,6 @@ export class TransactionController extends Controller {
     })
 
     const totalUserAmountMonthly = userTransactionsMonthly.reduce((acc, transaction) => acc + transaction.quote.sourceAmount, 0) + quote.sourceAmount
-    console.log('Total user amount monthly:', totalUserAmountMonthly)
     const link = await this.kycService.getKycLink({
       amount: totalUserAmountMonthly,
       country: quote.country,
