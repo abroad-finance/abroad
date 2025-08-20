@@ -158,12 +158,70 @@ function buildContract({
   taxId: string
   value: number
 }) {
+  const isBrazilPhoneNumber = (input: number | string): boolean => {
+    if (input === null || input === undefined) return false
+
+    // Keep digits only
+    const raw = String(input).replace(/\D+/g, '')
+    if (!raw) return false
+
+    // Accept toll-free 0800 numbers: 0800 + 7 digits
+    if (/^0800\d{7}$/.test(raw)) return true
+
+    // Strip domestic prefixes if present:
+    // - 0 + carrier code (two digits), e.g., 0 15 11 9xxxx-xxxx  => remove "015"
+    // - single trunk "0" before DDD, e.g., 0 11 2345-6789        => remove "0"
+    let digits = raw
+    if (/^0\d{2}\d{10,11}$/.test(digits)) {
+      digits = digits.slice(3)
+    }
+    else if (digits.length >= 11 && digits.startsWith('0')) {
+      digits = digits.slice(1)
+    }
+
+    // After cleaning, expect 10 (landline) or 11 (mobile) digits: DDD(2) + local
+    if (!(digits.length === 10 || digits.length === 11)) return false
+
+    const ddd = digits.slice(0, 2)
+    const local = digits.slice(2)
+
+    // Valid Brazilian DDD (area) codes
+    const VALID_DDD = new Set([
+      '11', '12', '13', '14', '15', '16', '17', '18', '19',
+      '21', '22', '24', '27', '28',
+      '31', '32', '33', '34', '35', '37', '38',
+      '41', '42', '43', '44', '45', '46',
+      '47', '48', '49',
+      '51', '53', '54', '55',
+      '61', '62', '63', '64', '65', '66', '67', '68', '69',
+      '71', '73', '74', '75', '77', '79',
+      '81', '82', '83', '84', '85', '86', '87', '88', '89',
+      '91', '92', '93', '94', '95', '96', '97', '98', '99',
+    ])
+
+    if (!VALID_DDD.has(ddd)) return false
+
+    // Landline: 8 digits, starts 2–5
+    if (local.length === 8) {
+      return /^[2-5]\d{7}$/.test(local)
+    }
+
+    // Mobile: 9 digits, starts with 9
+    if (local.length === 9) {
+      // If you want to be stricter, use /^9[6-9]\d{7}$/ (historical mobile ranges)
+      return /^9\d{8}$/.test(local)
+    }
+
+    return false
+  }
+
+  const pixKey = isBrazilPhoneNumber(account) ? `+55${String(account).replace(/\D/g, '')}` : account
   return [
     {
       amount: value,
       currency: 'BRL',
       name: 'Recipient',
-      pixKey: account,
+      pixKey,
       taxId,
       taxIdCountry: 'BRA',
     },
