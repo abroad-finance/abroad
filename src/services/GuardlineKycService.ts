@@ -29,17 +29,13 @@ export class GuardLineKycService implements IKycService {
     userId,
   }) => {
     const client = await this.dbProvider.getClient()
-    const highestKyc = await client.partnerUserKyc.findFirst({ orderBy: { createdAt: 'desc' }, where: { partnerUserId: userId } })
+    const highestKyc = await client.partnerUserKyc.findFirst({ orderBy: { createdAt: 'desc' }, where: { partnerUserId: userId, status: KycStatus.APPROVED } })
     let existingTier: KYCTier
     if (!highestKyc) {
       existingTier = KYCTier.NONE
     }
     else {
       existingTier = highestKyc.tier
-    }
-
-    if (highestKyc && highestKyc.status !== KycStatus.APPROVED) {
-      return highestKyc.link
     }
 
     const nextTier = getNextTier(country, amount, existingTier)
