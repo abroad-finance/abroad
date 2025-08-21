@@ -1,5 +1,5 @@
 steps:
-  # 1. Build the image, tagging :$COMMIT_SHA and :latest, and point BuildKit at the pulled cache
+  # 1. Build the image, tagging :$COMMIT_SHA, and point BuildKit at the pulled cache
   - id: Build
     name: gcr.io/cloud-builders/docker
     env:
@@ -9,8 +9,6 @@ steps:
       - build
       - -t
       - $_AR_HOSTNAME/$PROJECT_ID/cloud-run-source-deploy/$REPO_NAME/$_SERVICE_NAME:$COMMIT_SHA
-      - -t
-      - $_AR_HOSTNAME/$PROJECT_ID/cloud-run-source-deploy/$REPO_NAME/$_SERVICE_NAME:latest
       - -f
       - Dockerfile
       - .
@@ -22,13 +20,6 @@ steps:
     args:
       - push
       - $_AR_HOSTNAME/$PROJECT_ID/cloud-run-source-deploy/$REPO_NAME/$_SERVICE_NAME:$COMMIT_SHA
-    waitFor: ["Build"]
-
-  - id: Push latest
-    name: gcr.io/cloud-builders/docker
-    args:
-      - push
-      - $_AR_HOSTNAME/$PROJECT_ID/cloud-run-source-deploy/$REPO_NAME/$_SERVICE_NAME:latest
     waitFor: ["Build"]
 
   # 3. Render kustomization (runs in parallel; unchanged)
@@ -99,7 +90,6 @@ steps:
 
 images:
   - $_AR_HOSTNAME/$PROJECT_ID/cloud-run-source-deploy/$REPO_NAME/$_SERVICE_NAME:$COMMIT_SHA
-  - $_AR_HOSTNAME/$PROJECT_ID/cloud-run-source-deploy/$REPO_NAME/$_SERVICE_NAME:latest
 
 options:
   substitutionOption: ALLOW_LOOSE

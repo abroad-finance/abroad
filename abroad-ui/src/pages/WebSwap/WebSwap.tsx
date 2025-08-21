@@ -4,6 +4,7 @@ import { useWebSwapController } from '../../features/swap/useWebSwapController';
 import { lazy, Suspense } from 'react';
 const QrScannerFullScreen = lazy(() => import('../../components/WebSwap/QrScannerFullScreen'));
 import BackgroundCrossfade from '../../components/common/BackgroundCrossfade';
+import { Loader } from 'lucide-react';
 
 // Child Components
 import NavBarResponsive from '../../components/WebSwap/NavBarResponsive';
@@ -60,6 +61,16 @@ const WebSwap: React.FC = () => {
         <Suspense fallback={null}>
           <QrScannerFullScreen onClose={controller.closeQr} onResult={controller.handleQrResult} />
         </Suspense>
+      )}
+
+      {/* Decoding overlay */}
+      {controller.isDecodingQr && (
+        <div className="fixed inset-0 z-[1100] bg-black/60 backdrop-blur-sm flex items-center justify-center">
+          <div className="flex flex-col items-center gap-3 text-white">
+            <Loader className="w-8 h-8 animate-spin" />
+            <p className="text-sm">Decodificando QR…</p>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -19,7 +19,7 @@ spec:
       serviceAccountName: abroad-stellar-sa
       containers:
         - name: abroad-consumers-container
-          image: abroad-consumers-container:latest
+          image: abroad-consumers-container
           command: ["node"]
           args: ["dist/consumers.js"]
           imagePullPolicy: Always
