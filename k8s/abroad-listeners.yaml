@@ -19,7 +19,7 @@ spec:
       serviceAccountName: abroad-stellar-sa
       containers:
         - name: abroad-listeners-container
-          image: abroad-listeners-container:latest
+          image: abroad-listeners-container
           command: ["node"]
           args: ["dist/listeners.js"]
           imagePullPolicy: Always
