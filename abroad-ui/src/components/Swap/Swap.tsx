@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Button } from "../Button";
 import { ChevronsDown, Loader, CircleDollarSign, Landmark, Timer, Wallet } from 'lucide-react';
 import { TokenBadge } from './TokenBadge';
@@ -7,6 +7,7 @@ const IconAnimated = lazy(() => import('../IconAnimated').then(m => ({ default: 
 import { getReverseQuote, _36EnumsTargetCurrency as TargetCurrency, _36EnumsPaymentMethod as PaymentMethod, _36EnumsBlockchainNetwork as BlockchainNetwork, _36EnumsCryptoCurrency as CryptoCurrency } from '../../api/index';
 import { useWalletAuth } from '../../context/WalletAuthContext';
 import { kit } from '../../services/stellarKit';
+import { useDebounce } from '../../hooks';
 
 // Define props for Swap component
 interface SwapProps {
@@ -36,6 +37,7 @@ interface SwapProps {
 const COP_TRANSFER_FEE = 0.0;
 const BRL_TRANSFER_FEE = 0.0;
 
+
 export default function Swap({
   sourceAmount,
   targetAmount,
@@ -47,9 +49,17 @@ export default function Swap({
   quoteId,
   setQuoteId
 }: SwapProps) {
+  // Derived formatting and payment method by target currency
+  const targetLocale = targetCurrency === TargetCurrency.BRL ? 'pt-BR' : 'es-CO';
+  const targetSymbol = targetCurrency === TargetCurrency.BRL ? 'R$' : '$';
+  const targetPaymentMethod = targetCurrency === TargetCurrency.BRL ? PaymentMethod.PIX : PaymentMethod.MOVII;
+  // Dynamic transfer fee: BRL = 0, COP = 1354
+  const transferFee = targetCurrency === TargetCurrency.BRL ? BRL_TRANSFER_FEE : COP_TRANSFER_FEE;
+
   const { token, authenticateWithWallet } = useWalletAuth();
   const [loadingSource, setLoadingSource] = useState(false);
   const [loadingTarget, setLoadingTarget] = useState(false);
+  const [firstInputEnable, setFirstInputEnable] = useState(true);
   const [displayedTRM, setDisplayedTRM] = useState(0.000);
   const sourceDebounceRef = useRef<NodeJS.Timeout | null>(null);
   const targetDebounceRef = useRef<NodeJS.Timeout | null>(null);
@@ -57,13 +67,140 @@ export default function Swap({
   // Dropdown state for currency selection
   const [currencyMenuOpen, setCurrencyMenuOpen] = useState(false);
   const currencyMenuRef = useRef<HTMLDivElement | null>(null);
+  const [amount, setAmount] = useState('');
+  const [target, setTarget] = useState('');
+  const sourceDebouncedAmount = useDebounce(amount, 500); // 500ms delay
+  const targetDebounceAmount = useDebounce(target, 500)
 
-  // Derived formatting and payment method by target currency
-  const targetLocale = targetCurrency === TargetCurrency.BRL ? 'pt-BR' : 'es-CO';
-  const targetSymbol = targetCurrency === TargetCurrency.BRL ? 'R$' : '$';
-  const targetPaymentMethod = targetCurrency === TargetCurrency.BRL ? PaymentMethod.PIX : PaymentMethod.MOVII;
-  // Dynamic transfer fee: BRL = 0, COP = 1354
-  const transferFee = targetCurrency === TargetCurrency.BRL ? BRL_TRANSFER_FEE : COP_TRANSFER_FEE;
+  const isButtonDisabled = () => {
+    const numericSource = parseFloat(String(sourceAmount));
+    // Clean targetAmount: remove thousands separators (.), change decimal separator (,) to .
+    const cleanedTarget = String(targetAmount).replace(/\./g, '').replace(/,/g, '.');
+    const numericTarget = parseFloat(cleanedTarget);
+    return !(numericSource > 0 && numericTarget > 0);
+  };
+
+  const formatTargetNumber = useCallback((value: number) =>
+    new Intl.NumberFormat(targetLocale, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value), [targetLocale]);
+
+  const fetchDirectConversion = useCallback(async (value: string) => {
+    const num = parseFloat(value);
+    if (isNaN(num)) {
+      onTargetChange?.(0);
+      return;
+    }
+    setLoadingTarget(true);
+    try {
+      console.log('Fetching reverse quote for source amount:', num);
+      const response = await getReverseQuote({
+        target_currency: targetCurrency,
+        source_amount: num,
+        payment_method: targetPaymentMethod,
+        network: BlockchainNetwork.STELLAR,
+        crypto_currency: CryptoCurrency.USDC,
+      });
+      if (response.status === 200) {
+        const formatted = formatTargetNumber(response.data.value);
+        setQuoteId(response.data.quote_id); // Add this line
+        onAmountsChange?.({ src: value, tgt: formatted });
+      }
+    } catch (error: unknown) {
+      console.error('Reverse quote error', error);
+    } finally {
+      setLoadingTarget(false);
+    }
+  }, [
+    formatTargetNumber, 
+    onAmountsChange, 
+    onTargetChange, 
+    setQuoteId, 
+    targetCurrency, 
+    targetPaymentMethod
+  ]);
+
+  const fetchReverseConversion = useCallback(async (value: string) => {
+    // allow digits, dots and commas; normalize commas to dots for parse
+    const raw = value.replace(/[^0-9.,]/g, '');
+    const normalized = raw.replace(/\./g, '').replace(/,/g, '.');
+    const num = parseFloat(normalized);
+    if (isNaN(num)) {
+      onAmountsChange?.({ src: '' });
+      return;
+    }
+    setLoadingSource(true);
+    try {
+        await onTargetChange(num);
+      } catch (error: unknown) {
+        console.error('Quote error', error);
+      } finally {
+        setLoadingSource(false);
+      }
+  }, [onAmountsChange, onTargetChange])
+
+  const handleSourceFocus = () => {
+    // strip any formatting to show raw numbers
+    onAmountsChange?.({ src: sourceAmount.replace(/[^0-9.]/g, '') });
+  };
+
+  const handleSourceBlur = () => {
+    const num = parseFloat(sourceAmount);
+    if (isNaN(num)) {
+      onAmountsChange?.({ src: '' });
+    } else {
+      onAmountsChange?.({ src: num.toFixed(2) });
+    }
+  };
+
+  const handleTargetBlur = () => {
+    const clean = targetAmount.replace(/[^0-9.,]/g, '');
+    const normalized = clean.replace(/\./g, '').replace(/,/g, '.');
+    const num = parseFloat(normalized);
+    if (isNaN(num)) {
+      onAmountsChange?.({ tgt: '' });
+    } else {
+      // final numeric format with separators
+      onAmountsChange?.({ tgt: formatTargetNumber(num) });
+    }
+  };
+
+  // Direct wallet connection handler
+  const handleDirectWalletConnect = () => {
+    kit.openModal({
+      onWalletSelected: async (option) => {
+        authenticateWithWallet(option.id);
+      },
+    });
+  };
+
+  useEffect(() => {
+    if (!loadingSource && !loadingTarget) {
+      const numericSource = parseFloat(sourceAmount);
+      // Normalize targetAmount (which might have formatting) to a standard number string for parsing
+      const cleanedTarget = targetAmount.replace(/\./g, '').replace(/,/g, '.');
+      const numericTarget = parseFloat(cleanedTarget);
+
+      if (numericSource > 0 && !isNaN(numericTarget) && numericTarget >= 0) {
+        setDisplayedTRM((numericTarget + transferFee) / numericSource);
+      } else {
+        setDisplayedTRM(0.000);
+      }
+    }
+    // If loadingSource or loadingTarget is true, displayedTRM remains unchanged.
+  }, [sourceAmount, targetAmount, loadingSource, loadingTarget, transferFee]); // TransferFee is a module-level const
+
+  useEffect(() => {
+    if (sourceDebouncedAmount) {
+      setFirstInputEnable(true);
+      fetchDirectConversion(sourceDebouncedAmount);
+    }
+  }, [sourceDebouncedAmount, fetchDirectConversion]);
+
+  useEffect(() => {
+    if (targetDebounceAmount) {
+      setFirstInputEnable(false);
+      fetchReverseConversion(targetDebounceAmount);
+    }
+  }, [targetDebounceAmount, fetchReverseConversion]);
 
   // Close currency dropdown on outside click
   useEffect(() => {
@@ -88,130 +225,6 @@ export default function Swap({
     if (targetDebounceRef.current) clearTimeout(targetDebounceRef.current);
   }, [onAmountsChange, setQuoteId, targetCurrency])
 
-  const isButtonDisabled = () => {
-    const numericSource = parseFloat(String(sourceAmount));
-    // Clean targetAmount: remove thousands separators (.), change decimal separator (,) to .
-    const cleanedTarget = String(targetAmount).replace(/\./g, '').replace(/,/g, '.');
-    const numericTarget = parseFloat(cleanedTarget);
-    return !(numericSource > 0 && numericTarget > 0);
-  };
-
-  const formatTargetNumber = (value: number) => new Intl.NumberFormat(targetLocale, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
-
-  const handleSourceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const input = e.target.value.replace(/[^0-9.]/g, '');
-    // clear any pending debounce
-    if (sourceDebounceRef.current) clearTimeout(sourceDebounceRef.current);
-    // update state and notify parent
-    onAmountsChange?.({ src: input });
-    const num = parseFloat(input);
-    if (isNaN(num)) {
-      onAmountsChange?.({ src: '' });
-      return;
-    }
-    setLoadingTarget(true);
-    // debounce reverse quote API call
-    console.log('Setting sourceDebounceRef');
-    sourceDebounceRef.current = setTimeout(async () => {
-      try {
-        console.log('Fetching reverse quote for source amount:', num);
-        const response = await getReverseQuote({
-          target_currency: targetCurrency,
-          source_amount: num,
-          payment_method: targetPaymentMethod,
-          network: BlockchainNetwork.STELLAR,
-          crypto_currency: CryptoCurrency.USDC,
-        });
-        if (response.status === 200) {
-          const formatted = formatTargetNumber(response.data.value);
-          setQuoteId(response.data.quote_id); // Add this line
-          onAmountsChange?.({ src: input, tgt: formatted });
-        }
-      } catch (error: unknown) {
-        console.error('Reverse quote error', error);
-      } finally {
-        setLoadingTarget(false);
-      }
-    }, 300);
-  };
-
-  const handleSourceFocus = () => {
-    // strip any formatting to show raw numbers
-    onAmountsChange?.({ src: sourceAmount.replace(/[^0-9.]/g, '') });
-  };
-
-  const handleSourceBlur = () => {
-    const num = parseFloat(sourceAmount);
-    if (isNaN(num)) {
-      onAmountsChange?.({ src: '' });
-    } else {
-      onAmountsChange?.({ src: num.toFixed(2) });
-    }
-  };
-
-  const handleTargetChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    // allow digits, dots and commas; normalize commas to dots for parse
-    const raw = e.target.value.replace(/[^0-9.,]/g, '');
-    const normalized = raw.replace(/\./g, '').replace(/,/g, '.');
-    const num = parseFloat(normalized);
-    // clear any pending debounce
-    if (targetDebounceRef.current) clearTimeout(targetDebounceRef.current);
-    onAmountsChange?.({ tgt: raw });
-    console.log('Setting targetDebounceRef', raw);
-    if (isNaN(num)) {
-      onAmountsChange?.({ src: '' });
-      return;
-    }
-    setLoadingSource(true);
-    // debounce quote API call
-    targetDebounceRef.current = setTimeout(async () => {
-      try {
-        await onTargetChange(num);
-      } catch (error: unknown) {
-        console.error('Quote error', error);
-      } finally {
-        setLoadingSource(false);
-      }
-    }, 300);
-  };
-
-  const handleTargetBlur = () => {
-    const clean = targetAmount.replace(/[^0-9.,]/g, '');
-    const normalized = clean.replace(/\./g, '').replace(/,/g, '.');
-    const num = parseFloat(normalized);
-    if (isNaN(num)) {
-      onAmountsChange?.({ tgt: '' });
-    } else {
-      // final numeric format with separators
-      onAmountsChange?.({ tgt: formatTargetNumber(num) });
-    }
-  };
-
-  useEffect(() => {
-    if (!loadingSource && !loadingTarget) {
-      const numericSource = parseFloat(sourceAmount);
-      // Normalize targetAmount (which might have formatting) to a standard number string for parsing
-      const cleanedTarget = targetAmount.replace(/\./g, '').replace(/,/g, '.');
-      const numericTarget = parseFloat(cleanedTarget);
-
-      if (numericSource > 0 && !isNaN(numericTarget) && numericTarget >= 0) {
-        setDisplayedTRM((numericTarget + transferFee) / numericSource);
-      } else {
-        setDisplayedTRM(0.000);
-      }
-    }
-    // If loadingSource or loadingTarget is true, displayedTRM remains unchanged.
-  }, [sourceAmount, targetAmount, loadingSource, loadingTarget, transferFee]); // TransferFee is a module-level const
-
-  // Direct wallet connection handler
-  const handleDirectWalletConnect = () => {
-    kit.openModal({
-      onWalletSelected: async (option) => {
-        authenticateWithWallet(option.id);
-      },
-    });
-  };
-
   return (
     <div className="flex-1 flex items-center justify-center w-full flex flex-col">
       <div id="background-container"
@@ -222,7 +235,7 @@ export default function Swap({
           <div id="Title" className="text-xl md:text-2xl font-bold text-center" style={{ color: textColor }}>
             ¿Cuánto deseas cambiar?
           </div>
-  </div>
+        </div>
 
         {/* SOURCE */}
         <div
@@ -238,8 +251,8 @@ export default function Swap({
                 type="text"
                 inputMode="decimal"
                 pattern="[0-9.]*"
-                value={sourceAmount}
-                onChange={handleSourceChange}
+                value={firstInputEnable ? amount : sourceAmount}
+                onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ''))}
                 onFocus={handleSourceFocus}
                 onBlur={handleSourceBlur}
                 placeholder="0.00"
@@ -278,8 +291,8 @@ export default function Swap({
                   type="text"
                   inputMode="decimal"
                   pattern="[0-9.,]*"
-                  value={targetAmount}
-                  onChange={handleTargetChange}
+                  value={!firstInputEnable ? target : targetAmount}
+                  onChange={(e) => setTarget(e.target.value.replace(/[^0-9.]/g, ''))}
                   onBlur={handleTargetBlur}
                   placeholder="0,00"
                   className="w-full bg-transparent font-bold focus:outline-none text-xl md:text-2xl"
