@@ -399,8 +399,15 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({
                   className="flex items-center justify-center bg-[#356E6A]/5 backdrop-blur-xl rounded-xl px-4 py-2 border border-white/30 hover:bg-white/30 transition-colors duration-200 flex-1"
                   aria-label={address ? "Ver detalles de la billetera" : "Conectar billetera"}
                 >
-                  {/* Mobile shows only the balance badge to keep it compact */}
-                  {USDCBadge(true)}
+                  {/* When not connected show an explicit connect CTA; when connected show balance badge */}
+                  {address ? (
+                    USDCBadge(true)
+                  ) : (
+                    <div className="flex items-center space-x-2">
+                      <Wallet className="w-5 h-5 text-[#356E6A]" aria-hidden="true" />
+                      <span className="text-[#356E6A] text-sm font-medium">Conectar Billetera</span>
+                    </div>
+                  )}
                 </button>
                 {/* (Optional) Show info button on mobile too. Comment out if undesired. */}
                 {/* {InfoButton(true)} */}

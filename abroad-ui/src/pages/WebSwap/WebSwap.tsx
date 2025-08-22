@@ -37,14 +37,7 @@ const WebSwap: React.FC = () => {
       <main className="flex-1 relative z-10 flex">
         <WebSwapLayout {...controller} />
 
-        {/* Floating Scan Button */}
-        <button
-          type="button"
-          onClick={controller.openQr}
-          className="fixed bottom-6 right-6 z-[1001] rounded-full bg-green-600 text-white px-5 py-3 shadow-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-white/50"
-        >
-          Scan QR
-        </button>
+  {/* Floating Scan Button removed; scanner trigger moved into Swap title */}
       </main>
 
       {/* Top-level Modals */}

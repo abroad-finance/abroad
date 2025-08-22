@@ -1,26 +1,70 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '../Button';
 import { IconAnimated } from '../IconAnimated';
+import { TransactionStatus as ApiStatus, getTransactionStatus } from '../../api';
 
-// Mock statuses for visualization purposes
-type TransactionStatus = 'inProgress' | 'accepted' | 'denied';
+// UI status mapping
+type UiStatus = 'inProgress' | 'accepted' | 'denied';
 
-interface TxStatusProps {
+export interface TxStatusProps {
+  transactionId: string | null;
   onNewTransaction: () => void;
   onRetry: () => void;
 }
 
-export default function TxStatus({ onNewTransaction, onRetry }: TxStatusProps): React.JSX.Element {
-  const [status, setStatus] = useState<TransactionStatus>('inProgress');
+export default function TxStatus({ transactionId, onNewTransaction, onRetry }: TxStatusProps): React.JSX.Element {
+  const [status, setStatus] = useState<UiStatus>('inProgress');
+  const [error, setError] = useState<string | null>(null);
+  const pollRef = useRef<number | null>(null);
+
+  // Map API status to UI status
+  const mapStatus = (api?: ApiStatus): UiStatus => {
+    switch (api) {
+      case 'PAYMENT_COMPLETED': return 'accepted';
+      case 'PAYMENT_FAILED':
+      case 'WRONG_AMOUNT': return 'denied';
+      case 'AWAITING_PAYMENT':
+      case 'PROCESSING_PAYMENT':
+      default: return 'inProgress';
+    }
+  };
+
+  // Poll transaction status
+  useEffect(() => {
+    if (!transactionId) return;
+    let cancelled = false;
+
+    const poll = async () => {
+      try {
+        const res = await getTransactionStatus(transactionId);
+        if (cancelled) return;
+        const ui = mapStatus(res.data?.status as ApiStatus);
+        setStatus(ui);
+        if (ui === 'inProgress') {
+          pollRef.current = window.setTimeout(poll, 1000);
+        }
+      } catch (e) {
+        if (cancelled) return;
+        setError(e instanceof Error ? e.message : 'Error obteniendo estado');
+        // retry slower
+        pollRef.current = window.setTimeout(poll, 1000);
+      }
+    };
+    poll();
+    return () => {
+      cancelled = true;
+      if (pollRef.current) window.clearTimeout(pollRef.current);
+    };
+  }, [transactionId]);
 
   const renderIcon = () => {
     switch (status) {
       case 'inProgress':
-        return <IconAnimated icon='Coins' size={150} trigger='loop'/>;
+        return <IconAnimated icon='Coins' size={150} trigger='loop' />;
       case 'accepted':
-        return <IconAnimated icon='AnimatedCheck' size={150} trigger='loop'/>;
+        return <IconAnimated icon='AnimatedCheck' size={150} trigger='loop' />;
       case 'denied':
-        return <IconAnimated icon='Denied' size={150} trigger='loop'/>;
+        return <IconAnimated icon='Denied' size={150} trigger='loop' />;
     }
   };
 
@@ -45,20 +89,7 @@ export default function TxStatus({ onNewTransaction, onRetry }: TxStatusProps): 
 
   return (
     <div className=" flex-1 flex flex-col items-center justify-center w-full space-y-6">
-      {/* Mock selector for status changes */}
-      <div className="flex items-center space-x-2">
-        <label htmlFor="status-select" className="font-medium text-[#356E6A]">Mock Status:</label>
-        <select
-          id="status-select"
-          value={status}
-          onChange={e => setStatus(e.target.value as TransactionStatus)}
-          className="border border-[#356E6A] rounded px-2 py-1 bg-white/60 text-[#356E6A] focus:outline-none"
-        >
-          <option value="inProgress">In Progress</option>
-          <option value="accepted">Accepted</option>
-          <option value="denied">Denied</option>
-        </select>
-      </div>
+      {error && <div className="text-red-600 text-sm">{error}</div>}
 
       <div
         id="bg-container"

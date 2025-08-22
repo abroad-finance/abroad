@@ -9,6 +9,7 @@ import { ASSET_URLS, BRL_BACKGROUND_IMAGE } from './webSwap.constants';
 import { useWebSwapController } from './useWebSwapController'; // For prop types
 import { kit } from '../../services/stellarKit';
 import { useWalletAuth } from '../../context/WalletAuthContext';
+import TxStatus from '../../components/Swap/TxStatus';
 
 type LayoutProps = ReturnType<typeof useWebSwapController>;
 
@@ -30,6 +31,10 @@ const WebSwapLayout: React.FC<LayoutProps> = (props) => {
     setQuoteId,
     pixKey,
     setPixKey,
+    // new handlers/state for tx status view
+    showTxStatus,
+    resetForNewTransaction,
+    transactionId,
   } = props;
 
   const { authenticateWithWallet } = useWalletAuth();
@@ -75,6 +80,7 @@ const WebSwapLayout: React.FC<LayoutProps> = (props) => {
             onTargetChange={handleTargetChange}
             quoteId={quoteId}
             setQuoteId={setQuoteId}
+            openQr={props.openQr}
             {...(textColorProps ?? {})}
           />
         )}
@@ -88,6 +94,7 @@ const WebSwapLayout: React.FC<LayoutProps> = (props) => {
             <BankDetailsRoute
               onBackClick={handleBackToSwap}
               onTransactionComplete={handleTransactionComplete}
+              onTransactionSigned={(id, ref) => showTxStatus(id, ref)}
               quote_id={swapData.quote_id}
               sourceAmount={swapData.srcAmount}
               targetAmount={swapData.tgtAmount}
@@ -100,6 +107,14 @@ const WebSwapLayout: React.FC<LayoutProps> = (props) => {
               setTaxId={props.setTaxId}
             />
           </>
+        )}
+
+        {view === 'txStatus' && (
+          <TxStatus
+            transactionId={transactionId}
+            onNewTransaction={resetForNewTransaction}
+            onRetry={handleBackToSwap}
+          />
         )}
       </div>
     );

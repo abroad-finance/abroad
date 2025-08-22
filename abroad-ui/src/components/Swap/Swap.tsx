@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Button } from "../Button";
-import { ChevronsDown, Loader, CircleDollarSign, Landmark, Timer, Wallet } from 'lucide-react';
+import { ChevronsDown, Loader, CircleDollarSign, Landmark, Timer, Wallet, QrCode } from 'lucide-react';
 import { TokenBadge } from './TokenBadge';
 import { lazy, Suspense } from 'react';
 const IconAnimated = lazy(() => import('../IconAnimated').then(m => ({ default: m.IconAnimated })));
@@ -32,6 +32,7 @@ interface SwapProps {
   onTargetChange: (amount: number) => Promise<void>;
   quoteId: string;
   setQuoteId: (id: string) => void;
+  openQr: () => void; // handler to open QR scanner
 }
 
 const COP_TRANSFER_FEE = 0.0;
@@ -47,7 +48,8 @@ export default function Swap({
   textColor = '#356E6A',
   onTargetChange,
   quoteId,
-  setQuoteId
+  setQuoteId,
+  openQr
 }: SwapProps) {
   // Derived formatting and payment method by target currency
   const targetLocale = targetCurrency === TargetCurrency.BRL ? 'pt-BR' : 'es-CO';
@@ -110,11 +112,11 @@ export default function Swap({
       setLoadingTarget(false);
     }
   }, [
-    formatTargetNumber, 
-    onAmountsChange, 
-    onTargetChange, 
-    setQuoteId, 
-    targetCurrency, 
+    formatTargetNumber,
+    onAmountsChange,
+    onTargetChange,
+    setQuoteId,
+    targetCurrency,
     targetPaymentMethod
   ]);
 
@@ -129,12 +131,12 @@ export default function Swap({
     }
     setLoadingSource(true);
     try {
-        await onTargetChange(num);
-      } catch (error: unknown) {
-        console.error('Quote error', error);
-      } finally {
-        setLoadingSource(false);
-      }
+      await onTargetChange(num);
+    } catch (error: unknown) {
+      console.error('Quote error', error);
+    } finally {
+      setLoadingSource(false);
+    }
   }, [onAmountsChange, onTargetChange])
 
   const handleSourceFocus = () => {
@@ -231,9 +233,17 @@ export default function Swap({
         className="w-[90%] max-w-md min-h-[60vh] bg-[#356E6A]/5 backdrop-blur-xl rounded-4xl p-4 md:p-6 flex flex-col items-center justify-center space-y-1 lg:space-y-4"
       >
         {/* Title */}
-        <div className="flex-1 flex items-center justify-center">
-          <div id="Title" className="text-xl md:text-2xl font-bold text-center" style={{ color: textColor }}>
-            ¿Cuánto deseas cambiar?
+        <div className="flex-1 flex items-center justify-space-between">
+          <div id="Title" className="flex items-center gap-2 text-xl md:text-xl font-bold" style={{ color: textColor }}>
+            <span>¿Cuánto deseas cambiar?</span>
+            {targetCurrency === TargetCurrency.BRL && (<button
+              type="button"
+              onClick={openQr}
+              aria-label="Escanear QR"
+              className="p-2 cursor-pointer rounded-full hover:bg-white/30 focus:outline-none focus:ring-2 focus:ring-[#356E6A]/40 transition"
+            >
+              <QrCode className="w-6 h-6" style={{ color: textColor }} />
+            </button>)}
           </div>
         </div>
 
@@ -306,7 +316,7 @@ export default function Swap({
               <button
                 type="button"
                 onClick={() => setCurrencyMenuOpen(v => !v)}
-                className="focus:outline-none"
+                className="focus:outline-none cursor-pointer"
                 aria-haspopup="listbox"
                 aria-expanded={currencyMenuOpen}
               >
@@ -333,7 +343,7 @@ export default function Swap({
                       // Notify parent about currency change to update global state (e.g., background)
                       onAmountsChange?.({ src: sourceAmount, tgt: targetAmount, currency: TargetCurrency.COP });
                     }}
-                    className="w-full text-left hover:bg-black/5 rounded-lg px-1 py-1"
+                    className="w-full text-left hover:bg-black/5 rounded-lg px-1 py-1 cursor-pointer"
                     role="option"
                     aria-selected={targetCurrency === TargetCurrency.COP}
                   >
@@ -351,7 +361,7 @@ export default function Swap({
                       // Notify parent about currency change to update global state (e.g., background)
                       onAmountsChange?.({ src: sourceAmount, tgt: targetAmount, currency: TargetCurrency.BRL });
                     }}
-                    className="w-full text-left hover:bg-black/5 rounded-lg px-1 py-1"
+                    className="cursor-pointer w-full text-left hover:bg-black/5 rounded-lg px-1 py-1"
                     role="option"
                     aria-selected={targetCurrency === TargetCurrency.BRL}
                   >
@@ -402,7 +412,7 @@ export default function Swap({
       </div>
 
       <Button
-        className="mt-4 w-[90%] max-w-md py-4"
+        className="mt-4 w-[90%] max-w-md py-4 cursor-pointer"
         onClick={() => {
           if (!token) {
             // Always use direct wallet connection - prioritize the internal handler

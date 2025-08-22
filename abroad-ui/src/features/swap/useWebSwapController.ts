@@ -11,6 +11,8 @@ export const useWebSwapController = () => {
   const { address, token } = useWalletAuth();
   const [view, setView] = useState<SwapView>('swap');
   const [swapData, setSwapData] = useState<SwapData | null>(null);
+  const [transactionId, setTransactionId] = useState<string | null>(null);
+  const [transactionReference, setTransactionReference] = useState<string | null>(null);
 
   // Modal visibility state
   const [isWalletModalOpen, setIsWalletModalOpen] = useState(false);
@@ -19,7 +21,7 @@ export const useWebSwapController = () => {
   // Persist amounts between views
   const [sourceAmount, setSourceAmount] = useState('');
   const [targetAmount, setTargetAmount] = useState('');
-  const [targetCurrency, setTargetCurrency] = useState<(typeof TargetCurrency)[keyof typeof TargetCurrency]>(TargetCurrency.COP);
+  const [targetCurrency, setTargetCurrency] = useState<(typeof TargetCurrency)[keyof typeof TargetCurrency]>(TargetCurrency.BRL);
 
   // QR scanner state and URL param handling
   const [isQrOpen, setIsQrOpen] = useState(false);
@@ -136,11 +138,29 @@ export const useWebSwapController = () => {
 
   const handleTransactionComplete = useCallback(async ({ memo }: { memo: string | null }) => {
     console.log('Transaction complete with memo:', memo);
-    // Ideally, navigate to a dedicated success route
-    // For now, reset to the initial swap view
     localStorage.removeItem(PENDING_TX_KEY);
-    setView('swap');
+    // If we're already showing status screen, keep it so user can see final state.
     setSwapData(null);
+    setSourceAmount('');
+    setTargetAmount('');
+    setTransactionReference(null);
+  }, []);
+
+  // Show TxStatus screen right after signing
+  const showTxStatus = useCallback((id: string | null, reference: string | null) => {
+    if (id) setTransactionId(id);
+    if (reference) setTransactionReference(reference);
+    setView('txStatus');
+  }, []);
+
+  // Reset from TxStatus to start a fresh transaction
+  const resetForNewTransaction = useCallback(() => {
+    setSwapData(null);
+    setSourceAmount('');
+    setTargetAmount('');
+    setTransactionId(null);
+    setTransactionReference(null);
+    setView('swap');
   }, []);
 
   // Determine desired desktop background URL based on currency
@@ -152,6 +172,10 @@ export const useWebSwapController = () => {
     setIsQrOpen(true);
     setTargetCurrency(TargetCurrency.BRL);
   }, []);
+
+  useEffect(() => {
+    console.log("view", view);
+  }, [view]);
 
   return {
     // State
@@ -165,7 +189,9 @@ export const useWebSwapController = () => {
     address,
     isQrOpen,
     currentBgUrl,
-  isDecodingQr,
+    isDecodingQr,
+    transactionId,
+    transactionReference,
 
     // Handlers
     handleWalletConnectOpen,
@@ -177,6 +203,8 @@ export const useWebSwapController = () => {
     handleAmountsChange,
     handleBackToSwap,
     handleTransactionComplete,
+    showTxStatus,
+    resetForNewTransaction,
     handleQrResult,
     openQr: onOpenQr,
     closeQr: () => setIsQrOpen(false),

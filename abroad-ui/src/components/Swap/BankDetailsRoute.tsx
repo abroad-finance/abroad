@@ -102,6 +102,8 @@ const PENDING_TX_KEY = 'pendingTransaction';
 interface BankDetailsRouteProps {
   onBackClick: () => void;
   onTransactionComplete: ({ memo }: { memo: string | null }) => Promise<void>;
+  // called immediately after user signs the transaction (before or during submission) to show status screen
+  onTransactionSigned: (id: string | null, transactionReference: string | null) => void;
   quote_id: string;
   sourceAmount: string; // Amount the user sends (Stellar asset)
   targetAmount: string; // Amount receiver gets (COP)
@@ -121,6 +123,7 @@ export default function BankDetailsRoute({
   sourceAmount,
   targetAmount,
   onTransactionComplete,
+  onTransactionSigned,
   textColor = '#356E6A',
   targetCurrency = TargetCurrency.COP,
   pixKey,
@@ -292,6 +295,7 @@ export default function BankDetailsRoute({
       const {
         kycLink,
         transaction_reference,
+        id: acceptedTxId,
       } = response.data;
       const stellar_account = import.meta.env.VITE_ABROAD_STELLAR_ADDRESS;
       const asset_code = "USDC";
@@ -359,6 +363,9 @@ export default function BankDetailsRoute({
         networkPassphrase: WalletNetwork.PUBLIC,
       });
 
+      // Show transaction status UI right after signing
+  try { onTransactionSigned(acceptedTxId || null, transaction_reference || null); } catch (e) { console.warn('onTransactionSigned failed', e); }
+
       // 5️⃣  Submit -------------------------------------------------------------
       const tx = new Transaction(signedTxXdr, networkPassphrase);
       await server.submitTransaction(tx);
@@ -371,7 +378,7 @@ export default function BankDetailsRoute({
     } finally {
       setLoadingSubmit(false);
     }
-  }, [quote_id, targetCurrency, pixKey, account_number, bank_code, taxId, userId, walletId, address, buildPaymentXdr, sourceAmount, onTransactionComplete, targetAmount, selectedBank]);
+  }, [quote_id, targetCurrency, pixKey, account_number, bank_code, taxId, userId, walletId, address, buildPaymentXdr, sourceAmount, onTransactionComplete, targetAmount, selectedBank, onTransactionSigned]);
 
   // ------------------------------- RENDER -------------------------------------
   return (
@@ -384,7 +391,7 @@ export default function BankDetailsRoute({
         <div className="w-full flex items-center space-x-3 mb-2 flex-shrink-0">
           <button
             onClick={onBackClick}
-            className="hover:text-opacity-80 transition-colors"
+            className="hover:text-opacity-80 transition-colors cursor-pointer"
             style={{ color: textColor }}
             aria-label="Go back"
           >
@@ -569,7 +576,7 @@ export default function BankDetailsRoute({
 
       {/* Continue button */}
       <Button
-        className="mt-4 w-[90%] max-w-md py-4"
+        className="mt-4 w-[90%] max-w-md py-4 cursor-pointer"
         onClick={handleSubmit}
         disabled={
           loadingSubmit ||

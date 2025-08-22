@@ -7,7 +7,7 @@
     "dev": "vite --host",
     "build": "npm run generate:api && tsc -b && vite build",
     "build:code": "vite build",
-    "lint": "eslint .",
+    "lint": "eslint . --fix",
     "preview": "vite preview --host",
     "generate:api": "cd .. && npm i && npx prisma generate && npm run build && cd abroad-ui && orval --config orval.config.ts",
     "depcruise:tree": "depcruise src --include-only '^src' --config --output-type dot | dot -T svg > dependency-graph.svg && open dependency-graph.svg"

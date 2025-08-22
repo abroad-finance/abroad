@@ -13,4 +13,5 @@ export interface BluxUser {
   // Add other user properties as needed
 }
 
-export type SwapView = 'swap' | 'bankDetails';
+// Extend views to include transaction status screen shown right after user signs the tx
+export type SwapView = 'swap' | 'bankDetails' | 'txStatus';
