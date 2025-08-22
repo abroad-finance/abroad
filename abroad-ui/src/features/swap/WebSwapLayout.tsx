@@ -21,6 +21,7 @@ const WebSwapLayout: React.FC<LayoutProps> = (props) => {
     handleSwapContinue,
     handleBackToSwap,
     handleTransactionComplete,
+    handleTransactionFailed,
     handleAmountsChange,
     handleWalletConnectOpen,
     sourceAmount,
@@ -94,6 +95,7 @@ const WebSwapLayout: React.FC<LayoutProps> = (props) => {
             <BankDetailsRoute
               onBackClick={handleBackToSwap}
               onTransactionComplete={handleTransactionComplete}
+              onTransactionFailed={handleTransactionFailed}
               onTransactionSigned={(id, ref) => showTxStatus(id, ref)}
               quote_id={swapData.quote_id}
               sourceAmount={swapData.srcAmount}

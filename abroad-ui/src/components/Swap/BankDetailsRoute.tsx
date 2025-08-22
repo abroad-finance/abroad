@@ -102,6 +102,7 @@ const PENDING_TX_KEY = 'pendingTransaction';
 interface BankDetailsRouteProps {
   onBackClick: () => void;
   onTransactionComplete: ({ memo }: { memo: string | null }) => Promise<void>;
+  onTransactionFailed: () => void;
   // called immediately after user signs the transaction (before or during submission) to show status screen
   onTransactionSigned: (id: string | null, transactionReference: string | null) => void;
   quote_id: string;
@@ -123,6 +124,7 @@ export default function BankDetailsRoute({
   sourceAmount,
   targetAmount,
   onTransactionComplete,
+  onTransactionFailed,
   onTransactionSigned,
   textColor = '#356E6A',
   targetCurrency = TargetCurrency.COP,
@@ -288,7 +290,7 @@ export default function BankDetailsRoute({
       });
 
       if (response.status !== 200) {
-        alert(`Error: ${response.data.reason}`);
+        alert(`Error prttod: ${response.data.reason}`);
         return;
       }
 
@@ -364,7 +366,7 @@ export default function BankDetailsRoute({
       });
 
       // Show transaction status UI right after signing
-  try { onTransactionSigned(acceptedTxId || null, transaction_reference || null); } catch (e) { console.warn('onTransactionSigned failed', e); }
+      try { onTransactionSigned(acceptedTxId || null, transaction_reference || null); } catch (e) { console.warn('onTransactionSigned failed', e); }
 
       // 5️⃣  Submit -------------------------------------------------------------
       const tx = new Transaction(signedTxXdr, networkPassphrase);
@@ -377,8 +379,26 @@ export default function BankDetailsRoute({
       alert(err instanceof Error ? err.message : 'Transaction error');
     } finally {
       setLoadingSubmit(false);
+      onTransactionFailed();
     }
-  }, [quote_id, targetCurrency, pixKey, account_number, bank_code, taxId, userId, walletId, address, buildPaymentXdr, sourceAmount, onTransactionComplete, targetAmount, selectedBank, onTransactionSigned]);
+  }, [
+    quote_id,
+    targetCurrency,
+    pixKey,
+    account_number,
+    bank_code,
+    taxId,
+    userId,
+    walletId,
+    address,
+    buildPaymentXdr,
+    sourceAmount,
+    onTransactionComplete,
+    targetAmount,
+    selectedBank,
+    onTransactionSigned,
+    onTransactionFailed
+  ]);
 
   // ------------------------------- RENDER -------------------------------------
   return (
