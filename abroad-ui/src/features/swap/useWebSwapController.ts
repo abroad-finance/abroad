@@ -146,6 +146,14 @@ export const useWebSwapController = () => {
     setTransactionReference(null);
   }, []);
 
+  const handleTransactionFailed = useCallback(() => {
+    setView('swap');
+    setSwapData(null);
+    setSourceAmount('');
+    setTargetAmount('');
+    setTransactionReference(null);
+  }, [])
+
   // Show TxStatus screen right after signing
   const showTxStatus = useCallback((id: string | null, reference: string | null) => {
     if (id) setTransactionId(id);
@@ -203,6 +211,7 @@ export const useWebSwapController = () => {
     handleAmountsChange,
     handleBackToSwap,
     handleTransactionComplete,
+    handleTransactionFailed,
     showTxStatus,
     resetForNewTransaction,
     handleQrResult,
