@@ -6,7 +6,7 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { Info, Wallet } from "lucide-react";
+import { Info, Wallet, Languages } from "lucide-react";
 import { Horizon } from "@stellar/stellar-sdk";
 
 import { useWalletAuth } from "../../context/WalletAuthContext";
@@ -197,6 +197,8 @@ export interface NavBarResponsiveProps {
   onWalletConnect?: () => void;
   /** Called when the user clicks the wallet while connected */
   onWalletDetails?: () => void;
+  /** Called when the user clicks the settings button */
+  onSettingsOpen?: () => void;
   /** Override the Horizon URL (useful for testnet or proxies) */
   horizonUrl?: string;
   /** Override the USDC issuer (e.g., testing assets) */
@@ -214,6 +216,7 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({
   className = "",
   onWalletConnect,
   onWalletDetails,
+  onSettingsOpen,
   horizonUrl = DEFAULT_HORIZON_URL,
   usdcIssuer = DEFAULT_USDC_ISSUER,
   infoUrl = DEFAULT_INFO_URL,
@@ -249,6 +252,10 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({
       handleDirectWalletConnect();
     }
   }, [address, onWalletDetails, handleDirectWalletConnect]);
+
+  const handleSettingsClick = useCallback(() => {
+    onSettingsOpen?.();
+  }, [onSettingsOpen]);
 
   /**
    * Presentational data
@@ -348,7 +355,7 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({
   return (
     <nav className={cn("w-full px-4 pt-4", className)} role="navigation">
       <div className="max-w-8xl mx-auto bg-transparent md:bg-[#356E6A]/5 backdrop-blur-md rounded-2xl">
-        <div className="px-4 sm:px-6 lg:px-8">
+        <div className="sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             {/* Logo */}
             <div className="flex-shrink-0">
@@ -372,12 +379,22 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({
 
             {/* Desktop Right Side */}
             <div className="hidden md:flex items-center space-x-4">
+              {/* Languages Button */}
+              <button
+                type="button"
+                onClick={handleSettingsClick}
+                className="p-2 rounded-full hover:bg-white/30 transition-colors duration-200"
+                aria-label="Más opciones"
+              >
+                <Languages className="w-6 h-6 text-white" aria-hidden="true" />
+              </button>
+
               {/* Wallet Badge */}
               <button
                 type="button"
                 onClick={handleWalletClick}
                 className="cursor-pointer flex items-center space-x-3 bg-white/20 backdrop-blur-sm rounded-xl px-4 py-2 hover:bg-white/30 transition-colors duration-200"
-                aria-label={address ? "Ver detalles de la billetera" : "Conectar billetera"}
+                aria-label={address ? "Ver detalles de la billetera" : "Conectar Billetera"}
               >
                 {WalletIcon}
                 <span className="text-white text-md font-medium">
@@ -393,11 +410,21 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({
             {/* Mobile Right Side */}
             <div className="md:hidden">
               <div className="flex items-center space-x-3">
+                {/* Languages Button */}
+                <button
+                  type="button"
+                  onClick={handleSettingsClick}
+                  className="p-2 rounded-full hover:bg-[#356E6A]/10 transition-colors duration-200"
+                  aria-label="Más opciones"
+                >
+                  <Languages className="w-5 h-5 text-[#356E6A]" aria-hidden="true" />
+                </button>
+
                 <button
                   type="button"
                   onClick={handleWalletClick}
                   className="flex items-center justify-center bg-[#356E6A]/5 backdrop-blur-xl rounded-xl px-4 py-2 border border-white/30 hover:bg-white/30 transition-colors duration-200 flex-1"
-                  aria-label={address ? "Ver detalles de la billetera" : "Conectar billetera"}
+                  aria-label={address ? "Ver detalles de la billetera" : "Conectar Billetera"}
                 >
                   {/* When not connected show an explicit connect CTA; when connected show balance badge */}
                   {address ? (
@@ -405,7 +432,7 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({
                   ) : (
                     <div className="flex items-center space-x-2">
                       <Wallet className="w-5 h-5 text-[#356E6A]" aria-hidden="true" />
-                      <span className="text-[#356E6A] text-sm font-medium">Conectar Billetera</span>
+                      <span className="text-[#356E6A] text-sm font-medium">Conectar</span>
                     </div>
                   )}
                 </button>

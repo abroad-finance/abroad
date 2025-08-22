@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Button } from "../Button";
-import { ChevronsDown, Loader, CircleDollarSign, Landmark, Timer, Wallet, QrCode } from 'lucide-react';
+import { ChevronsDown, Loader, CircleDollarSign, Landmark, Timer, Wallet, ScanLine } from 'lucide-react';
 import { TokenBadge } from './TokenBadge';
 import { lazy, Suspense } from 'react';
 const IconAnimated = lazy(() => import('../IconAnimated').then(m => ({ default: m.IconAnimated })));
@@ -230,21 +230,30 @@ export default function Swap({
   return (
     <div className="flex-1 flex items-center justify-center w-full flex flex-col">
       <div id="background-container"
-        className="w-[90%] max-w-md min-h-[60vh] bg-[#356E6A]/5 backdrop-blur-xl rounded-4xl p-4 md:p-6 flex flex-col items-center justify-center space-y-1 lg:space-y-4"
+        className="max-w-md min-h-[60vh] bg-[#356E6A]/5 backdrop-blur-xl rounded-4xl p-4 md:p-6 flex flex-col items-center justify-center space-y-1 lg:space-y-4"
       >
         {/* Title */}
-        <div className="flex-1 flex items-center justify-space-between">
-          <div id="Title" className="flex items-center gap-2 text-xl md:text-xl font-bold" style={{ color: textColor }}>
-            <span>¿Cuánto deseas cambiar?</span>
-            {targetCurrency === TargetCurrency.BRL && (<button
+        <div className="flex-1 flex items-center justify-between w-full">
+          <div className="flex flex-col">
+            <div className="text-xl md:text-xl font-bold" style={{ color: textColor }}>
+              <span>Paga o Transfiere</span>
+            </div>
+            {targetCurrency === TargetCurrency.BRL && (
+              <div className="text-xs md:text-sm opacity-75" style={{ color: textColor }}>
+                Escribe los datos o escanea un QR de Pix
+              </div>
+            )}
+          </div>
+          {targetCurrency === TargetCurrency.BRL && (
+            <button
               type="button"
               onClick={openQr}
               aria-label="Escanear QR"
               className="p-2 cursor-pointer rounded-full hover:bg-white/30 focus:outline-none focus:ring-2 focus:ring-[#356E6A]/40 transition"
             >
-              <QrCode className="w-6 h-6" style={{ color: textColor }} />
-            </button>)}
-          </div>
+              <ScanLine className="w-8 h-8" style={{ color: textColor }} />
+            </button>
+          )}
         </div>
 
         {/* SOURCE */}
@@ -412,7 +421,7 @@ export default function Swap({
       </div>
 
       <Button
-        className="mt-4 w-[90%] max-w-md py-4 cursor-pointer"
+        className="mt-4 w-[98%] max-w-md py-4 cursor-pointer"
         onClick={() => {
           if (!token) {
             // Always use direct wallet connection - prioritize the internal handler
