@@ -54,7 +54,6 @@ model PartnerUserKyc {
   updatedAt   DateTime    @updatedAt
 
   @@unique([partnerUserId, externalId])
-  @@unique([partnerUserId, tier])
 }
 
 model Quote {
