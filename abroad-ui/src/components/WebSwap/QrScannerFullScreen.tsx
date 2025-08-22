@@ -28,7 +28,7 @@ const QrScannerFullScreen: React.FC<QrScannerFullScreenProps> = ({ onClose, onRe
       <div className="flex items-center justify-between p-4 max-h-[85vh]">
         <div className="flex items-center gap-2">
           <ScanLine className="h-6 w-6" />
-          <h2 className="text-lg font-semibold">Escane un código QR</h2>
+          <h2 className="text-lg font-semibold">Escanea un código QR</h2>
         </div>
         <button aria-label="Close scanner" onClick={onClose} className="p-2 rounded hover:bg-white/10">
           <X className="h-6 w-6" />

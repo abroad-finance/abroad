@@ -28,7 +28,6 @@ const Settings: React.FC<SettingsProps> = ({ onClose }) => {
     setSelectedLanguage(languageCode);
     // TODO: Implement language change logic here
     console.log('Language selected:', languageCode);
-    onClose?.();
   };
 
   return (
@@ -112,6 +111,16 @@ const Settings: React.FC<SettingsProps> = ({ onClose }) => {
               </button>
             ))}
           </div>
+        </div>
+
+        {/* Confirmation Button */}
+        <div className="mt-6">
+          <button
+            onClick={onClose}
+            className="bg-gradient-to-r from-[#356E6A] to-[#73B9A3] hover:from-[#2a5956] hover:to-[#5fa88d] text-white pointer-cursor text-lg font-medium rounded-xl w-full p-4 transition"
+          >
+            Confirmar Selección
+          </button>
         </div>
 
         {/* Footer */}
