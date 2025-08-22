@@ -62,9 +62,9 @@ export default function TxStatus({ transactionId, onNewTransaction, onRetry }: T
       case 'inProgress':
         return <IconAnimated icon='Coins' size={150} trigger='loop' />;
       case 'accepted':
-        return <IconAnimated icon='AnimatedCheck' size={150} trigger='loop' />;
+        return <IconAnimated icon='AnimatedCheck' size={150} trigger='once' />;
       case 'denied':
-        return <IconAnimated icon='Denied' size={150} trigger='loop' />;
+        return <IconAnimated icon='Denied' size={150} trigger='once' />;
     }
   };
 
