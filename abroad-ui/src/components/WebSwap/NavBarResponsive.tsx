@@ -6,11 +6,13 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { Info, Wallet } from "lucide-react";
+import { Info, Wallet, Ellipsis } from "lucide-react";
 import { Horizon } from "@stellar/stellar-sdk";
+import { AnimatePresence } from "framer-motion";
 
 import { useWalletAuth } from "../../context/WalletAuthContext";
 import { kit } from "../../services/stellarKit";
+import Settings from "./Settings";
 
 import AbroadLogoColored from "../../assets/Logos/AbroadLogoColored.svg";
 import AbroadLogoWhite from "../../assets/Logos/AbroadLogoWhite.svg";
@@ -197,6 +199,8 @@ export interface NavBarResponsiveProps {
   onWalletConnect?: () => void;
   /** Called when the user clicks the wallet while connected */
   onWalletDetails?: () => void;
+  /** Called when the user clicks the settings button */
+  onSettingsOpen?: () => void;
   /** Override the Horizon URL (useful for testnet or proxies) */
   horizonUrl?: string;
   /** Override the USDC issuer (e.g., testing assets) */
@@ -214,12 +218,14 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({
   className = "",
   onWalletConnect,
   onWalletDetails,
+  onSettingsOpen,
   horizonUrl = DEFAULT_HORIZON_URL,
   usdcIssuer = DEFAULT_USDC_ISSUER,
   infoUrl = DEFAULT_INFO_URL,
 }) => {
   const { address, walletId, authenticateWithWallet } = useWalletAuth();
   const { balance, loading } = useUSDCBalance(address, horizonUrl, usdcIssuer);
+  const [showSettings, setShowSettings] = useState(false);
 
   /**
    * Handlers
@@ -249,6 +255,18 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({
       handleDirectWalletConnect();
     }
   }, [address, onWalletDetails, handleDirectWalletConnect]);
+
+  const handleSettingsClick = useCallback(() => {
+    if (onSettingsOpen) {
+      onSettingsOpen();
+    } else {
+      setShowSettings(true);
+    }
+  }, [onSettingsOpen]);
+
+  const handleCloseSettings = useCallback(() => {
+    setShowSettings(false);
+  }, []);
 
   /**
    * Presentational data
@@ -346,77 +364,122 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({
    * UI
    */
   return (
-    <nav className={cn("w-full px-4 pt-4", className)} role="navigation">
-      <div className="max-w-8xl mx-auto bg-transparent md:bg-[#356E6A]/5 backdrop-blur-md rounded-2xl">
-        <div className="px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            {/* Logo */}
-            <div className="flex-shrink-0">
-              {/* Mobile Logo - Colored */}
-              <img
-                src={AbroadLogoColored}
-                alt="Abroad"
-                className="h-8 w-auto md:hidden"
-                width={32}
-                height={32}
-              />
-              {/* Desktop Logo - White */}
-              <img
-                src={AbroadLogoWhite}
-                alt="Abroad"
-                className="h-8 w-auto hidden md:block"
-                width={32}
-                height={32}
-              />
-            </div>
+    <>
+      <nav className={cn("w-full px-4 pt-4", className)} role="navigation">
+        <div className="max-w-8xl mx-auto bg-transparent md:bg-[#356E6A]/5 backdrop-blur-md rounded-2xl">
+          <div className="sm:px-6 lg:px-8">
+            <div className="flex items-center justify-between h-16">
+              {/* Logo */}
+              <div className="flex-shrink-0">
+                {/* Mobile Logo - Colored */}
+                <img
+                  src={AbroadLogoColored}
+                  alt="Abroad"
+                  className="h-8 w-auto md:hidden"
+                  width={32}
+                  height={32}
+                />
+                {/* Desktop Logo - White */}
+                <img
+                  src={AbroadLogoWhite}
+                  alt="Abroad"
+                  className="h-8 w-auto hidden md:block"
+                  width={32}
+                  height={32}
+                />
+              </div>
 
-            {/* Desktop Right Side */}
-            <div className="hidden md:flex items-center space-x-4">
-              {/* Wallet Badge */}
-              <button
-                type="button"
-                onClick={handleWalletClick}
-                className="cursor-pointer flex items-center space-x-3 bg-white/20 backdrop-blur-sm rounded-xl px-4 py-2 hover:bg-white/30 transition-colors duration-200"
-                aria-label={address ? "Ver detalles de la billetera" : "Conectar billetera"}
-              >
-                {WalletIcon}
-                <span className="text-white text-md font-medium">
-                  {address ? formatWalletAddress(address) : "Conectar Billetera"}
-                </span>
-                {USDCBadge(false)}
-              </button>
+              {/* Desktop Right Side */}
+              <div className="hidden md:flex items-center space-x-4">
+                {/* Ellipsis Button */}
+                <button
+                  type="button"
+                  onClick={handleSettingsClick}
+                  className="p-2 rounded-full hover:bg-white/30 transition-colors duration-200"
+                  aria-label="Más opciones"
+                >
+                  <Ellipsis className="w-6 h-6 text-white" aria-hidden="true" />
+                </button>
 
-              {/* Info Icon */}
-              {InfoButton(false)}
-            </div>
-
-            {/* Mobile Right Side */}
-            <div className="md:hidden">
-              <div className="flex items-center space-x-3">
+                {/* Wallet Badge */}
                 <button
                   type="button"
                   onClick={handleWalletClick}
-                  className="flex items-center justify-center bg-[#356E6A]/5 backdrop-blur-xl rounded-xl px-4 py-2 border border-white/30 hover:bg-white/30 transition-colors duration-200 flex-1"
-                  aria-label={address ? "Ver detalles de la billetera" : "Conectar billetera"}
+                  className="cursor-pointer flex items-center space-x-3 bg-white/20 backdrop-blur-sm rounded-xl px-4 py-2 hover:bg-white/30 transition-colors duration-200"
+                  aria-label={address ? "Ver detalles de la billetera" : "Conectar Billetera"}
                 >
-                  {/* When not connected show an explicit connect CTA; when connected show balance badge */}
-                  {address ? (
-                    USDCBadge(true)
-                  ) : (
-                    <div className="flex items-center space-x-2">
-                      <Wallet className="w-5 h-5 text-[#356E6A]" aria-hidden="true" />
-                      <span className="text-[#356E6A] text-sm font-medium">Conectar Billetera</span>
-                    </div>
-                  )}
+                  {WalletIcon}
+                  <span className="text-white text-md font-medium">
+                    {address ? formatWalletAddress(address) : "Conectar Billetera"}
+                  </span>
+                  {USDCBadge(false)}
                 </button>
-                {/* (Optional) Show info button on mobile too. Comment out if undesired. */}
-                {/* {InfoButton(true)} */}
+
+                {/* Info Icon */}
+                {InfoButton(false)}
+              </div>
+
+              {/* Mobile Right Side */}
+              <div className="md:hidden">
+                <div className="flex items-center space-x-3">
+                  {/* Ellipsis Button */}
+                  <button
+                    type="button"
+                    onClick={handleSettingsClick}
+                    className="p-2 rounded-full hover:bg-[#356E6A]/10 transition-colors duration-200"
+                    aria-label="Más opciones"
+                  >
+                    <Ellipsis className="w-5 h-5 text-[#356E6A]" aria-hidden="true" />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleWalletClick}
+                    className="flex items-center justify-center bg-[#356E6A]/5 backdrop-blur-xl rounded-xl px-4 py-2 border border-white/30 hover:bg-white/30 transition-colors duration-200 flex-1"
+                    aria-label={address ? "Ver detalles de la billetera" : "Conectar Billetera"}
+                  >
+                    {/* When not connected show an explicit connect CTA; when connected show balance badge */}
+                    {address ? (
+                      USDCBadge(true)
+                    ) : (
+                      <div className="flex items-center space-x-2">
+                        <Wallet className="w-5 h-5 text-[#356E6A]" aria-hidden="true" />
+                        <span className="text-[#356E6A] text-sm font-medium">Conectar</span>
+                      </div>
+                    )}
+                  </button>
+                  {/* (Optional) Show info button on mobile too. Comment out if undesired. */}
+                  {/* {InfoButton(true)} */}
+                </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
-    </nav>
+      </nav>
+
+      {/* Settings Modal */}
+      <AnimatePresence>
+        {showSettings && (
+          <div
+            className="fixed inset-0 z-[999] flex justify-end items-end md:items-center"
+            aria-labelledby="settings-modal-title"
+            role="dialog"
+            aria-modal="true"
+          >
+            {/* Backdrop */}
+            <div
+              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+              onClick={handleCloseSettings}
+            />
+            
+            {/* Panel container */}
+            <div className="relative w-full md:w-auto flex justify-end">
+              <Settings onClose={handleCloseSettings} />
+            </div>
+          </div>
+        )}
+      </AnimatePresence>
+    </>
   );
 };
 

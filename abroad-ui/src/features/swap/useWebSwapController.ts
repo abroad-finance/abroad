@@ -17,6 +17,7 @@ export const useWebSwapController = () => {
   // Modal visibility state
   const [isWalletModalOpen, setIsWalletModalOpen] = useState(false);
   const [isWalletDetailsOpen, setIsWalletDetailsOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   // Persist amounts between views
   const [sourceAmount, setSourceAmount] = useState('');
@@ -64,6 +65,9 @@ export const useWebSwapController = () => {
 
   const handleWalletDetailsOpen = useCallback(() => setIsWalletDetailsOpen(true), []);
   const handleWalletDetailsClose = useCallback(() => setIsWalletDetailsOpen(false), []);
+
+  const handleSettingsOpen = useCallback(() => setIsSettingsOpen(true), []);
+  const handleSettingsClose = useCallback(() => setIsSettingsOpen(false), []);
 
   const handleWalletSelect = useCallback((walletType: 'trust' | 'stellar') => {
     console.log('Wallet selected:', walletType);
@@ -183,6 +187,7 @@ export const useWebSwapController = () => {
     swapData,
     isWalletModalOpen,
     isWalletDetailsOpen,
+    isSettingsOpen,
     sourceAmount,
     targetAmount,
     targetCurrency,
@@ -198,6 +203,8 @@ export const useWebSwapController = () => {
     handleWalletConnectClose,
     handleWalletDetailsOpen,
     handleWalletDetailsClose,
+    handleSettingsOpen,
+    handleSettingsClose,
     handleWalletSelect,
     handleSwapContinue,
     handleAmountsChange,

@@ -225,12 +225,12 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
       }}
       transition={{ 
         type: 'spring',
-        stiffness: 800,
-        damping: 35,
-        duration: 0.12
+        stiffness: 300,
+        damping: 30,
+        mass: 0.8
       }}
     >
-      <div className="bg-white rounded-t-4xl md:rounded-4xl shadow-lg border border-gray-200 p-6 relative w-full h-full md:h-full md:flex md:flex-col overflow-y-auto">
+      <div className="bg-white rounded-t-4xl md:rounded-4xl shadow-lg border border-gray-200 p-3 relative w-full h-full md:h-full md:flex md:flex-col overflow-y-auto">
         {/* Close Button */}
         {onClose && (
           <button
@@ -247,7 +247,7 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
             Tu Cuenta
           </h2>
           <p className="text-md text-gray-600">
-            Gestiona tu billetera y consulta el historial de transacciones
+            Gestiona tu conexión y consulta el historial de transacciones
           </p>
         </div>
 

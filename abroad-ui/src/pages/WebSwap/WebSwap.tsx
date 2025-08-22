@@ -9,6 +9,7 @@ import { Loader } from 'lucide-react';
 // Child Components
 import NavBarResponsive from '../../components/WebSwap/NavBarResponsive';
 import WalletDetails from '../../components/WebSwap/WalletDetails';
+import Settings from '../../components/WebSwap/Settings';
 import WebSwapLayout from '../../features/swap/WebSwapLayout';
 
 
@@ -27,9 +28,10 @@ const WebSwap: React.FC = () => {
       />
       
       {/* Shared Navigation */}
-      <div className="relative z-10 bg-green-50 md:bg-transparent">
+      <div className="relative z-20 bg-green-50 md:bg-transparent">
         <NavBarResponsive 
           onWalletDetails={controller.handleWalletDetailsOpen} 
+          onSettingsOpen={controller.handleSettingsOpen}
         />
       </div>
 
@@ -45,6 +47,14 @@ const WebSwap: React.FC = () => {
         {controller.isWalletDetailsOpen && (
           <ModalOverlay onClose={controller.handleWalletDetailsClose}>
             <WalletDetails onClose={controller.handleWalletDetailsClose} />
+          </ModalOverlay>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {controller.isSettingsOpen && (
+          <ModalOverlay onClose={controller.handleSettingsClose}>
+            <Settings onClose={controller.handleSettingsClose} />
           </ModalOverlay>
         )}
       </AnimatePresence>
@@ -71,7 +81,7 @@ const WebSwap: React.FC = () => {
 
 const ModalOverlay: React.FC<{ children: React.ReactNode; onClose: () => void }> = ({ children, onClose }) => (
   <motion.div
-    className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[999] flex items-center justify-center md:justify-end p-4 md:pr-8"
+    className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[999] flex items-end md:items-center justify-center md:justify-end p-0 md:p-4 md:pr-8"
     onClick={onClose}
     initial={{ opacity: 0 }}
     animate={{ opacity: 1 }}
