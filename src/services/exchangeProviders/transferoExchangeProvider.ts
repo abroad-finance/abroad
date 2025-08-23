@@ -60,7 +60,7 @@ export class TransferoExchangeProvider implements IExchangeProvider {
 
       // acceptquote
       const { data: acceptQuoteData } = await axios.post(
-        `${apiUrl}/api/quote/v2.0/acceptquote`,
+        `${apiUrl}/api/trade/v2.0/acceptquote`,
         {
           name: 'Abroad',
           quoteId,
