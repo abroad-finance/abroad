@@ -30,7 +30,7 @@ interface Account {
 
 @injectable()
 export class TransferoExchangeProvider implements IExchangeProvider {
-  readonly exchangePercentageFee = -0.01
+  readonly exchangePercentageFee = 0.0
 
   private cachedToken?: { exp: number, value: string }
 
