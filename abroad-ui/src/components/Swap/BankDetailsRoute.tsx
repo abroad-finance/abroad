@@ -377,9 +377,9 @@ export default function BankDetailsRoute({
     } catch (err) {
       console.error(err);
       alert(err instanceof Error ? err.message : 'Transaction error');
+      onTransactionFailed();
     } finally {
       setLoadingSubmit(false);
-      onTransactionFailed();
     }
   }, [
     quote_id,
