@@ -136,7 +136,6 @@ container.bind(WebhookController).toSelf().inSingletonScope()
 container.bind<PartnerController>(PartnerController).toSelf().inSingletonScope()
 container.bind<PartnerUserController>(PartnerUserController).toSelf().inSingletonScope()
 container.bind<ConversionController>(ConversionController).toSelf().inSingletonScope()
-container.bind<ConversionController>(ConversionController).toSelf().inSingletonScope()
 container.bind<QuoteController>(QuoteController).toSelf().inSingletonScope()
 container
   .bind<TransactionController>(TransactionController)
