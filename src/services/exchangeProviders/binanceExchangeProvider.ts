@@ -30,6 +30,10 @@ export class BinanceExchangeProvider implements IExchangeProvider {
     @inject(TYPES.ISecretManager) private secretManager: ISecretManager,
   ) { }
 
+  createMarketOrder(): Promise<{ success: boolean }> {
+    throw new Error('Method not implemented.')
+  }
+
   /**
    * Gets a deposit address for the specified blockchain and crypto currency
    * @param params Parameters containing blockchain and cryptocurrency information

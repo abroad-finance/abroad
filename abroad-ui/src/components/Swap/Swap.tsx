@@ -178,7 +178,7 @@ export default function Swap({
     if (!loadingSource && !loadingTarget) {
       const numericSource = parseFloat(sourceAmount);
       // Normalize targetAmount (which might have formatting) to a standard number string for parsing
-      const cleanedTarget = targetAmount.replace(/\./g, '').replace(/,/g, '.');
+      const cleanedTarget = target.replace(/\./g, '').replace(/,/g, '.');
       const numericTarget = parseFloat(cleanedTarget);
 
       if (numericSource > 0 && !isNaN(numericTarget) && numericTarget >= 0) {
@@ -188,7 +188,7 @@ export default function Swap({
       }
     }
     // If loadingSource or loadingTarget is true, displayedTRM remains unchanged.
-  }, [sourceAmount, targetAmount, loadingSource, loadingTarget, transferFee]); // TransferFee is a module-level const
+  }, [sourceAmount, targetAmount, loadingSource, loadingTarget, transferFee, target]); // TransferFee is a module-level const
 
   useEffect(() => {
     if (sourceDebouncedAmount) {

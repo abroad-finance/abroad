@@ -66,7 +66,7 @@ export class QuoteUseCase implements IQuoteUseCase {
     const expirationDate = this.getExpirationDate()
     const exchangeRateProvider = this.exchangeProviderFactory.getExchangeProvider(targetCurrency)
     const exchangeRate = await exchangeRateProvider.getExchangeRate({
-      sourceCurrency: cryptoCurrency, targetCurrency,
+      sourceCurrency: cryptoCurrency, targetAmount: amount, targetCurrency,
     })
     if (!exchangeRate || isNaN(exchangeRate)) {
       throw new Error('Invalid exchange rate received')
@@ -110,7 +110,7 @@ export class QuoteUseCase implements IQuoteUseCase {
 
     const expirationDate = this.getExpirationDate()
     const exchangeRateProvider = this.exchangeProviderFactory.getExchangeProvider(targetCurrency)
-    const exchangeRate = await exchangeRateProvider.getExchangeRate({ sourceCurrency: cryptoCurrency, targetCurrency })
+    const exchangeRate = await exchangeRateProvider.getExchangeRate({ sourceAmount: sourceAmountInput, sourceCurrency: cryptoCurrency, targetCurrency })
     if (!exchangeRate || isNaN(exchangeRate)) {
       throw new Error('Invalid exchange rate received')
     }

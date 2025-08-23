@@ -2,6 +2,7 @@
 import { Container, decorate, injectable } from 'inversify'
 import { Controller } from 'tsoa'
 
+import { ConversionController } from './controllers/ConversionController'
 import { PartnerController } from './controllers/PartnerController'
 import { PartnerUserController } from './controllers/PartnerUserController'
 import { PaymentsController } from './controllers/PaymentsController'
@@ -33,7 +34,6 @@ import { IWebhookNotifier } from './interfaces/IWebhookNotifier'
 import { ConsoleLogger } from './services/consoleLogger'
 import { ExchangeProviderFactory } from './services/ExchangeProviderFactory'
 import { BinanceExchangeProvider } from './services/exchangeProviders/binanceExchangeProvider'
-import { BitsoExchangeRateProvider } from './services/exchangeProviders/bitsoExchangeProvider'
 import { TransferoExchangeProvider } from './services/exchangeProviders/transferoExchangeProvider'
 import { GuardLineKycService } from './services/GuardlineKycService'
 import { PartnerService } from './services/partnerService'
@@ -105,10 +105,6 @@ container
   .whenNamed('binance')
 container
   .bind<IExchangeProvider>(TYPES.IExchangeProvider)
-  .to(BitsoExchangeRateProvider)
-  .whenNamed('bitso')
-container
-  .bind<IExchangeProvider>(TYPES.IExchangeProvider)
   .to(TransferoExchangeProvider)
   .whenNamed('transfero')
 
@@ -139,6 +135,8 @@ container
 container.bind(WebhookController).toSelf().inSingletonScope()
 container.bind<PartnerController>(PartnerController).toSelf().inSingletonScope()
 container.bind<PartnerUserController>(PartnerUserController).toSelf().inSingletonScope()
+container.bind<ConversionController>(ConversionController).toSelf().inSingletonScope()
+container.bind<ConversionController>(ConversionController).toSelf().inSingletonScope()
 container.bind<QuoteController>(QuoteController).toSelf().inSingletonScope()
 container
   .bind<TransactionController>(TransactionController)

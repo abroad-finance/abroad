@@ -1,4 +1,4 @@
-import { BlockchainNetwork } from '@prisma/client'
+import { BlockchainNetwork, CryptoCurrency, TargetCurrency } from '@prisma/client'
 // src/services/transferoExchangeProvider.ts
 import axios from 'axios'
 import { inject, injectable } from 'inversify'
@@ -38,6 +38,44 @@ export class TransferoExchangeProvider implements IExchangeProvider {
     @inject(TYPES.ISecretManager) private readonly secretManager: ISecretManager,
   ) { }
 
+  async createMarketOrder({ sourceAmount, sourceCurrency, targetCurrency }: { sourceAmount: number, sourceCurrency: CryptoCurrency, targetCurrency: TargetCurrency }): Promise<{ success: boolean }> {
+    try {
+      const token = await this.getAccessToken()
+      const apiUrl = await this.secretManager.getSecret('TRANSFERO_BASE_URL')
+
+      // create quote:
+      const { data } = await axios.post(
+        `${apiUrl}/api/quote/v2.0/requestquote`,
+        {
+          baseCurrency: sourceCurrency,
+          baseCurrencySize: sourceAmount,
+          quoteCurrency: targetCurrency,
+          quoteCurrencySize: 0,
+          side: 'sell',
+        },
+        { headers: { 'Accept': 'application/json', 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' } },
+      )
+
+      const quoteId = data[0].quoteId
+
+      // acceptquote
+      const { data: acceptQuoteData } = await axios.post(
+        `${apiUrl}/api/quote/v2.0/acceptquote`,
+        {
+          name: 'Abroad',
+          quoteId,
+        },
+        { headers: { 'Accept': 'application/json', 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' } },
+      )
+
+      return { success: acceptQuoteData.success }
+    }
+    catch (error) {
+      console.error('Error creating market order:', error)
+      return { success: false }
+    }
+  }
+
   /**
            * Retrieves (or creates) the deposit wallet for the partner account.
            * Falls back to the first wallet that matches both currency and chain.
@@ -62,7 +100,9 @@ export class TransferoExchangeProvider implements IExchangeProvider {
  * Uses “request quote” with `fromSize = 1` to obtain the unit price.
  */
   getExchangeRate: IExchangeProvider['getExchangeRate'] = async ({
+    sourceAmount,
     sourceCurrency,
+    targetAmount,
     targetCurrency,
   }) => {
     try {
@@ -73,10 +113,10 @@ export class TransferoExchangeProvider implements IExchangeProvider {
         `${apiUrl}/api/quote/v2.0/requestquote`,
         {
           baseCurrency: sourceCurrency,
-          baseCurrencySize: 0,
+          baseCurrencySize: sourceAmount,
           quoteCurrency: targetCurrency,
-          quoteCurrencySize: 1,
-          side: 'buy',
+          quoteCurrencySize: targetAmount,
+          side: 'sell',
         },
         { headers: { 'Accept': 'application/json', 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' } },
       )
@@ -85,9 +125,9 @@ export class TransferoExchangeProvider implements IExchangeProvider {
       if (!price || Number.isNaN(price))
         throw new Error('Invalid price returned from Transfero')
 
-      console.log(`Exchange rate from ${sourceCurrency} to ${targetCurrency}: ${price}`)
+      console.log(`Exchange rate from ${sourceCurrency} ${sourceAmount} to ${targetCurrency} ${targetAmount}: ${price}`)
 
-      return price
+      return sourceAmount ? (sourceAmount / price) : targetAmount ? (price / targetAmount) : 0
     }
     catch (error) {
       console.error('Error getting exchange rate:', error)
