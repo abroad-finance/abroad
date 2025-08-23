@@ -9,7 +9,6 @@ import {
   Res,
   Response,
   Route,
-  Security,
   SuccessResponse,
   TsoaResponse,
 } from 'tsoa'
@@ -39,8 +38,6 @@ interface TriggerConversionResponse {
  *       clears internal pending balance and provides an indicative valuation.
  */
 @Route('conversions')
-@Security('ApiKeyAuth')
-@Security('BearerAuth')
 export class ConversionController extends Controller {
   constructor(
         @inject(TYPES.ILogger) private logger: ILogger,
