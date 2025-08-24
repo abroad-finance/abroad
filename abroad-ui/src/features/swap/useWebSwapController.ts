@@ -181,6 +181,10 @@ export const useWebSwapController = () => {
     setTargetCurrency(TargetCurrency.BRL);
   }, []);
 
+  const redirectToKYCAuth = useCallback(() => {
+    setView('kyc-needed');
+  }, [])
+
   useEffect(() => {
     console.log("view", view);
   }, [view]);
@@ -223,6 +227,7 @@ export const useWebSwapController = () => {
     pixKey,
     setPixKey,
     taxId,
-    setTaxId
+    setTaxId,
+    redirectToKYCAuth
   };
 };

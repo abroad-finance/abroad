@@ -103,6 +103,7 @@ interface BankDetailsRouteProps {
   onBackClick: () => void;
   onTransactionComplete: ({ memo }: { memo: string | null }) => Promise<void>;
   onTransactionFailed: () => void;
+  onKycRedirect: () => void;
   // called immediately after user signs the transaction (before or during submission) to show status screen
   onTransactionSigned: (id: string | null, transactionReference: string | null) => void;
   quote_id: string;
@@ -125,6 +126,7 @@ export default function BankDetailsRoute({
   targetAmount,
   onTransactionComplete,
   onTransactionFailed,
+  onKycRedirect,
   onTransactionSigned,
   textColor = '#356E6A',
   targetCurrency = TargetCurrency.COP,
@@ -133,7 +135,7 @@ export default function BankDetailsRoute({
   taxId,
   setTaxId,
 }: BankDetailsRouteProps): React.JSX.Element {
-  const { walletId, token, address } = useWalletAuth();
+  const { walletId, token, address, setKycUrl } = useWalletAuth();
 
   // ------------------------------- UI STATE -----------------------------------
   const [account_number, setaccount_number] = useState('');
@@ -290,7 +292,7 @@ export default function BankDetailsRoute({
       });
 
       if (response.status !== 200) {
-        alert(`Error prttod: ${response.data.reason}`);
+        alert(`Error: ${response.data.reason}`);
         return;
       }
 
@@ -320,7 +322,8 @@ export default function BankDetailsRoute({
             targetCurrency,
           }),
         );
-        window.location.href = kycLink;
+        setKycUrl(kycLink);
+        onKycRedirect();
         return;
       }
 
@@ -397,7 +400,9 @@ export default function BankDetailsRoute({
     targetAmount,
     selectedBank,
     onTransactionSigned,
-    onTransactionFailed
+    onTransactionFailed,
+    onKycRedirect,
+    setKycUrl
   ]);
 
   // ------------------------------- RENDER -------------------------------------

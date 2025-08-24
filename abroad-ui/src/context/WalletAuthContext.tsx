@@ -6,13 +6,22 @@ import { PENDING_TX_KEY } from '../constants';
 
 interface WalletAuthState {
   token: string | null;
+  kycUrl: string | null;
+  setKycUrl: (url: string) => void;
   authenticateWithWallet: (walletId: string) => Promise<void>;
   address: string | null;
   walletId: string | null;
   logout: () => void;
 }
 
-const WalletAuthContext = createContext<WalletAuthState>({ token: null, authenticateWithWallet: async () => { }, address: null, walletId: null, logout: () => { } });
+const WalletAuthContext = createContext<WalletAuthState>({ 
+  token: null, 
+  kycUrl: null, 
+  authenticateWithWallet: async () => { }, 
+  setKycUrl: () => {},
+  address: null, walletId: null, 
+  logout: () => { } ,
+});
 
 const signMessage = async (message: string): Promise<string> => {
   const response = await kit.signTransaction(message, { networkPassphrase: WalletNetwork.PUBLIC })
@@ -20,6 +29,7 @@ const signMessage = async (message: string): Promise<string> => {
 }
 export const WalletAuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [token, _setToken] = useState<string | null>(() => localStorage.getItem('token'));
+  const [ kycUrl, _setKycUrl ] = useState<string | null>(() => localStorage.getItem('kycUrl'))
   const [address, _setAddress] = useState<string | null>(() => localStorage.getItem('address'));
   const [walletId, _setWalletId] = useState<string | null>(() => localStorage.getItem('selectedWalletId'));
 
@@ -29,6 +39,15 @@ export const WalletAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       localStorage.setItem('token', newToken);
     } else {
       localStorage.removeItem('token');
+    }
+  }, []);
+
+  const setKycUrl = useCallback((url: string | null) => {
+    _setKycUrl(url);
+    if (url) {
+      localStorage.setItem('kycUrl', url);
+    } else {
+      localStorage.removeItem('kycUrl');
     }
   }, []);
 
@@ -76,9 +95,10 @@ export const WalletAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setToken(null);
     setAddress(null);
     setWalletId(null);
+    setKycUrl(null);
     localStorage.removeItem(PENDING_TX_KEY);
     kit.disconnect();
-  }, [setAddress, setToken, setWalletId]);
+  }, [setAddress, setKycUrl, setToken, setWalletId]);
 
   const refreshToken = useCallback(async () => {
     if (!token) return;
@@ -134,7 +154,7 @@ export const WalletAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   }, [setAddress, setToken]);
 
   return (
-    <WalletAuthContext.Provider value={{ token, authenticateWithWallet, address, walletId, logout }}>
+    <WalletAuthContext.Provider value={{ token, kycUrl, setKycUrl, authenticateWithWallet, address, walletId, logout }}>
       {children}
     </WalletAuthContext.Provider>
   );

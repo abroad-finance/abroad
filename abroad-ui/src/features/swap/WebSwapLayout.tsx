@@ -10,6 +10,7 @@ import { useWebSwapController } from './useWebSwapController'; // For prop types
 import { kit } from '../../services/stellarKit';
 import { useWalletAuth } from '../../context/WalletAuthContext';
 import TxStatus from '../../components/Swap/TxStatus';
+import UserVerification from '../../components/WebSwap/UserVerification';
 
 type LayoutProps = ReturnType<typeof useWebSwapController>;
 
@@ -35,10 +36,11 @@ const WebSwapLayout: React.FC<LayoutProps> = (props) => {
     // new handlers/state for tx status view
     showTxStatus,
     resetForNewTransaction,
+    redirectToKYCAuth,
     transactionId,
   } = props;
 
-  const { authenticateWithWallet } = useWalletAuth();
+  const { authenticateWithWallet, kycUrl } = useWalletAuth();
 
   // Marketing background for mobile hero
   const currentBgUrl =
@@ -62,8 +64,20 @@ const WebSwapLayout: React.FC<LayoutProps> = (props) => {
   const renderSwap = (isDesktop: boolean) => {
     const textColorProps = isDesktop ? ({ textColor: 'white' } as const) : undefined;
 
+  const handleKycRedirect = () => {
+    if(kycUrl){
+      window.location.href = kycUrl;
+    }else {
+      alert('No KYC url finded');
+    }
+  }
+
     return (
       <div className="w-full max-w-md">
+        { view === 'kyc-needed' && (
+          <UserVerification onVerify={handleKycRedirect} />
+        )}
+
         {view === 'swap' && (
           <Swap
             onContinue={(quote_id, srcAmount, tgtAmount, targetCurrency) => {
@@ -96,6 +110,7 @@ const WebSwapLayout: React.FC<LayoutProps> = (props) => {
               onBackClick={handleBackToSwap}
               onTransactionComplete={handleTransactionComplete}
               onTransactionFailed={handleTransactionFailed}
+              onKycRedirect={redirectToKYCAuth}
               onTransactionSigned={(id, ref) => showTxStatus(id, ref)}
               quote_id={swapData.quote_id}
               sourceAmount={swapData.srcAmount}
