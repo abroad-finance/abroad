@@ -1,6 +1,7 @@
 // WebSwapLayout.tsx
 import React from 'react'
 
+import { _36EnumsTargetCurrency as TargetCurrency } from '../../api'
 import AnimatedHeroText from '../../components/common/AnimatedHeroText'
 import BackgroundCrossfade from '../../components/common/BackgroundCrossfade'
 import ImageAttribution from '../../components/common/ImageAttribution'
@@ -10,12 +11,41 @@ import TxStatus from '../../components/Swap/TxStatus'
 import UserVerification from '../../components/WebSwap/UserVerification'
 import { useWalletAuth } from '../../contexts/WalletAuthContext'
 import { kit } from '../../services/stellarKit'
-import { useWebSwapController } from './useWebSwapController' // For prop types
 import { ASSET_URLS, BRL_BACKGROUND_IMAGE } from './webSwap.constants'
+import { SwapData, SwapView } from './webSwap.types'
 
-type LayoutProps = ReturnType<typeof useWebSwapController>
+export interface WebSwapLayoutProps {
+  address: null | string
+  handleAmountsChange: (params: {
+    currency?: (typeof TargetCurrency)[keyof typeof TargetCurrency]
+    src?: string
+    tgt?: string
+  }) => void
+  handleBackToSwap: () => void
+  handleSwapContinue: (data: SwapData) => void
+  handleTargetChange: (amount: number) => Promise<void>
+  handleTransactionComplete: (params: { memo: null | string }) => Promise<void>
+  handleTransactionFailed: () => void
+  handleWalletConnectOpen?: () => void
+  openQr: () => void
+  pixKey: string
+  quoteId: string
+  redirectToKYCAuth: () => void
+  resetForNewTransaction: () => void
+  setPixKey: (key: string) => void
+  setQuoteId: (id: string) => void
+  setTaxId: (id: string) => void
+  showTxStatus: (id: null | string, reference: null | string) => void
+  sourceAmount: string
+  swapData: null | SwapData
+  targetAmount: string
+  targetCurrency: (typeof TargetCurrency)[keyof typeof TargetCurrency]
+  taxId: string
+  transactionId: null | string
+  view: SwapView
+}
 
-const WebSwapLayout: React.FC<LayoutProps> = (props) => {
+const WebSwapLayout: React.FC<WebSwapLayoutProps> = (props) => {
   const {
     address,
     handleAmountsChange,

@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 
+import type { WebSwapLayoutProps } from './WebSwapLayout'
+
 import { _36EnumsBlockchainNetwork as BlockchainNetwork, _36EnumsCryptoCurrency as CryptoCurrency, decodeQrCodeBR, getQuote, _36EnumsPaymentMethod as PaymentMethod, _36EnumsTargetCurrency as TargetCurrency } from '../../api/index'
 import { useWalletAuth } from '../../contexts/WalletAuthContext'
 import { ASSET_URLS, BRL_BACKGROUND_IMAGE } from './webSwap.constants'
@@ -8,7 +10,25 @@ import { SwapData, SwapView } from './webSwap.types'
 
 const PENDING_TX_KEY = 'pendingTransaction'
 
-export const useWebSwapController = () => {
+// Extra controller-only fields not required by the layout component
+type UseWebSwapControllerReturn = WebSwapControllerExtras & WebSwapLayoutProps
+
+interface WebSwapControllerExtras {
+  closeQr: () => void
+  currentBgUrl: string
+  handleQrResult: (text: string) => Promise<void>
+  handleWalletConnectClose: () => void
+  handleWalletDetailsClose: () => void
+  handleWalletDetailsOpen: () => void
+  handleWalletSelect: (walletType: 'stellar' | 'trust') => void
+  isDecodingQr: boolean
+  isQrOpen: boolean
+  isWalletDetailsOpen: boolean
+  isWalletModalOpen: boolean
+  transactionReference: null | string
+}
+
+export const useWebSwapController = (): UseWebSwapControllerReturn => {
   const { address, token } = useWalletAuth()
   const [view, setView] = useState<SwapView>('swap')
   const [swapData, setSwapData] = useState<null | SwapData>(null)

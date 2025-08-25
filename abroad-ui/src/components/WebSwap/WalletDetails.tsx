@@ -1,226 +1,33 @@
-import { Horizon } from '@stellar/stellar-sdk'
 import { useTranslate } from '@tolgee/react'
 import { motion } from 'framer-motion'
 import { Copy, ExternalLink, RefreshCw, X } from 'lucide-react'
-import React, { useCallback, useEffect, useState } from 'react'
+import React from 'react'
 
-import { listPartnerTransactions, PaginatedTransactionListTransactionsItem } from '../../api/index'
-import { useWalletAuth } from '../../contexts/WalletAuthContext'
+import { WalletDetailsProps } from '../../hooks/useWalletDetails'
 
-// Stellar network configuration
-const STELLAR_HORIZON_URL = 'https://horizon.stellar.org'
-const USDC_ISSUER = 'GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN' // Circle's USDC issuer on Stellar mainnet
-
-// Utility function to fetch USDC balance
-const fetchUSDCBalance = async (stellarAddress: string): Promise<string> => {
-  try {
-    console.log('Fetching USDC balance for WalletDetails:', stellarAddress)
-
-    // Create Horizon server instance
-    const server = new Horizon.Server(STELLAR_HORIZON_URL)
-
-    // Load account information
-    const account = await server.loadAccount(stellarAddress)
-
-    // Find USDC balance in account balances
-    const usdcBalance = account.balances.find((balance) => {
-      // Check if it's a credit asset (not native XLM)
-      if (balance.asset_type === 'native') return false
-
-      // Type guard to ensure we have asset_code and asset_issuer properties
-      if ('asset_code' in balance && 'asset_issuer' in balance) {
-        return balance.asset_code === 'USDC' && balance.asset_issuer === USDC_ISSUER
-      }
-
-      return false
-    })
-
-    if (usdcBalance && 'balance' in usdcBalance) {
-      // Format balance to 2 decimal places with thousand separators
-      const balanceValue = parseFloat(usdcBalance.balance)
-      return balanceValue.toLocaleString('en-US', {
-        maximumFractionDigits: 2,
-        minimumFractionDigits: 2,
-      })
-    }
-    else {
-      return '0.00'
-    }
-  }
-  catch (error) {
-    console.error('Error fetching USDC balance in WalletDetails:', error)
-    return '0.00'
-  }
-}
-
-// Use the API transaction type
-type Transaction = PaginatedTransactionListTransactionsItem
-
-interface WalletDetailsProps {
-  onClose?: () => void
-}
-
-const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
-  const [copiedAddress, setCopiedAddress] = useState(false)
+// Stateless controlled component. All data & handlers provided via props.
+const WalletDetails: React.FC<WalletDetailsProps> = ({
+  address,
+  copiedAddress,
+  formatDate,
+  getStatusStyle,
+  getStatusText,
+  isLoadingBalance,
+  isLoadingTransactions,
+  onClose,
+  onCopyAddress,
+  onDisconnectWallet,
+  onRefreshBalance,
+  onRefreshTransactions,
+  transactionError,
+  transactions,
+  usdcBalance,
+}) => {
   const { t } = useTranslate()
-  const [usdcBalance, setUsdcBalance] = useState<string>('0.00')
-  const [isLoadingBalance, setIsLoadingBalance] = useState(false)
-  const [transactions, setTransactions] = useState<Transaction[]>([])
-  const [isLoadingTransactions, setIsLoadingTransactions] = useState(false)
-  const [transactionError, setTransactionError] = useState<null | string>(null)
-  const { address, logout, token } = useWalletAuth()
 
-  // Fetch USDC balance with loading state
-  const fetchUSDCBalanceWithLoading = useCallback(async (stellarAddress: string) => {
-    try {
-      setIsLoadingBalance(true)
-      const balance = await fetchUSDCBalance(stellarAddress)
-      setUsdcBalance(balance)
-    }
-    catch (error) {
-      console.error('Error fetching USDC balance in WalletDetails:', error)
-      setUsdcBalance('0.00')
-    }
-    finally {
-      setIsLoadingBalance(false)
-    }
-  }, [])
-
-  // Fetch transactions from API
-  const fetchTransactions = useCallback(async () => {
-    if (!token) {
-      setTransactionError(t('wallet_details.error.no_token', 'No authentication token available'))
-      return
-    }
-
-    try {
-      setIsLoadingTransactions(true)
-      setTransactionError(null)
-
-      if (!address) {
-        setTransactionError(t('wallet_details.error.no_address', 'No wallet address connected'))
-        return
-      }
-
-      const response = await listPartnerTransactions(
-        { externalUserId: address, page: 1, pageSize: 10 }, // Get first 10 transactions
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        },
-      )
-
-      if (response.status === 200) {
-        setTransactions(response.data.transactions)
-      }
-      else {
-        setTransactionError(t('wallet_details.error.fetch_failed', 'Failed to fetch transactions'))
-      }
-    }
-    catch (error) {
-      console.error('Error fetching transactions:', error)
-      setTransactionError(t('wallet_details.error.loading', 'Error loading transactions'))
-    }
-    finally {
-      setIsLoadingTransactions(false)
-    }
-  }, [token, address, t])
-
-  // Fetch balance and transactions when component mounts or token changes
-  useEffect(() => {
-    if (address) {
-      fetchUSDCBalanceWithLoading(address)
-    }
-    if (token) {
-      fetchTransactions()
-    }
-  }, [address, token, fetchUSDCBalanceWithLoading, fetchTransactions])
-
-  // Handle manual balance refresh
-  const handleRefreshBalance = useCallback(() => {
-    if (address && !isLoadingBalance) {
-      fetchUSDCBalanceWithLoading(address)
-    }
-  }, [address, isLoadingBalance, fetchUSDCBalanceWithLoading])
-
-  // Handle manual transactions refresh
-  const handleRefreshTransactions = useCallback(() => {
-    if (token && !isLoadingTransactions) {
-      fetchTransactions()
-    }
-  }, [token, isLoadingTransactions, fetchTransactions])
-
-  // Helper function to format transaction status
-  const getStatusStyle = (status: string) => {
-    switch (status) {
-      case 'AWAITING_PAYMENT':
-      case 'PROCESSING_PAYMENT':
-        return 'bg-blue-100 text-blue-700'
-      case 'PAYMENT_COMPLETED':
-        return 'bg-green-100 text-green-700'
-      case 'PAYMENT_FAILED':
-      case 'WRONG_AMOUNT':
-        return 'bg-red-100 text-red-700'
-      default:
-        return 'bg-gray-100 text-gray-700'
-    }
-  }
-
-  // Helper function to translate transaction status
-  const getStatusText = (status: string) => {
-    switch (status) {
-      case 'AWAITING_PAYMENT':
-        return t('wallet_details.status.awaiting_payment', 'Esperando Pago')
-      case 'PAYMENT_COMPLETED':
-        return t('wallet_details.status.completed', 'Completado')
-      case 'PAYMENT_FAILED':
-        return t('wallet_details.status.failed', 'Pago Fallido')
-      case 'PROCESSING_PAYMENT':
-        return t('wallet_details.status.processing', 'Procesando Pago')
-      case 'WRONG_AMOUNT':
-        return t('wallet_details.status.wrong_amount', 'Monto Incorrecto')
-      default:
-        return status
-    }
-  }
-
-  // Helper function to format wallet address
-  const formatWalletAddress = (address: null | string) => {
-    if (!address) return t('wallet_details.not_connected', 'No conectado')
-    return `${address.slice(0, 6)}...${address.slice(-4)}`
-  }
-
-  const copyToClipboard = async (text: null | string) => {
-    try {
-      if (text) {
-        await navigator.clipboard.writeText(text)
-        setCopiedAddress(true)
-        setTimeout(() => setCopiedAddress(false), 2000)
-      }
-    }
-    catch (err) {
-      console.error('Failed to copy address:', err)
-    }
-  }
-
-  const handleDisconnectWallet = async () => {
-    try {
-      await logout()
-      onClose?.() // Close the modal after disconnect
-    }
-    catch (err) {
-      console.error('Failed to disconnect wallet:', err)
-    }
-  }
-
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString)
-    return date.toLocaleDateString('en-US', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-    })
+  const formatWalletAddress = (addr: null | string) => {
+    if (!addr) return t('wallet_details.not_connected', 'No conectado')
+    return `${addr.slice(0, 6)}...${addr.slice(-4)}`
   }
 
   return (
@@ -278,7 +85,7 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
             <div className="flex space-x-2">
               <button
                 className="p-1 hover:bg-red-100 hover:bg-opacity-20 rounded transition-colors duration-200"
-                onClick={handleDisconnectWallet}
+                onClick={onDisconnectWallet}
                 title={t('wallet_details.actions.disconnect', 'Desconectar billetera')}
               >
                 <svg className="w-4 h-4 text-red-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -287,7 +94,7 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
               </button>
               <button
                 className="p-1 hover:bg-white hover:bg-opacity-20 rounded transition-colors duration-200"
-                onClick={() => copyToClipboard(address)}
+                onClick={onCopyAddress}
                 title={t('wallet_details.actions.copy_address', 'Copiar dirección')}
               >
                 <Copy className="w-4 h-4 text-white" />
@@ -328,7 +135,7 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
             <button
               className="p-2 hover:bg-white hover:bg-opacity-20 rounded-full transition-colors duration-200 disabled:opacity-50"
               disabled={isLoadingBalance}
-              onClick={handleRefreshBalance}
+              onClick={onRefreshBalance}
               title={t('wallet_details.actions.refresh_balance', 'Actualizar balance')}
             >
               <RefreshCw className={`w-4 h-4 text-white ${isLoadingBalance ? 'animate-spin' : ''}`} />
@@ -343,7 +150,7 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
             <button
               className="p-2 hover:bg-gray-100 rounded-full transition-colors duration-200 disabled:opacity-50"
               disabled={isLoadingTransactions}
-              onClick={handleRefreshTransactions}
+              onClick={onRefreshTransactions}
               title={t('wallet_details.actions.refresh_transactions', 'Actualizar transacciones')}
             >
               <RefreshCw className={`w-4 h-4 text-gray-600 ${isLoadingTransactions ? 'animate-spin' : ''}`} />

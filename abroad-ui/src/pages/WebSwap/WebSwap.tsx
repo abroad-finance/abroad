@@ -1,4 +1,3 @@
-import { AnimatePresence, motion } from 'framer-motion'
 import React from 'react'
 import { lazy, Suspense } from 'react'
 
@@ -9,15 +8,18 @@ import { Loader } from 'lucide-react'
 import BackgroundCrossfade from '../../components/common/BackgroundCrossfade'
 // Child Components
 import LanguageSelector from '../../components/common/LanguageSelector'
+import ModalOverlay from '../../components/common/overlay/ModalOverlay'
 import NavBarResponsive from '../../components/WebSwap/NavBarResponsive'
 import WalletDetails from '../../components/WebSwap/WalletDetails'
 import WebSwapLayout from '../../features/swap/WebSwapLayout'
+import { useWalletDetails } from '../../hooks'
 import { useLanguageSelector, useNavBarResponsive } from '../../hooks'
 
 const WebSwap: React.FC = () => {
   const controller = useWebSwapController()
   const navBar = useNavBarResponsive({ onWalletDetails: controller.handleWalletDetailsOpen })
   const languageSelector = useLanguageSelector()
+  const walletDetails = useWalletDetails({ onClose: controller.handleWalletDetailsClose })
 
   return (
     <div className="w-screen min-h-screen md:h-screen md:overflow-hidden flex flex-col">
@@ -42,18 +44,15 @@ const WebSwap: React.FC = () => {
       {/* Main Content Area */}
       <main className="flex-1 relative z-10 flex">
         <WebSwapLayout {...controller} />
-
-        {/* Floating Scan Button removed; scanner trigger moved into Swap title */}
       </main>
 
       {/* Top-level Modals */}
-      <AnimatePresence>
-        {controller.isWalletDetailsOpen && (
-          <ModalOverlay onClose={controller.handleWalletDetailsClose}>
-            <WalletDetails onClose={controller.handleWalletDetailsClose} />
-          </ModalOverlay>
-        )}
-      </AnimatePresence>
+      <ModalOverlay
+        onClose={controller.handleWalletDetailsClose}
+        open={!!controller.isWalletDetailsOpen}
+      >
+        <WalletDetails {...walletDetails} />
+      </ModalOverlay>
 
       {/* Full-screen QR Scanner */}
       {controller.isQrOpen && (
@@ -74,18 +73,5 @@ const WebSwap: React.FC = () => {
     </div>
   )
 }
-
-const ModalOverlay: React.FC<{ children: React.ReactNode, onClose: () => void }> = ({ children, onClose }) => (
-  <motion.div
-    animate={{ opacity: 1 }}
-    className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[999] flex items-center justify-center md:justify-end p-4 md:pr-8"
-    exit={{ opacity: 0 }}
-    initial={{ opacity: 0 }}
-    onClick={onClose}
-    transition={{ duration: 0.2, ease: 'easeOut' }}
-  >
-    <div onClick={e => e.stopPropagation()}>{children}</div>
-  </motion.div>
-)
 
 export default WebSwap
