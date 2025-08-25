@@ -16,17 +16,17 @@ const LanguageSelector: React.FC<LanguageSelectorProps> = ({ className = '', var
     return opts?.availableLanguages || ['pt', 'es', 'en', 'ru']
   }, [tolgee])
 
-  const [currentLang, setCurrentLang] = useState(() => tolgee.getLanguage())
+  const [currentLang, setCurrentLang] = useState(() => {
+    return tolgee.getLanguage()
+  })
 
   // Subscribe to language change events so the selector updates immediately
   useEffect(() => {
-    type OffFn = () => void
-    const anyTolgee = tolgee as unknown as { on?: (event: string, cb: (val: string) => void) => OffFn }
-    const off: OffFn | undefined = anyTolgee.on?.('language', (l: string) => setCurrentLang(l))
+    const off = tolgee.on?.('language', (l: { value: string }) => {
+      setCurrentLang(l.value)
+    })
     return () => {
-      if (typeof off === 'function') {
-        off()
-      }
+      off?.unsubscribe()
     }
   }, [tolgee])
 
