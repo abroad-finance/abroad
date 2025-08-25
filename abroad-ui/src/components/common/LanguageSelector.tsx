@@ -24,7 +24,9 @@ const LanguageSelector: React.FC<LanguageSelectorProps> = ({ className = '', var
     const anyTolgee = tolgee as unknown as { on?: (event: string, cb: (val: string) => void) => OffFn }
     const off: OffFn | undefined = anyTolgee.on?.('language', (l: string) => setCurrentLang(l))
     return () => {
-      off?.()
+      if (typeof off === 'function') {
+        off()
+      }
     }
   }, [tolgee])
 
