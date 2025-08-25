@@ -1,3 +1,4 @@
+import { useTranslate } from '@tolgee/react'
 import { ChevronsDown, CircleDollarSign, Landmark, Loader, QrCode, Timer, Wallet } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { lazy, Suspense } from 'react'
@@ -51,6 +52,7 @@ export default function Swap({
   targetCurrency,
   textColor = '#356E6A',
 }: SwapProps) {
+  const { t } = useTranslate()
   // Derived formatting and payment method by target currency
   const targetLocale = targetCurrency === TargetCurrency.BRL ? 'pt-BR' : 'es-CO'
   const targetSymbol = targetCurrency === TargetCurrency.BRL ? 'R$' : '$'
@@ -241,10 +243,10 @@ export default function Swap({
         {/* Title */}
         <div className="flex-1 flex items-center justify-space-between">
           <div className="flex items-center gap-2 text-xl md:text-xl font-bold" id="Title" style={{ color: textColor }}>
-            <span>¿Cuánto deseas cambiar?</span>
+            <span>{t('swap.title', '¿Cuánto deseas cambiar?')}</span>
             {targetCurrency === TargetCurrency.BRL && (
               <button
-                aria-label="Escanear QR"
+                aria-label={t('swap.scan_qr_aria', 'Escanear QR')}
                 className="p-2 cursor-pointer rounded-full hover:bg-white/30 focus:outline-none focus:ring-2 focus:ring-[#356E6A]/40 transition"
                 onClick={openQr}
                 type="button"
@@ -398,7 +400,7 @@ export default function Swap({
                 </div>
                 <div className="flex flex-col space-y-1">
                   <span className="text-lg font-semibold" style={{ color: textColor }}>
-                    Conecta tu billetera para poder cotizar
+                    {t('swap.connect_to_quote', 'Conecta tu billetera para poder cotizar')}
                   </span>
                 </div>
               </div>
@@ -410,14 +412,14 @@ export default function Swap({
               <div className="flex items-center space-x-2" id="trm">
                 <CircleDollarSign className="w-5 h-5" />
                 <span>
-                  Tasa de Cambio:
+                  {t('swap.exchange_rate', 'Tasa de Cambio:')}
                   <b>{displayedTRM === 0 ? '-' : `${targetSymbol}${formatTargetNumber(displayedTRM)}`}</b>
                 </span>
               </div>
               <div className="flex items-center space-x-2" id="transfer-fee">
                 <Landmark className="w-5 h-5" />
                 <span>
-                  Costo de Transferencia:
+                  {t('swap.transfer_cost', 'Costo de Transferencia:')}
                   <b>
                     {targetSymbol}
                     {formatTargetNumber(transferFee)}
@@ -427,8 +429,8 @@ export default function Swap({
               <div className="flex items-center space-x-2" id="time">
                 <Timer className="w-5 h-5" />
                 <span>
-                  Tiempo:
-                  <b>10 - 30 segundos</b>
+                  {t('swap.time', 'Tiempo:')}
+                  <b>{t('swap.time_value', '10 - 30 segundos')}</b>
                 </span>
               </div>
             </div>
@@ -447,7 +449,7 @@ export default function Swap({
           else {
             console.log('Continue clicked with quote_id:', quoteId)
             if (!quoteId) {
-              alert('Please wait for the quote to load before continuing')
+              alert(t('swap.wait_for_quote', 'Please wait for the quote to load before continuing'))
               return
             }
             onContinue(quoteId, sourceAmount, targetAmount, targetCurrency)
@@ -458,11 +460,11 @@ export default function Swap({
           ? (
               <div className="flex items-center justify-center space-x-2">
                 <Wallet className="w-5 h-5" />
-                <span>Conectar Billetera</span>
+                <span>{t('swap.connect_wallet', 'Conectar Billetera')}</span>
               </div>
             )
           : (
-              'Continuar'
+              t('swap.continue', 'Continuar')
             )}
       </Button>
     </div>

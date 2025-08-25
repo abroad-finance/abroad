@@ -1,7 +1,8 @@
+import { TolgeeProvider } from '@tolgee/react'
 import { lazy, Suspense } from 'react'
 import { Route, BrowserRouter as Router, Routes } from 'react-router-dom'
 
-import { LanguageProvider } from './contexts/LanguageContext'
+import { tolgee } from './contexts/LanguageContext'
 import { WalletAuthProvider } from './contexts/WalletAuthContext'
 
 // Route-level code splitting
@@ -9,7 +10,7 @@ const WebSwap = lazy(() => import('./pages/WebSwap/WebSwap'))
 
 function App() {
   return (
-    <LanguageProvider>
+    <TolgeeProvider tolgee={tolgee}>
       <WalletAuthProvider>
         <Router>
           <Suspense fallback={<div />}>
@@ -21,7 +22,7 @@ function App() {
           </Suspense>
         </Router>
       </WalletAuthProvider>
-    </LanguageProvider>
+    </TolgeeProvider>
   )
 }
 

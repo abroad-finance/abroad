@@ -1,4 +1,5 @@
 import { Horizon } from '@stellar/stellar-sdk'
+import { useTranslate } from '@tolgee/react'
 import { motion } from 'framer-motion'
 import { Copy, ExternalLink, RefreshCw, X } from 'lucide-react'
 import React, { useCallback, useEffect, useState } from 'react'
@@ -61,6 +62,7 @@ interface WalletDetailsProps {
 
 const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
   const [copiedAddress, setCopiedAddress] = useState(false)
+  const { t } = useTranslate()
   const [usdcBalance, setUsdcBalance] = useState<string>('0.00')
   const [isLoadingBalance, setIsLoadingBalance] = useState(false)
   const [transactions, setTransactions] = useState<Transaction[]>([])
@@ -87,7 +89,7 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
   // Fetch transactions from API
   const fetchTransactions = useCallback(async () => {
     if (!token) {
-      setTransactionError('No authentication token available')
+      setTransactionError(t('wallet_details.error.no_token', 'No authentication token available'))
       return
     }
 
@@ -96,7 +98,7 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
       setTransactionError(null)
 
       if (!address) {
-        setTransactionError('No wallet address connected')
+        setTransactionError(t('wallet_details.error.no_address', 'No wallet address connected'))
         return
       }
 
@@ -113,17 +115,17 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
         setTransactions(response.data.transactions)
       }
       else {
-        setTransactionError('Failed to fetch transactions')
+        setTransactionError(t('wallet_details.error.fetch_failed', 'Failed to fetch transactions'))
       }
     }
     catch (error) {
       console.error('Error fetching transactions:', error)
-      setTransactionError('Error loading transactions')
+      setTransactionError(t('wallet_details.error.loading', 'Error loading transactions'))
     }
     finally {
       setIsLoadingTransactions(false)
     }
-  }, [token, address])
+  }, [token, address, t])
 
   // Fetch balance and transactions when component mounts or token changes
   useEffect(() => {
@@ -169,15 +171,15 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
   const getStatusText = (status: string) => {
     switch (status) {
       case 'AWAITING_PAYMENT':
-        return 'Esperando Pago'
+        return t('wallet_details.status.awaiting_payment', 'Esperando Pago')
       case 'PAYMENT_COMPLETED':
-        return 'Completado'
+        return t('wallet_details.status.completed', 'Completado')
       case 'PAYMENT_FAILED':
-        return 'Pago Fallido'
+        return t('wallet_details.status.failed', 'Pago Fallido')
       case 'PROCESSING_PAYMENT':
-        return 'Procesando Pago'
+        return t('wallet_details.status.processing', 'Procesando Pago')
       case 'WRONG_AMOUNT':
-        return 'Monto Incorrecto'
+        return t('wallet_details.status.wrong_amount', 'Monto Incorrecto')
       default:
         return status
     }
@@ -185,7 +187,7 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
 
   // Helper function to format wallet address
   const formatWalletAddress = (address: null | string) => {
-    if (!address) return 'No conectado'
+    if (!address) return t('wallet_details.not_connected', 'No conectado')
     return `${address.slice(0, 6)}...${address.slice(-4)}`
   }
 
@@ -256,10 +258,10 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
         {/* Header */}
         <div className="mb-6 pr-8 text-center mt-2 md:mt-4">
           <h2 className="text-2xl font-semibold text-gray-900 mb-2">
-            Tu Cuenta
+            {t('wallet_details.header.title', 'Tu Cuenta')}
           </h2>
           <p className="text-md text-gray-600">
-            Gestiona tu billetera y consulta el historial de transacciones
+            {t('wallet_details.header.subtitle', 'Gestiona tu billetera y consulta el historial de transacciones')}
           </p>
         </div>
 
@@ -277,7 +279,7 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
               <button
                 className="p-1 hover:bg-red-100 hover:bg-opacity-20 rounded transition-colors duration-200"
                 onClick={handleDisconnectWallet}
-                title="Desconectar billetera"
+                title={t('wallet_details.actions.disconnect', 'Desconectar billetera')}
               >
                 <svg className="w-4 h-4 text-red-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} />
@@ -286,21 +288,21 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
               <button
                 className="p-1 hover:bg-white hover:bg-opacity-20 rounded transition-colors duration-200"
                 onClick={() => copyToClipboard(address)}
-                title="Copiar dirección"
+                title={t('wallet_details.actions.copy_address', 'Copiar dirección')}
               >
                 <Copy className="w-4 h-4 text-white" />
               </button>
               <button
                 className="p-1 hover:bg-white hover:bg-opacity-20 rounded transition-colors duration-200"
                 onClick={() => window.open(`https://stellar.expert/explorer/public/account/${address}`, '_blank')}
-                title="Ver en explorador"
+                title={t('wallet_details.actions.view_explorer', 'Ver en explorador')}
               >
                 <ExternalLink className="w-4 h-4 text-white" />
               </button>
             </div>
           </div>
           {copiedAddress && (
-            <div className="text-green-300 text-xs mb-4">¡Dirección copiada!</div>
+            <div className="text-green-300 text-xs mb-4">{t('wallet_details.toast.copied', '¡Dirección copiada!')}</div>
           )}
 
           {/* Balance Section */}
@@ -327,7 +329,7 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
               className="p-2 hover:bg-white hover:bg-opacity-20 rounded-full transition-colors duration-200 disabled:opacity-50"
               disabled={isLoadingBalance}
               onClick={handleRefreshBalance}
-              title="Actualizar balance"
+              title={t('wallet_details.actions.refresh_balance', 'Actualizar balance')}
             >
               <RefreshCw className={`w-4 h-4 text-white ${isLoadingBalance ? 'animate-spin' : ''}`} />
             </button>
@@ -337,12 +339,12 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
         {/* Transaction History */}
         <div className="flex-1">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-gray-800 font-medium text-lg">Historial de Transacciones</h3>
+            <h3 className="text-gray-800 font-medium text-lg">{t('wallet_details.transactions.title', 'Historial de Transacciones')}</h3>
             <button
               className="p-2 hover:bg-gray-100 rounded-full transition-colors duration-200 disabled:opacity-50"
               disabled={isLoadingTransactions}
               onClick={handleRefreshTransactions}
-              title="Actualizar transacciones"
+              title={t('wallet_details.actions.refresh_transactions', 'Actualizar transacciones')}
             >
               <RefreshCw className={`w-4 h-4 text-gray-600 ${isLoadingTransactions ? 'animate-spin' : ''}`} />
             </button>
@@ -391,7 +393,7 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
                       </div>
 
                       <div className="mb-2">
-                        <span className="text-gray-500 text-xs">Para: </span>
+                        <span className="text-gray-500 text-xs">{t('wallet_details.transactions.to', 'Para:')}</span>
                         <span className="text-gray-700 font-mono text-sm">
                           {transaction.accountNumber}
                         </span>
@@ -456,8 +458,8 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
                 </div>
               </div>
               <div className="text-gray-400 text-sm">
-                <div className="font-medium mb-1">No hay transacciones aún</div>
-                <div className="text-xs">Cuando hagas tu primera transacción, aparecerá aquí.</div>
+                <div className="font-medium mb-1">{t('wallet_details.empty.no_transactions', 'No hay transacciones aún')}</div>
+                <div className="text-xs">{t('wallet_details.empty.hint', 'Cuando hagas tu primera transacción, aparecerá aquí.')}</div>
               </div>
             </div>
           )}
@@ -465,7 +467,7 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({ onClose }) => {
 
         {/* Footer */}
         <div className="text-xs text-gray-500 leading-relaxed text-center mt-6 pt-4 border-t border-gray-200">
-          Los datos de transacciones se actualizan en tiempo real
+          {t('wallet_details.footer.realtime_note', 'Los datos de transacciones se actualizan en tiempo real')}
         </div>
       </div>
     </motion.div>

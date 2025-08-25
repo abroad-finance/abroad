@@ -9,6 +9,7 @@ import {
   Transaction,
   TransactionBuilder,
 } from '@stellar/stellar-sdk'
+import { useTranslate } from '@tolgee/react'
 import { ArrowLeft, Hash, Loader, Rotate3d } from 'lucide-react'
 import React, { useCallback, useEffect, useState } from 'react'
 
@@ -136,6 +137,7 @@ export default function BankDetailsRoute({
   textColor = '#356E6A',
   userId,
 }: BankDetailsRouteProps): React.JSX.Element {
+  const { t } = useTranslate()
   const { address, setKycUrl, token, walletId } = useWalletAuth()
 
   // ------------------------------- UI STATE -----------------------------------
@@ -419,7 +421,7 @@ export default function BankDetailsRoute({
         {/* Header */}
         <div className="w-full flex items-center space-x-3 mb-2 flex-shrink-0">
           <button
-            aria-label="Go back"
+            aria-label={t('bank_details.back_aria', 'Go back')}
             className="hover:text-opacity-80 transition-colors cursor-pointer"
             onClick={onBackClick}
             style={{ color: textColor }}
@@ -431,7 +433,7 @@ export default function BankDetailsRoute({
             id="Title"
             style={{ color: textColor }}
           >
-            Datos de Transacción
+            {t('bank_details.title', 'Datos de Transacción')}
           </div>
         </div>
 
@@ -447,7 +449,7 @@ export default function BankDetailsRoute({
                       className="w-full bg-transparent font-semibold focus:outline-none text-base sm:text-lg"
                       inputMode="text"
                       onChange={e => setPixKey(e.target.value)}
-                      placeholder="PIX Key"
+                      placeholder={t('bank_details.pix_key_placeholder', 'PIX Key')}
                       style={{ color: textColor }}
                       type="text"
                       value={pixKey}
@@ -461,7 +463,7 @@ export default function BankDetailsRoute({
                       inputMode="numeric"
                       onChange={handleTaxIdChange}
                       pattern="[0-9]*"
-                      placeholder="CPF"
+                      placeholder={t('bank_details.cpf_placeholder', 'CPF')}
                       style={{ color: textColor }}
                       type="text"
                       value={taxId}
@@ -482,7 +484,7 @@ export default function BankDetailsRoute({
                       inputMode="numeric"
                       onChange={handleaccount_numberChange}
                       pattern="[0-9]*"
-                      placeholder="Número Transfiya"
+                      placeholder={t('bank_details.transfiya_placeholder', 'Número Transfiya')}
                       style={{ color: textColor }}
                       type="text"
                       value={account_number}
@@ -510,7 +512,7 @@ export default function BankDetailsRoute({
                     {!loadingBanks && !errorBanks && apiBanks.length === 0 && (
                       <div className="p-6 flex items-center space-x-3">
                         <p className="text-[#356E6A]/70 text-xs sm:text-sm">
-                          No hay bancos disponibles.
+                          {t('bank_details.no_banks', 'No hay bancos disponibles.')}
                         </p>
                       </div>
                     )}
@@ -522,7 +524,7 @@ export default function BankDetailsRoute({
                             isOpen={bankOpen}
                             onSelectOption={handleBankSelect}
                             options={bankOptions}
-                            placeholder="Banco"
+                            placeholder={t('bank_details.bank_placeholder', 'Banco')}
                             placeholderIcons={[
                               'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Nequi_Badge.webp',
                               'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Daviplata_Badge.png',
@@ -545,7 +547,7 @@ export default function BankDetailsRoute({
             id="tx-info"
             style={{ color: textColor }}
           >
-            <span className="text-sm sm:text-base">Monto a recibir:</span>
+            <span className="text-sm sm:text-base">{t('bank_details.amount_to_receive', 'Monto a recibir:')}</span>
             <img
               alt={targetCurrency === TargetCurrency.BRL ? 'Brazil flag' : 'Colombia flag'}
               className="w-4 h-4 sm:w-5 sm:h-5 rounded-full"
@@ -574,7 +576,7 @@ export default function BankDetailsRoute({
                 <>
                   <div className="flex items-center space-x-2">
                     <Rotate3d className="w-4 h-4 sm:w-5 sm:h-5" />
-                    <span className="font-medium text-xs sm:text-sm">Red:</span>
+                    <span className="font-medium text-xs sm:text-sm">{t('bank_details.network', 'Red:')}</span>
                     <div className="bg-white/70 backdrop-blur-md rounded-lg px-2 py-1 flex items-center">
                       <img
                         alt="PIX Logo"
@@ -584,7 +586,7 @@ export default function BankDetailsRoute({
                     </div>
                   </div>
                   <span className="font-medium text-xs pl-1" style={{ color: textColor }}>
-                    Tu transacción será procesada de inmediato. Asegúrate de que la llave PIX y el CPF del destinatario sean correctos. Esta transacción no se puede reversar.
+                    {t('bank_details.pix_disclaimer', 'Tu transacción será procesada de inmediato. Asegúrate de que la llave PIX y el CPF del destinatario sean correctos. Esta transacción no se puede reversar.')}
                   </span>
                 </>
               )
@@ -592,7 +594,7 @@ export default function BankDetailsRoute({
                 <>
                   <div className="flex items-center space-x-2">
                     <Rotate3d className="w-4 h-4 sm:w-5 sm:h-5" />
-                    <span className="font-medium text-xs sm:text-sm">Red:</span>
+                    <span className="font-medium text-xs sm:text-sm">{t('bank_details.network', 'Red:')}</span>
                     <div className="bg-white/70 backdrop-blur-md rounded-lg px-2 py-1 flex items-center">
                       <img
                         alt="Transfiya Logo"
@@ -602,9 +604,7 @@ export default function BankDetailsRoute({
                     </div>
                   </div>
                   <span className="font-medium text-xs pl-1" style={{ color: textColor }}>
-                    Tu transacción será procesada de inmediato y llegará instantáneamente. Ten
-                    presente que el receptor debe tener activado Transfiya en el banco
-                    indicado.
+                    {t('bank_details.transfiya_disclaimer', 'Tu transacción será procesada de inmediato y llegará instantáneamente. Ten presente que el receptor debe tener activado Transfiya en el banco indicado.')}
                   </span>
                 </>
               )}
@@ -627,7 +627,7 @@ export default function BankDetailsRoute({
               <Loader className="animate-spin w-4 h-4 sm:w-5 sm:h-5" />
             )
           : (
-              'Continuar'
+              t('bank_details.continue', 'Continuar')
             )}
       </Button>
     </div>

@@ -1,0 +1,26 @@
+name: i18n-sync
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  tolgee:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '20' }
+      - run: npm ci
+
+      # PRs: show warnings as annotations
+      - if: ${{ github.event_name == 'pull_request' }}
+        run: npx tolgee compare || true
+        env:
+          TOLGEE_API_KEY: ${{ secrets.TOLGEE_API_KEY }}
+
+      # main: actually sync (create missing keys)
+      - if: ${{ github.ref == 'refs/heads/main' }}
+        run: npx tolgee sync -Y
+        env:
+          TOLGEE_API_KEY: ${{ secrets.TOLGEE_API_KEY }}

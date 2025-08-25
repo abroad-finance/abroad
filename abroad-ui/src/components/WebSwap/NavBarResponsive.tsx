@@ -1,4 +1,5 @@
 import { Horizon } from '@stellar/stellar-sdk'
+import { useTranslate } from '@tolgee/react'
 import { Info, Wallet } from 'lucide-react'
 import React, {
   memo,
@@ -16,6 +17,7 @@ import HanaLogo from '../../assets/Logos/Wallets/Hana.svg'
 import LobstrLogo from '../../assets/Logos/Wallets/Lobstr.svg'
 import { useWalletAuth } from '../../contexts/WalletAuthContext'
 import { kit } from '../../services/stellarKit'
+import LanguageSelector from '../common/LanguageSelector'
 
 /**
  * ----------------------------------------------------------------------------
@@ -63,8 +65,9 @@ type WalletKind
     | 'unknown'
     | 'xbull'
 
-const formatWalletAddress = (address?: null | string) => {
-  if (!address) return 'No conectado'
+// Accept a translated fallback label to avoid calling hooks outside components
+const formatWalletAddress = (address?: null | string, notConnectedLabel?: string) => {
+  if (!address) return notConnectedLabel || 'No conectado'
   const trimmed = address.trim()
   if (trimmed.length <= 10) return trimmed
   return `${trimmed.slice(0, 6)}...${trimmed.slice(-4)}`
@@ -221,6 +224,7 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({
   usdcIssuer = DEFAULT_USDC_ISSUER,
 }) => {
   const { address, authenticateWithWallet, walletId } = useWalletAuth()
+  const { t } = useTranslate()
   const { balance, loading } = useUSDCBalance(address, horizonUrl, usdcIssuer)
 
   /**
@@ -332,7 +336,7 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({
 
       return (
         <button
-          aria-label="Información de Abroad"
+          aria-label={t('navbar.info_aria_label', 'Información de Abroad')}
           className={buttonClasses}
           onClick={() => {
             // Avoid SSR breaking on 'window'
@@ -346,7 +350,7 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({
         </button>
       )
     },
-    [infoUrl],
+    [infoUrl, t],
   )
 
   /**
@@ -379,16 +383,17 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({
 
             {/* Desktop Right Side */}
             <div className="hidden md:flex items-center space-x-4">
+              <LanguageSelector />
               {/* Wallet Badge */}
               <button
-                aria-label={address ? 'Ver detalles de la billetera' : 'Conectar billetera'}
+                aria-label={address ? t('navbar.wallet_details_aria', 'Ver detalles de la billetera') : t('navbar.connect_wallet_aria', 'Conectar billetera')}
                 className="cursor-pointer flex items-center space-x-3 bg-white/20 backdrop-blur-sm rounded-xl px-4 py-2 hover:bg-white/30 transition-colors duration-200"
                 onClick={handleWalletClick}
                 type="button"
               >
                 {WalletIcon}
                 <span className="text-white text-md font-medium">
-                  {address ? formatWalletAddress(address) : 'Conectar Billetera'}
+                  {address ? formatWalletAddress(address, t('navbar.not_connected', 'No conectado')) : t('navbar.connect_wallet', 'Conectar Billetera')}
                 </span>
                 {USDCBadge(false)}
               </button>
@@ -400,8 +405,9 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({
             {/* Mobile Right Side */}
             <div className="md:hidden">
               <div className="flex items-center space-x-3">
+                <LanguageSelector variant="mobile" />
                 <button
-                  aria-label={address ? 'Ver detalles de la billetera' : 'Conectar billetera'}
+                  aria-label={address ? t('navbar.wallet_details_aria', 'Ver detalles de la billetera') : t('navbar.connect_wallet_aria', 'Conectar billetera')}
                   className="flex items-center justify-center bg-[#356E6A]/5 backdrop-blur-xl rounded-xl px-4 py-2 border border-white/30 hover:bg-white/30 transition-colors duration-200 flex-1"
                   onClick={handleWalletClick}
                   type="button"
@@ -414,7 +420,7 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({
                     : (
                         <div className="flex items-center space-x-2">
                           <Wallet aria-hidden="true" className="w-5 h-5 text-[#356E6A]" />
-                          <span className="text-[#356E6A] text-sm font-medium">Conectar Billetera</span>
+                          <span className="text-[#356E6A] text-sm font-medium">{t('navbar.connect_wallet', 'Conectar Billetera')}</span>
                         </div>
                       )}
                 </button>

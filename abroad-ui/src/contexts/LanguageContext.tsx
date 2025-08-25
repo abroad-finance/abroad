@@ -1,32 +1,13 @@
-import { createContext, ReactNode, useContext, useEffect, useState } from 'react'
+import { BackendFetch, DevTools, FormatSimple, Tolgee } from '@tolgee/react'
 
-type Language = 'en' | 'es' | 'pt' | 'zh'
+export const tolgee = Tolgee()
+  .use(DevTools())
+  .use(FormatSimple())
+  .use(BackendFetch({ prefix: 'https://storage.googleapis.com/tolgee-cd-bucket/2e0e6ec0908462504864b33aed3a6846' }))
+  .init({
+    apiKey: import.meta.env.VITE_APP_TOLGEE_API_KEY,
+    apiUrl: import.meta.env.VITE_APP_TOLGEE_API_URL,
+    availableLanguages: ['pt', 'es', 'en', 'ru'],
+    defaultLanguage: 'pt',
 
-interface LanguageContextType {
-  language: Language
-  setLanguage: (lang: Language) => void
-}
-
-const LanguageContext = createContext<LanguageContextType | undefined>(undefined)
-
-export function LanguageProvider({ children }: { children: ReactNode }) {
-  const [language, setLanguage] = useState<Language>(() => (localStorage.getItem('language') as Language) || 'en')
-
-  useEffect(() => {
-    localStorage.setItem('language', language)
-  }, [language])
-
-  return (
-    <LanguageContext.Provider value={{ language, setLanguage }}>
-      {children}
-    </LanguageContext.Provider>
-  )
-}
-
-export function useLanguage() {
-  const context = useContext(LanguageContext)
-  if (context === undefined) {
-    throw new Error('useLanguage must be used within a LanguageProvider')
-  }
-  return context
-}
+  })

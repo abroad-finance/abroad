@@ -1,3 +1,4 @@
+import { useTranslate } from '@tolgee/react'
 import { AnimatePresence, motion } from 'framer-motion'
 import React from 'react'
 
@@ -8,22 +9,25 @@ type Props = {
 }
 
 const AnimatedHeroText: React.FC<Props> = ({ currency = 'COP' }) => {
+  const { t } = useTranslate()
   const flag = currency === 'BRL' ? 'br' : 'co'
-  const displayName = currency === 'BRL' ? 'Reales' : 'Pesos'
+  const displayName = currency === 'BRL'
+    ? t('hero.currency.brl', 'Reales')
+    : t('hero.currency.cop', 'Pesos')
 
   return (
     <div className="font-bold text-white text-shadow-lg leading-tight">
       {/* Mobile/Tablet Layout - 4 lines (< 1200px) */}
       <div className="xl:hidden text-5xl md:text-6xl">
         <div className="mb-2">
-          <span>Cambia</span>
+          <span>{t('hero.action.exchange', 'Cambia')}</span>
         </div>
         <div className="flex items-center gap-4 mb-2">
           <img alt="USDC Token" className="h-14 w-14 md:h-16 md:w-16" src={ASSET_URLS.USDC_TOKEN_ICON} />
-          <span>Stablecoins</span>
+          <span>{t('hero.asset.stablecoins', 'Stablecoins')}</span>
         </div>
         <div className="flex items-center gap-2 mb-2">
-          <span>a</span>
+          <span>{t('hero.preposition.to', 'a')}</span>
           <AnimatePresence mode="wait">
             <motion.div
               animate={{ opacity: 1, y: 0 }}
@@ -43,19 +47,19 @@ const AnimatedHeroText: React.FC<Props> = ({ currency = 'COP' }) => {
           </AnimatePresence>
         </div>
         <div>
-          <span>en segundos</span>
+          <span>{t('hero.time.in_seconds', 'en segundos')}</span>
         </div>
       </div>
 
       {/* Desktop Layout - 2 lines (>= 1200px) */}
       <div className="hidden xl:block">
         <div className="flex items-center gap-4 mb-2">
-          <span>Cambia</span>
+          <span>{t('hero.action.exchange', 'Cambia')}</span>
           <img alt="USDC Token" className="h-10 w-10 md:h-14 md:w-14" src={ASSET_URLS.USDC_TOKEN_ICON} />
-          <span>Stablecoins</span>
+          <span>{t('hero.asset.stablecoins', 'Stablecoins')}</span>
         </div>
         <div className="flex items-center gap-2">
-          <span>a</span>
+          <span>{t('hero.preposition.to', 'a')}</span>
           <AnimatePresence mode="wait">
             <motion.div
               animate={{ opacity: 1, y: 0 }}
@@ -73,7 +77,7 @@ const AnimatedHeroText: React.FC<Props> = ({ currency = 'COP' }) => {
               <span className="whitespace-nowrap">{displayName}</span>
             </motion.div>
           </AnimatePresence>
-          <span className="whitespace-nowrap">en segundos</span>
+          <span className="whitespace-nowrap">{t('hero.time.in_seconds', 'en segundos')}</span>
         </div>
       </div>
     </div>

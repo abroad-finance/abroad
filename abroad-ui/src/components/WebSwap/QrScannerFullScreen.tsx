@@ -1,3 +1,4 @@
+import { useTranslate } from '@tolgee/react'
 import { Scanner } from '@yudiel/react-qr-scanner'
 import { ScanLine, X } from 'lucide-react'
 import React from 'react'
@@ -8,6 +9,7 @@ interface QrScannerFullScreenProps {
 }
 
 const QrScannerFullScreen: React.FC<QrScannerFullScreenProps> = ({ onClose, onResult }) => {
+  const { t } = useTranslate()
   const handleScan = (result: unknown) => {
     let text = ''
     if (typeof result === 'string') {
@@ -30,9 +32,9 @@ const QrScannerFullScreen: React.FC<QrScannerFullScreenProps> = ({ onClose, onRe
       <div className="flex items-center justify-between p-4 max-h-[85vh]">
         <div className="flex items-center gap-2">
           <ScanLine className="h-6 w-6" />
-          <h2 className="text-lg font-semibold">Escane un código QR</h2>
+          <h2 className="text-lg font-semibold">{t('qr_scanner.title', 'Escane un código QR')}</h2>
         </div>
-        <button aria-label="Close scanner" className="p-2 rounded hover:bg-white/10" onClick={onClose}>
+        <button aria-label={t('qr_scanner.close_aria', 'Close scanner')} className="p-2 rounded hover:bg-white/10" onClick={onClose}>
           <X className="h-6 w-6" />
         </button>
       </div>
@@ -49,7 +51,7 @@ const QrScannerFullScreen: React.FC<QrScannerFullScreenProps> = ({ onClose, onRe
 
         {/* Bottom help text */}
         <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/70 to-transparent text-center">
-          <p className="text-sm">Asegurate de que sea un código QR de Pix</p>
+          <p className="text-sm">{t('qr_scanner.hint', 'Asegurate de que sea un código QR de Pix')}</p>
         </div>
       </div>
     </div>
