@@ -1,35 +1,35 @@
-import React from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
-import { useWebSwapController } from '../../features/swap/useWebSwapController';
-import { lazy, Suspense } from 'react';
-const QrScannerFullScreen = lazy(() => import('../../components/WebSwap/QrScannerFullScreen'));
-import BackgroundCrossfade from '../../components/common/BackgroundCrossfade';
-import { Loader } from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion'
+import React from 'react'
+import { lazy, Suspense } from 'react'
 
+import { useWebSwapController } from '../../features/swap/useWebSwapController'
+const QrScannerFullScreen = lazy(() => import('../../components/WebSwap/QrScannerFullScreen'))
+import { Loader } from 'lucide-react'
+
+import BackgroundCrossfade from '../../components/common/BackgroundCrossfade'
 // Child Components
-import NavBarResponsive from '../../components/WebSwap/NavBarResponsive';
-import WalletDetails from '../../components/WebSwap/WalletDetails';
-import WebSwapLayout from '../../features/swap/WebSwapLayout';
-
+import NavBarResponsive from '../../components/WebSwap/NavBarResponsive'
+import WalletDetails from '../../components/WebSwap/WalletDetails'
+import WebSwapLayout from '../../features/swap/WebSwapLayout'
 
 const WebSwap: React.FC = () => {
-  const controller = useWebSwapController();
+  const controller = useWebSwapController()
 
   return (
     <div className="w-screen min-h-screen md:h-screen md:overflow-hidden flex flex-col">
       {/* Desktop page background with crossfade (no white flash) */}
       <BackgroundCrossfade
-        imageUrl={controller.currentBgUrl}
-        visibilityClass="hidden md:block"
-        positionClass="absolute inset-0"
-        zIndexClass="z-0"
         backgroundAttachment="fixed"
+        imageUrl={controller.currentBgUrl}
+        positionClass="absolute inset-0"
+        visibilityClass="hidden md:block"
+        zIndexClass="z-0"
       />
-      
+
       {/* Shared Navigation */}
       <div className="relative z-10 bg-green-50 md:bg-transparent">
-        <NavBarResponsive 
-          onWalletDetails={controller.handleWalletDetailsOpen} 
+        <NavBarResponsive
+          onWalletDetails={controller.handleWalletDetailsOpen}
         />
       </div>
 
@@ -37,7 +37,7 @@ const WebSwap: React.FC = () => {
       <main className="flex-1 relative z-10 flex">
         <WebSwapLayout {...controller} />
 
-  {/* Floating Scan Button removed; scanner trigger moved into Swap title */}
+        {/* Floating Scan Button removed; scanner trigger moved into Swap title */}
       </main>
 
       {/* Top-level Modals */}
@@ -66,20 +66,20 @@ const WebSwap: React.FC = () => {
         </div>
       )}
     </div>
-  );
-};
+  )
+}
 
-const ModalOverlay: React.FC<{ children: React.ReactNode; onClose: () => void }> = ({ children, onClose }) => (
+const ModalOverlay: React.FC<{ children: React.ReactNode, onClose: () => void }> = ({ children, onClose }) => (
   <motion.div
-    className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[999] flex items-center justify-center md:justify-end p-4 md:pr-8"
-    onClick={onClose}
-    initial={{ opacity: 0 }}
     animate={{ opacity: 1 }}
+    className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[999] flex items-center justify-center md:justify-end p-4 md:pr-8"
     exit={{ opacity: 0 }}
+    initial={{ opacity: 0 }}
+    onClick={onClose}
     transition={{ duration: 0.2, ease: 'easeOut' }}
   >
-    <div onClick={(e) => e.stopPropagation()}>{children}</div>
+    <div onClick={e => e.stopPropagation()}>{children}</div>
   </motion.div>
-);
+)
 
-export default WebSwap;
+export default WebSwap

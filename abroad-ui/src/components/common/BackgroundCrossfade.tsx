@@ -1,90 +1,91 @@
-import React from 'react';
-import { motion } from 'framer-motion';
+import { motion } from 'framer-motion'
+import React from 'react'
 
 type Props = {
-  imageUrl: string;
-  /** Tailwind classes controlling visibility like 'hidden md:block'; applied to both layers */
-  visibilityClass?: string;
-  /** Absolute positioning class override; default 'absolute inset-0' */
-  positionClass?: string;
-  /** z-index class for layers; default 'z-0' */
-  zIndexClass?: string;
   /** CSS background-attachment value; default 'fixed' */
-  backgroundAttachment?: 'scroll' | 'fixed' | 'local';
+  backgroundAttachment?: 'fixed' | 'local' | 'scroll'
   /** Additional classes for the layers */
-  className?: string;
+  className?: string
   /** Fade duration in seconds; default 0.35 */
-  durationSec?: number;
-};
+  durationSec?: number
+  imageUrl: string
+  /** Absolute positioning class override; default 'absolute inset-0' */
+  positionClass?: string
+  /** Tailwind classes controlling visibility like 'hidden md:block'; applied to both layers */
+  visibilityClass?: string
+  /** z-index class for layers; default 'z-0' */
+  zIndexClass?: string
+}
 
 /**
  * Renders a crossfading background with a persistent base layer and a fading overlay.
  * Preloads the next image before animating to avoid white flashes.
  */
 const BackgroundCrossfade: React.FC<Props> = ({
-  imageUrl,
-  visibilityClass = '',
-  positionClass = 'absolute inset-0',
-  zIndexClass = 'z-0',
   backgroundAttachment = 'fixed',
   className = '',
   durationSec = 0.35,
+  imageUrl,
+  positionClass = 'absolute inset-0',
+  visibilityClass = '',
+  zIndexClass = 'z-0',
 }) => {
-  const [baseBgUrl, setBaseBgUrl] = React.useState(imageUrl);
-  const [overlayBgUrl, setOverlayBgUrl] = React.useState<string | null>(null);
+  const [baseBgUrl, setBaseBgUrl] = React.useState(imageUrl)
+  const [overlayBgUrl, setOverlayBgUrl] = React.useState<null | string>(null)
 
   React.useEffect(() => {
-    if (imageUrl === baseBgUrl) return;
-    let canceled = false;
-    const img = new Image();
-    img.src = imageUrl;
+    if (imageUrl === baseBgUrl) return
+    let canceled = false
+    const img = new Image()
+    img.src = imageUrl
     const startOverlay = () => {
-      if (!canceled) setOverlayBgUrl(imageUrl);
-    };
+      if (!canceled) setOverlayBgUrl(imageUrl)
+    }
     if (img.complete) {
-      startOverlay();
-    } else {
-      img.onload = startOverlay;
+      startOverlay()
+    }
+    else {
+      img.onload = startOverlay
       img.onerror = () => {
         if (!canceled) {
-          setBaseBgUrl(imageUrl);
-          setOverlayBgUrl(null);
+          setBaseBgUrl(imageUrl)
+          setOverlayBgUrl(null)
         }
-      };
+      }
     }
     return () => {
-      canceled = true;
-    };
-  }, [imageUrl, baseBgUrl]);
+      canceled = true
+    }
+  }, [imageUrl, baseBgUrl])
 
   const handleOverlayComplete = React.useCallback(() => {
     if (overlayBgUrl) {
-      setBaseBgUrl(overlayBgUrl);
-      setOverlayBgUrl(null);
+      setBaseBgUrl(overlayBgUrl)
+      setOverlayBgUrl(null)
     }
-  }, [overlayBgUrl]);
+  }, [overlayBgUrl])
 
-  const layerClasses = `${positionClass} ${zIndexClass} ${visibilityClass} ${className} bg-cover bg-center bg-no-repeat`;
+  const layerClasses = `${positionClass} ${zIndexClass} ${visibilityClass} ${className} bg-cover bg-center bg-no-repeat`
 
   return (
     <>
       <div
         className={layerClasses}
-        style={{ backgroundImage: `url(${baseBgUrl})`, backgroundAttachment }}
+        style={{ backgroundAttachment, backgroundImage: `url(${baseBgUrl})` }}
       />
       {overlayBgUrl && (
         <motion.div
-          key={overlayBgUrl}
-          className={layerClasses}
-          style={{ backgroundImage: `url(${overlayBgUrl})`, backgroundAttachment, pointerEvents: 'none' as const }}
-          initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ duration: durationSec, ease: 'easeOut' }}
+          className={layerClasses}
+          initial={{ opacity: 0 }}
+          key={overlayBgUrl}
           onAnimationComplete={handleOverlayComplete}
+          style={{ backgroundAttachment, backgroundImage: `url(${overlayBgUrl})`, pointerEvents: 'none' as const }}
+          transition={{ duration: durationSec, ease: 'easeOut' }}
         />
       )}
     </>
-  );
-};
+  )
+}
 
-export default BackgroundCrossfade;
+export default BackgroundCrossfade

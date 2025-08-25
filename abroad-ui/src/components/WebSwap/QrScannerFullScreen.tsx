@@ -1,27 +1,29 @@
-import React from 'react';
-import { Scanner } from '@yudiel/react-qr-scanner';
-import { X, ScanLine } from 'lucide-react';
+import { Scanner } from '@yudiel/react-qr-scanner'
+import { ScanLine, X } from 'lucide-react'
+import React from 'react'
 
 interface QrScannerFullScreenProps {
-  onClose: () => void;
-  onResult: (text: string) => void;
+  onClose: () => void
+  onResult: (text: string) => void
 }
 
 const QrScannerFullScreen: React.FC<QrScannerFullScreenProps> = ({ onClose, onResult }) => {
   const handleScan = (result: unknown) => {
-    let text = '';
+    let text = ''
     if (typeof result === 'string') {
-      text = result;
-    } else if (Array.isArray(result)) {
-      const first = result[0] as unknown;
-      if (first && typeof first === 'object') {
-        text = (first as { rawValue?: string; text?: string }).rawValue || (first as { text?: string }).text || '';
-      }
-    } else if (result && typeof result === 'object') {
-      text = (result as { rawValue?: string; text?: string }).rawValue || (result as { text?: string }).text || '';
+      text = result
     }
-    if (text) onResult(text);
-  };
+    else if (Array.isArray(result)) {
+      const first = result[0] as unknown
+      if (first && typeof first === 'object') {
+        text = (first as { rawValue?: string, text?: string }).rawValue || (first as { text?: string }).text || ''
+      }
+    }
+    else if (result && typeof result === 'object') {
+      text = (result as { rawValue?: string, text?: string }).rawValue || (result as { text?: string }).text || ''
+    }
+    if (text) onResult(text)
+  }
 
   return (
     <div className="fixed inset-0 z-[1000] bg-black/90 text-white flex flex-col">
@@ -30,7 +32,7 @@ const QrScannerFullScreen: React.FC<QrScannerFullScreenProps> = ({ onClose, onRe
           <ScanLine className="h-6 w-6" />
           <h2 className="text-lg font-semibold">Escane un código QR</h2>
         </div>
-        <button aria-label="Close scanner" onClick={onClose} className="p-2 rounded hover:bg-white/10">
+        <button aria-label="Close scanner" className="p-2 rounded hover:bg-white/10" onClick={onClose}>
           <X className="h-6 w-6" />
         </button>
       </div>
@@ -38,11 +40,11 @@ const QrScannerFullScreen: React.FC<QrScannerFullScreenProps> = ({ onClose, onRe
       <div className="relative flex-1">
         {/* Camera view */}
         <Scanner
-          onScan={handleScan}
-          onError={() => { /* ignore camera errors */ }}
           components={{ finder: true }}
           constraints={{ facingMode: 'environment' }}
-          styles={{ container: { width: '100%', height: '100%', maxHeight:"85vh" }, video: { width: '100%', height: '100%', objectFit: 'cover' } }}
+          onError={() => { /* ignore camera errors */ }}
+          onScan={handleScan}
+          styles={{ container: { height: '100%', maxHeight: '85vh', width: '100%' }, video: { height: '100%', objectFit: 'cover', width: '100%' } }}
         />
 
         {/* Bottom help text */}
@@ -51,7 +53,7 @@ const QrScannerFullScreen: React.FC<QrScannerFullScreenProps> = ({ onClose, onRe
         </div>
       </div>
     </div>
-  );
-};
+  )
+}
 
-export default QrScannerFullScreen;
+export default QrScannerFullScreen

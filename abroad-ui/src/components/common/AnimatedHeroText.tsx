@@ -1,14 +1,15 @@
-import React from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
-import { ASSET_URLS } from '../../features/swap/webSwap.constants';
+import { AnimatePresence, motion } from 'framer-motion'
+import React from 'react'
+
+import { ASSET_URLS } from '../../features/swap/webSwap.constants'
 
 type Props = {
-  currency?: 'COP' | 'BRL';
-};
+  currency?: 'BRL' | 'COP'
+}
 
 const AnimatedHeroText: React.FC<Props> = ({ currency = 'COP' }) => {
-  const flag = currency === 'BRL' ? 'br' : 'co';
-  const displayName = currency === 'BRL' ? 'Reales' : 'Pesos';
+  const flag = currency === 'BRL' ? 'br' : 'co'
+  const displayName = currency === 'BRL' ? 'Reales' : 'Pesos'
 
   return (
     <div className="font-bold text-white text-shadow-lg leading-tight">
@@ -18,24 +19,24 @@ const AnimatedHeroText: React.FC<Props> = ({ currency = 'COP' }) => {
           <span>Cambia</span>
         </div>
         <div className="flex items-center gap-4 mb-2">
-          <img src={ASSET_URLS.USDC_TOKEN_ICON} alt="USDC Token" className="h-14 w-14 md:h-16 md:w-16" />
+          <img alt="USDC Token" className="h-14 w-14 md:h-16 md:w-16" src={ASSET_URLS.USDC_TOKEN_ICON} />
           <span>Stablecoins</span>
         </div>
         <div className="flex items-center gap-2 mb-2">
           <span>a</span>
           <AnimatePresence mode="wait">
             <motion.div
-              key={currency}
-              initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.5, ease: 'easeInOut' }}
               className="flex items-center gap-2"
+              exit={{ opacity: 0, y: -10 }}
+              initial={{ opacity: 0, y: 10 }}
+              key={currency}
+              transition={{ duration: 0.5, ease: 'easeInOut' }}
             >
               <img
-                src={`https://hatscripts.github.io/circle-flags/flags/${flag}.svg`}
                 alt={`${displayName} flag`}
                 className="h-14 w-14 md:h-16 md:w-16 rounded-full flex-shrink-0"
+                src={`https://hatscripts.github.io/circle-flags/flags/${flag}.svg`}
               />
               <span className="whitespace-nowrap">{displayName}</span>
             </motion.div>
@@ -50,24 +51,24 @@ const AnimatedHeroText: React.FC<Props> = ({ currency = 'COP' }) => {
       <div className="hidden xl:block">
         <div className="flex items-center gap-4 mb-2">
           <span>Cambia</span>
-          <img src={ASSET_URLS.USDC_TOKEN_ICON} alt="USDC Token" className="h-10 w-10 md:h-14 md:w-14" />
+          <img alt="USDC Token" className="h-10 w-10 md:h-14 md:w-14" src={ASSET_URLS.USDC_TOKEN_ICON} />
           <span>Stablecoins</span>
         </div>
         <div className="flex items-center gap-2">
           <span>a</span>
           <AnimatePresence mode="wait">
             <motion.div
-              key={currency}
-              initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.5, ease: 'easeInOut' }}
               className="flex items-center gap-2"
+              exit={{ opacity: 0, y: -10 }}
+              initial={{ opacity: 0, y: 10 }}
+              key={currency}
+              transition={{ duration: 0.5, ease: 'easeInOut' }}
             >
               <img
-                src={`https://hatscripts.github.io/circle-flags/flags/${flag}.svg`}
                 alt={`${displayName} flag`}
                 className="h-10 w-10 md:h-14 md:w-14 rounded-full flex-shrink-0"
+                src={`https://hatscripts.github.io/circle-flags/flags/${flag}.svg`}
               />
               <span className="whitespace-nowrap">{displayName}</span>
             </motion.div>
@@ -76,7 +77,7 @@ const AnimatedHeroText: React.FC<Props> = ({ currency = 'COP' }) => {
         </div>
       </div>
     </div>
-  );
-};
+  )
+}
 
-export default AnimatedHeroText;
+export default AnimatedHeroText

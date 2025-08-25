@@ -1,115 +1,117 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { Button } from "../Button";
-import { ChevronsDown, Loader, CircleDollarSign, Landmark, Timer, Wallet, QrCode } from 'lucide-react';
-import { TokenBadge } from './TokenBadge';
-import { lazy, Suspense } from 'react';
-const IconAnimated = lazy(() => import('../IconAnimated').then(m => ({ default: m.IconAnimated })));
-import { getReverseQuote, _36EnumsTargetCurrency as TargetCurrency, _36EnumsPaymentMethod as PaymentMethod, _36EnumsBlockchainNetwork as BlockchainNetwork, _36EnumsCryptoCurrency as CryptoCurrency } from '../../api/index';
-import { useWalletAuth } from '../../contexts/WalletAuthContext';
-import { kit } from '../../services/stellarKit';
-import { useDebounce } from '../../hooks';
+import { ChevronsDown, CircleDollarSign, Landmark, Loader, QrCode, Timer, Wallet } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { lazy, Suspense } from 'react'
+
+import { Button } from '../Button'
+import { TokenBadge } from './TokenBadge'
+const IconAnimated = lazy(() => import('../IconAnimated').then(m => ({ default: m.IconAnimated })))
+import { _36EnumsBlockchainNetwork as BlockchainNetwork, _36EnumsCryptoCurrency as CryptoCurrency, getReverseQuote, _36EnumsPaymentMethod as PaymentMethod, _36EnumsTargetCurrency as TargetCurrency } from '../../api/index'
+import { useWalletAuth } from '../../contexts/WalletAuthContext'
+import { useDebounce } from '../../hooks'
+import { kit } from '../../services/stellarKit'
 
 // Define props for Swap component
 interface SwapProps {
+  initialSourceAmount?: string
+  initialTargetAmount?: string
+  onAmountsChange?: (params: {
+    currency?: (typeof TargetCurrency)[keyof typeof TargetCurrency]
+    src?: string
+    tgt?: string
+  }) => void
   onContinue: (
     quote_id: string,
     srcAmount: string,
     tgtAmount: string,
     targetCurrency: (typeof TargetCurrency)[keyof typeof TargetCurrency]
-  ) => void;
-  initialSourceAmount?: string;
-  initialTargetAmount?: string;
-  onAmountsChange?: (params: {
-    src?: string;
-    tgt?: string;
-    currency?: (typeof TargetCurrency)[keyof typeof TargetCurrency];
-  }) => void;
-  textColor?: string;
-  onWalletConnect?: () => void;
-  sourceAmount: string;
-  targetAmount: string;
-  targetCurrency: (typeof TargetCurrency)[keyof typeof TargetCurrency];
-  onTargetChange: (amount: number) => Promise<void>;
-  quoteId: string;
-  setQuoteId: (id: string) => void;
-  openQr: () => void; // handler to open QR scanner
+  ) => void
+  onTargetChange: (amount: number) => Promise<void>
+  onWalletConnect?: () => void
+  openQr: () => void // handler to open QR scanner
+  quoteId: string
+  setQuoteId: (id: string) => void
+  sourceAmount: string
+  targetAmount: string
+  targetCurrency: (typeof TargetCurrency)[keyof typeof TargetCurrency]
+  textColor?: string
 }
 
-const COP_TRANSFER_FEE = 0.0;
-const BRL_TRANSFER_FEE = 0.0;
-
+const COP_TRANSFER_FEE = 0.0
+const BRL_TRANSFER_FEE = 0.0
 
 export default function Swap({
+  onAmountsChange,
+  onContinue,
+  onTargetChange,
+  openQr,
+  quoteId,
+  setQuoteId,
   sourceAmount,
   targetAmount,
   targetCurrency,
-  onContinue,
-  onAmountsChange,
   textColor = '#356E6A',
-  onTargetChange,
-  quoteId,
-  setQuoteId,
-  openQr
 }: SwapProps) {
   // Derived formatting and payment method by target currency
-  const targetLocale = targetCurrency === TargetCurrency.BRL ? 'pt-BR' : 'es-CO';
-  const targetSymbol = targetCurrency === TargetCurrency.BRL ? 'R$' : '$';
-  const targetPaymentMethod = targetCurrency === TargetCurrency.BRL ? PaymentMethod.PIX : PaymentMethod.MOVII;
+  const targetLocale = targetCurrency === TargetCurrency.BRL ? 'pt-BR' : 'es-CO'
+  const targetSymbol = targetCurrency === TargetCurrency.BRL ? 'R$' : '$'
+  const targetPaymentMethod = targetCurrency === TargetCurrency.BRL ? PaymentMethod.PIX : PaymentMethod.MOVII
   // Dynamic transfer fee: BRL = 0, COP = 1354
-  const transferFee = targetCurrency === TargetCurrency.BRL ? BRL_TRANSFER_FEE : COP_TRANSFER_FEE;
+  const transferFee = targetCurrency === TargetCurrency.BRL ? BRL_TRANSFER_FEE : COP_TRANSFER_FEE
 
-  const { token, authenticateWithWallet } = useWalletAuth();
-  const [loadingSource, setLoadingSource] = useState(false);
-  const [loadingTarget, setLoadingTarget] = useState(false);
-  const [firstInputEnable, setFirstInputEnable] = useState(true);
-  const [displayedTRM, setDisplayedTRM] = useState(0.000);
-  const sourceDebounceRef = useRef<NodeJS.Timeout | null>(null);
-  const targetDebounceRef = useRef<NodeJS.Timeout | null>(null);
+  const { authenticateWithWallet, token } = useWalletAuth()
+  const [loadingSource, setLoadingSource] = useState(false)
+  const [loadingTarget, setLoadingTarget] = useState(false)
+  const [firstInputEnable, setFirstInputEnable] = useState(true)
+  const [displayedTRM, setDisplayedTRM] = useState(0.000)
+  const sourceDebounceRef = useRef<NodeJS.Timeout | null>(null)
+  const targetDebounceRef = useRef<NodeJS.Timeout | null>(null)
   // New: selected target currency (COP | BRL)
   // Dropdown state for currency selection
-  const [currencyMenuOpen, setCurrencyMenuOpen] = useState(false);
-  const currencyMenuRef = useRef<HTMLDivElement | null>(null);
-  const [amount, setAmount] = useState('');
-  const [target, setTarget] = useState('');
-  const sourceDebouncedAmount = useDebounce(amount, 500); // 500ms delay
+  const [currencyMenuOpen, setCurrencyMenuOpen] = useState(false)
+  const currencyMenuRef = useRef<HTMLDivElement | null>(null)
+  const [amount, setAmount] = useState('')
+  const [target, setTarget] = useState('')
+  const sourceDebouncedAmount = useDebounce(amount, 500) // 500ms delay
   const targetDebounceAmount = useDebounce(target, 500)
 
   const isButtonDisabled = () => {
-    const numericSource = parseFloat(String(sourceAmount));
+    const numericSource = parseFloat(String(sourceAmount))
     // Clean targetAmount: remove thousands separators (.), change decimal separator (,) to .
-    const cleanedTarget = String(targetAmount).replace(/\./g, '').replace(/,/g, '.');
-    const numericTarget = parseFloat(cleanedTarget);
-    return !(numericSource > 0 && numericTarget > 0);
-  };
+    const cleanedTarget = String(targetAmount).replace(/\./g, '').replace(/,/g, '.')
+    const numericTarget = parseFloat(cleanedTarget)
+    return !(numericSource > 0 && numericTarget > 0)
+  }
 
   const formatTargetNumber = useCallback((value: number) =>
-    new Intl.NumberFormat(targetLocale, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value), [targetLocale]);
+    new Intl.NumberFormat(targetLocale, { maximumFractionDigits: 2, minimumFractionDigits: 2 }).format(value), [targetLocale])
 
   const fetchDirectConversion = useCallback(async (value: string) => {
-    const num = parseFloat(value);
+    const num = parseFloat(value)
     if (isNaN(num)) {
-      onTargetChange?.(0);
-      return;
+      onTargetChange?.(0)
+      return
     }
-    setLoadingTarget(true);
+    setLoadingTarget(true)
     try {
-      console.log('Fetching reverse quote for source amount:', num);
+      console.log('Fetching reverse quote for source amount:', num)
       const response = await getReverseQuote({
-        target_currency: targetCurrency,
-        source_amount: num,
-        payment_method: targetPaymentMethod,
-        network: BlockchainNetwork.STELLAR,
         crypto_currency: CryptoCurrency.USDC,
-      });
+        network: BlockchainNetwork.STELLAR,
+        payment_method: targetPaymentMethod,
+        source_amount: num,
+        target_currency: targetCurrency,
+      })
       if (response.status === 200) {
-        const formatted = formatTargetNumber(response.data.value);
-        setQuoteId(response.data.quote_id); // Add this line
-        onAmountsChange?.({ src: value, tgt: formatted });
+        const formatted = formatTargetNumber(response.data.value)
+        setQuoteId(response.data.quote_id) // Add this line
+        onAmountsChange?.({ src: value, tgt: formatted })
       }
-    } catch (error: unknown) {
-      console.error('Reverse quote error', error);
-    } finally {
-      setLoadingTarget(false);
+    }
+    catch (error: unknown) {
+      console.error('Reverse quote error', error)
+    }
+    finally {
+      setLoadingTarget(false)
     }
   }, [
     formatTargetNumber,
@@ -117,294 +119,317 @@ export default function Swap({
     onTargetChange,
     setQuoteId,
     targetCurrency,
-    targetPaymentMethod
-  ]);
+    targetPaymentMethod,
+  ])
 
   const fetchReverseConversion = useCallback(async (value: string) => {
     // allow digits, dots and commas; normalize commas to dots for parse
-    const raw = value.replace(/[^0-9.,]/g, '');
-    const normalized = raw.replace(/\./g, '').replace(/,/g, '.');
-    const num = parseFloat(normalized);
+    const raw = value.replace(/[^0-9.,]/g, '')
+    const normalized = raw.replace(/\./g, '').replace(/,/g, '.')
+    const num = parseFloat(normalized)
     if (isNaN(num)) {
-      onAmountsChange?.({ src: '' });
-      return;
+      onAmountsChange?.({ src: '' })
+      return
     }
-    setLoadingSource(true);
+    setLoadingSource(true)
     try {
-      await onTargetChange(num);
-    } catch (error: unknown) {
-      console.error('Quote error', error);
-    } finally {
-      setLoadingSource(false);
+      await onTargetChange(num)
+    }
+    catch (error: unknown) {
+      console.error('Quote error', error)
+    }
+    finally {
+      setLoadingSource(false)
     }
   }, [onAmountsChange, onTargetChange])
 
   const handleSourceFocus = () => {
     // strip any formatting to show raw numbers
-    onAmountsChange?.({ src: sourceAmount.replace(/[^0-9.]/g, '') });
-  };
+    onAmountsChange?.({ src: sourceAmount.replace(/[^0-9.]/g, '') })
+  }
 
   const handleSourceBlur = () => {
-    const num = parseFloat(sourceAmount);
+    const num = parseFloat(sourceAmount)
     if (isNaN(num)) {
-      onAmountsChange?.({ src: '' });
-    } else {
-      onAmountsChange?.({ src: num.toFixed(2) });
+      onAmountsChange?.({ src: '' })
     }
-  };
+    else {
+      onAmountsChange?.({ src: num.toFixed(2) })
+    }
+  }
 
   const handleTargetBlur = () => {
-    const clean = targetAmount.replace(/[^0-9.,]/g, '');
-    const normalized = clean.replace(/\./g, '').replace(/,/g, '.');
-    const num = parseFloat(normalized);
+    const clean = targetAmount.replace(/[^0-9.,]/g, '')
+    const normalized = clean.replace(/\./g, '').replace(/,/g, '.')
+    const num = parseFloat(normalized)
     if (isNaN(num)) {
-      onAmountsChange?.({ tgt: '' });
-    } else {
-      // final numeric format with separators
-      onAmountsChange?.({ tgt: formatTargetNumber(num) });
+      onAmountsChange?.({ tgt: '' })
     }
-  };
+    else {
+      // final numeric format with separators
+      onAmountsChange?.({ tgt: formatTargetNumber(num) })
+    }
+  }
 
   // Direct wallet connection handler
   const handleDirectWalletConnect = () => {
     kit.openModal({
       onWalletSelected: async (option) => {
-        authenticateWithWallet(option.id);
+        authenticateWithWallet(option.id)
       },
-    });
-  };
+    })
+  }
 
   useEffect(() => {
     if (!loadingSource && !loadingTarget) {
-      const numericSource = parseFloat(sourceAmount);
+      const numericSource = parseFloat(sourceAmount)
       // Normalize targetAmount (which might have formatting) to a standard number string for parsing
-      const cleanedTarget = target.replace(/\./g, '').replace(/,/g, '.');
-      const numericTarget = parseFloat(cleanedTarget);
+      const cleanedTarget = target.replace(/\./g, '').replace(/,/g, '.')
+      const numericTarget = parseFloat(cleanedTarget)
 
       if (numericSource > 0 && !isNaN(numericTarget) && numericTarget >= 0) {
-        setDisplayedTRM((numericTarget + transferFee) / numericSource);
-      } else {
-        setDisplayedTRM(0.000);
+        setDisplayedTRM((numericTarget + transferFee) / numericSource)
+      }
+      else {
+        setDisplayedTRM(0.000)
       }
     }
     // If loadingSource or loadingTarget is true, displayedTRM remains unchanged.
-  }, [sourceAmount, targetAmount, loadingSource, loadingTarget, transferFee, target]); // TransferFee is a module-level const
+  }, [sourceAmount, targetAmount, loadingSource, loadingTarget, transferFee, target]) // TransferFee is a module-level const
 
   useEffect(() => {
     if (sourceDebouncedAmount) {
-      setFirstInputEnable(true);
-      fetchDirectConversion(sourceDebouncedAmount);
+      setFirstInputEnable(true)
+      fetchDirectConversion(sourceDebouncedAmount)
     }
-  }, [sourceDebouncedAmount, fetchDirectConversion]);
+  }, [sourceDebouncedAmount, fetchDirectConversion])
 
   useEffect(() => {
     if (targetDebounceAmount) {
-      setFirstInputEnable(false);
-      fetchReverseConversion(targetDebounceAmount);
+      setFirstInputEnable(false)
+      fetchReverseConversion(targetDebounceAmount)
     }
-  }, [targetDebounceAmount, fetchReverseConversion]);
+  }, [targetDebounceAmount, fetchReverseConversion])
 
   // Close currency dropdown on outside click
   useEffect(() => {
     const onDocClick = (e: MouseEvent) => {
       if (currencyMenuRef.current && !currencyMenuRef.current.contains(e.target as Node)) {
-        setCurrencyMenuOpen(false);
+        setCurrencyMenuOpen(false)
       }
-    };
-    document.addEventListener('mousedown', onDocClick);
-    return () => document.removeEventListener('mousedown', onDocClick);
-  }, []);
-
-
+    }
+    document.addEventListener('mousedown', onDocClick)
+    return () => document.removeEventListener('mousedown', onDocClick)
+  }, [])
 
   // Reset values when switching target currency to avoid stale quotes
   useEffect(() => {
-    setQuoteId('');
-    setDisplayedTRM(0);
-    onAmountsChange?.({ src: '', tgt: '', currency: targetCurrency });
+    setQuoteId('')
+    setDisplayedTRM(0)
+    onAmountsChange?.({ currency: targetCurrency, src: '', tgt: '' })
     // clear any pending debounce
-    if (sourceDebounceRef.current) clearTimeout(sourceDebounceRef.current);
-    if (targetDebounceRef.current) clearTimeout(targetDebounceRef.current);
+    if (sourceDebounceRef.current) clearTimeout(sourceDebounceRef.current)
+    if (targetDebounceRef.current) clearTimeout(targetDebounceRef.current)
   }, [onAmountsChange, setQuoteId, targetCurrency])
 
   return (
     <div className="flex-1 flex items-center justify-center w-full flex flex-col">
-      <div id="background-container"
+      <div
         className="w-[90%] max-w-md min-h-[60vh] bg-[#356E6A]/5 backdrop-blur-xl rounded-4xl p-4 md:p-6 flex flex-col items-center justify-center space-y-1 lg:space-y-4"
+        id="background-container"
       >
         {/* Title */}
         <div className="flex-1 flex items-center justify-space-between">
-          <div id="Title" className="flex items-center gap-2 text-xl md:text-xl font-bold" style={{ color: textColor }}>
+          <div className="flex items-center gap-2 text-xl md:text-xl font-bold" id="Title" style={{ color: textColor }}>
             <span>¿Cuánto deseas cambiar?</span>
-            {targetCurrency === TargetCurrency.BRL && (<button
-              type="button"
-              onClick={openQr}
-              aria-label="Escanear QR"
-              className="p-2 cursor-pointer rounded-full hover:bg-white/30 focus:outline-none focus:ring-2 focus:ring-[#356E6A]/40 transition"
-            >
-              <QrCode className="w-6 h-6" style={{ color: textColor }} />
-            </button>)}
+            {targetCurrency === TargetCurrency.BRL && (
+              <button
+                aria-label="Escanear QR"
+                className="p-2 cursor-pointer rounded-full hover:bg-white/30 focus:outline-none focus:ring-2 focus:ring-[#356E6A]/40 transition"
+                onClick={openQr}
+                type="button"
+              >
+                <QrCode className="w-6 h-6" style={{ color: textColor }} />
+              </button>
+            )}
           </div>
         </div>
 
         {/* SOURCE */}
         <div
-          id="source-amount"
           className="w-full bg-white/60 backdrop-blur-xl rounded-2xl p-4 md:py-6 md:px-6 flex items-center justify-between"
+          id="source-amount"
         >
           <div className="flex-1 flex items-center gap-2 min-w-0">
             <span className="text-xl md:text-2xl font-bold shrink-0" style={{ color: textColor }}>$</span>
-            {loadingSource ? (
-              <Loader className="animate-spin w-6 h-6" style={{ color: textColor }} />
-            ) : (
-              <input
-                type="text"
-                inputMode="decimal"
-                pattern="[0-9.]*"
-                value={firstInputEnable ? amount : sourceAmount}
-                onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ''))}
-                onFocus={handleSourceFocus}
-                onBlur={handleSourceBlur}
-                placeholder="0.00"
-                className="w-full bg-transparent font-bold focus:outline-none text-xl md:text-2xl"
-                style={{ color: textColor }}
-              />
-            )}
+            {loadingSource
+              ? (
+                  <Loader className="animate-spin w-6 h-6" style={{ color: textColor }} />
+                )
+              : (
+                  <input
+                    className="w-full bg-transparent font-bold focus:outline-none text-xl md:text-2xl"
+                    inputMode="decimal"
+                    onBlur={handleSourceBlur}
+                    onChange={e => setAmount(e.target.value.replace(/[^0-9.]/g, ''))}
+                    onFocus={handleSourceFocus}
+                    pattern="[0-9.]*"
+                    placeholder="0.00"
+                    style={{ color: textColor }}
+                    type="text"
+                    value={firstInputEnable ? amount : sourceAmount}
+                  />
+                )}
           </div>
           <TokenBadge
-            iconSrc="https://storage.googleapis.com/cdn-abroad/Icons/Tokens/USDC%20Token.svg"
             alt="USDC Token Logo"
+            iconSrc="https://storage.googleapis.com/cdn-abroad/Icons/Tokens/USDC%20Token.svg"
             symbol="USDC"
           />
         </div>
 
         {/* TARGET */}
-        {token ? (
-          <div
-            id="target-amount"
-            className="relative w-full bg-white/60 backdrop-blur-xl rounded-2xl p-4 md:py-6 md:px-6 flex items-center justify-between"
-          >
-            {/* chevrons */}
-            <div className="absolute -top-4 left-1/2 -translate-x-1/2 w-8 h-8 bg-[#356E6A]/5 rounded-full grid place-items-center">
-              <ChevronsDown color="#356E6A" className="w-4 h-4" />
-            </div>
-
-            {/* input */}
-            <div className="flex-1 flex items-center gap-2 min-w-0">
-              <span className="text-xl md:text-2xl font-bold shrink-0" style={{ color: textColor }}>
-                {targetSymbol}
-              </span>
-              {loadingTarget ? (
-                <Loader className="animate-spin w-6 h-6" style={{ color: textColor }} />
-              ) : (
-                <input
-                  type="text"
-                  inputMode="decimal"
-                  pattern="[0-9.,]*"
-                  value={!firstInputEnable ? target : targetAmount}
-                  onChange={(e) => setTarget(e.target.value.replace(/[^0-9.]/g, ''))}
-                  onBlur={handleTargetBlur}
-                  placeholder="0,00"
-                  className="w-full bg-transparent font-bold focus:outline-none text-xl md:text-2xl"
-                  style={{ color: textColor }}
-                />
-              )}
-            </div>
-
-            {/* selector de moneda */}
-            <div className="relative ml-2 shrink-0" ref={currencyMenuRef}>
-              <button
-                type="button"
-                onClick={() => setCurrencyMenuOpen(v => !v)}
-                className="focus:outline-none cursor-pointer"
-                aria-haspopup="listbox"
-                aria-expanded={currencyMenuOpen}
+        {token
+          ? (
+              <div
+                className="relative w-full bg-white/60 backdrop-blur-xl rounded-2xl p-4 md:py-6 md:px-6 flex items-center justify-between"
+                id="target-amount"
               >
-                <TokenBadge
-                  iconSrc={
-                    targetCurrency === TargetCurrency.BRL
-                      ? 'https://hatscripts.github.io/circle-flags/flags/br.svg'
-                      : 'https://hatscripts.github.io/circle-flags/flags/co.svg'
-                  }
-                  alt={`${targetCurrency} Flag`}
-                  symbol={targetCurrency}
-                />
-              </button>
-
-              {currencyMenuOpen && (
-                <div
-                  className="absolute left-0 top-[calc(100%+8px)] z-50 bg-white/95 backdrop-blur-xl rounded-xl shadow-lg p-2 space-y-1 min-w-[100px]"
-                  role="listbox"
-                >
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setCurrencyMenuOpen(false);
-                      // Notify parent about currency change to update global state (e.g., background)
-                      onAmountsChange?.({ src: sourceAmount, tgt: targetAmount, currency: TargetCurrency.COP });
-                    }}
-                    className="w-full text-left hover:bg-black/5 rounded-lg px-1 py-1 cursor-pointer"
-                    role="option"
-                    aria-selected={targetCurrency === TargetCurrency.COP}
-                  >
-                    <TokenBadge
-                      iconSrc="https://hatscripts.github.io/circle-flags/flags/co.svg"
-                      alt="Colombia flag"
-                      symbol="COP"
-                    />
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setCurrencyMenuOpen(false);
-                      // Notify parent about currency change to update global state (e.g., background)
-                      onAmountsChange?.({ src: sourceAmount, tgt: targetAmount, currency: TargetCurrency.BRL });
-                    }}
-                    className="cursor-pointer w-full text-left hover:bg-black/5 rounded-lg px-1 py-1"
-                    role="option"
-                    aria-selected={targetCurrency === TargetCurrency.BRL}
-                  >
-                    <TokenBadge
-                      iconSrc="https://hatscripts.github.io/circle-flags/flags/br.svg"
-                      alt="Brazil flag"
-                      symbol="BRL"
-                    />
-                  </button>
+                {/* chevrons */}
+                <div className="absolute -top-4 left-1/2 -translate-x-1/2 w-8 h-8 bg-[#356E6A]/5 rounded-full grid place-items-center">
+                  <ChevronsDown className="w-4 h-4" color="#356E6A" />
                 </div>
-              )}
-            </div>
-          </div>
-        ) : (
-          <div className="w-full bg-white/60 backdrop-blur-xl rounded-2xl p-4 md:py-6 md:px-6 flex items-center justify-center gap-4">
-            <div className="flex-shrink-0">
-              <Suspense fallback={null}>
-                <IconAnimated icon="Denied" size={40} trigger="once" />
-              </Suspense>
-            </div>
-            <div className="flex flex-col space-y-1">
-              <span className="text-lg font-semibold" style={{ color: textColor }}>
-                Conecta tu billetera para poder cotizar
-              </span>
-            </div>
-          </div>
-        )}
 
+                {/* input */}
+                <div className="flex-1 flex items-center gap-2 min-w-0">
+                  <span className="text-xl md:text-2xl font-bold shrink-0" style={{ color: textColor }}>
+                    {targetSymbol}
+                  </span>
+                  {loadingTarget
+                    ? (
+                        <Loader className="animate-spin w-6 h-6" style={{ color: textColor }} />
+                      )
+                    : (
+                        <input
+                          className="w-full bg-transparent font-bold focus:outline-none text-xl md:text-2xl"
+                          inputMode="decimal"
+                          onBlur={handleTargetBlur}
+                          onChange={e => setTarget(e.target.value.replace(/[^0-9.]/g, ''))}
+                          pattern="[0-9.,]*"
+                          placeholder="0,00"
+                          style={{ color: textColor }}
+                          type="text"
+                          value={!firstInputEnable ? target : targetAmount}
+                        />
+                      )}
+                </div>
+
+                {/* selector de moneda */}
+                <div className="relative ml-2 shrink-0" ref={currencyMenuRef}>
+                  <button
+                    aria-expanded={currencyMenuOpen}
+                    aria-haspopup="listbox"
+                    className="focus:outline-none cursor-pointer"
+                    onClick={() => setCurrencyMenuOpen(v => !v)}
+                    type="button"
+                  >
+                    <TokenBadge
+                      alt={`${targetCurrency} Flag`}
+                      iconSrc={
+                        targetCurrency === TargetCurrency.BRL
+                          ? 'https://hatscripts.github.io/circle-flags/flags/br.svg'
+                          : 'https://hatscripts.github.io/circle-flags/flags/co.svg'
+                      }
+                      symbol={targetCurrency}
+                    />
+                  </button>
+
+                  {currencyMenuOpen && (
+                    <div
+                      className="absolute left-0 top-[calc(100%+8px)] z-50 bg-white/95 backdrop-blur-xl rounded-xl shadow-lg p-2 space-y-1 min-w-[100px]"
+                      role="listbox"
+                    >
+                      <button
+                        aria-selected={targetCurrency === TargetCurrency.COP}
+                        className="w-full text-left hover:bg-black/5 rounded-lg px-1 py-1 cursor-pointer"
+                        onClick={() => {
+                          setCurrencyMenuOpen(false)
+                          // Notify parent about currency change to update global state (e.g., background)
+                          onAmountsChange?.({ currency: TargetCurrency.COP, src: sourceAmount, tgt: targetAmount })
+                        }}
+                        role="option"
+                        type="button"
+                      >
+                        <TokenBadge
+                          alt="Colombia flag"
+                          iconSrc="https://hatscripts.github.io/circle-flags/flags/co.svg"
+                          symbol="COP"
+                        />
+                      </button>
+
+                      <button
+                        aria-selected={targetCurrency === TargetCurrency.BRL}
+                        className="cursor-pointer w-full text-left hover:bg-black/5 rounded-lg px-1 py-1"
+                        onClick={() => {
+                          setCurrencyMenuOpen(false)
+                          // Notify parent about currency change to update global state (e.g., background)
+                          onAmountsChange?.({ currency: TargetCurrency.BRL, src: sourceAmount, tgt: targetAmount })
+                        }}
+                        role="option"
+                        type="button"
+                      >
+                        <TokenBadge
+                          alt="Brazil flag"
+                          iconSrc="https://hatscripts.github.io/circle-flags/flags/br.svg"
+                          symbol="BRL"
+                        />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )
+          : (
+              <div className="w-full bg-white/60 backdrop-blur-xl rounded-2xl p-4 md:py-6 md:px-6 flex items-center justify-center gap-4">
+                <div className="flex-shrink-0">
+                  <Suspense fallback={null}>
+                    <IconAnimated icon="Denied" size={40} trigger="once" />
+                  </Suspense>
+                </div>
+                <div className="flex flex-col space-y-1">
+                  <span className="text-lg font-semibold" style={{ color: textColor }}>
+                    Conecta tu billetera para poder cotizar
+                  </span>
+                </div>
+              </div>
+            )}
 
         <div className="flex-1 flex items-center justify-center w-full">
-          <div id="tx-info" className="w-full" style={{ color: textColor }}>
+          <div className="w-full" id="tx-info" style={{ color: textColor }}>
             <div className="flex flex-col space-y-2">
-              <div id="trm" className="flex items-center space-x-2">
+              <div className="flex items-center space-x-2" id="trm">
                 <CircleDollarSign className="w-5 h-5" />
-                <span>Tasa de Cambio: <b>{displayedTRM === 0 ? '-' : `${targetSymbol}${formatTargetNumber(displayedTRM)}`}</b></span>
+                <span>
+                  Tasa de Cambio:
+                  <b>{displayedTRM === 0 ? '-' : `${targetSymbol}${formatTargetNumber(displayedTRM)}`}</b>
+                </span>
               </div>
-              <div id="transfer-fee" className="flex items-center space-x-2">
+              <div className="flex items-center space-x-2" id="transfer-fee">
                 <Landmark className="w-5 h-5" />
-                <span>Costo de Transferencia: <b>{targetSymbol}{formatTargetNumber(transferFee)}</b></span>
+                <span>
+                  Costo de Transferencia:
+                  <b>
+                    {targetSymbol}
+                    {formatTargetNumber(transferFee)}
+                  </b>
+                </span>
               </div>
-              <div id="time" className="flex items-center space-x-2">
+              <div className="flex items-center space-x-2" id="time">
                 <Timer className="w-5 h-5" />
-                <span>Tiempo: <b>10 - 30 segundos</b></span>
+                <span>
+                  Tiempo:
+                  <b>10 - 30 segundos</b>
+                </span>
               </div>
             </div>
           </div>
@@ -413,30 +438,33 @@ export default function Swap({
 
       <Button
         className="mt-4 w-[90%] max-w-md py-4 cursor-pointer"
+        disabled={!!token && (isButtonDisabled() || !quoteId)}
         onClick={() => {
           if (!token) {
             // Always use direct wallet connection - prioritize the internal handler
-            handleDirectWalletConnect();
-          } else {
-            console.log('Continue clicked with quote_id:', quoteId);
+            handleDirectWalletConnect()
+          }
+          else {
+            console.log('Continue clicked with quote_id:', quoteId)
             if (!quoteId) {
-              alert('Please wait for the quote to load before continuing');
-              return;
+              alert('Please wait for the quote to load before continuing')
+              return
             }
-            onContinue(quoteId, sourceAmount, targetAmount, targetCurrency);
+            onContinue(quoteId, sourceAmount, targetAmount, targetCurrency)
           }
         }}
-        disabled={!!token && (isButtonDisabled() || !quoteId)}
       >
-        {!token ? (
-          <div className="flex items-center justify-center space-x-2">
-            <Wallet className="w-5 h-5" />
-            <span>Conectar Billetera</span>
-          </div>
-        ) : (
-          'Continuar'
-        )}
+        {!token
+          ? (
+              <div className="flex items-center justify-center space-x-2">
+                <Wallet className="w-5 h-5" />
+                <span>Conectar Billetera</span>
+              </div>
+            )
+          : (
+              'Continuar'
+            )}
       </Button>
     </div>
-  );
+  )
 }

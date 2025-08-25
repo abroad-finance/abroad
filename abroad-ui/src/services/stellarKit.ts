@@ -7,15 +7,15 @@ import {
   StellarWalletsKit,
   WalletNetwork,
   xBullModule,
-} from '@creit.tech/stellar-wallets-kit';
+} from '@creit.tech/stellar-wallets-kit'
+import { LedgerModule } from '@creit.tech/stellar-wallets-kit/modules/ledger.module'
 import {
   WalletConnectAllowedMethods,
   WalletConnectModule,
-} from '@creit.tech/stellar-wallets-kit/modules/walletconnect.module';
-import { LedgerModule } from '@creit.tech/stellar-wallets-kit/modules/ledger.module';
+} from '@creit.tech/stellar-wallets-kit/modules/walletconnect.module'
 
 // Basic mobile detection (UA based) – sufficient for gating wallet options
-const isMobile = typeof window !== 'undefined' && /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+const isMobile = typeof window !== 'undefined' && /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
 
 const walletConnectModule = new WalletConnectModule({
   description: 'Abroad bridges USDC on Stellar with real-time payment networks around the world, enabling seamless crypto-fiat payments. You will be able to pay anywhere in Brazil and Colombia with your USDC.',
@@ -25,7 +25,7 @@ const walletConnectModule = new WalletConnectModule({
   network: WalletNetwork.PUBLIC,
   projectId: '5686074a7981cd147a5f0d7434a6d4b7',
   url: 'https://app.abroad.finance',
-});
+})
 
 // If mobile, expose only WalletConnect; otherwise include full set
 const modules = isMobile
@@ -39,9 +39,9 @@ const modules = isMobile
       new HotWalletModule(),
       new xBullModule(),
       new HanaModule(),
-    ];
+    ]
 
 export const kit: StellarWalletsKit = new StellarWalletsKit({
-  network: WalletNetwork.PUBLIC,
   modules,
-});
+  network: WalletNetwork.PUBLIC,
+})

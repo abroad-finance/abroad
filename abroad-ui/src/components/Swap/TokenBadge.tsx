@@ -1,18 +1,18 @@
-import React from 'react';
+import React from 'react'
 
 interface TokenBadgeProps {
-  iconSrc: string;  // token icon URL
-  symbol: string;   // token symbol text
-  alt?: string;     // alt text for icon
+  alt?: string // alt text for icon
+  iconSrc: string // token icon URL
+  symbol: string // token symbol text
 }
 
-export const TokenBadge: React.FC<TokenBadgeProps> = ({ iconSrc, symbol, alt }) => (
+export const TokenBadge: React.FC<TokenBadgeProps> = ({ alt, iconSrc, symbol }) => (
   <div className="bg-white/60 backdrop-blur-xl rounded-4xl px-4 py-2 flex items-center justify-center">
     <img
-      src={iconSrc}
       alt={alt || symbol}
       className="w-8 h-8 mr-2"
+      src={iconSrc}
     />
     <span>{symbol}</span>
   </div>
-);
+)

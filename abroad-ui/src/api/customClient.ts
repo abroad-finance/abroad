@@ -1,53 +1,53 @@
-import { AxiosError } from "axios";
+import { AxiosError } from 'axios'
 
-const baseURL = import.meta.env.VITE_API_URL || 'https://api.abroad.finance';
+const baseURL = import.meta.env.VITE_API_URL || 'https://api.abroad.finance'
 
 export const customClient = async <T>(
-    url: string,
-    {
-        method,
-        params,
-        body,
-        headers = []
-    }: {
-        method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
-        params?: Record<string, string>;
-        body?: BodyInit | null;
-        responseType?: string;
-        headers?: HeadersInit;
-    },
+  url: string,
+  {
+    body,
+    headers = [],
+    method,
+    params,
+  }: {
+    body?: BodyInit | null
+    headers?: HeadersInit
+    method: 'DELETE' | 'GET' | 'PATCH' | 'POST' | 'PUT'
+    params?: Record<string, string>
+    responseType?: string
+  },
 ): Promise<T> => {
-    let targetUrl = `${baseURL}${url}`;
+  let targetUrl = `${baseURL}${url}`
 
-    if (params) {
-        targetUrl += '?' + new URLSearchParams(params);
+  if (params) {
+    targetUrl += '?' + new URLSearchParams(params)
+  }
+
+  let token: null | string = null
+
+  const tokenFromStorage = localStorage.getItem('token')
+  if (tokenFromStorage) {
+    token = tokenFromStorage
+    headers = {
+      ...headers,
+      Authorization: `Bearer ${token}`,
     }
+  }
 
-    let token: string | null = null;
+  const response = await fetch(targetUrl, {
+    body,
+    headers,
+    method,
+  })
 
-    const tokenFromStorage = localStorage.getItem('token');
-    if (tokenFromStorage) {
-        token = tokenFromStorage;
-        headers = {
-            ...headers,
-            Authorization: `Bearer ${token}`
-        };
-    }
+  return {
+    data: await response.json(),
+    status: response.status,
+    statusText: response.statusText,
+  } as unknown as T
+}
 
-    const response = await fetch(targetUrl, {
-        method,
-        body,
-        headers
-    });
+export default customClient
 
-    return {
-        status: response.status,
-        statusText: response.statusText,
-        data: await response.json(),
-    } as unknown as T;
-};
-
-export default customClient;
-
-export type ErrorType<Error> = AxiosError<Error>;
-export type BodyType<BodyData> = BodyData;
+export type BodyType<BodyData> = BodyData
+export type ErrorType<Error> = AxiosError<Error>

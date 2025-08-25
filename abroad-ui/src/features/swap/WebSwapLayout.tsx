@@ -1,76 +1,78 @@
 // WebSwapLayout.tsx
-import React from 'react';
-import Swap from '../../components/Swap/Swap';
-import BankDetailsRoute from '../../components/Swap/BankDetailsRoute';
-import AnimatedHeroText from '../../components/common/AnimatedHeroText';
-import ImageAttribution from '../../components/common/ImageAttribution';
-import BackgroundCrossfade from '../../components/common/BackgroundCrossfade';
-import { ASSET_URLS, BRL_BACKGROUND_IMAGE } from './webSwap.constants';
-import { useWebSwapController } from './useWebSwapController'; // For prop types
-import { kit } from '../../services/stellarKit';
-import { useWalletAuth } from '../../contexts/WalletAuthContext';
-import TxStatus from '../../components/Swap/TxStatus';
-import UserVerification from '../../components/WebSwap/UserVerification';
+import React from 'react'
 
-type LayoutProps = ReturnType<typeof useWebSwapController>;
+import AnimatedHeroText from '../../components/common/AnimatedHeroText'
+import BackgroundCrossfade from '../../components/common/BackgroundCrossfade'
+import ImageAttribution from '../../components/common/ImageAttribution'
+import BankDetailsRoute from '../../components/Swap/BankDetailsRoute'
+import Swap from '../../components/Swap/Swap'
+import TxStatus from '../../components/Swap/TxStatus'
+import UserVerification from '../../components/WebSwap/UserVerification'
+import { useWalletAuth } from '../../contexts/WalletAuthContext'
+import { kit } from '../../services/stellarKit'
+import { useWebSwapController } from './useWebSwapController' // For prop types
+import { ASSET_URLS, BRL_BACKGROUND_IMAGE } from './webSwap.constants'
+
+type LayoutProps = ReturnType<typeof useWebSwapController>
 
 const WebSwapLayout: React.FC<LayoutProps> = (props) => {
   const {
-    view,
-    swapData,
     address,
-    handleSwapContinue,
+    handleAmountsChange,
     handleBackToSwap,
+    handleSwapContinue,
+    handleTargetChange,
     handleTransactionComplete,
     handleTransactionFailed,
-    handleAmountsChange,
     handleWalletConnectOpen,
-    sourceAmount,
-    targetAmount,
-    targetCurrency,
-    handleTargetChange,
-    quoteId,
-    setQuoteId,
     pixKey,
+    quoteId,
+    redirectToKYCAuth,
+    resetForNewTransaction,
     setPixKey,
+    setQuoteId,
     // new handlers/state for tx status view
     showTxStatus,
-    resetForNewTransaction,
-    redirectToKYCAuth,
+    sourceAmount,
+    swapData,
+    targetAmount,
+    targetCurrency,
     transactionId,
-  } = props;
+    view,
+  } = props
 
-  const { authenticateWithWallet, kycUrl } = useWalletAuth();
+  const { authenticateWithWallet, kycUrl } = useWalletAuth()
 
   // Marketing background for mobile hero
-  const currentBgUrl =
-    props.targetCurrency === 'BRL'
+  const currentBgUrl
+    = props.targetCurrency === 'BRL'
       ? BRL_BACKGROUND_IMAGE
-      : ASSET_URLS.BACKGROUND_IMAGE;
+      : ASSET_URLS.BACKGROUND_IMAGE
 
   // Direct wallet connection (used on mobile and as desktop fallback)
   const handleDirectWalletConnect = React.useCallback(() => {
     kit.openModal({
       onWalletSelected: async (option) => {
-        authenticateWithWallet(option.id);
+        authenticateWithWallet(option.id)
       },
-    });
-  }, [authenticateWithWallet]);
+    })
+  }, [authenticateWithWallet])
 
   // Prefer controller-provided handler on desktop; fallback to direct connect
-  const onDesktopWalletConnect = handleWalletConnectOpen || handleDirectWalletConnect;
+  const onDesktopWalletConnect = handleWalletConnectOpen || handleDirectWalletConnect
 
   // Shared renderer for Swap + BankDetails
   const renderSwap = (isDesktop: boolean) => {
-    const textColorProps = isDesktop ? ({ textColor: 'white' } as const) : undefined;
+    const textColorProps = isDesktop ? ({ textColor: 'white' } as const) : undefined
 
-  const handleKycRedirect = () => {
-    if(kycUrl){
-      window.location.href = kycUrl;
-    }else {
-      alert('No KYC url finded');
+    const handleKycRedirect = () => {
+      if (kycUrl) {
+        window.location.href = kycUrl
+      }
+      else {
+        alert('No KYC url finded')
+      }
     }
-  }
 
     return (
       <div className="w-full max-w-md">
@@ -80,22 +82,22 @@ const WebSwapLayout: React.FC<LayoutProps> = (props) => {
 
         {view === 'swap' && (
           <Swap
+            onAmountsChange={handleAmountsChange}
             onContinue={(quote_id, srcAmount, tgtAmount, targetCurrency) => {
               console.log(
                 `${isDesktop ? 'Desktop' : 'Mobile'} onContinue called with:`,
-                { quote_id, srcAmount, tgtAmount, targetCurrency }
-              );
-              handleSwapContinue({ quote_id, srcAmount, tgtAmount, targetCurrency });
+                { quote_id, srcAmount, targetCurrency, tgtAmount },
+              )
+              handleSwapContinue({ quote_id, srcAmount, targetCurrency, tgtAmount })
             }}
-            onAmountsChange={handleAmountsChange}
+            onTargetChange={handleTargetChange}
             onWalletConnect={isDesktop ? onDesktopWalletConnect : handleDirectWalletConnect}
+            openQr={props.openQr}
+            quoteId={quoteId}
+            setQuoteId={setQuoteId}
             sourceAmount={sourceAmount}
             targetAmount={targetAmount}
             targetCurrency={targetCurrency}
-            onTargetChange={handleTargetChange}
-            quoteId={quoteId}
-            setQuoteId={setQuoteId}
-            openQr={props.openQr}
             {...(textColorProps ?? {})}
           />
         )}
@@ -104,38 +106,38 @@ const WebSwapLayout: React.FC<LayoutProps> = (props) => {
           <>
             {console.log(
               `${isDesktop ? 'Desktop' : 'Mobile'} rendering BankDetailsRoute with swapData:`,
-              swapData
+              swapData,
             )}
             <BankDetailsRoute
               onBackClick={handleBackToSwap}
+              onKycRedirect={redirectToKYCAuth}
               onTransactionComplete={handleTransactionComplete}
               onTransactionFailed={handleTransactionFailed}
-              onKycRedirect={redirectToKYCAuth}
               onTransactionSigned={(id, ref) => showTxStatus(id, ref)}
+              pixKey={pixKey}
               quote_id={swapData.quote_id}
+              setPixKey={setPixKey}
               sourceAmount={swapData.srcAmount}
               targetAmount={swapData.tgtAmount}
-              userId={address}
               targetCurrency={swapData.targetCurrency}
-              pixKey={pixKey}
-              setPixKey={setPixKey}
+              userId={address}
               {...(textColorProps ?? {})}
-              taxId={props.taxId}
               setTaxId={props.setTaxId}
+              taxId={props.taxId}
             />
           </>
         )}
 
         {view === 'txStatus' && (
           <TxStatus
-            transactionId={transactionId}
             onNewTransaction={resetForNewTransaction}
             onRetry={handleBackToSwap}
+            transactionId={transactionId}
           />
         )}
       </div>
-    );
-  };
+    )
+  }
 
   return (
     <div className="w-full min-h-screen">
@@ -149,19 +151,19 @@ const WebSwapLayout: React.FC<LayoutProps> = (props) => {
         {/* Marketing / Hero */}
         <div className="relative min-h-screen flex flex-col justify-between items-center p-5 text-center overflow-hidden">
           <BackgroundCrossfade
-            imageUrl={currentBgUrl}
-            visibilityClass="block"
-            positionClass="absolute inset-0"
-            zIndexClass="-z-10"
             backgroundAttachment="fixed"
+            imageUrl={currentBgUrl}
+            positionClass="absolute inset-0"
+            visibilityClass="block"
+            zIndexClass="-z-10"
           />
           <ImageAttribution currency={String(props.targetCurrency)} />
           <div className="text-3xl">
-            <AnimatedHeroText currency={props.targetCurrency as 'COP' | 'BRL'} />
+            <AnimatedHeroText currency={props.targetCurrency as 'BRL' | 'COP'} />
           </div>
           <div className="flex items-center gap-3 text-white font-sans text-sm">
             <span>powered by</span>
-            <img src={ASSET_URLS.STELLAR_LOGO} alt="Stellar" className="h-6 w-auto" />
+            <img alt="Stellar" className="h-6 w-auto" src={ASSET_URLS.STELLAR_LOGO} />
           </div>
         </div>
       </div>
@@ -171,7 +173,7 @@ const WebSwapLayout: React.FC<LayoutProps> = (props) => {
         {/* Left Column - Marketing */}
         <div className="w-1/2 flex flex-col justify-center relative px-4 py-10 sm:px-6 lg:px-8">
           <div className="text-6xl max-w-xl">
-            <AnimatedHeroText currency={props.targetCurrency as 'COP' | 'BRL'} />
+            <AnimatedHeroText currency={props.targetCurrency as 'BRL' | 'COP'} />
           </div>
           <ImageAttribution
             className="absolute bottom-5 left-5"
@@ -184,12 +186,12 @@ const WebSwapLayout: React.FC<LayoutProps> = (props) => {
           {renderSwap(true)}
           <div className="absolute bottom-5 right-5 flex items-center gap-3 text-white font-sans text-base">
             <span>powered by</span>
-            <img src={ASSET_URLS.STELLAR_LOGO} alt="Stellar" className="h-9 w-auto" />
+            <img alt="Stellar" className="h-9 w-auto" src={ASSET_URLS.STELLAR_LOGO} />
           </div>
         </div>
       </div>
     </div>
-  );
-};
+  )
+}
 
-export default WebSwapLayout;
+export default WebSwapLayout

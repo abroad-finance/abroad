@@ -1,26 +1,28 @@
-import { BrowserRouter as Router, Route, Routes } from "react-router-dom";
-import { Suspense, lazy } from 'react';
-import { LanguageProvider } from './contexts/LanguageContext';
-import { WalletAuthProvider } from './contexts/WalletAuthContext';
+import { lazy, Suspense } from 'react'
+import { Route, BrowserRouter as Router, Routes } from 'react-router-dom'
+
+import { LanguageProvider } from './contexts/LanguageContext'
+import { WalletAuthProvider } from './contexts/WalletAuthContext'
 
 // Route-level code splitting
-const WebSwap = lazy(() => import('./pages/WebSwap/WebSwap'));
+const WebSwap = lazy(() => import('./pages/WebSwap/WebSwap'))
 
-
-function App() {  
+function App() {
   return (
-      <LanguageProvider>
-        <WalletAuthProvider>
-          <Router>
-            <Suspense fallback={<div />}> {/* simple lightweight fallback */}
-              <Routes>
-                <Route path="/" element={<WebSwap />} />
-              </Routes>
-            </Suspense>
-          </Router>
-        </WalletAuthProvider>
-      </LanguageProvider>
-  );
+    <LanguageProvider>
+      <WalletAuthProvider>
+        <Router>
+          <Suspense fallback={<div />}>
+            {' '}
+            {/* simple lightweight fallback */}
+            <Routes>
+              <Route element={<WebSwap />} path="/" />
+            </Routes>
+          </Suspense>
+        </Router>
+      </WalletAuthProvider>
+    </LanguageProvider>
+  )
 }
 
-export default App;
+export default App
