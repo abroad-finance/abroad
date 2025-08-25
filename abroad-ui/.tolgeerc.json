@@ -1,0 +1,10 @@
+{
+    "$schema": "https://docs.tolgee.io/cli-schema.json",
+    "apiUrl": "https://tolgee-910236263183.us-east1.run.app", 
+    "projectId": 2, 
+    "parser": "react",
+    "patterns": [
+        "src/**/*.{ts,tsx}"
+    ],
+    "strictNamespace": false
+}
