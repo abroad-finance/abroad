@@ -1,44 +1,26 @@
-import { useTolgee, useTranslate } from '@tolgee/react'
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React from 'react'
 
-interface LanguageSelectorProps {
+export interface LanguageSelectorProps {
+  ariaLabel?: string
   className?: string
+  languages: string[]
+  onChange: (lng: string) => void
+  value: string
   variant?: 'desktop' | 'mobile'
 }
 
-// Centralized language change logic
-const LanguageSelector: React.FC<LanguageSelectorProps> = ({ className = '', variant = 'desktop' }) => {
-  const tolgee = useTolgee()
-  const { t } = useTranslate()
-
-  const languages = useMemo(() => {
-    const opts = (tolgee as unknown as { getInitialOptions?: () => { availableLanguages?: string[] } })?.getInitialOptions?.()
-    return opts?.availableLanguages || ['pt', 'es', 'en', 'ru']
-  }, [tolgee])
-
-  const [currentLang, setCurrentLang] = useState(() => {
-    return tolgee.getLanguage()
-  })
-
-  // Subscribe to language change events so the selector updates immediately
-  useEffect(() => {
-    const off = tolgee.on?.('language', (l: { value: string }) => {
-      setCurrentLang(l.value)
-    })
-    return () => {
-      off?.unsubscribe()
-    }
-  }, [tolgee])
-
-  const changeLanguage = useCallback((lng: string) => {
-    try {
-      tolgee.changeLanguage(lng)
-      // Optimistic update in case event is delayed
-      setCurrentLang(lng)
-    }
-    catch { /* silently ignore */ }
-  }, [tolgee])
-
+/**
+ * Stateless & controlled language selector. All Tolgee logic has been moved
+ * to the `useLanguageSelector` hook. This component is purely presentational.
+ */
+const LanguageSelector: React.FC<LanguageSelectorProps> = ({
+  ariaLabel = 'Seleccionar idioma',
+  className = '',
+  languages,
+  onChange,
+  value,
+  variant = 'desktop',
+}) => {
   const styles = variant === 'mobile'
     ? 'appearance-none bg-[#356E6A]/5 border border-white/30 text-[#356E6A] text-xs font-medium px-2 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#356E6A]/40'
     : 'appearance-none bg-white/20 text-white text-sm font-medium px-3 py-2 pr-8 rounded-xl focus:outline-none focus:ring-2 focus:ring-white/40 hover:bg-white/30 cursor-pointer'
@@ -50,12 +32,12 @@ const LanguageSelector: React.FC<LanguageSelectorProps> = ({ className = '', var
   return (
     <div className={`relative ${className}`}>
       <select
-        aria-label={t('navbar.language_selector_aria', 'Seleccionar idioma')}
+        aria-label={ariaLabel}
         className={styles}
-        onChange={e => changeLanguage(e.target.value)}
-        value={currentLang}
+        onChange={e => onChange(e.target.value)}
+        value={value}
       >
-        {languages.map((l: string) => (
+        {languages.map(l => (
           <option className={variant === 'mobile' ? 'text-black' : 'text-black'} key={l} value={l}>
             {l.toUpperCase()}
           </option>

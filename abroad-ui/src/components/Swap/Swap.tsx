@@ -3,7 +3,7 @@ import { ChevronsDown, CircleDollarSign, Landmark, Loader, QrCode, Timer, Wallet
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { lazy, Suspense } from 'react'
 
-import { Button } from '../Button'
+import { Button } from '../../shared-components/Button'
 import { TokenBadge } from './TokenBadge'
 const IconAnimated = lazy(() => import('../IconAnimated').then(m => ({ default: m.IconAnimated })))
 import { _36EnumsBlockchainNetwork as BlockchainNetwork, _36EnumsCryptoCurrency as CryptoCurrency, getReverseQuote, _36EnumsPaymentMethod as PaymentMethod, _36EnumsTargetCurrency as TargetCurrency } from '../../api/index'

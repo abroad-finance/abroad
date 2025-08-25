@@ -17,8 +17,8 @@ import { acceptTransaction, Bank, getBanks, getBanksResponse200, _36EnumsTargetC
 import PixFull from '../../assets/Logos/networks/PixFull.svg'
 import { useWalletAuth } from '../../contexts/WalletAuthContext'
 import { kit } from '../../services/stellarKit'
-import { Button } from '../Button'
-import { DropSelector, Option } from '../DropSelector'
+import { Button } from '../../shared-components/Button'
+import { DropSelector, Option } from '../../shared-components/DropSelector'
 
 const networkPassphrase = Networks.PUBLIC
 const horizonUrl = 'https://horizon.stellar.org'

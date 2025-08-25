@@ -5,6 +5,7 @@ import reactRefresh from 'eslint-plugin-react-refresh'
 import tseslint from 'typescript-eslint'
 import stylistic from '@stylistic/eslint-plugin'
 import perfectionist from 'eslint-plugin-perfectionist'
+import importPlugin from 'eslint-plugin-import'
 
 export default tseslint.config(
   { ignores: ['dist'] },
@@ -20,10 +21,21 @@ export default tseslint.config(
       ecmaVersion: 2020,
       globals: globals.browser,
     },
+    'settings': {
+      'import/resolver': {
+        'node': {
+          'extensions': [
+            '.ts',
+            '.tsx'
+          ]
+        }
+      }
+    },
     // Don't re-declare plugins that presets already add
     plugins: {
       'react-hooks': reactHooks,
       'react-refresh': reactRefresh,
+      import: importPlugin,
     },
     rules: {
       ...reactHooks.configs.recommended.rules,
@@ -31,6 +43,17 @@ export default tseslint.config(
         'warn',
         { allowConstantExport: true },
       ],
+      'import/no-restricted-paths': [
+        'warn',
+        {
+          zones: [
+            { target: './src/components', from: './src/pages' },
+            { target: './src/components', from: './src/components' },
+          ],
+        },
+      ],
+
+      'import/no-cycle': ['warn', { maxDepth: 1 }],
     },
   },
 )

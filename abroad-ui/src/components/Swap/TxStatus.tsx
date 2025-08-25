@@ -2,7 +2,7 @@ import { useTranslate } from '@tolgee/react'
 import React, { useEffect, useRef, useState } from 'react'
 
 import { TransactionStatus as ApiStatus, getTransactionStatus } from '../../api'
-import { Button } from '../Button'
+import { Button } from '../../shared-components/Button'
 import { IconAnimated } from '../IconAnimated'
 
 interface TxStatusProps {

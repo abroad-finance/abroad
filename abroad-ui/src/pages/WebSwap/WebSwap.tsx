@@ -8,12 +8,16 @@ import { Loader } from 'lucide-react'
 
 import BackgroundCrossfade from '../../components/common/BackgroundCrossfade'
 // Child Components
+import LanguageSelector from '../../components/common/LanguageSelector'
 import NavBarResponsive from '../../components/WebSwap/NavBarResponsive'
 import WalletDetails from '../../components/WebSwap/WalletDetails'
 import WebSwapLayout from '../../features/swap/WebSwapLayout'
+import { useLanguageSelector, useNavBarResponsive } from '../../hooks'
 
 const WebSwap: React.FC = () => {
   const controller = useWebSwapController()
+  const navBar = useNavBarResponsive({ onWalletDetails: controller.handleWalletDetailsOpen })
+  const languageSelector = useLanguageSelector()
 
   return (
     <div className="w-screen min-h-screen md:h-screen md:overflow-hidden flex flex-col">
@@ -29,7 +33,9 @@ const WebSwap: React.FC = () => {
       {/* Shared Navigation */}
       <div className="relative z-10 bg-green-50 md:bg-transparent">
         <NavBarResponsive
-          onWalletDetails={controller.handleWalletDetailsOpen}
+          {...navBar}
+          languageSelector={<LanguageSelector {...languageSelector} />}
+          languageSelectorMobile={<LanguageSelector {...languageSelector} variant="mobile" />}
         />
       </div>
 
