@@ -6,7 +6,7 @@ import { TransactionStatus as ApiStatus, getTransactionStatus } from '../../api'
 // UI status mapping
 type UiStatus = 'inProgress' | 'accepted' | 'denied';
 
-export interface TxStatusProps {
+interface TxStatusProps {
   transactionId: string | null;
   onNewTransaction: () => void;
   onRetry: () => void;

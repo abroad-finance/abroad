@@ -190,7 +190,7 @@ function useUSDCBalance(
  * Props
  * ----------------------------------------------------------------------------
  */
-export interface NavBarResponsiveProps {
+interface NavBarResponsiveProps {
   /** Additional classes for the outer nav container */
   className?: string;
   /** Custom handler to trigger a connect flow. If not provided, falls back to `kit.openModal` */

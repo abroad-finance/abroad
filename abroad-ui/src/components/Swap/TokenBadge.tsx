@@ -1,6 +1,6 @@
 import React from 'react';
 
-export interface TokenBadgeProps {
+interface TokenBadgeProps {
   iconSrc: string;  // token icon URL
   symbol: string;   // token symbol text
   alt?: string;     // alt text for icon
