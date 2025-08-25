@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { X, Copy, ExternalLink, RefreshCw } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { useWalletAuth } from '../../context/WalletAuthContext';
+import { useWalletAuth } from '../../contexts/WalletAuthContext';
 import { Horizon } from '@stellar/stellar-sdk';
 import { listPartnerTransactions, PaginatedTransactionListTransactionsItem } from '../../api/index';
 

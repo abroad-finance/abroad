@@ -5,7 +5,7 @@ import { TokenBadge } from './TokenBadge';
 import { lazy, Suspense } from 'react';
 const IconAnimated = lazy(() => import('../IconAnimated').then(m => ({ default: m.IconAnimated })));
 import { getReverseQuote, _36EnumsTargetCurrency as TargetCurrency, _36EnumsPaymentMethod as PaymentMethod, _36EnumsBlockchainNetwork as BlockchainNetwork, _36EnumsCryptoCurrency as CryptoCurrency } from '../../api/index';
-import { useWalletAuth } from '../../context/WalletAuthContext';
+import { useWalletAuth } from '../../contexts/WalletAuthContext';
 import { kit } from '../../services/stellarKit';
 import { useDebounce } from '../../hooks';
 

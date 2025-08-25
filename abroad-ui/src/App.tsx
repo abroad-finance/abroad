@@ -1,7 +1,7 @@
 import { BrowserRouter as Router, Route, Routes } from "react-router-dom";
 import { Suspense, lazy } from 'react';
 import { LanguageProvider } from './contexts/LanguageContext';
-import { WalletAuthProvider } from './context/WalletAuthContext';
+import { WalletAuthProvider } from './contexts/WalletAuthContext';
 
 // Route-level code splitting
 const WebSwap = lazy(() => import('./pages/WebSwap/WebSwap'));

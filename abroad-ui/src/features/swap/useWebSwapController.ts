@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { SwapData, SwapView } from './webSwap.types';
-import { useWalletAuth } from '../../context/WalletAuthContext';
+import { useWalletAuth } from '../../contexts/WalletAuthContext';
 import { useSearchParams } from 'react-router-dom';
 import { ASSET_URLS, BRL_BACKGROUND_IMAGE } from './webSwap.constants';
 import { getQuote, _36EnumsTargetCurrency as TargetCurrency, _36EnumsPaymentMethod as PaymentMethod, _36EnumsBlockchainNetwork as BlockchainNetwork, _36EnumsCryptoCurrency as CryptoCurrency, decodeQrCodeBR } from '../../api/index';

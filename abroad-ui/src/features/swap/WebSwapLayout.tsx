@@ -8,7 +8,7 @@ import BackgroundCrossfade from '../../components/common/BackgroundCrossfade';
 import { ASSET_URLS, BRL_BACKGROUND_IMAGE } from './webSwap.constants';
 import { useWebSwapController } from './useWebSwapController'; // For prop types
 import { kit } from '../../services/stellarKit';
-import { useWalletAuth } from '../../context/WalletAuthContext';
+import { useWalletAuth } from '../../contexts/WalletAuthContext';
 import TxStatus from '../../components/Swap/TxStatus';
 import UserVerification from '../../components/WebSwap/UserVerification';
 

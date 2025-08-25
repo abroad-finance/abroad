@@ -5,7 +5,7 @@ import { Loader, Hash, ArrowLeft, Rotate3d } from 'lucide-react';
 import { getBanks, Bank, getBanksResponse200, acceptTransaction, _36EnumsTargetCurrency as TargetCurrency } from '../../api';
 import { DropSelector, Option } from '../DropSelector';
 import { kit } from '../../services/stellarKit';
-import { useWalletAuth } from '../../context/WalletAuthContext';
+import { useWalletAuth } from '../../contexts/WalletAuthContext';
 import {
   Asset,
   Memo,

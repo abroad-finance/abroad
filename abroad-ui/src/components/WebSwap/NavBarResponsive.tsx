@@ -9,7 +9,7 @@ import React, {
 import { Info, Wallet } from "lucide-react";
 import { Horizon } from "@stellar/stellar-sdk";
 
-import { useWalletAuth } from "../../context/WalletAuthContext";
+import { useWalletAuth } from "../../contexts/WalletAuthContext";
 import { kit } from "../../services/stellarKit";
 
 import AbroadLogoColored from "../../assets/Logos/AbroadLogoColored.svg";

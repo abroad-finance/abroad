@@ -18,13 +18,11 @@ export default defineConfig({
       output: {
         manualChunks: {
           react: ['react', 'react-dom', 'react-router-dom'],
-          charts: ['recharts'],
           motion: ['framer-motion'],
           icons: ['lucide-react'],
           lottie: ['lottie-web', '@lordicon/react'],
           stellar: ['@stellar/stellar-sdk', '@creit.tech/stellar-wallets-kit'],
           qr: ['@yudiel/react-qr-scanner'],
-          headless: ['@headlessui/react'],
         }
       }
     },
