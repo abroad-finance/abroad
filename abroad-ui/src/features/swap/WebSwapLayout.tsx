@@ -9,6 +9,7 @@ import BankDetailsRoute from '../../components/Swap/BankDetailsRoute'
 import Swap from '../../components/Swap/Swap'
 import TxStatus from '../../components/Swap/TxStatus'
 import UserVerification from '../../components/WebSwap/UserVerification'
+import WaitSign from '../../components/WebSwap/WaitSign'
 import { useWalletAuth } from '../../contexts/WalletAuthContext'
 import { kit } from '../../services/stellarKit'
 import { ASSET_URLS, BRL_BACKGROUND_IMAGE } from './webSwap.constants'
@@ -27,6 +28,7 @@ export interface WebSwapLayoutProps {
   pixKey: string
   quoteId: string
   redirectToKYCAuth: () => void
+  redirectToWaitSign: () => void
   resetForNewTransaction: () => void
   setPixKey: (key: string) => void
   setQuoteId: (id: string) => void
@@ -49,6 +51,7 @@ const WebSwapLayout: React.FC<WebSwapLayoutProps> = ({
   pixKey,
   quoteId,
   redirectToKYCAuth,
+  redirectToWaitSign,
   resetForNewTransaction,
   setPixKey,
   setQuoteId,
@@ -97,6 +100,10 @@ const WebSwapLayout: React.FC<WebSwapLayoutProps> = ({
           <UserVerification onVerify={handleKycRedirect} />
         )}
 
+        { view === 'wait-sign' && (
+          <WaitSign />
+        )}
+
         {view === 'swap' && (
           <Swap
             onAmountsChange={handleAmountsChange}
@@ -119,6 +126,7 @@ const WebSwapLayout: React.FC<WebSwapLayoutProps> = ({
             <BankDetailsRoute
               onBackClick={handleBackToSwap}
               onKycRedirect={redirectToKYCAuth}
+              onRedirectToWaitSign={redirectToWaitSign}
               onTransactionComplete={resetForNewTransaction}
               onTransactionFailed={resetForNewTransaction}
               onTransactionSigned={(id, ref) => showTxStatus(id, ref)}

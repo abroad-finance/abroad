@@ -105,6 +105,7 @@ const PENDING_TX_KEY = 'pendingTransaction'
 interface BankDetailsRouteProps {
   onBackClick: () => void
   onKycRedirect: () => void
+  onRedirectToWaitSign: () => void
   onTransactionComplete: () => void
   onTransactionFailed: () => void
   // called immediately after user signs the transaction (before or during submission) to show status screen
@@ -124,6 +125,7 @@ interface BankDetailsRouteProps {
 export default function BankDetailsRoute({
   onBackClick,
   onKycRedirect,
+  onRedirectToWaitSign,
   onTransactionComplete,
   onTransactionFailed,
   onTransactionSigned,
@@ -382,6 +384,7 @@ export default function BankDetailsRoute({
       })
 
       // 4️⃣  Sign via kit -------------------------------------------------------
+      onRedirectToWaitSign()
       const { signedTxXdr } = await kit.signTransaction(unsignedXdr, {
         address: walletId,
         networkPassphrase: WalletNetwork.PUBLIC,

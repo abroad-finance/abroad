@@ -87,6 +87,10 @@ export const useWebSwapLayout = ({ pixKey, quoteId, setIsQrOpen, setPixKey, setQ
     setView('kyc-needed')
   }, [setView])
 
+  const redirectToWaitSign = useCallback(() => {
+    setView('wait-sign')
+  }, [setView])
+
   return {
     address,
     handleAmountsChange,
@@ -96,6 +100,7 @@ export const useWebSwapLayout = ({ pixKey, quoteId, setIsQrOpen, setPixKey, setQ
     pixKey,
     quoteId,
     redirectToKYCAuth,
+    redirectToWaitSign,
     resetForNewTransaction,
     setPixKey,
     setQuoteId,
