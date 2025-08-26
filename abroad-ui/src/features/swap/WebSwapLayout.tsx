@@ -21,7 +21,6 @@ const WebSwapLayout: React.FC<LayoutProps> = (props) => {
     handleAmountsChange,
     handleBackToSwap,
     handleSwapContinue,
-    handleTargetChange,
     handleTransactionComplete,
     handleTransactionFailed,
     handleWalletConnectOpen,
