@@ -12,7 +12,7 @@ import UserVerification from '../../components/WebSwap/UserVerification'
 import { useWalletAuth } from '../../contexts/WalletAuthContext'
 import { kit } from '../../services/stellarKit'
 import { ASSET_URLS, BRL_BACKGROUND_IMAGE } from './webSwap.constants'
-import { SwapData, SwapView } from './webSwap.types'
+import { SwapView } from './webSwap.types'
 
 export interface WebSwapLayoutProps {
   address: null | string
@@ -22,11 +22,7 @@ export interface WebSwapLayoutProps {
     tgt?: string
   }) => void
   handleBackToSwap: () => void
-  handleSwapContinue: (data: SwapData) => void
-  handleTargetChange: (amount: number) => Promise<void>
-  handleTransactionComplete: (params: { memo: null | string }) => Promise<void>
-  handleTransactionFailed: () => void
-  handleWalletConnectOpen?: () => void
+  handleSwapContinue: () => void
   openQr: () => void
   pixKey: string
   quoteId: string
@@ -37,7 +33,6 @@ export interface WebSwapLayoutProps {
   setTaxId: (id: string) => void
   showTxStatus: (id: null | string, reference: null | string) => void
   sourceAmount: string
-  swapData: null | SwapData
   targetAmount: string
   targetCurrency: (typeof TargetCurrency)[keyof typeof TargetCurrency]
   taxId: string
@@ -45,36 +40,32 @@ export interface WebSwapLayoutProps {
   view: SwapView
 }
 
-const WebSwapLayout: React.FC<WebSwapLayoutProps> = (props) => {
-  const {
-    address,
-    handleAmountsChange,
-    handleBackToSwap,
-    handleSwapContinue,
-    handleTransactionComplete,
-    handleTransactionFailed,
-    handleWalletConnectOpen,
-    pixKey,
-    quoteId,
-    redirectToKYCAuth,
-    resetForNewTransaction,
-    setPixKey,
-    setQuoteId,
-    // new handlers/state for tx status view
-    showTxStatus,
-    sourceAmount,
-    swapData,
-    targetAmount,
-    targetCurrency,
-    transactionId,
-    view,
-  } = props
-
+const WebSwapLayout: React.FC<WebSwapLayoutProps> = ({
+  address,
+  handleAmountsChange,
+  handleBackToSwap,
+  handleSwapContinue,
+  openQr,
+  pixKey,
+  quoteId,
+  redirectToKYCAuth,
+  resetForNewTransaction,
+  setPixKey,
+  setQuoteId,
+  setTaxId,
+  showTxStatus,
+  sourceAmount,
+  targetAmount,
+  targetCurrency,
+  taxId,
+  transactionId,
+  view,
+}) => {
   const { authenticateWithWallet, kycUrl } = useWalletAuth()
 
   // Marketing background for mobile hero
   const currentBgUrl
-    = props.targetCurrency === 'BRL'
+    = targetCurrency === 'BRL'
       ? BRL_BACKGROUND_IMAGE
       : ASSET_URLS.BACKGROUND_IMAGE
 
@@ -86,9 +77,6 @@ const WebSwapLayout: React.FC<WebSwapLayoutProps> = (props) => {
       },
     })
   }, [authenticateWithWallet])
-
-  // Prefer controller-provided handler on desktop; fallback to direct connect
-  const onDesktopWalletConnect = handleWalletConnectOpen || handleDirectWalletConnect
 
   // Shared renderer for Swap + BankDetails
   const renderSwap = (isDesktop: boolean) => {
@@ -112,15 +100,11 @@ const WebSwapLayout: React.FC<WebSwapLayoutProps> = (props) => {
         {view === 'swap' && (
           <Swap
             onAmountsChange={handleAmountsChange}
-            onContinue={(quote_id, srcAmount, tgtAmount, targetCurrency) => {
-              console.log(
-                `${isDesktop ? 'Desktop' : 'Mobile'} onContinue called with:`,
-                { quote_id, srcAmount, targetCurrency, tgtAmount },
-              )
-              handleSwapContinue({ quote_id, srcAmount, targetCurrency, tgtAmount })
+            onContinue={() => {
+              handleSwapContinue()
             }}
-            onWalletConnect={isDesktop ? onDesktopWalletConnect : handleDirectWalletConnect}
-            openQr={props.openQr}
+            onWalletConnect={handleDirectWalletConnect}
+            openQr={openQr}
             quoteId={quoteId}
             setQuoteId={setQuoteId}
             sourceAmount={sourceAmount}
@@ -130,28 +114,24 @@ const WebSwapLayout: React.FC<WebSwapLayoutProps> = (props) => {
           />
         )}
 
-        {view === 'bankDetails' && swapData && address && (
+        {view === 'bankDetails' && address && (
           <>
-            {console.log(
-              `${isDesktop ? 'Desktop' : 'Mobile'} rendering BankDetailsRoute with swapData:`,
-              swapData,
-            )}
             <BankDetailsRoute
               onBackClick={handleBackToSwap}
               onKycRedirect={redirectToKYCAuth}
-              onTransactionComplete={handleTransactionComplete}
-              onTransactionFailed={handleTransactionFailed}
+              onTransactionComplete={resetForNewTransaction}
+              onTransactionFailed={resetForNewTransaction}
               onTransactionSigned={(id, ref) => showTxStatus(id, ref)}
               pixKey={pixKey}
-              quote_id={swapData.quote_id}
+              quote_id={quoteId}
               setPixKey={setPixKey}
-              sourceAmount={swapData.srcAmount}
-              targetAmount={swapData.tgtAmount}
-              targetCurrency={swapData.targetCurrency}
+              sourceAmount={sourceAmount}
+              targetAmount={targetAmount}
+              targetCurrency={targetCurrency}
               userId={address}
               {...(textColorProps ?? {})}
-              setTaxId={props.setTaxId}
-              taxId={props.taxId}
+              setTaxId={setTaxId}
+              taxId={taxId}
             />
           </>
         )}
@@ -185,9 +165,9 @@ const WebSwapLayout: React.FC<WebSwapLayoutProps> = (props) => {
             visibilityClass="block"
             zIndexClass="-z-10"
           />
-          <ImageAttribution currency={String(props.targetCurrency)} />
+          <ImageAttribution currency={String(targetCurrency)} />
           <div className="text-3xl">
-            <AnimatedHeroText currency={props.targetCurrency as 'BRL' | 'COP'} />
+            <AnimatedHeroText currency={targetCurrency as 'BRL' | 'COP'} />
           </div>
           <div className="flex items-center gap-3 text-white font-sans text-sm">
             <span>powered by</span>
@@ -201,11 +181,11 @@ const WebSwapLayout: React.FC<WebSwapLayoutProps> = (props) => {
         {/* Left Column - Marketing */}
         <div className="w-1/2 flex flex-col justify-center relative px-4 py-10 sm:px-6 lg:px-8">
           <div className="text-6xl max-w-xl">
-            <AnimatedHeroText currency={props.targetCurrency as 'BRL' | 'COP'} />
+            <AnimatedHeroText currency={targetCurrency as 'BRL' | 'COP'} />
           </div>
           <ImageAttribution
             className="absolute bottom-5 left-5"
-            currency={String(props.targetCurrency)}
+            currency={String(targetCurrency)}
           />
         </div>
 

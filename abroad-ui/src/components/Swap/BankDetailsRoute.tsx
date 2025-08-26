@@ -104,7 +104,7 @@ const PENDING_TX_KEY = 'pendingTransaction'
 interface BankDetailsRouteProps {
   onBackClick: () => void
   onKycRedirect: () => void
-  onTransactionComplete: ({ memo }: { memo: null | string }) => Promise<void>
+  onTransactionComplete: () => void
   onTransactionFailed: () => void
   // called immediately after user signs the transaction (before or during submission) to show status screen
   onTransactionSigned: (id: null | string, transactionReference: null | string) => void
@@ -380,7 +380,7 @@ export default function BankDetailsRoute({
       const tx = new Transaction(signedTxXdr, networkPassphrase)
       await server.submitTransaction(tx)
 
-      await onTransactionComplete({ memo: transaction_reference })
+      await onTransactionComplete()
     }
     catch (err) {
       console.error(err)
