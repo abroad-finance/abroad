@@ -146,13 +146,11 @@ export default function Swap({
 
   const handleSourceOnChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     triggerRef.current = true
-    console.log('Source onChange: source', triggerRef.current)
     onAmountsChange?.({ src: e.target.value.replace(/[^0-9.]/g, '') })
   }
 
   const handleTargetOnChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     triggerRef.current = false
-    console.log('Source onChange: target', triggerRef.current)
     onAmountsChange?.({ tgt: e.target.value.replace(/[^0-9.,]/g, '') })
   }
 
