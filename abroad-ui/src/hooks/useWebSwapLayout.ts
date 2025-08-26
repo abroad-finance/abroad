@@ -46,28 +46,28 @@ export const useWebSwapLayout = ({ pixKey, quoteId, setIsQrOpen, setPixKey, setQ
         console.error('Failed to restore pending transaction', e)
       }
     }
-  }, [token])
+  }, [setQuoteId, setSourceAmount, setTargetAmount, setTargetCurrency, setView, token])
 
   const handleSwapContinue = useCallback(() => {
     setView('bankDetails')
-  }, [])
+  }, [setView])
 
   const handleAmountsChange = useCallback(({ currency, src, tgt }: { currency?: (typeof TargetCurrency)[keyof typeof TargetCurrency], src?: string, tgt?: string }) => {
     if (typeof src === 'string') setSourceAmount(src || '')
     if (typeof tgt === 'string') setTargetAmount(tgt || '')
     if (typeof currency === 'string') setTargetCurrency(currency)
-  }, [])
+  }, [setSourceAmount, setTargetAmount, setTargetCurrency])
 
   const handleBackToSwap = useCallback(() => {
     localStorage.removeItem(PENDING_TX_KEY)
     setView('swap')
-  }, [])
+  }, [setView])
 
   // Show TxStatus screen right after signing
   const showTxStatus = useCallback((id: null | string) => {
     if (id) setTransactionId(id)
     setView('txStatus')
-  }, [])
+  }, [setTransactionId, setView])
 
   // Reset from TxStatus to start a fresh transaction
   const resetForNewTransaction = useCallback(() => {
@@ -76,16 +76,16 @@ export const useWebSwapLayout = ({ pixKey, quoteId, setIsQrOpen, setPixKey, setQ
     setTargetAmount('')
     setTransactionId(null)
     setView('swap')
-  }, [])
+  }, [setSourceAmount, setTargetAmount, setTransactionId, setView])
 
   const onOpenQr = useCallback(() => {
     setIsQrOpen(true)
     setTargetCurrency(TargetCurrency.BRL)
-  }, [setIsQrOpen])
+  }, [setIsQrOpen, setTargetCurrency])
 
   const redirectToKYCAuth = useCallback(() => {
     setView('kyc-needed')
-  }, [])
+  }, [setView])
 
   return {
     address,

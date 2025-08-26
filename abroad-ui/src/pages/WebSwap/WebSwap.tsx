@@ -49,13 +49,13 @@ const WebSwap: React.FC = () => {
     isWalletDetailsOpen,
     setIsQrOpen,
   } = useWebSwapController({
-    setPixKey: setPixKey,
-    setQuoteId: setQuoteId,
-    setSourceAmount: setSourceAmount,
-    setTargetAmount: setTargetAmount,
-    setTargetCurrency: setTargetCurrency,
-    setTaxId: setTaxId,
-    targetCurrency: targetCurrency,
+    setPixKey,
+    setQuoteId,
+    setSourceAmount,
+    setTargetAmount,
+    setTargetCurrency,
+    setTaxId,
+    targetCurrency,
   })
   const navBar = useNavBarResponsive({
     onWalletDetails: handleWalletDetailsOpen,
