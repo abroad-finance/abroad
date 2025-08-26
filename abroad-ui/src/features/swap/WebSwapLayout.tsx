@@ -90,7 +90,6 @@ const WebSwapLayout: React.FC<LayoutProps> = (props) => {
               )
               handleSwapContinue({ quote_id, srcAmount, targetCurrency, tgtAmount })
             }}
-            onTargetChange={handleTargetChange}
             onWalletConnect={isDesktop ? onDesktopWalletConnect : handleDirectWalletConnect}
             openQr={props.openQr}
             quoteId={quoteId}

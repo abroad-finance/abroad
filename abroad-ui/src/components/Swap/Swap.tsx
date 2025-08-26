@@ -6,7 +6,7 @@ import { lazy, Suspense } from 'react'
 import { Button } from '../../shared-components/Button'
 import { TokenBadge } from './TokenBadge'
 const IconAnimated = lazy(() => import('../IconAnimated').then(m => ({ default: m.IconAnimated })))
-import { _36EnumsBlockchainNetwork as BlockchainNetwork, _36EnumsCryptoCurrency as CryptoCurrency, getReverseQuote, _36EnumsPaymentMethod as PaymentMethod, _36EnumsTargetCurrency as TargetCurrency } from '../../api/index'
+import { _36EnumsBlockchainNetwork as BlockchainNetwork, _36EnumsCryptoCurrency as CryptoCurrency, getQuote, getReverseQuote, _36EnumsPaymentMethod as PaymentMethod, _36EnumsTargetCurrency as TargetCurrency } from '../../api/index'
 import { useWalletAuth } from '../../contexts/WalletAuthContext'
 import { useDebounce } from '../../hooks'
 import { kit } from '../../services/stellarKit'
@@ -26,7 +26,6 @@ interface SwapProps {
     tgtAmount: string,
     targetCurrency: (typeof TargetCurrency)[keyof typeof TargetCurrency]
   ) => void
-  onTargetChange: (amount: number) => Promise<void>
   onWalletConnect?: () => void
   openQr: () => void // handler to open QR scanner
   quoteId: string
@@ -43,7 +42,6 @@ const BRL_TRANSFER_FEE = 0.0
 export default function Swap({
   onAmountsChange,
   onContinue,
-  onTargetChange,
   openQr,
   quoteId,
   setQuoteId,
@@ -63,18 +61,14 @@ export default function Swap({
   const { authenticateWithWallet, token } = useWalletAuth()
   const [loadingSource, setLoadingSource] = useState(false)
   const [loadingTarget, setLoadingTarget] = useState(false)
-  const [firstInputEnable, setFirstInputEnable] = useState(true)
   const [displayedTRM, setDisplayedTRM] = useState(0.000)
-  const sourceDebounceRef = useRef<NodeJS.Timeout | null>(null)
-  const targetDebounceRef = useRef<NodeJS.Timeout | null>(null)
   // New: selected target currency (COP | BRL)
   // Dropdown state for currency selection
   const [currencyMenuOpen, setCurrencyMenuOpen] = useState(false)
   const currencyMenuRef = useRef<HTMLDivElement | null>(null)
-  const [amount, setAmount] = useState('')
-  const [target, setTarget] = useState('')
-  const sourceDebouncedAmount = useDebounce(amount, 500) // 500ms delay
-  const targetDebounceAmount = useDebounce(target, 500)
+  const sourceDebouncedAmount = useDebounce(sourceAmount, 1500) // 1000ms delay
+  const targetDebounceAmount = useDebounce(targetAmount, 1500)
+  const triggerRef = useRef<boolean | null>(null)
 
   const isButtonDisabled = () => {
     const numericSource = parseFloat(String(sourceAmount))
@@ -90,7 +84,7 @@ export default function Swap({
   const fetchDirectConversion = useCallback(async (value: string) => {
     const num = parseFloat(value)
     if (isNaN(num)) {
-      onTargetChange?.(0)
+      onAmountsChange?.({ tgt: '' })
       return
     }
     setLoadingTarget(true)
@@ -106,7 +100,7 @@ export default function Swap({
       if (response.status === 200) {
         const formatted = formatTargetNumber(response.data.value)
         setQuoteId(response.data.quote_id) // Add this line
-        onAmountsChange?.({ src: value, tgt: formatted })
+        onAmountsChange?.({ tgt: formatted })
       }
     }
     catch (error: unknown) {
@@ -115,14 +109,7 @@ export default function Swap({
     finally {
       setLoadingTarget(false)
     }
-  }, [
-    formatTargetNumber,
-    onAmountsChange,
-    onTargetChange,
-    setQuoteId,
-    targetCurrency,
-    targetPaymentMethod,
-  ])
+  }, [onAmountsChange, formatTargetNumber, targetCurrency, targetPaymentMethod, setQuoteId])
 
   const fetchReverseConversion = useCallback(async (value: string) => {
     // allow digits, dots and commas; normalize commas to dots for parse
@@ -135,7 +122,19 @@ export default function Swap({
     }
     setLoadingSource(true)
     try {
-      await onTargetChange(num)
+      console.log('Fetching direct quote for amount:', num)
+      const response = await getQuote({
+        amount: num,
+        crypto_currency: CryptoCurrency.USDC,
+        network: BlockchainNetwork.STELLAR,
+        payment_method: targetPaymentMethod,
+        target_currency: targetCurrency,
+      })
+      if (response.status === 200) {
+        const src = response.data.value.toFixed(2)
+        setQuoteId(response.data.quote_id)
+        onAmountsChange?.({ src: src })
+      }
     }
     catch (error: unknown) {
       console.error('Quote error', error)
@@ -143,34 +142,18 @@ export default function Swap({
     finally {
       setLoadingSource(false)
     }
-  }, [onAmountsChange, onTargetChange])
+  }, [onAmountsChange, setQuoteId, targetCurrency, targetPaymentMethod])
 
-  const handleSourceFocus = () => {
-    // strip any formatting to show raw numbers
-    onAmountsChange?.({ src: sourceAmount.replace(/[^0-9.]/g, '') })
+  const handleSourceOnChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    triggerRef.current = true
+    console.log('Source onChange: source', triggerRef.current)
+    onAmountsChange?.({ src: e.target.value.replace(/[^0-9.]/g, '') })
   }
 
-  const handleSourceBlur = () => {
-    const num = parseFloat(sourceAmount)
-    if (isNaN(num)) {
-      onAmountsChange?.({ src: '' })
-    }
-    else {
-      onAmountsChange?.({ src: num.toFixed(2) })
-    }
-  }
-
-  const handleTargetBlur = () => {
-    const clean = targetAmount.replace(/[^0-9.,]/g, '')
-    const normalized = clean.replace(/\./g, '').replace(/,/g, '.')
-    const num = parseFloat(normalized)
-    if (isNaN(num)) {
-      onAmountsChange?.({ tgt: '' })
-    }
-    else {
-      // final numeric format with separators
-      onAmountsChange?.({ tgt: formatTargetNumber(num) })
-    }
+  const handleTargetOnChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    triggerRef.current = false
+    console.log('Source onChange: target', triggerRef.current)
+    onAmountsChange?.({ tgt: e.target.value.replace(/[^0-9.,]/g, '') })
   }
 
   // Direct wallet connection handler
@@ -186,7 +169,7 @@ export default function Swap({
     if (!loadingSource && !loadingTarget) {
       const numericSource = parseFloat(sourceAmount)
       // Normalize targetAmount (which might have formatting) to a standard number string for parsing
-      const cleanedTarget = target.replace(/\./g, '').replace(/,/g, '.')
+      const cleanedTarget = targetAmount.replace(/\./g, '').replace(/,/g, '.')
       const numericTarget = parseFloat(cleanedTarget)
 
       if (numericSource > 0 && !isNaN(numericTarget) && numericTarget >= 0) {
@@ -197,18 +180,16 @@ export default function Swap({
       }
     }
     // If loadingSource or loadingTarget is true, displayedTRM remains unchanged.
-  }, [sourceAmount, targetAmount, loadingSource, loadingTarget, transferFee, target]) // TransferFee is a module-level const
+  }, [sourceAmount, targetAmount, loadingSource, loadingTarget, transferFee]) // TransferFee is a module-level const
 
   useEffect(() => {
-    if (sourceDebouncedAmount) {
-      setFirstInputEnable(true)
+    if (sourceDebouncedAmount && triggerRef.current === true) {
       fetchDirectConversion(sourceDebouncedAmount)
     }
-  }, [sourceDebouncedAmount, fetchDirectConversion])
+  }, [fetchDirectConversion, sourceDebouncedAmount])
 
   useEffect(() => {
-    if (targetDebounceAmount) {
-      setFirstInputEnable(false)
+    if (targetDebounceAmount && triggerRef.current === false) {
       fetchReverseConversion(targetDebounceAmount)
     }
   }, [targetDebounceAmount, fetchReverseConversion])
@@ -223,16 +204,6 @@ export default function Swap({
     document.addEventListener('mousedown', onDocClick)
     return () => document.removeEventListener('mousedown', onDocClick)
   }, [])
-
-  // Reset values when switching target currency to avoid stale quotes
-  useEffect(() => {
-    setQuoteId('')
-    setDisplayedTRM(0)
-    onAmountsChange?.({ currency: targetCurrency, src: '', tgt: '' })
-    // clear any pending debounce
-    if (sourceDebounceRef.current) clearTimeout(sourceDebounceRef.current)
-    if (targetDebounceRef.current) clearTimeout(targetDebounceRef.current)
-  }, [onAmountsChange, setQuoteId, targetCurrency])
 
   return (
     <div className="flex-1 flex items-center justify-center w-full flex flex-col">
@@ -272,14 +243,12 @@ export default function Swap({
                   <input
                     className="w-full bg-transparent font-bold focus:outline-none text-xl md:text-2xl"
                     inputMode="decimal"
-                    onBlur={handleSourceBlur}
-                    onChange={e => setAmount(e.target.value.replace(/[^0-9.]/g, ''))}
-                    onFocus={handleSourceFocus}
+                    onChange={handleSourceOnChange}
                     pattern="[0-9.]*"
                     placeholder="0.00"
                     style={{ color: textColor }}
                     type="text"
-                    value={firstInputEnable ? amount : sourceAmount}
+                    value={sourceAmount}
                   />
                 )}
           </div>
@@ -315,13 +284,12 @@ export default function Swap({
                         <input
                           className="w-full bg-transparent font-bold focus:outline-none text-xl md:text-2xl"
                           inputMode="decimal"
-                          onBlur={handleTargetBlur}
-                          onChange={e => setTarget(e.target.value.replace(/[^0-9.]/g, ''))}
+                          onChange={handleTargetOnChange}
                           pattern="[0-9.,]*"
                           placeholder="0,00"
                           style={{ color: textColor }}
                           type="text"
-                          value={!firstInputEnable ? target : targetAmount}
+                          value={targetAmount}
                         />
                       )}
                 </div>
