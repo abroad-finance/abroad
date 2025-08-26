@@ -255,26 +255,39 @@ export default function BankDetailsRoute({
     memoValue: string
     source: string
   }): Promise<string> => {
-    const account = await server.loadAccount(source)
-    const fee = await server.fetchBaseFee()
+    try {
+      const account = await server.loadAccount(source)
+      const fee = await server.fetchBaseFee()
 
-    const tx = new TransactionBuilder(account, {
-      fee: String(fee || BASE_FEE),
-      networkPassphrase,
-    })
-      .addOperation(
-        Operation.payment({
-          amount,
-          asset,
-          destination,
-        }),
-      )
-      .addMemo(Memo.text(memoValue))
-      .setTimeout(180)
-      .build()
+      const tx = new TransactionBuilder(account, {
+        fee: String(fee || BASE_FEE),
+        networkPassphrase,
+      })
+        .addOperation(
+          Operation.payment({
+            amount,
+            asset,
+            destination,
+          }),
+        )
+        .addMemo(Memo.text(memoValue))
+        .setTimeout(180)
+        .build()
 
-    return tx.toXDR()
-  }, [])
+      return tx.toXDR()
+    }
+    catch (err: unknown) {
+      // Create a descriptive message for UI and logs, preserve original where possible
+      let detail = ''
+      if (err instanceof Error) detail = err.message
+      else if (typeof err === 'object' && err !== null) detail = JSON.stringify(err)
+      else detail = String(err)
+
+      // Throw a new Error with the descriptive message so callers can show it to users
+      const message = `${t('bank_details.error_creating_transaction', 'No se pudo crear la transacción de pago')}: ${detail}`
+      throw new Error(message)
+    }
+  }, [t])
 
   // --------------------------- SUBMIT FLOW ------------------------------------
   const handleSubmit = useCallback(async () => {
