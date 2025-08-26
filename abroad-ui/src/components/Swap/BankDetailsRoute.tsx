@@ -19,6 +19,7 @@ import { useWalletAuth } from '../../contexts/WalletAuthContext'
 import { kit } from '../../services/stellarKit'
 import { Button } from '../../shared-components/Button'
 import { DropSelector, Option } from '../../shared-components/DropSelector'
+import { hasMessage } from '../../utils'
 
 const networkPassphrase = Networks.PUBLIC
 const horizonUrl = 'https://horizon.stellar.org'
@@ -396,8 +397,17 @@ export default function BankDetailsRoute({
       await onTransactionComplete()
     }
     catch (err) {
-      console.error(err)
-      alert(err instanceof Error ? err.message : 'Transaction error')
+      console.error('Transaction submission error:', err)
+
+      let userMessage = 'Transaction error'
+      if (err instanceof Error) {
+        userMessage = err.message
+      }
+      else if (hasMessage(err)) {
+        userMessage = err.message
+      }
+
+      alert(userMessage)
       onTransactionFailed()
     }
     finally {
