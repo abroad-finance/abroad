@@ -106,8 +106,6 @@ interface BankDetailsRouteProps {
   onBackClick: () => void
   onKycRedirect: () => void
   onRedirectToWaitSign: () => void
-  onTransactionComplete: () => void
-  onTransactionFailed: () => void
   // called immediately after user signs the transaction (before or during submission) to show status screen
   onTransactionSigned: (id: null | string, transactionReference: null | string) => void
   pixKey: string // For BRL transfers
@@ -126,8 +124,6 @@ export default function BankDetailsRoute({
   onBackClick,
   onKycRedirect,
   onRedirectToWaitSign,
-  onTransactionComplete,
-  onTransactionFailed,
   onTransactionSigned,
   pixKey,
   quote_id,
@@ -400,8 +396,6 @@ export default function BankDetailsRoute({
       // 5️⃣  Submit -------------------------------------------------------------
       const tx = new Transaction(signedTxXdr, networkPassphrase)
       await server.submitTransaction(tx)
-
-      await onTransactionComplete()
     }
     catch (err) {
       console.error('Transaction submission error:', err)
@@ -415,7 +409,6 @@ export default function BankDetailsRoute({
       }
 
       alert(userMessage)
-      onTransactionFailed()
     }
     finally {
       setLoadingSubmit(false)
@@ -434,12 +427,10 @@ export default function BankDetailsRoute({
     sourceAmount,
     onRedirectToWaitSign,
     onTransactionSigned,
-    onTransactionComplete,
     selectedBank,
     targetAmount,
     setKycUrl,
     onKycRedirect,
-    onTransactionFailed,
   ])
 
   // ------------------------------- RENDER -------------------------------------
