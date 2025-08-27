@@ -102,6 +102,13 @@ const LanguageSelector: React.FC<LanguageSelectorProps> = ({
               <div
                 className="absolute inset-0 bg-black/40 backdrop-blur-sm"
                 onClick={() => setOpen(false)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') {
+                    setOpen(false)
+                  }
+                }}
+                role="button"
+                tabIndex={0}
               />
               {/* Panel (mirrors WalletDetails positioning) */}
               <motion.div
