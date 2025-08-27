@@ -45,9 +45,9 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({
         y: window.innerWidth >= 768 ? 0 : '100%',
       }}
       transition={{
-        damping: 35,
-        duration: 0.12,
-        stiffness: 800,
+        damping: 30,
+        mass: 0.8,
+        stiffness: 300,
         type: 'spring',
       }}
     >
