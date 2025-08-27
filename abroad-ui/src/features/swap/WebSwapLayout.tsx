@@ -126,6 +126,7 @@ const WebSwapLayout: React.FC<WebSwapLayoutProps> = ({
             <BankDetailsRoute
               onBackClick={handleBackToSwap}
               onKycRedirect={redirectToKYCAuth}
+              onRedirectToHome={handleBackToSwap}
               onRedirectToWaitSign={redirectToWaitSign}
               onTransactionSigned={(id, ref) => showTxStatus(id, ref)}
               pixKey={pixKey}
