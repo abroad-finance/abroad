@@ -53,7 +53,8 @@ export default tseslint.config(
           ],
         },
       ],
-
+      '@stylistic/array-element-newline': ['error', { minItems: 3 }],
+      '@stylistic/array-bracket-newline': ['error', { minItems: 3 }],
       'import/no-cycle': ['warn', { maxDepth: 1 }],
     },
   },

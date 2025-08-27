@@ -13,7 +13,11 @@ export default defineConfig({
           lottie: ['lottie-web', '@lordicon/react'],
           motion: ['framer-motion'],
           qr: ['@yudiel/react-qr-scanner'],
-          react: ['react', 'react-dom', 'react-router-dom'],
+          react: [
+            'react',
+            'react-dom',
+            'react-router-dom',
+          ],
           stellar: ['@stellar/stellar-sdk', '@creit.tech/stellar-wallets-kit'],
         },
       },
@@ -24,10 +28,7 @@ export default defineConfig({
     'global': 'globalThis',
     'process.env': {},
   },
-  plugins: [
-    react({ include: '**/*.tsx' }),
-    tailwindcss(),
-  ],
+  plugins: [react({ include: '**/*.tsx' }), tailwindcss()],
   server: {
     watch: {
       usePolling: true,

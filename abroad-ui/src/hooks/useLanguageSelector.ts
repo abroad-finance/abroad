@@ -19,7 +19,12 @@ export const useLanguageSelector = (): UseLanguageSelectorResult => {
   // Resolve available languages from initial options (fallback to a safe list)
   const languages = useMemo(() => {
     const opts = (tolgee as unknown as { getInitialOptions?: () => { availableLanguages?: string[] } })?.getInitialOptions?.()
-    return opts?.availableLanguages || ['pt', 'es', 'en', 'ru']
+    return opts?.availableLanguages || [
+      'pt',
+      'es',
+      'en',
+      'ru',
+    ]
   }, [tolgee])
 
   const [value, setValue] = useState(() => tolgee.getLanguage())

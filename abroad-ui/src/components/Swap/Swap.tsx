@@ -109,7 +109,13 @@ export default function Swap({
     finally {
       setLoadingTarget(false)
     }
-  }, [onAmountsChange, formatTargetNumber, targetCurrency, targetPaymentMethod, setQuoteId])
+  }, [
+    onAmountsChange,
+    formatTargetNumber,
+    targetCurrency,
+    targetPaymentMethod,
+    setQuoteId,
+  ])
 
   const fetchReverseConversion = useCallback(async (value: string) => {
     // allow digits, dots and commas; normalize commas to dots for parse
@@ -142,7 +148,12 @@ export default function Swap({
     finally {
       setLoadingSource(false)
     }
-  }, [onAmountsChange, setQuoteId, targetCurrency, targetPaymentMethod])
+  }, [
+    onAmountsChange,
+    setQuoteId,
+    targetCurrency,
+    targetPaymentMethod,
+  ])
 
   const handleSourceOnChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     triggerRef.current = true
@@ -178,7 +189,13 @@ export default function Swap({
       }
     }
     // If loadingSource or loadingTarget is true, displayedTRM remains unchanged.
-  }, [sourceAmount, targetAmount, loadingSource, loadingTarget, transferFee]) // TransferFee is a module-level const
+  }, [
+    sourceAmount,
+    targetAmount,
+    loadingSource,
+    loadingTarget,
+    transferFee,
+  ]) // TransferFee is a module-level const
 
   useEffect(() => {
     if (sourceDebouncedAmount && triggerRef.current === true) {

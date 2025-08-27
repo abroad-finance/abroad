@@ -103,22 +103,39 @@ export function useWalletDetails(params: Params = {}): WalletDetailsProps {
       setTransactionError(t('wallet_details.error.loading', 'Error loading transactions'))
     }
     finally { setIsLoadingTransactions(false) }
-  }, [token, address, t])
+  }, [
+    token,
+    address,
+    t,
+  ])
 
   // Effects
   useEffect(() => {
     if (address) fetchUSDCBalanceWithLoading(address)
     if (token) fetchTransactions()
-  }, [address, token, fetchUSDCBalanceWithLoading, fetchTransactions])
+  }, [
+    address,
+    token,
+    fetchUSDCBalanceWithLoading,
+    fetchTransactions,
+  ])
 
   // Handlers exposed to component
   const onRefreshBalance = useCallback(() => {
     if (address && !isLoadingBalance) fetchUSDCBalanceWithLoading(address)
-  }, [address, isLoadingBalance, fetchUSDCBalanceWithLoading])
+  }, [
+    address,
+    isLoadingBalance,
+    fetchUSDCBalanceWithLoading,
+  ])
 
   const onRefreshTransactions = useCallback(() => {
     if (token && !isLoadingTransactions) fetchTransactions()
-  }, [token, isLoadingTransactions, fetchTransactions])
+  }, [
+    token,
+    isLoadingTransactions,
+    fetchTransactions,
+  ])
 
   const onCopyAddress = useCallback(async () => {
     try {

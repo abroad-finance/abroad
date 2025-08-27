@@ -95,7 +95,12 @@ export const WalletAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         console.trace('Wallet authentication failed', err)
       }
     }
-  }, [setAddress, setToken, setWalletId, token])
+  }, [
+    setAddress,
+    setToken,
+    setWalletId,
+    token,
+  ])
 
   const logout = useCallback(() => {
     setToken(null)
@@ -104,7 +109,12 @@ export const WalletAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setKycUrl(null)
     localStorage.removeItem(PENDING_TX_KEY)
     kit.disconnect()
-  }, [setAddress, setKycUrl, setToken, setWalletId])
+  }, [
+    setAddress,
+    setKycUrl,
+    setToken,
+    setWalletId,
+  ])
 
   const refreshToken = useCallback(async () => {
     if (!token) return
@@ -116,7 +126,11 @@ export const WalletAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       console.error('Failed to refresh wallet token', err)
       logout()
     }
-  }, [logout, setToken, token])
+  }, [
+    logout,
+    setToken,
+    token,
+  ])
 
   useEffect(() => {
     if (!walletId) {

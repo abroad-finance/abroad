@@ -46,7 +46,14 @@ export const useWebSwapLayout = ({ pixKey, quoteId, setIsQrOpen, setPixKey, setQ
         console.error('Failed to restore pending transaction', e)
       }
     }
-  }, [setQuoteId, setSourceAmount, setTargetAmount, setTargetCurrency, setView, token])
+  }, [
+    setQuoteId,
+    setSourceAmount,
+    setTargetAmount,
+    setTargetCurrency,
+    setView,
+    token,
+  ])
 
   const handleSwapContinue = useCallback(() => {
     setView('bankDetails')
@@ -56,7 +63,11 @@ export const useWebSwapLayout = ({ pixKey, quoteId, setIsQrOpen, setPixKey, setQ
     if (typeof src === 'string') setSourceAmount(src || '')
     if (typeof tgt === 'string') setTargetAmount(tgt || '')
     if (typeof currency === 'string') setTargetCurrency(currency)
-  }, [setSourceAmount, setTargetAmount, setTargetCurrency])
+  }, [
+    setSourceAmount,
+    setTargetAmount,
+    setTargetCurrency,
+  ])
 
   const handleBackToSwap = useCallback(() => {
     localStorage.removeItem(PENDING_TX_KEY)
@@ -76,7 +87,12 @@ export const useWebSwapLayout = ({ pixKey, quoteId, setIsQrOpen, setPixKey, setQ
     setTargetAmount('')
     setTransactionId(null)
     setView('swap')
-  }, [setSourceAmount, setTargetAmount, setTransactionId, setView])
+  }, [
+    setSourceAmount,
+    setTargetAmount,
+    setTransactionId,
+    setView,
+  ])
 
   const onOpenQr = useCallback(() => {
     setIsQrOpen(true)

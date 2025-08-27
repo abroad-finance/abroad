@@ -40,7 +40,11 @@ export const useWebSwapController = ({ setPixKey, setQuoteId, setSourceAmount, s
     if (typeof src === 'string') setSourceAmount(src || '')
     if (typeof tgt === 'string') setTargetAmount(tgt || '')
     if (typeof currency === 'string') setTargetCurrency(currency)
-  }, [setSourceAmount, setTargetAmount, setTargetCurrency])
+  }, [
+    setSourceAmount,
+    setTargetAmount,
+    setTargetCurrency,
+  ])
 
   const fetchQuote = useCallback(async (targetAmount: number) => {
     console.log('handleTargetChange called with:', { targetAmount, targetCurrency, targetPaymentMethod })
@@ -56,7 +60,12 @@ export const useWebSwapController = ({ setPixKey, setQuoteId, setSourceAmount, s
       handleAmountsChange?.({ src })
       setQuoteId(response.data.quote_id)
     }
-  }, [targetCurrency, targetPaymentMethod, handleAmountsChange, setQuoteId])
+  }, [
+    targetCurrency,
+    targetPaymentMethod,
+    handleAmountsChange,
+    setQuoteId,
+  ])
 
   // Handle QR results (PIX) and prefill amount
   const handleQrResult = useCallback(async (text: string) => {
@@ -88,7 +97,12 @@ export const useWebSwapController = ({ setPixKey, setQuoteId, setSourceAmount, s
     finally {
       setIsDecodingQr(false)
     }
-  }, [fetchQuote, handleAmountsChange, setPixKey, setTaxId])
+  }, [
+    fetchQuote,
+    handleAmountsChange,
+    setPixKey,
+    setTaxId,
+  ])
 
   // Determine desired desktop background URL based on currency
   const currentBgUrl = targetCurrency === 'BRL' ? BRL_BACKGROUND_IMAGE : ASSET_URLS.BACKGROUND_IMAGE

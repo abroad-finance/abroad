@@ -70,7 +70,11 @@ function useUSDCBalance(address?: null | string, horizonUrl = DEFAULT_HORIZON_UR
     finally {
       if (token === inFlight.current) setLoading(false)
     }
-  }, [address, horizonUrl, usdcIssuer])
+  }, [
+    address,
+    horizonUrl,
+    usdcIssuer,
+  ])
 
   useEffect(() => {
     void refetch()
@@ -127,7 +131,11 @@ export function useNavBarResponsive({
   const onWalletClick = useCallback(() => {
     if (address) onWalletDetails?.()
     else handleDirectWalletConnect()
-  }, [address, onWalletDetails, handleDirectWalletConnect])
+  }, [
+    address,
+    onWalletDetails,
+    handleDirectWalletConnect,
+  ])
 
   const walletInfo = useMemo(() => {
     const kind = normalizeWalletKind(walletId)

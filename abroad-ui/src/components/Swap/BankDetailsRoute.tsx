@@ -171,7 +171,11 @@ export default function BankDetailsRoute({
         console.error('Failed to restore pending transaction', e)
       }
     }
-  }, [setPixKey, setTaxId, token])
+  }, [
+    setPixKey,
+    setTaxId,
+    token,
+  ])
 
   // Fetch banks once -----------------------------------------------------------
   useEffect(() => {
@@ -428,13 +432,14 @@ export default function BankDetailsRoute({
     address,
     buildPaymentXdr,
     sourceAmount,
-    onTransactionComplete,
-    targetAmount,
-    selectedBank,
+    onRedirectToWaitSign,
     onTransactionSigned,
-    onTransactionFailed,
-    onKycRedirect,
+    onTransactionComplete,
+    selectedBank,
+    targetAmount,
     setKycUrl,
+    onKycRedirect,
+    onTransactionFailed,
   ])
 
   // ------------------------------- RENDER -------------------------------------
