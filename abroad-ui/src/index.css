@@ -1,2 +1,8 @@
 @import "tailwindcss";
 @import "./fonts.css";
+
+@theme {
+  --color-abroad-dark: #356E6A;
+  --color-abroad-mid: #26A17B;
+  --color-abroad-light: #73B9A3;
+}
