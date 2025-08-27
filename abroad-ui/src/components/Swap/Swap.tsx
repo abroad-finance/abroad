@@ -1,5 +1,5 @@
 import { useTranslate } from '@tolgee/react'
-import { ChevronsDown, CircleDollarSign, Landmark, Loader, QrCode, Timer, Wallet } from 'lucide-react'
+import { ChevronsDown, CircleDollarSign, Landmark, Loader, ScanLine, Timer, Wallet } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { lazy, Suspense } from 'react'
 
@@ -223,26 +223,32 @@ export default function Swap({
   return (
     <div className="flex-1 flex items-center justify-center w-full flex flex-col">
       <div
-        className="w-[90%] max-w-md min-h-[60vh] bg-[#356E6A]/5 backdrop-blur-xl rounded-4xl p-4 md:p-6 flex flex-col items-center justify-center space-y-1 lg:space-y-4"
+        className="w-[98%] max-w-md min-h-[60vh] bg-[#356E6A]/5 backdrop-blur-xl rounded-4xl p-4 md:p-6 flex flex-col items-center justify-center space-y-1 lg:space-y-4"
         id="background-container"
       >
-        {/* Title */}
-        <div className="flex-1 flex items-center justify-space-between">
-          <div className="flex items-center gap-2 text-xl md:text-xl font-bold" id="Title" style={{ color: textColor }}>
-            <span>{t('swap.title', '¿Cuánto deseas cambiar?')}</span>
+        {/* Title + Subtitle (new format) */}
+        <div className="flex-1 flex items-center justify-between w-full">
+          <div className="flex flex-col">
+            <div className="text-xl md:text-xl font-bold" style={{ color: textColor }}>
+              <span>{t('swap.title', 'Paga o Transfiere')}</span>
+            </div>
             {targetCurrency === TargetCurrency.BRL && (
-              <button
-                aria-label={t('swap.scan_qr_aria', 'Escanear QR')}
-                className="p-2 cursor-pointer rounded-full hover:bg-white/30 focus:outline-none focus:ring-2 focus:ring-[#356E6A]/40 transition"
-                onClick={openQr}
-                type="button"
-              >
-                <QrCode className="w-6 h-6" style={{ color: textColor }} />
-              </button>
+              <div className="text-xs md:text-sm opacity-75" style={{ color: textColor }}>
+                {t('swap.subtitle', 'Escribe los datos o escanea un QR de Pix')}
+              </div>
             )}
           </div>
+          {targetCurrency === TargetCurrency.BRL && (
+            <button
+              aria-label={t('swap.scan_qr_aria', 'Escanear QR')}
+              className="p-2 cursor-pointer rounded-full hover:bg-white/30 focus:outline-none focus:ring-2 focus:ring-[#356E6A]/40 transition"
+              onClick={openQr}
+              type="button"
+            >
+              <ScanLine className="w-8 h-8" style={{ color: textColor }} />
+            </button>
+          )}
         </div>
-
         {/* SOURCE */}
         <div
           className="w-full bg-white/60 backdrop-blur-xl rounded-2xl p-4 md:py-6 md:px-6 flex items-center justify-between"
@@ -422,7 +428,7 @@ export default function Swap({
       </div>
 
       <Button
-        className="mt-4 w-[90%] max-w-md py-4 cursor-pointer"
+        className="mt-4 w-[98%] max-w-md py-4 cursor-pointer"
         disabled={!!token && (isButtonDisabled() || !quoteId)}
         onClick={() => {
           if (!token) {
