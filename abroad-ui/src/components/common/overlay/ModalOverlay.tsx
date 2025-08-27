@@ -49,5 +49,3 @@ export const ModalOverlay: React.FC<ModalOverlayProps> = ({
     </AnimatePresence>
   )
 }
-
-export default ModalOverlay

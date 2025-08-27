@@ -3,9 +3,9 @@ import { ChevronsDown, CircleDollarSign, Landmark, Loader, QrCode, Timer, Wallet
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { lazy, Suspense } from 'react'
 
-import { Button } from '../../shared-components/Button'
-import { TokenBadge } from './TokenBadge'
-const IconAnimated = lazy(() => import('../IconAnimated').then(m => ({ default: m.IconAnimated })))
+import { Button } from '../../shared/components/Button'
+import { TokenBadge } from '../../shared/components/TokenBadge'
+const IconAnimated = lazy(() => import('../../shared/components/IconAnimated').then(m => ({ default: m.IconAnimated })))
 import { _36EnumsBlockchainNetwork as BlockchainNetwork, _36EnumsCryptoCurrency as CryptoCurrency, getQuote, getReverseQuote, _36EnumsPaymentMethod as PaymentMethod, _36EnumsTargetCurrency as TargetCurrency } from '../../api/index'
 import { useWalletAuth } from '../../contexts/WalletAuthContext'
 import { useDebounce } from '../../hooks'
@@ -378,7 +378,7 @@ export default function Swap({
               <div className="w-full bg-white/60 backdrop-blur-xl rounded-2xl p-4 md:py-6 md:px-6 flex items-center justify-center gap-4">
                 <div className="flex-shrink-0">
                   <Suspense fallback={null}>
-                    <IconAnimated icon="Denied" size={40} trigger="once" />
+                    <IconAnimated icon="Denied" loop={false} play size={40} />
                   </Suspense>
                 </div>
                 <div className="flex flex-col space-y-1">

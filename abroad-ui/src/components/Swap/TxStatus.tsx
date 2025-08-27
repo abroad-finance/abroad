@@ -2,8 +2,8 @@ import { useTranslate } from '@tolgee/react'
 import React, { useEffect, useRef, useState } from 'react'
 
 import { TransactionStatus as ApiStatus, getTransactionStatus } from '../../api'
-import { Button } from '../../shared-components/Button'
-import { IconAnimated } from '../IconAnimated'
+import { Button } from '../../shared/components/Button'
+import { IconAnimated } from '../../shared/components/IconAnimated'
 
 interface TxStatusProps {
   onNewTransaction: () => void
@@ -64,11 +64,11 @@ export default function TxStatus({ onNewTransaction, onRetry, transactionId }: T
   const renderIcon = () => {
     switch (status) {
       case 'accepted':
-        return <IconAnimated icon="AnimatedCheck" size={150} trigger="once" />
+        return <IconAnimated icon="AnimatedCheck" loop={false} play size={150} />
       case 'denied':
-        return <IconAnimated icon="Denied" size={150} trigger="once" />
+        return <IconAnimated icon="Denied" loop={false} play size={150} />
       case 'inProgress':
-        return <IconAnimated icon="Coins" size={150} trigger="loop" />
+        return <IconAnimated icon="Coins" loop play size={150} />
     }
   }
 

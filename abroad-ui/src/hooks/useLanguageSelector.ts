@@ -8,7 +8,7 @@ import type { LanguageSelectorProps } from '../components/common/LanguageSelecto
  * Encapsulates Tolgee language selection logic (available languages discovery,
  * current language subscription, optimistic change handler & aria label).
  */
-export type UseLanguageSelectorResult = Pick<LanguageSelectorProps, 'ariaLabel' | 'languages' | 'onChange' | 'value'> & {
+type UseLanguageSelectorResult = Pick<LanguageSelectorProps, 'ariaLabel' | 'languages' | 'onChange' | 'value'> & {
   // Keeping extensibility for future (e.g., loading state) without changing component API
 }
 

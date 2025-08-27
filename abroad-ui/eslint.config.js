@@ -45,10 +45,10 @@ export default tseslint.config(
       ],
       'react-hooks/exhaustive-deps': 'error',
       'import/no-restricted-paths': [
-        'warn',
+        'error',
         {
           zones: [
-            { target: './src/components', from: './src/pages' },
+            { target: './src/shared', from: './src', except: ['./assets'] },
             { target: './src/components', from: './src/components' },
           ],
         },

@@ -95,7 +95,7 @@ const normalizeWalletKind = (id?: null | string) => {
   return 'unknown'
 }
 
-export interface UseNavBarResponsiveArgs {
+interface UseNavBarResponsiveArgs {
   horizonUrl?: string
   infoUrl?: string
   onWalletConnect?: () => void
@@ -103,7 +103,7 @@ export interface UseNavBarResponsiveArgs {
   usdcIssuer?: string
 }
 
-export type UseNavBarResponsiveResult = Pick<NavBarResponsiveProps,
+type UseNavBarResponsiveResult = Pick<NavBarResponsiveProps,
   'address' | 'balance' | 'balanceLoading' | 'infoUrl' | 'labels' | 'onWalletClick' | 'walletInfo'
 >
 
