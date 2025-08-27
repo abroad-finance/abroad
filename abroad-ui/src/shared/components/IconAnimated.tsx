@@ -5,11 +5,13 @@ import AnimatedCheck from '../../assets/animated/AnimatedCheck.json'
 import BarChartInReveal from '../../assets/animated/BarChartInReveal.json'
 import Coins from '../../assets/animated/Coins.json'
 import Denied from '../../assets/animated/Denied.json'
+import DocumentSign from '../../assets/animated/DocumentSign.json'
+import MagnifyingGlass from '../../assets/animated/MagnifyingGlass.json'
 import PlusCircleHoverSwirl from '../../assets/animated/PlusCircleHoverSwirl.json'
 import SphereInReveal from '../../assets/animated/SphereInReveal.json'
 
 const Icons = {
-  AnimatedCheck, BarChartInReveal, Coins, Denied, PlusCircleHoverSwirl, SphereInReveal,
+  AnimatedCheck, BarChartInReveal, Coins, Denied, DocumentSign, MagnifyingGlass, PlusCircleHoverSwirl, SphereInReveal,
 }
 
 type Props = {
