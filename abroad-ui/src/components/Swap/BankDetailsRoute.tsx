@@ -105,6 +105,7 @@ const PENDING_TX_KEY = 'pendingTransaction'
 interface BankDetailsRouteProps {
   onBackClick: () => void
   onKycRedirect: () => void
+  onRedirectToHome: () => void
   onRedirectToWaitSign: () => void
   // called immediately after user signs the transaction (before or during submission) to show status screen
   onTransactionSigned: (id: null | string, transactionReference: null | string) => void
@@ -123,6 +124,7 @@ interface BankDetailsRouteProps {
 export default function BankDetailsRoute({
   onBackClick,
   onKycRedirect,
+  onRedirectToHome,
   onRedirectToWaitSign,
   onTransactionSigned,
   pixKey,
@@ -412,6 +414,7 @@ export default function BankDetailsRoute({
     }
     finally {
       setLoadingSubmit(false)
+      onRedirectToHome()
     }
   }, [
     quote_id,
@@ -431,6 +434,7 @@ export default function BankDetailsRoute({
     targetAmount,
     setKycUrl,
     onKycRedirect,
+    onRedirectToHome,
   ])
 
   // ------------------------------- RENDER -------------------------------------
