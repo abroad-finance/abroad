@@ -1,5 +1,5 @@
 import { Player } from '@lordicon/react'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useCallback } from 'react'
 
 import AnimatedCheck from '../../assets/animated/AnimatedCheck.json'
 import BarChartInReveal from '../../assets/animated/BarChartInReveal.json'
@@ -29,35 +29,38 @@ type Props = {
 
 export const IconAnimated = ({ className, colors, icon, loop, onComplete, play, size }: Props) => {
   const playerRef = useRef<Player>(null)
-  const lastPlayRef = useRef(false)
 
-  // React to external play flag changes (controlled behavior)
+  const start = useCallback(() => {
+    playerRef.current?.playFromBeginning()
+  }, [])
+
+  // React to external `play` and icon changes
   useEffect(() => {
-    if (play && !lastPlayRef.current) {
-      playerRef.current?.playFromBeginning()
-    }
-    else if (!play && lastPlayRef.current) {
-      // Pause when play turns false
-      playerRef.current?.pause()
-    }
-    lastPlayRef.current = play
-  }, [play])
+    const p = playerRef.current
+    if (!p) return
+    if (play) start()
+    else p.pause()
+  }, [play, icon, start])
+
+  const handleReady = () => {
+    if (play) start()
+  }
 
   const handleComplete = () => {
-    if (loop && play) {
-      playerRef.current?.playFromBeginning()
-    }
+    if (loop && play) start()
     onComplete?.()
   }
 
   return (
     <div className={className} style={{ display: 'inline-block' }}>
       <Player
-        colors={colors}
-        icon={Icons[icon]}
-        onComplete={handleComplete}
+        key={icon}                // ensure a fresh player when the icon changes
         ref={playerRef}
+        icon={Icons[icon]}
+        colors={colors}
         size={size}
+        onReady={handleReady}
+        onComplete={handleComplete}
       />
     </div>
   )

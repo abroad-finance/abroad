@@ -411,10 +411,10 @@ export default function BankDetailsRoute({
       }
 
       alert(userMessage)
+      onRedirectToHome()
     }
     finally {
       setLoadingSubmit(false)
-      onRedirectToHome()
     }
   }, [
     quote_id,
