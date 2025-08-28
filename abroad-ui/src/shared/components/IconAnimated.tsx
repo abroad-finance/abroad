@@ -1,5 +1,5 @@
 import { Player } from '@lordicon/react'
-import { useEffect, useRef, useCallback } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 
 import AnimatedCheck from '../../assets/animated/AnimatedCheck.json'
 import BarChartInReveal from '../../assets/animated/BarChartInReveal.json'
@@ -40,7 +40,11 @@ export const IconAnimated = ({ className, colors, icon, loop, onComplete, play, 
     if (!p) return
     if (play) start()
     else p.pause()
-  }, [play, icon, start])
+  }, [
+    play,
+    icon,
+    start,
+  ])
 
   const handleReady = () => {
     if (play) start()
@@ -54,13 +58,13 @@ export const IconAnimated = ({ className, colors, icon, loop, onComplete, play, 
   return (
     <div className={className} style={{ display: 'inline-block' }}>
       <Player
-        key={icon}                // ensure a fresh player when the icon changes
-        ref={playerRef}
-        icon={Icons[icon]}
         colors={colors}
-        size={size}
-        onReady={handleReady}
+        icon={Icons[icon]}
+        key={icon} // ensure a fresh player when the icon changes
         onComplete={handleComplete}
+        onReady={handleReady}
+        ref={playerRef}
+        size={size}
       />
     </div>
   )
