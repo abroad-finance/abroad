@@ -172,10 +172,10 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({
             {/* Mobile Right Side */}
             <div className="md:hidden">
               <div className="flex items-center space-x-3">
-                {languageSelectorMobile}
+
                 <button
                   aria-label={address ? labels.walletDetailsAria : labels.connectWalletAria}
-                  className="flex items-center justify-center bg-[#356E6A]/5 backdrop-blur-xl rounded-xl px-4 py-2 border border-white/30 hover:bg-white/30 transition-colors duration-200 flex-1"
+                  className="flex items-center justify-center bg-[#356E6A]/5 backdrop-blur-xl rounded-xl pl-2 pr-1 py-2 border border-white/30 hover:bg-white/30 transition-colors duration-200 flex-1"
                   onClick={onWalletClick}
                   type="button"
                 >
@@ -188,6 +188,7 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({
                         </div>
                       )}
                 </button>
+                {languageSelectorMobile}
               </div>
             </div>
           </div>

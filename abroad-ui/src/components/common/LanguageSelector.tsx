@@ -1,50 +1,205 @@
-import React from 'react'
+import { useTranslate } from '@tolgee/react'
+import { AnimatePresence, motion } from 'framer-motion'
+import { X } from 'lucide-react'
+import React, { useState } from 'react'
+import { createPortal } from 'react-dom'
 
 export interface LanguageSelectorProps {
   ariaLabel?: string
   className?: string
+  /** Text labels overrides */
+  labels?: {
+    closeAria?: string
+    confirm?: string
+    hint?: string
+    subtitle?: string
+    title?: string
+  }
   languages: string[]
+  /** Optional custom mapping for code -> { name, flag } */
+  metaMap?: Record<string, { flag: string, name: string }>
   onChange: (lng: string) => void
   value: string
+  /** Desktop vs mobile trigger styling */
   variant?: 'desktop' | 'mobile'
 }
 
-/**
- * Stateless & controlled language selector. All Tolgee logic has been moved
- * to the `useLanguageSelector` hook. This component is purely presentational.
- */
+const DEFAULT_META: Record<string, { flag: string, name: string }> = {
+  ar: { flag: 'sa', name: 'العربية' },
+  en: { flag: 'gb', name: 'English' },
+  es: { flag: 'es', name: 'Español' },
+  pt: { flag: 'br', name: 'Português' },
+  ru: { flag: 'ru', name: 'Русский' },
+  zh: { flag: 'cn', name: '中文' },
+}
+
 const LanguageSelector: React.FC<LanguageSelectorProps> = ({
-  ariaLabel = 'Seleccionar idioma',
+  ariaLabel,
   className = '',
+  labels,
   languages,
+  metaMap = DEFAULT_META,
   onChange,
   value,
   variant = 'desktop',
 }) => {
-  const styles = variant === 'mobile'
-    ? 'appearance-none bg-[#356E6A]/5 border border-white/30 text-[#356E6A] text-xs font-medium px-2 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#356E6A]/40'
-    : 'appearance-none bg-white/20 text-white text-sm font-medium px-3 py-2 pr-8 rounded-xl focus:outline-none focus:ring-2 focus:ring-white/40 hover:bg-white/30 cursor-pointer'
+  const { t } = useTranslate()
+  const [open, setOpen] = useState(false)
+  const [temp, setTemp] = useState<string>(value)
 
-  const caret = variant === 'mobile'
-    ? 'pointer-events-none absolute inset-y-0 right-2 flex items-center text-[#356E6A] text-[10px]'
-    : 'pointer-events-none absolute inset-y-0 right-2 flex items-center text-white text-xs'
+  // Keep temp in sync with external changes
+  React.useEffect(() => {
+    setTemp(value)
+  }, [value])
+
+  const currentMeta = metaMap[value] || { flag: value, name: value.toUpperCase() }
+
+  const title = labels?.title || t('language_selector.header.title', 'Configuración de Idioma')
+  const subtitle = labels?.subtitle || t('language_selector.header.subtitle', 'Selecciona tu idioma preferido para la interfaz')
+  const confirmLabel = labels?.confirm || t('language_selector.actions.confirm', 'Confirmar Selección')
+  const hint = labels?.hint || t('language_selector.footer.hint', 'Los cambios de idioma se aplicarán inmediatamente')
+  const closeAria = labels?.closeAria || t('language_selector.actions.close', 'Cerrar')
+  const selectLanguageAria = ariaLabel || t('language_selector.trigger.aria_label', 'Seleccionar idioma')
+
+  const triggerClasses = variant === 'mobile'
+    ? 'flex items-center gap-1 bg-[#356E6A]/5 border border-white/30 text-[#356E6A] text-xs font-medium px-2 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#356E6A]/40 hover:bg-[#356E6A]/10'
+    : 'flex items-center gap-2 bg-white/20 text-white text-sm font-medium px-3 py-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-white/40 hover:bg-white/30 cursor-pointer'
+
+  const handleConfirm = () => {
+    if (temp !== value) onChange(temp)
+    setOpen(false)
+  }
 
   return (
-    <div className={`relative ${className}`}>
-      <select
-        aria-label={ariaLabel}
-        className={styles}
-        onChange={e => onChange(e.target.value)}
-        value={value}
+    <>
+      {/* Trigger */}
+      <button
+        aria-label={selectLanguageAria}
+        className={`${triggerClasses} ${className}`}
+        onClick={() => setOpen(true)}
+        type="button"
       >
-        {languages.map(l => (
-          <option className={variant === 'mobile' ? 'text-black' : 'text-black'} key={l} value={l}>
-            {l.toUpperCase()}
-          </option>
-        ))}
-      </select>
-      <span className={caret}>▼</span>
-    </div>
+        <img
+          alt={currentMeta.name}
+          className="w-5 h-5 rounded-full"
+          loading="lazy"
+          src={`https://hatscripts.github.io/circle-flags/flags/${currentMeta.flag}.svg`}
+        />
+        <span className="hidden md:inline">{currentMeta.name}</span>
+      </button>
+
+      {/* Side Modal - Portal to document body level */}
+      {createPortal(
+        <AnimatePresence>
+          {open && (
+            <div
+              aria-label={title}
+              aria-modal="true"
+              className="fixed inset-0 z-[9999] flex justify-end items-end md:items-center md:pr-4"
+              role="dialog"
+            >
+              {/* Backdrop - covers entire viewport */}
+              <div
+                className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+                onClick={() => setOpen(false)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') {
+                    setOpen(false)
+                  }
+                }}
+                role="button"
+                tabIndex={0}
+              />
+              {/* Panel (mirrors WalletDetails positioning) */}
+              <motion.div
+                animate={{ opacity: 1, x: 0, y: 0 }}
+                className="w-screen md:w-auto md:mx-0 md:ml-auto md:max-w-md md:flex md:items-center fixed md:relative left-0 md:left-auto top-auto md:top-auto bottom-0 md:bottom-auto h-[80vh] md:h-[95vh] z-[10000]"
+                exit={{
+                  opacity: window.innerWidth >= 768 ? 1 : 0,
+                  x: window.innerWidth >= 768 ? '100%' : 0,
+                  y: window.innerWidth >= 768 ? 0 : '100%',
+                }}
+                initial={{
+                  opacity: 1,
+                  x: window.innerWidth >= 768 ? '100%' : 0,
+                  y: window.innerWidth >= 768 ? 0 : '100%',
+                }}
+                transition={{
+                  damping: 30,
+                  mass: 0.8,
+                  stiffness: 300,
+                  type: 'spring',
+                }}
+              >
+                <div className="bg-white rounded-t-4xl md:rounded-4xl shadow-lg border border-gray-200 p-3 md:p-4 relative w-full h-full flex flex-col overflow-y-auto pb-[env(safe-area-inset-bottom)]">
+                  <button
+                    aria-label={closeAria}
+                    className="absolute top-4 right-4 p-1 rounded-full hover:bg-gray-100 transition-colors duration-200 cursor-pointer z-10"
+                    onClick={() => setOpen(false)}
+                  >
+                    <X className="w-5 h-5 text-gray-400 hover:text-gray-600" />
+                  </button>
+                  {/* Header */}
+                  <div className="mb-6 pr-8 text-center mt-2 md:mt-4">
+                    <h2 className="text-2xl font-semibold text-gray-900">{title}</h2>
+                    <p className="text-md text-gray-600">{subtitle}</p>
+                  </div>
+                  {/* Language Options */}
+                  <div className="flex-1">
+                    <div className="space-y-3">
+                      {languages.map((code) => {
+                        const meta = metaMap[code] || { flag: code, name: code.toUpperCase() }
+                        const selected = temp === code
+                        return (
+                          <button
+                            className={`w-full flex items-center justify-between p-4 rounded-xl border transition-all duration-200 hover:bg-gray-50 ${selected ? 'border-[#356E6A] bg-[#356E6A]/10' : 'border-gray-200 bg-white'}`}
+                            key={code}
+                            onClick={() => setTemp(code)}
+                            type="button"
+                          >
+                            <div className="flex items-center space-x-4">
+                              <img
+                                alt={`${meta.name} flag`}
+                                className="w-6 h-6 rounded-full flex-shrink-0"
+                                loading="lazy"
+                                src={`https://hatscripts.github.io/circle-flags/flags/${meta.flag}.svg`}
+                              />
+                              <span className="text-gray-800 font-medium text-lg">{meta.name}</span>
+                            </div>
+                            <div className={`w-5 h-5 rounded-full border-2 transition-all duration-200 ${selected ? 'border-[#356E6A] bg-[#356E6A]' : 'border-gray-300'}`}>
+                              {selected && (
+                                <div className="w-full h-full flex items-center justify-center">
+                                  <div className="w-2 h-2 bg-white rounded-full" />
+                                </div>
+                              )}
+                            </div>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                  {/* Confirmation Button */}
+                  <div className="mt-6">
+                    <button
+                      className="bg-gradient-to-r from-[#356E6A] to-[#73B9A3] hover:from-[#2a5956] hover:to-[#5fa88d] text-white pointer-cursor text-lg font-medium rounded-xl w-full p-4 transition"
+                      onClick={handleConfirm}
+                      type="button"
+                    >
+                      {confirmLabel}
+                    </button>
+                  </div>
+                  {/* Footer */}
+                  <div className="text-xs text-gray-500 leading-relaxed text-center mt-6 pt-4 border-t border-gray-200">
+                    {hint}
+                  </div>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>,
+        document.body,
+      )}
+    </>
   )
 }
 
