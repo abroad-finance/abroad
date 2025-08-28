@@ -1,9 +1,9 @@
 import { useTranslate } from '@tolgee/react'
 import React, { useEffect, useRef, useState } from 'react'
 
-import { TransactionStatus as ApiStatus, getTransactionStatus } from '../../api'
-import { Button } from '../../shared/components/Button'
-import { IconAnimated } from '../../shared/components/IconAnimated'
+import { TransactionStatus as ApiStatus, getTransactionStatus } from '../../../api'
+import { Button } from '../../../shared/components/Button'
+import { IconAnimated } from '../../../shared/components/IconAnimated'
 
 interface TxStatusProps {
   onNewTransaction: () => void
@@ -24,10 +24,13 @@ export default function TxStatus({ onNewTransaction, onRetry, transactionId }: T
   const mapStatus = (api?: ApiStatus): UiStatus => {
     switch (api) {
       case 'PAYMENT_COMPLETED': return 'accepted'
+
       case 'PAYMENT_FAILED':
       case 'WRONG_AMOUNT': return 'denied'
+
       case 'AWAITING_PAYMENT':
       case 'PROCESSING_PAYMENT':
+      case undefined:
       default: return 'inProgress'
     }
   }

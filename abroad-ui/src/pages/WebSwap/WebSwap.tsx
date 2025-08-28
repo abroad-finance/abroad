@@ -2,20 +2,24 @@ import React, { useState } from 'react'
 import { lazy, Suspense } from 'react'
 
 import { useWebSwapController } from '../../features/swap/useWebSwapController'
-const QrScannerFullScreen = lazy(() => import('../../components/WebSwap/QrScannerFullScreen'))
+const QrScannerFullScreen = lazy(() => import('../../features/swap/components/QrScannerFullScreen'))
 import { Loader } from 'lucide-react'
 
 import { _36EnumsTargetCurrency as TargetCurrency } from '../../api/index'
-import BackgroundCrossfade from '../../components/common/BackgroundCrossfade'
-import LanguageSelector from '../../components/common/LanguageSelector'
-import { ModalOverlay } from '../../components/common/overlay/ModalOverlay'
-import NavBarResponsive from '../../components/WebSwap/NavBarResponsive'
-import WalletDetails from '../../components/WebSwap/WalletDetails'
+import { useWalletAuth } from '../../contexts/WalletAuthContext'
+import BankDetailsRoute from '../../features/swap/components/BankDetailsRoute'
+import NavBarResponsive from '../../features/swap/components/NavBarResponsive'
+import WaitSign from '../../features/swap/components/WaitSign'
+import WalletDetails from '../../features/swap/components/WalletDetails'
+import { useBankDetailsRoute } from '../../features/swap/hooks/useBankDetailsRoute'
+import { useWebSwapLayout } from '../../features/swap/hooks/useWebSwapLayout'
 import { SwapView } from '../../features/swap/webSwap.types'
 import WebSwapLayout from '../../features/swap/WebSwapLayout'
 import { useWalletDetails } from '../../hooks'
 import { useLanguageSelector, useNavBarResponsive } from '../../hooks'
-import { useWebSwapLayout } from '../../hooks/useWebSwapLayout'
+import BackgroundCrossfade from '../../shared/components/BackgroundCrossfade'
+import LanguageSelector from '../../shared/components/LanguageSelector'
+import { ModalOverlay } from '../../shared/components/ModalOverlay'
 
 export interface WebSwapControllerProps {
   closeQr: () => void
@@ -24,12 +28,16 @@ export interface WebSwapControllerProps {
   handleWalletDetailsClose: () => void
   handleWalletDetailsOpen: () => void
   isDecodingQr: boolean
+  isDesktop: boolean
   isQrOpen: boolean
   isWalletDetailsOpen: boolean
   setIsQrOpen: (isOpen: boolean) => void
 }
 
 const WebSwap: React.FC = () => {
+  const { address } = useWalletAuth()
+
+  // State management
   const [view, setView] = useState<SwapView>('swap')
   const [transactionId, setTransactionId] = useState<null | string>(null)
   const [sourceAmount, setSourceAmount] = useState('')
@@ -38,6 +46,8 @@ const WebSwap: React.FC = () => {
   const [quoteId, setQuoteId] = useState<string>('')
   const [pixKey, setPixKey] = useState<string>('')
   const [taxId, setTaxId] = useState<string>('')
+
+  // Main controller
   const {
     closeQr,
     currentBgUrl,
@@ -45,6 +55,7 @@ const WebSwap: React.FC = () => {
     handleWalletDetailsClose,
     handleWalletDetailsOpen,
     isDecodingQr,
+    isDesktop,
     isQrOpen,
     isWalletDetailsOpen,
     setIsQrOpen,
@@ -57,20 +68,35 @@ const WebSwap: React.FC = () => {
     setTaxId,
     targetCurrency,
   })
+
+  // Components controllers
   const navBar = useNavBarResponsive({
     onWalletDetails: handleWalletDetailsOpen,
   })
   const languageSelector = useLanguageSelector()
   const walletDetails = useWalletDetails({ onClose: handleWalletDetailsClose })
   const webSwapLayout = useWebSwapLayout({
-    pixKey,
     quoteId,
     setIsQrOpen,
-    setPixKey,
     setQuoteId,
     setSourceAmount,
     setTargetAmount,
     setTargetCurrency,
+    setTransactionId,
+    setView,
+    sourceAmount,
+    targetAmount,
+    targetCurrency,
+    transactionId,
+    view,
+  })
+  const bankDetailRoute = useBankDetailsRoute({
+    isDesktop,
+    onBackClick: webSwapLayout.handleBackToSwap,
+    onRedirectToHome: webSwapLayout.resetForNewTransaction,
+    pixKey,
+    quoteId,
+    setPixKey,
     setTaxId,
     setTransactionId,
     setView,
@@ -78,8 +104,7 @@ const WebSwap: React.FC = () => {
     targetAmount,
     targetCurrency,
     taxId,
-    transactionId,
-    view,
+    userId: address,
   })
 
   return (
@@ -106,7 +131,15 @@ const WebSwap: React.FC = () => {
 
       {/* Main Content Area */}
       <main className="flex-1 relative z-10 flex">
-        <WebSwapLayout {...webSwapLayout} />
+        <WebSwapLayout
+          {...webSwapLayout}
+          slots={{
+            bankDetails: (
+              <BankDetailsRoute {...bankDetailRoute} />
+            ),
+            waitSign: <WaitSign />,
+          }}
+        />
       </main>
 
       {/* Top-level Modals */}

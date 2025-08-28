@@ -3,7 +3,7 @@ import { challenge, refresh, verify } from '../api'
 export async function refreshWalletAuthToken(token: string): Promise<string> {
   const res = await refresh({ token })
   if (res.status !== 200) throw new Error('Failed to refresh token')
-  return res.data.token as string
+  return res.data.token
 }
 
 export async function walletAuth(address: string, signer: { signMessage: (msg: string) => Promise<string> }): Promise<string> {
@@ -14,5 +14,5 @@ export async function walletAuth(address: string, signer: { signMessage: (msg: s
   const verifyRes = await verify({ address, signedXDR: signature })
   if (verifyRes.status !== 200) throw new Error('Failed to verify signature')
   const { token } = await verifyRes.data
-  return token as string
+  return token
 }

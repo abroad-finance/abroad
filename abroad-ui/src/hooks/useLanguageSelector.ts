@@ -1,24 +1,24 @@
+// hooks/useLanguageSelector.ts
 import { useTolgee, useTranslate } from '@tolgee/react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
-import type { LanguageSelectorProps } from '../components/common/LanguageSelector'
+import type { LanguageSelectorProps } from '../shared/components/LanguageSelector'
 
 /**
  * useLanguageSelector
- * Encapsulates Tolgee language selection logic (available languages discovery,
- * current language subscription, optimistic change handler & aria label).
+ * Returns a fully controlled prop object for <LanguageSelector />.
+ * The return type is exactly LanguageSelectorProps, so you can do:
+ *   const props = useLanguageSelector()
+ *   <LanguageSelector {...props} />
  */
-type UseLanguageSelectorResult = Pick<LanguageSelectorProps, 'ariaLabel' | 'languages' | 'onChange' | 'value'> & {
-  // Keeping extensibility for future (e.g., loading state) without changing component API
-}
-
-export const useLanguageSelector = (): UseLanguageSelectorResult => {
+export const useLanguageSelector = (): LanguageSelectorProps => {
   const tolgee = useTolgee()
   const { t } = useTranslate()
 
-  // Resolve available languages from initial options (fallback to a safe list)
+  // Available languages from Tolgee (fallback list if missing)
   const languages = useMemo(() => {
-    const opts = (tolgee as unknown as { getInitialOptions?: () => { availableLanguages?: string[] } })?.getInitialOptions?.()
+    const opts = (tolgee as unknown as { getInitialOptions?: () => { availableLanguages?: string[] } })
+      ?.getInitialOptions?.()
     return opts?.availableLanguages || [
       'pt',
       'es',
@@ -27,27 +27,68 @@ export const useLanguageSelector = (): UseLanguageSelectorResult => {
     ]
   }, [tolgee])
 
-  const [value, setValue] = useState(() => tolgee.getLanguage())
+  // Committed language value + live sync with Tolgee (force non-undefined)
+  const [value, setValue] = useState<string>(() => tolgee.getLanguage() || 'en')
 
-  // Keep state in sync with external language changes
   useEffect(() => {
-  // eslint-disable-next-line
-  const off = tolgee.on?.('language', (l: { value: string }) => setValue(l.value))
-    return () => off?.unsubscribe()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const off = (tolgee as any).on?.(
+      'language',
+      (l: { value?: string }) => setValue(l.value || 'en'),
+    )
+    return () => off?.unsubscribe?.()
   }, [tolgee])
 
-  const onChange = useCallback((lng: string) => {
-    try {
-      tolgee.changeLanguage(lng)
-      setValue(lng) // optimistic update
-    }
-    catch {
-      /* noop */
-    }
-  }, [tolgee])
+  const onChange = useCallback(
+    (lng: string) => {
+      try {
+        tolgee.changeLanguage(lng)
+        setValue(lng) // optimistic
+      }
+      catch {
+        /* noop */
+      }
+    },
+    [tolgee],
+  )
 
-  const _aria = t('navbar.language_selector_aria', 'Seleccionar idioma')
-  const ariaLabel: string = typeof _aria === 'string' && _aria.length > 0 ? _aria : 'Seleccionar idioma'
+  // Controlled modal state
+  const [open, setOpen] = useState(false)
 
-  return { ariaLabel, languages, onChange, value } as UseLanguageSelectorResult
+  // Controlled draft selection inside the modal
+  const [draft, setDraft] = useState<string>(value)
+  useEffect(() => {
+    setDraft(value)
+  }, [value])
+
+  // Labels & aria (resolved via i18n here so the component stays dumb)
+  const labels = {
+    closeAria: t('language_selector.actions.close', 'Cerrar'),
+    confirm: t('language_selector.actions.confirm', 'Confirmar Selección'),
+    hint: t(
+      'language_selector.footer.hint',
+      'Los cambios de idioma se aplicarán inmediatamente',
+    ),
+    subtitle: t(
+      'language_selector.header.subtitle',
+      'Selecciona tu idioma preferido para la interfaz',
+    ),
+    title: t('language_selector.header.title', 'Configuración de Idioma'),
+  }
+
+  const _aria = t('language_selector.trigger.aria_label', 'Seleccionar idioma')
+  const ariaLabel
+    = typeof _aria === 'string' && _aria.length > 0 ? _aria : 'Seleccionar idioma'
+
+  return {
+    ariaLabel,
+    draft,
+    labels,
+    languages,
+    onChange,
+    onDraftChange: setDraft,
+    onOpenChange: setOpen,
+    open,
+    value,
+  }
 }

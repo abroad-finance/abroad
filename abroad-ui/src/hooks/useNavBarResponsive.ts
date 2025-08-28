@@ -2,7 +2,7 @@ import { Horizon } from '@stellar/stellar-sdk'
 import { useTranslate } from '@tolgee/react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
-import type { NavBarResponsiveProps } from '../components/WebSwap/NavBarResponsive'
+import type { NavBarResponsiveProps } from '../features/swap/components/NavBarResponsive'
 
 import { useWalletAuth } from '../contexts/WalletAuthContext'
 import { kit } from '../services/stellarKit'

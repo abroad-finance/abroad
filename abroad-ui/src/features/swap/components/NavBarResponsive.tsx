@@ -1,8 +1,8 @@
 import { Info, Wallet } from 'lucide-react'
 import React, { memo } from 'react'
 
-import AbroadLogoColored from '../../assets/Logos/AbroadLogoColored.svg'
-import AbroadLogoWhite from '../../assets/Logos/AbroadLogoWhite.svg'
+import AbroadLogoColored from '../../../assets/Logos/AbroadLogoColored.svg'
+import AbroadLogoWhite from '../../../assets/Logos/AbroadLogoWhite.svg'
 
 /**
  * ----------------------------------------------------------------------------

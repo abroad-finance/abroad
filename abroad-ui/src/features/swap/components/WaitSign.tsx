@@ -1,7 +1,7 @@
 import { useTranslate } from '@tolgee/react'
 import React from 'react'
 
-import { IconAnimated } from '../../shared/components/IconAnimated'
+import { IconAnimated } from '../../../shared/components/IconAnimated'
 
 const WaitSign = (): React.JSX.Element => {
   const { t } = useTranslate()

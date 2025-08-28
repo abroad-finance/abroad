@@ -9,29 +9,27 @@ import importPlugin from 'eslint-plugin-import'
 
 export default tseslint.config(
   { ignores: ['dist'] },
+
   {
+    files: ['**/src/**/*.{ts,tsx}'],
     extends: [
       js.configs.recommended,
       ...tseslint.configs.recommended,
-      stylistic.configs.recommended,             // registers @stylistic
-      perfectionist.configs['recommended-natural'], // registers perfectionist
+      stylistic.configs.recommended,
+      perfectionist.configs['recommended-natural'],
     ],
-    files: ['**/*.{ts,tsx}'],
     languageOptions: {
       ecmaVersion: 2020,
       globals: globals.browser,
+      parserOptions: {
+        projectService: true,
+      },
     },
-    'settings': {
+    settings: {
       'import/resolver': {
-        'node': {
-          'extensions': [
-            '.ts',
-            '.tsx'
-          ]
-        }
-      }
+        node: { extensions: ['.ts', '.tsx'] },
+      },
     },
-    // Don't re-declare plugins that presets already add
     plugins: {
       'react-hooks': reactHooks,
       'react-refresh': reactRefresh,
@@ -39,23 +37,23 @@ export default tseslint.config(
     },
     rules: {
       ...reactHooks.configs.recommended.rules,
-      'react-refresh/only-export-components': [
-        'warn',
-        { allowConstantExport: true },
-      ],
+      'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
       'react-hooks/exhaustive-deps': 'error',
+
       'import/no-restricted-paths': [
         'error',
         {
           zones: [
             { target: './src/shared', from: './src', except: ['./assets'] },
-            { target: './src/components', from: './src/components' },
+            // { target: './src/features/**/components/**/*', from: './src', except: ['./shared', './assets'] }, TODO: enable this rule
           ],
         },
       ],
       '@stylistic/array-element-newline': ['error', { minItems: 3 }],
       '@stylistic/array-bracket-newline': ['error', { minItems: 3 }],
       'import/no-cycle': ['warn', { maxDepth: 1 }],
+
+      '@typescript-eslint/switch-exhaustiveness-check': 'error',
     },
   },
 )

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 
 import { _36EnumsBlockchainNetwork as BlockchainNetwork, _36EnumsCryptoCurrency as CryptoCurrency, decodeQrCodeBR, getQuote, _36EnumsPaymentMethod as PaymentMethod, _36EnumsTargetCurrency as TargetCurrency } from '../../api/index'
@@ -104,6 +104,8 @@ export const useWebSwapController = ({ setPixKey, setQuoteId, setSourceAmount, s
     setTaxId,
   ])
 
+  const isDesktop = useMemo(() => window.innerWidth >= 768, [])
+
   // Determine desired desktop background URL based on currency
   const currentBgUrl = targetCurrency === 'BRL' ? BRL_BACKGROUND_IMAGE : ASSET_URLS.BACKGROUND_IMAGE
 
@@ -114,6 +116,7 @@ export const useWebSwapController = ({ setPixKey, setQuoteId, setSourceAmount, s
     handleWalletDetailsClose,
     handleWalletDetailsOpen,
     isDecodingQr,
+    isDesktop,
     isQrOpen,
     isWalletDetailsOpen,
     setIsQrOpen,

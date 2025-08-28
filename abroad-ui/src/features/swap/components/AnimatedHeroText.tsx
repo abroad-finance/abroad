@@ -2,7 +2,7 @@ import { useTranslate } from '@tolgee/react'
 import { AnimatePresence, motion } from 'framer-motion'
 import React from 'react'
 
-import { ASSET_URLS } from '../../features/swap/webSwap.constants'
+import { ASSET_URLS } from '../webSwap.constants'
 
 type Props = {
   currency?: 'BRL' | 'COP'

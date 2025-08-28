@@ -1,6 +1,6 @@
 import React from 'react'
 
-import { ATTRIBUTION_URL } from '../../features/swap/webSwap.constants'
+import { ATTRIBUTION_URL } from '../webSwap.constants'
 
 type Props = {
   className?: string

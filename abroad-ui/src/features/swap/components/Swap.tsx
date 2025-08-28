@@ -3,13 +3,13 @@ import { ChevronsDown, CircleDollarSign, Landmark, Loader, ScanLine, Timer, Wall
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { lazy, Suspense } from 'react'
 
-import { Button } from '../../shared/components/Button'
-import { TokenBadge } from '../../shared/components/TokenBadge'
-const IconAnimated = lazy(() => import('../../shared/components/IconAnimated').then(m => ({ default: m.IconAnimated })))
-import { _36EnumsBlockchainNetwork as BlockchainNetwork, _36EnumsCryptoCurrency as CryptoCurrency, getQuote, getReverseQuote, _36EnumsPaymentMethod as PaymentMethod, _36EnumsTargetCurrency as TargetCurrency } from '../../api/index'
-import { useWalletAuth } from '../../contexts/WalletAuthContext'
-import { useDebounce } from '../../hooks'
-import { kit } from '../../services/stellarKit'
+import { Button } from '../../../shared/components/Button'
+import { TokenBadge } from '../../../shared/components/TokenBadge'
+const IconAnimated = lazy(() => import('../../../shared/components/IconAnimated').then(m => ({ default: m.IconAnimated })))
+import { _36EnumsBlockchainNetwork as BlockchainNetwork, _36EnumsCryptoCurrency as CryptoCurrency, getQuote, getReverseQuote, _36EnumsPaymentMethod as PaymentMethod, _36EnumsTargetCurrency as TargetCurrency } from '../../../api/index'
+import { useWalletAuth } from '../../../contexts/WalletAuthContext'
+import { useDebounce } from '../../../hooks'
+import { kit } from '../../../services/stellarKit'
 
 // Define props for Swap component
 interface SwapProps {

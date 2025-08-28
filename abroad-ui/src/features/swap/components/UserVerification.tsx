@@ -1,8 +1,8 @@
 import { useTranslate } from '@tolgee/react'
 import React from 'react'
 
-import { Button } from '../../shared/components/Button'
-import { IconAnimated } from '../../shared/components/IconAnimated'
+import { Button } from '../../../shared/components/Button'
+import { IconAnimated } from '../../../shared/components/IconAnimated'
 
 interface UserVerificationProps {
   onVerify: () => void

@@ -13,13 +13,13 @@ import { useTranslate } from '@tolgee/react'
 import { ArrowLeft, Hash, Loader, Rotate3d } from 'lucide-react'
 import React, { useCallback, useEffect, useState } from 'react'
 
-import { acceptTransaction, Bank, getBanks, getBanksResponse200, _36EnumsTargetCurrency as TargetCurrency } from '../../api'
-import PixFull from '../../assets/Logos/networks/PixFull.svg'
-import { useWalletAuth } from '../../contexts/WalletAuthContext'
-import { kit } from '../../services/stellarKit'
-import { Button } from '../../shared/components/Button'
-import { DropSelector, Option } from '../../shared/components/DropSelector'
-import { hasMessage } from '../../utils'
+import { acceptTransaction, Bank, getBanks, getBanksResponse200, _36EnumsTargetCurrency as TargetCurrency } from '../../../api'
+import PixFull from '../../../assets/Logos/networks/PixFull.svg'
+import { useWalletAuth } from '../../../contexts/WalletAuthContext'
+import { kit } from '../../../services/stellarKit'
+import { Button } from '../../../shared/components/Button'
+import { DropSelector, Option } from '../../../shared/components/DropSelector'
+import { hasMessage } from '../../../utils'
 
 const networkPassphrase = Networks.PUBLIC
 const horizonUrl = 'https://horizon.stellar.org'
@@ -102,7 +102,7 @@ const EXCLUDED_BANKS = [
 
 const PENDING_TX_KEY = 'pendingTransaction'
 
-interface BankDetailsRouteProps {
+export interface BankDetailsRouteProps {
   onBackClick: () => void
   onKycRedirect: () => void
   onRedirectToHome: () => void
@@ -118,7 +118,7 @@ interface BankDetailsRouteProps {
   targetCurrency?: (typeof TargetCurrency)[keyof typeof TargetCurrency]
   taxId: string
   textColor?: string
-  userId: string
+  userId: null | string
 }
 
 export default function BankDetailsRoute({
@@ -299,7 +299,7 @@ export default function BankDetailsRoute({
     setLoadingSubmit(true)
 
     try {
-      if (!quote_id) throw new Error('Quote ID missing.')
+      if (!quote_id || !userId) throw new Error('Quote ID or User ID missing.')
 
       // 1️⃣  Reserve quote & obtain details ------------------------------------
       const redirectUrl = encodeURIComponent(

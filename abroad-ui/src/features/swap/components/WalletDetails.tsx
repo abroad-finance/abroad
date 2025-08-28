@@ -3,7 +3,7 @@ import { motion } from 'framer-motion'
 import { Copy, ExternalLink, RefreshCw, X } from 'lucide-react'
 import React from 'react'
 
-import { WalletDetailsProps } from '../../hooks/useWalletDetails'
+import { WalletDetailsProps } from '../../../hooks/useWalletDetails'
 
 // Stateless controlled component. All data & handlers provided via props.
 const WalletDetails: React.FC<WalletDetailsProps> = ({
