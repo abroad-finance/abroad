@@ -1,443 +1,59 @@
-import { WalletNetwork } from '@creit.tech/stellar-wallets-kit'
-import {
-  Asset,
-  BASE_FEE,
-  Horizon,
-  Memo,
-  Networks,
-  Operation,
-  Transaction,
-  TransactionBuilder,
-} from '@stellar/stellar-sdk'
 import { useTranslate } from '@tolgee/react'
 import { ArrowLeft, Hash, Loader, Rotate3d } from 'lucide-react'
-import React, { useCallback, useEffect, useState } from 'react'
+import React from 'react'
 
-import { acceptTransaction, Bank, getBanks, getBanksResponse200, _36EnumsTargetCurrency as TargetCurrency } from '../../../api'
+import { _36EnumsTargetCurrency as TargetCurrency } from '../../../api'
 import PixFull from '../../../assets/Logos/networks/PixFull.svg'
-import { useWalletAuth } from '../../../contexts/WalletAuthContext'
-import { kit } from '../../../services/stellarKit'
 import { Button } from '../../../shared/components/Button'
 import { DropSelector, Option } from '../../../shared/components/DropSelector'
-import { hasMessage } from '../../../utils'
-
-const networkPassphrase = Networks.PUBLIC
-const horizonUrl = 'https://horizon.stellar.org'
-const server = new Horizon.Server(horizonUrl)
-
-// Bank configuration mapping -------------------------------------------------------
-const BANK_CONFIG: Record<string, { displayLabel?: string, iconUrl: string }> = {
-  'BANCO AGRARIO DE COLOMBIA': {
-    displayLabel: 'Banco Agrario',
-    iconUrl: 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/BancoAgrario_Badge.jpg',
-  },
-  'BANCOBBVA': {
-    displayLabel: 'BBVA',
-    iconUrl: 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/BBVA_Badge.jpg',
-  },
-  'BANCO CAJA SOCIAL': {
-    displayLabel: 'Banco Caja Social',
-    iconUrl: 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/CajaSocial_Badge.webp',
-  },
-  'BANCO COOPERATIVO COOPCENTRAL DIGITAL': {
-    displayLabel: 'Coopcentral',
-    iconUrl: 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Bcc_Badge.jpg',
-  },
-  'BANCO CREZCAMOS': {
-    displayLabel: 'Banco Crezcamos',
-    iconUrl: 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/BancoCrezcamos_Badge.png',
-  },
-  'BANCO DE LAS MICROFINANZAS BANCAMIA SA': {
-    displayLabel: 'Bancamia',
-    iconUrl: 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Bancamia_Badge.jpg',
-  },
-  'BANCO FALABELLA': {
-    iconUrl: 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Falabella_Badge.png',
-  },
-  'BANCO FINANDINA': {
-    displayLabel: 'Banco Finandina',
-    iconUrl: 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/BancoFinandina_Badge.png',
-  },
-  'BANCO ITAU': {
-    displayLabel: 'Itau',
-    iconUrl: 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Itau_Badge.png',
-  },
-  'BANCOLOMBIA': {
-    iconUrl: 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Bancolombia_Badge.png',
-  },
-  'BANCO POWWI': {
-    displayLabel: 'Powwi',
-    iconUrl: 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Powwico_Badge.jpg',
-  },
-  'BANCO SERFINANZA': {
-    displayLabel: 'Serfinanza',
-    iconUrl: 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Bancoserfinanza_badge.jpg',
-  },
-  'DAVIPLATA': {
-    displayLabel: 'Daviplata',
-    iconUrl: 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Daviplata_Badge.png',
-  },
-  'DAVIVIENDA': {
-    displayLabel: 'Davivienda',
-    iconUrl: 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Davivienda_Badge.png',
-  },
-  'MOVII': {
-    iconUrl: 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/movii_badge.png',
-  },
-  'NEQUI': {
-    displayLabel: 'Nequi',
-    iconUrl: 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Nequi_Badge.webp',
-  },
-  'SUPERDIGITAL': {
-    iconUrl: 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Superdigital_Badge.png',
-  },
-}
-
-// Banks to exclude --------------------------------------------------------------
-const EXCLUDED_BANKS = [
-  'CFA COOPERATIVA FINANCIERA',
-  'CONFIAR COOPERATIVA FINANCIERA',
-  'BANCOCOOPCENTRAL',
-]
-
-const PENDING_TX_KEY = 'pendingTransaction'
 
 export interface BankDetailsRouteProps {
+  accountNumber: string
+  bankOpen: boolean
+  bankOptions: Option[]
+  continueDisabled: boolean
+  errorBanks: null | string
+  loadingBanks: boolean
+  loadingSubmit: boolean
+  onAccountNumberChange: (value: string) => void
   onBackClick: () => void
-  onKycRedirect: () => void
-  onRedirectToHome: () => void
-  onRedirectToWaitSign: () => void
-  // called immediately after user signs the transaction (before or during submission) to show status screen
-  onTransactionSigned: (id: null | string, transactionReference: null | string) => void
-  pixKey: string // For BRL transfers
-  quote_id: string
-  setPixKey: (key: string) => void
-  setTaxId: (id: string) => void
-  sourceAmount: string // Amount the user sends (Stellar asset)
-  targetAmount: string // Amount receiver gets (COP)
-  targetCurrency?: (typeof TargetCurrency)[keyof typeof TargetCurrency]
+  onContinue: () => void
+  onPixKeyChange: (value: string) => void
+  onSelectBank: (option: Option) => void
+  onTaxIdChange: (value: string) => void
+  pixKey: string
+  selectedBank: null | Option
+  setBankOpen: (open: boolean) => void
+  targetAmount: string
+  targetCurrency: (typeof TargetCurrency)[keyof typeof TargetCurrency]
   taxId: string
   textColor?: string
-  userId: null | string
 }
 
 export default function BankDetailsRoute({
+  accountNumber,
+  bankOpen,
+  bankOptions,
+  continueDisabled,
+  errorBanks,
+  loadingBanks,
+  loadingSubmit,
+  onAccountNumberChange,
   onBackClick,
-  onKycRedirect,
-  onRedirectToHome,
-  onRedirectToWaitSign,
-  onTransactionSigned,
+  onContinue,
+  onPixKeyChange,
+  onSelectBank,
+  onTaxIdChange,
   pixKey,
-  quote_id,
-  setPixKey,
-  setTaxId,
-  sourceAmount,
+  selectedBank,
+  setBankOpen,
   targetAmount,
-  targetCurrency = TargetCurrency.COP,
+  targetCurrency,
   taxId,
   textColor = '#356E6A',
-  userId,
 }: BankDetailsRouteProps): React.JSX.Element {
   const { t } = useTranslate()
-  const { address, setKycUrl, token, walletId } = useWalletAuth()
 
-  // ------------------------------- UI STATE -----------------------------------
-  const [account_number, setaccount_number] = useState('')
-  const [bank_code, setbank_code] = useState<string>('')
-  const [loadingSubmit, setLoadingSubmit] = useState(false)
-  const [bankOpen, setBankOpen] = useState(false)
-  const [selectedBank, setSelectedBank] = useState<null | Option>(null)
-
-  // ------------------------------ BANKS API -----------------------------------
-  const [apiBanks, setApiBanks] = useState<Bank[]>([])
-  const [loadingBanks, setLoadingBanks] = useState<boolean>(false)
-  const [errorBanks, setErrorBanks] = useState<null | string>(null)
-
-  // Restore saved details (returning from KYC) ---------------------------------
-  useEffect(() => {
-    const stored = localStorage.getItem(PENDING_TX_KEY)
-    if (stored && token) {
-      try {
-        const parsed = JSON.parse(stored)
-        if (parsed.account_number) setaccount_number(parsed.account_number)
-        if (parsed.bank_code) setbank_code(parsed.bank_code)
-        if (parsed.pixKey) setPixKey(parsed.pixKey)
-        if (parsed.taxId) setTaxId(parsed.taxId)
-        if (parsed.selectedBank) setSelectedBank(parsed.selectedBank)
-      }
-      catch (e) {
-        console.error('Failed to restore pending transaction', e)
-      }
-    }
-  }, [
-    setPixKey,
-    setTaxId,
-    token,
-  ])
-
-  // Fetch banks once -----------------------------------------------------------
-  useEffect(() => {
-    (async () => {
-      if (targetCurrency !== TargetCurrency.COP) return // Only fetch banks for COP flow
-      setLoadingBanks(true)
-      setErrorBanks(null)
-      try {
-        const response = await getBanks()
-        if (
-          response.status === 200
-          && (response as getBanksResponse200).data?.banks
-        ) {
-          setApiBanks((response as getBanksResponse200).data.banks)
-        }
-        else {
-          const errorMessage
-            = response.status === 400
-              ? 'Bad request to bank API.'
-              : `Failed to fetch banks. Status: ${response.status}`
-          setErrorBanks(errorMessage)
-          console.error('Error fetching banks:', response)
-        }
-      }
-      catch (err) {
-        setErrorBanks(
-          err instanceof Error
-            ? err.message
-            : 'An unknown error occurred while fetching banks.',
-        )
-        console.error(err)
-      }
-      finally {
-        setLoadingBanks(false)
-      }
-    })()
-  }, [targetCurrency])
-
-  // --------------------------- INPUT HANDLERS ---------------------------------
-  const handleaccount_numberChange = (
-    e: React.ChangeEvent<HTMLInputElement>,
-  ) => {
-    const input = e.target.value.replace(/[^\d]/g, '').slice(0, 10) // 10 digits max
-    setaccount_number(input)
-  }
-  const handleTaxIdChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const input = e.target.value.replace(/[^\d]/g, '').slice(0, 11) // 11 digits
-    setTaxId(input)
-  }
-
-  const handleBankSelect = (option: Option) => {
-    setSelectedBank(option)
-    setbank_code(option.value)
-  }
-
-  // Map banks to dropdown options ---------------------------------------------
-  const bankOptions: Option[] = apiBanks
-    .filter(
-      (bank: Bank) => !EXCLUDED_BANKS.includes(bank.bankName.toUpperCase()),
-    )
-    .map((bank: Bank) => {
-      const bankNameUpper = bank.bankName.toUpperCase()
-      const config = BANK_CONFIG[bankNameUpper]
-      return {
-        iconUrl: config?.iconUrl,
-        label: config?.displayLabel || bank.bankName,
-        value: String(bank.bankCode),
-      }
-    })
-    .sort((a, b) => a.label.localeCompare(b.label))
-
-  // --------------------------- HELPERS ----------------------------------------
-
-  const buildPaymentXdr = useCallback(async ({
-    amount,
-    asset,
-    destination,
-    memoValue,
-    source,
-  }: {
-    amount: string
-    asset: Asset
-    destination: string
-    memoValue: string
-    source: string
-  }): Promise<string> => {
-    try {
-      const account = await server.loadAccount(source)
-      const fee = await server.fetchBaseFee()
-
-      const tx = new TransactionBuilder(account, {
-        fee: String(fee || BASE_FEE),
-        networkPassphrase,
-      })
-        .addOperation(
-          Operation.payment({
-            amount,
-            asset,
-            destination,
-          }),
-        )
-        .addMemo(Memo.text(memoValue))
-        .setTimeout(180)
-        .build()
-
-      return tx.toXDR()
-    }
-    catch (err: unknown) {
-      // Create a descriptive message for UI and logs, preserve original where possible
-      let detail = ''
-      if (err instanceof Error) detail = err.message
-      else if (typeof err === 'object' && err !== null) detail = JSON.stringify(err)
-      else detail = String(err)
-
-      // Throw a new Error with the descriptive message so callers can show it to users
-      const message = `${t('bank_details.error_creating_transaction', 'No se pudo crear la transacción de pago')}: ${detail}`
-      throw new Error(message)
-    }
-  }, [t])
-
-  // --------------------------- SUBMIT FLOW ------------------------------------
-  const handleSubmit = useCallback(async () => {
-    setLoadingSubmit(true)
-
-    try {
-      if (!quote_id || !userId) throw new Error('Quote ID or User ID missing.')
-
-      // 1️⃣  Reserve quote & obtain details ------------------------------------
-      const redirectUrl = encodeURIComponent(
-        window.location.href.replace(/^https?:\/\//, ''),
-      )
-      const response = await acceptTransaction({
-        account_number: targetCurrency === TargetCurrency.BRL ? pixKey : account_number,
-        bank_code: targetCurrency === TargetCurrency.BRL ? 'PIX' : bank_code,
-        quote_id,
-        redirectUrl,
-        tax_id: targetCurrency === TargetCurrency.BRL ? taxId : undefined,
-        user_id: userId,
-      })
-
-      if (response.status !== 200) {
-        alert(`Error: ${response.data.reason}`)
-        return
-      }
-
-      const {
-        id: acceptedTxId,
-        kycLink,
-        transaction_reference,
-      } = response.data
-      const stellar_account = import.meta.env.VITE_ABROAD_STELLAR_ADDRESS
-      const asset_code = 'USDC'
-      const asset_issuer = 'GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN'
-
-      // 2️⃣  Redirect to KYC if needed ----------------------------------------
-      if (kycLink) {
-        localStorage.setItem(
-          PENDING_TX_KEY,
-          JSON.stringify({
-            account_number: targetCurrency === TargetCurrency.BRL ? pixKey : account_number,
-            bank_code: targetCurrency === TargetCurrency.BRL ? 'PIX' : bank_code,
-            pixKey: targetCurrency === TargetCurrency.BRL ? pixKey : undefined,
-            quote_id,
-            selectedBank,
-            srcAmount: sourceAmount,
-            targetCurrency,
-            taxId: targetCurrency === TargetCurrency.BRL ? taxId : undefined,
-            tgtAmount: targetAmount,
-            userId,
-          }),
-        )
-        setKycUrl(kycLink)
-        onKycRedirect()
-        return
-      }
-
-      // 6️⃣  Cleanup ------------------------------------------------------------
-      localStorage.removeItem(PENDING_TX_KEY)
-
-      if (!walletId) {
-        const queryParams = new URLSearchParams(window.location.search)
-        const callbackUrl = queryParams.get('callback')
-        const sepTransactionId = queryParams.get('transaction_id')
-        const sepBaseUrl = import.meta.env.VITE_SEP_BASE_URL || 'http://localhost:8000'
-        let url = encodeURI(`${sepBaseUrl}/sep24/transactions/withdraw/interactive/complete?amount_expected=${sourceAmount}&transaction_id=${sepTransactionId}`)
-        if (callbackUrl && callbackUrl.toLowerCase() !== 'none') {
-          url += `&callback=${encodeURIComponent(callbackUrl)}`
-        }
-        if (transaction_reference) {
-          url += `&memo=${encodeURIComponent(transaction_reference)}`
-        }
-        localStorage.removeItem(PENDING_TX_KEY)
-        window.location.href = url
-        return
-      }
-
-      // 3️⃣  Build payment XDR --------------------------------------------------
-      const paymentAsset = new Asset(asset_code, asset_issuer)
-
-      if (!address) {
-        throw new Error('Wallet address is not available.')
-      }
-
-      const unsignedXdr = await buildPaymentXdr({
-        amount: sourceAmount,
-        asset: paymentAsset,
-        destination: stellar_account,
-        memoValue: transaction_reference ?? '',
-        source: address,
-      })
-
-      // 4️⃣  Sign via kit -------------------------------------------------------
-      onRedirectToWaitSign()
-      const { signedTxXdr } = await kit.signTransaction(unsignedXdr, {
-        address: walletId,
-        networkPassphrase: WalletNetwork.PUBLIC,
-      })
-
-      // Show transaction status UI right after signing
-      onTransactionSigned(acceptedTxId || null, transaction_reference || null)
-
-      // 5️⃣  Submit -------------------------------------------------------------
-      const tx = new Transaction(signedTxXdr, networkPassphrase)
-      await server.submitTransaction(tx)
-    }
-    catch (err) {
-      console.error('Transaction submission error:', err)
-
-      let userMessage = 'Transaction error'
-      if (err instanceof Error) {
-        userMessage = err.message
-      }
-      else if (hasMessage(err)) {
-        userMessage = err.message
-      }
-
-      alert(userMessage)
-      onRedirectToHome()
-    }
-    finally {
-      setLoadingSubmit(false)
-    }
-  }, [
-    quote_id,
-    targetCurrency,
-    pixKey,
-    account_number,
-    bank_code,
-    taxId,
-    userId,
-    walletId,
-    address,
-    buildPaymentXdr,
-    sourceAmount,
-    onRedirectToWaitSign,
-    onTransactionSigned,
-    selectedBank,
-    targetAmount,
-    setKycUrl,
-    onKycRedirect,
-    onRedirectToHome,
-  ])
-
-  // ------------------------------- RENDER -------------------------------------
   return (
     <div className="flex-1 flex items-center justify-center w-full flex-col">
       <div
@@ -474,7 +90,7 @@ export default function BankDetailsRoute({
                     <input
                       className="w-full bg-transparent font-semibold focus:outline-none text-base sm:text-lg"
                       inputMode="text"
-                      onChange={e => setPixKey(e.target.value)}
+                      onChange={e => onPixKeyChange(e.target.value)}
                       placeholder={t('bank_details.pix_key_placeholder', 'PIX Key')}
                       style={{ color: textColor }}
                       type="text"
@@ -487,7 +103,7 @@ export default function BankDetailsRoute({
                     <input
                       className="w-full bg-transparent font-semibold focus:outline-none text-base sm:text-lg"
                       inputMode="numeric"
-                      onChange={handleTaxIdChange}
+                      onChange={e => onTaxIdChange(e.target.value)}
                       pattern="[0-9]*"
                       placeholder={t('bank_details.cpf_placeholder', 'CPF')}
                       style={{ color: textColor }}
@@ -508,12 +124,12 @@ export default function BankDetailsRoute({
                     <input
                       className="w-full bg-transparent font-semibold focus:outline-none text-base sm:text-lg"
                       inputMode="numeric"
-                      onChange={handleaccount_numberChange}
+                      onChange={e => onAccountNumberChange(e.target.value)}
                       pattern="[0-9]*"
                       placeholder={t('bank_details.transfiya_placeholder', 'Número Transfiya')}
                       style={{ color: textColor }}
                       type="text"
-                      value={account_number}
+                      value={accountNumber}
                     />
                   </div>
 
@@ -524,10 +140,7 @@ export default function BankDetailsRoute({
                   >
                     {loadingBanks && (
                       <div className="p-6 flex items-center space-x-3">
-                        <Loader
-                          className="animate-spin w-4 h-4 sm:w-5 sm:h-5"
-                          style={{ color: textColor }}
-                        />
+                        <Loader className="animate-spin w-4 h-4 sm:w-5 sm:h-5" style={{ color: textColor }} />
                       </div>
                     )}
                     {errorBanks && (
@@ -535,20 +148,20 @@ export default function BankDetailsRoute({
                         <p className="text-red-500 text-xs sm:text-sm">{errorBanks}</p>
                       </div>
                     )}
-                    {!loadingBanks && !errorBanks && apiBanks.length === 0 && (
+                    {!loadingBanks && !errorBanks && bankOptions.length === 0 && (
                       <div className="p-6 flex items-center space-x-3">
                         <p className="text-[#356E6A]/70 text-xs sm:text-sm">
                           {t('bank_details.no_banks', 'No hay bancos disponibles.')}
                         </p>
                       </div>
                     )}
-                    {!loadingBanks && !errorBanks && apiBanks.length > 0 && (
+                    {!loadingBanks && !errorBanks && bankOptions.length > 0 && (
                       <div className="p-6 flex items-center space-x-3 w-full">
                         <div className="flex-1">
                           <DropSelector
                             disabled={loadingBanks || errorBanks !== null}
                             isOpen={bankOpen}
-                            onSelectOption={handleBankSelect}
+                            onSelectOption={onSelectBank}
                             options={bankOptions}
                             placeholder={t('bank_details.bank_placeholder', 'Banco')}
                             placeholderIcons={[
@@ -604,15 +217,14 @@ export default function BankDetailsRoute({
                     <Rotate3d className="w-4 h-4 sm:w-5 sm:h-5" />
                     <span className="font-medium text-xs sm:text-sm">{t('bank_details.network', 'Red:')}</span>
                     <div className="bg-white/70 backdrop-blur-md rounded-lg px-2 py-1 flex items-center">
-                      <img
-                        alt="PIX Logo"
-                        className="h-3 sm:h-4 w-auto"
-                        src={PixFull}
-                      />
+                      <img alt="PIX Logo" className="h-3 sm:h-4 w-auto" src={PixFull} />
                     </div>
                   </div>
                   <span className="font-medium text-xs pl-1" style={{ color: textColor }}>
-                    {t('bank_details.pix_disclaimer', 'Tu transacción será procesada de inmediato. Asegúrate de que la llave PIX y el CPF del destinatario sean correctos. Esta transacción no se puede reversar.')}
+                    {t(
+                      'bank_details.pix_disclaimer',
+                      'Tu transacción será procesada de inmediato. Asegúrate de que la llave PIX y el CPF del destinatario sean correctos. Esta transacción no se puede reversar.',
+                    )}
                   </span>
                 </>
               )
@@ -630,7 +242,10 @@ export default function BankDetailsRoute({
                     </div>
                   </div>
                   <span className="font-medium text-xs pl-1" style={{ color: textColor }}>
-                    {t('bank_details.transfiya_disclaimer', 'Tu transacción será procesada de inmediato y llegará instantáneamente. Ten presente que el receptor debe tener activado Transfiya en el banco indicado.')}
+                    {t(
+                      'bank_details.transfiya_disclaimer',
+                      'Tu transacción será procesada de inmediato y llegará instantáneamente. Ten presente que el receptor debe tener activado Transfiya en el banco indicado.',
+                    )}
                   </span>
                 </>
               )}
@@ -640,13 +255,8 @@ export default function BankDetailsRoute({
       {/* Continue button */}
       <Button
         className="mt-4 w-[90%] max-w-md py-4 cursor-pointer"
-        disabled={
-          loadingSubmit
-          || (targetCurrency === TargetCurrency.BRL
-            ? !(pixKey && taxId)
-            : (!bank_code || account_number.length !== 10 || loadingBanks))
-        }
-        onClick={handleSubmit}
+        disabled={continueDisabled}
+        onClick={onContinue}
       >
         {loadingSubmit
           ? (
