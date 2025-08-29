@@ -2,7 +2,7 @@
 import { useTolgee, useTranslate } from '@tolgee/react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
-import type { LanguageSelectorProps } from '../shared/components/LanguageSelector'
+import type { LanguageSelectorProps } from '../components/LanguageSelector'
 
 /**
  * useLanguageSelector

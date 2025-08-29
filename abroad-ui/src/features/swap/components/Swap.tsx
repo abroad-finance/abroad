@@ -1,224 +1,67 @@
 import { useTranslate } from '@tolgee/react'
-import { ChevronsDown, CircleDollarSign, Landmark, Loader, ScanLine, Timer, Wallet } from 'lucide-react'
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { lazy, Suspense } from 'react'
+import {
+  ChevronsDown,
+  CircleDollarSign,
+  Landmark,
+  Loader,
+  ScanLine,
+  Timer,
+  Wallet,
+} from 'lucide-react'
+import React, { lazy, Suspense } from 'react'
 
 import { Button } from '../../../shared/components/Button'
 import { TokenBadge } from '../../../shared/components/TokenBadge'
-const IconAnimated = lazy(() => import('../../../shared/components/IconAnimated').then(m => ({ default: m.IconAnimated })))
-import { _36EnumsBlockchainNetwork as BlockchainNetwork, _36EnumsCryptoCurrency as CryptoCurrency, getQuote, getReverseQuote, _36EnumsPaymentMethod as PaymentMethod, _36EnumsTargetCurrency as TargetCurrency } from '../../../api/index'
-import { useWalletAuth } from '../../../contexts/WalletAuthContext'
-import { useDebounce } from '../../../hooks'
-import { kit } from '../../../services/stellarKit'
+const IconAnimated = lazy(() =>
+  import('../../../shared/components/IconAnimated').then(m => ({ default: m.IconAnimated })),
+)
 
-// Define props for Swap component
-interface SwapProps {
-  initialSourceAmount?: string
-  initialTargetAmount?: string
-  onAmountsChange?: (params: {
-    currency?: (typeof TargetCurrency)[keyof typeof TargetCurrency]
-    src?: string
-    tgt?: string
-  }) => void
-  onContinue: (
-    quote_id: string,
-    srcAmount: string,
-    tgtAmount: string,
-    targetCurrency: (typeof TargetCurrency)[keyof typeof TargetCurrency]
-  ) => void
-  onWalletConnect?: () => void
-  openQr: () => void // handler to open QR scanner
-  quoteId: string
-  setQuoteId: (id: string) => void
+import { _36EnumsTargetCurrency as TargetCurrency } from '../../../api'
+
+export interface SwapProps {
+  continueDisabled: boolean
+  currencyMenuOpen: boolean
+  currencyMenuRef: React.RefObject<HTMLDivElement | null>
+  exchangeRateDisplay: string // e.g. '-', 'R$5,43'
+  isAuthenticated: boolean
+  loadingSource: boolean
+  loadingTarget: boolean
+  onPrimaryAction: () => void
+  onSourceChange: (value: string) => void
+  onTargetChange: (value: string) => void
+  openQr: () => void
+  selectCurrency: (currency: (typeof TargetCurrency)[keyof typeof TargetCurrency]) => void
   sourceAmount: string
   targetAmount: string
   targetCurrency: (typeof TargetCurrency)[keyof typeof TargetCurrency]
+  targetSymbol: string
   textColor?: string
+  toggleCurrencyMenu: () => void
+  transferFeeDisplay: string // e.g. 'R$0,00'
 }
 
-const COP_TRANSFER_FEE = 0.0
-const BRL_TRANSFER_FEE = 0.0
-
 export default function Swap({
-  onAmountsChange,
-  onContinue,
+  continueDisabled,
+  currencyMenuOpen,
+  currencyMenuRef,
+  exchangeRateDisplay,
+  isAuthenticated,
+  loadingSource,
+  loadingTarget,
+  onPrimaryAction,
+  onSourceChange,
+  onTargetChange,
   openQr,
-  quoteId,
-  setQuoteId,
+  selectCurrency,
   sourceAmount,
   targetAmount,
   targetCurrency,
+  targetSymbol,
   textColor = '#356E6A',
-}: SwapProps) {
+  toggleCurrencyMenu,
+  transferFeeDisplay,
+}: SwapProps): React.JSX.Element {
   const { t } = useTranslate()
-  // Derived formatting and payment method by target currency
-  const targetLocale = targetCurrency === TargetCurrency.BRL ? 'pt-BR' : 'es-CO'
-  const targetSymbol = targetCurrency === TargetCurrency.BRL ? 'R$' : '$'
-  const targetPaymentMethod = targetCurrency === TargetCurrency.BRL ? PaymentMethod.PIX : PaymentMethod.MOVII
-  // Dynamic transfer fee: BRL = 0, COP = 1354
-  const transferFee = targetCurrency === TargetCurrency.BRL ? BRL_TRANSFER_FEE : COP_TRANSFER_FEE
-
-  const { authenticateWithWallet, token } = useWalletAuth()
-  const [loadingSource, setLoadingSource] = useState(false)
-  const [loadingTarget, setLoadingTarget] = useState(false)
-  const [displayedTRM, setDisplayedTRM] = useState(0.000)
-  // New: selected target currency (COP | BRL)
-  // Dropdown state for currency selection
-  const [currencyMenuOpen, setCurrencyMenuOpen] = useState(false)
-  const currencyMenuRef = useRef<HTMLDivElement | null>(null)
-  const sourceDebouncedAmount = useDebounce(sourceAmount, 1500) // 1000ms delay
-  const targetDebounceAmount = useDebounce(targetAmount, 1500)
-  const triggerRef = useRef<boolean | null>(null)
-
-  const isButtonDisabled = () => {
-    const numericSource = parseFloat(String(sourceAmount))
-    // Clean targetAmount: remove thousands separators (.), change decimal separator (,) to .
-    const cleanedTarget = String(targetAmount).replace(/\./g, '').replace(/,/g, '.')
-    const numericTarget = parseFloat(cleanedTarget)
-    return !(numericSource > 0 && numericTarget > 0)
-  }
-
-  const formatTargetNumber = useCallback((value: number) =>
-    new Intl.NumberFormat(targetLocale, { maximumFractionDigits: 2, minimumFractionDigits: 2 }).format(value), [targetLocale])
-
-  const fetchDirectConversion = useCallback(async (value: string) => {
-    const num = parseFloat(value)
-    if (isNaN(num)) {
-      onAmountsChange?.({ tgt: '' })
-      return
-    }
-    setLoadingTarget(true)
-    try {
-      console.log('Fetching reverse quote for source amount:', num)
-      const response = await getReverseQuote({
-        crypto_currency: CryptoCurrency.USDC,
-        network: BlockchainNetwork.STELLAR,
-        payment_method: targetPaymentMethod,
-        source_amount: num,
-        target_currency: targetCurrency,
-      })
-      if (response.status === 200) {
-        const formatted = formatTargetNumber(response.data.value)
-        setQuoteId(response.data.quote_id) // Add this line
-        onAmountsChange?.({ tgt: formatted })
-      }
-    }
-    catch (error: unknown) {
-      console.error('Reverse quote error', error)
-    }
-    finally {
-      setLoadingTarget(false)
-    }
-  }, [
-    onAmountsChange,
-    formatTargetNumber,
-    targetCurrency,
-    targetPaymentMethod,
-    setQuoteId,
-  ])
-
-  const fetchReverseConversion = useCallback(async (value: string) => {
-    // allow digits, dots and commas; normalize commas to dots for parse
-    const raw = value.replace(/[^0-9.,]/g, '')
-    const normalized = raw.replace(/\./g, '').replace(/,/g, '.')
-    const num = parseFloat(normalized)
-    if (isNaN(num)) {
-      onAmountsChange?.({ src: '' })
-      return
-    }
-    setLoadingSource(true)
-    try {
-      console.log('Fetching direct quote for amount:', num)
-      const response = await getQuote({
-        amount: num,
-        crypto_currency: CryptoCurrency.USDC,
-        network: BlockchainNetwork.STELLAR,
-        payment_method: targetPaymentMethod,
-        target_currency: targetCurrency,
-      })
-      if (response.status === 200) {
-        const src = response.data.value.toFixed(2)
-        setQuoteId(response.data.quote_id)
-        onAmountsChange?.({ src: src })
-      }
-    }
-    catch (error: unknown) {
-      console.error('Quote error', error)
-    }
-    finally {
-      setLoadingSource(false)
-    }
-  }, [
-    onAmountsChange,
-    setQuoteId,
-    targetCurrency,
-    targetPaymentMethod,
-  ])
-
-  const handleSourceOnChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    triggerRef.current = true
-    onAmountsChange?.({ src: e.target.value.replace(/[^0-9.]/g, '') })
-  }
-
-  const handleTargetOnChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    triggerRef.current = false
-    onAmountsChange?.({ tgt: e.target.value.replace(/[^0-9.,]/g, '') })
-  }
-
-  // Direct wallet connection handler
-  const handleDirectWalletConnect = () => {
-    kit.openModal({
-      onWalletSelected: async (option) => {
-        authenticateWithWallet(option.id)
-      },
-    })
-  }
-
-  useEffect(() => {
-    if (!loadingSource && !loadingTarget) {
-      const numericSource = parseFloat(sourceAmount)
-      // Normalize targetAmount (which might have formatting) to a standard number string for parsing
-      const cleanedTarget = targetAmount.replace(/\./g, '').replace(/,/g, '.')
-      const numericTarget = parseFloat(cleanedTarget)
-
-      if (numericSource > 0 && !isNaN(numericTarget) && numericTarget >= 0) {
-        setDisplayedTRM((numericTarget + transferFee) / numericSource)
-      }
-      else {
-        setDisplayedTRM(0.000)
-      }
-    }
-    // If loadingSource or loadingTarget is true, displayedTRM remains unchanged.
-  }, [
-    sourceAmount,
-    targetAmount,
-    loadingSource,
-    loadingTarget,
-    transferFee,
-  ]) // TransferFee is a module-level const
-
-  useEffect(() => {
-    if (sourceDebouncedAmount && triggerRef.current === true) {
-      fetchDirectConversion(sourceDebouncedAmount)
-    }
-  }, [fetchDirectConversion, sourceDebouncedAmount])
-
-  useEffect(() => {
-    if (targetDebounceAmount && triggerRef.current === false) {
-      fetchReverseConversion(targetDebounceAmount)
-    }
-  }, [targetDebounceAmount, fetchReverseConversion])
-
-  // Close currency dropdown on outside click
-  useEffect(() => {
-    const onDocClick = (e: MouseEvent) => {
-      if (currencyMenuRef.current && !currencyMenuRef.current.contains(e.target as Node)) {
-        setCurrencyMenuOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', onDocClick)
-    return () => document.removeEventListener('mousedown', onDocClick)
-  }, [])
 
   return (
     <div className="flex-1 flex items-center justify-center w-full flex flex-col">
@@ -226,7 +69,7 @@ export default function Swap({
         className="w-[98%] max-w-md min-h-[60vh] bg-[#356E6A]/5 backdrop-blur-xl rounded-4xl p-4 md:p-6 flex flex-col items-center justify-center space-y-1 lg:space-y-4"
         id="background-container"
       >
-        {/* Title + Subtitle (new format) */}
+        {/* Title + Subtitle */}
         <div className="flex-1 flex items-center justify-between w-full">
           <div className="flex flex-col">
             <div className="text-xl md:text-xl font-bold" style={{ color: textColor }}>
@@ -238,6 +81,7 @@ export default function Swap({
               </div>
             )}
           </div>
+
           {targetCurrency === TargetCurrency.BRL && (
             <button
               aria-label={t('swap.scan_qr_aria', 'Escanear QR')}
@@ -249,6 +93,7 @@ export default function Swap({
             </button>
           )}
         </div>
+
         {/* SOURCE */}
         <div
           className="w-full bg-white/60 backdrop-blur-xl rounded-2xl p-4 md:py-6 md:px-6 flex items-center justify-between"
@@ -264,7 +109,7 @@ export default function Swap({
                   <input
                     className="w-full bg-transparent font-bold focus:outline-none text-xl md:text-2xl"
                     inputMode="decimal"
-                    onChange={handleSourceOnChange}
+                    onChange={e => onSourceChange(e.target.value)}
                     pattern="[0-9.]*"
                     placeholder="0.00"
                     style={{ color: textColor }}
@@ -280,8 +125,8 @@ export default function Swap({
           />
         </div>
 
-        {/* TARGET */}
-        {token
+        {/* TARGET or Connect notice */}
+        {isAuthenticated
           ? (
               <div
                 className="relative w-full bg-white/60 backdrop-blur-xl rounded-2xl p-4 md:py-6 md:px-6 flex items-center justify-between"
@@ -305,7 +150,7 @@ export default function Swap({
                         <input
                           className="w-full bg-transparent font-bold focus:outline-none text-xl md:text-2xl"
                           inputMode="decimal"
-                          onChange={handleTargetOnChange}
+                          onChange={e => onTargetChange(e.target.value)}
                           pattern="[0-9.,]*"
                           placeholder="0,00"
                           style={{ color: textColor }}
@@ -315,13 +160,13 @@ export default function Swap({
                       )}
                 </div>
 
-                {/* selector de moneda */}
+                {/* currency selector */}
                 <div className="relative ml-2 shrink-0" ref={currencyMenuRef}>
                   <button
                     aria-expanded={currencyMenuOpen}
                     aria-haspopup="listbox"
                     className="focus:outline-none cursor-pointer"
-                    onClick={() => setCurrencyMenuOpen(v => !v)}
+                    onClick={toggleCurrencyMenu}
                     type="button"
                   >
                     <TokenBadge
@@ -343,11 +188,7 @@ export default function Swap({
                       <button
                         aria-selected={targetCurrency === TargetCurrency.COP}
                         className="w-full text-left hover:bg-black/5 rounded-lg px-1 py-1 cursor-pointer"
-                        onClick={() => {
-                          setCurrencyMenuOpen(false)
-                          // Notify parent about currency change to update global state (e.g., background)
-                          onAmountsChange?.({ currency: TargetCurrency.COP, src: sourceAmount, tgt: targetAmount })
-                        }}
+                        onClick={() => selectCurrency(TargetCurrency.COP)}
                         role="option"
                         type="button"
                       >
@@ -361,11 +202,7 @@ export default function Swap({
                       <button
                         aria-selected={targetCurrency === TargetCurrency.BRL}
                         className="cursor-pointer w-full text-left hover:bg-black/5 rounded-lg px-1 py-1"
-                        onClick={() => {
-                          setCurrencyMenuOpen(false)
-                          // Notify parent about currency change to update global state (e.g., background)
-                          onAmountsChange?.({ currency: TargetCurrency.BRL, src: sourceAmount, tgt: targetAmount })
-                        }}
+                        onClick={() => selectCurrency(TargetCurrency.BRL)}
                         role="option"
                         type="button"
                       >
@@ -395,6 +232,7 @@ export default function Swap({
               </div>
             )}
 
+        {/* Info */}
         <div className="flex-1 flex items-center justify-center w-full">
           <div className="w-full" id="tx-info" style={{ color: textColor }}>
             <div className="flex flex-col space-y-2">
@@ -402,23 +240,23 @@ export default function Swap({
                 <CircleDollarSign className="w-5 h-5" />
                 <span>
                   {t('swap.exchange_rate', 'Tasa de Cambio:')}
-                  <b>{displayedTRM === 0 ? '-' : `${targetSymbol}${formatTargetNumber(displayedTRM)}`}</b>
+                  {' '}
+                  <b>{exchangeRateDisplay}</b>
                 </span>
               </div>
               <div className="flex items-center space-x-2" id="transfer-fee">
                 <Landmark className="w-5 h-5" />
                 <span>
                   {t('swap.transfer_cost', 'Costo de Transferencia:')}
-                  <b>
-                    {targetSymbol}
-                    {formatTargetNumber(transferFee)}
-                  </b>
+                  {' '}
+                  <b>{transferFeeDisplay}</b>
                 </span>
               </div>
               <div className="flex items-center space-x-2" id="time">
                 <Timer className="w-5 h-5" />
                 <span>
                   {t('swap.time', 'Tiempo:')}
+                  {' '}
                   <b>{t('swap.time_value', '10 - 30 segundos')}</b>
                 </span>
               </div>
@@ -427,25 +265,13 @@ export default function Swap({
         </div>
       </div>
 
+      {/* Primary button (connect or continue) */}
       <Button
         className="mt-4 w-[98%] max-w-md py-4 cursor-pointer"
-        disabled={!!token && (isButtonDisabled() || !quoteId)}
-        onClick={() => {
-          if (!token) {
-            // Always use direct wallet connection - prioritize the internal handler
-            handleDirectWalletConnect()
-          }
-          else {
-            console.log('Continue clicked with quote_id:', quoteId)
-            if (!quoteId) {
-              alert(t('swap.wait_for_quote', 'Please wait for the quote to load before continuing'))
-              return
-            }
-            onContinue(quoteId, sourceAmount, targetAmount, targetCurrency)
-          }
-        }}
+        disabled={continueDisabled}
+        onClick={onPrimaryAction}
       >
-        {!token
+        {!isAuthenticated
           ? (
               <div className="flex items-center justify-center space-x-2">
                 <Wallet className="w-5 h-5" />

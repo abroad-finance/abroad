@@ -2,8 +2,11 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 
 import { _36EnumsBlockchainNetwork as BlockchainNetwork, _36EnumsCryptoCurrency as CryptoCurrency, decodeQrCodeBR, getQuote, _36EnumsPaymentMethod as PaymentMethod, _36EnumsTargetCurrency as TargetCurrency } from '../../api/index'
-import { WebSwapControllerProps } from '../../pages/WebSwap/WebSwap'
-import { ASSET_URLS, BRL_BACKGROUND_IMAGE } from './webSwap.constants'
+import { useWalletAuth } from '../../contexts/WalletAuthContext'
+import { BRL_BACKGROUND_IMAGE } from '../../features/swap/constants'
+import { SwapView } from '../../features/swap/types'
+import { ASSET_URLS, PENDING_TX_KEY } from '../../shared/constants'
+import { WebSwapControllerProps } from './WebSwap'
 
 type UseWebSwapControllerProps = {
   setPixKey: (key: string) => void
@@ -12,12 +15,15 @@ type UseWebSwapControllerProps = {
   setTargetAmount: (amount: string) => void
   setTargetCurrency: (currency: (typeof TargetCurrency)[keyof typeof TargetCurrency]) => void
   setTaxId: (id: string) => void
+  setTransactionId: (id: null | string) => void
+  setView: (view: SwapView) => void
   targetCurrency: TargetCurrency
 }
 
-export const useWebSwapController = ({ setPixKey, setQuoteId, setSourceAmount, setTargetAmount, setTargetCurrency, setTaxId, targetCurrency }: UseWebSwapControllerProps): WebSwapControllerProps => {
+export const useWebSwapController = ({ setPixKey, setQuoteId, setSourceAmount, setTargetAmount, setTargetCurrency, setTaxId, setTransactionId, setView, targetCurrency }: UseWebSwapControllerProps): WebSwapControllerProps => {
   // Modal visibility state
   const [isWalletDetailsOpen, setIsWalletDetailsOpen] = useState(false)
+  const { kycUrl, token } = useWalletAuth()
 
   // QR scanner state and URL param handling
   const [isQrOpen, setIsQrOpen] = useState(false)
@@ -32,6 +38,31 @@ export const useWebSwapController = ({ setPixKey, setQuoteId, setSourceAmount, s
       setTargetCurrency(TargetCurrency.BRL)
     }
   }, [searchParams, setTargetCurrency])
+
+  // Restore state if user returns from KYC
+  useEffect(() => {
+    const stored = localStorage.getItem(PENDING_TX_KEY)
+    if (stored && token) {
+      try {
+        const parsed = JSON.parse(stored)
+        setQuoteId(parsed.quote_id)
+        setSourceAmount(parsed.srcAmount)
+        setTargetAmount(parsed.tgtAmount)
+        setTargetCurrency(parsed.targetCurrency || TargetCurrency.COP)
+        setView('bankDetails')
+      }
+      catch (e) {
+        console.error('Failed to restore pending transaction', e)
+      }
+    }
+  }, [
+    setQuoteId,
+    setSourceAmount,
+    setTargetAmount,
+    setTargetCurrency,
+    setView,
+    token,
+  ])
 
   const handleWalletDetailsOpen = useCallback(() => setIsWalletDetailsOpen(true), [])
   const handleWalletDetailsClose = useCallback(() => setIsWalletDetailsOpen(false), [])
@@ -109,9 +140,39 @@ export const useWebSwapController = ({ setPixKey, setQuoteId, setSourceAmount, s
   // Determine desired desktop background URL based on currency
   const currentBgUrl = targetCurrency === 'BRL' ? BRL_BACKGROUND_IMAGE : ASSET_URLS.BACKGROUND_IMAGE
 
+  const handleKycRedirect = useCallback(() => {
+    if (kycUrl) {
+      window.location.href = kycUrl
+    }
+    else {
+      alert('No KYC url finded')
+    }
+  }, [kycUrl])
+
+  const handleBackToSwap = useCallback(() => {
+    localStorage.removeItem(PENDING_TX_KEY)
+    setView('swap')
+  }, [setView])
+
+  // Reset from TxStatus to start a fresh transaction
+  const resetForNewTransaction = useCallback(() => {
+    localStorage.removeItem(PENDING_TX_KEY)
+    setSourceAmount('')
+    setTargetAmount('')
+    setTransactionId(null)
+    setView('swap')
+  }, [
+    setSourceAmount,
+    setTargetAmount,
+    setTransactionId,
+    setView,
+  ])
+
   return {
     closeQr: () => setIsQrOpen(false),
     currentBgUrl,
+    handleBackToSwap,
+    handleKycRedirect,
     handleQrResult,
     handleWalletDetailsClose,
     handleWalletDetailsOpen,
@@ -119,6 +180,7 @@ export const useWebSwapController = ({ setPixKey, setQuoteId, setSourceAmount, s
     isDesktop,
     isQrOpen,
     isWalletDetailsOpen,
+    resetForNewTransaction,
     setIsQrOpen,
   }
 }
