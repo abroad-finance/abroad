@@ -129,7 +129,7 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({
   return (
     <nav className={cn('w-full px-4 pt-4', className)} role="navigation">
       <div className="max-w-8xl mx-auto bg-transparent md:bg-[#356E6A]/5 backdrop-blur-md rounded-2xl">
-        <div className="px-4 sm:px-6 lg:px-8">
+        <div className="sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             {/* Logo */}
             <div className="flex-shrink-0">

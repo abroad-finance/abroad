@@ -116,7 +116,7 @@ export default function TxStatus({ onNewTransaction, onRetry, transactionId }: T
       {error && <div className="text-red-600 text-sm">{error}</div>}
 
       <div
-        className="relative w-[90%] max-w-[50vh] h-[60vh] bg-[#356E6A]/5 backdrop-blur-xl rounded-4xl p-6 flex flex-col items-center justify-center space-y-4"
+        className="relative w-[98%] max-w-[50vh] h-[60vh] bg-[#356E6A]/5 backdrop-blur-xl rounded-4xl p-6 flex flex-col items-center justify-center space-y-4"
         id="bg-container"
       >
         {/* Status Icon */}

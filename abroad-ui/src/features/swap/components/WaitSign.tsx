@@ -7,7 +7,7 @@ const WaitSign = (): React.JSX.Element => {
   const { t } = useTranslate()
   return (
     <div className="flex-1 flex items-center justify-center w-full flex-col">
-      <div className="w-[90%] max-w-md min-h-[60vh] bg-[#356E6A]/5 backdrop-blur-xl rounded-4xl p-4 md:p-6 flex flex-col items-center justify-center space-y-1 lg:space-y-4 text-abroad-dark md:text-white">
+      <div className="w-[98%] max-w-md min-h-[60vh] bg-[#356E6A]/5 backdrop-blur-xl rounded-4xl p-4 md:p-6 flex flex-col items-center justify-center space-y-1 lg:space-y-4 text-abroad-dark md:text-white">
         <div className="block md:hidden">
           <IconAnimated colors="primary:#26A17B,secondary:#73B9A3" icon="DocumentSign" loop={true} play={true} size={150} />
         </div>
