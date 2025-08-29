@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { lazy, Suspense } from 'react'
 
-import { useWebSwapController } from '../../features/swap/useWebSwapController'
+import { useWebSwapController } from './useWebSwapController'
 const QrScannerFullScreen = lazy(() => import('../../features/swap/components/QrScannerFullScreen'))
 import { Loader } from 'lucide-react'
 
@@ -9,12 +9,15 @@ import { _36EnumsTargetCurrency as TargetCurrency } from '../../api/index'
 import { useWalletAuth } from '../../contexts/WalletAuthContext'
 import BankDetailsRoute from '../../features/swap/components/BankDetailsRoute'
 import NavBarResponsive from '../../features/swap/components/NavBarResponsive'
+import Swap from '../../features/swap/components/Swap'
+import TxStatus from '../../features/swap/components/TxStatus'
+import UserVerification from '../../features/swap/components/UserVerification'
 import WaitSign from '../../features/swap/components/WaitSign'
 import WalletDetails from '../../features/swap/components/WalletDetails'
+import WebSwapLayout from '../../features/swap/components/WebSwapLayout'
 import { useBankDetailsRoute } from '../../features/swap/hooks/useBankDetailsRoute'
-import { useWebSwapLayout } from '../../features/swap/hooks/useWebSwapLayout'
+import { useSwap } from '../../features/swap/hooks/useSwap'
 import { SwapView } from '../../features/swap/webSwap.types'
-import WebSwapLayout from '../../features/swap/WebSwapLayout'
 import { useWalletDetails } from '../../hooks'
 import { useLanguageSelector, useNavBarResponsive } from '../../hooks'
 import BackgroundCrossfade from '../../shared/components/BackgroundCrossfade'
@@ -24,6 +27,8 @@ import { ModalOverlay } from '../../shared/components/ModalOverlay'
 export interface WebSwapControllerProps {
   closeQr: () => void
   currentBgUrl: string
+  handleBackToSwap: () => void
+  handleKycRedirect: () => void
   handleQrResult: (text: string) => Promise<void>
   handleWalletDetailsClose: () => void
   handleWalletDetailsOpen: () => void
@@ -31,6 +36,7 @@ export interface WebSwapControllerProps {
   isDesktop: boolean
   isQrOpen: boolean
   isWalletDetailsOpen: boolean
+  resetForNewTransaction: () => void
   setIsQrOpen: (isOpen: boolean) => void
 }
 
@@ -51,6 +57,8 @@ const WebSwap: React.FC = () => {
   const {
     closeQr,
     currentBgUrl,
+    handleBackToSwap,
+    handleKycRedirect,
     handleQrResult,
     handleWalletDetailsClose,
     handleWalletDetailsOpen,
@@ -58,6 +66,7 @@ const WebSwap: React.FC = () => {
     isDesktop,
     isQrOpen,
     isWalletDetailsOpen,
+    resetForNewTransaction,
     setIsQrOpen,
   } = useWebSwapController({
     setPixKey,
@@ -66,6 +75,8 @@ const WebSwap: React.FC = () => {
     setTargetAmount,
     setTargetCurrency,
     setTaxId,
+    setTransactionId,
+    setView,
     targetCurrency,
   })
 
@@ -75,25 +86,10 @@ const WebSwap: React.FC = () => {
   })
   const languageSelector = useLanguageSelector()
   const walletDetails = useWalletDetails({ onClose: handleWalletDetailsClose })
-  const webSwapLayout = useWebSwapLayout({
-    quoteId,
-    setIsQrOpen,
-    setQuoteId,
-    setSourceAmount,
-    setTargetAmount,
-    setTargetCurrency,
-    setTransactionId,
-    setView,
-    sourceAmount,
-    targetAmount,
-    targetCurrency,
-    transactionId,
-    view,
-  })
   const bankDetailRoute = useBankDetailsRoute({
     isDesktop,
-    onBackClick: webSwapLayout.handleBackToSwap,
-    onRedirectToHome: webSwapLayout.resetForNewTransaction,
+    onBackClick: handleBackToSwap,
+    onRedirectToHome: resetForNewTransaction,
     pixKey,
     quoteId,
     setPixKey,
@@ -105,6 +101,19 @@ const WebSwap: React.FC = () => {
     targetCurrency,
     taxId,
     userId: address,
+  })
+  const swap = useSwap({
+    isDesktop,
+    quoteId,
+    setIsQrOpen,
+    setQuoteId,
+    setSourceAmount,
+    setTargetAmount,
+    setTargetCurrency,
+    setView,
+    sourceAmount,
+    targetAmount,
+    targetCurrency,
   })
 
   return (
@@ -132,13 +141,21 @@ const WebSwap: React.FC = () => {
       {/* Main Content Area */}
       <main className="flex-1 relative z-10 flex">
         <WebSwapLayout
-          {...webSwapLayout}
           slots={{
-            bankDetails: (
-              <BankDetailsRoute {...bankDetailRoute} />
+            bankDetails: <BankDetailsRoute {...bankDetailRoute} />,
+            kycNeeded: <UserVerification onVerify={handleKycRedirect} />,
+            swap: <Swap {...swap} />,
+            txStatus: (
+              <TxStatus
+                onNewTransaction={resetForNewTransaction}
+                onRetry={handleBackToSwap}
+                transactionId={transactionId}
+              />
             ),
             waitSign: <WaitSign />,
           }}
+          targetCurrency={targetCurrency}
+          view={view}
         />
       </main>
 
