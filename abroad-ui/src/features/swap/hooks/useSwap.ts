@@ -65,6 +65,8 @@ export const useSwap = ({
 
   const [currencyMenuOpen, setCurrencyMenuOpen] = useState(false)
   const currencyMenuRef = useRef<HTMLDivElement | null>(null)
+  // Prevent immediate close from the same click that opens the menu
+  const skipNextDocumentClickRef = useRef(false)
 
   // which input triggered the fetch: true=source, false=target
   const triggerRef = useRef<boolean | null>(null)
@@ -221,7 +223,14 @@ export const useSwap = ({
   }, [setIsQrOpen, setTargetCurrency])
 
   const toggleCurrencyMenu = useCallback(() => {
-    setCurrencyMenuOpen(v => !v)
+    setCurrencyMenuOpen((v) => {
+      const next = !v
+      if (!v && next) {
+        // Opening menu: ignore the very next document click
+        skipNextDocumentClickRef.current = true
+      }
+      return next
+    })
   }, [])
 
   const selectCurrency = useCallback(
@@ -292,16 +301,36 @@ export const useSwap = ({
     }
   }, [targetDebounceAmount, fetchReverseConversion])
 
-  // Close currency dropdown on outside click
+  // Close currency menu on outside click and Escape
   useEffect(() => {
-    const onDocClick = (e: MouseEvent) => {
-      if (currencyMenuRef.current && !currencyMenuRef.current.contains(e.target as Node)) {
-        setCurrencyMenuOpen(false)
+    if (!currencyMenuOpen) return
+
+    const onDocumentClick = (event: MouseEvent) => {
+      if (skipNextDocumentClickRef.current) {
+        skipNextDocumentClickRef.current = false
+        return
       }
+      const container = currencyMenuRef.current
+      if (!container) return
+
+      // Prefer composedPath for better accuracy across trees
+      const path = (event as unknown as { composedPath?: () => EventTarget[] }).composedPath?.()
+      const clickedInside = path ? path.includes(container) : container.contains(event.target as Node)
+
+      if (!clickedInside) setCurrencyMenuOpen(false)
     }
-    document.addEventListener('mousedown', onDocClick)
-    return () => document.removeEventListener('mousedown', onDocClick)
-  }, [])
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setCurrencyMenuOpen(false)
+    }
+
+    document.addEventListener('click', onDocumentClick)
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('click', onDocumentClick)
+      document.removeEventListener('keydown', onKeyDown)
+    }
+  }, [currencyMenuOpen])
 
   // Return props for stateless view -------------------------------------------
   return {
