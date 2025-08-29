@@ -45,7 +45,16 @@ export default tseslint.config(
         {
           zones: [
             { target: './src/shared', from: './src', except: ['./assets'] },
-            { target: './src/features/**/components/**/*', from: './src', except: ['./shared', './assets'] },
+            {
+              target: './src/features/**/components/**/*',
+              from: './src/**/*',
+              except: [
+                '**/features/**/constants/**/*',
+                '**/shared/**/*',
+                '**/assets/**/*',
+                '**/api/**/*'
+              ],
+            },
           ],
         },
       ],

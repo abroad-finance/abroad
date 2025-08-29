@@ -26,7 +26,7 @@ import {
 import { useWalletAuth } from '../../../contexts/WalletAuthContext'
 import { kit } from '../../../services/stellarKit'
 import { hasMessage } from '../../../utils'
-import { BANK_CONFIG } from '../webSwap.constants'
+import { BANK_CONFIG } from '../constants'
 
 type UseBankDetailsRouteArgs = {
   isDesktop?: boolean

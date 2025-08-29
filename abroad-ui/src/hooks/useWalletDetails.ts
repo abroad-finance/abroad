@@ -4,28 +4,11 @@ import { useCallback, useEffect, useState } from 'react'
 
 import { listPartnerTransactions, PaginatedTransactionListTransactionsItem } from '../api'
 import { useWalletAuth } from '../contexts/WalletAuthContext'
+import { WalletDetailsProps } from '../features/swap/components/WalletDetails'
 
 // Stellar network configuration
 const STELLAR_HORIZON_URL = 'https://horizon.stellar.org'
 const USDC_ISSUER = 'GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN'
-
-export interface WalletDetailsProps {
-  address: null | string
-  copiedAddress: boolean
-  formatDate: (dateString: string) => string
-  getStatusStyle: (status: string) => string
-  getStatusText: (status: string) => string
-  isLoadingBalance: boolean
-  isLoadingTransactions: boolean
-  onClose?: () => void
-  onCopyAddress: () => Promise<void>
-  onDisconnectWallet: () => Promise<void>
-  onRefreshBalance: () => void
-  onRefreshTransactions: () => void
-  transactionError: null | string
-  transactions: Transaction[]
-  usdcBalance: string
-}
 
 interface Params { onClose?: () => void }
 

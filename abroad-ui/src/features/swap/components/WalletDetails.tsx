@@ -3,7 +3,25 @@ import { motion } from 'framer-motion'
 import { Copy, ExternalLink, RefreshCw, X } from 'lucide-react'
 import React from 'react'
 
-import { WalletDetailsProps } from '../../../hooks/useWalletDetails'
+import { PaginatedTransactionListTransactionsItem } from '../../../api'
+
+export interface WalletDetailsProps {
+  address: null | string
+  copiedAddress: boolean
+  formatDate: (dateString: string) => string
+  getStatusStyle: (status: string) => string
+  getStatusText: (status: string) => string
+  isLoadingBalance: boolean
+  isLoadingTransactions: boolean
+  onClose?: () => void
+  onCopyAddress: () => Promise<void>
+  onDisconnectWallet: () => Promise<void>
+  onRefreshBalance: () => void
+  onRefreshTransactions: () => void
+  transactionError: null | string
+  transactions: PaginatedTransactionListTransactionsItem[]
+  usdcBalance: string
+}
 
 // Stateless controlled component. All data & handlers provided via props.
 const WalletDetails: React.FC<WalletDetailsProps> = ({
