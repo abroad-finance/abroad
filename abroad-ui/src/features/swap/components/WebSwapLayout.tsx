@@ -1,12 +1,13 @@
 // WebSwapLayout.tsx
 import React, { useMemo } from 'react'
 
-import { _36EnumsTargetCurrency as TargetCurrency } from '../../api'
-import BackgroundCrossfade from '../../shared/components/BackgroundCrossfade'
-import AnimatedHeroText from './components/AnimatedHeroText'
-import ImageAttribution from './components/ImageAttribution'
-import { ASSET_URLS, BRL_BACKGROUND_IMAGE } from './webSwap.constants'
-import { SwapView } from './webSwap.types'
+import { _36EnumsTargetCurrency as TargetCurrency } from '../../../api'
+import AnimatedHeroText from '../../../shared/components/AnimatedHeroText'
+import BackgroundCrossfade from '../../../shared/components/BackgroundCrossfade'
+import ImageAttribution from '../../../shared/components/ImageAttribution'
+import { ASSET_URLS } from '../../../shared/constants'
+import { BRL_BACKGROUND_IMAGE } from '../constants'
+import { SwapView } from '../types'
 
 export interface WebSwapLayoutProps {
   targetCurrency: (typeof TargetCurrency)[keyof typeof TargetCurrency]

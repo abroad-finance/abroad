@@ -14,7 +14,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import type { Option } from '../../../shared/components/DropSelector'
 import type { BankDetailsRouteProps } from '../components/BankDetailsRoute'
-import type { SwapView } from '../webSwap.types'
+import type { SwapView } from '../types'
 
 import {
   acceptTransaction,
