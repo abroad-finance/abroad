@@ -14,7 +14,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import type { Option } from '../../../shared/components/DropSelector'
 import type { BankDetailsRouteProps } from '../components/BankDetailsRoute'
-import type { SwapView } from '../types'
 
 import {
   acceptTransaction,
@@ -25,6 +24,7 @@ import {
 } from '../../../api'
 import { useWalletAuth } from '../../../contexts/WalletAuthContext'
 import { kit } from '../../../services/stellarKit'
+import { swapBus } from '../../../shared/events/swapBus'
 import { hasMessage } from '../../../utils'
 import { BANK_CONFIG } from '../constants'
 
@@ -34,10 +34,6 @@ type UseBankDetailsRouteArgs = {
   onRedirectToHome: () => void
   pixKey: string
   quoteId: string
-  setPixKey: (pixKey: string) => void
-  setTaxId: (taxId: string) => void
-  setTransactionId: (id: null | string) => void
-  setView: (view: SwapView) => void
   sourceAmount: string
   targetAmount: string
   targetCurrency: (typeof TargetCurrency)[keyof typeof TargetCurrency]
@@ -62,10 +58,6 @@ export const useBankDetailsRoute = ({
   onRedirectToHome,
   pixKey,
   quoteId,
-  setPixKey,
-  setTaxId,
-  setTransactionId,
-  setView,
   sourceAmount,
   targetAmount,
   targetCurrency,
@@ -98,19 +90,19 @@ export const useBankDetailsRoute = ({
         const parsed = JSON.parse(stored)
         if (parsed.account_number) setAccountNumber(parsed.account_number)
         if (parsed.bank_code) setBankCode(parsed.bank_code)
-        if (parsed.pixKey) setPixKey(parsed.pixKey)
-        if (parsed.taxId) setTaxId(parsed.taxId)
+        if (parsed.pixKey || parsed.taxId) {
+          swapBus.emit('bankDetails/kycInputsRestored', {
+            pixKey: parsed.pixKey,
+            taxId: parsed.taxId,
+          })
+        }
         if (parsed.selectedBank) setSelectedBank(parsed.selectedBank)
       }
       catch (e) {
         console.error('Failed to restore pending transaction', e)
       }
     }
-  }, [
-    setPixKey,
-    setTaxId,
-    token,
-  ])
+  }, [token])
 
   // Fetch banks once for COP flow
   useEffect(() => {
@@ -247,14 +239,16 @@ export const useBankDetailsRoute = ({
   const onTaxIdChange = useCallback(
     (value: string) => {
       const input = value.replace(/[^\d]/g, '').slice(0, 11)
-      setTaxId(input)
+      swapBus.emit('bankDetails/taxIdChanged', { value: input })
     },
-    [setTaxId],
+    [],
   )
 
   const onPixKeyChange = useCallback(
-    (value: string) => setPixKey(value),
-    [setPixKey],
+    (value: string) => {
+      swapBus.emit('bankDetails/pixKeyChanged', { value })
+    },
+    [],
   )
 
   const onSelectBank = useCallback(
@@ -321,7 +315,7 @@ export const useBankDetailsRoute = ({
           }),
         )
         setKycUrl(kycLink)
-        setView('kyc-needed')
+        swapBus.emit('swap/kycRequired')
         return
       }
 
@@ -363,15 +357,14 @@ export const useBankDetailsRoute = ({
       })
 
       // 5) Sign via wallet
-      setView('wait-sign')
+      swapBus.emit('swap/walletSigningStarted')
       const { signedTxXdr } = await kit.signTransaction(unsignedXdr, {
         address: walletId,
         networkPassphrase: WalletNetwork.PUBLIC,
       })
 
       // Show TxStatus UI right after signing
-      setTransactionId(acceptedTxId || null)
-      setView('txStatus')
+      swapBus.emit('swap/transactionSigned', { transactionId: acceptedTxId || null })
 
       // 6) Submit the transaction
       const tx = new Transaction(signedTxXdr, networkPassphrase)
@@ -400,8 +393,6 @@ export const useBankDetailsRoute = ({
     sourceAmount,
     targetAmount,
     setKycUrl,
-    setTransactionId,
-    setView,
     walletId,
     address,
     onRedirectToHome,

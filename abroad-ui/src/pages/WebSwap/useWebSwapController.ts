@@ -4,23 +4,15 @@ import { useSearchParams } from 'react-router-dom'
 import { _36EnumsBlockchainNetwork as BlockchainNetwork, _36EnumsCryptoCurrency as CryptoCurrency, decodeQrCodeBR, getQuote, _36EnumsPaymentMethod as PaymentMethod, _36EnumsTargetCurrency as TargetCurrency } from '../../api/index'
 import { useWalletAuth } from '../../contexts/WalletAuthContext'
 import { BRL_BACKGROUND_IMAGE } from '../../features/swap/constants'
-import { SwapView } from '../../features/swap/types'
 import { ASSET_URLS, PENDING_TX_KEY } from '../../shared/constants'
+import { swapBus } from '../../shared/events/swapBus'
 import { WebSwapControllerProps } from './WebSwap'
 
 type UseWebSwapControllerProps = {
-  setPixKey: (key: string) => void
-  setQuoteId: (id: string) => void
-  setSourceAmount: (amount: string) => void
-  setTargetAmount: (amount: string) => void
-  setTargetCurrency: (currency: (typeof TargetCurrency)[keyof typeof TargetCurrency]) => void
-  setTaxId: (id: string) => void
-  setTransactionId: (id: null | string) => void
-  setView: (view: SwapView) => void
   targetCurrency: TargetCurrency
 }
 
-export const useWebSwapController = ({ setPixKey, setQuoteId, setSourceAmount, setTargetAmount, setTargetCurrency, setTaxId, setTransactionId, setView, targetCurrency }: UseWebSwapControllerProps): WebSwapControllerProps => {
+export const useWebSwapController = ({ targetCurrency }: UseWebSwapControllerProps): WebSwapControllerProps => {
   // Modal visibility state
   const [isWalletDetailsOpen, setIsWalletDetailsOpen] = useState(false)
   const { kycUrl, token } = useWalletAuth()
@@ -35,9 +27,19 @@ export const useWebSwapController = ({ setPixKey, setQuoteId, setSourceAmount, s
   useEffect(() => {
     if (searchParams.has('qr_scanner')) {
       setIsQrOpen(true)
-      setTargetCurrency(TargetCurrency.BRL)
+      swapBus.emit('swap/qrOpenRequestedFromUrlParam')
+      swapBus.emit('swap/targetCurrencySetFromUrlParam', { currency: TargetCurrency.BRL })
     }
-  }, [searchParams, setTargetCurrency])
+  }, [searchParams])
+
+  // Listen for requests to open the QR scanner (from other hooks/components)
+  useEffect(() => {
+    const open = () => setIsQrOpen(true)
+    swapBus.on('swap/qrOpenRequestedByUser', open)
+    return () => {
+      swapBus.off('swap/qrOpenRequestedByUser', open)
+    }
+  }, [])
 
   // Restore state if user returns from KYC
   useEffect(() => {
@@ -45,37 +47,21 @@ export const useWebSwapController = ({ setPixKey, setQuoteId, setSourceAmount, s
     if (stored && token) {
       try {
         const parsed = JSON.parse(stored)
-        setQuoteId(parsed.quote_id)
-        setSourceAmount(parsed.srcAmount)
-        setTargetAmount(parsed.tgtAmount)
-        setTargetCurrency(parsed.targetCurrency || TargetCurrency.COP)
-        setView('bankDetails')
+        swapBus.emit('swap/amountsRestoredFromPending', {
+          quoteId: parsed.quote_id,
+          srcAmount: parsed.srcAmount,
+          targetCurrency: parsed.targetCurrency || TargetCurrency.COP,
+          tgtAmount: parsed.tgtAmount,
+        })
       }
       catch (e) {
         console.error('Failed to restore pending transaction', e)
       }
     }
-  }, [
-    setQuoteId,
-    setSourceAmount,
-    setTargetAmount,
-    setTargetCurrency,
-    setView,
-    token,
-  ])
+  }, [token])
 
   const handleWalletDetailsOpen = useCallback(() => setIsWalletDetailsOpen(true), [])
   const handleWalletDetailsClose = useCallback(() => setIsWalletDetailsOpen(false), [])
-
-  const handleAmountsChange = useCallback(({ currency, src, tgt }: { currency?: (typeof TargetCurrency)[keyof typeof TargetCurrency], src?: string, tgt?: string }) => {
-    if (typeof src === 'string') setSourceAmount(src || '')
-    if (typeof tgt === 'string') setTargetAmount(tgt || '')
-    if (typeof currency === 'string') setTargetCurrency(currency)
-  }, [
-    setSourceAmount,
-    setTargetAmount,
-    setTargetCurrency,
-  ])
 
   const fetchQuote = useCallback(async (targetAmount: number) => {
     console.log('handleTargetChange called with:', { targetAmount, targetCurrency, targetPaymentMethod })
@@ -88,15 +74,12 @@ export const useWebSwapController = ({ setPixKey, setQuoteId, setSourceAmount, s
     })
     if (response.status === 200) {
       const src = response.data.value.toFixed(2)
-      handleAmountsChange?.({ src })
-      setQuoteId(response.data.quote_id)
+      swapBus.emit('swap/quoteFromQrCalculated', {
+        quoteId: response.data.quote_id,
+        srcAmount: src,
+      })
     }
-  }, [
-    targetCurrency,
-    targetPaymentMethod,
-    handleAmountsChange,
-    setQuoteId,
-  ])
+  }, [targetCurrency, targetPaymentMethod])
 
   // Handle QR results (PIX) and prefill amount
   const handleQrResult = useCallback(async (text: string) => {
@@ -112,14 +95,11 @@ export const useWebSwapController = ({ setPixKey, setQuoteId, setSourceAmount, s
       const pixKey = responseDecoder.data.decoded?.account
       const taxIdDecoded = responseDecoder.data.decoded?.taxId
       if (amount) {
-        handleAmountsChange({ tgt: amount })
+        swapBus.emit('swap/qrDecoded', { amount })
         fetchQuote(parseFloat(amount))
       }
-      if (pixKey) {
-        setPixKey(pixKey)
-      }
-      if (taxIdDecoded) {
-        setTaxId(taxIdDecoded)
+      if (pixKey || taxIdDecoded) {
+        swapBus.emit('swap/qrDecoded', { pixKey, taxId: taxIdDecoded })
       }
     }
     catch (e) {
@@ -128,12 +108,7 @@ export const useWebSwapController = ({ setPixKey, setQuoteId, setSourceAmount, s
     finally {
       setIsDecodingQr(false)
     }
-  }, [
-    fetchQuote,
-    handleAmountsChange,
-    setPixKey,
-    setTaxId,
-  ])
+  }, [fetchQuote])
 
   const isDesktop = useMemo(() => window.innerWidth >= 768, [])
 
@@ -151,22 +126,14 @@ export const useWebSwapController = ({ setPixKey, setQuoteId, setSourceAmount, s
 
   const handleBackToSwap = useCallback(() => {
     localStorage.removeItem(PENDING_TX_KEY)
-    setView('swap')
-  }, [setView])
+    swapBus.emit('swap/backToSwapRequested')
+  }, [])
 
   // Reset from TxStatus to start a fresh transaction
   const resetForNewTransaction = useCallback(() => {
     localStorage.removeItem(PENDING_TX_KEY)
-    setSourceAmount('')
-    setTargetAmount('')
-    setTransactionId(null)
-    setView('swap')
-  }, [
-    setSourceAmount,
-    setTargetAmount,
-    setTransactionId,
-    setView,
-  ])
+    swapBus.emit('swap/newTransactionRequested')
+  }, [])
 
   return {
     closeQr: () => setIsQrOpen(false),
@@ -181,6 +148,5 @@ export const useWebSwapController = ({ setPixKey, setQuoteId, setSourceAmount, s
     isQrOpen,
     isWalletDetailsOpen,
     resetForNewTransaction,
-    setIsQrOpen,
   }
 }

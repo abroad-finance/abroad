@@ -2,7 +2,6 @@ import { useTranslate } from '@tolgee/react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import type { SwapProps } from '../components/Swap'
-import type { SwapView } from '../types'
 
 import {
   _36EnumsBlockchainNetwork as BlockchainNetwork,
@@ -14,17 +13,12 @@ import {
 } from '../../../api'
 import { useWalletAuth } from '../../../contexts/WalletAuthContext'
 import { kit } from '../../../services/stellarKit'
+import { swapBus } from '../../../shared/events/swapBus'
 import { useDebounce } from '../../../shared/hooks'
 
 type UseSwapArgs = {
   isDesktop: boolean
   quoteId: string
-  setIsQrOpen: (isOpen: boolean) => void
-  setQuoteId: (quoteId: string) => void
-  setSourceAmount: (amount: string) => void
-  setTargetAmount: (amount: string) => void
-  setTargetCurrency: (currency: (typeof TargetCurrency)[keyof typeof TargetCurrency]) => void
-  setView: (view: SwapView) => void
   sourceAmount: string
   targetAmount: string
   targetCurrency: (typeof TargetCurrency)[keyof typeof TargetCurrency]
@@ -36,12 +30,6 @@ const BRL_TRANSFER_FEE = 0.0
 export const useSwap = ({
   isDesktop,
   quoteId,
-  setIsQrOpen,
-  setQuoteId,
-  setSourceAmount,
-  setTargetAmount,
-  setTargetCurrency,
-  setView,
   sourceAmount,
   targetAmount,
   targetCurrency,
@@ -125,7 +113,7 @@ export const useSwap = ({
     async (value: string) => {
       const num = parseFloat(value)
       if (isNaN(num)) {
-        setTargetAmount('')
+        swapBus.emit('swap/quoteFromSourceCalculated', { quoteId: '', targetAmount: '' })
         return
       }
       setLoadingTarget(true)
@@ -139,8 +127,10 @@ export const useSwap = ({
         })
         if (response.status === 200) {
           const formatted = formatTargetNumber(response.data.value)
-          setQuoteId(response.data.quote_id)
-          setTargetAmount(formatted)
+          swapBus.emit('swap/quoteFromSourceCalculated', {
+            quoteId: response.data.quote_id,
+            targetAmount: formatted,
+          })
         }
       }
       catch (error) {
@@ -152,8 +142,6 @@ export const useSwap = ({
     },
     [
       formatTargetNumber,
-      setQuoteId,
-      setTargetAmount,
       targetCurrency,
       targetPaymentMethod,
     ],
@@ -165,7 +153,7 @@ export const useSwap = ({
       const normalized = raw.replace(/\./g, '').replace(/,/g, '.')
       const num = parseFloat(normalized)
       if (isNaN(num)) {
-        setSourceAmount('')
+        swapBus.emit('swap/quoteFromTargetCalculated', { quoteId: '', srcAmount: '' })
         return
       }
       setLoadingSource(true)
@@ -178,8 +166,10 @@ export const useSwap = ({
           target_currency: targetCurrency,
         })
         if (response.status === 200) {
-          setQuoteId(response.data.quote_id)
-          setSourceAmount(response.data.value.toFixed(2))
+          swapBus.emit('swap/quoteFromTargetCalculated', {
+            quoteId: response.data.quote_id,
+            srcAmount: response.data.value.toFixed(2),
+          })
         }
       }
       catch (error) {
@@ -189,12 +179,7 @@ export const useSwap = ({
         setLoadingSource(false)
       }
     },
-    [
-      setQuoteId,
-      setSourceAmount,
-      targetCurrency,
-      targetPaymentMethod,
-    ],
+    [targetCurrency, targetPaymentMethod],
   )
 
   // Handlers ------------------------------------------------------------------
@@ -202,23 +187,25 @@ export const useSwap = ({
   const onSourceChange = useCallback(
     (val: string) => {
       triggerRef.current = true
-      setSourceAmount(val.replace(/[^0-9.]/g, ''))
+      const cleaned = val.replace(/[^0-9.]/g, '')
+      swapBus.emit('swap/userSourceInputChanged', { value: cleaned })
     },
-    [setSourceAmount],
+    [],
   )
 
   const onTargetChange = useCallback(
     (val: string) => {
       triggerRef.current = false
-      setTargetAmount(val.replace(/[^0-9.,]/g, ''))
+      const cleaned = val.replace(/[^0-9.,]/g, '')
+      swapBus.emit('swap/userTargetInputChanged', { value: cleaned })
     },
-    [setTargetAmount],
+    [],
   )
 
   const openQr = useCallback(() => {
-    setIsQrOpen(true)
-    setTargetCurrency(TargetCurrency.BRL)
-  }, [setIsQrOpen, setTargetCurrency])
+    swapBus.emit('swap/qrOpenRequestedByUser')
+    swapBus.emit('swap/targetCurrencySelected', { currency: TargetCurrency.BRL })
+  }, [])
 
   const toggleCurrencyMenu = useCallback(() => {
     setCurrencyMenuOpen(v => !v)
@@ -227,9 +214,9 @@ export const useSwap = ({
   const selectCurrency = useCallback(
     (currency: (typeof TargetCurrency)[keyof typeof TargetCurrency]) => {
       setCurrencyMenuOpen(false)
-      setTargetCurrency(currency)
+      swapBus.emit('swap/targetCurrencySelected', { currency })
     },
-    [setTargetCurrency],
+    [],
   )
 
   const onPrimaryAction = useCallback(() => {
@@ -247,12 +234,11 @@ export const useSwap = ({
       return
     }
     // proceed
-    setView('bankDetails')
+    swapBus.emit('swap/continueRequested')
   }, [
     authenticateWithWallet,
     isAuthenticated,
     quoteId,
-    setView,
     t,
   ])
 
