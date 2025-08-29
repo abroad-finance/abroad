@@ -13,8 +13,8 @@ import {
   _36EnumsTargetCurrency as TargetCurrency,
 } from '../../../api'
 import { useWalletAuth } from '../../../contexts/WalletAuthContext'
-import { useDebounce } from '../../../hooks'
 import { kit } from '../../../services/stellarKit'
+import { useDebounce } from '../../../shared/hooks'
 
 type UseSwapArgs = {
   isDesktop: boolean

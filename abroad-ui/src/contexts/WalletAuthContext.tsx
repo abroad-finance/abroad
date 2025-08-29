@@ -1,9 +1,9 @@
 import { WalletNetwork } from '@creit.tech/stellar-wallets-kit'
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react'
 
-import { PENDING_TX_KEY } from '../constants'
 import { kit } from '../services/stellarKit'
 import { refreshWalletAuthToken, walletAuth } from '../services/walletAuth'
+import { PENDING_TX_KEY } from '../shared/constants'
 
 interface WalletAuthState {
   address: null | string

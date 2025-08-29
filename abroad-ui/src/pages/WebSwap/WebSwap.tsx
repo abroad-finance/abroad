@@ -18,11 +18,11 @@ import WebSwapLayout from '../../features/swap/components/WebSwapLayout'
 import { useBankDetailsRoute } from '../../features/swap/hooks/useBankDetailsRoute'
 import { useSwap } from '../../features/swap/hooks/useSwap'
 import { SwapView } from '../../features/swap/types'
-import { useWalletDetails } from '../../hooks'
-import { useLanguageSelector, useNavBarResponsive } from '../../hooks'
 import BackgroundCrossfade from '../../shared/components/BackgroundCrossfade'
 import LanguageSelector from '../../shared/components/LanguageSelector'
 import { ModalOverlay } from '../../shared/components/ModalOverlay'
+import { useWalletDetails } from '../../shared/hooks'
+import { useLanguageSelector, useNavBarResponsive } from '../../shared/hooks'
 
 export interface WebSwapControllerProps {
   closeQr: () => void

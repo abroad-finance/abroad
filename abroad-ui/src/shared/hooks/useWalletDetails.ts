@@ -2,9 +2,9 @@ import { Horizon } from '@stellar/stellar-sdk'
 import { useTranslate } from '@tolgee/react'
 import { useCallback, useEffect, useState } from 'react'
 
-import { listPartnerTransactions, PaginatedTransactionListTransactionsItem } from '../api'
-import { useWalletAuth } from '../contexts/WalletAuthContext'
-import { WalletDetailsProps } from '../features/swap/components/WalletDetails'
+import { listPartnerTransactions, PaginatedTransactionListTransactionsItem } from '../../api'
+import { useWalletAuth } from '../../contexts/WalletAuthContext'
+import { WalletDetailsProps } from '../../features/swap/components/WalletDetails'
 
 // Stellar network configuration
 const STELLAR_HORIZON_URL = 'https://horizon.stellar.org'

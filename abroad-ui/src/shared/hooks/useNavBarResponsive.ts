@@ -2,10 +2,10 @@ import { Horizon } from '@stellar/stellar-sdk'
 import { useTranslate } from '@tolgee/react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
-import type { NavBarResponsiveProps } from '../features/swap/components/NavBarResponsive'
+import type { NavBarResponsiveProps } from '../../features/swap/components/NavBarResponsive'
 
-import { useWalletAuth } from '../contexts/WalletAuthContext'
-import { kit } from '../services/stellarKit'
+import { useWalletAuth } from '../../contexts/WalletAuthContext'
+import { kit } from '../../services/stellarKit'
 
 const DEFAULT_HORIZON_URL = 'https://horizon.stellar.org'
 const DEFAULT_USDC_ISSUER = 'GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN'

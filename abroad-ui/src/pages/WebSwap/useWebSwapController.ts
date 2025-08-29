@@ -2,11 +2,10 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 
 import { _36EnumsBlockchainNetwork as BlockchainNetwork, _36EnumsCryptoCurrency as CryptoCurrency, decodeQrCodeBR, getQuote, _36EnumsPaymentMethod as PaymentMethod, _36EnumsTargetCurrency as TargetCurrency } from '../../api/index'
-import { PENDING_TX_KEY } from '../../constants'
 import { useWalletAuth } from '../../contexts/WalletAuthContext'
 import { BRL_BACKGROUND_IMAGE } from '../../features/swap/constants'
 import { SwapView } from '../../features/swap/types'
-import { ASSET_URLS } from '../../shared/constants'
+import { ASSET_URLS, PENDING_TX_KEY } from '../../shared/constants'
 import { WebSwapControllerProps } from './WebSwap'
 
 type UseWebSwapControllerProps = {
