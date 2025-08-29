@@ -1,11 +1,10 @@
-import React, { useEffect, useState } from 'react'
+import React from 'react'
 import { lazy, Suspense } from 'react'
 
 import { useWebSwapController } from './useWebSwapController'
 const QrScannerFullScreen = lazy(() => import('../../features/swap/components/QrScannerFullScreen'))
 import { Loader } from 'lucide-react'
 
-import { _36EnumsTargetCurrency as TargetCurrency } from '../../api/index'
 import { useWalletAuth } from '../../contexts/WalletAuthContext'
 import BankDetailsRoute from '../../features/swap/components/BankDetailsRoute'
 import NavBarResponsive from '../../features/swap/components/NavBarResponsive'
@@ -17,41 +16,17 @@ import WalletDetails from '../../features/swap/components/WalletDetails'
 import WebSwapLayout from '../../features/swap/components/WebSwapLayout'
 import { useBankDetailsRoute } from '../../features/swap/hooks/useBankDetailsRoute'
 import { useSwap } from '../../features/swap/hooks/useSwap'
-import { SwapView } from '../../features/swap/types'
+import { useSwapView } from '../../features/swap/hooks/useSwapView'
+import { useTxStatus } from '../../features/swap/hooks/useTxStatus'
 import BackgroundCrossfade from '../../shared/components/BackgroundCrossfade'
 import LanguageSelector from '../../shared/components/LanguageSelector'
 import { ModalOverlay } from '../../shared/components/ModalOverlay'
-import { swapBus } from '../../shared/events/swapBus'
 import { useWalletDetails } from '../../shared/hooks'
 import { useLanguageSelector, useNavBarResponsive } from '../../shared/hooks'
 
-export interface WebSwapControllerProps {
-  closeQr: () => void
-  currentBgUrl: string
-  handleBackToSwap: () => void
-  handleKycRedirect: () => void
-  handleQrResult: (text: string) => Promise<void>
-  handleWalletDetailsClose: () => void
-  handleWalletDetailsOpen: () => void
-  isDecodingQr: boolean
-  isDesktop: boolean
-  isQrOpen: boolean
-  isWalletDetailsOpen: boolean
-  resetForNewTransaction: () => void
-}
-
+// Controller provides all swap state and event-driven values
 const WebSwap: React.FC = () => {
   const { address } = useWalletAuth()
-
-  // State management
-  const [view, setView] = useState<SwapView>('swap')
-  const [transactionId, setTransactionId] = useState<null | string>(null)
-  const [sourceAmount, setSourceAmount] = useState('')
-  const [targetAmount, setTargetAmount] = useState('')
-  const [targetCurrency, setTargetCurrency] = useState<(typeof TargetCurrency)[keyof typeof TargetCurrency]>(TargetCurrency.BRL)
-  const [quoteId, setQuoteId] = useState<string>('')
-  const [pixKey, setPixKey] = useState<string>('')
-  const [taxId, setTaxId] = useState<string>('')
 
   // Main controller
   const {
@@ -63,124 +38,33 @@ const WebSwap: React.FC = () => {
     handleWalletDetailsClose,
     handleWalletDetailsOpen,
     isDecodingQr,
-    isDesktop,
     isQrOpen,
     isWalletDetailsOpen,
+    quoteId,
     resetForNewTransaction,
-  } = useWebSwapController({ targetCurrency })
-
-  // Wire event bus listeners to update state (cause-based events)
-  useEffect(() => {
-    const onTargetCurrencySelected = (p: { currency: (typeof TargetCurrency)[keyof typeof TargetCurrency] }) => setTargetCurrency(p.currency)
-    const onUserSourceChanged = (p: { value: string }) => setSourceAmount(p.value)
-    const onUserTargetChanged = (p: { value: string }) => setTargetAmount(p.value)
-    const onQuoteFromSource = (p: { quoteId: string, targetAmount: string }) => {
-      setQuoteId(p.quoteId)
-      setTargetAmount(p.targetAmount)
-    }
-    const onQuoteFromTarget = (p: { quoteId: string, srcAmount: string }) => {
-      setQuoteId(p.quoteId)
-      setSourceAmount(p.srcAmount)
-    }
-    const onQuoteFromQr = (p: { quoteId: string, srcAmount: string }) => {
-      setQuoteId(p.quoteId)
-      setSourceAmount(p.srcAmount)
-    }
-    const onQrDecoded = (p: { amount?: string, pixKey?: string, taxId?: string }) => {
-      if (typeof p.amount === 'string') setTargetAmount(p.amount)
-      if (typeof p.pixKey === 'string') setPixKey(p.pixKey)
-      if (typeof p.taxId === 'string') setTaxId(p.taxId)
-    }
-    const onBackToSwap = () => setView('swap')
-    const onNewTransaction = () => {
-      setSourceAmount('')
-      setTargetAmount('')
-      setTransactionId(null)
-      setView('swap')
-    }
-    const onContinue = () => setView('bankDetails')
-    const onKycRequired = () => setView('kyc-needed')
-    const onSigningStarted = () => setView('wait-sign')
-    const onTransactionSigned = (p: { transactionId: null | string }) => {
-      setTransactionId(p.transactionId)
-      setView('txStatus')
-    }
-    const onPendingRestored = (p: { quoteId?: string, srcAmount?: string, targetCurrency?: (typeof TargetCurrency)[keyof typeof TargetCurrency], tgtAmount?: string }) => {
-      if (typeof p.quoteId === 'string') setQuoteId(p.quoteId)
-      if (typeof p.srcAmount === 'string') setSourceAmount(p.srcAmount)
-      if (typeof p.tgtAmount === 'string') setTargetAmount(p.tgtAmount)
-      if (typeof p.targetCurrency === 'string') setTargetCurrency(p.targetCurrency)
-      setView('bankDetails')
-    }
-    const onKycInputsRestored = (p: { pixKey?: string, taxId?: string }) => {
-      if (typeof p.pixKey === 'string') setPixKey(p.pixKey)
-      if (typeof p.taxId === 'string') setTaxId(p.taxId)
-    }
-    const onTargetCurrencyFromUrl = (p: { currency: (typeof TargetCurrency)[keyof typeof TargetCurrency] }) => setTargetCurrency(p.currency)
-    const onPixKeyChanged = (p: { value: string }) => setPixKey(p.value)
-    const onTaxIdChanged = (p: { value: string }) => setTaxId(p.value)
-
-    swapBus.on('swap/targetCurrencySelected', onTargetCurrencySelected)
-    swapBus.on('swap/userSourceInputChanged', onUserSourceChanged)
-    swapBus.on('swap/userTargetInputChanged', onUserTargetChanged)
-    swapBus.on('swap/quoteFromSourceCalculated', onQuoteFromSource)
-    swapBus.on('swap/quoteFromTargetCalculated', onQuoteFromTarget)
-    swapBus.on('swap/quoteFromQrCalculated', onQuoteFromQr)
-    swapBus.on('swap/qrDecoded', onQrDecoded)
-    swapBus.on('swap/backToSwapRequested', onBackToSwap)
-    swapBus.on('swap/newTransactionRequested', onNewTransaction)
-    swapBus.on('swap/continueRequested', onContinue)
-    swapBus.on('swap/kycRequired', onKycRequired)
-    swapBus.on('swap/walletSigningStarted', onSigningStarted)
-    swapBus.on('swap/transactionSigned', onTransactionSigned)
-    swapBus.on('swap/amountsRestoredFromPending', onPendingRestored)
-    swapBus.on('bankDetails/kycInputsRestored', onKycInputsRestored)
-    swapBus.on('swap/targetCurrencySetFromUrlParam', onTargetCurrencyFromUrl)
-    swapBus.on('bankDetails/pixKeyChanged', onPixKeyChanged)
-    swapBus.on('bankDetails/taxIdChanged', onTaxIdChanged)
-
-    return () => {
-      swapBus.off('swap/targetCurrencySelected', onTargetCurrencySelected)
-      swapBus.off('swap/userSourceInputChanged', onUserSourceChanged)
-      swapBus.off('swap/userTargetInputChanged', onUserTargetChanged)
-      swapBus.off('swap/quoteFromSourceCalculated', onQuoteFromSource)
-      swapBus.off('swap/quoteFromTargetCalculated', onQuoteFromTarget)
-      swapBus.off('swap/quoteFromQrCalculated', onQuoteFromQr)
-      swapBus.off('swap/qrDecoded', onQrDecoded)
-      swapBus.off('swap/backToSwapRequested', onBackToSwap)
-      swapBus.off('swap/newTransactionRequested', onNewTransaction)
-      swapBus.off('swap/continueRequested', onContinue)
-      swapBus.off('swap/kycRequired', onKycRequired)
-      swapBus.off('swap/walletSigningStarted', onSigningStarted)
-      swapBus.off('swap/transactionSigned', onTransactionSigned)
-      swapBus.off('swap/amountsRestoredFromPending', onPendingRestored)
-      swapBus.off('bankDetails/kycInputsRestored', onKycInputsRestored)
-      swapBus.off('swap/targetCurrencySetFromUrlParam', onTargetCurrencyFromUrl)
-      swapBus.off('bankDetails/pixKeyChanged', onPixKeyChanged)
-      swapBus.off('bankDetails/taxIdChanged', onTaxIdChanged)
-    }
-  }, [])
+    sourceAmount,
+    targetAmount,
+    targetCurrency,
+  } = useWebSwapController()
 
   // Components controllers
+  const { view } = useSwapView()
+  const { transactionId } = useTxStatus()
   const navBar = useNavBarResponsive({
     onWalletDetails: handleWalletDetailsOpen,
   })
   const languageSelector = useLanguageSelector()
   const walletDetails = useWalletDetails({ onClose: handleWalletDetailsClose })
   const bankDetailRoute = useBankDetailsRoute({
-    isDesktop,
     onBackClick: handleBackToSwap,
     onRedirectToHome: resetForNewTransaction,
-    pixKey,
     quoteId,
     sourceAmount,
     targetAmount,
     targetCurrency,
-    taxId,
     userId: address,
   })
   const swap = useSwap({
-    isDesktop,
     quoteId,
     sourceAmount,
     targetAmount,

@@ -1,4 +1,5 @@
-import React, { useEffect, useRef } from 'react'
+import React, { useCallback, useRef } from 'react'
+import { useDomEvent } from '../hooks'
 
 // Define Option interface
 export interface Option {
@@ -34,21 +35,12 @@ export function DropSelector({
 }: DropSelectorProps) {
   const dropdownRef = useRef<HTMLDivElement>(null)
 
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsOpen(false)
-      }
+  const handleClickOutside = useCallback((event: MouseEvent) => {
+    if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      setIsOpen(false)
     }
-
-    if (isOpen) {
-      document.addEventListener('mousedown', handleClickOutside)
-    }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside)
-    }
-  }, [isOpen, setIsOpen])
+  }, [setIsOpen])
+  useDomEvent(isOpen ? document : null, 'mousedown', handleClickOutside)
   const handleToggle = () => {
     if (!disabled) {
       setIsOpen(!isOpen)

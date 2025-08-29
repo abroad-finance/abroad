@@ -24,26 +24,24 @@ import {
 } from '../../../api'
 import { useWalletAuth } from '../../../contexts/WalletAuthContext'
 import { kit } from '../../../services/stellarKit'
+import { PENDING_TX_KEY } from '../../../shared/constants'
 import { swapBus } from '../../../shared/events/swapBus'
+import { useEventBus } from '../../../shared/hooks'
 import { hasMessage } from '../../../utils'
 import { BANK_CONFIG } from '../constants'
 
 type UseBankDetailsRouteArgs = {
-  isDesktop?: boolean
   onBackClick: () => void
   onRedirectToHome: () => void
-  pixKey: string
   quoteId: string
   sourceAmount: string
   targetAmount: string
   targetCurrency: (typeof TargetCurrency)[keyof typeof TargetCurrency]
-  taxId: string
   userId: null | string
 }
 
 const networkPassphrase = Networks.PUBLIC
 const server = new Horizon.Server('https://horizon.stellar.org')
-const PENDING_TX_KEY = 'pendingTransaction'
 
 // Banks to exclude --------------------------------------------------------------
 const EXCLUDED_BANKS = [
@@ -53,17 +51,15 @@ const EXCLUDED_BANKS = [
 ]
 
 export const useBankDetailsRoute = ({
-  isDesktop,
   onBackClick,
   onRedirectToHome,
-  pixKey,
   quoteId,
   sourceAmount,
   targetAmount,
   targetCurrency,
-  taxId,
   userId,
 }: UseBankDetailsRouteArgs): BankDetailsRouteProps => {
+  const isDesktop = useMemo(() => window.innerWidth >= 768, [])
   const textColor = isDesktop ? 'white' : '#356E6A'
   const { t } = useTranslate()
   const { address, setKycUrl, token, walletId } = useWalletAuth()
@@ -71,6 +67,8 @@ export const useBankDetailsRoute = ({
   // ------------------------------- STATE -----------------------------------
   const [accountNumber, setAccountNumber] = useState('')
   const [bankCode, setBankCode] = useState<string>('')
+  const [pixKey, setPixKey] = useState<string>('')
+  const [taxId, setTaxId] = useState<string>('')
 
   const [loadingSubmit, setLoadingSubmit] = useState(false)
   const [bankOpen, setBankOpen] = useState(false)
@@ -90,12 +88,8 @@ export const useBankDetailsRoute = ({
         const parsed = JSON.parse(stored)
         if (parsed.account_number) setAccountNumber(parsed.account_number)
         if (parsed.bank_code) setBankCode(parsed.bank_code)
-        if (parsed.pixKey || parsed.taxId) {
-          swapBus.emit('bankDetails/kycInputsRestored', {
-            pixKey: parsed.pixKey,
-            taxId: parsed.taxId,
-          })
-        }
+        if (parsed.pixKey) setPixKey(parsed.pixKey)
+        if (parsed.taxId) setTaxId(parsed.taxId)
         if (parsed.selectedBank) setSelectedBank(parsed.selectedBank)
       }
       catch (e) {
@@ -103,6 +97,13 @@ export const useBankDetailsRoute = ({
       }
     }
   }, [token])
+
+  // Listen for QR-decoded bank details (PIX/taxId) and set locally
+  const onQrDecoded = useCallback((p: { amount?: string, pixKey?: string, taxId?: string }) => {
+    if (typeof p.pixKey === 'string') setPixKey(p.pixKey)
+    if (typeof p.taxId === 'string') setTaxId(p.taxId)
+  }, [])
+  useEventBus(swapBus, 'swap/qrDecoded', onQrDecoded)
 
   // Fetch banks once for COP flow
   useEffect(() => {
@@ -239,14 +240,14 @@ export const useBankDetailsRoute = ({
   const onTaxIdChange = useCallback(
     (value: string) => {
       const input = value.replace(/[^\d]/g, '').slice(0, 11)
-      swapBus.emit('bankDetails/taxIdChanged', { value: input })
+      setTaxId(input)
     },
     [],
   )
 
   const onPixKeyChange = useCallback(
     (value: string) => {
-      swapBus.emit('bankDetails/pixKeyChanged', { value })
+      setPixKey(value)
     },
     [],
   )

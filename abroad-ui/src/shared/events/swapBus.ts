@@ -6,9 +6,6 @@ import { _36EnumsTargetCurrency as TargetCurrency } from '../../api'
 // Each event type is emitted by a single source.
 export type SwapEvents = {
   // Bank details inputs (separate per cause)
-  'bankDetails/kycInputsRestored': { pixKey?: string, taxId?: string } // single source: useBankDetailsRoute
-  'bankDetails/pixKeyChanged': { value: string } // single source: useBankDetailsRoute
-  'bankDetails/taxIdChanged': { value: string } // single source: useBankDetailsRoute
   'swap/amountsRestoredFromPending': {
     quoteId?: string
     srcAmount?: string

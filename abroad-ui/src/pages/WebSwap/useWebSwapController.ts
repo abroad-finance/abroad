@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 
 import { _36EnumsBlockchainNetwork as BlockchainNetwork, _36EnumsCryptoCurrency as CryptoCurrency, decodeQrCodeBR, getQuote, _36EnumsPaymentMethod as PaymentMethod, _36EnumsTargetCurrency as TargetCurrency } from '../../api/index'
@@ -6,13 +6,28 @@ import { useWalletAuth } from '../../contexts/WalletAuthContext'
 import { BRL_BACKGROUND_IMAGE } from '../../features/swap/constants'
 import { ASSET_URLS, PENDING_TX_KEY } from '../../shared/constants'
 import { swapBus } from '../../shared/events/swapBus'
-import { WebSwapControllerProps } from './WebSwap'
-
-type UseWebSwapControllerProps = {
-  targetCurrency: TargetCurrency
+import { useEventBus } from '../../shared/hooks'
+export interface WebSwapControllerProps {
+  // Controller actions/state
+  closeQr: () => void
+  currentBgUrl: string
+  handleBackToSwap: () => void
+  handleKycRedirect: () => void
+  handleQrResult: (text: string) => Promise<void>
+  handleWalletDetailsClose: () => void
+  handleWalletDetailsOpen: () => void
+  isDecodingQr: boolean
+  isQrOpen: boolean
+  isWalletDetailsOpen: boolean
+  // Shared state for the page
+  quoteId: string
+  resetForNewTransaction: () => void
+  sourceAmount: string
+  targetAmount: string
+  targetCurrency: (typeof TargetCurrency)[keyof typeof TargetCurrency]
 }
 
-export const useWebSwapController = ({ targetCurrency }: UseWebSwapControllerProps): WebSwapControllerProps => {
+export const useWebSwapController = (): WebSwapControllerProps => {
   // Modal visibility state
   const [isWalletDetailsOpen, setIsWalletDetailsOpen] = useState(false)
   const { kycUrl, token } = useWalletAuth()
@@ -21,6 +36,14 @@ export const useWebSwapController = ({ targetCurrency }: UseWebSwapControllerPro
   const [isQrOpen, setIsQrOpen] = useState(false)
   const [isDecodingQr, setIsDecodingQr] = useState(false)
   const [searchParams] = useSearchParams()
+
+  // Swap page state moved here
+  const [sourceAmount, setSourceAmount] = useState<string>('')
+  const [targetAmount, setTargetAmount] = useState<string>('')
+  const [targetCurrency, setTargetCurrency] = useState<(typeof TargetCurrency)[keyof typeof TargetCurrency]>(TargetCurrency.BRL)
+  const [quoteId, setQuoteId] = useState<string>('')
+
+  // Derived controller state
 
   const targetPaymentMethod = targetCurrency === TargetCurrency.BRL ? PaymentMethod.PIX : PaymentMethod.MOVII
 
@@ -33,13 +56,50 @@ export const useWebSwapController = ({ targetCurrency }: UseWebSwapControllerPro
   }, [searchParams])
 
   // Listen for requests to open the QR scanner (from other hooks/components)
-  useEffect(() => {
-    const open = () => setIsQrOpen(true)
-    swapBus.on('swap/qrOpenRequestedByUser', open)
-    return () => {
-      swapBus.off('swap/qrOpenRequestedByUser', open)
-    }
+  const open = useCallback(() => setIsQrOpen(true), [])
+  useEventBus(swapBus, 'swap/qrOpenRequestedByUser', open)
+
+  // Wire event bus listeners to update state (moved from WebSwap.tsx)
+  const onTargetCurrencySelected = useCallback((p: { currency: (typeof TargetCurrency)[keyof typeof TargetCurrency] }) => setTargetCurrency(p.currency), [])
+  const onUserSourceChanged = useCallback((p: { value: string }) => setSourceAmount(p.value), [])
+  const onUserTargetChanged = useCallback((p: { value: string }) => setTargetAmount(p.value), [])
+  const onQuoteFromSource = useCallback((p: { quoteId: string, targetAmount: string }) => {
+    setQuoteId(p.quoteId)
+    setTargetAmount(p.targetAmount)
   }, [])
+  const onQuoteFromTarget = useCallback((p: { quoteId: string, srcAmount: string }) => {
+    setQuoteId(p.quoteId)
+    setSourceAmount(p.srcAmount)
+  }, [])
+  const onQuoteFromQr = useCallback((p: { quoteId: string, srcAmount: string }) => {
+    setQuoteId(p.quoteId)
+    setSourceAmount(p.srcAmount)
+  }, [])
+  const onQrDecoded = useCallback((p: { amount?: string, pixKey?: string, taxId?: string }) => {
+    if (typeof p.amount === 'string') setTargetAmount(p.amount)
+  }, [])
+  const onNewTransaction = useCallback(() => {
+    setSourceAmount('')
+    setTargetAmount('')
+  }, [])
+  const onPendingRestored = useCallback((p: { quoteId?: string, srcAmount?: string, targetCurrency?: (typeof TargetCurrency)[keyof typeof TargetCurrency], tgtAmount?: string }) => {
+    if (typeof p.quoteId === 'string') setQuoteId(p.quoteId)
+    if (typeof p.srcAmount === 'string') setSourceAmount(p.srcAmount)
+    if (typeof p.tgtAmount === 'string') setTargetAmount(p.tgtAmount)
+    if (typeof p.targetCurrency === 'string') setTargetCurrency(p.targetCurrency)
+  }, [])
+  const onTargetCurrencyFromUrl = useCallback((p: { currency: (typeof TargetCurrency)[keyof typeof TargetCurrency] }) => setTargetCurrency(p.currency), [])
+
+  useEventBus(swapBus, 'swap/targetCurrencySelected', onTargetCurrencySelected)
+  useEventBus(swapBus, 'swap/userSourceInputChanged', onUserSourceChanged)
+  useEventBus(swapBus, 'swap/userTargetInputChanged', onUserTargetChanged)
+  useEventBus(swapBus, 'swap/quoteFromSourceCalculated', onQuoteFromSource)
+  useEventBus(swapBus, 'swap/quoteFromTargetCalculated', onQuoteFromTarget)
+  useEventBus(swapBus, 'swap/quoteFromQrCalculated', onQuoteFromQr)
+  useEventBus(swapBus, 'swap/qrDecoded', onQrDecoded)
+  useEventBus(swapBus, 'swap/newTransactionRequested', onNewTransaction)
+  useEventBus(swapBus, 'swap/amountsRestoredFromPending', onPendingRestored)
+  useEventBus(swapBus, 'swap/targetCurrencySetFromUrlParam', onTargetCurrencyFromUrl)
 
   // Restore state if user returns from KYC
   useEffect(() => {
@@ -110,8 +170,6 @@ export const useWebSwapController = ({ targetCurrency }: UseWebSwapControllerPro
     }
   }, [fetchQuote])
 
-  const isDesktop = useMemo(() => window.innerWidth >= 768, [])
-
   // Determine desired desktop background URL based on currency
   const currentBgUrl = targetCurrency === 'BRL' ? BRL_BACKGROUND_IMAGE : ASSET_URLS.BACKGROUND_IMAGE
 
@@ -144,9 +202,12 @@ export const useWebSwapController = ({ targetCurrency }: UseWebSwapControllerPro
     handleWalletDetailsClose,
     handleWalletDetailsOpen,
     isDecodingQr,
-    isDesktop,
     isQrOpen,
     isWalletDetailsOpen,
+    quoteId,
     resetForNewTransaction,
+    sourceAmount,
+    targetAmount,
+    targetCurrency,
   }
 }

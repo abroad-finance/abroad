@@ -14,10 +14,9 @@ import {
 import { useWalletAuth } from '../../../contexts/WalletAuthContext'
 import { kit } from '../../../services/stellarKit'
 import { swapBus } from '../../../shared/events/swapBus'
-import { useDebounce } from '../../../shared/hooks'
+import { useDebounce, useDomEvent } from '../../../shared/hooks'
 
 type UseSwapArgs = {
-  isDesktop: boolean
   quoteId: string
   sourceAmount: string
   targetAmount: string
@@ -28,12 +27,12 @@ const COP_TRANSFER_FEE = 0.0
 const BRL_TRANSFER_FEE = 0.0
 
 export const useSwap = ({
-  isDesktop,
   quoteId,
   sourceAmount,
   targetAmount,
   targetCurrency,
 }: UseSwapArgs): SwapProps => {
+  const isDesktop = useMemo(() => window.innerWidth >= 768, [])
   const textColor = isDesktop ? 'white' : '#356E6A'
   const { t } = useTranslate()
   const { authenticateWithWallet, token } = useWalletAuth()
@@ -279,15 +278,12 @@ export const useSwap = ({
   }, [targetDebounceAmount, fetchReverseConversion])
 
   // Close currency dropdown on outside click
-  useEffect(() => {
-    const onDocClick = (e: MouseEvent) => {
-      if (currencyMenuRef.current && !currencyMenuRef.current.contains(e.target as Node)) {
-        setCurrencyMenuOpen(false)
-      }
+  const onDocClick = useCallback((e: MouseEvent) => {
+    if (currencyMenuRef.current && !currencyMenuRef.current.contains(e.target as Node)) {
+      setCurrencyMenuOpen(false)
     }
-    document.addEventListener('mousedown', onDocClick)
-    return () => document.removeEventListener('mousedown', onDocClick)
   }, [])
+  useDomEvent(document, 'mousedown', onDocClick)
 
   // Return props for stateless view -------------------------------------------
   return {
