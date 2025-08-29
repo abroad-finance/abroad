@@ -57,7 +57,7 @@ export default function BankDetailsRoute({
   return (
     <div className="flex-1 flex items-center justify-center w-full flex-col">
       <div
-        className="relative w-[90%] max-w-md min-h-[60vh] h-auto bg-[#356E6A]/5 backdrop-blur-xl rounded-4xl p-4 md:p-6 flex flex-col items-center space-y-4"
+        className="w-[98%] max-w-md min-h-[60vh] h-auto bg-[#356E6A]/5 backdrop-blur-xl rounded-4xl p-4 md:p-6 flex flex-col items-center space-y-4"
         id="bg-container"
       >
         {/* Header */}
