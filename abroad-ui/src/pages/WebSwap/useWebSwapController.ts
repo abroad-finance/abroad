@@ -160,10 +160,14 @@ export const useWebSwapController = ({ setPixKey, setQuoteId, setSourceAmount, s
     setSourceAmount('')
     setTargetAmount('')
     setTransactionId(null)
+    setPixKey('')
+    setTaxId('')
     setView('swap')
   }, [
+    setPixKey,
     setSourceAmount,
     setTargetAmount,
+    setTaxId,
     setTransactionId,
     setView,
   ])

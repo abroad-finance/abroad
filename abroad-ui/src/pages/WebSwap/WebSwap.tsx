@@ -17,11 +17,11 @@ import WalletDetails from '../../features/swap/components/WalletDetails'
 import WebSwapLayout from '../../features/swap/components/WebSwapLayout'
 import { useBankDetailsRoute } from '../../features/swap/hooks/useBankDetailsRoute'
 import { useSwap } from '../../features/swap/hooks/useSwap'
+import { useWalletDetails } from '../../features/swap/hooks/useWalletDetails'
 import { SwapView } from '../../features/swap/types'
 import BackgroundCrossfade from '../../shared/components/BackgroundCrossfade'
 import LanguageSelector from '../../shared/components/LanguageSelector'
 import { ModalOverlay } from '../../shared/components/ModalOverlay'
-import { useWalletDetails } from '../../shared/hooks'
 import { useLanguageSelector, useNavBarResponsive } from '../../shared/hooks'
 
 export interface WebSwapControllerProps {

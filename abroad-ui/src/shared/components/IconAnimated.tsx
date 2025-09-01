@@ -28,15 +28,15 @@ type Props = {
 }
 
 export const IconAnimated = ({ className, colors, icon, loop, onComplete, play, size }: Props) => {
-  const playerRef = useRef<Player>(null)
+  const playerRef = useRef<null | Player>(null)
 
   const start = useCallback(() => {
-    playerRef.current?.playFromBeginning()
+    playerRef?.current?.playFromBeginning()
   }, [])
 
   // React to external `play` and icon changes
   useEffect(() => {
-    const p = playerRef.current
+    const p = playerRef?.current
     if (!p) return
     if (play) start()
     else p.pause()

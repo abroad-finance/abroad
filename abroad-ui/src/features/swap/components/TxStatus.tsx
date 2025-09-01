@@ -57,9 +57,11 @@ export default function TxStatus({ onNewTransaction, onRetry, transactionId }: T
 
     on('transaction.created', onEvent)
     on('transaction.updated', onEvent)
-    on('connect_error', (err: Error) => setError(err.message || 'WS connection error'))
+    const onConnectError = (err: Error) => setError(err.message || 'WS connection error')
+    on('connect_error', onConnectError)
 
     return () => {
+      off('connect_error', onConnectError)
       off('transaction.created', onEvent)
       off('transaction.updated', onEvent)
     }
@@ -73,11 +75,35 @@ export default function TxStatus({ onNewTransaction, onRetry, transactionId }: T
   const renderIcon = () => {
     switch (status) {
       case 'accepted':
-        return <IconAnimated icon="AnimatedCheck" loop={false} play size={150} />
+        return (
+          <IconAnimated
+            icon="AnimatedCheck"
+            key={`icon-${status}`}
+            loop={false}
+            play
+            size={150}
+          />
+        )
       case 'denied':
-        return <IconAnimated icon="Denied" loop={false} play size={150} />
+        return (
+          <IconAnimated
+            icon="Denied"
+            key={`icon-${status}`}
+            loop={false}
+            play
+            size={150}
+          />
+        )
       case 'inProgress':
-        return <IconAnimated icon="Coins" loop play size={150} />
+        return (
+          <IconAnimated
+            icon="Coins"
+            key={`icon-${status}`}
+            loop
+            play
+            size={150}
+          />
+        )
     }
   }
 

@@ -120,9 +120,11 @@ export function useWalletDetails(params: Params = {}): WalletDetailsProps {
 
     on('transaction.created', refresh)
     on('transaction.updated', refresh)
-    on('connect_error', (err: Error) => setTransactionError(err.message || 'WS connection error'))
+    const onConnectError = (err: Error) => setTransactionError(err.message || 'WS connection error')
+    on('connect_error', onConnectError)
 
     return () => {
+      off('connect_error', onConnectError)
       off('transaction.created', refresh)
       off('transaction.updated', refresh)
     }
