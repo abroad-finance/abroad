@@ -15,6 +15,7 @@ export const TYPES = {
   ISlackNotifier: Symbol.for('ISlackNotifier'),
   IWalletHandlerFactory: Symbol.for('IWalletHandlerFactory'),
   IWebhookNotifier: Symbol.for('IWebhookNotifier'),
+  IWebSocketService: Symbol.for('IWebSocketService'),
   KycUseCase: Symbol.for('KycUseCase'),
   PaymentSentController: Symbol.for('PaymentSentController'),
   PaymentStatusUpdatedController: Symbol.for('PaymentStatusUpdatedController'),

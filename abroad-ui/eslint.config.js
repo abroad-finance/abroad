@@ -56,6 +56,7 @@ export default tseslint.config(
                 '**/assets/**/*',
                 '**/api/**/*',
                 '**/types/**/*',
+                '**/contexts/**/*',
               ],
             },
           ],

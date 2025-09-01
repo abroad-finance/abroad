@@ -31,6 +31,7 @@ import { ISecretManager } from './interfaces/ISecretManager'
 import { IWalletHandler } from './interfaces/IWalletHandler'
 import { IWalletHandlerFactory } from './interfaces/IWalletHandlerFactory'
 import { IWebhookNotifier } from './interfaces/IWebhookNotifier'
+import { IWebSocketService } from './interfaces/IWebSocketService'
 import { ConsoleLogger } from './services/consoleLogger'
 import { ExchangeProviderFactory } from './services/ExchangeProviderFactory'
 import { BinanceExchangeProvider } from './services/exchangeProviders/binanceExchangeProvider'
@@ -43,6 +44,7 @@ import { NequiPaymentService } from './services/paymentServices/nequi'
 import { TransferoPaymentService } from './services/paymentServices/transferoPaymentService'
 import { PixQrDecoder } from './services/PixQrDecoder'
 import { SlackNotifier } from './services/slackNotifier'
+import { SocketIOWebSocketService } from './services/SocketIOWebSocketService'
 import { SolanaWalletHandler } from './services/SolanaWalletHandler'
 import { StellarWalletHandler } from './services/StellarWalletHandler'
 import { WalletHandlerFactory } from './services/WalletHandlerFactory'
@@ -153,6 +155,12 @@ container.bind<ILogger>(TYPES.ILogger).to(ConsoleLogger).inSingletonScope()
 container
   .bind<ISlackNotifier>(TYPES.ISlackNotifier)
   .to(SlackNotifier)
+  .inSingletonScope()
+
+// IWebSocketService
+container
+  .bind<IWebSocketService>(TYPES.IWebSocketService)
+  .to(SocketIOWebSocketService)
   .inSingletonScope()
 
 // QuoteUseCase

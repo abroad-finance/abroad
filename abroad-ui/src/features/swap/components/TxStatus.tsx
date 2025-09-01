@@ -1,7 +1,9 @@
 import { useTranslate } from '@tolgee/react'
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 
-import { TransactionStatus as ApiStatus, getTransactionStatus } from '../../../api'
+import { TransactionStatus as ApiStatus } from '../../../api'
+import { useWalletAuth } from '../../../contexts/WalletAuthContext'
+import { useWebSocket } from '../../../contexts/WebSocketContext'
 import { Button } from '../../../shared/components/Button'
 import { IconAnimated } from '../../../shared/components/IconAnimated'
 
@@ -16,9 +18,11 @@ type UiStatus = 'accepted' | 'denied' | 'inProgress'
 
 export default function TxStatus({ onNewTransaction, onRetry, transactionId }: TxStatusProps): React.JSX.Element {
   const { t } = useTranslate()
+  const { address } = useWalletAuth()
+  const { off, on } = useWebSocket()
   const [status, setStatus] = useState<UiStatus>('inProgress')
   const [error, setError] = useState<null | string>(null)
-  const pollRef = useRef<null | number>(null)
+  // no local socket, using app-wide provider
 
   // Map API status to UI status
   const mapStatus = (api?: ApiStatus): UiStatus => {
@@ -35,34 +39,36 @@ export default function TxStatus({ onNewTransaction, onRetry, transactionId }: T
     }
   }
 
-  // Poll transaction status
+  // Subscribe to websocket notifications for this user/transaction
   useEffect(() => {
-    if (!transactionId) return
-    let cancelled = false
+    if (!transactionId || !address) return
+    setError(null)
 
-    const poll = async () => {
+    const onEvent = (payload: unknown) => {
       try {
-        const res = await getTransactionStatus(transactionId)
-        if (cancelled) return
-        const ui = mapStatus(res.data?.status as ApiStatus)
-        setStatus(ui)
-        if (ui === 'inProgress') {
-          pollRef.current = window.setTimeout(poll, 1000)
-        }
+        const data = (typeof payload === 'string' ? JSON.parse(payload) : payload) as { id?: string, status?: ApiStatus }
+        if (!data || data.id !== transactionId) return
+        setStatus(mapStatus(data.status as ApiStatus))
       }
       catch (e) {
-        if (cancelled) return
-        setError(e instanceof Error ? e.message : t('tx_status.error_fetching', 'Error obteniendo estado'))
-        // retry slower
-        pollRef.current = window.setTimeout(poll, 1000)
+        console.warn('Invalid ws payload:', e)
       }
     }
-    poll()
+
+    on('transaction.created', onEvent)
+    on('transaction.updated', onEvent)
+    on('connect_error', (err: Error) => setError(err.message || 'WS connection error'))
+
     return () => {
-      cancelled = true
-      if (pollRef.current) window.clearTimeout(pollRef.current)
+      off('transaction.created', onEvent)
+      off('transaction.updated', onEvent)
     }
-  }, [transactionId, t])
+  }, [
+    address,
+    transactionId,
+    on,
+    off,
+  ])
 
   const renderIcon = () => {
     switch (status) {

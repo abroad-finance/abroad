@@ -2,9 +2,10 @@ import { Horizon } from '@stellar/stellar-sdk'
 import { useTranslate } from '@tolgee/react'
 import { useCallback, useEffect, useState } from 'react'
 
-import { listPartnerTransactions, PaginatedTransactionListTransactionsItem } from '../../api'
-import { useWalletAuth } from '../../contexts/WalletAuthContext'
-import { WalletDetailsProps } from '../../features/swap/components/WalletDetails'
+import { listPartnerTransactions, PaginatedTransactionListTransactionsItem } from '../../../api'
+import { useWalletAuth } from '../../../contexts/WalletAuthContext'
+import { useWebSocket } from '../../../contexts/WebSocketContext'
+import { WalletDetailsProps } from '../components/WalletDetails'
 
 // Stellar network configuration
 const STELLAR_HORIZON_URL = 'https://horizon.stellar.org'
@@ -27,6 +28,7 @@ export function useWalletDetails(params: Params = {}): WalletDetailsProps {
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [isLoadingTransactions, setIsLoadingTransactions] = useState(false)
   const [transactionError, setTransactionError] = useState<null | string>(null)
+  const { off, on } = useWebSocket()
 
   // Fetch USDC balance (isolated for clarity)
   const fetchUSDCBalance = useCallback(async (stellarAddress: string): Promise<string> => {
@@ -101,6 +103,36 @@ export function useWalletDetails(params: Params = {}): WalletDetailsProps {
     token,
     fetchUSDCBalanceWithLoading,
     fetchTransactions,
+  ])
+
+  // Subscribe to websocket notifications to refresh transactions and balance
+  useEffect(() => {
+    if (!address || !token) return
+
+    const refresh = async () => {
+      try {
+        // Optimistically refresh in background, keep UI responsive
+        fetchTransactions()
+        fetchUSDCBalanceWithLoading(address)
+      }
+      catch { /* no-op */ }
+    }
+
+    on('transaction.created', refresh)
+    on('transaction.updated', refresh)
+    on('connect_error', (err: Error) => setTransactionError(err.message || 'WS connection error'))
+
+    return () => {
+      off('transaction.created', refresh)
+      off('transaction.updated', refresh)
+    }
+  }, [
+    address,
+    token,
+    fetchTransactions,
+    fetchUSDCBalanceWithLoading,
+    on,
+    off,
   ])
 
   // Handlers exposed to component

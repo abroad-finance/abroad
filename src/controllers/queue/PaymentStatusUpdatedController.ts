@@ -105,6 +105,18 @@ export class PaymentStatusUpdatedController {
       })
       this.webhookNotifier.notifyWebhook(transactionRecord.partnerUser.partner.webhookUrl, { data: transactionRecord, event: WebhookEvent.TRANSACTION_CREATED })
 
+      // Notify user via websocket bridge with full payload
+      try {
+        await this.queueHandler.postMessage(QueueName.USER_NOTIFICATION, {
+          payload: JSON.stringify(transactionRecord),
+          type: 'transaction.updated',
+          userId: transactionRecord.partnerUser.userId,
+        })
+      }
+      catch (e) {
+        this.logger.warn('[PaymentStatusUpdated queue]: Failed to publish websocket notification', e as Error)
+      }
+
       this.logger.info(
         `[Stellar transaction]: Payment ${newStatus === TransactionStatus.PAYMENT_COMPLETED ? 'completed' : 'failed'} for transaction:`,
         transactionRecord.id,

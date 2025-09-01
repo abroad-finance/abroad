@@ -7,6 +7,7 @@ export enum QueueName {
   PAYMENT_SENT = 'payment-sent',
   PAYMENT_STATUS_UPDATED = 'payment-status-updated',
   RECEIVED_CRYPTO_TRANSACTION = 'received-crypto-transaction',
+  USER_NOTIFICATION = 'user-notification',
 }
 
 export interface ILogger {
@@ -38,4 +39,5 @@ export interface ISlackNotifier {
 }
 
 export * from './IWalletHandlerFactory'
+export * from './IWebSocketService'
 export * from './queueSchema'

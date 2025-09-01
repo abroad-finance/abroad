@@ -63,6 +63,23 @@ steps:
       - --quiet
     waitFor: ["Migrate"]
 
+  # 5b. Deploy the WebSocket bridge as a separate Cloud Run service
+  - id: Deploy Cloud Run (ws)
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - $_WS_SERVICE_NAME
+      - --platform=managed
+      - --image=$_AR_HOSTNAME/$PROJECT_ID/cloud-run-source-deploy/$REPO_NAME/$_SERVICE_NAME:$COMMIT_SHA
+      - --region=$_DEPLOY_REGION
+      - --allow-unauthenticated
+      - --labels=managed-by=gcp-cloud-build-deploy-cloud-run,commit-sha=$COMMIT_SHA,gcb-build-id=$BUILD_ID,gcb-trigger-id=$_TRIGGER_ID,component=ws
+      - --command=node
+      - --args=dist/ws.js
+    waitFor: ["Push commit"]
+
   # 6. Deploy to GKE (after manifests & migrations)
   - id: Deploy GKE workloads
     name: gcr.io/cloud-builders/kubectl
@@ -101,6 +118,7 @@ substitutions:
   _AR_HOSTNAME: us-east1-docker.pkg.dev
   _PLATFORM: managed
   _SERVICE_NAME: abroad-api
+  _WS_SERVICE_NAME: abroad-ws
   _TRIGGER_ID: ""
   _GKE_CLUSTER: ""
 
@@ -108,6 +126,7 @@ tags:
   - gcp-cloud-build-deploy-cloud-run
   - gcp-cloud-build-deploy-cloud-run-managed
   - abroad-api
+  - abroad-ws
 
 availableSecrets:
   secretManager:

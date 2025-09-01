@@ -124,6 +124,17 @@ export class ReceivedCryptoTransactionController {
         },
       })
       this.webhookNotifier.notifyWebhook(transactionRecord.partnerUser.partner.webhookUrl, { data: transactionRecord, event: WebhookEvent.TRANSACTION_CREATED })
+      // Publish ws notification
+      try {
+        await this.queueHandler.postMessage(QueueName.USER_NOTIFICATION, {
+          payload: JSON.stringify(transactionRecord),
+          type: 'transaction.updated',
+          userId: transactionRecord.partnerUser.userId,
+        })
+      }
+      catch (e) {
+        this.logger.warn('[ReceivedCryptoTransaction] Failed to publish ws notification (processing)', e as Error)
+      }
     }
     catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError) {
@@ -154,6 +165,21 @@ export class ReceivedCryptoTransactionController {
         where: { id: transactionRecord.id },
       })
       this.webhookNotifier.notifyWebhook(transactionRecord.partnerUser.partner.webhookUrl, { data: transaction, event: WebhookEvent.TRANSACTION_CREATED })
+      // Publish ws notification
+      try {
+        const full = await prismaClient.transaction.findUnique({
+          include: { partnerUser: { include: { partner: true } }, quote: true },
+          where: { id: transaction.id },
+        })
+        await this.queueHandler.postMessage(QueueName.USER_NOTIFICATION, {
+          payload: JSON.stringify(full ?? transaction),
+          type: 'transaction.updated',
+          userId: transactionRecord.partnerUser.userId,
+        })
+      }
+      catch (e) {
+        this.logger.warn('[ReceivedCryptoTransaction] Failed to publish ws notification (wrong amount)', e as Error)
+      }
 
       const walletHandler = this.walletHandlerFactory.getWalletHandler(message.blockchain)
       await walletHandler.send({
@@ -200,6 +226,21 @@ export class ReceivedCryptoTransactionController {
         where: { id: transactionRecord.id },
       })
       this.webhookNotifier.notifyWebhook(transactionRecord.partnerUser.partner.webhookUrl, { data: transaction, event: WebhookEvent.TRANSACTION_CREATED })
+      // Publish ws notification
+      try {
+        const full = await prismaClient.transaction.findUnique({
+          include: { partnerUser: { include: { partner: true } }, quote: true },
+          where: { id: transaction.id },
+        })
+        await this.queueHandler.postMessage(QueueName.USER_NOTIFICATION, {
+          payload: JSON.stringify(full ?? transaction),
+          type: 'transaction.updated',
+          userId: transactionRecord.partnerUser.userId,
+        })
+      }
+      catch (e) {
+        this.logger.warn('[ReceivedCryptoTransaction] Failed to publish ws notification (final)', e as Error)
+      }
 
       this.logger.info(
         `[Stellar transaction]: Payment ${paymentResponse.success ? 'completed' : 'failed'} for transaction:`,
@@ -243,6 +284,21 @@ export class ReceivedCryptoTransactionController {
         where: { id: transactionRecord.id },
       })
       this.webhookNotifier.notifyWebhook(transactionRecord.partnerUser.partner.webhookUrl, { data: transaction, event: WebhookEvent.TRANSACTION_CREATED })
+      // Publish ws notification
+      try {
+        const full = await prismaClient.transaction.findUnique({
+          include: { partnerUser: { include: { partner: true } }, quote: true },
+          where: { id: transaction.id },
+        })
+        await this.queueHandler.postMessage(QueueName.USER_NOTIFICATION, {
+          payload: JSON.stringify(full ?? transaction),
+          type: 'transaction.updated',
+          userId: transactionRecord.partnerUser.userId,
+        })
+      }
+      catch (e) {
+        this.logger.warn('[ReceivedCryptoTransaction] Failed to publish ws notification (error)', e as Error)
+      }
 
       const walletHandler = this.walletHandlerFactory.getWalletHandler(
         message.blockchain,

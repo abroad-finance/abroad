@@ -10,6 +10,7 @@
     "start:server": "node dist/server.js",
     "start:consumers": "node dist/consumers.js",
     "start:listeners": "node dist/listeners.js",
+    "start:ws": "node dist/ws.js",
     "dev": "NODE_ENV=development concurrently \"tsx watch src/server.ts\" \"nodemon -x tsoa spec-and-routes\"",
     "migrate:dev": "prisma migrate dev",
     "depcruise:tree": "depcruise src --include-only '^src' --config --output-type dot | dot -T svg > dependency-graph.svg && open dependency-graph.svg",
@@ -45,6 +46,7 @@
     "js-sha512": "^0.9.0",
     "jsonwebtoken": "^9.0.2",
     "react-number-format": "^5.4.4",
+    "socket.io": "^4.8.1",
     "swagger-ui-express": "^5.0.1",
     "tsoa": "^6.6.0",
     "zod": "^4.0.17"

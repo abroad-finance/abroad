@@ -19,6 +19,7 @@ import {
 import { Body, Post } from 'tsoa'
 import { z } from 'zod'
 
+import { IQueueHandler, QueueName } from '../interfaces'
 import { IDatabaseClientProvider } from '../interfaces/IDatabaseClientProvider'
 import { IKycService } from '../interfaces/IKycService'
 import { IPaymentServiceFactory } from '../interfaces/IPaymentServiceFactory'
@@ -77,6 +78,7 @@ export class TransactionController extends Controller {
     @inject(TYPES.IPaymentServiceFactory) private paymentServiceFactory: IPaymentServiceFactory,
     @inject(TYPES.IKycService) private kycService: IKycService,
     @inject(TYPES.IWebhookNotifier) private webhookNotifier: IWebhookNotifier,
+    @inject(TYPES.IQueueHandler) private queueHandler: IQueueHandler,
   ) {
     super()
   }
@@ -242,6 +244,25 @@ export class TransactionController extends Controller {
         },
       })
       this.webhookNotifier.notifyWebhook(partner.webhookUrl, { data: transaction, event: WebhookEvent.TRANSACTION_CREATED })
+
+      // Publish websocket notification with full transaction payload
+      try {
+        const full = await prismaClient.transaction.findUnique({
+          include: {
+            partnerUser: { include: { partner: true } },
+            quote: true,
+          },
+          where: { id: transaction.id },
+        })
+        await this.queueHandler.postMessage(QueueName.USER_NOTIFICATION, {
+          payload: JSON.stringify(full ?? transaction),
+          type: 'transaction.created',
+          userId: partnerUser.userId,
+        })
+      }
+      catch (notifyErr) {
+        console.warn('[TransactionController] Failed to publish transaction.created notification', notifyErr)
+      }
 
       return {
         id: transaction.id,

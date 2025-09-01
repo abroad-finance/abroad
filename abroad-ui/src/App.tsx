@@ -4,6 +4,7 @@ import { Route, BrowserRouter as Router, Routes } from 'react-router-dom'
 
 import { tolgee } from './contexts/LanguageContext'
 import { WalletAuthProvider } from './contexts/WalletAuthContext'
+import { WebSocketProvider } from './contexts/WebSocketContext'
 
 // Route-level code splitting
 const WebSwap = lazy(() => import('./pages/WebSwap/WebSwap'))
@@ -12,15 +13,17 @@ function App() {
   return (
     <TolgeeProvider tolgee={tolgee}>
       <WalletAuthProvider>
-        <Router>
-          <Suspense fallback={<div />}>
-            {' '}
-            {/* simple lightweight fallback */}
-            <Routes>
-              <Route element={<WebSwap />} path="/" />
-            </Routes>
-          </Suspense>
-        </Router>
+        <WebSocketProvider>
+          <Router>
+            <Suspense fallback={<div />}>
+              {' '}
+              {/* simple lightweight fallback */}
+              <Routes>
+                <Route element={<WebSwap />} path="/" />
+              </Routes>
+            </Suspense>
+          </Router>
+        </WebSocketProvider>
       </WalletAuthProvider>
     </TolgeeProvider>
   )
