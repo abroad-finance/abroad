@@ -3,8 +3,8 @@ import React, { useEffect, useRef } from 'react'
 // Define Option interface
 export interface Option {
   disabled?: boolean
-  icon?: React.ReactNode // Icons are expected to be scaled by the parent providing them
-  iconUrl?: string // URL for image icons
+  icon?: React.ReactNode
+  iconUrl?: string
   label: string
   value: string
 }
@@ -43,15 +43,11 @@ export function DropSelector({
     const handlePointerDownOutside = (event: PointerEvent) => {
       const el = rootRef.current
       if (!el) return
-      if (!el.contains(event.target as Node)) {
-        setIsOpen(false)
-      }
+      if (!el.contains(event.target as Node)) setIsOpen(false)
     }
 
     document.addEventListener('pointerdown', handlePointerDownOutside)
-    return () => {
-      document.removeEventListener('pointerdown', handlePointerDownOutside)
-    }
+    return () => document.removeEventListener('pointerdown', handlePointerDownOutside)
   }, [isOpen, setIsOpen])
 
   // Close on Escape
@@ -94,11 +90,7 @@ export function DropSelector({
                     <span className="mr-3 flex-shrink-0">{selectedOption.icon}</span>
                   )}
                   {selectedOption.iconUrl && (
-                    <img
-                      alt=""
-                      className="w-8 h-8 mr-3 rounded-full flex-shrink-0"
-                      src={selectedOption.iconUrl}
-                    />
+                    <img alt="" className="w-8 h-8 mr-3 rounded-full flex-shrink-0" src={selectedOption.iconUrl} />
                   )}
                   <span className="truncate font-semibold" style={{ color: textColor }}>
                     {selectedOption.label}
@@ -131,8 +123,7 @@ export function DropSelector({
         </span>
         <svg
           aria-hidden="true"
-          className={`w-7 h-7 text-gray-500 transform transition-transform flex-shrink-0 ${isOpen ? 'rotate-180' : ''
-          }`}
+          className={`w-7 h-7 text-gray-500 transform transition-transform flex-shrink-0 ${isOpen ? 'rotate-180' : ''}`}
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -145,12 +136,17 @@ export function DropSelector({
       {isOpen && !disabled && (
         <div
           aria-activedescendant={selectedOption ? `${listboxId}-${selectedOption.value}` : undefined}
-          className="absolute z-10 mt-2.5 inset-x-0 bg-white border border-gray-300 rounded-xl shadow-lg max-h-72 overflow-auto"
+          className="
+            absolute z-10 mt-2.5 inset-x-0 bg-white border border-gray-300 rounded-xl shadow-lg
+            max-h-72 overflow-y-auto overscroll-contain touch-pan-y
+          "
           id={listboxId}
           onClick={e => e.stopPropagation()}
-          // Prevent inside interactions from reaching the document listener
+          // Important: stop pointerdown from reaching the document (keeps menu open),
+          // but DO NOT preventDefault, so native scrolling still works.
           onPointerDown={e => e.stopPropagation()}
           role="listbox"
+          style={{ WebkitOverflowScrolling: 'touch' }}
         >
           {options.length > 0
             ? (
@@ -160,35 +156,22 @@ export function DropSelector({
                     <div
                       aria-disabled={option.disabled || undefined}
                       aria-selected={isSelected}
-                      className={`flex items-center px-3 py-2 cursor-pointer ${option.disabled
-                        ? 'opacity-50 cursor-not-allowed'
-                        : isSelected
-                          ? 'bg-gray-200 font-semibold'
-                          : 'hover:bg-gray-50'
+                      className={`flex items-center px-3 py-2 ${
+                        option.disabled
+                          ? 'opacity-50 cursor-not-allowed'
+                          : 'cursor-pointer ' + (isSelected ? 'bg-gray-200 font-semibold' : 'hover:bg-gray-50')
                       }`}
                       id={`${listboxId}-${option.value}`}
                       key={option.value}
-                      // Select on pointerdown so it always wins the race with the outside listener
-                      onPointerDown={(e) => {
-                        e.preventDefault()
-                        e.stopPropagation()
-                        if (!option.disabled) handleSelect(option)
-                      }}
+                      // Select on click; no preventDefault so scrolling is smooth on mobile.
+                      onClick={() => !option.disabled && handleSelect(option)}
                       role="option"
                     >
-                      {option.icon && !option.iconUrl && (
-                        <span className="mr-3 flex-shrink-0">{option.icon}</span>
-                      )}
+                      {option.icon && !option.iconUrl && <span className="mr-3 flex-shrink-0">{option.icon}</span>}
                       {option.iconUrl && (
-                        <img
-                          alt=""
-                          className="w-8 h-8 mr-3 rounded-full flex-shrink-0"
-                          src={option.iconUrl}
-                        />
+                        <img alt="" className="w-8 h-8 mr-3 rounded-full flex-shrink-0" src={option.iconUrl} />
                       )}
-                      <span className="text-gray-700 text-lg font-semibold truncate">
-                        {option.label}
-                      </span>
+                      <span className="text-gray-700 text-lg font-semibold truncate">{option.label}</span>
                     </div>
                   )
                 })
