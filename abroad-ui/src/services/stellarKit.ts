@@ -11,6 +11,7 @@ import {
 import { LedgerModule } from '@creit.tech/stellar-wallets-kit/modules/ledger.module'
 import {
   WalletConnectAllowedMethods,
+  WALLET_CONNECT_ID as walletConnectIdStellarKit,
   WalletConnectModule,
 } from '@creit.tech/stellar-wallets-kit/modules/walletconnect.module'
 
@@ -46,4 +47,5 @@ const modules = isMobile
 export const kit: StellarWalletsKit = new StellarWalletsKit({
   modules,
   network: WalletNetwork.PUBLIC,
+  selectedWalletId: isMobile ? walletConnectIdStellarKit : undefined,
 })

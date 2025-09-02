@@ -1,87 +1,75 @@
-name: Deploy on Tag
+name: Deploy on Tag (fast)
 
 on:
   push:
     tags:
-      - '*'  
+      - '*'
+
+concurrency:
+  group: deploy-on-tag-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  precheck:
+  deploy:
     runs-on: ubuntu-latest
-    outputs:
-      on_main: ${{ steps.check.outputs.on_main }}
+    env:
+      CI: true
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout (shallow)
+        uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 1
+
       - id: check
-        name: Verify tag points to a commit contained in main
+        name: Verify tag commit is contained in main
         shell: bash
         run: |
           set -euo pipefail
-          TAG_REF="${GITHUB_REF#refs/tags/}"
-          TAG_SHA="$(git rev-list -n 1 "$TAG_REF")"
-          echo "Tag: $TAG_REF -> $TAG_SHA"
-          git fetch --no-tags origin main
-          if git merge-base --is-ancestor "$TAG_SHA" origin/main; then
+          echo "Tag: ${GITHUB_REF#refs/tags/} -> $GITHUB_SHA"
+          # Fetch just the latest main commit without tags
+          git fetch --no-tags --depth=1 origin main
+          if git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
             echo "on_main=true" >> "$GITHUB_OUTPUT"
             echo "Tag commit is contained in main. Proceeding."
           else
             echo "on_main=false" >> "$GITHUB_OUTPUT"
-            echo "Tag commit is NOT contained in main. Skipping workflow."
+            echo "::notice::Tag commit is NOT contained in main. Skipping."
           fi
 
-  build:
-    needs: precheck
-    if: needs.precheck.outputs.on_main == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
       - name: Setup Node.js
+        if: steps.check.outputs.on_main == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: 'npm'
+          cache-dependency-path: 'abroad-ui/package-lock.json'
+
       - name: Create .env for UI
+        if: steps.check.outputs.on_main == 'true'
         working-directory: abroad-ui
+        env:
+          UI_DOTENV: ${{ secrets.UI_DOTENV }}
         run: |
-          # Create the .env file required for the Vite build from a single multi-line secret
-          # Set the repo secret UI_DOTENV to the full contents of the .env file
-          if [ -z "${{ secrets.UI_DOTENV }}" ]; then
+          set -euo pipefail
+          if [ -z "${UI_DOTENV:-}" ]; then
             echo "::error::UI_DOTENV secret is not set or empty"
             exit 1
           fi
-          cat > .env << 'EOF'
-          ${{ secrets.UI_DOTENV }}
-          EOF
-      - name: Install UI deps
-        working-directory: abroad-ui
-        run: npm ci
-      - name: Build UI
-        working-directory: abroad-ui
-        run: npm run build
-      - name: Upload UI dist artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ui-dist
-          path: abroad-ui/dist
+          # Write exact contents without extra newlines or interpolation
+          printf "%s" "$UI_DOTENV" > .env
 
-  deploy-ui:
-    needs: build
-    runs-on: ubuntu-latest
-    if: needs.build.result == 'success'
-    steps:
-      - uses: actions/checkout@v4
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-      - name: Download UI dist artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: ui-dist
-          path: abroad-ui/dist
+      - name: Install UI deps
+        if: steps.check.outputs.on_main == 'true'
+        working-directory: abroad-ui
+        run: npm ci --no-audit --no-fund
+
+      - name: Build UI
+        if: steps.check.outputs.on_main == 'true'
+        working-directory: abroad-ui
+        run: npm run build --if-present
+
       - name: Deploy to Firebase Hosting
+        if: steps.check.outputs.on_main == 'true'
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
