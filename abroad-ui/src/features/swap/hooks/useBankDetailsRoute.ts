@@ -54,6 +54,12 @@ const EXCLUDED_BANKS = [
   'CFA COOPERATIVA FINANCIERA',
   'CONFIAR COOPERATIVA FINANCIERA',
   'BANCOCOOPCENTRAL',
+  'BANCO SERFINANZA',
+  'BANCO FINANDINA',
+  'BANCO CREZCAMOS',
+  'BANCO POWWI',
+  'SUPERDIGITAL',
+  'BANCAMIA',
 ]
 
 export const useBankDetailsRoute = ({
@@ -152,8 +158,15 @@ export const useBankDetailsRoute = ({
   // --------------------------- DERIVED DATA ---------------------------------
 
   const bankOptions: Option[] = useMemo(
-    () =>
-      apiBanks
+    () => {
+      const priorityBanks = [
+        'BANCOLOMBIA',
+        'DAVIPLATA',
+        'DAVIVIENDA',
+        'NEQUI',
+      ]
+
+      return apiBanks
         .filter((bank: Bank) => !EXCLUDED_BANKS.includes(bank.bankName.toUpperCase()))
         .map((bank: Bank) => {
           const bankNameUpper = bank.bankName.toUpperCase()
@@ -164,7 +177,33 @@ export const useBankDetailsRoute = ({
             value: String(bank.bankCode),
           }
         })
-        .sort((a, b) => a.label.localeCompare(b.label)),
+        .sort((a, b) => {
+          const getPriorityIndex = (label: string) => {
+            const labelUpper = label.toUpperCase();
+            return priorityBanks.findIndex(priority =>
+              labelUpper.includes(priority),
+            );
+          };
+
+          const aPriorityIndex = getPriorityIndex(a.label);
+          const bPriorityIndex = getPriorityIndex(b.label);
+
+          const aIsPriority = aPriorityIndex !== -1;
+          const bIsPriority = bPriorityIndex !== -1;
+
+          // Both are priority - sort by priority order
+          if (aIsPriority && bIsPriority) {
+            return aPriorityIndex - bPriorityIndex;
+          }
+
+          // One is priority - priority comes first
+          if (aIsPriority && !bIsPriority) return -1;
+          if (!aIsPriority && bIsPriority) return 1;
+
+          // Neither is priority - sort alphabetically
+          return a.label.localeCompare(b.label);
+        })
+    },
     [apiBanks],
   )
 
