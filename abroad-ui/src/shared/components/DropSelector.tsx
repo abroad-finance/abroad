@@ -32,27 +32,40 @@ export function DropSelector({
   setIsOpen,
   textColor,
 }: DropSelectorProps) {
-  const dropdownRef = useRef<HTMLDivElement>(null)
+  const rootRef = useRef<HTMLDivElement>(null)
+  const listboxIdRef = useRef(`drop-selector-${Math.random().toString(36).slice(2)}`)
+  const listboxId = listboxIdRef.current
 
+  // Close when clicking/touching outside — use pointerdown to cover mouse + touch.
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+    if (!isOpen) return
+
+    const handlePointerDownOutside = (event: PointerEvent) => {
+      const el = rootRef.current
+      if (!el) return
+      if (!el.contains(event.target as Node)) {
         setIsOpen(false)
       }
     }
 
-    if (isOpen) {
-      document.addEventListener('mousedown', handleClickOutside)
-    }
-
+    document.addEventListener('pointerdown', handlePointerDownOutside)
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside)
+      document.removeEventListener('pointerdown', handlePointerDownOutside)
     }
   }, [isOpen, setIsOpen])
-  const handleToggle = () => {
-    if (!disabled) {
-      setIsOpen(!isOpen)
+
+  // Close on Escape
+  useEffect(() => {
+    if (!isOpen) return
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsOpen(false)
     }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [isOpen, setIsOpen])
+
+  const handleToggle = () => {
+    if (!disabled) setIsOpen(!isOpen)
   }
 
   const handleSelect = (option: Option) => {
@@ -63,9 +76,12 @@ export function DropSelector({
   }
 
   return (
-    <div className="relative w-full" ref={dropdownRef}>
+    <div className="relative w-full" ref={rootRef}>
       <button
-        className="w-full p-3 text-lg font-semibold border-none rounded-none focus:ring-0 focus:outline-none text-left flex items-center justify-between bg-transparent disabled:bg-transparent disabled:cursor-not-allowed" /* Removed background and border */
+        aria-controls={isOpen ? listboxId : undefined}
+        aria-expanded={isOpen}
+        aria-haspopup="listbox"
+        className="w-full p-3 text-lg font-semibold border-none rounded-none focus:ring-0 focus:outline-none text-left flex items-center justify-between bg-transparent disabled:bg-transparent disabled:cursor-not-allowed"
         disabled={disabled}
         onClick={handleToggle}
         type="button"
@@ -74,13 +90,19 @@ export function DropSelector({
           {selectedOption
             ? (
                 <>
-                  {selectedOption.icon && !selectedOption.iconUrl && <span className="mr-3 flex-shrink-0">{selectedOption.icon}</span>}
-                  {' '}
-                  {/* Increased margin */}
-                  {selectedOption.iconUrl && <img alt="" className="w-8 h-8 mr-3 rounded-full flex-shrink-0" src={selectedOption.iconUrl} />}
-                  {' '}
-                  {/* Made 50% bigger total */}
-                  <span className="truncate font-semibold" style={{ color: textColor }}>{selectedOption.label}</span>
+                  {selectedOption.icon && !selectedOption.iconUrl && (
+                    <span className="mr-3 flex-shrink-0">{selectedOption.icon}</span>
+                  )}
+                  {selectedOption.iconUrl && (
+                    <img
+                      alt=""
+                      className="w-8 h-8 mr-3 rounded-full flex-shrink-0"
+                      src={selectedOption.iconUrl}
+                    />
+                  )}
+                  <span className="truncate font-semibold" style={{ color: textColor }}>
+                    {selectedOption.label}
+                  </span>
                 </>
               )
             : (
@@ -101,12 +123,16 @@ export function DropSelector({
                       ))}
                     </div>
                   )}
-                  <span className="text-lg font-semibold" style={{ color: textColor || '#9CA3AF' }}>{placeholder}</span>
+                  <span className="text-lg font-semibold" style={{ color: textColor || '#9CA3AF' }}>
+                    {placeholder}
+                  </span>
                 </>
               )}
         </span>
         <svg
-          className={`w-7 h-7 text-gray-500 transform transition-transform flex-shrink-0 ${isOpen ? 'rotate-180' : ''}`} /* Increased icon size */
+          aria-hidden="true"
+          className={`w-7 h-7 text-gray-500 transform transition-transform flex-shrink-0 ${isOpen ? 'rotate-180' : ''
+          }`}
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -117,22 +143,55 @@ export function DropSelector({
       </button>
 
       {isOpen && !disabled && (
-        <div className="absolute z-10 mt-2.5 inset-x-0 bg-white border border-gray-300 rounded-xl shadow-lg max-h-72 overflow-auto">
+        <div
+          aria-activedescendant={selectedOption ? `${listboxId}-${selectedOption.value}` : undefined}
+          className="absolute z-10 mt-2.5 inset-x-0 bg-white border border-gray-300 rounded-xl shadow-lg max-h-72 overflow-auto"
+          id={listboxId}
+          onClick={e => e.stopPropagation()}
+          // Prevent inside interactions from reaching the document listener
+          onPointerDown={e => e.stopPropagation()}
+          role="listbox"
+        >
           {options.length > 0
             ? (
-                options.map(option => (
-                  <div
-                    className={`flex items-center px-3 py-2 cursor-pointer hover:bg-gray-100 ${
-                      option.disabled ? 'opacity-50 cursor-not-allowed' : ''
-                    } ${selectedOption?.value === option.value ? 'bg-gray-200 font-semibold' : 'hover:bg-gray-50'}`}
-                    key={option.value}
-                    onClick={() => handleSelect(option)}
-                  >
-                    {option.icon && !option.iconUrl && <span className="mr-3 flex-shrink-0">{option.icon}</span>}
-                    {option.iconUrl && <img alt="" className="w-8 h-8 mr-3 rounded-full flex-shrink-0" src={option.iconUrl} />}
-                    <span className="text-gray-700 text-lg font-semibold truncate">{option.label}</span>
-                  </div>
-                ))
+                options.map((option) => {
+                  const isSelected = selectedOption?.value === option.value
+                  return (
+                    <div
+                      aria-disabled={option.disabled || undefined}
+                      aria-selected={isSelected}
+                      className={`flex items-center px-3 py-2 cursor-pointer ${option.disabled
+                        ? 'opacity-50 cursor-not-allowed'
+                        : isSelected
+                          ? 'bg-gray-200 font-semibold'
+                          : 'hover:bg-gray-50'
+                      }`}
+                      id={`${listboxId}-${option.value}`}
+                      key={option.value}
+                      // Select on pointerdown so it always wins the race with the outside listener
+                      onPointerDown={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        if (!option.disabled) handleSelect(option)
+                      }}
+                      role="option"
+                    >
+                      {option.icon && !option.iconUrl && (
+                        <span className="mr-3 flex-shrink-0">{option.icon}</span>
+                      )}
+                      {option.iconUrl && (
+                        <img
+                          alt=""
+                          className="w-8 h-8 mr-3 rounded-full flex-shrink-0"
+                          src={option.iconUrl}
+                        />
+                      )}
+                      <span className="text-gray-700 text-lg font-semibold truncate">
+                        {option.label}
+                      </span>
+                    </div>
+                  )
+                })
               )
             : (
                 <div className="px-3 py-2 text-gray-500 text-lg">No options available</div>
