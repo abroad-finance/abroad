@@ -5,6 +5,7 @@ import { Route, BrowserRouter as Router, Routes } from 'react-router-dom'
 import { tolgee } from './contexts/LanguageContext'
 import { WalletAuthProvider } from './contexts/WalletAuthContext'
 import { WebSocketProvider } from './contexts/WebSocketContext'
+import HiddenLogViewer from './shared/components/HiddenLogViewer'
 
 // Route-level code splitting
 const WebSwap = lazy(() => import('./pages/WebSwap/WebSwap'))
@@ -24,6 +25,7 @@ function App() {
             </Suspense>
           </Router>
         </WebSocketProvider>
+        <HiddenLogViewer />
       </WalletAuthProvider>
     </TolgeeProvider>
   )
