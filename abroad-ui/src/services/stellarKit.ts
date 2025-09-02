@@ -14,6 +14,8 @@ import {
   WalletConnectModule,
 } from '@creit.tech/stellar-wallets-kit/modules/walletconnect.module'
 
+import { WALLET_CONNECT_ID } from '../shared/constants'
+
 // Basic mobile detection (UA based) – sufficient for gating wallet options
 const isMobile = typeof window !== 'undefined' && /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
 
@@ -23,7 +25,7 @@ const walletConnectModule = new WalletConnectModule({
   method: WalletConnectAllowedMethods.SIGN,
   name: 'Abroad',
   network: WalletNetwork.PUBLIC,
-  projectId: '5686074a7981cd147a5f0d7434a6d4b7',
+  projectId: WALLET_CONNECT_ID,
   url: 'https://app.abroad.finance',
 })
 

@@ -22,7 +22,9 @@ import { SwapView } from '../../features/swap/types'
 import BackgroundCrossfade from '../../shared/components/BackgroundCrossfade'
 import LanguageSelector from '../../shared/components/LanguageSelector'
 import { ModalOverlay } from '../../shared/components/ModalOverlay'
+import { WALLET_CONNECT_ID } from '../../shared/constants'
 import { useLanguageSelector, useNavBarResponsive } from '../../shared/hooks'
+import { useLobstrAutoConnect } from '../../shared/hooks/useLobstrAutoConnect'
 
 export interface WebSwapControllerProps {
   closeQr: () => void
@@ -42,6 +44,10 @@ export interface WebSwapControllerProps {
 
 const WebSwap: React.FC = () => {
   const { address } = useWalletAuth()
+  useLobstrAutoConnect({
+    debug: true,
+    projectId: WALLET_CONNECT_ID,
+  })
 
   // State management
   const [view, setView] = useState<SwapView>('swap')
