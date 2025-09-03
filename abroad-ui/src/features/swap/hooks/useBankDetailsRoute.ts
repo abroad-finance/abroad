@@ -178,30 +178,30 @@ export const useBankDetailsRoute = ({
           }
         })
         .sort((a, b) => {
-          const getPriorityIndex = (label: string) => {
-            const labelUpper = label.toUpperCase();
-            return priorityBanks.findIndex(priority =>
-              labelUpper.includes(priority),
-            );
-          };
-
-          const aPriorityIndex = getPriorityIndex(a.label);
-          const bPriorityIndex = getPriorityIndex(b.label);
-
-          const aIsPriority = aPriorityIndex !== -1;
-          const bIsPriority = bPriorityIndex !== -1;
+          const aIsPriority = priorityBanks.some(priority =>
+            a.label.toUpperCase().includes(priority),
+          )
+          const bIsPriority = priorityBanks.some(priority =>
+            b.label.toUpperCase().includes(priority),
+          )
 
           // Both are priority - sort by priority order
           if (aIsPriority && bIsPriority) {
-            return aPriorityIndex - bPriorityIndex;
+            const aIndex = priorityBanks.findIndex(priority =>
+              a.label.toUpperCase().includes(priority),
+            )
+            const bIndex = priorityBanks.findIndex(priority =>
+              b.label.toUpperCase().includes(priority),
+            )
+            return aIndex - bIndex
           }
 
           // One is priority - priority comes first
-          if (aIsPriority && !bIsPriority) return -1;
-          if (!aIsPriority && bIsPriority) return 1;
+          if (aIsPriority && !bIsPriority) return -1
+          if (!aIsPriority && bIsPriority) return 1
 
           // Neither is priority - sort alphabetically
-          return a.label.localeCompare(b.label);
+          return a.label.localeCompare(b.label)
         })
     },
     [apiBanks],
