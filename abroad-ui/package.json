@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite --host",
     "build": "npm run generate:api && tsc -b && vite build",
-    "build:code": "vite build",
+    "build:code": "tsc -b && vite build",
     "lint": "eslint . --fix",
     "preview": "vite preview --host",
     "generate:api": "cd .. && npm i && npx prisma generate && npm run build && cd abroad-ui && orval --config orval.config.ts",
