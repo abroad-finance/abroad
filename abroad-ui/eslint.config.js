@@ -66,6 +66,9 @@ export default tseslint.config(
       '@stylistic/array-bracket-newline': ['error', { minItems: 3 }],
       'import/no-cycle': ['warn', { maxDepth: 1 }],
 
+      // Disallow non-null assertions ("!") to encourage safer type narrowing
+      '@typescript-eslint/no-non-null-assertion': 'error',
+
       '@typescript-eslint/switch-exhaustiveness-check': 'error',
     },
   },

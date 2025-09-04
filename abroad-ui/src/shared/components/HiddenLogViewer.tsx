@@ -74,7 +74,8 @@ export const HiddenLogViewer: React.FC = () => {
           level,
           time: Date.now(),
         }
-        const store = window.__appLogs!
+        if (!window.__appLogs) window.__appLogs = []
+        const store = window.__appLogs
         store.push(entry)
         if (store.length > MAX_LOGS) store.splice(0, store.length - MAX_LOGS)
         // Fire a custom event so listeners can update without tight coupling
