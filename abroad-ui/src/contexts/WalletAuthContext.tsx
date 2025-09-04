@@ -137,7 +137,13 @@ export const WalletAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       logout()
       return
     }
-    kit.setWallet(walletId)
+    try {
+      kit.setWallet(walletId)
+    }
+    catch (err) {
+      console.error('Failed to set wallet', err)
+      logout()
+    }
   }, [walletId, logout])
 
   useEffect(() => {
