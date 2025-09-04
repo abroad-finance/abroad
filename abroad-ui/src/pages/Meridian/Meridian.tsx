@@ -10,8 +10,8 @@ import MeridianCard from '../../assets/meridian-card.png'
 const walletOptions = [
   { name: 'abroad', onClick: () => { /* connect logic */ }, src: AbroadLogoWhite },
   { name: 'zypto', onClick: () => { /* connect logic */ }, src: ZyptoLogoWhite },
-  { name: 'beans', onClick: () => { /* connect logic */ }, src: BeansLogoWhite },
-  { name: 'lobstr', onClick: () => { /* connect logic */ }, src: LobstrLogoWhite },
+  { name: 'beans', onClick: () => window.open('https://www.beansapp.com/download', '_blank', 'noopener,noreferrer'), src: BeansLogoWhite },
+  { name: 'lobstr', onClick: () => window.open('https://lobstr.co/uni/wc/wc/', '_blank', 'noopener,noreferrer'), src: LobstrLogoWhite },
 ]
 
 const Meridian = () => {
