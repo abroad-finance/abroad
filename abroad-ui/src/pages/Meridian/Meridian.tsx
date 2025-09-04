@@ -43,7 +43,7 @@ const Meridian = () => {
 
         {/* foreground content (kept sharp) */}
         <div className="absolute top-3 left-3 text-white text-3xl drop-shadow z-10">
-          <span className="font-extralight">{t('merian_landing.pay_with', 'Pay with')}</span>
+          <span className="font-extralight">{t('merian_landing.paga_con', 'Paga con')}</span>
           <br />
           <div className="flex items-center space-x-2 font-semibold">
             <span>USDC</span>
@@ -57,17 +57,17 @@ const Meridian = () => {
           </div>
         </div>
         <div className="absolute bottom-3 right-3 text-3xl text-white font-extralight drop-shadow text-right whitespace-pre-line z-10">
-          {t('merian_landing.or_any_pix', 'On any Pix')}
+          {t('merian_landing.en_cualquier_pix', 'En cualquier Pix')}
           <br />
-          {t('merian_landing.qr_code', 'QR code')}
+          {t('merian_landing.codigo_qr', 'Código QR')}
         </div>
       </div>
 
       <div className="max-w-[400px] mr-auto mt-6 text-white text-xs font-extralight">
         <h2 className="text-left text-2xl font-extralight mb-3">
-          {t('merian_landing.please_follow', 'Please follow these')}
+          {t('merian_landing.por_favor_siga_estos', 'Por favor siga estos')}
           {' '}
-          <span className="text-[#F2CD00] font-semibold">{t('merian_landing.steps', 'steps')}</span>
+          <span className="text-[#F2CD00] font-semibold">{t('merian_landing.pasos', 'pasos')}</span>
         </h2>
         <ul className="space-y-2 text-left">
           <li className="flex items-center justify-start gap-3">
@@ -92,9 +92,9 @@ const Meridian = () => {
       {/* new subtitle before wallet buttons - same styles as the main h1, last word in yellow */}
       <div className="w-full my-4">
         <h1 className="text-center text-2xl font-extralight text-white">
-          {t('merian_landing.select_your_favourite_wallet', 'select your favourite wallet')}
+          {t('merian_landing.selecciona_billetera_mensaje', 'Selecciona tu billetera favorita')}
           {' '}
-          <span className="text-[#F2CD00] font-semibold">{t('merian_landing.to_continue', 'to continue')}</span>
+          <span className="text-[#F2CD00] font-semibold">{t('merian_landing.para_continuar', 'para continuar')}</span>
         </h1>
       </div>
 
