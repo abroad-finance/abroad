@@ -63,6 +63,7 @@ export class PixQrDecoder implements IPixQrDecoder {
         account: data.brCode.keyId,
         amount: data.amount.toFixed(2),
         currency: 'BRL',
+        name: data.name,
         taxId: data.taxId,
       }
     }

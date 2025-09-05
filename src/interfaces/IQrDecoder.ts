@@ -6,5 +6,6 @@ export interface PixDecoded {
   account?: string
   amount?: string
   currency?: string
-  taxId?: string
+  name?: string
+  taxId?: null | string
 }
