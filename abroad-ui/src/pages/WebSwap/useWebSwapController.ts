@@ -108,6 +108,7 @@ export const useWebSwapController = ({ setPixKey, setQuoteId, setSourceAmount, s
         alert(responseDecoder.data.reason)
         return
       }
+      console.log('QR Scanned', responseDecoder.data)
       const amount = responseDecoder.data?.decoded?.amount
       const pixKey = responseDecoder.data.decoded?.account
       const taxIdDecoded = responseDecoder.data.decoded?.taxId
@@ -121,6 +122,8 @@ export const useWebSwapController = ({ setPixKey, setQuoteId, setSourceAmount, s
       if (taxIdDecoded) {
         setTaxId(taxIdDecoded)
       }
+      // Redirect to the confirmation view so user can verify decoded data
+      setView('confirm-qr')
     }
     catch (e) {
       console.warn('Failed to decode PIX QR', e)
@@ -133,6 +136,7 @@ export const useWebSwapController = ({ setPixKey, setQuoteId, setSourceAmount, s
     handleAmountsChange,
     setPixKey,
     setTaxId,
+    setView,
   ])
 
   const isDesktop = useMemo(() => window.innerWidth >= 768, [])

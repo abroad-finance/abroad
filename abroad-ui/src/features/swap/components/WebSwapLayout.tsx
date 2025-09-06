@@ -17,6 +17,7 @@ export interface WebSwapLayoutProps {
 type WebSwapLayoutSlots = {
   slots: {
     bankDetails: React.JSX.Element
+    confirmQr: React.JSX.Element
     kycNeeded: React.JSX.Element
     swap: React.JSX.Element
     txStatus: React.JSX.Element
@@ -39,6 +40,8 @@ const WebSwapLayout: React.FC<WebSwapLayoutProps & WebSwapLayoutSlots> = ({
     switch (view) {
       case 'bankDetails':
         return slots.bankDetails
+      case 'confirm-qr':
+        return slots.confirmQr
       case 'kyc-needed':
         return slots.kycNeeded
       case 'swap':
@@ -50,6 +53,7 @@ const WebSwapLayout: React.FC<WebSwapLayoutProps & WebSwapLayoutSlots> = ({
     }
   }, [
     slots.bankDetails,
+    slots.confirmQr,
     slots.kycNeeded,
     slots.swap,
     slots.txStatus,

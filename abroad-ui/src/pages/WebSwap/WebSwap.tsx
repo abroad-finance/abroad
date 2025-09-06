@@ -8,6 +8,7 @@ import { Loader } from 'lucide-react'
 import { _36EnumsTargetCurrency as TargetCurrency } from '../../api/index'
 import { useWalletAuth } from '../../contexts/WalletAuthContext'
 import BankDetailsRoute from '../../features/swap/components/BankDetailsRoute'
+import ConfirmQr from '../../features/swap/components/ConfirmQr'
 import NavBarResponsive from '../../features/swap/components/NavBarResponsive'
 import Swap from '../../features/swap/components/Swap'
 import TxStatus from '../../features/swap/components/TxStatus'
@@ -149,6 +150,15 @@ const WebSwap: React.FC = () => {
         <WebSwapLayout
           slots={{
             bankDetails: <BankDetailsRoute {...bankDetailRoute} />,
+            confirmQr: (
+              <ConfirmQr
+                amount={targetAmount}
+                onConfirm={() => setView('bankDetails')}
+                onEdit={() => setView('swap')}
+                pixKey={pixKey}
+                taxId={taxId}
+              />
+            ),
             kycNeeded: <UserVerification onVerify={handleKycRedirect} />,
             swap: <Swap {...swap} />,
             txStatus: (
