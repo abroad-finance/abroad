@@ -119,7 +119,7 @@ export const useWebSwapController = ({ setPixKey, setQuoteId, setSourceAmount, s
       if (pixKey) {
         setPixKey(pixKey)
       }
-      if (taxIdDecoded) {
+      if (taxIdDecoded && !taxIdDecoded.includes('*')) {
         setTaxId(taxIdDecoded)
       }
       // Redirect to the confirmation view so user can verify decoded data

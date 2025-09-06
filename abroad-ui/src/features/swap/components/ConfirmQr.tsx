@@ -1,21 +1,24 @@
+import { useTranslate } from '@tolgee/react'
 import React from 'react'
 
 import { Button } from '../../../shared/components/Button'
 
 export interface ConfirmQrProps {
-  amount?: string
   onConfirm: () => void
   onEdit: () => void
   pixKey?: string
+  sourceAmount?: string
+  targetAmount?: string
   taxId?: string
 }
 
-const ConfirmQr: React.FC<ConfirmQrProps> = ({ amount, onConfirm, onEdit, pixKey, taxId }) => {
+const ConfirmQr: React.FC<ConfirmQrProps> = ({ onConfirm, onEdit, pixKey, sourceAmount, targetAmount, taxId }) => {
+  const { t } = useTranslate()
   return (
     <div className="flex-1 flex items-center justify-center w-full flex-col">
 
       <div className="w-[98%] max-w-md min-h-[60vh] h-auto bg-[#356E6A]/5 backdrop-blur-xl rounded-4xl p-4 md:p-6 flex flex-col items-center justify-around space-y-4 text-abroad-dark md:text-white">
-        <h2 className="text-2xl font-semibold mb-4">Confirm payment details</h2>
+        <h2 className="text-2xl font-semibold mb-4">{t('confirm_qr.title', 'Confirmar detalles del pago')}</h2>
 
         <div className="flex items-center gap-3 mb-4">
           <img
@@ -35,36 +38,41 @@ const ConfirmQr: React.FC<ConfirmQrProps> = ({ amount, onConfirm, onEdit, pixKey
 
         <div className="space-y-3 text-sm ">
           <div>
-            <div className="text-xl ">Amount</div>
-            <div className="text-2xl font-medium">{amount ?? '—'}</div>
+            <div className="text-xl ">{t('confirm_qr.amount', 'Cantidad')}</div>
+            <div className="text-2xl font-medium">{targetAmount ? `R$${targetAmount}` : '—'}</div>
           </div>
 
           <div>
-            <div className="text-xl ">PIX key</div>
-            <div className="text-2xl font-medium break-words">{pixKey ?? '—'}</div>
+            <div className="text-xl ">{t('confirm_qr.asset_usdc', 'USDC')}</div>
+            <div className="text-2xl font-medium">{sourceAmount ? `$${sourceAmount}` : '—'}</div>
           </div>
 
           <div>
-            <div className="text-xl ">Tax ID</div>
-            <div className="text-2xl font-medium">{taxId ?? '—'}</div>
+            <div className="text-xl ">{t('confirm_qr.pix_key', 'PIX key')}</div>
+            <div className="text-2xl font-medium break-words">{pixKey ? pixKey : '—'}</div>
+          </div>
+
+          <div>
+            <div className="text-xl ">{t('confirm_qr.tax_id', 'Tax ID')}</div>
+            <div className="text-2xl font-medium">{taxId ? taxId : '-'}</div>
           </div>
         </div>
 
       </div>
-      <div className="mt-6 flex gap-3 w-full">
+      <div className="mt-6 flex gap-3 w-full h-14">
         <button
-          className="flex-1 bg-transparent text-[#356E6A] md:text-white border border-[#356E6A] rounded-lg hover:!text-white"
+          className="flex-1 bg-transparent text-[#356E6A] md:text-white border border-[#356E6A] rounded-lg hover:!text-abroad-light"
           onClick={onEdit}
           type="button"
         >
-          Edit
+          {t('onfirm_qr.edit', 'Edit')}
         </button>
         <Button
           className="flex-1"
           onClick={onConfirm}
           type="button"
         >
-          Confirm
+          {t('confirm_qr.confirm', 'Confirm')}
         </Button>
       </div>
     </div>

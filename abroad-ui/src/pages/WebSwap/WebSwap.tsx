@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useCallback, useState } from 'react'
 import { lazy, Suspense } from 'react'
 
 import { useWebSwapController } from './useWebSwapController'
@@ -123,6 +123,25 @@ const WebSwap: React.FC = () => {
     targetCurrency,
   })
 
+  // handler when user select continue on confirmation after QR code scan
+
+  const handleOnConfirmQR = useCallback(() => {
+    if (!targetAmount || !sourceAmount) {
+      setView('swap')
+      return
+    }
+    if (!taxId) {
+      setView('bankDetails')
+      return
+    }
+    bankDetailRoute.onContinue()
+  }, [
+    bankDetailRoute,
+    sourceAmount,
+    targetAmount,
+    taxId,
+  ])
+
   return (
     <div className="w-screen min-h-screen md:h-screen md:overflow-hidden flex flex-col">
       {/* Desktop page background with crossfade (no white flash) */}
@@ -152,10 +171,11 @@ const WebSwap: React.FC = () => {
             bankDetails: <BankDetailsRoute {...bankDetailRoute} />,
             confirmQr: (
               <ConfirmQr
-                amount={targetAmount}
-                onConfirm={() => setView('bankDetails')}
+                onConfirm={handleOnConfirmQR}
                 onEdit={() => setView('swap')}
                 pixKey={pixKey}
+                sourceAmount={sourceAmount}
+                targetAmount={targetAmount}
                 taxId={taxId}
               />
             ),
