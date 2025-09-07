@@ -285,7 +285,7 @@ export const useBankDetailsRoute = ({
 
   const onTaxIdChange = useCallback(
     (value: string) => {
-      const input = value.replace(/[^\d]/g, '').slice(0, 11)
+      const input = value.replace(/[^\d]/g, '')
       setTaxId(input)
     },
     [setTaxId],
