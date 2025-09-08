@@ -165,6 +165,7 @@ const WebSwap: React.FC = () => {
             bankDetails: <BankDetailsRoute {...bankDetailRoute} />,
             confirmQr: (
               <ConfirmQr
+                onBack={handleBackToSwap}
                 onConfirm={handleOnConfirmQR}
                 onEdit={() => setView('swap')}
                 pixKey={pixKey}
