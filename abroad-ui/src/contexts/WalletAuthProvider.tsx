@@ -13,6 +13,12 @@ export const WalletAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     walletAuth: walletAuthentication,
   })
   const kit = useMemo(() => {
+    const searchParams = new URLSearchParams(window.location.search)
+    if (searchParams.get('token')) {
+      // If there's a token in the URL, force using sep24 wallet to handle it.
+      return walletFactory.getWalletHandler('sep24')
+    }
+
     const walletType = getWalletTypeByDevice()
     return walletFactory.getWalletHandler(walletType)
   }, [walletFactory])
@@ -26,9 +32,6 @@ export const WalletAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       localStorage.removeItem('kycUrl')
     }
   }, [])
-
-  // at mount check the url params for token
-  // TODO: implement wallet handler for sep24
 
   return (
     <WalletAuthContext.Provider value={{ kit, kycUrl, setKycUrl, walletAuthentication }}>

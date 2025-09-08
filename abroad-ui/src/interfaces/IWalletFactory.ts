@@ -4,4 +4,4 @@ export interface IWalletFactory {
   getWalletHandler: (walletType: WalletType) => IWallet
 }
 
-export type WalletType = 'stellar-kit' | 'wallet-connect'
+export type WalletType = 'sep24' | 'stellar-kit' | 'wallet-connect'

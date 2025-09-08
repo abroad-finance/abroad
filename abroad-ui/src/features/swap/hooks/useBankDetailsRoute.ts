@@ -366,7 +366,7 @@ export const useBankDetailsRoute = ({
       localStorage.removeItem(PENDING_TX_KEY)
 
       // 3) If no wallet connected, finalize SEP flow via redirect
-      if (!kit?.walletId) {
+      if (kit?.walletId === 'sep24') {
         const queryParams = new URLSearchParams(window.location.search)
         const callbackUrl = queryParams.get('callback')
         const sepTransactionId = queryParams.get('transaction_id')
@@ -388,7 +388,7 @@ export const useBankDetailsRoute = ({
 
       // 4) Build payment XDR
       const paymentAsset = new Asset(asset_code, asset_issuer)
-      if (!kit.address) {
+      if (!kit?.address) {
         throw new Error('Wallet address is not available.')
       }
       const unsignedXdr = await buildPaymentXdr({
