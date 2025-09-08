@@ -42,7 +42,7 @@ export interface WebSwapControllerProps {
 }
 
 const WebSwap: React.FC = () => {
-  const { address } = useWalletAuth()
+  const { kit } = useWalletAuth()
 
   // State management
   const [view, setView] = useState<SwapView>('swap')
@@ -101,7 +101,7 @@ const WebSwap: React.FC = () => {
     targetAmount,
     targetCurrency,
     taxId,
-    userId: address,
+    userId: kit?.address || null,
   })
   const swap = useSwap({
     isDesktop,

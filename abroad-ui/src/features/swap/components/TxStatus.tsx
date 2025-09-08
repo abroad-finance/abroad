@@ -18,7 +18,7 @@ type UiStatus = 'accepted' | 'denied' | 'inProgress'
 
 export default function TxStatus({ onNewTransaction, onRetry, transactionId }: TxStatusProps): React.JSX.Element {
   const { t } = useTranslate()
-  const { address } = useWalletAuth()
+  const { kit } = useWalletAuth()
   const { off, on } = useWebSocket()
   const [status, setStatus] = useState<UiStatus>('inProgress')
   const [error, setError] = useState<null | string>(null)
@@ -41,7 +41,7 @@ export default function TxStatus({ onNewTransaction, onRetry, transactionId }: T
 
   // Subscribe to websocket notifications for this user/transaction
   useEffect(() => {
-    if (!transactionId || !address) return
+    if (!transactionId || !kit?.address) return
     setError(null)
 
     const onEvent = (payload: unknown) => {
@@ -66,10 +66,10 @@ export default function TxStatus({ onNewTransaction, onRetry, transactionId }: T
       off('transaction.updated', onEvent)
     }
   }, [
-    address,
     transactionId,
     on,
     off,
+    kit?.address,
   ])
 
   const renderIcon = () => {

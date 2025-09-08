@@ -114,14 +114,13 @@ export function useNavBarResponsive({
   onWalletDetails,
   usdcIssuer = DEFAULT_USDC_ISSUER,
 }: UseNavBarResponsiveArgs = {}): UseNavBarResponsiveResult {
-  const { address, authenticateWithWallet, walletId } = useWalletAuth()
+  const { authenticateWithWallet, kit } = useWalletAuth()
   const { off, on } = useWebSocket()
   const { t } = useTranslate()
-  const { balance, loading: balanceLoading, refetch } = useUSDCBalance(address, horizonUrl, usdcIssuer)
+  const { balance, loading: balanceLoading, refetch } = useUSDCBalance(kit?.address, horizonUrl, usdcIssuer)
 
   // Refresh balance when a transaction event arrives for this user
   useEffect(() => {
-    if (!address) return
     const refresh = () => {
       void refetch()
     }
@@ -132,7 +131,6 @@ export function useNavBarResponsive({
       off('transaction.updated', refresh)
     }
   }, [
-    address,
     on,
     off,
     refetch,
@@ -147,16 +145,16 @@ export function useNavBarResponsive({
   }, [onWalletConnect, authenticateWithWallet])
 
   const onWalletClick = useCallback(() => {
-    if (address) onWalletDetails?.()
+    if (kit?.address) onWalletDetails?.()
     else handleDirectWalletConnect()
   }, [
-    address,
+    kit?.address,
     onWalletDetails,
     handleDirectWalletConnect,
   ])
 
   const walletInfo = useMemo(() => {
-    const kind = normalizeWalletKind(walletId)
+    const kind = normalizeWalletKind(kit?.walletId)
     const map: Record<string, { icon?: string, name: string }> = {
       freighter: { name: 'Freighter' },
       hana: { name: 'Hana' },
@@ -167,7 +165,7 @@ export function useNavBarResponsive({
       xbull: { name: 'xBull' },
     }
     return map[kind] || map.unknown
-  }, [walletId])
+  }, [kit?.walletId])
 
   const labels = useMemo(() => ({
     connectWallet: t('navbar.connect_wallet', 'Conectar Billetera'),
@@ -178,7 +176,7 @@ export function useNavBarResponsive({
   }), [t])
 
   return {
-    address,
+    address: kit?.address || null,
     balance,
     balanceLoading,
     infoUrl,

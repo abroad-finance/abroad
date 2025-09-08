@@ -23,7 +23,6 @@ import {
   _36EnumsTargetCurrency as TargetCurrency,
 } from '../../../api'
 import { useWalletAuth } from '../../../shared/hooks/useWalletAuth'
-import { useWalletKit } from '../../../shared/hooks/useWalletKit'
 import { hasMessage } from '../../../shared/utils'
 import { BANK_CONFIG } from '../constants'
 
@@ -79,8 +78,7 @@ export const useBankDetailsRoute = ({
 }: UseBankDetailsRouteArgs): BankDetailsRouteProps => {
   const textColor = isDesktop ? 'white' : '#356E6A'
   const { t } = useTranslate()
-  const { address, setKycUrl, token, walletId } = useWalletAuth()
-  const { kit } = useWalletKit()
+  const { kit, setKycUrl, token } = useWalletAuth()
 
   // ------------------------------- STATE -----------------------------------
   const [accountNumber, setAccountNumber] = useState('')
@@ -368,7 +366,7 @@ export const useBankDetailsRoute = ({
       localStorage.removeItem(PENDING_TX_KEY)
 
       // 3) If no wallet connected, finalize SEP flow via redirect
-      if (!walletId) {
+      if (!kit?.walletId) {
         const queryParams = new URLSearchParams(window.location.search)
         const callbackUrl = queryParams.get('callback')
         const sepTransactionId = queryParams.get('transaction_id')
@@ -390,7 +388,7 @@ export const useBankDetailsRoute = ({
 
       // 4) Build payment XDR
       const paymentAsset = new Asset(asset_code, asset_issuer)
-      if (!address) {
+      if (!kit.address) {
         throw new Error('Wallet address is not available.')
       }
       const unsignedXdr = await buildPaymentXdr({
@@ -398,7 +396,7 @@ export const useBankDetailsRoute = ({
         asset: paymentAsset,
         destination: stellar_account,
         memoValue: transaction_reference ?? '',
-        source: address,
+        source: kit.address,
       })
 
       // 5) Sign via wallet
@@ -432,8 +430,6 @@ export const useBankDetailsRoute = ({
     accountNumber,
     bankCode,
     taxId,
-    walletId,
-    address,
     buildPaymentXdr,
     sourceAmount,
     setView,

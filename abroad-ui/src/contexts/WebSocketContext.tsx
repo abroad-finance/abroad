@@ -35,7 +35,7 @@ function resolveWsUrl(): string {
 }
 
 export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { address } = useWalletAuth()
+  const { kit } = useWalletAuth()
   const socketRef = useRef<null | Socket>(null)
   const [connected, setConnected] = useState(false)
   const [error, setError] = useState<null | string>(null)
@@ -50,7 +50,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   useEffect(() => {
     // No address → no connection
-    if (!address) {
+    if (!kit?.address) {
       setConnected(false)
       setError(null)
       socketRef.current?.disconnect()
@@ -58,7 +58,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       return
     }
     const url = resolveWsUrl()
-    const socket = io(url, { auth: { userId: address }, transports: ['websocket'] })
+    const socket = io(url, { auth: { userId: kit?.address }, transports: ['websocket'] })
     socketRef.current = socket
 
     const onConnect = () => {
@@ -84,7 +84,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       socketRef.current = null
       setConnected(false)
     }
-  }, [address, attachAll])
+  }, [attachAll, kit?.address])
 
   const on = useCallback((event: string, handler: Listener) => {
     // Track desired listener

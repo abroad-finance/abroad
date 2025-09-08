@@ -20,7 +20,7 @@ type Transaction = PaginatedTransactionListTransactionsItem
 export function useWalletDetails(params: Params = {}): WalletDetailsProps {
   const { onClose } = params
   const { t } = useTranslate()
-  const { address, logout, token } = useWalletAuth()
+  const { kit, token } = useWalletAuth()
 
   const [copiedAddress, setCopiedAddress] = useState(false)
   const [usdcBalance, setUsdcBalance] = useState<string>('0.00')
@@ -73,12 +73,12 @@ export function useWalletDetails(params: Params = {}): WalletDetailsProps {
     try {
       setIsLoadingTransactions(true)
       setTransactionError(null)
-      if (!address) {
+      if (!kit?.address) {
         setTransactionError(t('wallet_details.error.no_address', 'No wallet address connected'))
         return
       }
       const response = await listPartnerTransactions(
-        { externalUserId: address, page: 1, pageSize: 10 },
+        { externalUserId: kit.address, page: 1, pageSize: 10 },
         { headers: { Authorization: `Bearer ${token}` } },
       )
       if (response.status === 200) setTransactions(response.data.transactions)
@@ -90,16 +90,16 @@ export function useWalletDetails(params: Params = {}): WalletDetailsProps {
     finally { setIsLoadingTransactions(false) }
   }, [
     token,
-    address,
     t,
+    kit?.address,
   ])
 
   // Effects
   useEffect(() => {
-    if (address) fetchUSDCBalanceWithLoading(address)
+    if (kit?.address) fetchUSDCBalanceWithLoading(kit.address)
     if (token) fetchTransactions()
   }, [
-    address,
+    kit?.address,
     token,
     fetchUSDCBalanceWithLoading,
     fetchTransactions,
@@ -107,13 +107,14 @@ export function useWalletDetails(params: Params = {}): WalletDetailsProps {
 
   // Subscribe to websocket notifications to refresh transactions and balance
   useEffect(() => {
-    if (!address || !token) return
+    if (!kit?.address || !token) return
 
     const refresh = async () => {
+      if (!kit?.address) return
       try {
         // Optimistically refresh in background, keep UI responsive
         fetchTransactions()
-        fetchUSDCBalanceWithLoading(address)
+        fetchUSDCBalanceWithLoading(kit.address)
       }
       catch { /* no-op */ }
     }
@@ -129,7 +130,7 @@ export function useWalletDetails(params: Params = {}): WalletDetailsProps {
       off('transaction.updated', refresh)
     }
   }, [
-    address,
+    kit?.address,
     token,
     fetchTransactions,
     fetchUSDCBalanceWithLoading,
@@ -139,9 +140,9 @@ export function useWalletDetails(params: Params = {}): WalletDetailsProps {
 
   // Handlers exposed to component
   const onRefreshBalance = useCallback(() => {
-    if (address && !isLoadingBalance) fetchUSDCBalanceWithLoading(address)
+    if (kit?.address && !isLoadingBalance) fetchUSDCBalanceWithLoading(kit.address)
   }, [
-    address,
+    kit?.address,
     isLoadingBalance,
     fetchUSDCBalanceWithLoading,
   ])
@@ -156,22 +157,22 @@ export function useWalletDetails(params: Params = {}): WalletDetailsProps {
 
   const onCopyAddress = useCallback(async () => {
     try {
-      if (address) {
-        await navigator.clipboard.writeText(address)
+      if (kit?.address) {
+        await navigator.clipboard.writeText(kit.address)
         setCopiedAddress(true)
         setTimeout(() => setCopiedAddress(false), 2000)
       }
     }
     catch { /* swallow */ }
-  }, [address])
+  }, [kit?.address])
 
   const onDisconnectWallet = useCallback(async () => {
     try {
-      await logout()
+      await kit?.disconnect()
       onClose?.()
     }
     catch { /* swallow */ }
-  }, [logout, onClose])
+  }, [kit, onClose])
 
   const getStatusStyle = useCallback((status: string) => {
     switch (status) {
@@ -201,7 +202,7 @@ export function useWalletDetails(params: Params = {}): WalletDetailsProps {
   }, [])
 
   return {
-    address,
+    address: kit?.address || null,
     copiedAddress,
     formatDate,
     getStatusStyle,
