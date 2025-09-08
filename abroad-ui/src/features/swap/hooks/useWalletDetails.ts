@@ -3,8 +3,8 @@ import { useTranslate } from '@tolgee/react'
 import { useCallback, useEffect, useState } from 'react'
 
 import { listPartnerTransactions, PaginatedTransactionListTransactionsItem } from '../../../api'
-import { useWalletAuth } from '../../../contexts/WalletAuthContext'
 import { useWebSocket } from '../../../contexts/WebSocketContext'
+import { useWalletAuth } from '../../../shared/hooks/useWalletAuth'
 import { WalletDetailsProps } from '../components/WalletDetails'
 
 // Stellar network configuration

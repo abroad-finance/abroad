@@ -23,6 +23,7 @@
     "@yudiel/react-qr-scanner": "^2.3.1",
     "axios": "^1.11.0",
     "framer-motion": "^12.23.12",
+    "inversify": "^7.9.1",
     "lottie-web": "^5.13.0",
     "lucide-react": "^0.539.0",
     "react": "^19.1.1",

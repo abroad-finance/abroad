@@ -2,10 +2,10 @@ import { useTranslate } from '@tolgee/react'
 import React, { useEffect, useState } from 'react'
 
 import { TransactionStatus as ApiStatus } from '../../../api'
-import { useWalletAuth } from '../../../contexts/WalletAuthContext'
 import { useWebSocket } from '../../../contexts/WebSocketContext'
 import { Button } from '../../../shared/components/Button'
 import { IconAnimated } from '../../../shared/components/IconAnimated'
+import { useWalletAuth } from '../../../shared/hooks/useWalletAuth'
 
 interface TxStatusProps {
   onNewTransaction: () => void

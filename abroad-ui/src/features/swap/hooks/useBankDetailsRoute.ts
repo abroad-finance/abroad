@@ -1,4 +1,3 @@
-import { WalletNetwork } from '@creit.tech/stellar-wallets-kit'
 import {
   Asset,
   BASE_FEE,
@@ -23,9 +22,9 @@ import {
   getBanksResponse200,
   _36EnumsTargetCurrency as TargetCurrency,
 } from '../../../api'
-import { useWalletAuth } from '../../../contexts/WalletAuthContext'
-import { kit } from '../../../services/stellarKit'
-import { hasMessage } from '../../../utils'
+import { useWalletAuth } from '../../../shared/hooks/useWalletAuth'
+import { useWalletKit } from '../../../shared/hooks/useWalletKit'
+import { hasMessage } from '../../../shared/utils'
 import { BANK_CONFIG } from '../constants'
 
 type UseBankDetailsRouteArgs = {
@@ -81,6 +80,7 @@ export const useBankDetailsRoute = ({
   const textColor = isDesktop ? 'white' : '#356E6A'
   const { t } = useTranslate()
   const { address, setKycUrl, token, walletId } = useWalletAuth()
+  const { kit } = useWalletKit()
 
   // ------------------------------- STATE -----------------------------------
   const [accountNumber, setAccountNumber] = useState('')
@@ -403,10 +403,7 @@ export const useBankDetailsRoute = ({
 
       // 5) Sign via wallet
       setView('wait-sign')
-      const { signedTxXdr } = await kit.signTransaction(unsignedXdr, {
-        address: walletId,
-        networkPassphrase: WalletNetwork.PUBLIC,
-      })
+      const { signedTxXdr } = await kit.signTransaction({ message: unsignedXdr })
 
       // Show TxStatus UI right after signing
       setTransactionId(acceptedTxId || null)
@@ -435,16 +432,17 @@ export const useBankDetailsRoute = ({
     accountNumber,
     bankCode,
     taxId,
-    selectedBank,
-    sourceAmount,
-    targetAmount,
-    setKycUrl,
-    setTransactionId,
-    setView,
     walletId,
     address,
-    onRedirectToHome,
     buildPaymentXdr,
+    sourceAmount,
+    setView,
+    kit,
+    setTransactionId,
+    selectedBank,
+    targetAmount,
+    setKycUrl,
+    onRedirectToHome,
   ])
 
   // --------------------------- RETURN (props for stateless view) --------------

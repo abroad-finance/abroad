@@ -4,17 +4,16 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import type { NavBarResponsiveProps } from '../../features/swap/components/NavBarResponsive'
 
-import { useWalletAuth } from '../../contexts/WalletAuthContext'
 import { useWebSocket } from '../../contexts/WebSocketContext'
-import { kit } from '../../services/stellarKit'
+import { useWalletAuth } from './useWalletAuth'
 
 const DEFAULT_HORIZON_URL = 'https://horizon.stellar.org'
 const DEFAULT_USDC_ISSUER = 'GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN'
 const DEFAULT_INFO_URL = 'https://linktr.ee/Abroad.finance'
 
 type BalanceLine
-    = | { asset_code: string, asset_issuer: string, asset_type: string, balance: string }
-      | { asset_type: 'native', balance: string }
+  = | { asset_code: string, asset_issuer: string, asset_type: string, balance: string }
+    | { asset_type: 'native', balance: string }
 
 interface FetchBalanceOpts { address: string, horizonUrl: string, usdcIssuer: string }
 
@@ -139,12 +138,10 @@ export function useNavBarResponsive({
     refetch,
   ])
 
-  const handleDirectWalletConnect = useCallback(() => {
+  const handleDirectWalletConnect = useCallback(async () => {
     if (onWalletConnect) return onWalletConnect()
     try {
-      kit?.openModal?.({
-        onWalletSelected: async (option: { id: string }) => { await authenticateWithWallet(option.id) },
-      })
+      await authenticateWithWallet()
     }
     catch { /* noop */ }
   }, [onWalletConnect, authenticateWithWallet])

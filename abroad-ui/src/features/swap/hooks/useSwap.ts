@@ -12,9 +12,8 @@ import {
   _36EnumsPaymentMethod as PaymentMethod,
   _36EnumsTargetCurrency as TargetCurrency,
 } from '../../../api'
-import { useWalletAuth } from '../../../contexts/WalletAuthContext'
-import { kit } from '../../../services/stellarKit'
 import { useDebounce } from '../../../shared/hooks'
+import { useWalletAuth } from '../../../shared/hooks/useWalletAuth'
 
 type UseSwapArgs = {
   isDesktop: boolean
@@ -241,14 +240,10 @@ export const useSwap = ({
     [setTargetCurrency],
   )
 
-  const onPrimaryAction = useCallback(() => {
+  const onPrimaryAction = useCallback(async () => {
     if (!isAuthenticated) {
       // Connect wallet
-      kit.openModal({
-        onWalletSelected: async (option) => {
-          await authenticateWithWallet(option.id)
-        },
-      })
+      await authenticateWithWallet()
       return
     }
     if (!quoteId) {

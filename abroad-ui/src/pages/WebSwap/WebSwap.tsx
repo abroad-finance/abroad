@@ -6,7 +6,6 @@ const QrScannerFullScreen = lazy(() => import('../../features/swap/components/Qr
 import { Loader } from 'lucide-react'
 
 import { _36EnumsTargetCurrency as TargetCurrency } from '../../api/index'
-import { useWalletAuth } from '../../contexts/WalletAuthContext'
 import BankDetailsRoute from '../../features/swap/components/BankDetailsRoute'
 import ConfirmQr from '../../features/swap/components/ConfirmQr'
 import NavBarResponsive from '../../features/swap/components/NavBarResponsive'
@@ -23,9 +22,8 @@ import { SwapView } from '../../features/swap/types'
 import BackgroundCrossfade from '../../shared/components/BackgroundCrossfade'
 import LanguageSelector from '../../shared/components/LanguageSelector'
 import { ModalOverlay } from '../../shared/components/ModalOverlay'
-import { WALLET_CONNECT_ID } from '../../shared/constants'
 import { useLanguageSelector, useNavBarResponsive } from '../../shared/hooks'
-import { useLobstrAutoConnect } from '../../shared/hooks/useLobstrAutoConnect'
+import { useWalletAuth } from '../../shared/hooks/useWalletAuth'
 
 export interface WebSwapControllerProps {
   closeQr: () => void
@@ -45,10 +43,6 @@ export interface WebSwapControllerProps {
 
 const WebSwap: React.FC = () => {
   const { address } = useWalletAuth()
-  useLobstrAutoConnect({
-    debug: true,
-    projectId: WALLET_CONNECT_ID,
-  })
 
   // State management
   const [view, setView] = useState<SwapView>('swap')

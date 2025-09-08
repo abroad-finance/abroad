@@ -3,7 +3,7 @@ import { lazy, Suspense } from 'react'
 import { Route, BrowserRouter as Router, Routes } from 'react-router-dom'
 
 import { tolgee } from './contexts/LanguageContext'
-import { WalletAuthProvider } from './contexts/WalletAuthContext'
+import { WalletAuthProvider } from './contexts/WalletAuthProvider'
 import { WebSocketProvider } from './contexts/WebSocketContext'
 import HiddenLogViewer from './shared/components/HiddenLogViewer'
 
