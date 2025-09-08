@@ -23,7 +23,7 @@ type UseWebSwapControllerProps = {
 export const useWebSwapController = ({ setPixKey, setQuoteId, setSourceAmount, setTargetAmount, setTargetCurrency, setTaxId, setTransactionId, setView, targetCurrency }: UseWebSwapControllerProps): WebSwapControllerProps => {
   // Modal visibility state
   const [isWalletDetailsOpen, setIsWalletDetailsOpen] = useState(false)
-  const { kycUrl, token } = useWalletAuth()
+  const { kycUrl, walletAuthentication } = useWalletAuth()
 
   // QR scanner state and URL param handling
   const [isQrOpen, setIsQrOpen] = useState(false)
@@ -42,7 +42,7 @@ export const useWebSwapController = ({ setPixKey, setQuoteId, setSourceAmount, s
   // Restore state if user returns from KYC
   useEffect(() => {
     const stored = localStorage.getItem(PENDING_TX_KEY)
-    if (stored && token) {
+    if (stored && walletAuthentication?.jwtToken) {
       try {
         const parsed = JSON.parse(stored)
         setQuoteId(parsed.quote_id)
@@ -61,7 +61,7 @@ export const useWebSwapController = ({ setPixKey, setQuoteId, setSourceAmount, s
     setTargetAmount,
     setTargetCurrency,
     setView,
-    token,
+    walletAuthentication?.jwtToken,
   ])
 
   const handleWalletDetailsOpen = useCallback(() => setIsWalletDetailsOpen(true), [])

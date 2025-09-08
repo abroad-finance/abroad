@@ -1,18 +1,16 @@
 import { createContext } from 'react'
 
 import { IWallet } from '../interfaces/IWallet'
+import { IWalletAuthentication } from '../interfaces/IWalletAuthentication'
 
 interface WalletAuthState {
-  authenticateWithWallet: () => Promise<void>
   kit?: IWallet
   kycUrl: null | string
   setKycUrl: (url: string) => void
-  token: null | string
+  walletAuthentication?: IWalletAuthentication
 }
 
 export const WalletAuthContext = createContext<WalletAuthState>({
-  authenticateWithWallet: async () => { },
   kycUrl: null,
   setKycUrl: () => { },
-  token: null,
 })

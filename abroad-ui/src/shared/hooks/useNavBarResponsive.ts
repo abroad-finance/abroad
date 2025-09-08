@@ -114,7 +114,7 @@ export function useNavBarResponsive({
   onWalletDetails,
   usdcIssuer = DEFAULT_USDC_ISSUER,
 }: UseNavBarResponsiveArgs = {}): UseNavBarResponsiveResult {
-  const { authenticateWithWallet, kit } = useWalletAuth()
+  const { kit } = useWalletAuth()
   const { off, on } = useWebSocket()
   const { t } = useTranslate()
   const { balance, loading: balanceLoading, refetch } = useUSDCBalance(kit?.address, horizonUrl, usdcIssuer)
@@ -139,10 +139,10 @@ export function useNavBarResponsive({
   const handleDirectWalletConnect = useCallback(async () => {
     if (onWalletConnect) return onWalletConnect()
     try {
-      await authenticateWithWallet()
+      await kit?.connect()
     }
     catch { /* noop */ }
-  }, [onWalletConnect, authenticateWithWallet])
+  }, [onWalletConnect, kit])
 
   const onWalletClick = useCallback(() => {
     if (kit?.address) onWalletDetails?.()

@@ -1,6 +1,7 @@
 export interface IWallet {
   readonly address: null | string
-  connect(): Promise<{ authToken: string }>
+
+  connect(): Promise<void>
 
   disconnect(): Promise<void>
 

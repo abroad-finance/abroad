@@ -42,6 +42,7 @@ export function useWalletConnectWallet({ walletAuth }: {
   const clientRef = useRef<null | SignClient>(null)
   const topicRef = useRef<string | undefined>(undefined)
   const modalRef = useRef<null | WalletConnectModal>(null)
+
   const [address, setAddress] = useState<null | string>(null)
 
   const ensureModal = useCallback(() => {
@@ -149,8 +150,7 @@ export function useWalletConnectWallet({ walletAuth }: {
     const { message } = await walletAuth.getChallengeMessage({ address })
     const { signedTxXdr } = await signTransaction({ message })
     const { token } = await walletAuth.getAuthToken({ address, signedMessage: signedTxXdr })
-
-    return { authToken: token }
+    walletAuth.setJwtToken(token)
   }, [
     ensureClient,
     ensureModal,
@@ -172,7 +172,8 @@ export function useWalletConnectWallet({ walletAuth }: {
       }
     }
     setAddress(null)
-  }, [ensureClient])
+    walletAuth.setJwtToken(null)
+  }, [ensureClient, walletAuth])
 
   return {
     address,

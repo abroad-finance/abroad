@@ -12,7 +12,7 @@ import {
   _36EnumsPaymentMethod as PaymentMethod,
   _36EnumsTargetCurrency as TargetCurrency,
 } from '../../../api'
-import { useDebounce } from '../../../shared/hooks'
+// ⛔️ Removed: import { useDebounce } from '../../../shared/hooks'
 import { useWalletAuth } from '../../../shared/hooks/useWalletAuth'
 
 type UseSwapArgs = {
@@ -47,7 +47,7 @@ export const useSwap = ({
 }: UseSwapArgs): SwapProps => {
   const textColor = isDesktop ? 'white' : '#356E6A'
   const { t } = useTranslate()
-  const { authenticateWithWallet, token } = useWalletAuth()
+  const { kit, walletAuthentication } = useWalletAuth()
 
   // Derived by currency
   const targetLocale = targetCurrency === TargetCurrency.BRL ? 'pt-BR' : 'es-CO'
@@ -58,8 +58,8 @@ export const useSwap = ({
     = targetCurrency === TargetCurrency.BRL ? BRL_TRANSFER_FEE : COP_TRANSFER_FEE
 
   // Local UI state
-  const [loadingSource, setLoadingSource] = useState(false)
-  const [loadingTarget, setLoadingTarget] = useState(false)
+  const [loadingSource, setLoadingSource] = useState(false) // typing in target field -> fetching source
+  const [loadingTarget, setLoadingTarget] = useState(false) // typing in source field -> fetching target
   const [displayedTRM, setDisplayedTRM] = useState(0.0)
 
   const [currencyMenuOpen, setCurrencyMenuOpen] = useState(false)
@@ -67,12 +67,17 @@ export const useSwap = ({
   // Prevent immediate close from the same click that opens the menu
   const skipNextDocumentClickRef = useRef(false)
 
-  // which input triggered the fetch: true=source, false=target
-  const triggerRef = useRef<boolean | null>(null)
+  // Request-cancellation + stale-response protection --------------------------
+  // Track which side the user edited last (to avoid cross-updates)
+  const lastEditedRef = useRef<'source' | 'target' | null>(null)
 
-  // Debounced inputs
-  const sourceDebouncedAmount = useDebounce(sourceAmount, 1500)
-  const targetDebounceAmount = useDebounce(targetAmount, 1500)
+  // Separate controllers for each direction
+  const directAbortRef = useRef<AbortController | null>(null) // source -> target (getReverseQuote)
+  const reverseAbortRef = useRef<AbortController | null>(null) // target -> source (getQuote)
+
+  // Incrementing ids so only the latest request can update state
+  const directReqIdRef = useRef(0)
+  const reverseReqIdRef = useRef(0)
 
   // Helpers
   const formatTargetNumber = useCallback(
@@ -84,7 +89,7 @@ export const useSwap = ({
     [targetLocale],
   )
 
-  const isAuthenticated = !!token
+  const isAuthenticated = Boolean(walletAuthentication?.jwtToken)
 
   const isButtonDisabled = useCallback(() => {
     const numericSource = parseFloat(String(sourceAmount))
@@ -122,33 +127,61 @@ export const useSwap = ({
 
   // API calls -----------------------------------------------------------------
 
+  // SOURCE → TARGET (user edits source; we compute target)
   const fetchDirectConversion = useCallback(
     async (value: string) => {
+      // Cancel any in-flight SOURCE→TARGET request; also cancel the opposite to avoid cross-updates.
+      directAbortRef.current?.abort()
+      reverseAbortRef.current?.abort()
+
+      const controller = new AbortController()
+      directAbortRef.current = controller
+      const reqId = ++directReqIdRef.current
+
       const num = parseFloat(value)
       if (isNaN(num)) {
+        // Clear target if input is not a number
         setTargetAmount('')
         return
       }
+
       setLoadingTarget(true)
       try {
-        const response = await getReverseQuote({
-          crypto_currency: CryptoCurrency.USDC,
-          network: BlockchainNetwork.STELLAR,
-          payment_method: targetPaymentMethod,
-          source_amount: num,
-          target_currency: targetCurrency,
-        })
+        // NOTE: We pass an AbortSignal as a 2nd arg; ensure your API helper forwards it to fetch/axios.
+        const response = await (getReverseQuote)(
+          {
+            crypto_currency: CryptoCurrency.USDC,
+            network: BlockchainNetwork.STELLAR,
+            payment_method: targetPaymentMethod,
+            source_amount: num,
+            target_currency: targetCurrency,
+          },
+          { signal: controller.signal },
+        )
+
+        // If this request is no longer the latest, or user switched fields, ignore.
+        if (controller.signal.aborted || reqId !== directReqIdRef.current || lastEditedRef.current !== 'source') return
+
         if (response.status === 200) {
           const formatted = formatTargetNumber(response.data.value)
           setQuoteId(response.data.quote_id)
           setTargetAmount(formatted)
         }
       }
-      catch (error) {
+      catch (error: unknown) {
+        if (
+          (error as Error)?.name === 'AbortError'
+          || (error as { code?: string })?.code === 'ERR_CANCELED'
+          || (error as { message?: string })?.message === 'canceled'
+        ) {
+          return
+        }
         console.error('Reverse quote error', error)
       }
       finally {
-        setLoadingTarget(false)
+        if (reqId === directReqIdRef.current && lastEditedRef.current === 'source') {
+          setLoadingTarget(false)
+        }
       }
     },
     [
@@ -160,8 +193,17 @@ export const useSwap = ({
     ],
   )
 
+  // TARGET → SOURCE (user edits target; we compute source)
   const fetchReverseConversion = useCallback(
     async (value: string) => {
+      // Cancel any in-flight TARGET→SOURCE request; also cancel the opposite to avoid cross-updates.
+      reverseAbortRef.current?.abort()
+      directAbortRef.current?.abort()
+
+      const controller = new AbortController()
+      reverseAbortRef.current = controller
+      const reqId = ++reverseReqIdRef.current
+
       const raw = value.replace(/[^0-9.,]/g, '')
       const normalized = raw.replace(/\./g, '').replace(/,/g, '.')
       const num = parseFloat(normalized)
@@ -169,25 +211,41 @@ export const useSwap = ({
         setSourceAmount('')
         return
       }
+
       setLoadingSource(true)
       try {
-        const response = await getQuote({
-          amount: num,
-          crypto_currency: CryptoCurrency.USDC,
-          network: BlockchainNetwork.STELLAR,
-          payment_method: targetPaymentMethod,
-          target_currency: targetCurrency,
-        })
+        const response = await (getQuote)(
+          {
+            amount: num,
+            crypto_currency: CryptoCurrency.USDC,
+            network: BlockchainNetwork.STELLAR,
+            payment_method: targetPaymentMethod,
+            target_currency: targetCurrency,
+          },
+          { signal: controller.signal },
+        )
+
+        if (controller.signal.aborted || reqId !== reverseReqIdRef.current || lastEditedRef.current !== 'target') return
+
         if (response.status === 200) {
           setQuoteId(response.data.quote_id)
           setSourceAmount(response.data.value.toFixed(2))
         }
       }
-      catch (error) {
+      catch (error: unknown) {
+        if (
+          (error as Error)?.name === 'AbortError'
+          || (error as { code?: string })?.code === 'ERR_CANCELED'
+          || (error as { message?: string })?.message === 'canceled'
+        ) {
+          return
+        }
         console.error('Quote error', error)
       }
       finally {
-        setLoadingSource(false)
+        if (reqId === reverseReqIdRef.current && lastEditedRef.current === 'target') {
+          setLoadingSource(false)
+        }
       }
     },
     [
@@ -202,18 +260,24 @@ export const useSwap = ({
 
   const onSourceChange = useCallback(
     (val: string) => {
-      triggerRef.current = true
-      setSourceAmount(val.replace(/[^0-9.]/g, ''))
+      lastEditedRef.current = 'source'
+      const sanitized = val.replace(/[^0-9.]/g, '')
+      setSourceAmount(sanitized)
+      // Immediate fetch; previous request gets aborted
+      fetchDirectConversion(sanitized)
     },
-    [setSourceAmount],
+    [setSourceAmount, fetchDirectConversion],
   )
 
   const onTargetChange = useCallback(
     (val: string) => {
-      triggerRef.current = false
-      setTargetAmount(val.replace(/[^0-9.,]/g, ''))
+      lastEditedRef.current = 'target'
+      const sanitized = val.replace(/[^0-9.,]/g, '')
+      setTargetAmount(sanitized)
+      // Immediate fetch; previous request gets aborted
+      fetchReverseConversion(sanitized)
     },
-    [setTargetAmount],
+    [setTargetAmount, fetchReverseConversion],
   )
 
   const openQr = useCallback(() => {
@@ -236,6 +300,9 @@ export const useSwap = ({
     (currency: (typeof TargetCurrency)[keyof typeof TargetCurrency]) => {
       setCurrencyMenuOpen(false)
       setTargetCurrency(currency)
+      // Optional: you can trigger a recompute for the current side here if desired.
+      // if (lastEditedRef.current === 'source' && sourceAmount) fetchDirectConversion(sourceAmount)
+      // if (lastEditedRef.current === 'target' && targetAmount) fetchReverseConversion(targetAmount)
     },
     [setTargetCurrency],
   )
@@ -243,7 +310,7 @@ export const useSwap = ({
   const onPrimaryAction = useCallback(async () => {
     if (!isAuthenticated) {
       // Connect wallet
-      await authenticateWithWallet()
+      await kit?.connect()
       return
     }
     if (!quoteId) {
@@ -253,8 +320,8 @@ export const useSwap = ({
     // proceed
     setView('bankDetails')
   }, [
-    authenticateWithWallet,
     isAuthenticated,
+    kit,
     quoteId,
     setView,
     t,
@@ -283,18 +350,9 @@ export const useSwap = ({
     transferFee,
   ])
 
-  // Debounced fetchers
-  useEffect(() => {
-    if (sourceDebouncedAmount && triggerRef.current === true) {
-      fetchDirectConversion(sourceDebouncedAmount)
-    }
-  }, [fetchDirectConversion, sourceDebouncedAmount])
-
-  useEffect(() => {
-    if (targetDebounceAmount && triggerRef.current === false) {
-      fetchReverseConversion(targetDebounceAmount)
-    }
-  }, [targetDebounceAmount, fetchReverseConversion])
+  // ⛔️ Removed debounced fetchers:
+  // useEffect(() => { ... }, [sourceDebouncedAmount])
+  // useEffect(() => { ... }, [targetDebounceAmount])
 
   // Close currency menu on outside click and Escape
   useEffect(() => {
@@ -326,6 +384,14 @@ export const useSwap = ({
       document.removeEventListener('keydown', onKeyDown)
     }
   }, [currencyMenuOpen])
+
+  // Cleanup on unmount: abort any in-flight requests
+  useEffect(() => {
+    return () => {
+      directAbortRef.current?.abort()
+      reverseAbortRef.current?.abort()
+    }
+  }, [])
 
   // Return props for stateless view -------------------------------------------
   return {

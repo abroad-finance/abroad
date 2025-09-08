@@ -20,7 +20,7 @@ type Transaction = PaginatedTransactionListTransactionsItem
 export function useWalletDetails(params: Params = {}): WalletDetailsProps {
   const { onClose } = params
   const { t } = useTranslate()
-  const { kit, token } = useWalletAuth()
+  const { kit, walletAuthentication } = useWalletAuth()
 
   const [copiedAddress, setCopiedAddress] = useState(false)
   const [usdcBalance, setUsdcBalance] = useState<string>('0.00')
@@ -66,7 +66,7 @@ export function useWalletDetails(params: Params = {}): WalletDetailsProps {
   }, [fetchUSDCBalance])
 
   const fetchTransactions = useCallback(async () => {
-    if (!token) {
+    if (!walletAuthentication?.jwtToken) {
       setTransactionError(t('wallet_details.error.no_token', 'No authentication token available'))
       return
     }
@@ -79,7 +79,6 @@ export function useWalletDetails(params: Params = {}): WalletDetailsProps {
       }
       const response = await listPartnerTransactions(
         { externalUserId: kit.address, page: 1, pageSize: 10 },
-        { headers: { Authorization: `Bearer ${token}` } },
       )
       if (response.status === 200) setTransactions(response.data.transactions)
       else setTransactionError(t('wallet_details.error.fetch_failed', 'Failed to fetch transactions'))
@@ -89,7 +88,7 @@ export function useWalletDetails(params: Params = {}): WalletDetailsProps {
     }
     finally { setIsLoadingTransactions(false) }
   }, [
-    token,
+    walletAuthentication?.jwtToken,
     t,
     kit?.address,
   ])
@@ -97,17 +96,17 @@ export function useWalletDetails(params: Params = {}): WalletDetailsProps {
   // Effects
   useEffect(() => {
     if (kit?.address) fetchUSDCBalanceWithLoading(kit.address)
-    if (token) fetchTransactions()
+    if (walletAuthentication?.jwtToken) fetchTransactions()
   }, [
     kit?.address,
-    token,
+    walletAuthentication?.jwtToken,
     fetchUSDCBalanceWithLoading,
     fetchTransactions,
   ])
 
   // Subscribe to websocket notifications to refresh transactions and balance
   useEffect(() => {
-    if (!kit?.address || !token) return
+    if (!kit?.address || !walletAuthentication?.jwtToken) return
 
     const refresh = async () => {
       if (!kit?.address) return
@@ -131,11 +130,11 @@ export function useWalletDetails(params: Params = {}): WalletDetailsProps {
     }
   }, [
     kit?.address,
-    token,
     fetchTransactions,
     fetchUSDCBalanceWithLoading,
     on,
     off,
+    walletAuthentication?.jwtToken,
   ])
 
   // Handlers exposed to component
@@ -148,9 +147,9 @@ export function useWalletDetails(params: Params = {}): WalletDetailsProps {
   ])
 
   const onRefreshTransactions = useCallback(() => {
-    if (token && !isLoadingTransactions) fetchTransactions()
+    if (walletAuthentication?.jwtToken && !isLoadingTransactions) fetchTransactions()
   }, [
-    token,
+    walletAuthentication?.jwtToken,
     isLoadingTransactions,
     fetchTransactions,
   ])

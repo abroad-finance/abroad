@@ -78,7 +78,7 @@ export const useBankDetailsRoute = ({
 }: UseBankDetailsRouteArgs): BankDetailsRouteProps => {
   const textColor = isDesktop ? 'white' : '#356E6A'
   const { t } = useTranslate()
-  const { kit, setKycUrl, token } = useWalletAuth()
+  const { kit, setKycUrl, walletAuthentication } = useWalletAuth()
 
   // ------------------------------- STATE -----------------------------------
   const [accountNumber, setAccountNumber] = useState('')
@@ -97,7 +97,7 @@ export const useBankDetailsRoute = ({
   // Restore saved details (returning from KYC)
   useEffect(() => {
     const stored = localStorage.getItem(PENDING_TX_KEY)
-    if (stored && token) {
+    if (stored && walletAuthentication?.jwtToken) {
       try {
         const parsed = JSON.parse(stored)
         if (parsed.account_number) setAccountNumber(parsed.account_number)
@@ -113,7 +113,7 @@ export const useBankDetailsRoute = ({
   }, [
     setPixKey,
     setTaxId,
-    token,
+    walletAuthentication?.jwtToken,
   ])
 
   // Fetch banks once for COP flow
