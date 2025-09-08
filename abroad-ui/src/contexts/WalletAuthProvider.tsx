@@ -39,23 +39,15 @@ export const WalletAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   }, [])
 
   const authenticateWithWallet = useCallback(async () => {
-    if (
-      !token
-    ) {
-      try {
-        const { authToken } = await kit.connect()
-        setToken(authToken)
-        console.log('Wallet authenticated successfully')
-      }
-      catch (err) {
-        console.trace('Wallet authentication failed', err)
-      }
+    try {
+      const { authToken } = await kit.connect()
+      setToken(authToken)
+      console.log('Wallet authenticated successfully')
     }
-  }, [
-    kit,
-    setToken,
-    token,
-  ])
+    catch (err) {
+      console.trace('Wallet authentication failed', err)
+    }
+  }, [kit, setToken])
 
   const refreshToken = useCallback(async () => {
     if (!token) return
