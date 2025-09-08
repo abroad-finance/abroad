@@ -22,7 +22,7 @@ type WCMetadata = {
 
 const metadata: WCMetadata = {
   description:
-        'Abroad bridges USDC on Stellar with real-time payment networks around the world, enabling seamless crypto-fiat payments. You will be able to pay anywhere in Brazil and Colombia with your USDC.',
+    'Abroad bridges USDC on Stellar with real-time payment networks around the world, enabling seamless crypto-fiat payments. You will be able to pay anywhere in Brazil and Colombia with your USDC.',
   icons: ['https://storage.googleapis.com/cdn-abroad/Icons/Favicon/Abroad_Badge_transparent.png'],
   name: 'Abroad',
   url: 'https://app.abroad.finance',
@@ -109,7 +109,7 @@ export function useWalletConnectWallet({ walletAuth }: {
 
     const result = await clientRef.current.request<{ signedXDR: string }>({
       chainId: STELLAR_CHAIN,
-      request: { method: WC_METHOD_SIGN, params: { message } },
+      request: { method: WC_METHOD_SIGN, params: { xdr: message } },
       topic: topicRef.current,
     })
 
