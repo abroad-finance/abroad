@@ -52,6 +52,7 @@ const WebSwap: React.FC = () => {
   const [quoteId, setQuoteId] = useState<string>('')
   const [pixKey, setPixKey] = useState<string>('')
   const [taxId, setTaxId] = useState<string>('')
+  const [recipentName, setRecipentName] = useState<string>('')
 
   // Main controller
   const {
@@ -70,6 +71,7 @@ const WebSwap: React.FC = () => {
   } = useWebSwapController({
     setPixKey,
     setQuoteId,
+    setRecipentName,
     setSourceAmount,
     setTargetAmount,
     setTargetCurrency,
@@ -160,13 +162,15 @@ const WebSwap: React.FC = () => {
       <main className="flex-1 relative z-10 flex">
         <WebSwapLayout
           slots={{
-            bankDetails: <BankDetailsRoute {...bankDetailRoute} />,
+            bankDetails: <BankDetailsRoute {...bankDetailRoute} onContinue={() => setView('confirm-qr')} />,
             confirmQr: (
               <ConfirmQr
+                loadingSubmit={bankDetailRoute.loadingSubmit}
                 onBack={handleBackToSwap}
                 onConfirm={handleOnConfirmQR}
                 onEdit={() => setView('swap')}
                 pixKey={pixKey}
+                recipentName={recipentName}
                 sourceAmount={sourceAmount}
                 targetAmount={targetAmount}
                 taxId={taxId}

@@ -11,6 +11,7 @@ import { WebSwapControllerProps } from './WebSwap'
 type UseWebSwapControllerProps = {
   setPixKey: (key: string) => void
   setQuoteId: (id: string) => void
+  setRecipentName: (name: string) => void
   setSourceAmount: (amount: string) => void
   setTargetAmount: (amount: string) => void
   setTargetCurrency: (currency: (typeof TargetCurrency)[keyof typeof TargetCurrency]) => void
@@ -20,7 +21,7 @@ type UseWebSwapControllerProps = {
   targetCurrency: TargetCurrency
 }
 
-export const useWebSwapController = ({ setPixKey, setQuoteId, setSourceAmount, setTargetAmount, setTargetCurrency, setTaxId, setTransactionId, setView, targetCurrency }: UseWebSwapControllerProps): WebSwapControllerProps => {
+export const useWebSwapController = ({ setPixKey, setQuoteId, setRecipentName, setSourceAmount, setTargetAmount, setTargetCurrency, setTaxId, setTransactionId, setView, targetCurrency }: UseWebSwapControllerProps): WebSwapControllerProps => {
   // Modal visibility state
   const [isWalletDetailsOpen, setIsWalletDetailsOpen] = useState(false)
   const { walletAuthentication } = useWalletAuth()
@@ -112,6 +113,10 @@ export const useWebSwapController = ({ setPixKey, setQuoteId, setSourceAmount, s
       const amount = responseDecoder.data?.decoded?.amount
       const pixKey = responseDecoder.data.decoded?.account
       const taxIdDecoded = responseDecoder.data.decoded?.taxId
+      const name = responseDecoder.data.decoded?.name
+      if (name) {
+        setRecipentName(name)
+      }
       if (amount) {
         handleAmountsChange({ tgt: amount })
         fetchQuote(parseFloat(amount))
@@ -135,6 +140,7 @@ export const useWebSwapController = ({ setPixKey, setQuoteId, setSourceAmount, s
     fetchQuote,
     handleAmountsChange,
     setPixKey,
+    setRecipentName,
     setTaxId,
     setView,
   ])

@@ -1,36 +1,55 @@
 import { useTranslate } from '@tolgee/react'
-import { ArrowLeft, Hash, Rotate3d } from 'lucide-react'
+import { ArrowLeft, Hash, Loader, Rotate3d } from 'lucide-react'
 import React from 'react'
 
 import PixFull from '../../../assets/Logos/networks/PixFull.svg'
 import { Button } from '../../../shared/components/Button'
 
 export interface ConfirmQrProps {
-  isDesktop?: boolean
+  loadingSubmit?: boolean
   onBack: () => void
   onConfirm: () => void
   onEdit: () => void
   pixKey?: string
+  recipentName?: string
   sourceAmount?: string
   targetAmount?: string
   taxId?: string
 }
 
 const ConfirmQr: React.FC<ConfirmQrProps> = ({
-  isDesktop,
+  loadingSubmit,
   onBack,
   onConfirm,
   onEdit,
   pixKey,
+  recipentName,
   sourceAmount,
   targetAmount,
   taxId,
 }) => {
   const { t } = useTranslate()
-  const textColor = isDesktop ? 'white' : '#356E6A'
 
+  const showMissingMessage = () => {
+    if (!pixKey || !sourceAmount || !targetAmount || !taxId) {
+      return (
+        <div className="flex-1 flex items-center justify-center">
+          <p className="text-center text-sm">
+            {t('confirm_qr.missing_data', 'Faltan datos para completar la transacción, al continuar serás redirigido a la pantalla de intercambio para ingresar los datos faltantes.')}
+          </p>
+        </div>
+      )
+    }
+  }
+
+  const getButtonText = () => {
+    if (!pixKey || !sourceAmount || !targetAmount || !taxId) {
+      return t('confirm_qr.continue', 'Continuar')
+    }
+    return t('confirm_qr.confirm', 'Confirmar')
+  }
   return (
-    <div className="flex-1 flex items-center justify-center w-full flex-col">
+    <div className="flex-1 flex items-center justify-center w-full flex-col text-abroad-dark md:text-white">
       <div
         className="w-[98%] max-w-md min-h-[60vh] h-auto bg-[#356E6A]/5 backdrop-blur-xl rounded-4xl p-4 md:p-6 flex flex-col items-center space-y-4"
         id="bg-container"
@@ -41,17 +60,25 @@ const ConfirmQr: React.FC<ConfirmQrProps> = ({
             aria-label={t('confirm_qr.back_aria', 'Go back')}
             className="hover:text-opacity-80 transition-colors cursor-pointer"
             onClick={onBack}
-            style={{ color: textColor }}
+
           >
             <ArrowLeft className="w-6 h-6" />
           </button>
           <div
             className="text-xl sm:text-2xl font-bold flex-grow text-center"
             id="Title"
-            style={{ color: textColor }}
+
           >
             {t('confirm_qr.title', 'Confirmar detalles del pago')}
           </div>
+        </div>
+
+        <div className="text-bold mt-10">
+          <span className="text-lg font-semibold">
+            {t('confirm_qr.recipent_name', 'Nombre del destinatario:')}
+          </span>
+          <br />
+          <span className="text-xl ">{recipentName}</span>
         </div>
 
         {/* Currency Exchange Display */}
@@ -63,7 +90,7 @@ const ConfirmQr: React.FC<ConfirmQrProps> = ({
               className="w-6 h-6 rounded-full"
               src="https://hatscripts.github.io/circle-flags/flags/br.svg"
             />
-            <span className="text-6xl font-bold" style={{ color: textColor }}>
+            <span className="text-6xl font-bold">
               R$
               {targetAmount || '—'}
             </span>
@@ -71,13 +98,13 @@ const ConfirmQr: React.FC<ConfirmQrProps> = ({
 
           {/* Equal sign and Origin Currency on same line */}
           <div className="flex items-center space-x-3">
-            <span className="text-2xl font-bold" style={{ color: textColor }}>=</span>
+            <span className="text-2xl font-bold">=</span>
             <img
               alt="USDC Token"
               className="w-6 h-6"
               src="https://storage.googleapis.com/cdn-abroad/Icons/Tokens/USDC%20Token.svg"
             />
-            <span className="text-lg font-semibold" style={{ color: textColor }}>
+            <span className="text-lg font-semibold">
               $
               {sourceAmount || '—'}
             </span>
@@ -88,7 +115,7 @@ const ConfirmQr: React.FC<ConfirmQrProps> = ({
         <div
           className="relative w-full bg-white/10 backdrop-blur-xl rounded-2xl p-3 sm:p-4 flex flex-col space-y-3"
           id="payment-details-disclaimer"
-          style={{ color: textColor }}
+
         >
           <div className="flex items-center space-x-2">
             <Rotate3d className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -116,13 +143,16 @@ const ConfirmQr: React.FC<ConfirmQrProps> = ({
             </div>
           )}
 
-          <span className="font-medium text-xs pl-1" style={{ color: textColor }}>
+          <span className="font-medium text-xs pl-1">
             {t(
               'confirm_qr.disclaimer',
               'Tu transacción será procesada de inmediato. Asegúrate de que la llave PIX y el CPF sean correctos. Esta transacción no se puede reversar.',
             )}
           </span>
         </div>
+
+        {/* Missing Data Message */}
+        {showMissingMessage()}
       </div>
 
       {/* Action Buttons */}
@@ -130,7 +160,6 @@ const ConfirmQr: React.FC<ConfirmQrProps> = ({
         <button
           className="flex-1 py-4 bg-transparent border border-[#356E6A] rounded-xl font-semibold hover:bg-[#356E6A]/10 transition-colors"
           onClick={onEdit}
-          style={{ color: textColor }}
           type="button"
         >
           {t('confirm_qr.edit', 'Editar')}
@@ -140,7 +169,11 @@ const ConfirmQr: React.FC<ConfirmQrProps> = ({
           onClick={onConfirm}
           type="button"
         >
-          {t('confirm_qr.confirm', 'Confirmar')}
+          {loadingSubmit
+            ? (
+                <Loader className="animate-spin w-4 h-4 sm:w-5 sm:h-5" />
+              )
+            : getButtonText()}
         </Button>
       </div>
     </div>
