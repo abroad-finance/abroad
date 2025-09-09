@@ -1,15 +1,44 @@
 import { useTranslate } from '@tolgee/react'
-import React from 'react'
+import React, { useEffect } from 'react'
 
+import { useWebSocket } from '../../../contexts/WebSocketContext'
 import { Button } from '../../../shared/components/Button'
 import { IconAnimated } from '../../../shared/components/IconAnimated'
+import { useWalletAuth } from '../../../shared/hooks/useWalletAuth'
 
 interface UserVerificationProps {
+  onApproved?: () => void
   onVerify: () => void
 }
 
-const UserVerification = ({ onVerify }: UserVerificationProps): React.JSX.Element => {
+const UserVerification = ({ onApproved, onVerify }: UserVerificationProps): React.JSX.Element => {
   const { t } = useTranslate()
+  const { off, on } = useWebSocket()
+  const { setKycUrl } = useWalletAuth()
+
+  // Subscribe to KYC updates so we can advance the flow automatically
+  useEffect(() => {
+    const handler = (payload: unknown) => {
+      try {
+        const data = (typeof payload === 'string' ? JSON.parse(payload) : payload) as { newStatus?: string }
+        if (data?.newStatus === 'APPROVED') {
+          // Clear any stored KYC URL and proceed
+          setKycUrl(null)
+          onApproved?.()
+        }
+      }
+      catch {
+        // ignore malformed payloads
+      }
+    }
+    on('kyc.updated', handler)
+    return () => off('kyc.updated', handler)
+  }, [
+    off,
+    on,
+    onApproved,
+    setKycUrl,
+  ])
   return (
     <div className="flex-1 flex items-center justify-center w-full flex-col">
       <div className="w-[98%] max-w-md min-h-[60vh] bg-[#356E6A]/5 backdrop-blur-xl rounded-4xl p-4 md:p-6 flex flex-col items-center justify-center space-y-1 lg:space-y-4 text-abroad-dark md:text-white">

@@ -43,7 +43,6 @@ export const Secrets = {
 
   // Persona related secrets
   PERSONA_API_KEY: 'PERSONA_API_KEY',
-
   PERSONA_INQUIRY_TEMPLATE_ID: 'PERSONA_INQUIRY_TEMPLATE_ID',
 
   // RabbitMQ related secrets

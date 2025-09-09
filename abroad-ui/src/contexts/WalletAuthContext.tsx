@@ -6,7 +6,7 @@ import { IWalletAuthentication } from '../interfaces/IWalletAuthentication'
 interface WalletAuthState {
   kit?: IWallet
   kycUrl: null | string
-  setKycUrl: (url: string) => void
+  setKycUrl: (url: null | string) => void
   walletAuthentication?: IWalletAuthentication
 }
 

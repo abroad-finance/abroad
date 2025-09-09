@@ -174,7 +174,12 @@ const WebSwap: React.FC = () => {
                 taxId={taxId}
               />
             ),
-            kycNeeded: <UserVerification onVerify={handleKycRedirect} />,
+            kycNeeded: (
+              <UserVerification
+                onApproved={() => setView('bankDetails')}
+                onVerify={handleKycRedirect}
+              />
+            ),
             swap: <Swap {...swap} />,
             txStatus: (
               <TxStatus

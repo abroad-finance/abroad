@@ -1,3 +1,5 @@
+import { useTolgee } from '@tolgee/react'
+import Persona from 'persona'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 
@@ -29,6 +31,7 @@ export const useWebSwapController = ({ setPixKey, setQuoteId, setSourceAmount, s
   const [isQrOpen, setIsQrOpen] = useState(false)
   const [isDecodingQr, setIsDecodingQr] = useState(false)
   const [searchParams] = useSearchParams()
+  const { getLanguage } = useTolgee()
 
   const targetPaymentMethod = targetCurrency === TargetCurrency.BRL ? PaymentMethod.PIX : PaymentMethod.MOVII
 
@@ -146,12 +149,19 @@ export const useWebSwapController = ({ setPixKey, setQuoteId, setSourceAmount, s
 
   const handleKycRedirect = useCallback(() => {
     if (kycUrl) {
-      window.location.href = kycUrl
+      const inquiryId = kycUrl.split('inquiry-id=')[1].split('&')[0]
+
+      const clientPersona = new Persona.Client({
+        environmentId: import.meta.env.VITE_PERSONA_ENV,
+        inquiryId,
+        language: getLanguage(),
+        onReady: () => clientPersona.open(),
+      })
     }
     else {
       alert('No KYC url finded')
     }
-  }, [kycUrl])
+  }, [getLanguage, kycUrl])
 
   const handleBackToSwap = useCallback(() => {
     localStorage.removeItem(PENDING_TX_KEY)

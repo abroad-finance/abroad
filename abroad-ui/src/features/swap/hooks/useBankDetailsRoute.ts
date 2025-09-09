@@ -341,22 +341,6 @@ export const useBankDetailsRoute = ({
 
       // 2) Redirect to KYC if needed
       if (kycLink) {
-        localStorage.setItem(
-          PENDING_TX_KEY,
-          JSON.stringify({
-            account_number:
-              targetCurrency === TargetCurrency.BRL ? pixKey : accountNumber,
-            bank_code: targetCurrency === TargetCurrency.BRL ? 'PIX' : bankCode,
-            pixKey: targetCurrency === TargetCurrency.BRL ? pixKey : undefined,
-            quote_id: quoteId,
-            selectedBank,
-            srcAmount: sourceAmount,
-            targetCurrency,
-            taxId: targetCurrency === TargetCurrency.BRL ? taxId : undefined,
-            tgtAmount: targetAmount,
-            userId,
-          }),
-        )
         setKycUrl(kycLink)
         setView('kyc-needed')
         return
@@ -430,13 +414,11 @@ export const useBankDetailsRoute = ({
     accountNumber,
     bankCode,
     taxId,
+    kit,
     buildPaymentXdr,
     sourceAmount,
     setView,
-    kit,
     setTransactionId,
-    selectedBank,
-    targetAmount,
     setKycUrl,
     onRedirectToHome,
   ])

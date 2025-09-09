@@ -36,12 +36,12 @@ import { ConsoleLogger } from './services/consoleLogger'
 import { ExchangeProviderFactory } from './services/ExchangeProviderFactory'
 import { BinanceExchangeProvider } from './services/exchangeProviders/binanceExchangeProvider'
 import { TransferoExchangeProvider } from './services/exchangeProviders/transferoExchangeProvider'
-import { GuardLineKycService } from './services/GuardlineKycService'
 import { PartnerService } from './services/partnerService'
 import { PaymentServiceFactory } from './services/PaymentServiceFactory'
 import { MoviiPaymentService } from './services/paymentServices/movii'
 import { NequiPaymentService } from './services/paymentServices/nequi'
 import { TransferoPaymentService } from './services/paymentServices/transferoPaymentService'
+import { PersonaKycService } from './services/PersonaKycService'
 import { PixQrDecoder } from './services/PixQrDecoder'
 import { SlackNotifier } from './services/slackNotifier'
 import { SocketIOWebSocketService } from './services/SocketIOWebSocketService'
@@ -130,7 +130,7 @@ container
 // IKycService
 container
   .bind<IKycService>(TYPES.IKycService)
-  .to(GuardLineKycService)
+  .to(PersonaKycService)
   .inSingletonScope()
 
 // Controllers
