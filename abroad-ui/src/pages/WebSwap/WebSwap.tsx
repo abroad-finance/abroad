@@ -29,7 +29,6 @@ export interface WebSwapControllerProps {
   closeQr: () => void
   currentBgUrl: string
   handleBackToSwap: () => void
-  handleKycRedirect: () => void
   handleQrResult: (text: string) => Promise<void>
   handleWalletDetailsClose: () => void
   handleWalletDetailsOpen: () => void
@@ -59,7 +58,6 @@ const WebSwap: React.FC = () => {
     closeQr,
     currentBgUrl,
     handleBackToSwap,
-    handleKycRedirect,
     handleQrResult,
     handleWalletDetailsClose,
     handleWalletDetailsOpen,
@@ -175,10 +173,7 @@ const WebSwap: React.FC = () => {
               />
             ),
             kycNeeded: (
-              <UserVerification
-                onApproved={() => setView('bankDetails')}
-                onVerify={handleKycRedirect}
-              />
+              <UserVerification onApproved={() => setView('bankDetails')} />
             ),
             swap: <Swap {...swap} />,
             txStatus: (

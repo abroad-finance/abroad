@@ -1,5 +1,6 @@
-import { useTranslate } from '@tolgee/react'
-import React, { useEffect } from 'react'
+import { useTolgee, useTranslate } from '@tolgee/react'
+import Persona from 'persona'
+import React, { useCallback, useEffect } from 'react'
 
 import { useWebSocket } from '../../../contexts/WebSocketContext'
 import { Button } from '../../../shared/components/Button'
@@ -8,13 +9,34 @@ import { useWalletAuth } from '../../../shared/hooks/useWalletAuth'
 
 interface UserVerificationProps {
   onApproved?: () => void
-  onVerify: () => void
 }
 
-const UserVerification = ({ onApproved, onVerify }: UserVerificationProps): React.JSX.Element => {
+const UserVerification = ({ onApproved }: UserVerificationProps): React.JSX.Element => {
   const { t } = useTranslate()
   const { off, on } = useWebSocket()
-  const { setKycUrl } = useWalletAuth()
+  const { kycUrl, setKycUrl } = useWalletAuth()
+  const { getLanguage } = useTolgee()
+  const [loading, setLoading] = React.useState(false)
+
+  const handleKycRedirect = useCallback(() => {
+    if (kycUrl) {
+      setLoading(true)
+      const inquiryId = kycUrl.split('inquiry-id=')[1].split('&')[0]
+
+      const clientPersona = new Persona.Client({
+        environmentId: import.meta.env.VITE_PERSONA_ENV,
+        inquiryId,
+        language: getLanguage(),
+        onReady: () => {
+          clientPersona.open()
+          setLoading(false)
+        },
+      })
+    }
+    else {
+      alert('No KYC url finded')
+    }
+  }, [getLanguage, kycUrl])
 
   // Subscribe to KYC updates so we can advance the flow automatically
   useEffect(() => {
@@ -57,7 +79,8 @@ const UserVerification = ({ onApproved, onVerify }: UserVerificationProps): Reac
       </div>
       <Button
         className="mt-4 w-[90%] max-w-md py-4 cursor-pointer"
-        onClick={onVerify}
+        loading={loading}
+        onClick={handleKycRedirect}
       >
         {t('user_verification.cta', 'Verificar Ahora')}
       </Button>

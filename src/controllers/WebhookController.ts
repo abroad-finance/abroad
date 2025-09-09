@@ -58,10 +58,15 @@ type PersonaStatus = 'approved'
 const personaWebhookSchema = z.object({
   data: z.object({
     attributes: z.object({
-      status: z.enum(PersonaStatusEnum),
-    }).partial(),
-    id: z.string().min(1), // Persona Inquiry ID
-    type: z.string().optional(),
+      payload: z.object({
+        data: z.object({
+          attributes: z.object({
+            status: z.enum(PersonaStatusEnum),
+          }),
+          id: z.string().min(1), // Persona Inquiry ID
+        }),
+      }),
+    }),
   }),
 }).loose()
 
@@ -237,8 +242,8 @@ export class WebhookController extends Controller {
       }
 
       const payload: PersonaWebhookPayload = parsed.data
-      const inquiryId = payload.data.id
-      const status = payload.data.attributes?.status
+      const inquiryId = payload.data.attributes.payload.data.id
+      const status = payload.data.attributes.payload.data.attributes.status
 
       this.logger.info('Processing Persona webhook', {
         inquiryId,

@@ -1,5 +1,3 @@
-import { useTolgee } from '@tolgee/react'
-import Persona from 'persona'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 
@@ -25,13 +23,12 @@ type UseWebSwapControllerProps = {
 export const useWebSwapController = ({ setPixKey, setQuoteId, setSourceAmount, setTargetAmount, setTargetCurrency, setTaxId, setTransactionId, setView, targetCurrency }: UseWebSwapControllerProps): WebSwapControllerProps => {
   // Modal visibility state
   const [isWalletDetailsOpen, setIsWalletDetailsOpen] = useState(false)
-  const { kycUrl, walletAuthentication } = useWalletAuth()
+  const { walletAuthentication } = useWalletAuth()
 
   // QR scanner state and URL param handling
   const [isQrOpen, setIsQrOpen] = useState(false)
   const [isDecodingQr, setIsDecodingQr] = useState(false)
   const [searchParams] = useSearchParams()
-  const { getLanguage } = useTolgee()
 
   const targetPaymentMethod = targetCurrency === TargetCurrency.BRL ? PaymentMethod.PIX : PaymentMethod.MOVII
 
@@ -147,22 +144,6 @@ export const useWebSwapController = ({ setPixKey, setQuoteId, setSourceAmount, s
   // Determine desired desktop background URL based on currency
   const currentBgUrl = targetCurrency === 'BRL' ? BRL_BACKGROUND_IMAGE : ASSET_URLS.BACKGROUND_IMAGE
 
-  const handleKycRedirect = useCallback(() => {
-    if (kycUrl) {
-      const inquiryId = kycUrl.split('inquiry-id=')[1].split('&')[0]
-
-      const clientPersona = new Persona.Client({
-        environmentId: import.meta.env.VITE_PERSONA_ENV,
-        inquiryId,
-        language: getLanguage(),
-        onReady: () => clientPersona.open(),
-      })
-    }
-    else {
-      alert('No KYC url finded')
-    }
-  }, [getLanguage, kycUrl])
-
   const handleBackToSwap = useCallback(() => {
     localStorage.removeItem(PENDING_TX_KEY)
     setView('swap')
@@ -190,7 +171,6 @@ export const useWebSwapController = ({ setPixKey, setQuoteId, setSourceAmount, s
     closeQr: () => setIsQrOpen(false),
     currentBgUrl,
     handleBackToSwap,
-    handleKycRedirect,
     handleQrResult,
     handleWalletDetailsClose,
     handleWalletDetailsOpen,
