@@ -103,7 +103,11 @@ export class PaymentStatusUpdatedController {
         },
         where: { externalId: message.externalId },
       })
-      this.webhookNotifier.notifyWebhook(transactionRecord.partnerUser.partner.webhookUrl, { data: transactionRecord, event: WebhookEvent.TRANSACTION_CREATED })
+      // Notify partner webhook that the transaction was updated
+      this.webhookNotifier.notifyWebhook(
+        transactionRecord.partnerUser.partner.webhookUrl,
+        { data: transactionRecord, event: WebhookEvent.TRANSACTION_UPDATED },
+      )
 
       // Notify user via websocket bridge with full payload
       try {

@@ -1,6 +1,8 @@
 // src/interfaces/ISecretManager.ts
 
 export const Secrets = {
+  ABROAD_WEBHOOK_SECRET: 'ABROAD_WEBHOOK_SECRET',
+
   // Binance related secrets
   BINANCE_API_KEY: 'BINANCE_API_KEY',
   BINANCE_API_SECRET: 'BINANCE_API_SECRET',
