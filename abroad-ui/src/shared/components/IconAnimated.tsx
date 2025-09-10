@@ -56,7 +56,7 @@ export const IconAnimated = ({ className, colors, icon, loop, onComplete, play, 
   }
 
   return (
-    <div className={className} style={{ display: 'inline-block' }}>
+    <div className={className}>
       <Player
         colors={colors}
         icon={Icons[icon]}
