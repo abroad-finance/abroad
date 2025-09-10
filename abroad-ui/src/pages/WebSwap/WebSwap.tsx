@@ -165,6 +165,7 @@ const WebSwap: React.FC = () => {
             bankDetails: <BankDetailsRoute {...bankDetailRoute} onContinue={() => setView('confirm-qr')} />,
             confirmQr: (
               <ConfirmQr
+                currency={targetCurrency}
                 loadingSubmit={bankDetailRoute.loadingSubmit}
                 onBack={handleBackToSwap}
                 onConfirm={handleOnConfirmQR}

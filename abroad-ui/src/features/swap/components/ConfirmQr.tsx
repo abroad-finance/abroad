@@ -1,11 +1,13 @@
 import { useTranslate } from '@tolgee/react'
 import { ArrowLeft, Hash, Loader, Rotate3d } from 'lucide-react'
-import React from 'react'
+import React, { memo, useMemo } from 'react'
 
+import { _36EnumsTargetCurrency as TargetCurrency } from '../../../api'
 import PixFull from '../../../assets/Logos/networks/PixFull.svg'
 import { Button } from '../../../shared/components/Button'
 
 export interface ConfirmQrProps {
+  currency: TargetCurrency
   loadingSubmit?: boolean
   onBack: () => void
   onConfirm: () => void
@@ -18,6 +20,7 @@ export interface ConfirmQrProps {
 }
 
 const ConfirmQr: React.FC<ConfirmQrProps> = ({
+  currency,
   loadingSubmit,
   onBack,
   onConfirm,
@@ -29,8 +32,12 @@ const ConfirmQr: React.FC<ConfirmQrProps> = ({
   taxId,
 }) => {
   const { t } = useTranslate()
+  const isRealBRL = currency === TargetCurrency.BRL
 
   const showMissingMessage = () => {
+    if (!isRealBRL) {
+      return <></>
+    }
     if (!pixKey || !sourceAmount || !targetAmount || !taxId) {
       return (
         <div className="flex-1 flex items-center justify-center">
@@ -42,12 +49,38 @@ const ConfirmQr: React.FC<ConfirmQrProps> = ({
     }
   }
 
-  const getButtonText = () => {
+  const getButtonText = useMemo(() => {
+    if (!isRealBRL) {
+      return t('confirm_qr.confirm', 'Confirmar')
+    }
     if (!pixKey || !sourceAmount || !targetAmount || !taxId) {
       return t('confirm_qr.continue', 'Continuar')
     }
     return t('confirm_qr.confirm', 'Confirmar')
-  }
+  }, [
+    isRealBRL,
+    pixKey,
+    sourceAmount,
+    t,
+    targetAmount,
+    taxId,
+  ])
+
+  const confirmationText = useMemo(() => {
+    if (isRealBRL) {
+      return t(
+        'confirm_qr.disclaimer',
+        'Tu transacción será procesada de inmediato. Asegúrate de que la llave PIX y el CPF sean correctos. Esta transacción no se puede reversar.',
+      )
+    }
+    else {
+      return t(
+        'confirm_qr.disclaimer_cop',
+        'Tu transacción será procesada de inmediato. Asegúrate de que el número de cuenta y datos sean los correctos. Esta transacción no se puede reversar.',
+      )
+    }
+  }, [isRealBRL, t])
+
   return (
     <div className="flex-1 flex items-center justify-center w-full flex-col text-abroad-dark md:text-white">
       <div
@@ -73,13 +106,18 @@ const ConfirmQr: React.FC<ConfirmQrProps> = ({
           </div>
         </div>
 
-        <div className="text-bold mt-10">
-          <span className="text-lg font-semibold">
-            {t('confirm_qr.recipent_name', 'Nombre del destinatario:')}
-          </span>
-          <br />
-          <span className="text-xl ">{recipentName}</span>
-        </div>
+        {
+          isRealBRL
+          && (
+            <div className="text-bold mt-10">
+              <span className="text-lg font-semibold">
+                {t('confirm_qr.recipent_name', 'Nombre del destinatario:')}
+              </span>
+              <br />
+              <span className="text-xl ">{recipentName}</span>
+            </div>
+          )
+        }
 
         {/* Currency Exchange Display */}
         <div className="flex-1 flex flex-col items-center justify-center w-full space-y-3 py-4">
@@ -88,10 +126,10 @@ const ConfirmQr: React.FC<ConfirmQrProps> = ({
             <img
               alt="Brazil flag"
               className="w-6 h-6 rounded-full"
-              src="https://hatscripts.github.io/circle-flags/flags/br.svg"
+              src={isRealBRL ? 'https://hatscripts.github.io/circle-flags/flags/br.svg' : 'https://hatscripts.github.io/circle-flags/flags/co.svg'}
             />
+            <span className="text-6xl font-bold">{isRealBRL ? 'R$' : '$'}</span>
             <span className="text-6xl font-bold">
-              R$
               {targetAmount || '—'}
             </span>
           </div>
@@ -117,13 +155,18 @@ const ConfirmQr: React.FC<ConfirmQrProps> = ({
           id="payment-details-disclaimer"
 
         >
-          <div className="flex items-center space-x-2">
-            <Rotate3d className="w-4 h-4 sm:w-5 sm:h-5" />
-            <span className="font-medium text-xs sm:text-sm">{t('confirm_qr.network', 'Red:')}</span>
-            <div className="bg-white/70 backdrop-blur-md rounded-lg px-2 py-1 flex items-center">
-              <img alt="PIX Logo" className="h-3 sm:h-4 w-auto" src={PixFull} />
-            </div>
-          </div>
+          {
+            isRealBRL
+            && (
+              <div className="flex items-center space-x-2">
+                <Rotate3d className="w-4 h-4 sm:w-5 sm:h-5" />
+                <span className="font-medium text-xs sm:text-sm">{t('confirm_qr.network', 'Red:')}</span>
+                <div className="bg-white/70 backdrop-blur-md rounded-lg px-2 py-1 flex items-center">
+                  <img alt="PIX Logo" className="h-3 sm:h-4 w-auto" src={PixFull} />
+                </div>
+              </div>
+            )
+          }
 
           {/* PIX Key */}
           {pixKey && (
@@ -144,10 +187,7 @@ const ConfirmQr: React.FC<ConfirmQrProps> = ({
           )}
 
           <span className="font-medium text-xs pl-1">
-            {t(
-              'confirm_qr.disclaimer',
-              'Tu transacción será procesada de inmediato. Asegúrate de que la llave PIX y el CPF sean correctos. Esta transacción no se puede reversar.',
-            )}
+            {confirmationText}
           </span>
         </div>
 
@@ -173,11 +213,11 @@ const ConfirmQr: React.FC<ConfirmQrProps> = ({
             ? (
                 <Loader className="animate-spin w-4 h-4 sm:w-5 sm:h-5" />
               )
-            : getButtonText()}
+            : getButtonText}
         </Button>
       </div>
     </div>
   )
 }
 
-export default ConfirmQr
+export default memo(ConfirmQr)
