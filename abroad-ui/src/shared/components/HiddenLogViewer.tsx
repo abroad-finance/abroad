@@ -143,6 +143,8 @@ export const HiddenLogViewer: React.FC = () => {
   const toggleLevel = (lvl: LogLevel) =>
     setFilter(f => ({ ...f, [lvl]: !f[lvl] }))
 
+  if (!import.meta.env.DEV) return null
+
   return (
     <>
       {/* Hidden hotspot in bottom-right corner to open modal */}

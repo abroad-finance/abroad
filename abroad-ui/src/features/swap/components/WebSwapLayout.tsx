@@ -3,10 +3,8 @@ import React, { useMemo } from 'react'
 
 import { _36EnumsTargetCurrency as TargetCurrency } from '../../../api'
 import AnimatedHeroText from '../../../shared/components/AnimatedHeroText'
-import BackgroundCrossfade from '../../../shared/components/BackgroundCrossfade'
 import ImageAttribution from '../../../shared/components/ImageAttribution'
 import { ASSET_URLS } from '../../../shared/constants'
-import { BRL_BACKGROUND_IMAGE } from '../constants'
 import { SwapView } from '../types'
 
 export interface WebSwapLayoutProps {
@@ -30,12 +28,6 @@ const WebSwapLayout: React.FC<WebSwapLayoutProps & WebSwapLayoutSlots> = ({
   targetCurrency,
   view,
 }) => {
-  // Marketing background for mobile hero
-  const currentBgUrl
-    = targetCurrency === 'BRL'
-      ? BRL_BACKGROUND_IMAGE
-      : ASSET_URLS.BACKGROUND_IMAGE
-
   const renderSwap = useMemo(() => {
     switch (view) {
       case 'bankDetails':
@@ -62,32 +54,13 @@ const WebSwapLayout: React.FC<WebSwapLayoutProps & WebSwapLayoutSlots> = ({
   ])
 
   return (
-    <div className="w-full min-h-screen">
+    <div className="w-full">
       {/* ---------- Mobile (<= md) ---------- */}
-      <div className="md:hidden flex flex-col w-full min-h-screen">
+      <div className="md:hidden flex flex-col w-full">
         {/* Swap Interface */}
         <div className="h-[calc(100vh-80px)] bg-green-50 flex items-center justify-center p-4">
           <div className="w-full max-w-md">
             {renderSwap}
-          </div>
-        </div>
-
-        {/* Marketing / Hero */}
-        <div className="relative min-h-screen flex flex-col justify-between items-center p-5 text-center overflow-hidden">
-          <BackgroundCrossfade
-            backgroundAttachment="fixed"
-            imageUrl={currentBgUrl}
-            positionClass="absolute inset-0"
-            visibilityClass="block"
-            zIndexClass="-z-10"
-          />
-          <ImageAttribution currency={String(targetCurrency)} />
-          <div className="text-3xl">
-            <AnimatedHeroText currency={targetCurrency} />
-          </div>
-          <div className="flex items-center gap-3 text-white font-sans text-sm">
-            <span>powered by</span>
-            <img alt="Stellar" className="h-6 w-auto" src={ASSET_URLS.STELLAR_LOGO} />
           </div>
         </div>
       </div>
