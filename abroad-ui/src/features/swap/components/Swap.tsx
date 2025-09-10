@@ -63,7 +63,7 @@ export default function Swap({
   const { t } = useTranslate()
 
   return (
-    <div className="flex-1 flex items-center justify-center w-full flex flex-col text-abroad-dark md:text-white">
+    <div className="flex-1 flex items-center justify-center w-full flex-col text-abroad-dark md:text-white">
       <div
         className="w-[98%] max-w-md min-h-[60vh] bg-[#356E6A]/5 backdrop-blur-xl rounded-4xl p-4 md:p-6 flex flex-col items-center justify-center space-y-1 lg:space-y-4"
         id="background-container"

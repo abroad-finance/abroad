@@ -97,6 +97,8 @@ export default function TxStatus({ onNewTransaction, onRetry, transactionId }: T
       case 'inProgress':
         return (
           <IconAnimated
+            className=""
+            colors="primary:#356E6A,secondary:#26A17B"
             icon="Coins"
             key={`icon-${status}`}
             loop
@@ -156,12 +158,12 @@ export default function TxStatus({ onNewTransaction, onRetry, transactionId }: T
           {renderIcon()}
         </div>
         {/* Title */}
-        <div className="text-2xl font-bold text-[#356E6A] text-center">
+        <div className="text-2xl font-bold  text-center text-abroad-dark md:text-white">
           {renderStatusText()}
         </div>
 
         {/* Description */}
-        <div className="text-[#356E6A]/90 text-center">
+        <div className="text-center text-abroad-dark md:text-white">
           {renderSubtitle()}
         </div>
       </div>
