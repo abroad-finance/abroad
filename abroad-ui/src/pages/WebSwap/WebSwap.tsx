@@ -118,7 +118,6 @@ const WebSwap: React.FC = () => {
   })
 
   // handler when user select continue on confirmation after QR code scan
-
   const handleOnConfirmQR = useCallback(() => {
     if (!targetAmount || !sourceAmount) {
       setView('swap')
@@ -177,7 +176,7 @@ const WebSwap: React.FC = () => {
               />
             ),
             kycNeeded: (
-              <UserVerification onApproved={() => setView('bankDetails')} />
+              <UserVerification onApproved={() => setView('confirm-qr')} />
             ),
             swap: <Swap {...swap} />,
             txStatus: (
