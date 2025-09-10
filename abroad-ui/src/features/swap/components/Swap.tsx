@@ -57,14 +57,13 @@ export default function Swap({
   targetAmount,
   targetCurrency,
   targetSymbol,
-  textColor = '#356E6A',
   toggleCurrencyMenu,
   transferFeeDisplay,
 }: SwapProps): React.JSX.Element {
   const { t } = useTranslate()
 
   return (
-    <div className="flex-1 flex items-center justify-center w-full flex flex-col">
+    <div className="flex-1 flex items-center justify-center w-full flex flex-col text-abroad-dark md:text-white">
       <div
         className="w-[98%] max-w-md min-h-[60vh] bg-[#356E6A]/5 backdrop-blur-xl rounded-4xl p-4 md:p-6 flex flex-col items-center justify-center space-y-1 lg:space-y-4"
         id="background-container"
@@ -72,11 +71,11 @@ export default function Swap({
         {/* Title + Subtitle */}
         <div className="flex-1 flex items-center justify-between w-full">
           <div className="flex flex-col">
-            <div className="text-xl md:text-xl font-bold" style={{ color: textColor }}>
+            <div className="text-xl md:text-xl font-bold">
               <span>{t('swap.title', 'Paga o Transfiere')}</span>
             </div>
             {targetCurrency === TargetCurrency.BRL && (
-              <div className="text-xs md:text-sm opacity-75" style={{ color: textColor }}>
+              <div className="text-xs md:text-sm opacity-75">
                 {t('swap.subtitle', 'Escribe los datos o escanea un QR de Pix')}
               </div>
             )}
@@ -89,7 +88,7 @@ export default function Swap({
               onClick={openQr}
               type="button"
             >
-              <ScanLine className="w-8 h-8" style={{ color: textColor }} />
+              <ScanLine className="w-8 h-8" />
             </button>
           )}
         </div>
@@ -100,10 +99,10 @@ export default function Swap({
           id="source-amount"
         >
           <div className="flex-1 flex items-center gap-2 min-w-0">
-            <span className="text-xl md:text-2xl font-bold shrink-0" style={{ color: textColor }}>$</span>
+            <span className="text-xl md:text-2xl font-bold shrink-0">$</span>
             {loadingSource
               ? (
-                  <Loader className="animate-spin w-6 h-6" style={{ color: textColor }} />
+                  <Loader className="animate-spin w-6 h-6" />
                 )
               : (
                   <input
@@ -112,7 +111,7 @@ export default function Swap({
                     onChange={e => onSourceChange(e.target.value)}
                     pattern="[0-9.]*"
                     placeholder="0.00"
-                    style={{ color: textColor }}
+
                     type="text"
                     value={sourceAmount}
                   />
@@ -139,12 +138,12 @@ export default function Swap({
 
                 {/* input */}
                 <div className="flex-1 flex items-center gap-2 min-w-0">
-                  <span className="text-xl md:text-2xl font-bold shrink-0" style={{ color: textColor }}>
+                  <span className="text-xl md:text-2xl font-bold shrink-0">
                     {targetSymbol}
                   </span>
                   {loadingTarget
                     ? (
-                        <Loader className="animate-spin w-6 h-6" style={{ color: textColor }} />
+                        <Loader className="animate-spin w-6 h-6" />
                       )
                     : (
                         <input
@@ -153,7 +152,7 @@ export default function Swap({
                           onChange={e => onTargetChange(e.target.value)}
                           pattern="[0-9.,]*"
                           placeholder="0,00"
-                          style={{ color: textColor }}
+
                           type="text"
                           value={targetAmount}
                         />
@@ -225,7 +224,7 @@ export default function Swap({
                   </Suspense>
                 </div>
                 <div className="flex flex-col space-y-1">
-                  <span className="text-lg font-semibold" style={{ color: textColor }}>
+                  <span className="text-lg font-semibold">
                     {t('swap.connect_to_quote', 'Conecta tu billetera para poder cotizar')}
                   </span>
                 </div>
@@ -234,7 +233,7 @@ export default function Swap({
 
         {/* Info */}
         <div className="flex-1 flex items-center justify-center w-full">
-          <div className="w-full" id="tx-info" style={{ color: textColor }}>
+          <div className="w-full" id="tx-info">
             <div className="flex flex-col space-y-2">
               <div className="flex items-center space-x-2" id="trm">
                 <CircleDollarSign className="w-5 h-5" />
