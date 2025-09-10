@@ -27,6 +27,12 @@ const UserVerification = ({ onApproved }: UserVerificationProps): React.JSX.Elem
         environmentId: import.meta.env.VITE_PERSONA_ENV,
         inquiryId,
         language: getLanguage(),
+        onComplete: ({ status }) => {
+          if (status.toLowerCase() === 'approved') {
+            setKycUrl(null)
+            onApproved?.()
+          }
+        },
         onReady: () => {
           clientPersona.open()
           setLoading(false)
@@ -36,7 +42,12 @@ const UserVerification = ({ onApproved }: UserVerificationProps): React.JSX.Elem
     else {
       alert('No KYC url finded')
     }
-  }, [getLanguage, kycUrl])
+  }, [
+    getLanguage,
+    kycUrl,
+    onApproved,
+    setKycUrl,
+  ])
 
   // Subscribe to KYC updates so we can advance the flow automatically
   useEffect(() => {
