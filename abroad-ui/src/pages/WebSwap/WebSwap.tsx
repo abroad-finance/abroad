@@ -123,7 +123,7 @@ const WebSwap: React.FC = () => {
       setView('swap')
       return
     }
-    if (!taxId) {
+    if (!taxId && targetCurrency === TargetCurrency.BRL) {
       setView('bankDetails')
       return
     }
@@ -132,6 +132,7 @@ const WebSwap: React.FC = () => {
     bankDetailRoute,
     sourceAmount,
     targetAmount,
+    targetCurrency,
     taxId,
   ])
 
