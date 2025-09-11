@@ -194,6 +194,8 @@ const WebSwap: React.FC = () => {
                 onNewTransaction={resetForNewTransaction}
                 onRetry={handleBackToSwap}
                 transactionId={transactionId}
+                targetAmount={targetAmount}
+                targerCurrency={targetCurrency}
               />
             ),
             waitSign: <WaitSign />,

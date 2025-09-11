@@ -1,26 +1,29 @@
 import { useTranslate } from '@tolgee/react'
 import React, { useEffect, useState } from 'react'
 
-import { TransactionStatus as ApiStatus } from '../../../api'
+import { TransactionStatus as ApiStatus, _36EnumsTargetCurrency as TargetCurrency } from '../../../api'
 import { useWebSocket } from '../../../contexts/WebSocketContext'
 import { Button } from '../../../shared/components/Button'
 import { IconAnimated } from '../../../shared/components/IconAnimated'
 import { useWalletAuth } from '../../../shared/hooks/useWalletAuth'
+import { formatMoney } from '../../../shared/utils'
 
 interface TxStatusProps {
   onNewTransaction: () => void
   onRetry: () => void
   transactionId: null | string
+  targetAmount?: string
+  targerCurrency: TargetCurrency
 }
 
 // UI status mapping
 type UiStatus = 'accepted' | 'denied' | 'inProgress'
 
-export default function TxStatus({ onNewTransaction, onRetry, transactionId }: TxStatusProps): React.JSX.Element {
+export default function TxStatus({ onNewTransaction, onRetry, transactionId, targerCurrency, targetAmount }: TxStatusProps): React.JSX.Element {
   const { t } = useTranslate()
   const { kit } = useWalletAuth()
   const { off, on } = useWebSocket()
-  const [status, setStatus] = useState<UiStatus>('inProgress')
+  const [status, setStatus] = useState<UiStatus>('accepted')
   const [error, setError] = useState<null | string>(null)
   // no local socket, using app-wide provider
 
@@ -72,6 +75,14 @@ export default function TxStatus({ onNewTransaction, onRetry, transactionId }: T
     off,
     kit?.address,
   ])
+
+  const renderAmount = () => {
+    if (status === 'accepted' && targetAmount) {
+      return (
+        <span className='text-5xl font-bold text-abroad-dark md:text-white'> {formatMoney(targerCurrency, targetAmount)} </span>
+      )
+    }
+  }
 
   const renderIcon = () => {
     switch (status) {
@@ -125,7 +136,7 @@ export default function TxStatus({ onNewTransaction, onRetry, transactionId }: T
     switch (status) {
       case 'accepted':
         return (
-          <>
+          <> 
             {t('tx_status.accepted.super', '¡Super!')}
             <br />
             {' '}
@@ -154,6 +165,7 @@ export default function TxStatus({ onNewTransaction, onRetry, transactionId }: T
         className="relative w-[98%] max-w-[50vh] h-[60vh] bg-[#356E6A]/5 backdrop-blur-xl rounded-4xl p-6 flex flex-col items-center justify-center space-y-4"
         id="bg-container"
       >
+        {renderAmount()}
         {/* Status Icon */}
         <div>
           {renderIcon()}
