@@ -1,6 +1,8 @@
 import { useTranslate } from '@tolgee/react'
 import { motion } from 'framer-motion'
-import { Copy, ExternalLink, RefreshCw, X } from 'lucide-react'
+import {
+  Copy, ExternalLink, RefreshCw, X,
+} from 'lucide-react'
 import React from 'react'
 
 import { PaginatedTransactionListTransactionsItem } from '../../../api'
@@ -50,7 +52,11 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({
 
   return (
     <motion.div
-      animate={{ opacity: 1, x: 0, y: 0 }}
+      animate={{
+        opacity: 1,
+        x: 0,
+        y: 0,
+      }}
       className="w-screen md:w-auto md:mx-0 md:ml-auto md:max-w-md md:flex md:items-center fixed md:relative left-0 md:left-auto top-auto md:top-auto bottom-0 md:bottom-auto h-[80vh] md:h-[95vh]"
       exit={{
         opacity: window.innerWidth >= 768 ? 1 : 0,
@@ -93,9 +99,7 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({
         {/* Wallet Address & Balance Card */}
         <div
           className="border border-gray-200 rounded-xl p-6 py-8 mb-6 bg-cover bg-center bg-no-repeat"
-          style={{
-            backgroundImage: 'url(https://static.vecteezy.com/system/resources/previews/026/493/927/non_2x/abstract-gradient-dark-green-liquid-wave-background-free-vector.jpg)',
-          }}
+          style={{ backgroundImage: 'url(https://static.vecteezy.com/system/resources/previews/026/493/927/non_2x/abstract-gradient-dark-green-liquid-wave-background-free-vector.jpg)' }}
         >
           {/* Wallet Address Section */}
           <div className="flex items-center justify-between mb-4">
@@ -250,7 +254,10 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({
                             {transaction.quote.targetCurrency === 'BRL' ? 'R$' : '$'}
                             {transaction.quote.targetAmount.toLocaleString(
                               transaction.quote.targetCurrency === 'BRL' ? 'pt-BR' : 'es-CO',
-                              { maximumFractionDigits: 2, minimumFractionDigits: 2 },
+                              {
+                                maximumFractionDigits: 2,
+                                minimumFractionDigits: 2,
+                              },
                             )}
                           </span>
                         </div>

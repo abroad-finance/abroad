@@ -1,4 +1,6 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, {
+  useCallback, useEffect, useMemo, useRef, useState,
+} from 'react'
 
 // Local overlay to avoid cross-zone import restrictions
 
@@ -141,7 +143,10 @@ export const HiddenLogViewer: React.FC = () => {
   const filtered = useMemo(() => logs.filter(l => filter[l.level]), [logs, filter])
 
   const toggleLevel = (lvl: LogLevel) =>
-    setFilter(f => ({ ...f, [lvl]: !f[lvl] }))
+    setFilter(f => ({
+      ...f,
+      [lvl]: !f[lvl],
+    }))
 
   if (!import.meta.env.DEV) return null
 

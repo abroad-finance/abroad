@@ -46,7 +46,8 @@ export default function TxStatus({ onNewTransaction, onRetry, transactionId }: T
 
     const onEvent = (payload: unknown) => {
       try {
-        const data = (typeof payload === 'string' ? JSON.parse(payload) : payload) as { id?: string, status?: ApiStatus }
+        const data = (typeof payload === 'string' ? JSON.parse(payload) : payload) as { id?: string
+          status?: ApiStatus }
         if (!data || data.id !== transactionId) return
         setStatus(mapStatus(data.status as ApiStatus))
       }

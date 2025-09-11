@@ -44,7 +44,10 @@ export function useWalletDetails(params: Params = {}): WalletDetailsProps {
       ))
       if (usdcBalance && 'balance' in usdcBalance) {
         const balanceValue = parseFloat(usdcBalance.balance)
-        return balanceValue.toLocaleString('en-US', { maximumFractionDigits: 2, minimumFractionDigits: 2 })
+        return balanceValue.toLocaleString('en-US', {
+          maximumFractionDigits: 2,
+          minimumFractionDigits: 2,
+        })
       }
       return '0.00'
     }
@@ -78,7 +81,11 @@ export function useWalletDetails(params: Params = {}): WalletDetailsProps {
         return
       }
       const response = await listPartnerTransactions(
-        { externalUserId: kit.address, page: 1, pageSize: 10 },
+        {
+          externalUserId: kit.address,
+          page: 1,
+          pageSize: 10,
+        },
       )
       if (response.status === 200) setTransactions(response.data.transactions)
       else setTransactionError(t('wallet_details.error.fetch_failed', 'Failed to fetch transactions'))
@@ -197,7 +204,11 @@ export function useWalletDetails(params: Params = {}): WalletDetailsProps {
 
   const formatDate = useCallback((dateString: string) => {
     const date = new Date(dateString)
-    return date.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })
+    return date.toLocaleDateString('en-US', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    })
   }, [])
 
   return {

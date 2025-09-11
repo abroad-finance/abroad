@@ -1,4 +1,6 @@
-import { BackendFetch, DevTools, FormatSimple, LanguageDetector, LanguageStorage, Tolgee } from '@tolgee/react'
+import {
+  BackendFetch, DevTools, FormatSimple, LanguageDetector, LanguageStorage, Tolgee,
+} from '@tolgee/react'
 
 export const tolgee = Tolgee()
   .use(DevTools())

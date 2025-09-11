@@ -29,6 +29,7 @@ import { TYPES } from '../types'
 const acceptTransactionRequestSchema = z.object({
   account_number: z.string().min(1, 'Account number is required'),
   bank_code: z.string().min(1, 'Bank code is required'),
+  qr_code: z.string().nullable().optional(),
   quote_id: z.string().min(1, 'Quote ID is required'),
   redirectUrl: z.string().optional(),
   tax_id: z.string().optional(),
@@ -38,6 +39,7 @@ const acceptTransactionRequestSchema = z.object({
 interface AcceptTransactionRequest {
   account_number: string
   bank_code: string
+  qr_code?: null | string
   quote_id: string
   redirectUrl?: string
   tax_id?: string
@@ -104,6 +106,7 @@ export class TransactionController extends Controller {
     const {
       account_number: accountNumber,
       bank_code: bankCode,
+      qr_code: qrCode,
       quote_id: quoteId,
       redirectUrl: redirectUrl,
       tax_id: taxId,
@@ -238,6 +241,7 @@ export class TransactionController extends Controller {
           accountNumber,
           bankCode,
           partnerUserId: partnerUser.id,
+          qrCode,
           quoteId: quoteId,
           status: TransactionStatus.AWAITING_PAYMENT,
           taxId,

@@ -19,7 +19,8 @@ export interface LanguageSelectorProps {
   }
   languages: string[]
   /** Optional custom mapping for code -> { name, flag } */
-  metaMap?: Record<string, { flag: string, name: string }>
+  metaMap?: Record<string, { flag: string
+    name: string }>
   /** Committed language value + change callback */
   onChange: (lng: string) => void
   onDraftChange: (lng: string) => void
@@ -31,13 +32,32 @@ export interface LanguageSelectorProps {
   variant?: 'desktop' | 'mobile'
 }
 
-const DEFAULT_META: Record<string, { flag: string, name: string }> = {
-  ar: { flag: 'sa', name: 'العربية' },
-  en: { flag: 'gb', name: 'English' },
-  es: { flag: 'es', name: 'Español' },
-  pt: { flag: 'br', name: 'Português' },
-  ru: { flag: 'ru', name: 'Русский' },
-  zh: { flag: 'cn', name: '中文' },
+const DEFAULT_META: Record<string, { flag: string
+  name: string }> = {
+  ar: {
+    flag: 'sa',
+    name: 'العربية',
+  },
+  en: {
+    flag: 'gb',
+    name: 'English',
+  },
+  es: {
+    flag: 'es',
+    name: 'Español',
+  },
+  pt: {
+    flag: 'br',
+    name: 'Português',
+  },
+  ru: {
+    flag: 'ru',
+    name: 'Русский',
+  },
+  zh: {
+    flag: 'cn',
+    name: '中文',
+  },
 }
 
 const LanguageSelector: React.FC<LanguageSelectorProps> = ({
@@ -54,7 +74,10 @@ const LanguageSelector: React.FC<LanguageSelectorProps> = ({
   value,
   variant = 'desktop',
 }) => {
-  const currentMeta = metaMap[value] || { flag: value, name: value.toUpperCase() }
+  const currentMeta = metaMap[value] || {
+    flag: value,
+    name: value.toUpperCase(),
+  }
 
   // Fallbacks (hook can override via `labels`)
   const title = labels?.title ?? 'Configuración de Idioma'
@@ -116,7 +139,11 @@ const LanguageSelector: React.FC<LanguageSelectorProps> = ({
               />
               {/* Panel */}
               <motion.div
-                animate={{ opacity: 1, x: 0, y: 0 }}
+                animate={{
+                  opacity: 1,
+                  x: 0,
+                  y: 0,
+                }}
                 className="w-screen md:w-auto md:mx-0 md:ml-auto md:max-w-md md:flex md:items-center fixed md:relative left-0 md:left-auto top-auto md:top-auto bottom-0 md:bottom-auto h-[80vh] md:h-[95vh] z-[10000]"
                 exit={{
                   opacity: typeof window !== 'undefined' && window.innerWidth >= 768 ? 1 : 0,
@@ -153,7 +180,10 @@ const LanguageSelector: React.FC<LanguageSelectorProps> = ({
                     <div className="space-y-3">
                       {languages.map((code) => {
                         const meta
-                          = metaMap[code] || { flag: code, name: code.toUpperCase() }
+                          = metaMap[code] || {
+                            flag: code,
+                            name: code.toUpperCase(),
+                          }
                         const selected = draft === code
                         return (
                           <button

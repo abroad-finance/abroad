@@ -1,5 +1,7 @@
 import { useTranslate } from '@tolgee/react'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  useCallback, useEffect, useMemo, useRef, useState,
+} from 'react'
 
 import type { SwapProps } from '../components/Swap'
 import type { SwapView } from '../types'

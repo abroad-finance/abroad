@@ -1,5 +1,7 @@
 import { useTranslate } from '@tolgee/react'
-import { ArrowLeft, Hash, Loader, Rotate3d } from 'lucide-react'
+import {
+  ArrowLeft, Hash, Loader, Rotate3d,
+} from 'lucide-react'
 import React, { memo, useMemo } from 'react'
 
 import { _36EnumsTargetCurrency as TargetCurrency } from '../../../api'

@@ -8,15 +8,11 @@ import {
   Timer,
   Wallet,
 } from 'lucide-react'
-import React, { lazy, Suspense } from 'react'
-
-import { Button } from '../../../shared/components/Button'
-import { TokenBadge } from '../../../shared/components/TokenBadge'
-const IconAnimated = lazy(() =>
-  import('../../../shared/components/IconAnimated').then(m => ({ default: m.IconAnimated })),
-)
+import React from 'react'
 
 import { _36EnumsTargetCurrency as TargetCurrency } from '../../../api'
+import { Button } from '../../../shared/components/Button'
+import { TokenBadge } from '../../../shared/components/TokenBadge'
 
 export interface SwapProps {
   continueDisabled: boolean
@@ -125,111 +121,95 @@ export default function Swap({
         </div>
 
         {/* TARGET or Connect notice */}
-        {isAuthenticated
-          ? (
+
+        <div
+          className="relative w-full bg-white/60 backdrop-blur-xl rounded-2xl p-4 md:py-6 md:px-6 flex items-center justify-between"
+          id="target-amount"
+        >
+          {/* chevrons */}
+          <div className="absolute -top-4 left-1/2 -translate-x-1/2 w-8 h-8 bg-[#356E6A]/5 rounded-full grid place-items-center">
+            <ChevronsDown className="w-4 h-4" color="#356E6A" />
+          </div>
+
+          {/* input */}
+          <div className="flex-1 flex items-center gap-2 min-w-0">
+            <span className="text-xl md:text-2xl font-bold shrink-0">
+              {targetSymbol}
+            </span>
+            {loadingTarget
+              ? (
+                  <Loader className="animate-spin w-6 h-6" />
+                )
+              : (
+                  <input
+                    className="w-full bg-transparent font-bold focus:outline-none text-xl md:text-2xl"
+                    inputMode="decimal"
+                    onChange={e => onTargetChange(e.target.value)}
+                    pattern="[0-9.,]*"
+                    placeholder="0,00"
+
+                    type="text"
+                    value={targetAmount}
+                  />
+                )}
+          </div>
+
+          {/* currency selector */}
+          <div className="relative ml-2 shrink-0" ref={currencyMenuRef}>
+            <button
+              aria-expanded={currencyMenuOpen}
+              aria-haspopup="listbox"
+              className="focus:outline-none cursor-pointer"
+              onClick={toggleCurrencyMenu}
+              type="button"
+            >
+              <TokenBadge
+                alt={`${targetCurrency} Flag`}
+                iconSrc={
+                  targetCurrency === TargetCurrency.BRL
+                    ? 'https://hatscripts.github.io/circle-flags/flags/br.svg'
+                    : 'https://hatscripts.github.io/circle-flags/flags/co.svg'
+                }
+                symbol={targetCurrency}
+              />
+            </button>
+
+            {currencyMenuOpen && (
               <div
-                className="relative w-full bg-white/60 backdrop-blur-xl rounded-2xl p-4 md:py-6 md:px-6 flex items-center justify-between"
-                id="target-amount"
+                className="absolute left-0 top-[calc(100%+8px)] z-50 bg-white/95 backdrop-blur-xl rounded-xl shadow-lg p-2 space-y-1 min-w-[100px]"
+                role="listbox"
               >
-                {/* chevrons */}
-                <div className="absolute -top-4 left-1/2 -translate-x-1/2 w-8 h-8 bg-[#356E6A]/5 rounded-full grid place-items-center">
-                  <ChevronsDown className="w-4 h-4" color="#356E6A" />
-                </div>
+                <button
+                  aria-selected={targetCurrency === TargetCurrency.COP}
+                  className="w-full text-left hover:bg-black/5 rounded-lg px-1 py-1 cursor-pointer"
+                  onClick={() => selectCurrency(TargetCurrency.COP)}
+                  role="option"
+                  type="button"
+                >
+                  <TokenBadge
+                    alt="Colombia flag"
+                    iconSrc="https://hatscripts.github.io/circle-flags/flags/co.svg"
+                    symbol="COP"
+                  />
+                </button>
 
-                {/* input */}
-                <div className="flex-1 flex items-center gap-2 min-w-0">
-                  <span className="text-xl md:text-2xl font-bold shrink-0">
-                    {targetSymbol}
-                  </span>
-                  {loadingTarget
-                    ? (
-                        <Loader className="animate-spin w-6 h-6" />
-                      )
-                    : (
-                        <input
-                          className="w-full bg-transparent font-bold focus:outline-none text-xl md:text-2xl"
-                          inputMode="decimal"
-                          onChange={e => onTargetChange(e.target.value)}
-                          pattern="[0-9.,]*"
-                          placeholder="0,00"
-
-                          type="text"
-                          value={targetAmount}
-                        />
-                      )}
-                </div>
-
-                {/* currency selector */}
-                <div className="relative ml-2 shrink-0" ref={currencyMenuRef}>
-                  <button
-                    aria-expanded={currencyMenuOpen}
-                    aria-haspopup="listbox"
-                    className="focus:outline-none cursor-pointer"
-                    onClick={toggleCurrencyMenu}
-                    type="button"
-                  >
-                    <TokenBadge
-                      alt={`${targetCurrency} Flag`}
-                      iconSrc={
-                        targetCurrency === TargetCurrency.BRL
-                          ? 'https://hatscripts.github.io/circle-flags/flags/br.svg'
-                          : 'https://hatscripts.github.io/circle-flags/flags/co.svg'
-                      }
-                      symbol={targetCurrency}
-                    />
-                  </button>
-
-                  {currencyMenuOpen && (
-                    <div
-                      className="absolute left-0 top-[calc(100%+8px)] z-50 bg-white/95 backdrop-blur-xl rounded-xl shadow-lg p-2 space-y-1 min-w-[100px]"
-                      role="listbox"
-                    >
-                      <button
-                        aria-selected={targetCurrency === TargetCurrency.COP}
-                        className="w-full text-left hover:bg-black/5 rounded-lg px-1 py-1 cursor-pointer"
-                        onClick={() => selectCurrency(TargetCurrency.COP)}
-                        role="option"
-                        type="button"
-                      >
-                        <TokenBadge
-                          alt="Colombia flag"
-                          iconSrc="https://hatscripts.github.io/circle-flags/flags/co.svg"
-                          symbol="COP"
-                        />
-                      </button>
-
-                      <button
-                        aria-selected={targetCurrency === TargetCurrency.BRL}
-                        className="cursor-pointer w-full text-left hover:bg-black/5 rounded-lg px-1 py-1"
-                        onClick={() => selectCurrency(TargetCurrency.BRL)}
-                        role="option"
-                        type="button"
-                      >
-                        <TokenBadge
-                          alt="Brazil flag"
-                          iconSrc="https://hatscripts.github.io/circle-flags/flags/br.svg"
-                          symbol="BRL"
-                        />
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )
-          : (
-              <div className="w-full bg-white/60 backdrop-blur-xl rounded-2xl p-4 md:py-6 md:px-6 flex items-center justify-center gap-4">
-                <div className="flex-shrink-0">
-                  <Suspense fallback={null}>
-                    <IconAnimated icon="Denied" loop={false} play size={40} />
-                  </Suspense>
-                </div>
-                <div className="flex flex-col space-y-1">
-                  <span className="text-lg font-semibold">
-                    {t('swap.connect_to_quote', 'Conecta tu billetera para poder cotizar')}
-                  </span>
-                </div>
+                <button
+                  aria-selected={targetCurrency === TargetCurrency.BRL}
+                  className="cursor-pointer w-full text-left hover:bg-black/5 rounded-lg px-1 py-1"
+                  onClick={() => selectCurrency(TargetCurrency.BRL)}
+                  role="option"
+                  type="button"
+                >
+                  <TokenBadge
+                    alt="Brazil flag"
+                    iconSrc="https://hatscripts.github.io/circle-flags/flags/br.svg"
+                    symbol="BRL"
+                  />
+                </button>
               </div>
             )}
+          </div>
+        </div>
 
         {/* Info */}
         <div className="flex-1 flex items-center justify-center w-full">

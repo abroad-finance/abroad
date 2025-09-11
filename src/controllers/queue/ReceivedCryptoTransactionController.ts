@@ -200,6 +200,7 @@ export class ReceivedCryptoTransactionController {
         account: transactionRecord.accountNumber,
         bankCode: transactionRecord.bankCode,
         id: transactionRecord.id,
+        qrCode: transactionRecord.qrCode,
         value: transactionRecord.quote.targetAmount,
       })
 

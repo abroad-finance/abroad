@@ -23,26 +23,25 @@ import BackgroundCrossfade from '../../shared/components/BackgroundCrossfade'
 import LanguageSelector from '../../shared/components/LanguageSelector'
 import { ModalOverlay } from '../../shared/components/ModalOverlay'
 import { useLanguageSelector, useNavBarResponsive } from '../../shared/hooks'
-import { useWalletAuth } from '../../shared/hooks/useWalletAuth'
 
 export interface WebSwapControllerProps {
   closeQr: () => void
   currentBgUrl: string
   handleBackToSwap: () => void
   handleQrResult: (text: string) => Promise<void>
+  handleTransactionFlow: () => Promise<void>
   handleWalletDetailsClose: () => void
   handleWalletDetailsOpen: () => void
   isDecodingQr: boolean
   isDesktop: boolean
   isQrOpen: boolean
   isWalletDetailsOpen: boolean
+  loadingSubmit: boolean
   resetForNewTransaction: () => void
   setIsQrOpen: (isOpen: boolean) => void
 }
 
 const WebSwap: React.FC = () => {
-  const { kit } = useWalletAuth()
-
   // State management
   const [view, setView] = useState<SwapView>('swap')
   const [transactionId, setTransactionId] = useState<null | string>(null)
@@ -53,6 +52,9 @@ const WebSwap: React.FC = () => {
   const [pixKey, setPixKey] = useState<string>('')
   const [taxId, setTaxId] = useState<string>('')
   const [recipentName, setRecipentName] = useState<string>('')
+  const [accountNumber, setAccountNumber] = useState('')
+  const [bankCode, setBankCode] = useState<string>('')
+  const [qrCode, setQrCode] = useState<null | string>(null)
 
   // Main controller
   const {
@@ -60,16 +62,24 @@ const WebSwap: React.FC = () => {
     currentBgUrl,
     handleBackToSwap,
     handleQrResult,
+    handleTransactionFlow,
     handleWalletDetailsClose,
     handleWalletDetailsOpen,
     isDecodingQr,
     isDesktop,
     isQrOpen,
     isWalletDetailsOpen,
+    loadingSubmit,
     resetForNewTransaction,
     setIsQrOpen,
   } = useWebSwapController({
+    accountNumber,
+    bankCode,
+    pixKey,
+    qrCode,
+    quoteId,
     setPixKey,
+    setQrCode,
     setQuoteId,
     setRecipentName,
     setSourceAmount,
@@ -78,30 +88,28 @@ const WebSwap: React.FC = () => {
     setTaxId,
     setTransactionId,
     setView,
+    sourceAmount,
     targetCurrency,
+    taxId,
   })
 
   // Components controllers
-  const navBar = useNavBarResponsive({
-    onWalletDetails: handleWalletDetailsOpen,
-  })
+  const navBar = useNavBarResponsive({ onWalletDetails: handleWalletDetailsOpen })
   const languageSelector = useLanguageSelector()
   const walletDetails = useWalletDetails({ onClose: handleWalletDetailsClose })
   const bankDetailRoute = useBankDetailsRoute({
+    accountNumber,
     isDesktop,
     onBackClick: handleBackToSwap,
-    onRedirectToHome: resetForNewTransaction,
     pixKey,
-    quoteId,
+    setAccountNumber,
+    setBankCode,
     setPixKey,
     setTaxId,
-    setTransactionId,
     setView,
-    sourceAmount,
     targetAmount,
     targetCurrency,
     taxId,
-    userId: kit?.address || null,
   })
   const swap = useSwap({
     isDesktop,
@@ -127,9 +135,9 @@ const WebSwap: React.FC = () => {
       setView('bankDetails')
       return
     }
-    bankDetailRoute.onContinue()
+    handleTransactionFlow()
   }, [
-    bankDetailRoute,
+    handleTransactionFlow,
     sourceAmount,
     targetAmount,
     targetCurrency,
@@ -162,11 +170,11 @@ const WebSwap: React.FC = () => {
       <main className="flex-1 relative z-10 flex">
         <WebSwapLayout
           slots={{
-            bankDetails: <BankDetailsRoute {...bankDetailRoute} onContinue={() => setView('confirm-qr')} />,
+            bankDetails: <BankDetailsRoute {...bankDetailRoute} />,
             confirmQr: (
               <ConfirmQr
                 currency={targetCurrency}
-                loadingSubmit={bankDetailRoute.loadingSubmit}
+                loadingSubmit={loadingSubmit}
                 onBack={handleBackToSwap}
                 onConfirm={handleOnConfirmQR}
                 onEdit={() => setView('swap')}

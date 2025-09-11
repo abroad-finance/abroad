@@ -27,15 +27,11 @@ export interface IPaymentService {
 
   readonly percentageFee: number
 
-  sendPayment({
-    account,
-    bankCode,
-    id,
-    value,
-  }: {
+  sendPayment(params: {
     account: string
     bankCode: string
     id: string
+    qrCode?: null | string
     value: number
   }): Promise<
     | {

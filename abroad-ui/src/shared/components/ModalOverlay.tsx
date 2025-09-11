@@ -39,7 +39,10 @@ export const ModalOverlay: React.FC<ModalOverlayProps> = ({
           exit={{ opacity: 0 }}
           initial={{ opacity: 0 }}
           onClick={onClose}
-          transition={{ duration: 0.2, ease: 'easeOut' }}
+          transition={{
+            duration: 0.2,
+            ease: 'easeOut',
+          }}
         >
           <div className={containerClassName} onClick={e => e.stopPropagation()}>
             {children}

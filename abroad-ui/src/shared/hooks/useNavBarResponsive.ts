@@ -1,6 +1,8 @@
 import { Horizon } from '@stellar/stellar-sdk'
 import { useTranslate } from '@tolgee/react'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  useCallback, useEffect, useMemo, useRef, useState,
+} from 'react'
 
 import type { NavBarResponsiveProps } from '../../features/swap/components/NavBarResponsive'
 
@@ -12,10 +14,16 @@ const DEFAULT_USDC_ISSUER = 'GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K
 const DEFAULT_INFO_URL = 'https://linktr.ee/Abroad.finance'
 
 type BalanceLine
-  = | { asset_code: string, asset_issuer: string, asset_type: string, balance: string }
-    | { asset_type: 'native', balance: string }
+  = | { asset_code: string
+    asset_issuer: string
+    asset_type: string
+    balance: string }
+    | { asset_type: 'native'
+      balance: string }
 
-interface FetchBalanceOpts { address: string, horizonUrl: string, usdcIssuer: string }
+interface FetchBalanceOpts { address: string
+  horizonUrl: string
+  usdcIssuer: string }
 
 async function fetchUSDCBalance({ address, horizonUrl, usdcIssuer }: FetchBalanceOpts): Promise<string> {
   try {
@@ -32,7 +40,10 @@ async function fetchUSDCBalance({ address, horizonUrl, usdcIssuer }: FetchBalanc
     if (!usdc) return '0.00'
     const n = parseFloat(usdc.balance || '0')
     if (!Number.isFinite(n)) return '0.00'
-    return n.toLocaleString('en-US', { maximumFractionDigits: 2, minimumFractionDigits: 2 })
+    return n.toLocaleString('en-US', {
+      maximumFractionDigits: 2,
+      minimumFractionDigits: 2,
+    })
   }
   catch (err) {
     const message = err instanceof Error ? err.message : String(err)
@@ -58,7 +69,11 @@ function useUSDCBalance(address?: null | string, horizonUrl = DEFAULT_HORIZON_UR
     setLoading(true)
     setError(null)
     try {
-      const b = await fetchUSDCBalance({ address, horizonUrl, usdcIssuer })
+      const b = await fetchUSDCBalance({
+        address,
+        horizonUrl,
+        usdcIssuer,
+      })
       if (token === inFlight.current) setBalance(b)
     }
     catch (e) {
@@ -80,7 +95,12 @@ function useUSDCBalance(address?: null | string, horizonUrl = DEFAULT_HORIZON_UR
     void refetch()
   }, [refetch])
 
-  return { balance, error, loading, refetch }
+  return {
+    balance,
+    error,
+    loading,
+    refetch,
+  }
 }
 
 const normalizeWalletKind = (id?: null | string) => {
@@ -155,7 +175,8 @@ export function useNavBarResponsive({
 
   const walletInfo = useMemo(() => {
     const kind = normalizeWalletKind(kit?.walletId)
-    const map: Record<string, { icon?: string, name: string }> = {
+    const map: Record<string, { icon?: string
+      name: string }> = {
       freighter: { name: 'Freighter' },
       hana: { name: 'Hana' },
       lobstr: { name: 'Lobstr' },

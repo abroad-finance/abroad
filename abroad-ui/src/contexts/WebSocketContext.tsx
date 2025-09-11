@@ -1,4 +1,6 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import React, {
+  createContext, useCallback, useContext, useEffect, useMemo, useRef, useState,
+} from 'react'
 import { io, type Socket } from 'socket.io-client'
 
 import { useWalletAuth } from '../shared/hooks/useWalletAuth'
@@ -58,7 +60,10 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       return
     }
     const url = resolveWsUrl()
-    const socket = io(url, { auth: { userId: kit?.address }, transports: ['websocket'] })
+    const socket = io(url, {
+      auth: { userId: kit?.address },
+      transports: ['websocket'],
+    })
     socketRef.current = socket
 
     const onConnect = () => {
@@ -106,7 +111,12 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     if (s) s.off(event, handler)
   }, [])
 
-  const value = useMemo<WebSocketApi>(() => ({ connected, error, off, on }), [
+  const value = useMemo<WebSocketApi>(() => ({
+    connected,
+    error,
+    off,
+    on,
+  }), [
     on,
     off,
     connected,

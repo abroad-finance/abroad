@@ -11,7 +11,14 @@ import PlusCircleHoverSwirl from '../../assets/animated/PlusCircleHoverSwirl.jso
 import SphereInReveal from '../../assets/animated/SphereInReveal.json'
 
 const Icons = {
-  AnimatedCheck, BarChartInReveal, Coins, Denied, DocumentSign, MagnifyingGlass, PlusCircleHoverSwirl, SphereInReveal,
+  AnimatedCheck,
+  BarChartInReveal,
+  Coins,
+  Denied,
+  DocumentSign,
+  MagnifyingGlass,
+  PlusCircleHoverSwirl,
+  SphereInReveal,
 }
 
 type Props = {
@@ -27,7 +34,15 @@ type Props = {
   size?: number
 }
 
-export const IconAnimated = ({ className, colors, icon, loop, onComplete, play, size }: Props) => {
+export const IconAnimated = ({
+  className,
+  colors,
+  icon,
+  loop,
+  onComplete,
+  play,
+  size,
+}: Props) => {
   const playerRef = useRef<null | Player>(null)
 
   const start = useCallback(() => {

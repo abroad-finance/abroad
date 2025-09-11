@@ -69,7 +69,10 @@ export function useStellarKitWallet(
         address,
         networkPassphrase: network,
       })
-      return { signedTxXdr, signerAddress: address as string | undefined }
+      return {
+        signedTxXdr,
+        signerAddress: address as string | undefined,
+      }
     },
     [address, ensureKit],
   )

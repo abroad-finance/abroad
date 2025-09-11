@@ -12,6 +12,7 @@ import { inject, injectable } from 'inversify'
 import { IDatabaseClientProvider } from '../interfaces/IDatabaseClientProvider'
 import { IExchangeProviderFactory } from '../interfaces/IExchangeProviderFactory'
 import { IPaymentServiceFactory } from '../interfaces/IPaymentServiceFactory'
+import { ISecretManager } from '../interfaces/ISecretManager'
 import { TYPES } from '../types'
 
 // Interface for QuoteUseCase
@@ -32,7 +33,7 @@ interface CreateQuoteParams {
   amount: number
   cryptoCurrency: CryptoCurrency
   network: BlockchainNetwork
-  partner: Partner
+  partner?: Partner
   paymentMethod: PaymentMethod
   targetCurrency: TargetCurrency
 }
@@ -41,7 +42,7 @@ interface CreateQuoteParams {
 interface CreateReverseQuoteParams {
   cryptoCurrency: CryptoCurrency
   network: BlockchainNetwork
-  partner: Partner
+  partner?: Partner
   paymentMethod: PaymentMethod
   sourceAmountInput: number
   targetCurrency: TargetCurrency
@@ -58,6 +59,7 @@ export class QuoteUseCase implements IQuoteUseCase {
     private paymentServiceFactory: IPaymentServiceFactory,
     @inject(TYPES.IExchangeProviderFactory)
     private exchangeProviderFactory: IExchangeProviderFactory,
+    @inject(TYPES.ISecretManager) private secretManager: ISecretManager,
   ) { }
 
   public async createQuote(params: CreateQuoteParams): Promise<QuoteResponse> {
@@ -84,13 +86,29 @@ export class QuoteUseCase implements IQuoteUseCase {
 
     const prismaClient = await this.dbClientProvider.getClient()
 
+    const sepPartnerId = await this.secretManager.getSecret('STELLAR_SEP_PARTNER_ID')
+    const sepPartner = await prismaClient.partner.findFirst({
+      where: { id: sepPartnerId },
+    })
+
+    let quotePartner: Partner
+    if (partner) {
+      quotePartner = partner
+    }
+    else if (sepPartner) {
+      quotePartner = sepPartner
+    }
+    else {
+      throw new Error('No partner information available for quote creation')
+    }
+
     const quote = await prismaClient.quote.create({
       data: {
         country: Country.CO,
         cryptoCurrency,
         expirationDate,
         network,
-        partnerId: partner.id,
+        partnerId: quotePartner.id,
         paymentMethod,
         sourceAmount,
         targetAmount: amount,
@@ -125,13 +143,29 @@ export class QuoteUseCase implements IQuoteUseCase {
     }
 
     const prismaClient = await this.dbClientProvider.getClient()
+    const sepPartnerId = await this.secretManager.getSecret('STELLAR_SEP_PARTNER_ID')
+    const sepPartner = await prismaClient.partner.findFirst({
+      where: { id: sepPartnerId },
+    })
+
+    let quotePartner: Partner
+    if (partner) {
+      quotePartner = partner
+    }
+    else if (sepPartner) {
+      quotePartner = sepPartner
+    }
+    else {
+      throw new Error('No partner information available for quote creation')
+    }
+
     const quote = await prismaClient.quote.create({
       data: {
         country: Country.CO,
         cryptoCurrency,
         expirationDate,
         network,
-        partnerId: partner.id,
+        partnerId: quotePartner.id,
         paymentMethod,
         sourceAmount: sourceAmountInput,
         targetAmount,

@@ -12,8 +12,12 @@ export const useWalletAuthentication = (): IWalletAuthentication => {
     _setJwtToken(token)
   }, [])
 
-  const getAuthToken = useCallback(async ({ address, signedMessage }: { address: string, signedMessage: string }): Promise<{ token: string }> => {
-    const res = await verify({ address, signedXDR: signedMessage })
+  const getAuthToken = useCallback(async ({ address, signedMessage }: { address: string
+    signedMessage: string }): Promise<{ token: string }> => {
+    const res = await verify({
+      address,
+      signedXDR: signedMessage,
+    })
     if (res.status !== 200) throw new Error('Failed to verify signature')
     return { token: res.data.token }
   }, [])

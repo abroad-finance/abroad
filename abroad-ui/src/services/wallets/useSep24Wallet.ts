@@ -3,9 +3,7 @@ import { useEffect, useState } from 'react'
 import { IWallet } from '../../interfaces/IWallet'
 import { IWalletAuthentication } from '../../interfaces/IWalletAuthentication'
 
-export const useSep24Wallet = ({
-  walletAuthentication,
-}: {
+export const useSep24Wallet = ({ walletAuthentication }: {
   walletAuthentication: IWalletAuthentication
 }): IWallet => {
   const [address, setAddress] = useState<null | string>(null)
@@ -22,7 +20,10 @@ export const useSep24Wallet = ({
 
   const signTransaction: IWallet['signTransaction'] = async () => {
     window.close()
-    return { signedTxXdr: '', signerAddress: undefined }
+    return {
+      signedTxXdr: '',
+      signerAddress: undefined,
+    }
   }
 
   useEffect(() => {

@@ -1,5 +1,7 @@
 import { useTranslate } from '@tolgee/react'
-import { ArrowLeft, Hash, Loader, Rotate3d } from 'lucide-react'
+import {
+  ArrowLeft, Hash, Loader, Rotate3d,
+} from 'lucide-react'
 import React from 'react'
 
 import { _36EnumsTargetCurrency as TargetCurrency } from '../../../api'
@@ -14,7 +16,6 @@ export interface BankDetailsRouteProps {
   continueDisabled: boolean
   errorBanks: null | string
   loadingBanks: boolean
-  loadingSubmit: boolean
   onAccountNumberChange: (value: string) => void
   onBackClick: () => void
   onContinue: () => void
@@ -37,7 +38,6 @@ export default function BankDetailsRoute({
   continueDisabled,
   errorBanks,
   loadingBanks,
-  loadingSubmit,
   onAccountNumberChange,
   onBackClick,
   onContinue,
@@ -258,13 +258,7 @@ export default function BankDetailsRoute({
         disabled={continueDisabled}
         onClick={onContinue}
       >
-        {loadingSubmit
-          ? (
-              <Loader className="animate-spin w-4 h-4 sm:w-5 sm:h-5" />
-            )
-          : (
-              t('bank_details.continue', 'Continuar')
-            )}
+        {t('bank_details.continue', 'Continuar')}
       </Button>
     </div>
   )

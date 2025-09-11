@@ -43,7 +43,8 @@ export interface NavBarResponsiveProps {
   /** Mobile language selector slot */
   languageSelectorMobile?: React.ReactNode
   onWalletClick: () => void
-  walletInfo: { icon?: string, name: string }
+  walletInfo: { icon?: string
+    name: string }
 }
 
 /**

@@ -30,12 +30,24 @@ const AnimatedHeroText: React.FC<Props> = ({ currency = 'COP' }) => {
           <span>{t('hero.preposition.to', 'a')}</span>
           <AnimatePresence mode="wait">
             <motion.div
-              animate={{ opacity: 1, y: 0 }}
+              animate={{
+                opacity: 1,
+                y: 0,
+              }}
               className="flex items-center gap-2"
-              exit={{ opacity: 0, y: -10 }}
-              initial={{ opacity: 0, y: 10 }}
+              exit={{
+                opacity: 0,
+                y: -10,
+              }}
+              initial={{
+                opacity: 0,
+                y: 10,
+              }}
               key={currency}
-              transition={{ duration: 0.5, ease: 'easeInOut' }}
+              transition={{
+                duration: 0.5,
+                ease: 'easeInOut',
+              }}
             >
               <img
                 alt={`${displayName} flag`}
@@ -62,12 +74,24 @@ const AnimatedHeroText: React.FC<Props> = ({ currency = 'COP' }) => {
           <span>{t('hero.preposition.to', 'a')}</span>
           <AnimatePresence mode="wait">
             <motion.div
-              animate={{ opacity: 1, y: 0 }}
+              animate={{
+                opacity: 1,
+                y: 0,
+              }}
               className="flex items-center gap-2"
-              exit={{ opacity: 0, y: -10 }}
-              initial={{ opacity: 0, y: 10 }}
+              exit={{
+                opacity: 0,
+                y: -10,
+              }}
+              initial={{
+                opacity: 0,
+                y: 10,
+              }}
               key={currency}
-              transition={{ duration: 0.5, ease: 'easeInOut' }}
+              transition={{
+                duration: 0.5,
+                ease: 'easeInOut',
+              }}
             >
               <img
                 alt={`${displayName} flag`}

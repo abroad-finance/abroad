@@ -1,6 +1,8 @@
 // hooks/useLanguageSelector.ts
 import { useTolgee, useTranslate } from '@tolgee/react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import {
+  useCallback, useEffect, useMemo, useState,
+} from 'react'
 
 import type { LanguageSelectorProps } from '../components/LanguageSelector'
 

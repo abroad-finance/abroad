@@ -18,11 +18,13 @@ const QrScannerFullScreen: React.FC<QrScannerFullScreenProps> = ({ onClose, onRe
     else if (Array.isArray(result)) {
       const first = result[0] as unknown
       if (first && typeof first === 'object') {
-        text = (first as { rawValue?: string, text?: string }).rawValue || (first as { text?: string }).text || ''
+        text = (first as { rawValue?: string
+          text?: string }).rawValue || (first as { text?: string }).text || ''
       }
     }
     else if (result && typeof result === 'object') {
-      text = (result as { rawValue?: string, text?: string }).rawValue || (result as { text?: string }).text || ''
+      text = (result as { rawValue?: string
+        text?: string }).rawValue || (result as { text?: string }).text || ''
     }
     if (text) onResult(text)
   }
@@ -46,7 +48,18 @@ const QrScannerFullScreen: React.FC<QrScannerFullScreenProps> = ({ onClose, onRe
           constraints={{ facingMode: 'environment' }}
           onError={() => { /* ignore camera errors */ }}
           onScan={handleScan}
-          styles={{ container: { height: '100%', maxHeight: '85vh', width: '100%' }, video: { height: '100%', objectFit: 'cover', width: '100%' } }}
+          styles={{
+            container: {
+              height: '100%',
+              maxHeight: '85vh',
+              width: '100%',
+            },
+            video: {
+              height: '100%',
+              objectFit: 'cover',
+              width: '100%',
+            },
+          }}
         />
 
         {/* Bottom help text */}

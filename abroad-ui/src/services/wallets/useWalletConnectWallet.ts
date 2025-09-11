@@ -66,7 +66,10 @@ export function useWalletConnectWallet({ walletAuth }: {
       if (typeof window === 'undefined') {
         throw new Error('WalletConnect client is only available in the browser')
       }
-      const client = await SignClient.init({ metadata, projectId: WALLET_CONNECT_ID })
+      const client = await SignClient.init({
+        metadata,
+        projectId: WALLET_CONNECT_ID,
+      })
       clientRef.current = client
 
       // Try to restore persisted session
@@ -110,13 +113,19 @@ export function useWalletConnectWallet({ walletAuth }: {
 
     const result = await clientRef.current.request<{ signedXDR: string }>({
       chainId: STELLAR_CHAIN,
-      request: { method: WC_METHOD_SIGN, params: { xdr: message } },
+      request: {
+        method: WC_METHOD_SIGN,
+        params: { xdr: message },
+      },
       topic: topicRef.current,
     })
 
     const ns = clientRef.current.session.get(topicRef.current)?.namespaces?.stellar
     const addr = ns?.accounts?.length ? caip10ToAddress(ns.accounts[0]) : undefined
-    return { signedTxXdr: result.signedXDR, signerAddress: addr }
+    return {
+      signedTxXdr: result.signedXDR,
+      signerAddress: addr,
+    }
   }, [])
 
   const connect: IWallet['connect'] = useCallback(async () => {
@@ -149,7 +158,10 @@ export function useWalletConnectWallet({ walletAuth }: {
 
     const { message } = await walletAuth.getChallengeMessage({ address })
     const { signedTxXdr } = await signTransaction({ message })
-    const { token } = await walletAuth.getAuthToken({ address, signedMessage: signedTxXdr })
+    const { token } = await walletAuth.getAuthToken({
+      address,
+      signedMessage: signedTxXdr,
+    })
     walletAuth.setJwtToken(token)
   }, [
     ensureClient,

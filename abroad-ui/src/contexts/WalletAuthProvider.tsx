@@ -9,9 +9,7 @@ export const WalletAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   // TODO: implement persitent sessions
   const [kycUrl, _setKycUrl] = useState<null | string>(() => localStorage.getItem('kycUrl'))
   const walletAuthentication = useWalletAuthentication()
-  const walletFactory = useWalletFactory({
-    walletAuth: walletAuthentication,
-  })
+  const walletFactory = useWalletFactory({ walletAuth: walletAuthentication })
   const kit = useMemo(() => {
     const searchParams = new URLSearchParams(window.location.search)
     if (searchParams.get('token')) {
@@ -34,7 +32,13 @@ export const WalletAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   }, [])
 
   return (
-    <WalletAuthContext.Provider value={{ kit, kycUrl, setKycUrl, walletAuthentication }}>
+    <WalletAuthContext.Provider value={{
+      kit,
+      kycUrl,
+      setKycUrl,
+      walletAuthentication,
+    }}
+    >
       {children}
     </WalletAuthContext.Provider>
   )

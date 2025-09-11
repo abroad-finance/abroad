@@ -2,7 +2,8 @@
 export const BRL_BACKGROUND_IMAGE = 'https://storage.googleapis.com/cdn-abroad/bg/6193481566_1a304e3aa3_o.jpg'
 
 // Bank configuration mapping -------------------------------------------------------
-export const BANK_CONFIG: Record<string, { displayLabel?: string, iconUrl: string }> = {
+export const BANK_CONFIG: Record<string, { displayLabel?: string
+  iconUrl: string }> = {
   'BANCO AGRARIO DE COLOMBIA': {
     displayLabel: 'Banco Agrario',
     iconUrl: 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/BancoAgrario_Badge.jpg',
@@ -27,9 +28,7 @@ export const BANK_CONFIG: Record<string, { displayLabel?: string, iconUrl: strin
     displayLabel: 'Bancamia',
     iconUrl: 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Bancamia_Badge.jpg',
   },
-  'BANCO FALABELLA': {
-    iconUrl: 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Falabella_Badge.png',
-  },
+  'BANCO FALABELLA': { iconUrl: 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Falabella_Badge.png' },
   'BANCO FINANDINA': {
     displayLabel: 'Banco Finandina',
     iconUrl: 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/BancoFinandina_Badge.png',
@@ -38,9 +37,7 @@ export const BANK_CONFIG: Record<string, { displayLabel?: string, iconUrl: strin
     displayLabel: 'Itau',
     iconUrl: 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Itau_Badge.png',
   },
-  'BANCOLOMBIA': {
-    iconUrl: 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Bancolombia_Badge.png',
-  },
+  'BANCOLOMBIA': { iconUrl: 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Bancolombia_Badge.png' },
   'BANCO POWWI': {
     displayLabel: 'Powwi',
     iconUrl: 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Powwico_Badge.jpg',
@@ -57,14 +54,10 @@ export const BANK_CONFIG: Record<string, { displayLabel?: string, iconUrl: strin
     displayLabel: 'Davivienda',
     iconUrl: 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Davivienda_Badge.png',
   },
-  'MOVII': {
-    iconUrl: 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/movii_badge.png',
-  },
+  'MOVII': { iconUrl: 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/movii_badge.png' },
   'NEQUI': {
     displayLabel: 'Nequi',
     iconUrl: 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Nequi_Badge.webp',
   },
-  'SUPERDIGITAL': {
-    iconUrl: 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Superdigital_Badge.png',
-  },
+  'SUPERDIGITAL': { iconUrl: 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Superdigital_Badge.png' },
 }

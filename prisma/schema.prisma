@@ -26,12 +26,12 @@ model Partner {
 }
 
 model PartnerUser {
-  id               String        @id @default(uuid())
+  id               String           @id @default(uuid())
   partnerId        String
-  partner          Partner       @relation(fields: [partnerId], references: [id])
+  partner          Partner          @relation(fields: [partnerId], references: [id])
   userId           String
-  createdAt        DateTime      @default(now())
-  updatedAt        DateTime      @updatedAt
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
   transaction      Transaction[]
   kyc              PartnerUserKyc[]
   kycExternalToken String?
@@ -41,17 +41,17 @@ model PartnerUser {
 }
 
 model PartnerUserKyc {
-  id          String      @id @default(uuid())
-  partnerUser PartnerUser @relation(fields: [partnerUserId], references: [id])
+  id            String      @id @default(uuid())
+  partnerUser   PartnerUser @relation(fields: [partnerUserId], references: [id])
   partnerUserId String
 
-  externalId  String
-  status      KycStatus   @default(PENDING)
-  tier        KYCTier     @default(NONE)
+  externalId String
+  status     KycStatus @default(PENDING)
+  tier       KYCTier   @default(NONE)
   link       String
 
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([partnerUserId, externalId])
 }
@@ -90,6 +90,7 @@ model Transaction {
   onChainId     String?           @unique
   taxId         String?
   externalId    String?           @unique
+  qrCode        String?            
 }
 
 model StellarListenerState {

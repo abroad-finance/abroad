@@ -1,50 +1,35 @@
 import {
-  Asset,
-  BASE_FEE,
-  Horizon,
-  Memo,
-  Networks,
-  Operation,
-  Transaction,
-  TransactionBuilder,
-} from '@stellar/stellar-sdk'
-import { useTranslate } from '@tolgee/react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+  useCallback, useEffect, useMemo, useState,
+} from 'react'
 
 import type { Option } from '../../../shared/components/DropSelector'
 import type { BankDetailsRouteProps } from '../components/BankDetailsRoute'
 import type { SwapView } from '../types'
 
 import {
-  acceptTransaction,
   Bank,
   getBanks,
   getBanksResponse200,
   _36EnumsTargetCurrency as TargetCurrency,
 } from '../../../api'
 import { useWalletAuth } from '../../../shared/hooks/useWalletAuth'
-import { hasMessage } from '../../../shared/utils'
 import { BANK_CONFIG } from '../constants'
 
 type UseBankDetailsRouteArgs = {
+  accountNumber: string
   isDesktop?: boolean
   onBackClick: () => void
-  onRedirectToHome: () => void
   pixKey: string
-  quoteId: string
+  setAccountNumber: (accountNumber: string) => void
+  setBankCode: (bankCode: string) => void
   setPixKey: (pixKey: string) => void
   setTaxId: (taxId: string) => void
-  setTransactionId: (id: null | string) => void
   setView: (view: SwapView) => void
-  sourceAmount: string
   targetAmount: string
   targetCurrency: (typeof TargetCurrency)[keyof typeof TargetCurrency]
   taxId: string
-  userId: null | string
 }
 
-const networkPassphrase = Networks.PUBLIC
-const server = new Horizon.Server('https://horizon.stellar.org')
 const PENDING_TX_KEY = 'pendingTransaction'
 
 // Banks to exclude --------------------------------------------------------------
@@ -61,30 +46,24 @@ const EXCLUDED_BANKS = [
 ]
 
 export const useBankDetailsRoute = ({
+  accountNumber,
   isDesktop,
   onBackClick,
-  onRedirectToHome,
   pixKey,
-  quoteId,
+  setAccountNumber,
+  setBankCode,
   setPixKey,
   setTaxId,
-  setTransactionId,
   setView,
-  sourceAmount,
   targetAmount,
   targetCurrency,
   taxId,
-  userId,
 }: UseBankDetailsRouteArgs): BankDetailsRouteProps => {
   const textColor = isDesktop ? 'white' : '#356E6A'
-  const { t } = useTranslate()
-  const { kit, setKycUrl, walletAuthentication } = useWalletAuth()
+  const { walletAuthentication } = useWalletAuth()
 
   // ------------------------------- STATE -----------------------------------
-  const [accountNumber, setAccountNumber] = useState('')
-  const [bankCode, setBankCode] = useState<string>('')
 
-  const [loadingSubmit, setLoadingSubmit] = useState(false)
   const [bankOpen, setBankOpen] = useState(false)
   const [selectedBank, setSelectedBank] = useState<null | Option>(null)
 
@@ -111,6 +90,8 @@ export const useBankDetailsRoute = ({
       }
     }
   }, [
+    setAccountNumber,
+    setBankCode,
     setPixKey,
     setTaxId,
     walletAuthentication?.jwtToken,
@@ -118,7 +99,7 @@ export const useBankDetailsRoute = ({
 
   // Fetch banks once for COP flow
   useEffect(() => {
-    ;(async () => {
+    ; (async () => {
       if (targetCurrency !== TargetCurrency.COP) return
       setLoadingBanks(true)
       setErrorBanks(null)
@@ -206,7 +187,6 @@ export const useBankDetailsRoute = ({
   )
 
   const continueDisabled = useMemo(() => {
-    if (loadingSubmit) return true
     if (targetCurrency === TargetCurrency.BRL) {
       return !(pixKey && taxId)
     }
@@ -217,69 +197,21 @@ export const useBankDetailsRoute = ({
       || accountNumber.length !== 10
     )
   }, [
-    loadingSubmit,
     targetCurrency,
-    pixKey,
-    taxId,
     loadingBanks,
     errorBanks,
     selectedBank,
-    accountNumber,
+    accountNumber.length,
+    pixKey,
+    taxId,
   ])
-
-  // --------------------------- HELPERS ----------------------------------------
-
-  const buildPaymentXdr = useCallback(
-    async ({
-      amount,
-      asset,
-      destination,
-      memoValue,
-      source,
-    }: {
-      amount: string
-      asset: Asset
-      destination: string
-      memoValue: string
-      source: string
-    }): Promise<string> => {
-      try {
-        const account = await server.loadAccount(source)
-        const fee = await server.fetchBaseFee()
-        const tx = new TransactionBuilder(account, {
-          fee: String(fee || BASE_FEE),
-          networkPassphrase,
-        })
-          .addOperation(
-            Operation.payment({
-              amount,
-              asset,
-              destination,
-            }),
-          )
-          .addMemo(Memo.text(memoValue))
-          .setTimeout(180)
-          .build()
-        return tx.toXDR()
-      }
-      catch (err: unknown) {
-        let detail = ''
-        if (err instanceof Error) detail = err.message
-        else if (typeof err === 'object' && err !== null) detail = JSON.stringify(err)
-        else detail = String(err)
-        const message = `${t('bank_details.error_creating_transaction', 'No se pudo crear la transacción de pago')}: ${detail}`
-        throw new Error(message)
-      }
-    },
-    [t],
-  )
 
   // --------------------------- INPUT HANDLERS ---------------------------------
 
   const onAccountNumberChange = useCallback((value: string) => {
     const input = value.replace(/[^\d]/g, '').slice(0, 10)
     setAccountNumber(input)
-  }, [])
+  }, [setAccountNumber])
 
   const onTaxIdChange = useCallback(
     (value: string) => {
@@ -299,129 +231,10 @@ export const useBankDetailsRoute = ({
       setSelectedBank(option)
       setBankCode(option.value)
     },
-    [],
+    [setBankCode],
   )
 
-  // --------------------------- SUBMIT FLOW ------------------------------------
-
-  const onContinue = useCallback(async () => {
-    setLoadingSubmit(true)
-    try {
-      if (!quoteId || !userId) throw new Error('Quote ID or User ID missing.')
-
-      // 1) Reserve quote & obtain details
-      const redirectUrl = encodeURIComponent(
-        window.location.href.replace(/^https?:\/\//, ''),
-      )
-      const response = await acceptTransaction({
-        account_number:
-          targetCurrency === TargetCurrency.BRL ? pixKey : accountNumber,
-        bank_code: targetCurrency === TargetCurrency.BRL ? 'PIX' : bankCode,
-        quote_id: quoteId,
-        redirectUrl,
-        tax_id: targetCurrency === TargetCurrency.BRL ? taxId : undefined,
-        user_id: userId,
-      })
-
-      if (response.status !== 200) {
-        alert(`Error: ${response.data.reason}`)
-        return
-      }
-
-      const {
-        id: acceptedTxId,
-        kycLink,
-        transaction_reference,
-      } = response.data
-
-      const stellar_account = import.meta.env.VITE_ABROAD_STELLAR_ADDRESS
-      const asset_code = 'USDC'
-      const asset_issuer
-        = 'GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN'
-
-      // 2) Redirect to KYC if needed
-      if (kycLink) {
-        setKycUrl(kycLink)
-        setView('kyc-needed')
-        return
-      }
-
-      // cleanup pending
-      localStorage.removeItem(PENDING_TX_KEY)
-
-      // 3) If no wallet connected, finalize SEP flow via redirect
-      if (kit?.walletId === 'sep24') {
-        const queryParams = new URLSearchParams(window.location.search)
-        const callbackUrl = queryParams.get('callback')
-        const sepTransactionId = queryParams.get('transaction_id')
-        const sepBaseUrl
-          = import.meta.env.VITE_SEP_BASE_URL || 'http://localhost:8000'
-        let url = encodeURI(
-          `${sepBaseUrl}/sep24/transactions/withdraw/interactive/complete?amount_expected=${sourceAmount}&transaction_id=${sepTransactionId}`,
-        )
-        if (callbackUrl && callbackUrl.toLowerCase() !== 'none') {
-          url += `&callback=${encodeURIComponent(callbackUrl)}`
-        }
-        if (transaction_reference) {
-          url += `&memo=${encodeURIComponent(transaction_reference)}`
-        }
-        localStorage.removeItem(PENDING_TX_KEY)
-        window.location.href = url
-        return
-      }
-
-      // 4) Build payment XDR
-      const paymentAsset = new Asset(asset_code, asset_issuer)
-      if (!kit?.address) {
-        throw new Error('Wallet address is not available.')
-      }
-      const unsignedXdr = await buildPaymentXdr({
-        amount: sourceAmount,
-        asset: paymentAsset,
-        destination: stellar_account,
-        memoValue: transaction_reference ?? '',
-        source: kit.address,
-      })
-
-      // 5) Sign via wallet
-      setView('wait-sign')
-      const { signedTxXdr } = await kit.signTransaction({ message: unsignedXdr })
-
-      // Show TxStatus UI right after signing
-      setTransactionId(acceptedTxId || null)
-      setView('txStatus')
-
-      // 6) Submit the transaction
-      const tx = new Transaction(signedTxXdr, networkPassphrase)
-      await server.submitTransaction(tx)
-    }
-    catch (err) {
-      console.error('Transaction submission error:', err)
-      let userMessage = 'Transaction error'
-      if (err instanceof Error) userMessage = err.message
-      else if (hasMessage(err)) userMessage = err.message
-      alert(userMessage)
-      onRedirectToHome()
-    }
-    finally {
-      setLoadingSubmit(false)
-    }
-  }, [
-    quoteId,
-    userId,
-    targetCurrency,
-    pixKey,
-    accountNumber,
-    bankCode,
-    taxId,
-    kit,
-    buildPaymentXdr,
-    sourceAmount,
-    setView,
-    setTransactionId,
-    setKycUrl,
-    onRedirectToHome,
-  ])
+  const onContinue = useCallback(() => setView('confirm-qr'), [setView])
 
   // --------------------------- RETURN (props for stateless view) --------------
 
@@ -432,7 +245,6 @@ export const useBankDetailsRoute = ({
     continueDisabled,
     errorBanks,
     loadingBanks,
-    loadingSubmit,
     onAccountNumberChange,
     onBackClick,
     onContinue,

@@ -38,13 +38,5 @@ export async function expressAuthentication(
     }
   }
 
-  if (securityName === 'SEPJWTAuth') {
-    const token = request.headers.authorization?.split('Bearer ')[1]
-    if (!token) {
-      throw new Error('No token provided')
-    }
-    return partnerService.getPartnerFromSepJwt(token)
-  }
-
   throw new Error('Invalid security scheme')
 }

@@ -71,7 +71,10 @@ const BackgroundCrossfade: React.FC<Props> = ({
     <>
       <div
         className={layerClasses}
-        style={{ backgroundAttachment, backgroundImage: `url(${baseBgUrl})` }}
+        style={{
+          backgroundAttachment,
+          backgroundImage: `url(${baseBgUrl})`,
+        }}
       />
       {overlayBgUrl && (
         <motion.div
@@ -80,8 +83,15 @@ const BackgroundCrossfade: React.FC<Props> = ({
           initial={{ opacity: 0 }}
           key={overlayBgUrl}
           onAnimationComplete={handleOverlayComplete}
-          style={{ backgroundAttachment, backgroundImage: `url(${overlayBgUrl})`, pointerEvents: 'none' as const }}
-          transition={{ duration: durationSec, ease: 'easeOut' }}
+          style={{
+            backgroundAttachment,
+            backgroundImage: `url(${overlayBgUrl})`,
+            pointerEvents: 'none' as const,
+          }}
+          transition={{
+            duration: durationSec,
+            ease: 'easeOut',
+          }}
         />
       )}
     </>

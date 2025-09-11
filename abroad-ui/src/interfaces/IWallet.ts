@@ -7,7 +7,8 @@ export interface IWallet {
 
   signTransaction(
     { message }: { message: string },
-  ): Promise<{ signedTxXdr: string, signerAddress?: string }>
+  ): Promise<{ signedTxXdr: string
+    signerAddress?: string }>
 
   readonly walletId: null | string
 }

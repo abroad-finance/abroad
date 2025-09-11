@@ -10,7 +10,6 @@ import {
   Res,
   Response,
   Route,
-  Security,
   SuccessResponse,
   TsoaResponse,
 } from 'tsoa'
@@ -22,10 +21,10 @@ import { IQuoteUseCase, QuoteResponse } from '../useCases/quoteUseCase'
 // Zod schemas for validating input data.
 const quoteRequestSchema = z.object({
   amount: z.number().positive(),
-  crypto_currency: z.nativeEnum(CryptoCurrency),
-  network: z.nativeEnum(BlockchainNetwork),
-  payment_method: z.nativeEnum(PaymentMethod),
-  target_currency: z.nativeEnum(TargetCurrency),
+  crypto_currency: z.enum(CryptoCurrency),
+  network: z.enum(BlockchainNetwork),
+  payment_method: z.enum(PaymentMethod),
+  target_currency: z.enum(TargetCurrency),
 })
 
 type QuoteRequest = {
@@ -37,11 +36,11 @@ type QuoteRequest = {
 }
 
 const reverseQuoteRequestSchema = z.object({
-  crypto_currency: z.nativeEnum(CryptoCurrency),
-  network: z.nativeEnum(BlockchainNetwork),
-  payment_method: z.nativeEnum(PaymentMethod),
+  crypto_currency: z.enum(CryptoCurrency),
+  network: z.enum(BlockchainNetwork),
+  payment_method: z.enum(PaymentMethod),
   source_amount: z.number().positive(),
-  target_currency: z.nativeEnum(TargetCurrency),
+  target_currency: z.enum(TargetCurrency),
 })
 
 type ReverseQuoteRequest = {
@@ -53,8 +52,6 @@ type ReverseQuoteRequest = {
 }
 
 @Route('quote')
-@Security('ApiKeyAuth')
-@Security('BearerAuth')
 export class QuoteController extends Controller {
   constructor(
     @inject(TYPES.QuoteUseCase)
