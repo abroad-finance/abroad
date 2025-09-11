@@ -63,11 +63,13 @@ export class TransferoPaymentService implements IPaymentService {
   async sendPayment({
     account,
     id,
+    qrCode,
     value,
   }: {
     account: string
     bankCode: string
     id: string
+    qrCode?: null | string
     value: number
   }): Promise<
     | { success: false }
@@ -83,7 +85,7 @@ export class TransferoPaymentService implements IPaymentService {
       }
       const token = await this.getAccessToken()
 
-      const contract = this.buildContract({ account, taxId: transaction.taxId, value })
+      const contract = this.buildContract({ account, qrCode, taxId: transaction.taxId, value })
 
       const { TRANSFERO_ACCOUNT_ID, TRANSFERO_BASE_URL } = await this.secretManager.getSecrets([
         'TRANSFERO_ACCOUNT_ID',
@@ -197,6 +199,7 @@ export class TransferoPaymentService implements IPaymentService {
           name: decoded?.name || 'Recipient',
           qrCode,
           taxId: decoded?.taxId || taxId,
+          taxIdCountry: 'BRA',
         },
       ]
     }
