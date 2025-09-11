@@ -31,6 +31,7 @@ export interface IQueueHandler {
   subscribeToQueue(
     queueName: QueueName,
     callback: (message: Record<string, boolean | number | string>) => void,
+    customSubscriptionName?: string,
   ): Promise<void>
 }
 

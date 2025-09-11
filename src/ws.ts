@@ -1,5 +1,6 @@
 // WebSocket bridge using the app's Pub/Sub infrastructure
 import dotenv from 'dotenv'
+import { v4 as uuidv4 } from 'uuid'
 
 import { IQueueHandler, QueueName, UserNotificationMessageSchema } from './interfaces'
 import { IWebSocketService } from './interfaces/IWebSocketService'
@@ -47,7 +48,8 @@ async function main() {
     catch (err) {
       console.error('[ws] Failed to handle notification message:', err)
     }
-  })
+  },
+  `${QueueName.USER_NOTIFICATION}-${uuidv4()}`)
 
   // Graceful shutdown
   const shutdown = async () => {

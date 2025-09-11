@@ -11,7 +11,7 @@ export class GCPPubSubQueueHandler implements IQueueHandler {
   private subscriptions = new Map<QueueName, Subscription>()
 
   constructor(
-        @inject(TYPES.ISecretManager) private secretManager: ISecretManager,
+    @inject(TYPES.ISecretManager) private secretManager: ISecretManager,
   ) { }
 
   public async closeAllSubscriptions(): Promise<void> {
@@ -39,6 +39,7 @@ export class GCPPubSubQueueHandler implements IQueueHandler {
   public async subscribeToQueue(
     queueName: QueueName,
     callback: (message: Record<string, boolean | number | string>) => void,
+    customSubscriptionName?: string,
   ): Promise<void> {
     await this.ensureClient()
     const topic = this.pubsub.topic(queueName)
@@ -46,7 +47,7 @@ export class GCPPubSubQueueHandler implements IQueueHandler {
     if (!exists) {
       await this.pubsub.createTopic(queueName)
     }
-    const subscriptionName = `${queueName}-subscription`
+    const subscriptionName = customSubscriptionName || `${queueName}-subscription`
     const subscription = this.pubsub.subscription(subscriptionName)
     this.subscriptions.set(queueName, subscription)
     const [subExists] = await subscription.exists()
