@@ -27,23 +27,24 @@ const safeStringify = (obj: unknown) => {
 type Sev = 'CRITICAL' | 'DEBUG' | 'ERROR' | 'INFO' | 'WARNING'
 
 export class ConsoleLogger implements ILogger {
-  error(...message: unknown[]): void {
-    log('ERROR', message)
+  error(message: string, ...optionalParams: unknown[]): void {
+    log('ERROR', message, optionalParams)
   }
 
-  info(...message: unknown[]): void {
-    log('INFO', message)
+  info(message: string, ...optionalParams: unknown[]): void {
+    log('INFO', message, optionalParams)
   }
 
-  warn(...message: unknown[]): void {
-    log('WARNING', message)
+  warn(message: string, ...optionalParams: unknown[]): void {
+    log('WARNING', message, optionalParams)
   }
 }
 
-function log(severity: Sev, message: unknown) {
+function log(severity: Sev, message: unknown, params: unknown[]) {
   // Build a structured log entry. One JSON object == one log line.
   const entry = {
     message, // Cloud Logging shows this as the main text
+    params: params.length ? params : undefined,
     severity, // Cloud Logging reads this
   }
 
