@@ -2,6 +2,7 @@ import { TargetCurrency } from '@prisma/client'
 import axios from 'axios'
 import { inject } from 'inversify'
 
+import { ILogger } from '../../interfaces'
 import { IDatabaseClientProvider } from '../../interfaces/IDatabaseClientProvider'
 import { IPaymentService } from '../../interfaces/IPaymentService'
 import { IPixQrDecoder } from '../../interfaces/IQrDecoder'
@@ -50,6 +51,7 @@ export class TransferoPaymentService implements IPaymentService {
     @inject(TYPES.ISecretManager) private secretManager: ISecretManager,
     @inject(TYPES.IDatabaseClientProvider) private databaseClientProvider: IDatabaseClientProvider,
     @inject(TYPES.IPixQrDecoder) private pixQrDecoder: IPixQrDecoder,
+    @inject(TYPES.ILogger) private logger: ILogger,
   ) { }
 
   getLiquidity = async () => {
@@ -111,7 +113,17 @@ export class TransferoPaymentService implements IPaymentService {
     }
     catch (err) {
       // Log / handle error as preferred
-      console.error('Transfero sendPayment error:', err)
+      let logPayload: string
+      if (axios.isAxiosError(err)) {
+        logPayload = JSON.stringify(err.response?.data || err.message)
+      }
+      else if (err instanceof Error) {
+        logPayload = err.message
+      }
+      else {
+        logPayload = String(err)
+      }
+      this.logger.error('Transfero sendPayment error:', logPayload)
       return { success: false }
     }
   }
