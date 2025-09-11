@@ -87,7 +87,7 @@ export class TransferoPaymentService implements IPaymentService {
       }
       const token = await this.getAccessToken()
 
-      const contract = this.buildContract({ account, qrCode, taxId: transaction.taxId, value })
+      const contract = await this.buildContract({ account, qrCode, taxId: transaction.taxId, value })
 
       const { TRANSFERO_ACCOUNT_ID, TRANSFERO_BASE_URL } = await this.secretManager.getSecrets([
         'TRANSFERO_ACCOUNT_ID',
