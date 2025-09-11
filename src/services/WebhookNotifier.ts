@@ -29,8 +29,8 @@ export class WebhookNotifier implements IWebhookNotifier {
       const headers = secret ? { 'X-Abroad-Webhook-Secret': secret } : undefined
       await axios.post(url, payload, { headers })
     }
-    catch (error) {
-      this.logger.error(`Failed to notify webhook: ${url}`, error)
+    catch {
+      this.logger.error(`Failed to notify webhook: ${url}`)
     }
   }
 }
