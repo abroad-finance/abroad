@@ -188,7 +188,7 @@ const WebSwap: React.FC = () => {
               />
             ),
             kycNeeded: (
-              <UserVerification onApproved={() => setView('confirm-qr')} />
+              <UserVerification onApproved={() => setView('confirm-qr')} onClose={() => setView('swap')} />
             ),
             swap: <Swap {...swap} />,
             txStatus: (

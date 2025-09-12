@@ -6,12 +6,14 @@ import { useWebSocket } from '../../../contexts/WebSocketContext'
 import { Button } from '../../../shared/components/Button'
 import { IconAnimated } from '../../../shared/components/IconAnimated'
 import { useWalletAuth } from '../../../shared/hooks/useWalletAuth'
+import { X } from 'lucide-react'
 
 interface UserVerificationProps {
   onApproved?: () => void
+  onClose: () => void
 }
 
-const UserVerification = ({ onApproved }: UserVerificationProps): React.JSX.Element => {
+const UserVerification = ({ onApproved, onClose }: UserVerificationProps): React.JSX.Element => {
   const { t } = useTranslate()
   const { off, on } = useWebSocket()
   const { kycUrl, setKycUrl } = useWalletAuth()
@@ -75,6 +77,13 @@ const UserVerification = ({ onApproved }: UserVerificationProps): React.JSX.Elem
   return (
     <div className="flex-1 flex items-center justify-center w-full flex-col">
       <div className="w-[98%] max-w-md min-h-[60vh] bg-[#356E6A]/5 backdrop-blur-xl rounded-4xl p-4 md:p-6 flex flex-col items-center justify-center space-y-1 lg:space-y-4 text-abroad-dark md:text-white">
+        <button
+          aria-label="Close"
+          onClick={onClose}
+          className="fixed top-4 right-4 z-20 rounded-full bg-white/90 p-2 shadow-md md:top-6 md:right-6"
+        >
+          <X className="w-5 h-5 text-abroad-dark" />
+        </button>
         <div className="block md:hidden">
           <IconAnimated colors="primary:#26A17B,secondary:#73B9A3" icon="MagnifyingGlass" loop={true} play={true} size={150} />
         </div>
