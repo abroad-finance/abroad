@@ -1,24 +1,36 @@
-name: CI
+name: Server CI
 
 on:
   pull_request:
-    branches:
-      - main
+    branches: [ main ]
+    paths:
+      - 'abroad-server/**'
 
 jobs:
-  ci:
+  server:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: abroad-server
     steps:
-      - uses: actions/checkout@v3
-      - name: Use Node.js
-        uses: actions/setup-node@v3
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: '22'
+          cache: npm
+          cache-dependency-path: abroad-server/package-lock.json
+
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --no-audit --no-fund
+
+      - name: Lint/format
+        run: npm run format --if-present
+
       - name: Build
-        run: npm run build
-      - name: Check formatting
-        run: npm run format
+        run: npm run build --if-present
+
       - name: Run tests
-        run: npm test
+        run: npm test --if-present

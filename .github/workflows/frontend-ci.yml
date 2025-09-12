@@ -2,8 +2,7 @@ name: Frontend CI
 
 on:
   pull_request:
-    branches:
-      - main
+    branches: [ main ]
     paths:
       - 'abroad-ui/**'
 
@@ -11,21 +10,19 @@ jobs:
   frontend:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Install dependencies
-        run: npm ci
-      - name: Build
-        run: npm run build
-      - name: Install dependencies
+          cache: npm
+          cache-dependency-path: abroad-ui/package-lock.json
+      - name: Install dependencies (UI)
         working-directory: abroad-ui
-        run: npm ci
-      - name: Lint
+        run: npm ci --no-audit --no-fund
+      - name: Lint (UI)
         working-directory: abroad-ui
-        run: npm run lint
-      - name: Build
+        run: npm run lint --if-present
+      - name: Build (UI)
         working-directory: abroad-ui
-        run: npm run build
+        run: npm run build --if-present
