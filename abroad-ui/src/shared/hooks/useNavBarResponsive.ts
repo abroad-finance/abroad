@@ -177,14 +177,14 @@ export function useNavBarResponsive({
     const kind = normalizeWalletKind(kit?.walletId)
     const map: Record<string, { icon?: string
       name: string }> = {
-      freighter: { name: 'Freighter' },
-      hana: { name: 'Hana' },
-      lobstr: { name: 'Lobstr' },
-      rabet: { name: 'Rabet' },
-      stellar: { name: 'Stellar Wallet' },
-      unknown: { name: 'Stellar Wallet' },
-      xbull: { name: 'xBull' },
-    }
+        freighter: { name: 'Freighter' },
+        hana: { name: 'Hana' },
+        lobstr: { name: 'Lobstr' },
+        rabet: { name: 'Rabet' },
+        stellar: { name: 'Stellar Wallet' },
+        unknown: { name: 'Stellar Wallet' },
+        xbull: { name: 'xBull' },
+      }
     return map[kind] || map.unknown
   }, [kit?.walletId])
 

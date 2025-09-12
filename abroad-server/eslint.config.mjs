@@ -11,6 +11,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const tsconfigRootDir = path.dirname(new URL(import.meta.url).pathname)
+console.log('tsconfigRootDir', tsconfigRootDir)
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -21,6 +22,13 @@ const compat = new FlatCompat({
 })
 
 export default [
+  // Ignore generated and compiled outputs
+  {
+    ignores: [
+      'dist/**',
+      'dependency-graph.svg',
+    ],
+  },
   importPlugin.flatConfigs.typescript,
   perfectionist.configs['recommended-natural'],
   stylistic.configs['recommended'],

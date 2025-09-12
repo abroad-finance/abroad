@@ -8,13 +8,17 @@
     "abroad-ui"
   ],
   "scripts": {
-    "dev:server": "npm --prefix abroad-server run dev",
-    "build:server": "npm --prefix abroad-server run build",
-    "start:server": "npm --prefix abroad-server run start",
-    "migrate:dev": "npm --prefix abroad-server run migrate:dev",
-    "dev:ui": "npm --prefix abroad-ui run dev",
-    "build:ui": "npm --prefix abroad-ui run build",
-    "format": "npm --prefix abroad-server run format && npm --prefix abroad-ui run lint"
+    "dev:server": "npm -w abroad run dev",
+    "build:server": "npm -w abroad run build",
+    "start:server": "npm -w abroad run start",
+    "migrate:dev": "npm -w abroad run migrate:dev",
+    "dev:ui": "npm -w abroad-ui run dev",
+    "build:ui": "npm -w abroad-ui run build",
+    "dev": "npx concurrently -n server,ui -c auto \"npm -w abroad run dev\" \"npm -w abroad-ui run dev\"",
+    "build": "npm -w abroad run build && npm -w abroad-ui run build",
+    "start": "npm -w abroad run start",
+    "lint": "npm -ws --if-present run lint",
+    "format": "npm -w abroad run format && npm -w abroad-ui run lint:fix",
+    "typecheck": "npm -ws --if-present run typecheck"
   }
 }
-
