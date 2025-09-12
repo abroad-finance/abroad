@@ -283,9 +283,18 @@ export const useSwap = ({
   )
 
   const openQr = useCallback(() => {
+    if (!isAuthenticated) {
+      kit?.connect()
+      return
+    }
     setIsQrOpen(true)
     setTargetCurrency(TargetCurrency.BRL)
-  }, [setIsQrOpen, setTargetCurrency])
+  }, [
+    isAuthenticated,
+    kit,
+    setIsQrOpen,
+    setTargetCurrency,
+  ])
 
   const toggleCurrencyMenu = useCallback(() => {
     setCurrencyMenuOpen((v) => {
