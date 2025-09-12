@@ -42,7 +42,10 @@ jobs:
         with:
           node-version: '22'
           cache: 'npm'
-          cache-dependency-path: 'abroad-ui/package-lock.json'
+          cache-dependency-path: |
+            package-lock.json
+            abroad-ui/package-lock.json
+            abroad-server/package-lock.json
 
       - name: Create .env for UI
         if: steps.check.outputs.on_main == 'true'
@@ -58,15 +61,13 @@ jobs:
           # Write exact contents without extra newlines or interpolation
           printf "%s" "$UI_DOTENV" > .env
 
-      - name: Install UI deps
+      - name: Install workspace deps
         if: steps.check.outputs.on_main == 'true'
-        working-directory: abroad-ui
         run: npm ci --no-audit --no-fund
 
       - name: Build UI
         if: steps.check.outputs.on_main == 'true'
-        working-directory: abroad-ui
-        run: npm run build --if-present
+        run: npm -w abroad-ui run build --if-present
 
       - name: Deploy to Firebase Hosting
         if: steps.check.outputs.on_main == 'true'
