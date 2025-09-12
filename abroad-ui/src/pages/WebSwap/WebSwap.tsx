@@ -5,7 +5,7 @@ import { useWebSwapController } from './useWebSwapController'
 const QrScannerFullScreen = lazy(() => import('../../features/swap/components/QrScannerFullScreen'))
 import { Loader } from 'lucide-react'
 
-import { _36EnumsTargetCurrency as TargetCurrency } from '../../api/index'
+import { PaginatedTransactionListTransactionsItem, _36EnumsTargetCurrency as TargetCurrency } from '../../api/index'
 import BankDetailsRoute from '../../features/swap/components/BankDetailsRoute'
 import ConfirmQr from '../../features/swap/components/ConfirmQr'
 import NavBarResponsive from '../../features/swap/components/NavBarResponsive'
@@ -55,6 +55,8 @@ const WebSwap: React.FC = () => {
   const [accountNumber, setAccountNumber] = useState('')
   const [bankCode, setBankCode] = useState<string>('')
   const [qrCode, setQrCode] = useState<null | string>(null)
+  // Local UI state to show a detailed transaction view when a transaction is clicked
+    const [selectedTransaction, setSelectedTransaction] = useState<PaginatedTransactionListTransactionsItem | null>(null)
 
   // Main controller
   const {
@@ -210,7 +212,7 @@ const WebSwap: React.FC = () => {
         onClose={handleWalletDetailsClose}
         open={!!isWalletDetailsOpen}
       >
-        <WalletDetails {...walletDetails} />
+        <WalletDetails {...walletDetails} selectedTransaction={selectedTransaction} onSelectTransaction={setSelectedTransaction}/>
       </ModalOverlay>
 
       {/* Full-screen QR Scanner */}
