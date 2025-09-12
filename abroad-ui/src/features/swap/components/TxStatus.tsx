@@ -23,7 +23,7 @@ export default function TxStatus({ onNewTransaction, onRetry, transactionId, tar
   const { t } = useTranslate()
   const { kit } = useWalletAuth()
   const { off, on } = useWebSocket()
-  const [status, setStatus] = useState<UiStatus>('accepted')
+  const [status, setStatus] = useState<UiStatus>('inProgress')
   const [error, setError] = useState<null | string>(null)
   // no local socket, using app-wide provider
 
