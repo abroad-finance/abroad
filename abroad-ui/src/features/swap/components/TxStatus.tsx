@@ -1,31 +1,30 @@
 import { useTranslate } from '@tolgee/react'
-import React, { useEffect, useState } from 'react'
+import React, { memo, useEffect, useState } from 'react'
 
 import { TransactionStatus as ApiStatus, _36EnumsTargetCurrency as TargetCurrency } from '../../../api'
 import { useWebSocket } from '../../../contexts/WebSocketContext'
 import { Button } from '../../../shared/components/Button'
 import { IconAnimated } from '../../../shared/components/IconAnimated'
 import { useWalletAuth } from '../../../shared/hooks/useWalletAuth'
-import { formatMoney } from '../../../shared/utils'
 
 interface TxStatusProps {
   onNewTransaction: () => void
   onRetry: () => void
-  targerCurrency: TargetCurrency
-  targetAmount?: string
+  targetCurrency: TargetCurrency
+  targetAmount: string
   transactionId: null | string
 }
 
 // UI status mapping
 type UiStatus = 'accepted' | 'denied' | 'inProgress'
 
-export default function TxStatus({
+const TxStatus = ({
   onNewTransaction,
   onRetry,
-  targerCurrency,
+  targetCurrency,
   targetAmount,
   transactionId,
-}: TxStatusProps): React.JSX.Element {
+}: TxStatusProps): React.JSX.Element =>{
   const { t } = useTranslate()
   const { kit } = useWalletAuth()
   const { off, on } = useWebSocket()
@@ -45,6 +44,14 @@ export default function TxStatus({
       case 'PROCESSING_PAYMENT':
       case undefined:
       default: return 'inProgress'
+    }
+  }
+
+  const getAmount = (currency: TargetCurrency, amount: string) => {
+    if(currency === TargetCurrency.BRL) {
+      return `R$${amount}`
+    }else if (currency === TargetCurrency.COP) {
+      return `$${amount}`
     }
   }
 
@@ -83,11 +90,11 @@ export default function TxStatus({
   ])
 
   const renderAmount = () => {
-    if (status === 'accepted' && targetAmount) {
+    if (status === 'accepted') {
       return (
         <span className="text-5xl font-bold text-abroad-dark md:text-white">
           {' '}
-          {formatMoney(targerCurrency, targetAmount)}
+          {getAmount(targetCurrency, targetAmount)}
           {' '}
         </span>
       )
@@ -204,3 +211,5 @@ export default function TxStatus({
     </div>
   )
 }
+
+export default memo(TxStatus)

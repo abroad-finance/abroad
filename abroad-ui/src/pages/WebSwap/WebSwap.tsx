@@ -193,7 +193,7 @@ const WebSwap: React.FC = () => {
               <TxStatus
                 onNewTransaction={resetForNewTransaction}
                 onRetry={handleBackToSwap}
-                targerCurrency={targetCurrency}
+                targetCurrency={targetCurrency}
                 targetAmount={targetAmount}
                 transactionId={transactionId}
               />
