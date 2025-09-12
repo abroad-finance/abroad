@@ -25,7 +25,7 @@ export interface WalletDetailsProps {
   transactions: PaginatedTransactionListTransactionsItem[]
   usdcBalance: string, 
   selectedTransaction: PaginatedTransactionListTransactionsItem | null,
-  onSelectTransaction: (transaction: PaginatedTransactionListTransactionsItem | null) => void
+  setSelectedTransaction: (transaction: PaginatedTransactionListTransactionsItem | null) => void
 }
 
 // Stateless controlled component. All data & handlers provided via props.
@@ -46,7 +46,7 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({
   transactions,
   usdcBalance,
   selectedTransaction,
-  onSelectTransaction,
+  setSelectedTransaction,
 }) => {
   const { t } = useTranslate()
 
@@ -215,7 +215,7 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({
                     {selectedTransaction ? (
                       <TransactionDetail
                         transaction={selectedTransaction}
-                        onBack={() => onSelectTransaction(null)}
+                        onBack={() => setSelectedTransaction(null)}
                         formatDate={formatDate}
                         getStatusStyle={getStatusStyle}
                         getStatusText={getStatusText}
@@ -227,8 +227,8 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({
                           key={transaction.id}
                           role="button"
                           tabIndex={0}
-                          onClick={() => onSelectTransaction(transaction)}
-                          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onSelectTransaction(transaction) }}
+                          onClick={() => setSelectedTransaction(transaction)}
+                          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setSelectedTransaction(transaction) }}
                         >
                           <div className="flex items-center justify-between mb-2">
                             <div className="flex items-center space-x-2">
