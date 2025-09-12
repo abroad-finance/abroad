@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { useTranslate } from '@tolgee/react'
 import { PaginatedTransactionListTransactionsItem } from '../../../api'
 import { formatMoney } from '../../../shared/utils'
+import { ShieldQuestionMark } from 'lucide-react'
 
 export interface TransactionDetailProps {
   transaction: PaginatedTransactionListTransactionsItem
@@ -9,6 +10,7 @@ export interface TransactionDetailProps {
   formatDate: (dateString: string) => string
   getStatusStyle: (status: string) => string
   getStatusText: (status: string) => string
+  onSupport: () => void
 }
 
 const TransactionDetail: React.FC<TransactionDetailProps> = ({
@@ -17,6 +19,7 @@ const TransactionDetail: React.FC<TransactionDetailProps> = ({
   formatDate,
   getStatusStyle,
   getStatusText,
+  onSupport
 }) => {
   const { t } = useTranslate()
   const [showRawDetails, setShowRawDetails] = useState(false)
@@ -25,12 +28,22 @@ const TransactionDetail: React.FC<TransactionDetailProps> = ({
     <div className="bg-white border border-gray-200 rounded-xl p-4">
       <div className="flex items-center justify-between mb-3">
         <h4 className="text-lg font-medium text-gray-800">{t('wallet_details.transactions.detail_title', 'Detalle de transacción')}</h4>
-        <button
-          className="text-sm text-blue-600 hover:underline"
-          onClick={onBack}
-        >
-          {t('wallet_details.actions.back_to_list', 'Volver')}
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            className="text-sm hover:underline hover:cursor-pointer"
+            onClick={onSupport}
+            aria-label={t('wallet_details.actions.support', 'Support')}
+          >
+            <ShieldQuestionMark className="w-5 h-5 text-abroad-dark" />
+          </button>
+
+          <button
+            className="text-sm text-blue-600 hover:underline hover:cursor-pointer"
+            onClick={onBack}
+          >
+            {t('wallet_details.actions.back_to_list', 'Volver')}
+          </button>
+        </div>
       </div>
 
       <div className="mb-2">
@@ -67,7 +80,7 @@ const TransactionDetail: React.FC<TransactionDetailProps> = ({
         <div className="flex items-center justify-between mb-1">
           <div className="font-medium">{t('wallet_details.transactions.raw', 'Detalles')}</div>
           <button
-            className="text-sm text-blue-600 hover:underline"
+            className="text-sm text-blue-600 hover:underline hover:cursor-pointer"
             onClick={() => setShowRawDetails(prev => !prev)}
             aria-expanded={showRawDetails}
             aria-controls="transaction-raw-details"

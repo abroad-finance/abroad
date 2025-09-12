@@ -219,6 +219,7 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({
                         formatDate={formatDate}
                         getStatusStyle={getStatusStyle}
                         getStatusText={getStatusText}
+                        onSupport={() => window.open('https://linktr.ee/Abroad.finance', '_blank', 'noopener,noreferrer')}
                       />
                     ) : (
                       transactions.map((transaction: PaginatedTransactionListTransactionsItem) => (
