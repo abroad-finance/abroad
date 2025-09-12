@@ -1,4 +1,4 @@
-import { _36EnumsTargetCurrency  as TargetCurrency} from '../../api'
+import { _36EnumsTargetCurrency as TargetCurrency } from '../../api'
 import { WalletType } from '../../interfaces/IWalletFactory'
 
 // Minimal safe type-guard for objects that have a string `message` property.
@@ -18,11 +18,13 @@ export const formatMoney = (currency: TargetCurrency, amount: string): string =>
 
   switch (currency) {
     case TargetCurrency.BRL: {
-      const formatted = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(abs)
+      const formatted = new Intl.NumberFormat('pt-BR', { currency: 'BRL', style: 'currency' }).format(abs)
       return formatted
     }
     case TargetCurrency.COP: {
-      const formatted = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(abs)
+      const formatted = new Intl.NumberFormat('es-CO', {
+        currency: 'COP', maximumFractionDigits: 0, minimumFractionDigits: 0, style: 'currency',
+      }).format(abs)
       return formatted
     }
     default: {

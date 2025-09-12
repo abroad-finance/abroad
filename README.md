@@ -1,6 +1,8 @@
 # Abroad Platform
 
-This repository hosts the full-stack Abroad Platform, including a TypeScript-based Node.js API (using TSOA, Prisma, and Express) and a React + Vite frontend (in `abroad-ui`). It supports transactions, quotes, payments, and KYC flows.
+This repository hosts the full-stack Abroad Platform as a simple monorepo with:
+- `abroad-server`: TypeScript Node.js API (TSOA, Prisma, Express)
+- `abroad-ui`: React + Vite frontend
 
 ## Prerequisites
 
@@ -19,9 +21,8 @@ This repository hosts the full-stack Abroad Platform, including a TypeScript-bas
    - Open in VS Code and select "Reopen in Container".
 3. Install dependencies:
    ```bash
-   npm install      # installs backend deps
-   cd abroad-ui
-   npm install      # installs frontend deps
+   cd abroad-server && npm install
+   cd ../abroad-ui && npm install
    cd ..
    ```
 4. Configure environment variables:
@@ -34,15 +35,16 @@ This repository hosts the full-stack Abroad Platform, including a TypeScript-bas
 ### Backend API
 
 ```bash
-npm run dev:server   # starts TSOA+Express API with hot reload
-``` 
+npm run dev:server          # from repo root, or:
+cd abroad-server && npm run dev
+```
 
 ### Frontend UI
 
 ```bash
-cd abroad-ui
-npm run dev          # starts Vite development server
-``` 
+npm run dev:ui              # from repo root, or:
+cd abroad-ui && npm run dev
+```
 
 ### Combined
 
@@ -62,26 +64,28 @@ Run both servers concurrently or in separate terminals.
 ## Project Structure
 
 ```text
-/abroad
-├── src               # Backend source (TS, controllers, services, infrastructure)
-├── prisma            # Database schema & migrations
-├── tests             # Unit & integration tests
-├── abroad-ui         # React + Vite frontend
-├── cloud             # Cloud build & deployment configs
-├── k8s               # Kubernetes manifests
-├── Dockerfile        # Dockerfile for API
-├── nodemon.json      # Dev server config
-└── package.json      # Monorepo scripts & deps
+.
+├── abroad-server
+│   ├── src               # API source (controllers, services, infra)
+│   ├── prisma            # Prisma schema & migrations
+│   ├── k8s               # Kubernetes manifests
+│   ├── cloud             # Cloud Build config
+│   ├── Dockerfile        # API Dockerfile
+│   ├── package.json      # Server scripts & deps
+│   └── ...               # Server configs (tsoa, tsconfig, jest, etc.)
+├── abroad-ui             # React + Vite frontend
+│   └── package.json
+└── package.json          # Monorepo helper scripts
 ```
 
 ## Deployment
 
-- Build API Docker image:
+- Build API Docker image (from repo root):
   ```bash
-  docker build -t abroad-api .
+  docker build -t abroad-api -f abroad-server/Dockerfile abroad-server
   ```
-- Deploy with Kubernetes using manifests in `k8s/`.
-- Cloud Build config in `cloud/cloudbuild.yaml`.
+- Kubernetes manifests now live under `abroad-server/k8s/`.
+- Cloud Build config moved to `abroad-server/cloud/cloudbuild.yaml` and uses the new Dockerfile path.
 
 ## Contributing
 

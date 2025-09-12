@@ -10,8 +10,8 @@ steps:
       - -t
       - $_AR_HOSTNAME/$PROJECT_ID/cloud-run-source-deploy/$REPO_NAME/$_SERVICE_NAME:$COMMIT_SHA
       - -f
-      - Dockerfile
-      - .
+      - abroad-server/Dockerfile
+      - abroad-server
     waitFor: ["-"]
 
   # 2. Push both tags so this build becomes the next build’s cache source
@@ -30,8 +30,8 @@ steps:
       - -c
       - |
         apt-get update -qq && apt-get install -y gettext-base --no-install-recommends -qq || true
-        envsubst < k8s/kustomization.yaml > k8s/kustomization.processed.yaml
-        mv k8s/kustomization.processed.yaml k8s/kustomization.yaml
+        envsubst < abroad-server/k8s/kustomization.yaml > abroad-server/k8s/kustomization.processed.yaml
+        mv abroad-server/k8s/kustomization.processed.yaml abroad-server/k8s/kustomization.yaml
     env:
       - PROJECT_ID=$PROJECT_ID
       - COMMIT_SHA=$COMMIT_SHA
@@ -87,7 +87,7 @@ steps:
       - CLOUDSDK_COMPUTE_REGION=$_DEPLOY_REGION
       - CLOUDSDK_CONTAINER_CLUSTER=$_GKE_CLUSTER
       - PROJECT_ID=$PROJECT_ID
-    args: ["apply", "-k", "k8s"]
+    args: ["apply", "-k", "abroad-server/k8s"]
     waitFor: ["Substitute kustomization", "Migrate"]
 
   # 7. Wait for listener and consumer rollouts

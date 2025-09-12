@@ -11,15 +11,21 @@ import { formatMoney } from '../../../shared/utils'
 interface TxStatusProps {
   onNewTransaction: () => void
   onRetry: () => void
-  transactionId: null | string
-  targetAmount?: string
   targerCurrency: TargetCurrency
+  targetAmount?: string
+  transactionId: null | string
 }
 
 // UI status mapping
 type UiStatus = 'accepted' | 'denied' | 'inProgress'
 
-export default function TxStatus({ onNewTransaction, onRetry, transactionId, targerCurrency, targetAmount }: TxStatusProps): React.JSX.Element {
+export default function TxStatus({
+  onNewTransaction,
+  onRetry,
+  targerCurrency,
+  targetAmount,
+  transactionId,
+}: TxStatusProps): React.JSX.Element {
   const { t } = useTranslate()
   const { kit } = useWalletAuth()
   const { off, on } = useWebSocket()
@@ -79,7 +85,11 @@ export default function TxStatus({ onNewTransaction, onRetry, transactionId, tar
   const renderAmount = () => {
     if (status === 'accepted' && targetAmount) {
       return (
-        <span className='text-5xl font-bold text-abroad-dark md:text-white'> {formatMoney(targerCurrency, targetAmount)} </span>
+        <span className="text-5xl font-bold text-abroad-dark md:text-white">
+          {' '}
+          {formatMoney(targerCurrency, targetAmount)}
+          {' '}
+        </span>
       )
     }
   }
@@ -136,7 +146,7 @@ export default function TxStatus({ onNewTransaction, onRetry, transactionId, tar
     switch (status) {
       case 'accepted':
         return (
-          <> 
+          <>
             {t('tx_status.accepted.super', '¡Super!')}
             <br />
             {' '}

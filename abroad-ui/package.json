@@ -9,7 +9,7 @@
     "build:code": "tsc -b && vite build",
     "lint": "eslint . --fix",
     "preview": "vite preview --host",
-    "generate:api": "cd .. && npm i && npx prisma generate && npm run build && cd abroad-ui && orval --config orval.config.ts",
+    "generate:api": "cd ../abroad-server && npm i && npx prisma generate && npm run build && cd ../abroad-ui && orval --config orval.config.ts",
     "depcruise:tree": "depcruise src --include-only '^src' --config --output-type dot | dot -T svg > dependency-graph.svg && open dependency-graph.svg",
     "i18n:compare": "tolgee compare",
     "i18n:sync": "tolgee sync -Y"

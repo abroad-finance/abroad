@@ -130,10 +130,10 @@ dist
 .pnp.*
 
 # Generated tsoa files
-src/routes.ts
-src/swagger.json
+abroad-server/src/routes.ts
+abroad-server/src/swagger.json
 concatenated.txt
-dependency-graph.svg
+abroad-server/dependency-graph.svg
 .env*
 abroad-ui/src/api/index.ts
 transactions-report.csv

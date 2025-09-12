@@ -2,7 +2,7 @@ import { defineConfig } from 'orval'
 
 export default defineConfig({
   abroad: {
-    input: '../src/swagger.json',
+    input: '../abroad-server/src/swagger.json',
     output: {
       client: 'fetch',
       httpClient: 'fetch',
