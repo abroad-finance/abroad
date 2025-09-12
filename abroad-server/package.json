@@ -35,7 +35,7 @@
     "@solana/spl-token": "^0.4.13",
     "@solana/web3.js": "^1.98.4",
     "@stellar/stellar-sdk": "^13.3.0",
-    "axios": "^1.11.0",
+    "axios": "^1.12.0",
     "binance": "^3.0.5",
     "body-parser": "^2.2.0",
     "bs58": "^6.0.0",
