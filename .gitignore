@@ -138,3 +138,4 @@ abroad-server/dependency-graph.svg
 abroad-ui/src/api/index.ts
 transactions-report.csv
 .DS_Store
+.adminjs/

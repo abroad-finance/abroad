@@ -8,6 +8,7 @@ import path from 'path'
 import swaggerUi from 'swagger-ui-express'
 
 import packageJson from '../package.json'
+import { initAdmin } from './admin/admin'
 import { RegisterRoutes } from './routes'
 
 dotenv.config()
@@ -126,34 +127,47 @@ if (process.env.NODE_ENV === 'production') {
 // ---------------------
 // Boot the HTTP server
 // ---------------------
-const port = process.env.PORT || 3784
-const server = app.listen(port, () => {
-  console.log(`Server running on http://localhost:${port}`)
-  console.log(`API docs at      http://localhost:${port}/docs`)
-})
+async function start() {
+  // Mount AdminJS before starting the server
+  try {
+    await initAdmin(app)
+  }
+  catch (e) {
+    console.warn('AdminJS failed to initialize:', e)
+  }
 
-// ---------------------
-// Graceful shutdown
-// ---------------------
-function shutdown(signal: NodeJS.Signals) {
-  console.log(`\n${signal} received. Shutting down gracefully...`)
-  // Stop accepting new connections
-  server.close((err?: Error) => {
-    if (err) {
-      console.error('Error during HTTP server close:', err)
-      process.exit(1)
-    }
-    console.log('HTTP server closed. Bye!')
-    process.exit(0)
+  const port = process.env.PORT || 3784
+  const server = app.listen(port, () => {
+    console.log(`Server running on http://localhost:${port}`)
+    console.log(`API docs at      http://localhost:${port}/docs`)
+    console.log(`Admin panel at   http://localhost:${port}/admin`)
   })
 
-  // Fallback: force exit if it takes too long
-  setTimeout(() => {
-    console.warn('Forcing shutdown after timeout')
-    process.exit(1)
-  }, 10000).unref()
+  // ---------------------
+  // Graceful shutdown
+  // ---------------------
+  function shutdown(signal: NodeJS.Signals) {
+    console.log(`\n${signal} received. Shutting down gracefully...`)
+    // Stop accepting new connections
+    server.close((err?: Error) => {
+      if (err) {
+        console.error('Error during HTTP server close:', err)
+        process.exit(1)
+      }
+      console.log('HTTP server closed. Bye!')
+      process.exit(0)
+    })
+
+    // Fallback: force exit if it takes too long
+    setTimeout(() => {
+      console.warn('Forcing shutdown after timeout')
+      process.exit(1)
+    }, 10000).unref()
+  }
+
+  ;['SIGINT', 'SIGTERM'].forEach((sig) => {
+    process.on(sig as NodeJS.Signals, shutdown)
+  })
 }
 
-;['SIGINT', 'SIGTERM'].forEach((sig) => {
-  process.on(sig as NodeJS.Signals, shutdown)
-})
+void start()
