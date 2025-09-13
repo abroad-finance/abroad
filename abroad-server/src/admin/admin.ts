@@ -1,21 +1,32 @@
 // src/admin/admin.ts
+import type { ExpressPlugin } from '@adminjs/express'
+import type AdminJSClass from 'adminjs'
+import type { ActionContext, ActionRequest } from 'adminjs'
 import type { Express } from 'express'
 
-let AdminJSExpress: any
-let AdminJS: any
-import { Prisma, PrismaClient } from '@prisma/client'
+import { Prisma } from '@prisma/client'
 import session from 'express-session'
+
+import { IDatabaseClientProvider } from '../interfaces/IDatabaseClientProvider'
+import { iocContainer } from '../ioc'
+import { TYPES } from '../types'
+
 // Use native dynamic import to support ESM-only packages from CJS output
-const dynamicImport: (specifier: string) => Promise<any> = new Function(
+type DynamicImport = <T = unknown>(specifier: string) => Promise<T>
+const dynamicImport: DynamicImport = new Function(
   'specifier',
   'return import(specifier)',
-) as unknown as (specifier: string) => Promise<any>
-let AdminJSPrisma: any
+) as unknown as DynamicImport
+
+let AdminJSExpress: ExpressPlugin
+let AdminJS: typeof AdminJSClass
+let AdminJSPrisma: typeof import('@adminjs/prisma') | undefined
 
 // Register the Prisma adapter once
 async function registerPrismaAdapter() {
   if (!AdminJSPrisma) {
-    AdminJSPrisma = await dynamicImport('@adminjs/prisma')
+    AdminJSPrisma
+      = await dynamicImport<typeof import('@adminjs/prisma')>('@adminjs/prisma')
   }
   // Support different module shapes (ESM/CJS)
   const Database = AdminJSPrisma.Database ?? AdminJSPrisma.default?.Database
@@ -24,34 +35,41 @@ async function registerPrismaAdapter() {
     AdminJS.registerAdapter({ Database, Resource })
   }
   else {
-    // As a last resort, try registering the module itself
-    AdminJS.registerAdapter((AdminJSPrisma.default ?? AdminJSPrisma))
+    throw new Error('Failed to load @adminjs/prisma adapter exports')
   }
 }
 
-// Simple field filtering to avoid showing secrets by default
-const defaultActions = {
-  delete: { isAccessible: true },
-  edit: { isAccessible: true },
+// Restrictive action sets
+const readOnlyActions = {
+  delete: { isAccessible: false },
+  edit: { isAccessible: false },
   list: { isAccessible: true },
-  new: { isAccessible: true },
+  new: { isAccessible: false },
   show: { isAccessible: true },
+} as const
+
+const readOnlyButEditable = {
+  ...readOnlyActions,
+  edit: { isAccessible: true },
 } as const
 
 export async function initAdmin(app: Express) {
   if (!AdminJS) {
-    const mod = await dynamicImport('adminjs')
-    AdminJS = mod.default ?? mod
+    const mod = await dynamicImport<typeof import('adminjs')>('adminjs')
+    AdminJS = mod.default
   }
   await registerPrismaAdapter()
   if (!AdminJSExpress) {
-    const mod = await dynamicImport('@adminjs/express')
-    AdminJSExpress = mod.default ?? mod
+    const mod
+      = await dynamicImport<typeof import('@adminjs/express')>(
+        '@adminjs/express',
+      )
+    AdminJSExpress = mod.default
   }
-  // Use local PrismaClient directly for AdminJS (read-only usage ok). If the
-  // project enforces a single provider, we could import and reuse it, but the
-  // provider requires async secret fetch; here we rely on env DATABASE_URL.
-  const prisma = new PrismaClient()
+  const databaseProvider = iocContainer.get<IDatabaseClientProvider>(
+    TYPES.IDatabaseClientProvider,
+  )
+  const prisma = await databaseProvider.getClient()
 
   const admin = new AdminJS({
     branding: {
@@ -60,15 +78,83 @@ export async function initAdmin(app: Express) {
       withMadeWithLove: false,
     },
     resources: [
-      { options: { actions: defaultActions }, resource: { client: prisma, model: Prisma.dmmf.datamodel.models.find(m => m.name === 'Partner')! } },
-      { options: { actions: defaultActions }, resource: { client: prisma, model: Prisma.dmmf.datamodel.models.find(m => m.name === 'PartnerUser')! } },
-      { options: { actions: defaultActions }, resource: { client: prisma, model: Prisma.dmmf.datamodel.models.find(m => m.name === 'PartnerUserKyc')! } },
-      { options: { actions: defaultActions }, resource: { client: prisma, model: Prisma.dmmf.datamodel.models.find(m => m.name === 'Quote')! } },
-      { options: { actions: defaultActions }, resource: { client: prisma, model: Prisma.dmmf.datamodel.models.find(m => m.name === 'Transaction')! } },
-      { options: { actions: defaultActions }, resource: { client: prisma, model: Prisma.dmmf.datamodel.models.find(m => m.name === 'StellarListenerState')! } },
-      { options: { actions: defaultActions }, resource: { client: prisma, model: Prisma.dmmf.datamodel.models.find(m => m.name === 'SolanaListenerState')! } },
-      { options: { actions: { list: { isAccessible: true }, show: { isAccessible: true } } }, resource: { client: prisma, model: Prisma.dmmf.datamodel.models.find(m => m.name === 'PendingConversions')! } },
-      { options: { actions: defaultActions }, resource: { client: prisma, model: Prisma.dmmf.datamodel.models.find(m => m.name === 'PaymentProvider')! } },
+      {
+        options: {
+          actions: {
+            ...readOnlyButEditable,
+            transactions: {
+              actionType: 'record',
+              component: false,
+              handler: async (
+                _req: ActionRequest,
+                _res: unknown,
+                ctx: ActionContext,
+              ) => {
+                const partnerUserId = ctx.record?.id() ?? ''
+                const qs = new URLSearchParams({
+                  'filters.partnerUser': partnerUserId,
+                }).toString()
+                const url = ctx.h.listUrl('Transaction', `?${qs}`)
+                const recordJson = ctx.record?.toJSON(ctx.currentAdmin)
+                return { record: recordJson!, redirectUrl: url }
+              },
+              icon: 'List',
+              isAccessible: true,
+              isVisible: true,
+              label: 'Transactions',
+            },
+          },
+        },
+        resource: {
+          client: prisma,
+          model: Prisma.dmmf.datamodel.models.find(
+            m => m.name === 'PartnerUser',
+          )!,
+        },
+      },
+      {
+        options: { actions: readOnlyButEditable },
+        resource: {
+          client: prisma,
+          model: Prisma.dmmf.datamodel.models.find(
+            m => m.name === 'PartnerUserKyc',
+          )!,
+        },
+      },
+      {
+        options: { actions: readOnlyActions },
+        resource: {
+          client: prisma,
+          model: Prisma.dmmf.datamodel.models.find(
+            m => m.name === 'Partner',
+          )!,
+        },
+      },
+      {
+        options: { actions: readOnlyActions },
+        resource: {
+          client: prisma,
+          model: Prisma.dmmf.datamodel.models.find(m => m.name === 'Quote')!,
+        },
+      },
+      {
+        options: { actions: readOnlyActions },
+        resource: {
+          client: prisma,
+          model: Prisma.dmmf.datamodel.models.find(
+            m => m.name === 'Transaction',
+          )!,
+        },
+      },
+      {
+        options: { actions: readOnlyActions },
+        resource: {
+          client: prisma,
+          model: Prisma.dmmf.datamodel.models.find(
+            m => m.name === 'PendingConversions',
+          )!,
+        },
+      },
     ],
     rootPath: '/admin',
   })

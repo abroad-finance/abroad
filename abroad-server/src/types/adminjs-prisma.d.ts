@@ -1,7 +1,14 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 declare module '@adminjs/prisma' {
-  export const Database: any
-  export const Resource: any
-  const _default: any
+  import BaseDatabase from 'adminjs/types/src/backend/adapters/database/base-database.js'
+  import BaseResource from 'adminjs/types/src/backend/adapters/resource/base-resource.js'
+
+  // Concrete adapter classes exported by @adminjs/prisma
+  export class Database extends BaseDatabase {}
+  export class Resource extends BaseResource {}
+
+  const _default: {
+    Database: typeof Database
+    Resource: typeof Resource
+  }
   export default _default
 }
