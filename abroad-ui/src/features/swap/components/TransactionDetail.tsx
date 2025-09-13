@@ -1,25 +1,26 @@
-import React, { useState } from 'react'
 import { useTranslate } from '@tolgee/react'
+import { ShieldQuestionMark } from 'lucide-react'
+import React, { useState } from 'react'
+
 import { PaginatedTransactionListTransactionsItem } from '../../../api'
 import { formatMoney } from '../../../shared/utils'
-import { ShieldQuestionMark } from 'lucide-react'
 
 export interface TransactionDetailProps {
-  transaction: PaginatedTransactionListTransactionsItem
-  onBack: () => void
   formatDate: (dateString: string) => string
   getStatusStyle: (status: string) => string
   getStatusText: (status: string) => string
+  onBack: () => void
   onSupport: () => void
+  transaction: PaginatedTransactionListTransactionsItem
 }
 
 const TransactionDetail: React.FC<TransactionDetailProps> = ({
-  transaction,
-  onBack,
   formatDate,
   getStatusStyle,
   getStatusText,
-  onSupport
+  onBack,
+  onSupport,
+  transaction,
 }) => {
   const { t } = useTranslate()
   const [showRawDetails, setShowRawDetails] = useState(false)
@@ -30,9 +31,9 @@ const TransactionDetail: React.FC<TransactionDetailProps> = ({
         <h4 className="text-lg font-medium text-gray-800">{t('wallet_details.transactions.detail_title', 'Detalle de transacción')}</h4>
         <div className="flex items-center gap-3">
           <button
+            aria-label={t('wallet_details.actions.support', 'Support')}
             className="text-sm hover:underline hover:cursor-pointer"
             onClick={onSupport}
-            aria-label={t('wallet_details.actions.support', 'Support')}
           >
             <ShieldQuestionMark className="w-5 h-5 text-abroad-dark" />
           </button>
@@ -66,7 +67,10 @@ const TransactionDetail: React.FC<TransactionDetailProps> = ({
       <div className="mb-2 flex justify-between items-center">
         <div>
           <div className="text-xs text-gray-500">{t('wallet_details.transactions.from_amount', 'Monto USDC')}</div>
-          <div className="text-lg font-bold">${transaction.quote.sourceAmount.toFixed(2)}</div>
+          <div className="text-lg font-bold">
+            $
+            {transaction.quote.sourceAmount.toFixed(2)}
+          </div>
         </div>
         <div>
           <div className="text-xs text-gray-500">{t('wallet_details.transactions.to_amount', 'Monto destino')}</div>
@@ -80,16 +84,16 @@ const TransactionDetail: React.FC<TransactionDetailProps> = ({
         <div className="flex items-center justify-between mb-1">
           <div className="font-medium">{t('wallet_details.transactions.raw', 'Detalles')}</div>
           <button
+            aria-controls="transaction-raw-details"
+            aria-expanded={showRawDetails}
             className="text-sm text-blue-600 hover:underline hover:cursor-pointer"
             onClick={() => setShowRawDetails(prev => !prev)}
-            aria-expanded={showRawDetails}
-            aria-controls="transaction-raw-details"
           >
             {showRawDetails ? t('wallet_details.actions.hide_details', 'Ocultar detalles') : t('wallet_details.actions.show_details', 'Mostrar detalles')}
           </button>
         </div>
         {showRawDetails && (
-          <pre id="transaction-raw-details" className="text-xs text-gray-700 bg-gray-50 p-2 rounded overflow-auto max-h-40">{JSON.stringify(transaction, null, 2)}</pre>
+          <pre className="text-xs text-gray-700 bg-gray-50 p-2 rounded overflow-auto max-h-40" id="transaction-raw-details">{JSON.stringify(transaction, null, 2)}</pre>
         )}
       </div>
     </div>

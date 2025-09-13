@@ -28,7 +28,7 @@ export function useWalletDetails(params: Params = {}): WalletDetailsProps {
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [isLoadingTransactions, setIsLoadingTransactions] = useState(false)
   const [transactionError, setTransactionError] = useState<null | string>(null)
-  const [selectedTransaction, setSelectedTransaction] = useState<PaginatedTransactionListTransactionsItem | null>(null)
+  const [selectedTransaction, setSelectedTransaction] = useState<null | PaginatedTransactionListTransactionsItem>(null)
   const { off, on } = useWebSocket()
 
   // Fetch USDC balance (isolated for clarity)
@@ -225,10 +225,10 @@ export function useWalletDetails(params: Params = {}): WalletDetailsProps {
     onDisconnectWallet,
     onRefreshBalance,
     onRefreshTransactions,
+    selectedTransaction,
+    setSelectedTransaction,
     transactionError,
     transactions,
     usdcBalance,
-    selectedTransaction,
-    setSelectedTransaction,
   }
 }

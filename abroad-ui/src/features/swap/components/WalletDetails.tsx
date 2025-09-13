@@ -21,11 +21,11 @@ export interface WalletDetailsProps {
   onDisconnectWallet: () => Promise<void>
   onRefreshBalance: () => void
   onRefreshTransactions: () => void
+  selectedTransaction: null | PaginatedTransactionListTransactionsItem
+  setSelectedTransaction: (transaction: null | PaginatedTransactionListTransactionsItem) => void
   transactionError: null | string
   transactions: PaginatedTransactionListTransactionsItem[]
-  usdcBalance: string, 
-  selectedTransaction: PaginatedTransactionListTransactionsItem | null,
-  setSelectedTransaction: (transaction: PaginatedTransactionListTransactionsItem | null) => void
+  usdcBalance: string
 }
 
 // Stateless controlled component. All data & handlers provided via props.
@@ -42,11 +42,11 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({
   onDisconnectWallet,
   onRefreshBalance,
   onRefreshTransactions,
+  selectedTransaction,
+  setSelectedTransaction,
   transactionError,
   transactions,
   usdcBalance,
-  selectedTransaction,
-  setSelectedTransaction,
 }) => {
   const { t } = useTranslate()
 
@@ -210,82 +210,84 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({
                   ))}
                 </div>
               )
-                : (
-                  <div className="space-y-3">
-                    {selectedTransaction ? (
-                      <TransactionDetail
-                        transaction={selectedTransaction}
-                        onBack={() => setSelectedTransaction(null)}
-                        formatDate={formatDate}
-                        getStatusStyle={getStatusStyle}
-                        getStatusText={getStatusText}
-                        onSupport={() => window.open('https://linktr.ee/Abroad.finance', '_blank', 'noopener,noreferrer')}
-                      />
-                    ) : (
-                      transactions.map((transaction: PaginatedTransactionListTransactionsItem) => (
-                        <div
-                          className="bg-gray-50 border border-gray-200 rounded-xl p-4 hover:bg-gray-100 transition-colors duration-200 cursor-pointer"
-                          key={transaction.id}
-                          role="button"
-                          tabIndex={0}
-                          onClick={() => setSelectedTransaction(transaction)}
-                          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setSelectedTransaction(transaction) }}
-                        >
-                          <div className="flex items-center justify-between mb-2">
-                            <div className="flex items-center space-x-2">
-                              <span className="text-gray-600 text-sm">{formatDate(transaction.createdAt)}</span>
-                            </div>
-                            <span className={`text-xs px-2 py-1 rounded-full ${getStatusStyle(transaction.status)}`}>
-                              {getStatusText(transaction.status)}
-                            </span>
-                          </div>
-
-                          <div className="mb-2">
-                            <span className="text-gray-500 text-xs">{t('wallet_details.transactions.to', 'Para:')}</span>
-                            <span className="text-gray-700 font-mono text-sm">
-                              {transaction.accountNumber}
-                            </span>
-                          </div>
-
-                          <div className="flex justify-between items-center">
-                            <div className="flex items-center space-x-1">
-                              <img
-                                alt="USDC"
-                                className="w-4 h-4"
-                                src="https://storage.googleapis.com/cdn-abroad/Icons/Tokens/USDC%20Token.svg"
-                              />
-                              <span className="text-gray-700 text-xl font-bold">
-                                $
-                                {transaction.quote.sourceAmount.toFixed(2)}
+            : (
+                <div className="space-y-3">
+                  {selectedTransaction
+                    ? (
+                        <TransactionDetail
+                          formatDate={formatDate}
+                          getStatusStyle={getStatusStyle}
+                          getStatusText={getStatusText}
+                          onBack={() => setSelectedTransaction(null)}
+                          onSupport={() => window.open('https://linktr.ee/Abroad.finance', '_blank', 'noopener,noreferrer')}
+                          transaction={selectedTransaction}
+                        />
+                      )
+                    : (
+                        transactions.map((transaction: PaginatedTransactionListTransactionsItem) => (
+                          <div
+                            className="bg-gray-50 border border-gray-200 rounded-xl p-4 hover:bg-gray-100 transition-colors duration-200 cursor-pointer"
+                            key={transaction.id}
+                            onClick={() => setSelectedTransaction(transaction)}
+                            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setSelectedTransaction(transaction) }}
+                            role="button"
+                            tabIndex={0}
+                          >
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="flex items-center space-x-2">
+                                <span className="text-gray-600 text-sm">{formatDate(transaction.createdAt)}</span>
+                              </div>
+                              <span className={`text-xs px-2 py-1 rounded-full ${getStatusStyle(transaction.status)}`}>
+                                {getStatusText(transaction.status)}
                               </span>
                             </div>
-                            <div className="flex items-center space-x-1">
-                              <img
-                                alt={transaction.quote.targetCurrency}
-                                className="w-4 h-4 rounded-full"
-                                src={
-                                  transaction.quote.targetCurrency === 'BRL'
-                                    ? 'https://hatscripts.github.io/circle-flags/flags/br.svg'
-                                    : 'https://hatscripts.github.io/circle-flags/flags/co.svg'
-                                }
-                              />
-                              <span className="text-gray-700 text-xl font-bold">
-                                {transaction.quote.targetCurrency === 'BRL' ? 'R$' : '$'}
-                                {transaction.quote.targetAmount.toLocaleString(
-                                  transaction.quote.targetCurrency === 'BRL' ? 'pt-BR' : 'es-CO',
-                                  {
-                                    maximumFractionDigits: 2,
-                                    minimumFractionDigits: 2,
-                                  },
-                                )}
+
+                            <div className="mb-2">
+                              <span className="text-gray-500 text-xs">{t('wallet_details.transactions.to', 'Para:')}</span>
+                              <span className="text-gray-700 font-mono text-sm">
+                                {transaction.accountNumber}
                               </span>
                             </div>
+
+                            <div className="flex justify-between items-center">
+                              <div className="flex items-center space-x-1">
+                                <img
+                                  alt="USDC"
+                                  className="w-4 h-4"
+                                  src="https://storage.googleapis.com/cdn-abroad/Icons/Tokens/USDC%20Token.svg"
+                                />
+                                <span className="text-gray-700 text-xl font-bold">
+                                  $
+                                  {transaction.quote.sourceAmount.toFixed(2)}
+                                </span>
+                              </div>
+                              <div className="flex items-center space-x-1">
+                                <img
+                                  alt={transaction.quote.targetCurrency}
+                                  className="w-4 h-4 rounded-full"
+                                  src={
+                                    transaction.quote.targetCurrency === 'BRL'
+                                      ? 'https://hatscripts.github.io/circle-flags/flags/br.svg'
+                                      : 'https://hatscripts.github.io/circle-flags/flags/co.svg'
+                                  }
+                                />
+                                <span className="text-gray-700 text-xl font-bold">
+                                  {transaction.quote.targetCurrency === 'BRL' ? 'R$' : '$'}
+                                  {transaction.quote.targetAmount.toLocaleString(
+                                    transaction.quote.targetCurrency === 'BRL' ? 'pt-BR' : 'es-CO',
+                                    {
+                                      maximumFractionDigits: 2,
+                                      minimumFractionDigits: 2,
+                                    },
+                                  )}
+                                </span>
+                              </div>
+                            </div>
                           </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                )}
+                        ))
+                      )}
+                </div>
+              )}
 
           {!isLoadingTransactions && transactions.length === 0 && !transactionError && (
             <div className="text-center py-8">

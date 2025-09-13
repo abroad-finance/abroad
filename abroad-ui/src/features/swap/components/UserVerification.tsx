@@ -1,4 +1,5 @@
 import { useTolgee, useTranslate } from '@tolgee/react'
+import { X } from 'lucide-react'
 import Persona from 'persona'
 import React, { useCallback, useEffect } from 'react'
 
@@ -6,7 +7,6 @@ import { useWebSocket } from '../../../contexts/WebSocketContext'
 import { Button } from '../../../shared/components/Button'
 import { IconAnimated } from '../../../shared/components/IconAnimated'
 import { useWalletAuth } from '../../../shared/hooks/useWalletAuth'
-import { X } from 'lucide-react'
 
 interface UserVerificationProps {
   onApproved?: () => void
@@ -79,8 +79,8 @@ const UserVerification = ({ onApproved, onClose }: UserVerificationProps): React
       <div className="w-[98%] max-w-md min-h-[60vh] bg-[#356E6A]/5 backdrop-blur-xl rounded-4xl p-4 md:p-6 flex flex-col items-center justify-center space-y-1 lg:space-y-4 text-abroad-dark md:text-white">
         <button
           aria-label="Close"
-          onClick={onClose}
           className="fixed top-4 right-4 z-20 rounded-full bg-white/90 p-2 shadow-md md:top-6 md:right-6"
+          onClick={onClose}
         >
           <X className="w-5 h-5 text-abroad-dark" />
         </button>

@@ -34,31 +34,31 @@ export interface LanguageSelectorProps {
 
 const DEFAULT_META: Record<string, { flag: string
   name: string }> = {
-    ar: {
-      flag: 'sa',
-      name: 'العربية',
-    },
-    en: {
-      flag: 'gb',
-      name: 'English',
-    },
-    es: {
-      flag: 'es',
-      name: 'Español',
-    },
-    pt: {
-      flag: 'br',
-      name: 'Português',
-    },
-    ru: {
-      flag: 'ru',
-      name: 'Русский',
-    },
-    zh: {
-      flag: 'cn',
-      name: '中文',
-    },
-  }
+  ar: {
+    flag: 'sa',
+    name: 'العربية',
+  },
+  en: {
+    flag: 'gb',
+    name: 'English',
+  },
+  es: {
+    flag: 'es',
+    name: 'Español',
+  },
+  pt: {
+    flag: 'br',
+    name: 'Português',
+  },
+  ru: {
+    flag: 'ru',
+    name: 'Русский',
+  },
+  zh: {
+    flag: 'cn',
+    name: '中文',
+  },
+}
 
 const LanguageSelector: React.FC<LanguageSelectorProps> = ({
   ariaLabel,

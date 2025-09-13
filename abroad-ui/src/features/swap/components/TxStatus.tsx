@@ -10,8 +10,8 @@ import { useWalletAuth } from '../../../shared/hooks/useWalletAuth'
 interface TxStatusProps {
   onNewTransaction: () => void
   onRetry: () => void
-  targetCurrency: TargetCurrency
   targetAmount: string
+  targetCurrency: TargetCurrency
   transactionId: null | string
 }
 
@@ -21,10 +21,10 @@ type UiStatus = 'accepted' | 'denied' | 'inProgress'
 const TxStatus = ({
   onNewTransaction,
   onRetry,
-  targetCurrency,
   targetAmount,
+  targetCurrency,
   transactionId,
-}: TxStatusProps): React.JSX.Element =>{
+}: TxStatusProps): React.JSX.Element => {
   const { t } = useTranslate()
   const { kit } = useWalletAuth()
   const { off, on } = useWebSocket()
@@ -48,9 +48,10 @@ const TxStatus = ({
   }
 
   const getAmount = (currency: TargetCurrency, amount: string) => {
-    if(currency === TargetCurrency.BRL) {
+    if (currency === TargetCurrency.BRL) {
       return `R$${amount}`
-    }else if (currency === TargetCurrency.COP) {
+    }
+    else if (currency === TargetCurrency.COP) {
       return `$${amount}`
     }
   }

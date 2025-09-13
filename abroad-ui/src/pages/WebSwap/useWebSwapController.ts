@@ -176,18 +176,18 @@ export const useWebSwapController = (props: UseWebSwapControllerProps): WebSwapC
       if (name) {
         setRecipentName(name)
       }
-      if (amount) {
-        handleAmountsChange({ tgt: amount })
-        fetchQuote(parseFloat(amount))
-      }
       if (pixKey) {
         setPixKey(pixKey)
       }
       if (taxIdDecoded && !taxIdDecoded.includes('*')) {
         setTaxId(taxIdDecoded)
       }
-      // Redirect to the confirmation view so user can verify decoded data
-      setView('confirm-qr')
+      // Redirect to the confirmation if amount is present in QR
+      if (typeof amount === 'string' && parseFloat(amount) > 0) {
+        handleAmountsChange({ tgt: amount })
+        await fetchQuote(parseFloat(amount))
+        setView('confirm-qr')
+      }
     }
     catch (e) {
       console.warn('Failed to decode PIX QR', e)

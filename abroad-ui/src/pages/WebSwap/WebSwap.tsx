@@ -193,8 +193,8 @@ const WebSwap: React.FC = () => {
               <TxStatus
                 onNewTransaction={resetForNewTransaction}
                 onRetry={handleBackToSwap}
-                targetCurrency={targetCurrency}
                 targetAmount={targetAmount}
+                targetCurrency={targetCurrency}
                 transactionId={transactionId}
               />
             ),
@@ -210,7 +210,7 @@ const WebSwap: React.FC = () => {
         onClose={handleWalletDetailsClose}
         open={!!isWalletDetailsOpen}
       >
-        <WalletDetails {...walletDetails}/>
+        <WalletDetails {...walletDetails} />
       </ModalOverlay>
 
       {/* Full-screen QR Scanner */}

@@ -1,4 +1,4 @@
-import { Transaction, TransactionStatus } from '@prisma/client'
+import { TargetCurrency, Transaction, TransactionStatus } from '@prisma/client'
 // src/controllers/TransactionsController.ts
 import { Request as RequestExpress } from 'express'
 import { inject } from 'inversify'
@@ -24,7 +24,7 @@ interface PaginatedTransactionList {
   page: number
   pageSize: number
   total: number
-  transactions: Array<Transaction & { quote: { cryptoCurrency: string, id: string, network: string, paymentMethod: string, sourceAmount: number, targetAmount: number, targetCurrency: string } }>
+  transactions: Array<Transaction & { quote: { cryptoCurrency: string, id: string, network: string, paymentMethod: string, sourceAmount: number, targetAmount: number, targetCurrency: TargetCurrency } }>
 }
 
 @Route('transactions')
