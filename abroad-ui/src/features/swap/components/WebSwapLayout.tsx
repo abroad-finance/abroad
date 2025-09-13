@@ -50,11 +50,11 @@ const WebSwapLayout: React.FC<WebSwapLayoutProps & WebSwapLayoutSlots> = ({ slot
   ])
 
   return (
-    <div className="w-full">
+    <div className="w-full overflow-scroll">
       {/* ---------- Mobile (<= md) ---------- */}
       <div className="md:hidden flex flex-col w-full">
         {/* Swap Interface */}
-        <div className="h-[calc(100vh-80px)] bg-green-50 flex items-center justify-center p-4">
+        <div className="min-h-[500px] h-[calc(100vh-80px)] bg-green-50 flex items-center justify-center p-4">
           <div className="w-full max-w-md">
             {renderSwap}
           </div>
