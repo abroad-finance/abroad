@@ -108,19 +108,6 @@ const ConfirmQr: React.FC<ConfirmQrProps> = ({
           </div>
         </div>
 
-        {
-          isRealBRL
-          && (
-            <div className="text-bold mt-10">
-              <span className="text-lg font-semibold">
-                {t('confirm_qr.recipent_name', 'Nombre del destinatario:')}
-              </span>
-              <br />
-              <span className="text-xl ">{recipentName}</span>
-            </div>
-          )
-        }
-
         {/* Currency Exchange Display */}
         <div className="flex-1 flex flex-col items-center justify-center w-full space-y-3 py-4">
           {/* Destination Currency - Primary display (larger) */}
@@ -130,8 +117,8 @@ const ConfirmQr: React.FC<ConfirmQrProps> = ({
               className="w-6 h-6 rounded-full"
               src={isRealBRL ? 'https://hatscripts.github.io/circle-flags/flags/br.svg' : 'https://hatscripts.github.io/circle-flags/flags/co.svg'}
             />
-            <span className="text-6xl font-bold">{isRealBRL ? 'R$' : '$'}</span>
-            <span className="text-6xl font-bold">
+            <span className="text-4xl md:text-6xl font-bold">{isRealBRL ? 'R$' : '$'}</span>
+            <span className="text-4xl md:text-6xl font-bold">
               {targetAmount || '—'}
             </span>
           </div>
@@ -166,6 +153,19 @@ const ConfirmQr: React.FC<ConfirmQrProps> = ({
                 <div className="bg-white/70 backdrop-blur-md rounded-lg px-2 py-1 flex items-center">
                   <img alt="PIX Logo" className="h-3 sm:h-4 w-auto" src={PixFull} />
                 </div>
+              </div>
+            )
+          }
+
+          {
+            isRealBRL
+            && (
+              <div className="flex items-center space-x-2">
+                <span className="font-medium text-xs sm:text-sm">
+                  {t('confirm_qr.recipent_name', 'Nombre del destinatario:')}
+                </span>
+                <br />
+                <span className="font-medium text-xs">{recipentName}</span>
               </div>
             )
           }
@@ -213,8 +213,8 @@ const ConfirmQr: React.FC<ConfirmQrProps> = ({
         >
           {loadingSubmit
             ? (
-                <Loader className="animate-spin w-4 h-4 sm:w-5 sm:h-5" />
-              )
+              <Loader className="animate-spin w-4 h-4 sm:w-5 sm:h-5" />
+            )
             : getButtonText}
         </Button>
       </div>
