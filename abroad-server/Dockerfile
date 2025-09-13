@@ -6,11 +6,11 @@ WORKDIR /app
 
 ##########  DEPENDENCY LAYER  (rarely changes)  ###############################
 FROM base AS deps
-COPY package-lock.json package.json ./
+COPY package*.json ./
 
 # Cache the npm directory – 100 % hit-rate when the lock-file is unchanged.
 RUN --mount=type=cache,id=npm,target=/root/.npm \
-    npm ci --ignore-scripts
+      npm install --ignore-scripts --no-audit --no-fund;
 
 ##########  PRISMA LAYER  (changes when schema.prisma changes)  ###############
 FROM deps AS prisma
