@@ -15,7 +15,7 @@ const walletOptions = [
   },
   {
     name: 'zypto',
-    onClick: () => window.open('http://ref.zypto.com/abroad', '_blank', 'noopener,noreferrer'),
+    onClick: () => window.open('https://ref.zypto.com/abroad', '_blank', 'noopener,noreferrer'),
     src: ZyptoLogoWhite,
   },
   {
