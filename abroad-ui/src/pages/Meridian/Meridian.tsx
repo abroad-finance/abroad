@@ -10,12 +10,12 @@ import MeridianCard from '../../assets/meridian-card.png'
 const walletOptions = [
   {
     name: 'abroad',
-    onClick: () => { /* connect logic */ },
+    onClick: () => window.open('https://app.abroad.finance', '_blank', 'noopener,noreferrer'),
     src: AbroadLogoWhite,
   },
   {
     name: 'zypto',
-    onClick: () => { /* connect logic */ },
+    onClick: () => window.open('http://ref.zypto.com/abroad', '_blank', 'noopener,noreferrer'),
     src: ZyptoLogoWhite,
   },
   {
