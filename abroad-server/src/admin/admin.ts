@@ -68,6 +68,30 @@ export async function initAdmin(app: Express) {
   const databaseProvider = iocContainer.get<IDatabaseClientProvider>(TYPES.IDatabaseClientProvider)
   const prisma = await databaseProvider.getClient()
 
+  const getModel = (modelName: string) => {
+    const model = Prisma.dmmf.datamodel.models.find(m => m.name === modelName)
+    if (!model) {
+      throw new Error(`Prisma model not found: ${modelName}`)
+    }
+    return model
+  }
+
+  const transactionQuoteViewModel = (() => {
+    const baseModel = getModel('TransactionQuoteView')
+    const clonedModel = JSON.parse(JSON.stringify(baseModel)) as typeof baseModel
+    const fields = clonedModel.fields as unknown as Array<{
+      isId?: boolean
+      isRequired?: boolean
+      name: string
+    }>
+    const idField = fields.find(field => field.name === 'id')
+    if (idField) {
+      idField.isId = true
+      idField.isRequired = true
+    }
+    return clonedModel
+  })()
+
   // ---------------------
   // Build AdminJS instance
   // ---------------------
@@ -114,7 +138,7 @@ export async function initAdmin(app: Express) {
         },
         resource: {
           client: prisma,
-          model: Prisma.dmmf.datamodel.models.find(m => m.name === 'PartnerUser')!,
+          model: getModel('PartnerUser'),
         },
       },
 
@@ -133,7 +157,7 @@ export async function initAdmin(app: Express) {
         },
         resource: {
           client: prisma,
-          model: Prisma.dmmf.datamodel.models.find(m => m.name === 'PartnerUserKyc')!,
+          model: getModel('PartnerUserKyc'),
         },
       },
 
@@ -152,7 +176,7 @@ export async function initAdmin(app: Express) {
         },
         resource: {
           client: prisma,
-          model: Prisma.dmmf.datamodel.models.find(m => m.name === 'Partner')!,
+          model: getModel('Partner'),
         },
       },
 
@@ -171,7 +195,7 @@ export async function initAdmin(app: Express) {
         },
         resource: {
           client: prisma,
-          model: Prisma.dmmf.datamodel.models.find(m => m.name === 'Quote')!,
+          model: getModel('Quote'),
         },
       },
 
@@ -190,7 +214,32 @@ export async function initAdmin(app: Express) {
         },
         resource: {
           client: prisma,
-          model: Prisma.dmmf.datamodel.models.find(m => m.name === 'Transaction')!,
+          model: getModel('Transaction'),
+        },
+      },
+
+      // TransactionQuoteView
+      {
+        features: [importExportFeature({ componentLoader })],
+        options: {
+          actions: {
+            delete: { isAccessible: false },
+            edit: { isAccessible: false },
+            export: { isAccessible: true },
+            list: { isAccessible: true },
+            new: { isAccessible: false },
+            show: { isAccessible: true },
+          },
+          properties: {
+            id: {
+              isId: true,
+              isVisible: { edit: false, filter: true, list: true, show: true },
+            },
+          },
+        },
+        resource: {
+          client: prisma,
+          model: transactionQuoteViewModel,
         },
       },
 
@@ -209,7 +258,7 @@ export async function initAdmin(app: Express) {
         },
         resource: {
           client: prisma,
-          model: Prisma.dmmf.datamodel.models.find(m => m.name === 'PendingConversions')!,
+          model: getModel('PendingConversions'),
         },
       },
     ],

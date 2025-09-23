@@ -1,6 +1,7 @@
 // prisma/schema.prisma
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["views"]
 }
 
 datasource db {
@@ -90,7 +91,7 @@ model Transaction {
   onChainId     String?           @unique
   taxId         String?
   externalId    String?           @unique
-  qrCode        String?            
+  qrCode        String?
 }
 
 model StellarListenerState {
@@ -181,4 +182,32 @@ model PaymentProvider {
   country   Country
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+view TransactionQuoteView {
+  id                   String
+  transactionStatus    TransactionStatus
+  partnerUserId        String
+  accountNumber        String
+  bankCode             String
+  transactionCreatedAt DateTime
+  quoteId              String
+  onChainId            String?
+  taxId                String?
+  externalId           String?
+  qrCode               String?
+  partnerId            String
+  targetAmount         Float
+  sourceAmount         Float
+  targetCurrency       TargetCurrency
+  paymentMethod        PaymentMethod
+  country              Country
+  cryptoCurrency       CryptoCurrency
+  network              BlockchainNetwork
+  expirationDate       DateTime
+  quoteCreatedAt       DateTime
+  quoteUpdatedAt       DateTime
+
+  @@unique([id])
+  @@map("TransactionQuoteView")
 }
