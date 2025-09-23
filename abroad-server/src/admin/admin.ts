@@ -100,8 +100,33 @@ export async function initAdmin(app: Express) {
       companyName: 'Abroad Admin',
       withMadeWithLove: false,
     },
-    componentLoader, // <- the exact loader passed to features below
+    componentLoader,
     resources: [
+      // TransactionQuoteView
+      {
+        features: [importExportFeature({ componentLoader })],
+        options: {
+          actions: {
+            delete: { isAccessible: false },
+            edit: { isAccessible: false },
+            export: { isAccessible: true },
+            list: { isAccessible: true },
+            new: { isAccessible: false },
+            show: { isAccessible: true },
+          },
+          properties: {
+            id: {
+              isId: true,
+              isVisible: { edit: false, filter: true, list: true, show: true },
+            },
+          },
+        },
+        resource: {
+          client: prisma,
+          model: transactionQuoteViewModel,
+        },
+      },
+
       // PartnerUser
       {
         features: [importExportFeature({ componentLoader })],
@@ -218,31 +243,6 @@ export async function initAdmin(app: Express) {
         },
       },
 
-      // TransactionQuoteView
-      {
-        features: [importExportFeature({ componentLoader })],
-        options: {
-          actions: {
-            delete: { isAccessible: false },
-            edit: { isAccessible: false },
-            export: { isAccessible: true },
-            list: { isAccessible: true },
-            new: { isAccessible: false },
-            show: { isAccessible: true },
-          },
-          properties: {
-            id: {
-              isId: true,
-              isVisible: { edit: false, filter: true, list: true, show: true },
-            },
-          },
-        },
-        resource: {
-          client: prisma,
-          model: transactionQuoteViewModel,
-        },
-      },
-
       // PendingConversions
       {
         features: [importExportFeature({ componentLoader })],
@@ -263,6 +263,7 @@ export async function initAdmin(app: Express) {
       },
     ],
     rootPath: '/admin',
+    settings: { defaultPerPage: 50 },
   })
 
   // ------------------------

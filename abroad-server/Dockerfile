@@ -38,7 +38,7 @@ COPY --from=prisma    /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=build     /app/dist                ./dist
 COPY --from=build     /app/src/swagger.json     ./dist/swagger.json
 COPY --from=build     /app/package.json        ./package.json
-COPY prisma/schema.prisma ./prisma/schema.prisma
+COPY prisma ./prisma
 
 EXPOSE 3000
 CMD ["node","dist/server.js"]
