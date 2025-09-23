@@ -20,9 +20,5 @@
     "lint": "npm -ws --if-present run lint",
     "format": "npm -w abroad run format && npm -w abroad-ui run lint:fix",
     "typecheck": "npm -ws --if-present run typecheck"
-  },
-  "dependencies": {
-    "ioredis": "^5.7.0",
-    "redlock": "^5.0.0-beta.2"
   }
 }
