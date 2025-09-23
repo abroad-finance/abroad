@@ -33,6 +33,10 @@ export class RedisLockManager implements ILockManager {
       maxRetriesPerRequest: null,
     })
 
+    this.redis.once('ready', () => {
+      console.info('[Redlock] Redis connection ready')
+    })
+
     this.redlock = new Redlock([this.redis!], {
       // Auto-extend while your critical section is running
       automaticExtensionThreshold: 5000, // extend if <5s remains
