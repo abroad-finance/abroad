@@ -50,6 +50,9 @@ export const Secrets = {
   // RabbitMQ related secrets
   RABBITMQ_URL: 'RABBITMQ_URL',
 
+  // Redis related secrets
+  REDIS_URL: 'REDIS_URL',
+
   // Slack related secrets
   SLACK_WEBHOOK_URL: 'SLACK_WEBHOOK_URL',
 

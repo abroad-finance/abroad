@@ -19,6 +19,7 @@ import { WebhookController } from './controllers/WebhookController'
 import { CachedSecretManager } from './environment'
 import { PrismaClientProvider } from './infrastructure/db'
 import { GCPPubSubQueueHandler } from './infrastructure/gcpPubSubQueueHandler'
+import { RedisLockManager } from './infrastructure/RedisLockManager'
 import { ILogger, IPartnerService, IQueueHandler, ISlackNotifier } from './interfaces'
 import { IDatabaseClientProvider } from './interfaces/IDatabaseClientProvider'
 import { IExchangeProvider } from './interfaces/IExchangeProvider'
@@ -194,5 +195,8 @@ container
   .bind<IWebhookNotifier>(TYPES.IWebhookNotifier)
   .to(WebhookNotifier)
   .inSingletonScope()
+
+// ILockManager
+container.bind<RedisLockManager>(TYPES.ILockManager).to(RedisLockManager).inSingletonScope()
 
 export { container as iocContainer }

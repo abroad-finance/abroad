@@ -5,6 +5,7 @@ export const TYPES = {
   IExchangeProvider: Symbol.for('IExchangeProvider'),
   IExchangeProviderFactory: Symbol.for('IExchangeProviderFactory'),
   IKycService: Symbol.for('IKycService'),
+  ILockManager: Symbol.for('ILockManager'),
   ILogger: Symbol.for('ILogger'),
   IPartnerService: Symbol.for('IPartnerService'),
   IPaymentService: Symbol.for('IPaymentService'),
