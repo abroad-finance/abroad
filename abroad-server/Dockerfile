@@ -2,11 +2,15 @@
 
 FROM node:22-alpine
 WORKDIR /app
-ENV NODE_ENV=production
+
+COPY package*.json ./
+RUN npm install
 
 COPY . .
-RUN npm install --omit=dev
-RUN npm run build 
+RUN npm run build
 RUN cp src/swagger.json dist/swagger.json
+
+RUN npm prune --omit=dev
+ENV NODE_ENV=production
 
 CMD ["node","dist/server.js"]
