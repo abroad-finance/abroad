@@ -120,6 +120,10 @@ export async function initAdmin(app: Express) {
               isVisible: { edit: false, filter: true, list: true, show: true },
             },
           },
+          sort: {
+            direction: 'desc',
+            sortBy: 'transactionCreatedAt',
+          },
         },
         resource: {
           client: prisma,
@@ -160,6 +164,10 @@ export async function initAdmin(app: Express) {
               label: 'Transactions',
             },
           },
+          sort: {
+            direction: 'desc',
+            sortBy: 'createdAt',
+          },
         },
         resource: {
           client: prisma,
@@ -178,6 +186,10 @@ export async function initAdmin(app: Express) {
             list: { isAccessible: true },
             new: { isAccessible: false },
             show: { isAccessible: true },
+          },
+          sort: {
+            direction: 'desc',
+            sortBy: 'createdAt',
           },
         },
         resource: {
@@ -198,6 +210,10 @@ export async function initAdmin(app: Express) {
             new: { isAccessible: false },
             show: { isAccessible: true },
           },
+          sort: {
+            direction: 'desc',
+            sortBy: 'createdAt',
+          },
         },
         resource: {
           client: prisma,
@@ -217,6 +233,10 @@ export async function initAdmin(app: Express) {
             new: { isAccessible: false },
             show: { isAccessible: true },
           },
+          sort: {
+            direction: 'desc',
+            sortBy: 'createdAt',
+          },
         },
         resource: {
           client: prisma,
@@ -235,6 +255,10 @@ export async function initAdmin(app: Express) {
             list: { isAccessible: true },
             new: { isAccessible: false },
             show: { isAccessible: true },
+          },
+          sort: {
+            direction: 'desc',
+            sortBy: 'createdAt',
           },
         },
         resource: {
