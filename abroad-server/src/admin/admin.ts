@@ -273,6 +273,17 @@ export async function initAdmin(app: Express) {
     settings: { defaultPerPage: 50 },
   })
 
+  // ---------------------------------------------
+  // DEV ONLY: build AdminJS frontend on the fly
+  // Ensures @adminjs/import-export components exist
+  // ---------------------------------------------
+  if (process.env.NODE_ENV === 'development' && process.env.ADMIN_JS_SKIP_BUNDLE !== 'true') {
+    await admin.watch()
+  }
+  else {
+    await admin.initialize()
+  }
+
   // ------------------------
   // Session + Auth middleware
   // ------------------------
@@ -308,17 +319,6 @@ export async function initAdmin(app: Express) {
 
   // Mount AdminJS
   app.use(admin.options.rootPath, router)
-
-  // ---------------------------------------------
-  // DEV ONLY: build AdminJS frontend on the fly
-  // Ensures @adminjs/import-export components exist
-  // ---------------------------------------------
-  if (process.env.NODE_ENV === 'development' && process.env.ADMIN_JS_SKIP_BUNDLE !== 'true') {
-    await admin.watch()
-  }
-  else {
-    admin.initialize()
-  }
 
   console.log(`AdminJS mounted at ${admin.options.rootPath}`)
 }
