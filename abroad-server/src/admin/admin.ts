@@ -100,6 +100,7 @@ export async function initAdmin(app: Express) {
       companyName: 'Abroad Admin',
       withMadeWithLove: false,
     },
+
     componentLoader,
     resources: [
       // TransactionQuoteView
@@ -267,24 +268,6 @@ export async function initAdmin(app: Express) {
         },
       },
 
-      // PendingConversions
-      {
-        features: [importExportFeature({ componentLoader })],
-        options: {
-          actions: {
-            delete: { isAccessible: false },
-            edit: { isAccessible: false },
-            export: { isAccessible: true },
-            list: { isAccessible: true },
-            new: { isAccessible: false },
-            show: { isAccessible: true },
-          },
-        },
-        resource: {
-          client: prisma,
-          model: getModel('PendingConversions'),
-        },
-      },
     ],
     rootPath: '/admin',
     settings: { defaultPerPage: 50 },
@@ -332,6 +315,9 @@ export async function initAdmin(app: Express) {
   // ---------------------------------------------
   if (process.env.NODE_ENV === 'development' && process.env.ADMIN_JS_SKIP_BUNDLE !== 'true') {
     await admin.watch()
+  }
+  else {
+    admin.initialize()
   }
 
   console.log(`AdminJS mounted at ${admin.options.rootPath}`)

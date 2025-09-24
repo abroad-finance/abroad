@@ -23,7 +23,8 @@
     "lint": "eslint .",
     "format": "eslint . --fix",
     "hygiene": "depcheck && knip --config knip.json",
-    "migrate:dev": "prisma migrate dev"
+    "migrate:dev": "prisma migrate dev",
+    "seed:dev": "tsx scripts/seed-dev.ts"
   },
   "keywords": [],
   "author": "",
