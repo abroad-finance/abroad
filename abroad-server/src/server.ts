@@ -24,6 +24,20 @@ app.use(
 // Handle text/json content-type generically (kept small)
 app.use(bodyParser.json({ type: 'text/json' }))
 
+// -----------------------
+// Serve AdminJS static CDN
+// -----------------------
+const adminAssetsDir = path.resolve(__dirname, '../public')
+if (fs.existsSync(adminAssetsDir)) {
+  app.use(
+    '/admin-assets',
+    express.static(adminAssetsDir, {
+      immutable: process.env.NODE_ENV === 'production',
+      maxAge: process.env.NODE_ENV === 'production' ? '1y' : 0,
+    }),
+  )
+}
+
 // ---------------------------
 // tsoa‑generated application routes
 // ---------------------------
