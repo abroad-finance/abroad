@@ -32,16 +32,23 @@ interface TransactionTransfero {
   totalAmountPaymentsCompletedWithSuccess: number
 }
 
+interface TransferoBalanceResponse {
+  balance?: {
+    amount?: number | string
+    currency?: string
+  }
+}
+
 export class TransferoPaymentService implements IPaymentService {
   banks = []
   currency: TargetCurrency = TargetCurrency.BRL
   fixedFee = 0.0
   isAsync: boolean = true
 
-  readonly MAX_TOTAL_AMOUNT_PER_DAY = 25_000_000
-  readonly MAX_USER_AMOUNT_PER_DAY = 25_000_000
-  readonly MAX_USER_AMOUNT_PER_TRANSACTION = 5_000_000
-  readonly MAX_USER_TRANSACTIONS_PER_DAY = 15
+  readonly MAX_TOTAL_AMOUNT_PER_DAY = Number.POSITIVE_INFINITY
+  readonly MAX_USER_AMOUNT_PER_DAY = Number.POSITIVE_INFINITY
+  readonly MAX_USER_AMOUNT_PER_TRANSACTION = Number.POSITIVE_INFINITY
+  readonly MAX_USER_TRANSACTIONS_PER_DAY = Number.POSITIVE_INFINITY
 
   percentageFee = 0.0
 
@@ -54,8 +61,74 @@ export class TransferoPaymentService implements IPaymentService {
     @inject(TYPES.ILogger) private logger: ILogger,
   ) { }
 
+  private static parseAmount(raw: number | string | undefined): null | number {
+    if (typeof raw === 'number' && Number.isFinite(raw)) {
+      return raw
+    }
+
+    if (typeof raw === 'string') {
+      const trimmed = raw.trim()
+
+      const direct = Number(trimmed)
+      if (Number.isFinite(direct)) {
+        return direct
+      }
+
+      const normalised = Number(trimmed.replace(/\./g, '').replace(',', '.'))
+      if (Number.isFinite(normalised)) {
+        return normalised
+      }
+    }
+
+    return null
+  }
+
   getLiquidity = async () => {
-    throw new Error('Method not implemented for this payment service.')
+    try {
+      const token = await this.getAccessToken()
+      const { TRANSFERO_ACCOUNT_ID, TRANSFERO_BASE_URL } = await this.secretManager.getSecrets([
+        'TRANSFERO_ACCOUNT_ID',
+        'TRANSFERO_BASE_URL',
+      ])
+
+      const { data } = await axios.get<TransferoBalanceResponse>(
+        `${TRANSFERO_BASE_URL}/api/v2.0/accounts/${TRANSFERO_ACCOUNT_ID}/balance`,
+        {
+          headers: {
+            Accept: 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      )
+
+      const expectedCurrency = this.currency.toUpperCase()
+      const liquidity = this.extractLiquidityFromBalance(data, expectedCurrency)
+
+      if (liquidity !== null) {
+        return liquidity
+      }
+
+      this.logger.warn('Transfero getLiquidity unexpected payload', {
+        balance: data?.balance,
+        expectedCurrency,
+      })
+      return 0
+    }
+    catch (err) {
+      let logPayload: string
+      if (axios.isAxiosError(err)) {
+        logPayload = JSON.stringify(err.response?.data || err.message)
+      }
+      else if (err instanceof Error) {
+        logPayload = err.message
+      }
+      else {
+        logPayload = String(err)
+      }
+
+      this.logger.error('Transfero getLiquidity error:', logPayload)
+      return 0
+    }
   }
 
   onboardUser(): Promise<{ message?: string, success: boolean }> {
@@ -227,6 +300,19 @@ export class TransferoPaymentService implements IPaymentService {
         taxIdCountry: 'BRA',
       },
     ]
+  }
+
+  private extractLiquidityFromBalance(
+    response: TransferoBalanceResponse,
+    expectedCurrency: string,
+  ): null | number {
+    const amount = TransferoPaymentService.parseAmount(response?.balance?.amount)
+    if (amount === null) return null
+
+    const currency = response?.balance?.currency
+    if (currency && currency.toUpperCase() !== expectedCurrency) return null
+
+    return amount
   }
 
   /** OAuth2 client-credentials flow */
