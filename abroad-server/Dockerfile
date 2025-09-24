@@ -5,7 +5,7 @@ WORKDIR /app
 ENV NODE_ENV=production
 
 COPY . .
-RUN npm install
+RUN npm install --omit=dev
 RUN npm run build 
 RUN cp src/swagger.json dist/swagger.json
 
