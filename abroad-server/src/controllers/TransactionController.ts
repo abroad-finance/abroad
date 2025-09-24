@@ -220,6 +220,19 @@ export class TransactionController extends Controller {
       return badRequestResponse(400, { reason: 'This payment method has reached the maximum amount for today' })
     }
 
+    let availableLiquidity = 0
+    try {
+      availableLiquidity = await paymentService.getLiquidity()
+    }
+    catch (err) {
+      console.warn('Failed to fetch payment service liquidity', err)
+      availableLiquidity = 0
+    }
+
+    if (quote.targetAmount > availableLiquidity) {
+      return badRequestResponse(400, { reason: 'This payment method does not have enough liquidity for the requested amount' })
+    }
+
     // Enforce max total for partners without KYB approval
     if (!partner.isKybApproved) {
       const partnerTransactions = await prismaClient.transaction.findMany({
