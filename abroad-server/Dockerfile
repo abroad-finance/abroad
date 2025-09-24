@@ -1,44 +1,12 @@
 # syntax=docker/dockerfile:1.7
 
-##########  BASE IMAGE  #######################################################
-FROM node:22-alpine AS base
+FROM node:22-alpine
 WORKDIR /app
-
-##########  DEPENDENCY LAYER  (rarely changes)  ###############################
-FROM base AS deps
-COPY package*.json ./
-
-# Cache the npm directory – 100 % hit-rate when the lock-file is unchanged.
-RUN --mount=type=cache,id=npm,target=/root/.npm \
-      npm install --ignore-scripts --no-audit --no-fund;
-
-##########  PRISMA LAYER  (changes when schema.prisma changes)  ###############
-FROM deps AS prisma
-COPY prisma/schema.prisma ./prisma/
-# Generates node_modules/.prisma; re-runs ONLY when schema changes
-RUN npx prisma generate
-
-##########  BUILD LAYER  (changes when src/ changes)  #########################
-FROM prisma AS build
-# Copy build-time configs first (keeps cache hits high)
-# - tsconfig*.json  – TypeScript compiler options
-# - tsoa.json      – OpenAPI & route generation config
-COPY tsconfig*.json tsoa.json ./
-COPY src ./src
-# Re-use the npm cache again while compiling
-RUN --mount=type=cache,id=npm,target=/root/.npm \
-    npm run build
-
-##########  FINAL RUNTIME IMAGE  ##############################################
-FROM base AS production
-# Lightweight copy—only the artefacts required at runtime
 ENV NODE_ENV=production
-COPY --from=deps      /app/node_modules        ./node_modules
-COPY --from=prisma    /app/node_modules/.prisma ./node_modules/.prisma
-COPY --from=build     /app/dist                ./dist
-COPY --from=build     /app/src/swagger.json     ./dist/swagger.json
-COPY --from=build     /app/package.json        ./package.json
-COPY prisma ./prisma
 
-EXPOSE 3000
+COPY . .
+RUN npm install
+RUN npm run build 
+RUN cp src/swagger.json dist/swagger.json
+
 CMD ["node","dist/server.js"]
