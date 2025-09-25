@@ -8,7 +8,7 @@
     "generate": "tsoa spec-and-routes",
     "prisma:generate": "prisma generate",
     "postinstall": "bun run prisma:generate",
-    "build": "bun run generate && tsc && bun run build:admin-assets",
+    "build": "bun run generate && tsc",
     "build:admin-assets": "tsx scripts/build-admin-assets.ts",
     "start": "node dist/server.js",
     "start:server": "bun run start",
