@@ -148,6 +148,7 @@ export const useSwap = ({
       }
 
       setLoadingTarget(true)
+      setQuoteId('') // invalidate previous quote
       try {
         // NOTE: We pass an AbortSignal as a 2nd arg; ensure your API helper forwards it to fetch/axios.
         const response = await (getReverseQuote)(
@@ -215,6 +216,7 @@ export const useSwap = ({
       }
 
       setLoadingSource(true)
+      setQuoteId('') // invalidate previous quote
       try {
         const response = await (getQuote)(
           {

@@ -21,5 +21,18 @@
     "lint": "bun run --cwd abroad-server lint && bun run --cwd abroad-ui lint",
     "format": "bun run --cwd abroad-server format && bun run --cwd abroad-ui lint:fix",
     "typecheck": "bun run --cwd abroad-server typecheck && bun run --cwd abroad-ui typecheck"
+  },
+    "overrides": {
+    "@stoplight/spectral-core": "^1.20.0",
+    "@stoplight/spectral-functions": "^1.10.1",
+    "ajv": "^8.17.1",
+
+    "@tiptap/core": "2.22.2",
+    "@tiptap/starter-kit": "2.22.2",
+    "@tiptap/pm": "2.22.2",
+    "@tiptap/extension-horizontal-rule": "2.22.2",
+    "@tiptap/extension-document": "2.22.2",
+    "@tiptap/extension-paragraph": "2.22.2",
+    "@tiptap/extension-text": "2.22.2"
   }
 }
