@@ -1,0 +1,21 @@
+# Monorepo artifacts we never need in the image context
+.git
+.devcontainer
+.vscode
+*.log
+node_modules
+bun.lockb
+
+# Workspace build outputs and installs
+abroad-server/node_modules
+abroad-server/dist
+abroad-server/coverage
+abroad-ui/node_modules
+abroad-ui/dist
+abroad-ui/.next
+abroad-ui/out
+
+# Local env & container orchestration files
+*.env
+.env.*
+docker-compose*.yml

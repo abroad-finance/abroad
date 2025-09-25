@@ -11,7 +11,7 @@ steps:
       - $_AR_HOSTNAME/$PROJECT_ID/cloud-run-source-deploy/$REPO_NAME/$_SERVICE_NAME:$COMMIT_SHA
       - -f
       - abroad-server/Dockerfile
-      - abroad-server
+      - .
     waitFor: ["-"]
 
   # 2. Push both tags so this build becomes the next build’s cache source

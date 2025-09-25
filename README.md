@@ -81,7 +81,7 @@ Run both servers concurrently or in separate terminals.
 
 - Build API Docker image (from repo root):
   ```bash
-  docker build -t abroad-api -f abroad-server/Dockerfile abroad-server
+  docker build -t abroad-api -f abroad-server/Dockerfile .
   ```
 - Kubernetes manifests now live under `abroad-server/k8s/`.
 - Cloud Build config moved to `abroad-server/cloud/cloudbuild.yaml` and uses the new Dockerfile path.
