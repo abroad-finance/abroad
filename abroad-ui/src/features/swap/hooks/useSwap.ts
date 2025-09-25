@@ -321,11 +321,22 @@ export const useSwap = ({
     (currency: (typeof TargetCurrency)[keyof typeof TargetCurrency]) => {
       setCurrencyMenuOpen(false)
       setTargetCurrency(currency)
-      // Optional: you can trigger a recompute for the current side here if desired.
-      // if (lastEditedRef.current === 'source' && sourceAmount) fetchDirectConversion(sourceAmount)
-      // if (lastEditedRef.current === 'target' && targetAmount) fetchReverseConversion(targetAmount)
+
+      // Reset any quote data to avoid using stale results after changing currency.
+      lastEditedRef.current = null
+      directAbortRef.current?.abort()
+      reverseAbortRef.current?.abort()
+      setQuoteId('')
+      setSourceAmount('')
+      setTargetAmount('')
+      setDisplayedTRM(0)
     },
-    [setTargetCurrency],
+    [
+      setQuoteId,
+      setSourceAmount,
+      setTargetAmount,
+      setTargetCurrency,
+    ],
   )
 
   const onPrimaryAction = useCallback(async () => {
