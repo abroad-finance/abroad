@@ -16,21 +16,24 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: npm
-          cache-dependency-path: abroad-ui/package-lock.json
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: '1.2.22'
       - name: Install UI deps
-        run: npm ci
+        run: bun install --frozen-lockfile
+        working-directory: ..
 
       # PRs: show warnings as annotations (do not fail the PR)
       - name: Tolgee compare
         if: ${{ github.event_name == 'pull_request' }}
-        run: npm run i18n:compare || true
+        run: bun run i18n:compare || true
         env:
           TOLGEE_API_KEY: ${{ secrets.TOLGEE_API_KEY }}
 
       # main: actually sync (create missing keys and fail on real errors)
       - name: Tolgee sync
         if: ${{ github.ref == 'refs/heads/main' }}
-        run: npm run i18n:sync
+        run: bun run i18n:sync
         env:
           TOLGEE_API_KEY: ${{ secrets.TOLGEE_API_KEY }}

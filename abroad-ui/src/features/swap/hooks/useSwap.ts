@@ -170,6 +170,9 @@ export const useSwap = ({
           setQuoteId(response.data.quote_id)
           setTargetAmount(formatted)
         }
+        else {
+          alert(t('swap.quote_error', 'This quote exceeded the maximum allowed amount.'))
+        }
       }
       catch (error: unknown) {
         if (
@@ -191,6 +194,7 @@ export const useSwap = ({
       formatTargetNumber,
       setQuoteId,
       setTargetAmount,
+      t,
       targetCurrency,
       targetPaymentMethod,
     ],
@@ -235,6 +239,9 @@ export const useSwap = ({
           setQuoteId(response.data.quote_id)
           setSourceAmount(response.data.value.toFixed(2))
         }
+        else {
+          alert(t('swap.quote_error', 'This quote exceeded the maximum allowed amount.'))
+        }
       }
       catch (error: unknown) {
         if (
@@ -255,6 +262,7 @@ export const useSwap = ({
     [
       setQuoteId,
       setSourceAmount,
+      t,
       targetCurrency,
       targetPaymentMethod,
     ],

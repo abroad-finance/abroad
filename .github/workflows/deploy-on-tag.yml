@@ -41,11 +41,12 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: 'npm'
-          cache-dependency-path: |
-            package-lock.json
-            abroad-ui/package-lock.json
-            abroad-server/package-lock.json
+
+      - name: Setup Bun
+        if: steps.check.outputs.on_main == 'true'
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: '1.2.22'
 
       - name: Create .env for UI
         if: steps.check.outputs.on_main == 'true'
@@ -63,11 +64,12 @@ jobs:
 
       - name: Install workspace deps
         if: steps.check.outputs.on_main == 'true'
-        run: npm ci --no-audit --no-fund
+        run: bun install --frozen-lockfile
 
       - name: Build UI
         if: steps.check.outputs.on_main == 'true'
-        run: npm -w abroad-ui run build --if-present
+        working-directory: abroad-ui
+        run: bun run build --if-present
 
       - name: Deploy to Firebase Hosting
         if: steps.check.outputs.on_main == 'true'
