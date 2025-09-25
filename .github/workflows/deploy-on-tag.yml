@@ -69,8 +69,7 @@ jobs:
       - name: Build UI
         if: steps.check.outputs.on_main == 'true'
         working-directory: abroad-ui
-        run: bun run build --if-present
-
+        run: bun run build 
       - name: Deploy to Firebase Hosting
         if: steps.check.outputs.on_main == 'true'
         uses: FirebaseExtended/action-hosting-deploy@v0

@@ -22,7 +22,7 @@ jobs:
           bun-version: '1.2.22'
       - name: Install UI deps
         run: bun install --frozen-lockfile
-        working-directory: ..
+        working-directory: .
 
       # PRs: show warnings as annotations (do not fail the PR)
       - name: Tolgee compare
