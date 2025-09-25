@@ -96,6 +96,21 @@ async function pathExists(target: string): Promise<boolean> {
   }
 }
 
+async function resolveAsset(projectRoot: string, segments: string[]): Promise<string> {
+  const candidates = [
+    path.join(projectRoot, 'node_modules', ...segments),
+    path.join(projectRoot, '..', 'node_modules', ...segments),
+  ]
+
+  for (const candidate of candidates) {
+    if (await pathExists(candidate)) {
+      return candidate
+    }
+  }
+
+  throw new Error(`Asset not found in node_modules: ${segments.join('/')}`)
+}
+
 async function resolveFirstExistingAsset(
   candidates: readonly string[][],
   resolver: (segments: string[]) => Promise<string>,
@@ -117,21 +132,6 @@ async function resolveFirstExistingAsset(
   }
 
   throw new Error(`Asset not found in node_modules: ${attempted.join(', ')}`)
-}
-
-async function resolveAsset(projectRoot: string, segments: string[]): Promise<string> {
-  const candidates = [
-    path.join(projectRoot, 'node_modules', ...segments),
-    path.join(projectRoot, '..', 'node_modules', ...segments),
-  ]
-
-  for (const candidate of candidates) {
-    if (await pathExists(candidate)) {
-      return candidate
-    }
-  }
-
-  throw new Error(`Asset not found in node_modules: ${segments.join('/')}`)
 }
 
 void buildAssets().catch((error) => {

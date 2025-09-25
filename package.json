@@ -23,9 +23,13 @@
     "typecheck": "bun run --cwd abroad-server typecheck && bun run --cwd abroad-ui typecheck"
   },
     "overrides": {
-    "@stoplight/spectral-core": "^1.20.0",
-    "@stoplight/spectral-functions": "^1.10.1",
-    "ajv": "^8.17.1",
+    "@stoplight/spectral-core": "1.20.0",
+    "@stoplight/spectral-functions": "1.10.1",
+    "@stoplight/spectral-rulesets": "1.22.0",
+
+    "ajv": "8.17.1",
+    "ajv-errors": "3.0.0",
+    "ajv-formats": "3.0.1",
 
     "@tiptap/core": "2.22.2",
     "@tiptap/starter-kit": "2.22.2",
