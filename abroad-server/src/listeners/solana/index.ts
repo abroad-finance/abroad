@@ -1,4 +1,4 @@
-#!/usr/bin/env -S npx tsx
+#!/usr/bin/env -S bunx tsx
 
 import { BlockchainNetwork, CryptoCurrency } from '@prisma/client'
 import { TOKEN_PROGRAM_ID } from '@solana/spl-token'

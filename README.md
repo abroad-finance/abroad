@@ -7,7 +7,8 @@ This repository hosts the full-stack Abroad Platform as a simple monorepo with:
 ## Prerequisites
 
 - Docker & Docker Compose (for dev container)
-- Node.js (>=18) and npm (pre-installed in dev container)
+- Node.js (>=18) (pre-installed in dev container)
+- Bun (>=1.2.22)
 - Git (pre-installed in dev container)
 
 ## Development Setup
@@ -19,11 +20,9 @@ This repository hosts the full-stack Abroad Platform as a simple monorepo with:
    ```
 2. Start the dev container (if using VS Code dev containers):
    - Open in VS Code and select "Reopen in Container".
-3. Install dependencies:
+3. Install dependencies from the repo root (Bun workspaces will wire up both packages):
    ```bash
-   cd abroad-server && npm install
-   cd ../abroad-ui && npm install
-   cd ..
+   bun install
    ```
 4. Configure environment variables:
    - Copy `.env.example` to `.env` (backend).
@@ -35,15 +34,15 @@ This repository hosts the full-stack Abroad Platform as a simple monorepo with:
 ### Backend API
 
 ```bash
-npm run dev:server          # from repo root, or:
-cd abroad-server && npm run dev
+bun run dev:server          # from repo root, or:
+cd abroad-server && bun run dev
 ```
 
 ### Frontend UI
 
 ```bash
-npm run dev:ui              # from repo root, or:
-cd abroad-ui && npm run dev
+bun run dev:ui              # from repo root, or:
+cd abroad-ui && bun run dev
 ```
 
 ### Combined
@@ -52,13 +51,13 @@ Run both servers concurrently or in separate terminals.
 
 ## Testing & Linting
 
-- Run tests:
+- Run backend tests:
   ```bash
-  npm test          # runs Jest for backend and frontend tests
+  bun run --cwd abroad-server test
   ```
 - Lint code:
   ```bash
-  npm run lint      # ESLint (skip lint errors when fixing code)
+  bun run lint
   ```
 
 ## Project Structure

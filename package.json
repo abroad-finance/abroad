@@ -2,23 +2,24 @@
   "name": "abroad-monorepo",
   "private": true,
   "version": "1.0.0",
+  "packageManager": "bun@1.2.22",
   "description": "Monorepo for Abroad: server + UI",
   "workspaces": [
     "abroad-server",
     "abroad-ui"
   ],
   "scripts": {
-    "dev:server": "npm -w abroad run dev",
-    "build:server": "npm -w abroad run build",
-    "start:server": "npm -w abroad run start",
-    "migrate:dev": "npm -w abroad run migrate:dev",
-    "dev:ui": "npm -w abroad-ui run dev",
-    "build:ui": "npm -w abroad-ui run build",
-    "dev": "npx concurrently -n server,ui -c auto \"npm -w abroad run dev\" \"npm -w abroad-ui run dev\"",
-    "build": "npm -w abroad run build && npm -w abroad-ui run build",
-    "start": "npm -w abroad run start",
-    "lint": "npm -ws --if-present run lint",
-    "format": "npm -w abroad run format && npm -w abroad-ui run lint:fix",
-    "typecheck": "npm -ws --if-present run typecheck"
+    "dev:server": "bun run --cwd abroad-server dev",
+    "build:server": "bun run --cwd abroad-server build",
+    "start:server": "bun run --cwd abroad-server start",
+    "migrate:dev": "bun run --cwd abroad-server migrate:dev",
+    "dev:ui": "bun run --cwd abroad-ui dev",
+    "build:ui": "bun run --cwd abroad-ui build",
+    "dev": "bunx concurrently -n server,ui -c auto \"bun run --cwd abroad-server dev\" \"bun run --cwd abroad-ui dev\"",
+    "build": "bun run --cwd abroad-server build && bun run --cwd abroad-ui build",
+    "start": "bun run --cwd abroad-server start",
+    "lint": "bun run --cwd abroad-server lint && bun run --cwd abroad-ui lint",
+    "format": "bun run --cwd abroad-server format && bun run --cwd abroad-ui lint:fix",
+    "typecheck": "bun run --cwd abroad-server typecheck && bun run --cwd abroad-ui typecheck"
   }
 }

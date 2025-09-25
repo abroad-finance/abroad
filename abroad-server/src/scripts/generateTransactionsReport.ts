@@ -1,4 +1,4 @@
-#!/usr/bin/env -S npx tsx
+#!/usr/bin/env -S bunx tsx
 
 import { TransactionStatus } from '@prisma/client'
 import { createObjectCsvWriter } from 'csv-writer'

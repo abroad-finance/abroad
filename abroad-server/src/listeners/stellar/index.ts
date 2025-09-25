@@ -1,4 +1,4 @@
-#!/usr/bin/env -S npx tsx
+#!/usr/bin/env -S bunx tsx
 // src/stellar/index.ts
 
 import { BlockchainNetwork, CryptoCurrency } from '@prisma/client'
