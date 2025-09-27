@@ -16,7 +16,10 @@ export class RedisLockManager implements ILockManager {
   async withLock<T>(key: string, ttlMs: number, fn: () => Promise<T>): Promise<T> {
     await this.init()
     const resource = `lock:stellar:${key}`
-    return this.redlock!.using([resource], ttlMs, async () => {
+    const retryDelay = Math.max(1, this.redlock!.settings.retryDelay)
+    const retryCount = Math.max(1, Math.ceil(ttlMs / retryDelay))
+
+    return this.redlock!.using([resource], ttlMs, { retryCount }, async () => {
       return await fn()
     })
   }
