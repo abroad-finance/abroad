@@ -5,13 +5,11 @@ WORKDIR /app
 
 # Copy the monorepo manifests up front so Docker layer caching stays effective
 COPY package.json bun.lock ./
-COPY abroad-server/package.json abroad-server/package.json
 
-WORKDIR /app/abroad-server
-COPY abroad-server/prisma ./prisma
+COPY prisma ./prisma
 RUN bun install --frozen-lockfile
 
-COPY abroad-server/ ./
+COPY . .
 RUN bun run build
 RUN cp src/swagger.json dist/swagger.json
 
