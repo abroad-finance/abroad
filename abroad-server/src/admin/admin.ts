@@ -30,21 +30,24 @@ let AdminJSExpress: ExpressPlugin
 let AdminJS: typeof AdminJSClass
 let AdminJSPrisma: typeof import('@adminjs/prisma') | undefined
 let AdminJSImport: typeof import('adminjs') | undefined
-let adminInstance: AdminJSClass | undefined
 
 type ImportExportFeatureFn = (options: { componentLoader: ComponentLoader }) => FeatureType
 type ImportExportModuleShape = { default: ImportExportFeatureFn }
 let ImportExportModule: ImportExportModuleShape | undefined
 
-export async function createAdmin(): Promise<AdminJSClass> {
-  if (adminInstance) {
-    return adminInstance
-  }
-
+// -----------------------------------------------------
+// MAIN: initialize AdminJS and mount it on the express app
+// -----------------------------------------------------
+export async function initAdmin(app: Express) {
+  // Load AdminJS & Express adapter
   if (!AdminJS) {
     const mod = await dynamicImport<typeof import('adminjs')>('adminjs')
     AdminJSImport = mod
     AdminJS = mod.default
+  }
+  if (!AdminJSExpress) {
+    const mod = await dynamicImport<typeof import('@adminjs/express')>('@adminjs/express')
+    AdminJSExpress = mod.default
   }
 
   // Prisma adapter
@@ -89,12 +92,15 @@ export async function createAdmin(): Promise<AdminJSClass> {
     return clonedModel
   })()
 
-  adminInstance = new AdminJS({
-    assetsCDN: determineAssetsCdnUrl(),
+  // ---------------------
+  // Build AdminJS instance
+  // ---------------------
+  const admin = new AdminJS({
     branding: {
       companyName: 'Abroad Admin',
       withMadeWithLove: false,
     },
+
     componentLoader,
     resources: [
       // TransactionQuoteView
@@ -267,20 +273,6 @@ export async function createAdmin(): Promise<AdminJSClass> {
     settings: { defaultPerPage: 50 },
   })
 
-  return adminInstance
-}
-
-// -----------------------------------------------------
-// MAIN: initialize AdminJS and mount it on the express app
-// -----------------------------------------------------
-export async function initAdmin(app: Express) {
-  if (!AdminJSExpress) {
-    const mod = await dynamicImport<typeof import('@adminjs/express')>('@adminjs/express')
-    AdminJSExpress = mod.default
-  }
-
-  const admin = await createAdmin()
-
   // ---------------------------------------------
   // DEV ONLY: build AdminJS frontend on the fly
   // Ensures @adminjs/import-export components exist
@@ -331,21 +323,6 @@ export async function initAdmin(app: Express) {
   console.log(`AdminJS mounted at ${admin.options.rootPath}`)
 }
 
-function determineAssetsCdnUrl(): string {
-  const explicitCdn = process.env.ADMINJS_ASSETS_CDN?.trim()
-  if (explicitCdn) {
-    return removeTrailingSlash(explicitCdn)
-  }
-
-  const explicitAppBase = process.env.ADMINJS_PUBLIC_URL?.trim() ?? process.env.APP_BASE_URL?.trim()
-  if (explicitAppBase) {
-    return `${removeTrailingSlash(explicitAppBase)}/admin-assets`
-  }
-
-  const port = process.env.PORT || '3784'
-  return `http://localhost:${port}/admin-assets`
-}
-
 // ----------------------------------------
 // Ensure Prisma adapter is registered once
 // ----------------------------------------
@@ -363,8 +340,4 @@ async function registerPrismaAdapter() {
   else {
     throw new Error('Failed to load @adminjs/prisma adapter exports')
   }
-}
-
-function removeTrailingSlash(value: string): string {
-  return value.endsWith('/') ? value.replace(/\/+$/, '') : value
 }
