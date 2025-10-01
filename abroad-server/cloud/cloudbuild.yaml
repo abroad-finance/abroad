@@ -46,7 +46,7 @@ steps:
     args:
       - -c
       - |
-        cd /app/abroad-server && bunx prisma migrate deploy
+        cd /app && bunx prisma migrate deploy
     secretEnv: ["DATABASE_URL"]
     waitFor: ["Push commit"]
 
