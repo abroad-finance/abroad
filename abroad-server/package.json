@@ -42,6 +42,7 @@
     "@solana/spl-token": "^0.4.13",
     "@solana/web3.js": "^1.98.4",
     "@stellar/stellar-sdk": "^13.3.0",
+    "@tiptap/extension-horizontal-rule": "2.1.13",
     "@types/express-session": "^1.18.2",
     "adminjs": "^7.8.17",
     "axios": "^1.11.0",
