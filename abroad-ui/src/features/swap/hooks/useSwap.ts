@@ -148,6 +148,7 @@ export const useSwap = ({
       }
 
       setLoadingTarget(true)
+      setQuoteId('') // invalidate previous quote
       try {
         // NOTE: We pass an AbortSignal as a 2nd arg; ensure your API helper forwards it to fetch/axios.
         const response = await (getReverseQuote)(
@@ -168,6 +169,9 @@ export const useSwap = ({
           const formatted = formatTargetNumber(response.data.value)
           setQuoteId(response.data.quote_id)
           setTargetAmount(formatted)
+        }
+        else {
+          alert(t('swap.quote_error', 'This quote exceeded the maximum allowed amount.'))
         }
       }
       catch (error: unknown) {
@@ -190,6 +194,7 @@ export const useSwap = ({
       formatTargetNumber,
       setQuoteId,
       setTargetAmount,
+      t,
       targetCurrency,
       targetPaymentMethod,
     ],
@@ -215,6 +220,7 @@ export const useSwap = ({
       }
 
       setLoadingSource(true)
+      setQuoteId('') // invalidate previous quote
       try {
         const response = await (getQuote)(
           {
@@ -232,6 +238,9 @@ export const useSwap = ({
         if (response.status === 200) {
           setQuoteId(response.data.quote_id)
           setSourceAmount(response.data.value.toFixed(2))
+        }
+        else {
+          alert(t('swap.quote_error', 'This quote exceeded the maximum allowed amount.'))
         }
       }
       catch (error: unknown) {
@@ -253,6 +262,7 @@ export const useSwap = ({
     [
       setQuoteId,
       setSourceAmount,
+      t,
       targetCurrency,
       targetPaymentMethod,
     ],
@@ -311,11 +321,22 @@ export const useSwap = ({
     (currency: (typeof TargetCurrency)[keyof typeof TargetCurrency]) => {
       setCurrencyMenuOpen(false)
       setTargetCurrency(currency)
-      // Optional: you can trigger a recompute for the current side here if desired.
-      // if (lastEditedRef.current === 'source' && sourceAmount) fetchDirectConversion(sourceAmount)
-      // if (lastEditedRef.current === 'target' && targetAmount) fetchReverseConversion(targetAmount)
+
+      // Reset any quote data to avoid using stale results after changing currency.
+      lastEditedRef.current = null
+      directAbortRef.current?.abort()
+      reverseAbortRef.current?.abort()
+      setQuoteId('')
+      setSourceAmount('')
+      setTargetAmount('')
+      setDisplayedTRM(0)
     },
-    [setTargetCurrency],
+    [
+      setQuoteId,
+      setSourceAmount,
+      setTargetAmount,
+      setTargetCurrency,
+    ],
   )
 
   const onPrimaryAction = useCallback(async () => {
