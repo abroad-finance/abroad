@@ -4,17 +4,21 @@ import type AdminJSClass from 'adminjs'
 import type {
   ActionContext,
   ActionRequest,
+  ActionResponse,
   ComponentLoader,
   FeatureType,
   RecordActionResponse,
 } from 'adminjs'
 import type { Express } from 'express'
 
-import { Prisma } from '@prisma/client'
+import { KycStatus, Prisma } from '@prisma/client'
 import session from 'express-session'
 
 import { IDatabaseClientProvider } from '../interfaces/IDatabaseClientProvider'
+import { ISecretManager } from '../interfaces/ISecretManager'
 import { iocContainer } from '../ioc'
+import { PersonaInquiryDetailsService } from '../services/PersonaInquiryDetailsService'
+import type { PersonaInquiryDetails } from '../services/PersonaInquiryDetailsService'
 import { TYPES } from '../types'
 
 // -----------------------
@@ -67,6 +71,123 @@ export async function initAdmin(app: Express) {
   // Acquire Prisma client
   const databaseProvider = iocContainer.get<IDatabaseClientProvider>(TYPES.IDatabaseClientProvider)
   const prisma = await databaseProvider.getClient()
+  const secretManager = iocContainer.get<ISecretManager>(TYPES.ISecretManager)
+  const personaInquiryDetailsService = new PersonaInquiryDetailsService(secretManager)
+
+  type AdminRecord = { params: Record<string, unknown> }
+
+  const kycInquiryCache = new Map<string, string | null>()
+  const fiatTargetCurrencies = new Set(['COP', 'BRL'])
+
+  const parseNumber = (value: unknown): number | null => {
+    if (typeof value === 'number') return Number.isFinite(value) ? value : null
+    if (typeof value === 'string') {
+      const normalised = value.replace(/,/g, '')
+      const parsed = Number(normalised)
+      return Number.isFinite(parsed) ? parsed : null
+    }
+    return null
+  }
+
+  const formatAmount = (value: number | null): string => {
+    if (value === null || Number.isNaN(value)) return ''
+    try {
+      return value.toLocaleString('es-CO', {
+        maximumFractionDigits: 2,
+        minimumFractionDigits: 2,
+      })
+    }
+    catch {
+      return value.toFixed(2)
+    }
+  }
+
+  const formatDateTime = (value: unknown): string => {
+    if (!value) return ''
+    const date = value instanceof Date ? value : new Date(String(value))
+    if (Number.isNaN(date.getTime())) return ''
+    return date.toISOString().replace('T', ' ').slice(0, 16)
+  }
+
+  const getOperationLabel = (targetCurrency: unknown): string => {
+    const currency = typeof targetCurrency === 'string' ? targetCurrency.toUpperCase() : ''
+    return fiatTargetCurrencies.has(currency) ? 'Venta' : 'Compra'
+  }
+
+  const ensurePersonaFields = (record: AdminRecord, persona: PersonaInquiryDetails | null) => {
+    record.params.tipoDocumento = persona?.documentType ?? ''
+    record.params.nombreRazonSocial = persona?.fullName ?? ''
+    record.params.direccion = persona?.address ?? ''
+    record.params.telefono = persona?.phone ?? ''
+    record.params.email = persona?.email ?? ''
+    record.params.pais = persona?.country ?? ''
+    record.params.departamento = persona?.department ?? ''
+    record.params.municipio = persona?.city ?? ''
+  }
+
+  const getInquiryIdForPartnerUser = async (partnerUserId: string): Promise<string | null> => {
+    if (kycInquiryCache.has(partnerUserId)) {
+      return kycInquiryCache.get(partnerUserId) ?? null
+    }
+
+    const approved = await prisma.partnerUserKyc.findFirst({
+      orderBy: { createdAt: 'desc' },
+      where: { partnerUserId, status: KycStatus.APPROVED },
+    })
+
+    let record = approved
+    if (!record) {
+      record = await prisma.partnerUserKyc.findFirst({
+        orderBy: { createdAt: 'desc' },
+        where: { partnerUserId },
+      })
+    }
+
+    const inquiryId = record?.externalId ?? null
+    kycInquiryCache.set(partnerUserId, inquiryId)
+    return inquiryId
+  }
+
+  const enrichRecord = async (record: AdminRecord) => {
+    const partnerUserId = typeof record.params.partnerUserId === 'string'
+      ? record.params.partnerUserId
+      : undefined
+
+    let personaDetails: PersonaInquiryDetails | null = null
+    if (partnerUserId) {
+      const inquiryId = await getInquiryIdForPartnerUser(partnerUserId)
+      if (inquiryId) {
+        personaDetails = await personaInquiryDetailsService.getDetails(inquiryId)
+      }
+    }
+
+    ensurePersonaFields(record, personaDetails)
+
+    record.params.fecha = formatDateTime(record.params.transactionCreatedAt)
+
+    const targetAmount = parseNumber(record.params.targetAmount)
+    const sourceAmount = parseNumber(record.params.sourceAmount)
+    const cryptoCurrency = typeof record.params.cryptoCurrency === 'string'
+      ? record.params.cryptoCurrency
+      : undefined
+    const targetCurrency = typeof record.params.targetCurrency === 'string'
+      ? record.params.targetCurrency
+      : undefined
+
+    const montoCop = targetCurrency === 'COP' ? formatAmount(targetAmount) : ''
+    const montoUsdc = cryptoCurrency === 'USDC' ? formatAmount(sourceAmount) : ''
+
+    record.params.montoCop = montoCop
+    record.params.montoUsdc = montoUsdc
+
+    const trmValue = targetAmount !== null && sourceAmount !== null && sourceAmount !== 0
+      ? targetAmount / sourceAmount
+      : null
+
+    record.params.trm = formatAmount(trmValue)
+    record.params.hashTransaccion = typeof record.params.onChainId === 'string' ? record.params.onChainId : ''
+    record.params.tipoOperacion = getOperationLabel(targetCurrency)
+  }
 
   const getModel = (modelName: string) => {
     const model = Prisma.dmmf.datamodel.models.find(m => m.name === modelName)
@@ -111,14 +232,146 @@ export async function initAdmin(app: Express) {
             delete: { isAccessible: false },
             edit: { isAccessible: false },
             export: { isAccessible: true },
-            list: { isAccessible: true },
+            list: {
+              after: async (response: ActionResponse) => {
+                const listResponse = response as ActionResponse & { records?: AdminRecord[] }
+                if (Array.isArray(listResponse.records)) {
+                  await Promise.all(listResponse.records.map(record => enrichRecord(record)))
+                }
+                return response
+              },
+              isAccessible: true,
+            },
             new: { isAccessible: false },
-            show: { isAccessible: true },
+            show: {
+              after: async (response: ActionResponse) => {
+                const showResponse = response as ActionResponse & { record?: AdminRecord }
+                if (showResponse.record) {
+                  await enrichRecord(showResponse.record)
+                }
+                return response
+              },
+              isAccessible: true,
+            },
           },
+          listProperties: [
+            'fecha',
+            'tipoDocumento',
+            'nombreRazonSocial',
+            'direccion',
+            'telefono',
+            'email',
+            'pais',
+            'departamento',
+            'municipio',
+            'montoCop',
+            'montoUsdc',
+            'trm',
+            'hashTransaccion',
+            'tipoOperacion',
+          ],
           properties: {
             id: {
               isId: true,
               isVisible: { edit: false, filter: true, list: true, show: true },
+            },
+            fecha: {
+              isSortable: false,
+              isVisible: { edit: false, filter: true, list: true, show: true },
+              label: 'Fecha',
+              position: 10,
+              type: 'string',
+            },
+            tipoDocumento: {
+              isSortable: false,
+              isVisible: { edit: false, filter: true, list: true, show: true },
+              label: 'Tipo de Documento',
+              position: 20,
+              type: 'string',
+            },
+            nombreRazonSocial: {
+              isSortable: false,
+              isVisible: { edit: false, filter: true, list: true, show: true },
+              label: 'Nombre o Razón Social',
+              position: 30,
+              type: 'string',
+            },
+            direccion: {
+              isSortable: false,
+              isVisible: { edit: false, filter: false, list: true, show: true },
+              label: 'Dirección',
+              position: 40,
+              type: 'string',
+            },
+            telefono: {
+              isSortable: false,
+              isVisible: { edit: false, filter: false, list: true, show: true },
+              label: 'Teléfono',
+              position: 50,
+              type: 'string',
+            },
+            email: {
+              isSortable: false,
+              isVisible: { edit: false, filter: true, list: true, show: true },
+              label: 'Email',
+              position: 60,
+              type: 'string',
+            },
+            pais: {
+              isSortable: false,
+              isVisible: { edit: false, filter: true, list: true, show: true },
+              label: 'País',
+              position: 70,
+              type: 'string',
+            },
+            departamento: {
+              isSortable: false,
+              isVisible: { edit: false, filter: true, list: true, show: true },
+              label: 'Departamento',
+              position: 80,
+              type: 'string',
+            },
+            municipio: {
+              isSortable: false,
+              isVisible: { edit: false, filter: true, list: true, show: true },
+              label: 'Municipio',
+              position: 90,
+              type: 'string',
+            },
+            montoCop: {
+              isSortable: false,
+              isVisible: { edit: false, filter: false, list: true, show: true },
+              label: 'Monto en COP',
+              position: 100,
+              type: 'string',
+            },
+            montoUsdc: {
+              isSortable: false,
+              isVisible: { edit: false, filter: false, list: true, show: true },
+              label: 'Monto en USDC',
+              position: 110,
+              type: 'string',
+            },
+            trm: {
+              isSortable: false,
+              isVisible: { edit: false, filter: false, list: true, show: true },
+              label: 'TRM',
+              position: 120,
+              type: 'string',
+            },
+            hashTransaccion: {
+              isSortable: false,
+              isVisible: { edit: false, filter: true, list: true, show: true },
+              label: 'Hash de la transacción',
+              position: 130,
+              type: 'string',
+            },
+            tipoOperacion: {
+              isSortable: false,
+              isVisible: { edit: false, filter: true, list: true, show: true },
+              label: 'Compra o Venta',
+              position: 140,
+              type: 'string',
             },
           },
           sort: {
