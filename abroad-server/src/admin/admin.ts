@@ -14,11 +14,12 @@ import type { Express } from 'express'
 import { KycStatus, Prisma } from '@prisma/client'
 import session from 'express-session'
 
+import type { PersonaInquiryDetails } from '../services/PersonaInquiryDetailsService'
+
 import { IDatabaseClientProvider } from '../interfaces/IDatabaseClientProvider'
 import { ISecretManager } from '../interfaces/ISecretManager'
 import { iocContainer } from '../ioc'
 import { PersonaInquiryDetailsService } from '../services/PersonaInquiryDetailsService'
-import type { PersonaInquiryDetails } from '../services/PersonaInquiryDetailsService'
 import { TYPES } from '../types'
 
 // -----------------------
@@ -76,10 +77,10 @@ export async function initAdmin(app: Express) {
 
   type AdminRecord = { params: Record<string, unknown> }
 
-  const kycInquiryCache = new Map<string, string | null>()
-  const fiatTargetCurrencies = new Set(['COP', 'BRL'])
+  const kycInquiryCache = new Map<string, null | string>()
+  const fiatTargetCurrencies = new Set(['BRL', 'COP'])
 
-  const parseNumber = (value: unknown): number | null => {
+  const parseNumber = (value: unknown): null | number => {
     if (typeof value === 'number') return Number.isFinite(value) ? value : null
     if (typeof value === 'string') {
       const normalised = value.replace(/,/g, '')
@@ -89,7 +90,7 @@ export async function initAdmin(app: Express) {
     return null
   }
 
-  const formatAmount = (value: number | null): string => {
+  const formatAmount = (value: null | number): string => {
     if (value === null || Number.isNaN(value)) return ''
     try {
       return value.toLocaleString('es-CO', {
@@ -114,7 +115,7 @@ export async function initAdmin(app: Express) {
     return fiatTargetCurrencies.has(currency) ? 'Venta' : 'Compra'
   }
 
-  const ensurePersonaFields = (record: AdminRecord, persona: PersonaInquiryDetails | null) => {
+  const ensurePersonaFields = (record: AdminRecord, persona: null | PersonaInquiryDetails) => {
     record.params.tipoDocumento = persona?.documentType ?? ''
     record.params.nombreRazonSocial = persona?.fullName ?? ''
     record.params.direccion = persona?.address ?? ''
@@ -125,7 +126,7 @@ export async function initAdmin(app: Express) {
     record.params.municipio = persona?.city ?? ''
   }
 
-  const getInquiryIdForPartnerUser = async (partnerUserId: string): Promise<string | null> => {
+  const getInquiryIdForPartnerUser = async (partnerUserId: string): Promise<null | string> => {
     if (kycInquiryCache.has(partnerUserId)) {
       return kycInquiryCache.get(partnerUserId) ?? null
     }
@@ -153,7 +154,7 @@ export async function initAdmin(app: Express) {
       ? record.params.partnerUserId
       : undefined
 
-    let personaDetails: PersonaInquiryDetails | null = null
+    let personaDetails: null | PersonaInquiryDetails = null
     if (partnerUserId) {
       const inquiryId = await getInquiryIdForPartnerUser(partnerUserId)
       if (inquiryId) {
@@ -221,10 +222,46 @@ export async function initAdmin(app: Express) {
       companyName: 'Abroad Admin',
       withMadeWithLove: false,
     },
-
     componentLoader,
+
+    locale: {
+      language: 'en',
+      translations: {
+        labels: {
+          TransactionQuoteDetailedView: 'Accountant report',
+        },
+      },
+    },
     resources: [
       // TransactionQuoteView
+      {
+        features: [importExportFeature({ componentLoader })],
+        options: {
+          actions: {
+            delete: { isAccessible: false },
+            edit: { isAccessible: false },
+            export: { isAccessible: true },
+            list: { isAccessible: true },
+            new: { isAccessible: false },
+            show: { isAccessible: true },
+          },
+          properties: {
+            id: {
+              isId: true,
+              isVisible: { edit: false, filter: true, list: true, show: true },
+            },
+          },
+          sort: {
+            direction: 'desc',
+            sortBy: 'transactionCreatedAt',
+          },
+        },
+        resource: {
+          client: prisma,
+          model: transactionQuoteViewModel,
+        },
+      },
+
       {
         features: [importExportFeature({ componentLoader })],
         options: {
@@ -254,6 +291,7 @@ export async function initAdmin(app: Express) {
               isAccessible: true,
             },
           },
+          id: 'TransactionQuoteDetailedView',
           listProperties: [
             'fecha',
             'tipoDocumento',
@@ -271,29 +309,11 @@ export async function initAdmin(app: Express) {
             'tipoOperacion',
           ],
           properties: {
-            id: {
-              isId: true,
-              isVisible: { edit: false, filter: true, list: true, show: true },
-            },
-            fecha: {
+            departamento: {
               isSortable: false,
               isVisible: { edit: false, filter: true, list: true, show: true },
-              label: 'Fecha',
-              position: 10,
-              type: 'string',
-            },
-            tipoDocumento: {
-              isSortable: false,
-              isVisible: { edit: false, filter: true, list: true, show: true },
-              label: 'Tipo de Documento',
-              position: 20,
-              type: 'string',
-            },
-            nombreRazonSocial: {
-              isSortable: false,
-              isVisible: { edit: false, filter: true, list: true, show: true },
-              label: 'Nombre o Razón Social',
-              position: 30,
+              label: 'Departamento',
+              position: 80,
               type: 'string',
             },
             direccion: {
@@ -303,13 +323,6 @@ export async function initAdmin(app: Express) {
               position: 40,
               type: 'string',
             },
-            telefono: {
-              isSortable: false,
-              isVisible: { edit: false, filter: false, list: true, show: true },
-              label: 'Teléfono',
-              position: 50,
-              type: 'string',
-            },
             email: {
               isSortable: false,
               isVisible: { edit: false, filter: true, list: true, show: true },
@@ -317,26 +330,23 @@ export async function initAdmin(app: Express) {
               position: 60,
               type: 'string',
             },
-            pais: {
+            fecha: {
               isSortable: false,
               isVisible: { edit: false, filter: true, list: true, show: true },
-              label: 'País',
-              position: 70,
+              label: 'Fecha',
+              position: 10,
               type: 'string',
             },
-            departamento: {
+            hashTransaccion: {
               isSortable: false,
               isVisible: { edit: false, filter: true, list: true, show: true },
-              label: 'Departamento',
-              position: 80,
+              label: 'Hash de la transacción',
+              position: 130,
               type: 'string',
             },
-            municipio: {
-              isSortable: false,
+            id: {
+              isId: true,
               isVisible: { edit: false, filter: true, list: true, show: true },
-              label: 'Municipio',
-              position: 90,
-              type: 'string',
             },
             montoCop: {
               isSortable: false,
@@ -352,18 +362,39 @@ export async function initAdmin(app: Express) {
               position: 110,
               type: 'string',
             },
-            trm: {
-              isSortable: false,
-              isVisible: { edit: false, filter: false, list: true, show: true },
-              label: 'TRM',
-              position: 120,
-              type: 'string',
-            },
-            hashTransaccion: {
+            municipio: {
               isSortable: false,
               isVisible: { edit: false, filter: true, list: true, show: true },
-              label: 'Hash de la transacción',
-              position: 130,
+              label: 'Municipio',
+              position: 90,
+              type: 'string',
+            },
+            nombreRazonSocial: {
+              isSortable: false,
+              isVisible: { edit: false, filter: true, list: true, show: true },
+              label: 'Nombre o Razón Social',
+              position: 30,
+              type: 'string',
+            },
+            pais: {
+              isSortable: false,
+              isVisible: { edit: false, filter: true, list: true, show: true },
+              label: 'País',
+              position: 70,
+              type: 'string',
+            },
+            telefono: {
+              isSortable: false,
+              isVisible: { edit: false, filter: false, list: true, show: true },
+              label: 'Teléfono',
+              position: 50,
+              type: 'string',
+            },
+            tipoDocumento: {
+              isSortable: false,
+              isVisible: { edit: false, filter: true, list: true, show: true },
+              label: 'Tipo de Documento',
+              position: 20,
               type: 'string',
             },
             tipoOperacion: {
@@ -371,6 +402,13 @@ export async function initAdmin(app: Express) {
               isVisible: { edit: false, filter: true, list: true, show: true },
               label: 'Compra o Venta',
               position: 140,
+              type: 'string',
+            },
+            trm: {
+              isSortable: false,
+              isVisible: { edit: false, filter: false, list: true, show: true },
+              label: 'TRM',
+              position: 120,
               type: 'string',
             },
           },
