@@ -30,7 +30,6 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@adminjs/import-export": "^3.0.0",
     "@adminjs/express": "^6.1.1",
     "@adminjs/prisma": "^5.0.4",
     "@binance/wallet": "^8.0.0",

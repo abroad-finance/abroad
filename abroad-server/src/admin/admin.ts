@@ -6,7 +6,6 @@ import type {
   ActionRequest,
   ActionResponse,
   ComponentLoader,
-  FeatureType,
   RecordActionResponse,
 } from 'adminjs'
 import type { Express } from 'express'
@@ -36,10 +35,6 @@ let AdminJS: typeof AdminJSClass
 let AdminJSPrisma: typeof import('@adminjs/prisma') | undefined
 let AdminJSImport: typeof import('adminjs') | undefined
 
-type ImportExportFeatureFn = (options: { componentLoader: ComponentLoader }) => FeatureType
-type ImportExportModuleShape = { default: ImportExportFeatureFn }
-let ImportExportModule: ImportExportModuleShape | undefined
-
 // -----------------------------------------------------
 // MAIN: initialize AdminJS and mount it on the express app
 // -----------------------------------------------------
@@ -57,12 +52,6 @@ export async function initAdmin(app: Express) {
 
   // Prisma adapter
   await registerPrismaAdapter()
-
-  // Import the import/export feature once
-  if (!ImportExportModule) {
-    ImportExportModule = (await dynamicImport('@adminjs/import-export')) as ImportExportModuleShape
-  }
-  const importExportFeature: ImportExportFeatureFn = ImportExportModule!.default
 
   // -------------------------------
   // SINGLETON ComponentLoader (key!)
@@ -235,7 +224,6 @@ export async function initAdmin(app: Express) {
     resources: [
       // TransactionQuoteView
       {
-        features: [importExportFeature({ componentLoader })],
         options: {
           actions: {
             delete: { isAccessible: false },
@@ -263,7 +251,6 @@ export async function initAdmin(app: Express) {
       },
 
       {
-        features: [importExportFeature({ componentLoader })],
         options: {
           actions: {
             delete: { isAccessible: false },
@@ -425,7 +412,6 @@ export async function initAdmin(app: Express) {
 
       // PartnerUser
       {
-        features: [importExportFeature({ componentLoader })],
         options: {
           actions: {
             delete: { isAccessible: false },
@@ -469,7 +455,6 @@ export async function initAdmin(app: Express) {
 
       // PartnerUserKyc
       {
-        features: [importExportFeature({ componentLoader })],
         options: {
           actions: {
             delete: { isAccessible: false },
@@ -492,7 +477,6 @@ export async function initAdmin(app: Express) {
 
       // Partner
       {
-        features: [importExportFeature({ componentLoader })],
         options: {
           actions: {
             delete: { isAccessible: false },
@@ -515,7 +499,6 @@ export async function initAdmin(app: Express) {
 
       // Quote
       {
-        features: [importExportFeature({ componentLoader })],
         options: {
           actions: {
             delete: { isAccessible: false },
@@ -538,7 +521,6 @@ export async function initAdmin(app: Express) {
 
       // Transaction
       {
-        features: [importExportFeature({ componentLoader })],
         options: {
           actions: {
             delete: { isAccessible: false },
