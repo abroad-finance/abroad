@@ -3,12 +3,13 @@ import type { ExpressPlugin } from '@adminjs/express'
 import type AdminJSClass from 'adminjs'
 import type {
   ActionContext,
+  ActionQueryParameters,
   ActionRequest,
   ActionResponse,
   ComponentLoader,
   RecordActionResponse,
 } from 'adminjs'
-import type { Express } from 'express'
+import type { Express, Response } from 'express'
 
 import { KycStatus, Prisma } from '@prisma/client'
 import session from 'express-session'
@@ -102,6 +103,13 @@ export async function initAdmin(app: Express) {
   const getOperationLabel = (targetCurrency: unknown): string => {
     const currency = typeof targetCurrency === 'string' ? targetCurrency.toUpperCase() : ''
     return fiatTargetCurrencies.has(currency) ? 'Venta' : 'Compra'
+  }
+
+  const escapeCsvValue = (value: unknown): string => {
+    if (value === null || value === undefined) return ''
+    if (value instanceof Date) return value.toISOString()
+    const stringValue = typeof value === 'object' ? JSON.stringify(value) : String(value)
+    return /[",\n\r]/.test(stringValue) ? `"${stringValue.replace(/"/g, '""')}"` : stringValue
   }
 
   const ensurePersonaFields = (record: AdminRecord, persona: null | PersonaInquiryDetails) => {
@@ -203,6 +211,23 @@ export async function initAdmin(app: Express) {
     return clonedModel
   })()
 
+  const TRANSACTION_QUOTE_LIST_COLUMNS = [
+    'fecha',
+    'tipoDocumento',
+    'nombreRazonSocial',
+    'direccion',
+    'telefono',
+    'email',
+    'pais',
+    'departamento',
+    'municipio',
+    'montoCop',
+    'montoUsdc',
+    'trm',
+    'hashTransaccion',
+    'tipoOperacion',
+  ] as const
+
   // ---------------------
   // Build AdminJS instance
   // ---------------------
@@ -254,8 +279,75 @@ export async function initAdmin(app: Express) {
         options: {
           actions: {
             delete: { isAccessible: false },
+            downloadCsv: {
+              actionType: 'resource',
+              handler: async (
+                request: ActionRequest,
+                response: Response,
+                context: ActionContext,
+              ) => {
+                const adminModule = AdminJSImport!
+                const { Filter, flat, populator } = adminModule
+                const { currentAdmin, resource } = context
+
+                const unflattenedQuery = flat.unflatten(request.query ?? {}) as ActionQueryParameters
+                const filters = unflattenedQuery.filters ?? {}
+                const sortBy = typeof unflattenedQuery.sortBy === 'string' && unflattenedQuery.sortBy.length > 0
+                  ? unflattenedQuery.sortBy
+                  : 'transactionCreatedAt'
+                const direction = unflattenedQuery.direction === 'asc' ? 'asc' : 'desc'
+
+                const filter = await new Filter(filters, resource).populate(context)
+                const total = await resource.count(filter, context)
+
+                const decoratedResource = resource.decorate()
+                const columns = [...TRANSACTION_QUOTE_LIST_COLUMNS]
+                const headerMap = Object.fromEntries(
+                  columns.map((propertyName) => {
+                    const property = decoratedResource.getPropertyByKey(propertyName)
+                    return [propertyName, property?.label() ?? propertyName] as const
+                  }),
+                )
+
+                const rows: Array<Array<unknown>> = [columns.map(column => headerMap[column])]
+
+                if (total > 0) {
+                  const records = await resource.find(
+                    filter,
+                    {
+                      limit: total,
+                      offset: 0,
+                      sort: { direction, sortBy },
+                    },
+                    context,
+                  )
+                  const populatedRecords = await populator(records, context)
+
+                  for (const record of populatedRecords) {
+                    const recordJson = record.toJSON(currentAdmin) as AdminRecord
+                    await enrichRecord(recordJson)
+                    rows.push(
+                      columns.map(column => recordJson.params[column] ?? ''),
+                    )
+                  }
+                }
+
+                const csvContent = rows
+                  .map(row => row.map(value => escapeCsvValue(value)).join(','))
+                  .join('\n')
+
+                response.setHeader('Content-Type', 'text/csv; charset=utf-8')
+                response.setHeader('Content-Disposition', 'attachment; filename=\"transaction-quote-detailed-view.csv\"')
+                response.send(`\uFEFF${csvContent}`)
+
+                return response
+              },
+              icon: 'Download',
+              isAccessible: true,
+              isVisible: true,
+              label: 'Download CSV',
+            },
             edit: { isAccessible: false },
-            export: { isAccessible: true },
             list: {
               after: async (response: ActionResponse) => {
                 const listResponse = response as ActionResponse & { records?: AdminRecord[] }
@@ -279,22 +371,7 @@ export async function initAdmin(app: Express) {
             },
           },
           id: 'TransactionQuoteDetailedView',
-          listProperties: [
-            'fecha',
-            'tipoDocumento',
-            'nombreRazonSocial',
-            'direccion',
-            'telefono',
-            'email',
-            'pais',
-            'departamento',
-            'municipio',
-            'montoCop',
-            'montoUsdc',
-            'trm',
-            'hashTransaccion',
-            'tipoOperacion',
-          ],
+          listProperties: [...TRANSACTION_QUOTE_LIST_COLUMNS],
           properties: {
             departamento: {
               isSortable: false,
@@ -416,7 +493,6 @@ export async function initAdmin(app: Express) {
           actions: {
             delete: { isAccessible: false },
             edit: { isAccessible: true },
-            export: { isAccessible: true },
             list: { isAccessible: true },
             new: { isAccessible: false },
             show: { isAccessible: true },
@@ -459,7 +535,6 @@ export async function initAdmin(app: Express) {
           actions: {
             delete: { isAccessible: false },
             edit: { isAccessible: true },
-            export: { isAccessible: true },
             list: { isAccessible: true },
             new: { isAccessible: false },
             show: { isAccessible: true },
@@ -481,7 +556,6 @@ export async function initAdmin(app: Express) {
           actions: {
             delete: { isAccessible: false },
             edit: { isAccessible: false },
-            export: { isAccessible: true },
             list: { isAccessible: true },
             new: { isAccessible: false },
             show: { isAccessible: true },
@@ -503,7 +577,6 @@ export async function initAdmin(app: Express) {
           actions: {
             delete: { isAccessible: false },
             edit: { isAccessible: false },
-            export: { isAccessible: true },
             list: { isAccessible: true },
             new: { isAccessible: false },
             show: { isAccessible: true },
@@ -525,7 +598,6 @@ export async function initAdmin(app: Express) {
           actions: {
             delete: { isAccessible: false },
             edit: { isAccessible: false },
-            export: { isAccessible: true },
             list: { isAccessible: true },
             new: { isAccessible: false },
             show: { isAccessible: true },
@@ -548,7 +620,6 @@ export async function initAdmin(app: Express) {
 
   // ---------------------------------------------
   // DEV ONLY: build AdminJS frontend on the fly
-  // Ensures @adminjs/import-export components exist
   // ---------------------------------------------
   if (process.env.NODE_ENV === 'development' && process.env.ADMIN_JS_SKIP_BUNDLE !== 'true') {
     await admin.watch()
