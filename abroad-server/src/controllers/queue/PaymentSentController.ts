@@ -82,71 +82,81 @@ export class PaymentSentController {
     cryptoCurrency: CryptoCurrency
     targetCurrency: TargetCurrency
   }) => {
-    const walletHandler = this.walletHandlerFactory.getWalletHandler(blockchain)
-    const exchangeProvider = this.exchangeProviderFactory.getExchangeProvider(targetCurrency)
-    const { address, memo } = await exchangeProvider.getExchangeAddress({ blockchain, cryptoCurrency })
+    try {
+      const walletHandler = this.walletHandlerFactory.getWalletHandler(blockchain)
+      const exchangeProvider = this.exchangeProviderFactory.getExchangeProvider(targetCurrency)
+      const { address, memo } = await exchangeProvider.getExchangeAddress({ blockchain, cryptoCurrency })
 
-    const { success, transactionId } = await walletHandler.send({ address, amount, cryptoCurrency, memo })
+      const { success, transactionId } = await walletHandler.send({ address, amount, cryptoCurrency, memo })
 
-    if (!success) {
-      this.logger.error('[PaymentSent Queue]: Error sending payment to exchange:', transactionId)
-      this.slackNotifier.sendMessage(
-        `[PaymentSent Queue]: Error exchanging ${amount} ${cryptoCurrency} to ${targetCurrency}.`,
-      )
-      return
+      if (!success) {
+        this.logger.error('[PaymentSent Queue]: Error sending payment to exchange:', transactionId)
+        this.slackNotifier.sendMessage(
+          `[PaymentSent Queue]: Error exchanging ${amount} ${cryptoCurrency} to ${targetCurrency}.`,
+        )
+        return
+      }
+
+      const clientDb = await this.dbClientProvider.getClient()
+
+      if (cryptoCurrency === SupportedCurrency.USDC && targetCurrency === SupportedCurrency.COP) {
+        await clientDb.pendingConversions.upsert({
+          create: {
+            amount,
+            side: 'SELL',
+            source: cryptoCurrency,
+            symbol: 'USDCUSDT',
+            target: SupportedCurrency.USDT,
+          },
+          update: {
+            amount: { increment: amount },
+          },
+          where: {
+            source_target: { source: cryptoCurrency, target: SupportedCurrency.USDT },
+          },
+        })
+
+        await clientDb.pendingConversions.upsert({
+          create: {
+            amount,
+            side: 'SELL',
+            source: SupportedCurrency.USDT,
+            symbol: 'USDTCOP',
+            target: targetCurrency,
+          },
+          update: {
+            amount: { increment: amount },
+          },
+          where: {
+            source_target: { source: SupportedCurrency.USDT, target: targetCurrency },
+          },
+        })
+      }
+      else if (cryptoCurrency === SupportedCurrency.USDC && targetCurrency === SupportedCurrency.BRL) {
+        await clientDb.pendingConversions.upsert({
+          create: {
+            amount,
+            side: 'SELL',
+            source: cryptoCurrency,
+            symbol: 'USDCBRL',
+            target: targetCurrency,
+          },
+          update: {
+            amount: { increment: amount },
+          },
+          where: {
+            source_target: { source: cryptoCurrency, target: targetCurrency },
+          },
+        })
+      }
     }
-
-    const clientDb = await this.dbClientProvider.getClient()
-
-    if (cryptoCurrency === SupportedCurrency.USDC && targetCurrency === SupportedCurrency.COP) {
-      await clientDb.pendingConversions.upsert({
-        create: {
-          amount,
-          side: 'SELL',
-          source: cryptoCurrency,
-          symbol: 'USDCUSDT',
-          target: SupportedCurrency.USDT,
-        },
-        update: {
-          amount: { increment: amount },
-        },
-        where: {
-          source_target: { source: cryptoCurrency, target: SupportedCurrency.USDT },
-        },
-      })
-
-      await clientDb.pendingConversions.upsert({
-        create: {
-          amount,
-          side: 'SELL',
-          source: SupportedCurrency.USDT,
-          symbol: 'USDTCOP',
-          target: targetCurrency,
-        },
-        update: {
-          amount: { increment: amount },
-        },
-        where: {
-          source_target: { source: SupportedCurrency.USDT, target: targetCurrency },
-        },
-      })
-    }
-    else if (cryptoCurrency === SupportedCurrency.USDC && targetCurrency === SupportedCurrency.BRL) {
-      await clientDb.pendingConversions.upsert({
-        create: {
-          amount,
-          side: 'SELL',
-          source: cryptoCurrency,
-          symbol: 'USDCBRL',
-          target: targetCurrency,
-        },
-        update: {
-          amount: { increment: amount },
-        },
-        where: {
-          source_target: { source: cryptoCurrency, target: targetCurrency },
-        },
-      })
+    catch (error) {
+      const errorMessage
+        = `[PaymentSent Queue]: Failed to process exchange handoff for ${amount} ${cryptoCurrency} to ${targetCurrency}`
+      this.logger.error(errorMessage, error)
+      const errorDetail = error instanceof Error ? error.message : String(error)
+      await this.slackNotifier.sendMessage(`${errorMessage}. Error: ${errorDetail}`)
+      throw error
     }
   }
 }
