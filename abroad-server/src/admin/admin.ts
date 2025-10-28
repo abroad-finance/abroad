@@ -11,7 +11,7 @@ import type {
 } from 'adminjs'
 import type { Express, Response } from 'express'
 
-import { KycStatus, Prisma } from '@prisma/client'
+import { KycStatus, Prisma, TransactionStatus } from '@prisma/client'
 import session from 'express-session'
 
 import type { PersonaInquiryDetails } from '../services/PersonaInquiryDetailsService'
@@ -196,59 +196,50 @@ export async function initAdmin(app: Express) {
   }
 
   const DEFAULT_TRANSACTION_QUOTE_CURRENCY = 'COP' as const
+  const DEFAULT_TRANSACTION_QUOTE_STATUS = TransactionStatus.PAYMENT_COMPLETED
 
   const ensureDefaultTransactionQuoteFilters = <T extends ActionRequest>(request: T): T => {
-    const dotNotationKey = 'filters.targetCurrency'
+    const currencyDotNotationKey = 'filters.targetCurrency'
+    const statusDotNotationKey = 'filters.transactionStatus'
     const normalizedRequest: ActionRequest = { ...request }
 
     const query = { ...(request.query ?? {}) } as Record<string, unknown>
-    const existingDotValue = query[dotNotationKey]
-    if (
-      existingDotValue === undefined
-      || existingDotValue === null
-      || String(existingDotValue).length === 0
-    ) {
-      query[dotNotationKey] = DEFAULT_TRANSACTION_QUOTE_CURRENCY
+    const isMissing = (value: unknown) =>
+      value === undefined || value === null || String(value).length === 0
+    const normalizeFilters = (value: unknown): Record<string, unknown> => {
+      if (value && typeof value === 'object' && !Array.isArray(value)) {
+        return { ...(value as Record<string, unknown>) }
+      }
+      return {}
     }
 
-    const queryFilters = query.filters
-    if (queryFilters && typeof queryFilters === 'object' && !Array.isArray(queryFilters)) {
-      const filtersObject = queryFilters as Record<string, unknown>
-      const currentTargetCurrency = filtersObject.targetCurrency
-      if (
-        currentTargetCurrency === undefined
-        || currentTargetCurrency === null
-        || String(currentTargetCurrency).length === 0
-      ) {
-        filtersObject.targetCurrency = DEFAULT_TRANSACTION_QUOTE_CURRENCY
-      }
+    if (isMissing(query[currencyDotNotationKey])) {
+      query[currencyDotNotationKey] = DEFAULT_TRANSACTION_QUOTE_CURRENCY
     }
+    query[statusDotNotationKey] = DEFAULT_TRANSACTION_QUOTE_STATUS
+
+    const queryFilters = normalizeFilters(query.filters)
+    if (isMissing(queryFilters.targetCurrency)) {
+      queryFilters.targetCurrency = DEFAULT_TRANSACTION_QUOTE_CURRENCY
+    }
+    queryFilters.transactionStatus = DEFAULT_TRANSACTION_QUOTE_STATUS
+    query.filters = queryFilters
 
     normalizedRequest.query = query as ActionRequest['query']
 
     if (request.payload && typeof request.payload === 'object' && !Array.isArray(request.payload)) {
       const payload = { ...request.payload } as Record<string, unknown>
-      if (
-        payload[dotNotationKey] === undefined
-        || payload[dotNotationKey] === null
-        || String(payload[dotNotationKey]).length === 0
-      ) {
-        payload[dotNotationKey] = DEFAULT_TRANSACTION_QUOTE_CURRENCY
+      if (isMissing(payload[currencyDotNotationKey])) {
+        payload[currencyDotNotationKey] = DEFAULT_TRANSACTION_QUOTE_CURRENCY
       }
-      const payloadFilters = payload.filters
-      if (
-        !payloadFilters
-        || typeof payloadFilters !== 'object'
-        || Array.isArray(payloadFilters)
-        || !('targetCurrency' in payloadFilters)
-      ) {
-        payload.filters = {
-          ...(typeof payloadFilters === 'object' && payloadFilters && !Array.isArray(payloadFilters)
-            ? payloadFilters
-            : {}),
-          targetCurrency: DEFAULT_TRANSACTION_QUOTE_CURRENCY,
-        }
+      payload[statusDotNotationKey] = DEFAULT_TRANSACTION_QUOTE_STATUS
+
+      const payloadFilters = normalizeFilters(payload.filters)
+      if (isMissing(payloadFilters.targetCurrency)) {
+        payloadFilters.targetCurrency = DEFAULT_TRANSACTION_QUOTE_CURRENCY
       }
+      payloadFilters.transactionStatus = DEFAULT_TRANSACTION_QUOTE_STATUS
+      payload.filters = payloadFilters
 
       normalizedRequest.payload = payload as ActionRequest['payload']
     }
