@@ -195,6 +195,67 @@ export async function initAdmin(app: Express) {
     return model
   }
 
+  const DEFAULT_TRANSACTION_QUOTE_CURRENCY = 'COP' as const
+
+  const ensureDefaultTransactionQuoteFilters = <T extends ActionRequest>(request: T): T => {
+    const dotNotationKey = 'filters.targetCurrency'
+    const normalizedRequest: ActionRequest = { ...request }
+
+    const query = { ...(request.query ?? {}) } as Record<string, unknown>
+    const existingDotValue = query[dotNotationKey]
+    if (
+      existingDotValue === undefined
+      || existingDotValue === null
+      || String(existingDotValue).length === 0
+    ) {
+      query[dotNotationKey] = DEFAULT_TRANSACTION_QUOTE_CURRENCY
+    }
+
+    const queryFilters = query.filters
+    if (queryFilters && typeof queryFilters === 'object' && !Array.isArray(queryFilters)) {
+      const filtersObject = queryFilters as Record<string, unknown>
+      const currentTargetCurrency = filtersObject.targetCurrency
+      if (
+        currentTargetCurrency === undefined
+        || currentTargetCurrency === null
+        || String(currentTargetCurrency).length === 0
+      ) {
+        filtersObject.targetCurrency = DEFAULT_TRANSACTION_QUOTE_CURRENCY
+      }
+    }
+
+    normalizedRequest.query = query as ActionRequest['query']
+
+    if (request.payload && typeof request.payload === 'object' && !Array.isArray(request.payload)) {
+      const payload = { ...request.payload } as Record<string, unknown>
+      if (
+        payload[dotNotationKey] === undefined
+        || payload[dotNotationKey] === null
+        || String(payload[dotNotationKey]).length === 0
+      ) {
+        payload[dotNotationKey] = DEFAULT_TRANSACTION_QUOTE_CURRENCY
+      }
+      const payloadFilters = payload.filters
+      if (
+        !payloadFilters
+        || typeof payloadFilters !== 'object'
+        || Array.isArray(payloadFilters)
+        || !('targetCurrency' in payloadFilters)
+      ) {
+        payload.filters = {
+          ...(typeof payloadFilters === 'object' && payloadFilters && !Array.isArray(payloadFilters)
+            ? payloadFilters
+            : {}),
+          targetCurrency: DEFAULT_TRANSACTION_QUOTE_CURRENCY,
+        }
+      }
+
+      normalizedRequest.payload = payload as ActionRequest['payload']
+    }
+
+    return normalizedRequest as T
+  }
+
   const transactionQuoteViewModel = (() => {
     const baseModel = getModel('TransactionQuoteView')
     const clonedModel = JSON.parse(JSON.stringify(baseModel)) as typeof baseModel
@@ -210,6 +271,61 @@ export async function initAdmin(app: Express) {
     }
     return clonedModel
   })()
+
+  async function streamTransactionQuoteCsv(
+    request: ActionRequest,
+    response: Response,
+    context: ActionContext,
+  ) {
+    const ensuredRequest = ensureDefaultTransactionQuoteFilters(request)
+    const adminModule = AdminJSImport!
+    const { Filter, flat, populator } = adminModule
+    const { currentAdmin, resource } = context
+
+    const unflattenedQuery = flat.unflatten(ensuredRequest.query ?? {}) as ActionQueryParameters
+    const filters = unflattenedQuery.filters ?? {}
+    const sortBy = typeof unflattenedQuery.sortBy === 'string' && unflattenedQuery.sortBy.length > 0
+      ? unflattenedQuery.sortBy
+      : 'transactionCreatedAt'
+    const direction = unflattenedQuery.direction === 'asc' ? 'asc' : 'desc'
+
+    const filter = await new Filter(filters, resource).populate(context)
+    const total = await resource.count(filter, context)
+
+    const decoratedResource = resource.decorate()
+    const columns = [...TRANSACTION_QUOTE_LIST_COLUMNS]
+    const headerMap = Object.fromEntries(
+      columns.map((propertyName) => {
+        const property = decoratedResource.getPropertyByKey(propertyName)
+        return [propertyName, property?.label() ?? propertyName] as const
+      }),
+    )
+
+    const rows: Array<Array<unknown>> = [columns.map(column => headerMap[column])]
+
+    if (total > 0) {
+      const records = await resource.find(
+        filter,
+        { limit: total, offset: 0, sort: { direction, sortBy } },
+        context,
+      )
+      const populatedRecords = await populator(records, context)
+
+      for (const record of populatedRecords) {
+        const recordJson = record.toJSON(currentAdmin) as { params: Record<string, unknown> }
+        await enrichRecord(recordJson)
+        rows.push(columns.map(column => recordJson.params[column] ?? ''))
+      }
+    }
+
+    const csvContent = rows.map(row => row.map(v => escapeCsvValue(v)).join(',')).join('\n')
+    response.setHeader('Content-Type', 'text/csv; charset=utf-8')
+    response.setHeader(
+      'Content-Disposition',
+      'attachment; filename="transaction-quote-detailed-view.csv"',
+    )
+    response.send(`\uFEFF${csvContent}`)
+  }
 
   const TRANSACTION_QUOTE_LIST_COLUMNS = [
     'fecha',
@@ -237,7 +353,6 @@ export async function initAdmin(app: Express) {
       withMadeWithLove: false,
     },
     componentLoader,
-
     locale: {
       language: 'en',
       translations: {
@@ -253,8 +368,14 @@ export async function initAdmin(app: Express) {
           actions: {
             delete: { isAccessible: false },
             edit: { isAccessible: false },
-            export: { isAccessible: true },
-            list: { isAccessible: true },
+            export: {
+              before: ensureDefaultTransactionQuoteFilters,
+              isAccessible: true,
+            },
+            list: {
+              before: ensureDefaultTransactionQuoteFilters,
+              isAccessible: true,
+            },
             new: { isAccessible: false },
             show: { isAccessible: true },
           },
@@ -281,67 +402,32 @@ export async function initAdmin(app: Express) {
             delete: { isAccessible: false },
             downloadCsv: {
               actionType: 'resource',
-              handler: async (
-                request: ActionRequest,
-                response: Response,
-                context: ActionContext,
-              ) => {
-                const adminModule = AdminJSImport!
-                const { Filter, flat, populator } = adminModule
-                const { currentAdmin, resource } = context
-
-                const unflattenedQuery = flat.unflatten(request.query ?? {}) as ActionQueryParameters
-                const filters = unflattenedQuery.filters ?? {}
-                const sortBy = typeof unflattenedQuery.sortBy === 'string' && unflattenedQuery.sortBy.length > 0
-                  ? unflattenedQuery.sortBy
-                  : 'transactionCreatedAt'
-                const direction = unflattenedQuery.direction === 'asc' ? 'asc' : 'desc'
-
-                const filter = await new Filter(filters, resource).populate(context)
-                const total = await resource.count(filter, context)
-
-                const decoratedResource = resource.decorate()
-                const columns = [...TRANSACTION_QUOTE_LIST_COLUMNS]
-                const headerMap = Object.fromEntries(
-                  columns.map((propertyName) => {
-                    const property = decoratedResource.getPropertyByKey(propertyName)
-                    return [propertyName, property?.label() ?? propertyName] as const
-                  }),
-                )
-
-                const rows: Array<Array<unknown>> = [columns.map(column => headerMap[column])]
-
-                if (total > 0) {
-                  const records = await resource.find(
-                    filter,
-                    {
-                      limit: total,
-                      offset: 0,
-                      sort: { direction, sortBy },
-                    },
-                    context,
-                  )
-                  const populatedRecords = await populator(records, context)
-
-                  for (const record of populatedRecords) {
-                    const recordJson = record.toJSON(currentAdmin) as AdminRecord
-                    await enrichRecord(recordJson)
-                    rows.push(
-                      columns.map(column => recordJson.params[column] ?? ''),
-                    )
-                  }
+              component: false,
+              handler: async (request: ActionRequest, response: Response, context: ActionContext) => {
+                const ensuredRequest = ensureDefaultTransactionQuoteFilters(request)
+                // If user is already on the view route (GET), stream the file.
+                if (ensuredRequest.method === 'get') {
+                  await streamTransactionQuoteCsv(ensuredRequest, response, context)
+                  return response
                 }
 
-                const csvContent = rows
-                  .map(row => row.map(value => escapeCsvValue(value)).join(','))
-                  .join('\n')
+                // First click is a POST/XHR → tell the SPA to navigate to the view route (GET).
+                const { h, resource } = context
+                const search = new URLSearchParams(
+                  (ensuredRequest.query ?? {}) as Record<string, string>,
+                ).toString()
+                const url = h.resourceActionUrl({
+                  actionName: 'downloadCsv',
+                  resourceId: resource._decorated?.id() || resource.id(),
+                  search,
+                })
 
-                response.setHeader('Content-Type', 'text/csv; charset=utf-8')
-                response.setHeader('Content-Disposition', 'attachment; filename=\"transaction-quote-detailed-view.csv\"')
-                response.send(`\uFEFF${csvContent}`)
-
-                return response
+                return {
+                  notice: { message: 'Starting CSV download…', type: 'success' },
+                  redirectUrl: url,
+                }
               },
+
               icon: 'Download',
               isAccessible: true,
               isVisible: true,
@@ -356,6 +442,7 @@ export async function initAdmin(app: Express) {
                 }
                 return response
               },
+              before: ensureDefaultTransactionQuoteFilters,
               isAccessible: true,
             },
             new: { isAccessible: false },
