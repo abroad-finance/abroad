@@ -9,7 +9,7 @@ import type {
   ComponentLoader,
   RecordActionResponse,
 } from 'adminjs'
-import type { Express, Response } from 'express'
+import type { Express, NextFunction, Request, Response } from 'express'
 
 import { KycStatus, Prisma, TransactionStatus } from '@prisma/client'
 import session from 'express-session'
@@ -335,6 +335,63 @@ export async function initAdmin(app: Express) {
     'tipoOperacion',
   ] as const
 
+  const TRANSACTION_QUOTE_CSV_ROUTE = '/transaction-quotes/download.csv'
+  const TRANSACTION_QUOTE_CSV_ROUTE_SEGMENTS = TRANSACTION_QUOTE_CSV_ROUTE
+    .split('/')
+    .filter(segment => segment.length > 0)
+  const TRANSACTION_QUOTE_RESOURCE_ID = 'TransactionQuoteDetailedView'
+  const TRANSACTION_QUOTE_DOWNLOAD_ACTION_NAME = 'downloadCsv' as const
+
+  const flattenActionParams = (input?: Record<string, unknown>): Array<[string, string]> => {
+    if (!input) return []
+    const { flat } = AdminJSImport!
+    const flattened = flat.flatten(input) as Record<string, unknown>
+    const entries: Array<[string, string]> = []
+
+    for (const [key, value] of Object.entries(flattened)) {
+      if (value === undefined || value === null) continue
+      if (Array.isArray(value)) {
+        value.forEach(item => entries.push([key, String(item)]))
+        continue
+      }
+      entries.push([key, String(value)])
+    }
+
+    return entries
+  }
+
+  const buildActionRequestSearchParams = (request: ActionRequest): string => {
+    const params = new URLSearchParams()
+
+    for (const [key, value] of flattenActionParams(request.payload as Record<string, unknown> | undefined)) {
+      params.set(key, value)
+    }
+
+    for (const [key, value] of flattenActionParams(request.query as Record<string, unknown> | undefined)) {
+      params.set(key, value)
+    }
+
+    return params.toString()
+  }
+
+  const normalizeQueryParams = (rawQuery: Request['query']): Record<string, unknown> => {
+    const normalized: Record<string, unknown> = {}
+
+    for (const [key, value] of Object.entries(rawQuery ?? {})) {
+      if (Array.isArray(value)) {
+        if (value.length > 0) {
+          normalized[key] = value[value.length - 1]
+        }
+        continue
+      }
+      if (value !== undefined) {
+        normalized[key] = value as unknown
+      }
+    }
+
+    return normalized
+  }
+
   // ---------------------
   // Build AdminJS instance
   // ---------------------
@@ -394,28 +451,18 @@ export async function initAdmin(app: Express) {
             downloadCsv: {
               actionType: 'resource',
               component: false,
-              handler: async (request: ActionRequest, response: Response, context: ActionContext) => {
+              handler: async (request: ActionRequest, _response: Response, context: ActionContext) => {
                 const ensuredRequest = ensureDefaultTransactionQuoteFilters(request)
-                // If user is already on the view route (GET), stream the file.
-                if (ensuredRequest.method === 'get') {
-                  await streamTransactionQuoteCsv(ensuredRequest, response, context)
-                  return response
-                }
-
-                // First click is a POST/XHR → tell the SPA to navigate to the view route (GET).
-                const { h, resource } = context
-                const search = new URLSearchParams(
-                  (ensuredRequest.query ?? {}) as Record<string, string>,
-                ).toString()
-                const url = h.resourceActionUrl({
-                  actionName: 'downloadCsv',
-                  resourceId: resource._decorated?.id() || resource.id(),
+                const searchParams = buildActionRequestSearchParams(ensuredRequest)
+                const search = searchParams.length > 0 ? `?${searchParams}` : ''
+                const redirectUrl = context.h.urlBuilder(
+                  TRANSACTION_QUOTE_CSV_ROUTE_SEGMENTS,
                   search,
-                })
+                )
 
                 return {
                   notice: { message: 'Starting CSV download…', type: 'success' },
-                  redirectUrl: url,
+                  redirectUrl,
                 }
               },
 
@@ -736,6 +783,47 @@ export async function initAdmin(app: Express) {
       resave: false,
       saveUninitialized: false,
       secret: process.env.SESSION_SECRET || 'keyboard cat',
+    },
+  )
+
+  router.get(
+    TRANSACTION_QUOTE_CSV_ROUTE,
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const resource = admin.findResource(TRANSACTION_QUOTE_RESOURCE_ID)
+        if (!resource) {
+          res.status(404).send('Resource not found')
+          return
+        }
+
+        const decorated = resource.decorate()
+        const downloadAction = decorated.actions[TRANSACTION_QUOTE_DOWNLOAD_ACTION_NAME]
+          ?? decorated.actions.list
+        const actionRequest: ActionRequest = {
+          method: 'get',
+          params: {
+            action: TRANSACTION_QUOTE_DOWNLOAD_ACTION_NAME,
+            resourceId: decorated.id(),
+          },
+          query: normalizeQueryParams(req.query),
+        }
+        const ensuredRequest = ensureDefaultTransactionQuoteFilters(actionRequest)
+        const viewHelpers = new (AdminJSImport!.ViewHelpers)({ options: admin.options })
+        const session = req.session as unknown as { adminUser?: ActionContext['currentAdmin'] }
+
+        const context: ActionContext = {
+          _admin: admin,
+          action: downloadAction,
+          currentAdmin: session?.adminUser,
+          h: viewHelpers,
+          resource,
+        }
+
+        await streamTransactionQuoteCsv(ensuredRequest, res, context)
+      }
+      catch (error) {
+        next(error)
+      }
     },
   )
 
