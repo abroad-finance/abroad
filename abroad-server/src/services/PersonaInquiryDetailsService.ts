@@ -10,10 +10,11 @@ export type PersonaInquiryDetails = {
   documentType?: string
   email?: string
   fullName?: string
+  idNumber?: string
   phone?: string
 }
 
-type FlatRecord = Record<string, unknown>
+// (intentionally not using a flattening approach; we consume exact Persona keys)
 
 /**
  * Fetches Persona inquiry details and normalises common personal-data fields so they can be
@@ -44,6 +45,8 @@ export class PersonaInquiryDetailsService {
         params: { include: 'account,documents' },
       })
 
+      console.log(JSON.stringify(data))
+
       const details = this.parseInquiryPayload(data)
       this.cache.set(inquiryId, details)
       return details
@@ -55,30 +58,13 @@ export class PersonaInquiryDetailsService {
     }
   }
 
-  private buildFullName(source: FlatRecord): string | undefined {
-    const first = this.pickString(source, ['name-first', 'name_first', 'first_name'])
-    const last = this.pickString(source, ['name-last', 'name_last', 'last_name'])
-
-    const parts = [first, last].filter(Boolean)
-    if (parts.length === 0) return undefined
-    return parts.join(' ')
-  }
-
-  private combineFields(...sources: Array<unknown>): FlatRecord {
-    return sources.reduce<FlatRecord>((acc, source) => {
-      if (!source) return acc
-      const flattened = this.flattenFields(source)
-      for (const [key, value] of Object.entries(flattened)) {
-        if (
-          !acc[key]
-          || acc[key] === null
-          || acc[key] === undefined
-        ) {
-          acc[key] = value
-        }
-      }
-      return acc
-    }, {})
+  private buildFullNameFromAttributes(attrs?: Record<string, unknown>): string | undefined {
+    if (!attrs) return undefined
+    const first = typeof attrs['name-first'] === 'string' ? String(attrs['name-first']).trim() : ''
+    const middle = typeof attrs['name-middle'] === 'string' ? String(attrs['name-middle']).trim() : ''
+    const last = typeof attrs['name-last'] === 'string' ? String(attrs['name-last']).trim() : ''
+    const parts = [first, middle, last].filter(p => p && p.length > 0)
+    return parts.length > 0 ? parts.join(' ') : undefined
   }
 
   private async ensureClient(): Promise<AxiosInstance> {
@@ -171,41 +157,41 @@ export class PersonaInquiryDetailsService {
     return attrs && typeof attrs === 'object' ? (attrs as Record<string, unknown>) : null
   }
 
-  private flattenFields(source: unknown): FlatRecord {
-    const result: FlatRecord = {}
-
-    const walk = (value: unknown): void => {
-      if (!value || typeof value !== 'object') return
-
-      for (const [rawKey, rawVal] of Object.entries(value as Record<string, unknown>)) {
-        const normalizedKey = this.normalizeKey(rawKey)
-
-        if (Array.isArray(rawVal)) {
-          rawVal.forEach(item => walk(item))
-        }
-        else if (rawVal && typeof rawVal === 'object') {
-          walk(rawVal)
-        }
-
-        const existing = result[normalizedKey]
-        const shouldOverwrite
-          = !Object.prototype.hasOwnProperty.call(result, normalizedKey)
-            || existing === null
-            || existing === undefined
-            || (typeof existing === 'string' && existing.trim() === '')
-
-        if (shouldOverwrite) {
-          result[normalizedKey] = rawVal
-        }
-      }
-    }
-
-    walk(source)
-    return result
+  // Helper to read Persona fields.<key>.value from inquiry.attributes.fields
+  private getFieldValue<T = unknown>(
+    fields: Record<string, unknown> | undefined,
+    key: string,
+  ): T | undefined {
+    if (!fields) return undefined
+    const entry = fields[key]
+    if (!entry || typeof entry !== 'object') return undefined
+    const value = (entry as Record<string, unknown>).value as T | undefined
+    return value === null ? undefined : value
   }
 
-  private normalizeKey(key: string): string {
-    return key.toLowerCase().replace(/[^a-z0-9]/g, '')
+  private mapDocumentClassToLabel(code: string | undefined, country?: string): string | undefined {
+    if (!code) return undefined
+    const normalized = code.toLowerCase()
+
+    // Normalized country for localization tweaks
+    const c = typeof country === 'string' ? country.toUpperCase() : undefined
+
+    // Common codes and their readable Spanish labels
+    const table: Record<string, string> = {
+      dl: 'Licencia de conducción',
+      driver_license: 'Licencia de conducción',
+      drivers_license: 'Licencia de conducción',
+      id: c === 'CO' ? 'Cédula de ciudadanía' : 'Documento de identidad',
+      id_card: c === 'CO' ? 'Cédula de ciudadanía' : 'Documento de identidad',
+      national_id: c === 'CO' ? 'Cédula de ciudadanía' : 'Documento de identidad',
+      passport: 'Pasaporte',
+      pp: 'Pasaporte',
+      residence_permit: 'Permiso de residencia',
+      rp: 'Permiso de residencia',
+      visa: 'Visa',
+    }
+
+    return table[normalized] ?? code
   }
 
   private parseInquiryPayload(payload: unknown): null | PersonaInquiryDetails {
@@ -215,21 +201,10 @@ export class PersonaInquiryDetailsService {
     if (!container) return null
 
     const { included, resource } = container
-    const relationships = resource.relationships
 
-    let accountId: string | undefined
-    if (relationships && typeof relationships === 'object') {
-      const accountData = (relationships as Record<string, unknown>).account
-      const accountRelationship = this.extractRelationship(accountData)
-      accountId = accountRelationship?.id
-    }
-
-    const accountAttributes = accountId
-      ? this.findIncludedAttributes(included, 'account', accountId)
-      : null
-
+    // Include Government ID document attributes (type is e.g. 'document/government-id')
     const documentsAttributes = included
-      .filter(item => item.type === 'document')
+      .filter(item => typeof item.type === 'string' && String(item.type).startsWith('document'))
       .map(item => (item.attributes ?? {})) as Array<Record<string, unknown>>
 
     const resourceAttributesRaw = resource.attributes
@@ -237,96 +212,59 @@ export class PersonaInquiryDetailsService {
       ? resourceAttributesRaw as Record<string, unknown>
       : undefined
 
-    const resourceFieldsValue = resourceAttributes
-      ? (resourceAttributes as Record<string, unknown>)['fields']
-      : undefined
-    const resourceFields = resourceFieldsValue && typeof resourceFieldsValue === 'object'
-      ? resourceFieldsValue as Record<string, unknown>
+    const resourceFields = resourceAttributes && typeof resourceAttributes.fields === 'object'
+      ? (resourceAttributes.fields as Record<string, unknown>)
       : undefined
 
-    const accountFieldsValue = accountAttributes
-      ? (accountAttributes as Record<string, unknown>)['fields']
+    // Exact keys from Persona API response (kebab-case)
+    let fullName = this.buildFullNameFromAttributes(resourceAttributes)
+
+    const documentAttrs = documentsAttributes[0] ?? {}
+    const documentClass = this.getFieldValue<string>(resourceFields, 'identification-class')
+      ?? (typeof documentAttrs['id-class'] === 'string' ? String(documentAttrs['id-class']) : undefined)
+    if (!fullName) {
+      fullName = this.buildFullNameFromAttributes(documentAttrs)
+    }
+
+    const addressLine1 = typeof resourceAttributes?.['address-street-1'] === 'string'
+      ? String(resourceAttributes['address-street-1'])
       : undefined
-    const accountFields = accountFieldsValue && typeof accountFieldsValue === 'object'
-      ? accountFieldsValue as Record<string, unknown>
+    const addressLine2 = typeof resourceAttributes?.['address-street-2'] === 'string'
+      ? String(resourceAttributes['address-street-2'])
       : undefined
-
-    const fieldsSource = this.combineFields(
-      resourceAttributes,
-      resourceFields,
-      accountAttributes,
-      accountFields,
-    )
-
-    const fullName = this.pickString(fieldsSource, [
-      'name-full',
-      'name_full',
-      'full_name',
-      'fullname',
-      'legal_name',
-    ]) ?? this.buildFullName(fieldsSource)
-
-    const documentAttributes = this.combineFields(...documentsAttributes)
-    const documentType = this.pickString(documentAttributes, [
-      'document-type',
-      'document_type',
-      'government-id-type',
-      'government_id_type',
-      'id-class',
-      'id_class',
-    ]) ?? this.pickString(fieldsSource, [
-      'government-id-type',
-      'government_id_type',
-      'document-type',
-      'document_type',
-      'identification-class',
-      'identification_class',
-      'id-class',
-      'id_class',
-    ])
-
-    const addressLine1 = this.pickString(fieldsSource, [
-      'address-street-1',
-      'address_street_1',
-      'address-line-1',
-      'address_line_1',
-      'address',
-      'street_1',
-    ])
-    const addressLine2 = this.pickString(fieldsSource, [
-      'address-street-2',
-      'address_street_2',
-      'address-line-2',
-      'address_line_2',
-      'address-secondary',
-      'address_secondary',
-      'street_2',
-    ])
-    const city = this.pickString(fieldsSource, [
-      'address-city',
-      'address_city',
-      'city',
-      'municipality',
-    ])
-    const department = this.pickString(fieldsSource, [
-      'address-subdivision',
-      'address_subdivision',
-      'state',
-      'region',
-      'department',
-      'subdivision',
-    ])
-    const country = this.pickString(fieldsSource, [
-      'address-country-code',
-      'address_country_code',
-      'country',
-      'country-code',
-      'country_code',
-      'selected-country-code',
-      'selected_country_code',
-    ])
+    const city = typeof resourceAttributes?.['address-city'] === 'string'
+      ? String(resourceAttributes['address-city'])
+      : undefined
+    const department = typeof resourceAttributes?.['address-subdivision'] === 'string'
+      ? String(resourceAttributes['address-subdivision'])
+      : undefined
+    const country = this.getFieldValue<string>(resourceFields, 'selected-country-code')
+      ?? (typeof resourceAttributes?.['address-country-code'] === 'string' ? String(resourceAttributes['address-country-code']) : undefined)
 
     const address = [addressLine1, addressLine2].filter(Boolean).join(', ')
+
+    // Determine the correct ID number to show
+    const attrIdNumber = typeof resourceAttributes?.['identification-number'] === 'string'
+      ? String(resourceAttributes['identification-number'])
+      : this.getFieldValue<string>(resourceFields, 'identification-number')
+    const documentNumber = typeof documentAttrs['document-number'] === 'string'
+      ? String(documentAttrs['document-number'])
+      : undefined
+    const docIdentificationNumber = typeof documentAttrs['identification-number'] === 'string'
+      ? String(documentAttrs['identification-number'])
+      : undefined
+
+    const idNumber = (documentClass === 'pp' ? documentNumber : (attrIdNumber ?? docIdentificationNumber))
+      ?? attrIdNumber
+
+    const email = typeof resourceAttributes?.['email-address'] === 'string'
+      ? String(resourceAttributes['email-address'])
+      : this.getFieldValue<string>(resourceFields, 'email-address')
+    const phone = typeof resourceAttributes?.['phone-number'] === 'string'
+      ? String(resourceAttributes['phone-number'])
+      : this.getFieldValue<string>(resourceFields, 'phone-number')
+
+    const documentType = this.mapDocumentClassToLabel(documentClass, country)
 
     return {
       address: address || undefined,
@@ -334,45 +272,10 @@ export class PersonaInquiryDetailsService {
       country,
       department,
       documentType,
-      email: this.pickString(fieldsSource, ['email-address', 'email_address', 'email']),
+      email: email ?? undefined,
       fullName,
-      phone: this.pickString(fieldsSource, ['phone-number', 'phone_number', 'phone']),
+      idNumber: idNumber ?? undefined,
+      phone: phone ?? undefined,
     }
-  }
-
-  private pickString(
-    source: FlatRecord,
-    candidateKeys: string[],
-  ): string | undefined {
-    for (const key of candidateKeys) {
-      const normalized = this.normalizeKey(key)
-      const value = source[normalized]
-      const extracted = this.toStringValue(value)
-      if (extracted) return extracted
-    }
-    return undefined
-  }
-
-  private toStringValue(value: unknown): string | undefined {
-    if (typeof value === 'string') {
-      const trimmed = value.trim()
-      return trimmed.length > 0 ? trimmed : undefined
-    }
-    if (Array.isArray(value)) {
-      for (const item of value) {
-        const str = this.toStringValue(item)
-        if (str) return str
-      }
-      return undefined
-    }
-    if (value && typeof value === 'object') {
-      const candidateKeys = ['value', 'label', 'name', 'display']
-      for (const key of candidateKeys) {
-        const nested = (value as Record<string, unknown>)[key]
-        const str = this.toStringValue(nested)
-        if (str) return str
-      }
-    }
-    return undefined
   }
 }

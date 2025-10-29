@@ -21,6 +21,7 @@ type AdminResourceConfig = NonNullable<AdminJSOptions['resources']>[number]
 const TRANSACTION_QUOTE_LIST_COLUMNS = [
   'fecha',
   'tipoDocumento',
+  'numeroDocumento',
   'nombreRazonSocial',
   'direccion',
   'telefono',
@@ -139,6 +140,7 @@ export function createTransactionQuoteSupport(deps: TransactionQuoteSupportDeps)
 
   const ensurePersonaFields = (record: AdminRecord, persona: null | PersonaInquiryDetails) => {
     record.params.tipoDocumento = persona?.documentType ?? ''
+    record.params.numeroDocumento = persona?.idNumber ?? ''
     record.params.nombreRazonSocial = persona?.fullName ?? ''
     record.params.direccion = persona?.address ?? ''
     record.params.telefono = persona?.phone ?? ''
@@ -513,6 +515,13 @@ export function createTransactionQuoteSupport(deps: TransactionQuoteSupportDeps)
           isVisible: { edit: false, filter: true, list: true, show: true },
           label: 'Nombre o Razón Social',
           position: 30,
+          type: 'string',
+        },
+        numeroDocumento: {
+          isSortable: false,
+          isVisible: { edit: false, filter: true, list: true, show: true },
+          label: 'Numero de documento',
+          position: 25,
           type: 'string',
         },
         pais: {
