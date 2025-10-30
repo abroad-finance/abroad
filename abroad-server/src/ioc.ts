@@ -6,6 +6,7 @@ import { ConversionController } from './controllers/ConversionController'
 import { PartnerController } from './controllers/PartnerController'
 import { PartnerUserController } from './controllers/PartnerUserController'
 import { PaymentsController } from './controllers/PaymentsController'
+import { PublicTransactionsController } from './controllers/PublicTransactionsController'
 import { QrDecoderController } from './controllers/QrDecoderController'
 import { BinanceBalanceUpdatedController } from './controllers/queue/BinanceBalanceUpdatedController'
 import { PaymentSentController } from './controllers/queue/PaymentSentController'
@@ -145,6 +146,7 @@ container
   .toSelf()
   .inSingletonScope()
 container.bind<TransactionsController>(TransactionsController).toSelf().inSingletonScope()
+container.bind<PublicTransactionsController>(PublicTransactionsController).toSelf().inSingletonScope()
 container.bind(PaymentsController).toSelf().inSingletonScope()
 container.bind(QrDecoderController).toSelf().inSingletonScope()
 container.bind(WalletAuthController).toSelf().inSingletonScope()

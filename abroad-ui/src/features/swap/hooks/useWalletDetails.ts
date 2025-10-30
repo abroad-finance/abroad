@@ -186,6 +186,7 @@ export function useWalletDetails(params: Params = {}): WalletDetailsProps {
       case 'AWAITING_PAYMENT':
       case 'PROCESSING_PAYMENT': return 'bg-blue-100 text-blue-700'
       case 'PAYMENT_COMPLETED': return 'bg-green-100 text-green-700'
+      case 'PAYMENT_EXPIRED':
       case 'PAYMENT_FAILED':
       case 'WRONG_AMOUNT': return 'bg-red-100 text-red-700'
       default: return 'bg-gray-100 text-gray-700'
@@ -196,6 +197,7 @@ export function useWalletDetails(params: Params = {}): WalletDetailsProps {
     switch (status) {
       case 'AWAITING_PAYMENT': return t('wallet_details.status.awaiting_payment', 'Esperando Pago')
       case 'PAYMENT_COMPLETED': return t('wallet_details.status.completed', 'Completado')
+      case 'PAYMENT_EXPIRED': return t('wallet_details.status.expired', 'Pago Expirado')
       case 'PAYMENT_FAILED': return t('wallet_details.status.failed', 'Pago Fallido')
       case 'PROCESSING_PAYMENT': return t('wallet_details.status.processing', 'Procesando Pago')
       case 'WRONG_AMOUNT': return t('wallet_details.status.wrong_amount', 'Monto Incorrecto')

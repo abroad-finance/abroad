@@ -37,6 +37,7 @@ const TxStatus = ({
     switch (api) {
       case 'PAYMENT_COMPLETED': return 'accepted'
 
+      case 'PAYMENT_EXPIRED':
       case 'PAYMENT_FAILED':
       case 'WRONG_AMOUNT': return 'denied'
 
