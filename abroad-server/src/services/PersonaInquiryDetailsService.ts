@@ -2,6 +2,10 @@ import axios, { AxiosInstance } from 'axios'
 
 import type { ISecretManager } from '../interfaces/ISecretManager'
 
+/**
+ * Normalized subset of personal data extracted from a Persona inquiry.
+ * This shape is stable for the Admin UI regardless of Persona template versions.
+ */
 export type PersonaInquiryDetails = {
   address?: string
   city?: string
@@ -14,169 +18,239 @@ export type PersonaInquiryDetails = {
   phone?: string
 }
 
-// (intentionally not using a flattening approach; we consume exact Persona keys)
+/** Minimal JSON object helper type (keeps us honest with unknown payloads) */
+type JsonRecord = Record<string, unknown>
 
 /**
- * Fetches Persona inquiry details and normalises common personal-data fields so they can be
- * displayed in the Admin panel regardless of the exact schema version configured in Persona.
+ * Service that fetches a Persona inquiry and normalizes a small set of personal-data fields.
  *
- * Persona's REST API exposes most user attributes under the `fields` object, using either
- * kebab-case (`address-city`) or snake_case (`address_city`). We flatten those keys and keep
- * a tiny cache to avoid hitting the API repeatedly while an admin paginates through the list.
+ * Persona's REST API generally follows a JSON:API shape where most user attributes are under
+ * the `attributes` object and dynamic form values are under `attributes.fields.<key>.value`.
+ *
+ * This service flattens and normalizes those values for Admin consumption. A tiny in-memory
+ * cache avoids refetching as an admin paginates through inquiries.
+ *
+ * @example
+ * const svc = new PersonaInquiryDetailsService(secretManager, { debug: false })
+ * const details = await svc.getDetails('inq_123...')
+ * // details -> { fullName, email, phone, address, city, department, country, idNumber, documentType }
  */
 export class PersonaInquiryDetailsService {
-  private axiosClient?: AxiosInstance
+  /** Persona REST API base URL */
+  private static readonly API_BASE_URL = 'https://withpersona.com/api/v1'
+  /**
+   * Explicit Persona API version header to stabilize payload shape.
+   * Adjust with care if/when your Persona workspace upgrades versions.
+   */
+  private static readonly API_VERSION = '2023-01-01'
+  /** Network timeout (ms) for Persona requests */
+  private static readonly REQUEST_TIMEOUT_MS = 10_000
 
+  private axiosClient?: AxiosInstance
   private readonly cache = new Map<string, null | PersonaInquiryDetails>()
 
-  constructor(private readonly secretManager: ISecretManager) {}
+  constructor(
+    private readonly secretManager: ISecretManager,
+    /** Optional flags for local debugging, etc. */
+    private readonly opts: { debug?: boolean } = {},
+  ) {}
 
+  /**
+   * Clear the memoized result(s).
+   * - Call with an `inquiryId` to invalidate a single entry
+   * - Call with no args to clear the entire cache
+   */
+  public clearCache(inquiryId?: string): void {
+    if (inquiryId) this.cache.delete(inquiryId)
+    else this.cache.clear()
+  }
+
+  /**
+   * Fetch and normalize the details for a given Persona inquiry id.
+   * Cached results are returned when available. On error, returns `null`
+   * and caches the null to avoid repeat failures during pagination.
+   *
+   * @param inquiryId Persona inquiry id (e.g. `inq_...`). Falsy/blank returns `null`.
+   */
   public async getDetails(inquiryId: string): Promise<null | PersonaInquiryDetails> {
-    if (!inquiryId) return null
+    const id = inquiryId?.trim()
+    if (!id) return null
 
-    if (this.cache.has(inquiryId)) {
-      return this.cache.get(inquiryId) ?? null
+    if (this.cache.has(id)) {
+      return this.cache.get(id) ?? null
     }
 
     try {
       const client = await this.ensureClient()
-
-      const { data } = await client.get(`/inquiries/${encodeURIComponent(inquiryId)}`, {
+      const { data } = await client.get(`/inquiries/${encodeURIComponent(id)}`, {
         params: { include: 'account,documents' },
       })
 
-      console.log(JSON.stringify(data))
+      this.debug('Persona inquiry payload', data)
 
       const details = this.parseInquiryPayload(data)
-      this.cache.set(inquiryId, details)
+      this.cache.set(id, details)
       return details
     }
     catch (error) {
-      console.error('Failed to fetch Persona inquiry details', { error, inquiryId })
-      this.cache.set(inquiryId, null)
+      console.error('Failed to fetch Persona inquiry details', { error, inquiryId: id })
+      this.cache.set(id, null)
       return null
     }
   }
 
-  private buildFullNameFromAttributes(attrs?: Record<string, unknown>): string | undefined {
-    if (!attrs) return undefined
-    const first = typeof attrs['name-first'] === 'string' ? String(attrs['name-first']).trim() : ''
-    const middle = typeof attrs['name-middle'] === 'string' ? String(attrs['name-middle']).trim() : ''
-    const last = typeof attrs['name-last'] === 'string' ? String(attrs['name-last']).trim() : ''
-    const parts = [first, middle, last].filter(p => p && p.length > 0)
-    return parts.length > 0 ? parts.join(' ') : undefined
+  // ───────────────────────────────────────────────────────────────────────────────
+  // HTTP client & configuration
+  // ───────────────────────────────────────────────────────────────────────────────
+
+  /** Narrows unknown to a plain object record (non-array). */
+  private asRecord(value: unknown): JsonRecord | undefined {
+    return value && typeof value === 'object' && !Array.isArray(value)
+      ? (value as JsonRecord)
+      : undefined
   }
 
+  // ───────────────────────────────────────────────────────────────────────────────
+  // Payload parsing & normalization
+  // ───────────────────────────────────────────────────────────────────────────────
+
+  /** Safely coerce a value to a trimmed string, or return undefined. */
+  private asString(value: unknown): string | undefined {
+    return typeof value === 'string' ? value.trim() || undefined : undefined
+  }
+
+  /**
+   * Builds a single full name from Persona-style attributes.
+   * Accepts either inquiry-level attributes or document attributes.
+   */
+  private buildFullNameFromAttributes(attrs?: JsonRecord): string | undefined {
+    if (!attrs) return undefined
+    const first = this.asString(attrs['name-first'])
+    const middle = this.asString(attrs['name-middle'])
+    const last = this.asString(attrs['name-last'])
+    const parts = [first, middle, last].filter(Boolean) as string[]
+    return parts.length ? parts.join(' ') : undefined
+  }
+
+  /**
+   * Persona may return "document" resources under `included` (e.g. `document/government-id`).
+   * We care only about the first such set of attributes for ID class/number/full name fallback.
+   */
+  private collectDocumentAttributes(included: JsonRecord[]): JsonRecord[] {
+    return included
+      .filter(item => typeof item.type === 'string' && String(item.type).startsWith('document'))
+      .map(item => this.asRecord(item.attributes) ?? {})
+  }
+
+  /** Conditional debug logger (opt-in via constructor). */
+  private debug(...args: unknown[]) {
+    if (this.opts.debug) {
+      console.debug('[PersonaInquiryDetailsService]', ...args)
+    }
+  }
+
+  /**
+   * Lazily initializes the Axios client with Persona auth & headers.
+   * Throws if the required secret is missing; callers handle the error.
+   */
   private async ensureClient(): Promise<AxiosInstance> {
     if (this.axiosClient) return this.axiosClient
 
-    const { PERSONA_API_KEY } = await this.secretManager.getSecrets([
-      'PERSONA_API_KEY',
-    ] as const)
+    const { PERSONA_API_KEY } = await this.secretManager.getSecrets(['PERSONA_API_KEY'] as const)
+    if (!PERSONA_API_KEY || typeof PERSONA_API_KEY !== 'string' || !PERSONA_API_KEY.trim()) {
+      throw new Error('Missing required secret: PERSONA_API_KEY')
+    }
 
     this.axiosClient = axios.create({
-      baseURL: 'https://withpersona.com/api/v1',
+      baseURL: PersonaInquiryDetailsService.API_BASE_URL,
       headers: {
         'Authorization': `Bearer ${PERSONA_API_KEY}`,
         'Content-Type': 'application/json',
-        // Explicit version header keeps payload shape stable
-        'Persona-Version': '2023-01-01',
+        'Persona-Version': PersonaInquiryDetailsService.API_VERSION,
       },
-      timeout: 10_000,
+      timeout: PersonaInquiryDetailsService.REQUEST_TIMEOUT_MS,
     })
 
     return this.axiosClient
   }
 
-  private extractPrimaryResource(payload: Record<string, unknown>): null | {
-    included: Array<Record<string, unknown>>
-    resource: Record<string, unknown>
-  } {
-    const included: Array<Record<string, unknown>> = []
+  /**
+   * Extracts the primary JSON:API resource and a flat list of included resources
+   * from arbitrary Persona responses.
+   *
+   * Persona responses are typically `{ data, included }`. In some cases `data` may
+   * itself nest a resource; this method unwraps such shapes.
+   */
+  private extractPrimaryResource(
+    payload: JsonRecord,
+  ): null | { included: JsonRecord[], resource: JsonRecord } {
+    const included: JsonRecord[] = []
     const seen = new Set<unknown>()
 
     const collectIncluded = (value: unknown) => {
-      if (!value || !Array.isArray(value)) return
+      if (!Array.isArray(value)) return
       for (const entry of value) {
-        if (entry && typeof entry === 'object' && !Array.isArray(entry)) {
-          included.push(entry as Record<string, unknown>)
-        }
+        const asRec = this.asRecord(entry)
+        if (asRec) included.push(asRec)
       }
     }
 
-    const unwrap = (value: unknown): null | Record<string, unknown> => {
-      if (!value || typeof value !== 'object' || Array.isArray(value)) return null
-      if (seen.has(value)) return null
-      seen.add(value)
+    const unwrap = (value: unknown): JsonRecord | null => {
+      const rec = this.asRecord(value)
+      if (!rec || seen.has(rec)) return null
+      seen.add(rec)
 
-      const record = value as Record<string, unknown>
-      collectIncluded(record.included)
+      collectIncluded(rec.included)
 
-      const inner = record.data
+      // JSON:API root is often { data: { ...resource } }
+      const inner = (rec as JsonRecord).data
       if (inner && typeof inner === 'object' && !Array.isArray(inner)) {
         return unwrap(inner)
       }
 
-      return record
+      return rec
     }
 
     collectIncluded(payload.included)
+
     let resource = unwrap(payload.data)
-    if (!resource) {
-      resource = unwrap(payload)
-    }
+    if (!resource) resource = unwrap(payload)
     if (!resource) return null
 
+    // Be defensive: sometimes libraries stick `included` on nested nodes
     collectIncluded(resource.included)
 
     return { included, resource }
   }
 
-  private extractRelationship(
-    relationship: unknown,
-  ): null | { id: string, type?: string } {
-    if (!relationship || typeof relationship !== 'object') return null
-    const data = (relationship as Record<string, unknown>).data
-    if (!data || typeof data !== 'object') return null
-    const id = (data as Record<string, unknown>).id
-    if (typeof id !== 'string' || !id.trim()) return null
-    const type = (data as Record<string, unknown>).type
-    return { id, type: typeof type === 'string' ? type : undefined }
-  }
+  // ───────────────────────────────────────────────────────────────────────────────
+  // Small utilities
+  // ───────────────────────────────────────────────────────────────────────────────
 
-  private findIncludedAttributes(
-    included: Array<Record<string, unknown>>,
-    type: string,
-    id: string,
-  ): null | Record<string, unknown> {
-    const match = included.find(
-      item => item.type === type && item.id === id,
-    )
-    if (!match) return null
-    const attrs = match.attributes
-    return attrs && typeof attrs === 'object' ? (attrs as Record<string, unknown>) : null
-  }
-
-  // Helper to read Persona fields.<key>.value from inquiry.attributes.fields
+  /**
+   * Helper to read `attributes.fields.<key>.value` safely.
+   */
   private getFieldValue<T = unknown>(
-    fields: Record<string, unknown> | undefined,
+    fields: JsonRecord | undefined,
     key: string,
   ): T | undefined {
     if (!fields) return undefined
-    const entry = fields[key]
-    if (!entry || typeof entry !== 'object') return undefined
-    const value = (entry as Record<string, unknown>).value as T | undefined
+    const entry = this.asRecord(fields[key])
+    const value = entry?.value as T | undefined
     return value === null ? undefined : value
   }
 
+  /**
+   * Maps a Persona document-class code to a human-friendly Spanish label.
+   * Falls back to the original code if unknown.
+   *
+   * Some labels vary by country (currently localized for CO).
+   */
   private mapDocumentClassToLabel(code: string | undefined, country?: string): string | undefined {
     if (!code) return undefined
     const normalized = code.toLowerCase()
-
-    // Normalized country for localization tweaks
     const c = typeof country === 'string' ? country.toUpperCase() : undefined
 
-    // Common codes and their readable Spanish labels
     const table: Record<string, string> = {
       dl: 'Licencia de conducción',
       driver_license: 'Licencia de conducción',
@@ -194,80 +268,73 @@ export class PersonaInquiryDetailsService {
     return table[normalized] ?? code
   }
 
+  /**
+   * Parses the Persona payload into our normalized structure.
+   * Returns `null` if the payload is empty or malformed.
+   */
   private parseInquiryPayload(payload: unknown): null | PersonaInquiryDetails {
-    if (!payload || typeof payload !== 'object') return null
+    const root = this.asRecord(payload)
+    if (!root) return null
 
-    const container = this.extractPrimaryResource(payload as Record<string, unknown>)
+    const container = this.extractPrimaryResource(root)
     if (!container) return null
 
     const { included, resource } = container
 
-    // Include Government ID document attributes (type is e.g. 'document/government-id')
-    const documentsAttributes = included
-      .filter(item => typeof item.type === 'string' && String(item.type).startsWith('document'))
-      .map(item => (item.attributes ?? {})) as Array<Record<string, unknown>>
+    const resourceAttrs = this.asRecord(resource.attributes)
+    const resourceFields = this.asRecord(resourceAttrs?.fields)
 
-    const resourceAttributesRaw = resource.attributes
-    const resourceAttributes = resourceAttributesRaw && typeof resourceAttributesRaw === 'object'
-      ? resourceAttributesRaw as Record<string, unknown>
-      : undefined
-
-    const resourceFields = resourceAttributes && typeof resourceAttributes.fields === 'object'
-      ? (resourceAttributes.fields as Record<string, unknown>)
-      : undefined
-
-    // Exact keys from Persona API response (kebab-case)
-    let fullName = this.buildFullNameFromAttributes(resourceAttributes)
-
+    // Pull first "document/*" attributes (commonly government ID)
+    const documentsAttributes = this.collectDocumentAttributes(included)
     const documentAttrs = documentsAttributes[0] ?? {}
-    const documentClass = this.getFieldValue<string>(resourceFields, 'identification-class')
-      ?? (typeof documentAttrs['id-class'] === 'string' ? String(documentAttrs['id-class']) : undefined)
-    if (!fullName) {
-      fullName = this.buildFullNameFromAttributes(documentAttrs)
-    }
 
-    const addressLine1 = typeof resourceAttributes?.['address-street-1'] === 'string'
-      ? String(resourceAttributes['address-street-1'])
-      : undefined
-    const addressLine2 = typeof resourceAttributes?.['address-street-2'] === 'string'
-      ? String(resourceAttributes['address-street-2'])
-      : undefined
-    const city = typeof resourceAttributes?.['address-city'] === 'string'
-      ? String(resourceAttributes['address-city'])
-      : undefined
-    const department = typeof resourceAttributes?.['address-subdivision'] === 'string'
-      ? String(resourceAttributes['address-subdivision'])
-      : undefined
-    const country = this.getFieldValue<string>(resourceFields, 'selected-country-code')
-      ?? (typeof resourceAttributes?.['address-country-code'] === 'string' ? String(resourceAttributes['address-country-code']) : undefined)
+    // Document class (e.g., 'pp', 'national_id', etc.)
+    const documentClass
+      = this.getFieldValue<string>(resourceFields, 'identification-class')
+        ?? this.asString(documentAttrs['id-class'])
 
-    const address = [addressLine1, addressLine2].filter(Boolean).join(', ')
+    // Prefer inquiry-level full name; fall back to document attributes if missing
+    const fullName
+      = this.buildFullNameFromAttributes(resourceAttrs)
+        ?? this.buildFullNameFromAttributes(documentAttrs)
+
+    // Address components (kebab-case as delivered by Persona)
+    const addressLine1 = this.asString(resourceAttrs?.['address-street-1'])
+    const addressLine2 = this.asString(resourceAttrs?.['address-street-2'])
+    const city = this.asString(resourceAttrs?.['address-city'])
+    const department = this.asString(resourceAttrs?.['address-subdivision'])
+    const country
+      = this.getFieldValue<string>(resourceFields, 'selected-country-code')
+        ?? this.asString(resourceAttrs?.['address-country-code'])
+
+    const address = [addressLine1, addressLine2].filter(Boolean).join(', ') || undefined
 
     // Determine the correct ID number to show
-    const attrIdNumber = typeof resourceAttributes?.['identification-number'] === 'string'
-      ? String(resourceAttributes['identification-number'])
-      : this.getFieldValue<string>(resourceFields, 'identification-number')
-    const documentNumber = typeof documentAttrs['document-number'] === 'string'
-      ? String(documentAttrs['document-number'])
-      : undefined
-    const docIdentificationNumber = typeof documentAttrs['identification-number'] === 'string'
-      ? String(documentAttrs['identification-number'])
-      : undefined
+    const attrIdNumber
+      = this.asString(resourceAttrs?.['identification-number'])
+        ?? this.getFieldValue<string>(resourceFields, 'identification-number')
 
-    const idNumber = (documentClass === 'pp' ? documentNumber : (attrIdNumber ?? docIdentificationNumber))
-      ?? attrIdNumber
+    const documentNumber = this.asString(documentAttrs['document-number'])
+    const docIdentificationNumber = this.asString(documentAttrs['identification-number'])
 
-    const email = typeof resourceAttributes?.['email-address'] === 'string'
-      ? String(resourceAttributes['email-address'])
-      : this.getFieldValue<string>(resourceFields, 'email-address')
-    const phone = typeof resourceAttributes?.['phone-number'] === 'string'
-      ? String(resourceAttributes['phone-number'])
-      : this.getFieldValue<string>(resourceFields, 'phone-number')
+    // For passports ('pp'), Persona often stores the number as `document-number`
+    const idNumber
+      = (documentClass === 'pp' ? documentNumber : attrIdNumber ?? docIdentificationNumber)
+        ?? attrIdNumber
+
+    // Contact info can be under attributes or fields.<key>.value
+    const email
+      = this.asString(resourceAttrs?.['email-address'])
+        ?? this.getFieldValue<string>(resourceFields, 'email-address')
+
+    const phone
+      = this.asString(resourceAttrs?.['phone-number'])
+        ?? this.getFieldValue<string>(resourceFields, 'phone-number')
 
     const documentType = this.mapDocumentClassToLabel(documentClass, country)
 
     return {
-      address: address || undefined,
+      address,
       city,
       country,
       department,

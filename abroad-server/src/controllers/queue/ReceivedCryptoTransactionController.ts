@@ -182,11 +182,12 @@ export class ReceivedCryptoTransactionController {
       }
 
       const walletHandler = this.walletHandlerFactory.getWalletHandler(message.blockchain)
-      await walletHandler.send({
+      const refundResult = await walletHandler.send({
         address: message.addressFrom,
         amount: message.amount,
         cryptoCurrency: message.cryptoCurrency,
       })
+      await this.recordRefundOnChainId(prismaClient, transactionRecord.id, refundResult)
       return
     }
 
@@ -268,11 +269,12 @@ export class ReceivedCryptoTransactionController {
         const walletHandler = this.walletHandlerFactory.getWalletHandler(
           message.blockchain,
         )
-        await walletHandler.send({
+        const refundResult = await walletHandler.send({
           address: message.addressFrom,
           amount: message.amount,
           cryptoCurrency: message.cryptoCurrency,
         })
+        await this.recordRefundOnChainId(prismaClient, transactionRecord.id, refundResult)
       }
     }
     catch (paymentError) {
@@ -304,11 +306,39 @@ export class ReceivedCryptoTransactionController {
       const walletHandler = this.walletHandlerFactory.getWalletHandler(
         message.blockchain,
       )
-      await walletHandler.send({
+      const refundResult = await walletHandler.send({
         address: message.addressFrom,
         amount: message.amount,
         cryptoCurrency: message.cryptoCurrency,
       })
+      await this.recordRefundOnChainId(prismaClient, transactionRecord.id, refundResult)
+    }
+  }
+
+  private async recordRefundOnChainId(
+    prismaClient: Awaited<ReturnType<IDatabaseClientProvider['getClient']>>,
+    transactionId: string,
+    refundResult: { success: boolean, transactionId?: string },
+  ): Promise<void> {
+    if (!refundResult.success || !refundResult.transactionId) {
+      this.logger.warn(
+        '[ReceivedCryptoTransaction] Refund transaction submission failed; no on-chain hash recorded',
+        { transactionId },
+      )
+      return
+    }
+
+    try {
+      await prismaClient.transaction.updateMany({
+        data: { refundOnChainId: refundResult.transactionId },
+        where: { id: transactionId, refundOnChainId: null },
+      })
+    }
+    catch (error) {
+      this.logger.error(
+        '[ReceivedCryptoTransaction] Failed to persist refund transaction hash',
+        error,
+      )
     }
   }
 }

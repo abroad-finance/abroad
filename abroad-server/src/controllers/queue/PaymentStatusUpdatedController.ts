@@ -150,11 +150,12 @@ export class PaymentStatusUpdatedController {
           return
         }
         const address = await walletHandler.getAddressFromTransaction({ onChainId: transactionRecord.onChainId })
-        await walletHandler.send({
+        const refundResult = await walletHandler.send({
           address: address,
           amount: transactionRecord.quote.sourceAmount,
           cryptoCurrency: transactionRecord.quote.cryptoCurrency,
         })
+        await this.recordRefundOnChainId(prismaClient, transactionRecord.id, refundResult)
       }
     }
     catch (err) {
@@ -163,6 +164,33 @@ export class PaymentStatusUpdatedController {
         `[PaymentStatusUpdated queue]: Error updating transaction: ${errorMessage}`,
       )
       this.logger.error('[PaymentStatusUpdated queue]: Error updating transaction:', err)
+    }
+  }
+
+  private async recordRefundOnChainId(
+    prismaClient: Awaited<ReturnType<IDatabaseClientProvider['getClient']>>,
+    transactionId: string,
+    refundResult: { success: boolean, transactionId?: string },
+  ): Promise<void> {
+    if (!refundResult.success || !refundResult.transactionId) {
+      this.logger.warn(
+        '[PaymentStatusUpdated queue]: Refund transaction submission failed; no on-chain hash recorded',
+        { transactionId },
+      )
+      return
+    }
+
+    try {
+      await prismaClient.transaction.updateMany({
+        data: { refundOnChainId: refundResult.transactionId },
+        where: { id: transactionId, refundOnChainId: null },
+      })
+    }
+    catch (error) {
+      this.logger.error(
+        '[PaymentStatusUpdated queue]: Failed to persist refund transaction hash',
+        error,
+      )
     }
   }
 }

@@ -89,6 +89,7 @@ model Transaction {
   quoteId       String            @unique
   quote         Quote             @relation(fields: [quoteId], references: [id])
   onChainId     String?           @unique
+  refundOnChainId String?         @unique
   taxId         String?
   externalId    String?           @unique
   qrCode        String?
@@ -193,6 +194,7 @@ view TransactionQuoteView {
   transactionCreatedAt DateTime
   quoteId              String
   onChainId            String?
+  refundOnChainId      String?
   taxId                String?
   externalId           String?
   qrCode               String?
