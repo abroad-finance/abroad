@@ -29,6 +29,7 @@ const TxStatus = ({
   const { kit } = useWalletAuth()
   const { off, on } = useWebSocket()
   const [status, setStatus] = useState<UiStatus>('inProgress')
+  const [apiStatus, setApiStatus] = useState<ApiStatus | undefined>(undefined)
   const [error, setError] = useState<null | string>(null)
   // no local socket, using app-wide provider
 
@@ -67,7 +68,9 @@ const TxStatus = ({
         const data = (typeof payload === 'string' ? JSON.parse(payload) : payload) as { id?: string
           status?: ApiStatus }
         if (!data || data.id !== transactionId) return
-        setStatus(mapStatus(data.status as ApiStatus))
+        const apiStatusValue = data.status as ApiStatus | undefined
+        setApiStatus(apiStatusValue)
+        setStatus(mapStatus(apiStatusValue))
       }
       catch (e) {
         console.warn('Invalid ws payload:', e)
@@ -90,6 +93,11 @@ const TxStatus = ({
     off,
     kit?.address,
   ])
+
+  useEffect(() => {
+    setApiStatus(undefined)
+    setStatus('inProgress')
+  }, [transactionId])
 
   const renderAmount = () => {
     if (status === 'accepted') {
@@ -145,6 +153,9 @@ const TxStatus = ({
       case 'accepted':
         return t('tx_status.accepted', 'Retiro Realizado')
       case 'denied':
+        if (apiStatus === 'PAYMENT_EXPIRED') {
+          return t('tx_status.expired', 'Transacción Expirada')
+        }
         return t('tx_status.denied', 'Transacción Rechazada')
       case 'inProgress':
         return t('tx_status.in_progress', 'Procesando Transacción')
@@ -163,6 +174,9 @@ const TxStatus = ({
           </>
         )
       case 'denied':
+        if (apiStatus === 'PAYMENT_EXPIRED') {
+          return <>{t('tx_status.expired.message', 'El tiempo para completar el pago se agotó y la solicitud fue cancelada. Puedes generar una nueva transacción cuando estés listo.')}</>
+        }
         return <>{t('tx_status.denied.message', 'La solicitud ha sido rechazada y tus fondos han sido devueltos. Puedes intentar nuevamente más tarde.')}</>
       case 'inProgress':
         return (
