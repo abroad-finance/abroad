@@ -6,7 +6,7 @@ import {
 import React from 'react'
 
 import { PaginatedTransactionListTransactionsItem } from '../../../api'
-import TransactionDetail from './TransactionDetail'
+import TransactionDetail from '../shared/TransactionDetail'
 
 export interface WalletDetailsProps {
   address: null | string
@@ -14,16 +14,16 @@ export interface WalletDetailsProps {
   formatDate: (dateString: string) => string
   getStatusStyle: (status: string) => string
   getStatusText: (status: string) => string
-  isLoadingBalance: boolean
-  isLoadingTransactions: boolean
-  isLoadingMoreTransactions: boolean
   hasMoreTransactions: boolean
+  isLoadingBalance: boolean
+  isLoadingMoreTransactions: boolean
+  isLoadingTransactions: boolean
   onClose?: () => void
   onCopyAddress: () => Promise<void>
   onDisconnectWallet: () => Promise<void>
+  onLoadMoreTransactions: () => void
   onRefreshBalance: () => void
   onRefreshTransactions: () => void
-  onLoadMoreTransactions: () => void
   selectedTransaction: null | PaginatedTransactionListTransactionsItem
   setSelectedTransaction: (transaction: null | PaginatedTransactionListTransactionsItem) => void
   transactionError: null | string
@@ -38,15 +38,15 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({
   formatDate,
   getStatusStyle,
   getStatusText,
-  isLoadingBalance,
-  isLoadingTransactions,
-  isLoadingMoreTransactions,
   hasMoreTransactions,
+  isLoadingBalance,
+  isLoadingMoreTransactions,
+  isLoadingTransactions,
   onClose,
   onCopyAddress,
   onDisconnectWallet,
-  onRefreshBalance,
   onLoadMoreTransactions,
+  onRefreshBalance,
   onRefreshTransactions,
   selectedTransaction,
   setSelectedTransaction,

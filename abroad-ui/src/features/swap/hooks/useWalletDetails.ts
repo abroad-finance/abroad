@@ -38,6 +38,7 @@ export function useWalletDetails(params: Params = {}): WalletDetailsProps {
   const [usdcBalance, setUsdcBalance] = useState<string>('0.00')
   const [isLoadingBalance, setIsLoadingBalance] = useState(false)
   const [transactions, setTransactions] = useState<Transaction[]>([])
+  const transactionsRef = useRef<Transaction[]>([])
   const [isLoadingTransactions, setIsLoadingTransactions] = useState(false)
   const [isLoadingMoreTransactions, setIsLoadingMoreTransactions] = useState(false)
   const [transactionError, setTransactionError] = useState<null | string>(null)
@@ -49,6 +50,9 @@ export function useWalletDetails(params: Params = {}): WalletDetailsProps {
     hasMore: false,
     total: 0,
   })
+  useEffect(() => {
+    transactionsRef.current = transactions
+  }, [transactions])
 
   // Fetch USDC balance (isolated for clarity)
   const fetchUSDCBalance = useCallback(async (stellarAddress: string): Promise<string> => {
@@ -88,7 +92,7 @@ export function useWalletDetails(params: Params = {}): WalletDetailsProps {
     finally { setIsLoadingBalance(false) }
   }, [fetchUSDCBalance])
 
-  const loadTransactions = useCallback(async ({ page, append }: { page: number; append: boolean }) => {
+  const loadTransactions = useCallback(async ({ append, page }: { append: boolean, page: number }) => {
     if (!walletAuthentication?.jwtToken) {
       setTransactionError(t('wallet_details.error.no_token', 'No authentication token available'))
       return
@@ -117,21 +121,17 @@ export function useWalletDetails(params: Params = {}): WalletDetailsProps {
         return
       }
 
-      const {
-        pageSize,
-        total,
-        transactions: pageTransactions,
-      } = response.data
+      const { pageSize, total, transactions: pageTransactions } = response.data
 
       if (pageSize && pageSize > 0) pageSizeRef.current = pageSize
 
       const nextTransactions = Array.isArray(pageTransactions) ? pageTransactions : []
-      let aggregatedTransactions: Transaction[] = []
+      const aggregatedTransactions = append
+        ? [...transactionsRef.current, ...nextTransactions]
+        : nextTransactions
 
-      setTransactions(prevTransactions => {
-        aggregatedTransactions = append ? [...prevTransactions, ...nextTransactions] : nextTransactions
-        return aggregatedTransactions
-      })
+      transactionsRef.current = aggregatedTransactions
+      setTransactions(aggregatedTransactions)
 
       if (!append) setSelectedTransaction(null)
 
@@ -165,7 +165,7 @@ export function useWalletDetails(params: Params = {}): WalletDetailsProps {
   useEffect(() => {
     if (kit?.address) fetchUSDCBalanceWithLoading(kit.address)
     if (kit?.address && walletAuthentication?.jwtToken) {
-      loadTransactions({ page: 1, append: false })
+      loadTransactions({ append: false, page: 1 })
     }
   }, [
     kit?.address,
@@ -182,7 +182,7 @@ export function useWalletDetails(params: Params = {}): WalletDetailsProps {
       if (!kit?.address) return
       try {
         // Optimistically refresh in background, keep UI responsive
-        await loadTransactions({ page: 1, append: false })
+        await loadTransactions({ append: false, page: 1 })
         fetchUSDCBalanceWithLoading(kit.address)
       }
       catch { /* no-op */ }
@@ -219,7 +219,7 @@ export function useWalletDetails(params: Params = {}): WalletDetailsProps {
   const onRefreshTransactions = useCallback(() => {
     if (!walletAuthentication?.jwtToken || !kit?.address) return
     if (isLoadingTransactions || isLoadingMoreTransactions) return
-    loadTransactions({ page: 1, append: false })
+    loadTransactions({ append: false, page: 1 })
   }, [
     walletAuthentication?.jwtToken,
     kit?.address,
@@ -231,7 +231,7 @@ export function useWalletDetails(params: Params = {}): WalletDetailsProps {
   const onLoadMoreTransactions = useCallback(() => {
     if (!walletAuthentication?.jwtToken || !kit?.address) return
     if (!pagination.hasMore || isLoadingTransactions || isLoadingMoreTransactions) return
-    loadTransactions({ page: pagination.currentPage + 1, append: true })
+    loadTransactions({ append: true, page: pagination.currentPage + 1 })
   }, [
     walletAuthentication?.jwtToken,
     kit?.address,
@@ -300,15 +300,15 @@ export function useWalletDetails(params: Params = {}): WalletDetailsProps {
     formatDate,
     getStatusStyle,
     getStatusText,
-    isLoadingBalance,
-    isLoadingTransactions,
-    isLoadingMoreTransactions,
     hasMoreTransactions: pagination.hasMore,
+    isLoadingBalance,
+    isLoadingMoreTransactions,
+    isLoadingTransactions,
     onClose,
     onCopyAddress,
     onDisconnectWallet,
-    onRefreshBalance,
     onLoadMoreTransactions,
+    onRefreshBalance,
     onRefreshTransactions,
     selectedTransaction,
     setSelectedTransaction,

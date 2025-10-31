@@ -213,8 +213,8 @@ const ConfirmQr: React.FC<ConfirmQrProps> = ({
         >
           {loadingSubmit
             ? (
-              <Loader className="animate-spin w-4 h-4 sm:w-5 sm:h-5" />
-            )
+                <Loader className="animate-spin w-4 h-4 sm:w-5 sm:h-5" />
+              )
             : getButtonText}
         </Button>
       </div>
