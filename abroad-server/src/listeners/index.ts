@@ -1,7 +1,7 @@
 // src/listeners/index.ts
 
 import { iocContainer } from '../ioc'
-// import { BinanceListener } from './binance'
+import { BinanceListener } from './binance'
 import { StellarListener } from './stellar'
 
 /**
@@ -21,8 +21,8 @@ export function startListeners(): void {
     console.error('[listeners] Error starting StellarListener:', err),
   )
 
-  // iocContainer.bind<BinanceListener>('BinanceListener').to(BinanceListener)
-  // iocContainer.get<BinanceListener>('BinanceListener').start()
+  iocContainer.bind<BinanceListener>('BinanceListener').to(BinanceListener)
+  iocContainer.get<BinanceListener>('BinanceListener').start()
 }
 
 /** Keep module-level references to prevent GC. */
