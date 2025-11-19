@@ -110,20 +110,18 @@ export class PersonaKycService implements IKycService {
   }
 
   private getInquiryTemplateIds = async (): Promise<Record<Country, Record<KYCTier, null | string>>> => {
-    const { PERSONA_INQUIRY_TEMPLATE_ID } = await this.secretManager.getSecrets([
-      'PERSONA_API_KEY',
-      'PERSONA_INQUIRY_TEMPLATE_ID',
-    ] as const)
+    const PERSONA_BASIC_INQUIRY_TEMPLATE_ID = 'itmpl_cV1CxdaysSpkxZfNZs7V1spRM5B1'
+    const PERSONA_ENHANCED_INQUIRY_TEMPLATE_ID = 'itmpl_XTXBkm9FEunS9kU7kMav3kh4mSwj'
     return {
       BR: {
-        [KYCTier.BASIC]: PERSONA_INQUIRY_TEMPLATE_ID,
-        [KYCTier.ENHANCED]: null,
+        [KYCTier.BASIC]: PERSONA_BASIC_INQUIRY_TEMPLATE_ID,
+        [KYCTier.ENHANCED]: PERSONA_ENHANCED_INQUIRY_TEMPLATE_ID,
         [KYCTier.NONE]: null,
         [KYCTier.STANDARD]: null,
       },
       CO: {
-        [KYCTier.BASIC]: PERSONA_INQUIRY_TEMPLATE_ID,
-        [KYCTier.ENHANCED]: null,
+        [KYCTier.BASIC]: PERSONA_BASIC_INQUIRY_TEMPLATE_ID,
+        [KYCTier.ENHANCED]: PERSONA_ENHANCED_INQUIRY_TEMPLATE_ID,
         [KYCTier.NONE]: null,
         [KYCTier.STANDARD]: null,
       },
@@ -172,6 +170,6 @@ const tierOrder: Record<KYCTier, number> = {
  * Note: KYCTier enum has numerical ordering for proper comparison
  * ------------------------------------------------------------------------- */
 const tierRule: Record<Country, (amount: number) => KYCTier> = {
-  BR: () => KYCTier.BASIC,
-  CO: () => KYCTier.BASIC,
+  BR: amount => amount < 1800 ? KYCTier.BASIC : KYCTier.ENHANCED,
+  CO: amount => amount < 10000 ? KYCTier.BASIC : KYCTier.ENHANCED,
 }
