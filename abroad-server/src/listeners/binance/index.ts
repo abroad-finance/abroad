@@ -67,7 +67,7 @@ export class BinanceListener {
       throw new Error('[Binance WS]: Missing API configuration')
     }
 
-    const websocketBinanceUrl = this.toWsUrl(BINANCE_API_URL, '')
+    const websocketBinanceUrl = this.toWsUrl(BINANCE_API_URL)
 
     this.wsClient = new WebsocketClient({
       api_key: BINANCE_API_KEY,
@@ -131,16 +131,18 @@ export class BinanceListener {
     }
   }
 
-  private toWsUrl = (httpUrl: string, pathSuffix: string) => {
+  private toWsUrl = (httpUrl: string, pathSuffix?: string) => {
     try {
       const u = new URL(httpUrl)
       const protocol = u.protocol === 'https:' ? 'wss:' : u.protocol === 'http:' ? 'ws:' : u.protocol
       const base = `${protocol}//${u.host}${u.pathname.replace(/\/$/, '')}`
+      if (!pathSuffix) return base
       const suffix = pathSuffix.startsWith('/') ? pathSuffix : `/${pathSuffix}`
       return `${base}${suffix}`
     }
     catch {
       // Fallback: naive replace
+      if (!pathSuffix) return httpUrl
       return httpUrl.replace(/^https:\/\//, 'wss://').replace(/^http:\/\//, 'ws://') + (pathSuffix.startsWith('/') ? pathSuffix : `/${pathSuffix}`)
     }
   }
