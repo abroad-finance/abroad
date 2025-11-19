@@ -67,7 +67,7 @@ export class BinanceListener {
       throw new Error('[Binance WS]: Missing API configuration')
     }
 
-    const websocketBinanceUrl = this.toWsUrl(BINANCE_API_URL, '/stream')
+    const websocketBinanceUrl = this.toWsUrl(BINANCE_API_URL, '')
 
     this.wsClient = new WebsocketClient({
       api_key: BINANCE_API_KEY,

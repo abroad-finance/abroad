@@ -1,0 +1,1 @@
+ - "any" can not be used as a type.
