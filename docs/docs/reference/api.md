@@ -9,6 +9,8 @@ import TabItem from '@theme/TabItem';
 
 Base URLs: `https://api.abroad.com` (Production) / `https://api-sandbox.abroad.com` (Sandbox). Add `X-API-Key` to every call. See [Integration basics](../integration-basics) for headers and enums.
 
+For a live, grouped view of every endpoint, open the Swagger UI at `https://api.abroad.finance/docs`.
+
 ## Quotes
 
 ### Create Quote (`POST /quote`)
