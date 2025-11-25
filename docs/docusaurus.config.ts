@@ -7,7 +7,7 @@ import type * as Preset from '@docusaurus/preset-classic';
 const config: Config = {
   title: 'Abroad',
   tagline: 'Global Payments Infrastructure',
-  favicon: 'img/favicon.ico',
+  favicon: 'https://cdn.prod.website-files.com/66d73974e0b6f2e9c06130a7/67c084e407b55642ef7d6cd4_Favicon.png',
 
   // Future flags, see https://docusaurus.io/docs/api/docusaurus-config#future
   future: {
