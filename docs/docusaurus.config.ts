@@ -36,6 +36,12 @@ const config: Config = {
     locales: ['en'],
   },
 
+  markdown: {
+    mermaid: true,
+  },
+
+  themes: ['@docusaurus/theme-mermaid'],
+
   presets: [
     [
       'classic',
@@ -61,10 +67,9 @@ const config: Config = {
       respectPrefersColorScheme: true,
     },
     navbar: {
-      title: 'Abroad',
       logo: {
         alt: 'Abroad Logo',
-        src: 'img/logo.svg',
+        src: 'img/abroad_logo.svg',
       },
       items: [
         {
