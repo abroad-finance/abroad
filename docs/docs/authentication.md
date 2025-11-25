@@ -1,36 +1,38 @@
 ---
-sidebar_position: 2
+sidebar_position: 4
 ---
 
 # Authentication
 
-Abroad uses API Keys to authenticate requests. You must include your API key in the header of every request.
+Abroad supports API keys for server-to-server requests and JWT bearer tokens for wallet/user scoped flows.
 
-## API Key
+## API keys
 
-To authenticate, add the `X-API-Key` header to your HTTP requests.
+Add the `X-API-Key` header to every HTTP request. Keep this key secret and never expose it client-side.
 
 ```http
 GET /transaction/123 HTTP/1.1
 Host: api.abroad.com
 X-API-Key: your_api_key_here
+Content-Type: application/json
 ```
 
-> **Security Note**: Your API Key carries many privileges, so be sure to keep it secret! Do not share your secret API keys in publicly accessible areas such as GitHub, client-side code, and so forth.
+## Bearer token (JWT)
 
-## Bearer Token (JWT)
-
-Some endpoints may require a Bearer token, which is typically used for user-scoped actions or when interacting with specific services that require a session.
+Some endpoints also accept a bearer token (for example, if you obtained a SEP JWT via `/walletAuth`). Include it as the `Authorization` header:
 
 ```http
 GET /protected-resource HTTP/1.1
 Host: api.abroad.com
 Authorization: Bearer your_jwt_token
+Content-Type: application/json
 ```
 
-## Errors
+## Errors & troubleshooting
 
-If you provide an invalid or expired key, the API will return a `401 Unauthorized` error.
+- Missing or invalid credentials return `401 Unauthorized`.
+- If an endpoint requires an API key, make sure the header name is exactly `X-API-Key`.
+- When using bearer auth, ensure the token is not expired and the `Bearer ` prefix is present.
 
 ```json
 {

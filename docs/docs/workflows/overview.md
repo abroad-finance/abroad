@@ -33,3 +33,5 @@ sequenceDiagram
     Abroad->>Abroad: Verifies Memo & Amount
     Abroad->>User: Payouts COP to User's Bank
 ```
+
+For status definitions and webhook behavior, see [Status lifecycle](./status-lifecycle) and [Webhooks](../reference/webhooks).

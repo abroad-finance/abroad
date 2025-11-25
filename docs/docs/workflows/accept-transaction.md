@@ -33,6 +33,8 @@ You must provide the `quote_id`, the user's identification (`user_id`), and thei
 | `account_number` | `string` | Yes | The recipient's bank account or mobile wallet number. |
 | `bank_code` | `string` | Yes | The bank code (e.g., `NEQUI`, `BANCOLOMBIA`). |
 | `tax_id` | `string` | No | The user's tax ID (NIT/CPF) if required. |
+| `redirectUrl` | `string` | No | Optional redirect URL after KYC. |
+| `qr_code` | `string` | No | QR code string, when applicable. |
 
 ## Response
 
@@ -40,8 +42,8 @@ The most critical part of the response is the `transaction_reference`. This is t
 
 ```json
 {
-  "id": "transaction-uuid",
-  "transaction_reference": "R28gQWJyZ...",
+  "id": "f4a96c4c-4d1e-4ab2-a6ec-2e1b5070c5db",
+  "transaction_reference": "9KlsTE0eSrKm7C4bUHDF2w==",
   "kycLink": null
 }
 ```

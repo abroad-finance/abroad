@@ -12,13 +12,13 @@ The first step in any transaction is to get a quote. This tells you exactly how 
 
 ## Request
 
-You can request a quote by specifying the **source amount** (how much you want to send) or the **target amount** (how much you want the recipient to receive).
+This endpoint expects a **target amount** in local currency. If you prefer to quote by crypto amount, use [Reverse Quote](../reference/api#reverse-quote-post-quotereverse).
 
-### Example: sending 100 USDC
+### Example: delivering 400,000 COP
 
 ```json
 {
-  "amount": 100,
+  "amount": 400000,
   "crypto_currency": "USDC",
   "network": "STELLAR",
   "payment_method": "NEQUI",
@@ -30,7 +30,7 @@ You can request a quote by specifying the **source amount** (how much you want t
 
 | Parameter | Type | Description |
 | :--- | :--- | :--- |
-| `amount` | `number` | The amount of crypto to convert. |
+| `amount` | `number` | Target amount the recipient should receive (in `target_currency`). |
 | `crypto_currency` | `string` | The source cryptocurrency (e.g., `USDC`). |
 | `network` | `string` | The blockchain network (e.g., `STELLAR`, `SOLANA`). |
 | `payment_method` | `string` | The payout method (e.g., `NEQUI`, `MOVII`, `PIX`). |
@@ -44,14 +44,14 @@ The response includes the `quote_id`, which you will need for the next step, and
 {
   "expiration_time": 1732520000,
   "quote_id": "uuid-string",
-  "source_amount": 100,
-  "target_amount": 400000,
-  "exchange_rate": 4000
+  "value": 100.5
 }
 ```
 
+`value` is the crypto amount (USDC) you need to send before `expiration_time` (epoch ms).
+
 :::warning Expiration
-Quotes are valid for a limited time (typically 5-15 minutes). You must accept the transaction before the quote expires.
+Quotes are valid until `expiration_time` (currently up to 1 hour). You must accept the transaction and fund it before the quote expires.
 :::
 
 ## Troubleshooting

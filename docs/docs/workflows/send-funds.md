@@ -23,14 +23,27 @@ If you send funds without the correct Memo/Reference, our system **cannot** auto
 
 *Note: Please contact support or check your dashboard for the current production deposit addresses.*
 
-## Monitoring Status
+## Track status
 
-After sending the funds, you can poll the transaction status or listen for webhooks.
+Monitor the transaction until the local payout completes:
 
-`GET /transaction/{transactionId}`
+```bash
+curl -X GET https://api-sandbox.abroad.com/transaction/{transactionId} \
+  -H "X-API-Key: YOUR_API_KEY"
+```
+
+Statuses and recommended actions are listed in [Status lifecycle](./status-lifecycle).
 
 Status flow:
-1.  `AWAITING_PAYMENT`: Waiting for on-chain deposit.
+1.  `AWAITING_PAYMENT`: Waiting for on-chain deposit (or KYC completion if `kycLink` was returned).
 2.  `PROCESSING_PAYMENT`: Deposit received, processing payout.
 3.  `PAYMENT_COMPLETED`: Fiat funds sent to user.
 4.  `PAYMENT_FAILED`: Something went wrong (e.g., invalid account number).
+5.  `WRONG_AMOUNT`: Deposit did not match the quoted source amount; refund attempted.
+6.  `PAYMENT_EXPIRED`: Quote expired before the deposit was matched.
+
+## When things go wrong
+
+- **Quote expired:** You will see `PAYMENT_EXPIRED` if funds arrive after the `expiration_time`. Create a fresh quote and transaction.  
+- **Wrong amount:** If fewer funds arrive than quoted, the transaction moves to `WRONG_AMOUNT` and we attempt to refund the crypto to the sender address. Create a new quote/transaction for the corrected amount.  
+- **Missing memo:** If the memo/reference is missing or incorrect, the funds cannot be matched automatically. Contact support with the on-chain hash to reconcile.
