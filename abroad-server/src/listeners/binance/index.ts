@@ -86,7 +86,7 @@ export class BinanceListener {
       else {
         this.logger.info('[Binance WS]: raw message received', { streamName: data.streamName, wsKey: data.wsKey })
       }
-      // Avoid queue spam: do not post for every raw message
+      this.queueHandler.postMessage(QueueName.BINANCE_BALANCE_UPDATED, {})
     })
 
     // connection lifecycle notifications
