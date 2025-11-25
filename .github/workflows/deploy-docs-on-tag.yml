@@ -1,0 +1,129 @@
+name: Deploy Docs on Tag
+
+on:
+  push:
+    tags:
+      - '*'
+
+concurrency:
+  group: deploy-docs-on-tag-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy-docs:
+    runs-on: ubuntu-latest
+    env:
+      CI: true
+      DOCS_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+      DOCS_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+      DOCS_HOSTING_SITE: ${{ secrets.FIREBASE_DOCS_SITE_ID }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - id: check_main
+        name: Verify tag commit is contained in main
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Tag: ${GITHUB_REF#refs/tags/} -> $GITHUB_SHA"
+          git fetch --no-tags --depth=1 origin main
+          if git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "on_main=true" >> "$GITHUB_OUTPUT"
+            echo "Tag commit is contained in main. Proceeding."
+          else
+            echo "on_main=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Tag commit is NOT contained in main. Skipping."
+          fi
+
+      - id: docs_changes
+        name: Detect docs changes since previous tag
+        if: steps.check_main.outputs.on_main == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          previous_tag=$(git describe --tags --abbrev=0 "$GITHUB_SHA^" 2>/dev/null || true)
+          if [ -z "$previous_tag" ]; then
+            echo "::notice::No previous tag found. Forcing docs deploy."
+            echo "docs_changed=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          base_commit=$(git rev-parse "$previous_tag^{commit}")
+          echo "Previous tag: $previous_tag ($base_commit)"
+
+          if git diff --quiet "$base_commit" "$GITHUB_SHA" -- docs; then
+            echo "docs_changed=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::No docs changes detected between $base_commit and $GITHUB_SHA."
+          else
+            echo "docs_changed=true" >> "$GITHUB_OUTPUT"
+            echo "Docs changes detected between $base_commit and $GITHUB_SHA."
+          fi
+
+      - name: Setup Node.js
+        if: steps.check_main.outputs.on_main == 'true' && steps.docs_changes.outputs.docs_changed == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: docs/package-lock.json
+
+      - name: Install docs dependencies
+        if: steps.check_main.outputs.on_main == 'true' && steps.docs_changes.outputs.docs_changed == 'true'
+        working-directory: docs
+        run: npm ci --no-audit --no-fund
+
+      - name: Build docs site
+        if: steps.check_main.outputs.on_main == 'true' && steps.docs_changes.outputs.docs_changed == 'true'
+        working-directory: docs
+        run: npm run build --if-present
+
+      - name: Prepare Firebase target mapping
+        if: steps.check_main.outputs.on_main == 'true' && steps.docs_changes.outputs.docs_changed == 'true'
+        working-directory: docs
+        env:
+          DOCS_PROJECT_ID: ${{ env.DOCS_PROJECT_ID }}
+          DOCS_HOSTING_SITE: ${{ env.DOCS_HOSTING_SITE }}
+        run: |
+          set -euo pipefail
+          if [ -z "${DOCS_PROJECT_ID:-}" ]; then
+            echo "::error::Set FIREBASE_PROJECT_ID or FIREBASE_DOCS_PROJECT_ID secret to deploy docs."
+            exit 1
+          fi
+          if [ -z "${DOCS_HOSTING_SITE:-}" ]; then
+            echo "::error::Set FIREBASE_DOCS_SITE_ID secret to map the docs hosting target."
+            exit 1
+          fi
+          if [ -z "${DOCS_SERVICE_ACCOUNT:-}" ]; then
+            echo "::error::Set FIREBASE_SERVICE_ACCOUNT or FIREBASE_DOCS_SERVICE_ACCOUNT secret for deployment."
+            exit 1
+          fi
+          cat > .firebaserc <<EOF
+          {
+            "projects": {
+              "default": "${DOCS_PROJECT_ID}"
+            },
+            "targets": {
+              "${DOCS_PROJECT_ID}": {
+                "hosting": {
+                  "docs": [
+                    "${DOCS_HOSTING_SITE}"
+                  ]
+                }
+              }
+            }
+          }
+          EOF
+
+      - name: Deploy Docs to Firebase Hosting
+        if: steps.check_main.outputs.on_main == 'true' && steps.docs_changes.outputs.docs_changed == 'true'
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ env.DOCS_SERVICE_ACCOUNT }}
+          projectId: ${{ env.DOCS_PROJECT_ID }}
+          channelId: live
+          target: docs
+          entryPoint: docs
