@@ -10,7 +10,9 @@ The final step for you (or your user) is to send the crypto funds to Abroad's wa
 
 When sending funds on networks like Stellar or Solana (if using a centralized deposit address), you **MUST** include the `transaction_reference` from the previous step as the **Memo** (Stellar) or **Note**.
 
-> **WARNING**: If you send funds without the correct Memo/Reference, our system cannot automatically match the deposit to your transaction. This will result in delays or potential loss of funds.
+:::danger Critical: Missing Memo
+If you send funds without the correct Memo/Reference, our system **cannot** automatically match the deposit to your transaction. This will result in delays or potential loss of funds.
+:::
 
 ## Deposit Addresses
 

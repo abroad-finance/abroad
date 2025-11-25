@@ -50,4 +50,14 @@ The response includes the `quote_id`, which you will need for the next step, and
 }
 ```
 
-> **Note**: Quotes are valid for a limited time (typically 5-15 minutes). You must accept the transaction before the quote expires.
+:::warning Expiration
+Quotes are valid for a limited time (typically 5-15 minutes). You must accept the transaction before the quote expires.
+:::
+
+## Troubleshooting
+
+### Quote Expired?
+If you receive a `400 Bad Request` when trying to accept a transaction, check if the `expiration_time` has passed. You will need to request a new quote.
+
+### Invalid Currency Pair?
+Ensure that the `target_currency` is supported for the selected `payment_method`. See [Supported Assets](../resources/supported-assets).

@@ -48,4 +48,16 @@ The most critical part of the response is the `transaction_reference`. This is t
 
 ### KYC/KYB Checks
 
-If the user or partner requires KYC/KYB verification, the `kycLink` field will contain a URL. You must redirect the user to this URL to complete their identity verification before the transaction can proceed.
+If the user or partner requires KYC/KYB verification, the `kycLink` field will contain a URL.
+
+:::important Action Required
+You **MUST** redirect the user to this URL to complete their identity verification. The transaction will not be processed until KYC is approved.
+:::
+
+## Troubleshooting
+
+### "User account is invalid"
+This error means the `account_number` does not match the expected format for the given `bank_code`. Double-check the number of digits.
+
+### "Quote not found"
+Ensure you are using the correct `quote_id` and that it hasn't expired.
