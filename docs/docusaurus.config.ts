@@ -71,7 +71,12 @@ const config: Config = {
           type: 'docSidebar',
           sidebarId: 'tutorialSidebar',
           position: 'left',
-          label: 'Documentation',
+          label: 'Docs',
+        },
+        {
+          to: '/reference/api',
+          label: 'API Reference',
+          position: 'left',
         },
         {
           href: 'https://github.com/abroad-finance/abroad',
@@ -84,11 +89,15 @@ const config: Config = {
       style: 'dark',
       links: [
         {
-          title: 'Docs',
+          title: 'Documentation',
           items: [
             {
-              label: 'Introduction',
-              to: '/',
+              label: 'Quickstart',
+              to: '/quickstart',
+            },
+            {
+              label: 'Workflows',
+              to: '/workflows/overview',
             },
             {
               label: 'API Reference',
@@ -103,6 +112,23 @@ const config: Config = {
               label: 'GitHub',
               href: 'https://github.com/abroad-finance/abroad',
             },
+            {
+              label: 'Support',
+              href: 'mailto:support@abroad.com',
+            },
+          ],
+        },
+        {
+          title: 'Legal',
+          items: [
+            {
+              label: 'Privacy Policy',
+              to: '#',
+            },
+            {
+              label: 'Terms of Service',
+              to: '#',
+            },
           ],
         },
       ],
@@ -111,6 +137,7 @@ const config: Config = {
     prism: {
       theme: prismThemes.github,
       darkTheme: prismThemes.dracula,
+      additionalLanguages: ['bash', 'json'],
     },
   } satisfies Preset.ThemeConfig,
 };

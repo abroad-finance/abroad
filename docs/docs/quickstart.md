@@ -2,19 +2,39 @@
 sidebar_position: 2
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 # Quickstart Guide
 
 This guide takes you from your API key to a full sandbox payout in a few minutes.
 
+```mermaid
+graph LR
+    A[Create Quote] --> B[Accept Transaction]
+    B --> C[Send Funds]
+    C --> D[Track Status]
+    style A fill:#10b981,stroke:#047857,color:#fff
+    style B fill:#34d399,stroke:#059669,color:#fff
+    style C fill:#6ee7b7,stroke:#059669,color:#064e3b
+    style D fill:#a7f3d0,stroke:#059669,color:#064e3b
+```
+
 ## Prerequisites
 
-- **API Key**: Sandbox `X-API-Key`. If you don't have one, contact [support@abroad.com](mailto:support@abroad.com).
-- **Base URL**: Sandbox `https://api-sandbox.abroad.com`.
+:::info
+You will need a Sandbox API Key to proceed. If you don't have one, please contact [support@abroad.com](mailto:support@abroad.com).
+:::
+
+- **Base URL**: `https://api-sandbox.abroad.com`
 - **HTTP client**: `curl`, Postman, or similar.
 
 ## 1) Create a quote (target payout)
 
 Ask for how much crypto you need to send to deliver a specific local amount. In this example the recipient should get **400,000 COP** via **Nequi**.
+
+<Tabs>
+<TabItem value="request" label="Request">
 
 ```bash
 curl -X POST https://api-sandbox.abroad.com/quote \
@@ -29,7 +49,8 @@ curl -X POST https://api-sandbox.abroad.com/quote \
   }'
 ```
 
-**Response (trimmed):**
+</TabItem>
+<TabItem value="response" label="Response">
 
 ```json
 {
@@ -39,11 +60,19 @@ curl -X POST https://api-sandbox.abroad.com/quote \
 }
 ```
 
+</TabItem>
+</Tabs>
+
+:::tip
 `value` is the crypto amount (USDC) you need to send before the `expiration_time` (epoch ms). Copy the `quote_id` for the next step.
+:::
 
 ## 2) Accept the transaction
 
 Register the recipient and lock the quote. Include your internal `user_id` so you can reconcile webhooks later.
+
+<Tabs>
+<TabItem value="request" label="Request">
 
 ```bash
 curl -X POST https://api-sandbox.abroad.com/transaction \
@@ -57,7 +86,8 @@ curl -X POST https://api-sandbox.abroad.com/transaction \
   }'
 ```
 
-**Response:**
+</TabItem>
+<TabItem value="response" label="Response">
 
 ```json
 {
@@ -67,11 +97,22 @@ curl -X POST https://api-sandbox.abroad.com/transaction \
 }
 ```
 
-If `kycLink` is not `null`, redirect the user there before continuing.
+</TabItem>
+</Tabs>
+
+:::warning KYC Requirement
+If `kycLink` is not `null`, you **must** redirect the user to that URL to complete identity verification before the transaction can proceed.
+:::
 
 ## 3) Send funds on-chain
 
-Send the `value` amount of crypto to the Abroad deposit address for the chosen `network`, and include `transaction_reference` exactly as the memo/note. See [Send Funds](./workflows/send-funds) for details.
+Send the `value` amount of crypto to the Abroad deposit address for the chosen `network`.
+
+:::danger Critical
+You **must** include the `transaction_reference` exactly as the memo/note in your crypto transfer. Failure to do so will result in lost funds.
+:::
+
+See [Send Funds](./workflows/send-funds) for detailed instructions.
 
 ## 4) Track status
 
