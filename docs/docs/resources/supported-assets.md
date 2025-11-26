@@ -11,7 +11,7 @@ Abroad supports a specific set of blockchains, cryptocurrencies, and fiat curren
 | Asset | Symbol | Networks | Notes |
 | :--- | :--- | :--- | :--- |
 | USD Coin | **USDC** | Stellar, Solana | Primary asset used for quotes today. |
-| Tether | **USDT** | Stellar | Coming soon. |
+| Tether | **USDT** | Celo | Coming soon. |
 
 ## Fiat Currencies
 
@@ -29,6 +29,25 @@ Abroad supports a specific set of blockchains, cryptocurrencies, and fiat curren
 | `PIX` | BRL | Brazil | Stellar, Solana |
 
 The `network` you send in the quote defines which crypto rail you will fund on-chain. The payout is still in the local currency for the selected `payment_method`.
+
+## Coming soon
+
+### Countries and currencies
+
+- Argentina (ARS)
+- Peru (PEN)
+- Philippines (PHP)
+- Thailand (THB)
+- Vietnam (VND)
+
+### Payment methods
+
+- Bre-B in Colombia
+- Transferencias 3.0 in Argentina
+- Yape in Peru
+- PromptPay in Thailand
+- PHQR in Philippines
+- VietQR in Vietnam
 
 ## Limits
 

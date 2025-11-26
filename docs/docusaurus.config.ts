@@ -128,11 +128,11 @@ const config: Config = {
           items: [
             {
               label: 'Privacy Policy',
-              to: '#',
+              href: 'https://abroad.finance/privacy',
             },
             {
               label: 'Terms of Service',
-              to: '#',
+              href: 'https://abroad.finance/terms-of-service',
             },
           ],
         },
