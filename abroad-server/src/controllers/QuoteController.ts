@@ -1,10 +1,17 @@
 // src/controllers/QuoteController.ts
-import { BlockchainNetwork, CryptoCurrency, PaymentMethod, TargetCurrency } from '.prisma/client'
+import {
+  BlockchainNetwork,
+  CryptoCurrency,
+  Partner,
+  PaymentMethod,
+  TargetCurrency,
+} from '.prisma/client'
 import { Request as RequestExpress } from 'express'
 import { inject } from 'inversify'
 import {
   Body,
   Controller,
+  Header,
   Post,
   Request,
   Res,
@@ -15,6 +22,7 @@ import {
 } from 'tsoa'
 import { z } from 'zod'
 
+import { IPartnerService } from '../interfaces'
 import { TYPES } from '../types'
 import { IQuoteUseCase, QuoteResponse } from '../useCases/quoteUseCase'
 
@@ -56,6 +64,8 @@ export class QuoteController extends Controller {
   constructor(
     @inject(TYPES.QuoteUseCase)
     private quoteUseCase: IQuoteUseCase,
+    @inject(TYPES.IPartnerService)
+    private partnerService: IPartnerService,
   ) {
     super()
   }
@@ -70,6 +80,7 @@ export class QuoteController extends Controller {
     @Body() requestBody: QuoteRequest,
     @Request() request: RequestExpress,
     @Res() badRequestResponse: TsoaResponse<400, { reason: string }>,
+    @Header('X-API-Key') apiKey?: string,
   ): Promise<QuoteResponse> {
     const parsed = quoteRequestSchema.safeParse(requestBody)
     if (!parsed.success) {
@@ -77,16 +88,20 @@ export class QuoteController extends Controller {
     }
     const { amount, crypto_currency, network, payment_method, target_currency } = parsed.data
 
+    const { errorReason, partner } = await this.resolvePartner(request, apiKey)
+    if (errorReason) {
+      return badRequestResponse(400, { reason: errorReason })
+    }
+
     try {
       const quote = await this.quoteUseCase.createQuote({
         amount,
         cryptoCurrency: crypto_currency,
         network,
-        partner: request.user,
+        partner,
         paymentMethod: payment_method,
         targetCurrency: target_currency,
-      },
-      )
+      })
       return quote
     }
     catch (error) {
@@ -109,6 +124,7 @@ export class QuoteController extends Controller {
     @Body() requestBody: ReverseQuoteRequest,
     @Request() request: RequestExpress,
     @Res() badRequestResponse: TsoaResponse<400, { reason: string }>,
+    @Header('X-API-Key') apiKey?: string,
   ): Promise<QuoteResponse> {
     const parsed = reverseQuoteRequestSchema.safeParse(requestBody)
     if (!parsed.success) {
@@ -116,11 +132,16 @@ export class QuoteController extends Controller {
     }
     const { crypto_currency, network, payment_method, source_amount, target_currency } = parsed.data
 
+    const { errorReason, partner } = await this.resolvePartner(request, apiKey)
+    if (errorReason) {
+      return badRequestResponse(400, { reason: errorReason })
+    }
+
     try {
       const quote = await this.quoteUseCase.createReverseQuote({
         cryptoCurrency: crypto_currency,
         network,
-        partner: request.user,
+        partner,
         paymentMethod: payment_method,
         sourceAmountInput: source_amount,
         targetCurrency: target_currency,
@@ -133,6 +154,30 @@ export class QuoteController extends Controller {
       }
       this.setStatus(500)
       return { expiration_time: 0, quote_id: 'error', value: 0 }
+    }
+  }
+
+  private async resolvePartner(
+    request: RequestExpress,
+    apiKey?: string,
+  ): Promise<{ errorReason?: string, partner?: Partner }> {
+    const normalizedApiKey = apiKey?.trim()
+
+    if (request.user) {
+      return { partner: request.user }
+    }
+
+    if (!normalizedApiKey) {
+      return { partner: undefined }
+    }
+
+    try {
+      const partner = await this.partnerService.getPartnerFromApiKey(normalizedApiKey)
+      return { partner }
+    }
+    catch (error) {
+      const reason = error instanceof Error ? error.message : 'Invalid API key'
+      return { errorReason: reason }
     }
   }
 }
