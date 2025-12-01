@@ -9,11 +9,15 @@ import swaggerUi from 'swagger-ui-express'
 
 import packageJson from '../package.json'
 import { initAdmin } from './admin/admin'
+import { ILogger } from './interfaces'
+import { iocContainer } from './ioc'
 import { RegisterRoutes } from './routes'
+import { TYPES } from './types'
 
 dotenv.config()
 
 const app = express()
+const logger = iocContainer.get<ILogger>(TYPES.ILogger)
 app.use(cors())
 app.use(bodyParser.json())
 // Allow larger payloads only for the Guardline webhook (avoid raising global limits)
@@ -23,6 +27,15 @@ app.use(
 )
 // Handle text/json content-type generically (kept small)
 app.use(bodyParser.json({ type: 'text/json' }))
+
+// Lightweight Movii webhook endpoint: log headers and payload, respond 200
+app.post('/webhooks/movii', (req: Request, res: Response) => {
+  logger.info('Received Movii webhook', {
+    body: req.body,
+    headers: req.headers,
+  })
+  res.sendStatus(200)
+})
 
 // ---------------------------
 // tsoa‑generated application routes
