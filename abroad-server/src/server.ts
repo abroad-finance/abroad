@@ -28,13 +28,13 @@ app.use(
 // Handle text/json content-type generically (kept small)
 app.use(bodyParser.json({ type: 'text/json' }))
 
-// Lightweight Movii webhook endpoint: log headers and payload, respond 200
+// Lightweight Movii webhook endpoint: log headers and payload, respond 200 with empty JSON (Movii sends Accept: application/json)
 app.post('/webhooks/movii', (req: Request, res: Response) => {
   logger.info('Received Movii webhook', {
     body: req.body,
     headers: req.headers,
   })
-  res.sendStatus(200)
+  res.status(200).json({})
 })
 
 // ---------------------------
