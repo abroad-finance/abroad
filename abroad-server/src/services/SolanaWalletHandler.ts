@@ -12,6 +12,7 @@ import {
 import bs58 from 'bs58'
 import { inject, injectable } from 'inversify'
 
+import { ILogger } from '../interfaces'
 import { ISecretManager, Secrets } from '../interfaces/ISecretManager'
 import { IWalletHandler } from '../interfaces/IWalletHandler'
 import { TYPES } from '../types'
@@ -20,6 +21,7 @@ import { TYPES } from '../types'
 export class SolanaWalletHandler implements IWalletHandler {
   constructor(
     @inject(TYPES.ISecretManager) private secretManager: ISecretManager,
+    @inject(TYPES.ILogger) private readonly logger: ILogger,
   ) {}
 
   async getAddressFromTransaction({
@@ -47,7 +49,8 @@ export class SolanaWalletHandler implements IWalletHandler {
     try {
       // Validate that the cryptocurrency is supported
       if (cryptoCurrency !== CryptoCurrency.USDC) {
-        throw new Error(`Unsupported cryptocurrency for Solana: ${cryptoCurrency}`)
+        this.logger.warn('Unsupported cryptocurrency for Solana', cryptoCurrency)
+        return { success: false }
       }
 
       // Get the RPC URL from the secret manager
@@ -135,9 +138,25 @@ export class SolanaWalletHandler implements IWalletHandler {
 
       return { success: true, transactionId: signature }
     }
-    catch (error) {
-      console.error('Error sending Solana transaction:', error)
+    catch (error: unknown) {
+      const reason = this.describeError(error)
+      this.logger.error('Error sending Solana transaction', reason)
       return { success: false }
+    }
+  }
+
+  private describeError(error: unknown): string {
+    if (error instanceof Error) {
+      return error.message
+    }
+    if (typeof error === 'string') {
+      return error
+    }
+    try {
+      return JSON.stringify(error)
+    }
+    catch {
+      return String(error)
     }
   }
 }

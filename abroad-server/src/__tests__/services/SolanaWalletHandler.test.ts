@@ -1,5 +1,6 @@
 import { CryptoCurrency } from '@prisma/client'
 
+import type { ILogger } from '../../interfaces'
 import type { ISecretManager } from '../../interfaces/ISecretManager'
 
 import { SolanaWalletHandler } from '../../services/SolanaWalletHandler'
@@ -87,6 +88,7 @@ jest.mock('bs58', () => ({
 
 describe('SolanaWalletHandler.send', () => {
   let secretManager: ISecretManager
+  let logger: ILogger
 
   beforeEach(() => {
     jest.clearAllMocks()
@@ -103,10 +105,15 @@ describe('SolanaWalletHandler.send', () => {
       }),
       getSecrets: jest.fn(),
     }
+    logger = {
+      error: jest.fn(),
+      info: jest.fn(),
+      warn: jest.fn(),
+    }
   })
 
   it('sends a USDC transfer and returns the signature', async () => {
-    const handler = new SolanaWalletHandler(secretManager)
+    const handler = new SolanaWalletHandler(secretManager, logger)
 
     const result = await handler.send({
       address: 'dest-wallet',
@@ -122,10 +129,12 @@ describe('SolanaWalletHandler.send', () => {
     expect(createTransferInstructionMock).toHaveBeenCalled()
     expect(sendTransactionMock).toHaveBeenCalled()
     expect(confirmTransactionMock).toHaveBeenCalled()
+    expect(logger.error).not.toHaveBeenCalled()
+    expect(logger.warn).not.toHaveBeenCalled()
   })
 
   it('returns failure for unsupported cryptocurrency', async () => {
-    const handler = new SolanaWalletHandler(secretManager)
+    const handler = new SolanaWalletHandler(secretManager, logger)
 
     const result = await handler.send({
       address: 'dest',
@@ -135,10 +144,11 @@ describe('SolanaWalletHandler.send', () => {
 
     expect(result).toEqual({ success: false })
     expect(secretManager.getSecret).not.toHaveBeenCalled()
+    expect(logger.warn).toHaveBeenCalledWith('Unsupported cryptocurrency for Solana', 'BTC')
   })
 
   it('handles downstream errors gracefully', async () => {
-    const handler = new SolanaWalletHandler(secretManager)
+    const handler = new SolanaWalletHandler(secretManager, logger)
     sendTransactionMock.mockRejectedValueOnce(new Error('network down'))
 
     const result = await handler.send({
@@ -148,5 +158,6 @@ describe('SolanaWalletHandler.send', () => {
     })
 
     expect(result).toEqual({ success: false })
+    expect(logger.error).toHaveBeenCalledWith('Error sending Solana transaction', 'network down')
   })
 })

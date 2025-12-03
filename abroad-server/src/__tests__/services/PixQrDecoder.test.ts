@@ -1,5 +1,6 @@
 import axios from 'axios'
 
+import type { ILogger } from '../../interfaces'
 import type { ISecretManager } from '../../interfaces/ISecretManager'
 
 import { PixQrDecoder } from '../../services/PixQrDecoder'
@@ -8,7 +9,8 @@ jest.mock('axios')
 
 describe('PixQrDecoder', () => {
   let secretManager: ISecretManager
-  const postMock = axios.post as jest.Mock
+  let logger: ILogger
+  const postMock = axios.post as jest.MockedFunction<typeof axios.post>
 
   beforeEach(() => {
     jest.clearAllMocks()
@@ -21,6 +23,11 @@ describe('PixQrDecoder', () => {
         })
         return result as Record<(typeof keys)[number], string>
       }),
+    }
+    logger = {
+      error: jest.fn(),
+      info: jest.fn(),
+      warn: jest.fn(),
     }
   })
 
@@ -36,7 +43,7 @@ describe('PixQrDecoder', () => {
         },
       })
 
-    const decoder = new PixQrDecoder(secretManager)
+    const decoder = new PixQrDecoder(secretManager, logger)
     const decoded = await decoder.decode('qr-123')
 
     expect(decoded).toEqual({
@@ -59,7 +66,7 @@ describe('PixQrDecoder', () => {
         taxId: '****1234',
       },
     })
-    const decoder = new PixQrDecoder(secretManager)
+    const decoder = new PixQrDecoder(secretManager, logger)
     await decoder.decode('first')
 
     // Cached token should bypass another auth call
@@ -80,10 +87,12 @@ describe('PixQrDecoder', () => {
 
   it('returns null on errors', async () => {
     postMock.mockRejectedValueOnce(new Error('network'))
-    const decoder = new PixQrDecoder(secretManager)
+    const decoder = new PixQrDecoder(secretManager, logger)
 
     const decoded = await decoder.decode('bad')
 
     expect(decoded).toBeNull()
+    expect(postMock).toHaveBeenCalledTimes(1)
+    expect(logger.error).toHaveBeenCalledWith('Transfero Pix QR decode failed', 'network')
   })
 })

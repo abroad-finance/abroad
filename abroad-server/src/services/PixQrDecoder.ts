@@ -1,6 +1,7 @@
 import axios from 'axios'
 import { inject, injectable } from 'inversify'
 
+import { ILogger } from '../interfaces'
 import { IPixQrDecoder, PixDecoded } from '../interfaces/IQrDecoder'
 import { ISecretManager } from '../interfaces/ISecretManager'
 import { TYPES } from '../types'
@@ -35,6 +36,7 @@ export class PixQrDecoder implements IPixQrDecoder {
 
   public constructor(
     @inject(TYPES.ISecretManager) private secretManager: ISecretManager,
+    @inject(TYPES.ILogger) private readonly logger: ILogger,
   ) { }
 
   decode = async (qrCode: string): Promise<null | PixDecoded> => {
@@ -69,9 +71,9 @@ export class PixQrDecoder implements IPixQrDecoder {
         taxId,
       }
     }
-    catch (err) {
-      // Log / handle error as preferred
-      console.error('Transfero sendPayment error:', err)
+    catch (err: unknown) {
+      const reason = this.describeError(err)
+      this.logger.error('Transfero Pix QR decode failed', reason)
       return null
     }
   }
@@ -104,5 +106,40 @@ export class PixQrDecoder implements IPixQrDecoder {
     this.cachedToken = { exp: now + seconds * 1000, value }
 
     return value
+  }
+
+  private describeError(err: unknown): string {
+    if (axios.isAxiosError(err)) {
+      const responseData = err.response?.data
+      if (typeof responseData === 'string') {
+        return responseData
+      }
+
+      if (responseData && typeof responseData === 'object') {
+        try {
+          return JSON.stringify(responseData)
+        }
+        catch {
+          return err.message
+        }
+      }
+
+      return err.message
+    }
+
+    if (err instanceof Error) {
+      return err.message
+    }
+
+    if (typeof err === 'string') {
+      return err
+    }
+
+    try {
+      return JSON.stringify(err)
+    }
+    catch {
+      return String(err)
+    }
   }
 }
