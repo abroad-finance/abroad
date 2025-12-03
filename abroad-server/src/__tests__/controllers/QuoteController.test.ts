@@ -7,7 +7,13 @@ import 'reflect-metadata' // required by Inversify/Tsoa decorators
 
 import type { Request as RequestExpress } from 'express'
 
-import { BlockchainNetwork, CryptoCurrency, Partner, PaymentMethod, TargetCurrency } from '.prisma/client'
+import {
+  BlockchainNetwork,
+  CryptoCurrency,
+  Partner,
+  PaymentMethod,
+  TargetCurrency,
+} from '.prisma/client'
 
 import type { IPartnerService } from '../../interfaces'
 import type { IQuoteUseCase, QuoteResponse } from '../../useCases/quoteUseCase'

@@ -40,18 +40,18 @@ interface TriggerConversionResponse {
 @Route('conversions')
 export class ConversionController extends Controller {
   constructor(
-        @inject(TYPES.ILogger) private logger: ILogger,
-        @inject(TYPES.IDatabaseClientProvider) private dbProvider: IDatabaseClientProvider,
-        @inject(TYPES.IExchangeProviderFactory) private exchangeProviderFactory: IExchangeProviderFactory,
+    @inject(TYPES.ILogger) private logger: ILogger,
+    @inject(TYPES.IDatabaseClientProvider) private dbProvider: IDatabaseClientProvider,
+    @inject(TYPES.IExchangeProviderFactory) private exchangeProviderFactory: IExchangeProviderFactory,
   ) { super() }
 
   @Post('brl/trigger')
   @Response<400, { reason: string }>(400, 'Bad Request')
   @SuccessResponse('200', 'Conversion trigger result')
   public async triggerBrlConversions(
-        @Body() body: Record<string, unknown>,
-        @Request() _req: RequestExpress,
-        @Res() badRequest: TsoaResponse<400, { reason: string }>,
+    @Body() body: Record<string, unknown>,
+    @Request() _req: RequestExpress,
+    @Res() badRequest: TsoaResponse<400, { reason: string }>,
   ): Promise<TriggerConversionResponse> {
     try {
       const schema = z.object({

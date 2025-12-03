@@ -13,6 +13,7 @@ import { PaymentSentController } from './controllers/queue/PaymentSentController
 import { PaymentStatusUpdatedController } from './controllers/queue/PaymentStatusUpdatedController'
 import { ReceivedCryptoTransactionController } from './controllers/queue/ReceivedCryptoTransactionController'
 import { QuoteController } from './controllers/QuoteController'
+import { SolanaPaymentsController } from './controllers/SolanaPaymentsController'
 import { TransactionController } from './controllers/TransactionController'
 import { TransactionsController } from './controllers/TransactionsController'
 import { WalletAuthController } from './controllers/WalletAuthController'
@@ -150,6 +151,7 @@ container.bind<PublicTransactionsController>(PublicTransactionsController).toSel
 container.bind(PaymentsController).toSelf().inSingletonScope()
 container.bind(QrDecoderController).toSelf().inSingletonScope()
 container.bind(WalletAuthController).toSelf().inSingletonScope()
+container.bind(SolanaPaymentsController).toSelf().inSingletonScope()
 
 // ILogger
 container.bind<ILogger>(TYPES.ILogger).to(ConsoleLogger).inSingletonScope()

@@ -9,8 +9,8 @@ import { TYPES } from '../types'
 @injectable()
 export class WebhookNotifier implements IWebhookNotifier {
   public constructor(
-        @inject(TYPES.ILogger) private logger: ILogger,
-        @inject(TYPES.ISecretManager) private secretManager: ISecretManager,
+    @inject(TYPES.ILogger) private logger: ILogger,
+    @inject(TYPES.ISecretManager) private secretManager: ISecretManager,
   ) { }
 
   async notifyWebhook(

@@ -30,6 +30,8 @@ export type TransactionQueueMessage = z.infer<
 >
 
 export class ReceivedCryptoTransactionController {
+  private readonly logPrefix = '[ReceivedCryptoTransaction]'
+
   public constructor(
     @inject(TYPES.IPaymentServiceFactory)
     private paymentServiceFactory: IPaymentServiceFactory,
@@ -45,7 +47,7 @@ export class ReceivedCryptoTransactionController {
   public registerConsumers() {
     try {
       this.logger.info(
-        '[Stellar transaction]: Registering consumer for queue:',
+        `${this.logPrefix}: Registering consumer for queue:`,
         QueueName.RECEIVED_CRYPTO_TRANSACTION,
       )
       this.queueHandler.subscribeToQueue(
@@ -55,7 +57,7 @@ export class ReceivedCryptoTransactionController {
     }
     catch (error) {
       this.logger.error(
-        '[Stellar transaction]: Error in consumer registration:',
+        `${this.logPrefix}: Error in consumer registration:`,
         error,
       )
     }
@@ -69,7 +71,7 @@ export class ReceivedCryptoTransactionController {
   ): Promise<void> {
     if (!msg || Object.keys(msg).length === 0) {
       this.logger.warn(
-        '[Stellar transaction]: Received empty message. Skipping...',
+        `${this.logPrefix}: Received empty message. Skipping...`,
       )
       return
     }
@@ -80,11 +82,12 @@ export class ReceivedCryptoTransactionController {
       message = TransactionQueueMessageSchema.parse(msg)
     }
     catch (error) {
-      this.logger.error('[Stellar transaction]: Invalid message format:', error)
+      this.logger.error(`${this.logPrefix}: Invalid message format:`, error)
       return
     }
+    const logPrefix = `${this.logPrefix}:${message.blockchain}`
     this.logger.info(
-      '[Stellar transaction]: Received transaction from queue:',
+      `${logPrefix}: Received transaction from queue:`,
       message.onChainId,
     )
     let prismaClient: Awaited<ReturnType<IDatabaseClientProvider['getClient']>>
@@ -93,7 +96,7 @@ export class ReceivedCryptoTransactionController {
     }
     catch (paymentError) {
       this.logger.error(
-        '[Stellar transaction]: Payment processing error:',
+        `${logPrefix}: Payment processing error:`,
         paymentError,
       )
       const walletHandler = this.walletHandlerFactory.getWalletHandler(
@@ -140,14 +143,14 @@ export class ReceivedCryptoTransactionController {
       if (error instanceof Prisma.PrismaClientKnownRequestError) {
         if (error.code === 'P2025') {
           this.logger.warn(
-            '[Stellar transaction]: Transaction not found or already processed:',
+            `${logPrefix}: Transaction not found or already processed:`,
             message.transactionId,
           )
           return
         }
       }
       this.logger.error(
-        '[Stellar transaction]: Error updating transaction:',
+        `${logPrefix}: Error updating transaction:`,
         error,
       )
       return
@@ -156,7 +159,7 @@ export class ReceivedCryptoTransactionController {
     // Validate that the amount in the message matches the expected quote
     if (message.amount < transactionRecord.quote.sourceAmount) {
       this.logger.warn(
-        '[Stellar transaction]: Transaction amount does not match quote:',
+        `${logPrefix}: Transaction amount does not match quote:`,
         message.amount,
         transactionRecord.quote.sourceAmount,
       )
@@ -245,7 +248,7 @@ export class ReceivedCryptoTransactionController {
       }
 
       this.logger.info(
-        `[Stellar transaction]: Payment ${paymentResponse.success ? 'completed' : 'failed'} for transaction:`,
+        `${logPrefix}: Payment ${paymentResponse.success ? 'completed' : 'failed'} for transaction:`,
         transactionRecord.id,
       )
 
@@ -279,7 +282,7 @@ export class ReceivedCryptoTransactionController {
     }
     catch (paymentError) {
       this.logger.error(
-        '[Stellar transaction]: Payment processing error:',
+        `${logPrefix}: Payment processing error:`,
         paymentError,
       )
       const transaction = await prismaClient.transaction.update({

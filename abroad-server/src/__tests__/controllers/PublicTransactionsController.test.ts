@@ -2,7 +2,6 @@
  * Unit tests for PublicTransactionsController.checkUnprocessedStellarTransactions.
  */
 import 'reflect-metadata'
-
 import { TransactionStatus } from '.prisma/client'
 import { Horizon } from '@stellar/stellar-sdk'
 import * as StellarSdk from '@stellar/stellar-sdk'
@@ -10,21 +9,20 @@ import * as StellarSdk from '@stellar/stellar-sdk'
 import { PublicTransactionsController } from '../../controllers/PublicTransactionsController'
 import { IQueueHandler } from '../../interfaces'
 import { IDatabaseClientProvider } from '../../interfaces/IDatabaseClientProvider'
-import { ISecretManager, Secret, Secrets } from '../../interfaces/ISecretManager'
 import { ILogger } from '../../interfaces/index'
+import { ISecretManager, Secret, Secrets } from '../../interfaces/ISecretManager'
 import { IWebhookNotifier } from '../../interfaces/IWebhookNotifier'
 
 jest.mock('@stellar/stellar-sdk', () => {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
   const actual = jest.requireActual('@stellar/stellar-sdk')
 
   let currentRecords: unknown[] = []
   const paymentRequest = {
+    call: jest.fn(async () => ({ records: currentRecords })),
     cursor: jest.fn().mockReturnThis(),
     forAccount: jest.fn().mockReturnThis(),
     limit: jest.fn().mockReturnThis(),
     order: jest.fn().mockReturnThis(),
-    call: jest.fn(async () => ({ records: currentRecords })),
   }
 
   const mockServer = {
@@ -33,20 +31,22 @@ jest.mock('@stellar/stellar-sdk', () => {
 
   return {
     ...actual,
+    __getMockServer: () => mockServer,
+    __getPaymentRequest: () => paymentRequest,
+    __setPaymentRecords: (records: unknown[]) => {
+      currentRecords = records
+    },
     Horizon: {
       ...actual.Horizon,
       Server: jest.fn(() => mockServer),
     },
-    __setPaymentRecords: (records: unknown[]) => {
-      currentRecords = records
-    },
-    __getPaymentRequest: () => paymentRequest,
-    __getMockServer: () => mockServer,
   }
 })
 
 type MockedStellarModule = typeof StellarSdk & {
-  __setPaymentRecords: (records: Horizon.ServerApi.PaymentOperationRecord[]) => void
+  __getMockServer: () => {
+    payments: jest.Mock
+  }
   __getPaymentRequest: () => {
     call: jest.Mock
     cursor: jest.Mock
@@ -54,9 +54,7 @@ type MockedStellarModule = typeof StellarSdk & {
     limit: jest.Mock
     order: jest.Mock
   }
-  __getMockServer: () => {
-    payments: jest.Mock
-  }
+  __setPaymentRecords: (records: Horizon.ServerApi.PaymentOperationRecord[]) => void
 }
 
 type PrismaClientLike = {
@@ -150,6 +148,13 @@ describe('PublicTransactionsController.checkUnprocessedStellarTransactions', () 
     })
 
     const payment: Horizon.ServerApi.PaymentOperationRecord = {
+      _links: {
+        effects: { href: '' },
+        precedes: { href: '' },
+        self: { href: '' },
+        succeeds: { href: '' },
+        transaction: { href: '' },
+      },
       amount: '50.5',
       asset_code: 'USDC',
       asset_issuer: secrets[Secrets.STELLAR_USDC_ISSUER],
@@ -160,13 +165,6 @@ describe('PublicTransactionsController.checkUnprocessedStellarTransactions', () 
       paging_token: '200',
       to: secrets[Secrets.STELLAR_ACCOUNT_ID],
       transaction: async () => ({ memo: memoBase64 } as unknown as Horizon.ServerApi.TransactionRecord),
-      _links: {
-        effects: { href: '' },
-        precedes: { href: '' },
-        self: { href: '' },
-        succeeds: { href: '' },
-        transaction: { href: '' },
-      },
       type: Horizon.HorizonApi.OperationResponseType.payment,
       type_i: Horizon.HorizonApi.OperationResponseTypeI.payment,
     } as unknown as Horizon.ServerApi.PaymentOperationRecord

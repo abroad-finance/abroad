@@ -6,13 +6,25 @@ sidebar_position: 4
 
 The final step for you (or your user) is to send the crypto funds to Abroad's wallet address.
 
-## The Importance of the Memo
+## How to tell us about the payment
 
-When sending funds on networks like Stellar or Solana (if using a centralized deposit address), you **MUST** include the `transaction_reference` from the previous step as the **Memo** (Stellar) or **Note**.
+When sending funds on Stellar you **must** include the `transaction_reference` from the previous step as the memo.
 
 :::danger Critical: Missing Memo
-If you send funds without the correct Memo/Reference, our system **cannot** automatically match the deposit to your transaction. This will result in delays or potential loss of funds.
+If you send Stellar funds without the correct memo/reference, our system **cannot** automatically match the deposit to your transaction. This will result in delays or potential loss of funds.
 :::
+
+For Solana there is no memo. After broadcasting the transaction, call the Solana payment notification endpoint so we can confirm it on-chain and start the payout:
+
+```bash
+curl -X POST https://api-sandbox.abroad.com/solana/payments/notify \
+  -H "X-API-Key: YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "transaction_id": "TRANSACTION_ID_FROM_ACCEPT",
+    "on_chain_tx": "SOLANA_TRANSACTION_SIGNATURE"
+  }'
+```
 
 ## Deposit Addresses
 
@@ -46,4 +58,4 @@ Status flow:
 
 - **Quote expired:** You will see `PAYMENT_EXPIRED` if funds arrive after the `expiration_time`. Create a fresh quote and transaction.  
 - **Wrong amount:** If fewer funds arrive than quoted, the transaction moves to `WRONG_AMOUNT` and we attempt to refund the crypto to the sender address. Create a new quote/transaction for the corrected amount.  
-- **Missing memo:** If the memo/reference is missing or incorrect, the funds cannot be matched automatically. Contact support with the on-chain hash to reconcile.
+- **Missing memo:** If the Stellar memo/reference is missing or incorrect, the funds cannot be matched automatically. Contact support with the on-chain hash to reconcile.

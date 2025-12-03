@@ -1,20 +1,23 @@
 // src/controllers/PublicTransactionsController.ts
-import { BlockchainNetwork, CryptoCurrency, Partner, PartnerUser, Quote, Transaction, TransactionStatus } from '@prisma/client'
+import {
+  BlockchainNetwork,
+  CryptoCurrency,
+  Partner,
+  PartnerUser,
+  Quote,
+  Transaction,
+  TransactionStatus,
+} from '@prisma/client'
 import { Horizon } from '@stellar/stellar-sdk'
 import { inject } from 'inversify'
-import {
-  Controller,
-  Post,
-  Route,
-  SuccessResponse,
-} from 'tsoa'
+import { Controller, Post, Route, SuccessResponse } from 'tsoa'
 
 import { ILogger, IQueueHandler, QueueName } from '../interfaces'
 import { IDatabaseClientProvider } from '../interfaces/IDatabaseClientProvider'
 import { ISecretManager, Secrets } from '../interfaces/ISecretManager'
 import { IWebhookNotifier, WebhookEvent } from '../interfaces/IWebhookNotifier'
-import { TransactionQueueMessage } from './queue/ReceivedCryptoTransactionController'
 import { TYPES } from '../types'
+import { TransactionQueueMessage } from './queue/ReceivedCryptoTransactionController'
 
 interface CheckExpiredTransactionsResponse {
   awaiting: number
@@ -23,18 +26,18 @@ interface CheckExpiredTransactionsResponse {
   updatedTransactionIds: string[]
 }
 
-type TransactionWithRelations = Transaction & {
-  partnerUser: PartnerUser & { partner: Partner }
-  quote: Quote
-}
-
 interface CheckUnprocessedStellarResponse {
   alreadyProcessed: number
-  endPagingToken: string | null
+  endPagingToken: null | string
   enqueued: number
   missingTransactions: number
   scannedPayments: number
-  startPagingToken: string | null
+  startPagingToken: null | string
+}
+
+type TransactionWithRelations = Transaction & {
+  partnerUser: PartnerUser & { partner: Partner }
+  quote: Quote
 }
 
 @Route('transactions')
@@ -47,6 +50,18 @@ export class PublicTransactionsController extends Controller {
     @inject(TYPES.ILogger) private logger: ILogger,
   ) {
     super()
+  }
+
+  private static base64ToUuid(base64: string): string {
+    const buffer = Buffer.from(base64, 'base64')
+    const hex = buffer.toString('hex')
+    return [
+      hex.substring(0, 8),
+      hex.substring(8, 12),
+      hex.substring(12, 16),
+      hex.substring(16, 20),
+      hex.substring(20),
+    ].join('-')
   }
 
   /**
@@ -127,7 +142,7 @@ export class PublicTransactionsController extends Controller {
       awaiting: totalAwaiting,
       expired: expiredTransactions.length,
       updated: updatedTransactions.length,
-      updatedTransactionIds: updatedTransactions.map((tx) => tx.id),
+      updatedTransactionIds: updatedTransactions.map(tx => tx.id),
     }
   }
 
@@ -289,6 +304,18 @@ export class PublicTransactionsController extends Controller {
     }
   }
 
+  private isUsdcPaymentToWallet(
+    payment: Horizon.ServerApi.PaymentOperationRecord,
+    accountId: string,
+    usdcIssuer: string,
+  ): boolean {
+    const isUsdcAsset = payment.asset_type === 'credit_alphanum4'
+      && payment.asset_code === 'USDC'
+      && payment.asset_issuer === usdcIssuer
+
+    return payment.to === accountId && isUsdcAsset
+  }
+
   private async notifyUpdates(transactions: TransactionWithRelations[]): Promise<void> {
     if (transactions.length === 0) {
       return
@@ -322,29 +349,5 @@ export class PublicTransactionsController extends Controller {
         )
       }
     }
-  }
-
-  private static base64ToUuid(base64: string): string {
-    const buffer = Buffer.from(base64, 'base64')
-    const hex = buffer.toString('hex')
-    return [
-      hex.substring(0, 8),
-      hex.substring(8, 12),
-      hex.substring(12, 16),
-      hex.substring(16, 20),
-      hex.substring(20),
-    ].join('-')
-  }
-
-  private isUsdcPaymentToWallet(
-    payment: Horizon.ServerApi.PaymentOperationRecord,
-    accountId: string,
-    usdcIssuer: string,
-  ): boolean {
-    const isUsdcAsset = payment.asset_type === 'credit_alphanum4'
-      && payment.asset_code === 'USDC'
-      && payment.asset_issuer === usdcIssuer
-
-    return payment.to === accountId && isUsdcAsset
   }
 }

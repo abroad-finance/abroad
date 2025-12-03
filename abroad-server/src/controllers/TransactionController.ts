@@ -89,7 +89,7 @@ export class TransactionController extends Controller {
    * Accepts a transaction based on a quote.
    *
    * @param requestBody - Includes the `quote_id`, `user_id`, and local `account_number`.
-   * @returns A `transaction_reference` (used on-chain as a memo) and an `expiration_time`.
+   * @returns A `transaction_reference` (used for on-chain matching) and an `expiration_time`.
    */
   @Post()
   @Response<400, { reason: string }>(400, 'Bad Request')

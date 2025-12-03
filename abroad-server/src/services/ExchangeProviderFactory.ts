@@ -7,8 +7,8 @@ import { TYPES } from '../types'
 
 export class ExchangeProviderFactory implements IExchangeProviderFactory {
   public constructor(
-        @inject(TYPES.IExchangeProvider) @named('transfero') private transferoExchangeProvider: IExchangeProvider,
-        @inject(TYPES.IExchangeProvider) @named('binance') private binanceExchangeProvider: IExchangeProvider,
+    @inject(TYPES.IExchangeProvider) @named('transfero') private transferoExchangeProvider: IExchangeProvider,
+    @inject(TYPES.IExchangeProvider) @named('binance') private binanceExchangeProvider: IExchangeProvider,
   ) { }
 
   getExchangeProvider(currency: TargetCurrency): IExchangeProvider {
