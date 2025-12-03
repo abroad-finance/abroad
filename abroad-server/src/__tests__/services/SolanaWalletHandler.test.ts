@@ -1,9 +1,9 @@
 import { CryptoCurrency } from '@prisma/client'
 
-import type { ILogger } from '../../interfaces'
 import type { ISecretManager } from '../../interfaces/ISecretManager'
 
 import { SolanaWalletHandler } from '../../services/SolanaWalletHandler'
+import { createMockLogger, MockLogger } from '../setup/mockFactories'
 
 const getOrCreateAssociatedTokenAccountMock = jest.fn()
 const createTransferInstructionMock = jest.fn()
@@ -88,7 +88,7 @@ jest.mock('bs58', () => ({
 
 describe('SolanaWalletHandler.send', () => {
   let secretManager: ISecretManager
-  let logger: ILogger
+  let logger: MockLogger
 
   beforeEach(() => {
     jest.clearAllMocks()
@@ -105,11 +105,7 @@ describe('SolanaWalletHandler.send', () => {
       }),
       getSecrets: jest.fn(),
     }
-    logger = {
-      error: jest.fn(),
-      info: jest.fn(),
-      warn: jest.fn(),
-    }
+    logger = createMockLogger()
   })
 
   it('sends a USDC transfer and returns the signature', async () => {

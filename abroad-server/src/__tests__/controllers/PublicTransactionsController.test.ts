@@ -7,11 +7,11 @@ import { Horizon } from '@stellar/stellar-sdk'
 import * as StellarSdk from '@stellar/stellar-sdk'
 
 import { PublicTransactionsController } from '../../controllers/PublicTransactionsController'
-import { IQueueHandler, QueueName } from '../../interfaces'
+import { QueueName } from '../../interfaces'
 import { IDatabaseClientProvider } from '../../interfaces/IDatabaseClientProvider'
-import { ILogger } from '../../interfaces/index'
 import { ISecretManager, Secret, Secrets } from '../../interfaces/ISecretManager'
 import { IWebhookNotifier } from '../../interfaces/IWebhookNotifier'
+import { createMockLogger, createMockQueueHandler, MockLogger, MockQueueHandler } from '../setup/mockFactories'
 
 jest.mock('@stellar/stellar-sdk', () => {
   const actual = jest.requireActual('@stellar/stellar-sdk')
@@ -79,9 +79,9 @@ describe('PublicTransactionsController.checkUnprocessedStellarTransactions', () 
   let prismaClient: PrismaClientLike
   let prismaProvider: IDatabaseClientProvider
   let webhookNotifier: IWebhookNotifier
-  let queueHandler: IQueueHandler
+  let queueHandler: MockQueueHandler
   let secretManager: ISecretManager
-  let logger: ILogger
+  let logger: MockLogger
   let paymentRecords: Horizon.ServerApi.PaymentOperationRecord[]
   const mockedStellar = StellarSdk as unknown as MockedStellarModule
   const serverConstructor = Horizon.Server as unknown as jest.Mock<unknown, [string?]>
@@ -117,21 +117,14 @@ describe('PublicTransactionsController.checkUnprocessedStellarTransactions', () 
       notifyWebhook: jest.fn(async () => undefined),
     } as IWebhookNotifier
 
-    queueHandler = {
-      postMessage: jest.fn(async () => undefined),
-      subscribeToQueue: jest.fn(async () => undefined),
-    } as IQueueHandler
+    queueHandler = createMockQueueHandler()
 
     secretManager = {
       getSecret: jest.fn(async (secret: Secret) => secrets[secret] ?? 'unused'),
       getSecrets: jest.fn(),
     } as ISecretManager
 
-    logger = {
-      error: jest.fn(),
-      info: jest.fn(),
-      warn: jest.fn(),
-    }
+    logger = createMockLogger()
   })
 
   it('enqueues missing Stellar payments and advances the cursor', async () => {
@@ -344,9 +337,9 @@ describe('PublicTransactionsController.checkExpiredTransactions', () => {
   }
   let prismaProvider: IDatabaseClientProvider
   let webhookNotifier: IWebhookNotifier
-  let queueHandler: IQueueHandler
+  let queueHandler: MockQueueHandler
   let secretManager: ISecretManager
-  let logger: ILogger
+  let logger: MockLogger
 
   beforeEach(() => {
     prismaClient = {
@@ -365,21 +358,14 @@ describe('PublicTransactionsController.checkExpiredTransactions', () => {
       notifyWebhook: jest.fn(async () => undefined),
     } as IWebhookNotifier
 
-    queueHandler = {
-      postMessage: jest.fn(async () => undefined),
-      subscribeToQueue: jest.fn(async () => undefined),
-    } as IQueueHandler
+    queueHandler = createMockQueueHandler()
 
     secretManager = {
       getSecret: jest.fn(async () => ''),
       getSecrets: jest.fn(),
     } as ISecretManager
 
-    logger = {
-      error: jest.fn(),
-      info: jest.fn(),
-      warn: jest.fn(),
-    }
+    logger = createMockLogger()
   })
 
   it('returns early when no expired transactions are found', async () => {

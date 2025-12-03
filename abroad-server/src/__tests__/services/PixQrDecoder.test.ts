@@ -1,15 +1,15 @@
 import axios from 'axios'
 
-import type { ILogger } from '../../interfaces'
 import type { ISecretManager } from '../../interfaces/ISecretManager'
 
 import { PixQrDecoder } from '../../services/PixQrDecoder'
+import { createMockLogger, MockLogger } from '../setup/mockFactories'
 
 jest.mock('axios')
 
 describe('PixQrDecoder', () => {
   let secretManager: ISecretManager
-  let logger: ILogger
+  let logger: MockLogger
   const postMock = axios.post as jest.MockedFunction<typeof axios.post>
 
   beforeEach(() => {
@@ -24,11 +24,7 @@ describe('PixQrDecoder', () => {
         return result as Record<(typeof keys)[number], string>
       }),
     }
-    logger = {
-      error: jest.fn(),
-      info: jest.fn(),
-      warn: jest.fn(),
-    }
+    logger = createMockLogger()
   })
 
   it('decodes a PIX QR code and normalizes response', async () => {

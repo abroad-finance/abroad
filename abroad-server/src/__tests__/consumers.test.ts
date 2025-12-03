@@ -1,17 +1,12 @@
-import type { IQueueHandler } from '../interfaces'
-
 import { startConsumers, stopConsumers } from '../consumers'
 import { TYPES } from '../types'
+import { createMockQueueHandler, MockQueueHandler } from './setup/mockFactories'
 
 const receivedController = { registerConsumers: jest.fn() }
 const paymentController = { registerConsumers: jest.fn() }
 const paymentStatusController = { registerConsumers: jest.fn() }
 const binanceController = { registerConsumers: jest.fn() }
-const queueHandler: IQueueHandler = {
-  closeAllSubscriptions: jest.fn(async () => undefined),
-  postMessage: jest.fn(),
-  subscribeToQueue: jest.fn(),
-}
+let queueHandler: MockQueueHandler
 
 const getMock = jest.fn()
 
@@ -24,6 +19,7 @@ jest.mock('../ioc', () => ({
 describe('consumers lifecycle', () => {
   beforeEach(() => {
     jest.clearAllMocks()
+    queueHandler = createMockQueueHandler()
     getMock.mockImplementation((token: unknown) => {
       switch (token) {
         case TYPES.BinanceBalanceUpdatedController:

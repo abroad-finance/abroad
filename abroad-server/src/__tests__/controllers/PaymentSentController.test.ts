@@ -1,12 +1,13 @@
 import 'reflect-metadata'
 import { BlockchainNetwork, CryptoCurrency, PaymentMethod, TargetCurrency } from '@prisma/client'
 
-import type { ILogger, IQueueHandler, ISlackNotifier } from '../../interfaces'
+import type { ISlackNotifier } from '../../interfaces'
 import type { IDatabaseClientProvider } from '../../interfaces/IDatabaseClientProvider'
 import type { IExchangeProviderFactory } from '../../interfaces/IExchangeProviderFactory'
 import type { IWalletHandlerFactory } from '../../interfaces/IWalletHandlerFactory'
 
 import { PaymentSentController } from '../../controllers/queue/PaymentSentController'
+import { createMockLogger, createMockQueueHandler, MockLogger, MockQueueHandler } from '../setup/mockFactories'
 
 type PrismaLike = {
   pendingConversions: {
@@ -15,11 +16,8 @@ type PrismaLike = {
 }
 
 const buildController = () => {
-  const logger: jest.Mocked<ILogger> = { error: jest.fn(), info: jest.fn(), warn: jest.fn() }
-  const queueHandler: IQueueHandler = {
-    postMessage: jest.fn(),
-    subscribeToQueue: jest.fn(),
-  }
+  const logger: MockLogger = createMockLogger()
+  const queueHandler: MockQueueHandler = createMockQueueHandler()
   const dbClient: PrismaLike = { pendingConversions: { upsert: jest.fn() } }
   const dbProvider: IDatabaseClientProvider = {
     getClient: jest.fn(async () => dbClient as unknown as import('@prisma/client').PrismaClient),

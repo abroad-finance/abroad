@@ -4,9 +4,10 @@ import { TOKEN_PROGRAM_ID } from '@solana/spl-token'
 import { Connection, type ParsedTransactionWithMeta } from '@solana/web3.js'
 
 import { SolanaPaymentsController } from '../../controllers/SolanaPaymentsController'
-import { IQueueHandler } from '../../interfaces'
+import { QueueName } from '../../interfaces'
 import { IDatabaseClientProvider } from '../../interfaces/IDatabaseClientProvider'
 import { ISecretManager, Secret } from '../../interfaces/ISecretManager'
+import { createMockLogger, createMockQueueHandler, MockLogger, MockQueueHandler } from '../setup/mockFactories'
 
 const mockParsedTransactions: Record<string, null | ParsedTransactionWithMeta> = {}
 
@@ -90,8 +91,8 @@ describe('SolanaPaymentsController.notifyPayment', () => {
   let prismaClient: PrismaLike
   let prismaProvider: IDatabaseClientProvider
   let secretManager: ISecretManager
-  let queueHandler: IQueueHandler
-  let logger: { error: jest.Mock, info: jest.Mock, warn: jest.Mock }
+  let queueHandler: MockQueueHandler
+  let logger: MockLogger
   const badRequest = jest.fn()
   const notFound = jest.fn()
   const buildTransaction = (overrides?: Partial<TransactionRecord>): TransactionRecord => {
@@ -139,16 +140,9 @@ describe('SolanaPaymentsController.notifyPayment', () => {
       getSecrets: jest.fn(),
     } as ISecretManager
 
-    queueHandler = {
-      postMessage: jest.fn(async () => undefined),
-      subscribeToQueue: jest.fn(),
-    } as IQueueHandler
+    queueHandler = createMockQueueHandler()
 
-    logger = {
-      error: jest.fn(),
-      info: jest.fn(),
-      warn: jest.fn(),
-    }
+    logger = createMockLogger()
   })
 
   it('enqueues a verified Solana USDC transfer to the configured wallet', async () => {
@@ -209,7 +203,7 @@ describe('SolanaPaymentsController.notifyPayment', () => {
     expect(result).toEqual({ enqueued: true })
     expect(badRequest).not.toHaveBeenCalled()
     expect(notFound).not.toHaveBeenCalled()
-    expect(queueHandler.postMessage).toHaveBeenCalledWith('received-crypto-transaction', {
+    expect(queueHandler.postMessage).toHaveBeenCalledWith(QueueName.RECEIVED_CRYPTO_TRANSACTION, {
       addressFrom: 'sender-wallet',
       amount: 2.5,
       blockchain: BlockchainNetwork.SOLANA,

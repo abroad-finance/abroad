@@ -1,11 +1,11 @@
 import 'reflect-metadata'
 import { MainClient } from 'binance'
 
-import type { ILogger, IQueueHandler } from '../../interfaces'
 import type { IDatabaseClientProvider } from '../../interfaces/IDatabaseClientProvider'
 import type { ISecretManager } from '../../interfaces/ISecretManager'
 
 import { BinanceBalanceUpdatedController } from '../../controllers/queue/BinanceBalanceUpdatedController'
+import { createMockLogger, createMockQueueHandler, MockLogger, MockQueueHandler } from '../setup/mockFactories'
 
 jest.mock('binance', () => {
   const submitNewOrder = jest.fn(async () => undefined)
@@ -27,15 +27,9 @@ type PendingConversion = {
 }
 
 describe('BinanceBalanceUpdatedController', () => {
-  const logger: jest.Mocked<ILogger> = { error: jest.fn(), info: jest.fn(), warn: jest.fn() }
-  const queueHandler: IQueueHandler = {
-    postMessage: jest.fn(),
-    subscribeToQueue: jest.fn(),
-  }
-  const secretManager: ISecretManager = {
-    getSecret: jest.fn(async () => 'secret'),
-    getSecrets: jest.fn(),
-  }
+  let logger: MockLogger
+  let queueHandler: MockQueueHandler
+  let secretManager: ISecretManager
 
   const buildDb = (pending: PendingConversion[], updateManyCounts: number[]) => {
     const updateMany = jest.fn()
@@ -55,6 +49,16 @@ describe('BinanceBalanceUpdatedController', () => {
     } as unknown as IDatabaseClientProvider
     return { db, provider, updateMany }
   }
+
+  beforeEach(() => {
+    jest.clearAllMocks()
+    logger = createMockLogger()
+    queueHandler = createMockQueueHandler()
+    secretManager = {
+      getSecret: jest.fn(async () => 'secret'),
+      getSecrets: jest.fn(),
+    }
+  })
 
   it('registers the consumer', () => {
     const controller = new BinanceBalanceUpdatedController(

@@ -1,23 +1,19 @@
 import axios from 'axios'
 
-import type { ILogger } from '../../interfaces'
 import type { ISecretManager } from '../../interfaces/ISecretManager'
 
 import { WebhookEvent } from '../../interfaces/IWebhookNotifier'
 import { WebhookNotifier } from '../../services/WebhookNotifier'
+import { createMockLogger, MockLogger } from '../setup/mockFactories'
 
 jest.mock('axios')
 
 describe('WebhookNotifier', () => {
-  let logger: ILogger
+  let logger: MockLogger
   let secretManager: ISecretManager
 
   beforeEach(() => {
-    logger = {
-      error: jest.fn(),
-      info: jest.fn(),
-      warn: jest.fn(),
-    }
+    logger = createMockLogger()
     secretManager = {
       getSecret: jest.fn(async () => 'secret'),
       getSecrets: jest.fn(),

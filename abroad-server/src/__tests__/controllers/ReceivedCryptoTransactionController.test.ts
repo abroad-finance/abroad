@@ -9,13 +9,14 @@ import {
 } from '.prisma/client'
 
 import { ReceivedCryptoTransactionController } from '../../controllers/queue/ReceivedCryptoTransactionController'
-import { IQueueHandler, QueueName } from '../../interfaces'
+import { QueueName } from '../../interfaces'
 import { IDatabaseClientProvider } from '../../interfaces/IDatabaseClientProvider'
 import { IPaymentService } from '../../interfaces/IPaymentService'
 import { IPaymentServiceFactory } from '../../interfaces/IPaymentServiceFactory'
 import { IWalletHandler } from '../../interfaces/IWalletHandler'
 import { IWalletHandlerFactory } from '../../interfaces/IWalletHandlerFactory'
 import { IWebhookNotifier } from '../../interfaces/IWebhookNotifier'
+import { createMockLogger, createMockQueueHandler, MockLogger, MockQueueHandler } from '../setup/mockFactories'
 
 type PrismaLike = {
   transaction: {
@@ -36,8 +37,8 @@ describe('ReceivedCryptoTransactionController.onTransactionReceived', () => {
   }
 
   let prismaClient: PrismaLike
-  let prismaProvider: IDatabaseClientProvider
-  let queueHandler: IQueueHandler
+  let prismaProvider: jest.Mocked<IDatabaseClientProvider>
+  let queueHandler: MockQueueHandler
   let paymentServiceFactory: IPaymentServiceFactory
   let paymentService: IPaymentService & {
     sendPayment: jest.Mock<Promise<{ success: boolean, transactionId?: string }>>
@@ -45,7 +46,7 @@ describe('ReceivedCryptoTransactionController.onTransactionReceived', () => {
   let walletHandlerFactory: IWalletHandlerFactory
   let walletHandler: IWalletHandler
   let webhookNotifier: IWebhookNotifier
-  let logger: { error: jest.Mock, info: jest.Mock, warn: jest.Mock }
+  let logger: MockLogger
   let slackNotifier: { sendMessage: jest.Mock }
 
   beforeEach(() => {
@@ -58,12 +59,9 @@ describe('ReceivedCryptoTransactionController.onTransactionReceived', () => {
     }
     prismaProvider = {
       getClient: jest.fn(async () => prismaClient as unknown as import('@prisma/client').PrismaClient),
-    } as unknown as IDatabaseClientProvider
+    }
 
-    queueHandler = {
-      postMessage: jest.fn(async () => undefined),
-      subscribeToQueue: jest.fn(),
-    } as IQueueHandler
+    queueHandler = createMockQueueHandler()
 
     paymentService = {
       banks: [],
@@ -98,11 +96,7 @@ describe('ReceivedCryptoTransactionController.onTransactionReceived', () => {
       notifyWebhook: jest.fn(async () => undefined),
     }
 
-    logger = {
-      error: jest.fn(),
-      info: jest.fn(),
-      warn: jest.fn(),
-    }
+    logger = createMockLogger()
 
     slackNotifier = { sendMessage: jest.fn() }
   })
@@ -130,7 +124,7 @@ describe('ReceivedCryptoTransactionController.onTransactionReceived', () => {
   })
 
   it('refunds when the database client cannot be acquired', async () => {
-    const getClientMock = prismaProvider.getClient as unknown as jest.Mock
+    const getClientMock = prismaProvider.getClient
     getClientMock.mockRejectedValueOnce(new Error('db down'))
 
     const controller = new ReceivedCryptoTransactionController(
@@ -436,7 +430,7 @@ describe('ReceivedCryptoTransactionController.onTransactionReceived', () => {
       expect.any(Function),
     )
 
-    const subscribeMock = queueHandler.subscribeToQueue as unknown as jest.Mock
+    const subscribeMock = queueHandler.subscribeToQueue
     subscribeMock.mockImplementationOnce(() => {
       throw new Error('subscribe failure')
     })
@@ -520,7 +514,7 @@ describe('ReceivedCryptoTransactionController.onTransactionReceived', () => {
     }
     const wrongAmountRecord = { ...processingRecord, status: TransactionStatus.WRONG_AMOUNT }
 
-    const queueMock = queueHandler.postMessage as unknown as jest.Mock
+    const queueMock = queueHandler.postMessage
     queueMock
       .mockRejectedValueOnce(new Error('processing notification failed'))
       .mockRejectedValueOnce(new Error('wrong amount notification failed'))
@@ -632,7 +626,7 @@ describe('ReceivedCryptoTransactionController.onTransactionReceived', () => {
       .mockResolvedValueOnce(completedRecord)
     prismaClient.transaction.findUnique.mockResolvedValue(processingRecord)
 
-    const queueMock = queueHandler.postMessage as unknown as jest.Mock
+    const queueMock = queueHandler.postMessage
     queueMock
       .mockResolvedValueOnce(undefined)
       .mockRejectedValueOnce(new Error('final ws failed'))
@@ -690,7 +684,7 @@ describe('ReceivedCryptoTransactionController.onTransactionReceived', () => {
 
     prismaClient.transaction.findUnique.mockResolvedValue(processingRecord)
 
-    const queueMock = queueHandler.postMessage as unknown as jest.Mock
+    const queueMock = queueHandler.postMessage
     queueMock.mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error('queue down'))
 
     const controller = new ReceivedCryptoTransactionController(

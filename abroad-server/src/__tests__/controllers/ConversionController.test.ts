@@ -2,15 +2,15 @@ import type { Request } from 'express'
 
 import { SupportedCurrency } from '@prisma/client'
 
-import type { ILogger } from '../../interfaces'
 import type { IDatabaseClientProvider } from '../../interfaces/IDatabaseClientProvider'
 import type { IExchangeProvider } from '../../interfaces/IExchangeProvider'
 import type { IExchangeProviderFactory } from '../../interfaces/IExchangeProviderFactory'
 
 import { ConversionController } from '../../controllers/ConversionController'
+import { createMockLogger, MockLogger } from '../setup/mockFactories'
 
 describe('ConversionController.triggerBrlConversions', () => {
-  let logger: ILogger
+  let logger: MockLogger
   let dbProvider: IDatabaseClientProvider
   let exchangeProviderFactory: IExchangeProviderFactory
   let exchangeProvider: IExchangeProvider
@@ -36,11 +36,7 @@ describe('ConversionController.triggerBrlConversions', () => {
   }
 
   beforeEach(() => {
-    logger = {
-      error: jest.fn(),
-      info: jest.fn(),
-      warn: jest.fn(),
-    }
+    logger = createMockLogger()
 
     exchangeProvider = {
       createMarketOrder: jest.fn(),

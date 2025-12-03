@@ -7,7 +7,6 @@ import {
   TransactionStatus,
 } from '@prisma/client'
 
-import type { ILogger, IQueueHandler } from '../../interfaces'
 import type { ISlackNotifier } from '../../interfaces'
 import type { IDatabaseClientProvider } from '../../interfaces/IDatabaseClientProvider'
 import type { IWalletHandlerFactory } from '../../interfaces/IWalletHandlerFactory'
@@ -15,6 +14,7 @@ import type { IWebhookNotifier } from '../../interfaces/IWebhookNotifier'
 
 import { PaymentStatusUpdatedController } from '../../controllers/queue/PaymentStatusUpdatedController'
 import { QueueName } from '../../interfaces'
+import { createMockLogger, createMockQueueHandler, MockLogger, MockQueueHandler } from '../setup/mockFactories'
 
 type PrismaLike = {
   transaction: {
@@ -24,9 +24,9 @@ type PrismaLike = {
 }
 
 describe('PaymentStatusUpdatedController', () => {
-  let logger: ILogger
-  let queueHandler: IQueueHandler
-  let dbProvider: IDatabaseClientProvider
+  let logger: MockLogger
+  let queueHandler: MockQueueHandler
+  let dbProvider: jest.Mocked<IDatabaseClientProvider>
   let webhookNotifier: IWebhookNotifier
   let slackNotifier: ISlackNotifier
   let walletHandlerFactory: IWalletHandlerFactory
@@ -38,11 +38,8 @@ describe('PaymentStatusUpdatedController', () => {
   let controller: PaymentStatusUpdatedController
 
   beforeEach(() => {
-    logger = { error: jest.fn(), info: jest.fn(), warn: jest.fn() }
-    queueHandler = {
-      postMessage: jest.fn(async () => undefined),
-      subscribeToQueue: jest.fn(async () => undefined),
-    }
+    logger = createMockLogger()
+    queueHandler = createMockQueueHandler()
     prisma = {
       transaction: {
         update: jest.fn(),
@@ -51,7 +48,7 @@ describe('PaymentStatusUpdatedController', () => {
     }
     dbProvider = {
       getClient: jest.fn(async () => prisma as unknown as import('@prisma/client').PrismaClient),
-    } as unknown as IDatabaseClientProvider
+    }
     webhookNotifier = {
       notifyWebhook: jest.fn(async () => undefined),
     }

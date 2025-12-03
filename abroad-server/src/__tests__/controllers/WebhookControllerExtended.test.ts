@@ -1,11 +1,17 @@
 import 'reflect-metadata'
 import { KycStatus, TargetCurrency } from '@prisma/client'
 
-import type { ILogger, IQueueHandler } from '../../interfaces'
 import type { IDatabaseClientProvider } from '../../interfaces/IDatabaseClientProvider'
 
 import { WebhookController } from '../../controllers/WebhookController'
 import { QueueName } from '../../interfaces'
+import {
+  createMockLogger,
+  createMockQueueHandler,
+  createResponder,
+  MockLogger,
+  MockQueueHandler,
+} from '../setup/mockFactories'
 
 type PrismaLike = {
   partnerUserKyc: {
@@ -13,10 +19,6 @@ type PrismaLike = {
     update: jest.Mock
   }
 }
-
-const createResponder = <Status extends number, Body>() => (
-  jest.fn((_status: Status, payload: Body) => payload)
-)
 
 const buildPersonaPayload = (status: string) => ({
   data: {
@@ -34,8 +36,8 @@ const buildPersonaPayload = (status: string) => ({
 describe('WebhookController webhooks', () => {
   let prisma: PrismaLike
   let dbProvider: IDatabaseClientProvider
-  let queueHandler: IQueueHandler
-  let logger: ILogger
+  let queueHandler: MockQueueHandler
+  let logger: MockLogger
 
   const buildRequest = (rawBody?: string) => (
     {
@@ -54,15 +56,8 @@ describe('WebhookController webhooks', () => {
     dbProvider = {
       getClient: jest.fn(async () => prisma as unknown as import('@prisma/client').PrismaClient),
     } as unknown as IDatabaseClientProvider
-    queueHandler = {
-      postMessage: jest.fn(async () => undefined),
-      subscribeToQueue: jest.fn(),
-    }
-    logger = {
-      error: jest.fn(),
-      info: jest.fn(),
-      warn: jest.fn(),
-    }
+    queueHandler = createMockQueueHandler()
+    logger = createMockLogger()
   })
 
   describe('Guardline webhook', () => {

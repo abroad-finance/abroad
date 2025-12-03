@@ -2,12 +2,12 @@ import 'reflect-metadata'
 import { TargetCurrency } from '@prisma/client'
 import axios, { type AxiosResponse } from 'axios'
 
-import type { ILogger } from '../../interfaces'
 import type { IDatabaseClientProvider } from '../../interfaces/IDatabaseClientProvider'
 import type { IPixQrDecoder } from '../../interfaces/IQrDecoder'
 import type { ISecretManager } from '../../interfaces/ISecretManager'
 
 import { TransferoPaymentService } from '../../services/paymentServices/transferoPaymentService'
+import { createMockLogger, MockLogger } from '../setup/mockFactories'
 
 jest.mock('axios')
 
@@ -46,7 +46,7 @@ describe('TransferoPaymentService', () => {
   let prismaClient: PrismaLike
   let dbProvider: IDatabaseClientProvider
   let pixDecoder: IPixQrDecoder
-  let logger: ILogger
+  let logger: MockLogger
 
   beforeEach(() => {
     jest.restoreAllMocks()
@@ -66,11 +66,7 @@ describe('TransferoPaymentService', () => {
     pixDecoder = {
       decode: jest.fn(async () => ({ name: 'QR Recipient', taxId: 'TAX-QR' })),
     }
-    logger = {
-      error: jest.fn(),
-      info: jest.fn(),
-      warn: jest.fn(),
-    }
+    logger = createMockLogger()
   })
 
   describe('getAccessToken', () => {
