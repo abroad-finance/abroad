@@ -78,36 +78,6 @@ export class PixQrDecoder implements IPixQrDecoder {
     }
   }
 
-  /** OAuth2 client-credentials flow */
-  private async getAccessToken(): Promise<string> {
-    const now = Date.now()
-    if (this.cachedToken && now < this.cachedToken.exp - 60_000) {
-      return this.cachedToken.value
-    }
-
-    const apiUrl = await this.secretManager.getSecret('TRANSFERO_BASE_URL')
-    const clientId = await this.secretManager.getSecret('TRANSFERO_CLIENT_ID')
-    const clientSecret = await this.secretManager.getSecret(
-      'TRANSFERO_CLIENT_SECRET',
-    )
-    const clientScope = await this.secretManager.getSecret('TRANSFERO_CLIENT_SCOPE')
-
-    const { data } = await axios.post(`${apiUrl}/auth/token`, {
-      client_id: clientId,
-      client_secret: clientSecret,
-      grant_type: 'client_credentials',
-      scope: clientScope,
-    }, {
-      headers: { 'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
-    })
-
-    const value = data.access_token ?? data
-    const seconds = Number(data.expires_in ?? 900) // default 15 min
-    this.cachedToken = { exp: now + seconds * 1000, value }
-
-    return value
-  }
-
   private describeError(err: unknown): string {
     if (axios.isAxiosError(err)) {
       const responseData = err.response?.data
@@ -141,5 +111,35 @@ export class PixQrDecoder implements IPixQrDecoder {
     catch {
       return String(err)
     }
+  }
+
+  /** OAuth2 client-credentials flow */
+  private async getAccessToken(): Promise<string> {
+    const now = Date.now()
+    if (this.cachedToken && now < this.cachedToken.exp - 60_000) {
+      return this.cachedToken.value
+    }
+
+    const apiUrl = await this.secretManager.getSecret('TRANSFERO_BASE_URL')
+    const clientId = await this.secretManager.getSecret('TRANSFERO_CLIENT_ID')
+    const clientSecret = await this.secretManager.getSecret(
+      'TRANSFERO_CLIENT_SECRET',
+    )
+    const clientScope = await this.secretManager.getSecret('TRANSFERO_CLIENT_SCOPE')
+
+    const { data } = await axios.post(`${apiUrl}/auth/token`, {
+      client_id: clientId,
+      client_secret: clientSecret,
+      grant_type: 'client_credentials',
+      scope: clientScope,
+    }, {
+      headers: { 'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
+    })
+
+    const value = data.access_token ?? data
+    const seconds = Number(data.expires_in ?? 900) // default 15 min
+    this.cachedToken = { exp: now + seconds * 1000, value }
+
+    return value
   }
 }
