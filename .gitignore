@@ -139,3 +139,4 @@ abroad-ui/src/api/index.ts
 transactions-report.csv
 .DS_Store
 .adminjs/
+abroad-server/tmp/maintainability-report.json

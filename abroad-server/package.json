@@ -22,6 +22,7 @@
     "depcruise:graph": "depcruise src --include-only '^src' --config --output-type dot | dot -T svg > dependency-graph.svg",
     "lint": "eslint .",
     "format": "eslint . --fix",
+    "maintainability:report": "tsx src/scripts/maintainability-report.ts",
     "hygiene": "depcheck && knip --config knip.json",
     "migrate:dev": "prisma migrate dev",
     "seed:dev": "tsx scripts/seed-dev.ts"
@@ -63,6 +64,7 @@
     "socket.io": "^4.8.1",
     "swagger-ui-express": "^5.0.1",
     "tsoa": "^6.6.0",
+    "typhonjs-escomplex": "^0.1.0",
     "zod": "^4.0.17"
   },
   "devDependencies": {

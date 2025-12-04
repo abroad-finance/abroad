@@ -1,0 +1,315 @@
+import { Command, Option } from 'commander'
+import fs from 'node:fs/promises'
+import path from 'node:path'
+import ts from 'typescript'
+import escomplex, { AnalyzeOptions, ModuleReport, ProjectSourceInput } from 'typhonjs-escomplex'
+
+interface CliOptions {
+  failOnError: boolean
+  format: OutputFormat
+  outputPath?: string
+  sourceRoot: string
+}
+
+interface MaintainabilityRow {
+  cyclomaticComplexity: number
+  halsteadVolume: number
+  logicalSloc: number
+  maintainabilityIndex: number
+  normalizedMaintainability: number
+  path: string
+  physicalSloc: number
+}
+
+type OutputFormat = 'json' | 'table'
+
+const SUPPORTED_EXTENSIONS = new Set(['.ts', '.tsx'])
+const DECLARATION_SUFFIX = '.d.ts'
+const MAINTAINABILITY_MAX = 171
+const DECORATOR_OVERRIDE = { decoratorsLegacy: true }
+const TRANSPILE_OPTIONS: ts.CompilerOptions = {
+  experimentalDecorators: true,
+  jsx: ts.JsxEmit.Preserve,
+  module: ts.ModuleKind.ESNext,
+  target: ts.ScriptTarget.ES2020,
+}
+
+const decimalFormatter = new Intl.NumberFormat('en-US', {
+  maximumFractionDigits: 2,
+  minimumFractionDigits: 2,
+})
+
+async function assertDirectory(candidate: string) {
+  const stats = await fs.stat(candidate)
+  if (!stats.isDirectory()) {
+    throw new Error(`Expected ${candidate} to be a directory`)
+  }
+}
+
+function buildAnalysisOptions(cliOptions: CliOptions): AnalyzeOptions {
+  return {
+    ignoreErrors: !cliOptions.failOnError,
+  }
+}
+
+function buildMaintainabilityRows(modules: ModuleReport[]): MaintainabilityRow[] {
+  return modules.map((moduleReport) => {
+    const aggregate = moduleReport.aggregate
+    const normalizedMaintainability = normalizeMaintainability(moduleReport.maintainability)
+
+    return {
+      cyclomaticComplexity: aggregate.cyclomatic,
+      halsteadVolume: aggregate.halstead.volume,
+      logicalSloc: aggregate.sloc.logical,
+      maintainabilityIndex: moduleReport.maintainability,
+      normalizedMaintainability,
+      path: moduleReport.srcPath ?? moduleReport.filePath ?? '<unknown>',
+      physicalSloc: aggregate.sloc.physical,
+    }
+  })
+}
+
+function buildTable(rows: MaintainabilityRow[]): string {
+  const headers = ['File', 'MI (0-171)', 'MI (%)', 'Cyclomatic', 'Halstead V', 'SLOC (L/P)']
+  const dataRows = rows.map(row => [
+    row.path,
+    decimalFormatter.format(row.maintainabilityIndex),
+    `${decimalFormatter.format(row.normalizedMaintainability)}%`,
+    decimalFormatter.format(row.cyclomaticComplexity),
+    decimalFormatter.format(row.halsteadVolume),
+    `${row.logicalSloc}/${row.physicalSloc}`,
+  ])
+
+  const columnWidths = headers.map((header, index) => {
+    const maxDataWidth = Math.max(...dataRows.map(dataRow => String(dataRow[index]).length))
+    return Math.max(header.length, maxDataWidth)
+  })
+
+  const headerLine = headers.map((header, index) => header.padEnd(columnWidths[index])).join('  ')
+  const separatorLine = columnWidths.map(width => '-'.repeat(width)).join('  ')
+  const dataLines = dataRows.map(dataRow =>
+    dataRow.map((cell, index) => String(cell).padEnd(columnWidths[index])).join('  '),
+  )
+
+  return [
+    `Maintainability report for ${rows.length} file${rows.length === 1 ? '' : 's'}`,
+    headerLine,
+    separatorLine,
+    ...dataLines,
+  ].join('\n')
+}
+
+function collectModuleErrors(modules: ModuleReport[]): string[] {
+  const errors: string[] = []
+
+  for (const moduleReport of modules) {
+    if (!moduleReport.errors || moduleReport.errors.length === 0) {
+      continue
+    }
+
+    const location = moduleReport.srcPath ?? moduleReport.filePath ?? '<unknown>'
+    for (const issue of moduleReport.errors) {
+      errors.push(`${location}: ${extractErrorMessage(issue)}`)
+    }
+  }
+
+  return errors
+}
+
+async function collectSourceFiles(directory: string): Promise<string[]> {
+  const entries = await fs.readdir(directory, { withFileTypes: true })
+  const files: string[] = []
+
+  for (const entry of entries) {
+    const absolutePath = path.join(directory, entry.name)
+
+    if (entry.isSymbolicLink()) {
+      continue
+    }
+
+    if (entry.isDirectory()) {
+      const nestedFiles = await collectSourceFiles(absolutePath)
+      files.push(...nestedFiles)
+      continue
+    }
+
+    if (!isSupportedSource(entry.name)) {
+      continue
+    }
+
+    files.push(absolutePath)
+  }
+
+  return files
+}
+
+function extractErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message
+  }
+
+  if (typeof error === 'string') {
+    return error
+  }
+
+  return JSON.stringify(error)
+}
+
+function formatDiagnostics(filePath: string, diagnostics: readonly ts.Diagnostic[]): string[] {
+  return diagnostics.map((diagnostic) => {
+    const message = ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n')
+
+    if (diagnostic.file && typeof diagnostic.start === 'number') {
+      const { character, line } = diagnostic.file.getLineAndCharacterOfPosition(diagnostic.start)
+      return `${diagnostic.file.fileName}:${line + 1}:${character + 1} ${message}`
+    }
+
+    return `${filePath}: ${message}`
+  })
+}
+
+function isSupportedSource(filename: string): boolean {
+  if (filename.endsWith(DECLARATION_SUFFIX)) {
+    return false
+  }
+
+  const extension = path.extname(filename).toLowerCase()
+  return SUPPORTED_EXTENSIONS.has(extension)
+}
+
+async function loadSources(
+  files: string[],
+  root: string,
+): Promise<{ diagnostics: string[], sources: ProjectSourceInput[] }> {
+  const diagnostics: string[] = []
+  const sources: ProjectSourceInput[] = []
+
+  for (const filePath of files) {
+    const code = await fs.readFile(filePath, 'utf8')
+    const relativePath = toNormalizedRelativePath(root, filePath)
+    const { diagnostics: transpileDiagnostics, outputText } = ts.transpileModule(code, {
+      compilerOptions: TRANSPILE_OPTIONS,
+      fileName: relativePath,
+      reportDiagnostics: true,
+    })
+
+    if (transpileDiagnostics && transpileDiagnostics.length > 0) {
+      diagnostics.push(...formatDiagnostics(relativePath, transpileDiagnostics))
+    }
+
+    sources.push({
+      code: outputText,
+      filePath,
+      srcPath: relativePath,
+    })
+  }
+
+  return { diagnostics, sources }
+}
+
+function normalizeMaintainability(maintainability: number): number {
+  const clamped = Math.min(MAINTAINABILITY_MAX, Math.max(0, maintainability))
+  return (clamped / MAINTAINABILITY_MAX) * 100
+}
+
+function parseCliOptions(): CliOptions {
+  const program = new Command()
+  const formatOption = new Option('-f, --format <type>', 'Output format').choices(['table', 'json']).default('table')
+
+  program
+    .name('maintainability-report')
+    .description('Generate maintainability index metrics per file in the src directory')
+    .addOption(formatOption)
+    .option('-s, --src <path>', 'Source directory to analyze', path.resolve(process.cwd(), 'src'))
+    .option('-o, --output <file>', 'Write the JSON report to a file in addition to console output')
+    .option('--ignore-errors', 'Do not fail when parser or analysis errors are found', false)
+
+  const options = program.parse(process.argv).opts<{
+    format: OutputFormat
+    ignoreErrors?: boolean
+    output?: string
+    src: string
+  }>()
+
+  return {
+    failOnError: !options.ignoreErrors,
+    format: options.format,
+    outputPath: options.output ? path.resolve(options.output) : undefined,
+    sourceRoot: path.resolve(options.src),
+  }
+}
+
+async function persistReport(rows: MaintainabilityRow[], outputPath: string) {
+  const outputDir = path.dirname(outputPath)
+  await fs.mkdir(outputDir, { recursive: true })
+  const payload = JSON.stringify(rows, null, 2)
+  await fs.writeFile(outputPath, payload, 'utf8')
+}
+
+function renderReport(rows: MaintainabilityRow[], cliOptions: CliOptions) {
+  if (cliOptions.format === 'json') {
+    console.log(JSON.stringify(rows, null, 2))
+    return
+  }
+
+  const table = buildTable(rows)
+
+  console.log(table)
+
+  if (cliOptions.outputPath) {
+    console.log(`\nJSON report written to ${cliOptions.outputPath}`)
+  }
+}
+
+async function run() {
+  try {
+    const cliOptions = parseCliOptions()
+    await assertDirectory(cliOptions.sourceRoot)
+
+    const sourceFiles = await collectSourceFiles(cliOptions.sourceRoot)
+    if (sourceFiles.length === 0) {
+      throw new Error(`No TypeScript sources found under ${cliOptions.sourceRoot}`)
+    }
+
+    const { diagnostics, sources } = await loadSources(sourceFiles, cliOptions.sourceRoot)
+    if (diagnostics.length > 0) {
+      console.warn('Transpilation warnings:\n', diagnostics.join('\n'))
+    }
+    const projectReport = escomplex.analyzeProject(
+      sources,
+      buildAnalysisOptions(cliOptions),
+      undefined,
+      DECORATOR_OVERRIDE,
+    )
+
+    const moduleErrors = collectModuleErrors(projectReport.modules)
+    if (moduleErrors.length > 0 && cliOptions.failOnError) {
+      const details = moduleErrors.map(error => `- ${error}`).join('\n')
+      throw new Error(`Complexity analysis reported errors:\n${details}`)
+    }
+
+    const rows = buildMaintainabilityRows(projectReport.modules)
+    const sortedRows = sortRows(rows)
+
+    if (cliOptions.outputPath) {
+      await persistReport(sortedRows, cliOptions.outputPath)
+    }
+
+    renderReport(sortedRows, cliOptions)
+  }
+  catch (error: unknown) {
+    console.error(`Failed to generate maintainability report: ${extractErrorMessage(error)}`)
+    process.exitCode = 1
+  }
+}
+
+function sortRows(rows: MaintainabilityRow[]): MaintainabilityRow[] {
+  return [...rows].sort((left, right) => left.maintainabilityIndex - right.maintainabilityIndex)
+}
+
+function toNormalizedRelativePath(root: string, filePath: string): string {
+  const relativePath = path.relative(root, filePath) || path.basename(filePath)
+  return relativePath.split(path.sep).join('/')
+}
+
+void run()
