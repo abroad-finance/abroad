@@ -1,5 +1,7 @@
 import 'reflect-metadata'
 
+import { flushAsyncOperations, mockProcessExit } from './setup/testHarness'
+
 type MiddlewareHandler = (req: RequestStub, res: ResponseStub, next?: () => void) => void
 type RequestStub = {
   body?: unknown
@@ -124,7 +126,7 @@ describe('server bootstrap', () => {
   })
 
   it('boots the app, wires health routes, and shuts down gracefully', async () => {
-    const exitSpy = jest.spyOn(process, 'exit').mockImplementation(() => undefined as never)
+    const exitMock = mockProcessExit()
     const handlers: Record<string, Array<(signal: NodeJS.Signals) => void>> = {}
     const onSpy = jest.spyOn(process, 'on').mockImplementation((event: string | symbol, listener: (signal: NodeJS.Signals) => void) => {
       const key = event.toString()
@@ -135,7 +137,7 @@ describe('server bootstrap', () => {
     jest.isolateModules(async () => {
       await import('../server')
     })
-    await new Promise(resolve => setImmediate(resolve))
+    await flushAsyncOperations()
     onSpy.mockRestore()
 
     // Ensure routes registered
@@ -187,8 +189,8 @@ describe('server bootstrap', () => {
 
     expect(appMock.listen).toHaveBeenCalled()
     expect(serverMock.close).toHaveBeenCalledTimes(2)
-    expect(exitSpy).toHaveBeenCalled()
+    expect(exitMock.exitSpy).toHaveBeenCalled()
     expect(responses.length).toBeGreaterThan(0)
-    exitSpy.mockRestore()
+    exitMock.restore()
   })
 })

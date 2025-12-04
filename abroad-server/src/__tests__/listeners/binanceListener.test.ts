@@ -16,6 +16,7 @@ class FakeWebsocketClient {
   private handlers: HandlerMap = {}
 
   public constructor(_config?: unknown) {
+    void _config
     handlerMap = this.handlers
   }
 

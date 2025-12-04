@@ -1,84 +1,66 @@
 import 'reflect-metadata'
 import type http from 'http'
 
-let recordedHandler: ((req: Partial<http.IncomingMessage>, res: Partial<http.ServerResponse>) => void) | undefined
+import {
+  createHttpServerRecorder,
+  createResponseRecorder,
+  getLastProcessListener,
+  mockProcessExit,
+  toServerResponse,
+} from '../setup/testHarness'
 
-const listenMock = jest.fn((_: number, cb?: () => void) => {
-  cb?.()
-  return undefined
-})
+const httpServer = createHttpServerRecorder<Partial<http.IncomingMessage>, Partial<http.ServerResponse>>()
 
-jest.mock('http', () => ({
-  createServer: (handler: typeof recordedHandler) => {
-    recordedHandler = handler
-    return {
-      listen: listenMock,
-    }
-  },
-}))
+jest.mock('http', () => httpServer.mockImplementation())
 
 const startListenersMock = jest.fn()
 jest.mock('../../listeners/index', () => ({
   startListeners: startListenersMock,
 }))
 
-const buildResponse = () => {
-  const chunks: string[] = []
-  const res: Partial<http.ServerResponse> = {
-    end: (chunk?: unknown) => {
-      if (typeof chunk === 'string') {
-        chunks.push(chunk)
-      }
-      return res as http.ServerResponse
-    },
-    setHeader: jest.fn(),
-    statusCode: 0,
-  }
-  return { chunks, res }
-}
-
 describe('listeners health server', () => {
   beforeEach(() => {
     jest.resetModules()
-    recordedHandler = undefined
-    listenMock.mockClear()
+    httpServer.reset()
     startListenersMock.mockClear()
   })
 
   it('responds to health checks and readiness transitions', async () => {
     await import('../../listeners')
 
-    expect(recordedHandler).toBeDefined()
+    const handler = httpServer.getHandler()
+    expect(handler).toBeDefined()
     expect(startListenersMock).toHaveBeenCalled()
-    expect(listenMock).toHaveBeenCalled()
+    expect(httpServer.listenMock).toHaveBeenCalled()
 
-    const { chunks: liveChunks, res: resLive } = buildResponse()
-    recordedHandler?.({ url: '/healthz' }, resLive)
+    const { body: liveChunks, res: resLive } = createResponseRecorder<string>()
+    handler?.({ url: '/healthz' }, toServerResponse(resLive))
     expect(resLive.statusCode).toBe(200)
     expect(liveChunks.join('')).toBe('ok')
 
-    const { chunks: readyChunksInitial, res: resReadyInitial } = buildResponse()
-    recordedHandler?.({ url: '/readyz' }, resReadyInitial)
+    const { body: readyChunksInitial, res: resReadyInitial } = createResponseRecorder<string>()
+    handler?.({ url: '/readyz' }, toServerResponse(resReadyInitial))
     expect(resReadyInitial.statusCode).toBe(200)
     expect(readyChunksInitial.join('')).toBe('ready')
 
     // simulate shutdown signal to flip readiness off
-    const sigtermHandler = process.listeners('SIGTERM').slice(-1)[0]
-    const exitSpy = jest.spyOn(process, 'exit').mockImplementation(() => undefined as never)
-    sigtermHandler?.('SIGTERM' as NodeJS.Signals)
-    const { chunks: readyChunksAfterStop, res: resReadyAfterStop } = buildResponse()
-    recordedHandler?.({ url: '/readyz' }, resReadyAfterStop)
+    const sigtermHandler = getLastProcessListener('SIGTERM')
+    const exitSpy = mockProcessExit()
+    await sigtermHandler?.('SIGTERM')
+    const { body: readyChunksAfterStop, res: resReadyAfterStop } = createResponseRecorder<string>()
+    handler?.({ url: '/readyz' }, toServerResponse(resReadyAfterStop))
     expect(resReadyAfterStop.statusCode).toBe(503)
     expect(readyChunksAfterStop.join('')).toBe('not ready')
-    exitSpy.mockRestore()
+    exitSpy.restore()
   })
 
   it('returns 404 for unknown paths', async () => {
     await import('../../listeners')
 
-    const { chunks, res } = buildResponse()
-    recordedHandler?.({ url: '/unknown' }, res)
+    const handler = httpServer.getHandler()
+    const { body, res } = createResponseRecorder<string>()
+    handler?.({ url: '/unknown' }, toServerResponse(res))
     expect(res.statusCode).toBe(404)
-    expect(chunks.join('')).toBe('not found')
+    expect(body.join('')).toBe('not found')
   })
 })

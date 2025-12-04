@@ -2,6 +2,7 @@ import 'reflect-metadata'
 
 import { QueueName } from '../../interfaces'
 import { TYPES } from '../../types'
+import { flushAsyncOperations, getLastProcessListener, mockProcessExit } from '../setup/testHarness'
 
 type SubscriptionHandler = (payload: unknown) => void
 
@@ -29,8 +30,6 @@ jest.mock('../../ioc', () => ({
 }))
 
 describe('ws bridge', () => {
-  const flush = () => new Promise(resolve => setImmediate(resolve))
-
   beforeEach(() => {
     jest.resetModules()
     subscriptionHandler = undefined
@@ -47,9 +46,13 @@ describe('ws bridge', () => {
     })
   })
 
+  it('returns undefined when asking for an unregistered signal listener', () => {
+    expect(getLastProcessListener('SIGUSR2')).toBeUndefined()
+  })
+
   it('routes valid notification messages and parses JSON payloads', async () => {
     await import('../../ws')
-    await flush()
+    await flushAsyncOperations()
 
     expect(webSocketService.start).toHaveBeenCalled()
     expect(queueHandler.subscribeToQueue).toHaveBeenCalledWith(
@@ -69,10 +72,10 @@ describe('ws bridge', () => {
   })
 
   it('ignores invalid payloads and handles shutdown signals', async () => {
-    const exitSpy = jest.spyOn(process, 'exit').mockImplementation(() => undefined as never)
+    const exitSpy = mockProcessExit()
 
     await import('../../ws')
-    await flush()
+    await flushAsyncOperations()
 
     // invalid payload (missing user id) gets dropped
     subscriptionHandler?.({ type: 'ping' })
@@ -82,10 +85,10 @@ describe('ws bridge', () => {
     subscriptionHandler?.({ id: 'user-2', payload: '{', type: 'event' })
     expect(webSocketService.emitToUser).toHaveBeenCalledWith('user-2', 'event', '{')
 
-    const sigintHandler = process.listeners('SIGINT').slice(-1)[0]
-    await sigintHandler?.('SIGINT' as NodeJS.Signals)
+    const sigintHandler = getLastProcessListener('SIGINT')
+    await sigintHandler?.('SIGINT')
     expect(queueHandler.closeAllSubscriptions).toHaveBeenCalled()
     expect(webSocketService.stop).toHaveBeenCalled()
-    exitSpy.mockRestore()
+    exitSpy.restore()
   })
 })
