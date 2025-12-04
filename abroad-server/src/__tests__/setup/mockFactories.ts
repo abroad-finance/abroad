@@ -15,10 +15,18 @@ export const createMockQueueHandler = (
   overrides?: Partial<MockQueueHandler>,
 ): MockQueueHandler => {
   const postMessage: jest.MockedFunction<IQueueHandler['postMessage']> = jest.fn(
-    async (_queueName, _message) => undefined,
+    async (queueName, message) => {
+      void queueName
+      void message
+      return undefined
+    },
   )
   const subscribeToQueue: jest.MockedFunction<IQueueHandler['subscribeToQueue']> = jest.fn(
-    async (_queueName, _callback) => undefined,
+    async (queueName, callback) => {
+      void queueName
+      void callback
+      return undefined
+    },
   )
   const closeAllSubscriptions: NonNullable<IQueueHandler['closeAllSubscriptions']> = jest.fn(
     async () => undefined,
