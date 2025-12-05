@@ -71,7 +71,7 @@ export function buildIgnoreMatcher(ignoredPaths: string[]): PathIgnorePredicate 
 
   const ignoredPathSet = new Set(ignoredPaths)
 
-    return (relativePath: string) =>
+  return (relativePath: string) =>
     ignoredPathSet.has(relativePath) || ignoredPaths.some(ignored => relativePath.startsWith(`${ignored}/`))
 }
 
@@ -159,42 +159,6 @@ export async function collectSourceFiles(root: string, shouldIgnore: PathIgnoreP
   return collectSourceFilesFromDirectory(root, root, shouldIgnore)
 }
 
-async function collectSourceFilesFromDirectory(
-  directory: string,
-  root: string,
-  shouldIgnore: PathIgnorePredicate,
-): Promise<string[]> {
-  const entries = await fs.readdir(directory, { withFileTypes: true })
-  const files: string[] = []
-
-  for (const entry of entries) {
-    const absolutePath = path.join(directory, entry.name)
-    const normalizedRelativePath = toNormalizedRelativePath(root, absolutePath)
-
-    if (entry.isSymbolicLink()) {
-      continue
-    }
-
-    if (shouldIgnore(normalizedRelativePath)) {
-      continue
-    }
-
-    if (entry.isDirectory()) {
-      const nestedFiles = await collectSourceFilesFromDirectory(absolutePath, root, shouldIgnore)
-      files.push(...nestedFiles)
-      continue
-    }
-
-    if (!isSupportedSource(entry.name)) {
-      continue
-    }
-
-    files.push(absolutePath)
-  }
-
-  return files
-}
-
 export function extractErrorMessage(error: unknown): string {
   if (error instanceof Error) {
     return error.message
@@ -218,6 +182,57 @@ export function formatDiagnostics(filePath: string, diagnostics: readonly ts.Dia
 
     return `${filePath}: ${message}`
   })
+}
+
+export async function generateMaintainabilityReport(cliOptions: CliOptions): Promise<MaintainabilityReport> {
+  await assertDirectory(cliOptions.sourceRoot)
+
+  const ignoreMatcher = buildIgnoreMatcher(cliOptions.ignoredPaths)
+  const sourceFiles = await collectSourceFiles(cliOptions.sourceRoot, ignoreMatcher)
+  if (sourceFiles.length === 0) {
+    throw new Error(`No TypeScript sources found under ${cliOptions.sourceRoot} after applying ignore filters`)
+  }
+
+  const { diagnostics, sources } = await loadSources(sourceFiles, cliOptions.sourceRoot)
+  if (diagnostics.length > 0) {
+    console.warn('Transpilation warnings:\n', diagnostics.join('\n'))
+  }
+  const projectReport = escomplex.analyzeProject(
+    sources,
+    buildAnalysisOptions(cliOptions),
+    undefined,
+    DECORATOR_OVERRIDE,
+  )
+
+  const moduleErrors = collectModuleErrors(projectReport.modules)
+  if (moduleErrors.length > 0 && cliOptions.failOnError) {
+    const details = moduleErrors.map(error => `- ${error}`).join('\n')
+    throw new Error(`Complexity analysis reported errors:\n${details}`)
+  }
+
+  const rows = buildMaintainabilityRows(projectReport.modules)
+  const sortedRows = sortRows(rows)
+  const averageNormalizedMaintainability = calculateAverageNormalizedMaintainability(sortedRows)
+  const report: MaintainabilityReport = {
+    averageNormalizedMaintainability,
+    ignoredPaths: cliOptions.ignoredPaths,
+    minimumAverageMaintainability: cliOptions.minimumAverageMaintainability,
+    rows: sortedRows,
+  }
+
+  if (cliOptions.outputPath) {
+    await persistReport(report, cliOptions.outputPath)
+  }
+
+  renderReport(report, cliOptions)
+
+  if (report.averageNormalizedMaintainability < cliOptions.minimumAverageMaintainability) {
+    throw new Error(
+      `Combined average MI ${decimalFormatter.format(report.averageNormalizedMaintainability)}% is below the required minimum of ${decimalFormatter.format(cliOptions.minimumAverageMaintainability)}%.`,
+    )
+  }
+
+  return report
 }
 
 export function isSupportedSource(filename: string): boolean {
@@ -380,57 +395,6 @@ export function renderReport(report: MaintainabilityReport, cliOptions: CliOptio
   }
 }
 
-export async function generateMaintainabilityReport(cliOptions: CliOptions): Promise<MaintainabilityReport> {
-  await assertDirectory(cliOptions.sourceRoot)
-
-  const ignoreMatcher = buildIgnoreMatcher(cliOptions.ignoredPaths)
-  const sourceFiles = await collectSourceFiles(cliOptions.sourceRoot, ignoreMatcher)
-  if (sourceFiles.length === 0) {
-    throw new Error(`No TypeScript sources found under ${cliOptions.sourceRoot} after applying ignore filters`)
-  }
-
-  const { diagnostics, sources } = await loadSources(sourceFiles, cliOptions.sourceRoot)
-  if (diagnostics.length > 0) {
-    console.warn('Transpilation warnings:\n', diagnostics.join('\n'))
-  }
-  const projectReport = escomplex.analyzeProject(
-    sources,
-    buildAnalysisOptions(cliOptions),
-    undefined,
-    DECORATOR_OVERRIDE,
-  )
-
-  const moduleErrors = collectModuleErrors(projectReport.modules)
-  if (moduleErrors.length > 0 && cliOptions.failOnError) {
-    const details = moduleErrors.map(error => `- ${error}`).join('\n')
-    throw new Error(`Complexity analysis reported errors:\n${details}`)
-  }
-
-  const rows = buildMaintainabilityRows(projectReport.modules)
-  const sortedRows = sortRows(rows)
-  const averageNormalizedMaintainability = calculateAverageNormalizedMaintainability(sortedRows)
-  const report: MaintainabilityReport = {
-    averageNormalizedMaintainability,
-    ignoredPaths: cliOptions.ignoredPaths,
-    minimumAverageMaintainability: cliOptions.minimumAverageMaintainability,
-    rows: sortedRows,
-  }
-
-  if (cliOptions.outputPath) {
-    await persistReport(report, cliOptions.outputPath)
-  }
-
-  renderReport(report, cliOptions)
-
-  if (report.averageNormalizedMaintainability < cliOptions.minimumAverageMaintainability) {
-    throw new Error(
-      `Combined average MI ${decimalFormatter.format(report.averageNormalizedMaintainability)}% is below the required minimum of ${decimalFormatter.format(cliOptions.minimumAverageMaintainability)}%.`,
-    )
-  }
-
-  return report
-}
-
 export async function run(cliOptions?: CliOptions): Promise<MaintainabilityReport | undefined> {
   try {
     const resolvedOptions = cliOptions ?? parseCliOptions()
@@ -474,6 +438,42 @@ export function stripLeadingRootSegment(pathCandidate: string, root: string): st
 export function toNormalizedRelativePath(root: string, filePath: string): string {
   const relativePath = path.relative(root, filePath) || path.basename(filePath)
   return relativePath.split(path.sep).join('/')
+}
+
+async function collectSourceFilesFromDirectory(
+  directory: string,
+  root: string,
+  shouldIgnore: PathIgnorePredicate,
+): Promise<string[]> {
+  const entries = await fs.readdir(directory, { withFileTypes: true })
+  const files: string[] = []
+
+  for (const entry of entries) {
+    const absolutePath = path.join(directory, entry.name)
+    const normalizedRelativePath = toNormalizedRelativePath(root, absolutePath)
+
+    if (entry.isSymbolicLink()) {
+      continue
+    }
+
+    if (shouldIgnore(normalizedRelativePath)) {
+      continue
+    }
+
+    if (entry.isDirectory()) {
+      const nestedFiles = await collectSourceFilesFromDirectory(absolutePath, root, shouldIgnore)
+      files.push(...nestedFiles)
+      continue
+    }
+
+    if (!isSupportedSource(entry.name)) {
+      continue
+    }
+
+    files.push(absolutePath)
+  }
+
+  return files
 }
 
 if (require.main === module) {

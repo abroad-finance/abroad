@@ -29,6 +29,15 @@ export type TransactionQueueMessage = z.infer<
   typeof TransactionQueueMessageSchema
 >
 
+type PrismaClientInstance = Awaited<ReturnType<IDatabaseClientProvider['getClient']>>
+
+const transactionInclude = {
+  partnerUser: { include: { partner: true } },
+  quote: true,
+} as const
+
+type TransactionWithRelations = Prisma.TransactionGetPayload<{ include: typeof transactionInclude }>
+
 export class ReceivedCryptoTransactionController {
   private readonly logPrefix = '[ReceivedCryptoTransaction]'
 
@@ -63,26 +72,131 @@ export class ReceivedCryptoTransactionController {
     }
   }
 
+  private async getClientOrRefund(
+    message: TransactionQueueMessage,
+    logPrefix: string,
+  ): Promise<PrismaClientInstance | undefined> {
+    try {
+      return await this.dbClientProvider.getClient()
+    }
+    catch (paymentError) {
+      this.logger.error(
+        `${logPrefix}: Payment processing error:`,
+        paymentError,
+      )
+      await this.sendRefund(message)
+      return undefined
+    }
+  }
+
+  private async handlePaymentFailure(
+    prismaClient: PrismaClientInstance,
+    transactionRecord: TransactionWithRelations,
+    message: TransactionQueueMessage,
+    logPrefix: string,
+    paymentError: unknown,
+  ): Promise<void> {
+    this.logger.error(
+      `${logPrefix}: Payment processing error:`,
+      paymentError,
+    )
+    const failedTransaction = await this.updateTransactionStatus(
+      prismaClient,
+      transactionRecord.id,
+      TransactionStatus.PAYMENT_FAILED,
+    )
+    await this.notifyTransactionUpdate(failedTransaction, logPrefix, 'error')
+
+    const refundResult = await this.sendRefund(message)
+    await this.recordRefundOnChainId(prismaClient, transactionRecord.id, refundResult)
+  }
+
+  private async handleWrongAmount(
+    prismaClient: PrismaClientInstance,
+    transactionRecord: TransactionWithRelations,
+    message: TransactionQueueMessage,
+    logPrefix: string,
+  ): Promise<void> {
+    this.logger.warn(
+      `${logPrefix}: Transaction amount does not match quote:`,
+      message.amount,
+      transactionRecord.quote.sourceAmount,
+    )
+
+    const updatedTransaction = await this.updateTransactionStatus(
+      prismaClient,
+      transactionRecord.id,
+      TransactionStatus.WRONG_AMOUNT,
+    )
+    await this.notifyTransactionUpdate(updatedTransaction, logPrefix, 'wrong amount')
+
+    const refundResult = await this.sendRefund(message)
+    await this.recordRefundOnChainId(prismaClient, transactionRecord.id, refundResult)
+  }
+
+  private async markTransactionProcessing(
+    prismaClient: PrismaClientInstance,
+    message: TransactionQueueMessage,
+    logPrefix: string,
+  ): Promise<TransactionWithRelations | undefined> {
+    try {
+      const transactionRecord = await prismaClient.transaction.update({
+        data: {
+          onChainId: message.onChainId,
+          status: TransactionStatus.PROCESSING_PAYMENT,
+        },
+        include: transactionInclude,
+        where: {
+          id: message.transactionId,
+          status: TransactionStatus.AWAITING_PAYMENT,
+        },
+      })
+      await this.notifyTransactionUpdate(transactionRecord, logPrefix, 'processing')
+      return transactionRecord
+    }
+    catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+        this.logger.warn(
+          `${logPrefix}: Transaction not found or already processed:`,
+          message.transactionId,
+        )
+        return undefined
+      }
+      this.logger.error(
+        `${logPrefix}: Error updating transaction:`,
+        error,
+      )
+      return undefined
+    }
+  }
+
+  private async notifyTransactionUpdate(
+    transaction: TransactionWithRelations,
+    logPrefix: string,
+    context: string,
+  ): Promise<void> {
+    this.webhookNotifier.notifyWebhook(transaction.partnerUser.partner.webhookUrl, { data: transaction, event: WebhookEvent.TRANSACTION_CREATED })
+    try {
+      await this.queueHandler.postMessage(QueueName.USER_NOTIFICATION, {
+        payload: JSON.stringify(transaction),
+        type: 'transaction.updated',
+        userId: transaction.partnerUser.userId,
+      })
+    }
+    catch (error) {
+      const warningContext = error instanceof Error ? error : new Error(String(error))
+      this.logger.warn(`${logPrefix}: Failed to publish ws notification (${context})`, warningContext)
+    }
+  }
+
   /**
    * Processes a transaction message from the queue.
    */
   private async onTransactionReceived(
     msg: Record<string, boolean | number | string>,
   ): Promise<void> {
-    if (!msg || Object.keys(msg).length === 0) {
-      this.logger.warn(
-        `${this.logPrefix}: Received empty message. Skipping...`,
-      )
-      return
-    }
-
-    // Validate and parse the message early
-    let message: TransactionQueueMessage
-    try {
-      message = TransactionQueueMessageSchema.parse(msg)
-    }
-    catch (error) {
-      this.logger.error(`${this.logPrefix}: Invalid message format:`, error)
+    const message = this.parseMessage(msg)
+    if (!message) {
       return
     }
     const logPrefix = `${this.logPrefix}:${message.blockchain}`
@@ -90,115 +204,70 @@ export class ReceivedCryptoTransactionController {
       `${logPrefix}: Received transaction from queue:`,
       message.onChainId,
     )
-    let prismaClient: Awaited<ReturnType<IDatabaseClientProvider['getClient']>>
-    try {
-      prismaClient = await this.dbClientProvider.getClient()
-    }
-    catch (paymentError) {
-      this.logger.error(
-        `${logPrefix}: Payment processing error:`,
-        paymentError,
-      )
-      const walletHandler = this.walletHandlerFactory.getWalletHandler(
-        message.blockchain,
-      )
-      await walletHandler.send({
-        address: message.addressFrom,
-        amount: message.amount,
-        cryptoCurrency: message.cryptoCurrency,
-      })
+
+    const prismaClient = await this.getClientOrRefund(message, logPrefix)
+    if (!prismaClient) {
       return
     }
 
-    let transactionRecord: Prisma.TransactionGetPayload<{
-      include: { partnerUser: { include: { partner: true } }, quote: true }
-    }>
-    try {
-      // Execute DB operations in a transaction block
-      transactionRecord = await prismaClient.transaction.update({
-        data: {
-          onChainId: message.onChainId,
-          status: TransactionStatus.PROCESSING_PAYMENT,
-        },
-        include: { partnerUser: { include: { partner: true } }, quote: true },
-        where: {
-          id: message.transactionId,
-          status: TransactionStatus.AWAITING_PAYMENT,
-        },
-      })
-      this.webhookNotifier.notifyWebhook(transactionRecord.partnerUser.partner.webhookUrl, { data: transactionRecord, event: WebhookEvent.TRANSACTION_CREATED })
-      // Publish ws notification
-      try {
-        await this.queueHandler.postMessage(QueueName.USER_NOTIFICATION, {
-          payload: JSON.stringify(transactionRecord),
-          type: 'transaction.updated',
-          userId: transactionRecord.partnerUser.userId,
-        })
-      }
-      catch (e) {
-        this.logger.warn('[ReceivedCryptoTransaction] Failed to publish ws notification (processing)', e as Error)
-      }
-    }
-    catch (error) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError) {
-        if (error.code === 'P2025') {
-          this.logger.warn(
-            `${logPrefix}: Transaction not found or already processed:`,
-            message.transactionId,
-          )
-          return
-        }
-      }
-      this.logger.error(
-        `${logPrefix}: Error updating transaction:`,
-        error,
-      )
+    const transactionRecord = await this.markTransactionProcessing(
+      prismaClient,
+      message,
+      logPrefix,
+    )
+    if (!transactionRecord) {
       return
     }
 
-    // Validate that the amount in the message matches the expected quote
-    if (message.amount < transactionRecord.quote.sourceAmount) {
+    const hasMismatchedAmount = message.amount < transactionRecord.quote.sourceAmount
+    if (hasMismatchedAmount) {
+      await this.handleWrongAmount(prismaClient, transactionRecord, message, logPrefix)
+      return
+    }
+
+    await this.processPayment(prismaClient, transactionRecord, message, logPrefix)
+  }
+
+  private parseMessage(msg: Record<string, boolean | number | string>): TransactionQueueMessage | undefined {
+    if (!msg || Object.keys(msg).length === 0) {
       this.logger.warn(
-        `${logPrefix}: Transaction amount does not match quote:`,
-        message.amount,
-        transactionRecord.quote.sourceAmount,
+        `${this.logPrefix}: Received empty message. Skipping...`,
       )
-      const transaction = await prismaClient.transaction.update({
-        data: { status: TransactionStatus.WRONG_AMOUNT },
-        where: { id: transactionRecord.id },
-      })
-      this.webhookNotifier.notifyWebhook(transactionRecord.partnerUser.partner.webhookUrl, { data: transaction, event: WebhookEvent.TRANSACTION_CREATED })
-      // Publish ws notification
-      try {
-        const full = await prismaClient.transaction.findUnique({
-          include: { partnerUser: { include: { partner: true } }, quote: true },
-          where: { id: transaction.id },
-        })
-        await this.queueHandler.postMessage(QueueName.USER_NOTIFICATION, {
-          payload: JSON.stringify(full ?? transaction),
-          type: 'transaction.updated',
-          userId: transactionRecord.partnerUser.userId,
-        })
-      }
-      catch (e) {
-        this.logger.warn('[ReceivedCryptoTransaction] Failed to publish ws notification (wrong amount)', e as Error)
-      }
-
-      const walletHandler = this.walletHandlerFactory.getWalletHandler(message.blockchain)
-      const refundResult = await walletHandler.send({
-        address: message.addressFrom,
-        amount: message.amount,
-        cryptoCurrency: message.cryptoCurrency,
-      })
-      await this.recordRefundOnChainId(prismaClient, transactionRecord.id, refundResult)
-      return
+      return undefined
     }
 
+    const parsedMessage = TransactionQueueMessageSchema.safeParse(msg)
+    if (!parsedMessage.success) {
+      this.logger.error(`${this.logPrefix}: Invalid message format:`, parsedMessage.error)
+      return undefined
+    }
+
+    return parsedMessage.data
+  }
+
+  private async persistExternalId(
+    prismaClient: PrismaClientInstance,
+    transactionId: string,
+    externalId: string,
+  ): Promise<void> {
+    await prismaClient.transaction.update({
+      data: {
+        externalId,
+      },
+      where: { id: transactionId },
+    })
+  }
+
+  private async processPayment(
+    prismaClient: PrismaClientInstance,
+    transactionRecord: TransactionWithRelations,
+    message: TransactionQueueMessage,
+    logPrefix: string,
+  ): Promise<void> {
     const paymentService = this.paymentServiceFactory.getPaymentService(
       transactionRecord.quote.paymentMethod,
     )
 
-    // Process the payment and update the transaction accordingly
     try {
       const paymentResponse = await paymentService.sendPayment({
         account: transactionRecord.accountNumber,
@@ -208,17 +277,15 @@ export class ReceivedCryptoTransactionController {
         value: transactionRecord.quote.targetAmount,
       })
 
-      if (paymentResponse.success) {
-        await prismaClient.transaction.update({
-          data: {
-            externalId: paymentResponse.transactionId,
-          },
-          where: { id: transactionRecord.id },
-        })
+      if (paymentResponse.success && paymentResponse.transactionId) {
+        await this.persistExternalId(prismaClient, transactionRecord.id, paymentResponse.transactionId)
       }
 
       if (paymentService.isAsync && paymentResponse.success) {
-        // Handle async payment success via webhook
+        this.logger.info(
+          `${logPrefix}: Payment dispatched for async confirmation`,
+          transactionRecord.id,
+        )
         return
       }
 
@@ -226,100 +293,51 @@ export class ReceivedCryptoTransactionController {
         ? TransactionStatus.PAYMENT_COMPLETED
         : TransactionStatus.PAYMENT_FAILED
 
-      const transaction = await prismaClient.transaction.update({
-        data: { status: newStatus },
-        where: { id: transactionRecord.id },
-      })
-      this.webhookNotifier.notifyWebhook(transactionRecord.partnerUser.partner.webhookUrl, { data: transaction, event: WebhookEvent.TRANSACTION_CREATED })
-      // Publish ws notification
-      try {
-        const full = await prismaClient.transaction.findUnique({
-          include: { partnerUser: { include: { partner: true } }, quote: true },
-          where: { id: transaction.id },
-        })
-        await this.queueHandler.postMessage(QueueName.USER_NOTIFICATION, {
-          payload: JSON.stringify(full ?? transaction),
-          type: 'transaction.updated',
-          userId: transactionRecord.partnerUser.userId,
-        })
-      }
-      catch (e) {
-        this.logger.warn('[ReceivedCryptoTransaction] Failed to publish ws notification (final)', e as Error)
-      }
-
-      this.logger.info(
-        `${logPrefix}: Payment ${paymentResponse.success ? 'completed' : 'failed'} for transaction:`,
+      const updatedTransaction = await this.updateTransactionStatus(
+        prismaClient,
         transactionRecord.id,
+        newStatus,
       )
+      await this.notifyTransactionUpdate(updatedTransaction, logPrefix, 'final')
 
       if (paymentResponse.success) {
         this.slackNotifier.sendMessage(
           `Payment completed for transaction: ${transactionRecord.id}, ${transactionRecord.quote.sourceAmount} ${transactionRecord.quote.cryptoCurrency} -> ${transactionRecord.quote.targetAmount} ${transactionRecord.quote.targetCurrency}, Partner: ${transactionRecord.partnerUser.partner.name}`,
         )
 
-        this.queueHandler.postMessage(QueueName.PAYMENT_SENT, {
-          amount: transactionRecord.quote.sourceAmount,
-          blockchain: BlockchainNetwork.STELLAR,
-          cryptoCurrency: transactionRecord.quote.cryptoCurrency,
-          paymentMethod: transactionRecord.quote.paymentMethod,
-          targetCurrency: transactionRecord.quote.targetCurrency,
-        } satisfies PaymentSentMessage)
+        await this.publishPaymentSentMessage(transactionRecord)
       }
       else {
         this.slackNotifier.sendMessage(
           `Payment failed for transaction: ${transactionRecord.id}, ${transactionRecord.quote.sourceAmount} ${transactionRecord.quote.cryptoCurrency} -> ${transactionRecord.quote.targetAmount} ${transactionRecord.quote.targetCurrency}, Partner: ${transactionRecord.partnerUser.partner.name}`,
         )
-        const walletHandler = this.walletHandlerFactory.getWalletHandler(
-          message.blockchain,
-        )
-        const refundResult = await walletHandler.send({
-          address: message.addressFrom,
-          amount: message.amount,
-          cryptoCurrency: message.cryptoCurrency,
-        })
+        const refundResult = await this.sendRefund(message)
         await this.recordRefundOnChainId(prismaClient, transactionRecord.id, refundResult)
       }
     }
     catch (paymentError) {
-      this.logger.error(
-        `${logPrefix}: Payment processing error:`,
-        paymentError,
-      )
-      const transaction = await prismaClient.transaction.update({
-        data: { status: TransactionStatus.PAYMENT_FAILED },
-        where: { id: transactionRecord.id },
-      })
-      this.webhookNotifier.notifyWebhook(transactionRecord.partnerUser.partner.webhookUrl, { data: transaction, event: WebhookEvent.TRANSACTION_CREATED })
-      // Publish ws notification
-      try {
-        const full = await prismaClient.transaction.findUnique({
-          include: { partnerUser: { include: { partner: true } }, quote: true },
-          where: { id: transaction.id },
-        })
-        await this.queueHandler.postMessage(QueueName.USER_NOTIFICATION, {
-          payload: JSON.stringify(full ?? transaction),
-          type: 'transaction.updated',
-          userId: transactionRecord.partnerUser.userId,
-        })
-      }
-      catch (e) {
-        this.logger.warn('[ReceivedCryptoTransaction] Failed to publish ws notification (error)', e as Error)
-      }
+      await this.handlePaymentFailure(prismaClient, transactionRecord, message, logPrefix, paymentError)
+    }
+  }
 
-      const walletHandler = this.walletHandlerFactory.getWalletHandler(
-        message.blockchain,
-      )
-      const refundResult = await walletHandler.send({
-        address: message.addressFrom,
-        amount: message.amount,
-        cryptoCurrency: message.cryptoCurrency,
-      })
-      await this.recordRefundOnChainId(prismaClient, transactionRecord.id, refundResult)
+  private async publishPaymentSentMessage(transactionRecord: TransactionWithRelations): Promise<void> {
+    try {
+      await this.queueHandler.postMessage(QueueName.PAYMENT_SENT, {
+        amount: transactionRecord.quote.sourceAmount,
+        blockchain: BlockchainNetwork.STELLAR,
+        cryptoCurrency: transactionRecord.quote.cryptoCurrency,
+        paymentMethod: transactionRecord.quote.paymentMethod,
+        targetCurrency: transactionRecord.quote.targetCurrency,
+      } satisfies PaymentSentMessage)
+    }
+    catch (error) {
+      const warningContext = error instanceof Error ? error : new Error(String(error))
+      this.logger.warn(`${this.logPrefix}: Failed to publish payment sent notification`, warningContext)
     }
   }
 
   private async recordRefundOnChainId(
-    prismaClient: Awaited<ReturnType<IDatabaseClientProvider['getClient']>>,
+    prismaClient: PrismaClientInstance,
     transactionId: string,
     refundResult: { success: boolean, transactionId?: string },
   ): Promise<void> {
@@ -343,5 +361,26 @@ export class ReceivedCryptoTransactionController {
         error,
       )
     }
+  }
+
+  private async sendRefund(message: TransactionQueueMessage): Promise<{ success: boolean, transactionId?: string }> {
+    const walletHandler = this.walletHandlerFactory.getWalletHandler(message.blockchain)
+    return walletHandler.send({
+      address: message.addressFrom,
+      amount: message.amount,
+      cryptoCurrency: message.cryptoCurrency,
+    })
+  }
+
+  private async updateTransactionStatus(
+    prismaClient: PrismaClientInstance,
+    transactionId: string,
+    status: TransactionStatus,
+  ): Promise<TransactionWithRelations> {
+    return prismaClient.transaction.update({
+      data: { status },
+      include: transactionInclude,
+      where: { id: transactionId },
+    })
   }
 }

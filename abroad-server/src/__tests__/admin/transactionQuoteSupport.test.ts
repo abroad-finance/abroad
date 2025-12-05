@@ -289,7 +289,7 @@ describe('createTransactionQuoteSupport', () => {
     const handler = support.createCsvRouteHandler(admin)
     const status = jest.fn().mockReturnThis()
     const send = jest.fn()
-    const res = { status, send } as unknown as Response
+    const res = { send, status } as unknown as Response
 
     await handler({ query: {}, session: {} } as unknown as Request, res, jest.fn())
 
@@ -409,8 +409,8 @@ describe('transactionQuoteSupport bootstrap', () => {
 
     await jest.isolateModulesAsync(async () => {
       jest.doMock('@prisma/client', () => ({
-        Prisma: { dmmf: { datamodel: { models: [] } } },
         KycStatus: { APPROVED: 'APPROVED' },
+        Prisma: { dmmf: { datamodel: { models: [] } } },
         TransactionStatus: { PAYMENT_COMPLETED: 'PAYMENT_COMPLETED' },
       }))
 

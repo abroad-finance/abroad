@@ -42,16 +42,16 @@ async function loadInitAdmin() {
       }
     }
     class MockAdminJS {
+      public static ComponentLoader = MockComponentLoader
+      public static registerAdapter = registerAdapter
+      public initialize = initialize
       public options: unknown
       public watch = watch
-      public initialize = initialize
-      public static registerAdapter = registerAdapter
-      public static ComponentLoader = MockComponentLoader
       constructor(options: unknown) {
         this.options = options
       }
     }
-    return { __esModule: true, default: MockAdminJS, ComponentLoader: MockComponentLoader }
+    return { __esModule: true, ComponentLoader: MockComponentLoader, default: MockAdminJS }
   }, { virtual: true })
 
   jest.doMock('@adminjs/express', () => ({
@@ -118,7 +118,7 @@ describe('initAdmin', () => {
     process.env.NODE_ENV = 'test'
     const appUse = jest.fn()
     const app = { use: appUse } as unknown as Express
-    const { initAdmin, registerAdapter, quoteSupport, authRouterGet, initialize, watch } = await loadInitAdmin()
+    const { authRouterGet, initAdmin, initialize, quoteSupport, registerAdapter, watch } = await loadInitAdmin()
 
     await initAdmin(app)
 
@@ -149,7 +149,7 @@ describe('initAdmin', () => {
     process.env.ADMIN_EMAIL = 'admin@test.com'
     process.env.ADMIN_PASSWORD = 'secret'
     const app = { use: jest.fn() } as unknown as Express
-    const { initAdmin, buildAuthenticatedRouter } = await loadInitAdmin()
+    const { buildAuthenticatedRouter, initAdmin } = await loadInitAdmin()
 
     await initAdmin(app)
 

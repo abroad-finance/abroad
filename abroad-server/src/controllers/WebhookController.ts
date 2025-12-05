@@ -1,4 +1,4 @@
-import { KycStatus, TargetCurrency } from '@prisma/client'
+import { TargetCurrency } from '@prisma/client'
 import { Request as RequestExpress } from 'express'
 import { inject } from 'inversify'
 import {
@@ -17,63 +17,22 @@ import { z } from 'zod'
 
 import { ILogger, IQueueHandler, PaymentStatusUpdatedMessage, QueueName } from '../interfaces'
 import { IDatabaseClientProvider } from '../interfaces/IDatabaseClientProvider'
+import { GuardlineWebhookRequest } from '../services/webhooks/guardlineSchema'
+import { GuardlineWebhookService } from '../services/webhooks/GuardlineWebhookService'
+import { PersonaWebhookService } from '../services/webhooks/PersonaWebhookService'
+import { WebhookProcessingResult } from '../services/webhooks/types'
 import { TYPES } from '../types'
-
-// Guardline webhook payload validation schema
-const guardlineWebhookSchema = z.object({
-  workflow_instance_id: z.string().min(1).optional(),
-}).loose() // Allow excess properties
-
-enum PersonaStatusEnum {
-  Approved = 'approved',
-  Completed = 'completed',
-  Created = 'created',
-  Declined = 'declined',
-  Expired = 'expired',
-  Failed = 'failed',
-  NeedsReview = 'needs_review',
-  Pending = 'pending',
-}
-
-interface GuardlineWebhookRequest {
-  [key: string]: unknown // Allow excess properties
-  workflow_instance_id?: string
-}
 
 interface GuardlineWebhookResponse {
   message?: string
   success: boolean
 }
 
-type PersonaStatus = 'approved'
-  | 'completed'
-  | 'created'
-  | 'declined'
-  | 'expired'
-  | 'failed'
-  | 'needs_review'
-  | 'pending'
-
-// ---------------- Persona webhook schema ----------------
-const personaWebhookSchema = z.object({
-  data: z.object({
-    attributes: z.object({
-      payload: z.object({
-        data: z.object({
-          attributes: z.object({
-            status: z.enum(PersonaStatusEnum),
-          }),
-          id: z.string().min(1), // Persona Inquiry ID
-        }),
-      }),
-    }),
-  }),
-}).loose()
-
-type PersonaWebhookPayload = z.infer<typeof personaWebhookSchema>
-
 @Route('webhook')
 export class WebhookController extends Controller {
+  private readonly guardlineWebhookService: GuardlineWebhookService
+
+  private readonly personaWebhookService: PersonaWebhookService
   constructor(
     @inject(TYPES.IDatabaseClientProvider)
     private dbProvider: IDatabaseClientProvider,
@@ -83,6 +42,8 @@ export class WebhookController extends Controller {
     private queueHandler: IQueueHandler,
   ) {
     super()
+    this.guardlineWebhookService = new GuardlineWebhookService(this.dbProvider, this.logger)
+    this.personaWebhookService = new PersonaWebhookService(this.dbProvider, this.logger, this.queueHandler)
   }
 
   /**
@@ -104,103 +65,8 @@ export class WebhookController extends Controller {
     @Res() notFound: TsoaResponse<404, { message: string, success: false }>,
     @Res() serverError: TsoaResponse<500, { message: string, success: false }>,
   ): Promise<GuardlineWebhookResponse> {
-    try {
-      // Log the incoming webhook payload
-      this.logger.info('Received Guardline webhook', {
-        headers: request.headers,
-        payload: body,
-      })
-
-      // Validate the webhook payload
-      const validation = guardlineWebhookSchema.safeParse(body)
-      if (!validation.success) {
-        this.logger.error('Invalid Guardline webhook payload', {
-          errors: validation.error.issues,
-          payload: body,
-        })
-        return badRequest(400, {
-          message: 'Invalid webhook payload format',
-          success: false,
-        })
-      }
-
-      const { workflow_instance_id } = validation.data
-      const externalId = workflow_instance_id
-
-      if (!externalId) {
-        this.logger.error('Missing workflow_instance_id in Guardline webhook', { payload: body })
-        return badRequest(400, {
-          message: 'Missing instance_id or process_id',
-          success: false,
-        })
-      }
-
-      this.logger.info('Processing Guardline webhook', {
-        externalId,
-      })
-
-      const prisma = await this.dbProvider.getClient()
-
-      // Find the KYC record by external ID
-      const kycRecord = await prisma.partnerUserKyc.findFirst({
-        include: {
-          partnerUser: {
-            include: {
-              partner: true,
-            },
-          },
-        },
-        where: { externalId },
-      })
-
-      if (!kycRecord) {
-        this.logger.warn('KYC record not found for external ID', { externalId })
-        return notFound(404, {
-          message: 'KYC session not found',
-          success: false,
-        })
-      }
-
-      // Map Guardline status to internal KYC status
-      // TODO: Implement a more comprehensive mapping if needed
-      const kycStatus = KycStatus.APPROVED
-
-      // Update the KYC record with the new status
-      await prisma.partnerUserKyc.update({
-        data: {
-          status: kycStatus,
-          updatedAt: new Date(),
-        },
-        where: { id: kycRecord.id },
-      })
-
-      this.logger.info('Updated KYC status from Guardline webhook', {
-        externalId,
-        kycRecordId: kycRecord.id,
-        newStatus: kycStatus,
-        oldStatus: kycRecord.status,
-        partnerId: kycRecord.partnerUser.partner.id,
-        partnerUserId: kycRecord.partnerUserId,
-      })
-
-      this.setStatus(200)
-      return {
-        message: 'Webhook processed successfully',
-        success: true,
-      }
-    }
-    catch (error) {
-      this.logger.error('Error processing Guardline webhook', {
-        error: error instanceof Error ? error.message : 'Unknown error',
-        payload: body,
-        stack: error instanceof Error ? error.stack : undefined,
-      })
-
-      return serverError(500, {
-        message: 'Internal server error',
-        success: false,
-      })
-    }
+    const result = await this.guardlineWebhookService.processWebhook(body, request)
+    return this.resolveWebhookResponse(result, badRequest, notFound, serverError)
   }
 
   /**
@@ -224,117 +90,8 @@ export class WebhookController extends Controller {
     @Res() notFound: TsoaResponse<404, { message: string, success: false }>,
     @Res() serverError: TsoaResponse<500, { message: string, success: false }>,
   ): Promise<{ message?: string, success: boolean }> {
-    try {
-      this.logger.info('Received Persona webhook', {
-        headers: request.headers,
-        payload: body,
-      })
-      // TODO: Add HMAC signature verification
-
-      // Validate payload shape
-      const parsed = personaWebhookSchema.safeParse(body)
-      if (!parsed.success) {
-        this.logger.error('Invalid Persona webhook payload', {
-          errors: parsed.error.issues,
-          payload: body,
-        })
-        return badRequest(400, { message: 'Invalid webhook payload format', success: false })
-      }
-
-      const payload: PersonaWebhookPayload = parsed.data
-      const inquiryId = payload.data.attributes.payload.data.id
-      const status = payload.data.attributes.payload.data.attributes.status
-
-      this.logger.info('Processing Persona webhook', {
-        inquiryId,
-        status,
-      })
-
-      const prisma = await this.dbProvider.getClient()
-
-      // Try to find the KYC record either by the Persona inquiry id or the reference_id
-      const kycRecord = await prisma.partnerUserKyc.findFirst({
-        include: {
-          partnerUser: {
-            include: { partner: true },
-          },
-        },
-        where: {
-          OR: [
-            { externalId: inquiryId },
-          ],
-        },
-      })
-
-      if (!kycRecord) {
-        this.logger.warn('KYC record not found for Persona inquiry', {
-          inquiryId,
-        })
-        return notFound(404, { message: 'KYC session not found', success: false })
-      }
-
-      const newStatus = this.mapPersonaToKycStatus(status)
-
-      // If no effective status change, acknowledge without writing
-      if (newStatus === kycRecord.status) {
-        this.logger.info('Persona webhook: status unchanged', {
-          inquiryId,
-          kycRecordId: kycRecord.id,
-          status: newStatus,
-        })
-        this.setStatus(200)
-        return { message: 'Webhook processed successfully', success: true }
-      }
-
-      await prisma.partnerUserKyc.update({
-        data: {
-          status: newStatus,
-          updatedAt: new Date(),
-        },
-        where: { id: kycRecord.id },
-      })
-
-      this.logger.info('Updated KYC status from Persona webhook', {
-        inquiryId,
-        kycRecordId: kycRecord.id,
-        newStatus,
-        oldStatus: kycRecord.status,
-        partnerId: kycRecord.partnerUser.partner.id,
-        partnerUserId: kycRecord.partnerUserId,
-      })
-
-      // Emit websocket notification for the user
-      try {
-        await this.queueHandler.postMessage(QueueName.USER_NOTIFICATION, {
-          payload: JSON.stringify({
-            externalId: inquiryId,
-            kycId: kycRecord.id,
-            newStatus,
-            oldStatus: kycRecord.status,
-            partnerId: kycRecord.partnerUser.partner.id,
-            partnerUserId: kycRecord.partnerUserId,
-            provider: 'persona',
-            updatedAt: new Date().toISOString(),
-          }),
-          type: 'kyc.updated',
-          userId: kycRecord.partnerUser.userId,
-        })
-      }
-      catch (notifyErr) {
-        this.logger.warn('Failed to publish kyc.updated notification (persona)', notifyErr)
-      }
-
-      this.setStatus(200)
-      return { message: 'Webhook processed successfully', success: true }
-    }
-    catch (error) {
-      this.logger.error('Error processing Persona webhook', {
-        error: error instanceof Error ? error.message : 'Unknown error',
-        payload: body,
-        stack: error instanceof Error ? error.stack : undefined,
-      })
-      return serverError(500, { message: 'Internal server error', success: false })
-    }
+    const result = await this.personaWebhookService.processWebhook(body, request)
+    return this.resolveWebhookResponse(result, badRequest, notFound, serverError)
   }
 
   /**
@@ -400,35 +157,25 @@ export class WebhookController extends Controller {
     }
   }
 
-  /**
-   * Maps Persona inquiry status/decision to internal KYC status
-   * Heuristics:
-   * - decision: "approved" => APPROVED, "declined" => REJECTED
-   * - otherwise fall back to status:
-   *   "completed" w/o decision => PENDING (neutral)
-   *   "processing" / "pending" / "requires_input" => PENDING
-   *   "expired" / "failed" => REJECTED
-   */
-  private mapPersonaToKycStatus(status?: PersonaStatus): KycStatus {
-    switch (status) {
-      case 'approved':
-        return KycStatus.APPROVED
-
-      case 'declined':
-      case 'expired':
-      case 'failed':
-        return KycStatus.REJECTED
-
-      case 'needs_review':
-        return KycStatus.PENDING_APPROVAL
-
-      case 'completed':
-      case 'created':
-      case 'pending':
-      case undefined:
-      default:
-        // If completed but no decision provided, keep pending to avoid false positives
-        return KycStatus.PENDING
+  private resolveWebhookResponse(
+    result: WebhookProcessingResult,
+    badRequest: TsoaResponse<400, { message: string, success: false }>,
+    notFound: TsoaResponse<404, { message: string, success: false }>,
+    serverError: TsoaResponse<500, { message: string, success: false }>,
+  ): { message?: string, success: boolean } {
+    if (result.status === 'bad_request') {
+      return badRequest(400, result.payload)
     }
+
+    if (result.status === 'not_found') {
+      return notFound(404, result.payload)
+    }
+
+    if (result.status === 'error') {
+      return serverError(500, result.payload)
+    }
+
+    this.setStatus(200)
+    return result.payload
   }
 }

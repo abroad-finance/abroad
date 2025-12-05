@@ -1,9 +1,8 @@
 import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
-
-import escomplex, { type ModuleReport } from 'typhonjs-escomplex'
 import ts from 'typescript'
+import escomplex, { type ModuleReport } from 'typhonjs-escomplex'
 
 import * as maintainabilityReport from '../../scripts/maintainability-report'
 
@@ -16,19 +15,6 @@ afterEach(async () => {
   await Promise.all(cleanups.map(cleanup => cleanup()))
   process.exitCode = undefined
 })
-
-async function createTempDir(prefix: string = 'maintainability-'): Promise<string> {
-  const dir = await fs.mkdtemp(path.join(os.tmpdir(), prefix))
-  tempCleanups.push(() => fs.rm(dir, { force: true, recursive: true }))
-  return dir
-}
-
-async function writeTempFile(root: string, relativePath: string, content: string): Promise<string> {
-  const fullPath = path.join(root, relativePath)
-  await fs.mkdir(path.dirname(fullPath), { recursive: true })
-  await fs.writeFile(fullPath, content, 'utf8')
-  return fullPath
-}
 
 function buildModuleReport(overrides: Partial<ModuleReport> = {}): ModuleReport {
   return {
@@ -64,6 +50,19 @@ function buildModuleReport(overrides: Partial<ModuleReport> = {}): ModuleReport 
     srcPath: overrides.srcPath ?? 'sample.ts',
     srcPathAlias: overrides.srcPathAlias,
   }
+}
+
+async function createTempDir(prefix: string = 'maintainability-'): Promise<string> {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), prefix))
+  tempCleanups.push(() => fs.rm(dir, { force: true, recursive: true }))
+  return dir
+}
+
+async function writeTempFile(root: string, relativePath: string, content: string): Promise<string> {
+  const fullPath = path.join(root, relativePath)
+  await fs.mkdir(path.dirname(fullPath), { recursive: true })
+  await fs.writeFile(fullPath, content, 'utf8')
+  return fullPath
 }
 
 describe('parseCliOptions and normalization helpers', () => {
@@ -220,7 +219,7 @@ describe('formatting helpers', () => {
 
   it('builds maintainability rows and tables with sorted output', () => {
     const rows = maintainabilityReport.buildMaintainabilityRows([
-      buildModuleReport({ maintainability: 120, aggregate: { ...buildModuleReport().aggregate, sloc: { logical: 2, physical: 3 } } }),
+      buildModuleReport({ aggregate: { ...buildModuleReport().aggregate, sloc: { logical: 2, physical: 3 } }, maintainability: 120 }),
     ])
     const sorted = maintainabilityReport.sortRows([
       { ...rows[0], maintainabilityIndex: 200 },
@@ -312,7 +311,7 @@ describe('analysis orchestration', () => {
     const outputPath = path.join(root, 'report.json')
 
     const analyzeSpy = jest.spyOn(escomplex, 'analyzeProject').mockReturnValue({
-      modules: [buildModuleReport({ maintainability: 150, srcPath: 'index.ts', filePath: path.join(root, 'index.ts') })],
+      modules: [buildModuleReport({ filePath: path.join(root, 'index.ts'), maintainability: 150, srcPath: 'index.ts' })],
       settings: {},
     })
     const logSpy = jest.spyOn(console, 'log').mockImplementation(() => undefined)
@@ -337,7 +336,7 @@ describe('analysis orchestration', () => {
     const root = await createTempDir('maintainability-diag-')
     await writeTempFile(root, 'index.ts', 'export const value =')
     jest.spyOn(escomplex, 'analyzeProject').mockReturnValue({
-      modules: [buildModuleReport({ srcPath: 'index.ts', filePath: path.join(root, 'index.ts') })],
+      modules: [buildModuleReport({ filePath: path.join(root, 'index.ts'), srcPath: 'index.ts' })],
       settings: {},
     })
     const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => undefined)

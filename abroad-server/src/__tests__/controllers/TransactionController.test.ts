@@ -1,13 +1,13 @@
 import 'reflect-metadata'
-import { NotFound } from 'http-errors'
 import { TransactionStatus } from '@prisma/client'
+import { NotFound } from 'http-errors'
 
 import type { IQueueHandler } from '../../interfaces'
 import type { IDatabaseClientProvider } from '../../interfaces/IDatabaseClientProvider'
 import type { IKycService } from '../../interfaces/IKycService'
+import type { IPaymentService } from '../../interfaces/IPaymentService'
 import type { IPaymentServiceFactory } from '../../interfaces/IPaymentServiceFactory'
 import type { IWebhookNotifier } from '../../interfaces/IWebhookNotifier'
-import type { IPaymentService } from '../../interfaces/IPaymentService'
 
 import { TransactionController } from '../../controllers/TransactionController'
 
@@ -102,38 +102,38 @@ describe('TransactionController acceptance flows', () => {
 
   const buildAcceptController = (
     overrides?: Partial<{
-      quote: unknown
+      kycLink: null | string
+      needsKyc: boolean
+      partnerIsKybApproved: boolean
       paymentService: {
+        getLiquidity: jest.Mock
         MAX_TOTAL_AMOUNT_PER_DAY: number
         MAX_USER_TRANSACTIONS_PER_DAY: number
-        getLiquidity: jest.Mock
         verifyAccount: jest.Mock
       }
-      needsKyc: boolean
-      kycLink: string | null
-      transactionFindMany: unknown[][]
-      partnerIsKybApproved: boolean
+      quote: unknown
       transactionCreate: () => Promise<unknown>
+      transactionFindMany: unknown[][]
       transactionFindUnique: () => Promise<unknown>
     }>,
   ) => {
     const quoteValue = overrides?.quote === undefined ? baseQuote : overrides.quote
     const transactionId = '11111111-2222-3333-4444-555555555555'
     const prisma = {
-      partnerUser: { upsert: jest.fn().mockResolvedValue({ id: 'pu-1', userId: 'user-1', partnerId: partner.id }) },
+      partnerUser: { upsert: jest.fn().mockResolvedValue({ id: 'pu-1', partnerId: partner.id, userId: 'user-1' }) },
       partnerUserKyc: { findFirst: jest.fn().mockResolvedValue({ link: 'kyc-link', status: 'PENDING' }) },
       quote: { findUnique: jest.fn().mockResolvedValue(quoteValue) },
       transaction: {
         create: jest.fn(overrides?.transactionCreate ?? (async () => ({ id: transactionId }))),
         findMany: jest.fn(),
-        findUnique: jest.fn(overrides?.transactionFindUnique ?? (async () => ({ id: transactionId, partnerUser: { userId: 'user-1', partnerId: partner.id }, quote: baseQuote }))),
+        findUnique: jest.fn(overrides?.transactionFindUnique ?? (async () => ({ id: transactionId, partnerUser: { partnerId: partner.id, userId: 'user-1' }, quote: baseQuote }))),
       },
     }
 
     const paymentService = {
+      getLiquidity: overrides?.paymentService?.getLiquidity ?? jest.fn().mockResolvedValue(1_000),
       MAX_TOTAL_AMOUNT_PER_DAY: overrides?.paymentService?.MAX_TOTAL_AMOUNT_PER_DAY ?? 500,
       MAX_USER_TRANSACTIONS_PER_DAY: overrides?.paymentService?.MAX_USER_TRANSACTIONS_PER_DAY ?? 3,
-      getLiquidity: overrides?.paymentService?.getLiquidity ?? jest.fn().mockResolvedValue(1_000),
       verifyAccount: overrides?.paymentService?.verifyAccount ?? jest.fn().mockResolvedValue(true),
     }
 
@@ -187,7 +187,7 @@ describe('TransactionController acceptance flows', () => {
   it('rejects invalid bank account data', async () => {
     const verifyAccount = jest.fn().mockResolvedValue(false)
     const { controller, prisma } = buildAcceptController({
-      paymentService: { MAX_TOTAL_AMOUNT_PER_DAY: 500, MAX_USER_TRANSACTIONS_PER_DAY: 3, getLiquidity: jest.fn().mockResolvedValue(1000), verifyAccount },
+      paymentService: { getLiquidity: jest.fn().mockResolvedValue(1000), MAX_TOTAL_AMOUNT_PER_DAY: 500, MAX_USER_TRANSACTIONS_PER_DAY: 3, verifyAccount },
     })
 
     const response = await controller.acceptTransaction(requestBody, { user: partner } as unknown as import('express').Request, badRequest)
@@ -197,7 +197,7 @@ describe('TransactionController acceptance flows', () => {
   })
 
   it('returns a KYC link when the partner requires verification', async () => {
-    const { controller, kycService } = buildAcceptController({ needsKyc: true, kycLink: 'https://kyc.test' })
+    const { controller, kycService } = buildAcceptController({ kycLink: 'https://kyc.test', needsKyc: true })
     const response = await controller.acceptTransaction(
       requestBody,
       { user: { ...partner, needsKyc: true } } as unknown as import('express').Request,
@@ -209,12 +209,12 @@ describe('TransactionController acceptance flows', () => {
   })
 
   it('enforces per-user daily transaction limits', async () => {
-    const priorTransactions = [{ quote: { targetAmount: 10, paymentMethod: baseQuote.paymentMethod }, status: TransactionStatus.PAYMENT_COMPLETED }]
+    const priorTransactions = [{ quote: { paymentMethod: baseQuote.paymentMethod, targetAmount: 10 }, status: TransactionStatus.PAYMENT_COMPLETED }]
     const { controller, paymentService } = buildAcceptController({
       paymentService: {
+        getLiquidity: jest.fn().mockResolvedValue(1_000),
         MAX_TOTAL_AMOUNT_PER_DAY: 500,
         MAX_USER_TRANSACTIONS_PER_DAY: 1,
-        getLiquidity: jest.fn().mockResolvedValue(1_000),
         verifyAccount: jest.fn().mockResolvedValue(true),
       },
       transactionFindMany: [[], priorTransactions, [], []],
@@ -232,9 +232,9 @@ describe('TransactionController acceptance flows', () => {
     })
     const { controller } = buildAcceptController({
       paymentService: {
+        getLiquidity: liquidityError,
         MAX_TOTAL_AMOUNT_PER_DAY: 500,
         MAX_USER_TRANSACTIONS_PER_DAY: 3,
-        getLiquidity: liquidityError,
         verifyAccount: jest.fn().mockResolvedValue(true),
       },
       transactionFindMany: [[], [], [], []],
@@ -253,8 +253,8 @@ describe('TransactionController acceptance flows', () => {
 
   it('limits partners without KYB approval to small totals', async () => {
     const partnerTransactions = [
-      { quote: { sourceAmount: 60, paymentMethod: baseQuote.paymentMethod }, status: TransactionStatus.PAYMENT_COMPLETED },
-      { quote: { sourceAmount: 50, paymentMethod: baseQuote.paymentMethod }, status: TransactionStatus.PAYMENT_COMPLETED },
+      { quote: { paymentMethod: baseQuote.paymentMethod, sourceAmount: 60 }, status: TransactionStatus.PAYMENT_COMPLETED },
+      { quote: { paymentMethod: baseQuote.paymentMethod, sourceAmount: 50 }, status: TransactionStatus.PAYMENT_COMPLETED },
     ]
     const { controller } = buildAcceptController({
       partnerIsKybApproved: false,
@@ -277,10 +277,10 @@ describe('TransactionController acceptance flows', () => {
     const webhookNotifier = { notifyWebhook: jest.fn() } as unknown as IWebhookNotifier
     const fullTransactionId = '12345678-9012-3456-7890-123456789012'
     const expectedReference = Buffer.from(fullTransactionId.replace(/-/g, ''), 'hex').toString('base64')
-    const fullTransaction = { id: fullTransactionId, partnerUser: { id: 'pu-1', userId: 'user-1', partnerId: partner.id }, quote: baseQuote }
+    const fullTransaction = { id: fullTransactionId, partnerUser: { id: 'pu-1', partnerId: partner.id, userId: 'user-1' }, quote: baseQuote }
 
     const prisma = {
-      partnerUser: { upsert: jest.fn().mockResolvedValue({ id: 'pu-1', userId: 'user-1', partnerId: partner.id }) },
+      partnerUser: { upsert: jest.fn().mockResolvedValue({ id: 'pu-1', partnerId: partner.id, userId: 'user-1' }) },
       partnerUserKyc: { findFirst: jest.fn().mockResolvedValue({ link: 'kyc-link', status: 'APPROVED' }) },
       quote: { findUnique: jest.fn().mockResolvedValue(baseQuote) },
       transaction: {
@@ -290,9 +290,9 @@ describe('TransactionController acceptance flows', () => {
       },
     }
     const paymentService = {
+      getLiquidity: jest.fn().mockResolvedValue(1_000),
       MAX_TOTAL_AMOUNT_PER_DAY: 500,
       MAX_USER_TRANSACTIONS_PER_DAY: 3,
-      getLiquidity: jest.fn().mockResolvedValue(1_000),
       verifyAccount: jest.fn().mockResolvedValue(true),
     }
     const controller = new TransactionController(
@@ -338,7 +338,7 @@ describe('TransactionController status lookup', () => {
         findUnique: jest.fn().mockResolvedValue({
           id: transactionId,
           onChainId: 'on-chain-id',
-          partnerUser: { id: 'pu-1', userId: 'user-1', partnerId: 'partner-1' },
+          partnerUser: { id: 'pu-1', partnerId: 'partner-1', userId: 'user-1' },
           partnerUserId: 'pu-1',
           quote: { partnerId: 'partner-1' },
           status: TransactionStatus.PAYMENT_COMPLETED,

@@ -347,10 +347,17 @@ describe('ReceivedCryptoTransactionController.onTransactionReceived', () => {
     await handler.onTransactionReceived({ ...message, amount: 75 })
 
     expect(paymentService.sendPayment).toHaveBeenCalled()
-    expect(prismaClient.transaction.update).toHaveBeenCalledWith({
+    expect(prismaClient.transaction.update).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      data: {
+        onChainId: 'on-chain-hash',
+        status: TransactionStatus.PROCESSING_PAYMENT,
+      },
+      where: { id: processingRecord.id, status: TransactionStatus.AWAITING_PAYMENT },
+    }))
+    expect(prismaClient.transaction.update).toHaveBeenNthCalledWith(2, expect.objectContaining({
       data: { status: TransactionStatus.PAYMENT_FAILED },
       where: { id: processingRecord.id },
-    })
+    }))
     expect(walletHandler.send).toHaveBeenCalledWith({
       address: message.addressFrom,
       amount: 75,
@@ -537,11 +544,11 @@ describe('ReceivedCryptoTransactionController.onTransactionReceived', () => {
     await controller['onTransactionReceived'](message)
 
     expect(logger.warn).toHaveBeenCalledWith(
-      '[ReceivedCryptoTransaction] Failed to publish ws notification (processing)',
+      expect.stringContaining('Failed to publish ws notification (processing)'),
       expect.any(Error),
     )
     expect(logger.warn).toHaveBeenCalledWith(
-      '[ReceivedCryptoTransaction] Failed to publish ws notification (wrong amount)',
+      expect.stringContaining('Failed to publish ws notification (wrong amount)'),
       expect.any(Error),
     )
   })
@@ -650,7 +657,7 @@ describe('ReceivedCryptoTransactionController.onTransactionReceived', () => {
     await handler.onTransactionReceived(message)
 
     expect(logger.warn).toHaveBeenCalledWith(
-      '[ReceivedCryptoTransaction] Failed to publish ws notification (final)',
+      expect.stringContaining('Failed to publish ws notification (final)'),
       expect.any(Error),
     )
     expect(queueHandler.postMessage).toHaveBeenCalledTimes(3)
@@ -703,7 +710,7 @@ describe('ReceivedCryptoTransactionController.onTransactionReceived', () => {
     await handler.onTransactionReceived(message)
 
     expect(logger.warn).toHaveBeenCalledWith(
-      '[ReceivedCryptoTransaction] Failed to publish ws notification (error)',
+      expect.stringContaining('Failed to publish ws notification (error)'),
       expect.any(Error),
     )
     expect(walletHandler.send).toHaveBeenCalled()

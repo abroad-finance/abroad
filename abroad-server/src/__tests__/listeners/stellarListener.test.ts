@@ -1,16 +1,12 @@
 import { PrismaClient } from '@prisma/client'
 import * as StellarSdk from '@stellar/stellar-sdk'
 
-import { QueueName } from '../../interfaces'
 import type { IQueueHandler } from '../../interfaces'
 import type { IDatabaseClientProvider } from '../../interfaces/IDatabaseClientProvider'
 import type { ISecretManager } from '../../interfaces/ISecretManager'
-import { StellarListener } from '../../listeners/stellar'
 
-interface StreamHandlers {
-  onerror?: (err: unknown) => void
-  onmessage?: (payment: TestPayment) => Promise<void> | void
-}
+import { QueueName } from '../../interfaces'
+import { StellarListener } from '../../listeners/stellar'
 
 interface HorizonMocks {
   cursor: jest.Mock
@@ -20,10 +16,15 @@ interface HorizonMocks {
   streamHandlers: StreamHandlers[]
 }
 
+interface StreamHandlers {
+  onerror?: (err: unknown) => void
+  onmessage?: (payment: TestPayment) => Promise<void> | void
+}
+
 interface TestPayment {
   amount: string
   asset_code: string
-  asset_issuer: string | null
+  asset_issuer: null | string
   asset_type: string
   from: string
   id: string
@@ -34,9 +35,9 @@ interface TestPayment {
 }
 
 jest.mock('@stellar/stellar-sdk', () => {
-  const streamHandlers: Array<{ onmessage?: (payment: unknown) => Promise<void> | void, onerror?: (err: unknown) => void }> = []
+  const streamHandlers: Array<{ onerror?: (err: unknown) => void, onmessage?: (payment: unknown) => Promise<void> | void }> = []
   const streamHandle = { close: jest.fn() }
-  const stream = jest.fn((handlers: { onmessage?: (payment: unknown) => Promise<void> | void, onerror?: (err: unknown) => void }) => {
+  const stream = jest.fn((handlers: { onerror?: (err: unknown) => void, onmessage?: (payment: unknown) => Promise<void> | void }) => {
     streamHandlers.push(handlers)
     return streamHandle
   })
@@ -65,17 +66,21 @@ afterEach(() => {
   jest.clearAllMocks()
 })
 
-function resetHorizonMocks() {
-  stellarMocks.cursor.mockClear()
-  stellarMocks.forAccount.mockClear()
-  stellarMocks.payments.mockClear()
-  stellarMocks.streamHandle.close.mockClear()
-  stellarMocks.streamHandlers.splice(0, stellarMocks.streamHandlers.length)
-}
+function createDbProvider(state: null | { lastPagingToken?: string } = null) {
+  const findUnique = jest.fn().mockResolvedValue(state)
+  const upsert = jest.fn().mockResolvedValue(undefined)
+  const prisma = {
+    stellarListenerState: {
+      findUnique,
+      upsert,
+    },
+  } as unknown as PrismaClient
 
-function setupHorizonMock(): HorizonMocks {
-  resetHorizonMocks()
-  return stellarMocks
+  const dbProvider: IDatabaseClientProvider = {
+    getClient: jest.fn().mockResolvedValue(prisma),
+  }
+
+  return { dbProvider, findUnique, upsert }
 }
 
 function createPayment(overrides: Partial<TestPayment> = {}): TestPayment {
@@ -95,6 +100,13 @@ function createPayment(overrides: Partial<TestPayment> = {}): TestPayment {
   }
 }
 
+function createQueueHandler(postMessage?: IQueueHandler['postMessage']): IQueueHandler {
+  return {
+    postMessage: postMessage ?? jest.fn().mockResolvedValue(undefined),
+    subscribeToQueue: jest.fn().mockResolvedValue(undefined),
+  } as IQueueHandler
+}
+
 function createSecretManager(accountId = 'account-id', horizonUrl = 'https://horizon', usdcIssuer = 'issuer'): ISecretManager {
   const getSecrets: jest.MockedFunction<ISecretManager['getSecrets']> = jest.fn(async (secretNames) => {
     const entries = secretNames.map(secretName => [secretName, ''] as const)
@@ -109,28 +121,17 @@ function createSecretManager(accountId = 'account-id', horizonUrl = 'https://hor
   }
 }
 
-function createQueueHandler(postMessage?: IQueueHandler['postMessage']): IQueueHandler {
-  return {
-    postMessage: postMessage ?? jest.fn().mockResolvedValue(undefined),
-    subscribeToQueue: jest.fn().mockResolvedValue(undefined),
-  } as IQueueHandler
+function resetHorizonMocks() {
+  stellarMocks.cursor.mockClear()
+  stellarMocks.forAccount.mockClear()
+  stellarMocks.payments.mockClear()
+  stellarMocks.streamHandle.close.mockClear()
+  stellarMocks.streamHandlers.splice(0, stellarMocks.streamHandlers.length)
 }
 
-function createDbProvider(state: { lastPagingToken?: string } | null = null) {
-  const findUnique = jest.fn().mockResolvedValue(state)
-  const upsert = jest.fn().mockResolvedValue(undefined)
-  const prisma = {
-    stellarListenerState: {
-      findUnique,
-      upsert,
-    },
-  } as unknown as PrismaClient
-
-  const dbProvider: IDatabaseClientProvider = {
-    getClient: jest.fn().mockResolvedValue(prisma),
-  }
-
-  return { dbProvider, findUnique, upsert }
+function setupHorizonMock(): HorizonMocks {
+  resetHorizonMocks()
+  return stellarMocks
 }
 
 describe('StellarListener', () => {
@@ -154,7 +155,7 @@ describe('StellarListener', () => {
     expect(horizonMocks.cursor).toHaveBeenCalledWith('cursor-1')
 
     const handler = horizonMocks.streamHandlers[0]
-    await handler.onmessage?.(createPayment({ type: 'create_account', paging_token: 'new-token' }))
+    await handler.onmessage?.(createPayment({ paging_token: 'new-token', type: 'create_account' }))
 
     expect(upsert).toHaveBeenCalledWith({
       create: { id: 'singleton', lastPagingToken: 'new-token' },
@@ -170,7 +171,9 @@ describe('StellarListener', () => {
   it('filters unsupported assets and memo-less payments before publishing', async () => {
     const horizonMocks = setupHorizonMock()
     const postMessage: jest.MockedFunction<IQueueHandler['postMessage']> = jest.fn()
-    postMessage.mockImplementationOnce(() => { throw new Error('queue down') })
+    postMessage.mockImplementationOnce(() => {
+      throw new Error('queue down')
+    })
     postMessage.mockResolvedValue(undefined)
     const queueHandler = createQueueHandler(postMessage)
     const secretManager = createSecretManager('account-id', 'https://horizon', 'trusted-issuer')
