@@ -60,61 +60,6 @@ describe('WebhookController webhooks', () => {
     logger = createMockLogger()
   })
 
-  describe('Guardline webhook', () => {
-    it('returns 400 when the payload is invalid', async () => {
-      const controller = new WebhookController(dbProvider, logger, queueHandler)
-      const badRequest = createResponder<400, { message: string, success: false }>()
-      const notFound = createResponder<404, { message: string, success: false }>()
-      const serverError = createResponder<500, { message: string, success: false }>()
-
-      const response = await controller.handleGuardlineWebhook(
-        {},
-        buildRequest(),
-        badRequest,
-        notFound,
-        serverError,
-      )
-
-      expect(response).toEqual({ message: 'Missing instance_id or process_id', success: false })
-      expect(badRequest).toHaveBeenCalledWith(
-        400,
-        expect.objectContaining({ message: 'Missing instance_id or process_id', success: false }),
-      )
-      expect(prisma.partnerUserKyc.findFirst).not.toHaveBeenCalled()
-    })
-
-    it('updates the KYC record when the session exists', async () => {
-      const controller = new WebhookController(dbProvider, logger, queueHandler)
-      const badRequest = createResponder<400, { message: string, success: false }>()
-      const notFound = createResponder<404, { message: string, success: false }>()
-      const serverError = createResponder<500, { message: string, success: false }>()
-      const setStatus = jest.spyOn(controller, 'setStatus')
-
-      prisma.partnerUserKyc.findFirst.mockResolvedValue({
-        id: 'kyc-1',
-        partnerUser: { id: 'user-1', partner: { id: 'partner-1' }, userId: 'user-1' },
-        partnerUserId: 'user-1',
-        status: KycStatus.PENDING,
-      })
-
-      const response = await controller.handleGuardlineWebhook(
-        { workflow_instance_id: 'ext-1' },
-        buildRequest(),
-        badRequest,
-        notFound,
-        serverError,
-      )
-
-      expect(response).toEqual({ message: 'Webhook processed successfully', success: true })
-      expect(prisma.partnerUserKyc.update).toHaveBeenCalledWith({
-        data: expect.objectContaining({ status: KycStatus.APPROVED }),
-        where: { id: 'kyc-1' },
-      })
-      expect(notFound).not.toHaveBeenCalled()
-      expect(setStatus).toHaveBeenCalledWith(200)
-    })
-  })
-
   describe('Persona webhook', () => {
     it('returns not found when no matching inquiry exists', async () => {
       prisma.partnerUserKyc.findFirst.mockResolvedValue(null)

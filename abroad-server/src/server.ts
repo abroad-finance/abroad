@@ -20,11 +20,6 @@ const app = express()
 const logger = iocContainer.get<ILogger>(TYPES.ILogger)
 app.use(cors())
 app.use(bodyParser.json())
-// Allow larger payloads only for the Guardline webhook (avoid raising global limits)
-app.use(
-  '/webhook/guardline',
-  bodyParser.json({ limit: '10mb', type: ['application/json', 'text/json', 'application/*+json'] }),
-)
 // Handle text/json content-type generically (kept small)
 app.use(bodyParser.json({ type: 'text/json' }))
 

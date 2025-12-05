@@ -133,7 +133,7 @@ export class PersonaKycService implements IKycService {
  * Smart workflow resolver
  * ------------------------------------------------------------------------- */
 /**
- * Decide whether the user must run a new Guardline workflow.
+ * Decide whether the user needs to complete an additional Persona KYC tier.
  *
  * @param country        "BR" or "CO"
  * @param amount         Transaction amount (BRL for BR, USD for CO)

@@ -17,21 +17,17 @@ import { z } from 'zod'
 
 import { ILogger, IQueueHandler, PaymentStatusUpdatedMessage, QueueName } from '../interfaces'
 import { IDatabaseClientProvider } from '../interfaces/IDatabaseClientProvider'
-import { GuardlineWebhookRequest } from '../services/webhooks/guardlineSchema'
-import { GuardlineWebhookService } from '../services/webhooks/GuardlineWebhookService'
 import { PersonaWebhookService } from '../services/webhooks/PersonaWebhookService'
 import { WebhookProcessingResult } from '../services/webhooks/types'
 import { TYPES } from '../types'
 
-interface GuardlineWebhookResponse {
+type WebhookResponse = {
   message?: string
   success: boolean
 }
 
 @Route('webhook')
 export class WebhookController extends Controller {
-  private readonly guardlineWebhookService: GuardlineWebhookService
-
   private readonly personaWebhookService: PersonaWebhookService
   constructor(
     @inject(TYPES.IDatabaseClientProvider)
@@ -42,31 +38,7 @@ export class WebhookController extends Controller {
     private queueHandler: IQueueHandler,
   ) {
     super()
-    this.guardlineWebhookService = new GuardlineWebhookService(this.dbProvider, this.logger)
     this.personaWebhookService = new PersonaWebhookService(this.dbProvider, this.logger, this.queueHandler)
-  }
-
-  /**
-   * Handle KYC webhook notifications from Guardline
-   *
-   * Receives asynchronous updates about KYC workflow status changes
-   * and updates the corresponding PartnerUserKyc records in the database.
-   */
-  @Hidden() // Hide from public API docs as this is a webhook endpoint
-  @Post('guardline')
-  @Response('400', 'Bad Request - Invalid payload')
-  @Response('404', 'Not Found - KYC session not found')
-  @Response('500', 'Internal Server Error')
-  @SuccessResponse('200', 'Webhook processed successfully')
-  public async handleGuardlineWebhook(
-    @Body() body: GuardlineWebhookRequest,
-    @Request() request: RequestExpress,
-    @Res() badRequest: TsoaResponse<400, { message: string, success: false }>,
-    @Res() notFound: TsoaResponse<404, { message: string, success: false }>,
-    @Res() serverError: TsoaResponse<500, { message: string, success: false }>,
-  ): Promise<GuardlineWebhookResponse> {
-    const result = await this.guardlineWebhookService.processWebhook(body, request)
-    return this.resolveWebhookResponse(result, badRequest, notFound, serverError)
   }
 
   /**
@@ -89,7 +61,7 @@ export class WebhookController extends Controller {
     @Res() badRequest: TsoaResponse<400, { message: string, success: false }>,
     @Res() notFound: TsoaResponse<404, { message: string, success: false }>,
     @Res() serverError: TsoaResponse<500, { message: string, success: false }>,
-  ): Promise<{ message?: string, success: boolean }> {
+  ): Promise<WebhookResponse> {
     const result = await this.personaWebhookService.processWebhook(body, request)
     return this.resolveWebhookResponse(result, badRequest, notFound, serverError)
   }
@@ -108,7 +80,7 @@ export class WebhookController extends Controller {
     @Request() request: RequestExpress,
     @Res() badRequest: TsoaResponse<400, { message: string, success: false }>,
     @Res() serverError: TsoaResponse<500, { message: string, success: false }>,
-  ): Promise<GuardlineWebhookResponse> {
+  ): Promise<WebhookResponse> {
     try {
       this.logger.info('Received Transfero webhook', {
         headers: request.headers,
@@ -162,7 +134,7 @@ export class WebhookController extends Controller {
     badRequest: TsoaResponse<400, { message: string, success: false }>,
     notFound: TsoaResponse<404, { message: string, success: false }>,
     serverError: TsoaResponse<500, { message: string, success: false }>,
-  ): { message?: string, success: boolean } {
+  ): WebhookResponse {
     if (result.status === 'bad_request') {
       return badRequest(400, result.payload)
     }
