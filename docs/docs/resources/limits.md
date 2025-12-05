@@ -26,4 +26,4 @@ Abroad enforces payment-method limits and compliance checks during quote creatio
 - **Available liquidity:** If liquidity for a payment method is lower than the quoted target amount, the request is rejected.  
 - **Recipient account checks:** An invalid account number/bank code pair returns `400` with `"User account is invalid."`.  
 - **Partner KYB cap:** Partners without KYB approval are limited to a cumulative **100 units of source currency** across completed transactions.  
-- **KYC gating:** If `needsKyc` is enabled for your partner, large or frequent payouts can return a `kycLink`. The transaction will not progress until the user completes that flow.
+- **KYC gating:** If `needsKyc` is enabled for your partner, users can move up to **$25 in source volume (rolling 30 days)** without KYC. Once above that threshold, a `kycLink` is returned and the transaction will not progress until the user completes that flow.

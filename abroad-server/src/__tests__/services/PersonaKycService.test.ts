@@ -4,6 +4,7 @@ import axios from 'axios'
 import type { IDatabaseClientProvider } from '../../interfaces/IDatabaseClientProvider'
 import type { ISecretManager, Secret } from '../../interfaces/ISecretManager'
 
+import { KYC_EXEMPTION_USD_THRESHOLD } from '../../config/kyc'
 import { getNextTier, PersonaKycService } from '../../services/PersonaKycService'
 
 jest.mock('axios')
@@ -67,6 +68,22 @@ describe('PersonaKycService.getKycLink', () => {
     expect(createSpy).not.toHaveBeenCalled()
   })
 
+  it('short-circuits KYC when the amount is within the exemption threshold', async () => {
+    findFirstSpy.mockResolvedValue(null)
+    const service = new PersonaKycService(dbProvider, secretManager)
+
+    const result = await service.getKycLink({
+      amount: KYC_EXEMPTION_USD_THRESHOLD,
+      country: 'CO',
+      redirectUrl: undefined,
+      userId: 'user-early',
+    })
+
+    expect(result).toBeNull()
+    expect(mockedAxios.post).not.toHaveBeenCalled()
+    expect(createSpy).not.toHaveBeenCalled()
+  })
+
   it('creates a new inquiry and persists the pending KYC record', async () => {
     findFirstSpy.mockResolvedValue(null)
     mockedAxios.post.mockResolvedValue({
@@ -119,11 +136,15 @@ describe('PersonaKycService.getNextTier', () => {
     expect(getNextTier('CO', 500, KYCTier.ENHANCED)).toBeNull()
   })
 
+  it('exempts low-value transactions from KYC', () => {
+    expect(getNextTier('CO', KYC_EXEMPTION_USD_THRESHOLD, KYCTier.NONE)).toBeNull()
+  })
+
   it('promotes BR users above the BASIC threshold', () => {
     expect(getNextTier('BR', 2_000, KYCTier.NONE)).toBe(KYCTier.ENHANCED)
   })
 
-  it('requires BASIC for small CO transactions', () => {
-    expect(getNextTier('CO', 100, KYCTier.NONE)).toBe(KYCTier.BASIC)
+  it('requires BASIC once above the CO exemption threshold', () => {
+    expect(getNextTier('CO', KYC_EXEMPTION_USD_THRESHOLD + 1, KYCTier.NONE)).toBe(KYCTier.BASIC)
   })
 })

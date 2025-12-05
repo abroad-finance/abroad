@@ -2,6 +2,7 @@ import { KycStatus, KYCTier } from '@prisma/client'
 import axios from 'axios'
 import { inject } from 'inversify'
 
+import { isKycExemptByAmount } from '../config/kyc'
 import { IDatabaseClientProvider } from '../interfaces/IDatabaseClientProvider'
 import { IKycService } from '../interfaces/IKycService'
 import { ISecretManager } from '../interfaces/ISecretManager'
@@ -149,6 +150,8 @@ export function getNextTier(
   existingTier: KYCTier = KYCTier.NONE,
 ): KYCTier | null {
   if (amount < 0) throw new Error('Amount cannot be negative')
+
+  if (isKycExemptByAmount(amount)) return null
 
   const requiredTier = tierRule[country](amount)
   if (tierOrder[existingTier] >= tierOrder[requiredTier]) return null

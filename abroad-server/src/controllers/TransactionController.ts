@@ -19,6 +19,7 @@ import {
 import { Body, Post } from 'tsoa'
 import { z } from 'zod'
 
+import { isKycExemptByAmount } from '../config/kyc'
 import { IQueueHandler, QueueName } from '../interfaces'
 import { IDatabaseClientProvider } from '../interfaces/IDatabaseClientProvider'
 import { IKycService } from '../interfaces/IKycService'
@@ -162,12 +163,15 @@ export class TransactionController extends Controller {
     })
 
     const totalUserAmountMonthly = userTransactionsMonthly.reduce((acc, transaction) => acc + transaction.quote.sourceAmount, 0) + quote.sourceAmount
-    const link = await this.kycService.getKycLink({
-      amount: totalUserAmountMonthly,
-      country: quote.country,
-      redirectUrl: redirectUrl,
-      userId: partnerUser.id,
-    })
+    const shouldRequestKyc = partner.needsKyc && !isKycExemptByAmount(totalUserAmountMonthly)
+    const link = shouldRequestKyc
+      ? await this.kycService.getKycLink({
+          amount: totalUserAmountMonthly,
+          country: quote.country,
+          redirectUrl: redirectUrl,
+          userId: partnerUser.id,
+        })
+      : null
 
     if (partner.needsKyc && link) {
       return {

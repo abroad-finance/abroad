@@ -197,7 +197,12 @@ describe('TransactionController acceptance flows', () => {
   })
 
   it('returns a KYC link when the partner requires verification', async () => {
-    const { controller, kycService } = buildAcceptController({ kycLink: 'https://kyc.test', needsKyc: true })
+    const monthlyHistory = [{ quote: { paymentMethod: baseQuote.paymentMethod, sourceAmount: 10 }, status: TransactionStatus.PAYMENT_COMPLETED }]
+    const { controller, kycService } = buildAcceptController({
+      kycLink: 'https://kyc.test',
+      needsKyc: true,
+      transactionFindMany: [monthlyHistory, [], []],
+    })
     const response = await controller.acceptTransaction(
       requestBody,
       { user: { ...partner, needsKyc: true } } as unknown as import('express').Request,
@@ -206,6 +211,24 @@ describe('TransactionController acceptance flows', () => {
 
     expect(kycService.getKycLink).toHaveBeenCalled()
     expect(response).toEqual({ id: null, kycLink: 'https://kyc.test', transaction_reference: null })
+  })
+
+  it('bypasses KYC when cumulative volume is within the exemption window', async () => {
+    const { controller, kycService } = buildAcceptController()
+    const response = await controller.acceptTransaction(
+      requestBody,
+      { user: { ...partner, needsKyc: true } } as unknown as import('express').Request,
+      badRequest,
+    )
+
+    const expectedReference = Buffer.from('11111111222233334444555555555555', 'hex').toString('base64')
+
+    expect(kycService.getKycLink).not.toHaveBeenCalled()
+    expect(response).toEqual({
+      id: '11111111-2222-3333-4444-555555555555',
+      kycLink: null,
+      transaction_reference: expectedReference,
+    })
   })
 
   it('enforces per-user daily transaction limits', async () => {
