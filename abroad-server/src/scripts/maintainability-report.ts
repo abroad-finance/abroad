@@ -11,6 +11,11 @@ interface CliOptions {
   sourceRoot: string
 }
 
+interface MaintainabilityReport {
+  averageNormalizedMaintainability: number
+  rows: MaintainabilityRow[]
+}
+
 interface MaintainabilityRow {
   cyclomaticComplexity: number
   halsteadVolume: number
@@ -69,11 +74,10 @@ function buildMaintainabilityRows(modules: ModuleReport[]): MaintainabilityRow[]
   })
 }
 
-function buildTable(rows: MaintainabilityRow[]): string {
-  const headers = ['File', 'MI (0-171)', 'MI (%)', 'Cyclomatic', 'Halstead V', 'SLOC (L/P)']
-  const dataRows = rows.map(row => [
+function buildTable(report: MaintainabilityReport): string {
+  const headers = ['File', 'MI (%)', 'Cyclomatic', 'Halstead V', 'SLOC (L/P)']
+  const dataRows = report.rows.map(row => [
     row.path,
-    decimalFormatter.format(row.maintainabilityIndex),
     `${decimalFormatter.format(row.normalizedMaintainability)}%`,
     decimalFormatter.format(row.cyclomaticComplexity),
     decimalFormatter.format(row.halsteadVolume),
@@ -92,11 +96,26 @@ function buildTable(rows: MaintainabilityRow[]): string {
   )
 
   return [
-    `Maintainability report for ${rows.length} file${rows.length === 1 ? '' : 's'}`,
+    `Maintainability report for ${report.rows.length} file${report.rows.length === 1 ? '' : 's'}`,
     headerLine,
     separatorLine,
     ...dataLines,
+    '',
+    `Combined average MI (%): ${decimalFormatter.format(report.averageNormalizedMaintainability)}%`,
   ].join('\n')
+}
+
+function calculateAverageNormalizedMaintainability(rows: MaintainabilityRow[]): number {
+  if (rows.length === 0) {
+    return 0
+  }
+
+  const totalNormalizedMaintainability = rows.reduce(
+    (total, row) => total + row.normalizedMaintainability,
+    0,
+  )
+
+  return totalNormalizedMaintainability / rows.length
 }
 
 function collectModuleErrors(modules: ModuleReport[]): string[] {
@@ -239,20 +258,20 @@ function parseCliOptions(): CliOptions {
   }
 }
 
-async function persistReport(rows: MaintainabilityRow[], outputPath: string) {
+async function persistReport(report: MaintainabilityReport, outputPath: string) {
   const outputDir = path.dirname(outputPath)
   await fs.mkdir(outputDir, { recursive: true })
-  const payload = JSON.stringify(rows, null, 2)
+  const payload = JSON.stringify(report, null, 2)
   await fs.writeFile(outputPath, payload, 'utf8')
 }
 
-function renderReport(rows: MaintainabilityRow[], cliOptions: CliOptions) {
+function renderReport(report: MaintainabilityReport, cliOptions: CliOptions) {
   if (cliOptions.format === 'json') {
-    console.log(JSON.stringify(rows, null, 2))
+    console.log(JSON.stringify(report, null, 2))
     return
   }
 
-  const table = buildTable(rows)
+  const table = buildTable(report)
 
   console.log(table)
 
@@ -290,12 +309,17 @@ async function run() {
 
     const rows = buildMaintainabilityRows(projectReport.modules)
     const sortedRows = sortRows(rows)
-
-    if (cliOptions.outputPath) {
-      await persistReport(sortedRows, cliOptions.outputPath)
+    const averageNormalizedMaintainability = calculateAverageNormalizedMaintainability(sortedRows)
+    const report: MaintainabilityReport = {
+      averageNormalizedMaintainability,
+      rows: sortedRows,
     }
 
-    renderReport(sortedRows, cliOptions)
+    if (cliOptions.outputPath) {
+      await persistReport(report, cliOptions.outputPath)
+    }
+
+    renderReport(report, cliOptions)
   }
   catch (error: unknown) {
     console.error(`Failed to generate maintainability report: ${extractErrorMessage(error)}`)
