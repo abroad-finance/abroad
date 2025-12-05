@@ -7,6 +7,14 @@ module.exports = {
     'src/routes.ts',
     'src/.*\\.d\\.ts$',
   ],
+  coverageThreshold: {
+    global: {
+      branches: 75,
+      functions: 75,
+      lines: 75,
+      statements: 75,
+    },
+  },
   moduleFileExtensions: ['ts', 'js', 'json', 'node'],
   preset: 'ts-jest',
   setupFilesAfterEnv: ['<rootDir>/src/__tests__/setup/jest.setup.ts'],

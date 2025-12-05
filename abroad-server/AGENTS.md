@@ -2,5 +2,7 @@
  - Run "npm run test" and:
     - All tests must pass.
     - The minimum coverage must be 75% for every category in "Average all files" section of the coverage report.
+    - Istanbul comments such as "istanbul ignore next" are not allowed.
+    - Jest configuration must not disable coverage collection.
  - Run "npm maintainability:report" and ensure the combined average is above 40%.
  
