@@ -22,7 +22,7 @@
     "depcruise:graph": "depcruise src --include-only '^src' --config --output-type dot | dot -T svg > dependency-graph.svg",
     "lint": "eslint .",
     "format": "eslint . --fix",
-    "maintainability:report": "tsx src/scripts/maintainability-report.ts",
+    "maintainability:report": "tsx src/scripts/maintainability-report.ts --min-average 60",
     "hygiene": "depcheck && knip --config knip.json",
     "migrate:dev": "prisma migrate dev",
     "seed:dev": "tsx scripts/seed-dev.ts"

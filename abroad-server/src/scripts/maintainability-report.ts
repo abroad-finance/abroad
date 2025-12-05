@@ -8,6 +8,7 @@ interface CliOptions {
   failOnError: boolean
   format: OutputFormat
   ignoredPaths: string[]
+  minimumAverageMaintainability: number
   outputPath?: string
   sourceRoot: string
 }
@@ -15,6 +16,7 @@ interface CliOptions {
 interface MaintainabilityReport {
   averageNormalizedMaintainability: number
   ignoredPaths: string[]
+  minimumAverageMaintainability: number
   rows: MaintainabilityRow[]
 }
 
@@ -118,6 +120,7 @@ function buildTable(report: MaintainabilityReport): string {
     ...dataLines,
     '',
     `Combined average MI (%): ${decimalFormatter.format(report.averageNormalizedMaintainability)}%`,
+    `Required minimum average MI (%): ${decimalFormatter.format(report.minimumAverageMaintainability)}%`,
     ...(report.ignoredPaths.length > 0 ? [`Ignored paths: ${report.ignoredPaths.join(', ')}`] : []),
   ].join('\n')
 }
@@ -296,11 +299,18 @@ function normalizeMaintainability(maintainability: number): number {
 function parseCliOptions(): CliOptions {
   const program = new Command()
   const formatOption = new Option('-f, --format <type>', 'Output format').choices(['table', 'json']).default('table')
+  const minimumAverageOption = new Option(
+    '--min-average <percentage>',
+    'Minimum average normalized maintainability required to pass (0-100).',
+  )
+    .argParser(parseMinimumAverageMaintainability)
+    .default(40)
 
   program
     .name('maintainability-report')
     .description('Generate maintainability index metrics per file in the src directory')
     .addOption(formatOption)
+    .addOption(minimumAverageOption)
     .option(
       '-i, --ignore <paths...>',
       'Paths relative to --src to ignore (files or directories). Can be provided multiple times.',
@@ -313,6 +323,7 @@ function parseCliOptions(): CliOptions {
     format: OutputFormat
     ignore?: string[]
     ignoreErrors?: boolean
+    minAverage: number
     output?: string
     src: string
   }>()
@@ -327,9 +338,24 @@ function parseCliOptions(): CliOptions {
     failOnError: !options.ignoreErrors,
     format: options.format,
     ignoredPaths,
+    minimumAverageMaintainability: options.minAverage,
     outputPath: options.output ? path.resolve(options.output) : undefined,
     sourceRoot,
   }
+}
+
+function parseMinimumAverageMaintainability(input: string): number {
+  const parsed = Number.parseFloat(input)
+
+  if (!Number.isFinite(parsed)) {
+    throw new Error(`Minimum average maintainability must be a finite number. Received "${input}".`)
+  }
+
+  if (parsed < 0 || parsed > 100) {
+    throw new Error('Minimum average maintainability must be between 0 and 100 (inclusive).')
+  }
+
+  return parsed
 }
 
 async function persistReport(report: MaintainabilityReport, outputPath: string) {
@@ -388,6 +414,7 @@ async function run() {
     const report: MaintainabilityReport = {
       averageNormalizedMaintainability,
       ignoredPaths: cliOptions.ignoredPaths,
+      minimumAverageMaintainability: cliOptions.minimumAverageMaintainability,
       rows: sortedRows,
     }
 
@@ -396,6 +423,12 @@ async function run() {
     }
 
     renderReport(report, cliOptions)
+
+    if (report.averageNormalizedMaintainability < cliOptions.minimumAverageMaintainability) {
+      throw new Error(
+        `Combined average MI ${decimalFormatter.format(report.averageNormalizedMaintainability)}% is below the required minimum of ${decimalFormatter.format(cliOptions.minimumAverageMaintainability)}%.`,
+      )
+    }
   }
   catch (error: unknown) {
     console.error(`Failed to generate maintainability report: ${extractErrorMessage(error)}`)
