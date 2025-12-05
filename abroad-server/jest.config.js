@@ -5,6 +5,7 @@ module.exports = {
   ],
   coveragePathIgnorePatterns: [
     'src/routes.ts',
+    'src/.*\\.d\\.ts$',
   ],
   moduleFileExtensions: ['ts', 'js', 'json', 'node'],
   preset: 'ts-jest',

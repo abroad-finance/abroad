@@ -7,12 +7,14 @@ import escomplex, { AnalyzeOptions, ModuleReport, ProjectSourceInput } from 'typ
 interface CliOptions {
   failOnError: boolean
   format: OutputFormat
+  ignoredPaths: string[]
   outputPath?: string
   sourceRoot: string
 }
 
 interface MaintainabilityReport {
   averageNormalizedMaintainability: number
+  ignoredPaths: string[]
   rows: MaintainabilityRow[]
 }
 
@@ -32,6 +34,7 @@ const SUPPORTED_EXTENSIONS = new Set(['.ts', '.tsx'])
 const DECLARATION_SUFFIX = '.d.ts'
 const MAINTAINABILITY_MAX = 171
 const DECORATOR_OVERRIDE = { decoratorsLegacy: true }
+const DEFAULT_IGNORED_PATHS = ['routes.ts']
 const TRANSPILE_OPTIONS: ts.CompilerOptions = {
   experimentalDecorators: true,
   jsx: ts.JsxEmit.Preserve,
@@ -44,6 +47,8 @@ const decimalFormatter = new Intl.NumberFormat('en-US', {
   minimumFractionDigits: 2,
 })
 
+type PathIgnorePredicate = (normalizedRelativePath: string) => boolean
+
 async function assertDirectory(candidate: string) {
   const stats = await fs.stat(candidate)
   if (!stats.isDirectory()) {
@@ -55,6 +60,17 @@ function buildAnalysisOptions(cliOptions: CliOptions): AnalyzeOptions {
   return {
     ignoreErrors: !cliOptions.failOnError,
   }
+}
+
+function buildIgnoreMatcher(ignoredPaths: string[]): PathIgnorePredicate {
+  if (ignoredPaths.length === 0) {
+    return () => false
+  }
+
+  const ignoredPathSet = new Set(ignoredPaths)
+
+  return (relativePath: string) =>
+    ignoredPathSet.has(relativePath) || ignoredPaths.some(ignored => relativePath.startsWith(`${ignored}/`))
 }
 
 function buildMaintainabilityRows(modules: ModuleReport[]): MaintainabilityRow[] {
@@ -102,6 +118,7 @@ function buildTable(report: MaintainabilityReport): string {
     ...dataLines,
     '',
     `Combined average MI (%): ${decimalFormatter.format(report.averageNormalizedMaintainability)}%`,
+    ...(report.ignoredPaths.length > 0 ? [`Ignored paths: ${report.ignoredPaths.join(', ')}`] : []),
   ].join('\n')
 }
 
@@ -135,19 +152,32 @@ function collectModuleErrors(modules: ModuleReport[]): string[] {
   return errors
 }
 
-async function collectSourceFiles(directory: string): Promise<string[]> {
+async function collectSourceFiles(root: string, shouldIgnore: PathIgnorePredicate): Promise<string[]> {
+  return collectSourceFilesFromDirectory(root, root, shouldIgnore)
+}
+
+async function collectSourceFilesFromDirectory(
+  directory: string,
+  root: string,
+  shouldIgnore: PathIgnorePredicate,
+): Promise<string[]> {
   const entries = await fs.readdir(directory, { withFileTypes: true })
   const files: string[] = []
 
   for (const entry of entries) {
     const absolutePath = path.join(directory, entry.name)
+    const normalizedRelativePath = toNormalizedRelativePath(root, absolutePath)
 
     if (entry.isSymbolicLink()) {
       continue
     }
 
+    if (shouldIgnore(normalizedRelativePath)) {
+      continue
+    }
+
     if (entry.isDirectory()) {
-      const nestedFiles = await collectSourceFiles(absolutePath)
+      const nestedFiles = await collectSourceFilesFromDirectory(absolutePath, root, shouldIgnore)
       files.push(...nestedFiles)
       continue
     }
@@ -226,6 +256,38 @@ async function loadSources(
   return { diagnostics, sources }
 }
 
+function normalizeIgnorePath(pathCandidate: string, root: string): string {
+  const trimmedCandidate = pathCandidate.replace(/[/\\]+$/, '')
+  if (trimmedCandidate.length === 0) {
+    throw new Error('Ignore path must not be empty')
+  }
+
+  const candidateWithinRoot = stripLeadingRootSegment(trimmedCandidate, root)
+  const resolvedCandidate = path.isAbsolute(candidateWithinRoot)
+    ? path.normalize(candidateWithinRoot)
+    : path.resolve(root, candidateWithinRoot)
+  const relativePath = path.relative(root, resolvedCandidate)
+
+  if (relativePath === '' || relativePath === '.') {
+    throw new Error('Ignoring the source root is not supported')
+  }
+
+  if (relativePath.startsWith('..')) {
+    throw new Error(`Ignore path ${trimmedCandidate} is outside of the source root ${root}`)
+  }
+
+  return relativePath.split(path.sep).join('/')
+}
+
+function normalizeIgnorePaths(ignoredPaths: string[], root: string): string[] {
+  const sanitizedPaths = ignoredPaths
+    .map(pathCandidate => pathCandidate.trim())
+    .filter(pathCandidate => pathCandidate.length > 0)
+
+  const normalizedPaths = sanitizedPaths.map(pathCandidate => normalizeIgnorePath(pathCandidate, root))
+  return Array.from(new Set(normalizedPaths))
+}
+
 function normalizeMaintainability(maintainability: number): number {
   const clamped = Math.min(MAINTAINABILITY_MAX, Math.max(0, maintainability))
   return (clamped / MAINTAINABILITY_MAX) * 100
@@ -239,22 +301,34 @@ function parseCliOptions(): CliOptions {
     .name('maintainability-report')
     .description('Generate maintainability index metrics per file in the src directory')
     .addOption(formatOption)
+    .option(
+      '-i, --ignore <paths...>',
+      'Paths relative to --src to ignore (files or directories). Can be provided multiple times.',
+    )
     .option('-s, --src <path>', 'Source directory to analyze', path.resolve(process.cwd(), 'src'))
     .option('-o, --output <file>', 'Write the JSON report to a file in addition to console output')
     .option('--ignore-errors', 'Do not fail when parser or analysis errors are found', false)
 
   const options = program.parse(process.argv).opts<{
     format: OutputFormat
+    ignore?: string[]
     ignoreErrors?: boolean
     output?: string
     src: string
   }>()
 
+  const sourceRoot = path.resolve(options.src)
+  const ignoredPaths = normalizeIgnorePaths(
+    [...DEFAULT_IGNORED_PATHS, ...(options.ignore ?? [])],
+    sourceRoot,
+  )
+
   return {
     failOnError: !options.ignoreErrors,
     format: options.format,
+    ignoredPaths,
     outputPath: options.output ? path.resolve(options.output) : undefined,
-    sourceRoot: path.resolve(options.src),
+    sourceRoot,
   }
 }
 
@@ -285,9 +359,10 @@ async function run() {
     const cliOptions = parseCliOptions()
     await assertDirectory(cliOptions.sourceRoot)
 
-    const sourceFiles = await collectSourceFiles(cliOptions.sourceRoot)
+    const ignoreMatcher = buildIgnoreMatcher(cliOptions.ignoredPaths)
+    const sourceFiles = await collectSourceFiles(cliOptions.sourceRoot, ignoreMatcher)
     if (sourceFiles.length === 0) {
-      throw new Error(`No TypeScript sources found under ${cliOptions.sourceRoot}`)
+      throw new Error(`No TypeScript sources found under ${cliOptions.sourceRoot} after applying ignore filters`)
     }
 
     const { diagnostics, sources } = await loadSources(sourceFiles, cliOptions.sourceRoot)
@@ -312,6 +387,7 @@ async function run() {
     const averageNormalizedMaintainability = calculateAverageNormalizedMaintainability(sortedRows)
     const report: MaintainabilityReport = {
       averageNormalizedMaintainability,
+      ignoredPaths: cliOptions.ignoredPaths,
       rows: sortedRows,
     }
 
@@ -329,6 +405,30 @@ async function run() {
 
 function sortRows(rows: MaintainabilityRow[]): MaintainabilityRow[] {
   return [...rows].sort((left, right) => left.maintainabilityIndex - right.maintainabilityIndex)
+}
+
+function stripLeadingRootSegment(pathCandidate: string, root: string): string {
+  if (path.isAbsolute(pathCandidate)) {
+    return pathCandidate
+  }
+
+  const candidateWithoutCurrentDirPrefix = pathCandidate.startsWith('./')
+    ? pathCandidate.slice(2)
+    : pathCandidate
+  const rootBasename = path.basename(root)
+
+  if (candidateWithoutCurrentDirPrefix === rootBasename) {
+    return '.'
+  }
+
+  if (
+    candidateWithoutCurrentDirPrefix.startsWith(`${rootBasename}/`)
+    || candidateWithoutCurrentDirPrefix.startsWith(`${rootBasename}\\`)
+  ) {
+    return candidateWithoutCurrentDirPrefix.slice(rootBasename.length + 1)
+  }
+
+  return candidateWithoutCurrentDirPrefix
 }
 
 function toNormalizedRelativePath(root: string, filePath: string): string {
