@@ -18,10 +18,9 @@ import { createTransactionQuoteSupport } from './transactionQuoteSupport'
 // ESM-safe dynamic import
 // -----------------------
 type DynamicImport = <T = unknown>(specifier: string) => Promise<T>
-const dynamicImport: DynamicImport = new Function(
-  'specifier',
-  'return import(specifier)',
-) as unknown as DynamicImport
+const dynamicImport: DynamicImport = async function dynamicImportImpl<T = unknown>(specifier: string): Promise<T> {
+  return import(specifier) as Promise<T>
+}
 
 let AdminJSExpress: ExpressPlugin
 let AdminJS: typeof AdminJSClass

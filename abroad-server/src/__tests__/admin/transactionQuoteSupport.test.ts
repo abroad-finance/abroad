@@ -117,6 +117,7 @@ describe('createTransactionQuoteSupport', () => {
         findFirst: jest.fn(),
       },
     }
+    prisma.partnerUserKyc.findFirst.mockResolvedValue(null)
 
     const decoratedResource = {
       actions: {
@@ -214,6 +215,88 @@ describe('createTransactionQuoteSupport', () => {
     })
   })
 
+  it('applies default payload filters when target currency is missing', () => {
+    const request: ActionRequest = {
+      method: 'get',
+      params: { action: 'list', resourceId: support.resourceId },
+      payload: { filters: {} },
+      query: {},
+    }
+
+    const normalized = support.ensureDefaultTransactionQuoteFilters(request)
+    const payload = normalized.payload as Record<string, unknown>
+
+    expect((payload.filters as Record<string, unknown>).targetCurrency).toBe('COP')
+    expect((payload.filters as Record<string, unknown>).transactionStatus).toBe(TransactionStatus.PAYMENT_COMPLETED)
+  })
+
+  it('builds query strings from nested and array-based action parameters', () => {
+    const params = support.buildActionRequestSearchParams({
+      method: 'get',
+      params: { action: 'list', resourceId: support.resourceId },
+      payload: { filters: { targetCurrency: ['COP', 'USD'] } },
+      query: { filters: { transactionStatus: ['PENDING'] } },
+    } as unknown as ActionRequest)
+
+    expect(params).toContain('filters.targetCurrency=USD')
+    expect(params).toContain('filters.transactionStatus=PENDING')
+  })
+
+  it('builds redirect URLs for CSV downloads', async () => {
+    const downloadHandler = support.detailedResource.options.actions.downloadCsv.handler!
+    const context = {
+      action: { name: support.downloadActionName },
+      currentAdmin: null,
+      h: new adminModule.ViewHelpers({ options: {} }),
+      resource: resource as unknown as AdminResourceStub,
+    } as unknown as ActionContext
+
+    const result = await downloadHandler(
+      {
+        method: 'get',
+        params: { action: support.downloadActionName, resourceId: support.resourceId },
+        query: {},
+      } as ActionRequest,
+      {} as Response,
+      context,
+    )
+
+    expect(result.redirectUrl).toContain('/transaction-quotes/download')
+    expect(result.notice?.type).toBe('success')
+  })
+
+  it('enriches list and show responses when records are present', async () => {
+    const listAfter = support.detailedResource.options.actions.list.after!
+    const showAfter = support.detailedResource.options.actions.show.after!
+
+    const hydratedRecords = records.map(record => ({
+      ...record,
+      params: record.toJSON(null as unknown as never).params,
+    })) as unknown as import('adminjs').BaseRecord[]
+
+    const listResponse = await listAfter({ records: hydratedRecords } as unknown as import('adminjs').ActionResponse)
+    const showResponse = await showAfter({ record: hydratedRecords[0] } as unknown as import('adminjs').ActionResponse)
+
+    expect(listResponse).toBeTruthy()
+    expect(showResponse).toBeTruthy()
+  })
+
+  it('returns 404 when CSV resource cannot be found', async () => {
+    const admin = {
+      findResource: jest.fn(() => undefined),
+      options: {},
+    } as unknown as AdminJSClass
+    const handler = support.createCsvRouteHandler(admin)
+    const status = jest.fn().mockReturnThis()
+    const send = jest.fn()
+    const res = { status, send } as unknown as Response
+
+    await handler({ query: {}, session: {} } as unknown as Request, res, jest.fn())
+
+    expect(status).toHaveBeenCalledWith(404)
+    expect(send).toHaveBeenCalledWith('Resource not found')
+  })
+
   it('streams a CSV using enriched transaction quote data', async () => {
     prisma.partnerUserKyc.findFirst
       .mockResolvedValueOnce(null)
@@ -252,5 +335,88 @@ describe('createTransactionQuoteSupport', () => {
     expect(res.send).toHaveBeenCalledWith(expect.stringContaining('Venta'))
     expect(res.send).toHaveBeenCalledWith(expect.stringContaining('hash-2'))
     expect(next).not.toHaveBeenCalled()
+  })
+
+  it('falls back to fixed formatting when locale formatting fails', async () => {
+    const localeSpy = jest.spyOn(Number.prototype, 'toLocaleString').mockImplementation(() => {
+      throw new Error('locale failure')
+    })
+
+    try {
+      const listAfter = support.detailedResource.options.actions.list.after!
+      const hydratedRecords = records.map(record => ({
+        ...record,
+        params: record.toJSON(null as unknown as never).params,
+      })) as unknown as import('adminjs').BaseRecord[]
+
+      await listAfter({ records: hydratedRecords } as unknown as import('adminjs').ActionResponse)
+
+      const enriched = hydratedRecords[0] as unknown as { params: Record<string, unknown> }
+      expect(enriched.params.montoCop).toBe('1000.00')
+      expect(enriched.params.trm).toBe('40.00')
+    }
+    finally {
+      localeSpy.mockRestore()
+    }
+  })
+
+  it('keeps invalid numeric inputs empty after enrichment', async () => {
+    const showAfter = support.detailedResource.options.actions.show.after!
+    const malformedRecord = {
+      params: {
+        cryptoCurrency: 'USDC',
+        sourceAmount: { nested: true },
+        targetAmount: ['invalid'],
+        targetCurrency: 'COP',
+        transactionCreatedAt: 'not-a-date',
+      },
+    } as unknown as import('adminjs').BaseRecord
+
+    await showAfter({ record: malformedRecord } as unknown as import('adminjs').ActionResponse)
+
+    expect(malformedRecord.params.montoCop).toBe('')
+    expect(malformedRecord.params.montoUsdc).toBe('')
+    expect(malformedRecord.params.trm).toBe('')
+    expect(malformedRecord.params.fecha).toBe('')
+  })
+
+  it('forwards CSV generation errors to middleware', async () => {
+    const admin = {
+      findResource: jest.fn(() => resource),
+      options: {},
+    } as unknown as AdminJSClass
+    const handler = support.createCsvRouteHandler(admin)
+    const res = {
+      send: jest.fn(),
+      setHeader: jest.fn(),
+      status: jest.fn(() => res),
+    } as unknown as Response
+    const next = jest.fn()
+
+    resource.decorate.mockImplementationOnce(() => {
+      throw new Error('decorate failure')
+    })
+
+    await handler({ query: {}, session: {} } as unknown as Request, res, next)
+
+    expect(next).toHaveBeenCalledWith(expect.any(Error))
+  })
+})
+
+describe('transactionQuoteSupport bootstrap', () => {
+  it('throws when the Prisma view model is missing', async () => {
+    jest.resetModules()
+
+    await jest.isolateModulesAsync(async () => {
+      jest.doMock('@prisma/client', () => ({
+        Prisma: { dmmf: { datamodel: { models: [] } } },
+        KycStatus: { APPROVED: 'APPROVED' },
+        TransactionStatus: { PAYMENT_COMPLETED: 'PAYMENT_COMPLETED' },
+      }))
+
+      await expect(import('../../admin/transactionQuoteSupport')).rejects.toThrow('Prisma model not found: TransactionQuoteView')
+    })
+
+    jest.dontMock('@prisma/client')
   })
 })

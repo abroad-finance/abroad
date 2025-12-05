@@ -68,6 +68,10 @@ describe('BinanceListener', () => {
     ;(secretManager.getSecrets as jest.Mock).mockResolvedValue({})
   })
 
+  afterEach(() => {
+    jest.restoreAllMocks()
+  })
+
   it('starts the listener and reacts to websocket events', async () => {
     const listener = new BinanceListener(secretManager, queueHandler, logger)
     await listener.start()
@@ -122,5 +126,44 @@ describe('BinanceListener', () => {
 
     const clientInstance = (WebsocketClient as unknown as jest.Mock).mock.results[0]?.value as FakeWebsocketClient
     expect(clientInstance.closeAll).toHaveBeenCalledWith(true)
+  })
+
+  it('subscribes even when websocket client does not return a wsKey', async () => {
+    const subscribeSpy = jest.spyOn(FakeWebsocketClient.prototype, 'subscribeSpotUserDataStream')
+    subscribeSpy.mockResolvedValueOnce(undefined as unknown as { wsKey: string })
+    const listener = new BinanceListener(secretManager, queueHandler, logger)
+
+    await listener.start()
+
+    expect(subscribeSpy).toHaveBeenCalled()
+    expect(logger.info).toHaveBeenCalledWith('[Binance WS]: Subscribed to spot user data stream')
+  })
+
+  it('converts arbitrary urls to websocket equivalents with suffix', () => {
+    const listener = new BinanceListener(secretManager, queueHandler, logger)
+    const toWsUrl = (listener as unknown as { toWsUrl: (httpUrl: string, pathSuffix?: string) => string }).toWsUrl
+
+    const url = toWsUrl('not-a-url', 'stream')
+
+    expect(url).toBe('not-a-url/stream')
+  })
+
+  it('logs and rethrows when startListener fails', async () => {
+    const listener = new BinanceListener(secretManager, queueHandler, logger)
+    const startSpy = jest.spyOn(listener as unknown as { startListener: () => Promise<void> }, 'startListener')
+    const failure = new Error('initialization failed')
+    startSpy.mockRejectedValueOnce(failure)
+
+    await expect(listener.start()).rejects.toThrow(failure)
+    expect(logger.error).toHaveBeenCalledWith('[Binance WS]: Failed to start listener', failure)
+  })
+
+  it('stops safely when no websocket client has been started', async () => {
+    const listener = new BinanceListener(secretManager, queueHandler, logger)
+
+    await listener.stop()
+
+    expect(logger.info).not.toHaveBeenCalledWith(expect.stringContaining('Stopping listener'))
+    expect(queueHandler.postMessage).not.toHaveBeenCalled()
   })
 })

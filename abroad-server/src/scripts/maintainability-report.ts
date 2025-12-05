@@ -4,7 +4,7 @@ import path from 'node:path'
 import ts from 'typescript'
 import escomplex, { AnalyzeOptions, ModuleReport, ProjectSourceInput } from 'typhonjs-escomplex'
 
-interface CliOptions {
+export interface CliOptions {
   failOnError: boolean
   format: OutputFormat
   ignoredPaths: string[]
@@ -13,14 +13,14 @@ interface CliOptions {
   sourceRoot: string
 }
 
-interface MaintainabilityReport {
+export interface MaintainabilityReport {
   averageNormalizedMaintainability: number
   ignoredPaths: string[]
   minimumAverageMaintainability: number
   rows: MaintainabilityRow[]
 }
 
-interface MaintainabilityRow {
+export interface MaintainabilityRow {
   cyclomaticComplexity: number
   halsteadVolume: number
   logicalSloc: number
@@ -30,7 +30,7 @@ interface MaintainabilityRow {
   physicalSloc: number
 }
 
-type OutputFormat = 'json' | 'table'
+export type OutputFormat = 'json' | 'table'
 
 const SUPPORTED_EXTENSIONS = new Set(['.ts', '.tsx'])
 const DECLARATION_SUFFIX = '.d.ts'
@@ -49,33 +49,33 @@ const decimalFormatter = new Intl.NumberFormat('en-US', {
   minimumFractionDigits: 2,
 })
 
-type PathIgnorePredicate = (normalizedRelativePath: string) => boolean
+export type PathIgnorePredicate = (normalizedRelativePath: string) => boolean
 
-async function assertDirectory(candidate: string) {
+export async function assertDirectory(candidate: string) {
   const stats = await fs.stat(candidate)
   if (!stats.isDirectory()) {
     throw new Error(`Expected ${candidate} to be a directory`)
   }
 }
 
-function buildAnalysisOptions(cliOptions: CliOptions): AnalyzeOptions {
+export function buildAnalysisOptions(cliOptions: CliOptions): AnalyzeOptions {
   return {
     ignoreErrors: !cliOptions.failOnError,
   }
 }
 
-function buildIgnoreMatcher(ignoredPaths: string[]): PathIgnorePredicate {
+export function buildIgnoreMatcher(ignoredPaths: string[]): PathIgnorePredicate {
   if (ignoredPaths.length === 0) {
     return () => false
   }
 
   const ignoredPathSet = new Set(ignoredPaths)
 
-  return (relativePath: string) =>
+    return (relativePath: string) =>
     ignoredPathSet.has(relativePath) || ignoredPaths.some(ignored => relativePath.startsWith(`${ignored}/`))
 }
 
-function buildMaintainabilityRows(modules: ModuleReport[]): MaintainabilityRow[] {
+export function buildMaintainabilityRows(modules: ModuleReport[]): MaintainabilityRow[] {
   return modules.map((moduleReport) => {
     const aggregate = moduleReport.aggregate
     const normalizedMaintainability = normalizeMaintainability(moduleReport.maintainability)
@@ -92,7 +92,7 @@ function buildMaintainabilityRows(modules: ModuleReport[]): MaintainabilityRow[]
   })
 }
 
-function buildTable(report: MaintainabilityReport): string {
+export function buildTable(report: MaintainabilityReport): string {
   const headers = ['File', 'MI (%)', 'Cyclomatic', 'Halstead V', 'SLOC (L/P)']
   const dataRows = report.rows.map(row => [
     row.path,
@@ -125,7 +125,7 @@ function buildTable(report: MaintainabilityReport): string {
   ].join('\n')
 }
 
-function calculateAverageNormalizedMaintainability(rows: MaintainabilityRow[]): number {
+export function calculateAverageNormalizedMaintainability(rows: MaintainabilityRow[]): number {
   if (rows.length === 0) {
     return 0
   }
@@ -138,7 +138,7 @@ function calculateAverageNormalizedMaintainability(rows: MaintainabilityRow[]): 
   return totalNormalizedMaintainability / rows.length
 }
 
-function collectModuleErrors(modules: ModuleReport[]): string[] {
+export function collectModuleErrors(modules: ModuleReport[]): string[] {
   const errors: string[] = []
 
   for (const moduleReport of modules) {
@@ -155,7 +155,7 @@ function collectModuleErrors(modules: ModuleReport[]): string[] {
   return errors
 }
 
-async function collectSourceFiles(root: string, shouldIgnore: PathIgnorePredicate): Promise<string[]> {
+export async function collectSourceFiles(root: string, shouldIgnore: PathIgnorePredicate): Promise<string[]> {
   return collectSourceFilesFromDirectory(root, root, shouldIgnore)
 }
 
@@ -195,7 +195,7 @@ async function collectSourceFilesFromDirectory(
   return files
 }
 
-function extractErrorMessage(error: unknown): string {
+export function extractErrorMessage(error: unknown): string {
   if (error instanceof Error) {
     return error.message
   }
@@ -207,7 +207,7 @@ function extractErrorMessage(error: unknown): string {
   return JSON.stringify(error)
 }
 
-function formatDiagnostics(filePath: string, diagnostics: readonly ts.Diagnostic[]): string[] {
+export function formatDiagnostics(filePath: string, diagnostics: readonly ts.Diagnostic[]): string[] {
   return diagnostics.map((diagnostic) => {
     const message = ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n')
 
@@ -220,7 +220,7 @@ function formatDiagnostics(filePath: string, diagnostics: readonly ts.Diagnostic
   })
 }
 
-function isSupportedSource(filename: string): boolean {
+export function isSupportedSource(filename: string): boolean {
   if (filename.endsWith(DECLARATION_SUFFIX)) {
     return false
   }
@@ -229,7 +229,7 @@ function isSupportedSource(filename: string): boolean {
   return SUPPORTED_EXTENSIONS.has(extension)
 }
 
-async function loadSources(
+export async function loadSources(
   files: string[],
   root: string,
 ): Promise<{ diagnostics: string[], sources: ProjectSourceInput[] }> {
@@ -259,7 +259,7 @@ async function loadSources(
   return { diagnostics, sources }
 }
 
-function normalizeIgnorePath(pathCandidate: string, root: string): string {
+export function normalizeIgnorePath(pathCandidate: string, root: string): string {
   const trimmedCandidate = pathCandidate.replace(/[/\\]+$/, '')
   if (trimmedCandidate.length === 0) {
     throw new Error('Ignore path must not be empty')
@@ -282,7 +282,7 @@ function normalizeIgnorePath(pathCandidate: string, root: string): string {
   return relativePath.split(path.sep).join('/')
 }
 
-function normalizeIgnorePaths(ignoredPaths: string[], root: string): string[] {
+export function normalizeIgnorePaths(ignoredPaths: string[], root: string): string[] {
   const sanitizedPaths = ignoredPaths
     .map(pathCandidate => pathCandidate.trim())
     .filter(pathCandidate => pathCandidate.length > 0)
@@ -291,12 +291,12 @@ function normalizeIgnorePaths(ignoredPaths: string[], root: string): string[] {
   return Array.from(new Set(normalizedPaths))
 }
 
-function normalizeMaintainability(maintainability: number): number {
+export function normalizeMaintainability(maintainability: number): number {
   const clamped = Math.min(MAINTAINABILITY_MAX, Math.max(0, maintainability))
   return (clamped / MAINTAINABILITY_MAX) * 100
 }
 
-function parseCliOptions(): CliOptions {
+export function parseCliOptions(rawArgs: string[] = process.argv, currentWorkingDirectory: string = process.cwd()): CliOptions {
   const program = new Command()
   const formatOption = new Option('-f, --format <type>', 'Output format').choices(['table', 'json']).default('table')
   const minimumAverageOption = new Option(
@@ -315,11 +315,11 @@ function parseCliOptions(): CliOptions {
       '-i, --ignore <paths...>',
       'Paths relative to --src to ignore (files or directories). Can be provided multiple times.',
     )
-    .option('-s, --src <path>', 'Source directory to analyze', path.resolve(process.cwd(), 'src'))
+    .option('-s, --src <path>', 'Source directory to analyze', 'src')
     .option('-o, --output <file>', 'Write the JSON report to a file in addition to console output')
     .option('--ignore-errors', 'Do not fail when parser or analysis errors are found', false)
 
-  const options = program.parse(process.argv).opts<{
+  const options = program.parse(rawArgs).opts<{
     format: OutputFormat
     ignore?: string[]
     ignoreErrors?: boolean
@@ -328,7 +328,7 @@ function parseCliOptions(): CliOptions {
     src: string
   }>()
 
-  const sourceRoot = path.resolve(options.src)
+  const sourceRoot = path.resolve(currentWorkingDirectory, options.src)
   const ignoredPaths = normalizeIgnorePaths(
     [...DEFAULT_IGNORED_PATHS, ...(options.ignore ?? [])],
     sourceRoot,
@@ -339,12 +339,12 @@ function parseCliOptions(): CliOptions {
     format: options.format,
     ignoredPaths,
     minimumAverageMaintainability: options.minAverage,
-    outputPath: options.output ? path.resolve(options.output) : undefined,
+    outputPath: options.output ? path.resolve(currentWorkingDirectory, options.output) : undefined,
     sourceRoot,
   }
 }
 
-function parseMinimumAverageMaintainability(input: string): number {
+export function parseMinimumAverageMaintainability(input: string): number {
   const parsed = Number.parseFloat(input)
 
   if (!Number.isFinite(parsed)) {
@@ -358,14 +358,14 @@ function parseMinimumAverageMaintainability(input: string): number {
   return parsed
 }
 
-async function persistReport(report: MaintainabilityReport, outputPath: string) {
+export async function persistReport(report: MaintainabilityReport, outputPath: string) {
   const outputDir = path.dirname(outputPath)
   await fs.mkdir(outputDir, { recursive: true })
   const payload = JSON.stringify(report, null, 2)
   await fs.writeFile(outputPath, payload, 'utf8')
 }
 
-function renderReport(report: MaintainabilityReport, cliOptions: CliOptions) {
+export function renderReport(report: MaintainabilityReport, cliOptions: CliOptions) {
   if (cliOptions.format === 'json') {
     console.log(JSON.stringify(report, null, 2))
     return
@@ -380,67 +380,74 @@ function renderReport(report: MaintainabilityReport, cliOptions: CliOptions) {
   }
 }
 
-async function run() {
-  try {
-    const cliOptions = parseCliOptions()
-    await assertDirectory(cliOptions.sourceRoot)
+export async function generateMaintainabilityReport(cliOptions: CliOptions): Promise<MaintainabilityReport> {
+  await assertDirectory(cliOptions.sourceRoot)
 
-    const ignoreMatcher = buildIgnoreMatcher(cliOptions.ignoredPaths)
-    const sourceFiles = await collectSourceFiles(cliOptions.sourceRoot, ignoreMatcher)
-    if (sourceFiles.length === 0) {
-      throw new Error(`No TypeScript sources found under ${cliOptions.sourceRoot} after applying ignore filters`)
-    }
+  const ignoreMatcher = buildIgnoreMatcher(cliOptions.ignoredPaths)
+  const sourceFiles = await collectSourceFiles(cliOptions.sourceRoot, ignoreMatcher)
+  if (sourceFiles.length === 0) {
+    throw new Error(`No TypeScript sources found under ${cliOptions.sourceRoot} after applying ignore filters`)
+  }
 
-    const { diagnostics, sources } = await loadSources(sourceFiles, cliOptions.sourceRoot)
-    if (diagnostics.length > 0) {
-      console.warn('Transpilation warnings:\n', diagnostics.join('\n'))
-    }
-    const projectReport = escomplex.analyzeProject(
-      sources,
-      buildAnalysisOptions(cliOptions),
-      undefined,
-      DECORATOR_OVERRIDE,
+  const { diagnostics, sources } = await loadSources(sourceFiles, cliOptions.sourceRoot)
+  if (diagnostics.length > 0) {
+    console.warn('Transpilation warnings:\n', diagnostics.join('\n'))
+  }
+  const projectReport = escomplex.analyzeProject(
+    sources,
+    buildAnalysisOptions(cliOptions),
+    undefined,
+    DECORATOR_OVERRIDE,
+  )
+
+  const moduleErrors = collectModuleErrors(projectReport.modules)
+  if (moduleErrors.length > 0 && cliOptions.failOnError) {
+    const details = moduleErrors.map(error => `- ${error}`).join('\n')
+    throw new Error(`Complexity analysis reported errors:\n${details}`)
+  }
+
+  const rows = buildMaintainabilityRows(projectReport.modules)
+  const sortedRows = sortRows(rows)
+  const averageNormalizedMaintainability = calculateAverageNormalizedMaintainability(sortedRows)
+  const report: MaintainabilityReport = {
+    averageNormalizedMaintainability,
+    ignoredPaths: cliOptions.ignoredPaths,
+    minimumAverageMaintainability: cliOptions.minimumAverageMaintainability,
+    rows: sortedRows,
+  }
+
+  if (cliOptions.outputPath) {
+    await persistReport(report, cliOptions.outputPath)
+  }
+
+  renderReport(report, cliOptions)
+
+  if (report.averageNormalizedMaintainability < cliOptions.minimumAverageMaintainability) {
+    throw new Error(
+      `Combined average MI ${decimalFormatter.format(report.averageNormalizedMaintainability)}% is below the required minimum of ${decimalFormatter.format(cliOptions.minimumAverageMaintainability)}%.`,
     )
+  }
 
-    const moduleErrors = collectModuleErrors(projectReport.modules)
-    if (moduleErrors.length > 0 && cliOptions.failOnError) {
-      const details = moduleErrors.map(error => `- ${error}`).join('\n')
-      throw new Error(`Complexity analysis reported errors:\n${details}`)
-    }
+  return report
+}
 
-    const rows = buildMaintainabilityRows(projectReport.modules)
-    const sortedRows = sortRows(rows)
-    const averageNormalizedMaintainability = calculateAverageNormalizedMaintainability(sortedRows)
-    const report: MaintainabilityReport = {
-      averageNormalizedMaintainability,
-      ignoredPaths: cliOptions.ignoredPaths,
-      minimumAverageMaintainability: cliOptions.minimumAverageMaintainability,
-      rows: sortedRows,
-    }
-
-    if (cliOptions.outputPath) {
-      await persistReport(report, cliOptions.outputPath)
-    }
-
-    renderReport(report, cliOptions)
-
-    if (report.averageNormalizedMaintainability < cliOptions.minimumAverageMaintainability) {
-      throw new Error(
-        `Combined average MI ${decimalFormatter.format(report.averageNormalizedMaintainability)}% is below the required minimum of ${decimalFormatter.format(cliOptions.minimumAverageMaintainability)}%.`,
-      )
-    }
+export async function run(cliOptions?: CliOptions): Promise<MaintainabilityReport | undefined> {
+  try {
+    const resolvedOptions = cliOptions ?? parseCliOptions()
+    return await generateMaintainabilityReport(resolvedOptions)
   }
   catch (error: unknown) {
     console.error(`Failed to generate maintainability report: ${extractErrorMessage(error)}`)
     process.exitCode = 1
+    return undefined
   }
 }
 
-function sortRows(rows: MaintainabilityRow[]): MaintainabilityRow[] {
+export function sortRows(rows: MaintainabilityRow[]): MaintainabilityRow[] {
   return [...rows].sort((left, right) => left.maintainabilityIndex - right.maintainabilityIndex)
 }
 
-function stripLeadingRootSegment(pathCandidate: string, root: string): string {
+export function stripLeadingRootSegment(pathCandidate: string, root: string): string {
   if (path.isAbsolute(pathCandidate)) {
     return pathCandidate
   }
@@ -464,9 +471,11 @@ function stripLeadingRootSegment(pathCandidate: string, root: string): string {
   return candidateWithoutCurrentDirPrefix
 }
 
-function toNormalizedRelativePath(root: string, filePath: string): string {
+export function toNormalizedRelativePath(root: string, filePath: string): string {
   const relativePath = path.relative(root, filePath) || path.basename(filePath)
   return relativePath.split(path.sep).join('/')
 }
 
-void run()
+if (require.main === module) {
+  void run()
+}
