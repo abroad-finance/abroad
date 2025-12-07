@@ -47,6 +47,23 @@ describe('MoviiPaymentService', () => {
       message: 'Onboarding started successfully, please make sure the user completes the onboarding process',
       success: true,
     })
+    expect(mockedAxios.post).toHaveBeenCalledWith(
+      'https://movii.example.com/transfiya/v2/transfers',
+      expect.objectContaining({
+        amount: '1000',
+        labels: expect.objectContaining({
+          acceptSms: expect.stringContaining('transfiya'),
+          sourceChannel: 'APP',
+          transactionPurpose: 'ONBOARDING',
+          type: 'SEND',
+        }),
+        source: '$handler',
+        target: '$573001234567',
+      }),
+      expect.objectContaining({
+        headers: expect.objectContaining({ 'x-api-key': 'api-key' }),
+      }),
+    )
 
     mockedAxios.post.mockResolvedValueOnce({ data: { error: { code: 1 } } })
     const rejected = await service.onboardUser({ account: '3001234567' })
@@ -90,7 +107,22 @@ describe('MoviiPaymentService', () => {
 
     const response = await service.sendPayment({ account: '3001234567', bankCode: '123', id: 'txn-2', value: 25 })
     expect(response).toEqual({ success: true, transactionId: 'transfer-1' })
-    expect(mockedAxios.post).toHaveBeenCalled()
+    expect(mockedAxios.post).toHaveBeenCalledWith(
+      'https://movii.example.com/transfiya/v2/transfers',
+      expect.objectContaining({
+        amount: '25',
+        labels: expect.objectContaining({
+          description: 'Abroad transfer',
+          transactionPurpose: 'TRANSFER',
+          type: 'SEND',
+        }),
+        source: '$handler',
+        target: '$handle',
+      }),
+      expect.objectContaining({
+        headers: expect.objectContaining({ 'x-api-key': 'api-key' }),
+      }),
+    )
   })
 
   it('returns failure when provider rejects the transfer', async () => {

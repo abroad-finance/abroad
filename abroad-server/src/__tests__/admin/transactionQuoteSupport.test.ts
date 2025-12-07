@@ -401,6 +401,104 @@ describe('createTransactionQuoteSupport', () => {
 
     expect(next).toHaveBeenCalledWith(expect.any(Error))
   })
+
+  it('normalizes query params by flattening arrays and skipping undefined', () => {
+    const normalized = support.normalizeQueryParams({
+      empty: undefined,
+      keep: 'value',
+      list: ['first', 'second'],
+    })
+
+    expect(normalized).toEqual({ keep: 'value', list: 'second' })
+  })
+
+  it('enriches records with formatted amounts, dates, and operation labels', async () => {
+    const showAfter = support.detailedResource.options.actions.show.after!
+    const record = {
+      params: {
+        cryptoCurrency: 'USDC',
+        sourceAmount: '1,234.50',
+        targetAmount: 2469,
+        targetCurrency: 'USD',
+        transactionCreatedAt: '2024-01-02T03:04:05Z',
+      },
+    } as unknown as import('adminjs').BaseRecord
+
+    await showAfter({ record } as unknown as import('adminjs').ActionResponse)
+
+    expect(record.params.montoUsdc).toMatch(/1[.,]234[.,]50/)
+    expect(record.params.montoCop).toBe('')
+    expect(record.params.trm).toMatch(/2[.,]00/)
+    expect(record.params.fecha).toBe('2024-01-02 03:04')
+    expect(record.params.tipoOperacion).toBe('Compra')
+  })
+
+  it('escapes CSV values containing commas, quotes, and objects', async () => {
+    prisma.partnerUserKyc.findFirst
+      .mockResolvedValueOnce({ externalId: 'escape-kyc' })
+    personaService.getDetails.mockResolvedValueOnce({
+      address: '123 Main St',
+      city: 'Bogota',
+      country: 'CO',
+      department: 'Cundinamarca',
+      documentType: 'ID',
+      email: 'doe@example.com',
+      fullName: 'Doe, "Jane"',
+      idNumber: 'ABC123',
+      phone: '+5712345678',
+    })
+
+    const customRecords: AdminRecordStub[] = [
+      {
+        toJSON: () => ({
+          params: {
+            partnerUserId: 'partner-escape',
+            targetAmount: 10,
+            targetCurrency: 'USD',
+            transactionCreatedAt: new Date('2024-04-02T00:00:00Z'),
+          },
+        }),
+      },
+    ]
+
+    resource.find = jest.fn<Promise<AdminRecordStub[]>, [unknown, unknown, ActionContext]>(
+      async (...args) => {
+        void args
+        return customRecords
+      },
+    )
+    resource.count = jest.fn<Promise<number>, [unknown, ActionContext]>(
+      async (...args) => {
+        void args
+        return customRecords.length
+      },
+    )
+
+    const req = {
+      query: { filters: {} },
+      session: { adminUser: { email: 'admin@example.com' } },
+    } as unknown as Request
+
+    const send = jest.fn()
+    const res = {
+      send,
+      setHeader: jest.fn(),
+      status: jest.fn(() => res),
+    } as unknown as Response
+
+    const admin: AdminJSClass = {
+      findResource: () => resource,
+      options: {},
+    } as unknown as AdminJSClass
+
+    const handler = support.createCsvRouteHandler(admin)
+    await handler(req, res, jest.fn())
+
+    const csv = send.mock.calls[0]?.[0] as string | undefined
+    expect(csv).toBeDefined()
+    expect(csv).toContain('"Doe, ""Jane"""')
+    expect(csv).toContain('label:nombreRazonSocial')
+  })
 })
 
 describe('transactionQuoteSupport bootstrap', () => {

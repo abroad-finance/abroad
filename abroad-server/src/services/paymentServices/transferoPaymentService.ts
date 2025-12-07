@@ -218,15 +218,15 @@ export class TransferoPaymentService implements IPaymentService {
     taxId: string
     value: number
   }) {
-    const isBrazilPhoneNumber = (input: number | string): boolean => {
-      if (input === null || input === undefined) return false
+    const normalizeBrazilPhoneNumber = (input: number | string): null | string => {
+      if (input === null || input === undefined) return null
 
       // Keep digits only
       const raw = String(input).replace(/\D+/g, '')
-      if (!raw) return false
+      if (!raw) return null
 
       // Accept toll-free 0800 numbers: 0800 + 7 digits
-      if (/^0800\d{7}$/.test(raw)) return true
+      if (/^0800\d{7}$/.test(raw)) return raw
 
       // Strip domestic prefixes if present:
       // - 0 + carrier code (two digits), e.g., 0 15 11 9xxxx-xxxx  => remove "015"
@@ -240,7 +240,7 @@ export class TransferoPaymentService implements IPaymentService {
       }
 
       // After cleaning, expect 10 (landline) or 11 (mobile) digits: DDD(2) + local
-      if (!(digits.length === 10 || digits.length === 11)) return false
+      if (!(digits.length === 10 || digits.length === 11)) return null
 
       const ddd = digits.slice(0, 2)
       const local = digits.slice(2)
@@ -259,20 +259,20 @@ export class TransferoPaymentService implements IPaymentService {
         '91', '92', '93', '94', '95', '96', '97', '98', '99',
       ])
 
-      if (!VALID_DDD.has(ddd)) return false
+      if (!VALID_DDD.has(ddd)) return null
 
       // Landline: 8 digits, starts 2–5
       if (local.length === 8) {
-        return /^[2-5]\d{7}$/.test(local)
+        return /^[2-5]\d{7}$/.test(local) ? digits : null
       }
 
       // Mobile: 9 digits, starts with 9
       if (local.length === 9) {
         // If you want to be stricter, use /^9[6-9]\d{7}$/ (historical mobile ranges)
-        return /^9\d{8}$/.test(local)
+        return /^9\d{8}$/.test(local) ? digits : null
       }
 
-      return false
+      return null
     }
 
     if (qrCode) {
@@ -289,7 +289,8 @@ export class TransferoPaymentService implements IPaymentService {
       ]
     }
 
-    const pixKey = isBrazilPhoneNumber(account) ? `+55${String(account).replace(/\D/g, '')}` : account
+    const normalizedBrazilPhone = normalizeBrazilPhoneNumber(account)
+    const pixKey = normalizedBrazilPhone ? `+55${normalizedBrazilPhone}` : account
     return [
       {
         amount: value,

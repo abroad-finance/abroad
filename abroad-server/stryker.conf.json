@@ -1,0 +1,37 @@
+{
+  "$schema": "./node_modules/@stryker-mutator/core/schema/stryker-schema.json",
+  "packageManager": "npm",
+  "testRunner": "jest",
+  "jest": {
+    "projectType": "custom",
+    "configFile": "jest.config.js"
+  },
+  "mutator": {
+    "name": "typescript"
+  },
+  "checkers": [
+    "typescript"
+  ],
+  "tsconfigFile": "tsconfig.json",
+  "coverageAnalysis": "perTest",
+  "ignoreStatic": true,
+  "reporters": [
+    "html",
+    "clear-text",
+    "progress",
+    "json"
+  ],
+  "tempDirName": "stryker-tmp",
+  "thresholds": {
+    "high": 80,
+    "low": 65,
+    "break": 80
+  },
+  "mutate": [
+    "src/**/*.ts",
+    "!src/routes.ts",
+    "!src/**/*.d.ts",
+    "!src/**/__tests__/**/*",
+    "!src/**/?(*.)+(spec|test).ts"
+  ]
+}

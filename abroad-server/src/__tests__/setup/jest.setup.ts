@@ -27,3 +27,11 @@ afterAll(() => {
     spy.mockRestore()
   })
 })
+
+describe('jest setup utilities', () => {
+  it('silences console output when configured', () => {
+    expect(consoleSpies.error).toBeDefined()
+    expect(consoleSpies.log).toBeDefined()
+    expect(consoleSpies.warn).toBeDefined()
+  })
+})

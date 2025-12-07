@@ -45,3 +45,13 @@ export type Responder<Status extends number, Body> = jest.Mock<Body, [Status, Bo
 export const createResponder = <Status extends number, Body>(): Responder<Status, Body> => (
   jest.fn((_status: Status, payload: Body) => payload)
 )
+
+describe('mockFactories helpers', () => {
+  it('exposes logger and queue factory helpers', () => {
+    const logger = createMockLogger()
+    const queue = createMockQueueHandler()
+
+    expect(logger.info).toBeDefined()
+    expect(queue.postMessage).toBeDefined()
+  })
+})

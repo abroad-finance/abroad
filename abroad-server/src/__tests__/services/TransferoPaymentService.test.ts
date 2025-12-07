@@ -164,7 +164,7 @@ describe('TransferoPaymentService', () => {
         taxId: 'TAX-ABC',
         value: 75,
       })
-      expect(brazilian[0]).toMatchObject({ pixKey: '+55021987654321', taxId: 'TAX-ABC' })
+      expect(brazilian[0]).toMatchObject({ pixKey: '+5521987654321', taxId: 'TAX-ABC' })
 
       const foreign = await builder.buildContract({
         account: 'user@example.com',
@@ -173,6 +173,37 @@ describe('TransferoPaymentService', () => {
         value: 75,
       })
       expect(foreign[0]).toMatchObject({ pixKey: 'user@example.com' })
+    })
+
+    it('accepts toll-free and carrier-prefixed domestic numbers while rejecting bad DDD codes', async () => {
+      const service = new TransferoPaymentService(secretManager, dbProvider, pixDecoder, logger)
+      const builder = service as unknown as {
+        buildContract: (input: { account: string, qrCode?: null, taxId: string, value: number }) => Promise<Array<Record<string, number | string>>>
+      }
+
+      const tollFree = await builder.buildContract({
+        account: '0800 123 4567',
+        qrCode: null,
+        taxId: 'TAX-ABC',
+        value: 10,
+      })
+      expect(tollFree[0]).toMatchObject({ pixKey: '+5508001234567' })
+
+      const carrierPrefixed = await builder.buildContract({
+        account: '015 11 91234-5678',
+        qrCode: null,
+        taxId: 'TAX-ABC',
+        value: 10,
+      })
+      expect(carrierPrefixed[0]).toMatchObject({ pixKey: '+5511912345678' })
+
+      const invalidDdd = await builder.buildContract({
+        account: '001 23 456789',
+        qrCode: null,
+        taxId: 'TAX-ABC',
+        value: 10,
+      })
+      expect(invalidDdd[0]).toMatchObject({ pixKey: '001 23 456789' })
     })
   })
 

@@ -140,3 +140,5 @@ transactions-report.csv
 .DS_Store
 .adminjs/
 abroad-server/tmp/maintainability-report.json
+stryker-tmp/
+abroad-server/reports/

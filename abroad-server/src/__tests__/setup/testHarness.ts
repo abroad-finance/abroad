@@ -87,3 +87,11 @@ export const createHttpServerRecorder = <Req, Res>(): HttpServerRecorder<Req, Re
     },
   }
 }
+
+describe('testHarness helpers', () => {
+  it('provides utilities without altering process state by default', () => {
+    expect(typeof mockProcessExit).toBe('function')
+    expect(typeof createResponseRecorder).toBe('function')
+    expect(typeof createHttpServerRecorder).toBe('function')
+  })
+})
