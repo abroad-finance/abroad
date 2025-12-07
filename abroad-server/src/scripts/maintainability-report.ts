@@ -130,12 +130,27 @@ export function calculateAverageNormalizedMaintainability(rows: MaintainabilityR
     return 0
   }
 
-  const totalNormalizedMaintainability = rows.reduce(
-    (total, row) => total + row.normalizedMaintainability,
-    0,
-  )
+  let weightedSum = 0
+  let totalSloc = 0
 
-  return totalNormalizedMaintainability / rows.length
+  for (const row of rows) {
+    const weight = row.physicalSloc > 0 ? row.physicalSloc : 0
+
+    weightedSum += row.normalizedMaintainability * weight
+    totalSloc += weight
+  }
+
+  // Fallback: if all files report 0 physical SLOC, keep previous behavior (simple average)
+  if (totalSloc === 0) {
+    const totalNormalizedMaintainability = rows.reduce(
+      (total, row) => total + row.normalizedMaintainability,
+      0,
+    )
+
+    return totalNormalizedMaintainability / rows.length
+  }
+
+  return weightedSum / totalSloc
 }
 
 export function collectModuleErrors(modules: ModuleReport[]): string[] {
