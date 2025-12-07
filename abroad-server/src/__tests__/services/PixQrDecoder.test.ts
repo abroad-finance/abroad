@@ -10,10 +10,13 @@ jest.mock('axios')
 describe('PixQrDecoder', () => {
   let secretManager: ISecretManager
   let logger: MockLogger
+  const isAxiosErrorMock = axios.isAxiosError as jest.MockedFunction<typeof axios.isAxiosError>
   const postMock = axios.post as jest.MockedFunction<typeof axios.post>
 
   beforeEach(() => {
     jest.clearAllMocks()
+    isAxiosErrorMock.mockReset()
+    isAxiosErrorMock.mockImplementation(() => false)
     secretManager = {
       getSecret: jest.fn(async (key: string) => `secret-${key.toLowerCase()}`),
       getSecrets: jest.fn(async (keys: ReadonlyArray<string>) => {
@@ -90,5 +93,42 @@ describe('PixQrDecoder', () => {
     expect(decoded).toBeNull()
     expect(postMock).toHaveBeenCalledTimes(1)
     expect(logger.error).toHaveBeenCalledWith('Transfero Pix QR decode failed', 'network')
+  })
+
+  describe('describeError', () => {
+    it('handles axios responses with strings, objects, and circular payloads', () => {
+      const decoder = new PixQrDecoder(secretManager, logger)
+      const describe = decoder as unknown as { describeError: (err: unknown) => string }
+
+      isAxiosErrorMock.mockReturnValueOnce(true)
+      const stringResponse: unknown = { message: 'string resp', response: { data: 'failure' } }
+      expect(describe.describeError(stringResponse)).toBe('failure')
+
+      isAxiosErrorMock.mockReturnValueOnce(true)
+      const objectResponse: unknown = { message: 'object resp', response: { data: { code: 400 } } }
+      expect(describe.describeError(objectResponse)).toBe(JSON.stringify({ code: 400 }))
+
+      isAxiosErrorMock.mockReturnValueOnce(true)
+      const circularPayload: Record<string, unknown> = {}
+      circularPayload.self = circularPayload
+      const circularResponse: unknown = { message: 'circular', response: { data: circularPayload } }
+      expect(describe.describeError(circularResponse)).toBe('circular')
+    })
+
+    it('falls back cleanly for non-Axios errors and unserializable objects', () => {
+      const decoder = new PixQrDecoder(secretManager, logger)
+      const describe = decoder as unknown as { describeError: (err: unknown) => string }
+
+      isAxiosErrorMock.mockReturnValueOnce(false)
+      expect(describe.describeError(new Error('plain'))).toBe('plain')
+
+      isAxiosErrorMock.mockReturnValueOnce(false)
+      expect(describe.describeError('text error')).toBe('text error')
+
+      isAxiosErrorMock.mockReturnValueOnce(false)
+      const circular: Record<string, unknown> = {}
+      circular.self = circular
+      expect(describe.describeError(circular)).toBe('[object Object]')
+    })
   })
 })

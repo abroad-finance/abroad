@@ -1,5 +1,6 @@
 import 'reflect-metadata'
 import type { TsoaResponse } from '@tsoa/runtime'
+import type { Partner } from '@prisma/client'
 
 import * as admin from 'firebase-admin'
 
@@ -192,6 +193,39 @@ describe('PartnerController', () => {
       name: partner.name,
       needsKyc: false,
       phone: partner.phone,
+    })
+  })
+
+  it('defaults nullable partner fields when they are not set', async () => {
+    const controller = new PartnerController(buildDbProvider().dbProvider)
+    const partner: Partner = {
+      apiKey: null,
+      country: null,
+      createdAt: new Date('2024-02-02T00:00:00.000Z'),
+      email: null,
+      firstName: null,
+      id: 'partner-null',
+      isKybApproved: null,
+      lastName: null,
+      name: 'Fallback Corp',
+      needsKyc: null,
+      phone: null,
+      webhookUrl: null,
+    }
+
+    const response = await controller.getPartnerInfo({ user: partner } as unknown as import('express').Request)
+
+    expect(response).toEqual({
+      country: undefined,
+      createdAt: partner.createdAt,
+      email: undefined,
+      firstName: undefined,
+      id: partner.id,
+      isKybApproved: false,
+      lastName: undefined,
+      name: partner.name,
+      needsKyc: false,
+      phone: undefined,
     })
   })
 })

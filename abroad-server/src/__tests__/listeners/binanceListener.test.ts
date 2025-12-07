@@ -98,6 +98,10 @@ describe('BinanceListener', () => {
     })
     flushHandlers('formattedUserDataMessage', {
       eventTime: Date.now(),
+      eventType: 'outboundAccountPosition',
+    })
+    flushHandlers('formattedUserDataMessage', {
+      eventTime: Date.now(),
       eventType: 'somethingElse',
     })
 
@@ -146,6 +150,15 @@ describe('BinanceListener', () => {
     const url = toWsUrl('not-a-url', 'stream')
 
     expect(url).toBe('not-a-url/stream')
+  })
+
+  it('normalizes websocket urls across protocols and suffixes', () => {
+    const listener = new BinanceListener(secretManager, queueHandler, logger)
+    const toWsUrl = (listener as unknown as { toWsUrl: (httpUrl: string, pathSuffix?: string) => string }).toWsUrl
+
+    expect(toWsUrl('http://api.binance.com/base', 'ws')).toBe('ws://api.binance.com/base/ws')
+    expect(toWsUrl('ws://api.binance.com/root/', '/stream')).toBe('ws://api.binance.com/root/stream')
+    expect(toWsUrl('not-a-url', '/fallback')).toBe('not-a-url/fallback')
   })
 
   it('logs and rethrows when startListener fails', async () => {

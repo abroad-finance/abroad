@@ -178,4 +178,155 @@ describe('PersonaInquiryDetailsService', () => {
     expect(consoleErrorSpy).toHaveBeenCalled()
     consoleErrorSpy.mockRestore()
   })
+
+  it('exercises helper branches for cache management and value coercion', () => {
+    const service = new PersonaInquiryDetailsService(secretManager)
+    const helpers = service as unknown as {
+      asRecord: (value: unknown) => Record<string, unknown> | undefined
+      asString: (value: unknown) => string | undefined
+      buildFullNameFromAttributes: (attrs?: Record<string, unknown>) => string | undefined
+      collectDocumentAttributes: (input: Array<Record<string, unknown>>) => Array<Record<string, unknown>>
+      mapDocumentClassToLabel: (code: string | undefined, country?: string) => string | undefined
+      parseInquiryPayload: (payload: unknown) => null | import('../../services/PersonaInquiryDetailsService').PersonaInquiryDetails
+    }
+    const cacheRef = service as unknown as { cache: Map<string, null | import('../../services/PersonaInquiryDetailsService').PersonaInquiryDetails> }
+
+    cacheRef.cache.set('inq-a', null)
+    cacheRef.cache.set('inq-b', { fullName: 'Bob' })
+    service.clearCache('inq-a')
+    expect(cacheRef.cache.has('inq-a')).toBe(false)
+    service.clearCache()
+    expect(cacheRef.cache.size).toBe(0)
+
+    expect(helpers.asRecord({ foo: 'bar' })).toEqual({ foo: 'bar' })
+    expect(helpers.asRecord(['x'])).toBeUndefined()
+    expect(helpers.asString('  Hi  ')).toBe('Hi')
+    expect(helpers.asString('   ')).toBeUndefined()
+    expect(helpers.asString(123)).toBeUndefined()
+
+    expect(helpers.buildFullNameFromAttributes(undefined)).toBeUndefined()
+    expect(helpers.buildFullNameFromAttributes({ 'name-first': 'Ana', 'name-middle': 'Maria', 'name-last': 'Lopez' }))
+      .toBe('Ana Maria Lopez')
+    expect(helpers.buildFullNameFromAttributes({ 'name-first': 'Solo' })).toBe('Solo')
+
+    const docs = helpers.collectDocumentAttributes([
+      { attributes: { 'id-class': 'id' }, type: 'document/id' },
+      { attributes: { 'id-class': 'ignored' }, type: 'profile' },
+    ])
+    expect(docs).toEqual([{ 'id-class': 'id' }])
+
+    expect(helpers.mapDocumentClassToLabel('id', 'CO')).toBe('Cédula de ciudadanía')
+    expect(helpers.mapDocumentClassToLabel('pp', 'US')).toBe('Pasaporte')
+    expect(helpers.mapDocumentClassToLabel('unknown', undefined)).toBe('unknown')
+    expect(helpers.mapDocumentClassToLabel(undefined, undefined)).toBeUndefined()
+
+    expect(helpers.parseInquiryPayload(42)).toBeNull()
+    const parsed = helpers.parseInquiryPayload({
+      data: {
+        data: {
+          attributes: {
+            'address-city': 'Quito',
+            'address-country-code': 'EC',
+            'email-address': 'jim@example.com',
+            'name-first': 'Jim',
+            'name-last': 'Halpert',
+          },
+        },
+        included: [
+          {
+            attributes: { 'document-number': 'DOC-77', 'name-first': 'Jim', 'name-last': 'Halpert' },
+            type: 'document/government-id',
+          },
+        ],
+      },
+    })
+    expect(parsed).toEqual(expect.objectContaining({
+      city: 'Quito',
+      country: 'EC',
+      fullName: 'Jim Halpert',
+    }))
+  })
+
+  it('covers debug, cached client, and fallback field/value parsing branches', async () => {
+    const debugService = new PersonaInquiryDetailsService(secretManager, { debug: true })
+    const helpers = debugService as unknown as {
+      buildFullNameFromAttributes: (attrs?: Record<string, unknown>) => string | undefined
+      collectDocumentAttributes: (input: Array<Record<string, unknown>>) => Array<Record<string, unknown>>
+      debug: (...args: unknown[]) => void
+      ensureClient: () => Promise<unknown>
+      extractPrimaryResource: (payload: Record<string, unknown>) => unknown
+      getFieldValue: <T>(fields: Record<string, unknown> | undefined, key: string) => T | undefined
+      mapDocumentClassToLabel: (code: string | undefined, country?: string) => string | undefined
+      parseInquiryPayload: (payload: unknown) => null | import('../../services/PersonaInquiryDetailsService').PersonaInquiryDetails
+    }
+
+    // buildFullNameFromAttributes: empty attrs path
+    expect(helpers.buildFullNameFromAttributes({})).toBeUndefined()
+
+    // collectDocumentAttributes: false branch (non-string type)
+    const collected = helpers.collectDocumentAttributes([
+      { attributes: { foo: 'bar' }, type: 123 as unknown as string },
+    ])
+    expect(collected).toEqual([])
+
+    // debug flag branch
+    const debugSpy = jest.spyOn(console, 'debug').mockImplementation(() => {})
+    helpers.debug('message', 1)
+    expect(debugSpy).toHaveBeenCalled()
+    debugSpy.mockRestore()
+
+    // ensureClient caches instances
+    const client = await helpers.ensureClient()
+    const cached = await helpers.ensureClient()
+    expect(cached).toBe(client)
+    expect(axiosCreateMock).toHaveBeenCalledTimes(1)
+
+    // extractPrimaryResource guards non-record payloads
+    expect(helpers.extractPrimaryResource({ data: 5 })).toEqual({
+      included: [],
+      resource: { data: 5 },
+    })
+
+    // getFieldValue handles null values
+    expect(helpers.getFieldValue<{ value: null }>({ nullable: { value: null } }, 'nullable')).toBeUndefined()
+
+    expect(helpers.mapDocumentClassToLabel('driver_license', 'AR')).toBe('Licencia de conducción')
+
+    // parseInquiryPayload covering field fallbacks and nested includes
+    const parsed = helpers.parseInquiryPayload({
+      data: {
+        data: {
+          attributes: {
+            fields: {
+              'email-address': { value: 'fields@example.com' },
+              'identification-class': { value: 'id_card' },
+              'identification-number': { value: 'FIELD-ID' },
+              'phone-number': { value: '999' },
+              'selected-country-code': { value: 'CO' },
+            },
+            'address-city': 'Bogota',
+            'address-country-code': 'CO',
+            'address-street-1': 'Line 1',
+            'address-street-2': 'Line 2',
+          },
+          type: 'inquiry',
+        },
+        included: [
+          { attributes: { 'document-number': 'DOC-FIELD' }, type: 'document/government-id' },
+          'skip-me',
+        ],
+      },
+    })
+
+    expect(parsed).toEqual(expect.objectContaining({
+      address: 'Line 1, Line 2',
+      city: 'Bogota',
+      country: 'CO',
+      documentType: 'Cédula de ciudadanía',
+      email: 'fields@example.com',
+      fullName: undefined,
+      idNumber: 'FIELD-ID',
+      phone: '999',
+    }))
+  })
 })

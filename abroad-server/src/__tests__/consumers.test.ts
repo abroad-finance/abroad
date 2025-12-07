@@ -50,10 +50,35 @@ describe('consumers lifecycle', () => {
     await stopConsumers()
     expect(queueHandler.closeAllSubscriptions).toHaveBeenCalled()
   })
+
+  it('stops gracefully when the queue handler cannot close subscriptions', async () => {
+    queueHandler = createMockQueueHandler({
+      closeAllSubscriptions: undefined as unknown as MockQueueHandler['closeAllSubscriptions'],
+    })
+    getMock.mockImplementation((token: unknown) => {
+      switch (token) {
+        case TYPES.BinanceBalanceUpdatedController:
+          return binanceController
+        case TYPES.IQueueHandler:
+          return queueHandler
+        case TYPES.PaymentSentController:
+          return paymentController
+        case TYPES.PaymentStatusUpdatedController:
+          return paymentStatusController
+        case TYPES.ReceivedCryptoTransactionController:
+          return receivedController
+        default:
+          return {}
+      }
+    })
+
+    await expect(stopConsumers()).resolves.not.toThrow()
+  })
 })
 
 describe('consumers entrypoint health server', () => {
   beforeEach(() => {
+    queueHandler = createMockQueueHandler()
     getMock.mockImplementation((token: unknown) => {
       switch (token) {
         case TYPES.BinanceBalanceUpdatedController:
@@ -96,6 +121,16 @@ describe('consumers entrypoint health server', () => {
     recordedHandler(toIncomingMessage({ url: '/readyz' }), toServerResponse(readyAfterRes))
     expect(readyAfterRes.statusCode).toBe(503)
     expect(readyAfterChunks.join('')).toBe('not ready')
+
+    const { body: unknownChunks, res: unknownRes } = createResponseRecorder<string>()
+    recordedHandler(toIncomingMessage({ url: '/missing' }), toServerResponse(unknownRes))
+    expect(unknownRes.statusCode).toBe(404)
+    expect(unknownChunks.join('')).toBe('not found')
+
+    const { body: defaultChunks, res: defaultRes } = createResponseRecorder<string>()
+    recordedHandler(toIncomingMessage({}), toServerResponse(defaultRes))
+    expect(defaultRes.statusCode).toBe(200)
+    expect(defaultChunks.join('')).toBe('ok')
     exitSpy.restore()
   })
 })

@@ -6,48 +6,59 @@ import type { ISecretManager } from '../../interfaces/ISecretManager'
 
 import { StellarWalletHandler } from '../../services/StellarWalletHandler'
 
+const fetchBaseFeeMock = jest.fn(async () => 100)
+const loadAccountMock = jest.fn(async () => ({ accountId: 'source-account' }))
 const submitTransactionMock = jest.fn()
+const operationCallMock: jest.Mock<Promise<{ source_account?: string }>, []> = jest.fn(async () => ({
+  source_account: 'source-account',
+}))
+const operationsMock = jest.fn(() => ({
+  operation: () => ({
+    call: operationCallMock,
+  }),
+}))
 const existingTx = { id: 'existing-tx' }
+const transactionLookupMock = jest.fn(async () => existingTx)
+const transactionsMock = jest.fn(() => ({
+  transaction: () => ({
+    call: transactionLookupMock,
+  }),
+}))
 const builtTx = {
   hash: jest.fn(() => Buffer.from('abcd', 'hex')),
   sign: jest.fn(),
 }
+const addMemoMock = jest.fn().mockReturnThis()
+const addOperationMock = jest.fn().mockReturnThis()
+const setTimeoutMock = jest.fn().mockReturnThis()
+const buildMock = jest.fn(() => builtTx)
 
 const mockKeypair = {
   publicKey: () => 'PUBLIC-KEY',
   sign: jest.fn(),
 }
+// eslint-disable-next-line no-var
+var memoTextMock: jest.Mock
 
 jest.mock('@stellar/stellar-sdk', () => {
+  memoTextMock = jest.fn((m: string) => ({ memo: m }))
   class MockServer {
-    fetchBaseFee = jest.fn(async () => 100)
+    fetchBaseFee = fetchBaseFeeMock
 
-    loadAccount = jest.fn(async () => ({ accountId: 'source-account' }))
+    loadAccount = loadAccountMock
 
     submitTransaction = submitTransactionMock
     public constructor(public readonly url: string) {}
-    operations() {
-      return {
-        operation: () => ({
-          call: async () => ({ source_account: 'source-account' }),
-        }),
-      }
-    }
+    operations = operationsMock
 
-    transactions() {
-      return {
-        transaction: () => ({
-          call: async () => existingTx,
-        }),
-      }
-    }
+    transactions = transactionsMock
   }
 
   class MockTransactionBuilder {
-    addMemo = jest.fn().mockReturnThis()
-    addOperation = jest.fn().mockReturnThis()
-    build = jest.fn(() => builtTx)
-    setTimeout = jest.fn().mockReturnThis()
+    addMemo = addMemoMock
+    addOperation = addOperationMock
+    build = buildMock
+    setTimeout = setTimeoutMock
     public constructor() {}
   }
 
@@ -57,7 +68,7 @@ jest.mock('@stellar/stellar-sdk', () => {
     },
     Horizon: { Server: MockServer },
     Keypair: { fromSecret: jest.fn(() => mockKeypair) },
-    Memo: { text: (m: string) => ({ memo: m }) },
+    Memo: { text: memoTextMock },
     Networks: { PUBLIC: 'PUBLIC' },
     Operation: { payment: (args: unknown) => args },
     Transaction: class {},
@@ -77,6 +88,17 @@ describe('StellarWalletHandler', () => {
     jest.clearAllMocks()
     builtTx.hash.mockClear()
     builtTx.sign.mockClear()
+    buildMock.mockClear()
+    addMemoMock.mockClear()
+    addOperationMock.mockClear()
+    setTimeoutMock.mockClear()
+    memoTextMock.mockClear()
+    fetchBaseFeeMock.mockClear()
+    loadAccountMock.mockClear()
+    operationCallMock.mockClear()
+    transactionLookupMock.mockClear()
+    operationsMock.mockClear()
+    transactionsMock.mockClear()
     mockKeypair.sign.mockClear()
     ;(secretManager.getSecret as jest.Mock).mockResolvedValue('value')
     submitTransactionMock.mockResolvedValue({ hash: 'tx-hash' })
@@ -113,6 +135,48 @@ describe('StellarWalletHandler', () => {
     expect(result).toEqual({ success: true, transactionId: 'tx-hash' })
   })
 
+  it('trims long memos and skips memo when absent', async () => {
+    ;(secretManager.getSecret as jest.Mock).mockResolvedValueOnce('https://horizon.test')
+    ;(secretManager.getSecret as jest.Mock).mockResolvedValueOnce('secret-key')
+    ;(secretManager.getSecret as jest.Mock).mockResolvedValueOnce('issuer')
+    const handler = new StellarWalletHandler(secretManager as unknown as ISecretManager, lockManager as unknown as ILockManager)
+
+    const longMemo = 'x'.repeat(40)
+    await handler.send({
+      address: 'DESTINATION',
+      amount: 5,
+      cryptoCurrency: CryptoCurrency.USDC,
+      memo: longMemo,
+    })
+
+    const trimmedMemo = memoTextMock.mock.calls[0][0]
+    expect(trimmedMemo.length).toBeLessThanOrEqual(28)
+    expect(addMemoMock).toHaveBeenCalledTimes(1)
+
+    addMemoMock.mockClear()
+    memoTextMock.mockClear()
+    await handler.send({
+      address: 'DESTINATION',
+      amount: 2,
+      cryptoCurrency: CryptoCurrency.USDC,
+      memo: undefined,
+    })
+    expect(addMemoMock).not.toHaveBeenCalled()
+  })
+
+  it('returns existing transactions without resubmitting on timeout', async () => {
+    const timeoutError = Object.assign(new Error('timeout'), { response: { status: 504 } })
+    submitTransactionMock.mockRejectedValueOnce(timeoutError)
+    const handler = new StellarWalletHandler(secretManager as unknown as ISecretManager, lockManager as unknown as ILockManager)
+    const server = new (jest.requireMock('@stellar/stellar-sdk').Horizon.Server)('https://horizon.test')
+
+    const result = await (handler as unknown as { submitWithRetry: (srv: unknown, tx: typeof builtTx) => Promise<unknown> }).submitWithRetry(server, builtTx)
+
+    expect(result).toEqual(existingTx)
+    expect(submitTransactionMock).toHaveBeenCalledTimes(1)
+    expect(transactionLookupMock).toHaveBeenCalled()
+  })
+
   it('retries once on submission timeout and returns existing transaction', async () => {
     const timeoutError = Object.assign(new Error('timeout'), {
       response: { status: 504 },
@@ -132,5 +196,42 @@ describe('StellarWalletHandler', () => {
 
     expect(result).toEqual({ hash: 'retry-hash' })
     expect(submitTransactionMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('detects timeouts by message and rethrows non-timeout failures', async () => {
+    const handler = new StellarWalletHandler(secretManager as unknown as ISecretManager, lockManager as unknown as ILockManager)
+    const server = new (jest.requireMock('@stellar/stellar-sdk').Horizon.Server)('https://horizon.test')
+
+    submitTransactionMock.mockRejectedValueOnce(new Error('request timed out'))
+    const retryResult = await (handler as unknown as { submitWithRetry: (srv: unknown, tx: typeof builtTx) => Promise<unknown> }).submitWithRetry(server, builtTx)
+    expect(retryResult).toEqual(existingTx)
+
+    submitTransactionMock.mockRejectedValueOnce(new Error('bad request'))
+    await expect(
+      (handler as unknown as { submitWithRetry: (srv: unknown, tx: typeof builtTx) => Promise<unknown> }).submitWithRetry(server, builtTx),
+    ).rejects.toThrow('bad request')
+  })
+
+  it('resolves the source account address and surfaces horizon failures', async () => {
+    const handler = new StellarWalletHandler(secretManager as unknown as ISecretManager, lockManager as unknown as ILockManager)
+
+    const address = await handler.getAddressFromTransaction({ onChainId: 'op-1' })
+    expect(address).toBe('source-account')
+
+    operationCallMock.mockResolvedValueOnce({})
+    const fallback = await handler.getAddressFromTransaction({ onChainId: 'op-2' })
+    expect(fallback).toBe('')
+
+    operationCallMock.mockRejectedValueOnce(new Error('horizon down'))
+    await expect(handler.getAddressFromTransaction({ onChainId: 'op-3' })).rejects.toThrow(
+      'Failed to fetch transaction with ID op-3',
+    )
+  })
+
+  it('throws when no onChainId is provided', async () => {
+    const handler = new StellarWalletHandler(secretManager as unknown as ISecretManager, lockManager as unknown as ILockManager)
+    await expect(handler.getAddressFromTransaction({ onChainId: undefined })).rejects.toThrow(
+      'onChainId is required to get address from transaction',
+    )
   })
 })

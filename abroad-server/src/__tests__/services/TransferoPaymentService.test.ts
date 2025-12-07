@@ -125,6 +125,32 @@ describe('TransferoPaymentService', () => {
       expect(liquidity).toBe(0)
       expect(logger.error).toHaveBeenCalledWith('Transfero getLiquidity error:', 'network down')
     })
+
+    it('stringifies axios error payloads on failures', async () => {
+      mockedAxios.isAxiosError.mockReturnValueOnce(true)
+      mockedAxios.get.mockRejectedValueOnce({ response: { data: { detail: 'bad' } } })
+      const service = new TransferoPaymentService(secretManager, dbProvider, pixDecoder, logger)
+      const tokenAccessor = service as unknown as { getAccessToken: () => Promise<string> }
+      jest.spyOn(tokenAccessor, 'getAccessToken').mockResolvedValue('token-err')
+
+      const liquidity = await service.getLiquidity()
+
+      expect(liquidity).toBe(0)
+      expect(logger.error).toHaveBeenCalledWith('Transfero getLiquidity error:', JSON.stringify({ detail: 'bad' }))
+    })
+
+    it('falls back to error message when axios payload is empty', async () => {
+      mockedAxios.isAxiosError.mockReturnValueOnce(true)
+      mockedAxios.get.mockRejectedValueOnce({ message: 'boom' })
+      const service = new TransferoPaymentService(secretManager, dbProvider, pixDecoder, logger)
+      const tokenAccessor = service as unknown as { getAccessToken: () => Promise<string> }
+      jest.spyOn(tokenAccessor, 'getAccessToken').mockResolvedValue('token-msg')
+
+      const liquidity = await service.getLiquidity()
+
+      expect(liquidity).toBe(0)
+      expect(logger.error).toHaveBeenCalledWith('Transfero getLiquidity error:', JSON.stringify('boom'))
+    })
   })
 
   describe('buildContract', () => {
@@ -258,6 +284,49 @@ describe('TransferoPaymentService', () => {
         'Partner user not found or tax ID is missing.',
       )
     })
+
+    it('logs axios error payloads when submission fails', async () => {
+      prismaClient.transaction.findUnique.mockResolvedValue({ id: 'txn-err', taxId: 'TAX-ERR' })
+      mockedAxios.isAxiosError.mockReturnValue(true)
+      mockedAxios.post.mockRejectedValueOnce({ response: { data: { reason: 'denied' } } })
+      const service = new TransferoPaymentService(secretManager, dbProvider, pixDecoder, logger)
+      const tokenAccessor = service as unknown as { getAccessToken: () => Promise<string> }
+      jest.spyOn(tokenAccessor, 'getAccessToken').mockResolvedValue('token-err')
+
+      const result = await service.sendPayment({
+        account: '11999999999',
+        bankCode: '001',
+        id: 'txn-err',
+        qrCode: null,
+        value: 10,
+      })
+
+      expect(result).toEqual({ success: false })
+      expect(logger.error).toHaveBeenCalledWith(
+        'Transfero sendPayment error:',
+        JSON.stringify({ reason: 'denied' }),
+      )
+    })
+
+    it('handles axios errors without response bodies', async () => {
+      prismaClient.transaction.findUnique.mockResolvedValue({ id: 'txn-plain', taxId: 'TAX-PLAIN' })
+      mockedAxios.isAxiosError.mockReturnValue(true)
+      mockedAxios.post.mockRejectedValueOnce({ message: 'plain axios' })
+      const service = new TransferoPaymentService(secretManager, dbProvider, pixDecoder, logger)
+      const tokenAccessor = service as unknown as { getAccessToken: () => Promise<string> }
+      jest.spyOn(tokenAccessor, 'getAccessToken').mockResolvedValue('token-plain')
+
+      const result = await service.sendPayment({
+        account: '123',
+        bankCode: '001',
+        id: 'txn-plain',
+        qrCode: null,
+        value: 5,
+      })
+
+      expect(result).toEqual({ success: false })
+      expect(logger.error).toHaveBeenCalledWith('Transfero sendPayment error:', JSON.stringify('plain axios'))
+    })
   })
 
   describe('helpers', () => {
@@ -281,6 +350,88 @@ describe('TransferoPaymentService', () => {
       expect(extractor.extractLiquidityFromBalance({ balance: { amount: '100', currency: 'BRL' } }, 'BRL')).toBe(100)
       expect(extractor.extractLiquidityFromBalance({ balance: { amount: '100', currency: 'USD' } }, 'BRL')).toBeNull()
       expect(extractor.extractLiquidityFromBalance({ balance: { amount: 'oops', currency: 'BRL' } }, 'BRL')).toBeNull()
+    })
+
+    it('refreshes expired tokens and falls back when QR decoding lacks data', async () => {
+      const nowSpy = jest.spyOn(Date, 'now')
+      nowSpy.mockReturnValue(0)
+      const service = new TransferoPaymentService(secretManager, dbProvider, { decode: jest.fn(async () => null) }, logger)
+      const tokenAccessor = service as unknown as { getAccessToken: () => Promise<string> }
+      mockedAxios.post.mockResolvedValue({ data: { access_token: 'fresh', expires_in: 1 } } as AxiosResponse<{ access_token: string, expires_in: number }>)
+
+      const first = await tokenAccessor.getAccessToken()
+      nowSpy.mockReturnValue(2000) // past expiry (1s - 60s buffer forces refresh)
+      mockedAxios.post.mockResolvedValue({ data: { access_token: 'refreshed', expires_in: 900 } } as AxiosResponse<{ access_token: string, expires_in: number }>)
+      const second = await tokenAccessor.getAccessToken()
+      nowSpy.mockRestore()
+
+      expect(first).toBe('fresh')
+      expect(second).toBe('refreshed')
+
+      const builder = service as unknown as {
+        buildContract: (input: { account: string, qrCode?: null | string, taxId: string, value: number }) => Promise<Array<Record<string, number | string | null>>>
+      }
+      const contract = await builder.buildContract({
+        account: 'abc-123',
+        qrCode: 'qr-without-data',
+        taxId: 'FALLBACK',
+        value: 99,
+      })
+      expect(contract[0]).toMatchObject({ name: 'Recipient', taxId: 'FALLBACK' })
+    })
+
+    it('reuses cached tokens and exercises phone normalization edge cases', async () => {
+      const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(0)
+      const service = new TransferoPaymentService(secretManager, dbProvider, pixDecoder, logger)
+      const accessor = service as unknown as { getAccessToken: () => Promise<string> }
+      mockedAxios.post.mockResolvedValue({ data: { access_token: 'cached', expires_in: 900 } } as AxiosResponse<{ access_token: string, expires_in: number }>)
+      const first = await accessor.getAccessToken()
+      nowSpy.mockReturnValue(1000)
+      const second = await accessor.getAccessToken()
+      expect(first).toBe(second)
+      nowSpy.mockRestore()
+
+      const builder = service as unknown as {
+        buildContract: (input: { account: string, qrCode?: null | string, taxId: string, value: number }) => Promise<Array<Record<string, number | string | null>>>
+      }
+
+      const emptyDigits = await builder.buildContract({
+        account: '---',
+        qrCode: null,
+        taxId: 'T',
+        value: 1,
+      })
+      expect(emptyDigits[0]).toMatchObject({ pixKey: '---' })
+
+      const nullInput = await builder.buildContract({
+        account: null as unknown as string,
+        qrCode: null,
+        taxId: 'T',
+        value: 1,
+      })
+      expect(nullInput[0]).toMatchObject({ pixKey: null })
+
+      const invalidLandline = await builder.buildContract({
+        account: '1199999999',
+        qrCode: null,
+        taxId: 'T',
+        value: 1,
+      })
+      expect(invalidLandline[0]).toMatchObject({ pixKey: '1199999999' })
+    })
+
+    it('handles token responses without access_token or expiry', async () => {
+      mockedAxios.post.mockResolvedValueOnce({
+        config: { headers: {} },
+        data: { expires_in: undefined, token: 'raw' },
+        headers: {},
+        status: 200,
+        statusText: 'OK',
+      } as unknown as AxiosResponse<Record<string, unknown>>)
+      const service = new TransferoPaymentService(secretManager, dbProvider, pixDecoder, logger)
+      const accessor = service as unknown as { getAccessToken: () => Promise<unknown> }
+      const value = await accessor.getAccessToken()
+      expect(value).toEqual({ expires_in: undefined, token: 'raw' })
     })
   })
 })

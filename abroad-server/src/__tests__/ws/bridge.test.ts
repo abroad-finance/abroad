@@ -33,12 +33,14 @@ describe('ws bridge', () => {
   beforeEach(() => {
     jest.resetModules()
     subscriptionHandler = undefined
-    queueHandler.closeAllSubscriptions.mockClear()
-    queueHandler.subscribeToQueue.mockClear()
-    queueHandler.postMessage.mockClear()
-    webSocketService.emitToUser.mockClear()
-    webSocketService.start.mockClear()
-    webSocketService.stop.mockClear()
+    queueHandler.closeAllSubscriptions = jest.fn(async () => undefined)
+    queueHandler.subscribeToQueue = jest.fn(async (_queue: QueueName, handler: SubscriptionHandler) => {
+      subscriptionHandler = handler
+    })
+    queueHandler.postMessage = jest.fn()
+    webSocketService.emitToUser = jest.fn()
+    webSocketService.start = jest.fn(async () => undefined)
+    webSocketService.stop = jest.fn(async () => undefined)
     getMock.mockImplementation((token: unknown) => {
       if (token === TYPES.IWebSocketService) return webSocketService
       if (token === TYPES.IQueueHandler) return queueHandler
@@ -88,6 +90,32 @@ describe('ws bridge', () => {
     const sigintHandler = getLastProcessListener('SIGINT')
     await sigintHandler?.('SIGINT')
     expect(queueHandler.closeAllSubscriptions).toHaveBeenCalled()
+    expect(webSocketService.stop).toHaveBeenCalled()
+    exitSpy.restore()
+  })
+
+  it('uses userId when provided and defaults payloads safely', async () => {
+    const exitSpy = mockProcessExit()
+    queueHandler.closeAllSubscriptions = undefined as unknown as typeof queueHandler.closeAllSubscriptions
+
+    await import('../../ws')
+    await flushAsyncOperations()
+
+    subscriptionHandler?.({
+      payload: { ok: true },
+      type: 'ready',
+      userId: 'user-3',
+    })
+    subscriptionHandler?.({
+      type: 'ready',
+      userId: 'user-3',
+    })
+
+    expect(webSocketService.emitToUser).toHaveBeenCalledWith('user-3', 'ready', { ok: true })
+    expect(webSocketService.emitToUser).toHaveBeenCalledWith('user-3', 'ready', {})
+
+    const handler = getLastProcessListener('SIGINT')
+    await handler?.('SIGINT')
     expect(webSocketService.stop).toHaveBeenCalled()
     exitSpy.restore()
   })

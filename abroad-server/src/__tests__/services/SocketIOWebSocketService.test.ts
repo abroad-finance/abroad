@@ -60,4 +60,22 @@ describe('SocketIOWebSocketService', () => {
     await service.stop()
     expect(closeMock).toHaveBeenCalledTimes(1)
   })
+
+  it('is idempotent on start and tolerates missing auth/user ids', async () => {
+    const service = new SocketIOWebSocketService()
+    await service.start(9999)
+
+    // Start again should return early without new listeners
+    await service.start(9999)
+    expect(listenMock).toHaveBeenCalledTimes(1)
+
+    const connectionHandler = onMock.mock.calls[0][1]
+    const socket = { handshake: { auth: {} }, join: joinMock }
+    connectionHandler(socket)
+    expect(joinMock).not.toHaveBeenCalled()
+
+    // emit without payload should default to empty object
+    service.emitToUser('u2', 'evt')
+    expect(emitMock).toHaveBeenCalledWith('evt', {})
+  })
 })

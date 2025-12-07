@@ -191,6 +191,30 @@ describe('server bootstrap', () => {
     expect(serverMock.close).toHaveBeenCalledTimes(2)
     expect(exitMock.exitSpy).toHaveBeenCalled()
     expect(responses.length).toBeGreaterThan(0)
+
+    // Production error middleware path
+    const errorHandler = registered.uses.find(u => u.handler.length === 4)?.handler as (
+      err: unknown,
+      req: RequestStub,
+      res: ResponseStub,
+      next?: () => void
+    ) => void
+    const json = jest.fn()
+    const status = jest.fn(() => ({ json }))
+    errorHandler?.(new Error('boom'), {}, { status })
+    expect(status).toHaveBeenCalledWith(500)
+    expect(json).toHaveBeenCalledWith({
+      message: 'boom',
+      reason: 'boom',
+    })
+
+    // Admin initialization failure is logged and swallowed
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {})
+    await jest.isolateModules(async () => {
+      await import('../server')
+    })
+    expect(warnSpy).toHaveBeenCalled()
+    warnSpy.mockRestore()
     exitMock.restore()
   })
 })
