@@ -4,7 +4,7 @@ import path from 'node:path'
 import ts from 'typescript'
 import escomplex, { type ModuleReport } from 'typhonjs-escomplex'
 
-import * as maintainabilityReport from '../../scripts/maintainability-report'
+import * as maintainabilityReport from '../../../scripts/maintainability-report'
 
 const tempCleanups: Array<() => Promise<void>> = []
 

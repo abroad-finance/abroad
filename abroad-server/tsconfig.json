@@ -17,7 +17,7 @@
     ]
   },
   "include": [
-    "./src/**/*",
+    "./src/**/*", "scripts/maintainability-report.ts",
   ],
   "exclude": [
     "node_modules",
