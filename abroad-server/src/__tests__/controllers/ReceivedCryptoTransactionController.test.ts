@@ -89,6 +89,7 @@ function buildPaymentService(): PaymentServiceMock {
     fixedFee: 0,
     getLiquidity: jest.fn(async () => 0),
     isAsync: false,
+    isEnabled: true,
     MAX_TOTAL_AMOUNT_PER_DAY: 1000,
     MAX_USER_AMOUNT_PER_DAY: 900,
     MAX_USER_AMOUNT_PER_TRANSACTION: 500,

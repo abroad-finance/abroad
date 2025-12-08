@@ -12,6 +12,7 @@ const buildPaymentService = (label: string): IPaymentService => ({
   fixedFee: 0,
   getLiquidity: async () => 0,
   isAsync: false,
+  isEnabled: true,
   MAX_TOTAL_AMOUNT_PER_DAY: 0,
   MAX_USER_AMOUNT_PER_DAY: 0,
   MAX_USER_AMOUNT_PER_TRANSACTION: 0,

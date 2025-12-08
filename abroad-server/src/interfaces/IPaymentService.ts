@@ -12,6 +12,7 @@ export interface IPaymentService {
   getLiquidity: () => Promise<number>
 
   readonly isAsync: boolean
+  readonly isEnabled: boolean
   readonly MAX_TOTAL_AMOUNT_PER_DAY: number
   readonly MAX_USER_AMOUNT_PER_DAY: number
   readonly MAX_USER_AMOUNT_PER_TRANSACTION: number

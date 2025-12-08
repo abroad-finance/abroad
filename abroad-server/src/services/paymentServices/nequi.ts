@@ -36,6 +36,7 @@ export class NequiPaymentService implements IPaymentService {
   public readonly currency = TargetCurrency.COP
   public readonly fixedFee = 0.0
   public readonly isAsync: boolean = false
+  public readonly isEnabled = true
 
   public readonly MAX_TOTAL_AMOUNT_PER_DAY: number = 10_000_000
   public readonly MAX_USER_AMOUNT_PER_DAY: number = 10_000_000

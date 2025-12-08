@@ -11,6 +11,7 @@ import { inject, injectable } from 'inversify'
 
 import { IDatabaseClientProvider } from '../interfaces/IDatabaseClientProvider'
 import { IExchangeProviderFactory } from '../interfaces/IExchangeProviderFactory'
+import { IPaymentService } from '../interfaces/IPaymentService'
 import { IPaymentServiceFactory } from '../interfaces/IPaymentServiceFactory'
 import { ISecretManager } from '../interfaces/ISecretManager'
 import { TYPES } from '../types'
@@ -76,6 +77,7 @@ export class QuoteUseCase implements IQuoteUseCase {
     const exchangeRateWithFee = this.applyExchangeFee(exchangeRate, exchangeRateProvider.exchangePercentageFee)
 
     const paymentService = this.paymentServiceFactory.getPaymentService(paymentMethod)
+    this.ensurePaymentServiceIsEnabled(paymentService, paymentMethod)
 
     // Enforce max user amount
     if (amount > paymentService.MAX_USER_AMOUNT_PER_TRANSACTION) {
@@ -135,6 +137,7 @@ export class QuoteUseCase implements IQuoteUseCase {
     const exchangeRateWithFee = this.applyExchangeFee(exchangeRate, exchangeRateProvider.exchangePercentageFee)
 
     const paymentService = this.paymentServiceFactory.getPaymentService(paymentMethod)
+    this.ensurePaymentServiceIsEnabled(paymentService, paymentMethod)
     const targetAmount = this.calculateTargetAmount(sourceAmountInput, exchangeRateWithFee, paymentService.fixedFee)
 
     // Enforce max user amount
@@ -194,6 +197,12 @@ export class QuoteUseCase implements IQuoteUseCase {
   private calculateTargetAmount(sourceAmount: number, exchangeRate: number, fixedFee: number): number {
     const result = sourceAmount / exchangeRate - fixedFee
     return Number(result.toFixed(2))
+  }
+
+  private ensurePaymentServiceIsEnabled(paymentService: IPaymentService, paymentMethod: PaymentMethod): void {
+    if (!paymentService.isEnabled) {
+      throw new Error(`Payment method ${paymentMethod} is currently unavailable`)
+    }
   }
 
   private getExpirationDate(): Date {

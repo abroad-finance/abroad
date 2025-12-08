@@ -47,6 +47,7 @@ export class TransactionAcceptanceService {
     const prismaClient = await this.prismaClientProvider.getClient()
     const quote = await this.fetchQuote(prismaClient, request.quoteId, partner.id)
     const paymentService = this.paymentServiceFactory.getPaymentService(quote.paymentMethod)
+    this.assertPaymentServiceIsEnabled(paymentService, quote.paymentMethod)
 
     await this.ensureAccountIsValid(paymentService, request.accountNumber, request.bankCode)
 
@@ -91,6 +92,12 @@ export class TransactionAcceptanceService {
       taxId: request.taxId,
       userId: request.userId,
     })
+  }
+
+  private assertPaymentServiceIsEnabled(paymentService: ReturnType<IPaymentServiceFactory['getPaymentService']>, paymentMethod: PaymentMethod): void {
+    if (!paymentService.isEnabled) {
+      throw new TransactionValidationError(`Payment method ${paymentMethod} is currently unavailable`)
+    }
   }
 
   private async calculateMonthlyAmount(

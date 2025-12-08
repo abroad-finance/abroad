@@ -21,6 +21,7 @@ const buildPaymentService = (overrides?: Partial<IPaymentService>): IPaymentServ
   fixedFee: 1,
   getLiquidity: async () => 0,
   isAsync: false,
+  isEnabled: true,
   MAX_TOTAL_AMOUNT_PER_DAY: 0,
   MAX_USER_AMOUNT_PER_DAY: 0,
   MAX_USER_AMOUNT_PER_TRANSACTION: 1_000,
@@ -167,5 +168,26 @@ describe('QuoteUseCase', () => {
       sourceAmountInput: 50,
       targetCurrency: TargetCurrency.COP,
     })).rejects.toThrow('The maximum allowed amount for COP is 1 COP')
+  })
+
+  it('rejects quotes when the payment method is disabled', async () => {
+    const disabledService = buildPaymentService({ isEnabled: false })
+    ;(paymentServiceFactory.getPaymentService as jest.Mock).mockReturnValue(disabledService)
+
+    await expect(quoteUseCase.createQuote({
+      amount: 50,
+      cryptoCurrency: CryptoCurrency.USDC,
+      network: BlockchainNetwork.STELLAR,
+      paymentMethod: PaymentMethod.MOVII,
+      targetCurrency: TargetCurrency.COP,
+    })).rejects.toThrow('Payment method MOVII is currently unavailable')
+
+    await expect(quoteUseCase.createReverseQuote({
+      cryptoCurrency: CryptoCurrency.USDC,
+      network: BlockchainNetwork.STELLAR,
+      paymentMethod: PaymentMethod.NEQUI,
+      sourceAmountInput: 25,
+      targetCurrency: TargetCurrency.COP,
+    })).rejects.toThrow('Payment method NEQUI is currently unavailable')
   })
 })

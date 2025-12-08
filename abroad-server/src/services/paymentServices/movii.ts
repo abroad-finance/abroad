@@ -36,7 +36,8 @@ export class MoviiPaymentService implements IPaymentService {
   public readonly currency = TargetCurrency.COP
   public readonly fixedFee = 0.0
 
-  isAsync: boolean = false
+  public readonly isAsync = false
+  public readonly isEnabled = true
   public readonly MAX_TOTAL_AMOUNT_PER_DAY: number = 25_000_000
   public readonly MAX_USER_AMOUNT_PER_DAY: number = 25_000_000
   public readonly MAX_USER_AMOUNT_PER_TRANSACTION: number = 5_000_000

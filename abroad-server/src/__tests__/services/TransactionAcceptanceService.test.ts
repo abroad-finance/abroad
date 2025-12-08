@@ -1,4 +1,4 @@
-import { Country, TargetCurrency } from '@prisma/client'
+import { Country, PaymentMethod, TargetCurrency } from '@prisma/client'
 
 import { TransactionAcceptanceService, TransactionValidationError } from '../../services/TransactionAcceptanceService'
 
@@ -26,6 +26,7 @@ const paymentService = {
   fixedFee: 0,
   getLiquidity: jest.fn(async () => 0),
   isAsync: false,
+  isEnabled: true,
   MAX_TOTAL_AMOUNT_PER_DAY: 100,
   MAX_USER_AMOUNT_PER_DAY: 100,
   MAX_USER_AMOUNT_PER_TRANSACTION: 100,
@@ -100,5 +101,48 @@ describe('TransactionAcceptanceService helpers', () => {
       type: 'transaction.created',
       userId: 'user-1',
     }))
+  })
+
+  it('rejects accepting transactions for disabled payment services', async () => {
+    const disabledPaymentService = { ...paymentService, isEnabled: false }
+    const disabledFactory = { getPaymentService: jest.fn(() => disabledPaymentService) }
+    const quoteId = 'quote-id'
+    const request = {
+      accountNumber: '123',
+      bankCode: '001',
+      quoteId,
+      userId: 'user-id',
+    }
+    const partnerContext = {
+      id: 'partner-id',
+      isKybApproved: false,
+      needsKyc: false,
+      webhookUrl: 'https://webhook',
+    }
+    const prismaClient = {
+      quote: {
+        findUnique: jest.fn(async () => ({
+          country: Country.CO,
+          id: quoteId,
+          partnerId: partnerContext.id,
+          paymentMethod: PaymentMethod.MOVII,
+          sourceAmount: 10,
+          targetAmount: 10,
+        })),
+      },
+    }
+    prismaProvider.getClient.mockResolvedValue(prismaClient as unknown as import('@prisma/client').PrismaClient)
+
+    const acceptanceService = new TransactionAcceptanceService(
+      prismaProvider,
+      disabledFactory as unknown as typeof paymentServiceFactory,
+      kycService,
+      webhookNotifier,
+      queueHandler,
+    )
+
+    await expect(acceptanceService.acceptTransaction(request, partnerContext)).rejects.toThrow('Payment method MOVII is currently unavailable')
+    expect(disabledFactory.getPaymentService).toHaveBeenCalledWith(PaymentMethod.MOVII)
+    expect(disabledPaymentService.verifyAccount).not.toHaveBeenCalled()
   })
 })

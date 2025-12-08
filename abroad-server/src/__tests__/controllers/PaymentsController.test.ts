@@ -27,6 +27,7 @@ const buildPaymentService = (
   fixedFee: 0,
   getLiquidity: jest.fn(async () => 75),
   isAsync: false,
+  isEnabled: true,
   MAX_TOTAL_AMOUNT_PER_DAY: 0,
   MAX_USER_AMOUNT_PER_DAY: 0,
   MAX_USER_AMOUNT_PER_TRANSACTION: 0,

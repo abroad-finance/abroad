@@ -43,7 +43,8 @@ export class TransferoPaymentService implements IPaymentService {
   banks = []
   currency: TargetCurrency = TargetCurrency.BRL
   fixedFee = 0.0
-  isAsync: boolean = true
+  public readonly isAsync = true
+  public readonly isEnabled = true
 
   readonly MAX_TOTAL_AMOUNT_PER_DAY = Number.POSITIVE_INFINITY
   readonly MAX_USER_AMOUNT_PER_DAY = Number.POSITIVE_INFINITY

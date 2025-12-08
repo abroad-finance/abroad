@@ -1,5 +1,5 @@
 import 'reflect-metadata'
-import { TransactionStatus } from '@prisma/client'
+import { Country, PaymentMethod, TargetCurrency, TransactionStatus } from '@prisma/client'
 import { NotFound } from 'http-errors'
 
 import type { IQueueHandler } from '../../interfaces'
@@ -39,6 +39,30 @@ const buildController = () => {
     prisma,
   }
 }
+
+const buildPaymentService = (overrides?: Partial<jest.Mocked<IPaymentService>>): jest.Mocked<IPaymentService> => ({
+  banks: [],
+  currency: TargetCurrency.COP,
+  fixedFee: 0,
+  getLiquidity: jest.fn(async () => 1_000),
+  isAsync: false,
+  isEnabled: true,
+  MAX_TOTAL_AMOUNT_PER_DAY: 500,
+  MAX_USER_AMOUNT_PER_DAY: 500,
+  MAX_USER_AMOUNT_PER_TRANSACTION: 500,
+  MAX_USER_TRANSACTIONS_PER_DAY: 3,
+  onboardUser: jest.fn(async ({ account }: { account: string }) => ({ message: undefined, success: Boolean(account) })),
+  percentageFee: 0,
+  sendPayment: jest.fn(async (params: {
+    account: string
+    bankCode: string
+    id: string
+    qrCode?: null | string
+    value: number
+  }) => ({ success: Boolean(params.account && params.bankCode && params.value), transactionId: 'tx-id' })),
+  verifyAccount: jest.fn(async ({ account, bankCode }: { account: string, bankCode: string }) => Boolean(account && bankCode)),
+  ...(overrides ?? {}),
+})
 
 const badRequest = jest.fn((status: number, payload: { reason: string }) => payload)
 const authRequest = (partnerId: string) => ({ user: { id: partnerId } } as unknown as import('express').Request)
@@ -92,10 +116,10 @@ describe('TransactionController acceptance flows', () => {
   }
 
   const baseQuote = {
-    country: 'CO',
+    country: Country.CO,
     id: 'quote-1',
     partnerId: partner.id,
-    paymentMethod: 'PIX',
+    paymentMethod: PaymentMethod.PIX,
     sourceAmount: 25,
     targetAmount: 50,
   }
@@ -105,12 +129,7 @@ describe('TransactionController acceptance flows', () => {
       kycLink: null | string
       needsKyc: boolean
       partnerIsKybApproved: boolean
-      paymentService: {
-        getLiquidity: jest.Mock
-        MAX_TOTAL_AMOUNT_PER_DAY: number
-        MAX_USER_TRANSACTIONS_PER_DAY: number
-        verifyAccount: jest.Mock
-      }
+      paymentService: Partial<jest.Mocked<IPaymentService>>
       quote: unknown
       transactionCreate: () => Promise<unknown>
       transactionFindMany: unknown[][]
@@ -130,12 +149,7 @@ describe('TransactionController acceptance flows', () => {
       },
     }
 
-    const paymentService = {
-      getLiquidity: overrides?.paymentService?.getLiquidity ?? jest.fn().mockResolvedValue(1_000),
-      MAX_TOTAL_AMOUNT_PER_DAY: overrides?.paymentService?.MAX_TOTAL_AMOUNT_PER_DAY ?? 500,
-      MAX_USER_TRANSACTIONS_PER_DAY: overrides?.paymentService?.MAX_USER_TRANSACTIONS_PER_DAY ?? 3,
-      verifyAccount: overrides?.paymentService?.verifyAccount ?? jest.fn().mockResolvedValue(true),
-    }
+    const paymentService = buildPaymentService(overrides?.paymentService)
 
     const paymentServiceFactory: IPaymentServiceFactory = {
       getPaymentService: jest.fn().mockReturnValue(paymentService as unknown as IPaymentService),
@@ -312,15 +326,13 @@ describe('TransactionController acceptance flows', () => {
         findUnique: jest.fn().mockResolvedValue(fullTransaction),
       },
     }
-    const paymentService = {
+    const paymentService = buildPaymentService({
       getLiquidity: jest.fn().mockResolvedValue(1_000),
-      MAX_TOTAL_AMOUNT_PER_DAY: 500,
-      MAX_USER_TRANSACTIONS_PER_DAY: 3,
       verifyAccount: jest.fn().mockResolvedValue(true),
-    }
+    })
     const controller = new TransactionController(
       { getClient: jest.fn(async () => prisma as unknown as import('@prisma/client').PrismaClient) },
-      { getPaymentService: jest.fn().mockReturnValue(paymentService as unknown as IPaymentService) },
+      { getPaymentService: jest.fn().mockReturnValue(paymentService) },
       { getKycLink: jest.fn().mockResolvedValue(null) },
       webhookNotifier,
       { postMessage: queueHandlerPost, subscribeToQueue: jest.fn() },
