@@ -1,6 +1,6 @@
 import 'reflect-metadata'
-import type { TsoaResponse } from '@tsoa/runtime'
 import type { Partner } from '@prisma/client'
+import type { TsoaResponse } from '@tsoa/runtime'
 
 import * as admin from 'firebase-admin'
 

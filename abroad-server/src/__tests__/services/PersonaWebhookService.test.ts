@@ -1,10 +1,12 @@
-import { KycStatus, type PrismaClient } from '@prisma/client'
 import type { Request as ExpressRequest } from 'express'
 
-import { QueueName } from '../../interfaces'
+import { KycStatus, type PrismaClient } from '@prisma/client'
+
 import type { IDatabaseClientProvider } from '../../interfaces/IDatabaseClientProvider'
-import { PersonaWebhookService } from '../../services/webhooks/PersonaWebhookService'
 import type { PersonaStatus } from '../../services/webhooks/personaSchema'
+
+import { QueueName } from '../../interfaces'
+import { PersonaWebhookService } from '../../services/webhooks/PersonaWebhookService'
 import { WEBHOOK_INTERNAL_ERROR, WEBHOOK_INVALID_PAYLOAD, WEBHOOK_PROCESSED } from '../../services/webhooks/webhookMessages'
 import { createMockLogger, createMockQueueHandler, MockLogger, MockQueueHandler } from '../setup/mockFactories'
 

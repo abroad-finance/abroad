@@ -1,11 +1,13 @@
-import { TargetCurrency } from '@prisma/client'
 import type { Request as ExpressRequest } from 'express'
 
+import { TargetCurrency } from '@prisma/client'
+
 import type { IDatabaseClientProvider } from '../../interfaces/IDatabaseClientProvider'
-import { QueueName } from '../../interfaces'
-import { WebhookController } from '../../controllers/WebhookController'
 import type { PersonaWebhookService } from '../../services/webhooks/PersonaWebhookService'
 import type { WebhookProcessingResult } from '../../services/webhooks/types'
+
+import { WebhookController } from '../../controllers/WebhookController'
+import { QueueName } from '../../interfaces'
 import { createMockLogger, createMockQueueHandler, MockLogger, MockQueueHandler } from '../setup/mockFactories'
 
 const setupResponses = () => {

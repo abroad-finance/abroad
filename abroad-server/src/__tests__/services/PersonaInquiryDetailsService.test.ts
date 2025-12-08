@@ -187,9 +187,9 @@ describe('PersonaInquiryDetailsService', () => {
       buildFullNameFromAttributes: (attrs?: Record<string, unknown>) => string | undefined
       collectDocumentAttributes: (input: Array<Record<string, unknown>>) => Array<Record<string, unknown>>
       mapDocumentClassToLabel: (code: string | undefined, country?: string) => string | undefined
-      parseInquiryPayload: (payload: unknown) => null | import('../../services/PersonaInquiryDetailsService').PersonaInquiryDetails
+      parseInquiryPayload: (payload: unknown) => import('../../services/PersonaInquiryDetailsService').PersonaInquiryDetails | null
     }
-    const cacheRef = service as unknown as { cache: Map<string, null | import('../../services/PersonaInquiryDetailsService').PersonaInquiryDetails> }
+    const cacheRef = service as unknown as { cache: Map<string, import('../../services/PersonaInquiryDetailsService').PersonaInquiryDetails | null> }
 
     cacheRef.cache.set('inq-a', null)
     cacheRef.cache.set('inq-b', { fullName: 'Bob' })
@@ -205,7 +205,7 @@ describe('PersonaInquiryDetailsService', () => {
     expect(helpers.asString(123)).toBeUndefined()
 
     expect(helpers.buildFullNameFromAttributes(undefined)).toBeUndefined()
-    expect(helpers.buildFullNameFromAttributes({ 'name-first': 'Ana', 'name-middle': 'Maria', 'name-last': 'Lopez' }))
+    expect(helpers.buildFullNameFromAttributes({ 'name-first': 'Ana', 'name-last': 'Lopez', 'name-middle': 'Maria' }))
       .toBe('Ana Maria Lopez')
     expect(helpers.buildFullNameFromAttributes({ 'name-first': 'Solo' })).toBe('Solo')
 
@@ -257,7 +257,7 @@ describe('PersonaInquiryDetailsService', () => {
       extractPrimaryResource: (payload: Record<string, unknown>) => unknown
       getFieldValue: <T>(fields: Record<string, unknown> | undefined, key: string) => T | undefined
       mapDocumentClassToLabel: (code: string | undefined, country?: string) => string | undefined
-      parseInquiryPayload: (payload: unknown) => null | import('../../services/PersonaInquiryDetailsService').PersonaInquiryDetails
+      parseInquiryPayload: (payload: unknown) => import('../../services/PersonaInquiryDetailsService').PersonaInquiryDetails | null
     }
 
     // buildFullNameFromAttributes: empty attrs path
@@ -297,17 +297,17 @@ describe('PersonaInquiryDetailsService', () => {
       data: {
         data: {
           attributes: {
-            fields: {
+            'address-city': 'Bogota',
+            'address-country-code': 'CO',
+            'address-street-1': 'Line 1',
+            'address-street-2': 'Line 2',
+            'fields': {
               'email-address': { value: 'fields@example.com' },
               'identification-class': { value: 'id_card' },
               'identification-number': { value: 'FIELD-ID' },
               'phone-number': { value: '999' },
               'selected-country-code': { value: 'CO' },
             },
-            'address-city': 'Bogota',
-            'address-country-code': 'CO',
-            'address-street-1': 'Line 1',
-            'address-street-2': 'Line 2',
           },
           type: 'inquiry',
         },

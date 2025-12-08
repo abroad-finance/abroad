@@ -2,7 +2,6 @@
 
 import { TransactionStatus } from '@prisma/client'
 import { Request as RequestExpress } from 'express'
-import { NotFound } from 'http-errors'
 import { inject } from 'inversify'
 import {
   Controller,
@@ -19,12 +18,13 @@ import {
 import { Body, Post } from 'tsoa'
 import { z } from 'zod'
 
-import { isKycExemptByAmount } from '../config/kyc'
-import { IQueueHandler, QueueName } from '../interfaces'
+import { IQueueHandler } from '../interfaces'
 import { IDatabaseClientProvider } from '../interfaces/IDatabaseClientProvider'
 import { IKycService } from '../interfaces/IKycService'
 import { IPaymentServiceFactory } from '../interfaces/IPaymentServiceFactory'
-import { IWebhookNotifier, WebhookEvent } from '../interfaces/IWebhookNotifier'
+import { IWebhookNotifier } from '../interfaces/IWebhookNotifier'
+import { TransactionAcceptanceService, TransactionValidationError } from '../services/TransactionAcceptanceService'
+import { TransactionStatusService } from '../services/TransactionStatusService'
 import { TYPES } from '../types'
 
 const acceptTransactionRequestSchema = z.object({
@@ -62,19 +62,13 @@ interface TransactionStatusResponse {
   user_id: string
 }
 
-function uuidToBase64(uuid: string): string {
-  // Remove hyphens from the UUID
-  const hex = uuid.replace(/-/g, '')
-  // Convert hex string to a Buffer
-  const buffer = Buffer.from(hex, 'hex')
-  // Encode the Buffer to a Base64 string
-  return buffer.toString('base64')
-}
-
 @Route('transaction')
 @Security('ApiKeyAuth')
 @Security('BearerAuth')
 export class TransactionController extends Controller {
+  private readonly transactionAcceptanceService: TransactionAcceptanceService
+
+  private readonly transactionStatusService: TransactionStatusService
   constructor(
     @inject(TYPES.IDatabaseClientProvider)
     private prismaClientProvider: IDatabaseClientProvider,
@@ -84,6 +78,14 @@ export class TransactionController extends Controller {
     @inject(TYPES.IQueueHandler) private queueHandler: IQueueHandler,
   ) {
     super()
+    this.transactionAcceptanceService = new TransactionAcceptanceService(
+      this.prismaClientProvider,
+      this.paymentServiceFactory,
+      this.kycService,
+      this.webhookNotifier,
+      this.queueHandler,
+    )
+    this.transactionStatusService = new TransactionStatusService(this.prismaClientProvider)
   }
 
   /**
@@ -115,185 +117,38 @@ export class TransactionController extends Controller {
     } = parsed.data
 
     const partner = request.user
-
-    const prismaClient = await this.prismaClientProvider.getClient()
-
-    const quote = await prismaClient.quote.findUnique({
-      where: { id: quoteId, partnerId: partner.id },
-    })
-
-    if (!quote) {
-      return badRequestResponse(400, { reason: 'Quote not found' })
-    }
-
-    const paymentService = this.paymentServiceFactory.getPaymentService(quote.paymentMethod)
-    const isAccountValid = await paymentService.verifyAccount({ account: accountNumber, bankCode })
-
-    if (!isAccountValid) {
-      return badRequestResponse(400, { reason: 'User account is invalid.' })
-    }
-
-    const partnerUser = await prismaClient.partnerUser.upsert({
-      create: {
-        partnerId: quote.partnerId,
-        userId: userId,
-      },
-      update: {
-      },
-      where: {
-        partnerId_userId: {
-          partnerId: quote.partnerId,
-          userId: userId,
-        },
-      },
-    })
-
-    const userTransactionsMonthly = await prismaClient.transaction.findMany({
-      include: { quote: true },
-      where: {
-        createdAt: {
-          gte: new Date(new Date().setDate(new Date().getDate() - 30)),
-        },
-        partnerUserId: partnerUser.id,
-        quote: {
-          paymentMethod: quote.paymentMethod,
-        },
-        status: TransactionStatus.PAYMENT_COMPLETED,
-      },
-    })
-
-    const totalUserAmountMonthly = userTransactionsMonthly.reduce((acc, transaction) => acc + transaction.quote.sourceAmount, 0) + quote.sourceAmount
-    const shouldRequestKyc = partner.needsKyc && !isKycExemptByAmount(totalUserAmountMonthly)
-    const link = shouldRequestKyc
-      ? await this.kycService.getKycLink({
-          amount: totalUserAmountMonthly,
-          country: quote.country,
-          redirectUrl: redirectUrl,
-          userId: partnerUser.id,
-        })
-      : null
-
-    if (partner.needsKyc && link) {
-      return {
-        id: null,
-        kycLink: link,
-        transaction_reference: null,
-      }
-    }
-
-    const userTransactionsToday = await prismaClient.transaction.findMany({
-      include: { quote: true },
-      where: {
-        createdAt: {
-          gte: new Date(new Date().setHours(0, 0, 0, 0)),
-        },
-        partnerUserId: partnerUser.id,
-        quote: {
-          paymentMethod: quote.paymentMethod,
-        },
-        status: TransactionStatus.PAYMENT_COMPLETED,
-      },
-    })
-
-    if (userTransactionsToday.length >= paymentService.MAX_USER_TRANSACTIONS_PER_DAY) {
-      return badRequestResponse(400, { reason: 'User has reached the maximum number of transactions for today' })
-    }
-
-    const totalUserAmount = userTransactionsToday.reduce((acc, transaction) => acc + transaction.quote.targetAmount, 0)
-
-    if (totalUserAmount + quote.targetAmount > paymentService.MAX_TOTAL_AMOUNT_PER_DAY) {
-      return badRequestResponse(400, { reason: 'User has reached the maximum amount for today' })
-    }
-
-    const transactionsToday = await prismaClient.transaction.findMany({
-      include: { quote: true },
-      where: {
-        createdAt: {
-          gte: new Date(new Date().setHours(0, 0, 0, 0)),
-        },
-        quote: {
-          paymentMethod: quote.paymentMethod,
-        },
-        status: TransactionStatus.PAYMENT_COMPLETED,
-      },
-    })
-
-    const totalAmountToday = transactionsToday.reduce((acc, transaction) => acc + transaction.quote.targetAmount, 0)
-
-    if (totalAmountToday + quote.targetAmount > paymentService.MAX_TOTAL_AMOUNT_PER_DAY) {
-      return badRequestResponse(400, { reason: 'This payment method has reached the maximum amount for today' })
-    }
-
-    let availableLiquidity = 0
-    try {
-      availableLiquidity = await paymentService.getLiquidity()
-    }
-    catch (err) {
-      console.warn('Failed to fetch payment service liquidity', err)
-      availableLiquidity = 0
-    }
-
-    if (quote.targetAmount > availableLiquidity) {
-      return badRequestResponse(400, { reason: 'This payment method does not have enough liquidity for the requested amount' })
-    }
-
-    // Enforce max total for partners without KYB approval
-    if (!partner.isKybApproved) {
-      const partnerTransactions = await prismaClient.transaction.findMany({
-        include: { partnerUser: true, quote: true },
-        where: {
-          partnerUser: { partnerId: partner.id },
-          status: TransactionStatus.PAYMENT_COMPLETED,
-        },
-      })
-      const partnerTotalAmount = partnerTransactions.reduce((sum, tx) => sum + tx.quote.sourceAmount, 0)
-      if (partnerTotalAmount + quote.sourceAmount > 100) {
-        return badRequestResponse(400, { reason: 'Partner KYB not approved. Maximum total amount of $100 allowed.' })
-      }
+    const partnerContext = {
+      id: String(partner.id),
+      isKybApproved: Boolean(partner.isKybApproved),
+      needsKyc: Boolean(partner.needsKyc),
+      webhookUrl: typeof partner.webhookUrl === 'string' ? partner.webhookUrl : '',
     }
 
     try {
-      const transaction = await prismaClient.transaction.create({
-        data: {
+      const response = await this.transactionAcceptanceService.acceptTransaction(
+        {
           accountNumber,
           bankCode,
-          partnerUserId: partnerUser.id,
           qrCode,
-          quoteId: quoteId,
-          status: TransactionStatus.AWAITING_PAYMENT,
+          quoteId,
+          redirectUrl,
           taxId,
+          userId,
         },
-      })
-      this.webhookNotifier.notifyWebhook(partner.webhookUrl, { data: transaction, event: WebhookEvent.TRANSACTION_CREATED })
-
-      // Publish websocket notification with full transaction payload
-      try {
-        const full = await prismaClient.transaction.findUnique({
-          include: {
-            partnerUser: { include: { partner: true } },
-            quote: true,
-          },
-          where: { id: transaction.id },
-        })
-        await this.queueHandler.postMessage(QueueName.USER_NOTIFICATION, {
-          payload: JSON.stringify(full ?? transaction),
-          type: 'transaction.created',
-          userId: partnerUser.userId,
-        })
-      }
-      catch (notifyErr) {
-        console.warn('[TransactionController] Failed to publish transaction.created notification', notifyErr)
-      }
+        partnerContext,
+      )
 
       return {
-        id: transaction.id,
-        kycLink: null,
-        transaction_reference: uuidToBase64(transaction.id),
+        id: response.id,
+        kycLink: response.kycLink,
+        transaction_reference: response.transactionReference,
       }
     }
     catch (error) {
-      console.warn('Error creating transaction:', error)
-      return badRequestResponse(400, { reason: 'Transaction creation failed' })
+      if (error instanceof TransactionValidationError) {
+        return badRequestResponse(400, { reason: error.reason })
+      }
+      throw error
     }
   }
 
@@ -313,39 +168,16 @@ export class TransactionController extends Controller {
     @Path() transactionId: string,
     @Request() request: RequestExpress,
   ): Promise<TransactionStatusResponse> {
-    const partner = request.user
-
-    const prismaClient = await this.prismaClientProvider.getClient()
-    const transaction = await prismaClient.transaction.findUnique({
-      include: {
-        partnerUser: true,
-        quote: true,
-      },
-      where: { id: transactionId },
-    })
-
-    if (!transaction) {
-      throw new NotFound('Transaction not found')
-    }
-
-    if (transaction.quote.partnerId !== partner.id) {
-      throw new NotFound('Transaction not found')
-    }
-
-    const transaction_reference = uuidToBase64(transaction.id)
-
-    const kyc = await prismaClient.partnerUserKyc.findFirst({
-      orderBy: { createdAt: 'desc' },
-      where: { partnerUserId: transaction.partnerUserId },
-    })
+    const partnerId = String(request.user.id)
+    const status = await this.transactionStatusService.getStatus(transactionId, partnerId)
 
     return {
-      id: transaction.id,
-      kycLink: kyc?.status !== 'APPROVED' ? kyc?.link ?? null : null,
-      on_chain_tx_hash: transaction.onChainId,
-      status: transaction.status,
-      transaction_reference: transaction_reference,
-      user_id: transaction.partnerUser.userId,
+      id: status.id,
+      kycLink: status.kycLink,
+      on_chain_tx_hash: status.onChainTxHash,
+      status: status.status,
+      transaction_reference: status.transactionReference,
+      user_id: status.userId,
     }
   }
 }

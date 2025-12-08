@@ -369,7 +369,7 @@ describe('TransferoPaymentService', () => {
       expect(second).toBe('refreshed')
 
       const builder = service as unknown as {
-        buildContract: (input: { account: string, qrCode?: null | string, taxId: string, value: number }) => Promise<Array<Record<string, number | string | null>>>
+        buildContract: (input: { account: string, qrCode?: null | string, taxId: string, value: number }) => Promise<Array<Record<string, null | number | string>>>
       }
       const contract = await builder.buildContract({
         account: 'abc-123',
@@ -392,7 +392,7 @@ describe('TransferoPaymentService', () => {
       nowSpy.mockRestore()
 
       const builder = service as unknown as {
-        buildContract: (input: { account: string, qrCode?: null | string, taxId: string, value: number }) => Promise<Array<Record<string, number | string | null>>>
+        buildContract: (input: { account: string, qrCode?: null | string, taxId: string, value: number }) => Promise<Array<Record<string, null | number | string>>>
       }
 
       const emptyDigits = await builder.buildContract({

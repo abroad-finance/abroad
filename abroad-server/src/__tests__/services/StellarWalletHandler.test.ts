@@ -47,11 +47,11 @@ jest.mock('@stellar/stellar-sdk', () => {
 
     loadAccount = loadAccountMock
 
-    submitTransaction = submitTransactionMock
-    public constructor(public readonly url: string) {}
     operations = operationsMock
-
+    submitTransaction = submitTransactionMock
     transactions = transactionsMock
+
+    public constructor(public readonly url: string) {}
   }
 
   class MockTransactionBuilder {

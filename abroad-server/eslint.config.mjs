@@ -27,6 +27,7 @@ export default [
     ignores: [
       'dist/**',
       'dependency-graph.svg',
+      'stryker-tmp/**',
     ],
   },
   importPlugin.flatConfigs.typescript,

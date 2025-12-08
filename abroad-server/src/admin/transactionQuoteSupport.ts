@@ -14,6 +14,16 @@ import { KycStatus, Prisma, TransactionStatus } from '@prisma/client'
 import type { PersonaInquiryDetails } from '../services/PersonaInquiryDetailsService'
 import type { PersonaInquiryDetailsService } from '../services/PersonaInquiryDetailsService'
 
+import { buildActionRequestSearchParams, ensureDefaultTransactionQuoteFilters, normalizeQueryParams } from './transactionQuoteFilters'
+import {
+  applyQuoteProjection,
+  assignTransactionMetadata,
+  escapeCsvValue,
+  hydratePersonaAndQuoteFields,
+  parseNumber,
+} from './transactionQuoteFormatters'
+import { transactionQuoteProperties } from './transactionQuoteProperties'
+
 type AdminModule = typeof import('adminjs')
 type AdminRecord = { params: Record<string, unknown> }
 type AdminResourceConfig = NonNullable<AdminJSOptions['resources']>[number]
@@ -45,6 +55,11 @@ const TRANSACTION_QUOTE_DOWNLOAD_ACTION_NAME = 'downloadCsv' as const
 
 const DEFAULT_TRANSACTION_QUOTE_CURRENCY = 'COP' as const
 const DEFAULT_TRANSACTION_QUOTE_STATUS = TransactionStatus.PAYMENT_COMPLETED
+const FILTER_DEFAULTS = {
+  currency: DEFAULT_TRANSACTION_QUOTE_CURRENCY,
+  status: DEFAULT_TRANSACTION_QUOTE_STATUS,
+} as const
+const FIAT_TARGET_CURRENCIES = new Set(['BRL', 'COP'])
 
 export interface TransactionQuoteSupport {
   baseResource: AdminResourceConfig
@@ -94,61 +109,10 @@ export function createTransactionQuoteSupport(deps: TransactionQuoteSupportDeps)
   const { adminModule, personaInquiryDetailsService, prisma } = deps
 
   const kycInquiryCache = new Map<string, null | string>()
-  const fiatTargetCurrencies = new Set(['BRL', 'COP'])
-
-  const parseNumber = (value: unknown): null | number => {
-    if (typeof value === 'number') return Number.isFinite(value) ? value : null
-    if (typeof value === 'string') {
-      const normalised = value.replace(/,/g, '')
-      const parsed = Number(normalised)
-      return Number.isFinite(parsed) ? parsed : null
-    }
-    return null
-  }
-
-  const formatAmount = (value: null | number): string => {
-    if (value === null || Number.isNaN(value)) return ''
-    try {
-      return value.toLocaleString('es-CO', {
-        maximumFractionDigits: 2,
-        minimumFractionDigits: 2,
-      })
-    }
-    catch {
-      return value.toFixed(2)
-    }
-  }
-
-  const formatDateTime = (value: unknown): string => {
-    if (!value) return ''
-    const date = value instanceof Date ? value : new Date(String(value))
-    if (Number.isNaN(date.getTime())) return ''
-    return date.toISOString().replace('T', ' ').slice(0, 16)
-  }
-
-  const getOperationLabel = (targetCurrency: unknown): string => {
-    const currency = typeof targetCurrency === 'string' ? targetCurrency.toUpperCase() : ''
-    return fiatTargetCurrencies.has(currency) ? 'Venta' : 'Compra'
-  }
-
-  const escapeCsvValue = (value: unknown): string => {
-    if (value === null || value === undefined) return ''
-    if (value instanceof Date) return value.toISOString()
-    const stringValue = typeof value === 'object' ? JSON.stringify(value) : String(value)
-    return /[",\n\r]/.test(stringValue) ? `"${stringValue.replace(/"/g, '""')}"` : stringValue
-  }
-
-  const ensurePersonaFields = (record: AdminRecord, persona: null | PersonaInquiryDetails) => {
-    record.params.tipoDocumento = persona?.documentType ?? ''
-    record.params.numeroDocumento = persona?.idNumber ?? ''
-    record.params.nombreRazonSocial = persona?.fullName ?? ''
-    record.params.direccion = persona?.address ?? ''
-    record.params.telefono = persona?.phone ?? ''
-    record.params.email = persona?.email ?? ''
-    record.params.pais = persona?.country ?? ''
-    record.params.departamento = persona?.department ?? ''
-    record.params.municipio = persona?.city ?? ''
-  }
+  const enforceDefaultFilters = <T extends ActionRequest>(request: T): T =>
+    ensureDefaultTransactionQuoteFilters(request, FILTER_DEFAULTS)
+  const buildSearchParams = (request: ActionRequest): string =>
+    buildActionRequestSearchParams(adminModule.flat, request)
 
   const getInquiryIdForPartnerUser = async (partnerUserId: string): Promise<null | string> => {
     if (kycInquiryCache.has(partnerUserId)) {
@@ -186,9 +150,13 @@ export function createTransactionQuoteSupport(deps: TransactionQuoteSupportDeps)
       }
     }
 
-    ensurePersonaFields(record, personaDetails)
-
-    record.params.fecha = formatDateTime(record.params.transactionCreatedAt)
+    hydratePersonaAndQuoteFields(record, personaDetails, FIAT_TARGET_CURRENCIES)
+    assignTransactionMetadata(
+      record,
+      record.params.transactionCreatedAt,
+      record.params.onChainId,
+      FIAT_TARGET_CURRENCIES,
+    )
 
     const targetAmount = parseNumber(record.params.targetAmount)
     const sourceAmount = parseNumber(record.params.sourceAmount)
@@ -199,104 +167,17 @@ export function createTransactionQuoteSupport(deps: TransactionQuoteSupportDeps)
       ? record.params.targetCurrency
       : undefined
 
-    const montoCop = targetCurrency === 'COP' ? formatAmount(targetAmount) : ''
-    const montoUsdc = cryptoCurrency === 'USDC' ? formatAmount(sourceAmount) : ''
-
-    record.params.montoCop = montoCop
-    record.params.montoUsdc = montoUsdc
-
-    const trmValue = targetAmount !== null && sourceAmount !== null && sourceAmount !== 0
-      ? targetAmount / sourceAmount
-      : null
-
-    record.params.trm = formatAmount(trmValue)
-    record.params.hashTransaccion = typeof record.params.onChainId === 'string' ? record.params.onChainId : ''
-    record.params.tipoOperacion = getOperationLabel(targetCurrency)
-  }
-
-  const ensureDefaultTransactionQuoteFilters = <T extends ActionRequest>(request: T): T => {
-    const currencyDotNotationKey = 'filters.targetCurrency'
-    const statusDotNotationKey = 'filters.transactionStatus'
-    const normalizedRequest: ActionRequest = { ...request }
-
-    const query = { ...(request.query ?? {}) } as Record<string, unknown>
-    const isMissing = (value: unknown) =>
-      value === undefined || value === null || String(value).length === 0
-    const normalizeFilters = (value: unknown): Record<string, unknown> => {
-      if (value && typeof value === 'object' && !Array.isArray(value)) {
-        return { ...(value as Record<string, unknown>) }
-      }
-      return {}
-    }
-
-    if (isMissing(query[currencyDotNotationKey])) {
-      query[currencyDotNotationKey] = DEFAULT_TRANSACTION_QUOTE_CURRENCY
-    }
-    query[statusDotNotationKey] = DEFAULT_TRANSACTION_QUOTE_STATUS
-
-    const queryFilters = normalizeFilters(query.filters)
-    if (isMissing(queryFilters.targetCurrency)) {
-      queryFilters.targetCurrency = DEFAULT_TRANSACTION_QUOTE_CURRENCY
-    }
-    queryFilters.transactionStatus = DEFAULT_TRANSACTION_QUOTE_STATUS
-    query.filters = queryFilters
-
-    normalizedRequest.query = query as ActionRequest['query']
-
-    if (request.payload && typeof request.payload === 'object' && !Array.isArray(request.payload)) {
-      const payload = { ...request.payload } as Record<string, unknown>
-      if (isMissing(payload[currencyDotNotationKey])) {
-        payload[currencyDotNotationKey] = DEFAULT_TRANSACTION_QUOTE_CURRENCY
-      }
-      payload[statusDotNotationKey] = DEFAULT_TRANSACTION_QUOTE_STATUS
-
-      const payloadFilters = normalizeFilters(payload.filters)
-      if (isMissing(payloadFilters.targetCurrency)) {
-        payloadFilters.targetCurrency = DEFAULT_TRANSACTION_QUOTE_CURRENCY
-      }
-      payloadFilters.transactionStatus = DEFAULT_TRANSACTION_QUOTE_STATUS
-      payload.filters = payloadFilters
-
-      normalizedRequest.payload = payload as ActionRequest['payload']
-    }
-
-    return normalizedRequest as T
-  }
-
-  const flattenActionParams = (input?: Record<string, unknown>): Array<[string, string]> => {
-    if (!input) return []
-    const { flat } = adminModule
-    const flattened = flat.flatten(input) as Record<string, unknown>
-    const entries: Array<[string, string]> = []
-
-    for (const [key, value] of Object.entries(flattened)) {
-      if (value === undefined || value === null) continue
-      if (Array.isArray(value)) {
-        value.forEach(item => entries.push([key, String(item)]))
-        continue
-      }
-      entries.push([key, String(value)])
-    }
-
-    return entries
-  }
-
-  const buildActionRequestSearchParams = (request: ActionRequest): string => {
-    const params = new URLSearchParams()
-
-    for (const [key, value] of flattenActionParams(request.payload as Record<string, unknown> | undefined)) {
-      params.set(key, value)
-    }
-
-    for (const [key, value] of flattenActionParams(request.query as Record<string, unknown> | undefined)) {
-      params.set(key, value)
-    }
-
-    return params.toString()
+    applyQuoteProjection(record, {
+      cryptoCurrency,
+      fiatCurrencies: FIAT_TARGET_CURRENCIES,
+      sourceAmount,
+      targetAmount,
+      targetCurrency,
+    })
   }
 
   const streamTransactionQuoteCsv: StreamCsv = async (request, response, context) => {
-    const ensuredRequest = ensureDefaultTransactionQuoteFilters(request)
+    const ensuredRequest = enforceDefaultFilters(request)
     const { Filter, flat, populator } = adminModule
     const { currentAdmin, resource } = context
 
@@ -345,35 +226,17 @@ export function createTransactionQuoteSupport(deps: TransactionQuoteSupportDeps)
     response.send(`\uFEFF${csvContent}`)
   }
 
-  const normalizeQueryParams = (rawQuery: Request['query']): Record<string, unknown> => {
-    const normalized: Record<string, unknown> = {}
-
-    for (const [key, value] of Object.entries(rawQuery ?? {})) {
-      if (Array.isArray(value)) {
-        if (value.length > 0) {
-          normalized[key] = value[value.length - 1]
-        }
-        continue
-      }
-      if (value !== undefined) {
-        normalized[key] = value as unknown
-      }
-    }
-
-    return normalized
-  }
-
   const baseResource: AdminResourceConfig = {
     options: {
       actions: {
         delete: { isAccessible: false },
         edit: { isAccessible: false },
         export: {
-          before: ensureDefaultTransactionQuoteFilters,
+          before: enforceDefaultFilters,
           isAccessible: true,
         },
         list: {
-          before: ensureDefaultTransactionQuoteFilters,
+          before: enforceDefaultFilters,
           isAccessible: true,
         },
         new: { isAccessible: false },
@@ -404,8 +267,8 @@ export function createTransactionQuoteSupport(deps: TransactionQuoteSupportDeps)
           actionType: 'resource',
           component: false,
           handler: async (request: ActionRequest, _response: Response, context: ActionContext) => {
-            const ensuredRequest = ensureDefaultTransactionQuoteFilters(request)
-            const searchParams = buildActionRequestSearchParams(ensuredRequest)
+            const ensuredRequest = enforceDefaultFilters(request)
+            const searchParams = buildSearchParams(ensuredRequest)
             const search = searchParams.length > 0 ? `?${searchParams}` : ''
             const redirectUrl = context.h.urlBuilder(
               TRANSACTION_QUOTE_CSV_ROUTE_SEGMENTS,
@@ -432,7 +295,7 @@ export function createTransactionQuoteSupport(deps: TransactionQuoteSupportDeps)
             }
             return response
           },
-          before: ensureDefaultTransactionQuoteFilters,
+          before: enforceDefaultFilters,
           isAccessible: true,
         },
         new: { isAccessible: false },
@@ -449,117 +312,7 @@ export function createTransactionQuoteSupport(deps: TransactionQuoteSupportDeps)
       },
       id: TRANSACTION_QUOTE_RESOURCE_ID,
       listProperties: [...TRANSACTION_QUOTE_LIST_COLUMNS],
-      properties: {
-        departamento: {
-          isSortable: false,
-          isVisible: { edit: false, filter: true, list: true, show: true },
-          label: 'Departamento',
-          position: 80,
-          type: 'string',
-        },
-        direccion: {
-          isSortable: false,
-          isVisible: { edit: false, filter: false, list: true, show: true },
-          label: 'Dirección',
-          position: 40,
-          type: 'string',
-        },
-        email: {
-          isSortable: false,
-          isVisible: { edit: false, filter: true, list: true, show: true },
-          label: 'Email',
-          position: 60,
-          type: 'string',
-        },
-        fecha: {
-          isSortable: false,
-          isVisible: { edit: false, filter: true, list: true, show: true },
-          label: 'Fecha',
-          position: 10,
-          type: 'string',
-        },
-        hashTransaccion: {
-          isSortable: false,
-          isVisible: { edit: false, filter: true, list: true, show: true },
-          label: 'Hash de la transacción',
-          position: 130,
-          type: 'string',
-        },
-        id: {
-          isId: true,
-          isVisible: { edit: false, filter: true, list: true, show: true },
-        },
-        montoCop: {
-          isSortable: false,
-          isVisible: { edit: false, filter: false, list: true, show: true },
-          label: 'Monto en COP',
-          position: 100,
-          type: 'string',
-        },
-        montoUsdc: {
-          isSortable: false,
-          isVisible: { edit: false, filter: false, list: true, show: true },
-          label: 'Monto en USDC',
-          position: 110,
-          type: 'string',
-        },
-        municipio: {
-          isSortable: false,
-          isVisible: { edit: false, filter: true, list: true, show: true },
-          label: 'Municipio',
-          position: 90,
-          type: 'string',
-        },
-        nombreRazonSocial: {
-          isSortable: false,
-          isVisible: { edit: false, filter: true, list: true, show: true },
-          label: 'Nombre o Razón Social',
-          position: 30,
-          type: 'string',
-        },
-        numeroDocumento: {
-          isSortable: false,
-          isVisible: { edit: false, filter: true, list: true, show: true },
-          label: 'Numero de documento',
-          position: 25,
-          type: 'string',
-        },
-        pais: {
-          isSortable: false,
-          isVisible: { edit: false, filter: true, list: true, show: true },
-          label: 'País',
-          position: 70,
-          type: 'string',
-        },
-        telefono: {
-          isSortable: false,
-          isVisible: { edit: false, filter: false, list: true, show: true },
-          label: 'Teléfono',
-          position: 50,
-          type: 'string',
-        },
-        tipoDocumento: {
-          isSortable: false,
-          isVisible: { edit: false, filter: true, list: true, show: true },
-          label: 'Tipo de Documento',
-          position: 20,
-          type: 'string',
-        },
-        tipoOperacion: {
-          isSortable: false,
-          isVisible: { edit: false, filter: true, list: true, show: true },
-          label: 'Compra o Venta',
-          position: 140,
-          type: 'string',
-        },
-        trm: {
-          isSortable: false,
-          isVisible: { edit: false, filter: false, list: true, show: true },
-          label: 'TRM',
-          position: 120,
-          type: 'string',
-        },
-      },
+      properties: transactionQuoteProperties,
       sort: {
         direction: 'desc',
         sortBy: 'transactionCreatedAt',
@@ -594,7 +347,7 @@ export function createTransactionQuoteSupport(deps: TransactionQuoteSupportDeps)
         },
         query: normalizeQueryParams(req.query),
       }
-      const ensuredRequest = ensureDefaultTransactionQuoteFilters(actionRequest)
+      const ensuredRequest = enforceDefaultFilters(actionRequest)
       const viewHelpers = new (adminModule.ViewHelpers)({ options: admin.options })
       const session = req.session as unknown as { adminUser?: ActionContext['currentAdmin'] }
 
@@ -615,12 +368,12 @@ export function createTransactionQuoteSupport(deps: TransactionQuoteSupportDeps)
 
   return {
     baseResource,
-    buildActionRequestSearchParams,
+    buildActionRequestSearchParams: buildSearchParams,
     createCsvRouteHandler,
     csvRoute: TRANSACTION_QUOTE_CSV_ROUTE,
     detailedResource,
     downloadActionName: TRANSACTION_QUOTE_DOWNLOAD_ACTION_NAME,
-    ensureDefaultTransactionQuoteFilters,
+    ensureDefaultTransactionQuoteFilters: enforceDefaultFilters,
     normalizeQueryParams,
     resourceId: TRANSACTION_QUOTE_RESOURCE_ID,
     streamTransactionQuoteCsv,
