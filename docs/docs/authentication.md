@@ -12,7 +12,7 @@ Add the `X-API-Key` header to every HTTP request. Keep this key secret and never
 
 ```http
 GET /transaction/123 HTTP/1.1
-Host: api.abroad.com
+Host: api.abroad.finance
 X-API-Key: your_api_key_here
 Content-Type: application/json
 ```
@@ -23,7 +23,7 @@ Some endpoints also accept a bearer token (for example, if you obtained a SEP JW
 
 ```http
 GET /protected-resource HTTP/1.1
-Host: api.abroad.com
+Host: api.abroad.finance
 Authorization: Bearer your_jwt_token
 Content-Type: application/json
 ```

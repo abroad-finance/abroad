@@ -7,7 +7,7 @@ import TabItem from '@theme/TabItem';
 
 # API Reference
 
-Base URLs: `https://api.abroad.com` (Production) / `https://api-sandbox.abroad.com` (Sandbox). Add `X-API-Key` to every call. See [Integration basics](../integration-basics) for headers and enums.
+Base URL: `https://api.abroad.finance`. Add `X-API-Key` to every call. See [Integration basics](../integration-basics) for headers and enums.
 
 For a live, grouped view of every endpoint, open the Swagger UI at `https://api.abroad.finance/docs`.
 
@@ -33,7 +33,7 @@ Calculate the crypto amount you need to send to deliver a target fiat amount.
 <TabItem value="curl" label="cURL">
 
 ```bash
-curl -X POST https://api-sandbox.abroad.com/quote \
+curl -X POST https://api.abroad.finance/quote \
   -H "X-API-Key: YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -49,7 +49,7 @@ curl -X POST https://api-sandbox.abroad.com/quote \
 <TabItem value="js" label="JavaScript">
 
 ```javascript
-const response = await fetch('https://api-sandbox.abroad.com/quote', {
+const response = await fetch('https://api.abroad.finance/quote', {
   method: 'POST',
   headers: {
     'X-API-Key': 'YOUR_API_KEY',

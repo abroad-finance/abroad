@@ -7,7 +7,7 @@ import TabItem from '@theme/TabItem';
 
 # Quickstart Guide
 
-This guide takes you from your API key to a full sandbox payout in a few minutes.
+This guide takes you from your API key to a full payout in a few minutes.
 
 ```mermaid
 graph LR
@@ -23,10 +23,10 @@ graph LR
 ## Prerequisites
 
 :::info
-You will need a Sandbox API Key to proceed. If you don't have one, please contact [support@abroad.com](mailto:support@abroad.com).
+You will need an API key to proceed. If you don't have one, please contact [support@abroad.com](mailto:support@abroad.com).
 :::
 
-- **Base URL**: `https://api-sandbox.abroad.com`
+- **Base URL**: `https://api.abroad.finance`
 - **HTTP client**: `curl`, Postman, or similar.
 
 ## 1) Create a quote (target payout)
@@ -37,7 +37,7 @@ Ask for how much crypto you need to send to deliver a specific local amount. In 
 <TabItem value="request" label="Request">
 
 ```bash
-curl -X POST https://api-sandbox.abroad.com/quote \
+curl -X POST https://api.abroad.finance/quote \
   -H "X-API-Key: YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -75,7 +75,7 @@ Register the recipient and lock the quote. Include your internal `user_id` so yo
 <TabItem value="request" label="Request">
 
 ```bash
-curl -X POST https://api-sandbox.abroad.com/transaction \
+curl -X POST https://api.abroad.finance/transaction \
   -H "X-API-Key: YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -119,7 +119,7 @@ See [Send Funds](./workflows/send-funds) for detailed instructions.
 Poll or subscribe to webhooks until the payout completes:
 
 ```bash
-curl -X GET https://api-sandbox.abroad.com/transaction/f4a96c4c-4d1e-4ab2-a6ec-2e1b5070c5db \
+curl -X GET https://api.abroad.finance/transaction/f4a96c4c-4d1e-4ab2-a6ec-2e1b5070c5db \
   -H "X-API-Key: YOUR_API_KEY"
 ```
 
@@ -127,6 +127,6 @@ Status values and webhook events are listed in [Status lifecycle](./workflows/st
 
 ## Next steps
 
-- Read [Integration basics](./integration-basics) for headers, IDs, and environments.
+- Read [Integration basics](./integration-basics) for headers, IDs, and operational guidance.
 - Walk through the [Workflows](./workflows/overview) guide.
 - Wire up [Webhooks](./reference/webhooks).

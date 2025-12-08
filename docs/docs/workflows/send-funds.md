@@ -17,7 +17,7 @@ If you send Stellar funds without the correct memo/reference, our system **canno
 For Solana there is no memo. After broadcasting the transaction, call the Solana payment notification endpoint so we can confirm it on-chain and start the payout:
 
 ```bash
-curl -X POST https://api-sandbox.abroad.com/solana/payments/notify \
+curl -X POST https://api.abroad.finance/solana/payments/notify \
   -H "X-API-Key: YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -40,7 +40,7 @@ curl -X POST https://api-sandbox.abroad.com/solana/payments/notify \
 Monitor the transaction until the local payout completes:
 
 ```bash
-curl -X GET https://api-sandbox.abroad.com/transaction/{transactionId} \
+curl -X GET https://api.abroad.finance/transaction/{transactionId} \
   -H "X-API-Key: YOUR_API_KEY"
 ```
 

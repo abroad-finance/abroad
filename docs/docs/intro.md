@@ -20,12 +20,12 @@ Abroad provides a unified API to:
 -   **Instant Quotes**: Get real-time exchange rates for conversions.
 -   **Local Payouts**: Disburse funds directly to bank accounts and mobile wallets in Colombia and Brazil.
 -   **Compliance First**: Built-in KYC and KYB checks to ensure regulatory compliance.
--   **Developer Friendly**: Simple REST API with comprehensive webhooks and sandbox environment.
+-   **Developer Friendly**: Simple REST API with comprehensive webhooks.
 
 ## Getting Started
 
 To start integrating with Abroad:
 
-1.  **Get your API Keys**: Contact our sales team to get your Sandbox credentials.
+1.  **Get your API Keys**: Contact our sales team to get your API credentials.
 2.  **Authenticate**: Learn how to authenticate your requests in the [Authentication](./authentication) guide.
 3.  **Follow the Workflow**: Check out our [Workflows](./workflows/overview) to understand the lifecycle of a transaction.

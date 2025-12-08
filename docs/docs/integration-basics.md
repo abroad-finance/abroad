@@ -6,12 +6,11 @@ sidebar_position: 3
 
 The essentials you need before wiring Abroad into your stack.
 
-## Base URLs
+## Base URL
 
 | Environment | Base URL |
 | :--- | :--- |
-| Production | `https://api.abroad.com` |
-| Sandbox | `https://api-sandbox.abroad.com` |
+| Production | `https://api.abroad.finance` |
 
 All endpoints live directly under the base URL (for example: `POST /quote`).
 
@@ -41,8 +40,8 @@ See [Authentication](./authentication) for concrete examples.
 
 Check [Supported Assets](./resources/supported-assets) for the full matrix and payment method availability.
 
-## Sandbox tips
+## Operational tips
 
-- Quotes expire; if you do not send funds in time you will see `PAYMENT_EXPIRED` when checking the transaction.  
-- Start with small amounts while testing KYC flows and error handling.  
+- Quotes expire; if funds arrive after the `expiration_time`, you will see `PAYMENT_EXPIRED` when checking the transaction.  
+- Start with small amounts while validating KYC flows, bank details, and error handling.  
 - Configure your webhook receiver and verify the `X-Abroad-Webhook-Secret` header before relying on callbacks.
