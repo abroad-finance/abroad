@@ -24,7 +24,9 @@ Abroad enforces payment-method limits and compliance checks during quote creatio
 
 ## Additional validation
 
-- **Available liquidity:** If liquidity for a payment method is lower than the quoted target amount, the request is rejected.  
-- **Recipient account checks:** An invalid account number/bank code pair returns `400` with `"User account is invalid."`.  
-- **Partner KYB cap:** Partners without KYB approval are limited to a cumulative **100 units of source currency** across completed transactions.  
+- **Available liquidity:** If liquidity for a payment method is lower than the quoted target amount, the request is rejected with `reason: "We cannot process this payout because liquidity for this method is below the requested amount. Try a smaller amount or choose another payment method."`.  
+- **Recipient account checks:** An invalid account number/bank code pair returns `400` with `reason: "We could not verify the account number and bank code provided. Please double-check the details and try again."`. MOVII payments also require a bank code; missing it yields a friendly prompt to include the code.  
+- **Payment rail availability:** If a payment rail is temporarily unavailable, the API responds with `reason: "Payments via <METHOD> are temporarily unavailable. Please try another method or retry shortly."`.  
+- **Daily caps:** When per-user or payment-method daily limits are exceeded, responses use phrases such as `reason: "This payment method already reached today's payout limit. Please try again tomorrow or use another method."` or `reason: "You reached the maximum number of transactions allowed today. Please try again tomorrow."`.  
+- **Partner KYB cap:** Partners without KYB approval are limited to a cumulative **100 units of source currency** across completed transactions. Exceeding that threshold returns `reason: "This partner is limited to a total of $100 until KYB is approved. Please complete KYB to raise the limit."`  
 - **KYC gating:** If `needsKyc` is enabled for your partner, users can move up to **$25 in source volume (rolling 30 days)** without KYC. Once above that threshold, a `kycLink` is returned and the transaction will not progress until the user completes that flow.

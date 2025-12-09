@@ -75,7 +75,7 @@ describe('TransactionAcceptanceService helpers', () => {
       enforceLiquidity: (svc: typeof paymentService, amount: number) => Promise<void>
     }).enforceLiquidity
 
-    await expect(enforceLiquidity(paymentService, 50)).rejects.toThrow('does not have enough liquidity')
+    await expect(enforceLiquidity(paymentService, 50)).rejects.toThrow('liquidity for this method is below the requested amount')
     expect(paymentService.getLiquidity).toHaveBeenCalled()
   })
 
@@ -141,7 +141,7 @@ describe('TransactionAcceptanceService helpers', () => {
       queueHandler,
     )
 
-    await expect(acceptanceService.acceptTransaction(request, partnerContext)).rejects.toThrow('Payment method MOVII is currently unavailable')
+    await expect(acceptanceService.acceptTransaction(request, partnerContext)).rejects.toThrow('Payments via MOVII are temporarily unavailable')
     expect(disabledFactory.getPaymentService).toHaveBeenCalledWith(PaymentMethod.MOVII)
     expect(disabledPaymentService.verifyAccount).not.toHaveBeenCalled()
   })

@@ -97,7 +97,7 @@ export class TransactionAcceptanceService {
 
   private assertPaymentServiceIsEnabled(paymentService: ReturnType<IPaymentServiceFactory['getPaymentService']>, paymentMethod: PaymentMethod): void {
     if (!paymentService.isEnabled) {
-      throw new TransactionValidationError(`Payment method ${paymentMethod} is currently unavailable`)
+      throw new TransactionValidationError(`Payments via ${paymentMethod} are temporarily unavailable. Please try another method or retry shortly.`)
     }
   }
 
@@ -162,7 +162,7 @@ export class TransactionAcceptanceService {
     }
     catch (error) {
       console.warn('Error creating transaction:', error)
-      throw new TransactionValidationError('Transaction creation failed')
+      throw new TransactionValidationError('We could not create your transaction right now. Please try again in a few moments.')
     }
   }
 
@@ -180,7 +180,7 @@ export class TransactionAcceptanceService {
     }
 
     if (targetAmount > availableLiquidity) {
-      throw new TransactionValidationError('This payment method does not have enough liquidity for the requested amount')
+      throw new TransactionValidationError('We cannot process this payout because liquidity for this method is below the requested amount. Try a smaller amount or choose another payment method.')
     }
   }
 
@@ -203,7 +203,7 @@ export class TransactionAcceptanceService {
     })
     const partnerTotalAmount = partnerTransactions.reduce((sum, tx) => sum + tx.quote.sourceAmount, 0)
     if (partnerTotalAmount + sourceAmount > 100) {
-      throw new TransactionValidationError('Partner KYB not approved. Maximum total amount of $100 allowed.')
+      throw new TransactionValidationError('This partner is limited to a total of $100 until KYB is approved. Please complete KYB to raise the limit.')
     }
   }
 
@@ -228,7 +228,7 @@ export class TransactionAcceptanceService {
     const totalAmountToday = transactionsToday.reduce((acc, transaction) => acc + transaction.quote.targetAmount, 0)
 
     if (totalAmountToday + quote.targetAmount > paymentService.MAX_TOTAL_AMOUNT_PER_DAY) {
-      throw new TransactionValidationError('This payment method has reached the maximum amount for today')
+      throw new TransactionValidationError('This payment method already reached today\'s payout limit. Please try again tomorrow or use another method.')
     }
   }
 
@@ -253,13 +253,13 @@ export class TransactionAcceptanceService {
     })
 
     if (userTransactionsToday.length >= paymentService.MAX_USER_TRANSACTIONS_PER_DAY) {
-      throw new TransactionValidationError('User has reached the maximum number of transactions for today')
+      throw new TransactionValidationError('You reached the maximum number of transactions allowed today. Please try again tomorrow.')
     }
 
     const totalUserAmount = userTransactionsToday.reduce((acc, transaction) => acc + transaction.quote.targetAmount, 0)
 
     if (totalUserAmount + quote.targetAmount > paymentService.MAX_TOTAL_AMOUNT_PER_DAY) {
-      throw new TransactionValidationError('User has reached the maximum amount for today')
+      throw new TransactionValidationError('This transaction would exceed your daily limit for this payment method. Lower the amount or try again tomorrow.')
     }
   }
 
@@ -270,12 +270,12 @@ export class TransactionAcceptanceService {
     paymentMethod: PaymentMethod,
   ) {
     if (paymentMethod === PaymentMethod.MOVII && !bankCode) {
-      throw new TransactionValidationError('Bank code is required for MOVII payments')
+      throw new TransactionValidationError('A bank code is required to process MOVII payments. Please add the bank code and try again.')
     }
 
     const isAccountValid = await paymentService.verifyAccount({ account: accountNumber, bankCode: bankCode ?? '' })
     if (!isAccountValid) {
-      throw new TransactionValidationError('User account is invalid.')
+      throw new TransactionValidationError('We could not verify the account number and bank code provided. Please double-check the details and try again.')
     }
   }
 
@@ -285,7 +285,7 @@ export class TransactionAcceptanceService {
     })
 
     if (!quote) {
-      throw new TransactionValidationError('Quote not found')
+      throw new TransactionValidationError('We could not find a valid quote for this request. Please generate a new quote and try again.')
     }
 
     return quote
@@ -296,7 +296,7 @@ export class TransactionAcceptanceService {
     if (upper === Country.CO) {
       return Country.CO
     }
-    throw new TransactionValidationError(`Unsupported country for KYC: ${country}`)
+    throw new TransactionValidationError(`KYC verification is not available for ${country}. Please provide a supported country or contact support.`)
   }
 
   private async publishUserNotification(

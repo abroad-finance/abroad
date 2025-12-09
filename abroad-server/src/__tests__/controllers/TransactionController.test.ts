@@ -195,7 +195,7 @@ describe('TransactionController acceptance flows', () => {
     const response = await controller.acceptTransaction(requestBody, { user: partner } as unknown as import('express').Request, badRequest)
 
     expect(prisma.quote.findUnique).toHaveBeenCalled()
-    expect(response).toEqual({ reason: 'Quote not found' })
+    expect(response).toEqual({ reason: 'We could not find a valid quote for this request. Please generate a new quote and try again.' })
   })
 
   it('rejects invalid bank account data', async () => {
@@ -207,7 +207,7 @@ describe('TransactionController acceptance flows', () => {
     const response = await controller.acceptTransaction(requestBody, { user: partner } as unknown as import('express').Request, badRequest)
 
     expect(prisma.quote.findUnique).toHaveBeenCalled()
-    expect(response).toEqual({ reason: 'User account is invalid.' })
+    expect(response).toEqual({ reason: 'We could not verify the account number and bank code provided. Please double-check the details and try again.' })
   })
 
   it('returns a KYC link when the partner requires verification', async () => {
@@ -260,7 +260,7 @@ describe('TransactionController acceptance flows', () => {
     const response = await controller.acceptTransaction(requestBody, { user: partner } as unknown as import('express').Request, badRequest)
 
     expect(paymentService.verifyAccount).toHaveBeenCalled()
-    expect(response).toEqual({ reason: 'User has reached the maximum number of transactions for today' })
+    expect(response).toEqual({ reason: 'You reached the maximum number of transactions allowed today. Please try again tomorrow.' })
   })
 
   it('rejects when liquidity retrieval fails or amount exceeds availability', async () => {
@@ -284,7 +284,7 @@ describe('TransactionController acceptance flows', () => {
     )
 
     expect(response).toEqual({
-      reason: 'This payment method does not have enough liquidity for the requested amount',
+      reason: 'We cannot process this payout because liquidity for this method is below the requested amount. Try a smaller amount or choose another payment method.',
     })
   })
 
@@ -305,7 +305,7 @@ describe('TransactionController acceptance flows', () => {
     )
 
     expect(response).toEqual({
-      reason: 'Partner KYB not approved. Maximum total amount of $100 allowed.',
+      reason: 'This partner is limited to a total of $100 until KYB is approved. Please complete KYB to raise the limit.',
     })
   })
 
@@ -359,7 +359,7 @@ describe('TransactionController acceptance flows', () => {
 
     const response = await controller.acceptTransaction(requestBody, { user: partner } as unknown as import('express').Request, badRequest)
 
-    expect(response).toEqual({ reason: 'Transaction creation failed' })
+    expect(response).toEqual({ reason: 'We could not create your transaction right now. Please try again in a few moments.' })
   })
 })
 
