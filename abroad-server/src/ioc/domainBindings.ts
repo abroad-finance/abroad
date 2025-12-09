@@ -4,6 +4,7 @@ import { ExchangeProviderFactory } from '../services/ExchangeProviderFactory'
 import { BinanceExchangeProvider } from '../services/exchangeProviders/binanceExchangeProvider'
 import { TransferoExchangeProvider } from '../services/exchangeProviders/transferoExchangeProvider'
 import { PaymentServiceFactory } from '../services/PaymentServiceFactory'
+import { BrebPaymentService } from '../services/paymentServices/brebPaymentService'
 import { MoviiPaymentService } from '../services/paymentServices/movii'
 import { NequiPaymentService } from '../services/paymentServices/nequi'
 import { TransferoPaymentService } from '../services/paymentServices/transferoPaymentService'
@@ -25,6 +26,7 @@ const domainBindings: ReadonlyArray<BindingRegistration<unknown>> = [
   { identifier: TYPES.StellarWalletHandler, implementation: StellarWalletHandler },
   { identifier: TYPES.IPaymentService, implementation: MoviiPaymentService, name: 'movii' },
   { identifier: TYPES.IPaymentService, implementation: NequiPaymentService, name: 'nequi' },
+  { identifier: TYPES.IPaymentService, implementation: BrebPaymentService, name: 'breb' },
   { identifier: TYPES.IPaymentService, implementation: TransferoPaymentService, name: 'transfero' },
   { identifier: TYPES.IExchangeProvider, implementation: BinanceExchangeProvider, name: 'binance' },
   { identifier: TYPES.IExchangeProvider, implementation: TransferoExchangeProvider, name: 'transfero' },

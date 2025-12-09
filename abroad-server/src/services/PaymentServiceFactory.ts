@@ -15,6 +15,9 @@ export class PaymentServiceFactory implements IPaymentServiceFactory {
     @inject(TYPES.IPaymentService)
     @named('nequi')
     private nequiPaymentService: IPaymentService,
+    @inject(TYPES.IPaymentService)
+    @named('breb')
+    private brebPaymentService: IPaymentService,
     @named('transfero')
     @inject(TYPES.IPaymentService)
     private transferoPaymentService: IPaymentService,
@@ -22,6 +25,8 @@ export class PaymentServiceFactory implements IPaymentServiceFactory {
 
   public getPaymentService(paymentMethod: PaymentMethod): IPaymentService {
     switch (paymentMethod) {
+      case PaymentMethod.BREB:
+        return this.brebPaymentService
       case PaymentMethod.MOVII:
         return this.moviiPaymentService
       case PaymentMethod.NEQUI:
