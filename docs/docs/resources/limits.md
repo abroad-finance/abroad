@@ -17,6 +17,7 @@ Abroad enforces payment-method limits and compliance checks during quote creatio
 | :--- | :--- | :--- | :--- | :--- |
 | `NEQUI` | 500,000 COP | 10,000,000 COP | 10,000,000 COP | 15 |
 | `MOVII` | 5,000,000 COP | 25,000,000 COP | 25,000,000 COP | 15 |
+| `BREB` | 5,000,000 COP | 25,000,000 COP | 25,000,000 COP | 15 |
 | `PIX` | No internal cap | No internal cap | No internal cap | No internal cap |
 
 > These values are enforced server-side via `MAX_*` constraints per payment service. Providers may still reject or delay payouts if their own limits are lower.

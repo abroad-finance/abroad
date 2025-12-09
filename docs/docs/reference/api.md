@@ -24,7 +24,7 @@ Calculate the crypto amount you need to send to deliver a target fiat amount.
 | `amount` | `number` | Yes | Target amount in the fiat currency you want the recipient to receive. |
 | `crypto_currency` | `string` | Yes | Source cryptocurrency (`USDC`). |
 | `network` | `string` | Yes | Blockchain network (`STELLAR` or `SOLANA`). |
-| `payment_method` | `string` | Yes | Payout method (`NEQUI`, `MOVII`, `PIX`). |
+| `payment_method` | `string` | Yes | Payout method (`NEQUI`, `MOVII`, `BREB`, `PIX`). |
 | `target_currency` | `string` | Yes | Target fiat currency (`COP` or `BRL`). |
 
 #### Example
@@ -211,7 +211,7 @@ Retrieve the bank list for a payment method (defaults to `MOVII` if omitted).
 
 | Query param | Type | Required | Description |
 | :--- | :--- | :--- | :--- |
-| `paymentMethod` | `string` | No | One of `NEQUI`, `MOVII`, `PIX`. |
+| `paymentMethod` | `string` | No | One of `NEQUI`, `MOVII`, `BREB`, `PIX`. |
 
 **Response:**
 
@@ -224,13 +224,18 @@ Retrieve the bank list for a payment method (defaults to `MOVII` if omitted).
 }
 ```
 
+For `BREB`, the bank list maps to its payout rails:
+
+- `9101` (`ENT`) — intra-BreB accounts  
+- `9102` (`TFY`) — Transfiya rail
+
 ### Check liquidity (`GET /payments/liquidity`)
 
 Returns the latest known liquidity for a payment method.
 
 | Query param | Type | Required | Description |
 | :--- | :--- | :--- | :--- |
-| `paymentMethod` | `string` | No | One of `NEQUI`, `MOVII`, `PIX`. |
+| `paymentMethod` | `string` | No | One of `NEQUI`, `MOVII`, `BREB`, `PIX`. |
 
 **Response:**
 

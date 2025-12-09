@@ -35,7 +35,7 @@ See [Authentication](./authentication) for concrete examples.
 | :--- | :--- |
 | `crypto_currency` | `USDC` |
 | `network` | `STELLAR`, `SOLANA` |
-| `payment_method` | `NEQUI`, `MOVII`, `PIX` |
+| `payment_method` | `NEQUI`, `MOVII`, `BREB`, `PIX` |
 | `target_currency` | `COP`, `BRL` |
 
 Check [Supported Assets](./resources/supported-assets) for the full matrix and payment method availability.

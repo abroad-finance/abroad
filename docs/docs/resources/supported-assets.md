@@ -17,7 +17,7 @@ Abroad supports a specific set of blockchains, cryptocurrencies, and fiat curren
 
 | Country | Currency | Symbol | Payment Methods |
 | :--- | :--- | :--- | :--- |
-| Colombia | Colombian Peso | **COP** | Nequi, Movii |
+| Colombia | Colombian Peso | **COP** | BreB, Nequi, Movii |
 | Brazil | Brazilian Real | **BRL** | PIX |
 
 ## Payment methods at a glance
@@ -26,6 +26,7 @@ Abroad supports a specific set of blockchains, cryptocurrencies, and fiat curren
 | :--- | :--- | :--- | :--- |
 | `NEQUI` | COP | Colombia | Stellar, Solana |
 | `MOVII` | COP | Colombia | Stellar, Solana |
+| `BREB` | COP | Colombia | Stellar, Solana |
 | `PIX` | BRL | Brazil | Stellar, Solana |
 
 The `network` you send in the quote defines which crypto rail you will fund on-chain. The payout is still in the local currency for the selected `payment_method`.
@@ -42,7 +43,6 @@ The `network` you send in the quote defines which crypto rail you will fund on-c
 
 ### Payment methods
 
-- Bre-B in Colombia
 - Transferencias 3.0 in Argentina
 - Yape in Peru
 - PromptPay in Thailand
