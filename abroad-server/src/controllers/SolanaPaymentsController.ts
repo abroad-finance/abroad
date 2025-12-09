@@ -1,5 +1,5 @@
 import { BlockchainNetwork, CryptoCurrency, TransactionStatus } from '@prisma/client'
-import { TOKEN_PROGRAM_ID } from '@solana/spl-token'
+import { getAssociatedTokenAddressSync, TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID } from '@solana/spl-token'
 import {
   Connection,
   ParsedInstruction,
@@ -133,12 +133,18 @@ export class SolanaPaymentsController extends Controller {
       throw new Error('Solana configuration is invalid')
     }
 
+    // Derive the USDC token accounts (ATAs) for the deposit wallet for both token programs
+    const depositTokenAccounts = [
+      getAssociatedTokenAddressSync(usdcMint, depositWallet, false, TOKEN_PROGRAM_ID),
+      getAssociatedTokenAddressSync(usdcMint, depositWallet, false, TOKEN_2022_PROGRAM_ID),
+    ]
+
     const connection = new Connection(rpcUrl, 'confirmed')
 
     let txDetails: null | ParsedTransactionWithMeta = null
     try {
       txDetails = await connection.getParsedTransaction(onChainSignature, {
-        maxSupportedTransactionVersion: 0,
+        maxSupportedTransactionVersion: 0, // support legacy + v0 txs
       })
     }
     catch (error) {
@@ -154,7 +160,7 @@ export class SolanaPaymentsController extends Controller {
       return badRequestResponse(400, { reason: 'Transaction failed on-chain' })
     }
 
-    const transfer = this.findUsdcTransferToWallet(txDetails, depositWallet, [usdcMint])
+    const transfer = this.findUsdcTransferToWallet(txDetails, depositTokenAccounts, [usdcMint])
 
     if (!transfer) {
       return badRequestResponse(400, { reason: 'No USDC transfer to the configured wallet found in this transaction' })
@@ -230,13 +236,26 @@ export class SolanaPaymentsController extends Controller {
 
   private findUsdcTransferToWallet(
     txDetails: ParsedTransactionWithMeta,
-    walletAddress: PublicKey,
+    walletTokenAccounts: PublicKey[],
     allowedMints: PublicKey[],
   ): null | { amount: number, source: string } {
-    const instructions = txDetails.transaction?.message.instructions ?? []
+    const outerInstructions = txDetails.transaction?.message.instructions ?? []
+    const innerInstructions = (txDetails.meta?.innerInstructions ?? []).reduce<ParsedInstructionType[]>(
+      (all, ix) => all.concat(ix.instructions as ParsedInstructionType[]),
+      [],
+    )
 
-    for (const instruction of instructions) {
-      if (!('programId' in instruction) || !instruction.programId.equals(TOKEN_PROGRAM_ID)) {
+    const allInstructions: ParsedInstructionType[] = [...outerInstructions, ...innerInstructions]
+
+    const tokenPrograms = [TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID]
+
+    for (const instruction of allInstructions) {
+      if (!('programId' in instruction)) {
+        continue
+      }
+
+      const programId = instruction.programId
+      if (!tokenPrograms.some(p => p.equals(programId))) {
         continue
       }
 
@@ -246,7 +265,7 @@ export class SolanaPaymentsController extends Controller {
       const destination = this.safePublicKey(transferInfo.destination)
       const mint = this.safePublicKey(transferInfo.mint)
 
-      if (!destination || !destination.equals(walletAddress)) {
+      if (!destination || !walletTokenAccounts.some(account => account.equals(destination))) {
         continue
       }
 
