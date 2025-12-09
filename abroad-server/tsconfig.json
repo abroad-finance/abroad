@@ -24,6 +24,7 @@
     "node_modules",
     "dist",
     "abroad-ui",
-    "eslint.config.mjs"
+    "eslint.config.mjs",
+    "src/__tests__/**/*"
   ]
 }

@@ -7,7 +7,7 @@
     "generate": "tsoa spec-and-routes",
     "prisma:generate": "prisma generate",
     "postinstall": "npm run prisma:generate",
-    "build": "npm run generate && tsc -p tsconfig.build.json",
+    "build": "npm run generate && tsc",
     "start": "node dist/server.js",
     "start:server": "npm run start",
     "start:consumers": "node dist/consumers.js",
