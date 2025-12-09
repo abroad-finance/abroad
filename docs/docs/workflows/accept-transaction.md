@@ -58,8 +58,8 @@ You **MUST** redirect the user to this URL to complete their identity verificati
 
 ## Troubleshooting
 
-### "User account is invalid"
-This error means the `account_number` does not match the expected format for the given `bank_code`. Double-check the number of digits.
+### "We could not verify the account number and bank code provided. Please double-check the details and try again."
+Abroad could not validate the provided payout details. Confirm the `account_number` and `bank_code` pair (for MOVII a bank code is required) and resend the request.
 
-### "Quote not found"
-Ensure you are using the correct `quote_id` and that it hasn't expired.
+### "We could not find a valid quote for this request. Please generate a new quote and try again."
+The supplied `quote_id` is missing or no longer valid (likely expired). Create a fresh quote and retry the transaction.
