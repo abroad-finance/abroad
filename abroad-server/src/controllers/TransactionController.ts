@@ -29,7 +29,7 @@ import { TYPES } from '../types'
 
 const acceptTransactionRequestSchema = z.object({
   account_number: z.string().min(1, 'Account number is required'),
-  bank_code: z.string().min(1, 'Bank code is required'),
+  bank_code: z.string().optional(),
   qr_code: z.string().nullable().optional(),
   quote_id: z.string().min(1, 'Quote ID is required'),
   redirectUrl: z.string().optional(),
@@ -39,7 +39,7 @@ const acceptTransactionRequestSchema = z.object({
 
 interface AcceptTransactionRequest {
   account_number: string
-  bank_code: string
+  bank_code?: string
   qr_code?: null | string
   quote_id: string
   redirectUrl?: string

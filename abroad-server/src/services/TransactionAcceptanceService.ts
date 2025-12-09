@@ -10,7 +10,7 @@ import { uuidToBase64 } from './transactionEncoding'
 
 interface AcceptTransactionRequest {
   accountNumber: string
-  bankCode: string
+  bankCode?: string
   qrCode?: null | string
   quoteId: string
   redirectUrl?: string
@@ -49,7 +49,7 @@ export class TransactionAcceptanceService {
     const paymentService = this.paymentServiceFactory.getPaymentService(quote.paymentMethod)
     this.assertPaymentServiceIsEnabled(paymentService, quote.paymentMethod)
 
-    await this.ensureAccountIsValid(paymentService, request.accountNumber, request.bankCode)
+    await this.ensureAccountIsValid(paymentService, request.accountNumber, request.bankCode, quote.paymentMethod)
 
     const partnerUser = await prismaClient.partnerUser.upsert({
       create: {
@@ -86,6 +86,7 @@ export class TransactionAcceptanceService {
       bankCode: request.bankCode,
       partner,
       partnerUserId: partnerUser.id,
+      paymentMethod: quote.paymentMethod,
       paymentService,
       qrCode: request.qrCode,
       quoteId: quote.id,
@@ -126,9 +127,10 @@ export class TransactionAcceptanceService {
     prismaClient: Awaited<ReturnType<IDatabaseClientProvider['getClient']>>,
     input: {
       accountNumber: string
-      bankCode: string
+      bankCode?: string
       partner: PartnerUserContext
       partnerUserId: string
+      paymentMethod: PaymentMethod
       paymentService: ReturnType<IPaymentServiceFactory['getPaymentService']>
       qrCode?: null | string
       quoteId: string
@@ -140,7 +142,7 @@ export class TransactionAcceptanceService {
       const transaction = await prismaClient.transaction.create({
         data: {
           accountNumber: input.accountNumber,
-          bankCode: input.bankCode,
+          bankCode: input.bankCode ?? '',
           partnerUserId: input.partnerUserId,
           qrCode: input.qrCode,
           quoteId: input.quoteId,
@@ -261,8 +263,17 @@ export class TransactionAcceptanceService {
     }
   }
 
-  private async ensureAccountIsValid(paymentService: ReturnType<IPaymentServiceFactory['getPaymentService']>, accountNumber: string, bankCode: string) {
-    const isAccountValid = await paymentService.verifyAccount({ account: accountNumber, bankCode })
+  private async ensureAccountIsValid(
+    paymentService: ReturnType<IPaymentServiceFactory['getPaymentService']>,
+    accountNumber: string,
+    bankCode: string | undefined,
+    paymentMethod: PaymentMethod,
+  ) {
+    if (paymentMethod === PaymentMethod.MOVII && !bankCode) {
+      throw new TransactionValidationError('Bank code is required for MOVII payments')
+    }
+
+    const isAccountValid = await paymentService.verifyAccount({ account: accountNumber, bankCode: bankCode ?? '' })
     if (!isAccountValid) {
       throw new TransactionValidationError('User account is invalid.')
     }

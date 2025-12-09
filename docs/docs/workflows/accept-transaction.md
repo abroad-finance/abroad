@@ -12,7 +12,7 @@ Once you have a valid `quote_id` and the user has confirmed the details, you cre
 
 ## Request
 
-You must provide the `quote_id`, the user's identification (`user_id`), and their payout details (account number, bank code).
+You must provide the `quote_id`, the user's identification (`user_id`), and their payout details. Bank code is only required for `MOVII`; other payment methods infer rails automatically.
 
 ```json
 {
@@ -31,7 +31,7 @@ You must provide the `quote_id`, the user's identification (`user_id`), and thei
 | `quote_id` | `string` | Yes | The ID of the quote to execute. |
 | `user_id` | `string` | Yes | Your internal user ID for compliance tracking. |
 | `account_number` | `string` | Yes | The recipient's bank account or mobile wallet number. |
-| `bank_code` | `string` | Yes | The bank code (e.g., `NEQUI`, `BANCOLOMBIA`). |
+| `bank_code` | `string` | No | The bank code (e.g., `NEQUI`, `BANCOLOMBIA`). Required only for `MOVII`; optional for `NEQUI`, `BREB`, and `PIX`. |
 | `tax_id` | `string` | No | The user's tax ID (NIT/CPF) if required. |
 | `redirectUrl` | `string` | No | Optional redirect URL after KYC. |
 | `qr_code` | `string` | No | QR code string, when applicable. |

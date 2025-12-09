@@ -124,7 +124,7 @@ Create a transaction from a quote. Returns the memo you must attach to the on-ch
 | `quote_id` | `string` | Yes | The ID of the quote to execute. |
 | `user_id` | `string` | Yes | Your internal user ID. |
 | `account_number` | `string` | Yes | Recipient's account number. |
-| `bank_code` | `string` | Yes | Bank code (e.g., `NEQUI`). |
+| `bank_code` | `string` | No | Bank code (e.g., `NEQUI`). Required only for `MOVII`; optional for `NEQUI`, `BREB`, and `PIX`. |
 | `tax_id` | `string` | No | User's tax ID. |
 | `redirectUrl` | `string` | No | Optional redirect after KYC. |
 | `qr_code` | `string` | No | QR code string, when applicable. |
@@ -228,6 +228,8 @@ For `BREB`, the bank list maps to its payout rails:
 
 - `9101` (`ENT`) — intra-BreB accounts  
 - `9102` (`TFY`) — Transfiya rail
+
+`MOVII` requires `bank_code` when accepting a transaction. `NEQUI`, `BREB`, and `PIX` can omit it (defaults to the right rail).
 
 ### Check liquidity (`GET /payments/liquidity`)
 

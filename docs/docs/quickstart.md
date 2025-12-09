@@ -104,6 +104,8 @@ curl -X POST https://api.abroad.finance/transaction \
 If `kycLink` is not `null`, you **must** redirect the user to that URL to complete identity verification before the transaction can proceed.
 :::
 
+**Bank code note:** `bank_code` is mandatory only for `MOVII`. For `NEQUI`, `BREB`, and `PIX`, you may omit it or provide the suggested rail/bank identifier if available.
+
 ## 3) Send funds on-chain
 
 Send the `value` amount of crypto to the Abroad deposit address for the chosen `network`.

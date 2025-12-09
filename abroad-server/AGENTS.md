@@ -11,3 +11,5 @@ When contributing to this repository, please ensure that you adhere to the follo
 - Istanbul comments such as "istanbul ignore next" are not allowed.
 - Jest configuration must not be modified.
  
+ ## Documentation
+ - If necessary, update repository documentation to reflect code changes.
