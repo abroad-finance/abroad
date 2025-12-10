@@ -324,7 +324,7 @@ export class ReceivedCryptoTransactionController {
     try {
       await this.queueHandler.postMessage(QueueName.PAYMENT_SENT, {
         amount: transactionRecord.quote.sourceAmount,
-        blockchain: BlockchainNetwork.STELLAR,
+        blockchain: transactionRecord.quote.network,
         cryptoCurrency: transactionRecord.quote.cryptoCurrency,
         paymentMethod: transactionRecord.quote.paymentMethod,
         targetCurrency: transactionRecord.quote.targetCurrency,

@@ -66,6 +66,7 @@ type ProcessingRecord = {
   }
   qrCode?: string
   quote: {
+    network: BlockchainNetwork
     cryptoCurrency: CryptoCurrency
     paymentMethod: PaymentMethod
     sourceAmount: number
@@ -122,6 +123,7 @@ function buildProcessingRecord(overrides: ProcessingRecordOverrides = {}): Proce
     },
     qrCode: 'qr-code',
     quote: {
+      network: BlockchainNetwork.STELLAR,
       cryptoCurrency: CryptoCurrency.USDC,
       paymentMethod: PaymentMethod.NEQUI,
       sourceAmount: 50,
@@ -284,7 +286,9 @@ describe('ReceivedCryptoTransactionController.onTransactionReceived', () => {
 
   it('completes synchronous payments and emits notifications', async () => {
     const harness = createControllerHarness()
-    const processingRecord = buildProcessingRecord()
+    const processingRecord = buildProcessingRecord({
+      quote: { network: BlockchainNetwork.SOLANA },
+    })
     const completedRecord = { ...processingRecord, status: TransactionStatus.PAYMENT_COMPLETED }
     const fullRecord = {
       ...completedRecord,
@@ -299,7 +303,7 @@ describe('ReceivedCryptoTransactionController.onTransactionReceived', () => {
       .mockResolvedValueOnce(completedRecord)
     harness.prismaClient.transaction.findUnique.mockResolvedValue(fullRecord)
 
-    await harness.handler({ ...message, amount: 50 })
+    await harness.handler({ ...message, amount: 50, blockchain: BlockchainNetwork.SOLANA })
 
     expect(harness.paymentService.sendPayment).toHaveBeenCalledWith({
       account: processingRecord.accountNumber,
@@ -326,7 +330,7 @@ describe('ReceivedCryptoTransactionController.onTransactionReceived', () => {
       QueueName.PAYMENT_SENT,
       expect.objectContaining({
         amount: processingRecord.quote.sourceAmount,
-        blockchain: BlockchainNetwork.STELLAR,
+        blockchain: processingRecord.quote.network,
       }),
     )
     expect(harness.slackNotifier.sendMessage).toHaveBeenCalled()

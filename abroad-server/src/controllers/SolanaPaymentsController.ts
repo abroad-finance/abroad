@@ -1,5 +1,5 @@
 import { BlockchainNetwork, CryptoCurrency, TransactionStatus } from '@prisma/client'
-import { getAssociatedTokenAddressSync, TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID } from '@solana/spl-token'
+import { getAssociatedTokenAddress, TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID } from '@solana/spl-token'
 import {
   Connection,
   ParsedInstruction,
@@ -134,10 +134,11 @@ export class SolanaPaymentsController extends Controller {
     }
 
     // Derive the USDC token accounts (ATAs) for the deposit wallet for both token programs
-    const depositTokenAccounts = [
-      getAssociatedTokenAddressSync(usdcMint, depositWallet, false, TOKEN_PROGRAM_ID),
-      getAssociatedTokenAddressSync(usdcMint, depositWallet, false, TOKEN_2022_PROGRAM_ID),
-    ]
+    const depositTokenAccounts = await Promise.all([
+      getAssociatedTokenAddress(usdcMint, depositWallet, false, TOKEN_PROGRAM_ID),
+      getAssociatedTokenAddress(usdcMint, depositWallet, false, TOKEN_2022_PROGRAM_ID),
+    ])
+    const walletTokenAccounts = [depositWallet, ...depositTokenAccounts]
 
     const connection = new Connection(rpcUrl, 'confirmed')
 
@@ -160,7 +161,7 @@ export class SolanaPaymentsController extends Controller {
       return badRequestResponse(400, { reason: 'Transaction failed on-chain' })
     }
 
-    const transfer = this.findUsdcTransferToWallet(txDetails, depositTokenAccounts, [usdcMint])
+    const transfer = this.findUsdcTransferToWallet(txDetails, walletTokenAccounts, [usdcMint])
 
     if (!transfer) {
       return badRequestResponse(400, { reason: 'No USDC transfer to the configured wallet found in this transaction' })

@@ -42,6 +42,7 @@ jest.mock('@solana/web3.js', () => {
 })
 
 jest.mock('@solana/spl-token', () => {
+  const { PublicKey } = require('@solana/web3.js')
   class TokenProgramKey {
     value: string
     constructor(value: string) {
@@ -53,7 +54,23 @@ jest.mock('@solana/spl-token', () => {
     }
   }
 
-  return { TOKEN_PROGRAM_ID: new TokenProgramKey('token-program') }
+  const isPublicKeyLike = (candidate: unknown): candidate is InstanceType<typeof PublicKey> =>
+    Boolean(candidate) && typeof candidate === 'object' && 'value' in (candidate as { value?: unknown })
+
+  const deriveAta = (mint: unknown, owner: InstanceType<typeof PublicKey>) => {
+    const ownerValue = owner.value ?? ''
+    const mintValue = isPublicKeyLike(mint) ? mint.value : String(mint ?? '')
+    return new PublicKey(`${ownerValue}-${mintValue}-ata`)
+  }
+
+  return {
+    TOKEN_2022_PROGRAM_ID: new TokenProgramKey('token-2022-program'),
+    TOKEN_PROGRAM_ID: new TokenProgramKey('token-program'),
+    getAssociatedTokenAddress: async (
+      mint: unknown,
+      owner: InstanceType<typeof PublicKey>,
+    ) => deriveAta(mint, owner),
+  }
 })
 
 type PrismaLike = {
