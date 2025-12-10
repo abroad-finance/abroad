@@ -9,6 +9,14 @@ import { IDatabaseClientProvider } from '../../interfaces/IDatabaseClientProvide
 import { ISecretManager, Secret } from '../../interfaces/ISecretManager'
 import { createMockLogger, createMockQueueHandler, MockLogger, MockQueueHandler } from '../setup/mockFactories'
 
+type MockedPublicKey = {
+  equals(other: unknown): boolean
+  toBase58(): string
+  value: string
+}
+
+type MockedPublicKeyConstructor = new (value: string) => MockedPublicKey
+
 const mockParsedTransactions: Record<string, null | ParsedTransactionWithMeta> = {}
 
 jest.mock('@solana/web3.js', () => {
@@ -42,7 +50,7 @@ jest.mock('@solana/web3.js', () => {
 })
 
 jest.mock('@solana/spl-token', () => {
-  const { PublicKey } = require('@solana/web3.js')
+  const { PublicKey } = jest.requireMock<{ PublicKey: MockedPublicKeyConstructor }>('@solana/web3.js')
   class TokenProgramKey {
     value: string
     constructor(value: string) {
@@ -64,12 +72,12 @@ jest.mock('@solana/spl-token', () => {
   }
 
   return {
-    TOKEN_2022_PROGRAM_ID: new TokenProgramKey('token-2022-program'),
-    TOKEN_PROGRAM_ID: new TokenProgramKey('token-program'),
     getAssociatedTokenAddress: async (
       mint: unknown,
       owner: InstanceType<typeof PublicKey>,
     ) => deriveAta(mint, owner),
+    TOKEN_2022_PROGRAM_ID: new TokenProgramKey('token-2022-program'),
+    TOKEN_PROGRAM_ID: new TokenProgramKey('token-program'),
   }
 })
 

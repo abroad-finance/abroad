@@ -34,7 +34,7 @@ describe('PartnerService', () => {
     partnersById = {
       'secret-STELLAR_SEP_PARTNER_ID': defaultPartner,
     }
-    findFirst = jest.fn(async ({ where }: { where?: { apiKey?: string; id?: string } } = {}) => {
+    findFirst = jest.fn(async ({ where }: { where?: { apiKey?: string, id?: string } } = {}) => {
       if (where?.apiKey) {
         return partnersByApiKey[where.apiKey] ?? null
       }

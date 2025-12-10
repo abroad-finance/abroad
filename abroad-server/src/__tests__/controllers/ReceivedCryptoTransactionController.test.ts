@@ -66,8 +66,8 @@ type ProcessingRecord = {
   }
   qrCode?: string
   quote: {
-    network: BlockchainNetwork
     cryptoCurrency: CryptoCurrency
+    network: BlockchainNetwork
     paymentMethod: PaymentMethod
     sourceAmount: number
     targetAmount: number
@@ -123,8 +123,8 @@ function buildProcessingRecord(overrides: ProcessingRecordOverrides = {}): Proce
     },
     qrCode: 'qr-code',
     quote: {
-      network: BlockchainNetwork.STELLAR,
       cryptoCurrency: CryptoCurrency.USDC,
+      network: BlockchainNetwork.STELLAR,
       paymentMethod: PaymentMethod.NEQUI,
       sourceAmount: 50,
       targetAmount: 200,
