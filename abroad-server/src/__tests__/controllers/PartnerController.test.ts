@@ -200,6 +200,7 @@ describe('PartnerController', () => {
     const controller = new PartnerController(buildDbProvider().dbProvider)
     const partner: Partner = {
       apiKey: null,
+      clientDomainHash: null,
       country: null,
       createdAt: new Date('2024-02-02T00:00:00.000Z'),
       email: null,

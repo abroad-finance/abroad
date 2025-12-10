@@ -34,13 +34,17 @@ export class PartnerService implements IPartnerService {
   ) { }
 
   public async getPartnerFromApiKey(apiKey?: string) {
-    if (!apiKey) {
+    const normalizedApiKey = apiKey?.trim()
+
+    if (!normalizedApiKey) {
       throw new Error('API key not provided')
     }
 
     const prismaClient = await this.databaseClientProvider.getClient()
 
-    const partner = await this.findPartnerByApiKey(prismaClient, apiKey)
+    const hashedApiKey = this.hashApiKey(normalizedApiKey)
+
+    const partner = await this.findPartnerByApiKey(prismaClient, hashedApiKey)
 
     if (!partner) {
       throw new Error('Partner not found')
@@ -67,7 +71,7 @@ export class PartnerService implements IPartnerService {
       const clientDomain = this.extractClientDomain(decodedToken)
 
       if (clientDomain) {
-        const partner = await this.findPartnerByApiKey(prismaClient, clientDomain)
+        const partner = await this.findPartnerByClientDomain(prismaClient, clientDomain)
         if (partner) {
           return partner
         }
@@ -87,18 +91,14 @@ export class PartnerService implements IPartnerService {
   }
 
   private extractClientDomain(payload: SepTokenPayload): string | undefined {
-    if (typeof payload.client_domain === 'string' && payload.client_domain.trim().length > 0) {
-      return payload.client_domain
+    const rootDomain = this.normalizeClientDomain(payload.client_domain)
+    if (rootDomain) {
+      return rootDomain
     }
 
-    if (
-      payload.data
-      && typeof payload.data === 'object'
-      && payload.data !== null
-      && typeof payload.data.client_domain === 'string'
-      && payload.data.client_domain.trim().length > 0
-    ) {
-      return payload.data.client_domain
+    const nestedDomain = this.normalizeClientDomain(payload.data?.client_domain)
+    if (nestedDomain) {
+      return nestedDomain
     }
 
     return undefined
@@ -106,11 +106,26 @@ export class PartnerService implements IPartnerService {
 
   private async findPartnerByApiKey(
     prismaClient: PrismaClient,
-    apiKey: string,
+    hashedApiKey: string,
   ): Promise<null | Partner> {
-    const apiKeyHash = this.hashApiKey(apiKey)
     return prismaClient.partner.findFirst({
-      where: { apiKey: apiKeyHash },
+      where: { apiKey: hashedApiKey },
+    })
+  }
+
+  private async findPartnerByClientDomain(
+    prismaClient: PrismaClient,
+    clientDomain: string,
+  ): Promise<null | Partner> {
+    const normalizedClientDomain = this.normalizeClientDomain(clientDomain)
+
+    if (!normalizedClientDomain) {
+      return null
+    }
+
+    const clientDomainHash = this.hashClientDomain(normalizedClientDomain)
+    return prismaClient.partner.findFirst({
+      where: { clientDomainHash },
     })
   }
 
@@ -118,7 +133,21 @@ export class PartnerService implements IPartnerService {
     return sha512_224(apiKey)
   }
 
+  private hashClientDomain(clientDomain: string): string {
+    return sha512_224(clientDomain)
+  }
+
   private isJwtPayload(payload: unknown): payload is SepTokenPayload {
     return typeof payload === 'object' && payload !== null
+  }
+
+  private normalizeClientDomain(clientDomain?: string): string | undefined {
+    if (typeof clientDomain !== 'string') {
+      return undefined
+    }
+
+    const normalizedDomain = clientDomain.trim().toLowerCase()
+
+    return normalizedDomain.length > 0 ? normalizedDomain : undefined
   }
 }

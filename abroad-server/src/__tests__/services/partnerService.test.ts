@@ -15,11 +15,12 @@ jest.mock('jsonwebtoken', () => ({
 describe('PartnerService', () => {
   const hashedApiKey = sha512_224('api-key')
   const hashedClientDomain = sha512_224('client.example.com')
-  const partnerFromApiKey = { apiKey: hashedApiKey, id: 'partner-1' } as unknown as PartnerModel
-  const partnerFromDomain = { apiKey: hashedClientDomain, id: 'partner-2' } as unknown as PartnerModel
-  const defaultPartner = { id: 'secret-STELLAR_SEP_PARTNER_ID' } as unknown as PartnerModel
+  const partnerFromApiKey = { apiKey: hashedApiKey, clientDomainHash: null, id: 'partner-1' } as unknown as PartnerModel
+  const partnerFromDomain = { apiKey: null, clientDomainHash: hashedClientDomain, id: 'partner-2' } as unknown as PartnerModel
+  const defaultPartner = { clientDomainHash: null, id: 'secret-STELLAR_SEP_PARTNER_ID' } as unknown as PartnerModel
 
   let partnersByApiKey: Record<string, PartnerModel>
+  let partnersByClientDomainHash: Record<string, PartnerModel>
   let partnersById: Record<string, PartnerModel>
   let dbProvider: IDatabaseClientProvider
   let secretManager: ISecretManager
@@ -29,14 +30,19 @@ describe('PartnerService', () => {
   beforeEach(() => {
     partnersByApiKey = {
       [hashedApiKey]: partnerFromApiKey,
+    }
+    partnersByClientDomainHash = {
       [hashedClientDomain]: partnerFromDomain,
     }
     partnersById = {
       'secret-STELLAR_SEP_PARTNER_ID': defaultPartner,
     }
-    findFirst = jest.fn(async ({ where }: { where?: { apiKey?: string, id?: string } } = {}) => {
+    findFirst = jest.fn(async ({ where }: { where?: { apiKey?: string, clientDomainHash?: string, id?: string } } = {}) => {
       if (where?.apiKey) {
         return partnersByApiKey[where.apiKey] ?? null
+      }
+      if (where?.clientDomainHash) {
+        return partnersByClientDomainHash[where.clientDomainHash] ?? null
       }
       if (where?.id) {
         return partnersById[where.id] ?? null
@@ -88,7 +94,7 @@ describe('PartnerService', () => {
     expect(secretManager.getSecret).toHaveBeenCalledWith('STELLAR_SEP_JWT_SECRET')
     expect(secretManager.getSecret).toHaveBeenCalledWith('STELLAR_SEP_PARTNER_ID')
     expect(jwt.verify).toHaveBeenCalledWith('token-123', 'secret-STELLAR_SEP_JWT_SECRET')
-    expect(findFirst).toHaveBeenCalledWith({ where: { apiKey: hashedClientDomain } })
+    expect(findFirst).toHaveBeenCalledWith({ where: { clientDomainHash: hashedClientDomain } })
     expect(result).toBe(partnerFromDomain)
   })
 
@@ -108,11 +114,11 @@ describe('PartnerService', () => {
   })
 
   it('falls back to SEP partner when client_domain has no matching partner', async () => {
-    delete partnersByApiKey[hashedClientDomain]
+    delete partnersByClientDomainHash[hashedClientDomain]
 
     const result = await service.getPartnerFromSepJwt('token-no-partner')
 
-    expect(findFirst).toHaveBeenCalledWith({ where: { apiKey: hashedClientDomain } })
+    expect(findFirst).toHaveBeenCalledWith({ where: { clientDomainHash: hashedClientDomain } })
     expect(findFirst).toHaveBeenCalledWith({ where: { id: 'secret-STELLAR_SEP_PARTNER_ID' } })
     expect(result).toBe(defaultPartner)
   })
