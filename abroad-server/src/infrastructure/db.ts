@@ -1,11 +1,12 @@
 // src/infrastructure/db.ts
 import { PrismaClient } from '@prisma/client'
-import { inject } from 'inversify'
+import { inject, injectable } from 'inversify'
 
 import { IDatabaseClientProvider } from '../interfaces/IDatabaseClientProvider'
 import { ISecretManager } from '../interfaces/ISecretManager'
 import { TYPES } from '../types'
 
+@injectable()
 export class PrismaClientProvider implements IDatabaseClientProvider {
   private datasourceUrl: null | string = null
   private prismaClient: null | PrismaClient = null

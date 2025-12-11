@@ -9,6 +9,7 @@ import swaggerUi from 'swagger-ui-express'
 
 import packageJson from '../package.json'
 import { initAdmin } from './admin/admin'
+import { RuntimeConfig } from './config/runtime'
 import { ILogger } from './interfaces'
 import { iocContainer } from './ioc'
 import { RegisterRoutes } from './routes'
@@ -18,6 +19,7 @@ dotenv.config()
 
 const app = express()
 const logger = iocContainer.get<ILogger>(TYPES.ILogger)
+const health = { ready: false }
 app.use(cors())
 app.use(bodyParser.json())
 // Handle text/json content-type generically (kept small)
@@ -99,6 +101,15 @@ app.get('/swagger.json', (_req: Request, res: Response) => {
 // -----------------
 // Landing / health
 // -----------------
+app.get('/healthz', (_req: Request, res: Response) => {
+  res.status(200).json({ status: 'ok' })
+})
+
+app.get('/readyz', (_req: Request, res: Response) => {
+  const status = health.ready ? 200 : 503
+  res.status(status).json({ ready: health.ready })
+})
+
 app.get('/', (req: Request, res: Response) => {
   const base = `${req.protocol}://${req.get('host')}`
   res.format({
@@ -121,16 +132,14 @@ interface ApiError extends Error {
   status?: number
 }
 
-if (process.env.NODE_ENV === 'production') {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  app.use((err: ApiError, _req: Request, res: Response, _next: NextFunction) => {
-    console.error('API error:', err)
-    res.status(err.status ?? 500).json({
-      message: err.message || 'An error occurred',
-      reason: err.message || 'Internal Server Error',
-    })
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+app.use((err: ApiError, _req: Request, res: Response, _next: NextFunction) => {
+  logger.error('API error', err)
+  res.status(err.status ?? 500).json({
+    message: err.message || 'An error occurred',
+    reason: err.message || 'Internal Server Error',
   })
-}
+})
 
 // ---------------------
 // Boot the HTTP server
@@ -141,36 +150,41 @@ async function start() {
     await initAdmin(app)
   }
   catch (e) {
-    console.warn('AdminJS failed to initialize:', e)
+    const error = e instanceof Error ? e : new Error(String(e))
+    logger.warn('AdminJS failed to initialize', error)
+    // Preserve legacy console warning for operational visibility and tests
+    console.warn('AdminJS failed to initialize:', error)
   }
 
-  const port = process.env.PORT || 3784
+  const port = RuntimeConfig.server.port
   const server = app.listen(port, () => {
-    console.log(`Server running on http://localhost:${port}`)
-    console.log(`API docs at      http://localhost:${port}/docs`)
-    console.log(`Admin panel at   http://localhost:${port}/admin`)
+    health.ready = true
+    logger.info(`Server running on http://localhost:${port}`)
+    logger.info(`API docs at      http://localhost:${port}/docs`)
+    logger.info(`Admin panel at   http://localhost:${port}/admin`)
   })
 
   // ---------------------
   // Graceful shutdown
   // ---------------------
   function shutdown(signal: NodeJS.Signals) {
-    console.log(`\n${signal} received. Shutting down gracefully...`)
+    health.ready = false
+    logger.info(`${signal} received. Shutting down gracefully...`)
     // Stop accepting new connections
     server.close((err?: Error) => {
       if (err) {
-        console.error('Error during HTTP server close:', err)
+        logger.error('Error during HTTP server close', err)
         process.exit(1)
       }
-      console.log('HTTP server closed. Bye!')
+      logger.info('HTTP server closed. Bye!')
       process.exit(0)
     })
 
     // Fallback: force exit if it takes too long
     setTimeout(() => {
-      console.warn('Forcing shutdown after timeout')
+      logger.warn('Forcing shutdown after timeout')
       process.exit(1)
-    }, 10000).unref()
+    }, RuntimeConfig.server.shutdownTimeoutMs).unref()
   }
 
   ;['SIGINT', 'SIGTERM'].forEach((sig) => {

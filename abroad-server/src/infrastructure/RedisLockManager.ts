@@ -2,6 +2,7 @@ import { inject, injectable } from 'inversify'
 import IORedis from 'ioredis'
 import Redlock from 'redlock'
 
+import { ILogger } from '../interfaces'
 import { ILockManager } from '../interfaces/ILockManager'
 import { ISecretManager } from '../interfaces/ISecretManager'
 import { TYPES } from '../types'
@@ -11,7 +12,10 @@ export class RedisLockManager implements ILockManager {
   private redis?: IORedis
   private redlock?: Redlock
 
-  constructor(@inject(TYPES.ISecretManager) private secretManager: ISecretManager) {}
+  constructor(
+    @inject(TYPES.ISecretManager) private secretManager: ISecretManager,
+    @inject(TYPES.ILogger) private logger: ILogger,
+  ) {}
 
   async withLock<T>(key: string, ttlMs: number, fn: () => Promise<T>): Promise<T> {
     await this.init()
@@ -37,7 +41,7 @@ export class RedisLockManager implements ILockManager {
     })
 
     this.redis.once('ready', () => {
-      console.info('[Redlock] Redis connection ready')
+      this.logger.info('[Redlock] Redis connection ready')
     })
 
     this.redlock = new Redlock([this.redis!], {
@@ -52,7 +56,7 @@ export class RedisLockManager implements ILockManager {
 
     // Redlock emits non-fatal errors (e.g., transient Redis hiccups)
     this.redlock.on('error', (err) => {
-      console.warn('[Redlock] non-fatal error:', err?.message || err)
+      this.logger.warn('[Redlock] non-fatal error:', err instanceof Error ? err : new Error(String(err)))
     })
   }
 }

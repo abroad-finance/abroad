@@ -2,11 +2,13 @@
 import { SecretManagerServiceClient } from '@google-cloud/secret-manager'
 import dotenv from 'dotenv'
 import { isAvailable, project } from 'gcp-metadata'
+import { injectable } from 'inversify'
 
 import { ISecretManager, Secret } from '../interfaces/ISecretManager'
 
 dotenv.config()
 
+@injectable()
 export class GcpSecretManager implements ISecretManager {
   private cachedProjectId: null | string = null
   private secretClient: SecretManagerServiceClient

@@ -2,12 +2,15 @@ import axios from 'axios'
 
 import type { ISecretManager } from '../../interfaces/ISecretManager'
 
+import { RuntimeConfig } from '../../config/runtime'
 import { SlackNotifier } from '../../services/slackNotifier'
+import { createMockLogger } from '../setup/mockFactories'
 
 jest.mock('axios')
 
 describe('SlackNotifier', () => {
   let secretManager: ISecretManager
+  const logger = createMockLogger()
 
   beforeEach(() => {
     jest.clearAllMocks()
@@ -19,17 +22,21 @@ describe('SlackNotifier', () => {
 
   it('posts to slack when a webhook is configured', async () => {
     (axios.post as jest.Mock).mockResolvedValueOnce(undefined)
-    const notifier = new SlackNotifier(secretManager)
+    const notifier = new SlackNotifier(secretManager, logger)
 
     await notifier.sendMessage('hello')
 
     expect(secretManager.getSecret).toHaveBeenCalledWith('SLACK_WEBHOOK_URL')
-    expect(axios.post).toHaveBeenCalledWith('https://slack.example.com/webhook', { text: 'hello' })
+    expect(axios.post).toHaveBeenCalledWith(
+      'https://slack.example.com/webhook',
+      { text: 'hello' },
+      { timeout: RuntimeConfig.axiosTimeoutMs },
+    )
   })
 
   it('returns early when webhook secret is missing', async () => {
     secretManager.getSecret = jest.fn(async () => '')
-    const notifier = new SlackNotifier(secretManager)
+    const notifier = new SlackNotifier(secretManager, logger)
 
     await notifier.sendMessage('no-op')
 
@@ -38,12 +45,10 @@ describe('SlackNotifier', () => {
 
   it('logs a warning when the post fails', async () => {
     ;(axios.post as jest.Mock).mockRejectedValueOnce(new Error('boom'))
-    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {})
-    const notifier = new SlackNotifier(secretManager)
+    const notifier = new SlackNotifier(secretManager, logger)
 
     await notifier.sendMessage('warn')
 
-    expect(warnSpy).toHaveBeenCalledWith('Failed to send message to Slack:', 'boom')
-    warnSpy.mockRestore()
+    expect(logger.warn).toHaveBeenCalledWith('Failed to send message to Slack', expect.any(Error))
   })
 })

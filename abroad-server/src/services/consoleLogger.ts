@@ -1,4 +1,6 @@
 // src/services/consoleLogger.ts
+import { injectable } from 'inversify'
+
 import { ILogger } from '../interfaces'
 
 // Tiny helper to safely stringify (handles Errors & circular refs)
@@ -26,6 +28,7 @@ const safeStringify = (obj: unknown) => {
 
 type Sev = 'CRITICAL' | 'DEBUG' | 'ERROR' | 'INFO' | 'WARNING'
 
+@injectable()
 export class ConsoleLogger implements ILogger {
   error(message: string, ...optionalParams: unknown[]): void {
     log('ERROR', message, optionalParams)

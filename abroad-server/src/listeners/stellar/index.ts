@@ -6,9 +6,10 @@ import { Horizon } from '@stellar/stellar-sdk'
 import { inject } from 'inversify'
 
 import { TransactionQueueMessage } from '../../controllers/queue/ReceivedCryptoTransactionController'
-import { IQueueHandler, QueueName } from '../../interfaces'
+import { ILogger, IQueueHandler, QueueName } from '../../interfaces'
 import { IDatabaseClientProvider } from '../../interfaces/IDatabaseClientProvider'
 import { ISecretManager } from '../../interfaces/ISecretManager'
+import { createScopedLogger, ScopedLogger } from '../../shared/logging'
 import { TYPES } from '../../types'
 
 // Minimal stream handle types returned by stellar-sdk stream()
@@ -18,6 +19,7 @@ export class StellarListener {
   private accountId!: string
   private horizonUrl!: string
   private keepAlive?: ReturnType<typeof setInterval>
+  private readonly logger: ScopedLogger
   private queueName = QueueName.RECEIVED_CRYPTO_TRANSACTION
   private server?: Horizon.Server
   // Keep strong references so the stream isn't GC'd.
@@ -29,7 +31,10 @@ export class StellarListener {
     @inject(TYPES.ISecretManager) private secretManager: ISecretManager,
     @inject(TYPES.IDatabaseClientProvider)
     private dbClientProvider: IDatabaseClientProvider,
-  ) { }
+    @inject(TYPES.ILogger) baseLogger: ILogger,
+  ) {
+    this.logger = createScopedLogger(baseLogger, { scope: 'StellarListener', staticPayload: { queue: this.queueName } })
+  }
 
   /**
    * Converts a Base64 string to a UUID string.
@@ -51,16 +56,13 @@ export class StellarListener {
    * publishes valid messages to the RabbitMQ queue.
    */
   public async start(): Promise<void> {
-    console.log(`[StellarListener] Initializing listener`)
+    this.logger.info('Initializing listener')
 
     this.accountId = await this.secretManager.getSecret('STELLAR_ACCOUNT_ID')
     this.horizonUrl = await this.secretManager.getSecret('STELLAR_HORIZON_URL')
     this.usdcIssuer = await this.secretManager.getSecret('STELLAR_USDC_ISSUER')
 
-    console.log(
-      `[StellarListener] Initializing Horizon server for account:`,
-      this.accountId,
-    )
+    this.logger.info('Initializing Horizon server for account', { accountId: this.accountId })
 
     const server = new Horizon.Server(this.horizonUrl)
     this.server = server
@@ -69,26 +71,23 @@ export class StellarListener {
     const state = await prismaClient.stellarListenerState.findUnique({
       where: { id: 'singleton' },
     })
-    console.log(`[StellarListener] Retrieved listener state:`, state)
+    this.logger.info('Retrieved listener state', state ?? {})
 
     const cursorServer = state?.lastPagingToken
       ? server.payments().cursor(state.lastPagingToken)
       : server.payments()
-    console.log(
-      `[StellarListener] Starting stream. Cursor initialized to:`,
-      state?.lastPagingToken ? state.lastPagingToken : 'now',
+    this.logger.info(
+      'Starting stream',
+      state?.lastPagingToken ? { cursor: state.lastPagingToken } : { cursor: 'now' },
     )
 
     // Keep a reference to the stream handle returned by SDK
     this.stream = cursorServer.forAccount(this.accountId).stream({
       onerror: (err) => {
-        console.error('[StellarListener] Stream error:', err)
+        this.logger.error('Stream error', err)
       },
       onmessage: async (payment) => {
-        console.log(
-          `[StellarListener] Received message from stream:`,
-          payment.id,
-        )
+        this.logger.info('Received payment from stream', { paymentId: payment.id })
 
         try {
           await prismaClient.stellarListenerState.upsert({
@@ -99,23 +98,14 @@ export class StellarListener {
             update: { lastPagingToken: payment.paging_token },
             where: { id: 'singleton' },
           })
-          console.log(
-            `[StellarListener] Updated listener state with paging token:`,
-            payment.paging_token,
-          )
+          this.logger.info('Updated listener state with paging token', { pagingToken: payment.paging_token })
         }
         catch (error) {
-          console.error(
-            `[StellarListener] Error updating listener state:`,
-            error,
-          )
+          this.logger.error('Error updating listener state', error)
         }
 
         if (payment.type !== 'payment') {
-          console.log(
-            `[StellarListener] Skipping message (wrong type):`,
-            payment,
-          )
+          this.logger.warn('Skipping message (wrong type)', { type: payment.type })
           return
         }
 
@@ -126,8 +116,15 @@ export class StellarListener {
           || payment.asset_code !== 'USDC'
           || !payment.asset_issuer
         ) {
-          console.log(
-            `[StellarListener] Skipping message (wrong type, recipient, or asset). Type: ${payment.type}, Asset Type: ${payment.asset_type}, Asset Code: ${payment.asset_code}, Asset Issuer: ${payment.asset_issuer}`,
+          this.logger.warn(
+            'Skipping message (wrong type, recipient, or asset).',
+            {
+              assetCode: payment.asset_code,
+              assetIssuer: payment.asset_issuer,
+              assetType: payment.asset_type,
+              recipient: payment.to,
+              type: payment.type,
+            },
           )
           return
         }
@@ -137,23 +134,18 @@ export class StellarListener {
         ]
 
         if (!usdcAssetIssuers.includes(payment.asset_issuer)) {
-          console.log(
-            `[StellarListener] Skipping payment. USDC Asset Issuer ${payment.asset_issuer} is not allowed.`,
+          this.logger.warn(
+            'Skipping payment. USDC Asset Issuer is not allowed.',
+            { assetIssuer: payment.asset_issuer },
           )
           return
         }
 
         const tx = await payment.transaction()
-        console.log(
-          `[StellarListener] Fetched full transaction details:`,
-          tx.id,
-        )
+        this.logger.info('Fetched full transaction details', { transactionId: tx.id })
 
         if (!tx.memo) {
-          console.log(
-            `[StellarListener] Skipping message (no memo) in payment:`,
-            payment.id,
-          )
+          this.logger.warn('Skipping message (no memo) in payment', { paymentId: payment.id })
           return
         }
 
@@ -170,15 +162,15 @@ export class StellarListener {
         }
 
         try {
-          this.queueHandler.postMessage(this.queueName, queueMessage)
-          console.log(
-            `[StellarListener] Sent message to RabbitMQ queue '${this.queueName}':`,
-            queueMessage,
+          await this.queueHandler.postMessage(this.queueName, queueMessage)
+          this.logger.info(
+            'Sent message to queue',
+            { queueName: this.queueName, transactionId: queueMessage.transactionId },
           )
         }
         catch (error) {
-          console.error(
-            `[StellarListener] Error sending message to RabbitMQ:`,
+          this.logger.error(
+            'Error sending message to queue',
             error,
           )
         }

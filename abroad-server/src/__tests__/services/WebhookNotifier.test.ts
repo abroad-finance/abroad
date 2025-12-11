@@ -40,7 +40,10 @@ describe('WebhookNotifier', () => {
     expect(axios.post).toHaveBeenCalledWith('https://hook', {
       data: { id: '123' },
       event: WebhookEvent.TRANSACTION_UPDATED,
-    }, { headers: { 'X-Abroad-Webhook-Secret': 'secret' } })
+    }, expect.objectContaining({
+      headers: { 'X-Abroad-Webhook-Secret': 'secret' },
+      timeout: expect.any(Number),
+    }))
   })
 
   it('logs an error when the webhook post fails', async () => {
@@ -52,6 +55,9 @@ describe('WebhookNotifier', () => {
       event: WebhookEvent.TRANSACTION_UPDATED,
     })
 
-    expect(logger.error).toHaveBeenCalledWith('Failed to notify webhook: https://hook')
+    expect(logger.error).toHaveBeenCalledWith('Failed to notify webhook', expect.objectContaining({
+      event: WebhookEvent.TRANSACTION_UPDATED,
+      url: 'https://hook',
+    }))
   })
 })

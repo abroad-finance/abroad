@@ -11,6 +11,8 @@ import { TransferoPaymentService } from '../services/paymentServices/transferoPa
 import { PixQrDecoder } from '../services/PixQrDecoder'
 import { SolanaWalletHandler } from '../services/SolanaWalletHandler'
 import { StellarWalletHandler } from '../services/StellarWalletHandler'
+import { TransactionAcceptanceService } from '../services/TransactionAcceptanceService'
+import { TransactionStatusService } from '../services/TransactionStatusService'
 import { WalletHandlerFactory } from '../services/WalletHandlerFactory'
 import { TYPES } from '../types'
 import { QuoteUseCase } from '../useCases/quoteUseCase'
@@ -30,6 +32,8 @@ const domainBindings: ReadonlyArray<BindingRegistration<unknown>> = [
   { identifier: TYPES.IPaymentService, implementation: TransferoPaymentService, name: 'transfero' },
   { identifier: TYPES.IExchangeProvider, implementation: BinanceExchangeProvider, name: 'binance' },
   { identifier: TYPES.IExchangeProvider, implementation: TransferoExchangeProvider, name: 'transfero' },
+  { identifier: TYPES.TransactionAcceptanceService, implementation: TransactionAcceptanceService },
+  { identifier: TYPES.TransactionStatusService, implementation: TransactionStatusService },
 ] as const
 
 export function bindDomainServices(container: Container): void {

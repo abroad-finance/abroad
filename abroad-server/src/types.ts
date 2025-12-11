@@ -24,6 +24,8 @@ const typeKeys = [
   'ReceivedCryptoTransactionController',
   'SolanaWalletHandler',
   'StellarWalletHandler',
+  'TransactionAcceptanceService',
+  'TransactionStatusService',
 ] as const
 
 type TypeKey = typeof typeKeys[number]

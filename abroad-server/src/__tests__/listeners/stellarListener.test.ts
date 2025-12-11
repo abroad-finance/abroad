@@ -7,6 +7,7 @@ import type { ISecretManager } from '../../interfaces/ISecretManager'
 
 import { QueueName } from '../../interfaces'
 import { StellarListener } from '../../listeners/stellar'
+import { createMockLogger } from '../setup/mockFactories'
 
 interface HorizonMocks {
   cursor: jest.Mock
@@ -148,7 +149,7 @@ describe('StellarListener', () => {
     const secretManager = createSecretManager()
     const { dbProvider, findUnique, upsert } = createDbProvider({ lastPagingToken: 'cursor-1' })
 
-    const listener = new StellarListener(queueHandler, secretManager, dbProvider)
+    const listener = new StellarListener(queueHandler, secretManager, dbProvider, createMockLogger())
     await listener.start()
 
     expect(findUnique).toHaveBeenCalledWith({ where: { id: 'singleton' } })
@@ -179,7 +180,7 @@ describe('StellarListener', () => {
     const secretManager = createSecretManager('account-id', 'https://horizon', 'trusted-issuer')
     const { dbProvider, upsert } = createDbProvider()
 
-    const listener = new StellarListener(queueHandler, secretManager, dbProvider)
+    const listener = new StellarListener(queueHandler, secretManager, dbProvider, createMockLogger())
     await listener.start()
 
     const handler = horizonMocks.streamHandlers[0]
@@ -211,7 +212,7 @@ describe('StellarListener', () => {
     const queueHandler = createQueueHandler()
     const secretManager = createSecretManager()
     const { dbProvider } = createDbProvider()
-    const listener = new StellarListener(queueHandler, secretManager, dbProvider)
+    const listener = new StellarListener(queueHandler, secretManager, dbProvider, createMockLogger())
 
     const cancel = jest.fn()
     const internals = listener as unknown as { keepAlive?: NodeJS.Timeout, stream?: unknown }

@@ -1,4 +1,5 @@
 import { SocketIOWebSocketService } from '../../services/SocketIOWebSocketService'
+import { createMockLogger } from '../setup/mockFactories'
 
 const listenMock = jest.fn((port: number, cb: () => void) => cb())
 const closeMock = jest.fn((cb: () => void) => cb())
@@ -22,12 +23,13 @@ jest.mock('socket.io', () => ({
 }))
 
 describe('SocketIOWebSocketService', () => {
+  const logger = createMockLogger()
   beforeEach(() => {
     jest.clearAllMocks()
   })
 
   it('emits to a user only after start and joins rooms on connection', async () => {
-    const service = new SocketIOWebSocketService()
+    const service = new SocketIOWebSocketService(logger)
     service.emitToUser('u1', 'evt', { ok: true })
     expect(toMock).not.toHaveBeenCalled()
 
@@ -49,7 +51,7 @@ describe('SocketIOWebSocketService', () => {
   })
 
   it('stops idempotently and clears listeners', async () => {
-    const service = new SocketIOWebSocketService()
+    const service = new SocketIOWebSocketService(logger)
     await service.start(4321)
     await service.stop()
 
@@ -62,7 +64,7 @@ describe('SocketIOWebSocketService', () => {
   })
 
   it('is idempotent on start and tolerates missing auth/user ids', async () => {
-    const service = new SocketIOWebSocketService()
+    const service = new SocketIOWebSocketService(logger)
     await service.start(9999)
 
     // Start again should return early without new listeners

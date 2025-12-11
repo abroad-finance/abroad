@@ -10,6 +10,9 @@ import type { IPaymentServiceFactory } from '../../interfaces/IPaymentServiceFac
 import type { IWebhookNotifier } from '../../interfaces/IWebhookNotifier'
 
 import { TransactionController } from '../../controllers/TransactionController'
+import { TransactionAcceptanceService } from '../../services/TransactionAcceptanceService'
+import { TransactionStatusService } from '../../services/TransactionStatusService'
+import { createMockLogger } from '../setup/mockFactories'
 
 const buildController = () => {
   const prisma = {
@@ -33,9 +36,20 @@ const buildController = () => {
     postMessage: jest.fn(),
     subscribeToQueue: jest.fn(),
   }
+  const logger = createMockLogger()
+
+  const acceptanceService = new TransactionAcceptanceService(
+    dbProvider,
+    paymentServiceFactory,
+    kycService,
+    webhookNotifier,
+    queueHandler,
+    logger,
+  )
+  const statusService = new TransactionStatusService(dbProvider)
 
   return {
-    controller: new TransactionController(dbProvider, paymentServiceFactory, kycService, webhookNotifier, queueHandler),
+    controller: new TransactionController(acceptanceService, statusService),
     prisma,
   }
 }
@@ -167,11 +181,22 @@ describe('TransactionController acceptance flows', () => {
     const dbProvider: IDatabaseClientProvider = {
       getClient: jest.fn(async () => prisma as unknown as import('@prisma/client').PrismaClient),
     }
+    const logger = createMockLogger()
+
+    const acceptanceService = new TransactionAcceptanceService(
+      dbProvider,
+      paymentServiceFactory,
+      kycService,
+      webhookNotifier,
+      queueHandler,
+      logger,
+    )
+    const statusService = new TransactionStatusService(dbProvider)
 
     const transactionsPerCall = overrides?.transactionFindMany ?? [[], [], [], []]
     prisma.transaction.findMany.mockImplementation(async () => transactionsPerCall.shift() ?? [])
 
-    const controller = new TransactionController(dbProvider, paymentServiceFactory, kycService, webhookNotifier, queueHandler)
+    const controller = new TransactionController(acceptanceService, statusService)
 
     return {
       controller,
@@ -330,13 +355,27 @@ describe('TransactionController acceptance flows', () => {
       getLiquidity: jest.fn().mockResolvedValue(1_000),
       verifyAccount: jest.fn().mockResolvedValue(true),
     })
-    const controller = new TransactionController(
-      { getClient: jest.fn(async () => prisma as unknown as import('@prisma/client').PrismaClient) },
-      { getPaymentService: jest.fn().mockReturnValue(paymentService) },
-      { getKycLink: jest.fn().mockResolvedValue(null) },
+    const dbProvider: IDatabaseClientProvider = {
+      getClient: jest.fn(async () => prisma as unknown as import('@prisma/client').PrismaClient),
+    }
+    const paymentServiceFactory: IPaymentServiceFactory = {
+      getPaymentService: jest.fn().mockReturnValue(paymentService),
+    }
+    const kycService: IKycService = {
+      getKycLink: jest.fn().mockResolvedValue(null),
+    }
+    const queueHandler: IQueueHandler = { postMessage: queueHandlerPost, subscribeToQueue: jest.fn() }
+    const logger = createMockLogger()
+    const acceptanceService = new TransactionAcceptanceService(
+      dbProvider,
+      paymentServiceFactory,
+      kycService,
       webhookNotifier,
-      { postMessage: queueHandlerPost, subscribeToQueue: jest.fn() },
+      queueHandler,
+      logger,
     )
+    const statusService = new TransactionStatusService(dbProvider)
+    const controller = new TransactionController(acceptanceService, statusService)
 
     const response = await controller.acceptTransaction(requestBody, { user: partner } as unknown as import('express').Request, badRequest)
 
@@ -380,12 +419,13 @@ describe('TransactionController status lookup', () => {
         }),
       },
     }
+    const dbProvider: IDatabaseClientProvider = {
+      getClient: jest.fn(async () => prisma as unknown as import('@prisma/client').PrismaClient),
+    }
+    const statusService = new TransactionStatusService(dbProvider)
     const controller = new TransactionController(
-      { getClient: jest.fn(async () => prisma as unknown as import('@prisma/client').PrismaClient) },
-      { getPaymentService: jest.fn() },
-      { getKycLink: jest.fn() },
-      { notifyWebhook: jest.fn() },
-      { postMessage: jest.fn(), subscribeToQueue: jest.fn() },
+      { acceptTransaction: jest.fn() } as unknown as TransactionAcceptanceService,
+      statusService,
     )
 
     const response = await controller.getTransactionStatus(

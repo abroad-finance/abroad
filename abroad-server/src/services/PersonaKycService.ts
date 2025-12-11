@@ -1,6 +1,6 @@
 import { KycStatus, KYCTier } from '@prisma/client'
 import axios from 'axios'
-import { inject } from 'inversify'
+import { inject, injectable } from 'inversify'
 
 import { isKycExemptByAmount } from '../config/kyc'
 import { IDatabaseClientProvider } from '../interfaces/IDatabaseClientProvider'
@@ -10,6 +10,7 @@ import { TYPES } from '../types'
 
 type Country = 'BR' | 'CO'
 
+@injectable()
 export class PersonaKycService implements IKycService {
   constructor(
     @inject(TYPES.IDatabaseClientProvider) private dbProvider: IDatabaseClientProvider,

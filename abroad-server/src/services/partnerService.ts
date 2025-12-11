@@ -2,7 +2,7 @@
 
 import type { Partner, PrismaClient } from '@prisma/client'
 
-import { inject } from 'inversify'
+import { inject, injectable } from 'inversify'
 import { sha512_224 } from 'js-sha512'
 import jwt from 'jsonwebtoken'
 
@@ -26,6 +26,7 @@ interface SepTokenPayload extends jwt.JwtPayload {
   sub: string
 }
 
+@injectable()
 export class PartnerService implements IPartnerService {
   constructor(
     @inject(TYPES.IDatabaseClientProvider)

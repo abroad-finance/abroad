@@ -1,9 +1,11 @@
 import { createServer, Server as HttpServer } from 'http'
-import { injectable } from 'inversify'
+import { inject, injectable } from 'inversify'
 import { Server as IOServer } from 'socket.io'
 import { z } from 'zod'
 
+import { ILogger } from '../interfaces'
 import { IWebSocketService } from '../interfaces/IWebSocketService'
+import { TYPES } from '../types'
 
 @injectable()
 export class SocketIOWebSocketService implements IWebSocketService {
@@ -11,9 +13,11 @@ export class SocketIOWebSocketService implements IWebSocketService {
   private io?: IOServer
   private port = 8080
 
+  constructor(@inject(TYPES.ILogger) private readonly logger: ILogger) {}
+
   emitToUser(userId: string, event: string, payload?: unknown): void {
     if (!this.io) {
-      console.warn('[ws] emit called before server started')
+      this.logger.warn('[ws] emit called before server started')
       return
     }
     this.io.to(`user:${userId}`).emit(event, payload ?? {})
@@ -36,7 +40,7 @@ export class SocketIOWebSocketService implements IWebSocketService {
 
     await new Promise<void>((resolve) => {
       this.httpServer!.listen(this.port, () => {
-        console.log(`[ws] listening on :${this.port}`)
+        this.logger.info(`[ws] listening on :${this.port}`)
         resolve()
       })
     })

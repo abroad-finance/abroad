@@ -1,6 +1,7 @@
 import axios from 'axios'
 import { inject, injectable } from 'inversify'
 
+import { RuntimeConfig } from '../config/runtime'
 import { ILogger } from '../interfaces'
 import { ISecretManager } from '../interfaces/ISecretManager'
 import { IWebhookNotifier, WebhookEvent } from '../interfaces/IWebhookNotifier'
@@ -27,10 +28,18 @@ export class WebhookNotifier implements IWebhookNotifier {
     try {
       const secret = await this.secretManager.getSecret('ABROAD_WEBHOOK_SECRET')
       const headers = secret ? { 'X-Abroad-Webhook-Secret': secret } : undefined
-      await axios.post(url, payload, { headers })
+      await axios.post(url, payload, {
+        headers,
+        timeout: RuntimeConfig.axiosTimeoutMs,
+      })
     }
-    catch {
-      this.logger.error(`Failed to notify webhook: ${url}`)
+    catch (error) {
+      const normalizedError = error instanceof Error ? error : new Error(String(error))
+      this.logger.error('Failed to notify webhook', {
+        error: normalizedError,
+        event: payload.event,
+        url,
+      })
     }
   }
 }

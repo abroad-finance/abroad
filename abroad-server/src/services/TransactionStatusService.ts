@@ -1,7 +1,9 @@
 import { TransactionStatus } from '@prisma/client'
 import { NotFound } from 'http-errors'
+import { inject, injectable } from 'inversify'
 
 import { IDatabaseClientProvider } from '../interfaces/IDatabaseClientProvider'
+import { TYPES } from '../types'
 import { uuidToBase64 } from './transactionEncoding'
 
 export interface TransactionStatusResult {
@@ -13,8 +15,12 @@ export interface TransactionStatusResult {
   userId: string
 }
 
+@injectable()
 export class TransactionStatusService {
-  constructor(private readonly prismaClientProvider: IDatabaseClientProvider) {}
+  constructor(
+    @inject(TYPES.IDatabaseClientProvider)
+    private readonly prismaClientProvider: IDatabaseClientProvider,
+  ) {}
 
   public async getStatus(transactionId: string, partnerId: string): Promise<TransactionStatusResult> {
     const prismaClient = await this.prismaClientProvider.getClient()

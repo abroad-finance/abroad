@@ -1,11 +1,14 @@
 import { Country, PaymentMethod, TransactionStatus } from '@prisma/client'
+import { inject, injectable } from 'inversify'
 
 import { isKycExemptByAmount } from '../config/kyc'
-import { IQueueHandler, QueueName } from '../interfaces'
+import { ILogger, IQueueHandler, QueueName } from '../interfaces'
 import { IDatabaseClientProvider } from '../interfaces/IDatabaseClientProvider'
 import { IKycService } from '../interfaces/IKycService'
 import { IPaymentServiceFactory } from '../interfaces/IPaymentServiceFactory'
 import { IWebhookNotifier, WebhookEvent } from '../interfaces/IWebhookNotifier'
+import { createScopedLogger, ScopedLogger } from '../shared/logging'
+import { TYPES } from '../types'
 import { uuidToBase64 } from './transactionEncoding'
 
 interface AcceptTransactionRequest {
@@ -31,14 +34,22 @@ type PartnerUserContext = {
   webhookUrl: string
 }
 
+@injectable()
 export class TransactionAcceptanceService {
+  private readonly logger: ScopedLogger
+
   constructor(
+    @inject(TYPES.IDatabaseClientProvider)
     private readonly prismaClientProvider: IDatabaseClientProvider,
+    @inject(TYPES.IPaymentServiceFactory)
     private readonly paymentServiceFactory: IPaymentServiceFactory,
-    private readonly kycService: IKycService,
-    private readonly webhookNotifier: IWebhookNotifier,
-    private readonly queueHandler: IQueueHandler,
-  ) {}
+    @inject(TYPES.IKycService) private readonly kycService: IKycService,
+    @inject(TYPES.IWebhookNotifier) private readonly webhookNotifier: IWebhookNotifier,
+    @inject(TYPES.IQueueHandler) private readonly queueHandler: IQueueHandler,
+    @inject(TYPES.ILogger) logger: ILogger,
+  ) {
+    this.logger = createScopedLogger(logger, { scope: 'TransactionAcceptance' })
+  }
 
   public async acceptTransaction(
     request: AcceptTransactionRequest,
@@ -161,7 +172,7 @@ export class TransactionAcceptanceService {
       }
     }
     catch (error) {
-      console.warn('Error creating transaction:', error)
+      this.logger.error('Error creating transaction', error)
       throw new TransactionValidationError('We could not create your transaction right now. Please try again in a few moments.')
     }
   }
@@ -175,7 +186,7 @@ export class TransactionAcceptanceService {
       availableLiquidity = await paymentService.getLiquidity()
     }
     catch (err) {
-      console.warn('Failed to fetch payment service liquidity', err)
+      this.logger.warn('Failed to fetch payment service liquidity', err)
       availableLiquidity = 0
     }
 
@@ -320,7 +331,7 @@ export class TransactionAcceptanceService {
       })
     }
     catch (notifyErr) {
-      console.warn('[TransactionAcceptanceService] Failed to publish transaction.created notification', notifyErr)
+      this.logger.warn('Failed to publish transaction.created notification', notifyErr)
     }
   }
 

@@ -2,6 +2,7 @@ import type { ISecretManager } from '../../interfaces/ISecretManager'
 
 import { GCPPubSubQueueHandler } from '../../infrastructure/gcpPubSubQueueHandler'
 import { QueueName } from '../../interfaces'
+import { createMockLogger } from '../setup/mockFactories'
 
 const publishMessageMock = jest.fn()
 const createTopicMock = jest.fn()
@@ -10,6 +11,7 @@ const subscriptionExistsMock = jest.fn()
 const createSubscriptionMock = jest.fn()
 const ackMock = jest.fn()
 const onMock = jest.fn()
+const logger = createMockLogger()
 
 class FakeMessage {
   data: Buffer
@@ -54,7 +56,7 @@ describe('GCPPubSubQueueHandler', () => {
 
   it('publishes messages to a topic and creates it if missing', async () => {
     topicExistsMock.mockResolvedValueOnce([false])
-    const handler = new GCPPubSubQueueHandler(secretManager)
+    const handler = new GCPPubSubQueueHandler(secretManager, logger)
 
     await handler.postMessage(QueueName.PAYMENT_SENT, { ok: true })
 
@@ -65,7 +67,7 @@ describe('GCPPubSubQueueHandler', () => {
 
   it('subscribes to a topic and handles incoming messages', async () => {
     subscriptionExistsMock.mockResolvedValueOnce([false])
-    const handler = new GCPPubSubQueueHandler(secretManager)
+    const handler = new GCPPubSubQueueHandler(secretManager, logger)
     const callback = jest.fn()
 
     onMock.mockImplementation((event: string, listener: (msg: FakeMessage) => void) => {
@@ -78,7 +80,10 @@ describe('GCPPubSubQueueHandler', () => {
 
     await handler.subscribeToQueue(QueueName.RECEIVED_CRYPTO_TRANSACTION, callback)
 
-    expect(createSubscriptionMock).toHaveBeenCalledWith('received-crypto-transaction-subscription')
+    expect(createSubscriptionMock).toHaveBeenCalledWith(
+      'received-crypto-transaction-subscription',
+      expect.objectContaining({ ackDeadlineSeconds: expect.any(Number) }),
+    )
     expect(onMock).toHaveBeenCalledWith('message', expect.any(Function))
     expect(callback).toHaveBeenCalledWith({ value: 42 })
     expect(ackMock).toHaveBeenCalled()

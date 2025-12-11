@@ -1,7 +1,10 @@
 // src/environment/CachedSecretManager.ts
+import { injectable } from 'inversify'
+
 import { ISecretManager, Secret } from '../interfaces/ISecretManager'
 import { GcpSecretManager } from './GcpSecretManager'
 
+@injectable()
 export class CachedSecretManager implements ISecretManager {
   private cache = new Map<string, string>()
   private decoratedSecretManager: ISecretManager

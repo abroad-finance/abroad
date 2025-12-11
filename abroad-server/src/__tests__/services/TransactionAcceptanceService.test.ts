@@ -1,6 +1,7 @@
 import { Country, PaymentMethod, TargetCurrency } from '@prisma/client'
 
 import { TransactionAcceptanceService, TransactionValidationError } from '../../services/TransactionAcceptanceService'
+import { createMockLogger } from '../setup/mockFactories'
 
 const prismaProvider = {
   getClient: jest.fn(),
@@ -41,6 +42,8 @@ const paymentServiceFactory = {
   getPaymentService: jest.fn(() => paymentService),
 }
 
+const logger = createMockLogger()
+
 describe('TransactionAcceptanceService helpers', () => {
   beforeEach(() => {
     jest.clearAllMocks()
@@ -52,6 +55,7 @@ describe('TransactionAcceptanceService helpers', () => {
     kycService,
     webhookNotifier,
     queueHandler,
+    logger,
   )
 
   it('rejects unsupported KYC countries', async () => {
@@ -139,6 +143,7 @@ describe('TransactionAcceptanceService helpers', () => {
       kycService,
       webhookNotifier,
       queueHandler,
+      createMockLogger(),
     )
 
     await expect(acceptanceService.acceptTransaction(request, partnerContext)).rejects.toThrow('Payments via MOVII are temporarily unavailable')

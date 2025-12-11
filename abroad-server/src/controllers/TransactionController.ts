@@ -18,11 +18,6 @@ import {
 import { Body, Post } from 'tsoa'
 import { z } from 'zod'
 
-import { IQueueHandler } from '../interfaces'
-import { IDatabaseClientProvider } from '../interfaces/IDatabaseClientProvider'
-import { IKycService } from '../interfaces/IKycService'
-import { IPaymentServiceFactory } from '../interfaces/IPaymentServiceFactory'
-import { IWebhookNotifier } from '../interfaces/IWebhookNotifier'
 import { TransactionAcceptanceService, TransactionValidationError } from '../services/TransactionAcceptanceService'
 import { TransactionStatusService } from '../services/TransactionStatusService'
 import { TYPES } from '../types'
@@ -67,25 +62,16 @@ interface TransactionStatusResponse {
 @Security('BearerAuth')
 export class TransactionController extends Controller {
   private readonly transactionAcceptanceService: TransactionAcceptanceService
-
   private readonly transactionStatusService: TransactionStatusService
   constructor(
-    @inject(TYPES.IDatabaseClientProvider)
-    private prismaClientProvider: IDatabaseClientProvider,
-    @inject(TYPES.IPaymentServiceFactory) private paymentServiceFactory: IPaymentServiceFactory,
-    @inject(TYPES.IKycService) private kycService: IKycService,
-    @inject(TYPES.IWebhookNotifier) private webhookNotifier: IWebhookNotifier,
-    @inject(TYPES.IQueueHandler) private queueHandler: IQueueHandler,
+    @inject(TYPES.TransactionAcceptanceService)
+    transactionAcceptanceService: TransactionAcceptanceService,
+    @inject(TYPES.TransactionStatusService)
+    transactionStatusService: TransactionStatusService,
   ) {
     super()
-    this.transactionAcceptanceService = new TransactionAcceptanceService(
-      this.prismaClientProvider,
-      this.paymentServiceFactory,
-      this.kycService,
-      this.webhookNotifier,
-      this.queueHandler,
-    )
-    this.transactionStatusService = new TransactionStatusService(this.prismaClientProvider)
+    this.transactionAcceptanceService = transactionAcceptanceService
+    this.transactionStatusService = transactionStatusService
   }
 
   /**

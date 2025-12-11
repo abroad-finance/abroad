@@ -1,10 +1,13 @@
 import type { Container } from 'inversify'
 
+import { TYPES } from '../../types'
+
 describe('listeners/index', () => {
   const stellar = { start: jest.fn(), stop: jest.fn() }
   const binance = { start: jest.fn() }
   const bind = jest.fn()
   const get = jest.fn()
+  const logger = { error: jest.fn(), info: jest.fn(), warn: jest.fn() }
   const mockContainer = { bind, get } as unknown as Container
 
   const setupModule = async () => {
@@ -12,9 +15,10 @@ describe('listeners/index', () => {
       inSingletonScope: jest.fn(),
       to: jest.fn().mockReturnThis(),
     }))
-    get.mockImplementation((identifier: string) => {
+    get.mockImplementation((identifier: unknown) => {
       if (identifier === 'StellarListener') return stellar
       if (identifier === 'BinanceListener') return binance
+      if (identifier === TYPES.ILogger) return logger
       throw new Error(`Unknown identifier ${identifier}`)
     })
 
@@ -45,12 +49,11 @@ describe('listeners/index', () => {
   it('logs errors when stellar listener fails to start', async () => {
     const error = new Error('failure')
     stellar.start.mockRejectedValueOnce(error)
-    const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined)
     const listeners = await setupModule()
 
     listeners.startListeners()
     await new Promise(resolve => setImmediate(resolve))
 
-    expect(consoleSpy).toHaveBeenCalledWith('[listeners] Error starting StellarListener:', error)
+    expect(logger.error).toHaveBeenCalledWith('[listeners] Error starting StellarListener:', error)
   })
 })

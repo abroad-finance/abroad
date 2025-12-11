@@ -41,16 +41,19 @@ jest.mock('../../ioc', () => {
 })
 
 import { startListeners } from '../../listeners/index'
+import { TYPES } from '../../types'
 
 describe('startListeners', () => {
+  const logger = { error: jest.fn(), info: jest.fn(), warn: jest.fn() }
   beforeEach(() => {
     jest.clearAllMocks()
     stellarStartMock.mockResolvedValue(undefined)
     stellarStopMock.mockResolvedValue(undefined)
     binanceStartMock.mockResolvedValue(undefined)
-    getMock.mockImplementation((key: string) => {
+    getMock.mockImplementation((key: unknown) => {
       if (key === 'StellarListener') return { start: stellarStartMock, stop: stellarStopMock }
       if (key === 'BinanceListener') return { start: binanceStartMock }
+      if (key === TYPES.ILogger) return logger
       return {}
     })
   })

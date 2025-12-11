@@ -4,6 +4,7 @@ import Redlock from 'redlock'
 import type { ISecretManager } from '../../interfaces/ISecretManager'
 
 import { RedisLockManager } from '../../infrastructure/RedisLockManager'
+import { createMockLogger } from '../setup/mockFactories'
 
 jest.mock('ioredis')
 jest.mock('redlock')
@@ -18,6 +19,7 @@ describe('RedisLockManager', () => {
   const redlockInstances: Array<{ clients: unknown[], options: unknown }> = []
 
   let secretManager: ISecretManager
+  const logger = createMockLogger()
 
   beforeEach(() => {
     jest.clearAllMocks()
@@ -41,7 +43,7 @@ describe('RedisLockManager', () => {
   })
 
   it('initializes once and executes the provided callback within a lock', async () => {
-    const manager = new RedisLockManager(secretManager)
+    const manager = new RedisLockManager(secretManager, logger)
     const work = jest.fn(async () => 'ok')
     redlockUsing.mockImplementation(async (_resources: string[], _ttl: number, opts: { retryCount: number }, fn: () => Promise<unknown>) => {
       return fn()
@@ -68,7 +70,7 @@ describe('RedisLockManager', () => {
   })
 
   it('falls back to a minimum retry count of 1 when retryDelay is falsy', async () => {
-    const manager = new RedisLockManager(secretManager)
+    const manager = new RedisLockManager(secretManager, logger)
     redlockUsing.mockImplementation(async (_resources: string[], _ttl: number, opts: { retryCount: number }, fn: () => Promise<unknown>) => fn())
     ;(Redlock as unknown as jest.Mock).mockImplementation((clients: unknown[], options: unknown) => {
       redlockInstances.push({ clients, options })
