@@ -16,7 +16,10 @@ import { TransactionStatusService } from '../services/TransactionStatusService'
 import { WalletHandlerFactory } from '../services/WalletHandlerFactory'
 import { PersonaWebhookService } from '../services/webhooks/PersonaWebhookService'
 import { TYPES } from '../types'
+import { PaymentSentUseCase } from '../useCases/paymentSentUseCase'
+import { PaymentUseCase } from '../useCases/paymentUseCase'
 import { QuoteUseCase } from '../useCases/quoteUseCase'
+import { ReceivedCryptoTransactionUseCase } from '../useCases/receivedCryptoTransactionUseCase'
 import { BindingRegistration, registerBindings } from './bindingSupport'
 
 const domainBindings: ReadonlyArray<BindingRegistration<unknown>> = [
@@ -35,6 +38,9 @@ const domainBindings: ReadonlyArray<BindingRegistration<unknown>> = [
   { identifier: TYPES.IExchangeProvider, implementation: TransferoExchangeProvider, name: 'transfero' },
   { identifier: TYPES.TransactionAcceptanceService, implementation: TransactionAcceptanceService },
   { identifier: TYPES.TransactionStatusService, implementation: TransactionStatusService },
+  { identifier: TYPES.PaymentUseCase, implementation: PaymentUseCase },
+  { identifier: TYPES.PaymentSentUseCase, implementation: PaymentSentUseCase },
+  { identifier: TYPES.ReceivedCryptoTransactionUseCase, implementation: ReceivedCryptoTransactionUseCase },
   { bindSelf: true, identifier: PersonaWebhookService, implementation: PersonaWebhookService },
 ] as const
 

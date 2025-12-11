@@ -25,7 +25,7 @@ import { ILogger, IQueueHandler, QueueName } from '../interfaces'
 import { IDatabaseClientProvider } from '../interfaces/IDatabaseClientProvider'
 import { ISecretManager, Secrets } from '../interfaces/ISecretManager'
 import { TYPES } from '../types'
-import { TransactionQueueMessage } from './queue/ReceivedCryptoTransactionController'
+import { TransactionQueueMessage } from '../useCases/receivedCryptoTransactionUseCase'
 
 const solanaPaymentNotificationSchema = z.object({
   on_chain_tx: z.string().min(1, 'On-chain transaction signature is required'),

@@ -16,22 +16,8 @@ import { IPaymentServiceFactory } from '../../interfaces/IPaymentServiceFactory'
 import { IWalletHandler } from '../../interfaces/IWalletHandler'
 import { IWalletHandlerFactory } from '../../interfaces/IWalletHandlerFactory'
 import { IWebhookNotifier } from '../../interfaces/IWebhookNotifier'
+import { ReceivedCryptoTransactionUseCase } from '../../useCases/receivedCryptoTransactionUseCase'
 import { createMockLogger, createMockQueueHandler, MockLogger, MockQueueHandler } from '../setup/mockFactories'
-
-interface ControllerHarness {
-  controller: ReceivedCryptoTransactionController
-  handler: (msg: Record<string, boolean | number | string>) => Promise<void>
-  logger: MockLogger
-  paymentService: PaymentServiceMock
-  paymentServiceFactory: IPaymentServiceFactory
-  prismaClient: PrismaLike
-  prismaProvider: jest.Mocked<IDatabaseClientProvider>
-  queueHandler: MockQueueHandler
-  slackNotifier: { sendMessage: jest.Mock }
-  walletHandler: WalletHandlerMock
-  walletHandlerFactory: IWalletHandlerFactory
-  webhookNotifier: IWebhookNotifier
-}
 
 type PaymentServiceMock = IPaymentService & {
   sendPayment: jest.Mock<Promise<{ success: boolean, transactionId?: string }>>
@@ -43,6 +29,20 @@ type PrismaLike = {
     update: jest.Mock
     updateMany: jest.Mock
   }
+}
+
+interface UseCaseHarness {
+  logger: MockLogger
+  paymentService: PaymentServiceMock
+  paymentServiceFactory: IPaymentServiceFactory
+  prismaClient: PrismaLike
+  prismaProvider: jest.Mocked<IDatabaseClientProvider>
+  queueHandler: MockQueueHandler
+  slackNotifier: { sendMessage: jest.Mock }
+  useCase: ReceivedCryptoTransactionUseCase
+  walletHandler: WalletHandlerMock
+  walletHandlerFactory: IWalletHandlerFactory
+  webhookNotifier: IWebhookNotifier
 }
 
 type WalletHandlerMock = IWalletHandler & { send: jest.Mock }
@@ -158,7 +158,7 @@ function buildWalletHandler(): WalletHandlerMock {
   }
 }
 
-function createControllerHarness(overrides: Partial<Omit<ControllerHarness, 'controller' | 'handler'>> = {}): ControllerHarness {
+function createUseCaseHarness(overrides: Partial<Omit<UseCaseHarness, 'useCase'>> = {}): UseCaseHarness {
   const paymentService = overrides.paymentService ?? buildPaymentService()
   const paymentServiceFactory: IPaymentServiceFactory = overrides.paymentServiceFactory ?? {
     getPaymentService: jest.fn(() => paymentService),
@@ -176,7 +176,7 @@ function createControllerHarness(overrides: Partial<Omit<ControllerHarness, 'con
   const logger = overrides.logger ?? createMockLogger()
   const slackNotifier = overrides.slackNotifier ?? { sendMessage: jest.fn() }
 
-  const controller = new ReceivedCryptoTransactionController(
+  const useCase = new ReceivedCryptoTransactionUseCase(
     paymentServiceFactory,
     queueHandler,
     prismaProvider,
@@ -185,14 +185,8 @@ function createControllerHarness(overrides: Partial<Omit<ControllerHarness, 'con
     walletHandlerFactory,
     webhookNotifier,
   )
-  const handler = (msg: Record<string, boolean | number | string>) =>
-    (controller as unknown as {
-      onTransactionReceived: (msg: Record<string, boolean | number | string>) => Promise<void>
-    }).onTransactionReceived(msg)
 
   return {
-    controller,
-    handler,
     logger,
     paymentService,
     paymentServiceFactory,
@@ -200,17 +194,18 @@ function createControllerHarness(overrides: Partial<Omit<ControllerHarness, 'con
     prismaProvider,
     queueHandler,
     slackNotifier,
+    useCase,
     walletHandler,
     walletHandlerFactory,
     webhookNotifier,
   }
 }
 
-describe('ReceivedCryptoTransactionController.onTransactionReceived', () => {
+describe('ReceivedCryptoTransactionUseCase.process', () => {
   it('ignores empty queue messages', async () => {
-    const harness = createControllerHarness()
+    const harness = createUseCaseHarness()
 
-    await harness.handler({} as Record<string, boolean | number | string>)
+    await harness.useCase.process({} as Record<string, boolean | number | string>)
 
     expect(harness.logger.warn).toHaveBeenCalledWith(
       '[ReceivedCryptoTransaction]: Received empty message. Skipping...',
@@ -219,10 +214,10 @@ describe('ReceivedCryptoTransactionController.onTransactionReceived', () => {
   })
 
   it('refunds when the database client cannot be acquired', async () => {
-    const harness = createControllerHarness()
+    const harness = createUseCaseHarness()
     harness.prismaProvider.getClient.mockRejectedValueOnce(new Error('db down'))
 
-    await harness.handler(message)
+    await harness.useCase.process(message)
 
     expect(harness.logger.error).toHaveBeenCalled()
     expect(harness.walletHandlerFactory.getWalletHandler).toHaveBeenCalledWith(message.blockchain)
@@ -235,7 +230,7 @@ describe('ReceivedCryptoTransactionController.onTransactionReceived', () => {
   })
 
   it('marks wrong amount transactions and triggers a refund', async () => {
-    const harness = createControllerHarness()
+    const harness = createUseCaseHarness()
     const processingRecord = buildProcessingRecord({
       quote: { sourceAmount: 100, targetAmount: 200 },
     })
@@ -247,7 +242,7 @@ describe('ReceivedCryptoTransactionController.onTransactionReceived', () => {
 
     harness.prismaClient.transaction.findUnique.mockResolvedValue(wrongAmountRecord)
 
-    await harness.controller['onTransactionReceived'](message)
+    await harness.useCase.process(message)
 
     expect(harness.prismaClient.transaction.update).toHaveBeenNthCalledWith(
       1,
@@ -285,7 +280,7 @@ describe('ReceivedCryptoTransactionController.onTransactionReceived', () => {
   })
 
   it('completes synchronous payments and emits notifications', async () => {
-    const harness = createControllerHarness()
+    const harness = createUseCaseHarness()
     const processingRecord = buildProcessingRecord({
       quote: { network: BlockchainNetwork.SOLANA },
     })
@@ -303,7 +298,7 @@ describe('ReceivedCryptoTransactionController.onTransactionReceived', () => {
       .mockResolvedValueOnce(completedRecord)
     harness.prismaClient.transaction.findUnique.mockResolvedValue(fullRecord)
 
-    await harness.handler({ ...message, amount: 50, blockchain: BlockchainNetwork.SOLANA })
+    await harness.useCase.process({ ...message, amount: 50, blockchain: BlockchainNetwork.SOLANA })
 
     expect(harness.paymentService.sendPayment).toHaveBeenCalledWith({
       account: processingRecord.accountNumber,
@@ -338,7 +333,7 @@ describe('ReceivedCryptoTransactionController.onTransactionReceived', () => {
   })
 
   it('refunds and marks failure when payment submission fails', async () => {
-    const harness = createControllerHarness()
+    const harness = createUseCaseHarness()
     const processingRecord = buildProcessingRecord()
 
     harness.paymentService.sendPayment.mockRejectedValueOnce(new Error('gateway down'))
@@ -349,7 +344,7 @@ describe('ReceivedCryptoTransactionController.onTransactionReceived', () => {
       .mockResolvedValueOnce({ ...processingRecord, status: TransactionStatus.PAYMENT_FAILED })
     harness.prismaClient.transaction.findUnique.mockResolvedValue(processingRecord)
 
-    await harness.handler({ ...message, amount: 75 })
+    await harness.useCase.process({ ...message, amount: 75 })
 
     expect(harness.paymentService.sendPayment).toHaveBeenCalled()
     expect(harness.prismaClient.transaction.update).toHaveBeenNthCalledWith(1, expect.objectContaining({
@@ -373,7 +368,7 @@ describe('ReceivedCryptoTransactionController.onTransactionReceived', () => {
   })
 
   it('records failed payments and refunds when the provider responds with failure', async () => {
-    const harness = createControllerHarness()
+    const harness = createUseCaseHarness()
     const processingRecord = buildProcessingRecord()
 
     harness.paymentService.sendPayment.mockResolvedValueOnce({ success: false })
@@ -384,7 +379,7 @@ describe('ReceivedCryptoTransactionController.onTransactionReceived', () => {
       .mockResolvedValueOnce({ ...processingRecord, status: TransactionStatus.PAYMENT_FAILED })
     harness.prismaClient.transaction.findUnique.mockResolvedValue(processingRecord)
 
-    await harness.handler({ ...message, amount: 60 })
+    await harness.useCase.process({ ...message, amount: 60 })
 
     expect(harness.prismaClient.transaction.update).toHaveBeenCalledTimes(2)
     expect(harness.queueHandler.postMessage).toHaveBeenCalledTimes(2)
@@ -394,9 +389,15 @@ describe('ReceivedCryptoTransactionController.onTransactionReceived', () => {
   })
 
   it('registers the queue consumer and reports failures', () => {
-    const harness = createControllerHarness()
+    const harness = createUseCaseHarness()
 
-    harness.controller.registerConsumers()
+    const controller = new ReceivedCryptoTransactionController(
+      harness.queueHandler,
+      harness.logger,
+      harness.useCase,
+    )
+
+    controller.registerConsumers()
     expect(harness.logger.info).toHaveBeenCalledWith(
       '[ReceivedCryptoTransaction]: Registering consumer for queue:',
       QueueName.RECEIVED_CRYPTO_TRANSACTION,
@@ -411,7 +412,7 @@ describe('ReceivedCryptoTransactionController.onTransactionReceived', () => {
       throw new Error('subscribe failure')
     })
 
-    harness.controller.registerConsumers()
+    controller.registerConsumers()
     expect(harness.logger.error).toHaveBeenCalledWith(
       '[ReceivedCryptoTransaction]: Error in consumer registration:',
       expect.any(Error),
@@ -419,9 +420,9 @@ describe('ReceivedCryptoTransactionController.onTransactionReceived', () => {
   })
 
   it('rejects malformed messages before touching the database', async () => {
-    const harness = createControllerHarness()
+    const harness = createUseCaseHarness()
 
-    await harness.handler({ transactionId: 'not-a-uuid' })
+    await harness.useCase.process({ transactionId: 'not-a-uuid' })
 
     expect(harness.logger.error).toHaveBeenCalledWith(
       '[ReceivedCryptoTransaction]: Invalid message format:',
@@ -435,10 +436,10 @@ describe('ReceivedCryptoTransactionController.onTransactionReceived', () => {
       'Not found',
       { clientVersion: 'test', code: 'P2025' },
     )
-    const harness = createControllerHarness()
+    const harness = createUseCaseHarness()
     harness.prismaClient.transaction.update.mockRejectedValueOnce(notFoundError)
 
-    await harness.handler(message)
+    await harness.useCase.process(message)
 
     expect(harness.logger.warn).toHaveBeenCalledWith(
       '[ReceivedCryptoTransaction]:STELLAR: Transaction not found or already processed:',
@@ -448,7 +449,7 @@ describe('ReceivedCryptoTransactionController.onTransactionReceived', () => {
   })
 
   it('warns when websocket notifications fail during processing and refunds', async () => {
-    const harness = createControllerHarness()
+    const harness = createUseCaseHarness()
     const processingRecord = buildProcessingRecord({
       quote: { sourceAmount: 100, targetAmount: 200 },
     })
@@ -464,7 +465,7 @@ describe('ReceivedCryptoTransactionController.onTransactionReceived', () => {
       .mockResolvedValueOnce(wrongAmountRecord)
     harness.prismaClient.transaction.findUnique.mockResolvedValue(wrongAmountRecord)
 
-    await harness.controller['onTransactionReceived'](message)
+    await harness.useCase.process(message)
 
     expect(harness.logger.warn).toHaveBeenCalledWith(
       expect.stringContaining('Failed to publish ws notification (processing)'),
@@ -482,7 +483,7 @@ describe('ReceivedCryptoTransactionController.onTransactionReceived', () => {
       isAsync: true,
       sendPayment: jest.fn(async () => ({ success: true, transactionId: 'bank-async' })),
     }
-    const harness = createControllerHarness({
+    const harness = createUseCaseHarness({
       paymentService,
       paymentServiceFactory: { getPaymentService: jest.fn(() => paymentService) } as unknown as IPaymentServiceFactory,
     })
@@ -494,7 +495,7 @@ describe('ReceivedCryptoTransactionController.onTransactionReceived', () => {
       .mockResolvedValueOnce(processingRecord)
     harness.prismaClient.transaction.findUnique.mockResolvedValue(processingRecord)
 
-    await harness.handler(message)
+    await harness.useCase.process(message)
 
     expect(paymentService.sendPayment).toHaveBeenCalled()
     expect(harness.prismaClient.transaction.update).toHaveBeenCalledTimes(2)
@@ -503,7 +504,7 @@ describe('ReceivedCryptoTransactionController.onTransactionReceived', () => {
   })
 
   it('logs websocket failures after payment processing while continuing the workflow', async () => {
-    const harness = createControllerHarness()
+    const harness = createUseCaseHarness()
     const processingRecord = buildProcessingRecord()
 
     const completedRecord = { ...processingRecord, status: TransactionStatus.PAYMENT_COMPLETED }
@@ -521,7 +522,7 @@ describe('ReceivedCryptoTransactionController.onTransactionReceived', () => {
 
     harness.paymentService.sendPayment.mockResolvedValueOnce({ success: true, transactionId: 'bank-123' })
 
-    await harness.handler(message)
+    await harness.useCase.process(message)
 
     expect(harness.logger.warn).toHaveBeenCalledWith(
       expect.stringContaining('Failed to publish ws notification (final)'),
@@ -532,7 +533,7 @@ describe('ReceivedCryptoTransactionController.onTransactionReceived', () => {
   })
 
   it('warns when websocket publication fails after payment errors', async () => {
-    const harness = createControllerHarness()
+    const harness = createUseCaseHarness()
     const processingRecord = buildProcessingRecord()
 
     harness.paymentService.sendPayment.mockRejectedValueOnce(new Error('gateway down'))
@@ -546,7 +547,7 @@ describe('ReceivedCryptoTransactionController.onTransactionReceived', () => {
     const queueMock = harness.queueHandler.postMessage
     queueMock.mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error('queue down'))
 
-    await harness.handler(message)
+    await harness.useCase.process(message)
 
     expect(harness.logger.warn).toHaveBeenCalledWith(
       expect.stringContaining('Failed to publish ws notification (error)'),
@@ -556,8 +557,8 @@ describe('ReceivedCryptoTransactionController.onTransactionReceived', () => {
   })
 
   it('logs persistence failures when recording refund hashes', async () => {
-    const harness = createControllerHarness()
-    const recorder = harness.controller as unknown as {
+    const harness = createUseCaseHarness()
+    const recorder = harness.useCase as unknown as {
       recordRefundOnChainId: (
         prisma: Awaited<ReturnType<IDatabaseClientProvider['getClient']>>,
         transactionId: string,

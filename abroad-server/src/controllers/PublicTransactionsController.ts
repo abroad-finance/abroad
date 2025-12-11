@@ -17,7 +17,7 @@ import { IDatabaseClientProvider } from '../interfaces/IDatabaseClientProvider'
 import { ISecretManager, Secrets } from '../interfaces/ISecretManager'
 import { IWebhookNotifier, WebhookEvent } from '../interfaces/IWebhookNotifier'
 import { TYPES } from '../types'
-import { TransactionQueueMessage } from './queue/ReceivedCryptoTransactionController'
+import { TransactionQueueMessage } from '../useCases/receivedCryptoTransactionUseCase'
 
 interface CheckExpiredTransactionsResponse {
   awaiting: number

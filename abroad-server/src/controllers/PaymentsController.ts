@@ -1,6 +1,6 @@
 // src/controllers/PaymentsController.ts
 
-import { Country, PaymentMethod } from '@prisma/client'
+import { PaymentMethod } from '@prisma/client'
 import { inject } from 'inversify'
 import {
   Body,
@@ -15,26 +15,14 @@ import {
   SuccessResponse,
 } from 'tsoa'
 
-import { IDatabaseClientProvider } from '../interfaces/IDatabaseClientProvider'
-import { IPaymentServiceFactory } from '../interfaces/IPaymentServiceFactory'
 import { TYPES } from '../types'
+import { BanksResult, IPaymentUseCase, LiquidityResult, OnboardResult } from '../useCases/paymentUseCase'
 
 // Define the response for the banks list endpoint
-interface Bank {
-  bankCode: number
-  bankName: string
-}
-
-interface BanksResponse {
-  banks: Bank[]
-}
+type BanksResponse = BanksResult
 
 // Define the response for the liquidity endpoint
-interface LiquidityResponse {
-  liquidity: number
-  message?: string
-  success: boolean
-}
+type LiquidityResponse = LiquidityResult
 
 // Define the request body schema.
 interface OnboardRequest {
@@ -42,19 +30,15 @@ interface OnboardRequest {
 }
 
 // Define the expected response from onboardUser.
-interface OnboardResponse {
-  message?: string
-  success: boolean
-}
+type OnboardResponse = OnboardResult
 
 @Route('payments')
 @Security('ApiKeyAuth')
 @Security('BearerAuth')
 export class PaymentsController extends Controller {
   constructor(
-    @inject(TYPES.IPaymentServiceFactory)
-    private paymentServiceFactory: IPaymentServiceFactory,
-    @inject(TYPES.IDatabaseClientProvider) private dbClientProvider: IDatabaseClientProvider,
+    @inject(TYPES.PaymentUseCase)
+    private readonly paymentUseCase: IPaymentUseCase,
   ) {
     super()
   }
@@ -70,13 +54,7 @@ export class PaymentsController extends Controller {
   @SuccessResponse('200', 'Banks retrieved successfully')
   public async getBanks(@Query() paymentMethod?: PaymentMethod): Promise<BanksResponse> {
     try {
-      // If no payment method is provided, default to MOVII
-      const method = paymentMethod || PaymentMethod.MOVII
-
-      const paymentService = this.paymentServiceFactory.getPaymentService(method)
-      return {
-        banks: paymentService.banks,
-      }
+      return this.paymentUseCase.getBanks(paymentMethod)
     }
     catch {
       this.setStatus(400)
@@ -94,49 +72,11 @@ export class PaymentsController extends Controller {
   @Response('400', 'Bad Request')
   @SuccessResponse('200', 'Liquidity retrieved successfully')
   public async getLiquidity(@Query() paymentMethod?: PaymentMethod): Promise<LiquidityResponse> {
-    try {
-      // If no payment method is provided, default to MOVII
-      const method = paymentMethod || PaymentMethod.MOVII
-      const clientDb = await this.dbClientProvider.getClient()
-      const paymentProvider = await clientDb.paymentProvider.upsert({
-        create: {
-          country: Country.CO,
-          id: method,
-          liquidity: 0,
-          name: method,
-        },
-        update: {},
-        where: {
-          id: method,
-        },
-      })
-
-      if (paymentProvider.liquidity !== 0) {
-        return {
-          liquidity: paymentProvider.liquidity,
-          message: 'Liquidity retrieved successfully',
-          success: true,
-        }
-      }
-      const paymentService = this.paymentServiceFactory.getPaymentService(method)
-      const liquidity = await paymentService.getLiquidity()
-      if (liquidity) {
-        await clientDb.paymentProvider.update({
-          data: { liquidity },
-          where: { id: method },
-        })
-      }
-
-      return {
-        liquidity: liquidity || 0,
-        message: 'Liquidity retrieved successfully',
-        success: true,
-      }
-    }
-    catch (error) {
+    const result = await this.paymentUseCase.getLiquidity(paymentMethod)
+    if (!result.success) {
       this.setStatus(400)
-      return { liquidity: 0, message: error instanceof Error ? error.message : 'Unknown error', success: false }
     }
+    return result
   }
 
   /**
@@ -154,14 +94,10 @@ export class PaymentsController extends Controller {
       return { message: 'Account is required', success: false }
     }
 
-    try {
-      const paymentService = this.paymentServiceFactory.getPaymentService(PaymentMethod.MOVII)
-      const result = await paymentService.onboardUser({ account: requestBody.account })
-      return result
-    }
-    catch (error) {
+    const result = await this.paymentUseCase.onboardUser(requestBody.account, PaymentMethod.MOVII)
+    if (!result.success) {
       this.setStatus(400)
-      return { message: error instanceof Error ? error.message : 'Unknown error', success: false }
     }
+    return result
   }
 }
