@@ -22,6 +22,12 @@ const webSocketService = {
   stop: jest.fn(async () => undefined),
 }
 
+const logger = {
+  error: jest.fn(),
+  info: jest.fn(),
+  warn: jest.fn(),
+}
+
 const getMock = jest.fn()
 jest.mock('../../ioc', () => ({
   iocContainer: {
@@ -41,9 +47,13 @@ describe('ws bridge', () => {
     webSocketService.emitToUser = jest.fn()
     webSocketService.start = jest.fn(async () => undefined)
     webSocketService.stop = jest.fn(async () => undefined)
+    logger.error = jest.fn()
+    logger.info = jest.fn()
+    logger.warn = jest.fn()
     getMock.mockImplementation((token: unknown) => {
       if (token === TYPES.IWebSocketService) return webSocketService
       if (token === TYPES.IQueueHandler) return queueHandler
+      if (token === TYPES.ILogger) return logger
       return undefined
     })
   })
@@ -82,6 +92,7 @@ describe('ws bridge', () => {
     // invalid payload (missing user id) gets dropped
     subscriptionHandler?.({ type: 'ping' })
     expect(webSocketService.emitToUser).not.toHaveBeenCalled()
+    expect(logger.warn).toHaveBeenCalledWith('[ws] Invalid notification message received', expect.any(Array))
 
     // malformed JSON payload is forwarded as raw string
     subscriptionHandler?.({ id: 'user-2', payload: '{', type: 'event' })
@@ -91,6 +102,7 @@ describe('ws bridge', () => {
     await sigintHandler?.('SIGINT')
     expect(queueHandler.closeAllSubscriptions).toHaveBeenCalled()
     expect(webSocketService.stop).toHaveBeenCalled()
+    expect(logger.info).toHaveBeenCalledWith('[ws] SIGINT received. Shutting down WebSocket bridge...')
     exitSpy.restore()
   })
 

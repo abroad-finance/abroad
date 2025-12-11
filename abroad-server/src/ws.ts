@@ -1,73 +1,46 @@
 // WebSocket bridge using the app's Pub/Sub infrastructure
 import dotenv from 'dotenv'
-import { v4 as uuidv4 } from 'uuid'
 
-import { IQueueHandler, QueueName, UserNotificationMessageSchema } from './interfaces'
+import { ILogger, IQueueHandler } from './interfaces'
 import { IWebSocketService } from './interfaces/IWebSocketService'
 import { iocContainer } from './ioc'
+import { WebSocketBridge } from './services/WebSocketBridge'
 import { TYPES } from './types'
 
 dotenv.config()
 
-type JsonObject = Record<string, unknown>
-
 async function main() {
-  const ws = iocContainer.get<IWebSocketService>(TYPES.IWebSocketService)
-  const port = Number(process.env.WS_PORT || 8080)
-  await ws.start(port)
-
-  // Resolve the shared Pub/Sub handler via IoC
+  const logger = resolveLogger()
+  const webSocketService = iocContainer.get<IWebSocketService>(TYPES.IWebSocketService)
   const queueHandler = iocContainer.get<IQueueHandler>(TYPES.IQueueHandler)
 
-  // Subscribe to user notification messages and forward to Socket.IO
-  await queueHandler.subscribeToQueue(QueueName.USER_NOTIFICATION, (raw) => {
-    try {
-      const parsed = UserNotificationMessageSchema.safeParse(raw)
-      if (!parsed.success) {
-        console.warn('[ws] Invalid notification message:', parsed.error.issues)
-        return
-      }
-      const data = parsed.data
-      // Normalize payload: string → JSON object when possible
-      let payload: JsonObject | string | undefined = data.payload
-      if (typeof payload === 'string') {
-        try {
-          payload = JSON.parse(payload) as JsonObject
-        }
-        catch {
-          // keep as raw string if not JSON
-        }
-      }
-      const userId = (data.userId || data.id || '').toString().trim()
-      if (!userId) {
-        console.warn('[ws] Skipping notification without userId:', data)
-        return
-      }
-      ws.emitToUser(userId, data.type, payload ?? {})
-    }
-    catch (err) {
-      console.error('[ws] Failed to handle notification message:', err)
-    }
-  },
-  `${QueueName.USER_NOTIFICATION}-${uuidv4()}`)
+  const bridge = new WebSocketBridge(webSocketService, queueHandler, logger)
+  await bridge.start()
 
-  // Graceful shutdown
-  const shutdown = async () => {
-    try {
-      if (queueHandler.closeAllSubscriptions) {
-        await queueHandler.closeAllSubscriptions()
-      }
-    }
-    finally {
-      await ws.stop()
-      process.exit(0)
-    }
-  }
+  const shutdown = bridge.createShutdownHandler()
   process.on('SIGINT', shutdown)
   process.on('SIGTERM', shutdown)
 }
 
+function resolveLogger(): ILogger {
+  try {
+    const logger = iocContainer.get<ILogger>(TYPES.ILogger)
+    if (logger) {
+      return logger
+    }
+  }
+  catch {
+  }
+
+  return {
+    error: (message: string, ...optionalParams: unknown[]) => console.error(message, ...optionalParams),
+    info: (message: string, ...optionalParams: unknown[]) => console.info(message, ...optionalParams),
+    warn: (message: string, ...optionalParams: unknown[]) => console.warn(message, ...optionalParams),
+  }
+}
+
 main().catch((err) => {
-  console.error('[ws] fatal error during startup:', err)
+  const logger = resolveLogger()
+  logger.error('[ws] fatal error during startup:', err)
   process.exit(1)
 })

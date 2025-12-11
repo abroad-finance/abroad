@@ -32,5 +32,18 @@ describe('queue schema validation', () => {
     })
 
     expect(parsed.id).toBe('user-123')
+
+    const complexPayload = UserNotificationMessageSchema.parse({
+      id: 'user-123',
+      payload: { nested: [1, true, null] },
+      type: 'event',
+    })
+
+    expect(complexPayload.payload).toEqual({ nested: [1, true, null] })
+    expect(() => UserNotificationMessageSchema.parse({
+      id: 'user-123',
+      payload: (() => 'not-serializable') as unknown as never,
+      type: 'event',
+    })).toThrow()
   })
 })

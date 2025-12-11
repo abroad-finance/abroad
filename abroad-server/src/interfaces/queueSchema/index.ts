@@ -1,6 +1,21 @@
 import { BlockchainNetwork, CryptoCurrency, PaymentMethod, TargetCurrency } from '@prisma/client'
 import { z } from 'zod'
 
+export type JsonObject = { [key: string]: JsonValue }
+export type JsonPrimitive = boolean | null | number | string
+export type JsonValue = JsonObject | JsonPrimitive | JsonValue[]
+
+export const JsonValueSchema: z.ZodType<JsonValue> = z.lazy(() =>
+  z.union([
+    z.string(),
+    z.number(),
+    z.boolean(),
+    z.null(),
+    z.array(JsonValueSchema),
+    z.record(z.string(), JsonValueSchema),
+  ]),
+)
+
 export const PaymentSentMessageSchema = z.object({
   amount: z.number().positive(),
   blockchain: z.nativeEnum(BlockchainNetwork),
@@ -25,11 +40,11 @@ export type PaymentStatusUpdatedMessage = z.infer<typeof PaymentStatusUpdatedMes
 // Message emitted to notify a specific user via WebSocket bridge
 export const UserNotificationMessageSchema = z
   .object({
-    id: z.string().min(1).optional(), // backward‑compat alias for userId
+    id: z.string().trim().min(1).optional(), // backward‑compat alias for userId
     // Accept either a JSON string or any JSON-serializable value
-    payload: z.any().optional(),
-    type: z.string().min(1), // Socket.IO event name
-    userId: z.string().min(1).optional(),
+    payload: JsonValueSchema.optional(),
+    type: z.string().trim().min(1), // Socket.IO event name
+    userId: z.string().trim().min(1).optional(),
   })
   .refine(d => Boolean(d.userId || d.id), {
     message: 'userId or id must be provided',
