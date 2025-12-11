@@ -6,7 +6,7 @@ import {
 
 import type { NavBarResponsiveProps } from '../../features/swap/components/NavBarResponsive'
 
-import { useWebSocket } from '../../contexts/WebSocketContext'
+import { useWebSocketSubscription } from '../../contexts/WebSocketContext'
 import { useWalletAuth } from './useWalletAuth'
 
 const DEFAULT_HORIZON_URL = 'https://horizon.stellar.org'
@@ -135,26 +135,15 @@ export function useNavBarResponsive({
   usdcIssuer = DEFAULT_USDC_ISSUER,
 }: UseNavBarResponsiveArgs = {}): UseNavBarResponsiveResult {
   const { kit } = useWalletAuth()
-  const { off, on } = useWebSocket()
   const { t } = useTranslate()
   const { balance, loading: balanceLoading, refetch } = useUSDCBalance(kit?.address, horizonUrl, usdcIssuer)
 
-  // Refresh balance when a transaction event arrives for this user
-  useEffect(() => {
-    const refresh = () => {
-      void refetch()
-    }
-    on('transaction.created', refresh)
-    on('transaction.updated', refresh)
-    return () => {
-      off('transaction.created', refresh)
-      off('transaction.updated', refresh)
-    }
-  }, [
-    on,
-    off,
-    refetch,
-  ])
+  const refreshBalance = useCallback(() => {
+    void refetch()
+  }, [refetch])
+
+  useWebSocketSubscription('transaction.created', refreshBalance)
+  useWebSocketSubscription('transaction.updated', refreshBalance)
 
   const handleDirectWalletConnect = useCallback(async () => {
     if (onWalletConnect) return onWalletConnect()

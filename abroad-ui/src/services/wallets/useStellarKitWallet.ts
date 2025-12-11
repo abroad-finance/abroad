@@ -88,19 +88,13 @@ export function useStellarKitWallet(
           const { address } = await kit.getAddress()
           setAddress(address)
           if (!address) throw new Error('Failed to get wallet address')
-          const { message } = await walletAuth.getChallengeMessage({ address })
-          // Sign immediately using the freshly resolved address instead of
-          // relying on async state updates to avoid "Wallet not connected".
-          const { signedTxXdr } = await kit.signTransaction(message, {
-            address,
-            networkPassphrase: network,
+          await walletAuth.authenticate(address, async (challenge: string) => {
+            const { signedTxXdr } = await kit.signTransaction(challenge, {
+              address,
+              networkPassphrase: network,
+            })
+            return signedTxXdr
           })
-          const { token } = await walletAuth.getAuthToken({
-            address,
-            signedMessage: signedTxXdr,
-          })
-
-          walletAuth.setJwtToken(token)
         }
         catch (err) {
           console.error('Failed to connect wallet', err)
@@ -118,9 +112,14 @@ export function useStellarKitWallet(
   const disconnect = useCallback(async () => {
     const kit = ensureKit()
     await kit.disconnect()
+    setWalletId(null)
     setAddress(null)
     walletAuth.setJwtToken(null)
-  }, [ensureKit, walletAuth])
+  }, [
+    ensureKit,
+    setWalletId,
+    walletAuth,
+  ])
 
   // Return an object compatible with IWallet
   return {

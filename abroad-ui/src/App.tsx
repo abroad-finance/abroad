@@ -3,6 +3,7 @@ import { lazy, Suspense } from 'react'
 import { Route, BrowserRouter as Router, Routes } from 'react-router-dom'
 
 import { tolgee } from './contexts/LanguageContext'
+import { NoticeProvider } from './contexts/NoticeContext'
 import { WalletAuthProvider } from './contexts/WalletAuthProvider'
 import { WebSocketProvider } from './contexts/WebSocketContext'
 import HiddenLogViewer from './shared/components/HiddenLogViewer'
@@ -14,21 +15,23 @@ const Meridian = lazy(() => import('./pages/Meridian/Meridian'))
 function App() {
   return (
     <TolgeeProvider tolgee={tolgee}>
-      <WalletAuthProvider>
-        <WebSocketProvider>
-          <Router>
-            <Suspense fallback={<div />}>
-              {' '}
-              {/* simple lightweight fallback */}
-              <Routes>
-                <Route element={<WebSwap />} path="/" />
-                <Route element={<Meridian />} path="/meridian" />
-              </Routes>
-            </Suspense>
-          </Router>
-        </WebSocketProvider>
-        <HiddenLogViewer />
-      </WalletAuthProvider>
+      <NoticeProvider>
+        <WalletAuthProvider>
+          <WebSocketProvider>
+            <Router>
+              <Suspense fallback={<div />}>
+                {' '}
+                {/* simple lightweight fallback */}
+                <Routes>
+                  <Route element={<WebSwap />} path="/" />
+                  <Route element={<Meridian />} path="/meridian" />
+                </Routes>
+              </Suspense>
+            </Router>
+          </WebSocketProvider>
+          <HiddenLogViewer />
+        </WalletAuthProvider>
+      </NoticeProvider>
     </TolgeeProvider>
   )
 }

@@ -155,14 +155,10 @@ export function useWalletConnectWallet({ walletAuth }: {
     const { address } = await getAddress()
     setAddress(address)
     if (!address) throw new Error('Failed to get wallet address')
-
-    const { message } = await walletAuth.getChallengeMessage({ address })
-    const { signedTxXdr } = await signTransaction({ message })
-    const { token } = await walletAuth.getAuthToken({
-      address,
-      signedMessage: signedTxXdr,
+    await walletAuth.authenticate(address, async (message: string) => {
+      const { signedTxXdr } = await signTransaction({ message })
+      return signedTxXdr
     })
-    walletAuth.setJwtToken(token)
   }, [
     ensureClient,
     ensureModal,

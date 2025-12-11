@@ -1,53 +1,17 @@
-import { AxiosError } from 'axios'
+import type { ApiResult, HttpRequestConfig } from '../services/http/types'
 
-const baseURL = import.meta.env.VITE_API_URL || 'https://api.abroad.finance'
+import { httpClient } from '../services/http/httpClient'
 
-export const customClient = async <T>(
+export type ClientOptions = HttpRequestConfig & { method: NonNullable<HttpRequestConfig['method']> }
+
+export const customClient = async <TSuccess, TError = unknown>(
   url: string,
-  {
-    body,
-    headers = [],
-    method,
-    params,
-  }: {
-    body?: BodyInit | null
-    headers?: HeadersInit
-    method: 'DELETE' | 'GET' | 'PATCH' | 'POST' | 'PUT'
-    params?: Record<string, string>
-    responseType?: string
-  },
-): Promise<T> => {
-  let targetUrl = `${baseURL}${url}`
-
-  if (params) {
-    targetUrl += '?' + new URLSearchParams(params)
-  }
-
-  let token: null | string = null
-
-  const tokenFromStorage = localStorage.getItem('token')
-  if (tokenFromStorage) {
-    token = tokenFromStorage
-    headers = {
-      ...headers,
-      Authorization: `Bearer ${token}`,
-    }
-  }
-
-  const response = await fetch(targetUrl, {
-    body,
-    headers,
-    method,
-  })
-
-  return {
-    data: await response.json(),
-    status: response.status,
-    statusText: response.statusText,
-  } as unknown as T
+  options: ClientOptions,
+): Promise<ApiResult<TSuccess, TError>> => {
+  return httpClient.request<TSuccess, TError>(url, options)
 }
 
 export default customClient
 
 export type BodyType<BodyData> = BodyData
-export type ErrorType<Error> = AxiosError<Error>
+export type ErrorType<Error> = ApiResult<Error>

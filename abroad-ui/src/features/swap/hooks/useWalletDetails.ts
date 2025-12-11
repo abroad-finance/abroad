@@ -8,7 +8,7 @@ import {
 } from 'react'
 
 import { listPartnerTransactions, PaginatedTransactionListTransactionsItem } from '../../../api'
-import { useWebSocket } from '../../../contexts/WebSocketContext'
+import { useWebSocketSubscription } from '../../../contexts/WebSocketContext'
 import { useWalletAuth } from '../../../shared/hooks/useWalletAuth'
 import { WalletDetailsProps } from '../components/WalletDetails'
 
@@ -43,8 +43,8 @@ export function useWalletDetails(params: Params = {}): WalletDetailsProps {
   const [isLoadingMoreTransactions, setIsLoadingMoreTransactions] = useState(false)
   const [transactionError, setTransactionError] = useState<null | string>(null)
   const [selectedTransaction, setSelectedTransaction] = useState<null | PaginatedTransactionListTransactionsItem>(null)
-  const { off, on } = useWebSocket()
   const pageSizeRef = useRef<number>(DEFAULT_TRANSACTIONS_PAGE_SIZE)
+  const transactionsAbortRef = useRef<AbortController | null>(null)
   const [pagination, setPagination] = useState<PaginationState>({
     currentPage: 0,
     hasMore: false,
@@ -53,6 +53,12 @@ export function useWalletDetails(params: Params = {}): WalletDetailsProps {
   useEffect(() => {
     transactionsRef.current = transactions
   }, [transactions])
+
+  useEffect(() => {
+    return () => {
+      transactionsAbortRef.current?.abort()
+    }
+  }, [])
 
   // Fetch USDC balance (isolated for clarity)
   const fetchUSDCBalance = useCallback(async (stellarAddress: string): Promise<string> => {
@@ -104,6 +110,9 @@ export function useWalletDetails(params: Params = {}): WalletDetailsProps {
     }
 
     const setLoadingState = append ? setIsLoadingMoreTransactions : setIsLoadingTransactions
+    transactionsAbortRef.current?.abort()
+    const abortController = new AbortController()
+    transactionsAbortRef.current = abortController
 
     try {
       setLoadingState(true)
@@ -113,11 +122,16 @@ export function useWalletDetails(params: Params = {}): WalletDetailsProps {
         externalUserId: kit.address,
         page,
         pageSize: pageSizeRef.current,
-      })
+      }, { signal: abortController.signal })
 
-      if (response.status !== 200) {
+      if (!response.ok) {
+        if (abortController.signal.aborted) return
         const fallback = t('wallet_details.error.fetch_failed', 'Failed to fetch transactions')
-        setTransactionError('reason' in response.data ? response.data.reason || fallback : fallback)
+        const body = response.error.body
+        const reason = body && typeof body === 'object' && 'reason' in body
+          ? (body as { reason?: string }).reason
+          : null
+        setTransactionError(reason || response.error.message || fallback)
         return
       }
 
@@ -149,11 +163,15 @@ export function useWalletDetails(params: Params = {}): WalletDetailsProps {
         total: safeTotal,
       })
     }
-    catch {
-      setTransactionError(t('wallet_details.error.loading', 'Error loading transactions'))
+    catch (err) {
+      if (abortController.signal.aborted) return
+      setTransactionError(err instanceof Error ? err.message : t('wallet_details.error.loading', 'Error loading transactions'))
     }
     finally {
-      setLoadingState(false)
+      if (!abortController.signal.aborted) {
+        setLoadingState(false)
+      }
+      transactionsAbortRef.current = null
     }
   }, [
     walletAuthentication?.jwtToken,
@@ -175,37 +193,22 @@ export function useWalletDetails(params: Params = {}): WalletDetailsProps {
   ])
 
   // Subscribe to websocket notifications to refresh transactions and balance
-  useEffect(() => {
+  const refreshFromEvent = useCallback(() => {
     if (!kit?.address || !walletAuthentication?.jwtToken) return
-
-    const refresh = async () => {
-      if (!kit?.address) return
-      try {
-        // Optimistically refresh in background, keep UI responsive
-        await loadTransactions({ append: false, page: 1 })
-        fetchUSDCBalanceWithLoading(kit.address)
-      }
-      catch { /* no-op */ }
-    }
-
-    on('transaction.created', refresh)
-    on('transaction.updated', refresh)
-    const onConnectError = (err: Error) => setTransactionError(err.message || 'WS connection error')
-    on('connect_error', onConnectError)
-
-    return () => {
-      off('connect_error', onConnectError)
-      off('transaction.created', refresh)
-      off('transaction.updated', refresh)
-    }
+    void loadTransactions({ append: false, page: 1 })
+    if (kit?.address) fetchUSDCBalanceWithLoading(kit.address)
   }, [
+    fetchUSDCBalanceWithLoading,
     kit?.address,
     loadTransactions,
-    fetchUSDCBalanceWithLoading,
-    on,
-    off,
     walletAuthentication?.jwtToken,
   ])
+
+  useWebSocketSubscription('transaction.created', refreshFromEvent)
+  useWebSocketSubscription('transaction.updated', refreshFromEvent)
+  useWebSocketSubscription('connect_error', (err) => {
+    setTransactionError(err.message || 'WS connection error')
+  }, [])
 
   // Handlers exposed to component
   const onRefreshBalance = useCallback(() => {

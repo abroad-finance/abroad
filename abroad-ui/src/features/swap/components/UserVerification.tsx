@@ -1,9 +1,10 @@
 import { useTolgee, useTranslate } from '@tolgee/react'
 import { X } from 'lucide-react'
 import Persona from 'persona'
-import React, { useCallback, useEffect } from 'react'
+import React, { useCallback } from 'react'
 
-import { useWebSocket } from '../../../contexts/WebSocketContext'
+import { useNotices } from '../../../contexts/NoticeContext'
+import { useWebSocketSubscription } from '../../../contexts/WebSocketContext'
 import { Button } from '../../../shared/components/Button'
 import { IconAnimated } from '../../../shared/components/IconAnimated'
 import { useWalletAuth } from '../../../shared/hooks/useWalletAuth'
@@ -15,7 +16,7 @@ interface UserVerificationProps {
 
 const UserVerification = ({ onApproved, onClose }: UserVerificationProps): React.JSX.Element => {
   const { t } = useTranslate()
-  const { off, on } = useWebSocket()
+  const { addNotice } = useNotices()
   const { kycUrl, setKycUrl } = useWalletAuth()
   const { getLanguage } = useTolgee()
   const [loading, setLoading] = React.useState(false)
@@ -42,38 +43,27 @@ const UserVerification = ({ onApproved, onClose }: UserVerificationProps): React
       })
     }
     else {
-      alert('No KYC url finded')
+      addNotice({
+        description: t('user_verification.missing_url', 'No encontramos el enlace de verificación.'),
+        kind: 'error',
+        message: t('user_verification.missing_url_title', 'No se encontró el enlace de KYC'),
+      })
     }
   }, [
+    addNotice,
     getLanguage,
     kycUrl,
     onApproved,
     setKycUrl,
+    t,
   ])
 
-  // Subscribe to KYC updates so we can advance the flow automatically
-  useEffect(() => {
-    const handler = (payload: unknown) => {
-      try {
-        const data = (typeof payload === 'string' ? JSON.parse(payload) : payload) as { newStatus?: string }
-        if (data?.newStatus === 'APPROVED') {
-          // Clear any stored KYC URL and proceed
-          setKycUrl(null)
-          onApproved?.()
-        }
-      }
-      catch {
-        // ignore malformed payloads
-      }
+  useWebSocketSubscription('kyc.updated', (payload) => {
+    if (payload?.newStatus === 'APPROVED') {
+      setKycUrl(null)
+      onApproved?.()
     }
-    on('kyc.updated', handler)
-    return () => off('kyc.updated', handler)
-  }, [
-    off,
-    on,
-    onApproved,
-    setKycUrl,
-  ])
+  }, [onApproved, setKycUrl])
   return (
     <div className="flex-1 flex items-center justify-center w-full flex-col">
       <div className="w-[98%] max-w-md min-h-[60vh] bg-[#356E6A]/5 backdrop-blur-xl rounded-4xl p-4 md:p-6 flex flex-col items-center justify-center space-y-1 lg:space-y-4 text-abroad-dark md:text-white">

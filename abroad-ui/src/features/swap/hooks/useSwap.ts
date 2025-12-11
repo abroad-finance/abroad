@@ -14,6 +14,7 @@ import {
   _36EnumsPaymentMethod as PaymentMethod,
   _36EnumsTargetCurrency as TargetCurrency,
 } from '../../../api'
+import { useNotices } from '../../../contexts/NoticeContext'
 // ⛔️ Removed: import { useDebounce } from '../../../shared/hooks'
 import { useWalletAuth } from '../../../shared/hooks/useWalletAuth'
 
@@ -49,6 +50,7 @@ export const useSwap = ({
 }: UseSwapArgs): SwapProps => {
   const textColor = isDesktop ? 'white' : '#356E6A'
   const { t } = useTranslate()
+  const { addNotice } = useNotices()
   const { kit, walletAuthentication } = useWalletAuth()
 
   // Derived by currency
@@ -171,7 +173,7 @@ export const useSwap = ({
           setTargetAmount(formatted)
         }
         else {
-          alert(t('swap.quote_error', 'This quote exceeded the maximum allowed amount.'))
+          addNotice({ kind: 'error', message: t('swap.quote_error', 'This quote exceeded the maximum allowed amount.') })
         }
       }
       catch (error: unknown) {
@@ -194,6 +196,7 @@ export const useSwap = ({
       formatTargetNumber,
       setQuoteId,
       setTargetAmount,
+      addNotice,
       t,
       targetCurrency,
       targetPaymentMethod,
@@ -240,7 +243,7 @@ export const useSwap = ({
           setSourceAmount(response.data.value.toFixed(2))
         }
         else {
-          alert(t('swap.quote_error', 'This quote exceeded the maximum allowed amount.'))
+          addNotice({ kind: 'error', message: t('swap.quote_error', 'This quote exceeded the maximum allowed amount.') })
         }
       }
       catch (error: unknown) {
@@ -262,6 +265,7 @@ export const useSwap = ({
     [
       setQuoteId,
       setSourceAmount,
+      addNotice,
       t,
       targetCurrency,
       targetPaymentMethod,
@@ -346,7 +350,7 @@ export const useSwap = ({
       return
     }
     if (!quoteId) {
-      alert(t('swap.wait_for_quote', 'Please wait for the quote to load before continuing'))
+      addNotice({ kind: 'info', message: t('swap.wait_for_quote', 'Please wait for the quote to load before continuing') })
       return
     }
     // proceed
@@ -355,6 +359,7 @@ export const useSwap = ({
     isAuthenticated,
     kit,
     quoteId,
+    addNotice,
     setView,
     t,
   ])

@@ -1,8 +1,10 @@
 import { useTranslate } from '@tolgee/react'
-import React, { memo, useEffect, useState } from 'react'
+import React, {
+  memo, useCallback, useEffect, useState,
+} from 'react'
 
 import { TransactionStatus as ApiStatus, _36EnumsTargetCurrency as TargetCurrency } from '../../../api'
-import { useWebSocket } from '../../../contexts/WebSocketContext'
+import { useWebSocketSubscription } from '../../../contexts/WebSocketContext'
 import { Button } from '../../../shared/components/Button'
 import { IconAnimated } from '../../../shared/components/IconAnimated'
 import { useWalletAuth } from '../../../shared/hooks/useWalletAuth'
@@ -27,14 +29,12 @@ const TxStatus = ({
 }: TxStatusProps): React.JSX.Element => {
   const { t } = useTranslate()
   const { kit } = useWalletAuth()
-  const { off, on } = useWebSocket()
   const [status, setStatus] = useState<UiStatus>('inProgress')
   const [apiStatus, setApiStatus] = useState<ApiStatus | undefined>(undefined)
   const [error, setError] = useState<null | string>(null)
   // no local socket, using app-wide provider
 
-  // Map API status to UI status
-  const mapStatus = (api?: ApiStatus): UiStatus => {
+  const mapStatus = useCallback((api?: ApiStatus): UiStatus => {
     switch (api) {
       case 'PAYMENT_COMPLETED': return 'accepted'
 
@@ -47,7 +47,7 @@ const TxStatus = ({
       case undefined:
       default: return 'inProgress'
     }
-  }
+  }, [])
 
   const getAmount = (currency: TargetCurrency, amount: string) => {
     if (currency === TargetCurrency.BRL) {
@@ -58,41 +58,23 @@ const TxStatus = ({
     }
   }
 
-  // Subscribe to websocket notifications for this user/transaction
-  useEffect(() => {
+  const handleTxEvent = useCallback((payload: { id?: string, status?: ApiStatus }) => {
     if (!transactionId || !kit?.address) return
-    setError(null)
-
-    const onEvent = (payload: unknown) => {
-      try {
-        const data = (typeof payload === 'string' ? JSON.parse(payload) : payload) as { id?: string
-          status?: ApiStatus }
-        if (!data || data.id !== transactionId) return
-        const apiStatusValue = data.status as ApiStatus | undefined
-        setApiStatus(apiStatusValue)
-        setStatus(mapStatus(apiStatusValue))
-      }
-      catch (e) {
-        console.warn('Invalid ws payload:', e)
-      }
-    }
-
-    on('transaction.created', onEvent)
-    on('transaction.updated', onEvent)
-    const onConnectError = (err: Error) => setError(err.message || 'WS connection error')
-    on('connect_error', onConnectError)
-
-    return () => {
-      off('connect_error', onConnectError)
-      off('transaction.created', onEvent)
-      off('transaction.updated', onEvent)
-    }
+    if (!payload || payload.id !== transactionId) return
+    const apiStatusValue = payload.status
+    setApiStatus(apiStatusValue)
+    setStatus(mapStatus(apiStatusValue))
   }, [
-    transactionId,
-    on,
-    off,
     kit?.address,
+    mapStatus,
+    transactionId,
   ])
+
+  useWebSocketSubscription('transaction.created', handleTxEvent)
+  useWebSocketSubscription('transaction.updated', handleTxEvent)
+  useWebSocketSubscription('connect_error', (err) => {
+    setError(err.message || 'WS connection error')
+  }, [])
 
   useEffect(() => {
     setApiStatus(undefined)

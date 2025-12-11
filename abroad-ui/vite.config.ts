@@ -15,6 +15,7 @@ function randomHash(key: string): string {
 }
 
 export default defineConfig({
+  root: __dirname,
   build: {
     chunkSizeWarningLimit: 1200,
     rollupOptions: {
@@ -55,10 +56,26 @@ export default defineConfig({
     'global': 'globalThis',
     'process.env': {},
   },
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, 'src'),
+      '@/': path.resolve(__dirname, 'src'),
+    },
+  },
   plugins: [react({ include: '**/*.tsx' }), tailwindcss()],
   server: {
     watch: {
       usePolling: true,
     },
+  },
+  test: {
+    alias: {
+      '@': path.resolve(__dirname, 'src'),
+      '@/': path.resolve(__dirname, 'src'),
+    },
+    environment: 'jsdom',
+    globals: true,
+    restoreMocks: true,
+    setupFiles: ['./src/test/setupTests.ts'],
   },
 })
