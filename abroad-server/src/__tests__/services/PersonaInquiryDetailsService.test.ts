@@ -1,6 +1,7 @@
 import type { ISecretManager } from '../../interfaces/ISecretManager'
 
 import { PersonaInquiryDetailsService } from '../../services/PersonaInquiryDetailsService'
+import { createMockLogger } from '../setup/mockFactories'
 
 const axiosGetMock = jest.fn()
 
@@ -165,8 +166,8 @@ describe('PersonaInquiryDetailsService', () => {
     )
     secretManager.getSecrets = failingSecrets
     axiosGetMock.mockRejectedValueOnce(new Error('network fail'))
-    const service = buildService()
-    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {})
+    const logger = createMockLogger()
+    const service = new PersonaInquiryDetailsService(secretManager, {}, logger)
 
     const first = await service.getDetails('inq-3')
     const second = await service.getDetails('inq-3')
@@ -175,8 +176,7 @@ describe('PersonaInquiryDetailsService', () => {
     expect(second).toBeNull()
     expect(secretManager.getSecrets).toHaveBeenCalledTimes(1)
     expect(axiosGetMock).not.toHaveBeenCalled()
-    expect(consoleErrorSpy).toHaveBeenCalled()
-    consoleErrorSpy.mockRestore()
+    expect(logger.error).toHaveBeenCalled()
   })
 
   it('exercises helper branches for cache management and value coercion', () => {
@@ -248,7 +248,8 @@ describe('PersonaInquiryDetailsService', () => {
   })
 
   it('covers debug, cached client, and fallback field/value parsing branches', async () => {
-    const debugService = new PersonaInquiryDetailsService(secretManager, { debug: true })
+    const logger = createMockLogger()
+    const debugService = new PersonaInquiryDetailsService(secretManager, { debug: true }, logger)
     const helpers = debugService as unknown as {
       buildFullNameFromAttributes: (attrs?: Record<string, unknown>) => string | undefined
       collectDocumentAttributes: (input: Array<Record<string, unknown>>) => Array<Record<string, unknown>>
@@ -270,10 +271,8 @@ describe('PersonaInquiryDetailsService', () => {
     expect(collected).toEqual([])
 
     // debug flag branch
-    const debugSpy = jest.spyOn(console, 'debug').mockImplementation(() => {})
     helpers.debug('message', 1)
-    expect(debugSpy).toHaveBeenCalled()
-    debugSpy.mockRestore()
+    expect(logger.info).toHaveBeenCalled()
 
     // ensureClient caches instances
     const client = await helpers.ensureClient()

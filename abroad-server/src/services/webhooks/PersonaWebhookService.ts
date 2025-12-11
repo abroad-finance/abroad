@@ -1,8 +1,10 @@
 import { KycStatus, Prisma } from '@prisma/client'
 import { Request as RequestExpress } from 'express'
+import { inject, injectable } from 'inversify'
 
 import { ILogger, IQueueHandler, QueueName } from '../../interfaces'
 import { IDatabaseClientProvider } from '../../interfaces/IDatabaseClientProvider'
+import { TYPES } from '../../types'
 import { PersonaStatus, PersonaWebhookPayload, personaWebhookSchema } from './personaSchema'
 import { WebhookProcessingResult } from './types'
 import { WEBHOOK_INTERNAL_ERROR, WEBHOOK_INVALID_PAYLOAD, WEBHOOK_PROCESSED } from './webhookMessages'
@@ -15,11 +17,12 @@ const partnerUserInclude = {
 } as const
 type PartnerUserKycRecord = Prisma.PartnerUserKycGetPayload<{ include: typeof partnerUserInclude }>
 
+@injectable()
 export class PersonaWebhookService {
   public constructor(
-    private readonly dbProvider: IDatabaseClientProvider,
-    private readonly logger: ILogger,
-    private readonly queueHandler: IQueueHandler,
+    @inject(TYPES.IDatabaseClientProvider) private readonly dbProvider: IDatabaseClientProvider,
+    @inject(TYPES.ILogger) private readonly logger: ILogger,
+    @inject(TYPES.IQueueHandler) private readonly queueHandler: IQueueHandler,
   ) { }
 
   public async processWebhook(

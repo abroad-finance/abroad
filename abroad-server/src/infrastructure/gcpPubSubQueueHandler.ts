@@ -1,22 +1,30 @@
-import { PubSub, Subscription } from '@google-cloud/pubsub'
+import { Message, PubSub, Subscription } from '@google-cloud/pubsub'
 import { inject, injectable } from 'inversify'
 
-import { RuntimeConfig } from '../config/runtime'
+import { RuntimeConfiguration } from '../config/runtime'
 import { ILogger, IQueueHandler, QueueName } from '../interfaces'
 import { ISecretManager } from '../interfaces/ISecretManager'
+import { createScopedLogger, ScopedLogger } from '../shared/logging'
+import { generateCorrelationId, runWithCorrelationId } from '../shared/requestContext'
 import { TYPES } from '../types'
 
 @injectable()
 export class GCPPubSubQueueHandler implements IQueueHandler {
-  private readonly ackDeadlineSeconds = RuntimeConfig.pubSub.ackDeadlineSeconds
+  private readonly ackDeadlineSeconds: number
+  private readonly logger: ScopedLogger
   private pubsub!: PubSub
   private subscriptions = new Map<QueueName, Subscription>()
-  private readonly subscriptionSuffix = RuntimeConfig.pubSub.subscriptionSuffix
+  private readonly subscriptionSuffix: string
 
   constructor(
     @inject(TYPES.ISecretManager) private secretManager: ISecretManager,
-    @inject(TYPES.ILogger) private logger: ILogger,
-  ) { }
+    @inject(TYPES.ILogger) baseLogger: ILogger,
+    @inject(TYPES.AppConfig) config: RuntimeConfiguration,
+  ) {
+    this.logger = createScopedLogger(baseLogger, { scope: 'PubSubQueueHandler' })
+    this.ackDeadlineSeconds = config.pubSub.ackDeadlineSeconds
+    this.subscriptionSuffix = config.pubSub.subscriptionSuffix
+  }
 
   public async closeAllSubscriptions(): Promise<void> {
     for (const subscription of this.subscriptions.values()) {
@@ -37,7 +45,7 @@ export class GCPPubSubQueueHandler implements IQueueHandler {
     }
     const dataBuffer = Buffer.from(JSON.stringify(message))
     await topic.publishMessage({ data: dataBuffer })
-    this.logger.info('[IQueueHandler] Message published to PubSub topic', { queueName })
+    this.logger.child({ staticPayload: { queueName } }).info('Message published to PubSub topic')
   }
 
   public async subscribeToQueue(
@@ -59,26 +67,30 @@ export class GCPPubSubQueueHandler implements IQueueHandler {
       await topic.createSubscription(subscriptionName, { ackDeadlineSeconds: this.ackDeadlineSeconds })
       this.logger.info('[IQueueHandler] Created subscription', { queueName, subscriptionName })
     }
+    const subscriptionLogger = this.logger.child({ staticPayload: { queueName, subscriptionName } })
     subscription.on('message', async (msg) => {
-      try {
-        const data = this.parseMessage(msg.data)
+      const correlationId = generateCorrelationId(msg.id)
+      await runWithCorrelationId(correlationId, async () => {
+        const data = this.parseMessage(msg, subscriptionLogger)
         if (!data) {
           msg.ack()
           return
         }
-        this.logger.info('[IQueueHandler] Received message from PubSub', { queueName })
-        await Promise.resolve(callback(data))
-        msg.ack()
-      }
-      catch (err) {
-        this.logger.error('[IQueueHandler] Error handling PubSub message', err)
-        msg.nack?.()
-      }
+        subscriptionLogger.info('Received message from PubSub', { messageId: msg.id })
+        try {
+          await Promise.resolve(callback(data))
+          msg.ack()
+        }
+        catch (err) {
+          subscriptionLogger.error('Error handling PubSub message', err)
+          msg.nack?.()
+        }
+      })
     })
     subscription.on('error', (err) => {
-      this.logger.error('[IQueueHandler] Subscription error', { err, queueName, subscriptionName })
+      subscriptionLogger.error('Subscription error', { err })
     })
-    this.logger.info('[IQueueHandler] Subscribed to PubSub topic', { queueName, subscriptionName })
+    subscriptionLogger.info('Subscribed to PubSub topic')
   }
 
   private async ensureClient(): Promise<void> {
@@ -88,12 +100,12 @@ export class GCPPubSubQueueHandler implements IQueueHandler {
     }
   }
 
-  private parseMessage(data: Buffer): Record<string, boolean | number | string> | undefined {
+  private parseMessage(msg: Message, logger: ScopedLogger): Record<string, boolean | number | string> | undefined {
     try {
-      return JSON.parse(data.toString()) as Record<string, boolean | number | string>
+      return JSON.parse(msg.data.toString()) as Record<string, boolean | number | string>
     }
     catch (err) {
-      this.logger.warn('[IQueueHandler] Failed to parse PubSub message', err)
+      logger.warn('Failed to parse PubSub message', { err, messageId: msg.id })
       return undefined
     }
   }

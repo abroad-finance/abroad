@@ -58,9 +58,18 @@ export class StellarListener {
   public async start(): Promise<void> {
     this.logger.info('Initializing listener')
 
-    this.accountId = await this.secretManager.getSecret('STELLAR_ACCOUNT_ID')
-    this.horizonUrl = await this.secretManager.getSecret('STELLAR_HORIZON_URL')
-    this.usdcIssuer = await this.secretManager.getSecret('STELLAR_USDC_ISSUER')
+    const {
+      STELLAR_ACCOUNT_ID,
+      STELLAR_HORIZON_URL,
+      STELLAR_USDC_ISSUER,
+    } = await this.secretManager.getSecrets([
+      'STELLAR_ACCOUNT_ID',
+      'STELLAR_HORIZON_URL',
+      'STELLAR_USDC_ISSUER',
+    ])
+    this.accountId = STELLAR_ACCOUNT_ID
+    this.horizonUrl = STELLAR_HORIZON_URL
+    this.usdcIssuer = STELLAR_USDC_ISSUER
 
     this.logger.info('Initializing Horizon server for account', { accountId: this.accountId })
 
@@ -196,7 +205,7 @@ export class StellarListener {
       }
     }
     catch (err) {
-      console.error('[StellarListener] Error while stopping stream:', err)
+      this.logger.error('Error while stopping stream', err)
     }
     finally {
       if (this.keepAlive) {

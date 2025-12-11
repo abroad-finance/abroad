@@ -2,6 +2,7 @@ import axios from 'axios'
 
 import type { ISecretManager } from '../../interfaces/ISecretManager'
 
+import { RuntimeConfig } from '../../config/runtime'
 import { WebhookEvent } from '../../interfaces/IWebhookNotifier'
 import { WebhookNotifier } from '../../services/WebhookNotifier'
 import { createMockLogger, MockLogger } from '../setup/mockFactories'
@@ -22,7 +23,7 @@ describe('WebhookNotifier', () => {
   })
 
   it('skips when url is null', async () => {
-    const notifier = new WebhookNotifier(logger, secretManager)
+    const notifier = new WebhookNotifier(logger, secretManager, RuntimeConfig)
 
     await notifier.notifyWebhook(null, { data: {}, event: WebhookEvent.TRANSACTION_UPDATED })
 
@@ -30,7 +31,7 @@ describe('WebhookNotifier', () => {
   })
 
   it('sends payload with secret header when available', async () => {
-    const notifier = new WebhookNotifier(logger, secretManager)
+    const notifier = new WebhookNotifier(logger, secretManager, RuntimeConfig)
 
     await notifier.notifyWebhook('https://hook', {
       data: { id: '123' },
@@ -48,7 +49,7 @@ describe('WebhookNotifier', () => {
 
   it('logs an error when the webhook post fails', async () => {
     (axios.post as jest.Mock).mockRejectedValueOnce(new Error('fail'))
-    const notifier = new WebhookNotifier(logger, secretManager)
+    const notifier = new WebhookNotifier(logger, secretManager, RuntimeConfig)
 
     await notifier.notifyWebhook('https://hook', {
       data: { id: 'x' },

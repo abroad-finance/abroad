@@ -2,15 +2,16 @@ import dotenv from 'dotenv'
 import http from 'http'
 
 import { RuntimeConfig } from './config/runtime'
+import { ILogger } from './interfaces'
+import { iocContainer } from './ioc'
 import { startListeners } from './listeners/index'
+import { createScopedLogger } from './shared/logging'
+import { TYPES } from './types'
 
 dotenv.config()
 
-const logger = {
-  error: (...args: unknown[]) => console.error(...args),
-  info: (...args: unknown[]) => console.log(...args),
-  warn: (...args: unknown[]) => console.warn(...args),
-}
+const baseLogger = iocContainer.get<ILogger>(TYPES.ILogger)
+const logger = createScopedLogger(baseLogger, { scope: 'listeners' })
 const health = { live: true, ready: false }
 
 // Start a tiny HTTP server for k8s health checks

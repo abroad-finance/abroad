@@ -11,9 +11,11 @@ import {
 } from '@stellar/stellar-sdk'
 import { inject, injectable } from 'inversify'
 
+import { ILogger } from '../interfaces'
 import { ILockManager } from '../interfaces/ILockManager'
 import { ISecretManager } from '../interfaces/ISecretManager'
 import { IWalletHandler } from '../interfaces/IWalletHandler'
+import { createScopedLogger, ScopedLogger } from '../shared/logging'
 import { TYPES } from '../types'
 
 function safeMemo(m: string): string {
@@ -32,10 +34,15 @@ function toStellarAmount(n: number): string {
 
 @injectable()
 export class StellarWalletHandler implements IWalletHandler {
+  private readonly logger: ScopedLogger
+
   constructor(
     @inject(TYPES.ISecretManager) private secretManager: ISecretManager,
     @inject(TYPES.ILockManager) private lockManager: ILockManager,
-  ) {}
+    @inject(TYPES.ILogger) baseLogger: ILogger,
+  ) {
+    this.logger = createScopedLogger(baseLogger, { scope: 'StellarWalletHandler' })
+  }
 
   async getAddressFromTransaction({ onChainId }: { onChainId?: string }): Promise<string> {
     if (!onChainId) {
@@ -49,7 +56,7 @@ export class StellarWalletHandler implements IWalletHandler {
       return op.source_account || ''
     }
     catch (error) {
-      console.error('Error fetching Stellar transaction:', error, onChainId)
+      this.logger.error('Error fetching Stellar transaction', { error, onChainId })
       throw new Error(`Failed to fetch transaction with ID ${onChainId}`)
     }
   }
@@ -115,14 +122,14 @@ export class StellarWalletHandler implements IWalletHandler {
 
       return { success: true, transactionId: result }
     }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    catch (error: any) {
-      const rc = error?.response?.data?.extras?.result_codes
-      console.error('Error sending Stellar transaction', {
-        data: error?.response?.data,
-        err: error,
+    catch (error: unknown) {
+      const err = error as { message?: string, response?: { data?: unknown, extras?: unknown, status?: number } }
+      const rc = (err.response as undefined | { data?: { extras?: { result_codes?: unknown } } })?.data?.extras?.result_codes
+      this.logger.error('Error sending Stellar transaction', {
+        data: err.response?.data,
+        err,
         result_codes: rc,
-        status: error?.response?.status,
+        status: err.response?.status,
       })
       return { success: false }
     }

@@ -1,4 +1,5 @@
 import { ConsoleLogger } from '../../services/consoleLogger'
+import { runWithCorrelationId } from '../../shared/requestContext'
 
 type ConsoleSpy = jest.SpyInstance<void, [message?: unknown, ...optionalParams: unknown[]]>
 
@@ -11,9 +12,11 @@ describe('ConsoleLogger', () => {
   const parseEntry = (spy: ConsoleSpy) => {
     const payload = spy.mock.calls[0]?.[0]
     return JSON.parse(String(payload)) as {
+      correlationId?: string
       message: unknown
       params?: unknown[]
       severity: string
+      timestamp: string
     }
   }
 
@@ -39,6 +42,7 @@ describe('ConsoleLogger', () => {
       message: 'hello',
       severity: 'INFO',
     })
+    expect(entry.timestamp).toBeDefined()
     expect(entry.params).toEqual([
       expect.objectContaining({ message: 'boom', name: 'Error', stack: expect.any(String) }),
       { requestId: 'req-1' },
@@ -62,5 +66,14 @@ describe('ConsoleLogger', () => {
     expect(errorEntry).toMatchObject({ message: 'failure', severity: 'ERROR' })
     expect(errorEntry.params).toBeUndefined()
     expect(logSpy).not.toHaveBeenCalled()
+  })
+
+  it('injects correlation id from request context when present', () => {
+    runWithCorrelationId('corr-123', () => {
+      logger.info('with correlation')
+    })
+
+    const entry = parseEntry(logSpy)
+    expect(entry.correlationId).toBe('corr-123')
   })
 })

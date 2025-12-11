@@ -2,6 +2,7 @@
 
 import { ILogger } from '../interfaces'
 import { iocContainer } from '../ioc'
+import { createScopedLogger } from '../shared/logging'
 import { TYPES } from '../types'
 import { BinanceListener } from './binance'
 import { StellarListener } from './stellar'
@@ -10,7 +11,8 @@ import { StellarListener } from './stellar'
  * Register and start all listeners.
  */
 export function startListeners(): void {
-  const logger = iocContainer.get<ILogger>(TYPES.ILogger)
+  const baseLogger = iocContainer.get<ILogger>(TYPES.ILogger)
+  const logger = createScopedLogger(baseLogger, { scope: 'listeners' })
   // Keep strong references so listeners are not GC'd
   iocContainer
     .bind<StellarListener>('StellarListener')
@@ -21,7 +23,7 @@ export function startListeners(): void {
   // Store on module scope to keep a reference
   running.stellar = stellar
   stellar.start().catch(err =>
-    logger.error('[listeners] Error starting StellarListener:', err),
+    logger.error('Error starting StellarListener:', err),
   )
 
   iocContainer.bind<BinanceListener>('BinanceListener').to(BinanceListener)

@@ -9,18 +9,22 @@ const paymentStatusController = { registerConsumers: jest.fn() }
 const binanceController = { registerConsumers: jest.fn() }
 let queueHandler: MockQueueHandler
 
-const getMock = jest.fn()
-
-jest.mock('../ioc', () => ({
-  iocContainer: {
-    get: (...args: unknown[]) => getMock(...args),
-  },
-}))
+jest.mock('../ioc', () => {
+  const mockGet = jest.fn()
+  return {
+    __mockGet: mockGet,
+    iocContainer: {
+      get: (...args: unknown[]) => mockGet(...args),
+    },
+  }
+})
+const { __mockGet: getMock } = jest.requireMock('../ioc') as { __mockGet: jest.Mock }
 
 describe('consumers lifecycle', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     queueHandler = createMockQueueHandler()
+    getMock.mockReset()
     getMock.mockImplementation((token: unknown) => {
       switch (token) {
         case TYPES.BinanceBalanceUpdatedController:

@@ -13,6 +13,8 @@ import { RuntimeConfig } from './config/runtime'
 import { ILogger } from './interfaces'
 import { iocContainer } from './ioc'
 import { RegisterRoutes } from './routes'
+import { mapErrorToHttpResponse } from './shared/errors'
+import { requestContextMiddleware } from './shared/requestContext'
 import { TYPES } from './types'
 
 dotenv.config()
@@ -24,6 +26,7 @@ app.use(cors())
 app.use(bodyParser.json())
 // Handle text/json content-type generically (kept small)
 app.use(bodyParser.json({ type: 'text/json' }))
+app.use(requestContextMiddleware)
 
 // Lightweight Movii webhook endpoint: log headers and payload, respond 200 with empty JSON (Movii sends Accept: application/json)
 app.post('/webhooks/movii', (req: Request, res: Response) => {
@@ -128,17 +131,11 @@ app.get('/', (req: Request, res: Response) => {
 // ---------------
 // Error handling
 // ---------------
-interface ApiError extends Error {
-  status?: number
-}
-
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-app.use((err: ApiError, _req: Request, res: Response, _next: NextFunction) => {
+app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
   logger.error('API error', err)
-  res.status(err.status ?? 500).json({
-    message: err.message || 'An error occurred',
-    reason: err.message || 'Internal Server Error',
-  })
+  const { body, status } = mapErrorToHttpResponse(err)
+  res.status(status).json(body)
 })
 
 // ---------------------

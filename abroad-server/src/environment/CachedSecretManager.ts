@@ -1,27 +1,37 @@
 // src/environment/CachedSecretManager.ts
 import { injectable } from 'inversify'
 
+import { RuntimeConfig } from '../config/runtime'
 import { ISecretManager, Secret } from '../interfaces/ISecretManager'
 import { GcpSecretManager } from './GcpSecretManager'
 
+type CachedSecret = {
+  expiresAt: number
+  value: string
+}
+
 @injectable()
 export class CachedSecretManager implements ISecretManager {
-  private cache = new Map<string, string>()
+  private cache = new Map<string, CachedSecret>()
+  private readonly cacheTtlMs: number
   private decoratedSecretManager: ISecretManager
 
-  constructor() {
+  constructor(cacheTtlMs = RuntimeConfig.secrets.cacheTtlMs) {
     this.decoratedSecretManager = new GcpSecretManager()
+    this.cacheTtlMs = cacheTtlMs
   }
 
   /**
    * Returns a cached secret if available, otherwise fetches it using the underlying secret manager.
    */
   async getSecret(secretName: Secret): Promise<string> {
-    if (this.cache.has(secretName)) {
-      return this.cache.get(secretName)!
+    const cached = this.cache.get(secretName)
+    if (cached && cached.expiresAt > Date.now()) {
+      return cached.value
     }
+
     const secret = await this.decoratedSecretManager.getSecret(secretName)
-    this.cache.set(secretName, secret)
+    this.cache.set(secretName, { expiresAt: Date.now() + this.cacheTtlMs, value: secret })
     return secret
   }
 

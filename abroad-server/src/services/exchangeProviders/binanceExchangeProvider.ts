@@ -6,8 +6,10 @@ import axios from 'axios'
 import crypto from 'crypto'
 import { inject, injectable } from 'inversify'
 
+import { ILogger } from '../../interfaces'
 import { IExchangeProvider } from '../../interfaces/IExchangeProvider'
 import { ISecretManager } from '../../interfaces/ISecretManager'
+import { createScopedLogger, ScopedLogger } from '../../shared/logging'
 import { TYPES } from '../../types'
 
 type BinanceBookTickerResponse = {
@@ -25,10 +27,14 @@ const SUPPORTED_SYMBOLS = [
 @injectable()
 export class BinanceExchangeProvider implements IExchangeProvider {
   public readonly exchangePercentageFee = 0.0085
+  private readonly logger: ScopedLogger
 
   constructor(
     @inject(TYPES.ISecretManager) private secretManager: ISecretManager,
-  ) { }
+    @inject(TYPES.ILogger) baseLogger: ILogger,
+  ) {
+    this.logger = createScopedLogger(baseLogger, { scope: 'BinanceExchangeProvider' })
+  }
 
   createMarketOrder(): Promise<{ success: boolean }> {
     throw new Error('Method not implemented.')
@@ -43,9 +49,15 @@ export class BinanceExchangeProvider implements IExchangeProvider {
     { blockchain, cryptoCurrency },
   ) => {
     try {
-      const BINANCE_API_KEY = await this.secretManager.getSecret('BINANCE_API_KEY')
-      const BINANCE_API_SECRET = await this.secretManager.getSecret('BINANCE_API_SECRET')
-      const BINANCE_API_URL = await this.secretManager.getSecret('BINANCE_API_URL')
+      const {
+        BINANCE_API_KEY,
+        BINANCE_API_SECRET,
+        BINANCE_API_URL,
+      } = await this.secretManager.getSecrets([
+        'BINANCE_API_KEY',
+        'BINANCE_API_SECRET',
+        'BINANCE_API_URL',
+      ])
 
       const network = this.mapBlockchainToNetwork(blockchain)
       const coin = cryptoCurrency
@@ -75,7 +87,7 @@ export class BinanceExchangeProvider implements IExchangeProvider {
       }
     }
     catch (error) {
-      console.error('[BinanceExchangeProvider] Error fetching deposit address from Binance:', error)
+      this.logger.error('Error fetching deposit address from Binance', error)
       throw error
     }
   }
@@ -89,7 +101,9 @@ export class BinanceExchangeProvider implements IExchangeProvider {
     { sourceCurrency, targetCurrency },
   ) => {
     try {
-      const BINANCE_API_URL = await this.secretManager.getSecret('BINANCE_API_URL')
+      const { BINANCE_API_URL } = await this.secretManager.getSecrets([
+        'BINANCE_API_URL',
+      ])
 
       // Construct the trading pair symbol
       const symbol = `${sourceCurrency}${targetCurrency}`
@@ -98,7 +112,7 @@ export class BinanceExchangeProvider implements IExchangeProvider {
         throw new Error(`Unsupported symbol: ${symbol}`)
       }
 
-      console.warn(`[BinanceExchangeProvider] Falling back to USDT pairs for ${sourceCurrency} to ${targetCurrency}`)
+      this.logger.warn('Falling back to USDT pairs', { sourceCurrency, targetCurrency })
 
       // Get source currency to USDT rate
       const sourceToUSDT = await axios.get<BinanceBookTickerResponse>(
@@ -121,7 +135,7 @@ export class BinanceExchangeProvider implements IExchangeProvider {
       return sourcePrice / targetPrice
     }
     catch (fallbackError) {
-      console.error('[BinanceExchangeProvider] Error fetching exchange rate from Binance:', fallbackError)
+      this.logger.error('Error fetching exchange rate from Binance', fallbackError)
       throw fallbackError
     }
   }

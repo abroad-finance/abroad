@@ -1,11 +1,19 @@
 // src/services/nequi.ts
 import { TargetCurrency } from '@prisma/client'
 import axios, { AxiosResponse } from 'axios'
-import { inject } from 'inversify'
+import { inject, injectable } from 'inversify'
 
+import { ILogger } from '../../interfaces'
 import { IPaymentService } from '../../interfaces/IPaymentService'
 import { ISecretManager } from '../../interfaces/ISecretManager'
+import { createScopedLogger, ScopedLogger } from '../../shared/logging'
 import { TYPES } from '../../types'
+
+type NequiAuthConfig = {
+  accessKey: string
+  secretKey: string
+  urlAuth: string
+}
 
 type ResponseNequiDispersion = {
   ResponseMessage: {
@@ -31,6 +39,8 @@ type ResponseNequiDispersion = {
   }
 }
 
+@injectable()
+
 export class NequiPaymentService implements IPaymentService {
   public readonly banks = []
   public readonly currency = TargetCurrency.COP
@@ -45,12 +55,17 @@ export class NequiPaymentService implements IPaymentService {
   public readonly MAX_USER_TRANSACTIONS_PER_DAY: number = 15
 
   public readonly percentageFee = 0.0
-  private token: null | string = null
+  private readonly logger: ScopedLogger
 
+  private token: null | string = null
   private tokenExpiration: null | number = null
+
   public constructor(
     @inject(TYPES.ISecretManager) private secretManager: ISecretManager,
-  ) { }
+    @inject(TYPES.ILogger) baseLogger: ILogger,
+  ) {
+    this.logger = createScopedLogger(baseLogger, { scope: 'NequiPaymentService' })
+  }
 
   public async getLiquidity(): Promise<number> {
     // Nequi does not provide a direct endpoint to get liquidity.
@@ -68,15 +83,11 @@ export class NequiPaymentService implements IPaymentService {
     id,
     value,
   }) => {
-    console.log('[NequiPaymentService]: Sending payment to Nequi:', {
-      account,
-      id,
-      value,
-    })
+    this.logger.info('Sending payment to Nequi', { account, id, value })
 
-    const DISPERSION_CODE_NEQUI = await this.secretManager.getSecret(
+    const { DISPERSION_CODE_NEQUI } = await this.secretManager.getSecrets([
       'DISPERSION_CODE_NEQUI',
-    )
+    ])
 
     const messageId = Array.from({ length: 16 }, () =>
       Math.floor(Math.random() * 10),
@@ -119,9 +130,8 @@ export class NequiPaymentService implements IPaymentService {
       '/dispersions/v2/-services-dispersionservice-dispersefunds',
       body,
     )
-    console.log(
-      '[NequiPaymentService]: ',
-      'response ',
+    this.logger.info(
+      'Dispersion response',
       response.ResponseMessage.ResponseHeader.Status,
     )
 
@@ -137,12 +147,25 @@ export class NequiPaymentService implements IPaymentService {
     return Promise.resolve(true)
   }
 
+  private async getAuthConfig(): Promise<NequiAuthConfig> {
+    const {
+      ACCESS_KEY_NEQUI,
+      SECRET_KEY_NEQUI,
+      URL_NEQUI_AUTH,
+    } = await this.secretManager.getSecrets([
+      'ACCESS_KEY_NEQUI',
+      'SECRET_KEY_NEQUI',
+      'URL_NEQUI_AUTH',
+    ])
+    return {
+      accessKey: ACCESS_KEY_NEQUI,
+      secretKey: SECRET_KEY_NEQUI,
+      urlAuth: URL_NEQUI_AUTH,
+    }
+  }
+
   private async getAuthToken(): Promise<string> {
-    const ACCESS_KEY_NEQUI
-      = await this.secretManager.getSecret('ACCESS_KEY_NEQUI')
-    const SECRET_KEY_NEQUI
-      = await this.secretManager.getSecret('SECRET_KEY_NEQUI')
-    const URL_NEQUI_AUTH = await this.secretManager.getSecret('URL_NEQUI_AUTH')
+    const { accessKey, secretKey, urlAuth } = await this.getAuthConfig()
 
     if (
       this.token
@@ -152,7 +175,7 @@ export class NequiPaymentService implements IPaymentService {
       return this.token
     }
 
-    const key = Buffer.from(`${ACCESS_KEY_NEQUI}:${SECRET_KEY_NEQUI}`).toString(
+    const key = Buffer.from(`${accessKey}:${secretKey}`).toString(
       'base64',
     )
     const response: AxiosResponse = await axios({
@@ -161,7 +184,7 @@ export class NequiPaymentService implements IPaymentService {
         'Content-Type': 'application/x-www-form-urlencoded',
       },
       method: 'POST',
-      url: URL_NEQUI_AUTH,
+      url: urlAuth,
     })
 
     if (response.status !== 200 && response.status !== 201) {
@@ -183,8 +206,13 @@ export class NequiPaymentService implements IPaymentService {
     endpoint: string,
     body: Record<string, unknown>,
   ): Promise<T> {
-    const URL_NEQUI = await this.secretManager.getSecret('URL_NEQUI')
-    const API_KEY_NEQUI = await this.secretManager.getSecret('API_KEY_NEQUI')
+    const {
+      API_KEY_NEQUI,
+      URL_NEQUI,
+    } = await this.secretManager.getSecrets([
+      'API_KEY_NEQUI',
+      'URL_NEQUI',
+    ])
 
     const token = await this.getAuthToken()
     const response: AxiosResponse = await axios({

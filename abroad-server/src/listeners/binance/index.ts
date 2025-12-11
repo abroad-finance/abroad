@@ -3,24 +3,29 @@ import { inject } from 'inversify'
 
 import { ILogger, IQueueHandler, QueueName } from '../../interfaces'
 import { ISecretManager } from '../../interfaces/ISecretManager'
+import { createScopedLogger, ScopedLogger } from '../../shared/logging'
+import { generateCorrelationId, runWithCorrelationId } from '../../shared/requestContext'
 import { TYPES } from '../../types'
 
 export class BinanceListener {
+  private readonly logger: ScopedLogger
   private wsClient?: WebsocketClient
   public constructor(
     @inject(TYPES.ISecretManager) private secretManager: ISecretManager,
     @inject(TYPES.IQueueHandler) private queueHandler: IQueueHandler,
-    @inject(TYPES.ILogger) private logger: ILogger,
-  ) { }
+    @inject(TYPES.ILogger) baseLogger: ILogger,
+  ) {
+    this.logger = createScopedLogger(baseLogger, { scope: 'BinanceListener' })
+  }
 
   public start = async () => {
     try {
-      this.logger.info('[Binance WS]: Starting listener')
+      this.logger.info('Starting listener')
       await this.startListener()
-      this.logger.info('[Binance WS]: Listener started')
+      this.logger.info('Listener started')
     }
     catch (err: unknown) {
-      this.logger.error('[Binance WS]: Failed to start listener', err)
+      this.logger.error('Failed to start listener', err)
       throw err
     }
   }
@@ -28,39 +33,46 @@ export class BinanceListener {
   public stop = async () => {
     try {
       if (this.wsClient) {
-        this.logger.info('[Binance WS]: Stopping listener')
+        this.logger.info('Stopping listener')
         this.wsClient.closeAll(true)
         this.wsClient = undefined
       }
     }
     catch (err: unknown) {
-      this.logger.error('[Binance WS]: Failed to stop listener', err)
+      this.logger.error('Failed to stop listener', err)
     }
   }
 
   private handleSpotUserDataStream = (data: WsUserDataEvents) => {
-    if (data.eventType === 'outboundAccountPosition') {
-      const balancesCount = 'balances' in data ? data.balances.length : undefined
-      this.logger.info('[Binance WS]: balanceUpdate event received', {
-        balances: balancesCount,
-        eventTime: data.eventTime,
-        eventType: data.eventType,
-      })
-      this.queueHandler.postMessage(QueueName.BINANCE_BALANCE_UPDATED, {})
-    }
-    else {
-      this.logger.info('[Binance WS]: user data event received', {
-        eventTime: data.eventTime,
-        eventType: data.eventType,
-      })
-    }
+    const correlationId = generateCorrelationId(String(data.eventTime ?? Date.now()))
+    runWithCorrelationId(correlationId, () => {
+      if (data.eventType === 'outboundAccountPosition') {
+        const balancesCount = 'balances' in data ? data.balances.length : undefined
+        this.logger.info('balanceUpdate event received', {
+          balances: balancesCount,
+          eventTime: data.eventTime,
+          eventType: data.eventType,
+        })
+        void this.queueHandler.postMessage(QueueName.BINANCE_BALANCE_UPDATED, {})
+      }
+      else {
+        this.logger.info('user data event received', {
+          eventTime: data.eventTime,
+          eventType: data.eventType,
+        })
+      }
+    })
   }
 
   private startListener = async () => {
-    const [BINANCE_API_KEY, BINANCE_API_SECRET, BINANCE_API_URL] = await Promise.all([
-      this.secretManager.getSecret('BINANCE_API_KEY'),
-      this.secretManager.getSecret('BINANCE_API_SECRET'),
-      this.secretManager.getSecret('BINANCE_API_URL'),
+    const {
+      BINANCE_API_KEY,
+      BINANCE_API_SECRET,
+      BINANCE_API_URL,
+    } = await this.secretManager.getSecrets([
+      'BINANCE_API_KEY',
+      'BINANCE_API_SECRET',
+      'BINANCE_API_URL',
     ])
 
     if (!BINANCE_API_KEY || !BINANCE_API_SECRET || !BINANCE_API_URL) {
@@ -76,46 +88,55 @@ export class BinanceListener {
       wsUrl: websocketBinanceUrl,
     })
 
-    this.logger.info('[Binance WS]: Websocket client initialized', { baseUrl: BINANCE_API_URL, wsUrl: websocketBinanceUrl })
+    this.logger.info('Websocket client initialized', { baseUrl: BINANCE_API_URL, wsUrl: websocketBinanceUrl })
 
     // raw messages: keep lightweight logging only
     this.wsClient.on('message', (data) => {
-      if (Array.isArray(data)) {
-        this.logger.info('[Binance WS]: raw message received (array)', { items: data.length })
-      }
-      else {
-        this.logger.info('[Binance WS]: raw message received', { streamName: data.streamName, wsKey: data.wsKey })
-      }
-      this.queueHandler.postMessage(QueueName.BINANCE_BALANCE_UPDATED, {})
+      const correlationSeed = typeof data === 'object'
+        && data !== null
+        && 'eventTime' in data
+        && typeof (data as { eventTime?: unknown }).eventTime === 'number'
+        ? String((data as { eventTime: number }).eventTime)
+        : undefined
+      const correlationId = generateCorrelationId(correlationSeed)
+      runWithCorrelationId(correlationId, () => {
+        if (Array.isArray(data)) {
+          this.logger.info('raw message received (array)', { items: data.length })
+        }
+        else {
+          this.logger.info('raw message received', { streamName: data?.streamName, wsKey: data?.wsKey })
+        }
+        void this.queueHandler.postMessage(QueueName.BINANCE_BALANCE_UPDATED, {})
+      })
     })
 
     // connection lifecycle notifications
     this.wsClient.on('open', (data) => {
-      this.logger.info('[Binance WS]: connection opened', { wsKey: data.wsKey })
+      this.logger.info('connection opened', { wsKey: data.wsKey })
       // Trigger an initial balance sync on connect
-      this.queueHandler.postMessage(QueueName.BINANCE_BALANCE_UPDATED, {})
+      void this.queueHandler.postMessage(QueueName.BINANCE_BALANCE_UPDATED, {})
     })
     this.wsClient.on('reconnecting', (data) => {
-      this.logger.warn('[Binance WS]: reconnecting', { wsKey: data.wsKey })
+      this.logger.warn('reconnecting', { wsKey: data.wsKey })
     })
     this.wsClient.on('reconnected', (data) => {
-      this.logger.info('[Binance WS]: reconnected', { wsKey: data.wsKey })
+      this.logger.info('reconnected', { wsKey: data.wsKey })
       // Trigger a balance sync after reconnection
-      this.queueHandler.postMessage(QueueName.BINANCE_BALANCE_UPDATED, {})
+      void this.queueHandler.postMessage(QueueName.BINANCE_BALANCE_UPDATED, {})
     })
     this.wsClient.on('close', (data) => {
-      this.logger.warn('[Binance WS]: connection closed', { wsKey: data.wsKey })
+      this.logger.warn('connection closed', { wsKey: data.wsKey })
     })
     this.wsClient.on('response', ({ isWSAPIResponse, wsKey }) => {
-      this.logger.info('[Binance WS]: ws api response', { isWSAPIResponse, wsKey })
+      this.logger.info('ws api response', { isWSAPIResponse, wsKey })
     })
     this.wsClient.on('exception', (data) => {
-      this.logger.error('[Binance WS]: websocket exception', data)
+      this.logger.error('websocket exception', data)
     })
 
     // formatted user data events
     this.wsClient.on('formattedUserDataMessage', (data: WsUserDataEvents) => {
-      this.logger.info('[Binance WS]: formatted user data', {
+      this.logger.info('formatted user data', {
         eventTime: data.eventTime,
         eventType: data.eventType,
       })
@@ -124,10 +145,10 @@ export class BinanceListener {
 
     const connected = await this.wsClient.subscribeSpotUserDataStream()
     if (connected) {
-      this.logger.info('[Binance WS]: Subscribed to spot user data stream', { wsKey: connected.wsKey })
+      this.logger.info('Subscribed to spot user data stream', { wsKey: connected.wsKey })
     }
     else {
-      this.logger.info('[Binance WS]: Subscribed to spot user data stream')
+      this.logger.info('Subscribed to spot user data stream')
     }
   }
 

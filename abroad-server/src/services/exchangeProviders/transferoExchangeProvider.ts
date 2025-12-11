@@ -3,8 +3,10 @@ import { BlockchainNetwork, CryptoCurrency, TargetCurrency } from '@prisma/clien
 import axios from 'axios'
 import { inject, injectable } from 'inversify'
 
+import { ILogger } from '../../interfaces'
 import { IExchangeProvider } from '../../interfaces/IExchangeProvider'
 import { ISecretManager } from '../../interfaces/ISecretManager'
+import { createScopedLogger, ScopedLogger } from '../../shared/logging'
 import { TYPES } from '../../types'
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -33,15 +35,21 @@ export class TransferoExchangeProvider implements IExchangeProvider {
   readonly exchangePercentageFee = 0.001
 
   private cachedToken?: { exp: number, value: string }
+  private readonly logger: ScopedLogger
 
   constructor(
     @inject(TYPES.ISecretManager) private readonly secretManager: ISecretManager,
-  ) { }
+    @inject(TYPES.ILogger) baseLogger: ILogger,
+  ) {
+    this.logger = createScopedLogger(baseLogger, { scope: 'TransferoExchangeProvider' })
+  }
 
   async createMarketOrder({ sourceAmount, sourceCurrency, targetCurrency }: { sourceAmount: number, sourceCurrency: CryptoCurrency, targetCurrency: TargetCurrency }): Promise<{ success: boolean }> {
     try {
       const token = await this.getAccessToken()
-      const apiUrl = await this.secretManager.getSecret('TRANSFERO_BASE_URL')
+      const { TRANSFERO_BASE_URL: apiUrl } = await this.secretManager.getSecrets([
+        'TRANSFERO_BASE_URL',
+      ])
 
       // create quote:
       const { data } = await axios.post(
@@ -71,7 +79,7 @@ export class TransferoExchangeProvider implements IExchangeProvider {
       return { success: acceptQuoteData.success }
     }
     catch (error) {
-      console.error('Error creating market order:', error)
+      this.logger.error('Error creating market order', error)
       return { success: false }
     }
   }
@@ -87,7 +95,9 @@ export class TransferoExchangeProvider implements IExchangeProvider {
       throw new Error(`Unsupported blockchain: ${blockchain}`)
     }
 
-    const transferoStellarWallet = await this.secretManager.getSecret('TRANSFERO_STELLAR_WALLET')
+    const { TRANSFERO_STELLAR_WALLET: transferoStellarWallet } = await this.secretManager.getSecrets([
+      'TRANSFERO_STELLAR_WALLET',
+    ])
 
     return {
       address: transferoStellarWallet,
@@ -107,7 +117,9 @@ export class TransferoExchangeProvider implements IExchangeProvider {
   }) => {
     try {
       const token = await this.getAccessToken()
-      const apiUrl = await this.secretManager.getSecret('TRANSFERO_BASE_URL')
+      const { TRANSFERO_BASE_URL: apiUrl } = await this.secretManager.getSecrets([
+        'TRANSFERO_BASE_URL',
+      ])
 
       const { data } = await axios.post(
         `${apiUrl}/api/quote/v2.0/requestquote`,
@@ -125,12 +137,12 @@ export class TransferoExchangeProvider implements IExchangeProvider {
       if (!price || Number.isNaN(price))
         throw new Error('Invalid price returned from Transfero')
 
-      console.log(`Exchange rate from ${sourceCurrency} ${sourceAmount} to ${targetCurrency} ${targetAmount}: ${price}`)
+      this.logger.info('Fetched exchange rate', { price, sourceAmount, sourceCurrency, targetAmount, targetCurrency })
 
       return sourceAmount ? (sourceAmount / price) : targetAmount ? (price / targetAmount) : 0
     }
     catch (error) {
-      console.error('Error getting exchange rate:', error)
+      this.logger.error('Error getting exchange rate', error)
       throw new Error(`Failed to get exchange rate: ${error instanceof Error ? error.message : 'Unknown error'}`)
     }
   }
@@ -142,18 +154,23 @@ export class TransferoExchangeProvider implements IExchangeProvider {
       return this.cachedToken.value
     }
 
-    const apiUrl = await this.secretManager.getSecret('TRANSFERO_BASE_URL')
-    const clientId = await this.secretManager.getSecret('TRANSFERO_CLIENT_ID')
-    const clientSecret = await this.secretManager.getSecret(
+    const {
+      TRANSFERO_BASE_URL,
+      TRANSFERO_CLIENT_ID,
+      TRANSFERO_CLIENT_SCOPE,
+      TRANSFERO_CLIENT_SECRET,
+    } = await this.secretManager.getSecrets([
+      'TRANSFERO_BASE_URL',
+      'TRANSFERO_CLIENT_ID',
       'TRANSFERO_CLIENT_SECRET',
-    )
-    const clientScope = await this.secretManager.getSecret('TRANSFERO_CLIENT_SCOPE')
+      'TRANSFERO_CLIENT_SCOPE',
+    ])
 
-    const { data } = await axios.post(`${apiUrl}/auth/token`, {
-      client_id: clientId,
-      client_secret: clientSecret,
+    const { data } = await axios.post(`${TRANSFERO_BASE_URL}/auth/token`, {
+      client_id: TRANSFERO_CLIENT_ID,
+      client_secret: TRANSFERO_CLIENT_SECRET,
       grant_type: 'client_credentials',
-      scope: clientScope,
+      scope: TRANSFERO_CLIENT_SCOPE,
     }, {
       headers: { 'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
     })

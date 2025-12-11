@@ -3,6 +3,7 @@ import axios from 'axios'
 
 import { ISecretManager, Secret } from '../../../interfaces/ISecretManager'
 import { TransferoExchangeProvider } from '../../../services/exchangeProviders/transferoExchangeProvider'
+import { createMockLogger } from '../../setup/mockFactories'
 
 jest.mock('axios')
 
@@ -14,8 +15,11 @@ class SecretManagerStub implements ISecretManager {
   }
 
   async getSecrets<T extends readonly Secret[]>(secretNames: T): Promise<Record<T[number], string>> {
-    void secretNames
-    throw new Error('getSecrets not implemented for SecretManagerStub')
+    const result: Record<string, string> = {}
+    secretNames.forEach((name) => {
+      result[name] = this.secrets[name] ?? ''
+    })
+    return result as Record<T[number], string>
   }
 }
 
@@ -35,7 +39,7 @@ describe('TransferoExchangeProvider', () => {
   })
 
   const createProvider = (secrets: Partial<Record<Secret, string>> = baseSecrets) =>
-    new TransferoExchangeProvider(new SecretManagerStub(secrets))
+    new TransferoExchangeProvider(new SecretManagerStub(secrets), createMockLogger())
 
   describe('getExchangeAddress', () => {
     it('returns the configured stellar wallet', async () => {

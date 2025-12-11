@@ -2,6 +2,7 @@
 import { injectable } from 'inversify'
 
 import { ILogger } from '../interfaces'
+import { getCorrelationId } from '../shared/requestContext'
 
 // Tiny helper to safely stringify (handles Errors & circular refs)
 const safeStringify = (obj: unknown) => {
@@ -26,6 +27,14 @@ const safeStringify = (obj: unknown) => {
   )
 }
 
+type LogEntry = {
+  correlationId?: string
+  message: unknown
+  params?: unknown[]
+  severity: Sev
+  timestamp: string
+}
+
 type Sev = 'CRITICAL' | 'DEBUG' | 'ERROR' | 'INFO' | 'WARNING'
 
 @injectable()
@@ -45,10 +54,12 @@ export class ConsoleLogger implements ILogger {
 
 function log(severity: Sev, message: unknown, params: unknown[]) {
   // Build a structured log entry. One JSON object == one log line.
-  const entry = {
+  const entry: LogEntry = {
+    correlationId: getCorrelationId(),
     message, // Cloud Logging shows this as the main text
     params: params.length ? params : undefined,
     severity, // Cloud Logging reads this
+    timestamp: new Date().toISOString(),
   }
 
   const line = safeStringify(entry) // serializes newlines as "\n"

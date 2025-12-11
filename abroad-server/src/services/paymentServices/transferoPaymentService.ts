@@ -1,6 +1,6 @@
 import { TargetCurrency } from '@prisma/client'
 import axios from 'axios'
-import { inject } from 'inversify'
+import { inject, injectable } from 'inversify'
 
 import { ILogger } from '../../interfaces'
 import { IDatabaseClientProvider } from '../../interfaces/IDatabaseClientProvider'
@@ -39,6 +39,7 @@ interface TransferoBalanceResponse {
   }
 }
 
+@injectable()
 export class TransferoPaymentService implements IPaymentService {
   banks = []
   currency: TargetCurrency = TargetCurrency.BRL

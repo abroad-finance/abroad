@@ -1,5 +1,6 @@
 // src/types.ts
 const typeKeys = [
+  'AppConfig',
   'BinanceBalanceUpdatedController',
   'IDatabaseClientProvider',
   'IExchangeProvider',

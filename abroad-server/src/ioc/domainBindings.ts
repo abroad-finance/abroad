@@ -14,6 +14,7 @@ import { StellarWalletHandler } from '../services/StellarWalletHandler'
 import { TransactionAcceptanceService } from '../services/TransactionAcceptanceService'
 import { TransactionStatusService } from '../services/TransactionStatusService'
 import { WalletHandlerFactory } from '../services/WalletHandlerFactory'
+import { PersonaWebhookService } from '../services/webhooks/PersonaWebhookService'
 import { TYPES } from '../types'
 import { QuoteUseCase } from '../useCases/quoteUseCase'
 import { BindingRegistration, registerBindings } from './bindingSupport'
@@ -34,6 +35,7 @@ const domainBindings: ReadonlyArray<BindingRegistration<unknown>> = [
   { identifier: TYPES.IExchangeProvider, implementation: TransferoExchangeProvider, name: 'transfero' },
   { identifier: TYPES.TransactionAcceptanceService, implementation: TransactionAcceptanceService },
   { identifier: TYPES.TransactionStatusService, implementation: TransactionStatusService },
+  { bindSelf: true, identifier: PersonaWebhookService, implementation: PersonaWebhookService },
 ] as const
 
 export function bindDomainServices(container: Container): void {

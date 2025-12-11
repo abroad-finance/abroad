@@ -44,4 +44,23 @@ describe('CachedSecretManager', () => {
     })
     expect(getSecretMock).toHaveBeenCalledTimes(2)
   })
+
+  it('refreshes cached value after TTL expires', async () => {
+    jest.useFakeTimers()
+    getSecretMock
+      .mockResolvedValueOnce('postgres://cached-url')
+      .mockResolvedValueOnce('postgres://refreshed-url')
+
+    const manager = new CachedSecretManager(10)
+    const first = await manager.getSecret(Secrets.DATABASE_URL)
+
+    jest.advanceTimersByTime(15)
+    const second = await manager.getSecret(Secrets.DATABASE_URL)
+
+    expect(first).toBe('postgres://cached-url')
+    expect(second).toBe('postgres://refreshed-url')
+    expect(getSecretMock).toHaveBeenCalledTimes(2)
+
+    jest.useRealTimers()
+  })
 })

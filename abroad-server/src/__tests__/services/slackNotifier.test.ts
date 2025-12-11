@@ -22,7 +22,7 @@ describe('SlackNotifier', () => {
 
   it('posts to slack when a webhook is configured', async () => {
     (axios.post as jest.Mock).mockResolvedValueOnce(undefined)
-    const notifier = new SlackNotifier(secretManager, logger)
+    const notifier = new SlackNotifier(secretManager, logger, RuntimeConfig)
 
     await notifier.sendMessage('hello')
 
@@ -36,7 +36,7 @@ describe('SlackNotifier', () => {
 
   it('returns early when webhook secret is missing', async () => {
     secretManager.getSecret = jest.fn(async () => '')
-    const notifier = new SlackNotifier(secretManager, logger)
+    const notifier = new SlackNotifier(secretManager, logger, RuntimeConfig)
 
     await notifier.sendMessage('no-op')
 
@@ -45,7 +45,7 @@ describe('SlackNotifier', () => {
 
   it('logs a warning when the post fails', async () => {
     ;(axios.post as jest.Mock).mockRejectedValueOnce(new Error('boom'))
-    const notifier = new SlackNotifier(secretManager, logger)
+    const notifier = new SlackNotifier(secretManager, logger, RuntimeConfig)
 
     await notifier.sendMessage('warn')
 

@@ -1,6 +1,9 @@
 import axios, { AxiosInstance } from 'axios'
 
+import type { ILogger } from '../interfaces'
 import type { ISecretManager } from '../interfaces/ISecretManager'
+
+import { ConsoleLogger } from './consoleLogger'
 
 /**
  * Normalized subset of personal data extracted from a Persona inquiry.
@@ -53,6 +56,7 @@ export class PersonaInquiryDetailsService {
     private readonly secretManager: ISecretManager,
     /** Optional flags for local debugging, etc. */
     private readonly opts: { debug?: boolean } = {},
+    private readonly logger: ILogger = new ConsoleLogger(),
   ) {}
 
   /**
@@ -93,7 +97,7 @@ export class PersonaInquiryDetailsService {
       return details
     }
     catch (error) {
-      console.error('Failed to fetch Persona inquiry details', { error, inquiryId: id })
+      this.logger.error('Failed to fetch Persona inquiry details', { error, inquiryId: id })
       this.cache.set(id, null)
       return null
     }
@@ -145,7 +149,7 @@ export class PersonaInquiryDetailsService {
   /** Conditional debug logger (opt-in via constructor). */
   private debug(...args: unknown[]) {
     if (this.opts.debug) {
-      console.debug('[PersonaInquiryDetailsService]', ...args)
+      this.logger.info('[PersonaInquiryDetailsService]', ...args)
     }
   }
 

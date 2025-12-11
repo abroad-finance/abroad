@@ -4,6 +4,7 @@ import axios from 'axios'
 import type { ISecretManager } from '../../interfaces/ISecretManager'
 
 import { MoviiPaymentService } from '../../services/paymentServices/movii'
+import { createMockLogger } from '../setup/mockFactories'
 
 jest.mock('axios')
 
@@ -12,21 +13,28 @@ const mockedAxios = axios as unknown as jest.MockedFunction<typeof axios> & {
   post: jest.Mock
 }
 
-const buildSecretManager = (): ISecretManager => ({
-  getSecret: jest.fn(async (name: string) => {
-    const secrets: Record<string, string> = {
-      MOVII_API_KEY: 'api-key',
-      MOVII_BALANCE_ACCOUNT_ID: 'account-1',
-      MOVII_BALANCE_API_KEY: 'balance-key',
-      MOVII_BASE_URL: 'https://movii.example.com',
-      MOVII_CLIENT_ID: 'client-id',
-      MOVII_CLIENT_SECRET: 'client-secret',
-      MOVII_SIGNER_HANDLER: '$handler',
-    }
-    return secrets[name] ?? ''
-  }),
-  getSecrets: jest.fn(),
-})
+const buildSecretManager = (): ISecretManager => {
+  const secrets: Record<string, string> = {
+    MOVII_API_KEY: 'api-key',
+    MOVII_BALANCE_ACCOUNT_ID: 'account-1',
+    MOVII_BALANCE_API_KEY: 'balance-key',
+    MOVII_BASE_URL: 'https://movii.example.com',
+    MOVII_CLIENT_ID: 'client-id',
+    MOVII_CLIENT_SECRET: 'client-secret',
+    MOVII_SIGNER_HANDLER: '$handler',
+  }
+
+  return {
+    getSecret: jest.fn(async (name: string) => secrets[name] ?? ''),
+    getSecrets: jest.fn(async (names: readonly string[]) => {
+      const result: Record<string, string> = {}
+      names.forEach((name) => {
+        result[name] = secrets[name] ?? ''
+      })
+      return result as Record<typeof names[number], string>
+    }),
+  }
+}
 
 describe('MoviiPaymentService', () => {
   beforeEach(() => {
@@ -38,7 +46,7 @@ describe('MoviiPaymentService', () => {
   })
 
   it('starts onboarding and handles provider errors', async () => {
-    const service = new MoviiPaymentService(buildSecretManager())
+    const service = new MoviiPaymentService(buildSecretManager(), createMockLogger())
     jest.spyOn(service as unknown as { getToken: () => Promise<string> }, 'getToken').mockResolvedValue('token-123')
 
     mockedAxios.post.mockResolvedValueOnce({ data: { error: { code: 0 } } })
@@ -75,7 +83,7 @@ describe('MoviiPaymentService', () => {
   })
 
   it('reads liquidity and falls back to zero on failure', async () => {
-    const service = new MoviiPaymentService(buildSecretManager())
+    const service = new MoviiPaymentService(buildSecretManager(), createMockLogger())
     mockedAxios.get.mockResolvedValueOnce({ data: { body: [{ saldo: '1000.50' }], statusCode: 200 } })
 
     const liquidity = await service.getLiquidity()
@@ -87,7 +95,7 @@ describe('MoviiPaymentService', () => {
   })
 
   it('aborts sendPayment when signer handle is missing', async () => {
-    const service = new MoviiPaymentService(buildSecretManager())
+    const service = new MoviiPaymentService(buildSecretManager(), createMockLogger())
     jest.spyOn(service as unknown as { getToken: () => Promise<string> }, 'getToken').mockResolvedValue('token-123')
     jest.spyOn(service as unknown as { getSignerHandle: (wallet: string, bankCode: string) => Promise<null | string> }, 'getSignerHandle')
       .mockResolvedValueOnce(null)
@@ -97,7 +105,7 @@ describe('MoviiPaymentService', () => {
   })
 
   it('sends payments and waits for transaction finalization', async () => {
-    const service = new MoviiPaymentService(buildSecretManager())
+    const service = new MoviiPaymentService(buildSecretManager(), createMockLogger())
     jest.spyOn(service as unknown as { getSignerHandle: (wallet: string, bankCode: string) => Promise<null | string> }, 'getSignerHandle')
       .mockResolvedValue('$handle')
     jest.spyOn(service as unknown as { getToken: () => Promise<string> }, 'getToken').mockResolvedValue('token-123')
@@ -126,7 +134,7 @@ describe('MoviiPaymentService', () => {
   })
 
   it('returns failure when provider rejects the transfer', async () => {
-    const service = new MoviiPaymentService(buildSecretManager())
+    const service = new MoviiPaymentService(buildSecretManager(), createMockLogger())
     jest.spyOn(service as unknown as { getSignerHandle: (wallet: string, bankCode: string) => Promise<null | string> }, 'getSignerHandle')
       .mockResolvedValue('$handle')
     jest.spyOn(service as unknown as { getToken: () => Promise<string> }, 'getToken').mockResolvedValue('token-123')
@@ -137,7 +145,7 @@ describe('MoviiPaymentService', () => {
   })
 
   it('handles downstream errors gracefully and logs rejected transactions', async () => {
-    const service = new MoviiPaymentService(buildSecretManager())
+    const service = new MoviiPaymentService(buildSecretManager(), createMockLogger())
     jest.spyOn(service as unknown as { getSignerHandle: (wallet: string, bankCode: string) => Promise<null | string> }, 'getSignerHandle')
       .mockResolvedValue('$handle')
     jest.spyOn(service as unknown as { getToken: () => Promise<string> }, 'getToken').mockResolvedValue('token-123')
@@ -154,7 +162,7 @@ describe('MoviiPaymentService', () => {
   })
 
   it('verifies accounts and propagates fetch failures', async () => {
-    const service = new MoviiPaymentService(buildSecretManager())
+    const service = new MoviiPaymentService(buildSecretManager(), createMockLogger())
     jest.spyOn(service as unknown as { getToken: () => Promise<string> }, 'getToken').mockResolvedValue('token-123')
     ;(global.fetch as jest.Mock).mockResolvedValueOnce({
       json: async () => ({
@@ -182,7 +190,7 @@ describe('MoviiPaymentService', () => {
 
   it('polls transaction status until completion', async () => {
     jest.useFakeTimers()
-    const service = new MoviiPaymentService(buildSecretManager())
+    const service = new MoviiPaymentService(buildSecretManager(), createMockLogger())
     jest.spyOn(service as unknown as { getToken: () => Promise<string> }, 'getToken').mockResolvedValue('token-123')
     mockedAxios.get
       .mockResolvedValueOnce({ data: { entities: [{ status: 'PENDING' }] } })
@@ -197,7 +205,7 @@ describe('MoviiPaymentService', () => {
   })
 
   it('throws when token retrieval fails and when polling times out', async () => {
-    const service = new MoviiPaymentService(buildSecretManager())
+    const service = new MoviiPaymentService(buildSecretManager(), createMockLogger())
     mockedAxios.post.mockRejectedValueOnce(new Error('auth down'))
     await expect((service as unknown as { getToken: () => Promise<string> }).getToken()).rejects.toThrow('auth down')
 
@@ -215,7 +223,7 @@ describe('MoviiPaymentService', () => {
   })
 
   it('retrieves an auth token successfully', async () => {
-    const service = new MoviiPaymentService(buildSecretManager())
+    const service = new MoviiPaymentService(buildSecretManager(), createMockLogger())
     mockedAxios.post.mockResolvedValueOnce({ data: { access_token: 'token-success' } })
 
     const token = await (service as unknown as { getToken: () => Promise<string> }).getToken()

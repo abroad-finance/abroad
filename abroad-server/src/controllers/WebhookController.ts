@@ -28,7 +28,6 @@ type WebhookResponse = {
 
 @Route('webhook')
 export class WebhookController extends Controller {
-  private readonly personaWebhookService: PersonaWebhookService
   constructor(
     @inject(TYPES.IDatabaseClientProvider)
     private dbProvider: IDatabaseClientProvider,
@@ -36,9 +35,10 @@ export class WebhookController extends Controller {
     private logger: ILogger,
     @inject(TYPES.IQueueHandler)
     private queueHandler: IQueueHandler,
+    @inject(PersonaWebhookService)
+    private readonly personaWebhookService: PersonaWebhookService,
   ) {
     super()
-    this.personaWebhookService = new PersonaWebhookService(this.dbProvider, this.logger, this.queueHandler)
   }
 
   /**

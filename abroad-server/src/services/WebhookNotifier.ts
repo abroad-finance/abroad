@@ -1,7 +1,7 @@
 import axios from 'axios'
 import { inject, injectable } from 'inversify'
 
-import { RuntimeConfig } from '../config/runtime'
+import { RuntimeConfiguration } from '../config/runtime'
 import { ILogger } from '../interfaces'
 import { ISecretManager } from '../interfaces/ISecretManager'
 import { IWebhookNotifier, WebhookEvent } from '../interfaces/IWebhookNotifier'
@@ -12,6 +12,7 @@ export class WebhookNotifier implements IWebhookNotifier {
   public constructor(
     @inject(TYPES.ILogger) private logger: ILogger,
     @inject(TYPES.ISecretManager) private secretManager: ISecretManager,
+    @inject(TYPES.AppConfig) private readonly config: RuntimeConfiguration,
   ) { }
 
   async notifyWebhook(
@@ -30,7 +31,7 @@ export class WebhookNotifier implements IWebhookNotifier {
       const headers = secret ? { 'X-Abroad-Webhook-Secret': secret } : undefined
       await axios.post(url, payload, {
         headers,
-        timeout: RuntimeConfig.axiosTimeoutMs,
+        timeout: this.config.axiosTimeoutMs,
       })
     }
     catch (error) {

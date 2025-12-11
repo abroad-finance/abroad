@@ -5,6 +5,7 @@ import type { IDatabaseClientProvider } from '../../interfaces/IDatabaseClientPr
 
 import { WebhookController } from '../../controllers/WebhookController'
 import { QueueName } from '../../interfaces'
+import { PersonaWebhookService } from '../../services/webhooks/PersonaWebhookService'
 import {
   createMockLogger,
   createMockQueueHandler,
@@ -38,6 +39,7 @@ describe('WebhookController webhooks', () => {
   let dbProvider: IDatabaseClientProvider
   let queueHandler: MockQueueHandler
   let logger: MockLogger
+  let personaWebhookService: PersonaWebhookService
 
   const buildRequest = (rawBody?: string) => (
     {
@@ -58,12 +60,13 @@ describe('WebhookController webhooks', () => {
     } as unknown as IDatabaseClientProvider
     queueHandler = createMockQueueHandler()
     logger = createMockLogger()
+    personaWebhookService = new PersonaWebhookService(dbProvider, logger, queueHandler)
   })
 
   describe('Persona webhook', () => {
     it('returns not found when no matching inquiry exists', async () => {
       prisma.partnerUserKyc.findFirst.mockResolvedValue(null)
-      const controller = new WebhookController(dbProvider, logger, queueHandler)
+      const controller = new WebhookController(dbProvider, logger, queueHandler, personaWebhookService)
       const badRequest = createResponder<400, { message: string, success: false }>()
       const notFound = createResponder<404, { message: string, success: false }>()
       const serverError = createResponder<500, { message: string, success: false }>()
@@ -88,7 +91,7 @@ describe('WebhookController webhooks', () => {
         partnerUserId: 'user-1',
         status: KycStatus.APPROVED,
       })
-      const controller = new WebhookController(dbProvider, logger, queueHandler)
+      const controller = new WebhookController(dbProvider, logger, queueHandler, personaWebhookService)
       const setStatus = jest.spyOn(controller, 'setStatus')
       const response = await controller.handlePersonaWebhook(
         buildPersonaPayload('approved'),
@@ -111,7 +114,7 @@ describe('WebhookController webhooks', () => {
         partnerUserId: 'user-1',
         status: KycStatus.PENDING,
       })
-      const controller = new WebhookController(dbProvider, logger, queueHandler)
+      const controller = new WebhookController(dbProvider, logger, queueHandler, personaWebhookService)
       const setStatus = jest.spyOn(controller, 'setStatus')
       const payload = buildPersonaPayload('declined')
 
@@ -147,7 +150,7 @@ describe('WebhookController webhooks', () => {
 
   describe('Transfero webhook', () => {
     it('rejects invalid payloads', async () => {
-      const controller = new WebhookController(dbProvider, logger, queueHandler)
+      const controller = new WebhookController(dbProvider, logger, queueHandler, personaWebhookService)
       const badRequest = createResponder<400, { message: string, success: false }>()
 
       const response = await controller.handleTransferoWebhook(
@@ -163,7 +166,7 @@ describe('WebhookController webhooks', () => {
     })
 
     it('publishes normalized payment status updates', async () => {
-      const controller = new WebhookController(dbProvider, logger, queueHandler)
+      const controller = new WebhookController(dbProvider, logger, queueHandler, personaWebhookService)
       const serverError = createResponder<500, { message: string, success: false }>()
       const setStatus = jest.spyOn(controller, 'setStatus')
 

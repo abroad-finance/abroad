@@ -2,7 +2,7 @@
 import axios from 'axios'
 import { inject, injectable } from 'inversify'
 
-import { RuntimeConfig } from '../config/runtime'
+import { RuntimeConfiguration } from '../config/runtime'
 import { ILogger, ISlackNotifier } from '../interfaces'
 import { ISecretManager } from '../interfaces/ISecretManager'
 import { TYPES } from '../types'
@@ -12,6 +12,7 @@ export class SlackNotifier implements ISlackNotifier {
   constructor(
     @inject(TYPES.ISecretManager) private secretManager: ISecretManager,
     @inject(TYPES.ILogger) private logger: ILogger,
+    @inject(TYPES.AppConfig) private readonly config: RuntimeConfiguration,
   ) { }
 
   async sendMessage(message: string): Promise<void> {
@@ -23,7 +24,7 @@ export class SlackNotifier implements ISlackNotifier {
         return
       }
 
-      await axios.post(webhookUrl, { text: message }, { timeout: RuntimeConfig.axiosTimeoutMs })
+      await axios.post(webhookUrl, { text: message }, { timeout: this.config.axiosTimeoutMs })
       this.logger.info('Message sent to Slack', { length: message.length })
     }
     catch (error) {

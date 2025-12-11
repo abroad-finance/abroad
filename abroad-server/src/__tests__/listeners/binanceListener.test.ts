@@ -62,10 +62,11 @@ describe('BinanceListener', () => {
     jest.clearAllMocks()
     handlerMap = {}
     ;(secretManager.getSecret as jest.Mock).mockReset()
-    ;(secretManager.getSecret as jest.Mock).mockResolvedValueOnce('api-key')
-    ;(secretManager.getSecret as jest.Mock).mockResolvedValueOnce('api-secret')
-    ;(secretManager.getSecret as jest.Mock).mockResolvedValueOnce('https://api.binance.com')
-    ;(secretManager.getSecrets as jest.Mock).mockResolvedValue({})
+    ;(secretManager.getSecrets as jest.Mock).mockResolvedValue({
+      BINANCE_API_KEY: 'api-key',
+      BINANCE_API_SECRET: 'api-secret',
+      BINANCE_API_URL: 'https://api.binance.com',
+    })
   })
 
   afterEach(() => {
@@ -111,10 +112,11 @@ describe('BinanceListener', () => {
   })
 
   it('throws when secrets are missing', async () => {
-    ;(secretManager.getSecret as jest.Mock).mockReset()
-    ;(secretManager.getSecret as jest.Mock).mockResolvedValueOnce('')
-    ;(secretManager.getSecret as jest.Mock).mockResolvedValueOnce('')
-    ;(secretManager.getSecret as jest.Mock).mockResolvedValueOnce('')
+    ;(secretManager.getSecrets as jest.Mock).mockResolvedValue({
+      BINANCE_API_KEY: '',
+      BINANCE_API_SECRET: '',
+      BINANCE_API_URL: '',
+    })
     const listener = new BinanceListener(secretManager, queueHandler, logger)
     await expect(listener.start()).rejects.toThrow('[Binance WS]: Missing API configuration')
   })
@@ -140,7 +142,7 @@ describe('BinanceListener', () => {
     await listener.start()
 
     expect(subscribeSpy).toHaveBeenCalled()
-    expect(logger.info).toHaveBeenCalledWith('[Binance WS]: Subscribed to spot user data stream')
+    expect(logger.info).toHaveBeenCalledWith('[BinanceListener] Subscribed to spot user data stream')
   })
 
   it('converts arbitrary urls to websocket equivalents with suffix', () => {
@@ -168,7 +170,7 @@ describe('BinanceListener', () => {
     startSpy.mockRejectedValueOnce(failure)
 
     await expect(listener.start()).rejects.toThrow(failure)
-    expect(logger.error).toHaveBeenCalledWith('[Binance WS]: Failed to start listener', failure)
+    expect(logger.error).toHaveBeenCalledWith('[BinanceListener] Failed to start listener', failure)
   })
 
   it('stops safely when no websocket client has been started', async () => {

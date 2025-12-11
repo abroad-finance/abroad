@@ -4,25 +4,32 @@ import axios from 'axios'
 import type { ISecretManager } from '../../interfaces/ISecretManager'
 
 import { NequiPaymentService } from '../../services/paymentServices/nequi'
+import { createMockLogger } from '../setup/mockFactories'
 
 jest.mock('axios')
 
 const mockedAxios = axios as unknown as jest.MockedFunction<typeof axios>
 
-const buildSecrets = (): ISecretManager => ({
-  getSecret: jest.fn(async (name: string) => {
-    const defaults: Record<string, string> = {
-      ACCESS_KEY_NEQUI: 'access',
-      API_KEY_NEQUI: 'api-key',
-      DISPERSION_CODE_NEQUI: 'code',
-      SECRET_KEY_NEQUI: 'secret',
-      URL_NEQUI: 'https://nequi.example.com',
-      URL_NEQUI_AUTH: 'https://nequi.example.com/auth',
-    }
-    return defaults[name] ?? ''
-  }),
-  getSecrets: jest.fn(),
-})
+const buildSecrets = (): ISecretManager => {
+  const defaults: Record<string, string> = {
+    ACCESS_KEY_NEQUI: 'access',
+    API_KEY_NEQUI: 'api-key',
+    DISPERSION_CODE_NEQUI: 'code',
+    SECRET_KEY_NEQUI: 'secret',
+    URL_NEQUI: 'https://nequi.example.com',
+    URL_NEQUI_AUTH: 'https://nequi.example.com/auth',
+  }
+  return {
+    getSecret: jest.fn(async (name: string) => defaults[name] ?? ''),
+    getSecrets: jest.fn(async (names: readonly string[]) => {
+      const result: Record<string, string> = {}
+      names.forEach((name) => {
+        result[name] = defaults[name] ?? ''
+      })
+      return result as Record<typeof names[number], string>
+    }),
+  }
+}
 
 describe('NequiPaymentService', () => {
   beforeEach(() => {
@@ -32,7 +39,7 @@ describe('NequiPaymentService', () => {
 
   it('caches auth tokens and rejects failed auth responses', async () => {
     const secretManager = buildSecrets()
-    const service = new NequiPaymentService(secretManager)
+    const service = new NequiPaymentService(secretManager, createMockLogger())
     mockedAxios.mockResolvedValueOnce({
       data: { access_token: 'token-1', expires_in: 120 },
       status: 200,
@@ -47,7 +54,7 @@ describe('NequiPaymentService', () => {
     expect(second).toBe('token-1')
     expect(mockedAxios).toHaveBeenCalledTimes(1)
 
-    const freshService = new NequiPaymentService(secretManager)
+    const freshService = new NequiPaymentService(secretManager, createMockLogger())
     mockedAxios.mockResolvedValueOnce({ data: {}, status: 500 })
     await expect((freshService as unknown as { getAuthToken: () => Promise<string> }).getAuthToken())
       .rejects.toThrow('Nequi authentication failed')
@@ -55,7 +62,7 @@ describe('NequiPaymentService', () => {
 
   it('sends payments and interprets provider responses', async () => {
     const secretManager = buildSecrets()
-    const service = new NequiPaymentService(secretManager)
+    const service = new NequiPaymentService(secretManager, createMockLogger())
     const makeRequest = jest.spyOn(service as unknown as { makeRequest: (endpoint: string, body: Record<string, unknown>) => Promise<unknown> }, 'makeRequest')
 
     makeRequest.mockResolvedValueOnce({
@@ -104,7 +111,7 @@ describe('NequiPaymentService', () => {
 
   it('validates provider request responses', async () => {
     const secretManager = buildSecrets()
-    const service = new NequiPaymentService(secretManager)
+    const service = new NequiPaymentService(secretManager, createMockLogger())
     mockedAxios.mockResolvedValueOnce({
       data: { access_token: 'token-2', expires_in: 120 },
       status: 200,

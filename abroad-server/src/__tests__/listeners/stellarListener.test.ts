@@ -109,8 +109,13 @@ function createQueueHandler(postMessage?: IQueueHandler['postMessage']): IQueueH
 }
 
 function createSecretManager(accountId = 'account-id', horizonUrl = 'https://horizon', usdcIssuer = 'issuer'): ISecretManager {
+  const values: Record<string, string> = {
+    STELLAR_ACCOUNT_ID: accountId,
+    STELLAR_HORIZON_URL: horizonUrl,
+    STELLAR_USDC_ISSUER: usdcIssuer,
+  }
   const getSecrets: jest.MockedFunction<ISecretManager['getSecrets']> = jest.fn(async (secretNames) => {
-    const entries = secretNames.map(secretName => [secretName, ''] as const)
+    const entries = secretNames.map(secretName => [secretName, values[secretName] ?? ''] as const)
     return Object.fromEntries(entries) as Record<(typeof secretNames)[number], string>
   })
   return {

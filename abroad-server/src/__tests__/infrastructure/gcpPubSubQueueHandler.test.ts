@@ -1,5 +1,6 @@
 import type { ISecretManager } from '../../interfaces/ISecretManager'
 
+import { RuntimeConfig } from '../../config/runtime'
 import { GCPPubSubQueueHandler } from '../../infrastructure/gcpPubSubQueueHandler'
 import { QueueName } from '../../interfaces'
 import { createMockLogger } from '../setup/mockFactories'
@@ -56,7 +57,7 @@ describe('GCPPubSubQueueHandler', () => {
 
   it('publishes messages to a topic and creates it if missing', async () => {
     topicExistsMock.mockResolvedValueOnce([false])
-    const handler = new GCPPubSubQueueHandler(secretManager, logger)
+    const handler = new GCPPubSubQueueHandler(secretManager, logger, RuntimeConfig)
 
     await handler.postMessage(QueueName.PAYMENT_SENT, { ok: true })
 
@@ -67,7 +68,7 @@ describe('GCPPubSubQueueHandler', () => {
 
   it('subscribes to a topic and handles incoming messages', async () => {
     subscriptionExistsMock.mockResolvedValueOnce([false])
-    const handler = new GCPPubSubQueueHandler(secretManager, logger)
+    const handler = new GCPPubSubQueueHandler(secretManager, logger, RuntimeConfig)
     const callback = jest.fn()
 
     onMock.mockImplementation((event: string, listener: (msg: FakeMessage) => void) => {

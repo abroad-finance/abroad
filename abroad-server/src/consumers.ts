@@ -5,7 +5,9 @@ import { BinanceBalanceUpdatedController } from './controllers/queue/BinanceBala
 import { PaymentSentController } from './controllers/queue/PaymentSentController'
 import { PaymentStatusUpdatedController } from './controllers/queue/PaymentStatusUpdatedController'
 import { ReceivedCryptoTransactionController } from './controllers/queue/ReceivedCryptoTransactionController'
+import { ILogger } from './interfaces'
 import { iocContainer } from './ioc'
+import { createScopedLogger } from './shared/logging'
 import { TYPES } from './types'
 
 dotenv.config()
@@ -15,6 +17,8 @@ const health = {
   live: true,
   ready: false,
 }
+const baseLogger = iocContainer.get<ILogger>(TYPES.ILogger)
+const logger = createScopedLogger(baseLogger, { scope: 'consumers' })
 
 export const createHealthHandler = (state: { live: boolean, ready: boolean }) =>
   (req: http.IncomingMessage, res: http.ServerResponse) => {
@@ -91,7 +95,7 @@ if (require.main === module) {
   const port = Number(process.env.HEALTH_PORT || process.env.PORT || 3000)
   const server = http.createServer(createHealthHandler(health))
   server.listen(port, () => {
-    console.log(`[consumers] health server listening on :${port}`)
+    logger.info(`health server listening on :${port}`)
   })
 
   startConsumers()

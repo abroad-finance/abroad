@@ -2,10 +2,12 @@
 
 import { TargetCurrency } from '@prisma/client'
 import axios from 'axios'
-import { inject } from 'inversify'
+import { inject, injectable } from 'inversify'
 
+import { ILogger } from '../../interfaces'
 import { IPaymentService } from '../../interfaces/IPaymentService'
 import { ISecretManager } from '../../interfaces/ISecretManager'
+import { createScopedLogger, ScopedLogger } from '../../shared/logging'
 import { TYPES } from '../../types'
 
 const banks = [
@@ -31,6 +33,19 @@ const banks = [
   { bankCode: 1803, bankName: 'Banco Powwi', routerReference: '$powwi' },
 ]
 
+type MoviiAuthConfig = {
+  baseUrl: string
+  clientId: string
+  clientSecret: string
+}
+
+type MoviiCoreConfig = {
+  apiKey: string
+  baseUrl: string
+  signerHandler: string
+}
+
+@injectable()
 export class MoviiPaymentService implements IPaymentService {
   public readonly banks = banks
   public readonly currency = TargetCurrency.COP
@@ -45,15 +60,22 @@ export class MoviiPaymentService implements IPaymentService {
   public readonly MAX_USER_TRANSACTIONS_PER_DAY: number = 15
 
   public readonly percentageFee = 0.0
+  private readonly logger: ScopedLogger
+
   public constructor(
     @inject(TYPES.ISecretManager) private secretManager: ISecretManager,
-  ) { }
+    @inject(TYPES.ILogger) baseLogger: ILogger,
+  ) {
+    this.logger = createScopedLogger(baseLogger, { scope: 'MoviiPaymentService' })
+  }
 
   // Fetch current liquidity from Movii "traguatan" endpoint
   public getLiquidity: () => Promise<number> = async () => {
     try {
-      const apiKey = await this.secretManager.getSecret('MOVII_BALANCE_API_KEY')
-      const accountId = await this.secretManager.getSecret('MOVII_BALANCE_ACCOUNT_ID')
+      const { MOVII_BALANCE_ACCOUNT_ID: accountId, MOVII_BALANCE_API_KEY: apiKey } = await this.secretManager.getSecrets([
+        'MOVII_BALANCE_API_KEY',
+        'MOVII_BALANCE_ACCOUNT_ID',
+      ])
 
       const url = `https://apigw-data.movii.com.co/traguatan/?id=${encodeURIComponent(accountId)}`
       const headers = {
@@ -68,7 +90,7 @@ export class MoviiPaymentService implements IPaymentService {
       return Number.isFinite(saldo) ? saldo : 0
     }
     catch (err) {
-      console.error('Error fetching Movii liquidity:', err)
+      this.logger.error('Error fetching Movii liquidity', err)
       return 0
     }
   }
@@ -76,11 +98,7 @@ export class MoviiPaymentService implements IPaymentService {
   public onboardUser: IPaymentService['onboardUser'] = async ({
     account,
   }) => {
-    const baseUrl = await this.secretManager.getSecret('MOVII_BASE_URL')
-    const signerHandler = await this.secretManager.getSecret(
-      'MOVII_SIGNER_HANDLER',
-    )
-    const apiKey = await this.secretManager.getSecret('MOVII_API_KEY')
+    const { apiKey, baseUrl, signerHandler } = await this.getCoreConfig()
 
     const token = await this.getToken()
 
@@ -112,18 +130,18 @@ export class MoviiPaymentService implements IPaymentService {
     try {
       const response = await axios.post(url, data, { headers })
 
-      console.log('Response:', response.data)
+      this.logger.info('Onboard response received', { message: response.data?.message })
       // Check if the transfer was created successfully
       if (response.data?.error?.code === 0) {
         return { message: 'Onboarding started successfully, please make sure the user completes the onboarding process', success: true }
       }
       else {
-        console.error('API returned an error:', response.data)
+        this.logger.error('API returned an error', response.data)
         return { success: false }
       }
     }
     catch (error) {
-      console.error('Error sending payment:', error)
+      this.logger.error('Error sending onboarding payment', error)
       return { success: false }
     }
   }
@@ -133,18 +151,14 @@ export class MoviiPaymentService implements IPaymentService {
     bankCode,
     value,
   }) => {
-    const baseUrl = await this.secretManager.getSecret('MOVII_BASE_URL')
-    const signerHandler = await this.secretManager.getSecret(
-      'MOVII_SIGNER_HANDLER',
-    )
-    const apiKey = await this.secretManager.getSecret('MOVII_API_KEY')
+    const { apiKey, baseUrl, signerHandler } = await this.getCoreConfig()
 
     const token = await this.getToken()
 
     const targetSigner = await this.getSignerHandle(account, bankCode)
 
     if (!targetSigner) {
-      console.error(`No signer found for account ${account} and bankCode ${bankCode}`)
+      this.logger.warn('No signer found for payment', { account, bankCode })
       return { success: false }
     }
 
@@ -183,17 +197,17 @@ export class MoviiPaymentService implements IPaymentService {
           return { success: true, transactionId: transferId }
         }
         else {
-          console.error('Transaction rejected:', finalTransaction)
+          this.logger.warn('Transaction rejected', finalTransaction)
           return { success: false }
         }
       }
       else {
-        console.error('API returned an error:', response.data)
+        this.logger.error('API returned an error', response.data)
         return { success: false }
       }
     }
     catch (error) {
-      console.error('Error sending payment:', error)
+      this.logger.error('Error sending payment', error)
       return { success: false }
     }
   }
@@ -207,8 +221,42 @@ export class MoviiPaymentService implements IPaymentService {
       return !!signerHandler
     }
     catch (error) {
-      console.warn('Error verifying account:', error)
+      this.logger.warn('Error verifying account', error)
       return false
+    }
+  }
+
+  private async getAuthConfig(): Promise<MoviiAuthConfig> {
+    const {
+      MOVII_BASE_URL,
+      MOVII_CLIENT_ID,
+      MOVII_CLIENT_SECRET,
+    } = await this.secretManager.getSecrets([
+      'MOVII_BASE_URL',
+      'MOVII_CLIENT_ID',
+      'MOVII_CLIENT_SECRET',
+    ])
+    return {
+      baseUrl: MOVII_BASE_URL,
+      clientId: MOVII_CLIENT_ID,
+      clientSecret: MOVII_CLIENT_SECRET,
+    }
+  }
+
+  private async getCoreConfig(): Promise<MoviiCoreConfig> {
+    const {
+      MOVII_API_KEY,
+      MOVII_BASE_URL,
+      MOVII_SIGNER_HANDLER,
+    } = await this.secretManager.getSecrets([
+      'MOVII_API_KEY',
+      'MOVII_BASE_URL',
+      'MOVII_SIGNER_HANDLER',
+    ])
+    return {
+      apiKey: MOVII_API_KEY,
+      baseUrl: MOVII_BASE_URL,
+      signerHandler: MOVII_SIGNER_HANDLER,
     }
   }
 
@@ -219,8 +267,10 @@ export class MoviiPaymentService implements IPaymentService {
  * @returns A promise that resolves with the signer handle or null if no match is found.
  */
   private async getSignerHandle(wallet: string, bankCode: string): Promise<null | string> {
-    const baseUrl = await this.secretManager.getSecret('MOVII_BASE_URL')
-    const apiKey = await this.secretManager.getSecret('MOVII_API_KEY')
+    const { MOVII_API_KEY: apiKey, MOVII_BASE_URL: baseUrl } = await this.secretManager.getSecrets([
+      'MOVII_BASE_URL',
+      'MOVII_API_KEY',
+    ])
     const token = await this.getToken()
 
     const parsedWallet = `$57${wallet}`
@@ -249,17 +299,13 @@ export class MoviiPaymentService implements IPaymentService {
       return signer ? signer.handle : null
     }
     catch (error) {
-      console.error('Error retrieving signer handle:', error)
+      this.logger.error('Error retrieving signer handle', error)
       throw error
     }
   }
 
   private async getToken(): Promise<string> {
-    const baseUrl = await this.secretManager.getSecret('MOVII_BASE_URL')
-    const clientId = await this.secretManager.getSecret('MOVII_CLIENT_ID')
-    const clientSecret = await this.secretManager.getSecret(
-      'MOVII_CLIENT_SECRET',
-    )
+    const { baseUrl, clientId, clientSecret } = await this.getAuthConfig()
 
     const url = `${baseUrl}/transfiya/oauth/token`
 
@@ -279,7 +325,7 @@ export class MoviiPaymentService implements IPaymentService {
       return response.data.access_token
     }
     catch (error) {
-      console.error('Error fetching token:', error)
+      this.logger.error('Error fetching token', error)
       throw error
     }
   }
@@ -290,8 +336,10 @@ export class MoviiPaymentService implements IPaymentService {
    * @returns The final transaction object.
    */
   private async waitForTransaction(transferId: string): Promise<{ status: string }> {
-    const baseUrl = await this.secretManager.getSecret('MOVII_BASE_URL')
-    const apiKey = await this.secretManager.getSecret('MOVII_API_KEY')
+    const { MOVII_API_KEY: apiKey, MOVII_BASE_URL: baseUrl } = await this.secretManager.getSecrets([
+      'MOVII_BASE_URL',
+      'MOVII_API_KEY',
+    ])
     const token = await this.getToken()
 
     const pollingUrl = `${baseUrl}/transfiya/v2/transfers/${transferId}`
@@ -309,12 +357,12 @@ export class MoviiPaymentService implements IPaymentService {
         const transaction = response.data.entities[0]
         // If the status is no longer "PENDING", break out of the loop
         if (transaction && transaction.status !== 'PENDING' && transaction.status !== 'CREATED' && transaction.status !== 'INITIATED') {
-          console.log('Transaction status:', transaction)
+          this.logger.info('Transaction status updated', transaction)
           return transaction
         }
       }
       catch (error) {
-        console.error('Error polling transaction status:', error)
+        this.logger.error('Error polling transaction status', error)
       }
       if (Date.now() - startTime > timeout) {
         throw new Error('Timeout waiting for transaction to complete')

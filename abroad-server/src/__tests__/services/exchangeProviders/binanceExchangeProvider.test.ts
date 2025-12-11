@@ -4,6 +4,7 @@ import axios from 'axios'
 
 import { ISecretManager, Secret } from '../../../interfaces/ISecretManager'
 import { BinanceExchangeProvider } from '../../../services/exchangeProviders/binanceExchangeProvider'
+import { createMockLogger } from '../../setup/mockFactories'
 
 jest.mock('axios', () => ({
   get: jest.fn(),
@@ -25,8 +26,11 @@ class SecretManagerStub implements ISecretManager {
   }
 
   async getSecrets<T extends readonly Secret[]>(secretNames: T): Promise<Record<T[number], string>> {
-    void secretNames
-    throw new Error('getSecrets not implemented for SecretManagerStub')
+    const result: Record<string, string> = {}
+    secretNames.forEach((name) => {
+      result[name] = this.secrets[name] ?? ''
+    })
+    return result as Record<T[number], string>
   }
 }
 
@@ -48,7 +52,7 @@ describe('BinanceExchangeProvider', () => {
 
   const createProvider = (secrets: Partial<Record<Secret, string>> = defaultSecrets) => {
     const secretManager = new SecretManagerStub(secrets)
-    return new BinanceExchangeProvider(secretManager)
+    return new BinanceExchangeProvider(secretManager, createMockLogger())
   }
 
   describe('getExchangeAddress', () => {

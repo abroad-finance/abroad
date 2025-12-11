@@ -18,6 +18,13 @@ jest.mock('../../listeners/index', () => ({
   startListeners: startListenersMock,
 }))
 
+const logger = { error: jest.fn(), info: jest.fn(), warn: jest.fn() }
+jest.mock('../../ioc', () => ({
+  iocContainer: {
+    get: jest.fn(() => logger),
+  },
+}))
+
 describe('listeners health server', () => {
   beforeEach(() => {
     jest.resetModules()
