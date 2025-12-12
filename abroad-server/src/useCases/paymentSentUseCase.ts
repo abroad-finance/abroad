@@ -15,14 +15,15 @@ export interface IPaymentSentUseCase {
 
 @injectable()
 export class PaymentSentUseCase implements IPaymentSentUseCase {
+  private readonly exchangeErrorPrefix = 'Error exchanging'
   private readonly logPrefix = '[PaymentSent]'
 
   public constructor(
     @inject(TYPES.ILogger) private readonly logger: ILogger,
     @inject(TYPES.IWalletHandlerFactory) private readonly walletHandlerFactory: IWalletHandlerFactory,
-  @inject(TYPES.ISlackNotifier) private readonly slackNotifier: ISlackNotifier,
-  @inject(TYPES.IDatabaseClientProvider) private readonly dbClientProvider: IDatabaseClientProvider,
-  @inject(TYPES.IExchangeProviderFactory) private readonly exchangeProviderFactory: IExchangeProviderFactory,
+    @inject(TYPES.ISlackNotifier) private readonly slackNotifier: ISlackNotifier,
+    @inject(TYPES.IDatabaseClientProvider) private readonly dbClientProvider: IDatabaseClientProvider,
+    @inject(TYPES.IExchangeProviderFactory) private readonly exchangeProviderFactory: IExchangeProviderFactory,
   ) { }
 
   public async process(rawMessage: unknown): Promise<void> {
@@ -48,6 +49,28 @@ export class PaymentSentUseCase implements IPaymentSentUseCase {
     )
   }
 
+  private buildPendingConversionUpdates(
+    cryptoCurrency: CryptoCurrency,
+    targetCurrency: TargetCurrency,
+  ): Array<{ source: SupportedCurrency, symbol: string, target: SupportedCurrency }> {
+    if (cryptoCurrency !== SupportedCurrency.USDC) {
+      return []
+    }
+
+    if (targetCurrency === SupportedCurrency.COP) {
+      return [
+        { source: SupportedCurrency.USDC, symbol: 'USDCUSDT', target: SupportedCurrency.USDT },
+        { source: SupportedCurrency.USDT, symbol: 'USDTCOP', target: SupportedCurrency.COP },
+      ]
+    }
+
+    if (targetCurrency === SupportedCurrency.BRL) {
+      return [{ source: SupportedCurrency.USDC, symbol: 'USDCBRL', target: SupportedCurrency.BRL }]
+    }
+
+    return []
+  }
+
   private parseMessage(msg: unknown, logger: ILogger): PaymentSentMessage | undefined {
     const parsed = PaymentSentMessageSchema.safeParse(msg)
     if (!parsed.success) {
@@ -70,55 +93,21 @@ export class PaymentSentUseCase implements IPaymentSentUseCase {
       targetCurrency: TargetCurrency
     },
   ): Promise<void> {
-    if (cryptoCurrency === SupportedCurrency.USDC && targetCurrency === SupportedCurrency.COP) {
+    const conversions = this.buildPendingConversionUpdates(cryptoCurrency, targetCurrency)
+    for (const conversion of conversions) {
       await clientDb.pendingConversions.upsert({
         create: {
           amount,
           side: 'SELL',
-          source: cryptoCurrency,
-          symbol: 'USDCUSDT',
-          target: SupportedCurrency.USDT,
+          source: conversion.source,
+          symbol: conversion.symbol,
+          target: conversion.target,
         },
         update: {
           amount: { increment: amount },
         },
         where: {
-          source_target: { source: cryptoCurrency, target: SupportedCurrency.USDT },
-        },
-      })
-
-      await clientDb.pendingConversions.upsert({
-        create: {
-          amount,
-          side: 'SELL',
-          source: SupportedCurrency.USDT,
-          symbol: 'USDTCOP',
-          target: targetCurrency,
-        },
-        update: {
-          amount: { increment: amount },
-        },
-        where: {
-          source_target: { source: SupportedCurrency.USDT, target: targetCurrency },
-        },
-      })
-      return
-    }
-
-    if (cryptoCurrency === SupportedCurrency.USDC && targetCurrency === SupportedCurrency.BRL) {
-      await clientDb.pendingConversions.upsert({
-        create: {
-          amount,
-          side: 'SELL',
-          source: cryptoCurrency,
-          symbol: 'USDCBRL',
-          target: targetCurrency,
-        },
-        update: {
-          amount: { increment: amount },
-        },
-        where: {
-          source_target: { source: cryptoCurrency, target: targetCurrency },
+          source_target: { source: conversion.source, target: conversion.target },
         },
       })
     }
@@ -127,16 +116,16 @@ export class PaymentSentUseCase implements IPaymentSentUseCase {
   private async sendToExchangeAndUpdatePendingConversions(
     logger: ILogger,
     {
-    amount,
-    blockchain,
-    cryptoCurrency,
-    targetCurrency,
-  }: {
-    amount: number
-    blockchain: BlockchainNetwork
-    cryptoCurrency: CryptoCurrency
-    targetCurrency: TargetCurrency
-  }): Promise<void> {
+      amount,
+      blockchain,
+      cryptoCurrency,
+      targetCurrency,
+    }: {
+      amount: number
+      blockchain: BlockchainNetwork
+      cryptoCurrency: CryptoCurrency
+      targetCurrency: TargetCurrency
+    }): Promise<void> {
     try {
       const walletHandler = this.walletHandlerFactory.getWalletHandler(blockchain)
       const exchangeProvider = this.exchangeProviderFactory.getExchangeProvider(targetCurrency)
@@ -147,7 +136,7 @@ export class PaymentSentUseCase implements IPaymentSentUseCase {
       if (!success) {
         logger.error(`${this.logPrefix}: Error sending payment to exchange:`, transactionId)
         await this.slackNotifier.sendMessage(
-          `${this.logPrefix}: Error exchanging ${amount} ${cryptoCurrency} to ${targetCurrency}.`,
+          `${this.logPrefix}: ${this.exchangeErrorPrefix} ${amount} ${cryptoCurrency} to ${targetCurrency}.`,
         )
         return
       }

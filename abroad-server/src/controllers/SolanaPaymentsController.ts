@@ -1,4 +1,4 @@
-import { BlockchainNetwork, CryptoCurrency, TransactionStatus } from '@prisma/client'
+import { BlockchainNetwork, CryptoCurrency, PrismaClient, TransactionStatus } from '@prisma/client'
 import { getAssociatedTokenAddress, TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID } from '@solana/spl-token'
 import {
   Connection,
@@ -32,6 +32,12 @@ const solanaPaymentNotificationSchema = z.object({
 })
 
 type ParsedInstructionType = ParsedInstruction | PartiallyDecodedInstruction
+
+type SolanaPaymentContext = {
+  connection: Connection
+  tokenAccounts: PublicKey[]
+  usdcMint: PublicKey
+}
 
 interface SolanaPaymentNotificationRequest {
   on_chain_tx: string
@@ -94,73 +100,36 @@ export class SolanaPaymentsController extends Controller {
       return notFoundResponse(404, { reason: 'Transaction not found' })
     }
 
-    if (transaction.status !== TransactionStatus.AWAITING_PAYMENT) {
-      return badRequestResponse(400, { reason: 'Transaction is not awaiting payment' })
+    const validationError = this.validateTransaction(transaction)
+    if (validationError) {
+      return badRequestResponse(400, { reason: validationError })
     }
 
-    if (transaction.quote.network !== BlockchainNetwork.SOLANA) {
-      return badRequestResponse(400, { reason: 'Transaction is not set for Solana' })
+    const duplicateReason = await this.ensureUniqueOnChainId(prismaClient, onChainSignature, transaction.id)
+    if (duplicateReason) {
+      return badRequestResponse(400, { reason: duplicateReason })
     }
 
-    if (transaction.quote.cryptoCurrency !== CryptoCurrency.USDC) {
-      return badRequestResponse(400, { reason: 'Unsupported currency for Solana payments' })
-    }
+    const { connection, tokenAccounts, usdcMint } = await this.buildPaymentContext()
 
-    const duplicateOnChain = await prismaClient.transaction.findFirst({
-      select: { id: true },
-      where: { onChainId: onChainSignature },
-    })
-
-    if (duplicateOnChain && duplicateOnChain.id !== transaction.id) {
-      return badRequestResponse(400, { reason: 'On-chain transaction already linked to another transaction' })
-    }
-
-    const [rpcUrl, depositWalletAddress, usdcMintAddress] = await Promise.all([
-      this.secretManager.getSecret(Secrets.SOLANA_RPC_URL),
-      this.secretManager.getSecret(Secrets.SOLANA_ADDRESS),
-      this.secretManager.getSecret(Secrets.SOLANA_USDC_MINT),
-    ])
-
-    const depositWallet = this.safePublicKey(depositWalletAddress)
-    const usdcMint = this.safePublicKey(usdcMintAddress)
-
-    if (!depositWallet || !usdcMint) {
-      this.logger.error('[SolanaPaymentsController] Invalid Solana configuration', {
-        depositWalletAddress,
-        usdcMintAddress,
-      })
-      throw new Error('Solana configuration is invalid')
-    }
-
-    // Derive the USDC token accounts (ATAs) for the deposit wallet for both token programs
-    const depositTokenAccounts = await Promise.all([
-      getAssociatedTokenAddress(usdcMint, depositWallet, false, TOKEN_PROGRAM_ID),
-      getAssociatedTokenAddress(usdcMint, depositWallet, false, TOKEN_2022_PROGRAM_ID),
-    ])
-    const walletTokenAccounts = [depositWallet, ...depositTokenAccounts]
-
-    const connection = new Connection(rpcUrl, 'confirmed')
-
-    let txDetails: null | ParsedTransactionWithMeta = null
+    let txDetails: ParsedTransactionWithMeta
     try {
-      txDetails = await connection.getParsedTransaction(onChainSignature, {
-        maxSupportedTransactionVersion: 0, // support legacy + v0 txs
-      })
+      txDetails = await this.fetchOnChainTransaction(connection, onChainSignature)
     }
     catch (error) {
       this.logger.error('[SolanaPaymentsController] Failed to fetch transaction from Solana', error)
-      return badRequestResponse(400, { reason: 'Failed to fetch transaction from Solana' })
+      const reason = error instanceof Error
+        && (
+          error.message === 'Transaction not found on Solana'
+          || error.message === 'Transaction failed on-chain'
+        )
+        ? error.message
+        : 'Failed to fetch transaction from Solana'
+
+      return badRequestResponse(400, { reason })
     }
 
-    if (!txDetails) {
-      return badRequestResponse(400, { reason: 'Transaction not found on Solana' })
-    }
-
-    if (txDetails.meta?.err) {
-      return badRequestResponse(400, { reason: 'Transaction failed on-chain' })
-    }
-
-    const transfer = this.findUsdcTransferToWallet(txDetails, walletTokenAccounts, [usdcMint])
+    const transfer = this.findUsdcTransferToWallet(txDetails, tokenAccounts, [usdcMint])
 
     if (!transfer) {
       return badRequestResponse(400, { reason: 'No USDC transfer to the configured wallet found in this transaction' })
@@ -185,6 +154,53 @@ export class SolanaPaymentsController extends Controller {
 
     this.setStatus(202)
     return { enqueued: true }
+  }
+
+  private async buildPaymentContext(): Promise<SolanaPaymentContext> {
+    const [rpcUrl, depositWalletAddress, usdcMintAddress] = await Promise.all([
+      this.secretManager.getSecret(Secrets.SOLANA_RPC_URL),
+      this.secretManager.getSecret(Secrets.SOLANA_ADDRESS),
+      this.secretManager.getSecret(Secrets.SOLANA_USDC_MINT),
+    ])
+
+    const depositWallet = this.safePublicKey(depositWalletAddress)
+    const usdcMint = this.safePublicKey(usdcMintAddress)
+
+    if (!depositWallet || !usdcMint) {
+      this.logger.error('[SolanaPaymentsController] Invalid Solana configuration', {
+        depositWalletAddress,
+        usdcMintAddress,
+      })
+      throw new Error('Solana configuration is invalid')
+    }
+
+    const depositTokenAccounts = await Promise.all([
+      getAssociatedTokenAddress(usdcMint, depositWallet, false, TOKEN_PROGRAM_ID),
+      getAssociatedTokenAddress(usdcMint, depositWallet, false, TOKEN_2022_PROGRAM_ID),
+    ])
+
+    return {
+      connection: new Connection(rpcUrl, 'confirmed'),
+      tokenAccounts: [depositWallet, ...depositTokenAccounts],
+      usdcMint,
+    }
+  }
+
+  private async ensureUniqueOnChainId(
+    prismaClient: PrismaClient,
+    onChainSignature: string,
+    transactionId: string,
+  ): Promise<string | undefined> {
+    const duplicateOnChain = await prismaClient.transaction.findFirst({
+      select: { id: true },
+      where: { onChainId: onChainSignature },
+    })
+
+    if (duplicateOnChain && duplicateOnChain.id !== transactionId) {
+      return 'On-chain transaction already linked to another transaction'
+    }
+
+    return undefined
   }
 
   private extractTransferInfo(instruction: ParsedInstructionType): null | TransferCheckedInfo {
@@ -232,6 +248,25 @@ export class SolanaPaymentsController extends Controller {
         uiAmountString: typeof uiAmountString === 'string' ? uiAmountString : undefined,
       },
     }
+  }
+
+  private async fetchOnChainTransaction(
+    connection: Connection,
+    onChainSignature: string,
+  ): Promise<ParsedTransactionWithMeta> {
+    const txDetails = await connection.getParsedTransaction(onChainSignature, {
+      maxSupportedTransactionVersion: 0, // support legacy + v0 txs
+    })
+
+    if (!txDetails) {
+      throw new Error('Transaction not found on Solana')
+    }
+
+    if (txDetails.meta?.err) {
+      throw new Error('Transaction failed on-chain')
+    }
+
+    return txDetails
   }
 
   private findUsdcTransferToWallet(
@@ -313,5 +348,24 @@ export class SolanaPaymentsController extends Controller {
       this.logger.warn('[SolanaPaymentsController] Invalid public key string provided', { error, key })
       return null
     }
+  }
+
+  private validateTransaction(transaction: {
+    quote: { cryptoCurrency: CryptoCurrency, network: BlockchainNetwork }
+    status: TransactionStatus
+  }): string | undefined {
+    if (transaction.status !== TransactionStatus.AWAITING_PAYMENT) {
+      return 'Transaction is not awaiting payment'
+    }
+
+    if (transaction.quote.network !== BlockchainNetwork.SOLANA) {
+      return 'Transaction is not set for Solana'
+    }
+
+    if (transaction.quote.cryptoCurrency !== CryptoCurrency.USDC) {
+      return 'Unsupported currency for Solana payments'
+    }
+
+    return undefined
   }
 }

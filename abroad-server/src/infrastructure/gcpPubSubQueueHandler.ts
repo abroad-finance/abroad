@@ -2,7 +2,13 @@ import { Message, PubSub, Subscription } from '@google-cloud/pubsub'
 import { inject, injectable } from 'inversify'
 
 import { RuntimeConfiguration } from '../config/runtime'
-import { ILogger, IQueueHandler, QueueName, QueuePayloadByName, QueueSubscriber } from '../interfaces'
+import {
+  ILogger,
+  IQueueHandler,
+  QueueName,
+  QueuePayloadByName,
+  QueueSubscriber,
+} from '../interfaces'
 import { ISecretManager } from '../interfaces/ISecretManager'
 import { createScopedLogger, ScopedLogger } from '../shared/logging'
 import { generateCorrelationId, runWithCorrelationId } from '../shared/requestContext'

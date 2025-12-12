@@ -19,22 +19,29 @@ import { IWebhookNotifier } from '../../interfaces/IWebhookNotifier'
 import { ReceivedCryptoTransactionUseCase } from '../../useCases/receivedCryptoTransactionUseCase'
 import { createMockLogger, createMockQueueHandler, MockLogger, MockQueueHandler } from '../setup/mockFactories'
 
-type PrismaMock = {
-  transaction: {
-    update: jest.Mock
-    updateMany: jest.Mock
-  }
+type Harness = {
+  dbProvider: jest.Mocked<IDatabaseClientProvider>
+  logger: MockLogger
+  paymentService: PaymentServiceMock
+  prisma: PrismaMock
+  queueHandler: MockQueueHandler
+  slackNotifier: { sendMessage: jest.Mock }
+  useCase: ReceivedCryptoTransactionUseCase
+  walletFactory: IWalletHandlerFactory
+  walletHandler: WalletHandlerMock
+  webhookNotifier: IWebhookNotifier
 }
 
 type PaymentServiceMock = IPaymentService & {
   sendPayment: jest.Mock<Promise<{ success: boolean, transactionId?: string }>>
 }
 
-type WalletHandlerMock = IWalletHandler & {
-  send: jest.Mock<Promise<{ success: boolean, transactionId?: string }>>
+type PrismaMock = {
+  transaction: {
+    update: jest.Mock
+    updateMany: jest.Mock
+  }
 }
-
-type TransactionRecord = Prisma.TransactionGetPayload<{ include: { partnerUser: { include: { partner: true } }, quote: true } }>
 
 type TransactionOverrides = Partial<Omit<TransactionRecord, 'partnerUser' | 'quote'>> & {
   partnerUser?: Partial<TransactionRecord['partnerUser']> & {
@@ -43,17 +50,10 @@ type TransactionOverrides = Partial<Omit<TransactionRecord, 'partnerUser' | 'quo
   quote?: Partial<TransactionRecord['quote']>
 }
 
-type Harness = {
-  useCase: ReceivedCryptoTransactionUseCase
-  paymentService: PaymentServiceMock
-  queueHandler: MockQueueHandler
-  prisma: PrismaMock
-  dbProvider: jest.Mocked<IDatabaseClientProvider>
-  walletHandler: WalletHandlerMock
-  walletFactory: IWalletHandlerFactory
-  webhookNotifier: IWebhookNotifier
-  slackNotifier: { sendMessage: jest.Mock }
-  logger: MockLogger
+type TransactionRecord = Prisma.TransactionGetPayload<{ include: { partnerUser: { include: { partner: true } }, quote: true } }>
+
+type WalletHandlerMock = IWalletHandler & {
+  send: jest.Mock<Promise<{ success: boolean, transactionId?: string }>>
 }
 
 const baseMessage: ReceivedCryptoTransactionMessage = {
@@ -159,16 +159,16 @@ const createHarness = (overrides: Partial<Harness> = {}): Harness => {
   )
 
   return {
-    useCase,
-    paymentService,
-    queueHandler,
-    prisma,
     dbProvider,
-    walletHandler,
-    walletFactory,
-    webhookNotifier,
-    slackNotifier,
     logger,
+    paymentService,
+    prisma,
+    queueHandler,
+    slackNotifier,
+    useCase,
+    walletFactory,
+    walletHandler,
+    webhookNotifier,
   }
 }
 

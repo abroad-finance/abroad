@@ -8,33 +8,36 @@ import { TYPES } from '../types'
 
 @injectable()
 export class PaymentServiceFactory implements IPaymentServiceFactory {
+  private readonly serviceByMethod: Record<PaymentMethod, IPaymentService>
+
   constructor(
     @inject(TYPES.IPaymentService)
     @named('movii')
-    private moviiPaymentService: IPaymentService,
+    moviiPaymentService: IPaymentService,
     @inject(TYPES.IPaymentService)
     @named('nequi')
-    private nequiPaymentService: IPaymentService,
+    nequiPaymentService: IPaymentService,
     @inject(TYPES.IPaymentService)
     @named('breb')
-    private brebPaymentService: IPaymentService,
-    @named('transfero')
+    brebPaymentService: IPaymentService,
     @inject(TYPES.IPaymentService)
-    private transferoPaymentService: IPaymentService,
-  ) { }
+    @named('transfero')
+    transferoPaymentService: IPaymentService,
+  ) {
+    this.serviceByMethod = {
+      [PaymentMethod.BREB]: brebPaymentService,
+      [PaymentMethod.MOVII]: moviiPaymentService,
+      [PaymentMethod.NEQUI]: nequiPaymentService,
+      [PaymentMethod.PIX]: transferoPaymentService,
+    }
+  }
 
   public getPaymentService(paymentMethod: PaymentMethod): IPaymentService {
-    switch (paymentMethod) {
-      case PaymentMethod.BREB:
-        return this.brebPaymentService
-      case PaymentMethod.MOVII:
-        return this.moviiPaymentService
-      case PaymentMethod.NEQUI:
-        return this.nequiPaymentService
-      case PaymentMethod.PIX:
-        return this.transferoPaymentService
-      default:
-        throw new Error(`Unsupported payment method: ${paymentMethod}`)
+    const service = this.serviceByMethod[paymentMethod]
+    if (!service) {
+      throw new Error(`Unsupported payment method: ${paymentMethod}`)
     }
+
+    return service
   }
 }

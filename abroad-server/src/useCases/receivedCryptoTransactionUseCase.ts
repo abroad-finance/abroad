@@ -11,28 +11,24 @@ import {
 import { IDatabaseClientProvider } from '../interfaces/IDatabaseClientProvider'
 import { IPaymentServiceFactory } from '../interfaces/IPaymentServiceFactory'
 import { IWebhookNotifier, WebhookEvent } from '../interfaces/IWebhookNotifier'
-import {
-  PaymentSentMessage,
-  ReceivedCryptoTransactionMessage,
-  ReceivedCryptoTransactionMessageSchema,
-} from '../interfaces/queueSchema'
+import { PaymentSentMessage, ReceivedCryptoTransactionMessage, ReceivedCryptoTransactionMessageSchema } from '../interfaces/queueSchema'
 import { createScopedLogger, ScopedLogger } from '../shared/logging'
 import { getCorrelationId } from '../shared/requestContext'
 import { TYPES } from '../types'
 
 type PrismaClientInstance = Awaited<ReturnType<IDatabaseClientProvider['getClient']>>
-type TransactionClient = PrismaClientInstance | Prisma.TransactionClient
+type TransactionClient = Prisma.TransactionClient | PrismaClientInstance
 
 const transactionInclude = {
   partnerUser: { include: { partner: true } },
   quote: true,
 } as const
 
-type TransactionWithRelations = Prisma.TransactionGetPayload<{ include: typeof transactionInclude }>
-
 export interface IReceivedCryptoTransactionUseCase {
   process(rawMessage: unknown): Promise<void>
 }
+
+type TransactionWithRelations = Prisma.TransactionGetPayload<{ include: typeof transactionInclude }>
 
 class RefundService {
   constructor(private readonly walletHandlerFactory: IWalletHandlerFactory) {}
@@ -46,6 +42,42 @@ class RefundService {
       amount: message.amount,
       cryptoCurrency: message.cryptoCurrency,
     })
+  }
+}
+
+class TransactionNotifier {
+  constructor(
+    private readonly webhookNotifier: IWebhookNotifier,
+    private readonly queueHandler: IQueueHandler,
+    private readonly logger: ScopedLogger,
+  ) {}
+
+  public async notify(
+    transaction: TransactionWithRelations,
+    event: WebhookEvent,
+    context: string,
+  ): Promise<void> {
+    try {
+      await this.webhookNotifier.notifyWebhook(
+        transaction.partnerUser.partner.webhookUrl,
+        { data: transaction, event },
+      )
+    }
+    catch (error) {
+      this.logger.warn(`Failed to notify partner webhook (${context})`, error)
+    }
+
+    try {
+      await this.queueHandler.postMessage(QueueName.USER_NOTIFICATION, {
+        payload: JSON.stringify(transaction),
+        type: 'transaction.updated',
+        userId: transaction.partnerUser.userId,
+      })
+    }
+    catch (error) {
+      const warningContext = error instanceof Error ? error : new Error(String(error))
+      this.logger.warn(`Failed to publish ws notification (${context})`, warningContext)
+    }
   }
 }
 
@@ -115,46 +147,10 @@ class TransactionRepository {
   }
 }
 
-class TransactionNotifier {
-  constructor(
-    private readonly webhookNotifier: IWebhookNotifier,
-    private readonly queueHandler: IQueueHandler,
-    private readonly logger: ScopedLogger,
-  ) {}
-
-  public async notify(
-    transaction: TransactionWithRelations,
-    event: WebhookEvent,
-    context: string,
-  ): Promise<void> {
-    try {
-      await this.webhookNotifier.notifyWebhook(
-        transaction.partnerUser.partner.webhookUrl,
-        { data: transaction, event },
-      )
-    }
-    catch (error) {
-      this.logger.warn(`Failed to notify partner webhook (${context})`, error)
-    }
-
-    try {
-      await this.queueHandler.postMessage(QueueName.USER_NOTIFICATION, {
-        payload: JSON.stringify(transaction),
-        type: 'transaction.updated',
-        userId: transaction.partnerUser.userId,
-      })
-    }
-    catch (error) {
-      const warningContext = error instanceof Error ? error : new Error(String(error))
-      this.logger.warn(`Failed to publish ws notification (${context})`, warningContext)
-    }
-  }
-}
-
 @injectable()
 export class ReceivedCryptoTransactionUseCase implements IReceivedCryptoTransactionUseCase {
-  private readonly repository = new TransactionRepository()
   private readonly refundService: RefundService
+  private readonly repository = new TransactionRepository()
 
   public constructor(
     @inject(TYPES.IPaymentServiceFactory)
@@ -270,6 +266,15 @@ export class ReceivedCryptoTransactionUseCase implements IReceivedCryptoTransact
     await this.recordRefundOnChainId(prismaClient, transactionRecord.id, refundResult, logger)
   }
 
+  private async notifySlack(message: string, logger: ScopedLogger): Promise<void> {
+    try {
+      await this.slackNotifier.sendMessage(message)
+    }
+    catch (error) {
+      logger.warn('Failed to send slack notification', error)
+    }
+  }
+
   private parseMessage(
     msg: unknown,
     logger: ScopedLogger,
@@ -382,15 +387,6 @@ export class ReceivedCryptoTransactionUseCase implements IReceivedCryptoTransact
     }
     catch (error) {
       logger.error('Failed to persist refund transaction hash', error)
-    }
-  }
-
-  private async notifySlack(message: string, logger: ScopedLogger): Promise<void> {
-    try {
-      await this.slackNotifier.sendMessage(message)
-    }
-    catch (error) {
-      logger.warn('Failed to send slack notification', error)
     }
   }
 }

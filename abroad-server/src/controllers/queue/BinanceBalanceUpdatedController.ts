@@ -1,7 +1,7 @@
 import { MainClient } from 'binance'
 import { inject, injectable } from 'inversify'
 
-import { BinanceBalanceUpdatedMessage, ILogger, IQueueHandler, QueueName } from '../../interfaces'
+import { ILogger, IQueueHandler, QueueName } from '../../interfaces'
 import { IDatabaseClientProvider } from '../../interfaces/IDatabaseClientProvider'
 import { ISecretManager } from '../../interfaces/ISecretManager'
 import { TYPES } from '../../types'
@@ -53,7 +53,7 @@ export class BinanceBalanceUpdatedController {
   /**
    * Handler for the balance‑updated event coming from the queue.
    */
-  private async onBalanceUpdated(_message: BinanceBalanceUpdatedMessage): Promise<void> {
+  private async onBalanceUpdated(): Promise<void> {
     let client: MainClient | null = null
     try {
       // --- Initialise REST client -------------------------------------------------------

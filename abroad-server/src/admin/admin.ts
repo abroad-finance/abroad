@@ -73,6 +73,53 @@ export async function initAdmin(app: Express) {
   // ---------------------
   // Build AdminJS instance
   // ---------------------
+  const buildActions = (allowEdit: boolean, extraActions: Record<string, unknown> = {}) => ({
+    delete: { isAccessible: false },
+    edit: { isAccessible: allowEdit },
+    list: { isAccessible: true },
+    new: { isAccessible: false },
+    show: { isAccessible: true },
+    ...extraActions,
+  })
+
+  const createResource = (
+    modelName: string,
+    allowEdit: boolean,
+    extraActions: Record<string, unknown> = {},
+  ) => ({
+    options: {
+      actions: buildActions(allowEdit, extraActions),
+      sort: {
+        direction: 'desc',
+        sortBy: 'createdAt',
+      },
+    },
+    resource: {
+      client: prisma,
+      model: getModel(modelName),
+    },
+  })
+
+  const partnerUserTransactionsAction = {
+    actionType: 'record',
+    component: false,
+    handler: async (
+      _req: ActionRequest,
+      _res: unknown,
+      ctx: ActionContext,
+    ): Promise<RecordActionResponse> => {
+      const partnerUserId = ctx.record?.id() ?? ''
+      const qs = new URLSearchParams({ 'filters.partnerUser': partnerUserId }).toString()
+      const url = ctx.h.listUrl('Transaction', `?${qs}`)
+      const recordJson = ctx.record?.toJSON(ctx.currentAdmin)
+      return { record: recordJson!, redirectUrl: url }
+    },
+    icon: 'List',
+    isAccessible: true,
+    isVisible: true,
+    label: 'Transactions',
+  }
+
   const admin = new AdminJS({
     branding: {
       companyName: 'Abroad Admin',
@@ -90,133 +137,11 @@ export async function initAdmin(app: Express) {
     resources: [
       transactionQuoteSupport.baseResource,
       transactionQuoteSupport.detailedResource,
-
-      // PartnerUser
-      {
-        options: {
-          actions: {
-            delete: { isAccessible: false },
-            edit: { isAccessible: true },
-            list: { isAccessible: true },
-            new: { isAccessible: false },
-            show: { isAccessible: true },
-
-            // custom record action
-            transactions: {
-              actionType: 'record',
-              component: false, // no custom React UI, just a redirect
-              handler: async (
-                _req: ActionRequest,
-                _res: unknown,
-                ctx: ActionContext,
-              ): Promise<RecordActionResponse> => {
-                const partnerUserId = ctx.record?.id() ?? ''
-                const qs = new URLSearchParams({ 'filters.partnerUser': partnerUserId }).toString()
-                const url = ctx.h.listUrl('Transaction', `?${qs}`)
-                const recordJson = ctx.record?.toJSON(ctx.currentAdmin)
-                return { record: recordJson!, redirectUrl: url }
-              },
-              icon: 'List',
-              isAccessible: true,
-              isVisible: true,
-              label: 'Transactions',
-            },
-          },
-          sort: {
-            direction: 'desc',
-            sortBy: 'createdAt',
-          },
-        },
-        resource: {
-          client: prisma,
-          model: getModel('PartnerUser'),
-        },
-      },
-
-      // PartnerUserKyc
-      {
-        options: {
-          actions: {
-            delete: { isAccessible: false },
-            edit: { isAccessible: true },
-            list: { isAccessible: true },
-            new: { isAccessible: false },
-            show: { isAccessible: true },
-          },
-          sort: {
-            direction: 'desc',
-            sortBy: 'createdAt',
-          },
-        },
-        resource: {
-          client: prisma,
-          model: getModel('PartnerUserKyc'),
-        },
-      },
-
-      // Partner
-      {
-        options: {
-          actions: {
-            delete: { isAccessible: false },
-            edit: { isAccessible: false },
-            list: { isAccessible: true },
-            new: { isAccessible: false },
-            show: { isAccessible: true },
-          },
-          sort: {
-            direction: 'desc',
-            sortBy: 'createdAt',
-          },
-        },
-        resource: {
-          client: prisma,
-          model: getModel('Partner'),
-        },
-      },
-
-      // Quote
-      {
-        options: {
-          actions: {
-            delete: { isAccessible: false },
-            edit: { isAccessible: false },
-            list: { isAccessible: true },
-            new: { isAccessible: false },
-            show: { isAccessible: true },
-          },
-          sort: {
-            direction: 'desc',
-            sortBy: 'createdAt',
-          },
-        },
-        resource: {
-          client: prisma,
-          model: getModel('Quote'),
-        },
-      },
-
-      // Transaction
-      {
-        options: {
-          actions: {
-            delete: { isAccessible: false },
-            edit: { isAccessible: false },
-            list: { isAccessible: true },
-            new: { isAccessible: false },
-            show: { isAccessible: true },
-          },
-          sort: {
-            direction: 'desc',
-            sortBy: 'createdAt',
-          },
-        },
-        resource: {
-          client: prisma,
-          model: getModel('Transaction'),
-        },
-      },
-
+      createResource('PartnerUser', true, { transactions: partnerUserTransactionsAction }),
+      createResource('PartnerUserKyc', true),
+      createResource('Partner', false),
+      createResource('Quote', false),
+      createResource('Transaction', false),
     ],
     rootPath: '/admin',
     settings: { defaultPerPage: 50 },
