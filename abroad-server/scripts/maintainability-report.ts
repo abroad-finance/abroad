@@ -271,7 +271,7 @@ export async function loadSources(
     const relativePath = toNormalizedRelativePath(root, filePath)
 
     // still collect TS diagnostics
-    const { diagnostics: transpileDiagnostics } = ts.transpileModule(code, {
+    const { diagnostics: transpileDiagnostics, outputText } = ts.transpileModule(code, {
       compilerOptions: TRANSPILE_OPTIONS,
       fileName: relativePath,
       reportDiagnostics: true,
@@ -283,7 +283,7 @@ export async function loadSources(
 
     // but send *original TS* to escomplex
     sources.push({
-      code, // <-- TS, not outputText
+      code: outputText,
       filePath,
       srcPath: relativePath,
     })
