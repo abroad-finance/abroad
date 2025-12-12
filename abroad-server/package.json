@@ -24,6 +24,7 @@
     "lint": "eslint .",
     "format": "eslint . --fix",
     "maintainability:report": "tsx scripts/maintainability-report.ts --min-average 57",
+    "checks:mandatory": "npm run format && npm run build && npm run test && npm run maintainability:report",
     "hygiene": "depcheck && knip --config knip.json",
     "migrate:dev": "prisma migrate dev",
     "seed:dev": "tsx scripts/seed-dev.ts"

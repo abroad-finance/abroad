@@ -93,8 +93,8 @@ describe('PartnerUserController', () => {
       badRequest,
     )
 
-    expect(badRequest).toHaveBeenCalledWith(400, { reason: 'Invalid payload' })
-    expect(response).toEqual({ reason: 'Invalid payload' })
+    expect(badRequest).toHaveBeenCalledWith(400, { reason: 'Invalid UUID' })
+    expect(response).toEqual({ reason: 'Invalid UUID' })
     expect(prisma.partnerUser.create).not.toHaveBeenCalled()
   })
 
@@ -133,7 +133,7 @@ describe('PartnerUserController', () => {
 
     const response = await controller.listPartnerUsers(0, 10, authRequest('partner-1'), badRequest)
 
-    expect(response).toEqual({ reason: 'Invalid pagination parameters' })
+    expect(response).toEqual({ reason: 'Too small: expected number to be >=1' })
     expect(prisma.partnerUser.findMany).not.toHaveBeenCalled()
   })
 

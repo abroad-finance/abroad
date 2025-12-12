@@ -18,48 +18,10 @@ import {
   SuccessResponse,
   TsoaResponse,
 } from 'tsoa'
-import { z } from 'zod'
 
 import { IDatabaseClientProvider } from '../interfaces/IDatabaseClientProvider'
 import { TYPES } from '../types'
-
-const createPartnerRequestSchema = z.object({
-  company: z.string().min(1),
-  country: z.string().min(1),
-  email: z.string().email(),
-  firstName: z.string().min(1),
-  lastName: z.string().min(1),
-  password: z.string().min(8),
-  phone: z.string().optional(),
-})
-
-interface CreatePartnerRequest {
-  company: string
-  country: string
-  email: string
-  firstName: string
-  lastName: string
-  password: string
-  phone: string
-}
-
-interface CreatePartnerResponse {
-  id: string
-}
-
-// Add response type for partner info
-interface PartnerInfoResponse {
-  country?: string
-  createdAt: Date
-  email?: string
-  firstName?: string
-  id: string
-  isKybApproved?: boolean
-  lastName?: string
-  name: string
-  needsKyc?: boolean
-  phone?: string
-}
+import { type CreatePartnerRequest, createPartnerRequestSchema, type CreatePartnerResponse, type PartnerInfoResponse } from './partner/contracts'
 
 @Route('partner')
 export class PartnerController extends Controller {

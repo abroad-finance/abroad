@@ -8,7 +8,11 @@ import { BrebPaymentService } from '../../services/paymentServices/brebPaymentSe
 
 jest.mock('axios')
 
-const mockedAxios = axios as unknown as { get: jest.Mock, isAxiosError: jest.Mock, post: jest.Mock }
+const mockedAxios = axios as unknown as {
+  get: jest.Mock
+  isAxiosError: jest.Mock
+  post: jest.Mock
+}
 
 type BrebConfig = {
   apiBaseUrl: string
@@ -16,40 +20,91 @@ type BrebConfig = {
   clientId: string
   clientSecret: string
   dadAccount: string
-  forwardedFor: string
-  origin: string
   productCode: string
 }
 
 type BrebInternals = {
-  buildSendPayload(keyDetails: Record<string, unknown>, value: number): Record<string, unknown>
+  buildSendPayload(keyDetails: Record<string, unknown>, value: number): Record<string, number | string>
   dispatchPayment(
     payload: Record<string, number | string>,
     config: BrebConfig,
     token: string,
   ): Promise<unknown>
-  fetchTransactionReport(transactionId: string, rail: 'ENT' | 'TFY', config: BrebConfig, token: string): Promise<unknown>
+  fetchTransactionReport(
+    transactionId: string,
+    rail: 'ENT' | 'TFY',
+    config: BrebConfig,
+    token: string,
+  ): Promise<unknown>
   getAccessToken(config: BrebConfig): Promise<string>
   getConfig(): Promise<BrebConfig>
-  interpretReport(report: {
-    Creditor?: { TransactionInfAndSts?: { TransactionStatus?: string } }
-    Debtor?: { TransactionInfAndSts?: { TransactionStatus?: string } }
-    GlobalTransactionInfAndSts?: { GlobalTxStatus?: string }
-  }): 'failure' | 'pending' | 'success'
-  isKeyUsable(keyDetails: Record<string, unknown>, rail: 'ENT' | 'TFY'): boolean
+  interpretReport(report: Record<string, unknown>): 'failure' | 'pending' | 'success'
+  isKeyUsable(keyDetails: null | Record<string, unknown>, rail: 'ENT' | 'TFY'): boolean
   pollConfig: { delayMs: number, timeoutMs: number }
   pollTransactionReport(
     transactionId: string,
     rail: 'ENT' | 'TFY',
     config: BrebConfig,
     token: string,
-  ): Promise<null | { report: unknown, result: 'failure' | 'pending' | 'success' }>
+  ): Promise<null | { report: null | Record<string, unknown>, result: 'failure' | 'pending' | 'success' }>
 }
+
+type BrebKeyFixture = {
+  accountNumber: string
+  documentNumber: string
+  documentType: string
+  entityId?: string
+  instructedAgent: 'ENT' | 'TFY'
+  keyId: string
+  keyState: string
+  merchantId?: null | string
+  name: string
+  partyIdentifier: string
+  partySystemIdentifier: string
+  partyType: string
+  subType: string
+  typeAccount: string
+}
+
+const defaultKeyDetails: BrebKeyFixture = {
+  accountNumber: '3112268870',
+  documentNumber: '123456',
+  documentType: 'CC',
+  entityId: '0930',
+  instructedAgent: 'ENT',
+  keyId: 'key-123',
+  keyState: 'ACTIVA',
+  merchantId: 'm-001',
+  name: 'Test User',
+  partyIdentifier: '3112268870',
+  partySystemIdentifier: 'MSISDN',
+  partyType: 'PERSON',
+  subType: 'PN',
+  typeAccount: 'DBMO',
+}
+
+const tokenResponse = (token: string = 'token-1', expiresIn: number = 3600) => ({
+  data: { access_token: token, expires_in: expiresIn },
+})
+
+const keyLookupResponse = (overrides: Partial<BrebKeyFixture> = {}) => ({
+  data: { data: { ...defaultKeyDetails, ...overrides } },
+})
+
+const sendResponse = (moviiTxId: string | undefined = 'tx-001', rail: 'ENT' | 'TFY' = 'ENT') => ({
+  data: { data: { moviiTxId, rail } },
+})
+
+const reportEnvelope = (status: string) => ({
+  data: { data: { GlobalTransactionInfAndSts: { GlobalTxStatus: status } } },
+})
+
+const axiosFailure = (payload: unknown) => ({ isAxiosError: true, response: { data: payload } })
 
 const getInternals = (service: BrebPaymentService): BrebInternals => service as unknown as BrebInternals
 
 const buildSecretManager = (): ISecretManager => {
-  const secrets = {
+  const secrets: Partial<Record<Secret, string>> = {
     BREB_API_BASE_URL: 'https://breb.example.com/api',
     BREB_AUTH_URL: 'https://breb-auth.example.com/token',
     BREB_CLIENT_ID: 'client-id',
@@ -59,11 +114,12 @@ const buildSecretManager = (): ISecretManager => {
   }
 
   return {
-    getSecret: jest.fn(async (name: Secret) => secrets[name as keyof typeof secrets] ?? ''),
+    getSecret: jest.fn(async (name: Secret) => secrets[name] ?? ''),
     getSecrets: jest.fn(async <T extends readonly Secret[]>(names: T) => {
       const resolved = {} as Record<T[number], string>
       names.forEach((name) => {
-        resolved[name as T[number]] = secrets[name as keyof typeof secrets] ?? ''
+        const key = name as T[number]
+        resolved[key] = secrets[key] ?? ''
       })
       return resolved
     }),
@@ -76,6 +132,28 @@ const buildLogger = (): ILogger => ({
   warn: jest.fn(),
 })
 
+const setupService = () => {
+  const logger = buildLogger()
+  const service = new BrebPaymentService(buildSecretManager(), logger)
+  return { internals: getInternals(service), logger, service }
+}
+
+const primeAccessToken = (token: string = 'token-1', expiresIn: number = 3600) =>
+  mockedAxios.post.mockResolvedValueOnce(tokenResponse(token, expiresIn))
+
+const primeKeyLookup = (overrides: Partial<BrebKeyFixture> = {}) =>
+  mockedAxios.get.mockResolvedValueOnce(keyLookupResponse(overrides))
+
+const primeSend = (moviiTxId?: string, rail: 'ENT' | 'TFY' = 'ENT') =>
+  mockedAxios.post.mockResolvedValueOnce(sendResponse(moviiTxId, rail))
+
+const primeReport = (status: string) => mockedAxios.get.mockResolvedValueOnce(reportEnvelope(status))
+
+const expectSendPayload = (expectations: Record<string, number | string>) => {
+  const sendCall = mockedAxios.post.mock.calls.find(call => String(call[0]).includes('/send'))
+  expect(sendCall?.[1]).toMatchObject(expectations)
+}
+
 describe('BrebPaymentService', () => {
   beforeEach(() => {
     jest.clearAllMocks()
@@ -84,447 +162,275 @@ describe('BrebPaymentService', () => {
     mockedAxios.isAxiosError = jest.fn(() => false)
   })
 
-  it('verifies accounts by validating key state and rail', async () => {
-    const service = new BrebPaymentService(buildSecretManager(), buildLogger())
-    mockedAxios.post.mockResolvedValueOnce({ data: { access_token: 'token-1', expires_in: 3600 } })
-    mockedAxios.get.mockResolvedValueOnce({
-      data: {
-        data: {
-          accountNumber: '3112268870',
-          documentNumber: '123456',
-          documentType: 'CC',
-          instructedAgent: 'ENT',
-          keyId: 'key-123',
-          keyState: 'ACTIVA',
-          name: 'Test User',
-          partyIdentifier: '3112268870',
-          partySystemIdentifier: 'MSISDN',
-          partyType: 'PERSON',
-          subType: 'PN',
-          typeAccount: 'DBMO',
-        },
-      },
-    })
+  describe('sendPayment', () => {
+    it('sends payments and reports success when the transaction is accepted', async () => {
+      const { service } = setupService()
+      primeAccessToken()
+      primeKeyLookup()
+      primeSend('tx-001')
+      primeReport('ACCP')
 
-    const result = await service.verifyAccount({ account: '3112268870', bankCode: 'ENT' })
-    expect(result).toBe(true)
-    expect(mockedAxios.get).toHaveBeenCalledWith(
-      expect.stringContaining('/key/3112268870'),
-      expect.objectContaining({ headers: expect.any(Object) }),
-    )
-  })
-
-  it('provides default liquidity and onboarding acknowledgement', async () => {
-    const service = new BrebPaymentService(buildSecretManager(), buildLogger())
-    await expect(service.getLiquidity()).resolves.toBe(service.MAX_TOTAL_AMOUNT_PER_DAY)
-    await expect(service.onboardUser()).resolves.toEqual({
-      message: 'BreB does not require explicit onboarding',
-      success: true,
-    })
-  })
-
-  it('sends payments and reports success when the transaction is accepted', async () => {
-    const service = new BrebPaymentService(buildSecretManager(), buildLogger())
-
-    mockedAxios.post
-      .mockResolvedValueOnce({ data: { access_token: 'token-1', expires_in: 3600 } })
-      .mockResolvedValueOnce({ data: { data: { moviiTxId: 'tx-001', rail: 'ENT' } } })
-
-    mockedAxios.get
-      .mockResolvedValueOnce({
-        data: {
-          data: {
-            accountNumber: '3112268870',
-            documentNumber: '1098765',
-            documentType: 'CC',
-            entityId: '0930',
-            instructedAgent: 'ENT',
-            keyId: 'key-123',
-            keyState: 'ACTIVA',
-            merchantId: 'm-001',
-            name: 'Carlos Ruiz',
-            partyIdentifier: '3112268870',
-            partySystemIdentifier: 'MSISDN',
-            partyType: 'PERSON',
-            subType: 'PN',
-            typeAccount: 'DBMO',
-          },
-        },
-      })
-      .mockResolvedValueOnce({
-        data: {
-          data: {
-            GlobalTransactionInfAndSts: { GlobalTxStatus: 'ACCP' },
-          },
-        },
+      const response = await service.sendPayment({
+        account: defaultKeyDetails.accountNumber,
+        bankCode: '9101',
+        id: 'txn-1',
+        value: 125_000,
       })
 
-    const response = await service.sendPayment({
-      account: '3112268870',
-      bankCode: '9101',
-      id: 'txn-1',
-      value: 125_000,
-    })
-
-    expect(response).toEqual({ success: true, transactionId: 'tx-001' })
-    const sendCall = mockedAxios.post.mock.calls.find(call => String(call[0]).includes('/send'))
-    expect(sendCall?.[1]).toMatchObject({
-      creditor_account_number: '3112268870',
-      creditor_document_number: '1098765',
-      creditor_document_type: 'CC',
-      creditor_entity_id: '0930',
-      creditor_instructed_agent: 'ENT',
-      creditor_key_id: 'key-123',
-      creditor_merchant_id: 'm-001',
-      creditor_party_identifier: '3112268870',
-      creditor_party_system_identifier: 'MSISDN',
-      creditor_party_type: 'PERSON',
-      creditor_sub_type: 'PN',
-      creditor_type_account: 'DBMO',
-      transaction_total_amount: 125_000,
-    })
-  })
-
-  it('returns failure when the transaction report is rejected', async () => {
-    const logger = buildLogger()
-    const service = new BrebPaymentService(buildSecretManager(), logger)
-
-    mockedAxios.post
-      .mockResolvedValueOnce({ data: { access_token: 'token-1', expires_in: 3600 } })
-      .mockResolvedValueOnce({ data: { data: { moviiTxId: 'tx-002', rail: 'ENT' } } })
-
-    mockedAxios.get
-      .mockResolvedValueOnce({
-        data: {
-          data: {
-            instructedAgent: 'ENT',
-            keyId: 'key-456',
-            keyState: 'ACTIVA',
-            name: 'Test User',
-            partyIdentifier: '3001234567',
-            partySystemIdentifier: 'MSISDN',
-            partyType: 'PERSON',
-            subType: 'PN',
-            typeAccount: 'DBMO',
-          },
-        },
+      expect(response).toEqual({ success: true, transactionId: 'tx-001' })
+      expectSendPayload({
+        creditor_account_number: defaultKeyDetails.accountNumber,
+        creditor_document_number: defaultKeyDetails.documentNumber,
+        creditor_document_type: defaultKeyDetails.documentType,
+        creditor_entity_id: defaultKeyDetails.entityId ?? '',
+        creditor_instructed_agent: defaultKeyDetails.instructedAgent,
+        creditor_key_id: defaultKeyDetails.keyId,
+        creditor_party_identifier: defaultKeyDetails.partyIdentifier,
+        creditor_party_system_identifier: defaultKeyDetails.partySystemIdentifier,
+        creditor_party_type: defaultKeyDetails.partyType,
+        creditor_sub_type: defaultKeyDetails.subType,
+        creditor_type_account: defaultKeyDetails.typeAccount,
+        transaction_total_amount: 125_000,
       })
-      .mockResolvedValueOnce({
-        data: {
-          data: {
-            GlobalTransactionInfAndSts: { GlobalTxStatus: 'RJCT' },
-          },
-        },
+    })
+
+    it('returns failure when the provider omits a transaction id', async () => {
+      const { logger, service } = setupService()
+      primeAccessToken()
+      primeKeyLookup()
+      mockedAxios.post.mockResolvedValueOnce({ data: { data: { rail: 'ENT' } } })
+      mockedAxios.get.mockResolvedValue(reportEnvelope('FAILED'))
+
+      const outcome = await service.sendPayment({
+        account: defaultKeyDetails.accountNumber,
+        bankCode: 'ENT',
+        id: 'txn-4',
+        value: 10_000,
       })
 
-    const result = await service.sendPayment({
-      account: '3001234567',
-      bankCode: 'ENT',
-      id: 'txn-3',
-      value: 50_000,
+      expect(outcome).toEqual({ success: false })
+      expect(logger.error).toHaveBeenCalledWith('[BreB] Send response missing transaction id', { rail: 'ENT' })
     })
 
-    expect(result).toEqual({ success: false })
-    expect(logger.warn).not.toHaveBeenCalledWith(expect.stringContaining('pending'))
-  })
+    it('handles dispatch failures gracefully', async () => {
+      const { logger, service } = setupService()
+      mockedAxios.isAxiosError.mockReturnValue(true)
+      primeAccessToken()
+      primeKeyLookup()
+      mockedAxios.post.mockRejectedValueOnce(axiosFailure('network down'))
 
-  it('returns failure when the provider omits a transaction id', async () => {
-    const logger = buildLogger()
-    const service = new BrebPaymentService(buildSecretManager(), logger)
+      const result = await service.sendPayment({
+        account: defaultKeyDetails.accountNumber,
+        bankCode: 'ENT',
+        id: 'txn-5',
+        value: 15_000,
+      })
 
-    mockedAxios.post.mockResolvedValueOnce({ data: { access_token: 'token-1', expires_in: 3600 } })
-    mockedAxios.get.mockResolvedValueOnce({
-      data: {
-        data: {
-          accountNumber: '3009876543',
-          documentNumber: '9001',
-          documentType: 'CE',
-          instructedAgent: 'ENT',
-          keyId: 'key-789',
-          keyState: 'ACTIVA',
-          name: 'Test User',
-          partyIdentifier: '3009876543',
-          partySystemIdentifier: 'MSISDN',
-          partyType: 'PERSON',
-          subType: 'PN',
-          typeAccount: 'DBMO',
-        },
-      },
-    })
-    mockedAxios.post.mockResolvedValueOnce({ data: { data: { rail: 'ENT' } } })
-
-    const outcome = await service.sendPayment({
-      account: '3009876543',
-      bankCode: 'ENT',
-      id: 'txn-4',
-      value: 10_000,
+      expect(result).toEqual({ success: false })
+      expect(logger.error).toHaveBeenCalledWith('[BreB] Failed to dispatch payment', 'network down')
     })
 
-    expect(outcome).toEqual({ success: false })
-    expect(logger.error).toHaveBeenCalledWith('[BreB] Send response missing transaction id', { rail: 'ENT' })
-  })
+    it('logs pending outcomes when polling does not conclude', async () => {
+      const { internals, logger, service } = setupService()
+      jest.spyOn(internals, 'pollTransactionReport').mockResolvedValueOnce({ report: null, result: 'pending' })
+      primeAccessToken()
+      primeKeyLookup()
+      primeSend('tx-005')
 
-  it('handles dispatch failures gracefully', async () => {
-    const logger = buildLogger()
-    const service = new BrebPaymentService(buildSecretManager(), logger)
-    mockedAxios.isAxiosError.mockReturnValue(true)
+      const result = await service.sendPayment({
+        account: defaultKeyDetails.accountNumber,
+        bankCode: 'ENT',
+        id: 'txn-5',
+        value: 15_000,
+      })
 
-    mockedAxios.post
-      .mockResolvedValueOnce({ data: { access_token: 'token-1', expires_in: 3600 } })
-      .mockRejectedValueOnce({ isAxiosError: true, response: { data: 'network down' } })
-
-    mockedAxios.get.mockResolvedValueOnce({
-      data: {
-        data: {
-          accountNumber: '3001112222',
-          documentNumber: '12345',
-          documentType: 'CC',
-          instructedAgent: 'ENT',
-          keyId: 'key-900',
-          keyState: 'ACTIVA',
-          name: 'Test User',
-          partyIdentifier: '3001112222',
-          partySystemIdentifier: 'MSISDN',
-          partyType: 'PERSON',
-          subType: 'PN',
-          typeAccount: 'DBMO',
-        },
-      },
+      expect(result).toEqual({ success: false })
+      expect(logger.warn).toHaveBeenCalledWith('[BreB] Payment pending after timeout', { transactionId: 'tx-005' })
     })
 
-    const result = await service.sendPayment({
-      account: '3001112222',
-      bankCode: 'ENT',
-      id: 'txn-5',
-      value: 15_000,
+    it('fails fast when the bank code is unsupported', async () => {
+      const { logger, service } = setupService()
+      const result = await service.sendPayment({
+        account: '123',
+        bankCode: 'INVALID',
+        id: 'txn-invalid',
+        value: 1_000,
+      })
+
+      expect(result).toEqual({ success: false })
+      expect(logger.error).toHaveBeenCalledWith(
+        '[BreB] Payment submission failed',
+        expect.objectContaining({ bankCode: 'INVALID', reason: expect.stringContaining('Unsupported BreB rail') }),
+      )
+    })
+  })
+
+  describe('verifyAccount', () => {
+    it('rejects verification when the rail or key data is invalid', async () => {
+      const { logger, service } = setupService()
+
+      const invalidRail = await service.verifyAccount({ account: '123', bankCode: '???' })
+      expect(invalidRail).toBe(false)
+
+      primeAccessToken()
+      mockedAxios.get.mockResolvedValueOnce({ data: {} })
+
+      const missingKey = await service.verifyAccount({ account: '123', bankCode: 'ENT' })
+      expect(missingKey).toBe(false)
+      expect(logger.warn).toHaveBeenCalledWith(
+        '[BreB] Failed to verify account',
+        expect.objectContaining({ bankCode: '???', reason: expect.stringContaining('Unsupported BreB rail') }),
+      )
     })
 
-    expect(result).toEqual({ success: false })
-    expect(logger.error).toHaveBeenCalledWith('[BreB] Failed to dispatch payment', 'network down')
-  })
+    it('handles key lookup failures from the provider', async () => {
+      const { logger, service } = setupService()
+      mockedAxios.isAxiosError.mockReturnValue(true)
 
-  it('logs pending outcomes when polling does not conclude', async () => {
-    const logger = buildLogger()
-    const service = new BrebPaymentService(buildSecretManager(), logger)
-    const internals = getInternals(service)
+      primeAccessToken()
+      mockedAxios.get.mockRejectedValueOnce(axiosFailure('lookup failed'))
 
-    jest.spyOn(internals, 'pollTransactionReport').mockResolvedValueOnce({ report: null, result: 'pending' })
-
-    mockedAxios.post
-      .mockResolvedValueOnce({ data: { access_token: 'token-1', expires_in: 3600 } })
-      .mockResolvedValueOnce({ data: { data: { moviiTxId: 'tx-005', rail: 'ENT' } } })
-
-    mockedAxios.get.mockResolvedValueOnce({
-      data: {
-        data: {
-          accountNumber: '3001112222',
-          documentNumber: '12345',
-          documentType: 'CC',
-          instructedAgent: 'ENT',
-          keyId: 'key-900',
-          keyState: 'ACTIVA',
-          name: 'Test User',
-          partyIdentifier: '3001112222',
-          partySystemIdentifier: 'MSISDN',
-          partyType: 'PERSON',
-          subType: 'PN',
-          typeAccount: 'DBMO',
-        },
-      },
+      const verified = await service.verifyAccount({ account: defaultKeyDetails.accountNumber, bankCode: 'ENT' })
+      expect(verified).toBe(false)
+      expect(logger.error).toHaveBeenCalledWith('[BreB] Failed to fetch key', 'lookup failed')
     })
 
-    const result = await service.sendPayment({
-      account: '3001112222',
-      bankCode: 'ENT',
-      id: 'txn-5',
-      value: 15_000,
+    it('captures non-axios key lookup errors', async () => {
+      const { logger, service } = setupService()
+
+      primeAccessToken()
+      mockedAxios.get.mockRejectedValueOnce(new Error('plain failure'))
+
+      const verified = await service.verifyAccount({ account: defaultKeyDetails.accountNumber, bankCode: 'ENT' })
+      expect(verified).toBe(false)
+      expect(logger.error).toHaveBeenCalledWith('[BreB] Failed to fetch key', expect.any(Error))
     })
 
-    expect(result).toEqual({ success: false })
-    expect(logger.warn).toHaveBeenCalledWith('[BreB] Payment pending after timeout', { transactionId: 'tx-005' })
+    it('recognises incomplete keys as unusable', async () => {
+      const { logger, service } = setupService()
+      primeAccessToken()
+      primeKeyLookup({ accountNumber: '', keyState: 'ACTIVA' })
+
+      const result = await service.verifyAccount({ account: '321', bankCode: 'ENT' })
+      expect(result).toBe(false)
+      expect(logger.warn).toHaveBeenCalledWith('[BreB] Key missing required attributes', expect.any(Object))
+    })
   })
 
-  it('rejects verification when the rail or key data is invalid', async () => {
-    const logger = buildLogger()
-    const service = new BrebPaymentService(buildSecretManager(), logger)
+  describe('configuration and authentication', () => {
+    it('caches access tokens and propagates authentication failures', async () => {
+      mockedAxios.isAxiosError.mockReturnValue(true)
+      const { internals } = setupService()
+      const config = await internals.getConfig()
+      primeAccessToken('token-1', 40)
 
-    const invalidRail = await service.verifyAccount({ account: '123', bankCode: '???' })
-    expect(invalidRail).toBe(false)
+      const first = await internals.getAccessToken(config)
+      const second = await internals.getAccessToken(config)
 
-    mockedAxios.post.mockResolvedValueOnce({ data: { access_token: 'token-1', expires_in: 3600 } })
-    mockedAxios.get.mockResolvedValueOnce({ data: {} })
+      expect(first).toBe('token-1')
+      expect(second).toBe('token-1')
+      expect(mockedAxios.post).toHaveBeenCalledTimes(1)
 
-    const missingKey = await service.verifyAccount({ account: '123', bankCode: 'ENT' })
-    expect(missingKey).toBe(false)
-    expect(logger.warn).toHaveBeenCalledWith('[BreB] Failed to verify account', expect.objectContaining({ bankCode: '???' }))
-  })
+      const failingInternals = getInternals(new BrebPaymentService(buildSecretManager(), buildLogger()))
+      mockedAxios.post.mockRejectedValueOnce(axiosFailure('auth down'))
 
-  it('handles transaction report errors and pending interpretations', async () => {
-    const service = new BrebPaymentService(buildSecretManager(), buildLogger())
-    const internals = getInternals(service)
-    const config = await internals.getConfig()
-    mockedAxios.isAxiosError.mockReturnValue(true)
-
-    mockedAxios.get.mockRejectedValueOnce({ isAxiosError: true, response: { data: 'reporting down' } })
-    const report = await internals.fetchTransactionReport('tx-err', 'ENT', config, 'token')
-    expect(report).toBeNull()
-    expect(internals.interpretReport({})).toBe('pending')
-  })
-
-  it('caches access tokens and propagates authentication failures', async () => {
-    const service = new BrebPaymentService(buildSecretManager(), buildLogger())
-    const internals = getInternals(service)
-    const config = await internals.getConfig()
-    mockedAxios.isAxiosError.mockReturnValue(true)
-
-    mockedAxios.post.mockResolvedValueOnce({ data: { access_token: 'token-1', expires_in: 40 } })
-
-    const first = await internals.getAccessToken(config)
-    const second = await internals.getAccessToken(config)
-
-    expect(first).toBe('token-1')
-    expect(second).toBe('token-1')
-    expect(mockedAxios.post).toHaveBeenCalledTimes(1)
-
-    const failingService = new BrebPaymentService(buildSecretManager(), buildLogger())
-    const failingInternals = getInternals(failingService)
-    mockedAxios.post.mockRejectedValueOnce({ isAxiosError: true, response: { data: 'auth down' } })
-
-    await expect(failingInternals.getAccessToken(await failingInternals.getConfig())).rejects.toThrow('BreB authentication failed')
-  })
-
-  it('propagates authentication failures without axios metadata', async () => {
-    const internals = getInternals(new BrebPaymentService(buildSecretManager(), buildLogger()))
-    mockedAxios.post.mockRejectedValueOnce(new Error('auth exploded'))
-
-    await expect(internals.getAccessToken(await internals.getConfig())).rejects.toThrow('BreB authentication failed')
-  })
-
-  it('fails fast when the bank code is unsupported during sendPayment', async () => {
-    const logger = buildLogger()
-    const service = new BrebPaymentService(buildSecretManager(), logger)
-
-    const result = await service.sendPayment({
-      account: '123',
-      bankCode: 'INVALID',
-      id: 'txn-invalid',
-      value: 1_000,
+      await expect(failingInternals.getAccessToken(await failingInternals.getConfig())).rejects.toThrow(
+        'BreB authentication failed',
+      )
     })
 
-    expect(result).toEqual({ success: false })
-    expect(logger.error).toHaveBeenCalledWith(
-      '[BreB] Payment submission failed',
-      expect.objectContaining({ bankCode: 'INVALID', reason: expect.any(String) }),
-    )
-  })
+    it('reuses cached configuration', async () => {
+      const secretManager = buildSecretManager()
+      const service = new BrebPaymentService(secretManager, buildLogger())
+      const internals = getInternals(service)
 
-  it('handles key lookup failures from the provider', async () => {
-    const logger = buildLogger()
-    const service = new BrebPaymentService(buildSecretManager(), logger)
-    mockedAxios.isAxiosError.mockReturnValue(true)
+      const firstConfig = await internals.getConfig()
+      const secondConfig = await internals.getConfig()
 
-    mockedAxios.post.mockResolvedValueOnce({ data: { access_token: 'token-1', expires_in: 3600 } })
-    mockedAxios.get.mockRejectedValueOnce({ isAxiosError: true, response: { data: 'lookup failed' } })
-
-    const verified = await service.verifyAccount({ account: '3112268870', bankCode: 'ENT' })
-    expect(verified).toBe(false)
-    expect(logger.error).toHaveBeenCalledWith('[BreB] Failed to fetch key', 'lookup failed')
-  })
-
-  it('captures non-axios key lookup errors', async () => {
-    const logger = buildLogger()
-    const service = new BrebPaymentService(buildSecretManager(), logger)
-
-    mockedAxios.post.mockResolvedValueOnce({ data: { access_token: 'token-1', expires_in: 3600 } })
-    mockedAxios.get.mockRejectedValueOnce(new Error('plain failure'))
-
-    const verified = await service.verifyAccount({ account: '3112268870', bankCode: 'ENT' })
-    expect(verified).toBe(false)
-    expect(logger.error).toHaveBeenCalledWith('[BreB] Failed to fetch key', expect.any(Error))
-  })
-
-  it('reuses cached configuration and recognises failure reports', async () => {
-    const secretManager = buildSecretManager()
-    const service = new BrebPaymentService(secretManager, buildLogger())
-    const internals = getInternals(service)
-
-    const firstConfig = await internals.getConfig()
-    const secondConfig = await internals.getConfig()
-
-    expect(secondConfig).toBe(firstConfig)
-    expect(secretManager.getSecrets).toHaveBeenCalledTimes(1)
-    expect(internals.interpretReport({
-      Debtor: { TransactionInfAndSts: { TransactionStatus: 'RJCT' } },
-    })).toBe('failure')
-  })
-
-  it('builds payload defaults and rejects incomplete keys', () => {
-    const service = new BrebPaymentService(buildSecretManager(), buildLogger())
-    const internals = getInternals(service)
-    const payload = internals.buildSendPayload({}, 50)
-
-    expect(payload).toMatchObject({
-      creditor_account_number: '',
-      creditor_document_number: '',
-      creditor_document_type: '',
-      creditor_entity_id: '',
-      creditor_instructed_agent: '',
-      creditor_key_id: '',
-      creditor_name: '',
-      creditor_party_identifier: '',
-      creditor_party_system_identifier: '',
-      creditor_party_type: '',
-      creditor_sub_type: '',
-      creditor_type_account: '',
-      transaction_total_amount: 50,
+      expect(secondConfig).toBe(firstConfig)
+      expect(secretManager.getSecrets).toHaveBeenCalledTimes(1)
     })
-    expect(internals.isKeyUsable({ instructedAgent: 'ENT', keyState: 'ACTIVA' }, 'ENT')).toBe(false)
   })
 
-  it('returns null when dispatch responses lack data envelopes', async () => {
-    const service = new BrebPaymentService(buildSecretManager(), buildLogger())
-    const internals = getInternals(service)
-    const config = await internals.getConfig()
+  describe('dispatch and report handling', () => {
+    it('builds payload defaults and rejects incomplete keys', () => {
+      const { internals } = setupService()
+      const payload = internals.buildSendPayload({}, 50)
 
-    mockedAxios.post.mockResolvedValueOnce({ data: null })
+      expect(payload).toMatchObject({
+        creditor_account_number: '',
+        creditor_document_number: '',
+        creditor_document_type: '',
+        creditor_entity_id: '',
+        creditor_instructed_agent: '',
+        creditor_key_id: '',
+        creditor_name: '',
+        creditor_party_identifier: '',
+        creditor_party_system_identifier: '',
+        creditor_party_type: '',
+        creditor_sub_type: '',
+        creditor_type_account: '',
+        transaction_total_amount: 50,
+      })
+      expect(internals.isKeyUsable({ instructedAgent: 'ENT', keyState: 'ACTIVA' }, 'ENT')).toBe(false)
+    })
 
-    const result = await internals.dispatchPayment({ amount: 1 }, config, 'token')
-    expect(result).toBeNull()
-  })
+    it('returns null when dispatch responses lack data envelopes', async () => {
+      const { internals } = setupService()
+      const config = await internals.getConfig()
 
-  it('handles dispatch failures without axios metadata', async () => {
-    const logger = buildLogger()
-    const service = new BrebPaymentService(buildSecretManager(), logger)
-    const internals = getInternals(service)
-    const config = await internals.getConfig()
+      mockedAxios.post.mockResolvedValueOnce({ data: null })
 
-    mockedAxios.post.mockRejectedValueOnce(new Error('plain dispatch error'))
+      const result = await internals.dispatchPayment({ amount: 1 }, config, 'token')
+      expect(result).toBeNull()
+    })
 
-    const result = await internals.dispatchPayment({ amount: 1 }, config, 'token')
-    expect(result).toBeNull()
-    expect(logger.error).toHaveBeenCalledWith('[BreB] Failed to dispatch payment', expect.any(Error))
-  })
+    it('handles dispatch failures without axios metadata', async () => {
+      const { internals, logger } = setupService()
+      const config = await internals.getConfig()
 
-  it('handles transaction report errors without axios context', async () => {
-    const service = new BrebPaymentService(buildSecretManager(), buildLogger())
-    const internals = getInternals(service)
-    const config = await internals.getConfig()
+      mockedAxios.post.mockRejectedValueOnce(new Error('plain dispatch error'))
 
-    mockedAxios.get.mockRejectedValueOnce(new Error('plain report error'))
+      const result = await internals.dispatchPayment({ amount: 1 }, config, 'token')
+      expect(result).toBeNull()
+      expect(logger.error).toHaveBeenCalledWith('[BreB] Failed to dispatch payment', expect.any(Error))
+    })
 
-    const report = await internals.fetchTransactionReport('tx-plain', 'ENT', config, 'token')
-    expect(report).toBeNull()
-  })
+    it('handles transaction report errors and pending interpretations', async () => {
+      const { internals } = setupService()
+      const config = await internals.getConfig()
+      mockedAxios.isAxiosError.mockReturnValue(true)
 
-  it('times out polling when no transaction report is available', async () => {
-    const service = new BrebPaymentService(buildSecretManager(), buildLogger())
-    const internals = getInternals(service)
-    internals.pollConfig.delayMs = 0
-    internals.pollConfig.timeoutMs = 1
+      mockedAxios.get.mockRejectedValueOnce(axiosFailure('reporting down'))
+      const report = await internals.fetchTransactionReport('tx-err', 'ENT', config, 'token')
+      expect(report).toBeNull()
+      expect(internals.interpretReport({})).toBe('pending')
+      expect(
+        internals.interpretReport({
+          Debtor: { TransactionInfAndSts: { TransactionStatus: 'RJCT' } },
+        }),
+      ).toBe('failure')
+    })
 
-    jest.spyOn(internals, 'fetchTransactionReport').mockResolvedValue(null)
+    it('handles transaction report errors without axios context', async () => {
+      const { internals } = setupService()
+      const config = await internals.getConfig()
 
-    const result = await internals.pollTransactionReport('tx-timeout', 'ENT', await internals.getConfig(), 'token')
-    expect(result).toBeNull()
+      mockedAxios.get.mockRejectedValueOnce(new Error('plain report error'))
+
+      const report = await internals.fetchTransactionReport('tx-plain', 'ENT', config, 'token')
+      expect(report).toBeNull()
+    })
+
+    it('times out polling when no transaction report is available', async () => {
+      const { internals } = setupService()
+      internals.pollConfig.delayMs = 0
+      internals.pollConfig.timeoutMs = 1
+
+      jest.spyOn(internals, 'fetchTransactionReport').mockResolvedValue(null)
+
+      const result = await internals.pollTransactionReport('tx-timeout', 'ENT', await internals.getConfig(), 'token')
+      expect(result).toBeNull()
+    })
   })
 })

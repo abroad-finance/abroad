@@ -1,16 +1,4 @@
-/**
- * PartnerUserController
- * ---------------------
- * HTTP boundary layer for Partner‑User resources.
- *
- * ▸ Strict Zod validation for all DTOs (but DTOs themselves are plain TS interfaces so TSOA can reflect them).
- * ▸ Clear HTTP semantics (201 for create, typed error responses, pagination constraints).
- * ▸ Controller remains thin; no domain/business logic leaks.
- * ▸ Zero `any` usage – all values are fully typed with Prisma models or utility types.
- */
-
 import { type PartnerUser as PartnerUserModel, Prisma } from '@prisma/client'
-import { Request as ExpressRequest } from 'express'
 import { inject } from 'inversify'
 import {
   Body,
@@ -28,72 +16,27 @@ import {
   SuccessResponse,
   TsoaResponse,
 } from 'tsoa'
-import { z, type ZodType } from 'zod'
 
 import { IDatabaseClientProvider } from '../interfaces/IDatabaseClientProvider'
 import { IPaymentServiceFactory } from '../interfaces/IPaymentServiceFactory'
 import { TYPES } from '../types'
-
-/** ------------------------------------------------------------------------
- * 🗒️  DTOs & Validation Schemas
- * --------------------------------------------------------------------- */
-
-interface CreatePartnerUserRequest {
-  kycExternalToken?: null | string
-  userId: string
-}
-
-const createPartnerUserSchema: ZodType<CreatePartnerUserRequest> = z.object({
-  kycExternalToken: z.string().min(1).nullable().optional(),
-  kycToken: z.string().min(1).nullable().optional(),
-  userId: z.string().uuid(),
-})
-
-interface PaginatedPartnerUsers {
-  page: number
-  pageSize: number
-  total: number
-  users: PartnerUserDto[]
-}
-
-interface PartnerUserDto {
-  createdAt: Date
-  id: string
-  kycToken: null | string
-  updatedAt: Date
-  userId: string
-}
-
-interface UpdatePartnerUserRequest {
-  kycExternalToken?: null | string
-}
-
-const updatePartnerUserSchema: ZodType<UpdatePartnerUserRequest> = z
-  .object({
-    kycExternalToken: z.string().min(1).nullable().optional(),
-  })
-  .refine(data => Object.keys(data).length > 0, {
-    message: 'At least one field must be supplied',
-  })
-
-/**
- * Express request augmented with authenticated partner context.
- */
-type AuthenticatedRequest = ExpressRequest & {
-  user: { id: string }
-}
-
-/** ------------------------------------------------------------------------
- * 🚦  Controller
- * --------------------------------------------------------------------- */
+import {
+  AuthenticatedRequest,
+  CreatePartnerUserRequest,
+  createPartnerUserSchema,
+  DEFAULT_PAGE_SIZE,
+  PaginatedPartnerUsers,
+  parsePagination,
+  parsePayload,
+  PartnerUserDto,
+  UpdatePartnerUserRequest,
+  updatePartnerUserSchema,
+} from './partnerUser/contracts'
 
 @Route('partnerUser')
 @Security('BearerAuth')
 @Security('ApiKeyAuth')
 export class PartnerUserController extends Controller {
-  private static readonly DEFAULT_PAGE_SIZE = 20
-  private static readonly MAX_PAGE_SIZE = 100
-
   constructor(
     @inject(TYPES.IDatabaseClientProvider)
     private readonly dbProvider: IDatabaseClientProvider,
@@ -116,9 +59,9 @@ export class PartnerUserController extends Controller {
     @Request() req: AuthenticatedRequest,
     @Res() badRequest: TsoaResponse<400, { reason: string }>,
   ): Promise<PartnerUserDto> {
-    const validation = createPartnerUserSchema.safeParse(body)
-    if (!validation.success) {
-      return badRequest(400, { reason: 'Invalid payload' })
+    const validation = parsePayload(createPartnerUserSchema, body)
+    if ('error' in validation) {
+      return badRequest(400, { reason: validation.error })
     }
 
     const prisma = await this.dbProvider.getClient()
@@ -149,16 +92,13 @@ export class PartnerUserController extends Controller {
   @SuccessResponse('200', 'Partner users retrieved')
   public async listPartnerUsers(
     @Query() page: number = 1,
-    @Query() pageSize: number = PartnerUserController.DEFAULT_PAGE_SIZE,
+    @Query() pageSize: number = DEFAULT_PAGE_SIZE,
     @Request() req: AuthenticatedRequest,
     @Res() badRequest: TsoaResponse<400, { reason: string }>,
   ): Promise<PaginatedPartnerUsers> {
-    if (
-      page < 1
-      || pageSize < 1
-      || pageSize > PartnerUserController.MAX_PAGE_SIZE
-    ) {
-      return badRequest(400, { reason: 'Invalid pagination parameters' })
+    const pagination = parsePagination({ page, pageSize })
+    if ('error' in pagination) {
+      return badRequest(400, { reason: pagination.error })
     }
 
     const prisma = await this.dbProvider.getClient()
@@ -166,16 +106,16 @@ export class PartnerUserController extends Controller {
     const [records, total] = await Promise.all([
       prisma.partnerUser.findMany({
         orderBy: { createdAt: 'desc' },
-        skip: (page - 1) * pageSize,
-        take: pageSize,
+        skip: (pagination.data.page - 1) * pagination.data.pageSize,
+        take: pagination.data.pageSize,
         where: { partnerId: req.user.id },
       }),
       prisma.partnerUser.count({ where: { partnerId: req.user.id } }),
     ])
 
     return {
-      page,
-      pageSize,
+      page: pagination.data.page,
+      pageSize: pagination.data.pageSize,
       total,
       users: records.map(record => this.mapToDto(record)),
     }
@@ -195,9 +135,9 @@ export class PartnerUserController extends Controller {
     @Request() req: AuthenticatedRequest,
     @Res() res: TsoaResponse<400 | 404, { reason: string }>,
   ): Promise<PartnerUserDto> {
-    const validation = updatePartnerUserSchema.safeParse(body)
-    if (!validation.success) {
-      return res(400, { reason: validation.error.issues[0].message })
+    const validation = parsePayload(updatePartnerUserSchema, body)
+    if ('error' in validation) {
+      return res(400, { reason: validation.error })
     }
 
     const prisma = await this.dbProvider.getClient()

@@ -4,9 +4,7 @@ When contributing to this repository, please ensure that you adhere to the follo
 
 
 ## Mandatory Checks
-- Run "npm run format && npm run build".
-- Run "npm run test".
-- Run "npm maintainability:report".
+- Run `"npm -w abroad run checks:mandatory"` (formats, builds, runs tests, and generates the maintainability report).
 
 - Istanbul comments such as "istanbul ignore next" are not allowed.
 - Jest configuration must not be modified.

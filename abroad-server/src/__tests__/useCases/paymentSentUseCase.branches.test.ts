@@ -1,6 +1,5 @@
 import 'reflect-metadata'
-
-import { BlockchainNetwork, CryptoCurrency, SupportedCurrency, TargetCurrency } from '@prisma/client'
+import { CryptoCurrency, SupportedCurrency, TargetCurrency } from '@prisma/client'
 
 import { PaymentSentUseCase } from '../../useCases/paymentSentUseCase'
 
@@ -40,7 +39,7 @@ describe('PaymentSentUseCase branch helpers', () => {
     }
 
     const brlConversions = builder.buildPendingConversionUpdates(SupportedCurrency.USDC, TargetCurrency.BRL)
-    expect(brlConversions).toEqual([{ source: SupportedCurrency.USDC, target: SupportedCurrency.BRL, symbol: 'USDCBRL' }])
+    expect(brlConversions).toEqual([{ source: SupportedCurrency.USDC, symbol: 'USDCBRL', target: SupportedCurrency.BRL }])
 
     const unrelated = builder.buildPendingConversionUpdates('BTC' as CryptoCurrency, TargetCurrency.BRL)
     expect(unrelated).toEqual([])

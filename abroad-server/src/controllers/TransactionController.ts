@@ -1,6 +1,5 @@
 // src/controllers/TransactionController.ts
 
-import { TransactionStatus } from '@prisma/client'
 import { Request as RequestExpress } from 'express'
 import { inject } from 'inversify'
 import {
@@ -16,46 +15,11 @@ import {
   TsoaResponse,
 } from 'tsoa'
 import { Body, Post } from 'tsoa'
-import { z } from 'zod'
 
 import { TransactionAcceptanceService, TransactionValidationError } from '../services/TransactionAcceptanceService'
 import { TransactionStatusService } from '../services/TransactionStatusService'
 import { TYPES } from '../types'
-
-const acceptTransactionRequestSchema = z.object({
-  account_number: z.string().min(1, 'Account number is required'),
-  bank_code: z.string().optional(),
-  qr_code: z.string().nullable().optional(),
-  quote_id: z.string().min(1, 'Quote ID is required'),
-  redirectUrl: z.string().optional(),
-  tax_id: z.string().optional(),
-  user_id: z.string().min(1, 'User ID is required'),
-})
-
-interface AcceptTransactionRequest {
-  account_number: string
-  bank_code?: string
-  qr_code?: null | string
-  quote_id: string
-  redirectUrl?: string
-  tax_id?: string
-  user_id: string
-}
-
-interface AcceptTransactionResponse {
-  id: null | string
-  kycLink: null | string
-  transaction_reference: null | string
-}
-
-interface TransactionStatusResponse {
-  id: string
-  kycLink: null | string
-  on_chain_tx_hash: null | string
-  status: TransactionStatus
-  transaction_reference: string
-  user_id: string
-}
+import { type AcceptTransactionRequest, acceptTransactionRequestSchema, type AcceptTransactionResponse, type TransactionStatusResponse } from './transaction/contracts'
 
 @Route('transaction')
 @Security('ApiKeyAuth')

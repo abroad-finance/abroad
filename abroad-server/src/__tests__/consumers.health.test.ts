@@ -6,27 +6,27 @@ import { createHealthHandler } from '../consumers'
 
 type ResponseShape = {
   body: string
-  headers: Record<string, string>
-  statusCode: number
   end: (this: ResponseShape, chunk?: string) => ResponseShape
+  headers: Record<string, string>
   setHeader: (this: ResponseShape, key: string, value: string) => ResponseShape
+  statusCode: number
 }
 
 const buildResponse = () => {
   const response: ResponseShape = {
     body: '',
-    headers: {},
-    statusCode: 0,
     end(this: ResponseShape, chunk?: string) {
       if (chunk) {
         this.body += chunk
       }
       return this
     },
+    headers: {},
     setHeader(this: ResponseShape, key: string, value: string) {
       this.headers[key] = value
       return this
     },
+    statusCode: 0,
   }
 
   return response as unknown as http.ServerResponse & { body: string, headers: Record<string, string>, statusCode: number }

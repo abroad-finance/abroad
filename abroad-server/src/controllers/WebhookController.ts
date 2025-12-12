@@ -1,4 +1,3 @@
-import { TargetCurrency } from '@prisma/client'
 import { Request as RequestExpress } from 'express'
 import { inject } from 'inversify'
 import {
@@ -13,18 +12,14 @@ import {
   SuccessResponse,
   TsoaResponse,
 } from 'tsoa'
-import { z } from 'zod'
 
-import { ILogger, IQueueHandler, PaymentStatusUpdatedMessage, QueueName } from '../interfaces'
+import { ILogger, IQueueHandler, QueueName } from '../interfaces'
 import { IDatabaseClientProvider } from '../interfaces/IDatabaseClientProvider'
 import { PersonaWebhookService } from '../services/webhooks/PersonaWebhookService'
 import { WebhookProcessingResult } from '../services/webhooks/types'
 import { TYPES } from '../types'
-
-type WebhookResponse = {
-  message?: string
-  success: boolean
-}
+import { parseTransferoWebhook } from './webhook/transferoWebhookValidator'
+import { WebhookResponse } from './webhook/types'
 
 @Route('webhook')
 export class WebhookController extends Controller {
@@ -87,32 +82,13 @@ export class WebhookController extends Controller {
         payload: body,
       })
 
-      // Validate minimum fields from provided example
-      const schema = z.object({
-        Amount: z.number().optional(),
-        Currency: z.enum(TargetCurrency),
-        PaymentId: z.string().min(1),
-        PaymentStatus: z.string().min(1),
-      }).loose()
-
-      const parsed = schema.safeParse(body)
-      if (!parsed.success) {
-        this.logger.warn('Invalid Transfero webhook payload', {
-          errors: JSON.stringify(parsed.error.issues),
-        })
+      const validation = parseTransferoWebhook(body)
+      if (!validation.success) {
+        this.logger.warn('Invalid Transfero webhook payload', { errors: validation.errors })
         return badRequest(400, { message: 'Invalid webhook payload', success: false })
       }
 
-      const { Amount, Currency, PaymentId, PaymentStatus } = parsed.data as z.output<typeof schema>
-
-      // Publish a normalized message to the queue for async processing
-      await this.queueHandler.postMessage(QueueName.PAYMENT_STATUS_UPDATED, {
-        amount: typeof Amount === 'number' ? Amount : 0,
-        currency: Currency ?? 'BRL',
-        externalId: PaymentId,
-        provider: 'transfero',
-        status: PaymentStatus,
-      } satisfies PaymentStatusUpdatedMessage)
+      await this.queueHandler.postMessage(QueueName.PAYMENT_STATUS_UPDATED, validation.message)
       this.setStatus(200)
       return { message: 'Webhook processed successfully', success: true }
     }
