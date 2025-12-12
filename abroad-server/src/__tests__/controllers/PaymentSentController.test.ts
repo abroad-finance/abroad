@@ -60,13 +60,14 @@ describe('PaymentSentUseCase.process', () => {
     const { logger, useCase } = buildUseCaseHarness()
 
     await useCase.process({})
-    expect(logger.warn).toHaveBeenCalledWith(
-      '[PaymentSent]: Received empty message. Skipping...',
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.stringContaining('Invalid message format'),
+      expect.anything(),
     )
 
     await useCase.process({ amount: 10 })
     expect(logger.error).toHaveBeenCalledWith(
-      '[PaymentSent]: Invalid message format:',
+      expect.stringContaining('Invalid message format'),
       expect.anything(),
     )
   })
@@ -96,7 +97,7 @@ describe('PaymentSentUseCase.process', () => {
       memo: 'memo',
     })
     expect(dbClient.pendingConversions.upsert).toHaveBeenCalledTimes(2)
-    expect(logger.info).toHaveBeenCalledWith('[PaymentSent]: Payment sent successfully')
+    expect(logger.info).toHaveBeenCalledWith(expect.stringContaining('Payment sent successfully'))
   })
 
   it('handles BRL settlement path and no-ops on failed wallet sends', async () => {

@@ -34,7 +34,7 @@ export class PaymentSentController {
     }
   }
 
-  private async onPaymentSent(msg: Record<string, boolean | number | string>): Promise<void> {
+  private async onPaymentSent(msg: unknown): Promise<void> {
     await this.paymentSentUseCase.process(msg)
   }
 }

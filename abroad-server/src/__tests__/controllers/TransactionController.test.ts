@@ -2,7 +2,6 @@ import 'reflect-metadata'
 import { Country, PaymentMethod, TargetCurrency, TransactionStatus } from '@prisma/client'
 import { NotFound } from 'http-errors'
 
-import type { IQueueHandler } from '../../interfaces'
 import type { IDatabaseClientProvider } from '../../interfaces/IDatabaseClientProvider'
 import type { IKycService } from '../../interfaces/IKycService'
 import type { IPaymentService } from '../../interfaces/IPaymentService'
@@ -12,7 +11,7 @@ import type { IWebhookNotifier } from '../../interfaces/IWebhookNotifier'
 import { TransactionController } from '../../controllers/TransactionController'
 import { TransactionAcceptanceService } from '../../services/TransactionAcceptanceService'
 import { TransactionStatusService } from '../../services/TransactionStatusService'
-import { createMockLogger } from '../setup/mockFactories'
+import { createMockLogger, createMockQueueHandler, MockQueueHandler } from '../setup/mockFactories'
 
 const buildController = () => {
   const prisma = {
@@ -32,10 +31,7 @@ const buildController = () => {
   const webhookNotifier: IWebhookNotifier = {
     notifyWebhook: jest.fn(),
   }
-  const queueHandler: IQueueHandler = {
-    postMessage: jest.fn(),
-    subscribeToQueue: jest.fn(),
-  }
+  const queueHandler = createMockQueueHandler()
   const logger = createMockLogger()
 
   const acceptanceService = new TransactionAcceptanceService(
@@ -174,10 +170,7 @@ describe('TransactionController acceptance flows', () => {
     const webhookNotifier: IWebhookNotifier = {
       notifyWebhook: jest.fn(),
     }
-    const queueHandler: IQueueHandler = {
-      postMessage: jest.fn().mockResolvedValue(undefined),
-      subscribeToQueue: jest.fn(),
-    }
+    const queueHandler = createMockQueueHandler()
     const dbProvider: IDatabaseClientProvider = {
       getClient: jest.fn(async () => prisma as unknown as import('@prisma/client').PrismaClient),
     }
@@ -364,7 +357,9 @@ describe('TransactionController acceptance flows', () => {
     const kycService: IKycService = {
       getKycLink: jest.fn().mockResolvedValue(null),
     }
-    const queueHandler: IQueueHandler = { postMessage: queueHandlerPost, subscribeToQueue: jest.fn() }
+    const queueHandler = createMockQueueHandler({
+      postMessage: queueHandlerPost as unknown as MockQueueHandler['postMessage'],
+    })
     const logger = createMockLogger()
     const acceptanceService = new TransactionAcceptanceService(
       dbProvider,

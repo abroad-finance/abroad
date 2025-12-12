@@ -12,12 +12,11 @@ import { Horizon } from '@stellar/stellar-sdk'
 import { inject } from 'inversify'
 import { Controller, Post, Route, SuccessResponse } from 'tsoa'
 
-import { ILogger, IQueueHandler, QueueName } from '../interfaces'
+import { ILogger, IQueueHandler, QueueName, ReceivedCryptoTransactionMessage } from '../interfaces'
 import { IDatabaseClientProvider } from '../interfaces/IDatabaseClientProvider'
 import { ISecretManager, Secrets } from '../interfaces/ISecretManager'
 import { IWebhookNotifier, WebhookEvent } from '../interfaces/IWebhookNotifier'
 import { TYPES } from '../types'
-import { TransactionQueueMessage } from '../useCases/receivedCryptoTransactionUseCase'
 
 interface CheckExpiredTransactionsResponse {
   awaiting: number
@@ -241,7 +240,7 @@ export class PublicTransactionsController extends Controller {
           continue
         }
 
-        const queueMessage: TransactionQueueMessage = {
+        const queueMessage: ReceivedCryptoTransactionMessage = {
           addressFrom: payment.from,
           amount: parseFloat(payment.amount),
           blockchain: BlockchainNetwork.STELLAR,

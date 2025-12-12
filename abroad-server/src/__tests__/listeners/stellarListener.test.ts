@@ -1,13 +1,12 @@
 import { PrismaClient } from '@prisma/client'
 import * as StellarSdk from '@stellar/stellar-sdk'
 
-import type { IQueueHandler } from '../../interfaces'
 import type { IDatabaseClientProvider } from '../../interfaces/IDatabaseClientProvider'
 import type { ISecretManager } from '../../interfaces/ISecretManager'
 
-import { QueueName } from '../../interfaces'
+import { QueueName, ReceivedCryptoTransactionMessage } from '../../interfaces'
 import { StellarListener } from '../../listeners/stellar'
-import { createMockLogger } from '../setup/mockFactories'
+import { createMockLogger, createMockQueueHandler, MockQueueHandler } from '../setup/mockFactories'
 
 interface HorizonMocks {
   cursor: jest.Mock
@@ -101,11 +100,11 @@ function createPayment(overrides: Partial<TestPayment> = {}): TestPayment {
   }
 }
 
-function createQueueHandler(postMessage?: IQueueHandler['postMessage']): IQueueHandler {
-  return {
-    postMessage: postMessage ?? jest.fn().mockResolvedValue(undefined),
-    subscribeToQueue: jest.fn().mockResolvedValue(undefined),
-  } as IQueueHandler
+function createQueueHandler(postMessage?: MockQueueHandler['postMessage']): MockQueueHandler {
+  if (postMessage) {
+    return createMockQueueHandler({ postMessage })
+  }
+  return createMockQueueHandler()
 }
 
 function createSecretManager(accountId = 'account-id', horizonUrl = 'https://horizon', usdcIssuer = 'issuer'): ISecretManager {
@@ -176,7 +175,7 @@ describe('StellarListener', () => {
 
   it('filters unsupported assets and memo-less payments before publishing', async () => {
     const horizonMocks = setupHorizonMock()
-    const postMessage: jest.MockedFunction<IQueueHandler['postMessage']> = jest.fn()
+    const postMessage: jest.MockedFunction<MockQueueHandler['postMessage']> = jest.fn()
     postMessage.mockImplementationOnce(() => {
       throw new Error('queue down')
     })
@@ -205,7 +204,7 @@ describe('StellarListener', () => {
 
     expect(upsert).toHaveBeenCalledTimes(4)
     expect(postMessage).toHaveBeenCalledTimes(1)
-    const queuedPayload = postMessage.mock.calls[0][1]
+    const queuedPayload = postMessage.mock.calls[0][1] as ReceivedCryptoTransactionMessage
     expect(postMessage).toHaveBeenCalledWith(QueueName.RECEIVED_CRYPTO_TRANSACTION, queuedPayload)
     expect(queuedPayload.transactionId).toBe('12345678-1234-5678-1234-567812345678')
 

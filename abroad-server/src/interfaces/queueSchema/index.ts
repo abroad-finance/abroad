@@ -26,6 +26,21 @@ export const PaymentSentMessageSchema = z.object({
 
 export type PaymentSentMessage = z.infer<typeof PaymentSentMessageSchema>
 
+export const BinanceBalanceUpdatedMessageSchema = z.object({}).strict()
+
+export type BinanceBalanceUpdatedMessage = z.infer<typeof BinanceBalanceUpdatedMessageSchema>
+
+export const ReceivedCryptoTransactionMessageSchema = z.object({
+  addressFrom: z.string().min(1, 'Address from is required'),
+  amount: z.number().positive(),
+  blockchain: z.nativeEnum(BlockchainNetwork),
+  cryptoCurrency: z.nativeEnum(CryptoCurrency),
+  onChainId: z.string().min(1),
+  transactionId: z.string().uuid(),
+})
+
+export type ReceivedCryptoTransactionMessage = z.infer<typeof ReceivedCryptoTransactionMessageSchema>
+
 // Message emitted when a payment provider (e.g., Transfero) reports a status update
 export const PaymentStatusUpdatedMessageSchema = z.object({
   amount: z.number().nonnegative().optional(),

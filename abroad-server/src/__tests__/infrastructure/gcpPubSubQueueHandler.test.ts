@@ -1,3 +1,5 @@
+import { BlockchainNetwork, CryptoCurrency, PaymentMethod, TargetCurrency } from '@prisma/client'
+
 import type { ISecretManager } from '../../interfaces/ISecretManager'
 
 import { RuntimeConfig } from '../../config/runtime'
@@ -59,21 +61,43 @@ describe('GCPPubSubQueueHandler', () => {
     topicExistsMock.mockResolvedValueOnce([false])
     const handler = new GCPPubSubQueueHandler(secretManager, logger, RuntimeConfig)
 
-    await handler.postMessage(QueueName.PAYMENT_SENT, { ok: true })
+    await handler.postMessage(QueueName.PAYMENT_SENT, {
+      amount: 100,
+      blockchain: BlockchainNetwork.STELLAR,
+      cryptoCurrency: CryptoCurrency.USDC,
+      paymentMethod: PaymentMethod.NEQUI,
+      targetCurrency: TargetCurrency.COP,
+    })
 
     expect(secretManager.getSecret).toHaveBeenCalledWith('GCP_PROJECT_ID')
     expect(createTopicMock).toHaveBeenCalledWith(QueueName.PAYMENT_SENT)
-    expect(publishMessageMock).toHaveBeenCalledWith({ data: Buffer.from(JSON.stringify({ ok: true })) })
+    expect(publishMessageMock).toHaveBeenCalledWith({
+      data: Buffer.from(JSON.stringify({
+        amount: 100,
+        blockchain: BlockchainNetwork.STELLAR,
+        cryptoCurrency: CryptoCurrency.USDC,
+        paymentMethod: PaymentMethod.NEQUI,
+        targetCurrency: TargetCurrency.COP,
+      })),
+    })
   })
 
   it('subscribes to a topic and handles incoming messages', async () => {
     subscriptionExistsMock.mockResolvedValueOnce([false])
     const handler = new GCPPubSubQueueHandler(secretManager, logger, RuntimeConfig)
     const callback = jest.fn()
+    const queueMessage = {
+      addressFrom: 'GABC',
+      amount: 42,
+      blockchain: BlockchainNetwork.STELLAR,
+      cryptoCurrency: CryptoCurrency.USDC,
+      onChainId: 'tx-hash-1',
+      transactionId: '11111111-1111-1111-1111-111111111111',
+    }
 
     onMock.mockImplementation((event: string, listener: (msg: FakeMessage) => void) => {
       if (event === 'message') {
-        const msg = new FakeMessage(Buffer.from(JSON.stringify({ value: 42 })))
+        const msg = new FakeMessage(Buffer.from(JSON.stringify(queueMessage)))
         listener(msg)
       }
       return undefined
@@ -86,7 +110,7 @@ describe('GCPPubSubQueueHandler', () => {
       expect.objectContaining({ ackDeadlineSeconds: expect.any(Number) }),
     )
     expect(onMock).toHaveBeenCalledWith('message', expect.any(Function))
-    expect(callback).toHaveBeenCalledWith({ value: 42 })
+    expect(callback).toHaveBeenCalledWith(queueMessage)
     expect(ackMock).toHaveBeenCalled()
   })
 })

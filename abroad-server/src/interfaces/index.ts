@@ -1,6 +1,14 @@
 // src/interfaces/index.ts
 import { Partner } from '@prisma/client'
 
+import {
+  BinanceBalanceUpdatedMessage,
+  PaymentSentMessage,
+  PaymentStatusUpdatedMessage,
+  ReceivedCryptoTransactionMessage,
+  UserNotificationMessage,
+} from './queueSchema'
+
 // The enum and interface definitions:
 export enum QueueName {
   BINANCE_BALANCE_UPDATED = 'binance-balance-updated',
@@ -8,6 +16,14 @@ export enum QueueName {
   PAYMENT_STATUS_UPDATED = 'payment-status-updated',
   RECEIVED_CRYPTO_TRANSACTION = 'received-crypto-transaction',
   USER_NOTIFICATION = 'user-notification',
+}
+
+export type QueuePayloadByName = {
+  [QueueName.BINANCE_BALANCE_UPDATED]: BinanceBalanceUpdatedMessage
+  [QueueName.PAYMENT_SENT]: PaymentSentMessage
+  [QueueName.PAYMENT_STATUS_UPDATED]: PaymentStatusUpdatedMessage
+  [QueueName.RECEIVED_CRYPTO_TRANSACTION]: ReceivedCryptoTransactionMessage
+  [QueueName.USER_NOTIFICATION]: UserNotificationMessage
 }
 
 export interface ILogger {
@@ -21,16 +37,20 @@ export interface IPartnerService {
   getPartnerFromSepJwt(token: string): Promise<Partner>
 }
 
+export type QueueSubscriber<Name extends QueueName> = (
+  message: QueuePayloadByName[Name],
+) => void | Promise<void>
+
 export interface IQueueHandler {
   /** Optional: allow implementations to close subscriptions on shutdown. */
   closeAllSubscriptions?: () => Promise<void>
-  postMessage(
-    queueName: QueueName,
-    message: Record<string, boolean | number | string>,
+  postMessage<Name extends QueueName>(
+    queueName: Name,
+    message: QueuePayloadByName[Name],
   ): Promise<void>
-  subscribeToQueue(
-    queueName: QueueName,
-    callback: (message: Record<string, boolean | number | string>) => void,
+  subscribeToQueue<Name extends QueueName>(
+    queueName: Name,
+    callback: QueueSubscriber<Name>,
     customSubscriptionName?: string,
   ): Promise<void>
 }

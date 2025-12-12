@@ -11,6 +11,8 @@ import {
 import { IDatabaseClientProvider } from '../../interfaces/IDatabaseClientProvider'
 import { IWebhookNotifier, WebhookEvent } from '../../interfaces/IWebhookNotifier'
 import { PaymentSentMessage, PaymentStatusUpdatedMessage, PaymentStatusUpdatedMessageSchema } from '../../interfaces/queueSchema'
+import { createScopedLogger } from '../../shared/logging'
+import { getCorrelationId } from '../../shared/requestContext'
 import { TYPES } from '../../types'
 
 /**
@@ -64,20 +66,18 @@ export class PaymentStatusUpdatedController {
     return TransactionStatus.PROCESSING_PAYMENT
   }
 
-  private async onPaymentStatusUpdated(msg: Record<string, boolean | number | string>): Promise<void> {
-    if (!msg || Object.keys(msg).length === 0) {
-      this.logger.warn('[PaymentStatusUpdated queue]: Received empty message. Skipping...')
-      return
-    }
+  private async onPaymentStatusUpdated(msg: unknown): Promise<void> {
+    const logger = createScopedLogger(this.logger, {
+      correlationId: getCorrelationId(),
+      scope: 'PaymentStatusUpdated queue',
+    })
 
-    let message: PaymentStatusUpdatedMessage
-    try {
-      message = PaymentStatusUpdatedMessageSchema.parse(msg)
-    }
-    catch (error) {
-      this.logger.error('[PaymentStatusUpdated queue]: Invalid message format:', error)
+    const parsed = PaymentStatusUpdatedMessageSchema.safeParse(msg)
+    if (!parsed.success) {
+      logger.error('[PaymentStatusUpdated queue]: Invalid message format:', parsed.error)
       return
     }
+    const message: PaymentStatusUpdatedMessage = parsed.data
 
     const prismaClient = await this.dbClientProvider.getClient()
 
@@ -104,34 +104,37 @@ export class PaymentStatusUpdatedController {
         where: { externalId: message.externalId },
       })
       // Notify partner webhook that the transaction was updated
-      this.webhookNotifier.notifyWebhook(
+      await this.webhookNotifier.notifyWebhook(
         transactionRecord.partnerUser.partner.webhookUrl,
         { data: transactionRecord, event: WebhookEvent.TRANSACTION_UPDATED },
       )
 
       // Notify user via websocket bridge with full payload
       try {
-        await this.queueHandler.postMessage(QueueName.USER_NOTIFICATION, {
-          payload: JSON.stringify(transactionRecord),
-          type: 'transaction.updated',
-          userId: transactionRecord.partnerUser.userId,
-        })
+        await this.queueHandler.postMessage(
+          QueueName.USER_NOTIFICATION,
+          {
+            payload: JSON.stringify(transactionRecord),
+            type: 'transaction.updated',
+            userId: transactionRecord.partnerUser.userId,
+          },
+        )
       }
       catch (e) {
-        this.logger.warn('[PaymentStatusUpdated queue]: Failed to publish websocket notification', e as Error)
+        logger.warn('[PaymentStatusUpdated queue]: Failed to publish websocket notification', e as Error)
       }
 
-      this.logger.info(
+      logger.info(
         `[Stellar transaction]: Payment ${newStatus === TransactionStatus.PAYMENT_COMPLETED ? 'completed' : 'failed'} for transaction:`,
         transactionRecord.id,
       )
 
       if (newStatus === TransactionStatus.PAYMENT_COMPLETED) {
-        this.slackNotifier.sendMessage(
+        await this.slackNotifier.sendMessage(
           `Payment completed for transaction: ${transactionRecord.id}, ${transactionRecord.quote.sourceAmount} ${transactionRecord.quote.cryptoCurrency} -> ${transactionRecord.quote.targetAmount} ${transactionRecord.quote.targetCurrency}, Partner: ${transactionRecord.partnerUser.partner.name}`,
         )
 
-        this.queueHandler.postMessage(QueueName.PAYMENT_SENT, {
+        await this.queueHandler.postMessage(QueueName.PAYMENT_SENT, {
           amount: transactionRecord.quote.sourceAmount,
           blockchain: transactionRecord.quote.network,
           cryptoCurrency: transactionRecord.quote.cryptoCurrency,
@@ -140,7 +143,7 @@ export class PaymentStatusUpdatedController {
         } satisfies PaymentSentMessage)
       }
       else {
-        this.slackNotifier.sendMessage(
+        await this.slackNotifier.sendMessage(
           `Payment failed for transaction: ${transactionRecord.id}, ${transactionRecord.quote.sourceAmount} ${transactionRecord.quote.cryptoCurrency} -> ${transactionRecord.quote.targetAmount} ${transactionRecord.quote.targetCurrency}, Partner: ${transactionRecord.partnerUser.partner.name}`,
         )
         const walletHandler = this.walletHandlerFactory.getWalletHandler(
@@ -163,7 +166,7 @@ export class PaymentStatusUpdatedController {
       this.slackNotifier.sendMessage(
         `[PaymentStatusUpdated queue]: Error updating transaction: ${errorMessage}`,
       )
-      this.logger.error('[PaymentStatusUpdated queue]: Error updating transaction:', err)
+      logger.error('[PaymentStatusUpdated queue]: Error updating transaction:', err)
     }
   }
 

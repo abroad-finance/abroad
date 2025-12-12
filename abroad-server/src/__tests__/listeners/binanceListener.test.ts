@@ -1,11 +1,12 @@
 import 'reflect-metadata'
 import { WebsocketClient } from 'binance'
 
-import type { ILogger, IQueueHandler } from '../../interfaces'
+import type { ILogger } from '../../interfaces'
 import type { ISecretManager } from '../../interfaces/ISecretManager'
 
 import { QueueName } from '../../interfaces'
 import { BinanceListener } from '../../listeners/binance'
+import { createMockQueueHandler } from '../setup/mockFactories'
 
 type HandlerMap = Record<string, ((data: unknown) => void)[]>
 
@@ -36,11 +37,7 @@ jest.mock('binance', () => ({
   WebsocketClient: jest.fn((config: unknown) => new FakeWebsocketClient(config)),
 }))
 
-const queueHandler: IQueueHandler = {
-  closeAllSubscriptions: jest.fn(),
-  postMessage: jest.fn(),
-  subscribeToQueue: jest.fn(),
-}
+const queueHandler = createMockQueueHandler()
 
 const secretManager: ISecretManager = {
   getSecret: jest.fn(),

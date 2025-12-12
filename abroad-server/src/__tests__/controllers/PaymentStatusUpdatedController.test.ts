@@ -93,25 +93,27 @@ describe('PaymentStatusUpdatedController', () => {
 
   it('skips empty or malformed messages', async () => {
     const handler = controller as unknown as {
-      onPaymentStatusUpdated: (msg: Record<string, boolean | number | string>) => Promise<void>
+      onPaymentStatusUpdated: (msg: unknown) => Promise<void>
     }
 
     await handler.onPaymentStatusUpdated({})
-    expect(logger.warn).toHaveBeenCalledWith(
-      '[PaymentStatusUpdated queue]: Received empty message. Skipping...',
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.stringContaining('Invalid message format'),
+      expect.anything(),
     )
     expect(dbProvider.getClient).not.toHaveBeenCalled()
 
+    logger.error.mockClear()
     await handler.onPaymentStatusUpdated({ status: '' })
     expect(logger.error).toHaveBeenCalledWith(
-      '[PaymentStatusUpdated queue]: Invalid message format:',
+      expect.stringContaining('Invalid message format'),
       expect.anything(),
     )
   })
 
   it('ignores pending statuses without touching the database', async () => {
     const handler = controller as unknown as {
-      onPaymentStatusUpdated: (msg: Record<string, boolean | number | string>) => Promise<void>
+      onPaymentStatusUpdated: (msg: unknown) => Promise<void>
     }
 
     await handler.onPaymentStatusUpdated({
@@ -127,7 +129,7 @@ describe('PaymentStatusUpdatedController', () => {
 
   it('updates completed payments, notifies webhook and emits follow-up events', async () => {
     const handler = controller as unknown as {
-      onPaymentStatusUpdated: (msg: Record<string, boolean | number | string>) => Promise<void>
+      onPaymentStatusUpdated: (msg: unknown) => Promise<void>
     }
     prisma.transaction.update.mockResolvedValue({
       id: 'txn-1',
@@ -177,7 +179,7 @@ describe('PaymentStatusUpdatedController', () => {
 
   it('records failures and triggers refunds when hashes exist', async () => {
     const handler = controller as unknown as {
-      onPaymentStatusUpdated: (msg: Record<string, boolean | number | string>) => Promise<void>
+      onPaymentStatusUpdated: (msg: unknown) => Promise<void>
       recordRefundOnChainId: (
         prismaClient: Awaited<ReturnType<IDatabaseClientProvider['getClient']>>,
         transactionId: string,

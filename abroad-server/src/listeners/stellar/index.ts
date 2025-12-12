@@ -5,12 +5,11 @@ import { BlockchainNetwork, CryptoCurrency } from '@prisma/client'
 import { Horizon } from '@stellar/stellar-sdk'
 import { inject } from 'inversify'
 
-import { ILogger, IQueueHandler, QueueName } from '../../interfaces'
+import { ILogger, IQueueHandler, QueueName, ReceivedCryptoTransactionMessage } from '../../interfaces'
 import { IDatabaseClientProvider } from '../../interfaces/IDatabaseClientProvider'
 import { ISecretManager } from '../../interfaces/ISecretManager'
 import { createScopedLogger, ScopedLogger } from '../../shared/logging'
 import { TYPES } from '../../types'
-import { TransactionQueueMessage } from '../../useCases/receivedCryptoTransactionUseCase'
 
 // Minimal stream handle types returned by stellar-sdk stream()
 type StreamHandle = (() => void) | { close: () => void }
@@ -161,7 +160,7 @@ export class StellarListener {
         // Convert memo to a UUID if needed
         const transactionId = StellarListener.base64ToUuid(tx.memo)
 
-        const queueMessage: TransactionQueueMessage = {
+        const queueMessage: ReceivedCryptoTransactionMessage = {
           addressFrom: payment.from,
           amount: parseFloat(payment.amount),
           blockchain: BlockchainNetwork.STELLAR,

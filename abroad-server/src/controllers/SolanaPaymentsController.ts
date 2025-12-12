@@ -21,11 +21,10 @@ import {
 } from 'tsoa'
 import z from 'zod'
 
-import { ILogger, IQueueHandler, QueueName } from '../interfaces'
+import { ILogger, IQueueHandler, QueueName, ReceivedCryptoTransactionMessage } from '../interfaces'
 import { IDatabaseClientProvider } from '../interfaces/IDatabaseClientProvider'
 import { ISecretManager, Secrets } from '../interfaces/ISecretManager'
 import { TYPES } from '../types'
-import { TransactionQueueMessage } from '../useCases/receivedCryptoTransactionUseCase'
 
 const solanaPaymentNotificationSchema = z.object({
   on_chain_tx: z.string().min(1, 'On-chain transaction signature is required'),
@@ -167,7 +166,7 @@ export class SolanaPaymentsController extends Controller {
       return badRequestResponse(400, { reason: 'No USDC transfer to the configured wallet found in this transaction' })
     }
 
-    const queueMessage: TransactionQueueMessage = {
+    const queueMessage: ReceivedCryptoTransactionMessage = {
       addressFrom: transfer.source,
       amount: transfer.amount,
       blockchain: BlockchainNetwork.SOLANA,

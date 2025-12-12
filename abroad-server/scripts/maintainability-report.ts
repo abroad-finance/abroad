@@ -269,7 +269,9 @@ export async function loadSources(
   for (const filePath of files) {
     const code = await fs.readFile(filePath, 'utf8')
     const relativePath = toNormalizedRelativePath(root, filePath)
-    const { diagnostics: transpileDiagnostics, outputText } = ts.transpileModule(code, {
+
+    // still collect TS diagnostics
+    const { diagnostics: transpileDiagnostics } = ts.transpileModule(code, {
       compilerOptions: TRANSPILE_OPTIONS,
       fileName: relativePath,
       reportDiagnostics: true,
@@ -279,8 +281,9 @@ export async function loadSources(
       diagnostics.push(...formatDiagnostics(relativePath, transpileDiagnostics))
     }
 
+    // but send *original TS* to escomplex
     sources.push({
-      code: outputText,
+      code, // <-- TS, not outputText
       filePath,
       srcPath: relativePath,
     })
