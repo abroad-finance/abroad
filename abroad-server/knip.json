@@ -1,13 +1,63 @@
 {
+  "$schema": "https://unpkg.com/knip@^5/schema.json",
   "entry": [
     "src/server.ts",
     "src/consumers.ts",
-    "src/listeners.ts"
+    "src/listeners.ts",
+    "src/ws.ts",
+    "scripts/maintainability-report.ts",
+    "scripts/seed-dev.ts"
   ],
   "project": [
-    "src/**/*.ts"
+    "src/**/*.{ts,tsx}",
+    "scripts/**/*.ts"
   ],
   "ignore": [
-    "src/scripts/**"
-  ]
+    "src/scripts/**",
+    "dist/**",
+    "coverage/**",
+    "reports/**",
+    "stryker-tmp/**",
+    "tmp/**"
+  ],
+  "ignoreDependencies": [
+    "@stryker-mutator/core",
+    "concurrently",
+    "depcheck",
+    "nodemon",
+    "prisma",
+    "tsx"
+  ],
+  "ignoreBinaries": [
+    "tsoa",
+    "prisma",
+    "tsc",
+    "concurrently",
+    "tsx",
+    "nodemon",
+    "jest",
+    "stryker",
+    "depcruise",
+    "dot",
+    "eslint",
+    "depcheck",
+    "knip"
+  ],
+  "jest": {
+    "config": [
+      "jest.config.js"
+    ],
+    "entry": [
+      "src/**/__tests__/**/*.{ts,tsx}"
+    ],
+    "project": [
+      "src/**/*.{ts,tsx}",
+      "src/__tests__/**/*.{ts,tsx}"
+    ]
+  },
+  "stryker": {
+    "config": [
+      "stryker.config.cjs"
+    ]
+  }
 }

@@ -2,7 +2,7 @@ import { Request as ExpressRequest } from 'express'
 import { z, type ZodType } from 'zod'
 
 export const DEFAULT_PAGE_SIZE = 20
-export const MAX_PAGE_SIZE = 100
+const MAX_PAGE_SIZE = 100
 
 export type AuthenticatedRequest = ExpressRequest & { user: { id: string } }
 
@@ -51,7 +51,7 @@ const paginationSchema = z.object({
   pageSize: z.coerce.number().int().min(1).max(MAX_PAGE_SIZE).default(DEFAULT_PAGE_SIZE),
 })
 
-export type PaginationParams = { page?: number, pageSize?: number }
+type PaginationParams = { page?: number, pageSize?: number }
 
 export function parsePagination(params: PaginationParams): { data: { page: number, pageSize: number } } | { error: string } {
   const parsed = paginationSchema.safeParse(params)

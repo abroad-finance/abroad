@@ -1,11 +1,11 @@
 import type { TransactionStatus } from '@prisma/client'
 import type { ActionRequest } from 'adminjs'
 
-export interface FlatAdapter {
+interface FlatAdapter {
   flatten: (input: Record<string, unknown>) => Record<string, unknown>
 }
 
-export interface TransactionQuoteFilterDefaults {
+interface TransactionQuoteFilterDefaults {
   currency: string
   status: TransactionStatus
 }

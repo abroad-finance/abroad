@@ -64,7 +64,7 @@ export type RuntimeConfiguration = {
   }
 }
 
-export function buildRuntimeConfig(env: NodeJS.ProcessEnv = process.env): RuntimeConfiguration {
+function buildRuntimeConfig(env: NodeJS.ProcessEnv = process.env): RuntimeConfiguration {
   return envSchema.parse(env)
 }
 

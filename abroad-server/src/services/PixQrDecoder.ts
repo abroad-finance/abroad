@@ -6,7 +6,7 @@ import { IPixQrDecoder, PixDecoded } from '../interfaces/IQrDecoder'
 import { ISecretManager } from '../interfaces/ISecretManager'
 import { TYPES } from '../types'
 
-export interface BrCode {
+interface BrCode {
   accountType: string
   bankCode: string
   description: string
@@ -16,7 +16,7 @@ export interface BrCode {
   reductionAmount: number
 }
 
-export interface TransferoQrResponse {
+interface TransferoQrResponse {
   amount: number
   brCode: BrCode
   discountAmount: number

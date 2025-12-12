@@ -92,7 +92,7 @@ describe('GCPPubSubQueueHandler', () => {
       blockchain: BlockchainNetwork.STELLAR,
       cryptoCurrency: CryptoCurrency.USDC,
       onChainId: 'tx-hash-1',
-      transactionId: '11111111-1111-1111-1111-111111111111',
+      transactionId: '11111111-1111-4111-8111-111111111111',
     }
 
     onMock.mockImplementation((event: string, listener: (msg: FakeMessage) => void) => {
@@ -111,6 +111,33 @@ describe('GCPPubSubQueueHandler', () => {
     )
     expect(onMock).toHaveBeenCalledWith('message', expect.any(Function))
     expect(callback).toHaveBeenCalledWith(queueMessage)
+    expect(ackMock).toHaveBeenCalled()
+  })
+
+  it('acks and drops messages that fail schema validation', async () => {
+    const handler = new GCPPubSubQueueHandler(secretManager, logger, RuntimeConfig)
+    const callback = jest.fn()
+
+    onMock.mockImplementation((event: string, listener: (msg: FakeMessage) => void) => {
+      if (event === 'message') {
+        const msg = new FakeMessage(Buffer.from(JSON.stringify({})))
+        listener(msg)
+      }
+      return undefined
+    })
+
+    await handler.subscribeToQueue(QueueName.RECEIVED_CRYPTO_TRANSACTION, callback)
+
+    expect(callback).not.toHaveBeenCalled()
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.stringContaining('Failed to validate PubSub message'),
+      expect.objectContaining({ context: expect.objectContaining({ queueName: QueueName.RECEIVED_CRYPTO_TRANSACTION }) }),
+      expect.objectContaining({ issues: expect.any(Array) }),
+    )
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.stringContaining('Dropping message due to parse failure'),
+      expect.objectContaining({ context: expect.objectContaining({ queueName: QueueName.RECEIVED_CRYPTO_TRANSACTION }) }),
+    )
     expect(ackMock).toHaveBeenCalled()
   })
 })

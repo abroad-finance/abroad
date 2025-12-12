@@ -1,14 +1,14 @@
 import { ILogger } from '../interfaces'
 
-export type LoggingContext = {
+export interface ScopedLogger extends ILogger {
+  child: (additional: Partial<LoggingContext>) => ScopedLogger
+}
+
+type LoggingContext = {
   correlationId?: string
   scope: string
   // Additional metadata that should ride along with every log entry
   staticPayload?: Record<string, unknown>
-}
-
-export interface ScopedLogger extends ILogger {
-  child: (additional: Partial<LoggingContext>) => ScopedLogger
 }
 
 export function createScopedLogger(base: ILogger, context: LoggingContext): ScopedLogger {

@@ -11,11 +11,6 @@ export interface BanksResult {
   banks: BankSummary[]
 }
 
-export interface BankSummary {
-  bankCode: number
-  bankName: string
-}
-
 export interface IPaymentUseCase {
   getBanks(paymentMethod?: PaymentMethod): BanksResult
   getLiquidity(paymentMethod?: PaymentMethod): Promise<LiquidityResult>
@@ -31,6 +26,11 @@ export interface LiquidityResult {
 export interface OnboardResult {
   message?: string
   success: boolean
+}
+
+type BankSummary = {
+  bankCode: number
+  bankName: string
 }
 
 @injectable()

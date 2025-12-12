@@ -2,6 +2,16 @@ import type { Partner } from '@prisma/client'
 
 import { z } from 'zod'
 
+export interface CreatePartnerRequest {
+  company: string
+  country: string
+  email: string
+  firstName: string
+  lastName: string
+  password: string
+  phone?: string
+}
+
 export const createPartnerRequestSchema = z.object({
   company: z.string().min(1),
   country: z.string().min(1),
@@ -10,9 +20,7 @@ export const createPartnerRequestSchema = z.object({
   lastName: z.string().min(1),
   password: z.string().min(8),
   phone: z.string().optional(),
-})
-
-export type CreatePartnerRequest = z.infer<typeof createPartnerRequestSchema>
+}).strict() satisfies z.ZodType<CreatePartnerRequest>
 
 export interface CreatePartnerResponse {
   id: string

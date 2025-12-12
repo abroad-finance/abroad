@@ -9,15 +9,15 @@ import {
 } from '../interfaces'
 import { IWebSocketService } from '../interfaces/IWebSocketService'
 
-export type WebSocketBridgeOptions = {
-  port?: number
-  subscriptionName?: string
-}
-
 type NormalizedNotification = {
   payload: JsonValue
   type: string
   userId: string
+}
+
+type WebSocketBridgeOptions = {
+  port?: number
+  subscriptionName?: string
 }
 
 export class WebSocketBridge {

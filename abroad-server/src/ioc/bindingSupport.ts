@@ -3,11 +3,9 @@ import { Container, Newable, ServiceIdentifier } from 'inversify'
 export type BindingRegistration<T> = {
   bindSelf?: boolean
   identifier: ServiceIdentifier<T>
-  implementation: Constructor<T>
+  implementation: Newable<T>
   name?: string
 }
-
-export type Constructor<T> = Newable<T>
 
 export function registerBindings(
   container: Container,

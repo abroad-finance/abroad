@@ -18,7 +18,7 @@ export type ExpiredTransactionsSummary = {
   updatedTransactionIds: string[]
 }
 
-export type TransactionWithRelations = Transaction & {
+type TransactionWithRelations = Transaction & {
   partnerUser: PartnerUser & { partner: Partner }
   quote: Quote
 }

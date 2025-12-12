@@ -7,6 +7,7 @@ import {
   IQueueHandler,
   QueueName,
   QueuePayloadByName,
+  QueuePayloadSchemaByName,
   QueueSubscriber,
 } from '../interfaces'
 import { ISecretManager } from '../interfaces/ISecretManager'
@@ -81,7 +82,7 @@ export class GCPPubSubQueueHandler implements IQueueHandler {
         staticPayload: { messageId: msg.id },
       })
       await runWithCorrelationId(correlationId, async () => {
-        const data = this.parseMessage<Name>(msg, scopedLogger)
+        const data = this.parseMessage<Name>(queueName, msg, scopedLogger)
         if (!data) {
           scopedLogger.warn('Dropping message due to parse failure')
           msg.ack()
@@ -113,15 +114,29 @@ export class GCPPubSubQueueHandler implements IQueueHandler {
   }
 
   private parseMessage<Name extends QueueName>(
+    queueName: Name,
     msg: Message,
     logger: ScopedLogger,
   ): QueuePayloadByName[Name] | undefined {
+    let payload: unknown
     try {
-      return JSON.parse(msg.data.toString()) as QueuePayloadByName[Name]
+      payload = JSON.parse(msg.data.toString())
     }
     catch (err) {
       logger.warn('Failed to parse PubSub message', { err, messageId: msg.id })
       return undefined
     }
+
+    const schema = QueuePayloadSchemaByName[queueName]
+    const parsed = schema.safeParse(payload)
+    if (!parsed.success) {
+      logger.warn('Failed to validate PubSub message', {
+        issues: parsed.error.issues,
+        messageId: msg.id,
+      })
+      return undefined
+    }
+
+    return parsed.data
   }
 }

@@ -18,8 +18,7 @@ import { IDatabaseClientProvider } from '../interfaces/IDatabaseClientProvider'
 import { PersonaWebhookService } from '../services/webhooks/PersonaWebhookService'
 import { WebhookProcessingResult } from '../services/webhooks/types'
 import { TYPES } from '../types'
-import { parseTransferoWebhook } from './webhook/transferoWebhookValidator'
-import { WebhookResponse } from './webhook/types'
+import { parseTransferoWebhook, WebhookResponse } from './webhook'
 
 @Route('webhook')
 export class WebhookController extends Controller {

@@ -35,25 +35,6 @@ export function assignTransactionMetadata(
   record.params.tipoOperacion = getOperationLabel(targetCurrency, fiatCurrencies)
 }
 
-export function deriveTrm(targetAmount: null | number, sourceAmount: null | number): null | number {
-  if (targetAmount === null || sourceAmount === null || sourceAmount === 0) {
-    return null
-  }
-  return targetAmount / sourceAmount
-}
-
-export function ensurePersonaFields(record: { params: Record<string, unknown> }, persona: null | PersonaInquiryDetails) {
-  record.params.tipoDocumento = persona?.documentType ?? ''
-  record.params.numeroDocumento = persona?.idNumber ?? ''
-  record.params.nombreRazonSocial = persona?.fullName ?? ''
-  record.params.direccion = persona?.address ?? ''
-  record.params.telefono = persona?.phone ?? ''
-  record.params.email = persona?.email ?? ''
-  record.params.pais = persona?.country ?? ''
-  record.params.departamento = persona?.department ?? ''
-  record.params.municipio = persona?.city ?? ''
-}
-
 export function escapeCsvValue(value: unknown): string {
   if (value === null || value === undefined) return ''
   if (value instanceof Date) return value.toISOString()
@@ -61,29 +42,11 @@ export function escapeCsvValue(value: unknown): string {
   return /[",\n\r]/.test(stringValue) ? `"${stringValue.replace(/"/g, '""')}"` : stringValue
 }
 
-export function formatAmount(value: null | number, locale: string = DEFAULT_LOCALE): string {
-  if (value === null || Number.isNaN(value)) return ''
-  try {
-    return value.toLocaleString(locale, {
-      maximumFractionDigits: 2,
-      minimumFractionDigits: 2,
-    })
-  }
-  catch {
-    return value.toFixed(2)
-  }
-}
-
 export function formatDateTime(value: unknown): string {
   if (!value) return ''
   const date = value instanceof Date ? value : new Date(String(value))
   if (Number.isNaN(date.getTime())) return ''
   return date.toISOString().replace('T', ' ').slice(0, 16)
-}
-
-export function getOperationLabel(targetCurrency: unknown, fiatCurrencies: ReadonlySet<string>): string {
-  const currency = typeof targetCurrency === 'string' ? targetCurrency.toUpperCase() : ''
-  return fiatCurrencies.has(currency) ? 'Venta' : 'Compra'
 }
 
 export function hydratePersonaAndQuoteFields(
@@ -114,4 +77,41 @@ export function parseNumber(value: unknown): null | number {
     return Number.isFinite(parsed) ? parsed : null
   }
   return null
+}
+
+function deriveTrm(targetAmount: null | number, sourceAmount: null | number): null | number {
+  if (targetAmount === null || sourceAmount === null || sourceAmount === 0) {
+    return null
+  }
+  return targetAmount / sourceAmount
+}
+
+function ensurePersonaFields(record: { params: Record<string, unknown> }, persona: null | PersonaInquiryDetails) {
+  record.params.tipoDocumento = persona?.documentType ?? ''
+  record.params.numeroDocumento = persona?.idNumber ?? ''
+  record.params.nombreRazonSocial = persona?.fullName ?? ''
+  record.params.direccion = persona?.address ?? ''
+  record.params.telefono = persona?.phone ?? ''
+  record.params.email = persona?.email ?? ''
+  record.params.pais = persona?.country ?? ''
+  record.params.departamento = persona?.department ?? ''
+  record.params.municipio = persona?.city ?? ''
+}
+
+function formatAmount(value: null | number, locale: string = DEFAULT_LOCALE): string {
+  if (value === null || Number.isNaN(value)) return ''
+  try {
+    return value.toLocaleString(locale, {
+      maximumFractionDigits: 2,
+      minimumFractionDigits: 2,
+    })
+  }
+  catch {
+    return value.toFixed(2)
+  }
+}
+
+function getOperationLabel(targetCurrency: unknown, fiatCurrencies: ReadonlySet<string>): string {
+  const currency = typeof targetCurrency === 'string' ? targetCurrency.toUpperCase() : ''
+  return fiatCurrencies.has(currency) ? 'Venta' : 'Compra'
 }

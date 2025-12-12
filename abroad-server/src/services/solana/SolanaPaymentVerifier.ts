@@ -12,8 +12,6 @@ import { ILogger, ReceivedCryptoTransactionMessage } from '../../interfaces'
 import { IDatabaseClientProvider } from '../../interfaces/IDatabaseClientProvider'
 import { ISecretManager, Secrets } from '../../interfaces/ISecretManager'
 
-export type SolanaPaymentVerificationResult = SolanaPaymentVerificationError | SolanaPaymentVerificationSuccess
-
 type ParsedInstructionType = ParsedInstruction | PartiallyDecodedInstruction
 
 type SolanaPaymentContext = {
@@ -23,6 +21,8 @@ type SolanaPaymentContext = {
 }
 
 type SolanaPaymentVerificationError = { outcome: 'error', reason: string, status: 400 | 404 }
+
+type SolanaPaymentVerificationResult = SolanaPaymentVerificationError | SolanaPaymentVerificationSuccess
 
 type SolanaPaymentVerificationSuccess = { outcome: 'ok', queueMessage: ReceivedCryptoTransactionMessage }
 type TokenAmountInfo = {

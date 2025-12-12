@@ -6,7 +6,7 @@ import { IDatabaseClientProvider } from '../interfaces/IDatabaseClientProvider'
 import { TYPES } from '../types'
 import { uuidToBase64 } from './transactionEncoding'
 
-export interface TransactionStatusResult {
+interface TransactionStatusResult {
   id: string
   kycLink: null | string
   onChainTxHash: null | string

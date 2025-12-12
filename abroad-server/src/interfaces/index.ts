@@ -1,12 +1,18 @@
 // src/interfaces/index.ts
 import { Partner } from '@prisma/client'
+import { ZodType } from 'zod'
 
 import {
   BinanceBalanceUpdatedMessage,
+  BinanceBalanceUpdatedMessageSchema,
   PaymentSentMessage,
+  PaymentSentMessageSchema,
   PaymentStatusUpdatedMessage,
+  PaymentStatusUpdatedMessageSchema,
   ReceivedCryptoTransactionMessage,
+  ReceivedCryptoTransactionMessageSchema,
   UserNotificationMessage,
+  UserNotificationMessageSchema,
 } from './queueSchema'
 
 // The enum and interface definitions:
@@ -53,6 +59,18 @@ export type QueuePayloadByName = {
   [QueueName.PAYMENT_STATUS_UPDATED]: PaymentStatusUpdatedMessage
   [QueueName.RECEIVED_CRYPTO_TRANSACTION]: ReceivedCryptoTransactionMessage
   [QueueName.USER_NOTIFICATION]: UserNotificationMessage
+}
+
+type QueuePayloadSchemaMap = {
+  [Name in QueueName]: ZodType<QueuePayloadByName[Name]>
+}
+
+export const QueuePayloadSchemaByName: QueuePayloadSchemaMap = {
+  [QueueName.BINANCE_BALANCE_UPDATED]: BinanceBalanceUpdatedMessageSchema,
+  [QueueName.PAYMENT_SENT]: PaymentSentMessageSchema,
+  [QueueName.PAYMENT_STATUS_UPDATED]: PaymentStatusUpdatedMessageSchema,
+  [QueueName.RECEIVED_CRYPTO_TRANSACTION]: ReceivedCryptoTransactionMessageSchema,
+  [QueueName.USER_NOTIFICATION]: UserNotificationMessageSchema,
 }
 
 export type QueueSubscriber<Name extends QueueName> = (

@@ -10,7 +10,7 @@ const transferoWebhookSchema = z.object({
   PaymentStatus: z.string().min(1),
 }).loose()
 
-export type TransferoWebhookValidationResult
+type TransferoWebhookValidationResult
   = | { errors: string, success: false }
     | { message: PaymentStatusUpdatedMessage, success: true }
 
