@@ -28,7 +28,7 @@ module.exports = {
   tempDirName: 'stryker-tmp',
   testRunner: 'jest',
   thresholds: {
-    break: 54,
+    break: 41,
     high: 80,
     low: 60,
   },

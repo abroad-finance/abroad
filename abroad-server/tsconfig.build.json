@@ -12,6 +12,6 @@
     "dist",
     "abroad-ui",
     "eslint.config.mjs",
-    "src/__tests__/**/*"
+    "src/tests/**/*"
   ]
 }

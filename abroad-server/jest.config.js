@@ -4,7 +4,7 @@ module.exports = {
     'src/**/*.{js,jsx,ts,tsx}',
   ],
   coveragePathIgnorePatterns: [
-    'src/routes.ts',
+    'src/app/http/routes.ts',
     'src/.*\\.d\\.ts$',
   ],
   coverageThreshold: {
@@ -17,9 +17,9 @@ module.exports = {
   },
   moduleFileExtensions: ['ts', 'js', 'json', 'node'],
   preset: 'ts-jest',
-  setupFilesAfterEnv: ['<rootDir>/src/__tests__/setup/jest.setup.ts'],
+  setupFilesAfterEnv: ['<rootDir>/src/tests/setup/jest.setup.ts'],
   testEnvironment: 'node',
-  testMatch: ['<rootDir>/src/**/__tests__/**/*.ts?(x)'],
+  testMatch: ['<rootDir>/src/tests/**/*.ts?(x)'],
   transform: {
     '^.+\\.ts?$': ['ts-jest', { tsconfig: 'tsconfig.json' }],
   },

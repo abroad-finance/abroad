@@ -1,5 +1,5 @@
 {
   "watch": ["src"],
   "ext": "ts",
-  "ignore": ["src/routes.ts", "src/swagger.json"]
+  "ignore": ["src/app/http/routes.ts", "src/app/http/swagger.json"]
 }

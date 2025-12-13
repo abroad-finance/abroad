@@ -1,11 +1,11 @@
 {
-  "entryFile": "src/server.ts",
+  "entryFile": "src/app/http/server.ts",
   "noImplicitAdditionalProperties": "throw-on-extras",
   "controllerPathGlobs": [
-    "src/controllers/**/*Controller.ts"
+    "src/modules/**/interfaces/http/**/*Controller.ts"
   ],
   "spec": {
-    "outputDirectory": "src",
+    "outputDirectory": "src/app/http",
     "specVersion": 3,
     "info": {
       "title": "Abroad API Documentation",
@@ -34,8 +34,8 @@
     ]
   },
   "routes": {
-    "routesDir": "src",
-    "authenticationModule": "./src/authentication.ts",
-    "iocModule": "./src/ioc.ts"
+    "routesDir": "src/app/http",
+    "authenticationModule": "./src/app/http/authentication.ts",
+    "iocModule": "./src/app/container/index.ts"
   }
 }
