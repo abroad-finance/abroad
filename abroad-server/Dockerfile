@@ -36,9 +36,9 @@ ENV NODE_ENV=production
 COPY --from=deps      /app/node_modules        ./node_modules
 COPY --from=prisma    /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=build     /app/dist                ./dist
-COPY --from=build     /app/src/swagger.json     ./dist/swagger.json
+COPY --from=build     /app/src/app/http/swagger.json ./dist/app/http/swagger.json
 COPY --from=build     /app/package.json        ./package.json
 COPY prisma ./prisma
 
 EXPOSE 3000
-CMD ["node","dist/server.js"]
+CMD ["node","dist/app/http/server.js"]

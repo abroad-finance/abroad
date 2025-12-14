@@ -21,7 +21,7 @@ spec:
         - name: abroad-consumers-container
           image: abroad-consumers-container
           command: ["node"]
-          args: ["dist/consumers.js"]
+          args: ["dist/app/workers/consumers/server.js"]
           imagePullPolicy: Always
           env:
             - name: HEALTH_PORT

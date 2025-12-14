@@ -21,7 +21,7 @@ spec:
         - name: abroad-listeners-container
           image: abroad-listeners-container
           command: ["node"]
-          args: ["dist/listeners.js"]
+          args: ["dist/app/workers/listeners/server.js"]
           imagePullPolicy: Always
           env:
             - name: HEALTH_PORT

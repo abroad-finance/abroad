@@ -80,7 +80,7 @@ steps:
       - --allow-unauthenticated
       - --labels=managed-by=gcp-cloud-build-deploy-cloud-run,commit-sha=$COMMIT_SHA,gcb-build-id=$BUILD_ID,gcb-trigger-id=$_TRIGGER_ID,component=ws
       - --command=node
-      - --args=dist/ws.js
+      - --args=dist/app/workers/websocket/server.js
     waitFor: ["Push commit"]
 
   # 6. Deploy to GKE (after manifests & migrations)
