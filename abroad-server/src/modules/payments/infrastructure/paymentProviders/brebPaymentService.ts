@@ -18,7 +18,7 @@ interface BrebKeyDetails {
   documentNumber?: string
   documentType?: string
   entityId?: string
-  instructedAgent?: BrebRail
+  instructedAgent?: string
   keyId?: string
   keyState?: string
   merchantId?: null | string
@@ -120,6 +120,7 @@ export class BrebPaymentService implements IPaymentService {
     'accountNumber',
     'documentNumber',
     'documentType',
+    'instructedAgent',
     'keyId',
     'name',
     'partyIdentifier',
@@ -135,6 +136,8 @@ export class BrebPaymentService implements IPaymentService {
   }
 
   private serviceConfig?: BrebServiceConfig
+
+  private readonly supportedRails: ReadonlyArray<BrebRail> = ['ENT', 'TFY']
 
   public constructor(
     @inject(TYPES.ISecretManager) private readonly secretManager: ISecretManager,
@@ -156,6 +159,7 @@ export class BrebPaymentService implements IPaymentService {
     value,
   }: {
     account: string
+    bankCode?: string
     id: string
     qrCode?: null | string
     value: number
@@ -206,6 +210,7 @@ export class BrebPaymentService implements IPaymentService {
     account,
   }: {
     account: string
+    bankCode?: string
   }): Promise<boolean> {
     try {
       const config = await this.getConfig()
@@ -545,7 +550,7 @@ export class BrebPaymentService implements IPaymentService {
     return 'pending'
   }
 
-  private isKeyUsable(keyDetails: BrebKeyDetails | null): keyDetails is BrebKeyDetails {
+  private isKeyUsable(keyDetails: BrebKeyDetails | null): keyDetails is BrebKeyDetails & { instructedAgent: BrebRail } {
     if (!keyDetails) {
       return false
     }
@@ -558,7 +563,16 @@ export class BrebPaymentService implements IPaymentService {
       return false
     }
 
+    if (!this.isSupportedRail(keyDetails.instructedAgent)) {
+      this.logger.warn('[BreB] Unsupported rail for key', { rail: keyDetails.instructedAgent ?? '<empty>' })
+      return false
+    }
+
     return isActive
+  }
+
+  private isSupportedRail(rail: unknown): rail is BrebRail {
+    return typeof rail === 'string' && this.supportedRails.includes(rail as BrebRail)
   }
 
   private logBrebError({

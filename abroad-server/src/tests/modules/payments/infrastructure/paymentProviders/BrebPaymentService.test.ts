@@ -39,7 +39,8 @@ type BrebInternals = {
   getAccessToken(config: BrebConfig): Promise<string>
   getConfig(): Promise<BrebConfig>
   interpretReport(report: Record<string, unknown>): 'failure' | 'pending' | 'success'
-  isKeyUsable(keyDetails: null | Record<string, unknown>, rail: 'ENT' | 'TFY'): boolean
+  isKeyUsable(keyDetails: null | Record<string, unknown>): boolean
+  maskIdentifier(value: null | string | undefined): string
   pollConfig: { delayMs: number, timeoutMs: number }
   pollTransactionReport(
     transactionId: string,
@@ -47,6 +48,7 @@ type BrebInternals = {
     config: BrebConfig,
     token: string,
   ): Promise<null | { report: null | Record<string, unknown>, result: 'failure' | 'pending' | 'success' }>
+  sanitizeUrlForLogs(url: string): string
 }
 
 type BrebKeyFixture = {
@@ -54,7 +56,7 @@ type BrebKeyFixture = {
   documentNumber: string
   documentType: string
   entityId?: string
-  instructedAgent: 'ENT' | 'TFY'
+  instructedAgent: string
   keyId: string
   keyState: string
   merchantId?: null | string
@@ -162,6 +164,25 @@ describe('BrebPaymentService', () => {
     mockedAxios.isAxiosError = jest.fn(() => false)
   })
 
+  describe('service basics', () => {
+    it('exposes static liquidity and onboarding responses', async () => {
+      const { service } = setupService()
+
+      await expect(service.getLiquidity()).resolves.toBe(service.MAX_TOTAL_AMOUNT_PER_DAY)
+      await expect(service.onboardUser()).resolves.toEqual({
+        message: 'BreB does not require explicit onboarding',
+        success: true,
+      })
+    })
+
+    it('masks identifiers and tolerates malformed URLs in logs', () => {
+      const { internals } = setupService()
+
+      expect(internals.maskIdentifier(undefined)).toBe('<empty>')
+      expect(internals.sanitizeUrlForLogs('://invalid url')).toBe('://invalid url')
+    })
+  })
+
   describe('sendPayment', () => {
     it('sends payments and reports success when the transaction is accepted', async () => {
       const { service } = setupService()
@@ -172,7 +193,6 @@ describe('BrebPaymentService', () => {
 
       const response = await service.sendPayment({
         account: defaultKeyDetails.accountNumber,
-        bankCode: '9101',
         id: 'txn-1',
         value: 125_000,
       })
@@ -203,7 +223,6 @@ describe('BrebPaymentService', () => {
 
       const outcome = await service.sendPayment({
         account: defaultKeyDetails.accountNumber,
-        bankCode: 'ENT',
         id: 'txn-4',
         value: 10_000,
       })
@@ -221,13 +240,15 @@ describe('BrebPaymentService', () => {
 
       const result = await service.sendPayment({
         account: defaultKeyDetails.accountNumber,
-        bankCode: 'ENT',
         id: 'txn-5',
         value: 15_000,
       })
 
       expect(result).toEqual({ success: false })
-      expect(logger.error).toHaveBeenCalledWith('[BreB] Failed to dispatch payment', 'network down')
+      expect(logger.error).toHaveBeenCalledWith(
+        '[BreB] Failed to dispatch payment',
+        expect.objectContaining({ responseData: 'network down' }),
+      )
     })
 
     it('logs pending outcomes when polling does not conclude', async () => {
@@ -239,7 +260,6 @@ describe('BrebPaymentService', () => {
 
       const result = await service.sendPayment({
         account: defaultKeyDetails.accountNumber,
-        bankCode: 'ENT',
         id: 'txn-5',
         value: 15_000,
       })
@@ -248,20 +268,34 @@ describe('BrebPaymentService', () => {
       expect(logger.warn).toHaveBeenCalledWith('[BreB] Payment pending after timeout', { transactionId: 'tx-005' })
     })
 
-    it('fails fast when the bank code is unsupported', async () => {
+    it('fails fast when the key rail is unsupported', async () => {
       const { logger, service } = setupService()
+      primeAccessToken()
+      primeKeyLookup({ instructedAgent: 'INVALID' })
+
       const result = await service.sendPayment({
-        account: '123',
-        bankCode: 'INVALID',
+        account: defaultKeyDetails.accountNumber,
         id: 'txn-invalid',
         value: 1_000,
       })
 
       expect(result).toEqual({ success: false })
-      expect(logger.error).toHaveBeenCalledWith(
-        '[BreB] Payment submission failed',
-        expect.objectContaining({ bankCode: 'INVALID', reason: expect.stringContaining('Unsupported BreB rail') }),
-      )
+      expect(logger.warn).toHaveBeenCalledWith('[BreB] Unsupported rail for key', { rail: 'INVALID' })
+    })
+
+    it('logs unexpected failures during submission', async () => {
+      const { logger, service } = setupService()
+      const internals = getInternals(service)
+      jest.spyOn(internals, 'getAccessToken').mockRejectedValueOnce(new Error('boom'))
+
+      const result = await service.sendPayment({
+        account: '123',
+        id: 'txn-broken',
+        value: 500,
+      })
+
+      expect(result).toEqual({ success: false })
+      expect(logger.error).toHaveBeenCalledWith('[BreB] Payment submission failed', { account: '123', reason: 'boom' })
     })
   })
 
@@ -269,18 +303,18 @@ describe('BrebPaymentService', () => {
     it('rejects verification when the rail or key data is invalid', async () => {
       const { logger, service } = setupService()
 
-      const invalidRail = await service.verifyAccount({ account: '123', bankCode: '???' })
-      expect(invalidRail).toBe(false)
-
       primeAccessToken()
+      primeKeyLookup({ instructedAgent: '???' })
+
+      const invalidRail = await service.verifyAccount({ account: defaultKeyDetails.accountNumber })
+      expect(invalidRail).toBe(false)
+      expect(logger.warn).toHaveBeenCalledWith('[BreB] Unsupported rail for key', { rail: '???' })
+
       mockedAxios.get.mockResolvedValueOnce({ data: {} })
 
-      const missingKey = await service.verifyAccount({ account: '123', bankCode: 'ENT' })
+      const missingKey = await service.verifyAccount({ account: '123' })
       expect(missingKey).toBe(false)
-      expect(logger.warn).toHaveBeenCalledWith(
-        '[BreB] Failed to verify account',
-        expect.objectContaining({ bankCode: '???', reason: expect.stringContaining('Unsupported BreB rail') }),
-      )
+      expect(logger.warn).toHaveBeenCalledWith('[BreB] Key lookup returned no data', { account: '123' })
     })
 
     it('handles key lookup failures from the provider', async () => {
@@ -290,9 +324,12 @@ describe('BrebPaymentService', () => {
       primeAccessToken()
       mockedAxios.get.mockRejectedValueOnce(axiosFailure('lookup failed'))
 
-      const verified = await service.verifyAccount({ account: defaultKeyDetails.accountNumber, bankCode: 'ENT' })
+      const verified = await service.verifyAccount({ account: defaultKeyDetails.accountNumber })
       expect(verified).toBe(false)
-      expect(logger.error).toHaveBeenCalledWith('[BreB] Failed to fetch key', 'lookup failed')
+      expect(logger.error).toHaveBeenCalledWith(
+        '[BreB] Failed to fetch key',
+        expect.objectContaining({ responseData: 'lookup failed' }),
+      )
     })
 
     it('captures non-axios key lookup errors', async () => {
@@ -301,9 +338,12 @@ describe('BrebPaymentService', () => {
       primeAccessToken()
       mockedAxios.get.mockRejectedValueOnce(new Error('plain failure'))
 
-      const verified = await service.verifyAccount({ account: defaultKeyDetails.accountNumber, bankCode: 'ENT' })
+      const verified = await service.verifyAccount({ account: defaultKeyDetails.accountNumber })
       expect(verified).toBe(false)
-      expect(logger.error).toHaveBeenCalledWith('[BreB] Failed to fetch key', expect.any(Error))
+      expect(logger.error).toHaveBeenCalledWith(
+        '[BreB] Failed to fetch key',
+        expect.objectContaining({ message: 'plain failure' }),
+      )
     })
 
     it('recognises incomplete keys as unusable', async () => {
@@ -311,9 +351,22 @@ describe('BrebPaymentService', () => {
       primeAccessToken()
       primeKeyLookup({ accountNumber: '', keyState: 'ACTIVA' })
 
-      const result = await service.verifyAccount({ account: '321', bankCode: 'ENT' })
+      const result = await service.verifyAccount({ account: '321' })
       expect(result).toBe(false)
       expect(logger.warn).toHaveBeenCalledWith('[BreB] Key missing required attributes', expect.any(Object))
+    })
+
+    it('logs verification failures when authentication cannot be performed', async () => {
+      const { logger, service } = setupService()
+      const internals = getInternals(service)
+      jest.spyOn(internals, 'getAccessToken').mockRejectedValueOnce(new Error('auth fail'))
+
+      const verified = await service.verifyAccount({ account: defaultKeyDetails.accountNumber })
+      expect(verified).toBe(false)
+      expect(logger.warn).toHaveBeenCalledWith('[BreB] Failed to verify account', {
+        account: defaultKeyDetails.accountNumber,
+        reason: 'auth fail',
+      })
     })
   })
 
@@ -372,7 +425,7 @@ describe('BrebPaymentService', () => {
         creditor_type_account: '',
         transaction_total_amount: 50,
       })
-      expect(internals.isKeyUsable({ instructedAgent: 'ENT', keyState: 'ACTIVA' }, 'ENT')).toBe(false)
+      expect(internals.isKeyUsable({ instructedAgent: 'ENT', keyState: 'ACTIVA' })).toBe(false)
     })
 
     it('returns null when dispatch responses lack data envelopes', async () => {
@@ -393,7 +446,10 @@ describe('BrebPaymentService', () => {
 
       const result = await internals.dispatchPayment({ amount: 1 }, config, 'token')
       expect(result).toBeNull()
-      expect(logger.error).toHaveBeenCalledWith('[BreB] Failed to dispatch payment', expect.any(Error))
+      expect(logger.error).toHaveBeenCalledWith(
+        '[BreB] Failed to dispatch payment',
+        expect.objectContaining({ message: 'plain dispatch error' }),
+      )
     })
 
     it('handles transaction report errors and pending interpretations', async () => {
