@@ -26,6 +26,7 @@ interface BrebKeyDetails {
   partyIdentifier?: string
   partySystemIdentifier?: string
   partyType?: string
+  rail?: BrebRail
   subType?: string
   typeAccount?: string
 }
@@ -277,16 +278,7 @@ export class BrebPaymentService implements IPaymentService {
         transactionTotalAmount: payload.transaction_total_amount,
       },
       method: 'POST',
-      payload: {
-        creditor_account_number: this.maskIdentifier(payload.creditor_account_number),
-        creditor_document_number: this.maskIdentifier(payload.creditor_document_number),
-        creditor_document_type: payload.creditor_document_type,
-        creditor_party_type: payload.creditor_party_type,
-        creditor_sub_type: payload.creditor_sub_type,
-        creditor_type_account: payload.creditor_type_account,
-        transaction_note: payload.transaction_note,
-        transaction_total_amount: payload.transaction_total_amount,
-      },
+      payload,
     })
 
     try {
@@ -354,6 +346,7 @@ export class BrebPaymentService implements IPaymentService {
           keyState: response.data?.data?.keyState ?? null,
         },
         method: 'GET',
+        responseData: response.data.data,
         status: response.status,
       })
 
@@ -566,47 +559,6 @@ export class BrebPaymentService implements IPaymentService {
     return isActive
   }
 
-  private logBrebRequest({
-    endpoint,
-    headers,
-    metadata,
-    method,
-    payload,
-  }: {
-    endpoint: string
-    headers: Record<string, string>
-    metadata?: Record<string, boolean | null | number | string | undefined>
-    method: 'GET' | 'POST'
-    payload?: unknown
-  }): void {
-    this.logger.info('[BreB] Outbound request', {
-      endpoint: this.sanitizeUrlForLogs(endpoint),
-      headers: this.redactHeaders(headers),
-      method,
-      ...(metadata ? { metadata } : {}),
-      ...(payload === undefined ? {} : { payload }),
-    })
-  }
-
-  private logBrebResponse({
-    endpoint,
-    metadata,
-    method,
-    status,
-  }: {
-    endpoint: string
-    metadata?: Record<string, boolean | null | number | string | undefined>
-    method: 'GET' | 'POST'
-    status: number
-  }): void {
-    this.logger.info('[BreB] Response received', {
-      endpoint: this.sanitizeUrlForLogs(endpoint),
-      method,
-      status,
-      ...(metadata ? { metadata } : {}),
-    })
-  }
-
   private logBrebError({
     endpoint,
     error,
@@ -637,6 +589,50 @@ export class BrebPaymentService implements IPaymentService {
       endpoint: this.sanitizeUrlForLogs(endpoint),
       message: fallbackMessage,
       method,
+      ...(metadata ? { metadata } : {}),
+    })
+  }
+
+  private logBrebRequest({
+    endpoint,
+    headers,
+    metadata,
+    method,
+    payload,
+  }: {
+    endpoint: string
+    headers: Record<string, string>
+    metadata?: Record<string, boolean | null | number | string | undefined>
+    method: 'GET' | 'POST'
+    payload?: unknown
+  }): void {
+    this.logger.info('[BreB] Outbound request', {
+      endpoint: this.sanitizeUrlForLogs(endpoint),
+      headers: this.redactHeaders(headers),
+      method,
+      ...(metadata ? { metadata } : {}),
+      ...(payload === undefined ? {} : { payload }),
+    })
+  }
+
+  private logBrebResponse({
+    endpoint,
+    metadata,
+    method,
+    responseData,
+    status,
+  }: {
+    endpoint: string
+    metadata?: Record<string, boolean | null | number | string | undefined>
+    method: 'GET' | 'POST'
+    responseData?: unknown
+    status: number
+  }): void {
+    this.logger.info('[BreB] Response received', {
+      endpoint: this.sanitizeUrlForLogs(endpoint),
+      method,
+      status,
+      ...(responseData === undefined ? {} : { responseData }),
       ...(metadata ? { metadata } : {}),
     })
   }
