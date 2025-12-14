@@ -10,6 +10,8 @@ import { PaymentSentMessage, PaymentStatusUpdatedMessage, PaymentStatusUpdatedMe
 import { ISlackNotifier } from '../../../../platform/notifications/ISlackNotifier'
 import { IWebhookNotifier, WebhookEvent } from '../../../../platform/notifications/IWebhookNotifier'
 import { IDatabaseClientProvider } from '../../../../platform/persistence/IDatabaseClientProvider'
+import { transactionNotificationInclude, TransactionWithRelations } from '../../../transactions/application/transactionNotificationTypes'
+import { buildTransactionSlackMessage } from '../../../transactions/application/transactionSlackFormatter'
 import { IWalletHandlerFactory } from '../../application/contracts/IWalletHandlerFactory'
 
 /**
@@ -38,6 +40,27 @@ export class PaymentStatusUpdatedController {
     catch (error) {
       this.logger.error('[PaymentStatusUpdated queue]: Error in consumer registration:', error)
     }
+  }
+
+  private buildSlackMessage(
+    transaction: TransactionWithRelations,
+    status: TransactionStatus,
+    message: PaymentStatusUpdatedMessage,
+  ): string {
+    const heading = status === TransactionStatus.PAYMENT_COMPLETED
+      ? 'Payment completed'
+      : 'Payment failed'
+
+    return buildTransactionSlackMessage(transaction, {
+      heading,
+      notes: {
+        provider: message.provider,
+        providerAmount: message.amount,
+        providerStatus: message.status,
+      },
+      status,
+      trigger: 'PaymentStatusUpdatedController',
+    })
   }
 
   private mapProviderStatus(status: string): TransactionStatus {
@@ -90,14 +113,7 @@ export class PaymentStatusUpdatedController {
 
       const transactionRecord = await prismaClient.transaction.update({
         data: { status: newStatus },
-        include: {
-          partnerUser: {
-            include: {
-              partner: true,
-            },
-          },
-          quote: true,
-        },
+        include: transactionNotificationInclude,
         where: { externalId: message.externalId },
       })
       // Notify partner webhook that the transaction was updated
@@ -127,9 +143,7 @@ export class PaymentStatusUpdatedController {
       )
 
       if (newStatus === TransactionStatus.PAYMENT_COMPLETED) {
-        await this.slackNotifier.sendMessage(
-          `Payment completed for transaction: ${transactionRecord.id}, ${transactionRecord.quote.sourceAmount} ${transactionRecord.quote.cryptoCurrency} -> ${transactionRecord.quote.targetAmount} ${transactionRecord.quote.targetCurrency}, Partner: ${transactionRecord.partnerUser.partner.name}`,
-        )
+        await this.slackNotifier.sendMessage(this.buildSlackMessage(transactionRecord, newStatus, message))
 
         await this.queueHandler.postMessage(QueueName.PAYMENT_SENT, {
           amount: transactionRecord.quote.sourceAmount,
@@ -140,9 +154,7 @@ export class PaymentStatusUpdatedController {
         } satisfies PaymentSentMessage)
       }
       else {
-        await this.slackNotifier.sendMessage(
-          `Payment failed for transaction: ${transactionRecord.id}, ${transactionRecord.quote.sourceAmount} ${transactionRecord.quote.cryptoCurrency} -> ${transactionRecord.quote.targetAmount} ${transactionRecord.quote.targetCurrency}, Partner: ${transactionRecord.partnerUser.partner.name}`,
-        )
+        await this.slackNotifier.sendMessage(this.buildSlackMessage(transactionRecord, newStatus, message))
         const walletHandler = this.walletHandlerFactory.getWalletHandler(
           transactionRecord.quote.network,
         )

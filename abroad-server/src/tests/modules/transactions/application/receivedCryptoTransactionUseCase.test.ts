@@ -69,14 +69,16 @@ const buildTransaction = (overrides: TransactionOverrides = {}): TransactionReco
   const base = {
     accountNumber: '123',
     bankCode: 'bank',
+    externalId: 'external-1',
     id: baseMessage.transactionId,
-    onChainId: null,
+    onChainId: baseMessage.onChainId,
     partnerUser: {
-      partner: { name: 'Partner', webhookUrl: 'http://webhook' },
+      partner: { id: 'partner-1', name: 'Partner', webhookUrl: 'http://webhook' },
       userId: 'user-1',
     },
     quote: {
       cryptoCurrency: CryptoCurrency.USDC,
+      id: 'quote-1',
       network: BlockchainNetwork.STELLAR,
       paymentMethod: PaymentMethod.NEQUI,
       sourceAmount: 50,
@@ -299,6 +301,13 @@ describe('ReceivedCryptoTransactionUseCase', () => {
       }),
     )
     expect(harness.slackNotifier.sendMessage).toHaveBeenCalledWith(expect.stringContaining('Payment completed'))
+    const [slackMessage] = harness.slackNotifier.sendMessage.mock.calls[0] as [string]
+    expect(slackMessage).toContain(`Transaction: ${processingRecord.id}`)
+    expect(slackMessage).toContain(`Quote: ${processingRecord.quote.id}`)
+    expect(slackMessage).toContain(`Payment: ${processingRecord.quote.paymentMethod}`)
+    expect(slackMessage).toContain(`Network: ${processingRecord.quote.network}`)
+    expect(slackMessage).toContain(`Account: ${processingRecord.accountNumber}`)
+    expect(slackMessage).toContain(`References: External: ${processingRecord.externalId}`)
     expect(harness.walletHandler.send).not.toHaveBeenCalled()
   })
 

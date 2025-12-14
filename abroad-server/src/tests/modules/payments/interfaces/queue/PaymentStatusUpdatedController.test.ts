@@ -132,14 +132,18 @@ describe('PaymentStatusUpdatedController', () => {
       onPaymentStatusUpdated: (msg: unknown) => Promise<void>
     }
     prisma.transaction.update.mockResolvedValue({
+      accountNumber: 'account-123',
+      bankCode: 'bank-xyz',
+      externalId: 'txn-1',
       id: 'txn-1',
       onChainId: 'on-chain-1',
       partnerUser: {
-        partner: { name: 'Partner', webhookUrl: 'http://hook' },
+        partner: { id: 'partner-1', name: 'Partner', webhookUrl: 'http://hook' },
         userId: 'user-1',
       },
       quote: {
         cryptoCurrency: CryptoCurrency.USDC,
+        id: 'quote-1',
         network: BlockchainNetwork.STELLAR,
         paymentMethod: PaymentMethod.NEQUI,
         sourceAmount: 100,
@@ -175,6 +179,13 @@ describe('PaymentStatusUpdatedController', () => {
       }),
     )
     expect(slackNotifier.sendMessage).toHaveBeenCalledWith(expect.stringContaining('Payment completed'))
+    const [slackMessage] = (slackNotifier.sendMessage as jest.Mock).mock.calls[0] as [string]
+    expect(slackMessage).toContain('Transaction: txn-1')
+    expect(slackMessage).toContain('Quote: quote-1')
+    expect(slackMessage).toContain('Payment: NEQUI')
+    expect(slackMessage).toContain('Network: STELLAR')
+    expect(slackMessage).toContain('References: External: txn-1')
+    expect(slackMessage).toContain('Notes: provider: transfero | providerStatus: processed')
   })
 
   it('records failures and triggers refunds when hashes exist', async () => {
@@ -187,14 +198,18 @@ describe('PaymentStatusUpdatedController', () => {
       ) => Promise<void>
     }
     prisma.transaction.update.mockResolvedValue({
+      accountNumber: 'account-123',
+      bankCode: 'bank-xyz',
+      externalId: 'txn-2',
       id: 'txn-2',
       onChainId: 'hash-1',
       partnerUser: {
-        partner: { name: 'Partner', webhookUrl: 'http://hook' },
+        partner: { id: 'partner-1', name: 'Partner', webhookUrl: 'http://hook' },
         userId: 'user-2',
       },
       quote: {
         cryptoCurrency: CryptoCurrency.USDC,
+        id: 'quote-2',
         network: BlockchainNetwork.STELLAR,
         paymentMethod: PaymentMethod.NEQUI,
         sourceAmount: 50,

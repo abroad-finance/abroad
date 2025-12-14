@@ -12,20 +12,15 @@ import { IWebhookNotifier, WebhookEvent } from '../../../platform/notifications/
 import { IDatabaseClientProvider } from '../../../platform/persistence/IDatabaseClientProvider'
 import { IPaymentServiceFactory } from '../../payments/application/contracts/IPaymentServiceFactory'
 import { IWalletHandlerFactory } from '../../payments/application/contracts/IWalletHandlerFactory'
-
-type PrismaClientInstance = Awaited<ReturnType<IDatabaseClientProvider['getClient']>>
-type TransactionClient = Prisma.TransactionClient | PrismaClientInstance
-
-const transactionInclude = {
-  partnerUser: { include: { partner: true } },
-  quote: true,
-} as const
+import { transactionNotificationInclude, TransactionWithRelations } from './transactionNotificationTypes'
+import { buildTransactionSlackMessage } from './transactionSlackFormatter'
 
 export interface IReceivedCryptoTransactionUseCase {
   process(rawMessage: unknown): Promise<void>
 }
+type PrismaClientInstance = Awaited<ReturnType<IDatabaseClientProvider['getClient']>>
 
-type TransactionWithRelations = Prisma.TransactionGetPayload<{ include: typeof transactionInclude }>
+type TransactionClient = Prisma.TransactionClient | PrismaClientInstance
 
 class RefundService {
   constructor(private readonly walletHandlerFactory: IWalletHandlerFactory) {}
@@ -79,7 +74,7 @@ class TransactionNotifier {
 }
 
 class TransactionRepository {
-  constructor(private readonly include = transactionInclude) {}
+  constructor(private readonly include = transactionNotificationInclude) {}
 
   public async markProcessing(
     prismaClient: TransactionClient,
@@ -196,6 +191,19 @@ export class ReceivedCryptoTransactionUseCase implements IReceivedCryptoTransact
     }
 
     await this.processPayment(prismaClient, transactionRecord, parsedMessage, notifier, logger)
+  }
+
+  private buildSlackMessage(
+    transaction: TransactionWithRelations,
+    status: TransactionStatus,
+    notes?: Record<string, boolean | null | number | string | undefined>,
+  ): string {
+    return buildTransactionSlackMessage(transaction, {
+      heading: status === TransactionStatus.PAYMENT_COMPLETED ? 'Payment completed' : 'Payment failed',
+      notes,
+      status,
+      trigger: 'ReceivedCryptoTransactionUseCase',
+    })
   }
 
   private createLogger(staticPayload?: Record<string, unknown>): ScopedLogger {
@@ -326,17 +334,21 @@ export class ReceivedCryptoTransactionUseCase implements IReceivedCryptoTransact
       await notifier.notify(updatedTransaction, WebhookEvent.TRANSACTION_CREATED, 'final')
 
       if (paymentResponse.success) {
-        await this.notifySlack(
-          `Payment completed for transaction: ${transactionRecord.id}, ${transactionRecord.quote.sourceAmount} ${transactionRecord.quote.cryptoCurrency} -> ${transactionRecord.quote.targetAmount} ${transactionRecord.quote.targetCurrency}, Partner: ${transactionRecord.partnerUser.partner.name}`,
-          logger,
+        const slackMessage = this.buildSlackMessage(
+          updatedTransaction,
+          newStatus,
+          { sourceAddress: message.addressFrom },
         )
+        await this.notifySlack(slackMessage, logger)
         await this.publishPaymentSentMessage(transactionRecord, logger)
       }
       else {
-        await this.notifySlack(
-          `Payment failed for transaction: ${transactionRecord.id}, ${transactionRecord.quote.sourceAmount} ${transactionRecord.quote.cryptoCurrency} -> ${transactionRecord.quote.targetAmount} ${transactionRecord.quote.targetCurrency}, Partner: ${transactionRecord.partnerUser.partner.name}`,
-          logger,
+        const slackMessage = this.buildSlackMessage(
+          updatedTransaction,
+          newStatus,
+          { providerTransactionId: 'not-provided' },
         )
+        await this.notifySlack(slackMessage, logger)
         const refundResult = await this.refundService.refundToSender(message)
         await this.recordRefundOnChainId(prismaClient, transactionRecord.id, refundResult, logger)
       }
