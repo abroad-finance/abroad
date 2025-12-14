@@ -95,7 +95,7 @@ export class BrebPaymentService implements IPaymentService {
   public readonly fixedFee = 0
 
   public readonly isAsync = false
-  public readonly isEnabled = false
+  public readonly isEnabled = true
 
   public readonly MAX_TOTAL_AMOUNT_PER_DAY = 25_000_000
   public readonly MAX_USER_AMOUNT_PER_DAY = 25_000_000
