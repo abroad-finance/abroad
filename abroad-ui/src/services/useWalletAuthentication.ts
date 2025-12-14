@@ -2,21 +2,26 @@ import {
   useCallback, useEffect, useRef, useState,
 } from 'react'
 
+import type { ApiClientResponse } from '../api/customClient'
 import type { IWalletAuthentication } from '../interfaces/IWalletAuthentication'
 
 import {
   challenge,
-  ChallengeResult,
+  type challengeResponse,
   refresh,
-  RefreshResult,
+  type refreshResponse,
   verify,
-  VerifyResult,
+  type verifyResponse,
 } from '../api'
 import { authTokenStore } from './auth/authTokenStore'
 
 type JwtPayload = { exp?: number }
 
 const REFRESH_GRACE_MS = 60_000
+
+type ChallengeResult = ApiClientResponse<challengeResponse>
+type RefreshResult = ApiClientResponse<refreshResponse>
+type VerifyResult = ApiClientResponse<verifyResponse>
 
 const extractReason = (body: unknown): null | string => {
   if (body && typeof body === 'object' && 'reason' in body) {
@@ -63,7 +68,7 @@ export const useWalletAuthentication = (): IWalletAuthentication => {
   }, [])
 
   const refreshAuthToken = useCallback(async ({ token }: { token: string }): Promise<{ token: string }> => {
-    const res: RefreshResult = await refresh({ token })
+    const res = await refresh({ token }) as RefreshResult
     const data = ensureOk(res, 'Failed to refresh token')
     return { token: data.token }
   }, [])
@@ -106,7 +111,7 @@ export const useWalletAuthentication = (): IWalletAuthentication => {
   }, [])
 
   const getChallengeMessage = useCallback(async ({ address }: { address: string }): Promise<{ message: string }> => {
-    const res: ChallengeResult = await challenge({ address })
+    const res = await challenge({ address }) as ChallengeResult
     const data = ensureOk(res, 'Failed to fetch challenge')
     return { message: data.xdr }
   }, [])
@@ -115,10 +120,10 @@ export const useWalletAuthentication = (): IWalletAuthentication => {
     address: string
     signedMessage: string
   }): Promise<{ token: string }> => {
-    const res: VerifyResult = await verify({
+    const res = await verify({
       address,
       signedXDR: signedMessage,
-    })
+    }) as VerifyResult
     const data = ensureOk(res, 'Failed to verify signature')
     return { token: data.token }
   }, [])

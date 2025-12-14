@@ -17,6 +17,7 @@ import {
   useRef,
 } from 'react'
 
+import type { ApiClientResponse } from '../../api/customClient'
 import type { BankDetailsRouteProps } from '../../features/swap/components/BankDetailsRoute'
 import type { ConfirmQrProps } from '../../features/swap/components/ConfirmQr'
 import type { SwapProps } from '../../features/swap/components/Swap'
@@ -24,11 +25,19 @@ import type { WebSwapControllerProps } from './WebSwap'
 
 import {
   acceptTransaction,
+  type AcceptTransaction400,
+  type acceptTransactionResponse,
   _36EnumsBlockchainNetwork as BlockchainNetwork,
   _36EnumsCryptoCurrency as CryptoCurrency,
   decodeQrCodeBR,
+  type DecodeQrCodeBR400,
+  type decodeQrCodeBRResponse,
   getQuote,
+  type GetQuote400,
+  type getQuoteResponse,
   getReverseQuote,
+  type GetReverseQuote400,
+  type getReverseQuoteResponse,
   _36EnumsPaymentMethod as PaymentMethod,
   _36EnumsTargetCurrency as TargetCurrency,
 } from '../../api'
@@ -39,6 +48,12 @@ import { ASSET_URLS, PENDING_TX_KEY } from '../../shared/constants'
 import { useWalletAuth } from '../../shared/hooks/useWalletAuth'
 import { hasMessage } from '../../shared/utils'
 
+type AcceptTransactionApiResponse = ApiClientResponse<acceptTransactionResponse, AcceptTransaction400>
+
+type DecodeQrApiResponse = ApiClientResponse<decodeQrCodeBRResponse, DecodeQrCodeBR400>
+
+type QuoteApiResponse = ApiClientResponse<getQuoteResponse, GetQuote400>
+type ReverseQuoteApiResponse = ApiClientResponse<getReverseQuoteResponse, GetReverseQuote400>
 type SwapAction
   = | { accountNumber?: string, bankCode?: string, pixKey?: string, recipientName?: string, taxId?: string, type: 'SET_BANK_DETAILS' }
     | { isDecodingQr: boolean, type: 'SET_DECODING' }
@@ -54,7 +69,6 @@ type SwapAction
     | { transactionId: null | string, type: 'SET_TRANSACTION_ID' }
     | { type: 'RESET' }
     | { type: 'SET_VIEW', view: SwapView }
-
 type SwapControllerState = {
   accountNumber: string
   bankCode: string
@@ -224,7 +238,7 @@ const extractReason = (body: unknown): null | string => {
   return null
 }
 
-const isAbortError = (result: { error: { type: string }, ok: boolean }) => !result.ok && result.error.type === 'aborted'
+const isAbortError = (result: { error?: { type?: string } }) => result.error?.type === 'aborted'
 
 export const useWebSwapController = (): WebSwapControllerProps => {
   const initialDesktop = typeof window !== 'undefined' ? window.innerWidth >= 768 : true
@@ -375,22 +389,23 @@ export const useWebSwapController = (): WebSwapControllerProps => {
         target_currency: state.targetCurrency,
       },
       { signal: controller.signal },
-    )
+    ) as ReverseQuoteApiResponse
 
     if (controller.signal.aborted || reqId !== directReqIdRef.current || lastEditedRef.current !== 'source') return
 
-    if (!response.ok) {
+    if (response.status !== 200) {
       if (!isAbortError(response)) {
-        const reason = extractReason(response.error.body) || t('swap.quote_error', 'Esta cotización superó el monto máximo permitido.')
-        notifyError(reason, response.error.message)
+        const reason = extractReason(response.data) || response.error?.message || t('swap.quote_error', 'Esta cotización superó el monto máximo permitido.')
+        notifyError(reason, response.error?.message)
       }
       dispatch({ loadingTarget: false, type: 'SET_LOADING' })
       return
     }
 
-    const formatted = formatTargetNumber(response.data.value)
+    const quote = response.data
+    const formatted = formatTargetNumber(quote.value)
     dispatch({
-      quoteId: response.data.quote_id,
+      quoteId: quote.quote_id,
       sourceAmount: value,
       targetAmount: formatted,
       type: 'SET_AMOUNTS',
@@ -435,22 +450,23 @@ export const useWebSwapController = (): WebSwapControllerProps => {
         target_currency: state.targetCurrency,
       },
       { signal: controller.signal },
-    )
+    ) as QuoteApiResponse
 
     if (controller.signal.aborted || reqId !== reverseReqIdRef.current || lastEditedRef.current !== 'target') return
 
-    if (!response.ok) {
+    if (response.status !== 200) {
       if (!isAbortError(response)) {
-        const reason = extractReason(response.error.body) || t('swap.quote_error', 'Esta cotización superó el monto máximo permitido.')
-        notifyError(reason, response.error.message)
+        const reason = extractReason(response.data) || response.error?.message || t('swap.quote_error', 'Esta cotización superó el monto máximo permitido.')
+        notifyError(reason, response.error?.message)
       }
       dispatch({ loadingSource: false, type: 'SET_LOADING' })
       return
     }
 
+    const quote = response.data
     dispatch({
-      quoteId: response.data.quote_id,
-      sourceAmount: response.data.value.toFixed(2),
+      quoteId: quote.quote_id,
+      sourceAmount: quote.value.toFixed(2),
       targetAmount: value,
       type: 'SET_AMOUNTS',
     })
@@ -573,11 +589,12 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     const controller = new AbortController()
     decodeAbortRef.current = controller
     try {
-      const response = await decodeQrCodeBR({ qrCode: text }, { signal: controller.signal })
-      if (!response.ok) {
+      const response = await decodeQrCodeBR({ qrCode: text }, { signal: controller.signal }) as DecodeQrApiResponse
+      if (controller.signal.aborted) return
+      if (response.status !== 200) {
         if (!isAbortError(response)) {
-          const reason = extractReason(response.error.body) || t('swap.qr_decode_error', 'No pudimos decodificar este QR.')
-          notifyError(reason, response.error.message)
+          const reason = extractReason(response.data) || response.error?.message || t('swap.qr_decode_error', 'No pudimos decodificar este QR.')
+          notifyError(reason, response.error?.message)
         }
         return
       }
@@ -661,12 +678,12 @@ export const useWebSwapController = (): WebSwapControllerProps => {
         redirectUrl,
         tax_id: isBrazil ? state.taxId : undefined,
         user_id: kit.address,
-      })
+      }) as AcceptTransactionApiResponse
 
-      if (!response.ok) {
+      if (response.status !== 200) {
         if (!isAbortError(response)) {
-          const reason = extractReason(response.error.body) || t('swap.accept_error', 'No pudimos iniciar la transacción.')
-          notifyError(reason, response.error.message)
+          const reason = extractReason(response.data) || response.error?.message || t('swap.accept_error', 'No pudimos iniciar la transacción.')
+          notifyError(reason, response.error?.message)
         }
         return
       }
@@ -781,7 +798,12 @@ export const useWebSwapController = (): WebSwapControllerProps => {
       return !(state.pixKey && state.taxId)
     }
     return state.accountNumber.trim().length < 6
-  }, [state.accountNumber, state.pixKey, state.targetCurrency, state.taxId])
+  }, [
+    state.accountNumber,
+    state.pixKey,
+    state.targetCurrency,
+    state.taxId,
+  ])
 
   const bankDetailsProps: BankDetailsRouteProps = {
     accountNumber: state.accountNumber,
@@ -854,10 +876,8 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     handleWalletDetailsClose,
     handleWalletDetailsOpen,
     isDecodingQr: state.isDecodingQr,
-    isDesktop: state.isDesktop,
     isQrOpen: state.isQrOpen,
     isWalletDetailsOpen: state.isWalletDetailsOpen,
-    loadingSubmit: state.loadingSubmit,
     resetForNewTransaction,
     swapViewProps: swapProps,
     targetAmount: state.targetAmount,

@@ -7,7 +7,14 @@ import {
   useState,
 } from 'react'
 
-import { listPartnerTransactions, PaginatedTransactionListTransactionsItem } from '../../../api'
+import type { ApiClientResponse } from '../../../api/customClient'
+
+import {
+  listPartnerTransactions,
+  type ListPartnerTransactions400,
+  type listPartnerTransactionsResponse,
+  PaginatedTransactionListTransactionsItem,
+} from '../../../api'
 import { useWebSocketSubscription } from '../../../contexts/WebSocketContext'
 import { useWalletAuth } from '../../../shared/hooks/useWalletAuth'
 import { WalletDetailsProps } from '../components/WalletDetails'
@@ -17,6 +24,8 @@ const STELLAR_HORIZON_URL = 'https://horizon.stellar.org'
 const USDC_ISSUER = 'GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN'
 const DEFAULT_TRANSACTIONS_PAGE_SIZE = 10
 
+type ListTransactionsResult = ApiClientResponse<listPartnerTransactionsResponse, ListPartnerTransactions400>
+
 interface PaginationState {
   currentPage: number
   hasMore: boolean
@@ -24,7 +33,6 @@ interface PaginationState {
 }
 
 interface Params { onClose?: () => void }
-
 // Transaction type
 type Transaction = PaginatedTransactionListTransactionsItem
 
@@ -122,16 +130,16 @@ export function useWalletDetails(params: Params = {}): WalletDetailsProps {
         externalUserId: kit.address,
         page,
         pageSize: pageSizeRef.current,
-      }, { signal: abortController.signal })
+      }, { signal: abortController.signal }) as ListTransactionsResult
 
-      if (!response.ok) {
-        if (abortController.signal.aborted) return
+      if (abortController.signal.aborted) return
+
+      if (response.status !== 200) {
         const fallback = t('wallet_details.error.fetch_failed', 'Failed to fetch transactions')
-        const body = response.error.body
-        const reason = body && typeof body === 'object' && 'reason' in body
-          ? (body as { reason?: string }).reason
+        const reason = response.data && typeof response.data === 'object' && 'reason' in response.data
+          ? (response.data as { reason?: string }).reason
           : null
-        setTransactionError(reason || response.error.message || fallback)
+        setTransactionError(reason || response.error?.message || fallback)
         return
       }
 
@@ -208,7 +216,7 @@ export function useWalletDetails(params: Params = {}): WalletDetailsProps {
   useWebSocketSubscription('transaction.updated', refreshFromEvent)
   useWebSocketSubscription('connect_error', (err) => {
     setTransactionError(err.message || 'WS connection error')
-  }, [])
+  })
 
   // Handlers exposed to component
   const onRefreshBalance = useCallback(() => {

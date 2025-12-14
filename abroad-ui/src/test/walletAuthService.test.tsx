@@ -17,31 +17,31 @@ vi.mock('@tolgee/react', () => ({
   useTranslate: () => ({ t: (_key: string, fallback: string) => fallback }),
 }))
 
-const challengeMock = vi.fn(async () => ({
-  data: { xdr: 'challenge-xdr' },
-  headers: new Headers(),
-  ok: true,
-  status: 200,
-}))
-
-const verifyMock = vi.fn(async () => ({
-  data: { token },
-  headers: new Headers(),
-  ok: true,
-  status: 200,
-}))
-
-const refreshMock = vi.fn(async () => ({
-  data: { token: `${token}-refreshed` },
-  headers: new Headers(),
-  ok: true,
-  status: 200,
+const mocked = vi.hoisted(() => ({
+  challengeMock: vi.fn(async () => ({
+    data: { xdr: 'challenge-xdr' },
+    headers: new Headers(),
+    ok: true,
+    status: 200,
+  })),
+  refreshMock: vi.fn(async () => ({
+    data: { token: `${token}-refreshed` },
+    headers: new Headers(),
+    ok: true,
+    status: 200,
+  })),
+  verifyMock: vi.fn(async () => ({
+    data: { token },
+    headers: new Headers(),
+    ok: true,
+    status: 200,
+  })),
 }))
 
 vi.mock('../api', () => ({
-  challenge: (...args: unknown[]) => challengeMock(...args),
-  refresh: (...args: unknown[]) => refreshMock(...args),
-  verify: (...args: unknown[]) => verifyMock(...args),
+  challenge: mocked.challengeMock,
+  refresh: mocked.refreshMock,
+  verify: mocked.verifyMock,
 }))
 
 afterEach(() => {
@@ -60,8 +60,8 @@ describe('useWalletAuthentication', () => {
       })
     })
 
-    expect(challengeMock).toHaveBeenCalled()
-    expect(verifyMock).toHaveBeenCalledWith({
+    expect(mocked.challengeMock).toHaveBeenCalled()
+    expect(mocked.verifyMock).toHaveBeenCalledWith({
       address: 'GADDR',
       signedXDR: 'signed-xdr',
     })
@@ -73,7 +73,7 @@ describe('useWalletAuthentication', () => {
 
     const refreshed = await act(async () => result.current.refreshAuthToken({ token }))
 
-    expect(refreshMock).toHaveBeenCalled()
+    expect(mocked.refreshMock).toHaveBeenCalled()
     expect(refreshed.token).toContain('refreshed')
   })
 })

@@ -30,7 +30,7 @@ export interface HttpRequestConfig extends Omit<RequestInit, 'body' | 'headers' 
   headers?: HeadersInit
   method?: HttpMethod
   query?: QueryParams
-  signal?: AbortSignal
+  signal?: AbortSignal | null
 }
 
 export type QueryParams = Record<string, boolean | null | number | string | undefined>

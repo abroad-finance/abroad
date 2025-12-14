@@ -20,6 +20,12 @@ const UserVerification = ({ onApproved, onClose }: UserVerificationProps): React
   const { kycUrl, setKycUrl } = useWalletAuth()
   const { getLanguage } = useTolgee()
   const [loading, setLoading] = React.useState(false)
+  const handleKycUpdate = useCallback((payload: { newStatus?: string }) => {
+    if (payload?.newStatus === 'APPROVED') {
+      setKycUrl(null)
+      onApproved?.()
+    }
+  }, [onApproved, setKycUrl])
 
   const handleKycRedirect = useCallback(() => {
     if (kycUrl) {
@@ -58,12 +64,7 @@ const UserVerification = ({ onApproved, onClose }: UserVerificationProps): React
     t,
   ])
 
-  useWebSocketSubscription('kyc.updated', (payload) => {
-    if (payload?.newStatus === 'APPROVED') {
-      setKycUrl(null)
-      onApproved?.()
-    }
-  }, [onApproved, setKycUrl])
+  useWebSocketSubscription('kyc.updated', handleKycUpdate)
   return (
     <div className="flex-1 flex items-center justify-center w-full flex-col">
       <div className="w-[98%] max-w-md min-h-[60vh] bg-[#356E6A]/5 backdrop-blur-xl rounded-4xl p-4 md:p-6 flex flex-col items-center justify-center space-y-1 lg:space-y-4 text-abroad-dark md:text-white">

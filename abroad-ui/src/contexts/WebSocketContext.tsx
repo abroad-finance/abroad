@@ -91,7 +91,11 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     set.add(entry as ListenerEntry<EventName>)
     listenersRef.current.set(event, set as Set<ListenerEntry<EventName>>)
     const socket = socketRef.current
-    if (socket) socket.on(event, wrapped)
+    if (socket) {
+      const eventName = event as Parameters<Socket['on']>[0]
+      const listener = wrapped as Parameters<Socket['on']>[1]
+      socket.on(eventName, listener)
+    }
     return () => {
       const currentSet = listenersRef.current.get(event)
       if (currentSet) {
@@ -102,7 +106,11 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         })
         if (currentSet.size === 0) listenersRef.current.delete(event)
       }
-      if (socket) socket.off(event, wrapped)
+      if (socket) {
+        const eventName = event as Parameters<Socket['off']>[0]
+        const listener = wrapped as Parameters<Socket['off']>[1]
+        socket.off(eventName, listener)
+      }
     }
   }, [])
 

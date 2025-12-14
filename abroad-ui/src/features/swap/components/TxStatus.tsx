@@ -74,7 +74,7 @@ const TxStatus = ({
   useWebSocketSubscription('transaction.updated', handleTxEvent)
   useWebSocketSubscription('connect_error', (err) => {
     setError(err.message || 'WS connection error')
-  }, [])
+  })
 
   useEffect(() => {
     setApiStatus(undefined)

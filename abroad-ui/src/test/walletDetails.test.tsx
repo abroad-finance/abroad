@@ -28,35 +28,37 @@ vi.mock('../contexts/WebSocketContext', () => ({
 
 const abortedPages: number[] = []
 
-const listPartnerTransactionsMock = vi.fn((params: { page: number }, opts?: { signal?: AbortSignal }) => new Promise((resolve) => {
-  const timer = setTimeout(() => resolve({
-    data: {
-      page: params.page,
-      pageSize: 10,
-      total: 0,
-      transactions: [],
-    },
-    headers: new Headers(),
-    ok: true,
-    status: 200,
-  }), 50)
-  opts?.signal?.addEventListener('abort', () => {
-    abortedPages.push(params.page)
-    clearTimeout(timer)
-    resolve({
-      error: {
-        body: null, message: 'aborted', status: null, type: 'aborted',
+const mocked = vi.hoisted(() => ({
+  listPartnerTransactionsMock: vi.fn((params: { page: number }, opts?: { signal?: AbortSignal }) => new Promise((resolve) => {
+    const timer = setTimeout(() => resolve({
+      data: {
+        page: params.page,
+        pageSize: 10,
+        total: 0,
+        transactions: [],
       },
-      headers: null,
-      ok: false,
-      status: null,
+      headers: new Headers(),
+      ok: true,
+      status: 200,
+    }), 50)
+    opts?.signal?.addEventListener('abort', () => {
+      abortedPages.push(params.page)
+      clearTimeout(timer)
+      resolve({
+        error: {
+          body: null, message: 'aborted', status: null, type: 'aborted',
+        },
+        headers: null,
+        ok: false,
+        status: null,
+      })
     })
-  })
+  })),
 }))
 
 vi.mock('../api', () => ({
   _36EnumsBlockchainNetwork: { STELLAR: 'STELLAR' },
-  listPartnerTransactions: (...args: unknown[]) => listPartnerTransactionsMock(...args),
+  listPartnerTransactions: mocked.listPartnerTransactionsMock,
 }))
 
 const mockKit: IWallet = {
@@ -91,7 +93,7 @@ const Wrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
 beforeEach(() => {
   vi.useFakeTimers()
   abortedPages.length = 0
-  listPartnerTransactionsMock.mockClear()
+  mocked.listPartnerTransactionsMock.mockClear()
 })
 
 afterEach(() => {
@@ -114,7 +116,7 @@ describe('useWalletDetails pagination', () => {
       vi.runAllTimers()
     })
 
-    expect(listPartnerTransactionsMock).toHaveBeenCalled()
+    expect(mocked.listPartnerTransactionsMock).toHaveBeenCalled()
     expect(abortedPages.length).toBeGreaterThanOrEqual(1)
   })
 })

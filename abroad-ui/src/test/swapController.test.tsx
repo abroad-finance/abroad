@@ -19,63 +19,73 @@ vi.mock('@tolgee/react', () => ({
   useTranslate: () => ({ t: (_key: string, fallback: string) => fallback }),
 }))
 
-const abortResult = {
-  error: {
-    body: null,
-    message: 'aborted',
+const mocked = vi.hoisted(() => {
+  const abortResult = {
+    error: {
+      body: null,
+      message: 'aborted',
+      status: null,
+      type: 'aborted',
+    },
+    headers: null,
+    ok: false,
     status: null,
-    type: 'aborted',
-  },
-  headers: null,
-  ok: false,
-  status: null,
-} as const
+  } as const
 
-const getQuoteMock = vi.fn((request: { amount: number }, opts?: { signal?: AbortSignal }) => new Promise((resolve) => {
-  const timer = setTimeout(() => {
-    resolve({
-      data: { quote_id: `q-${request.amount}`, value: request.amount * 2 },
-      headers: new Headers(),
-      ok: true,
-      status: 200,
+  const getQuoteMock = vi.fn((request: { amount: number }, opts?: { signal?: AbortSignal }) => new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      resolve({
+        data: { quote_id: `q-${request.amount}`, value: request.amount * 2 },
+        headers: new Headers(),
+        ok: true,
+        status: 200,
+      })
+    }, 50)
+    opts?.signal?.addEventListener('abort', () => {
+      clearTimeout(timer)
+      resolve(abortResult)
     })
-  }, 50)
-  opts?.signal?.addEventListener('abort', () => {
-    clearTimeout(timer)
-    resolve(abortResult)
-  })
-}))
+  }))
 
-const getReverseQuoteMock = vi.fn(async () => ({
-  data: { quote_id: 'reverse-quote', value: 5 },
-  headers: new Headers(),
-  ok: true,
-  status: 200,
-}))
+  const getReverseQuoteMock = vi.fn(async () => ({
+    data: { quote_id: 'reverse-quote', value: 5 },
+    headers: new Headers(),
+    ok: true,
+    status: 200,
+  }))
 
-const decodeQrCodeBRMock = vi.fn(async () => ({
-  data: { decoded: {} },
-  headers: new Headers(),
-  ok: true,
-  status: 200,
-}))
+  const decodeQrCodeBRMock = vi.fn(async () => ({
+    data: { decoded: {} },
+    headers: new Headers(),
+    ok: true,
+    status: 200,
+  }))
 
-const acceptTransactionMock = vi.fn(async () => ({
-  data: { id: 'tx-1', kycLink: null, transaction_reference: 'ref' },
-  headers: new Headers(),
-  ok: true,
-  status: 200,
-}))
+  const acceptTransactionMock = vi.fn(async () => ({
+    data: { id: 'tx-1', kycLink: null, transaction_reference: 'ref' },
+    headers: new Headers(),
+    ok: true,
+    status: 200,
+  }))
+
+  return {
+    abortResult,
+    acceptTransactionMock,
+    decodeQrCodeBRMock,
+    getQuoteMock,
+    getReverseQuoteMock,
+  }
+})
 
 vi.mock('../api', () => ({
   _36EnumsBlockchainNetwork: { STELLAR: 'STELLAR' },
   _36EnumsCryptoCurrency: { USDC: 'USDC' },
   _36EnumsPaymentMethod: { BREB: 'BREB', PIX: 'PIX' },
   _36EnumsTargetCurrency: { BRL: 'BRL', COP: 'COP' },
-  acceptTransaction: (...args: unknown[]) => acceptTransactionMock(...args),
-  decodeQrCodeBR: (...args: unknown[]) => decodeQrCodeBRMock(...args),
-  getQuote: (...args: unknown[]) => getQuoteMock(...args),
-  getReverseQuote: (...args: unknown[]) => getReverseQuoteMock(...args),
+  acceptTransaction: mocked.acceptTransactionMock,
+  decodeQrCodeBR: mocked.decodeQrCodeBRMock,
+  getQuote: mocked.getQuoteMock,
+  getReverseQuote: mocked.getReverseQuoteMock,
 }))
 
 const mockKit: IWallet = {
@@ -131,7 +141,7 @@ describe('useWebSwapController', () => {
       vi.runAllTimers()
     })
 
-    expect(getQuoteMock).toHaveBeenCalledTimes(2)
+    expect(mocked.getQuoteMock).toHaveBeenCalledTimes(2)
     expect(result.current.swapViewProps.sourceAmount).toBe('40.00')
     expect(result.current.swapViewProps.targetAmount).toBe('20')
   })

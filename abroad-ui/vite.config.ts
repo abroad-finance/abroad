@@ -1,5 +1,7 @@
+/// <reference types="vitest" />
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
+import type { PluginOption, UserConfig } from 'vite'
 import { defineConfig } from 'vite'
 import crypto from 'node:crypto'
 import path from 'node:path'
@@ -14,7 +16,14 @@ function randomHash(key: string): string {
   return hashCache.get(key) as string
 }
 
-export default defineConfig({
+type VitestEnabledConfig = UserConfig & { test?: import('vitest/config').UserConfig['test'] }
+
+const plugins: PluginOption[] = [
+  react({ include: '**/*.tsx' }),
+  tailwindcss(),
+]
+
+const config: VitestEnabledConfig = {
   root: __dirname,
   build: {
     chunkSizeWarningLimit: 1200,
@@ -62,7 +71,7 @@ export default defineConfig({
       '@/': path.resolve(__dirname, 'src'),
     },
   },
-  plugins: [react({ include: '**/*.tsx' }), tailwindcss()],
+  plugins,
   server: {
     watch: {
       usePolling: true,
@@ -78,4 +87,6 @@ export default defineConfig({
     restoreMocks: true,
     setupFiles: ['./src/test/setupTests.ts'],
   },
-})
+}
+
+export default defineConfig(config)
