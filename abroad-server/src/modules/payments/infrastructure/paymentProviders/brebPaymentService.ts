@@ -308,8 +308,17 @@ export class BrebPaymentService implements IPaymentService {
       return response.data?.data ?? null
     }
     catch (error) {
-      const reason = axios.isAxiosError(error) ? error.response?.data ?? error.message : error
-      this.logger.error('[BreB] Failed to dispatch payment', reason)
+      this.logBrebError({
+        endpoint,
+        error,
+        metadata: {
+          durationMs: Date.now() - requestStartedAt,
+          rail: payload.creditor_instructed_agent,
+          transactionTotalAmount: payload.transaction_total_amount,
+        },
+        method: 'POST',
+        operation: 'Failed to dispatch payment',
+      })
       return null
     }
   }
@@ -355,8 +364,16 @@ export class BrebPaymentService implements IPaymentService {
       return response.data.data
     }
     catch (error) {
-      const reason = axios.isAxiosError(error) ? error.response?.data ?? error.message : error
-      this.logger.error('[BreB] Failed to fetch key', reason)
+      this.logBrebError({
+        endpoint,
+        error,
+        metadata: {
+          accountSuffix: this.maskIdentifier(account),
+          durationMs: Date.now() - requestStartedAt,
+        },
+        method: 'GET',
+        operation: 'Failed to fetch key',
+      })
       return null
     }
   }
@@ -401,8 +418,17 @@ export class BrebPaymentService implements IPaymentService {
       return response.data?.data ?? null
     }
     catch (error) {
-      const reason = axios.isAxiosError(error) ? error.response?.data ?? error.message : error
-      this.logger.error('[BreB] Failed to fetch transaction report', reason)
+      this.logBrebError({
+        endpoint,
+        error,
+        metadata: {
+          durationMs: Date.now() - requestStartedAt,
+          rail,
+          transactionId: this.maskIdentifier(transactionId),
+        },
+        method: 'GET',
+        operation: 'Failed to fetch transaction report',
+      })
       return null
     }
   }
@@ -461,8 +487,15 @@ export class BrebPaymentService implements IPaymentService {
       return data.access_token
     }
     catch (error) {
-      const reason = axios.isAxiosError(error) ? error.response?.data ?? error.message : error
-      this.logger.error('[BreB] Failed to obtain access token', reason)
+      this.logBrebError({
+        endpoint: config.authUrl,
+        error,
+        metadata: {
+          durationMs: Date.now() - requestStartedAt,
+        },
+        method: 'POST',
+        operation: 'Failed to obtain access token',
+      })
       throw new Error('BreB authentication failed')
     }
   }
@@ -570,6 +603,40 @@ export class BrebPaymentService implements IPaymentService {
       endpoint: this.sanitizeUrlForLogs(endpoint),
       method,
       status,
+      ...(metadata ? { metadata } : {}),
+    })
+  }
+
+  private logBrebError({
+    endpoint,
+    error,
+    metadata,
+    method,
+    operation,
+  }: {
+    endpoint: string
+    error: unknown
+    metadata?: Record<string, boolean | null | number | string | undefined>
+    method: 'GET' | 'POST'
+    operation: string
+  }): void {
+    if (axios.isAxiosError(error)) {
+      this.logger.error(`[BreB] ${operation}`, {
+        endpoint: this.sanitizeUrlForLogs(endpoint),
+        message: error.message,
+        method,
+        responseData: error.response?.data ?? null,
+        status: error.response?.status ?? null,
+        ...(metadata ? { metadata } : {}),
+      })
+      return
+    }
+
+    const fallbackMessage = error instanceof Error ? error.message : 'Unknown error'
+    this.logger.error(`[BreB] ${operation}`, {
+      endpoint: this.sanitizeUrlForLogs(endpoint),
+      message: fallbackMessage,
+      method,
       ...(metadata ? { metadata } : {}),
     })
   }
