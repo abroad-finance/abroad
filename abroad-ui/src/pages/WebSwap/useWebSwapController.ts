@@ -20,23 +20,20 @@ import {
 import type { BankDetailsRouteProps } from '../../features/swap/components/BankDetailsRoute'
 import type { ConfirmQrProps } from '../../features/swap/components/ConfirmQr'
 import type { SwapProps } from '../../features/swap/components/Swap'
-import type { Option } from '../../shared/components/DropSelector'
 import type { WebSwapControllerProps } from './WebSwap'
 
 import {
   acceptTransaction,
-  Bank,
   _36EnumsBlockchainNetwork as BlockchainNetwork,
   _36EnumsCryptoCurrency as CryptoCurrency,
   decodeQrCodeBR,
-  getBanks,
   getQuote,
   getReverseQuote,
   _36EnumsPaymentMethod as PaymentMethod,
   _36EnumsTargetCurrency as TargetCurrency,
 } from '../../api'
 import { useNotices } from '../../contexts/NoticeContext'
-import { BANK_CONFIG, BRL_BACKGROUND_IMAGE } from '../../features/swap/constants'
+import { BRL_BACKGROUND_IMAGE } from '../../features/swap/constants'
 import { SwapView } from '../../features/swap/types'
 import { ASSET_URLS, PENDING_TX_KEY } from '../../shared/constants'
 import { useWalletAuth } from '../../shared/hooks/useWalletAuth'
@@ -44,8 +41,6 @@ import { hasMessage } from '../../shared/utils'
 
 type SwapAction
   = | { accountNumber?: string, bankCode?: string, pixKey?: string, recipientName?: string, taxId?: string, type: 'SET_BANK_DETAILS' }
-    | { bankOpen?: boolean, selectedBank?: null | Option, type: 'SET_BANK_UI' }
-    | { bankOptions?: Option[], errorBanks?: null | string, loadingBanks?: boolean, type: 'SET_BANK_META' }
     | { isDecodingQr: boolean, type: 'SET_DECODING' }
     | { isDesktop: boolean, type: 'SET_DESKTOP' }
     | { isQrOpen: boolean, type: 'SET_QR_OPEN' }
@@ -63,14 +58,10 @@ type SwapAction
 type SwapControllerState = {
   accountNumber: string
   bankCode: string
-  bankOpen: boolean
-  bankOptions: Option[]
-  errorBanks: null | string
   isDecodingQr: boolean
   isDesktop: boolean
   isQrOpen: boolean
   isWalletDetailsOpen: boolean
-  loadingBanks: boolean
   loadingSource: boolean
   loadingSubmit: boolean
   loadingTarget: boolean
@@ -78,7 +69,6 @@ type SwapControllerState = {
   qrCode: null | string
   quoteId: string
   recipientName: string
-  selectedBank: null | Option
   sourceAmount: string
   targetAmount: string
   targetCurrency: TargetCurrency
@@ -91,29 +81,14 @@ const COP_TRANSFER_FEE = 0.0
 const BRL_TRANSFER_FEE = 0.0
 const NETWORK_PASSPHRASE = Networks.PUBLIC
 const HORIZON_SERVER = new Horizon.Server('https://horizon.stellar.org')
-const EXCLUDED_BANKS = [
-  'CFA COOPERATIVA FINANCIERA',
-  'CONFIAR COOPERATIVA FINANCIERA',
-  'BANCOCOOPCENTRAL',
-  'BANCO SERFINANZA',
-  'BANCO FINANDINA',
-  'BANCO CREZCAMOS',
-  'BANCO POWWI',
-  'SUPERDIGITAL',
-  'BANCAMIA',
-]
 
 const createInitialState = (isDesktop: boolean): SwapControllerState => ({
   accountNumber: '',
   bankCode: '',
-  bankOpen: false,
-  bankOptions: [],
-  errorBanks: null,
   isDecodingQr: false,
   isDesktop,
   isQrOpen: false,
   isWalletDetailsOpen: false,
-  loadingBanks: false,
   loadingSource: false,
   loadingSubmit: false,
   loadingTarget: false,
@@ -121,7 +96,6 @@ const createInitialState = (isDesktop: boolean): SwapControllerState => ({
   qrCode: null,
   quoteId: '',
   recipientName: '',
-  selectedBank: null,
   sourceAmount: '',
   targetAmount: '',
   targetCurrency: TargetCurrency.BRL,
@@ -154,19 +128,6 @@ const reducer = (state: SwapControllerState, action: SwapAction): SwapController
         pixKey: action.pixKey ?? state.pixKey,
         recipientName: action.recipientName ?? state.recipientName,
         taxId: action.taxId ?? state.taxId,
-      }
-    case 'SET_BANK_META':
-      return {
-        ...state,
-        bankOptions: action.bankOptions ?? state.bankOptions,
-        errorBanks: action.errorBanks ?? state.errorBanks,
-        loadingBanks: action.loadingBanks ?? state.loadingBanks,
-      }
-    case 'SET_BANK_UI':
-      return {
-        ...state,
-        bankOpen: action.bankOpen ?? state.bankOpen,
-        selectedBank: action.selectedBank ?? state.selectedBank,
       }
     case 'SET_DECODING':
       return { ...state, isDecodingQr: action.isDecodingQr }
@@ -255,39 +216,6 @@ const formatError = (message: string, description?: string) => ({
   message,
 })
 
-const buildBankOptions = (banks: Bank[]): Option[] => {
-  const priorityBanks = [
-    'BREB',
-    'BANCOLOMBIA',
-    'DAVIPLATA',
-    'DAVIVIENDA',
-    'NEQUI',
-  ]
-  return banks
-    .filter(bank => !EXCLUDED_BANKS.includes(bank.bankName.toUpperCase()))
-    .map((bank) => {
-      const bankNameUpper = bank.bankName.toUpperCase()
-      const config = BANK_CONFIG[bankNameUpper]
-      return {
-        iconUrl: config?.iconUrl,
-        label: config?.displayLabel || bank.bankName,
-        value: String(bank.bankCode),
-      }
-    })
-    .sort((a, b) => {
-      const aIsPriority = priorityBanks.some(priority => a.label.toUpperCase().includes(priority))
-      const bIsPriority = priorityBanks.some(priority => b.label.toUpperCase().includes(priority))
-      if (aIsPriority && bIsPriority) {
-        const aIndex = priorityBanks.findIndex(priority => a.label.toUpperCase().includes(priority))
-        const bIndex = priorityBanks.findIndex(priority => b.label.toUpperCase().includes(priority))
-        return aIndex - bIndex
-      }
-      if (aIsPriority && !bIsPriority) return -1
-      if (!aIsPriority && bIsPriority) return 1
-      return a.label.localeCompare(b.label)
-    })
-}
-
 const extractReason = (body: unknown): null | string => {
   if (body && typeof body === 'object' && 'reason' in body) {
     const reason = (body as { reason?: unknown }).reason
@@ -311,7 +239,6 @@ export const useWebSwapController = (): WebSwapControllerProps => {
   const directReqIdRef = useRef(0)
   const reverseReqIdRef = useRef(0)
   const decodeAbortRef = useRef<AbortController | null>(null)
-  const banksAbortRef = useRef<AbortController | null>(null)
 
   const targetLocale = useMemo(
     () => (state.targetCurrency === TargetCurrency.BRL ? 'pt-BR' : 'es-CO'),
@@ -417,53 +344,8 @@ export const useWebSwapController = (): WebSwapControllerProps => {
       directAbortRef.current?.abort()
       reverseAbortRef.current?.abort()
       decodeAbortRef.current?.abort()
-      banksAbortRef.current?.abort()
     }
   }, [])
-
-  const fetchBanks = useCallback(async () => {
-    banksAbortRef.current?.abort()
-    const controller = new AbortController()
-    banksAbortRef.current = controller
-    dispatch({ errorBanks: null, loadingBanks: true, type: 'SET_BANK_META' })
-    try {
-      const response = await getBanks({ paymentMethod: PaymentMethod.BREB }, { signal: controller.signal })
-      if (controller.signal.aborted) return
-      if (response.ok) {
-        dispatch({
-          bankOptions: buildBankOptions(response.data.banks ?? []),
-          loadingBanks: false,
-          type: 'SET_BANK_META',
-        })
-      }
-      else if (!isAbortError(response)) {
-        const reason = extractReason(response.error.body)
-        dispatch({
-          errorBanks: reason || t('bank_details.error_banks', 'No se pudieron cargar los bancos'),
-          loadingBanks: false,
-          type: 'SET_BANK_META',
-        })
-      }
-    }
-    catch (err) {
-      if (controller.signal.aborted) return
-      dispatch({
-        errorBanks: err instanceof Error ? err.message : t('bank_details.error_banks', 'No se pudieron cargar los bancos'),
-        loadingBanks: false,
-        type: 'SET_BANK_META',
-      })
-    }
-    finally {
-      if (!controller.signal.aborted) {
-        banksAbortRef.current = null
-      }
-    }
-  }, [t])
-
-  useEffect(() => {
-    if (state.targetCurrency !== TargetCurrency.COP) return
-    void fetchBanks()
-  }, [fetchBanks, state.targetCurrency])
 
   const quoteFromSource = useCallback(async (value: string) => {
     lastEditedRef.current = 'source'
@@ -768,15 +650,16 @@ export const useWebSwapController = (): WebSwapControllerProps => {
       const redirectUrl = encodeURIComponent(
         window.location.href.replace(/^https?:\/\//, ''),
       )
+      const isBrazil = state.targetCurrency === TargetCurrency.BRL
 
       const response = await acceptTransaction({
         account_number:
-          state.targetCurrency === TargetCurrency.BRL ? state.pixKey : state.accountNumber,
-        bank_code: state.targetCurrency === TargetCurrency.BRL ? 'PIX' : state.bankCode,
+          isBrazil ? state.pixKey : state.accountNumber.trim(),
+        bank_code: isBrazil ? 'PIX' : undefined,
         qr_code: state.qrCode,
         quote_id: state.quoteId,
         redirectUrl,
-        tax_id: state.targetCurrency === TargetCurrency.BRL ? state.taxId : undefined,
+        tax_id: isBrazil ? state.taxId : undefined,
         user_id: kit.address,
       })
 
@@ -897,34 +780,24 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     if (state.targetCurrency === TargetCurrency.BRL) {
       return !(state.pixKey && state.taxId)
     }
-    return state.accountNumber.length !== 10
-  }, [state.accountNumber.length, state.pixKey, state.targetCurrency, state.taxId])
+    return state.accountNumber.trim().length < 6
+  }, [state.accountNumber, state.pixKey, state.targetCurrency, state.taxId])
 
   const bankDetailsProps: BankDetailsRouteProps = {
     accountNumber: state.accountNumber,
-    bankOpen: state.bankOpen,
-    bankOptions: state.bankOptions,
     continueDisabled: bankDetailsContinueDisabled,
-    errorBanks: state.errorBanks,
-    loadingBanks: state.loadingBanks,
     onAccountNumberChange: (value: string) => {
-      const input = value.replace(/[^\d]/g, '').slice(0, 10)
+      const input = value.trim().slice(0, 64)
       dispatch({ accountNumber: input, type: 'SET_BANK_DETAILS' })
     },
     onBackClick: handleBackToSwap,
     onContinue: () => dispatch({ type: 'SET_VIEW', view: 'confirm-qr' }),
     onPixKeyChange: (value: string) => dispatch({ pixKey: value, type: 'SET_BANK_DETAILS' }),
-    onSelectBank: (option: Option) => {
-      dispatch({ bankCode: option.value, type: 'SET_BANK_DETAILS' })
-      dispatch({ selectedBank: option, type: 'SET_BANK_UI' })
-    },
     onTaxIdChange: (value: string) => {
       const input = value.replace(/[^\d]/g, '')
       dispatch({ taxId: input, type: 'SET_BANK_DETAILS' })
     },
     pixKey: state.pixKey,
-    selectedBank: state.selectedBank,
-    setBankOpen: (open: boolean) => dispatch({ bankOpen: open, type: 'SET_BANK_UI' }),
     targetAmount: state.targetAmount,
     targetCurrency: state.targetCurrency,
     taxId: state.taxId,

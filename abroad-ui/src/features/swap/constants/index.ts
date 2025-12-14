@@ -47,10 +47,10 @@ export const BANK_CONFIG: Record<string, { displayLabel?: string
     iconUrl: 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Bancoserfinanza_badge.jpg',
   },
   'BREB - ENTRE CUENTAS (ENT)': {
-    displayLabel: 'BreB (Entre Cuentas)',
+    displayLabel: 'BRE-B (ENT)',
   },
   'BREB - TRANSFIYA (TFY)': {
-    displayLabel: 'BreB (Transfiya)',
+    displayLabel: 'BRE-B (TFY)',
   },
   'DAVIPLATA': {
     displayLabel: 'Daviplata',

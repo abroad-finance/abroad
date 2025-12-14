@@ -1,30 +1,22 @@
 import { useTranslate } from '@tolgee/react'
 import {
-  ArrowLeft, Hash, Loader, Rotate3d,
+  ArrowLeft, Hash, Rotate3d,
 } from 'lucide-react'
 import React from 'react'
 
 import { _36EnumsTargetCurrency as TargetCurrency } from '../../../api'
 import PixFull from '../../../assets/Logos/networks/PixFull.svg'
 import { Button } from '../../../shared/components/Button'
-import { DropSelector, Option } from '../../../shared/components/DropSelector'
 
 export interface BankDetailsRouteProps {
   accountNumber: string
-  bankOpen: boolean
-  bankOptions: Option[]
   continueDisabled: boolean
-  errorBanks: null | string
-  loadingBanks: boolean
   onAccountNumberChange: (value: string) => void
   onBackClick: () => void
   onContinue: () => void
   onPixKeyChange: (value: string) => void
-  onSelectBank: (option: Option) => void
   onTaxIdChange: (value: string) => void
   pixKey: string
-  selectedBank: null | Option
-  setBankOpen: (open: boolean) => void
   targetAmount: string
   targetCurrency: (typeof TargetCurrency)[keyof typeof TargetCurrency]
   taxId: string
@@ -33,20 +25,13 @@ export interface BankDetailsRouteProps {
 
 export default function BankDetailsRoute({
   accountNumber,
-  bankOpen,
-  bankOptions,
   continueDisabled,
-  errorBanks,
-  loadingBanks,
   onAccountNumberChange,
   onBackClick,
   onContinue,
   onPixKeyChange,
-  onSelectBank,
   onTaxIdChange,
   pixKey,
-  selectedBank,
-  setBankOpen,
   targetAmount,
   targetCurrency,
   taxId,
@@ -115,7 +100,7 @@ export default function BankDetailsRoute({
               )
             : (
                 <>
-                  {/* Transfiya number */}
+                  {/* BreB key */}
                   <div
                     className="w-full bg-white/60 backdrop-blur-xl rounded-2xl p-4 md:p-6 flex items-center space-x-3"
                     id="bank-account-input"
@@ -123,66 +108,13 @@ export default function BankDetailsRoute({
                     <Hash className="w-5 h-5 sm:w-6 sm:h-6" style={{ color: textColor }} />
                     <input
                       className="w-full bg-transparent font-semibold focus:outline-none text-base sm:text-lg"
-                      inputMode="numeric"
+                      inputMode="text"
                       onChange={e => onAccountNumberChange(e.target.value)}
-                      pattern="[0-9]*"
-                      placeholder={t('bank_details.transfiya_placeholder', 'Número Transfiya')}
+                      placeholder={t('bank_details.breb_key_placeholder', 'Clave BRE-B')}
                       style={{ color: textColor }}
                       type="text"
                       value={accountNumber}
                     />
-                  </div>
-
-                  {/* Bank selector */}
-                  <div
-                    className="w-full bg-white/60 backdrop-blur-xl rounded-2xl flex-shrink-0 relative z-50"
-                    id="bank-selector"
-                  >
-                    {loadingBanks && (
-                      <div className="p-6 flex items-center space-x-3">
-                        <Loader className="animate-spin w-4 h-4 sm:w-5 sm:h-5" style={{ color: textColor }} />
-                      </div>
-                    )}
-                    {errorBanks && (
-                      <div className="p-6 flex items-center space-x-3">
-                        <p className="text-red-500 text-xs sm:text-sm">{errorBanks}</p>
-                      </div>
-                    )}
-                    {!loadingBanks && !errorBanks && bankOptions.length === 0 && (
-                      <div className="p-6 flex items-center space-x-3">
-                        <p className="text-[#356E6A]/70 text-xs sm:text-sm">
-                          {t('bank_details.no_banks', 'No encontramos redes opcionales para BreB. Puedes continuar sin seleccionar banco.')}
-                        </p>
-                      </div>
-                    )}
-                    {errorBanks && (
-                      <div className="p-6 flex items-center space-x-3">
-                        <p className="text-[#356E6A]/70 text-xs sm:text-sm">
-                          {t('bank_details.breb_banks_optional', 'No pudimos cargar las redes opcionales de BreB. Puedes continuar sin seleccionarlas.')}
-                        </p>
-                      </div>
-                    )}
-                    {!loadingBanks && bankOptions.length > 0 && (
-                      <div className="p-6 flex items-center space-x-3 w-full">
-                        <div className="flex-1">
-                          <DropSelector
-                            disabled={loadingBanks}
-                            isOpen={bankOpen}
-                            onSelectOption={onSelectBank}
-                            options={bankOptions}
-                            placeholder={t('bank_details.bank_placeholder', 'Red (opcional)')}
-                            placeholderIcons={[
-                              'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Nequi_Badge.webp',
-                              'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Daviplata_Badge.png',
-                              'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Bancolombia_Badge.png',
-                            ]}
-                            selectedOption={selectedBank}
-                            setIsOpen={setBankOpen}
-                            textColor={textColor}
-                          />
-                        </div>
-                      </div>
-                    )}
                   </div>
                 </>
               )}
@@ -241,17 +173,15 @@ export default function BankDetailsRoute({
                     <Rotate3d className="w-4 h-4 sm:w-5 sm:h-5" />
                     <span className="font-medium text-xs sm:text-sm">{t('bank_details.network', 'Red:')}</span>
                     <div className="bg-white/70 backdrop-blur-md rounded-lg px-2 py-1 flex items-center">
-                      <img
-                        alt="Transfiya Logo"
-                        className="h-3 sm:h-4 w-auto"
-                        src="https://vectorseek.com/wp-content/uploads/2023/11/Transfiya-Logo-Vector.svg-.png"
-                      />
+                      <span className="text-xs sm:text-sm font-semibold" style={{ color: textColor }}>
+                        BRE-B
+                      </span>
                     </div>
                   </div>
                   <span className="font-medium text-xs pl-1" style={{ color: textColor }}>
                     {t(
-                      'bank_details.transfiya_disclaimer',
-                      'Tu transacción será procesada de inmediato y llegará instantáneamente. BreB no requiere seleccionar banco; si no eliges red usaremos la predeterminada.',
+                      'bank_details.breb_disclaimer',
+                      'Tu transacción será procesada de inmediato con BRE-B. Ingresa la clave correcta del destinatario; no es necesario seleccionar banco.',
                     )}
                   </span>
                 </>
