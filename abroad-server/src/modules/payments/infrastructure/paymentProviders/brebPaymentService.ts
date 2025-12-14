@@ -32,12 +32,6 @@ interface BrebKeyDetails {
 
 type BrebRail = 'ENT' | 'TFY'
 
-type BrebRailOption = {
-  bankCode: number
-  bankName: string
-  rail: BrebRail
-}
-
 interface BrebSendResponseData {
   moviiTxId?: string
   rail?: BrebRail
@@ -83,14 +77,9 @@ interface BrebTransactionStatusInfo {
   TransactionStatusRsnInf?: string
 }
 
-const railOptions: readonly BrebRailOption[] = [
-  { bankCode: 9101, bankName: 'BreB - Entre Cuentas (ENT)', rail: 'ENT' },
-  { bankCode: 9102, bankName: 'BreB - Transfiya (TFY)', rail: 'TFY' },
-]
-
 @injectable()
 export class BrebPaymentService implements IPaymentService {
-  public readonly banks = railOptions.map(option => ({ bankCode: option.bankCode, bankName: option.bankName }))
+  public readonly banks = []
   public readonly currency = TargetCurrency.COP
   public readonly fixedFee = 0
 
@@ -124,14 +113,12 @@ export class BrebPaymentService implements IPaymentService {
     timeoutMs: 60_000,
   }
 
-  private readonly railByCode: Map<string, BrebRail>
   private serviceConfig?: BrebServiceConfig
 
   public constructor(
     @inject(TYPES.ISecretManager) private readonly secretManager: ISecretManager,
     @inject(TYPES.ILogger) private readonly logger: ILogger,
   ) {
-    this.railByCode = new Map(railOptions.map(option => [String(option.bankCode), option.rail]))
   }
 
   public async getLiquidity(): Promise<number> {
@@ -145,23 +132,20 @@ export class BrebPaymentService implements IPaymentService {
 
   public async sendPayment({
     account,
-    bankCode,
     value,
   }: {
     account: string
-    bankCode: string
     id: string
     qrCode?: null | string
     value: number
   }): Promise<{ success: false } | { success: true, transactionId: string }> {
     try {
-      const resolvedRail = this.resolveRail(bankCode)
       const config = await this.getConfig()
       const token = await this.getAccessToken(config)
 
       const keyDetails = await this.fetchKey(account, config, token)
-      if (!this.isKeyUsable(keyDetails, resolvedRail)) {
-        this.logger.warn('[BreB] Invalid or mismatched key for account', { account, bankCode })
+      if (!this.isKeyUsable(keyDetails)) {
+        this.logger.warn('[BreB] Invalid or mismatched key for account', { account })
         return { success: false }
       }
 
@@ -170,6 +154,12 @@ export class BrebPaymentService implements IPaymentService {
 
       if (!sendResponse?.moviiTxId) {
         this.logger.error('[BreB] Send response missing transaction id', sendResponse)
+        return { success: false }
+      }
+
+      const resolvedRail = keyDetails.instructedAgent
+      if (!resolvedRail) {
+        this.logger.error('[BreB] Missing instructed agent on key details', { account })
         return { success: false }
       }
 
@@ -186,28 +176,25 @@ export class BrebPaymentService implements IPaymentService {
     }
     catch (error) {
       const reason = error instanceof Error ? error.message : 'Unknown error'
-      this.logger.error('[BreB] Payment submission failed', { account, bankCode, reason })
+      this.logger.error('[BreB] Payment submission failed', { account, reason })
       return { success: false }
     }
   }
 
   public async verifyAccount({
     account,
-    bankCode,
   }: {
     account: string
-    bankCode: string
   }): Promise<boolean> {
     try {
-      const resolvedRail = this.resolveRail(bankCode)
       const config = await this.getConfig()
       const token = await this.getAccessToken(config)
       const keyDetails = await this.fetchKey(account, config, token)
-      return this.isKeyUsable(keyDetails, resolvedRail)
+      return this.isKeyUsable(keyDetails)
     }
     catch (error) {
       const reason = error instanceof Error ? error.message : 'Unknown error'
-      this.logger.warn('[BreB] Failed to verify account', { account, bankCode, reason })
+      this.logger.warn('[BreB] Failed to verify account', { account, reason })
       return false
     }
   }
@@ -401,13 +388,12 @@ export class BrebPaymentService implements IPaymentService {
     return 'pending'
   }
 
-  private isKeyUsable(keyDetails: BrebKeyDetails | null, rail: BrebRail): keyDetails is BrebKeyDetails {
+  private isKeyUsable(keyDetails: BrebKeyDetails | null): keyDetails is BrebKeyDetails {
     if (!keyDetails) {
       return false
     }
 
     const isActive = keyDetails.keyState?.toUpperCase() === 'ACTIVA' || keyDetails.keyState?.toUpperCase() === 'ACTIVE'
-    const matchesRail = keyDetails.instructedAgent?.toUpperCase() === rail
     const missingFields = this.mandatoryKeyFields.filter(field => !this.hasValue(keyDetails[field]))
 
     if (missingFields.length > 0) {
@@ -415,7 +401,7 @@ export class BrebPaymentService implements IPaymentService {
       return false
     }
 
-    return isActive && matchesRail
+    return isActive
   }
 
   private async pollTransactionReport(
@@ -442,19 +428,5 @@ export class BrebPaymentService implements IPaymentService {
     }
 
     return lastReport ? { report: lastReport, result: this.interpretReport(lastReport) } : null
-  }
-
-  private resolveRail(bankCode: string): BrebRail {
-    const normalized = bankCode.trim().toUpperCase()
-    if (normalized === 'ENT' || normalized === 'TFY') {
-      return normalized
-    }
-
-    const mappedRail = this.railByCode.get(bankCode) || this.railByCode.get(normalized)
-    if (mappedRail) {
-      return mappedRail
-    }
-
-    throw new Error(`Unsupported BreB rail or bank code: ${bankCode}`)
   }
 }
