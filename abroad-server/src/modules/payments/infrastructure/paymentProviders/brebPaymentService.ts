@@ -222,8 +222,8 @@ export class BrebPaymentService implements IPaymentService {
       'authorizationApi': `Bearer ${token}`,
       'Content-Type': 'application/json',
       'dad-account': config.dadAccount,
-      'x-forwarded': 'miportal.web:8080',
-      'x-origin': '192.168.1.1',
+      'x-forwarded': '192.168.1.1',
+      'x-origin': 'miportal.web:8080',
       'x-product-code': config.productCode,
     }
 

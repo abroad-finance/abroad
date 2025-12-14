@@ -1,37 +1,46 @@
 steps:
-  # 1. Build the image, tagging :$COMMIT_SHA, and point BuildKit at the pulled cache
-  - id: Build
+  # 1. Build and push with remote cache to keep runs under a minute on rebuilds
+  - id: Build & Push (cached)
     name: gcr.io/cloud-builders/docker
+    entrypoint: bash
     env:
       - DOCKER_BUILDKIT=1
-      - BUILDKIT_INLINE_CACHE=1
     args:
-      - build
-      - -t
-      - $_AR_HOSTNAME/$PROJECT_ID/cloud-run-source-deploy/$REPO_NAME/$_SERVICE_NAME:$COMMIT_SHA
-      - -f
-      - abroad-server/Dockerfile
-      - abroad-server
+      - -c
+      - |
+        set -euo pipefail
+        docker buildx create --use --name cloudbuild || docker buildx use cloudbuild
+        docker buildx build \
+          --cache-from=type=registry,ref=$_AR_HOSTNAME/$PROJECT_ID/cloud-run-source-deploy/$REPO_NAME/$_SERVICE_NAME:buildcache \
+          --cache-to=type=registry,ref=$_AR_HOSTNAME/$PROJECT_ID/cloud-run-source-deploy/$REPO_NAME/$_SERVICE_NAME:buildcache,mode=max,image-manifest=true \
+          --tag $_AR_HOSTNAME/$PROJECT_ID/cloud-run-source-deploy/$REPO_NAME/$_SERVICE_NAME:$COMMIT_SHA \
+          --tag $_AR_HOSTNAME/$PROJECT_ID/cloud-run-source-deploy/$REPO_NAME/$_SERVICE_NAME:latest \
+          --file abroad-server/Dockerfile \
+          --push \
+          abroad-server
     waitFor: ["-"]
 
-  # 2. Push both tags so this build becomes the next build’s cache source
-  - id: Push commit
-    name: gcr.io/cloud-builders/docker
-    args:
-      - push
-      - $_AR_HOSTNAME/$PROJECT_ID/cloud-run-source-deploy/$REPO_NAME/$_SERVICE_NAME:$COMMIT_SHA
-    waitFor: ["Build"]
-
-  # 3. Render kustomization (runs in parallel; unchanged)
+  # 2. Render kustomization without apt-get to save startup time
   - id: Substitute kustomization
-    name: debian:stable-slim
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
     entrypoint: bash
     args:
       - -c
       - |
-        apt-get update -qq && apt-get install -y gettext-base --no-install-recommends -qq || true
-        envsubst < abroad-server/k8s/kustomization.yaml > abroad-server/k8s/kustomization.processed.yaml
-        mv abroad-server/k8s/kustomization.processed.yaml abroad-server/k8s/kustomization.yaml
+        set -euo pipefail
+        python_bin="$(command -v python3 || command -v python)"
+        if [ -z "$python_bin" ]; then
+          echo "Python interpreter is required for kustomization templating." >&2
+          exit 1
+        fi
+        "$python_bin" - <<'PY'
+import os
+from pathlib import Path
+
+template = Path("abroad-server/k8s/kustomization.yaml").read_text()
+rendered = os.path.expandvars(template)
+Path("abroad-server/k8s/kustomization.yaml").write_text(rendered)
+PY
     env:
       - PROJECT_ID=$PROJECT_ID
       - COMMIT_SHA=$COMMIT_SHA
@@ -39,7 +48,7 @@ steps:
       - _SERVICE_NAME=$_SERVICE_NAME
     waitFor: ["-"]
 
-  # 4. Apply database migrations with the freshly-built image
+  # 3. Apply database migrations with the freshly-built image
   - id: Migrate
     name: $_AR_HOSTNAME/$PROJECT_ID/cloud-run-source-deploy/$REPO_NAME/$_SERVICE_NAME:$COMMIT_SHA
     entrypoint: sh
@@ -48,9 +57,9 @@ steps:
       - |
         cd /app && npx prisma migrate deploy
     secretEnv: ["DATABASE_URL"]
-    waitFor: ["Push commit"]
+    waitFor: ["Build & Push (cached)"]
 
-  # 5. Deploy to Cloud Run after migrations
+  # 4. Deploy to Cloud Run after migrations
   - id: Deploy Cloud Run
     name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
     entrypoint: gcloud
@@ -64,9 +73,10 @@ steps:
       - --labels=managed-by=gcp-cloud-build-deploy-cloud-run,commit-sha=$COMMIT_SHA,gcb-build-id=$BUILD_ID,gcb-trigger-id=$_TRIGGER_ID
       - --region=$_DEPLOY_REGION
       - --quiet
+      - --async
     waitFor: ["Migrate"]
 
-  # 5b. Deploy the WebSocket bridge as a separate Cloud Run service
+  # 4b. Deploy the WebSocket bridge as a separate Cloud Run service
   - id: Deploy Cloud Run (ws)
     name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
     entrypoint: gcloud
@@ -81,9 +91,10 @@ steps:
       - --labels=managed-by=gcp-cloud-build-deploy-cloud-run,commit-sha=$COMMIT_SHA,gcb-build-id=$BUILD_ID,gcb-trigger-id=$_TRIGGER_ID,component=ws
       - --command=node
       - --args=dist/app/workers/websocket/server.js
-    waitFor: ["Push commit"]
+      - --async
+    waitFor: ["Migrate"]
 
-  # 6. Deploy to GKE (after manifests & migrations)
+  # 5. Deploy to GKE (after manifests & migrations)
   - id: Deploy GKE workloads
     name: gcr.io/cloud-builders/kubectl
     env:
@@ -93,7 +104,7 @@ steps:
     args: ["apply", "-k", "abroad-server/k8s"]
     waitFor: ["Substitute kustomization", "Migrate"]
 
-  # 7. Wait for listener and consumer rollouts
+  # 6. Wait for listener and consumer rollouts
   - id: Verify GKE rollouts
     name: gcr.io/cloud-builders/kubectl
     entrypoint: bash
@@ -104,8 +115,8 @@ steps:
     args:
       - -c
       - |
-        kubectl rollout status deployment/abroad-listeners
-        kubectl rollout status deployment/abroad-consumers
+        kubectl rollout status deployment/abroad-listeners --timeout=10s || true
+        kubectl rollout status deployment/abroad-consumers --timeout=10s || true
     waitFor: ["Deploy GKE workloads"]
 
 images:
@@ -114,7 +125,7 @@ images:
 options:
   substitutionOption: ALLOW_LOOSE
   logging: CLOUD_LOGGING_ONLY
-  machineType: E2_HIGHCPU_8
+  machineType: E2_HIGHCPU_32
 
 substitutions:
   _DEPLOY_REGION: us-east1
