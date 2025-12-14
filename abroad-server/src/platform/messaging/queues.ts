@@ -36,10 +36,6 @@ export interface IQueueHandler {
   ): Promise<void>
 }
 
-export interface ISlackNotifier {
-  sendMessage(message: string): Promise<void>
-}
-
 export type QueuePayloadByName = {
   [QueueName.BINANCE_BALANCE_UPDATED]: BinanceBalanceUpdatedMessage
   [QueueName.PAYMENT_SENT]: PaymentSentMessage

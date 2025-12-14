@@ -1,10 +1,10 @@
 {
   "$schema": "https://unpkg.com/knip@^5/schema.json",
   "entry": [
-    "src/server.ts",
-    "src/consumers.ts",
-    "src/listeners.ts",
-    "src/ws.ts",
+    "src/app/http/server.ts",
+    "src/app/workers/consumers/server.ts",
+    "src/app/workers/listeners/server.ts",
+    "src/app/workers/websocket/server.ts",
     "scripts/maintainability-report.ts",
     "scripts/seed-dev.ts"
   ],
@@ -48,11 +48,10 @@
       "jest.config.js"
     ],
     "entry": [
-      "src/**/__tests__/**/*.{ts,tsx}"
+      "src/tests/**/*.{ts,tsx}"
     ],
     "project": [
-      "src/**/*.{ts,tsx}",
-      "src/__tests__/**/*.{ts,tsx}"
+      "src/**/*.{ts,tsx}"
     ]
   },
   "stryker": {
