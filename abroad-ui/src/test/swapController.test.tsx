@@ -1,4 +1,4 @@
-import { act, renderHook } from '@testing-library/react'
+import { act, renderHook, waitFor } from '@testing-library/react'
 import React from 'react'
 import {
   afterEach,
@@ -77,7 +77,7 @@ const getBanksMock = vi.fn(async () => ({
 vi.mock('../api', () => ({
   _36EnumsBlockchainNetwork: { STELLAR: 'STELLAR' },
   _36EnumsCryptoCurrency: { USDC: 'USDC' },
-  _36EnumsPaymentMethod: { MOVII: 'MOVII', PIX: 'PIX' },
+  _36EnumsPaymentMethod: { BREB: 'BREB', PIX: 'PIX' },
   _36EnumsTargetCurrency: { BRL: 'BRL', COP: 'COP' },
   acceptTransaction: (...args: unknown[]) => acceptTransactionMock(...args),
   decodeQrCodeBR: (...args: unknown[]) => decodeQrCodeBRMock(...args),
@@ -152,5 +152,43 @@ describe('useWebSwapController', () => {
     })
 
     expect(result.current.view).toBe('swap')
+  })
+
+  it('requests BreB rails when quoting to COP', async () => {
+    const { result } = renderHook(() => useWebSwapController(), { wrapper: Wrapper })
+
+    await act(async () => {
+      result.current.swapViewProps.selectCurrency('COP')
+      await Promise.resolve()
+    })
+
+    await act(async () => {
+      result.current.swapViewProps.onTargetChange('15')
+      vi.runAllTimers()
+    })
+
+    await waitFor(() => {
+      expect(getBanksMock).toHaveBeenCalledWith(
+        { paymentMethod: 'BREB' },
+        expect.objectContaining({ signal: expect.any(AbortSignal) }),
+      )
+      expect(getQuoteMock).toHaveBeenCalledWith(
+        expect.objectContaining({ payment_method: 'BREB' }),
+        expect.anything(),
+      )
+    })
+  })
+
+  it('does not require selecting a bank when using BreB', async () => {
+    const { result } = renderHook(() => useWebSwapController(), { wrapper: Wrapper })
+
+    await act(async () => {
+      result.current.swapViewProps.selectCurrency('COP')
+      result.current.bankDetailsProps.onAccountNumberChange('1234567890')
+    })
+
+    await waitFor(() => {
+      expect(result.current.bankDetailsProps.continueDisabled).toBe(false)
+    })
   })
 })

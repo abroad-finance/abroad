@@ -3,7 +3,7 @@ export const BRL_BACKGROUND_IMAGE = 'https://storage.googleapis.com/cdn-abroad/b
 
 // Bank configuration mapping -------------------------------------------------------
 export const BANK_CONFIG: Record<string, { displayLabel?: string
-  iconUrl: string }> = {
+  iconUrl?: string }> = {
   'BANCO AGRARIO DE COLOMBIA': {
     displayLabel: 'Banco Agrario',
     iconUrl: 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/BancoAgrario_Badge.jpg',
@@ -46,6 +46,12 @@ export const BANK_CONFIG: Record<string, { displayLabel?: string
     displayLabel: 'Serfinanza',
     iconUrl: 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Bancoserfinanza_badge.jpg',
   },
+  'BREB - ENTRE CUENTAS (ENT)': {
+    displayLabel: 'BreB (Entre Cuentas)',
+  },
+  'BREB - TRANSFIYA (TFY)': {
+    displayLabel: 'BreB (Transfiya)',
+  },
   'DAVIPLATA': {
     displayLabel: 'Daviplata',
     iconUrl: 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Daviplata_Badge.png',
@@ -54,7 +60,6 @@ export const BANK_CONFIG: Record<string, { displayLabel?: string
     displayLabel: 'Davivienda',
     iconUrl: 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Davivienda_Badge.png',
   },
-  'MOVII': { iconUrl: 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/movii_badge.png' },
   'NEQUI': {
     displayLabel: 'Nequi',
     iconUrl: 'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Nequi_Badge.webp',

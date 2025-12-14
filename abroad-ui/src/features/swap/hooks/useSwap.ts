@@ -57,7 +57,7 @@ export const useSwap = ({
   const targetLocale = targetCurrency === TargetCurrency.BRL ? 'pt-BR' : 'es-CO'
   const targetSymbol = targetCurrency === TargetCurrency.BRL ? 'R$' : '$'
   const targetPaymentMethod
-    = targetCurrency === TargetCurrency.BRL ? PaymentMethod.PIX : PaymentMethod.MOVII
+    = targetCurrency === TargetCurrency.BRL ? PaymentMethod.PIX : PaymentMethod.BREB
   const transferFee
     = targetCurrency === TargetCurrency.BRL ? BRL_TRANSFER_FEE : COP_TRANSFER_FEE
 

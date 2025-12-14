@@ -10,6 +10,7 @@ import {
   Bank,
   getBanks,
   getBanksResponse200,
+  _36EnumsPaymentMethod as PaymentMethod,
   _36EnumsTargetCurrency as TargetCurrency,
 } from '../../../api'
 import { useWalletAuth } from '../../../shared/hooks/useWalletAuth'
@@ -104,7 +105,7 @@ export const useBankDetailsRoute = ({
       setLoadingBanks(true)
       setErrorBanks(null)
       try {
-        const response = await getBanks()
+        const response = await getBanks({ paymentMethod: PaymentMethod.BREB })
         if (
           response.status === 200
           && (response as getBanksResponse200).data?.banks
@@ -139,6 +140,7 @@ export const useBankDetailsRoute = ({
   const bankOptions: Option[] = useMemo(
     () => {
       const priorityBanks = [
+        'BREB',
         'BANCOLOMBIA',
         'DAVIPLATA',
         'DAVIVIENDA',
@@ -191,16 +193,10 @@ export const useBankDetailsRoute = ({
       return !(pixKey && taxId)
     }
     return (
-      loadingBanks
-      || !!errorBanks
-      || !selectedBank
-      || accountNumber.length !== 10
+      accountNumber.length !== 10
     )
   }, [
     targetCurrency,
-    loadingBanks,
-    errorBanks,
-    selectedBank,
     accountNumber.length,
     pixKey,
     taxId,

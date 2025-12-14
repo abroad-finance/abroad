@@ -151,19 +151,26 @@ export default function BankDetailsRoute({
                     {!loadingBanks && !errorBanks && bankOptions.length === 0 && (
                       <div className="p-6 flex items-center space-x-3">
                         <p className="text-[#356E6A]/70 text-xs sm:text-sm">
-                          {t('bank_details.no_banks', 'No hay bancos disponibles.')}
+                          {t('bank_details.no_banks', 'No encontramos redes opcionales para BreB. Puedes continuar sin seleccionar banco.')}
                         </p>
                       </div>
                     )}
-                    {!loadingBanks && !errorBanks && bankOptions.length > 0 && (
+                    {errorBanks && (
+                      <div className="p-6 flex items-center space-x-3">
+                        <p className="text-[#356E6A]/70 text-xs sm:text-sm">
+                          {t('bank_details.breb_banks_optional', 'No pudimos cargar las redes opcionales de BreB. Puedes continuar sin seleccionarlas.')}
+                        </p>
+                      </div>
+                    )}
+                    {!loadingBanks && bankOptions.length > 0 && (
                       <div className="p-6 flex items-center space-x-3 w-full">
                         <div className="flex-1">
                           <DropSelector
-                            disabled={loadingBanks || errorBanks !== null}
+                            disabled={loadingBanks}
                             isOpen={bankOpen}
                             onSelectOption={onSelectBank}
                             options={bankOptions}
-                            placeholder={t('bank_details.bank_placeholder', 'Banco')}
+                            placeholder={t('bank_details.bank_placeholder', 'Red (opcional)')}
                             placeholderIcons={[
                               'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Nequi_Badge.webp',
                               'https://storage.googleapis.com/cdn-abroad/Icons/Banks/Daviplata_Badge.png',
@@ -244,7 +251,7 @@ export default function BankDetailsRoute({
                   <span className="font-medium text-xs pl-1" style={{ color: textColor }}>
                     {t(
                       'bank_details.transfiya_disclaimer',
-                      'Tu transacción será procesada de inmediato y llegará instantáneamente. Ten presente que el receptor debe tener activado Transfiya en el banco indicado.',
+                      'Tu transacción será procesada de inmediato y llegará instantáneamente. BreB no requiere seleccionar banco; si no eliges red usaremos la predeterminada.',
                     )}
                   </span>
                 </>

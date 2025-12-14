@@ -257,6 +257,7 @@ const formatError = (message: string, description?: string) => ({
 
 const buildBankOptions = (banks: Bank[]): Option[] => {
   const priorityBanks = [
+    'BREB',
     'BANCOLOMBIA',
     'DAVIPLATA',
     'DAVIVIENDA',
@@ -317,7 +318,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     [state.targetCurrency],
   )
   const targetSymbol = state.targetCurrency === TargetCurrency.BRL ? 'R$' : '$'
-  const targetPaymentMethod = state.targetCurrency === TargetCurrency.BRL ? PaymentMethod.PIX : PaymentMethod.MOVII
+  const targetPaymentMethod = state.targetCurrency === TargetCurrency.BRL ? PaymentMethod.PIX : PaymentMethod.BREB
   const transferFee = state.targetCurrency === TargetCurrency.BRL ? BRL_TRANSFER_FEE : COP_TRANSFER_FEE
 
   const formatTargetNumber = useCallback((value: number) => new Intl.NumberFormat(targetLocale, {
@@ -426,7 +427,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     banksAbortRef.current = controller
     dispatch({ errorBanks: null, loadingBanks: true, type: 'SET_BANK_META' })
     try {
-      const response = await getBanks(undefined, { signal: controller.signal })
+      const response = await getBanks({ paymentMethod: PaymentMethod.BREB }, { signal: controller.signal })
       if (controller.signal.aborted) return
       if (response.ok) {
         dispatch({
@@ -896,21 +897,8 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     if (state.targetCurrency === TargetCurrency.BRL) {
       return !(state.pixKey && state.taxId)
     }
-    return (
-      state.loadingBanks
-      || !!state.errorBanks
-      || !state.selectedBank
-      || state.accountNumber.length !== 10
-    )
-  }, [
-    state.accountNumber.length,
-    state.errorBanks,
-    state.loadingBanks,
-    state.pixKey,
-    state.selectedBank,
-    state.targetCurrency,
-    state.taxId,
-  ])
+    return state.accountNumber.length !== 10
+  }, [state.accountNumber.length, state.pixKey, state.targetCurrency, state.taxId])
 
   const bankDetailsProps: BankDetailsRouteProps = {
     accountNumber: state.accountNumber,

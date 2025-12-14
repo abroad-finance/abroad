@@ -10,9 +10,9 @@ module.exports = {
   },
   mutate: [
     'src/**/*.ts',
-    '!src/routes.ts',
+    '!src/app/http/routes.ts',
     '!src/**/*.d.ts',
-    '!src/**/__tests__/**/*',
+    '!src/**/tests/**/*',
     '!src/**/?(*.)+(spec|test).ts',
   ],
   mutator: {
