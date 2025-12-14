@@ -33,14 +33,7 @@ steps:
           echo "Python interpreter is required for kustomization templating." >&2
           exit 1
         fi
-        "$python_bin" - <<'PY'
-import os
-from pathlib import Path
-
-template = Path("abroad-server/k8s/kustomization.yaml").read_text()
-rendered = os.path.expandvars(template)
-Path("abroad-server/k8s/kustomization.yaml").write_text(rendered)
-PY
+        "$python_bin" -c "import os; from pathlib import Path; template = Path('abroad-server/k8s/kustomization.yaml').read_text(); Path('abroad-server/k8s/kustomization.yaml').write_text(os.path.expandvars(template))"
     env:
       - PROJECT_ID=$PROJECT_ID
       - COMMIT_SHA=$COMMIT_SHA
