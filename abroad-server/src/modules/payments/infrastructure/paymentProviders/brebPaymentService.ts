@@ -32,6 +32,24 @@ interface BrebKeyDetails {
 
 type BrebRail = 'ENT' | 'TFY'
 
+interface BrebSendPayload {
+  creditor_account_number: string
+  creditor_document_number: string
+  creditor_document_type: string
+  creditor_entity_id: string
+  creditor_instructed_agent: string
+  creditor_key_id: string
+  creditor_merchant_id?: string
+  creditor_name: string
+  creditor_party_identifier: string
+  creditor_party_system_identifier: string
+  creditor_party_type: string
+  creditor_sub_type: string
+  creditor_type_account: string
+  transaction_note: string
+  transaction_total_amount: number
+}
+
 interface BrebSendResponseData {
   moviiTxId?: string
   rail?: BrebRail
@@ -214,8 +232,8 @@ export class BrebPaymentService implements IPaymentService {
     return headers
   }
 
-  private buildSendPayload(keyDetails: BrebKeyDetails, value: number): Record<string, number | string> {
-    const payload: Record<string, number | string> = {
+  private buildSendPayload(keyDetails: BrebKeyDetails, value: number): BrebSendPayload {
+    const payload: BrebSendPayload = {
       creditor_account_number: keyDetails.accountNumber ?? '',
       creditor_document_number: keyDetails.documentNumber ?? '',
       creditor_document_type: keyDetails.documentType ?? '',
@@ -240,17 +258,52 @@ export class BrebPaymentService implements IPaymentService {
   }
 
   private async dispatchPayment(
-    payload: Record<string, number | string>,
+    payload: BrebSendPayload,
     config: BrebServiceConfig,
     token: string,
   ): Promise<BrebSendResponseData | null> {
+    const endpoint = `${config.apiBaseUrl}/send`
+    const headers = this.buildHeaders(config, token)
+    const requestStartedAt = Date.now()
+
+    this.logBrebRequest({
+      endpoint,
+      headers,
+      metadata: {
+        merchantIdPresent: Boolean(payload.creditor_merchant_id),
+        rail: payload.creditor_instructed_agent,
+        transactionTotalAmount: payload.transaction_total_amount,
+      },
+      method: 'POST',
+      payload: {
+        creditor_account_number: this.maskIdentifier(payload.creditor_account_number),
+        creditor_document_number: this.maskIdentifier(payload.creditor_document_number),
+        creditor_document_type: payload.creditor_document_type,
+        creditor_party_type: payload.creditor_party_type,
+        creditor_sub_type: payload.creditor_sub_type,
+        creditor_type_account: payload.creditor_type_account,
+        transaction_note: payload.transaction_note,
+        transaction_total_amount: payload.transaction_total_amount,
+      },
+    })
+
     try {
-      const { data } = await axios.post<BrebApiEnvelope<BrebSendResponseData>>(
-        `${config.apiBaseUrl}/send`,
+      const response = await axios.post<BrebApiEnvelope<BrebSendResponseData>>(
+        endpoint,
         payload,
-        { headers: this.buildHeaders(config, token) },
+        { headers },
       )
-      return data?.data ?? null
+      this.logBrebResponse({
+        endpoint,
+        metadata: {
+          durationMs: Date.now() - requestStartedAt,
+          rail: payload.creditor_instructed_agent,
+          transactionId: response.data?.data?.moviiTxId ?? null,
+        },
+        method: 'POST',
+        status: response.status,
+      })
+      return response.data?.data ?? null
     }
     catch (error) {
       const reason = axios.isAxiosError(error) ? error.response?.data ?? error.message : error
@@ -264,17 +317,40 @@ export class BrebPaymentService implements IPaymentService {
     config: BrebServiceConfig,
     token: string,
   ): Promise<BrebKeyDetails | null> {
-    try {
-      const { data } = await axios.get<BrebApiEnvelope<BrebKeyDetails>>(
-        `${config.apiBaseUrl}/key/${encodeURIComponent(account)}`,
-        { headers: this.buildHeaders(config, token) },
-      )
+    const endpoint = `${config.apiBaseUrl}/key/${encodeURIComponent(account)}`
+    const headers = this.buildHeaders(config, token)
+    const requestStartedAt = Date.now()
 
-      if (!data?.data) {
+    this.logBrebRequest({
+      endpoint,
+      headers,
+      metadata: {
+        accountSuffix: this.maskIdentifier(account),
+      },
+      method: 'GET',
+    })
+
+    try {
+      const response = await axios.get<BrebApiEnvelope<BrebKeyDetails>>(
+        endpoint,
+        { headers },
+      )
+      this.logBrebResponse({
+        endpoint,
+        metadata: {
+          durationMs: Date.now() - requestStartedAt,
+          hasKey: Boolean(response.data?.data),
+          keyState: response.data?.data?.keyState ?? null,
+        },
+        method: 'GET',
+        status: response.status,
+      })
+
+      if (!response.data?.data) {
         this.logger.warn('[BreB] Key lookup returned no data', { account })
         return null
       }
-      return data.data
+      return response.data.data
     }
     catch (error) {
       const reason = axios.isAxiosError(error) ? error.response?.data ?? error.message : error
@@ -289,13 +365,38 @@ export class BrebPaymentService implements IPaymentService {
     config: BrebServiceConfig,
     token: string,
   ): Promise<BrebTransactionReport | null> {
+    const endpoint = `${config.apiBaseUrl}/transaction-report/${encodeURIComponent(transactionId)}`
+    const headers = this.buildHeaders(config, token, rail)
+    const requestStartedAt = Date.now()
+
+    this.logBrebRequest({
+      endpoint,
+      headers,
+      metadata: {
+        rail,
+        transactionId: this.maskIdentifier(transactionId),
+      },
+      method: 'GET',
+    })
+
     try {
-      const { data } = await axios.get<BrebApiEnvelope<BrebTransactionReport>>(
-        `${config.apiBaseUrl}/transaction-report/${encodeURIComponent(transactionId)}`,
-        { headers: this.buildHeaders(config, token, rail) },
+      const response = await axios.get<BrebApiEnvelope<BrebTransactionReport>>(
+        endpoint,
+        { headers },
       )
 
-      return data?.data ?? null
+      this.logBrebResponse({
+        endpoint,
+        metadata: {
+          durationMs: Date.now() - requestStartedAt,
+          rail,
+          reportAvailable: Boolean(response.data?.data),
+        },
+        method: 'GET',
+        status: response.status,
+      })
+
+      return response.data?.data ?? null
     }
     catch (error) {
       const reason = axios.isAxiosError(error) ? error.response?.data ?? error.message : error
@@ -314,9 +415,24 @@ export class BrebPaymentService implements IPaymentService {
     params.append('grant_type', 'client_credentials')
 
     const basicAuth = Buffer.from(`${config.clientId}:${config.clientSecret}`).toString('base64')
+    const requestStartedAt = Date.now()
 
+    this.logBrebRequest({
+      endpoint: config.authUrl,
+      headers: {
+        'Authorization': `Basic ${basicAuth}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      metadata: {
+        grantType: 'client_credentials',
+      },
+      method: 'POST',
+      payload: {
+        grant_type: 'client_credentials',
+      },
+    })
     try {
-      const { data } = await axios.post<BrebTokenResponse>(
+      const response = await axios.post<BrebTokenResponse>(
         config.authUrl,
         params,
         {
@@ -326,6 +442,17 @@ export class BrebPaymentService implements IPaymentService {
           },
         },
       )
+      const data = response.data
+      this.logBrebResponse({
+        endpoint: config.authUrl,
+        metadata: {
+          durationMs: Date.now() - requestStartedAt,
+          tokenReceived: Boolean(data?.access_token),
+          tokenTtlSeconds: data?.expires_in ?? null,
+        },
+        method: 'POST',
+        status: response.status,
+      })
 
       const expiresAt = now + Math.max(data.expires_in - 30, 0) * 1000
       this.accessTokenCache = { expiresAt, value: data.access_token }
@@ -404,6 +531,62 @@ export class BrebPaymentService implements IPaymentService {
     return isActive
   }
 
+  private logBrebRequest({
+    endpoint,
+    headers,
+    metadata,
+    method,
+    payload,
+  }: {
+    endpoint: string
+    headers: Record<string, string>
+    metadata?: Record<string, boolean | null | number | string | undefined>
+    method: 'GET' | 'POST'
+    payload?: unknown
+  }): void {
+    this.logger.info('[BreB] Outbound request', {
+      endpoint: this.sanitizeUrlForLogs(endpoint),
+      headers: this.redactHeaders(headers),
+      method,
+      ...(metadata ? { metadata } : {}),
+      ...(payload === undefined ? {} : { payload }),
+    })
+  }
+
+  private logBrebResponse({
+    endpoint,
+    metadata,
+    method,
+    status,
+  }: {
+    endpoint: string
+    metadata?: Record<string, boolean | null | number | string | undefined>
+    method: 'GET' | 'POST'
+    status: number
+  }): void {
+    this.logger.info('[BreB] Response received', {
+      endpoint: this.sanitizeUrlForLogs(endpoint),
+      method,
+      status,
+      ...(metadata ? { metadata } : {}),
+    })
+  }
+
+  private maskIdentifier(value: null | string | undefined): string {
+    if (!value) {
+      return '<empty>'
+    }
+
+    const trimmed = value.trim()
+    if (trimmed.length <= 4) {
+      return '***'
+    }
+
+    const visibleSuffix = trimmed.slice(-4)
+    const maskedPrefixLength = Math.min(Math.max(trimmed.length - 4, 3), 12)
+    return `${'*'.repeat(maskedPrefixLength)}${visibleSuffix}`
+  }
+
   private async pollTransactionReport(
     transactionId: string,
     rail: BrebRail,
@@ -428,5 +611,38 @@ export class BrebPaymentService implements IPaymentService {
     }
 
     return lastReport ? { report: lastReport, result: this.interpretReport(lastReport) } : null
+  }
+
+  private redactHeaders(headers: Record<string, string>): Record<string, string> {
+    const sensitiveHints = ['authorization', 'secret', 'token']
+    return Object.entries(headers).reduce<Record<string, string>>((sanitized, [key, value]) => {
+      const normalizedKey = key.toLowerCase()
+      const shouldRedact = sensitiveHints.some(hint => normalizedKey.includes(hint))
+      sanitized[key] = shouldRedact ? '<redacted>' : value
+      return sanitized
+    }, {})
+  }
+
+  private sanitizeUrlForLogs(url: string): string {
+    try {
+      const parsedUrl = new URL(url)
+      const sanitizedPath = parsedUrl.pathname
+        .split('/')
+        .map(segment => (this.shouldMaskPathSegment(segment) ? this.maskIdentifier(segment) : segment))
+        .join('/')
+      return `${parsedUrl.origin}${sanitizedPath}`
+    }
+    catch {
+      return url
+    }
+  }
+
+  private shouldMaskPathSegment(segment: string): boolean {
+    if (!segment) {
+      return false
+    }
+
+    const normalized = segment.trim()
+    return /^\d+$/.test(normalized) || normalized.length >= 16
   }
 }
