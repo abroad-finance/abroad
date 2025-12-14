@@ -115,6 +115,7 @@ const createPaymentService = (overrides: Partial<PaymentServiceMock> = {}): Paym
   MAX_USER_AMOUNT_PER_DAY: 900,
   MAX_USER_AMOUNT_PER_TRANSACTION: 500,
   MAX_USER_TRANSACTIONS_PER_DAY: 5,
+  MIN_USER_AMOUNT_PER_TRANSACTION: 0,
   onboardUser: jest.fn(),
   percentageFee: 0,
   sendPayment: jest.fn(),

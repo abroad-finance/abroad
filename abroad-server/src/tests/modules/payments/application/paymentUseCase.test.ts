@@ -28,6 +28,7 @@ const buildPaymentService = (
   MAX_USER_AMOUNT_PER_DAY: 0,
   MAX_USER_AMOUNT_PER_TRANSACTION: 0,
   MAX_USER_TRANSACTIONS_PER_DAY: 0,
+  MIN_USER_AMOUNT_PER_TRANSACTION: 0,
   onboardUser: jest.fn(async ({ account }: { account: string }) => ({ message: `ok:${account}`, success: true })),
   percentageFee: 0,
   sendPayment: jest.fn(),

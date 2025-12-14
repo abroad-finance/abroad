@@ -1,4 +1,4 @@
-import { Country, PaymentMethod, TransactionStatus } from '@prisma/client'
+import { Country, PaymentMethod, TargetCurrency, TransactionStatus } from '@prisma/client'
 import { inject, injectable } from 'inversify'
 
 import { isKycExemptByAmount } from '../../../app/config/kyc'
@@ -61,6 +61,7 @@ export class TransactionAcceptanceService {
     const paymentService = this.paymentServiceFactory.getPaymentService(quote.paymentMethod)
     this.assertPaymentServiceIsEnabled(paymentService, quote.paymentMethod)
 
+    this.enforceTransactionAmountBounds(quote, paymentService, quote.paymentMethod)
     await this.ensureAccountIsValid(paymentService, request.accountNumber, request.bankCode, quote.paymentMethod)
 
     const partnerUser = await prismaClient.partnerUser.upsert({
@@ -241,6 +242,20 @@ export class TransactionAcceptanceService {
 
     if (totalAmountToday + quote.targetAmount > paymentService.MAX_TOTAL_AMOUNT_PER_DAY) {
       throw new TransactionValidationError('This payment method already reached today\'s payout limit. Please try again tomorrow or use another method.')
+    }
+  }
+
+  private enforceTransactionAmountBounds(
+    quote: { targetAmount: number, targetCurrency: TargetCurrency },
+    paymentService: ReturnType<IPaymentServiceFactory['getPaymentService']>,
+    paymentMethod: PaymentMethod,
+  ): void {
+    if (quote.targetAmount < paymentService.MIN_USER_AMOUNT_PER_TRANSACTION) {
+      throw new TransactionValidationError(`Payouts via ${paymentMethod} must be at least ${paymentService.MIN_USER_AMOUNT_PER_TRANSACTION} ${quote.targetCurrency}. Increase the amount and try again.`)
+    }
+
+    if (quote.targetAmount > paymentService.MAX_USER_AMOUNT_PER_TRANSACTION) {
+      throw new TransactionValidationError(`Payouts via ${paymentMethod} cannot exceed ${paymentService.MAX_USER_AMOUNT_PER_TRANSACTION} ${quote.targetCurrency}. Lower the amount or choose another method.`)
     }
   }
 

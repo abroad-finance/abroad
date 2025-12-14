@@ -17,6 +17,7 @@ const buildPaymentService = (label: string): IPaymentService => ({
   MAX_USER_AMOUNT_PER_DAY: 0,
   MAX_USER_AMOUNT_PER_TRANSACTION: 0,
   MAX_USER_TRANSACTIONS_PER_DAY: 0,
+  MIN_USER_AMOUNT_PER_TRANSACTION: 0,
   onboardUser: async () => ({ message: label, success: true }),
   percentageFee: 0,
   sendPayment: async () => ({ success: true, transactionId: `tx-${label}` }),

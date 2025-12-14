@@ -48,6 +48,7 @@ export class TransferoPaymentService implements IPaymentService {
   public readonly MAX_USER_AMOUNT_PER_DAY = Number.POSITIVE_INFINITY
   public readonly MAX_USER_AMOUNT_PER_TRANSACTION = Number.POSITIVE_INFINITY
   public readonly MAX_USER_TRANSACTIONS_PER_DAY = Number.POSITIVE_INFINITY
+  public readonly MIN_USER_AMOUNT_PER_TRANSACTION = 0
 
   public readonly percentageFee = 0.0
 

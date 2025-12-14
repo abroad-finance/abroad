@@ -29,6 +29,7 @@ export const buildPaymentService = (overrides?: Partial<jest.Mocked<IPaymentServ
   MAX_USER_AMOUNT_PER_DAY: 500,
   MAX_USER_AMOUNT_PER_TRANSACTION: 500,
   MAX_USER_TRANSACTIONS_PER_DAY: 3,
+  MIN_USER_AMOUNT_PER_TRANSACTION: 0,
   onboardUser: jest.fn(async ({ account }: { account: string }) => ({ message: undefined, success: Boolean(account) })),
   percentageFee: 0,
   sendPayment: jest.fn(async (params: {

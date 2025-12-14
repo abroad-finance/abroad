@@ -32,6 +32,7 @@ const paymentService = {
   MAX_USER_AMOUNT_PER_DAY: 100,
   MAX_USER_AMOUNT_PER_TRANSACTION: 100,
   MAX_USER_TRANSACTIONS_PER_DAY: 1,
+  MIN_USER_AMOUNT_PER_TRANSACTION: 0,
   onboardUser: jest.fn(),
   percentageFee: 0,
   sendPayment: jest.fn(),
@@ -83,6 +84,24 @@ describe('TransactionAcceptanceService helpers', () => {
     expect(paymentService.getLiquidity).toHaveBeenCalled()
   })
 
+  it('enforces per-transaction amount bounds', () => {
+    const enforceAmountBounds = (service as unknown as {
+      enforceTransactionAmountBounds: (quote: { targetAmount: number, targetCurrency: TargetCurrency }, svc: typeof paymentService, method: PaymentMethod) => void
+    }).enforceTransactionAmountBounds
+
+    expect(() => enforceAmountBounds(
+      { targetAmount: 5, targetCurrency: TargetCurrency.COP },
+      { ...paymentService, MIN_USER_AMOUNT_PER_TRANSACTION: 10 },
+      PaymentMethod.MOVII,
+    )).toThrow('Payouts via MOVII must be at least 10 COP. Increase the amount and try again.')
+
+    expect(() => enforceAmountBounds(
+      { targetAmount: 150, targetCurrency: TargetCurrency.COP },
+      { ...paymentService, MAX_USER_AMOUNT_PER_TRANSACTION: 100 },
+      PaymentMethod.MOVII,
+    )).toThrow('Payouts via MOVII cannot exceed 100 COP. Lower the amount or choose another method.')
+  })
+
   it('logs failures when publishing user notifications', async () => {
     const publishUserNotification = (service as unknown as {
       publishUserNotification: (prisma: {
@@ -132,6 +151,7 @@ describe('TransactionAcceptanceService helpers', () => {
           paymentMethod: PaymentMethod.MOVII,
           sourceAmount: 10,
           targetAmount: 10,
+          targetCurrency: TargetCurrency.COP,
         })),
       },
     }

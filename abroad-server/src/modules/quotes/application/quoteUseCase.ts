@@ -79,10 +79,7 @@ export class QuoteUseCase implements IQuoteUseCase {
     const paymentService = this.paymentServiceFactory.getPaymentService(paymentMethod)
     this.ensurePaymentServiceIsEnabled(paymentService, paymentMethod)
 
-    // Enforce max user amount
-    if (amount > paymentService.MAX_USER_AMOUNT_PER_TRANSACTION) {
-      throw new Error(`The maximum allowed amount for ${targetCurrency} is ${paymentService.MAX_USER_AMOUNT_PER_TRANSACTION} ${targetCurrency}`)
-    }
+    this.ensureAmountWithinLimits(amount, paymentService, targetCurrency)
 
     const sourceAmount = this.calculateSourceAmount(amount, exchangeRateWithFee, paymentService.fixedFee)
 
@@ -140,10 +137,7 @@ export class QuoteUseCase implements IQuoteUseCase {
     this.ensurePaymentServiceIsEnabled(paymentService, paymentMethod)
     const targetAmount = this.calculateTargetAmount(sourceAmountInput, exchangeRateWithFee, paymentService.fixedFee)
 
-    // Enforce max user amount
-    if (targetAmount > paymentService.MAX_USER_AMOUNT_PER_TRANSACTION) {
-      throw new Error(`The maximum allowed amount for ${targetCurrency} is ${paymentService.MAX_USER_AMOUNT_PER_TRANSACTION} ${targetCurrency}`)
-    }
+    this.ensureAmountWithinLimits(targetAmount, paymentService, targetCurrency)
 
     const prismaClient = await this.dbClientProvider.getClient()
     const sepPartnerId = await this.secretManager.getSecret('STELLAR_SEP_PARTNER_ID')
@@ -197,6 +191,16 @@ export class QuoteUseCase implements IQuoteUseCase {
   private calculateTargetAmount(sourceAmount: number, exchangeRate: number, fixedFee: number): number {
     const result = sourceAmount / exchangeRate - fixedFee
     return Number(result.toFixed(2))
+  }
+
+  private ensureAmountWithinLimits(amount: number, paymentService: IPaymentService, targetCurrency: TargetCurrency): void {
+    if (amount < paymentService.MIN_USER_AMOUNT_PER_TRANSACTION) {
+      throw new Error(`The minimum allowed amount for ${targetCurrency} is ${paymentService.MIN_USER_AMOUNT_PER_TRANSACTION} ${targetCurrency}`)
+    }
+
+    if (amount > paymentService.MAX_USER_AMOUNT_PER_TRANSACTION) {
+      throw new Error(`The maximum allowed amount for ${targetCurrency} is ${paymentService.MAX_USER_AMOUNT_PER_TRANSACTION} ${targetCurrency}`)
+    }
   }
 
   private ensurePaymentServiceIsEnabled(paymentService: IPaymentService, paymentMethod: PaymentMethod): void {

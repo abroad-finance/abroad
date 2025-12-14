@@ -110,6 +110,8 @@ export class BrebPaymentService implements IPaymentService {
   public readonly MAX_USER_AMOUNT_PER_TRANSACTION = 5_000_000
   public readonly MAX_USER_TRANSACTIONS_PER_DAY = 15
 
+  public readonly MIN_USER_AMOUNT_PER_TRANSACTION = 5_000
+
   public readonly percentageFee = 0
 
   private accessTokenCache?: { expiresAt: number, value: string }

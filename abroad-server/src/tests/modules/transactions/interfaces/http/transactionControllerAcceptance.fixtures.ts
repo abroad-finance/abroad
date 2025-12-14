@@ -1,4 +1,4 @@
-import { Country, PaymentMethod } from '@prisma/client'
+import { Country, PaymentMethod, TargetCurrency } from '@prisma/client'
 
 import type { IKycService } from '../../../../../modules/kyc/application/contracts/IKycService'
 import type { IPaymentService } from '../../../../../modules/payments/application/contracts/IPaymentService'
@@ -26,6 +26,7 @@ export const baseQuote = {
   paymentMethod: PaymentMethod.PIX,
   sourceAmount: 25,
   targetAmount: 50,
+  targetCurrency: TargetCurrency.BRL,
 }
 
 export const requestBody = {

@@ -105,8 +105,9 @@ export class MoviiPaymentService implements IPaymentService {
   public readonly MAX_TOTAL_AMOUNT_PER_DAY: number = 25_000_000
   public readonly MAX_USER_AMOUNT_PER_DAY: number = 25_000_000
   public readonly MAX_USER_AMOUNT_PER_TRANSACTION: number = 5_000_000
-
   public readonly MAX_USER_TRANSACTIONS_PER_DAY: number = 15
+
+  public readonly MIN_USER_AMOUNT_PER_TRANSACTION: number = 0
 
   public readonly percentageFee = 0.0
   private readonly logger: ScopedLogger

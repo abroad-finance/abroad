@@ -26,6 +26,7 @@ const buildPaymentService = (overrides?: Partial<IPaymentService>): IPaymentServ
   MAX_USER_AMOUNT_PER_DAY: 0,
   MAX_USER_AMOUNT_PER_TRANSACTION: 1_000,
   MAX_USER_TRANSACTIONS_PER_DAY: 0,
+  MIN_USER_AMOUNT_PER_TRANSACTION: 0,
   onboardUser: async () => ({ success: true }),
   percentageFee: 0,
   sendPayment: async () => ({ success: true, transactionId: 'tx' }),
@@ -126,6 +127,19 @@ describe('QuoteUseCase', () => {
       paymentMethod: PaymentMethod.MOVII,
       targetCurrency: TargetCurrency.COP,
     })).rejects.toThrow('The maximum allowed amount for COP is 50 COP')
+  })
+
+  it('enforces minimum amount per transaction', async () => {
+    const brebService = buildPaymentService({ MAX_USER_AMOUNT_PER_TRANSACTION: 10_000, MIN_USER_AMOUNT_PER_TRANSACTION: 5_000 })
+    ;(paymentServiceFactory.getPaymentService as jest.Mock).mockReturnValue(brebService)
+
+    await expect(quoteUseCase.createQuote({
+      amount: 4_999,
+      cryptoCurrency: CryptoCurrency.USDC,
+      network: BlockchainNetwork.STELLAR,
+      paymentMethod: PaymentMethod.BREB,
+      targetCurrency: TargetCurrency.COP,
+    })).rejects.toThrow('The minimum allowed amount for COP is 5000 COP')
   })
 
   it('requires a partner when none is available from SEP config', async () => {
