@@ -9,6 +9,15 @@ type TransactionSlackContext = {
   trigger: string
 }
 
+const statusEmoji: Record<TransactionStatus, string> = {
+  [TransactionStatus.AWAITING_PAYMENT]: '⌛️',
+  [TransactionStatus.PROCESSING_PAYMENT]: '🔄',
+  [TransactionStatus.PAYMENT_COMPLETED]: '✅',
+  [TransactionStatus.PAYMENT_EXPIRED]: '⏰',
+  [TransactionStatus.PAYMENT_FAILED]: '❌',
+  [TransactionStatus.WRONG_AMOUNT]: '⚠️',
+}
+
 const joinSegments = (segments: Array<null | string | undefined>): string =>
   segments.filter((segment): segment is string => Boolean(segment)).join(' | ')
 
@@ -44,8 +53,9 @@ export const buildTransactionSlackMessage = (
     transaction.refundOnChainId ? `Refund: ${transaction.refundOnChainId}` : null,
   ])
 
+  const emoji = statusEmoji[context.status]
   const lines = [
-    `${context.heading} | Status: ${context.status} | Trigger: ${context.trigger}`,
+    `${emoji} ${context.heading} | Status: ${context.status} | Trigger: ${context.trigger}`,
     joinSegments([
       `Transaction: ${transaction.id}`,
       `Quote: ${transaction.quote.id}`,

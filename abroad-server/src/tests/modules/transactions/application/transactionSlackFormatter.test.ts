@@ -77,7 +77,7 @@ describe('transactionSlackFormatter', () => {
       trigger: 'TransactionFormatterTest',
     })
 
-    expect(message).toContain('Payment completed | Status: PAYMENT_COMPLETED | Trigger: TransactionFormatterTest')
+    expect(message).toContain('✅ Payment completed | Status: PAYMENT_COMPLETED | Trigger: TransactionFormatterTest')
     expect(message).toContain(`Transaction: ${transaction.id}`)
     expect(message).toContain(`Quote: ${transaction.quote.id}`)
     expect(message).toContain(`Partner: ${transaction.partnerUser.partner.name} (${transaction.partnerUser.partner.id})`)
@@ -107,6 +107,6 @@ describe('transactionSlackFormatter', () => {
     expect(message).not.toContain('References:')
     expect(message).not.toContain('Notes:')
     expect(message).toContain('Payment: NEQUI | Network: STELLAR')
-    expect(message).toContain('Payment failed | Status: PAYMENT_FAILED | Trigger: TransactionFormatterTest')
+    expect(message).toContain('❌ Payment failed | Status: PAYMENT_FAILED | Trigger: TransactionFormatterTest')
   })
 })
