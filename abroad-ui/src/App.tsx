@@ -10,6 +10,7 @@ import HiddenLogViewer from './shared/components/HiddenLogViewer'
 // Route-level code splitting
 const WebSwap = lazy(() => import('./pages/WebSwap/WebSwap'))
 const Meridian = lazy(() => import('./pages/Meridian/Meridian'))
+const Onboarding = lazy(() => import('./pages/Kyb/Onboarding'))
 
 function App() {
   return (
@@ -23,6 +24,7 @@ function App() {
               <Routes>
                 <Route element={<WebSwap />} path="/" />
                 <Route element={<Meridian />} path="/meridian" />
+                <Route element={<Onboarding />} path="/onboarding" />
               </Routes>
             </Suspense>
           </Router>
