@@ -32,22 +32,18 @@ const buildExchangeProvider = (id: string): IExchangeProvider => ({
 })
 
 describe('PaymentServiceFactory', () => {
-  const moviiService = buildPaymentService('movii')
-  const nequiService = buildPaymentService('nequi')
   const brebService = buildPaymentService('breb')
   const transferoService = buildPaymentService('transfero')
 
   it('returns the correct payment service for supported methods', () => {
-    const factory = new PaymentServiceFactory(moviiService, nequiService, brebService, transferoService)
+    const factory = new PaymentServiceFactory(brebService, transferoService)
 
-    expect(factory.getPaymentService(PaymentMethod.MOVII)).toBe(moviiService)
-    expect(factory.getPaymentService(PaymentMethod.NEQUI)).toBe(nequiService)
     expect(factory.getPaymentService(PaymentMethod.BREB)).toBe(brebService)
     expect(factory.getPaymentService(PaymentMethod.PIX)).toBe(transferoService)
   })
 
   it('throws for unsupported payment methods', () => {
-    const factory = new PaymentServiceFactory(moviiService, nequiService, brebService, transferoService)
+    const factory = new PaymentServiceFactory(brebService, transferoService)
 
     expect(() => factory.getPaymentService('UNSUPPORTED' as PaymentMethod)).toThrow('Unsupported payment method: UNSUPPORTED')
   })

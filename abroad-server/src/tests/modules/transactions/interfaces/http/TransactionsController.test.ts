@@ -34,7 +34,7 @@ const buildPrisma = () => {
         cryptoCurrency: 'USDC',
         id: 'quote-1',
         network: 'stellar',
-        paymentMethod: 'NEQUI',
+        paymentMethod: 'BREB',
         sourceAmount: 10,
         targetAmount: 9,
         targetCurrency: 'COP',

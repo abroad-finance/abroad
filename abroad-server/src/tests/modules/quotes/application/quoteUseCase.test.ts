@@ -81,12 +81,12 @@ describe('QuoteUseCase', () => {
       cryptoCurrency: CryptoCurrency.USDC,
       network: BlockchainNetwork.STELLAR,
       partner,
-      paymentMethod: PaymentMethod.MOVII,
+      paymentMethod: PaymentMethod.BREB,
       targetCurrency: TargetCurrency.COP,
     })
 
     expect(exchangeProviderFactory.getExchangeProvider).toHaveBeenCalledWith(TargetCurrency.COP)
-    expect(paymentServiceFactory.getPaymentService).toHaveBeenCalledWith(PaymentMethod.MOVII)
+    expect(paymentServiceFactory.getPaymentService).toHaveBeenCalledWith(PaymentMethod.BREB)
     expect(prisma.quote.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         country: Country.CO,
@@ -110,7 +110,7 @@ describe('QuoteUseCase', () => {
       amount: 10,
       cryptoCurrency: CryptoCurrency.USDC,
       network: BlockchainNetwork.STELLAR,
-      paymentMethod: PaymentMethod.MOVII,
+      paymentMethod: PaymentMethod.BREB,
       targetCurrency: TargetCurrency.COP,
     })).rejects.toThrow('Invalid exchange rate received')
   })
@@ -123,7 +123,7 @@ describe('QuoteUseCase', () => {
       amount: 100,
       cryptoCurrency: CryptoCurrency.USDC,
       network: BlockchainNetwork.STELLAR,
-      paymentMethod: PaymentMethod.MOVII,
+      paymentMethod: PaymentMethod.BREB,
       targetCurrency: TargetCurrency.COP,
     })).rejects.toThrow('The maximum allowed amount for COP is 50 COP')
   })
@@ -148,7 +148,7 @@ describe('QuoteUseCase', () => {
       amount: 10,
       cryptoCurrency: CryptoCurrency.USDC,
       network: BlockchainNetwork.STELLAR,
-      paymentMethod: PaymentMethod.MOVII,
+      paymentMethod: PaymentMethod.BREB,
       targetCurrency: TargetCurrency.COP,
     })).rejects.toThrow('No partner information available for quote creation')
   })
@@ -162,7 +162,7 @@ describe('QuoteUseCase', () => {
     const result = await quoteUseCase.createReverseQuote({
       cryptoCurrency: CryptoCurrency.USDC,
       network: BlockchainNetwork.STELLAR,
-      paymentMethod: PaymentMethod.NEQUI,
+      paymentMethod: PaymentMethod.PIX,
       sourceAmountInput: 50,
       targetCurrency: TargetCurrency.COP,
     })
@@ -176,7 +176,7 @@ describe('QuoteUseCase', () => {
     await expect(quoteUseCase.createReverseQuote({
       cryptoCurrency: CryptoCurrency.USDC,
       network: BlockchainNetwork.STELLAR,
-      paymentMethod: PaymentMethod.NEQUI,
+      paymentMethod: PaymentMethod.PIX,
       sourceAmountInput: 50,
       targetCurrency: TargetCurrency.COP,
     })).rejects.toThrow('The maximum allowed amount for COP is 1 COP')
@@ -190,17 +190,17 @@ describe('QuoteUseCase', () => {
       amount: 50,
       cryptoCurrency: CryptoCurrency.USDC,
       network: BlockchainNetwork.STELLAR,
-      paymentMethod: PaymentMethod.MOVII,
+      paymentMethod: PaymentMethod.BREB,
       targetCurrency: TargetCurrency.COP,
-    })).rejects.toThrow('Payment method MOVII is currently unavailable')
+    })).rejects.toThrow('Payment method BREB is currently unavailable')
 
     await expect(quoteUseCase.createReverseQuote({
       cryptoCurrency: CryptoCurrency.USDC,
       network: BlockchainNetwork.STELLAR,
-      paymentMethod: PaymentMethod.NEQUI,
+      paymentMethod: PaymentMethod.PIX,
       sourceAmountInput: 25,
       targetCurrency: TargetCurrency.COP,
-    })).rejects.toThrow('Payment method NEQUI is currently unavailable')
+    })).rejects.toThrow('Payment method PIX is currently unavailable')
   })
 
   it('normalizes COP target amounts to whole numbers when creating quotes', async () => {
@@ -214,7 +214,7 @@ describe('QuoteUseCase', () => {
       cryptoCurrency: CryptoCurrency.USDC,
       network: BlockchainNetwork.STELLAR,
       partner,
-      paymentMethod: PaymentMethod.MOVII,
+      paymentMethod: PaymentMethod.BREB,
       targetCurrency: TargetCurrency.COP,
     })
 
@@ -242,7 +242,7 @@ describe('QuoteUseCase', () => {
     const result = await quoteUseCase.createReverseQuote({
       cryptoCurrency: CryptoCurrency.USDC,
       network: BlockchainNetwork.STELLAR,
-      paymentMethod: PaymentMethod.NEQUI,
+      paymentMethod: PaymentMethod.PIX,
       sourceAmountInput: 12.34,
       targetCurrency: TargetCurrency.COP,
     })

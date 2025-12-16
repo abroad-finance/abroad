@@ -65,7 +65,7 @@ describe('GCPPubSubQueueHandler', () => {
       amount: 100,
       blockchain: BlockchainNetwork.STELLAR,
       cryptoCurrency: CryptoCurrency.USDC,
-      paymentMethod: PaymentMethod.NEQUI,
+      paymentMethod: PaymentMethod.BREB,
       targetCurrency: TargetCurrency.COP,
     })
 
@@ -76,7 +76,7 @@ describe('GCPPubSubQueueHandler', () => {
         amount: 100,
         blockchain: BlockchainNetwork.STELLAR,
         cryptoCurrency: CryptoCurrency.USDC,
-        paymentMethod: PaymentMethod.NEQUI,
+        paymentMethod: PaymentMethod.BREB,
         targetCurrency: TargetCurrency.COP,
       })),
     })

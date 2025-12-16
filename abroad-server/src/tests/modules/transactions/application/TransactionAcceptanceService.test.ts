@@ -92,14 +92,14 @@ describe('TransactionAcceptanceService helpers', () => {
     expect(() => enforceAmountBounds(
       { targetAmount: 5, targetCurrency: TargetCurrency.COP },
       { ...paymentService, MIN_USER_AMOUNT_PER_TRANSACTION: 10 },
-      PaymentMethod.MOVII,
-    )).toThrow('Payouts via MOVII must be at least 10 COP. Increase the amount and try again.')
+      PaymentMethod.BREB,
+    )).toThrow('Payouts via BREB must be at least 10 COP. Increase the amount and try again.')
 
     expect(() => enforceAmountBounds(
       { targetAmount: 150, targetCurrency: TargetCurrency.COP },
       { ...paymentService, MAX_USER_AMOUNT_PER_TRANSACTION: 100 },
-      PaymentMethod.MOVII,
-    )).toThrow('Payouts via MOVII cannot exceed 100 COP. Lower the amount or choose another method.')
+      PaymentMethod.BREB,
+    )).toThrow('Payouts via BREB cannot exceed 100 COP. Lower the amount or choose another method.')
   })
 
   it('logs failures when publishing user notifications', async () => {
@@ -148,7 +148,7 @@ describe('TransactionAcceptanceService helpers', () => {
           country: Country.CO,
           id: quoteId,
           partnerId: partnerContext.id,
-          paymentMethod: PaymentMethod.MOVII,
+          paymentMethod: PaymentMethod.BREB,
           sourceAmount: 10,
           targetAmount: 10,
           targetCurrency: TargetCurrency.COP,
@@ -166,8 +166,8 @@ describe('TransactionAcceptanceService helpers', () => {
       createMockLogger(),
     )
 
-    await expect(acceptanceService.acceptTransaction(request, partnerContext)).rejects.toThrow('Payments via MOVII are temporarily unavailable')
-    expect(disabledFactory.getPaymentService).toHaveBeenCalledWith(PaymentMethod.MOVII)
+    await expect(acceptanceService.acceptTransaction(request, partnerContext)).rejects.toThrow('Payments via BREB are temporarily unavailable')
+    expect(disabledFactory.getPaymentService).toHaveBeenCalledWith(PaymentMethod.BREB)
     expect(disabledPaymentService.verifyAccount).not.toHaveBeenCalled()
   })
 })

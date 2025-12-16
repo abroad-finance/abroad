@@ -174,7 +174,7 @@ async function seedPartners() {
       id: 'quote-dev-alpha-1',
       network: BlockchainNetwork.STELLAR,
       partnerId: alphaPartner.id,
-      paymentMethod: PaymentMethod.NEQUI,
+      paymentMethod: PaymentMethod.BREB,
       sourceAmount: 100,
       targetAmount: 250000,
       targetCurrency: TargetCurrency.COP,
@@ -189,7 +189,7 @@ async function seedPartners() {
   await prisma.transaction.upsert({
     create: {
       accountNumber: '1234567890',
-      bankCode: 'NEQUI',
+      bankCode: 'BREB',
       externalId: 'txn-dev-alpha-ext-1',
       id: 'txn-dev-alpha-1',
       partnerUserId: alphaPrimaryUser.id,
@@ -200,7 +200,7 @@ async function seedPartners() {
     },
     update: {
       accountNumber: '1234567890',
-      bankCode: 'NEQUI',
+      bankCode: 'BREB',
       externalId: 'txn-dev-alpha-ext-1',
       partnerUserId: alphaPrimaryUser.id,
       qrCode: 'https://alpha.dev/qr/txn-dev-alpha-1',
@@ -219,7 +219,7 @@ async function seedPartners() {
       id: 'quote-dev-beta-1',
       network: BlockchainNetwork.SOLANA,
       partnerId: betaPartner.id,
-      paymentMethod: PaymentMethod.MOVII,
+      paymentMethod: PaymentMethod.BREB,
       sourceAmount: 200,
       targetAmount: 500000,
       targetCurrency: TargetCurrency.COP,
@@ -234,7 +234,7 @@ async function seedPartners() {
   await prisma.transaction.upsert({
     create: {
       accountNumber: '9876543210',
-      bankCode: 'MOVII',
+      bankCode: 'BREB',
       externalId: 'txn-dev-beta-ext-1',
       id: 'txn-dev-beta-1',
       partnerUserId: betaPrimaryUser.id,
@@ -244,7 +244,7 @@ async function seedPartners() {
     },
     update: {
       accountNumber: '9876543210',
-      bankCode: 'MOVII',
+      bankCode: 'BREB',
       externalId: 'txn-dev-beta-ext-1',
       partnerUserId: betaPrimaryUser.id,
       qrCode: 'https://beta.dev/qr/txn-dev-beta-1',

@@ -1,6 +1,6 @@
 import type { ParsedInstruction, ParsedTransactionWithMeta } from '@solana/web3.js'
 
-import { BlockchainNetwork, CryptoCurrency, TransactionStatus } from '.prisma/client'
+import { BlockchainNetwork, CryptoCurrency, PaymentMethod, TransactionStatus } from '.prisma/client'
 import { TOKEN_PROGRAM_ID } from '@solana/spl-token'
 
 import type { IDatabaseClientProvider } from '../../../../../platform/persistence/IDatabaseClientProvider'
@@ -125,7 +125,7 @@ export const buildTransaction = (overrides?: Partial<TransactionRecord>): Transa
     quote: {
       cryptoCurrency: CryptoCurrency.USDC,
       network: BlockchainNetwork.SOLANA,
-      paymentMethod: 'nequi',
+      paymentMethod: PaymentMethod.BREB,
       targetAmount: 0,
       targetCurrency: 'COP',
       ...(quoteOverride ?? {}),

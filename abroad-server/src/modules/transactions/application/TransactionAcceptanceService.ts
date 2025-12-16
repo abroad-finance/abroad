@@ -62,7 +62,7 @@ export class TransactionAcceptanceService {
     this.assertPaymentServiceIsEnabled(paymentService, quote.paymentMethod)
 
     this.enforceTransactionAmountBounds(quote, paymentService, quote.paymentMethod)
-    await this.ensureAccountIsValid(paymentService, request.accountNumber, request.bankCode, quote.paymentMethod)
+    await this.ensureAccountIsValid(paymentService, request.accountNumber, request.bankCode)
 
     const partnerUser = await prismaClient.partnerUser.upsert({
       create: {
@@ -294,12 +294,7 @@ export class TransactionAcceptanceService {
     paymentService: ReturnType<IPaymentServiceFactory['getPaymentService']>,
     accountNumber: string,
     bankCode: string | undefined,
-    paymentMethod: PaymentMethod,
   ) {
-    if (paymentMethod === PaymentMethod.MOVII && !bankCode) {
-      throw new TransactionValidationError('A bank code is required to process MOVII payments. Please add the bank code and try again.')
-    }
-
     const isAccountValid = await paymentService.verifyAccount({ account: accountNumber, bankCode: bankCode ?? '' })
     if (!isAccountValid) {
       throw new TransactionValidationError('We could not verify the account number and bank code provided. Please double-check the details and try again.')

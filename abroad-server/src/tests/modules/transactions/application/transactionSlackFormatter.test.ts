@@ -1,14 +1,14 @@
 import {
   BlockchainNetwork,
+  Country,
   CryptoCurrency,
   PaymentMethod,
   TargetCurrency,
   TransactionStatus,
-  Country,
 } from '@prisma/client'
 
-import { buildTransactionSlackMessage } from '../../../../modules/transactions/application/transactionSlackFormatter'
 import { TransactionWithRelations } from '../../../../modules/transactions/application/transactionNotificationTypes'
+import { buildTransactionSlackMessage } from '../../../../modules/transactions/application/transactionSlackFormatter'
 
 const buildTransaction = (overrides: Partial<TransactionWithRelations> = {}): TransactionWithRelations => ({
   accountNumber: '123456789',
@@ -17,7 +17,6 @@ const buildTransaction = (overrides: Partial<TransactionWithRelations> = {}): Tr
   externalId: 'external-1',
   id: 'txn-1',
   onChainId: 'on-chain-1',
-  partnerUserId: 'partner-user-1',
   partnerUser: {
     createdAt: new Date(),
     id: 'partner-user-1',
@@ -41,6 +40,8 @@ const buildTransaction = (overrides: Partial<TransactionWithRelations> = {}): Tr
     updatedAt: new Date(),
     userId: 'user-1',
   },
+  partnerUserId: 'partner-user-1',
+  qrCode: null,
   quote: {
     country: Country.CO,
     createdAt: new Date(),
@@ -49,7 +50,7 @@ const buildTransaction = (overrides: Partial<TransactionWithRelations> = {}): Tr
     id: 'quote-1',
     network: BlockchainNetwork.STELLAR,
     partnerId: 'partner-1',
-    paymentMethod: PaymentMethod.NEQUI,
+    paymentMethod: PaymentMethod.BREB,
     sourceAmount: 10,
     targetAmount: 20,
     targetCurrency: TargetCurrency.COP,
@@ -59,7 +60,6 @@ const buildTransaction = (overrides: Partial<TransactionWithRelations> = {}): Tr
   refundOnChainId: 'refund-1',
   status: TransactionStatus.PAYMENT_COMPLETED,
   taxId: null,
-  qrCode: null,
   ...overrides,
 })
 
@@ -82,7 +82,7 @@ describe('transactionSlackFormatter', () => {
     expect(message).toContain(`Quote: ${transaction.quote.id}`)
     expect(message).toContain(`Partner: ${transaction.partnerUser.partner.name} (${transaction.partnerUser.partner.id})`)
     expect(message).toContain('Amounts: 10 USDC -> 20 COP')
-    expect(message).toContain('Payment: NEQUI | Network: STELLAR | Account: 123456789 | Bank: bank-1')
+    expect(message).toContain('Payment: BREB | Network: STELLAR | Account: 123456789 | Bank: bank-1')
     expect(message).toContain('References: External: external-1 | On-chain: on-chain-1 | Refund: refund-1')
     expect(message).toContain('Notes: provider: transfero | providerAmount: 10 | providerStatus: processed')
   })
@@ -106,7 +106,7 @@ describe('transactionSlackFormatter', () => {
     expect(message).not.toContain('Bank:')
     expect(message).not.toContain('References:')
     expect(message).not.toContain('Notes:')
-    expect(message).toContain('Payment: NEQUI | Network: STELLAR')
+    expect(message).toContain('Payment: BREB | Network: STELLAR')
     expect(message).toContain('❌ Payment failed | Status: PAYMENT_FAILED | Trigger: TransactionFormatterTest')
   })
 })

@@ -31,10 +31,10 @@ describe('GcpSecretManager', () => {
 
   it('returns environment secrets in development', async () => {
     process.env.NODE_ENV = 'development'
-    process.env.MOVII_API_KEY = 'dev-key'
+    process.env.BREB_API_BASE_URL = 'dev-key'
     const manager = new GcpSecretManager()
 
-    const secret = await manager.getSecret('MOVII_API_KEY' as Secret)
+    const secret = await manager.getSecret('BREB_API_BASE_URL' as Secret)
 
     expect(secret).toBe('dev-key')
     expect(accessSecretVersionMock).not.toHaveBeenCalled()
@@ -47,14 +47,14 @@ describe('GcpSecretManager', () => {
     accessSecretVersionMock.mockResolvedValue([{ payload: { data: Buffer.from('secret-val') } }])
     const manager = new GcpSecretManager()
 
-    const first = await manager.getSecret('MOVII_API_KEY' as Secret)
+    const first = await manager.getSecret('BREB_API_BASE_URL' as Secret)
     const second = await manager.getSecret('GCP_PROJECT_ID')
 
     expect(first).toBe('secret-val')
     expect(second).toBe('proj-123')
     expect(projectMock).toHaveBeenCalledTimes(1)
     expect(accessSecretVersionMock).toHaveBeenCalledWith({
-      name: 'projects/proj-123/secrets/MOVII_API_KEY/versions/latest',
+      name: 'projects/proj-123/secrets/BREB_API_BASE_URL/versions/latest',
     })
   })
 

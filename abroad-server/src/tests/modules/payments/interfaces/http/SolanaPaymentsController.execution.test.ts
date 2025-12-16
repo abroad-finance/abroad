@@ -1,5 +1,5 @@
 import 'reflect-metadata'
-import { BlockchainNetwork, CryptoCurrency, TransactionStatus } from '.prisma/client'
+import { BlockchainNetwork, CryptoCurrency, PaymentMethod, TransactionStatus } from '.prisma/client'
 import { type ParsedTransactionWithMeta } from '@solana/web3.js'
 
 import {
@@ -28,7 +28,7 @@ describe('SolanaPaymentsController notifyPayment execution', () => {
       quote: {
         cryptoCurrency: CryptoCurrency.USDC,
         network: BlockchainNetwork.SOLANA,
-        paymentMethod: 'nequi',
+        paymentMethod: PaymentMethod.BREB,
         targetAmount: 0,
         targetCurrency: 'COP',
       },
@@ -66,7 +66,7 @@ describe('SolanaPaymentsController notifyPayment execution', () => {
       quote: {
         cryptoCurrency: CryptoCurrency.USDC,
         network: BlockchainNetwork.SOLANA,
-        paymentMethod: 'nequi',
+        paymentMethod: PaymentMethod.BREB,
         targetAmount: 0,
         targetCurrency: 'COP',
       },
@@ -99,7 +99,7 @@ describe('SolanaPaymentsController notifyPayment execution', () => {
       quote: {
         cryptoCurrency: CryptoCurrency.USDC,
         network: BlockchainNetwork.SOLANA,
-        paymentMethod: 'nequi',
+        paymentMethod: PaymentMethod.BREB,
         targetAmount: 0,
         targetCurrency: 'COP',
       },
@@ -147,7 +147,7 @@ describe('SolanaPaymentsController notifyPayment execution', () => {
       quote: {
         cryptoCurrency: CryptoCurrency.USDC,
         network: BlockchainNetwork.SOLANA,
-        paymentMethod: 'nequi',
+        paymentMethod: PaymentMethod.BREB,
         targetAmount: 0,
         targetCurrency: 'COP',
       },

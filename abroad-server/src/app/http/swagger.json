@@ -414,8 +414,6 @@
 			"_36_Enums.PaymentMethod": {
 				"type": "string",
 				"enum": [
-					"NEQUI",
-					"MOVII",
 					"PIX",
 					"BREB"
 				]
@@ -550,6 +548,13 @@
 			},
 			"BanksResponse": {
 				"$ref": "#/components/schemas/BanksResult"
+			},
+			"SupportedPaymentMethod": {
+				"type": "string",
+				"enum": [
+					"PIX",
+					"BREB"
+				]
 			},
 			"LiquidityResult": {
 				"properties": {
@@ -1441,12 +1446,12 @@
 				],
 				"parameters": [
 					{
-						"description": "- The payment method to get banks for (MOVII, NEQUI, etc.)",
+						"description": "- The payment method to get banks for (BREB, PIX)",
 						"in": "query",
 						"name": "paymentMethod",
 						"required": false,
 						"schema": {
-							"$ref": "#/components/schemas/PaymentMethod"
+							"$ref": "#/components/schemas/SupportedPaymentMethod"
 						}
 					}
 				]
@@ -1481,12 +1486,12 @@
 				],
 				"parameters": [
 					{
-						"description": "- The payment method to get liquidity for (MOVII, NEQUI, etc.)",
+						"description": "- The payment method to get liquidity for (BREB, PIX)",
 						"in": "query",
 						"name": "paymentMethod",
 						"required": false,
 						"schema": {
-							"$ref": "#/components/schemas/PaymentMethod"
+							"$ref": "#/components/schemas/SupportedPaymentMethod"
 						}
 					}
 				]

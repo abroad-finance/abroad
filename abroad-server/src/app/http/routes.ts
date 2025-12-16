@@ -180,7 +180,7 @@ const models: TsoaRoute.Models = {
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
     "_36_Enums.PaymentMethod": {
         "dataType": "refAlias",
-        "type": {"dataType":"union","subSchemas":[{"dataType":"enum","enums":["NEQUI"]},{"dataType":"enum","enums":["MOVII"]},{"dataType":"enum","enums":["PIX"]},{"dataType":"enum","enums":["BREB"]}],"validators":{}},
+        "type": {"dataType":"union","subSchemas":[{"dataType":"enum","enums":["PIX"]},{"dataType":"enum","enums":["BREB"]}],"validators":{}},
     },
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
     "PaymentMethod": {
@@ -235,6 +235,11 @@ const models: TsoaRoute.Models = {
     "BanksResponse": {
         "dataType": "refAlias",
         "type": {"ref":"BanksResult","validators":{}},
+    },
+    // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
+    "SupportedPaymentMethod": {
+        "dataType": "refAlias",
+        "type": {"dataType":"union","subSchemas":[{"dataType":"enum","enums":["PIX"]},{"dataType":"enum","enums":["BREB"]}],"validators":{}},
     },
     // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
     "LiquidityResult": {
@@ -899,7 +904,7 @@ export function RegisterRoutes(app: Router) {
         });
         // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
         const argsPaymentsController_getBanks: Record<string, TsoaRoute.ParameterSchema> = {
-                paymentMethod: {"in":"query","name":"paymentMethod","ref":"PaymentMethod"},
+                paymentMethod: {"in":"query","name":"paymentMethod","ref":"SupportedPaymentMethod"},
         };
         app.get('/payments/banks',
             authenticateMiddleware([{"ApiKeyAuth":[]},{"BearerAuth":[]}]),
@@ -935,7 +940,7 @@ export function RegisterRoutes(app: Router) {
         });
         // WARNING: This file was auto-generated with tsoa. Please do not modify it. Re-run tsoa to re-generate this file: https://github.com/lukeautry/tsoa
         const argsPaymentsController_getLiquidity: Record<string, TsoaRoute.ParameterSchema> = {
-                paymentMethod: {"in":"query","name":"paymentMethod","ref":"PaymentMethod"},
+                paymentMethod: {"in":"query","name":"paymentMethod","ref":"SupportedPaymentMethod"},
         };
         app.get('/payments/liquidity',
             authenticateMiddleware([{"ApiKeyAuth":[]},{"BearerAuth":[]}]),

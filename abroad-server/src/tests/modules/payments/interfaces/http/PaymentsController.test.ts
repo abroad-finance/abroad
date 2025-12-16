@@ -20,9 +20,9 @@ describe('PaymentsController', () => {
   })
 
   it('returns banks from the payment use case', async () => {
-    const result = await controller.getBanks(PaymentMethod.NEQUI)
+    const result = await controller.getBanks(PaymentMethod.BREB)
 
-    expect(paymentUseCase.getBanks).toHaveBeenCalledWith(PaymentMethod.NEQUI)
+    expect(paymentUseCase.getBanks).toHaveBeenCalledWith(PaymentMethod.BREB)
     expect(result.banks).toHaveLength(1)
   })
 
@@ -32,7 +32,7 @@ describe('PaymentsController', () => {
     })
     const setStatusSpy = jest.spyOn(controller, 'setStatus')
 
-    const result = await controller.getBanks(PaymentMethod.NEQUI)
+    const result = await controller.getBanks(PaymentMethod.PIX)
 
     expect(setStatusSpy).toHaveBeenCalledWith(400)
     expect(result.banks).toHaveLength(0)
@@ -41,8 +41,8 @@ describe('PaymentsController', () => {
   it('returns liquidity from the use case and sets status when failing', async () => {
     paymentUseCase.getLiquidity.mockResolvedValueOnce({ liquidity: 12, message: 'ok', success: true })
 
-    const successResponse = await controller.getLiquidity(PaymentMethod.MOVII)
-    expect(paymentUseCase.getLiquidity).toHaveBeenCalledWith(PaymentMethod.MOVII)
+    const successResponse = await controller.getLiquidity(PaymentMethod.PIX)
+    expect(paymentUseCase.getLiquidity).toHaveBeenCalledWith(PaymentMethod.PIX)
     expect(successResponse.success).toBe(true)
 
     paymentUseCase.getLiquidity.mockResolvedValueOnce({ liquidity: 0, message: 'failure', success: false })
@@ -69,7 +69,7 @@ describe('PaymentsController', () => {
 
     const response = await controller.onboardUser({ account: '12345' })
 
-    expect(paymentUseCase.onboardUser).toHaveBeenCalledWith('12345', PaymentMethod.MOVII)
+    expect(paymentUseCase.onboardUser).toHaveBeenCalledWith('12345', PaymentMethod.BREB)
     expect(response).toEqual({ message: 'ok', success: true })
     expect(setStatusSpy).not.toHaveBeenCalled()
   })
