@@ -49,11 +49,10 @@ describe('QuoteUseCase', () => {
 
   beforeEach(() => {
     prisma.partner.findFirst.mockResolvedValue(sepPartner)
-    prisma.quote.create.mockResolvedValue({
+    prisma.quote.create.mockImplementation(async ({ data }) => ({
       id: 'quote-id',
-      sourceAmount: 101,
-      targetAmount: 100,
-    })
+      ...data,
+    }))
     dbProvider = {
       getClient: jest.fn(async () => prisma as unknown as import('@prisma/client').PrismaClient),
     }
@@ -96,7 +95,7 @@ describe('QuoteUseCase', () => {
       }),
     })
     expect(result.quote_id).toBe('quote-id')
-    expect(result.value).toBe(101)
+    expect(result.value).toBeCloseTo(103.03, 2)
   })
 
   it('throws when exchange rate is invalid', async () => {
@@ -155,11 +154,10 @@ describe('QuoteUseCase', () => {
   })
 
   it('creates reverse quotes and validates max amount', async () => {
-    prisma.quote.create.mockResolvedValueOnce({
+    prisma.quote.create.mockImplementationOnce(async ({ data }) => ({
       id: 'reverse-1',
-      sourceAmount: 50,
-      targetAmount: 25,
-    })
+      ...data,
+    }))
 
     const result = await quoteUseCase.createReverseQuote({
       cryptoCurrency: CryptoCurrency.USDC,
@@ -170,7 +168,7 @@ describe('QuoteUseCase', () => {
     })
 
     expect(result.quote_id).toBe('reverse-1')
-    expect(result.value).toBe(25)
+    expect(result.value).toBe(48)
 
     const restrictiveService = buildPaymentService({ MAX_USER_AMOUNT_PER_TRANSACTION: 1 })
     ;(paymentServiceFactory.getPaymentService as jest.Mock).mockReturnValue(restrictiveService)
@@ -203,5 +201,57 @@ describe('QuoteUseCase', () => {
       sourceAmountInput: 25,
       targetCurrency: TargetCurrency.COP,
     })).rejects.toThrow('Payment method NEQUI is currently unavailable')
+  })
+
+  it('normalizes COP target amounts to whole numbers when creating quotes', async () => {
+    prisma.quote.create.mockImplementationOnce(async ({ data }) => ({
+      id: 'quote-decimal',
+      ...data,
+    }))
+
+    await quoteUseCase.createQuote({
+      amount: 100.6,
+      cryptoCurrency: CryptoCurrency.USDC,
+      network: BlockchainNetwork.STELLAR,
+      partner,
+      paymentMethod: PaymentMethod.MOVII,
+      targetCurrency: TargetCurrency.COP,
+    })
+
+    expect(prisma.quote.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        targetAmount: 101,
+      }),
+    })
+  })
+
+  it('drops fractional digits from COP reverse quotes', async () => {
+    const paymentService = buildPaymentService({ fixedFee: 0 })
+    ;(paymentServiceFactory.getPaymentService as jest.Mock).mockReturnValue(paymentService)
+    ;(exchangeProviderFactory.getExchangeProvider as jest.Mock).mockReturnValue({
+      createMarketOrder: jest.fn(),
+      exchangePercentageFee: 0,
+      getExchangeAddress: jest.fn(),
+      getExchangeRate: jest.fn(async () => 3.789),
+    })
+    prisma.quote.create.mockImplementationOnce(async ({ data }) => ({
+      id: 'reverse-precision',
+      ...data,
+    }))
+
+    const result = await quoteUseCase.createReverseQuote({
+      cryptoCurrency: CryptoCurrency.USDC,
+      network: BlockchainNetwork.STELLAR,
+      paymentMethod: PaymentMethod.NEQUI,
+      sourceAmountInput: 12.34,
+      targetCurrency: TargetCurrency.COP,
+    })
+
+    expect(prisma.quote.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        targetAmount: 3,
+      }),
+    })
+    expect(result.value).toBe(3)
   })
 })

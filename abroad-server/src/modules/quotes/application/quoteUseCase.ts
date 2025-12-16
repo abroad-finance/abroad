@@ -66,10 +66,11 @@ export class QuoteUseCase implements IQuoteUseCase {
   public async createQuote(params: CreateQuoteParams): Promise<QuoteResponse> {
     const { amount, cryptoCurrency, network, partner, paymentMethod, targetCurrency } = params
 
+    const targetAmount = this.normalizeTargetAmount(amount, targetCurrency)
     const expirationDate = this.getExpirationDate()
     const exchangeRateProvider = this.exchangeProviderFactory.getExchangeProvider(targetCurrency)
     const exchangeRate = await exchangeRateProvider.getExchangeRate({
-      sourceCurrency: cryptoCurrency, targetAmount: amount, targetCurrency,
+      sourceCurrency: cryptoCurrency, targetAmount, targetCurrency,
     })
     if (!exchangeRate || isNaN(exchangeRate)) {
       throw new Error('Invalid exchange rate received')
@@ -79,9 +80,9 @@ export class QuoteUseCase implements IQuoteUseCase {
     const paymentService = this.paymentServiceFactory.getPaymentService(paymentMethod)
     this.ensurePaymentServiceIsEnabled(paymentService, paymentMethod)
 
-    this.ensureAmountWithinLimits(amount, paymentService, targetCurrency)
+    this.ensureAmountWithinLimits(targetAmount, paymentService, targetCurrency)
 
-    const sourceAmount = this.calculateSourceAmount(amount, exchangeRateWithFee, paymentService.fixedFee)
+    const sourceAmount = this.calculateSourceAmount(targetAmount, exchangeRateWithFee, paymentService.fixedFee)
 
     const prismaClient = await this.dbClientProvider.getClient()
 
@@ -110,7 +111,7 @@ export class QuoteUseCase implements IQuoteUseCase {
         partnerId: quotePartner.id,
         paymentMethod,
         sourceAmount,
-        targetAmount: amount,
+        targetAmount,
         targetCurrency,
       },
     })
@@ -135,7 +136,12 @@ export class QuoteUseCase implements IQuoteUseCase {
 
     const paymentService = this.paymentServiceFactory.getPaymentService(paymentMethod)
     this.ensurePaymentServiceIsEnabled(paymentService, paymentMethod)
-    const targetAmount = this.calculateTargetAmount(sourceAmountInput, exchangeRateWithFee, paymentService.fixedFee)
+    const targetAmount = this.calculateTargetAmount(
+      sourceAmountInput,
+      exchangeRateWithFee,
+      paymentService.fixedFee,
+      targetCurrency,
+    )
 
     this.ensureAmountWithinLimits(targetAmount, paymentService, targetCurrency)
 
@@ -188,9 +194,14 @@ export class QuoteUseCase implements IQuoteUseCase {
     return Number(result.toFixed(2))
   }
 
-  private calculateTargetAmount(sourceAmount: number, exchangeRate: number, fixedFee: number): number {
+  private calculateTargetAmount(
+    sourceAmount: number,
+    exchangeRate: number,
+    fixedFee: number,
+    targetCurrency: TargetCurrency,
+  ): number {
     const result = sourceAmount / exchangeRate - fixedFee
-    return Number(result.toFixed(2))
+    return this.normalizeTargetAmount(result, targetCurrency)
   }
 
   private ensureAmountWithinLimits(amount: number, paymentService: IPaymentService, targetCurrency: TargetCurrency): void {
@@ -206,6 +217,20 @@ export class QuoteUseCase implements IQuoteUseCase {
   private ensurePaymentServiceIsEnabled(paymentService: IPaymentService, paymentMethod: PaymentMethod): void {
     if (!paymentService.isEnabled) {
       throw new Error(`Payment method ${paymentMethod} is currently unavailable`)
+    }
+  }
+
+  private normalizeTargetAmount(amount: number, targetCurrency: TargetCurrency): number {
+    const fractionDigits = this.getFractionDigitsForCurrency(targetCurrency)
+    return Number(amount.toFixed(fractionDigits))
+  }
+
+  private getFractionDigitsForCurrency(targetCurrency: TargetCurrency): number {
+    switch (targetCurrency) {
+      case TargetCurrency.COP:
+        return 0
+      default:
+        return 2
     }
   }
 
