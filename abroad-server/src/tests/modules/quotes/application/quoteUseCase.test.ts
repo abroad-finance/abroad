@@ -254,4 +254,82 @@ describe('QuoteUseCase', () => {
     })
     expect(result.value).toBe(3)
   })
+
+  it('surfaces invalid exchange rates on reverse quotes', async () => {
+    ;(exchangeProviderFactory.getExchangeProvider as jest.Mock).mockReturnValue({
+      createMarketOrder: jest.fn(),
+      exchangePercentageFee: 0.01,
+      getExchangeAddress: jest.fn(),
+      getExchangeRate: jest.fn(async () => undefined),
+    })
+
+    await expect(quoteUseCase.createReverseQuote({
+      cryptoCurrency: CryptoCurrency.USDC,
+      network: BlockchainNetwork.STELLAR,
+      paymentMethod: PaymentMethod.BREB,
+      sourceAmountInput: 10,
+      targetCurrency: TargetCurrency.COP,
+    })).rejects.toThrow('Invalid exchange rate received')
+  })
+
+  it('prefers provided partners over SEP configuration when reversing quotes', async () => {
+    prisma.quote.create.mockImplementationOnce(async ({ data }) => ({ id: 'partnered-reverse', ...data }))
+
+    const response = await quoteUseCase.createReverseQuote({
+      cryptoCurrency: CryptoCurrency.USDC,
+      network: BlockchainNetwork.STELLAR,
+      partner,
+      paymentMethod: PaymentMethod.BREB,
+      sourceAmountInput: 80,
+      targetCurrency: TargetCurrency.BRL,
+    })
+
+    expect(prisma.quote.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ partnerId: partner.id, targetCurrency: TargetCurrency.BRL }),
+    })
+    expect(response.quote_id).toBe('partnered-reverse')
+  })
+
+  it('requires configured partners when reversing quotes with SEP unavailable', async () => {
+    prisma.partner.findFirst.mockResolvedValueOnce(null)
+
+    await expect(quoteUseCase.createReverseQuote({
+      cryptoCurrency: CryptoCurrency.USDC,
+      network: BlockchainNetwork.STELLAR,
+      paymentMethod: PaymentMethod.PIX,
+      sourceAmountInput: 25,
+      targetCurrency: TargetCurrency.BRL,
+    })).rejects.toThrow('No partner information available for quote creation')
+  })
+
+  it('keeps two decimal places for BRL target amounts', async () => {
+    prisma.quote.create.mockImplementationOnce(async ({ data }) => ({ id: 'brl-quote', ...data }))
+
+    await quoteUseCase.createQuote({
+      amount: 123.456,
+      cryptoCurrency: CryptoCurrency.USDC,
+      network: BlockchainNetwork.STELLAR,
+      partner,
+      paymentMethod: PaymentMethod.PIX,
+      targetCurrency: TargetCurrency.BRL,
+    })
+
+    expect(prisma.quote.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ targetAmount: 123.46, targetCurrency: TargetCurrency.BRL }),
+    })
+  })
+
+  it('falls back to default fraction digits for unexpected currencies', async () => {
+    const normalizeTargetAmount = (quoteUseCase as unknown as {
+      normalizeTargetAmount: (amount: number, targetCurrency: TargetCurrency) => number
+    }).normalizeTargetAmount
+
+    const normalized = normalizeTargetAmount.call(
+      quoteUseCase,
+      42.987,
+      'USD' as unknown as TargetCurrency,
+    )
+
+    expect(normalized).toBe(42.99)
+  })
 })
