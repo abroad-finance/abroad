@@ -40,15 +40,21 @@ export class StellarReconciliationService {
 
   public async reconcile(): Promise<CheckUnprocessedStellarResponse> {
     const prismaClient = await this.prismaProvider.getClient()
-    const startPagingToken = await this.getStartPagingToken(prismaClient)
+    const storedPagingToken = await this.getStartPagingToken(prismaClient)
 
-    if (!startPagingToken) {
+    if (!storedPagingToken) {
       this.logger.warn('[PublicTransactionsController] No Stellar listener cursor found; skipping reconciliation run')
       return this.buildEmptySummary()
     }
 
     const { accountId, horizonUrl, usdcIssuer } = await this.getStellarSecrets()
     const server = new Horizon.Server(horizonUrl)
+    const startPagingToken = await this.rewindPagingToken(
+      server,
+      accountId,
+      storedPagingToken,
+      this.getLookbackPages(),
+    )
 
     const summary = await this.reconcileStellarPayments({
       accountId,
@@ -58,7 +64,7 @@ export class StellarReconciliationService {
       usdcIssuer,
     })
 
-    await this.persistPagingToken(prismaClient, startPagingToken, summary.endPagingToken)
+    await this.persistPagingToken(prismaClient, storedPagingToken, summary.endPagingToken)
 
     return summary
   }
@@ -126,6 +132,23 @@ export class StellarReconciliationService {
 
     const page = await request.call()
     return page.records as Horizon.ServerApi.PaymentOperationRecord[]
+  }
+
+  private getLookbackPages(): number {
+    const envValue = process.env.STELLAR_RECONCILIATION_LOOKBACK_PAGES
+    if (!envValue) {
+      return 1
+    }
+
+    const parsed = Number.parseInt(envValue, 10)
+    if (Number.isNaN(parsed) || parsed < 0) {
+      this.logger.warn('[PublicTransactionsController] Invalid STELLAR_RECONCILIATION_LOOKBACK_PAGES value; defaulting to 1', {
+        envValue,
+      })
+      return 1
+    }
+
+    return parsed
   }
 
   private async getStartPagingToken(prismaClient: PrismaClient): Promise<null | string> {
@@ -297,5 +320,55 @@ export class StellarReconciliationService {
     }
 
     return summary
+  }
+
+  private async rewindPagingToken(
+    server: Horizon.Server,
+    accountId: string,
+    currentPagingToken: string,
+    lookbackPages: number,
+  ): Promise<string> {
+    if (lookbackPages <= 0) {
+      return currentPagingToken
+    }
+
+    let cursor: null | string = currentPagingToken
+    let earliestSeenToken = currentPagingToken
+
+    for (let pageIndex = 0; pageIndex < lookbackPages; pageIndex += 1) {
+      const page = await server
+        .payments()
+        .forAccount(accountId)
+        .order('desc')
+        .cursor(cursor)
+        .limit(STELLAR_PAGE_SIZE)
+        .call()
+
+      const records = page.records as Horizon.ServerApi.PaymentOperationRecord[]
+      if (records.length === 0) {
+        break
+      }
+
+      const oldestRecordOnPage = records[records.length - 1]
+      earliestSeenToken = oldestRecordOnPage?.paging_token ?? earliestSeenToken
+
+      const hasReachedOldestSeen = oldestRecordOnPage?.paging_token === cursor
+      if (records.length < STELLAR_PAGE_SIZE || hasReachedOldestSeen) {
+        break
+      }
+
+      cursor = oldestRecordOnPage?.paging_token ?? null
+    }
+
+    if (earliestSeenToken !== currentPagingToken) {
+      this.logger.info('[PublicTransactionsController] Rewound Stellar reconciliation cursor', {
+        currentPagingToken,
+        effectivePagingToken: earliestSeenToken,
+        lookbackPages,
+        pageSize: STELLAR_PAGE_SIZE,
+      })
+    }
+
+    return earliestSeenToken
   }
 }
