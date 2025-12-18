@@ -16,7 +16,6 @@ import type { ISecretManager } from '../../../../platform/secrets/ISecretManager
 import { QuoteUseCase } from '../../../../modules/quotes/application/quoteUseCase'
 
 const buildPaymentService = (overrides?: Partial<IPaymentService>): IPaymentService => ({
-  banks: [],
   currency: TargetCurrency.COP,
   fixedFee: 1,
   getLiquidity: async () => 0,

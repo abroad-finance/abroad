@@ -18,7 +18,6 @@ type PrismaLike = {
 const buildPaymentService = (
   overrides?: Partial<jest.Mocked<IPaymentService>>,
 ): jest.Mocked<IPaymentService> => ({
-  banks: [{ bankCode: 101, bankName: 'Mock Bank' }],
   currency: TargetCurrency.COP,
   fixedFee: 0,
   getLiquidity: jest.fn(async () => 75),
@@ -59,23 +58,14 @@ const buildUseCase = ({
 }
 
 describe('PaymentUseCase', () => {
-  it('returns banks for the resolved payment service', () => {
-    const { paymentService, paymentServiceFactory, useCase } = buildUseCase()
-
-    const result = useCase.getBanks(PaymentMethod.BREB)
-
-    expect(paymentServiceFactory.getPaymentService).toHaveBeenCalledWith(PaymentMethod.BREB)
-    expect(result).toEqual({ banks: paymentService.banks })
-  })
-
-  it('throws when the payment service is disabled', () => {
+  it('rejects when the payment service is disabled', async () => {
     const paymentService = buildPaymentService({ isEnabled: false })
     const { useCase } = buildUseCase({
       paymentService,
       paymentServiceFactory: { getPaymentService: jest.fn<IPaymentService, [PaymentMethod]>(() => paymentService) } as jest.Mocked<IPaymentServiceFactory>,
     })
 
-    expect(() => useCase.getBanks(PaymentMethod.BREB)).toThrow(/unavailable/i)
+    await expect(useCase.getLiquidity(PaymentMethod.BREB)).rejects.toThrow(/unavailable/i)
   })
 
   it('returns cached liquidity without invoking the payment provider', async () => {

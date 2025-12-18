@@ -7,7 +7,6 @@ import { PaymentServiceFactory } from '../../../../modules/payments/application/
 import { ExchangeProviderFactory } from '../../../../modules/treasury/application/ExchangeProviderFactory'
 
 const buildPaymentService = (label: string): IPaymentService => ({
-  banks: [],
   currency: TargetCurrency.COP,
   fixedFee: 0,
   getLiquidity: async () => 0,

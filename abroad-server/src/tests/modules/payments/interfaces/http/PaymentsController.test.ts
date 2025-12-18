@@ -11,31 +11,11 @@ describe('PaymentsController', () => {
 
   beforeEach(() => {
     paymentUseCase = {
-      getBanks: jest.fn(() => ({ banks: [{ bankCode: 101, bankName: 'Mock Bank' }] })),
       getLiquidity: jest.fn(async () => ({ liquidity: 75, message: 'ok', success: true })),
       onboardUser: jest.fn(async (account: string) => ({ message: `onboard:${account}`, success: true })),
     }
 
     controller = new PaymentsController(paymentUseCase)
-  })
-
-  it('returns banks from the payment use case', async () => {
-    const result = await controller.getBanks(PaymentMethod.BREB)
-
-    expect(paymentUseCase.getBanks).toHaveBeenCalledWith(PaymentMethod.BREB)
-    expect(result.banks).toHaveLength(1)
-  })
-
-  it('returns an empty list and sets status 400 when fetching banks fails', async () => {
-    paymentUseCase.getBanks.mockImplementation(() => {
-      throw new Error('failure')
-    })
-    const setStatusSpy = jest.spyOn(controller, 'setStatus')
-
-    const result = await controller.getBanks(PaymentMethod.PIX)
-
-    expect(setStatusSpy).toHaveBeenCalledWith(400)
-    expect(result.banks).toHaveLength(0)
   })
 
   it('returns liquidity from the use case and sets status when failing', async () => {

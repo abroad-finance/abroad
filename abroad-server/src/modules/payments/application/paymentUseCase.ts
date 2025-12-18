@@ -8,12 +8,7 @@ import { IPaymentService } from './contracts/IPaymentService'
 import { IPaymentServiceFactory } from './contracts/IPaymentServiceFactory'
 import { assertSupportedPaymentMethod, DEFAULT_PAYMENT_METHOD, SupportedPaymentMethod } from './supportedPaymentMethods'
 
-export interface BanksResult {
-  banks: BankSummary[]
-}
-
 export interface IPaymentUseCase {
-  getBanks(paymentMethod?: SupportedPaymentMethod): BanksResult
   getLiquidity(paymentMethod?: SupportedPaymentMethod): Promise<LiquidityResult>
   onboardUser(account: string, paymentMethod?: SupportedPaymentMethod): Promise<OnboardResult>
 }
@@ -29,11 +24,6 @@ export interface OnboardResult {
   success: boolean
 }
 
-type BankSummary = {
-  bankCode: number
-  bankName: string
-}
-
 @injectable()
 export class PaymentUseCase implements IPaymentUseCase {
   private readonly successMessage = 'Liquidity retrieved successfully'
@@ -46,11 +36,6 @@ export class PaymentUseCase implements IPaymentUseCase {
     @inject(TYPES.ILogger)
     private readonly logger: ILogger,
   ) { }
-
-  public getBanks(paymentMethod?: SupportedPaymentMethod): BanksResult {
-    const { service } = this.resolvePaymentService(paymentMethod)
-    return { banks: service.banks }
-  }
 
   public async getLiquidity(paymentMethod?: SupportedPaymentMethod): Promise<LiquidityResult> {
     const { method, service } = this.resolvePaymentService(paymentMethod)

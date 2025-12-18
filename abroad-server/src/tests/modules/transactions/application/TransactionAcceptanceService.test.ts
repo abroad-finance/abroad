@@ -22,7 +22,6 @@ const kycService = {
 }
 
 const paymentService = {
-  banks: [],
   currency: TargetCurrency.COP,
   fixedFee: 0,
   getLiquidity: jest.fn(async () => 0),
@@ -278,8 +277,8 @@ describe('TransactionAcceptanceService helpers', () => {
       createTransaction: (
         prisma: {
           transaction: {
-            create: jest.Mock<Promise<{ id: string }>, [Record<string, unknown>]>,
-            findUnique: jest.Mock<Promise<{ id: string, partnerUser: { partner: object }, quote: object } | null>, [Record<string, unknown>?]>,
+            create: jest.Mock<Promise<{ id: string }>, [Record<string, unknown>]>
+            findUnique: jest.Mock<Promise<null | { id: string, partnerUser: { partner: object }, quote: object }>, [Record<string, unknown>?]>
           }
         },
         input: {
@@ -294,17 +293,21 @@ describe('TransactionAcceptanceService helpers', () => {
           taxId?: string
           userId: string
         },
-      ) => Promise<{ id: string | null, kycLink: string | null, transactionReference: string | null }>
+      ) => Promise<{ id: null | string, kycLink: null | string, transactionReference: null | string }>
     }).createTransaction
 
     const prismaClient = {
       transaction: {
-        create: jest.fn(async (_data: Record<string, unknown>) => ({ id: 'tx-abc' })),
-        findUnique: jest.fn(async (_query?: Record<string, unknown>) => ({
-          id: 'tx-abc',
-          partnerUser: { partner: {} },
-          quote: {},
-        })),
+        create: jest.fn<Promise<{ id: string }>, [Record<string, unknown>]>(
+          async () => ({ id: 'tx-abc' }),
+        ),
+        findUnique: jest.fn<Promise<null | { id: string, partnerUser: { partner: object }, quote: object }>, [Record<string, unknown>?]>(
+          async () => ({
+            id: 'tx-abc',
+            partnerUser: { partner: {} },
+            quote: {},
+          }),
+        ),
       },
     }
     const response = await createTransaction.call(
@@ -342,7 +345,9 @@ describe('TransactionAcceptanceService helpers', () => {
 
     const prismaClient = {
       transaction: {
-        findUnique: jest.fn(async (_query?: Record<string, unknown>) => null),
+        findUnique: jest.fn<Promise<null>, [Record<string, unknown>?]>(
+          async () => null,
+        ),
       },
     }
 

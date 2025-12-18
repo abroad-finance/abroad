@@ -15,11 +15,8 @@ import {
 } from 'tsoa'
 
 import { TYPES } from '../../../../app/container/types'
-import { BanksResult, IPaymentUseCase, LiquidityResult, OnboardResult } from '../../application/paymentUseCase'
+import { IPaymentUseCase, LiquidityResult, OnboardResult } from '../../application/paymentUseCase'
 import { DEFAULT_PAYMENT_METHOD, SupportedPaymentMethod } from '../../application/supportedPaymentMethods'
-
-// Define the response for the banks list endpoint
-type BanksResponse = BanksResult
 
 // Define the response for the liquidity endpoint
 type LiquidityResponse = LiquidityResult
@@ -41,25 +38,6 @@ export class PaymentsController extends Controller {
     private readonly paymentUseCase: IPaymentUseCase,
   ) {
     super()
-  }
-
-  /**
-   * Lists all banks available for a specific payment method.
-   *
-   * @param paymentMethod - The payment method to get banks for (BREB, PIX)
-   * @returns List of banks supported by the payment method
-   */
-  @Get('banks')
-  @Response('400', 'Bad Request')
-  @SuccessResponse('200', 'Banks retrieved successfully')
-  public async getBanks(@Query() paymentMethod?: SupportedPaymentMethod): Promise<BanksResponse> {
-    try {
-      return this.paymentUseCase.getBanks(paymentMethod)
-    }
-    catch {
-      this.setStatus(400)
-      return { banks: [] }
-    }
   }
 
   /**

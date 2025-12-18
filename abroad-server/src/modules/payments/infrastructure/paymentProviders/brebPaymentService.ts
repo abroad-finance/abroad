@@ -98,7 +98,6 @@ interface BrebTransactionStatusInfo {
 
 @injectable()
 export class BrebPaymentService implements IPaymentService {
-  public readonly banks = []
   public readonly currency = TargetCurrency.COP
   public readonly fixedFee = 0
 

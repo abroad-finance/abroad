@@ -107,7 +107,6 @@ const buildTransaction = (overrides: TransactionOverrides = {}): TransactionReco
 }
 
 const createPaymentService = (overrides: Partial<PaymentServiceMock> = {}): PaymentServiceMock => ({
-  banks: [],
   currency: TargetCurrency.COP,
   fixedFee: 0,
   getLiquidity: jest.fn(async () => 0),

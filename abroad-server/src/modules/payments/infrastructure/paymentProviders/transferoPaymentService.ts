@@ -38,7 +38,6 @@ type TransferoPayment = {
 
 @injectable()
 export class TransferoPaymentService implements IPaymentService {
-  public readonly banks: IPaymentService['banks'] = []
   public readonly currency: TargetCurrency = TargetCurrency.BRL
   public readonly fixedFee = 0.0
   public readonly isAsync = true

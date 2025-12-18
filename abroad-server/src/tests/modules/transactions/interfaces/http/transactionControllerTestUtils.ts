@@ -19,7 +19,6 @@ export const createBadRequestResponder = () =>
 export const authRequest = (partnerId: string) => ({ user: { id: partnerId } } as unknown as import('express').Request)
 
 export const buildPaymentService = (overrides?: Partial<jest.Mocked<IPaymentService>>): jest.Mocked<IPaymentService> => ({
-  banks: [],
   currency: TargetCurrency.COP,
   fixedFee: 0,
   getLiquidity: jest.fn(async () => 1_000),
