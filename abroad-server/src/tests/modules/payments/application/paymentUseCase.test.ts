@@ -31,7 +31,7 @@ const buildPaymentService = (
   onboardUser: jest.fn(async ({ account }: { account: string }) => ({ message: `ok:${account}`, success: true })),
   percentageFee: 0,
   sendPayment: jest.fn(),
-  verifyAccount: jest.fn(async ({ account, bankCode }: { account: string, bankCode: string }) => Boolean(account && bankCode)),
+  verifyAccount: jest.fn(async ({ account }: { account: string }) => Boolean(account)),
   ...(overrides ?? {}),
 })
 

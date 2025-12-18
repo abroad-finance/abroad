@@ -142,7 +142,6 @@ export class TransferoPaymentService implements IPaymentService {
     value,
   }: {
     account: string
-    bankCode: string
     id: string
     qrCode?: null | string
     value: number
@@ -178,8 +177,8 @@ export class TransferoPaymentService implements IPaymentService {
     }
   }
 
-  public verifyAccount(): Promise<boolean> {
-    return Promise.resolve(true)
+  public verifyAccount({ account }: { account: string }): Promise<boolean> {
+    return Promise.resolve(Boolean(account))
   }
 
   private async buildContract({

@@ -133,7 +133,6 @@ describe('PaymentStatusUpdatedController', () => {
     }
     prisma.transaction.update.mockResolvedValue({
       accountNumber: 'account-123',
-      bankCode: 'bank-xyz',
       externalId: 'txn-1',
       id: 'txn-1',
       onChainId: 'on-chain-1',
@@ -199,7 +198,6 @@ describe('PaymentStatusUpdatedController', () => {
     }
     prisma.transaction.update.mockResolvedValue({
       accountNumber: 'account-123',
-      bankCode: 'bank-xyz',
       externalId: 'txn-2',
       id: 'txn-2',
       onChainId: 'hash-1',

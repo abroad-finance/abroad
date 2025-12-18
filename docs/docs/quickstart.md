@@ -31,7 +31,7 @@ You will need an API key to proceed. If you don't have one, please contact [supp
 
 ## 1) Create a quote (target payout)
 
-Ask for how much crypto you need to send to deliver a specific local amount. In this example the recipient should get **400,000 COP** via **Nequi**.
+Ask for how much crypto you need to send to deliver a specific local amount. In this example the recipient should get **400,000 COP** via **BreB**.
 
 <Tabs>
 <TabItem value="request" label="Request">
@@ -44,7 +44,7 @@ curl -X POST https://api.abroad.finance/quote \
     "amount": 400000,
     "crypto_currency": "USDC",
     "network": "STELLAR",
-    "payment_method": "NEQUI",
+    "payment_method": "BREB",
     "target_currency": "COP"
   }'
 ```
@@ -82,7 +82,7 @@ curl -X POST https://api.abroad.finance/transaction \
     "quote_id": "550e8400-e29b-41d4-a716-446655440000",
     "user_id": "test-user-01",
     "account_number": "3001234567",
-    "bank_code": "NEQUI"
+    "bank_code": "9101"
   }'
 ```
 
@@ -104,7 +104,7 @@ curl -X POST https://api.abroad.finance/transaction \
 If `kycLink` is not `null`, you **must** redirect the user to that URL to complete identity verification before the transaction can proceed.
 :::
 
-**Bank code note:** `bank_code` is mandatory only for `MOVII`. For `NEQUI`, `BREB`, and `PIX`, you may omit it or provide the suggested rail/bank identifier if available.
+**Bank code note:** `bank_code` is optional for supported methods. Include it only if a specific rail or bank identifier is required for the payout.
 
 ## 3) Send funds on-chain
 

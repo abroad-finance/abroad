@@ -9,27 +9,6 @@ import { ILogger } from '../../../../core/logging/types'
 import { ISecretManager } from '../../../../platform/secrets/ISecretManager'
 import { IExchangeProvider } from '../../application/contracts/IExchangeProvider'
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-interface Account {
-  accountId: string
-  bankAccount: null
-  bankBeneficiaryName: null
-  bankBeneficiaryTaxId: null
-  bankBeneficiaryTaxIdCountry: number
-  bankBranch: null
-  bankName: null
-  currency: string
-  depositAddress: Record<string, string>
-  feeBankReconciliation: number
-  feeFlat: number
-  feePayIn: number
-  feePayOut: number
-  isPixPaymentEnable: boolean
-  label: string
-  pixKeys: null
-  wallet: string[]
-}
-
 @injectable()
 export class TransferoExchangeProvider implements IExchangeProvider {
   readonly exchangePercentageFee = 0.001

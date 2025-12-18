@@ -14,7 +14,7 @@ describe('TransactionController minimal branches', () => {
     const { controller } = buildMinimalController()
 
     const response = await controller.acceptTransaction(
-      { account_number: '', bank_code: '', quote_id: '', user_id: '' },
+      { account_number: '', quote_id: '', user_id: '' },
       authRequest('partner-1'),
       badRequest,
     )

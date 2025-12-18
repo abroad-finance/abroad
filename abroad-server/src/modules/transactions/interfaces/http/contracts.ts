@@ -3,7 +3,6 @@ import { z } from 'zod'
 
 export const acceptTransactionRequestSchema = z.object({
   account_number: z.string().min(1, 'Account number is required'),
-  bank_code: z.string().optional(),
   qr_code: z.string().nullable().optional(),
   quote_id: z.string().min(1, 'Quote ID is required'),
   redirectUrl: z.string().optional(),
@@ -13,7 +12,6 @@ export const acceptTransactionRequestSchema = z.object({
 
 export interface AcceptTransactionRequest {
   account_number: string
-  bank_code?: string
   qr_code?: null | string
   quote_id: string
   redirectUrl?: string

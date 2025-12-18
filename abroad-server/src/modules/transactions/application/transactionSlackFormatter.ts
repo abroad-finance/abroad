@@ -45,7 +45,6 @@ export const buildTransactionSlackMessage = (
     `Payment: ${transaction.quote.paymentMethod}`,
     `Network: ${transaction.quote.network}`,
     transaction.accountNumber ? `Account: ${transaction.accountNumber}` : null,
-    transaction.bankCode ? `Bank: ${transaction.bankCode}` : null,
   ])
   const references = joinSegments([
     transaction.externalId ? `External: ${transaction.externalId}` : null,

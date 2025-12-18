@@ -84,7 +84,6 @@ jest.mock('@solana/spl-token', () => {
 
 export type TransactionRecord = {
   accountNumber: string
-  bankCode: string
   id: string
   onChainId?: string
   partnerUser: { partner: { webhookUrl: string } }
@@ -118,7 +117,6 @@ export const buildTransaction = (overrides?: Partial<TransactionRecord>): Transa
 
   return {
     accountNumber: 'acc',
-    bankCode: 'bank',
     id: transactionId,
     onChainId: undefined,
     partnerUser: { partner: { webhookUrl: 'http://webhook' } },

@@ -22,7 +22,6 @@ describe('SolanaPaymentsController notifyPayment execution', () => {
 
     prismaClient.transaction.findUnique.mockResolvedValueOnce({
       accountNumber: 'acc',
-      bankCode: 'bank',
       id: transactionId,
       partnerUser: { partner: { webhookUrl: 'http://webhook' } },
       quote: {
@@ -60,7 +59,6 @@ describe('SolanaPaymentsController notifyPayment execution', () => {
     const { badRequest, controller, prismaClient } = createControllerContext()
     prismaClient.transaction.findUnique.mockResolvedValueOnce({
       accountNumber: 'acc',
-      bankCode: 'bank',
       id: transactionId,
       partnerUser: { partner: { webhookUrl: 'http://webhook' } },
       quote: {
@@ -93,7 +91,6 @@ describe('SolanaPaymentsController notifyPayment execution', () => {
     const { badRequest, controller, prismaClient } = createControllerContext()
     prismaClient.transaction.findUnique.mockResolvedValue({
       accountNumber: 'acc',
-      bankCode: 'bank',
       id: transactionId,
       partnerUser: { partner: { webhookUrl: 'http://webhook' } },
       quote: {
@@ -141,7 +138,6 @@ describe('SolanaPaymentsController notifyPayment execution', () => {
     const { badRequest, controller, prismaClient, queueHandler } = createControllerContext()
     prismaClient.transaction.findUnique.mockResolvedValueOnce({
       accountNumber: 'acc',
-      bankCode: 'bank',
       id: transactionId,
       partnerUser: { partner: { webhookUrl: 'http://webhook' } },
       quote: {

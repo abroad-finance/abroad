@@ -131,7 +131,6 @@ describe('TransactionAcceptanceService helpers', () => {
     const quoteId = 'quote-id'
     const request = {
       accountNumber: '123',
-      bankCode: '001',
       quoteId,
       userId: 'user-id',
     }
@@ -258,21 +257,20 @@ describe('TransactionAcceptanceService helpers', () => {
     )).rejects.toThrow('This transaction would exceed your daily limit for this payment method. Lower the amount or try again tomorrow.')
   })
 
-  it('rejects invalid bank data when verifying accounts', async () => {
+  it('rejects invalid account data when verifying accounts', async () => {
     const ensureAccountIsValid = (service as unknown as {
       ensureAccountIsValid: (
         paymentSvc: typeof paymentService,
         accountNumber: string,
-        bankCode: string | undefined,
       ) => Promise<void>
     }).ensureAccountIsValid
     const rejectingService = { ...paymentService, verifyAccount: jest.fn(async () => false) }
 
-    await expect(ensureAccountIsValid(rejectingService, '123', undefined))
-      .rejects.toThrow('We could not verify the account number and bank code provided. Please double-check the details and try again.')
+    await expect(ensureAccountIsValid(rejectingService, '123'))
+      .rejects.toThrow('We could not verify the account number provided. Please double-check the details and try again.')
   })
 
-  it('creates transactions with optional bank codes and notifies subscribers', async () => {
+  it('creates transactions and notifies subscribers', async () => {
     const createTransaction = (service as unknown as {
       createTransaction: (
         prisma: {
@@ -283,7 +281,6 @@ describe('TransactionAcceptanceService helpers', () => {
         },
         input: {
           accountNumber: string
-          bankCode?: string
           partner: { webhookUrl: string }
           partnerUserId: string
           paymentMethod: PaymentMethod
@@ -326,9 +323,9 @@ describe('TransactionAcceptanceService helpers', () => {
       },
     )
 
-    expect(prismaClient.transaction.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({ bankCode: '' }),
-    })
+    const createArgs = prismaClient.transaction.create.mock.calls[0]?.[0] as { data?: Record<string, unknown> }
+    expect(createArgs?.data).toBeDefined()
+    expect(createArgs?.data).not.toHaveProperty('bankCode')
     expect(webhookNotifier.notifyWebhook).toHaveBeenCalledWith('https://webhook.test', expect.any(Object))
     expect(queueHandler.postMessage).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ type: 'transaction.created' }))
     expect(response.transactionReference).toBeDefined()

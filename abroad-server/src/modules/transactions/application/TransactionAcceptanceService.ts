@@ -11,10 +11,10 @@ import { IDatabaseClientProvider } from '../../../platform/persistence/IDatabase
 import { IKycService } from '../../kyc/application/contracts/IKycService'
 import { IPaymentServiceFactory } from '../../payments/application/contracts/IPaymentServiceFactory'
 import { uuidToBase64 } from '../infrastructure/transactionEncoding'
+import { toWebhookTransactionPayload } from './transactionPayload'
 
 interface AcceptTransactionRequest {
   accountNumber: string
-  bankCode?: string
   qrCode?: null | string
   quoteId: string
   redirectUrl?: string
@@ -62,7 +62,7 @@ export class TransactionAcceptanceService {
     this.assertPaymentServiceIsEnabled(paymentService, quote.paymentMethod)
 
     this.enforceTransactionAmountBounds(quote, paymentService, quote.paymentMethod)
-    await this.ensureAccountIsValid(paymentService, request.accountNumber, request.bankCode)
+    await this.ensureAccountIsValid(paymentService, request.accountNumber)
 
     const partnerUser = await prismaClient.partnerUser.upsert({
       create: {
@@ -96,7 +96,6 @@ export class TransactionAcceptanceService {
 
     return this.createTransaction(prismaClient, {
       accountNumber: request.accountNumber,
-      bankCode: request.bankCode,
       partner,
       partnerUserId: partnerUser.id,
       paymentMethod: quote.paymentMethod,
@@ -140,7 +139,6 @@ export class TransactionAcceptanceService {
     prismaClient: Awaited<ReturnType<IDatabaseClientProvider['getClient']>>,
     input: {
       accountNumber: string
-      bankCode?: string
       partner: PartnerUserContext
       partnerUserId: string
       paymentMethod: PaymentMethod
@@ -155,7 +153,6 @@ export class TransactionAcceptanceService {
       const transaction = await prismaClient.transaction.create({
         data: {
           accountNumber: input.accountNumber,
-          bankCode: input.bankCode ?? '',
           partnerUserId: input.partnerUserId,
           qrCode: input.qrCode,
           quoteId: input.quoteId,
@@ -163,7 +160,8 @@ export class TransactionAcceptanceService {
           taxId: input.taxId,
         },
       })
-      await this.webhookNotifier.notifyWebhook(input.partner.webhookUrl, { data: transaction, event: WebhookEvent.TRANSACTION_CREATED })
+      const webhookPayload = toWebhookTransactionPayload(transaction)
+      await this.webhookNotifier.notifyWebhook(input.partner.webhookUrl, { data: webhookPayload, event: WebhookEvent.TRANSACTION_CREATED })
 
       await this.publishUserNotification(prismaClient, transaction.id, input.userId)
 
@@ -293,11 +291,10 @@ export class TransactionAcceptanceService {
   private async ensureAccountIsValid(
     paymentService: ReturnType<IPaymentServiceFactory['getPaymentService']>,
     accountNumber: string,
-    bankCode: string | undefined,
   ) {
-    const isAccountValid = await paymentService.verifyAccount({ account: accountNumber, bankCode: bankCode ?? '' })
+    const isAccountValid = await paymentService.verifyAccount({ account: accountNumber })
     if (!isAccountValid) {
-      throw new TransactionValidationError('We could not verify the account number and bank code provided. Please double-check the details and try again.')
+      throw new TransactionValidationError('We could not verify the account number provided. Please double-check the details and try again.')
     }
   }
 
@@ -336,7 +333,7 @@ export class TransactionAcceptanceService {
       })
 
       await this.queueHandler.postMessage(QueueName.USER_NOTIFICATION, {
-        payload: JSON.stringify(full ?? { id: transactionId }),
+        payload: JSON.stringify(full ? toWebhookTransactionPayload(full) : { id: transactionId }),
         type: 'transaction.created',
         userId,
       })

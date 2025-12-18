@@ -30,7 +30,6 @@ export interface IPaymentService {
 
   sendPayment(params: {
     account: string
-    bankCode: string
     id: string
     qrCode?: null | string
     value: number
@@ -46,9 +45,7 @@ export interface IPaymentService {
 
   verifyAccount({
     account,
-    bankCode,
   }: {
     account: string
-    bankCode: string
   }): Promise<boolean>
 }

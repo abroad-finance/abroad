@@ -23,7 +23,7 @@ Abroad sends JSON webhooks to notify your application about transaction lifecycl
     "status": "PROCESSING_PAYMENT",
     "quoteId": "550e8400-e29b-41d4-a716-446655440000",
     "accountNumber": "3001234567",
-    "bankCode": "NEQUI",
+    "bankCode": "9101",
     "onChainId": "2bebb7...",
     "refundOnChainId": null,
     "taxId": "123456789",

@@ -19,12 +19,25 @@ import {
 import { TYPES } from '../../../../app/container/types'
 import { IDatabaseClientProvider } from '../../../../platform/persistence/IDatabaseClientProvider'
 import { IPartnerService } from '../../../partners/application/contracts/IPartnerService'
+import { toWebhookTransactionPayload } from '../../application/transactionPayload'
 
 interface PaginatedTransactionList {
   page: number
   pageSize: number
   total: number
-  transactions: Array<Transaction & { quote: { cryptoCurrency: string, id: string, network: string, paymentMethod: string, sourceAmount: number, targetAmount: number, targetCurrency: TargetCurrency } }>
+  transactions: TransactionListItem[]
+}
+
+type TransactionListItem = Omit<Transaction, 'bankCode'> & {
+  quote: {
+    cryptoCurrency: string
+    id: string
+    network: string
+    paymentMethod: string
+    sourceAmount: number
+    targetAmount: number
+    targetCurrency: TargetCurrency
+  }
 }
 
 @Route('transactions')
@@ -70,7 +83,8 @@ export class TransactionsController extends Controller {
       }),
       prismaClient.transaction.count({ where: whereClause }),
     ])
-    return { page, pageSize, total, transactions }
+    const sanitizedTransactions = transactions.map(transaction => toWebhookTransactionPayload(transaction))
+    return { page, pageSize, total, transactions: sanitizedTransactions }
   }
 
   /**
@@ -101,6 +115,7 @@ export class TransactionsController extends Controller {
       }),
       prismaClient.transaction.count({ where: { partnerUser: { partnerId: partner.id, userId: externalUserId } } }),
     ])
-    return { page, pageSize, total, transactions }
+    const sanitizedTransactions = transactions.map(transaction => toWebhookTransactionPayload(transaction))
+    return { page, pageSize, total, transactions: sanitizedTransactions }
   }
 }

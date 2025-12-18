@@ -82,7 +82,7 @@ describe('transactionSlackFormatter', () => {
     expect(message).toContain(`Quote: ${transaction.quote.id}`)
     expect(message).toContain(`Partner: ${transaction.partnerUser.partner.name} (${transaction.partnerUser.partner.id})`)
     expect(message).toContain('Amounts: 10 USDC -> 20 COP')
-    expect(message).toContain('Payment: BREB | Network: STELLAR | Account: 123456789 | Bank: bank-1')
+    expect(message).toContain('Payment: BREB | Network: STELLAR | Account: 123456789')
     expect(message).toContain('References: External: external-1 | On-chain: on-chain-1 | Refund: refund-1')
     expect(message).toContain('Notes: provider: transfero | providerAmount: 10 | providerStatus: processed')
   })
@@ -90,7 +90,6 @@ describe('transactionSlackFormatter', () => {
   it('omits optional sections when data is absent', () => {
     const transaction = buildTransaction({
       accountNumber: '',
-      bankCode: '',
       externalId: null,
       onChainId: null,
       refundOnChainId: null,

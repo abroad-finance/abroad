@@ -33,12 +33,11 @@ export const buildPaymentService = (overrides?: Partial<jest.Mocked<IPaymentServ
   percentageFee: 0,
   sendPayment: jest.fn(async (params: {
     account: string
-    bankCode: string
     id: string
     qrCode?: null | string
     value: number
-  }) => ({ success: Boolean(params.account && params.bankCode && params.value), transactionId: 'tx-id' })),
-  verifyAccount: jest.fn(async ({ account, bankCode }: { account: string, bankCode: string }) => Boolean(account && bankCode)),
+  }) => ({ success: Boolean(params.account && params.value), transactionId: 'tx-id' })),
+  verifyAccount: jest.fn(async ({ account }: { account: string }) => Boolean(account)),
   ...(overrides ?? {}),
 })
 

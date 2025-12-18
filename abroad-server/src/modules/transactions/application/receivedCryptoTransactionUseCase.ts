@@ -13,6 +13,7 @@ import { IDatabaseClientProvider } from '../../../platform/persistence/IDatabase
 import { IPaymentServiceFactory } from '../../payments/application/contracts/IPaymentServiceFactory'
 import { IWalletHandlerFactory } from '../../payments/application/contracts/IWalletHandlerFactory'
 import { transactionNotificationInclude, TransactionWithRelations } from './transactionNotificationTypes'
+import { toWebhookTransactionPayload } from './transactionPayload'
 import { buildTransactionSlackMessage } from './transactionSlackFormatter'
 
 export interface IReceivedCryptoTransactionUseCase {
@@ -52,7 +53,7 @@ class TransactionNotifier {
     try {
       await this.webhookNotifier.notifyWebhook(
         transaction.partnerUser.partner.webhookUrl,
-        { data: transaction, event },
+        { data: toWebhookTransactionPayload(transaction), event },
       )
     }
     catch (error) {
@@ -61,7 +62,7 @@ class TransactionNotifier {
 
     try {
       await this.queueHandler.postMessage(QueueName.USER_NOTIFICATION, {
-        payload: JSON.stringify(transaction),
+        payload: JSON.stringify(toWebhookTransactionPayload(transaction)),
         type: 'transaction.updated',
         userId: transaction.partnerUser.userId,
       })
@@ -307,7 +308,6 @@ export class ReceivedCryptoTransactionUseCase implements IReceivedCryptoTransact
     try {
       const paymentResponse = await paymentService.sendPayment({
         account: transactionRecord.accountNumber,
-        bankCode: transactionRecord.bankCode,
         id: transactionRecord.id,
         qrCode: transactionRecord.qrCode,
         value: transactionRecord.quote.targetAmount,

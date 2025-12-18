@@ -58,7 +58,6 @@ export class TransactionController extends Controller {
     }
     const {
       account_number: accountNumber,
-      bank_code: bankCode,
       qr_code: qrCode,
       quote_id: quoteId,
       redirectUrl: redirectUrl,
@@ -78,7 +77,6 @@ export class TransactionController extends Controller {
       const response = await this.transactionAcceptanceService.acceptTransaction(
         {
           accountNumber,
-          bankCode,
           qrCode,
           quoteId,
           redirectUrl,
