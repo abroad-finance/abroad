@@ -13,7 +13,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "test": "vitest --config vite.config.ts",
+    "test": "vitest --config vite.config.ts --run",
     "test:watch": "vitest watch --config vite.config.ts",
     "i18n:compare": "tolgee compare",
     "i18n:sync": "tolgee sync -Y"

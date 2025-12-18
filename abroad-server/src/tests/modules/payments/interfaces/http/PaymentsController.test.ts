@@ -11,7 +11,6 @@ describe('PaymentsController', () => {
 
   beforeEach(() => {
     paymentUseCase = {
-      getBanks: jest.fn(() => ({ banks: [{ bankCode: 101, bankName: 'Mock Bank' }] })),
       getLiquidity: jest.fn(async () => ({ liquidity: 75, message: 'ok', success: true })),
       onboardUser: jest.fn(async (account: string) => ({ message: `onboard:${account}`, success: true })),
     }
@@ -19,30 +18,11 @@ describe('PaymentsController', () => {
     controller = new PaymentsController(paymentUseCase)
   })
 
-  it('returns banks from the payment use case', async () => {
-    const result = await controller.getBanks(PaymentMethod.NEQUI)
-
-    expect(paymentUseCase.getBanks).toHaveBeenCalledWith(PaymentMethod.NEQUI)
-    expect(result.banks).toHaveLength(1)
-  })
-
-  it('returns an empty list and sets status 400 when fetching banks fails', async () => {
-    paymentUseCase.getBanks.mockImplementation(() => {
-      throw new Error('failure')
-    })
-    const setStatusSpy = jest.spyOn(controller, 'setStatus')
-
-    const result = await controller.getBanks(PaymentMethod.NEQUI)
-
-    expect(setStatusSpy).toHaveBeenCalledWith(400)
-    expect(result.banks).toHaveLength(0)
-  })
-
   it('returns liquidity from the use case and sets status when failing', async () => {
     paymentUseCase.getLiquidity.mockResolvedValueOnce({ liquidity: 12, message: 'ok', success: true })
 
-    const successResponse = await controller.getLiquidity(PaymentMethod.MOVII)
-    expect(paymentUseCase.getLiquidity).toHaveBeenCalledWith(PaymentMethod.MOVII)
+    const successResponse = await controller.getLiquidity(PaymentMethod.PIX)
+    expect(paymentUseCase.getLiquidity).toHaveBeenCalledWith(PaymentMethod.PIX)
     expect(successResponse.success).toBe(true)
 
     paymentUseCase.getLiquidity.mockResolvedValueOnce({ liquidity: 0, message: 'failure', success: false })
@@ -69,7 +49,7 @@ describe('PaymentsController', () => {
 
     const response = await controller.onboardUser({ account: '12345' })
 
-    expect(paymentUseCase.onboardUser).toHaveBeenCalledWith('12345', PaymentMethod.MOVII)
+    expect(paymentUseCase.onboardUser).toHaveBeenCalledWith('12345', PaymentMethod.BREB)
     expect(response).toEqual({ message: 'ok', success: true })
     expect(setStatusSpy).not.toHaveBeenCalled()
   })

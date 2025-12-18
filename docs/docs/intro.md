@@ -11,7 +11,7 @@ Welcome to the **Abroad** documentation. Abroad is a global payments infrastruct
 
 Abroad provides a unified API to:
 -   **Convert** between fiat currencies (COP, BRL) and cryptocurrencies (USDC, USDT).
--   **Pay** local vendors and users via local payment methods (Nequi, Movii, Pix).
+-   **Pay** local vendors and users via local payment methods (BreB, Pix).
 -   **Accept** payments from users in multiple currencies.
 -   **Manage** compliance (KYC/KYB) automatically.
 

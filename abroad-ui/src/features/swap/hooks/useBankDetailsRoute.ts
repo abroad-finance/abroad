@@ -45,16 +45,23 @@ export const useBankDetailsRoute = ({
   // Restore saved details (returning from KYC)
   useEffect(() => {
     const stored = localStorage.getItem(PENDING_TX_KEY)
-    if (stored && walletAuthentication?.jwtToken) {
-      try {
-        const parsed = JSON.parse(stored)
-        if (parsed.account_number) setAccountNumber(parsed.account_number)
-        if (parsed.pixKey) setPixKey(parsed.pixKey)
-        if (parsed.taxId) setTaxId(parsed.taxId)
+    if (!stored || !walletAuthentication?.jwtToken) return
+
+    try {
+      const parsed = JSON.parse(stored) as {
+        account_number?: string
+        accountNumber?: string
+        pixKey?: string
+        taxId?: string
       }
-      catch (e) {
-        console.error('Failed to restore pending transaction', e)
-      }
+
+      const accountNumberValue = parsed.accountNumber ?? parsed.account_number
+      if (accountNumberValue) setAccountNumber(accountNumberValue)
+      if (parsed.pixKey) setPixKey(parsed.pixKey)
+      if (parsed.taxId) setTaxId(parsed.taxId)
+    }
+    catch (e) {
+      console.error('Failed to restore pending transaction', e)
     }
   }, [
     setAccountNumber,

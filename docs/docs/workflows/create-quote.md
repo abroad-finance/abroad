@@ -21,7 +21,7 @@ This endpoint expects a **target amount** in local currency. If you prefer to qu
   "amount": 400000,
   "crypto_currency": "USDC",
   "network": "STELLAR",
-  "payment_method": "NEQUI",
+  "payment_method": "BREB",
   "target_currency": "COP"
 }
 ```
@@ -33,7 +33,7 @@ This endpoint expects a **target amount** in local currency. If you prefer to qu
 | `amount` | `number` | Target amount the recipient should receive (in `target_currency`). |
 | `crypto_currency` | `string` | The source cryptocurrency (e.g., `USDC`). |
 | `network` | `string` | The blockchain network (e.g., `STELLAR`, `SOLANA`). |
-| `payment_method` | `string` | The payout method (e.g., `NEQUI`, `MOVII`, `BREB`, `PIX`). |
+| `payment_method` | `string` | The payout method (e.g., `BREB`, `PIX`). |
 | `target_currency` | `string` | The target fiat currency (e.g., `COP`, `BRL`). |
 
 ## Response

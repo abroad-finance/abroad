@@ -15,7 +15,7 @@ type WebhookPayload = {
 
 @injectable()
 export class WebhookNotifier implements IWebhookNotifier {
-  private sepPartnerWebhookUrlPromise?: Promise<string | null>
+  private sepPartnerWebhookUrlPromise?: Promise<null | string>
 
   public constructor(
     @inject(TYPES.ILogger) private logger: ILogger,
@@ -41,78 +41,6 @@ export class WebhookNotifier implements IWebhookNotifier {
     )
   }
 
-  private async resolveTargets(primaryUrl: null | string): Promise<string[]> {
-    const targets: string[] = []
-    const normalizedPrimary = this.normalizeUrl(primaryUrl)
-    if (normalizedPrimary) {
-      targets.push(normalizedPrimary)
-    }
-
-    const sepWebhookUrl = await this.getSepPartnerWebhookUrl()
-    if (sepWebhookUrl && !targets.includes(sepWebhookUrl)) {
-      targets.push(sepWebhookUrl)
-    }
-
-    return targets
-  }
-
-  private normalizeUrl(url: null | string): string | null {
-    if (typeof url !== 'string') {
-      return null
-    }
-    const trimmed = url.trim()
-    return trimmed.length > 0 ? trimmed : null
-  }
-
-  private async getSepPartnerWebhookUrl(): Promise<string | null> {
-    if (!this.sepPartnerWebhookUrlPromise) {
-      this.sepPartnerWebhookUrlPromise = this.fetchSepPartnerWebhookUrl()
-    }
-
-    try {
-      return await this.sepPartnerWebhookUrlPromise
-    }
-    catch (error) {
-      this.logger.warn('Failed to resolve SEP partner webhook URL; skipping SEP notification', {
-        error: error instanceof Error ? error : new Error(String(error)),
-      })
-      this.sepPartnerWebhookUrlPromise = undefined
-      return null
-    }
-  }
-
-  private async fetchSepPartnerWebhookUrl(): Promise<string | null> {
-    const [sepPartnerId, prismaClient] = await Promise.all([
-      this.secretManager.getSecret('STELLAR_SEP_PARTNER_ID'),
-      this.databaseClientProvider.getClient(),
-    ])
-
-    if (!sepPartnerId) {
-      return null
-    }
-
-    const sepPartner = await prismaClient.partner.findUnique({
-      select: { webhookUrl: true },
-      where: { id: sepPartnerId },
-    })
-
-    const normalizedUrl = this.normalizeUrl(sepPartner?.webhookUrl ?? null)
-    return normalizedUrl
-  }
-
-  private async resolveWebhookSecret(): Promise<string | undefined> {
-    try {
-      const secret = await this.secretManager.getSecret('ABROAD_WEBHOOK_SECRET')
-      return secret?.trim() ? secret : undefined
-    }
-    catch (error) {
-      this.logger.warn('Failed to fetch webhook secret; continuing without authentication header', {
-        error: error instanceof Error ? error : new Error(String(error)),
-      })
-      return undefined
-    }
-  }
-
   private async deliverWebhook(
     target: string,
     payload: WebhookPayload,
@@ -131,6 +59,78 @@ export class WebhookNotifier implements IWebhookNotifier {
         event: payload.event,
         url: target,
       })
+    }
+  }
+
+  private async fetchSepPartnerWebhookUrl(): Promise<null | string> {
+    const [sepPartnerId, prismaClient] = await Promise.all([
+      this.secretManager.getSecret('STELLAR_SEP_PARTNER_ID'),
+      this.databaseClientProvider.getClient(),
+    ])
+
+    if (!sepPartnerId) {
+      return null
+    }
+
+    const sepPartner = await prismaClient.partner.findUnique({
+      select: { webhookUrl: true },
+      where: { id: sepPartnerId },
+    })
+
+    const normalizedUrl = this.normalizeUrl(sepPartner?.webhookUrl ?? null)
+    return normalizedUrl
+  }
+
+  private async getSepPartnerWebhookUrl(): Promise<null | string> {
+    if (!this.sepPartnerWebhookUrlPromise) {
+      this.sepPartnerWebhookUrlPromise = this.fetchSepPartnerWebhookUrl()
+    }
+
+    try {
+      return await this.sepPartnerWebhookUrlPromise
+    }
+    catch (error) {
+      this.logger.warn('Failed to resolve SEP partner webhook URL; skipping SEP notification', {
+        error: error instanceof Error ? error : new Error(String(error)),
+      })
+      this.sepPartnerWebhookUrlPromise = undefined
+      return null
+    }
+  }
+
+  private normalizeUrl(url: null | string): null | string {
+    if (typeof url !== 'string') {
+      return null
+    }
+    const trimmed = url.trim()
+    return trimmed.length > 0 ? trimmed : null
+  }
+
+  private async resolveTargets(primaryUrl: null | string): Promise<string[]> {
+    const targets: string[] = []
+    const normalizedPrimary = this.normalizeUrl(primaryUrl)
+    if (normalizedPrimary) {
+      targets.push(normalizedPrimary)
+    }
+
+    const sepWebhookUrl = await this.getSepPartnerWebhookUrl()
+    if (sepWebhookUrl && !targets.includes(sepWebhookUrl)) {
+      targets.push(sepWebhookUrl)
+    }
+
+    return targets
+  }
+
+  private async resolveWebhookSecret(): Promise<string | undefined> {
+    try {
+      const secret = await this.secretManager.getSecret('ABROAD_WEBHOOK_SECRET')
+      return secret?.trim() ? secret : undefined
+    }
+    catch (error) {
+      this.logger.warn('Failed to fetch webhook secret; continuing without authentication header', {
+        error: error instanceof Error ? error : new Error(String(error)),
+      })
+      return undefined
     }
   }
 }

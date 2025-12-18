@@ -5,24 +5,28 @@ on:
     branches: [ main ]
     paths:
       - 'abroad-ui/**'
+      - 'package.json'
+      - 'package-lock.json'
 
 jobs:
   frontend:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: npm
-          cache-dependency-path: abroad-ui/package-lock.json
+          cache-dependency-path: package-lock.json
+
       - name: Install dependencies (UI)
-        working-directory: abroad-ui
-        run: npm ci --no-audit --no-fund
+        run: npm ci --workspace=abroad-ui --no-audit --no-fund
+
       - name: Lint (UI)
-        working-directory: abroad-ui
-        run: npm run lint --if-present
+        run: npm -w abroad-ui run lint --if-present
+
       - name: Build (UI)
-        working-directory: abroad-ui
-        run: npm run build --if-present
+        run: npm -w abroad-ui run build:code --if-present

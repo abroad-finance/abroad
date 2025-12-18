@@ -11,6 +11,7 @@ import { ILogger } from '../../../core/logging/types'
 import { IQueueHandler, QueueName, UserNotificationMessage } from '../../../platform/messaging/queues'
 import { IWebhookNotifier, WebhookEvent } from '../../../platform/notifications/IWebhookNotifier'
 import { IDatabaseClientProvider } from '../../../platform/persistence/IDatabaseClientProvider'
+import { toWebhookTransactionPayload } from './transactionPayload'
 
 export type ExpiredTransactionsSummary = {
   awaiting: number
@@ -122,10 +123,15 @@ export class ExpiredTransactionService {
 
   private async notifyUpdates(transaction: TransactionWithRelations): Promise<void> {
     const webhookTarget = transaction.partnerUser.partner.webhookUrl
-    const queueMessage: UserNotificationMessage = { payload: JSON.stringify(transaction), type: 'transaction.updated', userId: transaction.partnerUser.userId }
+    const webhookPayload = toWebhookTransactionPayload(transaction)
+    const queueMessage: UserNotificationMessage = {
+      payload: JSON.stringify(webhookPayload),
+      type: 'transaction.updated',
+      userId: transaction.partnerUser.userId,
+    }
 
     const [webhookResult, queueResult] = await Promise.allSettled([
-      this.webhookNotifier.notifyWebhook(webhookTarget, { data: transaction, event: WebhookEvent.TRANSACTION_UPDATED }),
+      this.webhookNotifier.notifyWebhook(webhookTarget, { data: webhookPayload, event: WebhookEvent.TRANSACTION_UPDATED }),
       this.queueHandler.postMessage(QueueName.USER_NOTIFICATION, queueMessage),
     ])
 

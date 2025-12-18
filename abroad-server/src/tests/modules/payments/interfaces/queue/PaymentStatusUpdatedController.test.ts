@@ -133,7 +133,6 @@ describe('PaymentStatusUpdatedController', () => {
     }
     prisma.transaction.update.mockResolvedValue({
       accountNumber: 'account-123',
-      bankCode: 'bank-xyz',
       externalId: 'txn-1',
       id: 'txn-1',
       onChainId: 'on-chain-1',
@@ -145,7 +144,7 @@ describe('PaymentStatusUpdatedController', () => {
         cryptoCurrency: CryptoCurrency.USDC,
         id: 'quote-1',
         network: BlockchainNetwork.STELLAR,
-        paymentMethod: PaymentMethod.NEQUI,
+        paymentMethod: PaymentMethod.BREB,
         sourceAmount: 100,
         targetAmount: 200,
         targetCurrency: TargetCurrency.COP,
@@ -182,7 +181,7 @@ describe('PaymentStatusUpdatedController', () => {
     const [slackMessage] = (slackNotifier.sendMessage as jest.Mock).mock.calls[0] as [string]
     expect(slackMessage).toContain('Transaction: txn-1')
     expect(slackMessage).toContain('Quote: quote-1')
-    expect(slackMessage).toContain('Payment: NEQUI')
+    expect(slackMessage).toContain('Payment: BREB')
     expect(slackMessage).toContain('Network: STELLAR')
     expect(slackMessage).toContain('References: External: txn-1')
     expect(slackMessage).toContain('Notes: provider: transfero | providerStatus: processed')
@@ -199,7 +198,6 @@ describe('PaymentStatusUpdatedController', () => {
     }
     prisma.transaction.update.mockResolvedValue({
       accountNumber: 'account-123',
-      bankCode: 'bank-xyz',
       externalId: 'txn-2',
       id: 'txn-2',
       onChainId: 'hash-1',
@@ -211,7 +209,7 @@ describe('PaymentStatusUpdatedController', () => {
         cryptoCurrency: CryptoCurrency.USDC,
         id: 'quote-2',
         network: BlockchainNetwork.STELLAR,
-        paymentMethod: PaymentMethod.NEQUI,
+        paymentMethod: PaymentMethod.BREB,
         sourceAmount: 50,
         targetAmount: 90,
         targetCurrency: TargetCurrency.BRL,

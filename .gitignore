@@ -142,3 +142,5 @@ transactions-report.csv
 abroad-server/tmp/maintainability-report.json
 stryker-tmp/
 abroad-server/reports/
+abroad-server/src/app/http/swagger.json
+abroad-server/src/app/http/routes.ts

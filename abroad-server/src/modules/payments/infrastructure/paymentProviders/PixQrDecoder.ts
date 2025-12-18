@@ -8,7 +8,6 @@ import { IPixQrDecoder, PixDecoded } from '../../application/contracts/IQrDecode
 
 interface BrCode {
   accountType: string
-  bankCode: string
   description: string
   keyId: string
   nominalAmount: number

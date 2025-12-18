@@ -80,7 +80,7 @@ const buildTransaction = (overrides: TransactionOverrides = {}): TransactionReco
       cryptoCurrency: CryptoCurrency.USDC,
       id: 'quote-1',
       network: BlockchainNetwork.STELLAR,
-      paymentMethod: PaymentMethod.NEQUI,
+      paymentMethod: PaymentMethod.BREB,
       sourceAmount: 50,
       targetAmount: 100,
       targetCurrency: TargetCurrency.COP,
@@ -107,7 +107,6 @@ const buildTransaction = (overrides: TransactionOverrides = {}): TransactionReco
 }
 
 const createPaymentService = (overrides: Partial<PaymentServiceMock> = {}): PaymentServiceMock => ({
-  banks: [],
   currency: TargetCurrency.COP,
   fixedFee: 0,
   getLiquidity: jest.fn(async () => 0),

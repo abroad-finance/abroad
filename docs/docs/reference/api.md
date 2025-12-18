@@ -24,7 +24,7 @@ Calculate the crypto amount you need to send to deliver a target fiat amount.
 | `amount` | `number` | Yes | Target amount in the fiat currency you want the recipient to receive. |
 | `crypto_currency` | `string` | Yes | Source cryptocurrency (`USDC`). |
 | `network` | `string` | Yes | Blockchain network (`STELLAR` or `SOLANA`). |
-| `payment_method` | `string` | Yes | Payout method (`NEQUI`, `MOVII`, `BREB`, `PIX`). |
+| `payment_method` | `string` | Yes | Payout method (`BREB`, `PIX`). |
 | `target_currency` | `string` | Yes | Target fiat currency (`COP` or `BRL`). |
 
 #### Example
@@ -40,7 +40,7 @@ curl -X POST https://api.abroad.finance/quote \
     "amount": 400000,
     "crypto_currency": "USDC",
     "network": "STELLAR",
-    "payment_method": "NEQUI",
+    "payment_method": "BREB",
     "target_currency": "COP"
   }'
 ```
@@ -59,7 +59,7 @@ const response = await fetch('https://api.abroad.finance/quote', {
     amount: 400000,
     crypto_currency: 'USDC',
     network: 'STELLAR',
-    payment_method: 'NEQUI',
+    payment_method: 'BREB',
     target_currency: 'COP'
   })
 });
@@ -94,7 +94,7 @@ Calculate how much the recipient will receive for a specific crypto amount.
 | `source_amount` | `number` | Yes | Crypto amount you plan to send (for example, `100` USDC). |
 | `crypto_currency` | `string` | Yes | Source cryptocurrency. |
 | `network` | `string` | Yes | Blockchain network. |
-| `payment_method` | `string` | Yes | Payout method. |
+| `payment_method` | `string` | Yes | Payout method (`BREB`, `PIX`). |
 | `target_currency` | `string` | Yes | Target fiat currency. |
 
 #### Response
@@ -124,7 +124,7 @@ Create a transaction from a quote. Returns the memo you must attach to the on-ch
 | `quote_id` | `string` | Yes | The ID of the quote to execute. |
 | `user_id` | `string` | Yes | Your internal user ID. |
 | `account_number` | `string` | Yes | Recipient's account number. |
-| `bank_code` | `string` | No | Bank code (e.g., `NEQUI`). Required only for `MOVII`; optional for `NEQUI`, `BREB`, and `PIX`. |
+| `bank_code` | `string` | No | Optional bank or rail identifier; provide one only if your payout rail requires it. |
 | `tax_id` | `string` | No | User's tax ID. |
 | `redirectUrl` | `string` | No | Optional redirect after KYC. |
 | `qr_code` | `string` | No | QR code string, when applicable. |
@@ -186,12 +186,12 @@ Paginated list scoped to your partner and a single external user.
       "id": "f4a96c4c-4d1e-4ab2-a6ec-2e1b5070c5db",
       "status": "PAYMENT_COMPLETED",
       "accountNumber": "3001234567",
-      "bankCode": "NEQUI",
+      "bankCode": "9101",
       "quote": {
         "id": "550e8400-e29b-41d4-a716-446655440000",
         "cryptoCurrency": "USDC",
         "network": "STELLAR",
-        "paymentMethod": "NEQUI",
+        "paymentMethod": "BREB",
         "sourceAmount": 100.5,
         "targetAmount": 400000,
         "targetCurrency": "COP"
@@ -207,19 +207,19 @@ Paginated list scoped to your partner and a single external user.
 
 ### List banks (`GET /payments/banks`)
 
-Retrieve the bank list for a payment method (defaults to `MOVII` if omitted).
+Retrieve the bank list for a payment method (defaults to `BREB` if omitted).
 
 | Query param | Type | Required | Description |
 | :--- | :--- | :--- | :--- |
-| `paymentMethod` | `string` | No | One of `NEQUI`, `MOVII`, `BREB`, `PIX`. |
+| `paymentMethod` | `string` | No | One of `BREB`, `PIX`. |
 
 **Response:**
 
 ```json
 {
   "banks": [
-    { "bankCode": 1007, "bankName": "Bancolombia" },
-    { "bankCode": 1507, "bankName": "NEQUI" }
+    { "bankCode": 9101, "bankName": "BREB ENT rail" },
+    { "bankCode": 9102, "bankName": "BREB TFY rail" }
   ]
 }
 ```
@@ -229,7 +229,7 @@ For `BREB`, the bank list maps to its payout rails:
 - `9101` (`ENT`) — intra-BreB accounts  
 - `9102` (`TFY`) — Transfiya rail
 
-`MOVII` requires `bank_code` when accepting a transaction. `NEQUI`, `BREB`, and `PIX` can omit it (defaults to the right rail).
+`bank_code` is optional for supported methods. BREB resolves rails from the account details, and PIX ignores `bank_code`.
 
 ### Check liquidity (`GET /payments/liquidity`)
 
@@ -237,7 +237,7 @@ Returns the latest known liquidity for a payment method.
 
 | Query param | Type | Required | Description |
 | :--- | :--- | :--- | :--- |
-| `paymentMethod` | `string` | No | One of `NEQUI`, `MOVII`, `BREB`, `PIX`. |
+| `paymentMethod` | `string` | No | One of `BREB`, `PIX`. |
 
 **Response:**
 

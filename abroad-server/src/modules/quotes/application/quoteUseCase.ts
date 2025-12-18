@@ -220,21 +220,22 @@ export class QuoteUseCase implements IQuoteUseCase {
     }
   }
 
-  private normalizeTargetAmount(amount: number, targetCurrency: TargetCurrency): number {
-    const fractionDigits = this.getFractionDigitsForCurrency(targetCurrency)
-    return Number(amount.toFixed(fractionDigits))
+  private getExpirationDate(): Date {
+    return new Date(Date.now() + this.EXPIRATION_DURATION_MS)
   }
 
   private getFractionDigitsForCurrency(targetCurrency: TargetCurrency): number {
     switch (targetCurrency) {
       case TargetCurrency.COP:
         return 0
+      case TargetCurrency.BRL:
       default:
         return 2
     }
   }
 
-  private getExpirationDate(): Date {
-    return new Date(Date.now() + this.EXPIRATION_DURATION_MS)
+  private normalizeTargetAmount(amount: number, targetCurrency: TargetCurrency): number {
+    const fractionDigits = this.getFractionDigitsForCurrency(targetCurrency)
+    return Number(amount.toFixed(fractionDigits))
   }
 }

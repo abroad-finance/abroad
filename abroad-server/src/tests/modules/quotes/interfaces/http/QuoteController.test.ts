@@ -53,7 +53,7 @@ describe('QuoteController', () => {
       amount: 100,
       crypto_currency: CryptoCurrency.USDC,
       network: BlockchainNetwork.STELLAR,
-      payment_method: PaymentMethod.NEQUI,
+      payment_method: PaymentMethod.BREB,
       target_currency: TargetCurrency.COP,
     }
 
@@ -74,7 +74,7 @@ describe('QuoteController', () => {
         cryptoCurrency: CryptoCurrency.USDC,
         network: BlockchainNetwork.STELLAR,
         partner,
-        paymentMethod: PaymentMethod.NEQUI,
+        paymentMethod: PaymentMethod.BREB,
         targetCurrency: TargetCurrency.COP,
       })
     })
@@ -138,7 +138,7 @@ describe('QuoteController', () => {
         cryptoCurrency: CryptoCurrency.USDC,
         network: BlockchainNetwork.STELLAR,
         partner: apiPartner,
-        paymentMethod: PaymentMethod.NEQUI,
+        paymentMethod: PaymentMethod.BREB,
         targetCurrency: TargetCurrency.COP,
       })
     })
@@ -166,7 +166,7 @@ describe('QuoteController', () => {
     const validReverseBody = {
       crypto_currency: CryptoCurrency.USDC,
       network: BlockchainNetwork.STELLAR,
-      payment_method: PaymentMethod.NEQUI,
+      payment_method: PaymentMethod.PIX,
       source_amount: 150,
       target_currency: TargetCurrency.COP,
     }
@@ -192,7 +192,7 @@ describe('QuoteController', () => {
         cryptoCurrency: CryptoCurrency.USDC,
         network: BlockchainNetwork.STELLAR,
         partner,
-        paymentMethod: PaymentMethod.NEQUI,
+        paymentMethod: PaymentMethod.PIX,
         sourceAmountInput: 150,
         targetCurrency: TargetCurrency.COP,
       })

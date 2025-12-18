@@ -1,4 +1,4 @@
-import { Country, PaymentMethod } from '@prisma/client'
+import { Country } from '@prisma/client'
 import { inject, injectable } from 'inversify'
 
 import { TYPES } from '../../../app/container/types'
@@ -6,15 +6,11 @@ import { ILogger } from '../../../core/logging/types'
 import { IDatabaseClientProvider } from '../../../platform/persistence/IDatabaseClientProvider'
 import { IPaymentService } from './contracts/IPaymentService'
 import { IPaymentServiceFactory } from './contracts/IPaymentServiceFactory'
-
-export interface BanksResult {
-  banks: BankSummary[]
-}
+import { assertSupportedPaymentMethod, DEFAULT_PAYMENT_METHOD, SupportedPaymentMethod } from './supportedPaymentMethods'
 
 export interface IPaymentUseCase {
-  getBanks(paymentMethod?: PaymentMethod): BanksResult
-  getLiquidity(paymentMethod?: PaymentMethod): Promise<LiquidityResult>
-  onboardUser(account: string, paymentMethod?: PaymentMethod): Promise<OnboardResult>
+  getLiquidity(paymentMethod?: SupportedPaymentMethod): Promise<LiquidityResult>
+  onboardUser(account: string, paymentMethod?: SupportedPaymentMethod): Promise<OnboardResult>
 }
 
 export interface LiquidityResult {
@@ -26,11 +22,6 @@ export interface LiquidityResult {
 export interface OnboardResult {
   message?: string
   success: boolean
-}
-
-type BankSummary = {
-  bankCode: number
-  bankName: string
 }
 
 @injectable()
@@ -46,12 +37,7 @@ export class PaymentUseCase implements IPaymentUseCase {
     private readonly logger: ILogger,
   ) { }
 
-  public getBanks(paymentMethod?: PaymentMethod): BanksResult {
-    const { service } = this.resolvePaymentService(paymentMethod)
-    return { banks: service.banks }
-  }
-
-  public async getLiquidity(paymentMethod?: PaymentMethod): Promise<LiquidityResult> {
+  public async getLiquidity(paymentMethod?: SupportedPaymentMethod): Promise<LiquidityResult> {
     const { method, service } = this.resolvePaymentService(paymentMethod)
     try {
       const clientDb = await this.dbClientProvider.getClient()
@@ -96,7 +82,7 @@ export class PaymentUseCase implements IPaymentUseCase {
     }
   }
 
-  public async onboardUser(account: string, paymentMethod?: PaymentMethod): Promise<OnboardResult> {
+  public async onboardUser(account: string, paymentMethod?: SupportedPaymentMethod): Promise<OnboardResult> {
     try {
       const { service } = this.resolvePaymentService(paymentMethod)
       return await service.onboardUser({ account })
@@ -108,8 +94,9 @@ export class PaymentUseCase implements IPaymentUseCase {
     }
   }
 
-  private resolvePaymentService(paymentMethod?: PaymentMethod): { method: PaymentMethod, service: IPaymentService } {
-    const method = paymentMethod ?? PaymentMethod.MOVII
+  private resolvePaymentService(paymentMethod?: SupportedPaymentMethod): { method: SupportedPaymentMethod, service: IPaymentService } {
+    const method: SupportedPaymentMethod = paymentMethod ?? DEFAULT_PAYMENT_METHOD
+    assertSupportedPaymentMethod(method)
     const service = this.paymentServiceFactory.getPaymentService(method)
 
     if (!service.isEnabled) {

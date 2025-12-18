@@ -5,8 +5,6 @@ import { PaymentServiceFactory } from '../../modules/payments/application/Paymen
 import { PaymentUseCase } from '../../modules/payments/application/paymentUseCase'
 import { WalletHandlerFactory } from '../../modules/payments/application/WalletHandlerFactory'
 import { BrebPaymentService } from '../../modules/payments/infrastructure/paymentProviders/brebPaymentService'
-import { MoviiPaymentService } from '../../modules/payments/infrastructure/paymentProviders/movii'
-import { NequiPaymentService } from '../../modules/payments/infrastructure/paymentProviders/nequi'
 import { PixQrDecoder } from '../../modules/payments/infrastructure/paymentProviders/PixQrDecoder'
 import { TransferoPaymentService } from '../../modules/payments/infrastructure/paymentProviders/transferoPaymentService'
 import { SolanaWalletHandler } from '../../modules/payments/infrastructure/wallets/SolanaWalletHandler'
@@ -30,8 +28,6 @@ const domainBindings: ReadonlyArray<BindingRegistration<unknown>> = [
   { identifier: TYPES.QuoteUseCase, implementation: QuoteUseCase },
   { identifier: TYPES.SolanaWalletHandler, implementation: SolanaWalletHandler },
   { identifier: TYPES.StellarWalletHandler, implementation: StellarWalletHandler },
-  { identifier: TYPES.IPaymentService, implementation: MoviiPaymentService, name: 'movii' },
-  { identifier: TYPES.IPaymentService, implementation: NequiPaymentService, name: 'nequi' },
   { identifier: TYPES.IPaymentService, implementation: BrebPaymentService, name: 'breb' },
   { identifier: TYPES.IPaymentService, implementation: TransferoPaymentService, name: 'transfero' },
   { identifier: TYPES.IExchangeProvider, implementation: BinanceExchangeProvider, name: 'binance' },

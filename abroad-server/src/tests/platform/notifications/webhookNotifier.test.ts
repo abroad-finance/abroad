@@ -1,4 +1,5 @@
 import type { PrismaClient } from '@prisma/client'
+
 import axios from 'axios'
 
 import type { IDatabaseClientProvider } from '../../../platform/persistence/IDatabaseClientProvider'
@@ -15,7 +16,7 @@ describe('WebhookNotifier', () => {
   let logger: MockLogger
   let secretManager: ISecretManager
   let databaseClientProvider: IDatabaseClientProvider
-  let partnerClient: { findUnique: jest.Mock<Promise<{ webhookUrl: string | null } | null>, [unknown]> }
+  let partnerClient: { findUnique: jest.Mock<Promise<null | { webhookUrl: null | string }>, [unknown]> }
   let prismaClient: { partner: typeof partnerClient }
 
   beforeEach(() => {

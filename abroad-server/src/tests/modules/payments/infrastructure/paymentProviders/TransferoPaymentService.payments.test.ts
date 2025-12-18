@@ -160,7 +160,6 @@ describe('TransferoPaymentService sendPayment', () => {
 
     const result = await harness.service.sendPayment({
       account: '11999999999',
-      bankCode: '001',
       id: 'txn-1',
       qrCode: null,
       value: 10,
@@ -182,7 +181,6 @@ describe('TransferoPaymentService sendPayment', () => {
 
     const response = await harness.service.sendPayment({
       account: '11999999999',
-      bankCode: '001',
       id: 'missing',
       qrCode: null,
       value: 10,
@@ -202,7 +200,6 @@ describe('TransferoPaymentService sendPayment', () => {
 
     const result = await harness.service.sendPayment({
       account: '11999999999',
-      bankCode: '001',
       id: 'txn-err',
       qrCode: null,
       value: 10,
@@ -222,7 +219,6 @@ describe('TransferoPaymentService sendPayment', () => {
 
     const result = await harness.service.sendPayment({
       account: '123',
-      bankCode: '001',
       id: 'txn-plain',
       qrCode: null,
       value: 5,

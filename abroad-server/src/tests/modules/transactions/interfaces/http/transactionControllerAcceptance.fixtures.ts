@@ -31,7 +31,6 @@ export const baseQuote = {
 
 export const requestBody = {
   account_number: '123',
-  bank_code: '001',
   quote_id: baseQuote.id,
   user_id: 'user-1',
 }

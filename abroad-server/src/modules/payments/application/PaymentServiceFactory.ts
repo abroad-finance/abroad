@@ -5,18 +5,13 @@ import { inject, injectable, named } from 'inversify'
 import { TYPES } from '../../../app/container/types'
 import { IPaymentService } from './contracts/IPaymentService'
 import { IPaymentServiceFactory } from './contracts/IPaymentServiceFactory'
+import { assertSupportedPaymentMethod, SupportedPaymentMethod } from './supportedPaymentMethods'
 
 @injectable()
 export class PaymentServiceFactory implements IPaymentServiceFactory {
-  private readonly serviceByMethod: Record<PaymentMethod, IPaymentService>
+  private readonly serviceByMethod: Record<SupportedPaymentMethod, IPaymentService>
 
   constructor(
-    @inject(TYPES.IPaymentService)
-    @named('movii')
-    moviiPaymentService: IPaymentService,
-    @inject(TYPES.IPaymentService)
-    @named('nequi')
-    nequiPaymentService: IPaymentService,
     @inject(TYPES.IPaymentService)
     @named('breb')
     brebPaymentService: IPaymentService,
@@ -26,18 +21,12 @@ export class PaymentServiceFactory implements IPaymentServiceFactory {
   ) {
     this.serviceByMethod = {
       [PaymentMethod.BREB]: brebPaymentService,
-      [PaymentMethod.MOVII]: moviiPaymentService,
-      [PaymentMethod.NEQUI]: nequiPaymentService,
       [PaymentMethod.PIX]: transferoPaymentService,
     }
   }
 
   public getPaymentService(paymentMethod: PaymentMethod): IPaymentService {
-    const service = this.serviceByMethod[paymentMethod]
-    if (!service) {
-      throw new Error(`Unsupported payment method: ${paymentMethod}`)
-    }
-
-    return service
+    assertSupportedPaymentMethod(paymentMethod)
+    return this.serviceByMethod[paymentMethod]
   }
 }

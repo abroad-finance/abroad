@@ -168,8 +168,6 @@ enum Country {
 }
 
 enum PaymentMethod {
-  NEQUI
-  MOVII
   PIX
   BREB
 }

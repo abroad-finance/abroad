@@ -17,15 +17,13 @@ Abroad supports a specific set of blockchains, cryptocurrencies, and fiat curren
 
 | Country | Currency | Symbol | Payment Methods |
 | :--- | :--- | :--- | :--- |
-| Colombia | Colombian Peso | **COP** | BreB, Nequi, Movii |
+| Colombia | Colombian Peso | **COP** | BreB |
 | Brazil | Brazilian Real | **BRL** | PIX |
 
 ## Payment methods at a glance
 
 | Method | Payout currency | Recipient location | Crypto networks you can fund with |
 | :--- | :--- | :--- | :--- |
-| `NEQUI` | COP | Colombia | Stellar, Solana |
-| `MOVII` | COP | Colombia | Stellar, Solana |
 | `BREB` | COP | Colombia | Stellar, Solana |
 | `PIX` | BRL | Brazil | Stellar, Solana |
 

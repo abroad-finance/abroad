@@ -19,7 +19,7 @@ describe('TransactionController acceptance flows', () => {
     expect(response).toEqual({ reason: 'We could not find a valid quote for this request. Please generate a new quote and try again.' })
   })
 
-  it('rejects invalid bank account data', async () => {
+  it('rejects invalid account data', async () => {
     const verifyAccount = jest.fn().mockResolvedValue(false)
     const { controller, prisma } = buildAcceptController({
       paymentService: { getLiquidity: jest.fn().mockResolvedValue(1000), MAX_TOTAL_AMOUNT_PER_DAY: 500, MAX_USER_TRANSACTIONS_PER_DAY: 3, verifyAccount },
@@ -28,7 +28,7 @@ describe('TransactionController acceptance flows', () => {
     const response = await controller.acceptTransaction(requestBody, { user: partner } as unknown as import('express').Request, badRequest)
 
     expect(prisma.quote.findUnique).toHaveBeenCalled()
-    expect(response).toEqual({ reason: 'We could not verify the account number and bank code provided. Please double-check the details and try again.' })
+    expect(response).toEqual({ reason: 'We could not verify the account number provided. Please double-check the details and try again.' })
   })
 
   it('returns a KYC link when the partner requires verification', async () => {

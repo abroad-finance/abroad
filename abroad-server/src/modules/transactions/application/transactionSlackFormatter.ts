@@ -11,10 +11,10 @@ type TransactionSlackContext = {
 
 const statusEmoji: Record<TransactionStatus, string> = {
   [TransactionStatus.AWAITING_PAYMENT]: '⌛️',
-  [TransactionStatus.PROCESSING_PAYMENT]: '🔄',
   [TransactionStatus.PAYMENT_COMPLETED]: '✅',
   [TransactionStatus.PAYMENT_EXPIRED]: '⏰',
   [TransactionStatus.PAYMENT_FAILED]: '❌',
+  [TransactionStatus.PROCESSING_PAYMENT]: '🔄',
   [TransactionStatus.WRONG_AMOUNT]: '⚠️',
 }
 
@@ -45,7 +45,6 @@ export const buildTransactionSlackMessage = (
     `Payment: ${transaction.quote.paymentMethod}`,
     `Network: ${transaction.quote.network}`,
     transaction.accountNumber ? `Account: ${transaction.accountNumber}` : null,
-    transaction.bankCode ? `Bank: ${transaction.bankCode}` : null,
   ])
   const references = joinSegments([
     transaction.externalId ? `External: ${transaction.externalId}` : null,

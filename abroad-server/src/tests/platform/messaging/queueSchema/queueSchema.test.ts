@@ -8,7 +8,7 @@ describe('queue schema validation', () => {
       amount: 25,
       blockchain: BlockchainNetwork.STELLAR,
       cryptoCurrency: CryptoCurrency.USDC,
-      paymentMethod: PaymentMethod.NEQUI,
+      paymentMethod: PaymentMethod.BREB,
       targetCurrency: TargetCurrency.COP,
     })).not.toThrow()
 

@@ -85,7 +85,7 @@ describe('PaymentSentUseCase.process', () => {
       amount: 50,
       blockchain: BlockchainNetwork.STELLAR,
       cryptoCurrency: CryptoCurrency.USDC,
-      paymentMethod: PaymentMethod.NEQUI,
+      paymentMethod: PaymentMethod.BREB,
       targetCurrency: TargetCurrency.COP,
     })
 
@@ -114,7 +114,7 @@ describe('PaymentSentUseCase.process', () => {
       amount: 25,
       blockchain: BlockchainNetwork.STELLAR,
       cryptoCurrency: CryptoCurrency.USDC,
-      paymentMethod: PaymentMethod.NEQUI,
+      paymentMethod: PaymentMethod.BREB,
       targetCurrency: TargetCurrency.BRL,
     })
 
@@ -129,7 +129,7 @@ describe('PaymentSentUseCase.process', () => {
       amount: 25,
       blockchain: BlockchainNetwork.STELLAR,
       cryptoCurrency: CryptoCurrency.USDC,
-      paymentMethod: PaymentMethod.NEQUI,
+      paymentMethod: PaymentMethod.BREB,
       targetCurrency: TargetCurrency.BRL,
     })
     expect(dbClient.pendingConversions.upsert).toHaveBeenCalledTimes(1)
@@ -150,7 +150,7 @@ describe('PaymentSentUseCase.process', () => {
       amount: 10,
       blockchain: BlockchainNetwork.STELLAR,
       cryptoCurrency: CryptoCurrency.USDC,
-      paymentMethod: PaymentMethod.NEQUI,
+      paymentMethod: PaymentMethod.BREB,
       targetCurrency: TargetCurrency.COP,
     })).rejects.toThrow('wallet offline')
 

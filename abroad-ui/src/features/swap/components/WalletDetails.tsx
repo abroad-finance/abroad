@@ -5,7 +5,7 @@ import {
 } from 'lucide-react'
 import React from 'react'
 
-import { PaginatedTransactionListTransactionsItem } from '../../../api'
+import { TransactionListItem } from '../../../api'
 import TransactionDetail from '../shared/TransactionDetail'
 
 export interface WalletDetailsProps {
@@ -24,10 +24,10 @@ export interface WalletDetailsProps {
   onLoadMoreTransactions: () => void
   onRefreshBalance: () => void
   onRefreshTransactions: () => void
-  selectedTransaction: null | PaginatedTransactionListTransactionsItem
-  setSelectedTransaction: (transaction: null | PaginatedTransactionListTransactionsItem) => void
+  selectedTransaction: null | TransactionListItem
+  setSelectedTransaction: (transaction: null | TransactionListItem) => void
   transactionError: null | string
-  transactions: PaginatedTransactionListTransactionsItem[]
+  transactions: TransactionListItem[]
   usdcBalance: string
 }
 
@@ -231,7 +231,7 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({
                       )
                     : (
                         <>
-                          {transactions.map((transaction: PaginatedTransactionListTransactionsItem) => (
+                          {transactions.map((transaction: TransactionListItem) => (
                             <div
                               className="bg-gray-50 border border-gray-200 rounded-xl p-4 hover:bg-gray-100 transition-colors duration-200 cursor-pointer"
                               key={transaction.id}

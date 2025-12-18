@@ -18,7 +18,6 @@ type PrismaLike = {
 const buildPaymentService = (
   overrides?: Partial<jest.Mocked<IPaymentService>>,
 ): jest.Mocked<IPaymentService> => ({
-  banks: [{ bankCode: 101, bankName: 'Mock Bank' }],
   currency: TargetCurrency.COP,
   fixedFee: 0,
   getLiquidity: jest.fn(async () => 75),
@@ -32,7 +31,7 @@ const buildPaymentService = (
   onboardUser: jest.fn(async ({ account }: { account: string }) => ({ message: `ok:${account}`, success: true })),
   percentageFee: 0,
   sendPayment: jest.fn(),
-  verifyAccount: jest.fn(async ({ account, bankCode }: { account: string, bankCode: string }) => Boolean(account && bankCode)),
+  verifyAccount: jest.fn(async ({ account }: { account: string }) => Boolean(account)),
   ...(overrides ?? {}),
 })
 
@@ -59,23 +58,14 @@ const buildUseCase = ({
 }
 
 describe('PaymentUseCase', () => {
-  it('returns banks for the resolved payment service', () => {
-    const { paymentService, paymentServiceFactory, useCase } = buildUseCase()
-
-    const result = useCase.getBanks(PaymentMethod.NEQUI)
-
-    expect(paymentServiceFactory.getPaymentService).toHaveBeenCalledWith(PaymentMethod.NEQUI)
-    expect(result).toEqual({ banks: paymentService.banks })
-  })
-
-  it('throws when the payment service is disabled', () => {
+  it('rejects when the payment service is disabled', async () => {
     const paymentService = buildPaymentService({ isEnabled: false })
     const { useCase } = buildUseCase({
       paymentService,
       paymentServiceFactory: { getPaymentService: jest.fn<IPaymentService, [PaymentMethod]>(() => paymentService) } as jest.Mocked<IPaymentServiceFactory>,
     })
 
-    expect(() => useCase.getBanks(PaymentMethod.MOVII)).toThrow(/unavailable/i)
+    await expect(useCase.getLiquidity(PaymentMethod.BREB)).rejects.toThrow(/unavailable/i)
   })
 
   it('returns cached liquidity without invoking the payment provider', async () => {
@@ -84,15 +74,15 @@ describe('PaymentUseCase', () => {
         update: jest.fn(),
         upsert: jest.fn().mockResolvedValue({
           country: Country.CO,
-          id: PaymentMethod.NEQUI,
+          id: PaymentMethod.BREB,
           liquidity: 250,
-          name: PaymentMethod.NEQUI,
+          name: PaymentMethod.BREB,
         }),
       },
     }
     const { paymentService, useCase } = buildUseCase({ prismaClient })
 
-    const response = await useCase.getLiquidity(PaymentMethod.NEQUI)
+    const response = await useCase.getLiquidity(PaymentMethod.BREB)
 
     expect(response).toEqual({
       liquidity: 250,
@@ -109,9 +99,9 @@ describe('PaymentUseCase', () => {
         update: jest.fn(),
         upsert: jest.fn().mockResolvedValue({
           country: Country.CO,
-          id: PaymentMethod.MOVII,
+          id: PaymentMethod.BREB,
           liquidity: 0,
-          name: PaymentMethod.MOVII,
+          name: PaymentMethod.BREB,
         }),
       },
     }
@@ -123,7 +113,7 @@ describe('PaymentUseCase', () => {
     expect(paymentService.getLiquidity).toHaveBeenCalled()
     expect(prismaClient.paymentProvider.update).toHaveBeenCalledWith({
       data: { liquidity: 510 },
-      where: { id: PaymentMethod.MOVII },
+      where: { id: PaymentMethod.BREB },
     })
     expect(response).toEqual({
       liquidity: 510,
@@ -136,7 +126,7 @@ describe('PaymentUseCase', () => {
     const { dbProvider, logger, useCase } = buildUseCase()
     dbProvider.getClient.mockRejectedValueOnce(new Error('db down'))
 
-    const response = await useCase.getLiquidity(PaymentMethod.NEQUI)
+    const response = await useCase.getLiquidity(PaymentMethod.BREB)
 
     expect(response).toEqual({
       liquidity: 0,
@@ -152,12 +142,12 @@ describe('PaymentUseCase', () => {
     })
     const { logger, paymentServiceFactory, useCase } = buildUseCase({ paymentService })
 
-    const response = await useCase.onboardUser('12345', PaymentMethod.MOVII)
-    expect(paymentServiceFactory.getPaymentService).toHaveBeenCalledWith(PaymentMethod.MOVII)
+    const response = await useCase.onboardUser('12345', PaymentMethod.BREB)
+    expect(paymentServiceFactory.getPaymentService).toHaveBeenCalledWith(PaymentMethod.BREB)
     expect(response).toEqual({ message: 'ok:12345', success: true })
 
     paymentService.onboardUser.mockRejectedValueOnce(new Error('onboard failure'))
-    const failure = await useCase.onboardUser('abc', PaymentMethod.MOVII)
+    const failure = await useCase.onboardUser('abc', PaymentMethod.BREB)
     expect(failure).toEqual({ message: 'onboard failure', success: false })
     expect(logger.error).toHaveBeenCalledWith('[PaymentUseCase] Failed to onboard user', 'onboard failure')
   })

@@ -55,7 +55,7 @@ type DecodeQrApiResponse = ApiClientResponse<decodeQrCodeBRResponse, DecodeQrCod
 type QuoteApiResponse = ApiClientResponse<getQuoteResponse, GetQuote400>
 type ReverseQuoteApiResponse = ApiClientResponse<getReverseQuoteResponse, GetReverseQuote400>
 type SwapAction
-  = | { accountNumber?: string, bankCode?: string, pixKey?: string, recipientName?: string, taxId?: string, type: 'SET_BANK_DETAILS' }
+  = | { accountNumber?: string, pixKey?: string, recipientName?: string, taxId?: string, type: 'SET_BANK_DETAILS' }
     | { isDecodingQr: boolean, type: 'SET_DECODING' }
     | { isDesktop: boolean, type: 'SET_DESKTOP' }
     | { isQrOpen: boolean, type: 'SET_QR_OPEN' }
@@ -71,7 +71,6 @@ type SwapAction
     | { type: 'SET_VIEW', view: SwapView }
 type SwapControllerState = {
   accountNumber: string
-  bankCode: string
   isDecodingQr: boolean
   isDesktop: boolean
   isQrOpen: boolean
@@ -98,7 +97,6 @@ const HORIZON_SERVER = new Horizon.Server('https://horizon.stellar.org')
 
 const createInitialState = (isDesktop: boolean): SwapControllerState => ({
   accountNumber: '',
-  bankCode: '',
   isDecodingQr: false,
   isDesktop,
   isQrOpen: false,
@@ -138,7 +136,6 @@ const reducer = (state: SwapControllerState, action: SwapAction): SwapController
       return {
         ...state,
         accountNumber: action.accountNumber ?? state.accountNumber,
-        bankCode: action.bankCode ?? state.bankCode,
         pixKey: action.pixKey ?? state.pixKey,
         recipientName: action.recipientName ?? state.recipientName,
         taxId: action.taxId ?? state.taxId,
@@ -174,7 +171,6 @@ const reducer = (state: SwapControllerState, action: SwapAction): SwapController
 
 type PersistedSwap = {
   accountNumber?: string
-  bankCode?: string
   pixKey?: string
   quoteId?: string
   recipientName?: string
@@ -199,7 +195,6 @@ const readPersisted = (): null | PersistedSwap => {
 const persistState = (state: SwapControllerState) => {
   const payload: PersistedSwap = {
     accountNumber: state.accountNumber,
-    bankCode: state.bankCode,
     pixKey: state.pixKey,
     quoteId: state.quoteId,
     recipientName: state.recipientName,
@@ -330,7 +325,6 @@ export const useWebSwapController = (): WebSwapControllerProps => {
       dispatch({
         payload: {
           accountNumber: stored.accountNumber ?? '',
-          bankCode: stored.bankCode ?? '',
           pixKey: stored.pixKey ?? '',
           quoteId: stored.quoteId ?? '',
           recipientName: stored.recipientName ?? '',
@@ -672,7 +666,6 @@ export const useWebSwapController = (): WebSwapControllerProps => {
       const response = await acceptTransaction({
         account_number:
           isBrazil ? state.pixKey : state.accountNumber.trim(),
-        bank_code: isBrazil ? 'PIX' : undefined,
         qr_code: state.qrCode,
         quote_id: state.quoteId,
         redirectUrl,
@@ -760,7 +753,6 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     resetForNewTransaction,
     setKycUrl,
     state.accountNumber,
-    state.bankCode,
     state.pixKey,
     state.qrCode,
     state.quoteId,

@@ -160,9 +160,7 @@ describe('server bootstrap', () => {
 
     // Ensure routes registered
     const rootRoute = registered.gets.find(r => r.path === '/')
-    const moviiRoute = registered.posts.find(r => r.path === '/webhooks/movii')
     expect(rootRoute).toBeDefined()
-    expect(moviiRoute).toBeDefined()
 
     // Exercise landing route formats
     const responses: Array<{ body: unknown, headers: Record<string, string>, status?: number }> = []
@@ -187,15 +185,6 @@ describe('server bootstrap', () => {
       }
     }
     rootRoute?.handler({ get: () => 'localhost:3000', protocol: 'http' }, resFactory())
-
-    // Movii webhook logging path
-    moviiRoute?.handler(
-      { body: { ok: true }, headers: { foo: 'bar' } },
-      {
-        json: (body: unknown) => responses.push({ body, headers: {} }),
-        status: jest.fn(() => ({ json: (body: unknown) => responses.push({ body, headers: {} }) })),
-      },
-    )
 
     // Trigger error middleware and graceful shutdown (duplicate signals should not double-close)
     const sigintHandler = handlers.SIGINT?.[0]

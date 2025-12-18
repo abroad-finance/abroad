@@ -12,14 +12,14 @@ Once you have a valid `quote_id` and the user has confirmed the details, you cre
 
 ## Request
 
-You must provide the `quote_id`, the user's identification (`user_id`), and their payout details. Bank code is only required for `MOVII`; other payment methods infer rails automatically.
+You must provide the `quote_id`, the user's identification (`user_id`), and their payout details. Provide `bank_code` only when a specific rail or bank identifier is required.
 
 ```json
 {
   "quote_id": "uuid-from-previous-step",
   "user_id": "your-internal-user-id",
   "account_number": "3001234567",
-  "bank_code": "NEQUI",
+  "bank_code": "9101",
   "tax_id": "123456789"
 }
 ```
@@ -31,7 +31,7 @@ You must provide the `quote_id`, the user's identification (`user_id`), and thei
 | `quote_id` | `string` | Yes | The ID of the quote to execute. |
 | `user_id` | `string` | Yes | Your internal user ID for compliance tracking. |
 | `account_number` | `string` | Yes | The recipient's bank account or mobile wallet number. |
-| `bank_code` | `string` | No | The bank code (e.g., `NEQUI`, `BANCOLOMBIA`). Required only for `MOVII`; optional for `NEQUI`, `BREB`, and `PIX`. |
+| `bank_code` | `string` | No | Optional bank or rail identifier; include it only if the payout rail requires it. |
 | `tax_id` | `string` | No | The user's tax ID (NIT/CPF) if required. |
 | `redirectUrl` | `string` | No | Optional redirect URL after KYC. |
 | `qr_code` | `string` | No | QR code string, when applicable. |
@@ -59,7 +59,7 @@ You **MUST** redirect the user to this URL to complete their identity verificati
 ## Troubleshooting
 
 ### "We could not verify the account number and bank code provided. Please double-check the details and try again."
-Abroad could not validate the provided payout details. Confirm the `account_number` and `bank_code` pair (for MOVII a bank code is required) and resend the request.
+Abroad could not validate the provided payout details. Confirm the `account_number` and resend the request.
 
 ### "We could not find a valid quote for this request. Please generate a new quote and try again."
 The supplied `quote_id` is missing or no longer valid (likely expired). Create a fresh quote and retry the transaction.

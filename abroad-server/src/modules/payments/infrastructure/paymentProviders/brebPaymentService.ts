@@ -98,7 +98,6 @@ interface BrebTransactionStatusInfo {
 
 @injectable()
 export class BrebPaymentService implements IPaymentService {
-  public readonly banks = []
   public readonly currency = TargetCurrency.COP
   public readonly fixedFee = 0
 
@@ -159,7 +158,6 @@ export class BrebPaymentService implements IPaymentService {
     value,
   }: {
     account: string
-    bankCode?: string
     id: string
     qrCode?: null | string
     value: number
@@ -210,7 +208,6 @@ export class BrebPaymentService implements IPaymentService {
     account,
   }: {
     account: string
-    bankCode?: string
   }): Promise<boolean> {
     try {
       const config = await this.getConfig()

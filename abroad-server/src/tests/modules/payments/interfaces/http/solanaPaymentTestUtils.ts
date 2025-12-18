@@ -1,6 +1,6 @@
 import type { ParsedInstruction, ParsedTransactionWithMeta } from '@solana/web3.js'
 
-import { BlockchainNetwork, CryptoCurrency, TransactionStatus } from '.prisma/client'
+import { BlockchainNetwork, CryptoCurrency, PaymentMethod, TransactionStatus } from '.prisma/client'
 import { TOKEN_PROGRAM_ID } from '@solana/spl-token'
 
 import type { IDatabaseClientProvider } from '../../../../../platform/persistence/IDatabaseClientProvider'
@@ -84,7 +84,6 @@ jest.mock('@solana/spl-token', () => {
 
 export type TransactionRecord = {
   accountNumber: string
-  bankCode: string
   id: string
   onChainId?: string
   partnerUser: { partner: { webhookUrl: string } }
@@ -118,14 +117,13 @@ export const buildTransaction = (overrides?: Partial<TransactionRecord>): Transa
 
   return {
     accountNumber: 'acc',
-    bankCode: 'bank',
     id: transactionId,
     onChainId: undefined,
     partnerUser: { partner: { webhookUrl: 'http://webhook' } },
     quote: {
       cryptoCurrency: CryptoCurrency.USDC,
       network: BlockchainNetwork.SOLANA,
-      paymentMethod: 'nequi',
+      paymentMethod: PaymentMethod.BREB,
       targetAmount: 0,
       targetCurrency: 'COP',
       ...(quoteOverride ?? {}),

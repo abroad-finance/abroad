@@ -1,6 +1,5 @@
 // src/modules/payments/interfaces/http/PaymentsController.ts
 
-import { PaymentMethod } from '@prisma/client'
 import { inject } from 'inversify'
 import {
   Body,
@@ -16,10 +15,8 @@ import {
 } from 'tsoa'
 
 import { TYPES } from '../../../../app/container/types'
-import { BanksResult, IPaymentUseCase, LiquidityResult, OnboardResult } from '../../application/paymentUseCase'
-
-// Define the response for the banks list endpoint
-type BanksResponse = BanksResult
+import { IPaymentUseCase, LiquidityResult, OnboardResult } from '../../application/paymentUseCase'
+import { DEFAULT_PAYMENT_METHOD, SupportedPaymentMethod } from '../../application/supportedPaymentMethods'
 
 // Define the response for the liquidity endpoint
 type LiquidityResponse = LiquidityResult
@@ -44,34 +41,15 @@ export class PaymentsController extends Controller {
   }
 
   /**
-   * Lists all banks available for a specific payment method.
-   *
-   * @param paymentMethod - The payment method to get banks for (MOVII, NEQUI, etc.)
-   * @returns List of banks supported by the payment method
-   */
-  @Get('banks')
-  @Response('400', 'Bad Request')
-  @SuccessResponse('200', 'Banks retrieved successfully')
-  public async getBanks(@Query() paymentMethod?: PaymentMethod): Promise<BanksResponse> {
-    try {
-      return this.paymentUseCase.getBanks(paymentMethod)
-    }
-    catch {
-      this.setStatus(400)
-      return { banks: [] }
-    }
-  }
-
-  /**
    * Gets the liquidity for a specific payment method.
    *
-   * @param paymentMethod - The payment method to get liquidity for (MOVII, NEQUI, etc.)
+   * @param paymentMethod - The payment method to get liquidity for (BREB, PIX)
    * @returns The liquidity of the payment method
    */
   @Get('liquidity')
   @Response('400', 'Bad Request')
   @SuccessResponse('200', 'Liquidity retrieved successfully')
-  public async getLiquidity(@Query() paymentMethod?: PaymentMethod): Promise<LiquidityResponse> {
+  public async getLiquidity(@Query() paymentMethod?: SupportedPaymentMethod): Promise<LiquidityResponse> {
     const result = await this.paymentUseCase.getLiquidity(paymentMethod)
     if (!result.success) {
       this.setStatus(400)
@@ -94,7 +72,7 @@ export class PaymentsController extends Controller {
       return { message: 'Account is required', success: false }
     }
 
-    const result = await this.paymentUseCase.onboardUser(requestBody.account, PaymentMethod.MOVII)
+    const result = await this.paymentUseCase.onboardUser(requestBody.account, DEFAULT_PAYMENT_METHOD)
     if (!result.success) {
       this.setStatus(400)
     }

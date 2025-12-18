@@ -11,6 +11,7 @@ import { ISlackNotifier } from '../../../../platform/notifications/ISlackNotifie
 import { IWebhookNotifier, WebhookEvent } from '../../../../platform/notifications/IWebhookNotifier'
 import { IDatabaseClientProvider } from '../../../../platform/persistence/IDatabaseClientProvider'
 import { transactionNotificationInclude, TransactionWithRelations } from '../../../transactions/application/transactionNotificationTypes'
+import { toWebhookTransactionPayload } from '../../../transactions/application/transactionPayload'
 import { buildTransactionSlackMessage } from '../../../transactions/application/transactionSlackFormatter'
 import { IWalletHandlerFactory } from '../../application/contracts/IWalletHandlerFactory'
 
@@ -116,10 +117,11 @@ export class PaymentStatusUpdatedController {
         include: transactionNotificationInclude,
         where: { externalId: message.externalId },
       })
+      const webhookPayload = toWebhookTransactionPayload(transactionRecord)
       // Notify partner webhook that the transaction was updated
       await this.webhookNotifier.notifyWebhook(
         transactionRecord.partnerUser.partner.webhookUrl,
-        { data: transactionRecord, event: WebhookEvent.TRANSACTION_UPDATED },
+        { data: webhookPayload, event: WebhookEvent.TRANSACTION_UPDATED },
       )
 
       // Notify user via websocket bridge with full payload
@@ -127,7 +129,7 @@ export class PaymentStatusUpdatedController {
         await this.queueHandler.postMessage(
           QueueName.USER_NOTIFICATION,
           {
-            payload: JSON.stringify(transactionRecord),
+            payload: JSON.stringify(webhookPayload),
             type: 'transaction.updated',
             userId: transactionRecord.partnerUser.userId,
           },
