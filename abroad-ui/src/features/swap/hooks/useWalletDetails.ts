@@ -13,7 +13,7 @@ import {
   listPartnerTransactions,
   type ListPartnerTransactions400,
   type listPartnerTransactionsResponse,
-  PaginatedTransactionListTransactionsItem,
+  TransactionListItem,
 } from '../../../api'
 import { useWebSocketSubscription } from '../../../contexts/WebSocketContext'
 import { useWalletAuth } from '../../../shared/hooks/useWalletAuth'
@@ -34,7 +34,7 @@ interface PaginationState {
 
 interface Params { onClose?: () => void }
 // Transaction type
-type Transaction = PaginatedTransactionListTransactionsItem
+type Transaction = TransactionListItem
 
 // Hook encapsulating all stateful logic from WalletDetails component.
 export function useWalletDetails(params: Params = {}): WalletDetailsProps {
@@ -50,7 +50,7 @@ export function useWalletDetails(params: Params = {}): WalletDetailsProps {
   const [isLoadingTransactions, setIsLoadingTransactions] = useState(false)
   const [isLoadingMoreTransactions, setIsLoadingMoreTransactions] = useState(false)
   const [transactionError, setTransactionError] = useState<null | string>(null)
-  const [selectedTransaction, setSelectedTransaction] = useState<null | PaginatedTransactionListTransactionsItem>(null)
+  const [selectedTransaction, setSelectedTransaction] = useState<null | TransactionListItem>(null)
   const pageSizeRef = useRef<number>(DEFAULT_TRANSACTIONS_PAGE_SIZE)
   const transactionsAbortRef = useRef<AbortController | null>(null)
   const [pagination, setPagination] = useState<PaginationState>({

@@ -2,7 +2,7 @@ import { useTranslate } from '@tolgee/react'
 import { ShieldQuestionMark } from 'lucide-react'
 import React, { useState } from 'react'
 
-import { PaginatedTransactionListTransactionsItem } from '../../../api'
+import { TransactionListItem } from '../../../api'
 import { formatMoney } from '../../../shared/utils'
 
 export interface TransactionDetailProps {
@@ -11,7 +11,7 @@ export interface TransactionDetailProps {
   getStatusText: (status: string) => string
   onBack: () => void
   onSupport: () => void
-  transaction: PaginatedTransactionListTransactionsItem
+  transaction: TransactionListItem
 }
 
 const TransactionDetail: React.FC<TransactionDetailProps> = ({
