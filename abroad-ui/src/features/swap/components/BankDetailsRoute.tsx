@@ -60,7 +60,7 @@ export default function BankDetailsRoute({
             id="Title"
             style={{ color: textColor }}
           >
-            {t('bank_details.title', 'Datos de Transacción')}
+            {t('bank_details.title', 'Datos del destinatario')}
           </div>
         </div>
 
@@ -103,7 +103,7 @@ export default function BankDetailsRoute({
                   {/* BreB key */}
                   <div
                     className="w-full bg-white/60 backdrop-blur-xl rounded-2xl p-4 md:p-6 flex items-center space-x-3"
-                    id="bank-account-input"
+                    id="recipient-key-input"
                   >
                     <Hash className="w-5 h-5 sm:w-6 sm:h-6" style={{ color: textColor }} />
                     <input
@@ -181,7 +181,7 @@ export default function BankDetailsRoute({
                   <span className="font-medium text-xs pl-1" style={{ color: textColor }}>
                     {t(
                       'bank_details.breb_disclaimer',
-                      'Tu transacción será procesada de inmediato con BRE-B. Ingresa la clave correcta del destinatario; no es necesario seleccionar banco.',
+                      'Tu transacción será procesada de inmediato con BRE-B. Ingresa la clave correcta del destinatario; esta transacción no se puede reversar.',
                     )}
                   </span>
                 </>

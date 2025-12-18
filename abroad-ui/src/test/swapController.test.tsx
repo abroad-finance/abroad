@@ -156,7 +156,7 @@ describe('useWebSwapController', () => {
     expect(result.current.view).toBe('swap')
   })
 
-  it('does not require selecting a bank when using BRE-B, only a key', () => {
+  it('requires only the BRE-B key when using COP payouts', () => {
     const { result } = renderHook(() => useWebSwapController(), { wrapper: Wrapper })
 
     act(() => {
