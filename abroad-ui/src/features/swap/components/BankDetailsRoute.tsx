@@ -5,6 +5,7 @@ import {
 import React from 'react'
 
 import { _36EnumsTargetCurrency as TargetCurrency } from '../../../api'
+import BreBLogo from '../../../assets/Logos/networks/Bre-b.svg'
 import PixFull from '../../../assets/Logos/networks/PixFull.svg'
 import { Button } from '../../../shared/components/Button'
 
@@ -173,9 +174,7 @@ export default function BankDetailsRoute({
                     <Rotate3d className="w-4 h-4 sm:w-5 sm:h-5" />
                     <span className="font-medium text-xs sm:text-sm">{t('bank_details.network', 'Red:')}</span>
                     <div className="bg-white/70 backdrop-blur-md rounded-lg px-2 py-1 flex items-center">
-                      <span className="text-xs sm:text-sm font-semibold" style={{ color: textColor }}>
-                        BRE-B
-                      </span>
+                      <img alt="BRE-B Logo" className="h-3 sm:h-4 w-auto" src={BreBLogo} />
                     </div>
                   </div>
                   <span className="font-medium text-xs pl-1" style={{ color: textColor }}>
