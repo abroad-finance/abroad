@@ -560,16 +560,7 @@ export class BrebPaymentService implements IPaymentService {
       return false
     }
 
-    if (!this.isSupportedRail(keyDetails.instructedAgent)) {
-      this.logger.warn('[BreB] Unsupported rail for key', { rail: keyDetails.instructedAgent ?? '<empty>' })
-      return false
-    }
-
     return isActive
-  }
-
-  private isSupportedRail(rail: unknown): rail is BrebRail {
-    return typeof rail === 'string' && this.supportedRails.includes(rail as BrebRail)
   }
 
   private logBrebError({

@@ -268,21 +268,6 @@ describe('BrebPaymentService', () => {
       expect(logger.warn).toHaveBeenCalledWith('[BreB] Payment pending after timeout', { transactionId: 'tx-005' })
     })
 
-    it('fails fast when the key rail is unsupported', async () => {
-      const { logger, service } = setupService()
-      primeAccessToken()
-      primeKeyLookup({ instructedAgent: 'INVALID' })
-
-      const result = await service.sendPayment({
-        account: defaultKeyDetails.accountNumber,
-        id: 'txn-invalid',
-        value: 1_000,
-      })
-
-      expect(result).toEqual({ success: false })
-      expect(logger.warn).toHaveBeenCalledWith('[BreB] Unsupported rail for key', { rail: 'INVALID' })
-    })
-
     it('logs unexpected failures during submission', async () => {
       const { logger, service } = setupService()
       const internals = getInternals(service)
@@ -300,23 +285,6 @@ describe('BrebPaymentService', () => {
   })
 
   describe('verifyAccount', () => {
-    it('rejects verification when the rail or key data is invalid', async () => {
-      const { logger, service } = setupService()
-
-      primeAccessToken()
-      primeKeyLookup({ instructedAgent: '???' })
-
-      const invalidRail = await service.verifyAccount({ account: defaultKeyDetails.accountNumber })
-      expect(invalidRail).toBe(false)
-      expect(logger.warn).toHaveBeenCalledWith('[BreB] Unsupported rail for key', { rail: '???' })
-
-      mockedAxios.get.mockResolvedValueOnce({ data: {} })
-
-      const missingKey = await service.verifyAccount({ account: '123' })
-      expect(missingKey).toBe(false)
-      expect(logger.warn).toHaveBeenCalledWith('[BreB] Key lookup returned no data', { account: '123' })
-    })
-
     it('handles key lookup failures from the provider', async () => {
       const { logger, service } = setupService()
       mockedAxios.isAxiosError.mockReturnValue(true)
