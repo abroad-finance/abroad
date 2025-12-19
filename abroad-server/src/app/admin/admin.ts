@@ -6,6 +6,7 @@ import type { Express } from 'express'
 
 import { Prisma } from '@prisma/client'
 import session from 'express-session'
+import { createRequire } from 'module'
 
 import { PersonaInquiryDetailsService } from '../../modules/kyc/application/PersonaInquiryDetailsService'
 import { IDatabaseClientProvider } from '../../platform/persistence/IDatabaseClientProvider'
@@ -17,10 +18,21 @@ import { createTransactionQuoteSupport } from './transactionQuoteSupport'
 // -----------------------
 // ESM-safe dynamic import
 // -----------------------
-type DynamicImport = <T = unknown>(specifier: string) => Promise<T>
-const dynamicImport: DynamicImport = async function dynamicImportImpl<T = unknown>(specifier: string): Promise<T> {
-  return import(specifier) as Promise<T>
-}
+type DynamicImport = <TModule>(specifier: string) => Promise<TModule>
+const dynamicImport: DynamicImport = (() => {
+  const cjsRequire = createRequire(__filename)
+  // Use native dynamic import to honor ESM-only packages such as @adminjs/express.
+  const loader = new Function('specifier', 'return import(specifier)') as (specifier: string) => Promise<unknown>
+  return async <TModule>(specifier: string): Promise<TModule> => {
+    if (typeof jest !== 'undefined' || process.env.NODE_ENV === 'test') {
+      // Jest runs in CommonJS mode and expects mocks to flow through require().
+      const moduleExports = cjsRequire(specifier)
+      return moduleExports as TModule
+    }
+    const moduleExports = await loader(specifier)
+    return moduleExports as TModule
+  }
+})()
 
 let AdminJSExpress: ExpressPlugin
 let AdminJS: typeof AdminJSClass
