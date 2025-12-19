@@ -16,17 +16,34 @@ export type CheckUnprocessedStellarResponse = {
   startPagingToken: null | string
 }
 
-type PaymentProcessingOutcome
-  = | { cursor: string, result: 'alreadyProcessed' | 'enqueued' | 'irrelevant' | 'missing' }
-    | { cursor: string, result: 'halt' }
+export type SingleStellarReconciliationResponse = {
+  paymentId: string
+  result: 'alreadyProcessed' | 'enqueued' | 'failed' | 'invalid' | 'irrelevant' | 'missing' | 'notFound'
+  transactionId: null | string
+}
 
-type StellarReconciliationContext = {
+type PaymentLookupResult
+  = | { payment: Horizon.ServerApi.PaymentOperationRecord, status: 'found' }
+    | { status: 'failed' }
+    | { status: 'invalid' }
+    | { status: 'notFound' }
+    | { status: 'unsupported' }
+
+type PaymentProcessingOutcome
+  = | { cursor: string, result: 'alreadyProcessed' | 'enqueued' | 'missing', transactionId: string }
+    | { cursor: string, result: 'halt', transactionId?: string }
+    | { cursor: string, result: 'irrelevant' }
+
+type StellarPaymentContext = {
   accountId: string
   prismaClient: PrismaClient
+  usdcIssuer: string
+}
+
+type StellarReconciliationContext = StellarPaymentContext & {
   scanStartPagingToken: string
   server: Horizon.Server
   storedPagingToken: string
-  usdcIssuer: string
 }
 
 const STELLAR_PAGE_SIZE = 200
@@ -71,6 +88,46 @@ export class StellarReconciliationService {
     return summary
   }
 
+  public async reconcilePaymentById(paymentId: string): Promise<SingleStellarReconciliationResponse> {
+    const normalizedPaymentId = paymentId.trim()
+    if (!normalizedPaymentId) {
+      this.logger.warn('[PublicTransactionsController] Empty Stellar payment id provided for reconciliation', {
+        paymentId,
+      })
+      return { paymentId, result: 'invalid', transactionId: null }
+    }
+
+    const prismaClient = await this.prismaProvider.getClient()
+    const { accountId, horizonUrl, usdcIssuer } = await this.getStellarSecrets()
+    const server = new Horizon.Server(horizonUrl)
+
+    const lookupResult = await this.fetchPaymentById(server, normalizedPaymentId)
+    if (lookupResult.status === 'failed') {
+      return { paymentId: normalizedPaymentId, result: 'failed', transactionId: null }
+    }
+    if (lookupResult.status === 'invalid') {
+      return { paymentId: normalizedPaymentId, result: 'invalid', transactionId: null }
+    }
+    if (lookupResult.status === 'notFound') {
+      return { paymentId: normalizedPaymentId, result: 'notFound', transactionId: null }
+    }
+    if (lookupResult.status === 'unsupported') {
+      return { paymentId: normalizedPaymentId, result: 'irrelevant', transactionId: null }
+    }
+
+    const outcome = await this.processPayment(lookupResult.payment, { accountId, prismaClient, usdcIssuer })
+    if (outcome.result === 'halt') {
+      return { paymentId: normalizedPaymentId, result: 'failed', transactionId: outcome.transactionId ?? null }
+    }
+
+    const transactionId = 'transactionId' in outcome ? outcome.transactionId : null
+    return {
+      paymentId: normalizedPaymentId,
+      result: outcome.result,
+      transactionId,
+    }
+  }
+
   private applyOutcome(
     summary: CheckUnprocessedStellarResponse,
     outcome: Exclude<PaymentProcessingOutcome, { result: 'halt' }>,
@@ -103,6 +160,28 @@ export class StellarReconciliationService {
     }
   }
 
+  private extractErrorStatus(error: unknown): number | undefined {
+    if (!error || typeof error !== 'object') {
+      return undefined
+    }
+
+    if ('response' in error) {
+      const response = (error as { response?: { status?: number } }).response
+      if (response && typeof response.status === 'number') {
+        return response.status
+      }
+    }
+
+    if ('status' in error) {
+      const status = (error as { status?: number }).status
+      if (typeof status === 'number') {
+        return status
+      }
+    }
+
+    return undefined
+  }
+
   private async extractTransactionId(payment: Horizon.ServerApi.PaymentOperationRecord): Promise<null | string> {
     const transaction = await payment.transaction()
     const memo = transaction.memo
@@ -120,6 +199,38 @@ export class StellarReconciliationService {
       hex.substring(16, 20),
       hex.substring(20),
     ].join('-')
+  }
+
+  private async fetchPaymentById(server: Horizon.Server, paymentId: string): Promise<PaymentLookupResult> {
+    try {
+      const operation = await server.operations().operation(paymentId).call()
+      if (!this.isPaymentOperationRecord(operation)) {
+        this.logger.warn('[PublicTransactionsController] Stellar operation is not a direct payment', {
+          operationType: operation.type,
+          paymentId,
+        })
+        return { status: 'unsupported' }
+      }
+
+      return { payment: operation, status: 'found' }
+    }
+    catch (error: unknown) {
+      if (this.isNotFoundError(error)) {
+        return { status: 'notFound' }
+      }
+      if (this.isBadRequestError(error)) {
+        this.logger.warn('[PublicTransactionsController] Invalid Stellar payment id supplied', {
+          paymentId,
+        })
+        return { status: 'invalid' }
+      }
+
+      this.logger.error('[PublicTransactionsController] Failed to load Stellar payment for reconciliation', {
+        error,
+        paymentId,
+      })
+      return { status: 'failed' }
+    }
   }
 
   private async fetchPaymentPage(
@@ -166,6 +277,20 @@ export class StellarReconciliationService {
     ])
 
     return { accountId, horizonUrl, usdcIssuer }
+  }
+
+  private isBadRequestError(error: unknown): boolean {
+    return this.extractErrorStatus(error) === 400
+  }
+
+  private isNotFoundError(error: unknown): boolean {
+    return this.extractErrorStatus(error) === 404
+  }
+
+  private isPaymentOperationRecord(
+    record: Horizon.ServerApi.OperationRecord,
+  ): record is Horizon.ServerApi.PaymentOperationRecord {
+    return record.type === 'payment'
   }
 
   private isUsdcPaymentToWallet(
@@ -235,7 +360,7 @@ export class StellarReconciliationService {
 
   private async processPayment(
     payment: Horizon.ServerApi.PaymentOperationRecord,
-    context: StellarReconciliationContext,
+    context: StellarPaymentContext,
   ): Promise<PaymentProcessingOutcome> {
     const cursor = payment.paging_token
 
@@ -265,11 +390,11 @@ export class StellarReconciliationService {
     })
 
     if (!transaction) {
-      return { cursor, result: 'missing' }
+      return { cursor, result: 'missing', transactionId }
     }
 
     if (transaction.status !== TransactionStatus.AWAITING_PAYMENT) {
-      return { cursor, result: 'alreadyProcessed' }
+      return { cursor, result: 'alreadyProcessed', transactionId: transaction.id }
     }
 
     const queueMessage: ReceivedCryptoTransactionMessage = {
@@ -283,7 +408,7 @@ export class StellarReconciliationService {
 
     try {
       await this.queueHandler.postMessage(QueueName.RECEIVED_CRYPTO_TRANSACTION, queueMessage)
-      return { cursor, result: 'enqueued' }
+      return { cursor, result: 'enqueued', transactionId: transaction.id }
     }
     catch (error: unknown) {
       this.logger.error('[PublicTransactionsController] Failed to enqueue recovered Stellar payment', {
@@ -291,7 +416,7 @@ export class StellarReconciliationService {
         paymentId: payment.id,
         transactionId: transaction.id,
       })
-      return { cursor, result: 'halt' }
+      return { cursor, result: 'halt', transactionId: transaction.id }
     }
   }
 
