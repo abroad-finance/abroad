@@ -51,4 +51,18 @@ describe('SlackNotifier', () => {
 
     expect(logger.warn).toHaveBeenCalledWith('Failed to send message to Slack', expect.any(Error))
   })
+
+  it('wraps non-error failures before logging', async () => {
+    ;(axios.post as jest.Mock).mockRejectedValueOnce('boom')
+    const notifier = new SlackNotifier(secretManager, logger, RuntimeConfig)
+
+    await notifier.sendMessage('warn')
+
+    expect(logger.warn).toHaveBeenCalledWith('Failed to send message to Slack', expect.any(Error))
+    const [, loggedError] = logger.warn.mock.calls[0] ?? []
+    expect(loggedError).toBeInstanceOf(Error)
+    if (loggedError instanceof Error) {
+      expect(loggedError.message).toBe('boom')
+    }
+  })
 })

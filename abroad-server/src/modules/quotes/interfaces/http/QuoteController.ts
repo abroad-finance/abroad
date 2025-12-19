@@ -1,10 +1,5 @@
 // src/modules/quotes/interfaces/http/QuoteController.ts
-import {
-  BlockchainNetwork,
-  CryptoCurrency,
-  Partner,
-  TargetCurrency,
-} from '@prisma/client'
+import { BlockchainNetwork, CryptoCurrency, Partner, TargetCurrency } from '@prisma/client'
 import { Request as RequestExpress } from 'express'
 import { inject } from 'inversify'
 import {
@@ -23,8 +18,8 @@ import { z } from 'zod'
 
 import { TYPES } from '../../../../app/container/types'
 import { IPartnerService } from '../../../partners/application/contracts/IPartnerService'
+import { SUPPORTED_PAYMENT_METHODS, SupportedPaymentMethod } from '../../../payments/application/supportedPaymentMethods'
 import { IQuoteUseCase, QuoteResponse } from '../../application/quoteUseCase'
-import { SUPPORTED_PAYMENT_METHODS, SupportedPaymentMethod } from '../../application/supportedPaymentMethods'
 
 type PartnerResolution = { errorReason?: string, partner?: Partner }
 

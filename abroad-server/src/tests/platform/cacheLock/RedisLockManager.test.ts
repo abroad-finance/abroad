@@ -86,4 +86,27 @@ describe('RedisLockManager', () => {
     const [, , opts] = redlockUsing.mock.calls[0]
     expect(opts).toEqual({ retryCount: 10 })
   })
+
+  it('normalizes Redlock errors before logging', async () => {
+    const manager = new RedisLockManager(secretManager, logger)
+    redlockUsing.mockImplementation(async (_resources: string[], _ttl: number, _opts: { retryCount: number }, fn: () => Promise<unknown>) => fn())
+
+    await manager.withLock('account-1', 1000, async () => 'ok')
+
+    const errorHandler = redlockOn.mock.calls[0]?.[1]
+    expect(typeof errorHandler).toBe('function')
+    if (typeof errorHandler !== 'function') {
+      throw new Error('Expected Redlock error handler to be registered')
+    }
+
+    errorHandler(new Error('boom'))
+    errorHandler('boom')
+
+    expect(logger.warn).toHaveBeenNthCalledWith(1, '[Redlock] non-fatal error:', expect.any(Error))
+    expect(logger.warn).toHaveBeenNthCalledWith(2, '[Redlock] non-fatal error:', expect.any(Error))
+    const firstError = logger.warn.mock.calls[0]?.[1]
+    const secondError = logger.warn.mock.calls[1]?.[1]
+    expect(firstError).toBeInstanceOf(Error)
+    expect(secondError).toBeInstanceOf(Error)
+  })
 })

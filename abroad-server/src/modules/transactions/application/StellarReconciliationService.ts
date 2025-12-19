@@ -23,8 +23,9 @@ type PaymentProcessingOutcome
 type StellarReconciliationContext = {
   accountId: string
   prismaClient: PrismaClient
+  scanStartPagingToken: string
   server: Horizon.Server
-  startPagingToken: string
+  storedPagingToken: string
   usdcIssuer: string
 }
 
@@ -49,7 +50,7 @@ export class StellarReconciliationService {
 
     const { accountId, horizonUrl, usdcIssuer } = await this.getStellarSecrets()
     const server = new Horizon.Server(horizonUrl)
-    const startPagingToken = await this.rewindPagingToken(
+    const scanStartPagingToken = await this.rewindPagingToken(
       server,
       accountId,
       storedPagingToken,
@@ -59,8 +60,9 @@ export class StellarReconciliationService {
     const summary = await this.reconcileStellarPayments({
       accountId,
       prismaClient,
+      scanStartPagingToken,
       server,
-      startPagingToken,
+      storedPagingToken,
       usdcIssuer,
     })
 
@@ -296,17 +298,17 @@ export class StellarReconciliationService {
   private async reconcileStellarPayments(context: StellarReconciliationContext): Promise<CheckUnprocessedStellarResponse> {
     const summary: CheckUnprocessedStellarResponse = {
       alreadyProcessed: 0,
-      endPagingToken: context.startPagingToken,
+      endPagingToken: context.storedPagingToken,
       enqueued: 0,
       missingTransactions: 0,
       scannedPayments: 0,
-      startPagingToken: context.startPagingToken,
+      startPagingToken: context.storedPagingToken,
     }
 
     for await (const payment of this.iterateStellarPayments(
       context.server,
       context.accountId,
-      context.startPagingToken,
+      context.scanStartPagingToken,
     )) {
       summary.scannedPayments += 1
       const outcome = await this.processPayment(payment, context)

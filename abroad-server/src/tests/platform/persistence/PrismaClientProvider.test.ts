@@ -52,4 +52,26 @@ describe('PrismaClientProvider', () => {
     expect(secretManager.getSecret).not.toHaveBeenCalled()
     expect(PrismaClientMock).not.toHaveBeenCalled()
   })
+
+  it('reuses the cached datasource URL when the client cache is cleared', async () => {
+    const provider = new PrismaClientProvider(secretManager)
+
+    await provider.getClient()
+
+    const mutableProvider = provider as unknown as {
+      datasourceUrl: null | string
+      prismaClient: import('@prisma/client').PrismaClient | null
+    }
+    mutableProvider.prismaClient = null
+
+    ;(secretManager.getSecret as jest.Mock).mockClear()
+    PrismaClientMock.mockClear()
+
+    await provider.getClient()
+
+    expect(secretManager.getSecret).not.toHaveBeenCalled()
+    expect(PrismaClientMock).toHaveBeenCalledTimes(1)
+    expect(prismaConstructorCalls).toHaveLength(2)
+    expect(prismaConstructorCalls[1]).toEqual({ datasourceUrl: 'postgres://from-secret' })
+  })
 })
