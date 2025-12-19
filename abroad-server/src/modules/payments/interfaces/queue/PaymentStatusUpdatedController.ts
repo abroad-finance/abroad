@@ -14,6 +14,7 @@ import { transactionNotificationInclude, TransactionWithRelations } from '../../
 import { toWebhookTransactionPayload } from '../../../transactions/application/transactionPayload'
 import { buildTransactionSlackMessage } from '../../../transactions/application/transactionSlackFormatter'
 import { IWalletHandlerFactory } from '../../application/contracts/IWalletHandlerFactory'
+import { isSupportedPaymentMethod } from '../../application/supportedPaymentMethods'
 
 /**
  * Consumes payment status update messages coming from providers like Transfero
@@ -147,13 +148,22 @@ export class PaymentStatusUpdatedController {
       if (newStatus === TransactionStatus.PAYMENT_COMPLETED) {
         await this.slackNotifier.sendMessage(this.buildSlackMessage(transactionRecord, newStatus, message))
 
-        await this.queueHandler.postMessage(QueueName.PAYMENT_SENT, {
-          amount: transactionRecord.quote.sourceAmount,
-          blockchain: transactionRecord.quote.network,
-          cryptoCurrency: transactionRecord.quote.cryptoCurrency,
-          paymentMethod: transactionRecord.quote.paymentMethod,
-          targetCurrency: transactionRecord.quote.targetCurrency,
-        } satisfies PaymentSentMessage)
+        const paymentMethod = transactionRecord.quote.paymentMethod
+        if (!isSupportedPaymentMethod(paymentMethod)) {
+          logger.warn(
+            '[PaymentStatusUpdated queue]: Skipping payment sent notification for unsupported method',
+            { paymentMethod, transactionId: transactionRecord.id },
+          )
+        }
+        else {
+          await this.queueHandler.postMessage(QueueName.PAYMENT_SENT, {
+            amount: transactionRecord.quote.sourceAmount,
+            blockchain: transactionRecord.quote.network,
+            cryptoCurrency: transactionRecord.quote.cryptoCurrency,
+            paymentMethod,
+            targetCurrency: transactionRecord.quote.targetCurrency,
+          } satisfies PaymentSentMessage)
+        }
       }
       else {
         await this.slackNotifier.sendMessage(this.buildSlackMessage(transactionRecord, newStatus, message))

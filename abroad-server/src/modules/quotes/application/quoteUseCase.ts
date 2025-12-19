@@ -4,7 +4,6 @@ import {
   Country,
   CryptoCurrency,
   Partner,
-  PaymentMethod,
   TargetCurrency,
 } from '.prisma/client'
 import { inject, injectable } from 'inversify'
@@ -14,6 +13,7 @@ import { IDatabaseClientProvider } from '../../../platform/persistence/IDatabase
 import { ISecretManager } from '../../../platform/secrets/ISecretManager'
 import { IPaymentService } from '../../payments/application/contracts/IPaymentService'
 import { IPaymentServiceFactory } from '../../payments/application/contracts/IPaymentServiceFactory'
+import { SupportedPaymentMethod } from '../../payments/application/supportedPaymentMethods'
 import { IExchangeProviderFactory } from '../../treasury/application/contracts/IExchangeProviderFactory'
 
 // Interface for QuoteUseCase
@@ -35,7 +35,7 @@ interface CreateQuoteParams {
   cryptoCurrency: CryptoCurrency
   network: BlockchainNetwork
   partner?: Partner
-  paymentMethod: PaymentMethod
+  paymentMethod: SupportedPaymentMethod
   targetCurrency: TargetCurrency
 }
 
@@ -44,7 +44,7 @@ interface CreateReverseQuoteParams {
   cryptoCurrency: CryptoCurrency
   network: BlockchainNetwork
   partner?: Partner
-  paymentMethod: PaymentMethod
+  paymentMethod: SupportedPaymentMethod
   sourceAmountInput: number
   targetCurrency: TargetCurrency
 }
@@ -214,7 +214,7 @@ export class QuoteUseCase implements IQuoteUseCase {
     }
   }
 
-  private ensurePaymentServiceIsEnabled(paymentService: IPaymentService, paymentMethod: PaymentMethod): void {
+  private ensurePaymentServiceIsEnabled(paymentService: IPaymentService, paymentMethod: SupportedPaymentMethod): void {
     if (!paymentService.isEnabled) {
       throw new Error(`Payment method ${paymentMethod} is currently unavailable`)
     }

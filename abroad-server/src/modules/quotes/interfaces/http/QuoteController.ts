@@ -3,7 +3,6 @@ import {
   BlockchainNetwork,
   CryptoCurrency,
   Partner,
-  PaymentMethod,
   TargetCurrency,
 } from '@prisma/client'
 import { Request as RequestExpress } from 'express'
@@ -25,6 +24,7 @@ import { z } from 'zod'
 import { TYPES } from '../../../../app/container/types'
 import { IPartnerService } from '../../../partners/application/contracts/IPartnerService'
 import { IQuoteUseCase, QuoteResponse } from '../../application/quoteUseCase'
+import { SUPPORTED_PAYMENT_METHODS, SupportedPaymentMethod } from '../../application/supportedPaymentMethods'
 
 type PartnerResolution = { errorReason?: string, partner?: Partner }
 
@@ -42,7 +42,7 @@ const quoteRequestSchema = z.object({
   amount: z.number().positive(),
   crypto_currency: z.enum(CryptoCurrency),
   network: z.enum(BlockchainNetwork),
-  payment_method: z.enum(PaymentMethod),
+  payment_method: z.enum(SUPPORTED_PAYMENT_METHODS),
   target_currency: z.enum(TargetCurrency),
 })
 
@@ -50,14 +50,14 @@ type QuoteRequest = {
   amount: number
   crypto_currency: CryptoCurrency
   network: BlockchainNetwork
-  payment_method: PaymentMethod
+  payment_method: SupportedPaymentMethod
   target_currency: TargetCurrency
 }
 
 const reverseQuoteRequestSchema = z.object({
   crypto_currency: z.enum(CryptoCurrency),
   network: z.enum(BlockchainNetwork),
-  payment_method: z.enum(PaymentMethod),
+  payment_method: z.enum(SUPPORTED_PAYMENT_METHODS),
   source_amount: z.number().positive(),
   target_currency: z.enum(TargetCurrency),
 })
@@ -65,7 +65,7 @@ const reverseQuoteRequestSchema = z.object({
 type ReverseQuoteRequest = {
   crypto_currency: CryptoCurrency
   network: BlockchainNetwork
-  payment_method: PaymentMethod
+  payment_method: SupportedPaymentMethod
   source_amount: number
   target_currency: TargetCurrency
 }

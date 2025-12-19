@@ -10,7 +10,11 @@ export const DEFAULT_PAYMENT_METHOD: SupportedPaymentMethod = SUPPORTED_PAYMENT_
 export type SupportedPaymentMethod = typeof SUPPORTED_PAYMENT_METHODS[number]
 
 export function assertSupportedPaymentMethod(method: PaymentMethod): asserts method is SupportedPaymentMethod {
-  if (!SUPPORTED_PAYMENT_METHODS.includes(method as SupportedPaymentMethod)) {
+  if (!isSupportedPaymentMethod(method)) {
     throw new Error(`Unsupported payment method: ${method}`)
   }
+}
+
+export function isSupportedPaymentMethod(method: PaymentMethod): method is SupportedPaymentMethod {
+  return SUPPORTED_PAYMENT_METHODS.includes(method as SupportedPaymentMethod)
 }

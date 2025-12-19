@@ -12,6 +12,7 @@ import { IWebhookNotifier, WebhookEvent } from '../../../platform/notifications/
 import { IDatabaseClientProvider } from '../../../platform/persistence/IDatabaseClientProvider'
 import { IPaymentServiceFactory } from '../../payments/application/contracts/IPaymentServiceFactory'
 import { IWalletHandlerFactory } from '../../payments/application/contracts/IWalletHandlerFactory'
+import { isSupportedPaymentMethod } from '../../payments/application/supportedPaymentMethods'
 import { transactionNotificationInclude, TransactionWithRelations } from './transactionNotificationTypes'
 import { toWebhookTransactionPayload } from './transactionPayload'
 import { buildTransactionSlackMessage } from './transactionSlackFormatter'
@@ -363,11 +364,20 @@ export class ReceivedCryptoTransactionUseCase implements IReceivedCryptoTransact
     logger: ScopedLogger,
   ): Promise<void> {
     try {
+      const paymentMethod = transactionRecord.quote.paymentMethod
+      if (!isSupportedPaymentMethod(paymentMethod)) {
+        logger.warn(
+          'Skipping payment sent notification for unsupported method',
+          { paymentMethod, transactionId: transactionRecord.id },
+        )
+        return
+      }
+
       await this.queueHandler.postMessage(QueueName.PAYMENT_SENT, {
         amount: transactionRecord.quote.sourceAmount,
         blockchain: transactionRecord.quote.network,
         cryptoCurrency: transactionRecord.quote.cryptoCurrency,
-        paymentMethod: transactionRecord.quote.paymentMethod,
+        paymentMethod,
         targetCurrency: transactionRecord.quote.targetCurrency,
       } satisfies PaymentSentMessage)
     }

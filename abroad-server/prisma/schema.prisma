@@ -168,6 +168,8 @@ enum Country {
 }
 
 enum PaymentMethod {
+  NEQUI // Legacy: kept for historical records only
+  MOVII // Legacy: kept for historical records only
   PIX
   BREB
 }
