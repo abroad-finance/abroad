@@ -15,7 +15,7 @@ jest.mock('@stellar/stellar-sdk', () => {
 
   let currentRecords: unknown[] = []
   let currentOperation: Horizon.ServerApi.OperationRecord | null = null
-  let currentOperationError: unknown | null = null
+  let currentOperationError: null | unknown = null
   const paymentRequest = {
     call: jest.fn(async () => ({ records: currentRecords })),
     cursor: jest.fn().mockReturnThis(),
@@ -39,8 +39,8 @@ jest.mock('@stellar/stellar-sdk', () => {
   }
 
   const mockServer = {
-    payments: jest.fn(() => paymentRequest),
     operations: jest.fn(() => operationsRequest),
+    payments: jest.fn(() => paymentRequest),
   }
 
   return {

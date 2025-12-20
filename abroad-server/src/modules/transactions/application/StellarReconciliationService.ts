@@ -385,7 +385,7 @@ export class StellarReconciliationService {
     }
 
     const transaction = await context.prismaClient.transaction.findUnique({
-      select: { id: true, onChainId: true, status: true },
+      select: { id: true, refundOnChainId: true, status: true },
       where: { id: transactionId },
     })
 
@@ -393,7 +393,18 @@ export class StellarReconciliationService {
       return { cursor, result: 'missing', transactionId }
     }
 
-    if (transaction.status !== TransactionStatus.AWAITING_PAYMENT) {
+    const isAwaitingPayment = transaction.status === TransactionStatus.AWAITING_PAYMENT
+    const isExpiredPayment = transaction.status === TransactionStatus.PAYMENT_EXPIRED
+
+    if (!isAwaitingPayment && !isExpiredPayment) {
+      return { cursor, result: 'alreadyProcessed', transactionId: transaction.id }
+    }
+
+    if (isExpiredPayment && transaction.refundOnChainId) {
+      this.logger.info('[PublicTransactionsController] Skipping expired Stellar payment because refund already exists', {
+        refundOnChainId: transaction.refundOnChainId,
+        transactionId: transaction.id,
+      })
       return { cursor, result: 'alreadyProcessed', transactionId: transaction.id }
     }
 

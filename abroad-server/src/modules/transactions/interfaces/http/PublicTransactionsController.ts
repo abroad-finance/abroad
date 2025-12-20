@@ -26,8 +26,8 @@ const STELLAR_RECONCILIATION_HEADER = 'X-Abroad-Stellar-Reconciliation-Secret'
 @Route('transactions')
 export class PublicTransactionsController extends Controller {
   private readonly expiredTransactionService: ExpiredTransactionService
-  private readonly stellarReconciliationService: StellarReconciliationService
   private reconciliationSecret: string | undefined
+  private readonly stellarReconciliationService: StellarReconciliationService
 
   constructor(
     @inject(TYPES.IDatabaseClientProvider) private prismaClientProvider: IDatabaseClientProvider,

@@ -1,4 +1,4 @@
-import { Prisma, TransactionStatus } from '@prisma/client'
+import { Prisma, Transaction, TransactionStatus } from '@prisma/client'
 import { inject, injectable } from 'inversify'
 
 import { TYPES } from '../../../app/container/types'
@@ -23,6 +23,7 @@ export interface IReceivedCryptoTransactionUseCase {
 type PrismaClientInstance = Awaited<ReturnType<IDatabaseClientProvider['getClient']>>
 
 type TransactionClient = Prisma.TransactionClient | PrismaClientInstance
+type TransactionRefundState = Pick<Transaction, 'id' | 'onChainId' | 'refundOnChainId' | 'status'>
 
 class RefundService {
   constructor(private readonly walletHandlerFactory: IWalletHandlerFactory) {}
@@ -78,6 +79,21 @@ class TransactionNotifier {
 class TransactionRepository {
   constructor(private readonly include = transactionNotificationInclude) {}
 
+  public async findRefundState(
+    prismaClient: TransactionClient,
+    transactionId: string,
+  ): Promise<null | TransactionRefundState> {
+    return prismaClient.transaction.findUnique({
+      select: {
+        id: true,
+        onChainId: true,
+        refundOnChainId: true,
+        status: true,
+      },
+      where: { id: transactionId },
+    })
+  }
+
   public async markProcessing(
     prismaClient: TransactionClient,
     message: ReceivedCryptoTransactionMessage,
@@ -115,6 +131,18 @@ class TransactionRepository {
       data: { externalId },
       where: { id: transactionId },
     })
+  }
+
+  public async recordOnChainIdIfMissing(
+    prismaClient: TransactionClient,
+    transactionId: string,
+    onChainId: string,
+  ): Promise<boolean> {
+    const result = await prismaClient.transaction.updateMany({
+      data: { onChainId },
+      where: { id: transactionId, onChainId: null },
+    })
+    return result.count > 0
   }
 
   public async recordRefundOnChainId(
@@ -182,6 +210,7 @@ export class ReceivedCryptoTransactionUseCase implements IReceivedCryptoTransact
     const notifier = new TransactionNotifier(this.webhookNotifier, this.queueHandler, logger)
     const transactionRecord = await this.repository.markProcessing(prismaClient, parsedMessage, logger)
     if (!transactionRecord) {
+      await this.handleNonAwaitingTransaction(prismaClient, parsedMessage, logger)
       return
     }
     await notifier.notify(transactionRecord, WebhookEvent.TRANSACTION_CREATED, 'processing')
@@ -225,6 +254,42 @@ export class ReceivedCryptoTransactionUseCase implements IReceivedCryptoTransact
       await this.refundService.refundToSender(message)
       return undefined
     }
+  }
+
+  private async handleNonAwaitingTransaction(
+    prismaClient: TransactionClient,
+    message: ReceivedCryptoTransactionMessage,
+    logger: ScopedLogger,
+  ): Promise<void> {
+    const transactionState = await this.repository.findRefundState(prismaClient, message.transactionId)
+    if (!transactionState) {
+      logger.warn('Received crypto for unknown transaction', {
+        onChainId: message.onChainId,
+        transactionId: message.transactionId,
+      })
+      return
+    }
+
+    if (transactionState.status !== TransactionStatus.PAYMENT_EXPIRED) {
+      logger.info('Skipping received crypto for non-expired transaction', {
+        status: transactionState.status,
+        transactionId: transactionState.id,
+      })
+      return
+    }
+
+    if (transactionState.refundOnChainId) {
+      logger.info('Expired transaction already refunded; skipping', {
+        refundOnChainId: transactionState.refundOnChainId,
+        transactionId: transactionState.id,
+      })
+      return
+    }
+
+    await this.recordOnChainIdForExpiredTransaction(prismaClient, transactionState, message.onChainId, logger)
+
+    const refundResult = await this.refundService.refundToSender(message)
+    await this.recordRefundOnChainId(prismaClient, transactionState.id, refundResult, logger)
   }
 
   private async handlePaymentFailure(
@@ -384,6 +449,41 @@ export class ReceivedCryptoTransactionUseCase implements IReceivedCryptoTransact
     catch (error) {
       const warningContext = error instanceof Error ? error : new Error(String(error))
       logger.warn('Failed to publish payment sent notification', warningContext)
+    }
+  }
+
+  private async recordOnChainIdForExpiredTransaction(
+    prismaClient: TransactionClient,
+    transaction: TransactionRefundState,
+    onChainId: string,
+    logger: ScopedLogger,
+  ): Promise<void> {
+    if (transaction.onChainId) {
+      if (transaction.onChainId !== onChainId) {
+        logger.warn('Expired transaction already has a different on-chain id', {
+          existingOnChainId: transaction.onChainId,
+          receivedOnChainId: onChainId,
+          transactionId: transaction.id,
+        })
+      }
+      return
+    }
+
+    try {
+      const recorded = await this.repository.recordOnChainIdIfMissing(prismaClient, transaction.id, onChainId)
+      if (recorded) {
+        logger.info('Recorded on-chain id for expired transaction', {
+          onChainId,
+          transactionId: transaction.id,
+        })
+      }
+    }
+    catch (error) {
+      logger.warn('Failed to record on-chain id for expired transaction', {
+        error,
+        onChainId,
+        transactionId: transaction.id,
+      })
     }
   }
 
