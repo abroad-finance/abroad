@@ -38,6 +38,7 @@ type PaymentServiceMock = IPaymentService & {
 
 type PrismaMock = {
   transaction: {
+    findUnique: jest.Mock
     update: jest.Mock
     updateMany: jest.Mock
   }
@@ -132,6 +133,7 @@ const createHarness = (overrides: Partial<Harness> = {}): Harness => {
   const queueHandler = overrides.queueHandler ?? createMockQueueHandler()
   const prisma: PrismaMock = overrides.prisma ?? {
     transaction: {
+      findUnique: jest.fn(),
       update: jest.fn(),
       updateMany: jest.fn(),
     },
@@ -269,6 +271,159 @@ describe('ReceivedCryptoTransactionUseCase', () => {
       expect.any(Error),
     )
     expect(harness.queueHandler.postMessage).not.toHaveBeenCalled()
+  })
+
+  it('skips received crypto for non-expired transactions after processing conflicts', async () => {
+    const harness = createHarness()
+    const notFoundError = new Prisma.PrismaClientKnownRequestError(
+      'Not found',
+      { clientVersion: 'test', code: 'P2025' },
+    )
+    harness.prisma.transaction.update.mockRejectedValueOnce(notFoundError)
+    harness.prisma.transaction.findUnique.mockResolvedValueOnce({
+      id: baseMessage.transactionId,
+      onChainId: baseMessage.onChainId,
+      refundOnChainId: null,
+      status: TransactionStatus.PAYMENT_COMPLETED,
+    })
+
+    await harness.useCase.process(baseMessage)
+
+    expect(harness.logger.info).toHaveBeenCalledWith(
+      expect.stringContaining('Skipping received crypto for non-expired transaction'),
+      expect.objectContaining({
+        context: expect.objectContaining({
+          blockchain: baseMessage.blockchain,
+          transactionId: baseMessage.transactionId,
+        }),
+      }),
+      {
+        status: TransactionStatus.PAYMENT_COMPLETED,
+        transactionId: baseMessage.transactionId,
+      },
+    )
+    expect(harness.walletHandler.send).not.toHaveBeenCalled()
+  })
+
+  it('refunds expired transactions and records late on-chain ids', async () => {
+    const harness = createHarness()
+    const notFoundError = new Prisma.PrismaClientKnownRequestError(
+      'Not found',
+      { clientVersion: 'test', code: 'P2025' },
+    )
+    harness.prisma.transaction.update.mockRejectedValueOnce(notFoundError)
+    harness.prisma.transaction.findUnique.mockResolvedValueOnce({
+      id: baseMessage.transactionId,
+      onChainId: null,
+      refundOnChainId: null,
+      status: TransactionStatus.PAYMENT_EXPIRED,
+    })
+    harness.prisma.transaction.updateMany
+      .mockResolvedValueOnce({ count: 1 })
+      .mockResolvedValueOnce({ count: 1 })
+
+    await harness.useCase.process(baseMessage)
+
+    expect(harness.prisma.transaction.updateMany).toHaveBeenNthCalledWith(1, {
+      data: { onChainId: baseMessage.onChainId },
+      where: { id: baseMessage.transactionId, onChainId: null },
+    })
+    expect(harness.prisma.transaction.updateMany).toHaveBeenNthCalledWith(2, {
+      data: { refundOnChainId: 'refund-1' },
+      where: { id: baseMessage.transactionId, refundOnChainId: null },
+    })
+    expect(harness.logger.info).toHaveBeenCalledWith(
+      expect.stringContaining('Recorded on-chain id for expired transaction'),
+      expect.objectContaining({
+        context: expect.objectContaining({
+          blockchain: baseMessage.blockchain,
+          transactionId: baseMessage.transactionId,
+        }),
+      }),
+      {
+        onChainId: baseMessage.onChainId,
+        transactionId: baseMessage.transactionId,
+      },
+    )
+    expect(harness.walletHandler.send).toHaveBeenCalledWith({
+      address: baseMessage.addressFrom,
+      amount: baseMessage.amount,
+      cryptoCurrency: baseMessage.cryptoCurrency,
+    })
+  })
+
+  it('skips refunds for expired transactions that already have refunds', async () => {
+    const harness = createHarness()
+    const notFoundError = new Prisma.PrismaClientKnownRequestError(
+      'Not found',
+      { clientVersion: 'test', code: 'P2025' },
+    )
+    harness.prisma.transaction.update.mockRejectedValueOnce(notFoundError)
+    harness.prisma.transaction.findUnique.mockResolvedValueOnce({
+      id: baseMessage.transactionId,
+      onChainId: baseMessage.onChainId,
+      refundOnChainId: 'refund-existing',
+      status: TransactionStatus.PAYMENT_EXPIRED,
+    })
+
+    await harness.useCase.process(baseMessage)
+
+    expect(harness.logger.info).toHaveBeenCalledWith(
+      expect.stringContaining('Expired transaction already refunded; skipping'),
+      expect.objectContaining({
+        context: expect.objectContaining({
+          blockchain: baseMessage.blockchain,
+          transactionId: baseMessage.transactionId,
+        }),
+      }),
+      {
+        refundOnChainId: 'refund-existing',
+        transactionId: baseMessage.transactionId,
+      },
+    )
+    expect(harness.walletHandler.send).not.toHaveBeenCalled()
+    expect(harness.prisma.transaction.updateMany).not.toHaveBeenCalled()
+  })
+
+  it('warns when expired transactions already have a different on-chain id', async () => {
+    const harness = createHarness()
+    const notFoundError = new Prisma.PrismaClientKnownRequestError(
+      'Not found',
+      { clientVersion: 'test', code: 'P2025' },
+    )
+    harness.prisma.transaction.update.mockRejectedValueOnce(notFoundError)
+    harness.prisma.transaction.findUnique.mockResolvedValueOnce({
+      id: baseMessage.transactionId,
+      onChainId: 'existing-on-chain',
+      refundOnChainId: null,
+      status: TransactionStatus.PAYMENT_EXPIRED,
+    })
+    harness.prisma.transaction.updateMany.mockResolvedValueOnce({ count: 1 })
+
+    await harness.useCase.process(baseMessage)
+
+    expect(harness.logger.warn).toHaveBeenCalledWith(
+      expect.stringContaining('Expired transaction already has a different on-chain id'),
+      expect.objectContaining({
+        context: expect.objectContaining({
+          blockchain: baseMessage.blockchain,
+          transactionId: baseMessage.transactionId,
+        }),
+      }),
+      {
+        existingOnChainId: 'existing-on-chain',
+        receivedOnChainId: baseMessage.onChainId,
+        transactionId: baseMessage.transactionId,
+      },
+    )
+    expect(harness.prisma.transaction.updateMany).toHaveBeenCalledWith({
+      data: { refundOnChainId: 'refund-1' },
+      where: { id: baseMessage.transactionId, refundOnChainId: null },
+    })
+    expect(harness.prisma.transaction.updateMany).not.toHaveBeenCalledWith({
+      data: { onChainId: baseMessage.onChainId },
+      where: { id: baseMessage.transactionId, onChainId: null },
+    })
   })
 
   it('completes synchronous payments and emits notifications', async () => {

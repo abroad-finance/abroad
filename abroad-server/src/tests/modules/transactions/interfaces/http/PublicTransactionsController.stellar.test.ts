@@ -231,7 +231,7 @@ describe('PublicTransactionsController.checkUnprocessedStellarTransactions', () 
 
     expect(queueHandler.postMessage).toHaveBeenCalledTimes(1)
     expect(prismaClient.transaction.findUnique).toHaveBeenCalledWith({
-      select: { id: true, onChainId: true, status: true },
+      select: { id: true, refundOnChainId: true, status: true },
       where: { id: transactionId },
     })
     expect(prismaClient.stellarListenerState.upsert).toHaveBeenCalledWith({
@@ -486,7 +486,7 @@ describe('PublicTransactionsController.reconcileStellarPayment', () => {
 
     expect(result).toEqual({ paymentId: 'payment-missing', result: 'missing', transactionId })
     expect(prismaClient.transaction.findUnique).toHaveBeenCalledWith({
-      select: { id: true, onChainId: true, status: true },
+      select: { id: true, refundOnChainId: true, status: true },
       where: { id: transactionId },
     })
   })
