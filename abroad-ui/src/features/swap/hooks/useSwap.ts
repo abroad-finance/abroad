@@ -11,7 +11,7 @@ import {
   _36EnumsCryptoCurrency as CryptoCurrency,
   getQuote,
   getReverseQuote,
-  _36EnumsPaymentMethod as PaymentMethod,
+  SupportedPaymentMethod as PaymentMethod,
   _36EnumsTargetCurrency as TargetCurrency,
 } from '../../../api'
 import { useNotices } from '../../../contexts/NoticeContext'

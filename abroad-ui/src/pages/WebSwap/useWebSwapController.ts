@@ -38,7 +38,7 @@ import {
   getReverseQuote,
   type GetReverseQuote400,
   type getReverseQuoteResponse,
-  _36EnumsPaymentMethod as PaymentMethod,
+  SupportedPaymentMethod as PaymentMethod,
   _36EnumsTargetCurrency as TargetCurrency,
 } from '../../api'
 import { useNotices } from '../../contexts/NoticeContext'

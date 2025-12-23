@@ -80,8 +80,8 @@ const mocked = vi.hoisted(() => {
 vi.mock('../api', () => ({
   _36EnumsBlockchainNetwork: { STELLAR: 'STELLAR' },
   _36EnumsCryptoCurrency: { USDC: 'USDC' },
-  _36EnumsPaymentMethod: { BREB: 'BREB', PIX: 'PIX' },
   _36EnumsTargetCurrency: { BRL: 'BRL', COP: 'COP' },
+  SupportedPaymentMethod: { BREB: 'BREB', PIX: 'PIX' },
   acceptTransaction: mocked.acceptTransactionMock,
   decodeQrCodeBR: mocked.decodeQrCodeBRMock,
   getQuote: mocked.getQuoteMock,
