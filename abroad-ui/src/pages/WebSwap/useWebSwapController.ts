@@ -698,6 +698,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
       if (kit.walletId === 'sep24') {
         const queryParams = new URLSearchParams(window.location.search)
         const callbackUrl = queryParams.get('callback')
+        const onChangeCallbackUrl = queryParams.get('on_change_callback')
         const sepTransactionId = queryParams.get('transaction_id')
         const sepBaseUrl = import.meta.env.VITE_SEP_BASE_URL || 'http://localhost:8000'
         let url = encodeURI(
@@ -705,6 +706,9 @@ export const useWebSwapController = (): WebSwapControllerProps => {
         )
         if (callbackUrl && callbackUrl.toLowerCase() !== 'none') {
           url += `&callback=${encodeURIComponent(callbackUrl)}`
+        }
+        if (onChangeCallbackUrl && onChangeCallbackUrl.toLowerCase() !== 'none') {
+          url += `&on_change_callback=${encodeURIComponent(onChangeCallbackUrl)}`
         }
         if (transaction_reference) {
           url += `&memo=${encodeURIComponent(transaction_reference)}`
