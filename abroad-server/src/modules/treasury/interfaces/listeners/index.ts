@@ -14,14 +14,7 @@ export function startListeners(): void {
   const baseLogger = iocContainer.get<ILogger>(TYPES.ILogger)
   const logger = createScopedLogger(baseLogger, { scope: 'listeners' })
   // Keep strong references so listeners are not GC'd
-  iocContainer
-    .bind<StellarListener>('StellarListener')
-    .to(StellarListener)
-    .inSingletonScope()
-
-  const stellar = iocContainer.get<StellarListener>('StellarListener')
-  // Store on module scope to keep a reference
-  running.stellar = stellar
+  const stellar = iocContainer.get<StellarListener>(TYPES.StellarListener)
   stellar.start().catch(err =>
     logger.error('Error starting StellarListener:', err),
   )

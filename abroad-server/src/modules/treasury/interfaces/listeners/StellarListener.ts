@@ -3,7 +3,7 @@
 
 import { BlockchainNetwork, CryptoCurrency } from '@prisma/client'
 import { Horizon } from '@stellar/stellar-sdk'
-import { inject } from 'inversify'
+import { inject, injectable } from 'inversify'
 
 import { TYPES } from '../../../../app/container/types'
 import { createScopedLogger, ScopedLogger } from '../../../../core/logging/scopedLogger'
@@ -16,6 +16,7 @@ import { ISecretManager } from '../../../../platform/secrets/ISecretManager'
 // Minimal stream handle types returned by stellar-sdk stream()
 type StreamHandle = (() => void) | { close: () => void }
 
+@injectable()
 export class StellarListener {
   private accountId!: string
   private horizonUrl!: string

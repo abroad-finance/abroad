@@ -12,6 +12,7 @@ import { OutboxDispatcher } from '../../../platform/outbox/OutboxDispatcher'
 import { IDatabaseClientProvider } from '../../../platform/persistence/IDatabaseClientProvider'
 import { IPaymentServiceFactory } from '../../payments/application/contracts/IPaymentServiceFactory'
 import { IWalletHandlerFactory } from '../../payments/application/contracts/IWalletHandlerFactory'
+import { PayoutStatusAdapterRegistry } from '../../payments/application/PayoutStatusAdapterRegistry'
 import { isSupportedPaymentMethod } from '../../payments/application/supportedPaymentMethods'
 import { TransactionEventDispatcher } from './TransactionEventDispatcher'
 import { TransactionWithRelations } from './transactionNotificationTypes'
@@ -31,6 +32,7 @@ export class TransactionWorkflow {
   constructor(
     @inject(TYPES.IDatabaseClientProvider) dbProvider: IDatabaseClientProvider,
     @inject(TYPES.IPaymentServiceFactory) private readonly paymentServiceFactory: IPaymentServiceFactory,
+    @inject(PayoutStatusAdapterRegistry) private readonly payoutStatusAdapterRegistry: PayoutStatusAdapterRegistry,
     @inject(TYPES.IWalletHandlerFactory) walletHandlerFactory: IWalletHandlerFactory,
     @inject(TYPES.IQueueHandler) queueHandler: import('../../../platform/messaging/queues').IQueueHandler,
     @inject(TYPES.ISlackNotifier) slackNotifier: ISlackNotifier,
@@ -107,7 +109,8 @@ export class TransactionWorkflow {
       scopedLogger.error('Unsupported payment method for provider status update', error)
       return
     }
-    const newStatus = this.statusMapper.mapProviderStatus(message.provider, message.status)
+    const adapter = this.payoutStatusAdapterRegistry.getAdapter(message.provider)
+    const newStatus = adapter.mapStatus(message.status)
 
     if (newStatus === TransactionStatus.PROCESSING_PAYMENT) {
       scopedLogger.info('Provider status indicates processing; leaving transaction unchanged')
