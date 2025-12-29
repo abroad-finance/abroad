@@ -95,6 +95,8 @@ model Transaction {
   externalId    String?           @unique
   qrCode        String?
   exchangeHandoffAt DateTime?
+
+  @@index([partnerUserId, status, createdAt], name: "transaction_partnerUser_status_createdAt_idx")
 }
 
 model StellarListenerState {
