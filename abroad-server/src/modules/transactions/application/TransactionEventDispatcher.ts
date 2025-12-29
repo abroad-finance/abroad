@@ -1,4 +1,4 @@
-import { TransactionStatus } from '@prisma/client'
+import { PrismaClient, TransactionStatus } from '@prisma/client'
 
 import { createScopedLogger, ScopedLogger } from '../../../core/logging/scopedLogger'
 import { ILogger } from '../../../core/logging/types'
@@ -26,6 +26,7 @@ export class TransactionEventDispatcher {
     event: WebhookEvent,
     type: 'transaction.created' | 'transaction.updated',
     context: string,
+    options: { deliverNow?: boolean, prismaClient?: PrismaClient } = {},
   ): Promise<void> {
     const payload = toWebhookTransactionPayload(transaction)
     try {
@@ -33,6 +34,7 @@ export class TransactionEventDispatcher {
         transaction.partnerUser.partner.webhookUrl,
         { data: payload, event },
         context,
+        { client: options.prismaClient, deliverNow: options.deliverNow },
       )
     }
     catch (error) {
@@ -55,8 +57,10 @@ export class TransactionEventDispatcher {
     transaction: TransactionWithRelations,
     status: TransactionStatus,
     options: {
+      deliverNow?: boolean
       heading?: string
       notes?: Record<string, boolean | null | number | string | undefined>
+      prismaClient?: PrismaClient
       trigger: string
     },
   ): Promise<void> {
@@ -68,7 +72,10 @@ export class TransactionEventDispatcher {
       trigger: options.trigger,
     })
 
-    await this.outboxDispatcher.enqueueSlack(message, 'slack')
+    await this.outboxDispatcher.enqueueSlack(message, 'slack', {
+      client: options.prismaClient,
+      deliverNow: options.deliverNow,
+    })
   }
 
   public async publishPaymentSent(

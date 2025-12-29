@@ -1,4 +1,4 @@
-import { OutboxStatus, Prisma } from '@prisma/client'
+import { OutboxStatus, Prisma, PrismaClient } from '@prisma/client'
 import { inject, injectable } from 'inversify'
 
 import { TYPES } from '../../app/container/types'
@@ -27,9 +27,10 @@ export class OutboxRepository {
     type: string,
     payload: Prisma.JsonValue,
     availableAt: Date = new Date(),
+    client?: PrismaClient,
   ): Promise<OutboxRecord> {
-    const client = await this.dbProvider.getClient()
-    const created = await client.outboxEvent.create({
+    const prisma = client ?? await this.dbProvider.getClient()
+    const created = await prisma.outboxEvent.create({
       data: {
         availableAt,
         payload,
@@ -39,9 +40,9 @@ export class OutboxRepository {
     return created
   }
 
-  public async markDelivered(id: string): Promise<void> {
-    const client = await this.dbProvider.getClient()
-    await client.outboxEvent.update({
+  public async markDelivered(id: string, client?: PrismaClient): Promise<void> {
+    const prisma = client ?? await this.dbProvider.getClient()
+    await prisma.outboxEvent.update({
       data: {
         attempts: { increment: 1 },
         lastError: null,
@@ -51,9 +52,9 @@ export class OutboxRepository {
     })
   }
 
-  public async markFailed(id: string, error: Error): Promise<void> {
-    const client = await this.dbProvider.getClient()
-    await client.outboxEvent.update({
+  public async markFailed(id: string, error: Error, client?: PrismaClient): Promise<void> {
+    const prisma = client ?? await this.dbProvider.getClient()
+    await prisma.outboxEvent.update({
       data: {
         attempts: { increment: 1 },
         lastError: error.message,
@@ -79,9 +80,10 @@ export class OutboxRepository {
     id: string,
     nextAttempt: Date,
     error: Error,
+    client?: PrismaClient,
   ): Promise<void> {
-    const client = await this.dbProvider.getClient()
-    await client.outboxEvent.update({
+    const prisma = client ?? await this.dbProvider.getClient()
+    await prisma.outboxEvent.update({
       data: {
         attempts: { increment: 1 },
         availableAt: nextAttempt,

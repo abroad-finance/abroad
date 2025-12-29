@@ -1,12 +1,11 @@
-import { TransactionStatus } from '@prisma/client'
+import { SupportedCurrency, TargetCurrency, TransactionStatus } from '@prisma/client'
 import { inject, injectable } from 'inversify'
 
 import { TYPES } from '../../../app/container/types'
 import { createScopedLogger, ScopedLogger } from '../../../core/logging/scopedLogger'
 import { ILogger } from '../../../core/logging/types'
 import { getCorrelationId } from '../../../core/requestContext'
-import { PaymentStatusUpdatedMessage, ReceivedCryptoTransactionMessage } from '../../../platform/messaging/queueSchema'
-import { ISlackNotifier } from '../../../platform/notifications/ISlackNotifier'
+import { PaymentSentMessage, PaymentStatusUpdatedMessage, ReceivedCryptoTransactionMessage } from '../../../platform/messaging/queueSchema'
 import { IWebhookNotifier, WebhookEvent } from '../../../platform/notifications/IWebhookNotifier'
 import { OutboxDispatcher } from '../../../platform/outbox/OutboxDispatcher'
 import { IDatabaseClientProvider } from '../../../platform/persistence/IDatabaseClientProvider'
@@ -14,28 +13,29 @@ import { IPaymentServiceFactory } from '../../payments/application/contracts/IPa
 import { IWalletHandlerFactory } from '../../payments/application/contracts/IWalletHandlerFactory'
 import { PayoutStatusAdapterRegistry } from '../../payments/application/PayoutStatusAdapterRegistry'
 import { isSupportedPaymentMethod } from '../../payments/application/supportedPaymentMethods'
+import { IExchangeProviderFactory } from '../../treasury/application/contracts/IExchangeProviderFactory'
 import { TransactionEventDispatcher } from './TransactionEventDispatcher'
 import { TransactionWithRelations } from './transactionNotificationTypes'
 import { TransactionRepository } from './TransactionRepository'
-import { TransactionStatusMapper } from './TransactionStatusMapper'
 
 type RefundResult = { success: boolean, transactionId?: string }
 
 @injectable()
 export class TransactionWorkflow {
   private readonly dispatcher: TransactionEventDispatcher
+  private readonly exchangeProviderFactory: IExchangeProviderFactory
   private readonly logger: ScopedLogger
+  private readonly outboxDispatcher: OutboxDispatcher
   private readonly refundService: RefundService
   private readonly repository: TransactionRepository
-  private readonly statusMapper = new TransactionStatusMapper()
 
   constructor(
     @inject(TYPES.IDatabaseClientProvider) dbProvider: IDatabaseClientProvider,
     @inject(TYPES.IPaymentServiceFactory) private readonly paymentServiceFactory: IPaymentServiceFactory,
     @inject(PayoutStatusAdapterRegistry) private readonly payoutStatusAdapterRegistry: PayoutStatusAdapterRegistry,
     @inject(TYPES.IWalletHandlerFactory) walletHandlerFactory: IWalletHandlerFactory,
+    @inject(TYPES.IExchangeProviderFactory) exchangeProviderFactory: IExchangeProviderFactory,
     @inject(TYPES.IQueueHandler) queueHandler: import('../../../platform/messaging/queues').IQueueHandler,
-    @inject(TYPES.ISlackNotifier) slackNotifier: ISlackNotifier,
     @inject(TYPES.IWebhookNotifier) webhookNotifier: IWebhookNotifier,
     @inject(TYPES.IOutboxDispatcher) outboxDispatcher: OutboxDispatcher,
     @inject(TYPES.ILogger) baseLogger: ILogger,
@@ -43,7 +43,9 @@ export class TransactionWorkflow {
     this.logger = createScopedLogger(baseLogger, { scope: 'TransactionWorkflow' })
     this.repository = new TransactionRepository(dbProvider)
     this.dispatcher = new TransactionEventDispatcher(outboxDispatcher, queueHandler, baseLogger)
+    this.outboxDispatcher = outboxDispatcher
     this.refundService = new RefundService(walletHandlerFactory, baseLogger)
+    this.exchangeProviderFactory = exchangeProviderFactory
   }
 
   public async handleIncomingDeposit(message: ReceivedCryptoTransactionMessage): Promise<void> {
@@ -72,6 +74,7 @@ export class TransactionWorkflow {
       WebhookEvent.TRANSACTION_UPDATED,
       'transaction.updated',
       'processing',
+      { deliverNow: false, prismaClient },
     )
 
     const hasMismatchedAmount = message.amount < transactionRecord.quote.sourceAmount
@@ -81,6 +84,56 @@ export class TransactionWorkflow {
     }
 
     await this.processPayout(prismaClient, transactionRecord, message, scopedLogger)
+  }
+
+  public async handlePaymentSent(message: PaymentSentMessage): Promise<void> {
+    const scopedLogger = this.logger.child({
+      correlationId: getCorrelationId(),
+      staticPayload: { targetCurrency: message.targetCurrency, transactionId: message.transactionId },
+    })
+
+    if (message.transactionId && await this.isExchangeHandoffRecorded(message.transactionId)) {
+      scopedLogger.info('Skipping exchange handoff; already recorded', { transactionId: message.transactionId })
+      return
+    }
+
+    try {
+      const walletHandler = this.refundService.resolveWalletHandler(message.blockchain)
+      const exchangeProvider = this.exchangeProviderFactory.getExchangeProvider(message.targetCurrency)
+      const { address, memo } = await exchangeProvider.getExchangeAddress({
+        blockchain: message.blockchain,
+        cryptoCurrency: message.cryptoCurrency,
+      })
+
+      const { success, transactionId: exchangeTransactionId } = await walletHandler.send({
+        address,
+        amount: message.amount,
+        cryptoCurrency: message.cryptoCurrency,
+        memo,
+      })
+
+      if (!success) {
+        await this.outboxDispatcher.enqueueSlack(
+          `${this.logger.scope} Error sending ${message.amount} ${message.cryptoCurrency} to exchange (${message.targetCurrency}); tx=${message.transactionId ?? 'n/a'} on-chain=${exchangeTransactionId ?? 'n/a'}`,
+          'payment-sent',
+        )
+        return
+      }
+
+      const clientDb = await this.repository.getClient()
+      await this.persistPendingConversions(clientDb, {
+        amount: message.amount,
+        cryptoCurrency: message.cryptoCurrency,
+        targetCurrency: message.targetCurrency,
+        transactionId: message.transactionId,
+      })
+    }
+    catch (error) {
+      const errorMessage = `Failed exchange handoff for ${message.amount} ${message.cryptoCurrency} -> ${message.targetCurrency}`
+      scopedLogger.error(errorMessage, error)
+      await this.outboxDispatcher.enqueueSlack(errorMessage, 'payment-sent')
+      throw error
+    }
   }
 
   public async handleProviderStatusUpdate(
@@ -125,6 +178,7 @@ export class TransactionWorkflow {
       WebhookEvent.TRANSACTION_UPDATED,
       'transaction.updated',
       'provider_status',
+      { deliverNow: false, prismaClient },
     )
 
     if (newStatus === TransactionStatus.PAYMENT_COMPLETED) {
@@ -132,12 +186,14 @@ export class TransactionWorkflow {
         updatedTransaction,
         newStatus,
         {
+          deliverNow: false,
           heading: 'Payment completed',
           notes: {
             provider: message.provider,
             providerAmount: message.amount,
             providerStatus: message.status,
           },
+          prismaClient,
           trigger: 'PaymentStatusUpdated',
         },
       )
@@ -152,11 +208,13 @@ export class TransactionWorkflow {
       updatedTransaction,
       newStatus,
       {
+        deliverNow: false,
         heading: 'Payment failed',
         notes: {
           provider: message.provider,
           providerStatus: message.status,
         },
+        prismaClient,
         trigger: 'PaymentStatusUpdated',
       },
     )
@@ -179,6 +237,23 @@ export class TransactionWorkflow {
     catch (error) {
       scopedLogger.error('Failed to refund after provider failure', error)
     }
+  }
+
+  private buildPendingConversionUpdates(
+    cryptoCurrency: PaymentSentMessage['cryptoCurrency'],
+    targetCurrency: PaymentSentMessage['targetCurrency'],
+  ): Array<{ source: SupportedCurrency, symbol: string, target: SupportedCurrency }> {
+    if (cryptoCurrency !== SupportedCurrency.USDC) return []
+    if (targetCurrency === TargetCurrency.COP) {
+      return [
+        { source: SupportedCurrency.USDC, symbol: 'USDCUSDT', target: SupportedCurrency.USDT },
+        { source: SupportedCurrency.USDT, symbol: 'USDTCOP', target: SupportedCurrency.COP },
+      ]
+    }
+    if (targetCurrency === TargetCurrency.BRL) {
+      return [{ source: SupportedCurrency.USDC, symbol: 'USDCBRL', target: SupportedCurrency.BRL }]
+    }
+    return []
   }
 
   private async handleNonAwaitingDeposit(
@@ -244,10 +319,53 @@ export class TransactionWorkflow {
       WebhookEvent.TRANSACTION_UPDATED,
       'transaction.updated',
       'wrong_amount',
+      { deliverNow: false, prismaClient },
     )
 
     const refundResult = await this.refundService.refundToSender(message)
     await this.recordRefundOnChainId(prismaClient, transaction.id, refundResult, logger)
+  }
+
+  private async isExchangeHandoffRecorded(transactionId: string): Promise<boolean> {
+    const clientDb = await this.repository.getClient()
+    const existing = await clientDb.transaction.findUnique({
+      select: { exchangeHandoffAt: true },
+      where: { id: transactionId },
+    })
+    return Boolean(existing?.exchangeHandoffAt)
+  }
+
+  private async persistPendingConversions(
+    prismaClient: Awaited<ReturnType<IDatabaseClientProvider['getClient']>>,
+    params: {
+      amount: number
+      cryptoCurrency: PaymentSentMessage['cryptoCurrency']
+      targetCurrency: PaymentSentMessage['targetCurrency']
+      transactionId?: string
+    },
+  ): Promise<void> {
+    const conversions = this.buildPendingConversionUpdates(params.cryptoCurrency, params.targetCurrency)
+    for (const conversion of conversions) {
+      await prismaClient.pendingConversions.upsert({
+        create: {
+          amount: params.amount,
+          side: 'SELL',
+          source: conversion.source,
+          symbol: conversion.symbol,
+          target: conversion.target,
+        },
+        update: {
+          amount: { increment: params.amount },
+        },
+        where: {
+          source_target: { source: conversion.source, target: conversion.target },
+        },
+      })
+    }
+
+    if (params.transactionId) {
+      await this.repository.markExchangeHandoff(prismaClient, params.transactionId)
+    }
   }
 
   private async processPayout(
@@ -274,6 +392,7 @@ export class TransactionWorkflow {
         WebhookEvent.TRANSACTION_UPDATED,
         'transaction.updated',
         'unsupported_payment_method',
+        { deliverNow: false, prismaClient },
       )
       const refundResult = await this.refundService.refundToSender(message)
       await this.recordRefundOnChainId(prismaClient, transaction.id, refundResult, logger)
@@ -292,11 +411,14 @@ export class TransactionWorkflow {
         WebhookEvent.TRANSACTION_UPDATED,
         'transaction.updated',
         'payment_disabled',
+        { deliverNow: false, prismaClient },
       )
 
       await this.dispatcher.notifySlack(updatedTransaction, TransactionStatus.PAYMENT_FAILED, {
+        deliverNow: false,
         heading: 'Payment failed',
         notes: { reason: 'Payment method disabled' },
+        prismaClient,
         trigger: 'TransactionWorkflow',
       })
 
@@ -337,11 +459,14 @@ export class TransactionWorkflow {
         WebhookEvent.TRANSACTION_UPDATED,
         'transaction.updated',
         'final',
+        { deliverNow: false, prismaClient },
       )
 
       if (paymentResponse.success) {
         await this.dispatcher.notifySlack(updatedTransaction, newStatus, {
+          deliverNow: false,
           notes: { sourceAddress: message.addressFrom },
+          prismaClient,
           trigger: 'TransactionWorkflow',
         })
         if (isSupportedPaymentMethod(updatedTransaction.quote.paymentMethod)) {
@@ -350,7 +475,9 @@ export class TransactionWorkflow {
       }
       else {
         await this.dispatcher.notifySlack(updatedTransaction, newStatus, {
+          deliverNow: false,
           notes: { providerTransactionId: paymentResponse.transactionId ?? 'not-provided' },
+          prismaClient,
           trigger: 'TransactionWorkflow',
         })
         const refundResult = await this.refundService.refundToSender(message)
@@ -369,6 +496,7 @@ export class TransactionWorkflow {
         WebhookEvent.TRANSACTION_UPDATED,
         'transaction.updated',
         'error',
+        { deliverNow: false, prismaClient },
       )
 
       const refundResult = await this.refundService.refundToSender(message)
@@ -430,5 +558,9 @@ class RefundService {
       amount: message.amount,
       cryptoCurrency: message.cryptoCurrency,
     })
+  }
+
+  public resolveWalletHandler(blockchain: Parameters<IWalletHandlerFactory['getWalletHandler']>[0]) {
+    return this.walletHandlerFactory.getWalletHandler(blockchain)
   }
 }

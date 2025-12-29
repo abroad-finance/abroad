@@ -32,9 +32,9 @@ describe('OutboxDispatcher', () => {
   it('delivers slack messages immediately', async () => {
     const { dispatcher, repository, slackNotifier } = buildMocks()
     await dispatcher.enqueueSlack('hello', 'test')
-    expect(repository.create).toHaveBeenCalledWith('slack', { kind: 'slack', message: 'hello' })
+    expect(repository.create).toHaveBeenCalledWith('slack', { kind: 'slack', message: 'hello' }, expect.any(Date), undefined)
     expect(slackNotifier.sendMessage).toHaveBeenCalledWith('hello')
-    expect(repository.markDelivered).toHaveBeenCalledWith(baseRecord.id)
+    expect(repository.markDelivered).toHaveBeenCalledWith(baseRecord.id, undefined)
   })
 
   it('delivers webhook payloads', async () => {
@@ -44,10 +44,17 @@ describe('OutboxDispatcher', () => {
       kind: 'webhook',
       payload: { data: { ok: true }, event: 'TRANSACTION_CREATED' },
       target: 'https://example.com',
-    })
+    }, expect.any(Date), undefined)
     expect(webhookNotifier.notifyWebhook).toHaveBeenCalledWith('https://example.com', {
       data: { ok: true },
       event: 'TRANSACTION_CREATED',
     })
+  })
+
+  it('defers delivery when instructed', async () => {
+    const { dispatcher, repository, slackNotifier } = buildMocks()
+    await dispatcher.enqueueSlack('queued', 'ctx', { deliverNow: false })
+    expect(repository.create).toHaveBeenCalledWith('slack', { kind: 'slack', message: 'queued' }, expect.any(Date), undefined)
+    expect(slackNotifier.sendMessage).not.toHaveBeenCalled()
   })
 })

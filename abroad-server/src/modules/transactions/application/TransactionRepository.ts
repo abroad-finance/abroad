@@ -38,6 +38,16 @@ export class TransactionRepository {
     return this.dbProvider.getClient()
   }
 
+  public async markExchangeHandoff(
+    prismaClient: TransactionClient,
+    transactionId: string,
+  ): Promise<void> {
+    await prismaClient.transaction.updateMany({
+      data: { exchangeHandoffAt: new Date() },
+      where: { exchangeHandoffAt: null, id: transactionId },
+    })
+  }
+
   public async markProcessingAwaiting(
     transactionId: string,
     onChainId: string,

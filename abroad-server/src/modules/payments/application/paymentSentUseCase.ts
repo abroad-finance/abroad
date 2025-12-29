@@ -1,4 +1,3 @@
-import { BlockchainNetwork, CryptoCurrency, SupportedCurrency, TargetCurrency } from '@prisma/client'
 import { inject, injectable } from 'inversify'
 
 import { TYPES } from '../../../app/container/types'
@@ -6,10 +5,7 @@ import { createScopedLogger } from '../../../core/logging/scopedLogger'
 import { ILogger } from '../../../core/logging/types'
 import { getCorrelationId } from '../../../core/requestContext'
 import { PaymentSentMessage, PaymentSentMessageSchema } from '../../../platform/messaging/queueSchema'
-import { ISlackNotifier } from '../../../platform/notifications/ISlackNotifier'
-import { IDatabaseClientProvider } from '../../../platform/persistence/IDatabaseClientProvider'
-import { IExchangeProviderFactory } from '../../treasury/application/contracts/IExchangeProviderFactory'
-import { IWalletHandlerFactory } from './contracts/IWalletHandlerFactory'
+import { TransactionWorkflow } from '../../transactions/application/TransactionWorkflow'
 
 export interface IPaymentSentUseCase {
   process(rawMessage: unknown): Promise<void>
@@ -17,15 +13,9 @@ export interface IPaymentSentUseCase {
 
 @injectable()
 export class PaymentSentUseCase implements IPaymentSentUseCase {
-  private readonly exchangeErrorPrefix = 'Error exchanging'
-  private readonly logPrefix = '[PaymentSent]'
-
   public constructor(
     @inject(TYPES.ILogger) private readonly logger: ILogger,
-    @inject(TYPES.IWalletHandlerFactory) private readonly walletHandlerFactory: IWalletHandlerFactory,
-    @inject(TYPES.ISlackNotifier) private readonly slackNotifier: ISlackNotifier,
-    @inject(TYPES.IDatabaseClientProvider) private readonly dbClientProvider: IDatabaseClientProvider,
-    @inject(TYPES.IExchangeProviderFactory) private readonly exchangeProviderFactory: IExchangeProviderFactory,
+    @inject(TYPES.TransactionWorkflow) private readonly workflow: TransactionWorkflow,
   ) { }
 
   public async process(rawMessage: unknown): Promise<void> {
@@ -38,152 +28,16 @@ export class PaymentSentUseCase implements IPaymentSentUseCase {
       return
     }
 
-    const { amount, blockchain, cryptoCurrency, targetCurrency, transactionId } = message
-    if (transactionId && await this.isAlreadyHandedOff(transactionId)) {
-      logger.info(`${this.logPrefix}: Skipping exchange handoff; already processed`, { transactionId })
-      return
-    }
-
-    await this.sendToExchangeAndUpdatePendingConversions(logger, {
-      amount,
-      blockchain,
-      cryptoCurrency,
-      targetCurrency,
-      transactionId,
-    })
-
-    logger.info(
-      `${this.logPrefix}: Payment sent successfully`,
-    )
-  }
-
-  private buildPendingConversionUpdates(
-    cryptoCurrency: CryptoCurrency,
-    targetCurrency: TargetCurrency,
-  ): Array<{ source: SupportedCurrency, symbol: string, target: SupportedCurrency }> {
-    if (cryptoCurrency !== SupportedCurrency.USDC) {
-      return []
-    }
-
-    if (targetCurrency === SupportedCurrency.COP) {
-      return [
-        { source: SupportedCurrency.USDC, symbol: 'USDCUSDT', target: SupportedCurrency.USDT },
-        { source: SupportedCurrency.USDT, symbol: 'USDTCOP', target: SupportedCurrency.COP },
-      ]
-    }
-
-    if (targetCurrency === SupportedCurrency.BRL) {
-      return [{ source: SupportedCurrency.USDC, symbol: 'USDCBRL', target: SupportedCurrency.BRL }]
-    }
-
-    return []
-  }
-
-  private async isAlreadyHandedOff(transactionId: string): Promise<boolean> {
-    const clientDb = await this.dbClientProvider.getClient()
-    const existing = await clientDb.transaction.findUnique({
-      select: { exchangeHandoffAt: true },
-      where: { id: transactionId },
-    })
-    return Boolean(existing?.exchangeHandoffAt)
+    await this.workflow.handlePaymentSent(message)
   }
 
   private parseMessage(msg: unknown, logger: ILogger): PaymentSentMessage | undefined {
     const parsed = PaymentSentMessageSchema.safeParse(msg)
     if (!parsed.success) {
-      logger.error(`${this.logPrefix}: Invalid message format:`, parsed.error)
+      logger.error('[PaymentSent]: Invalid message format:', parsed.error)
       return undefined
     }
 
     return parsed.data
-  }
-
-  private async persistPendingConversions(
-    clientDb: Awaited<ReturnType<IDatabaseClientProvider['getClient']>>,
-    {
-      amount,
-      cryptoCurrency,
-      targetCurrency,
-      transactionId,
-    }: {
-      amount: number
-      cryptoCurrency: CryptoCurrency
-      targetCurrency: TargetCurrency
-      transactionId?: string
-    },
-  ): Promise<void> {
-    const conversions = this.buildPendingConversionUpdates(cryptoCurrency, targetCurrency)
-    for (const conversion of conversions) {
-      await clientDb.pendingConversions.upsert({
-        create: {
-          amount,
-          side: 'SELL',
-          source: conversion.source,
-          symbol: conversion.symbol,
-          target: conversion.target,
-        },
-        update: {
-          amount: { increment: amount },
-        },
-        where: {
-          source_target: { source: conversion.source, target: conversion.target },
-        },
-      })
-    }
-
-    if (transactionId) {
-      await clientDb.transaction.updateMany({
-        data: { exchangeHandoffAt: new Date() },
-        where: { exchangeHandoffAt: null, id: transactionId },
-      })
-    }
-  }
-
-  private async sendToExchangeAndUpdatePendingConversions(
-    logger: ILogger,
-    {
-      amount,
-      blockchain,
-      cryptoCurrency,
-      targetCurrency,
-      transactionId,
-    }: {
-      amount: number
-      blockchain: BlockchainNetwork
-      cryptoCurrency: CryptoCurrency
-      targetCurrency: TargetCurrency
-      transactionId?: string
-    }): Promise<void> {
-    try {
-      const walletHandler = this.walletHandlerFactory.getWalletHandler(blockchain)
-      const exchangeProvider = this.exchangeProviderFactory.getExchangeProvider(targetCurrency)
-      const { address, memo } = await exchangeProvider.getExchangeAddress({ blockchain, cryptoCurrency })
-
-      const { success, transactionId: exchangeTransactionId } = await walletHandler.send({
-        address,
-        amount,
-        cryptoCurrency,
-        memo,
-      })
-
-      if (!success) {
-        logger.error(`${this.logPrefix}: Error sending payment to exchange:`, exchangeTransactionId)
-        await this.slackNotifier.sendMessage(
-          `${this.logPrefix}: ${this.exchangeErrorPrefix} ${amount} ${cryptoCurrency} to ${targetCurrency}.`,
-        )
-        return
-      }
-
-      const clientDb = await this.dbClientProvider.getClient()
-      await this.persistPendingConversions(clientDb, { amount, cryptoCurrency, targetCurrency, transactionId })
-    }
-    catch (error) {
-      const errorMessage
-        = `${this.logPrefix}: Failed to process exchange handoff for ${amount} ${cryptoCurrency} to ${targetCurrency}`
-      logger.error(errorMessage, error)
-      const errorDetail = error instanceof Error ? error.message : String(error)
-      await this.slackNotifier.sendMessage(`${errorMessage}. Error: ${errorDetail}`)
-      throw error
-    }
   }
 }
