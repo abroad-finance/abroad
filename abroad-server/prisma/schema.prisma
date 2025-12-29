@@ -94,6 +94,7 @@ model Transaction {
   taxId         String?
   externalId    String?           @unique
   qrCode        String?
+  exchangeHandoffAt DateTime?
 }
 
 model StellarListenerState {
@@ -117,6 +118,27 @@ model PendingConversions {
   side   OrderSide
 
   @@id([source, target])
+}
+
+enum OutboxStatus {
+  PENDING
+  DELIVERING
+  DELIVERED
+  FAILED
+}
+
+model OutboxEvent {
+  id           String       @id @default(uuid())
+  type         String
+  payload      Json
+  status       OutboxStatus @default(PENDING)
+  attempts     Int          @default(0)
+  lastError    String?
+  availableAt  DateTime     @default(now())
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  @@index([status, availableAt])
 }
 
 enum KycStatus {

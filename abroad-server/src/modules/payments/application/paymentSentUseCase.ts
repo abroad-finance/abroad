@@ -38,12 +38,18 @@ export class PaymentSentUseCase implements IPaymentSentUseCase {
       return
     }
 
-    const { amount, blockchain, cryptoCurrency, targetCurrency } = message
+    const { amount, blockchain, cryptoCurrency, targetCurrency, transactionId } = message
+    if (transactionId && await this.isAlreadyHandedOff(transactionId)) {
+      logger.info(`${this.logPrefix}: Skipping exchange handoff; already processed`, { transactionId })
+      return
+    }
+
     await this.sendToExchangeAndUpdatePendingConversions(logger, {
       amount,
       blockchain,
       cryptoCurrency,
       targetCurrency,
+      transactionId,
     })
 
     logger.info(
@@ -73,6 +79,15 @@ export class PaymentSentUseCase implements IPaymentSentUseCase {
     return []
   }
 
+  private async isAlreadyHandedOff(transactionId: string): Promise<boolean> {
+    const clientDb = await this.dbClientProvider.getClient()
+    const existing = await clientDb.transaction.findUnique({
+      select: { exchangeHandoffAt: true },
+      where: { id: transactionId },
+    })
+    return Boolean(existing?.exchangeHandoffAt)
+  }
+
   private parseMessage(msg: unknown, logger: ILogger): PaymentSentMessage | undefined {
     const parsed = PaymentSentMessageSchema.safeParse(msg)
     if (!parsed.success) {
@@ -89,10 +104,12 @@ export class PaymentSentUseCase implements IPaymentSentUseCase {
       amount,
       cryptoCurrency,
       targetCurrency,
+      transactionId,
     }: {
       amount: number
       cryptoCurrency: CryptoCurrency
       targetCurrency: TargetCurrency
+      transactionId?: string
     },
   ): Promise<void> {
     const conversions = this.buildPendingConversionUpdates(cryptoCurrency, targetCurrency)
@@ -113,6 +130,13 @@ export class PaymentSentUseCase implements IPaymentSentUseCase {
         },
       })
     }
+
+    if (transactionId) {
+      await clientDb.transaction.updateMany({
+        data: { exchangeHandoffAt: new Date() },
+        where: { exchangeHandoffAt: null, id: transactionId },
+      })
+    }
   }
 
   private async sendToExchangeAndUpdatePendingConversions(
@@ -122,21 +146,28 @@ export class PaymentSentUseCase implements IPaymentSentUseCase {
       blockchain,
       cryptoCurrency,
       targetCurrency,
+      transactionId,
     }: {
       amount: number
       blockchain: BlockchainNetwork
       cryptoCurrency: CryptoCurrency
       targetCurrency: TargetCurrency
+      transactionId?: string
     }): Promise<void> {
     try {
       const walletHandler = this.walletHandlerFactory.getWalletHandler(blockchain)
       const exchangeProvider = this.exchangeProviderFactory.getExchangeProvider(targetCurrency)
       const { address, memo } = await exchangeProvider.getExchangeAddress({ blockchain, cryptoCurrency })
 
-      const { success, transactionId } = await walletHandler.send({ address, amount, cryptoCurrency, memo })
+      const { success, transactionId: exchangeTransactionId } = await walletHandler.send({
+        address,
+        amount,
+        cryptoCurrency,
+        memo,
+      })
 
       if (!success) {
-        logger.error(`${this.logPrefix}: Error sending payment to exchange:`, transactionId)
+        logger.error(`${this.logPrefix}: Error sending payment to exchange:`, exchangeTransactionId)
         await this.slackNotifier.sendMessage(
           `${this.logPrefix}: ${this.exchangeErrorPrefix} ${amount} ${cryptoCurrency} to ${targetCurrency}.`,
         )
@@ -144,7 +175,7 @@ export class PaymentSentUseCase implements IPaymentSentUseCase {
       }
 
       const clientDb = await this.dbClientProvider.getClient()
-      await this.persistPendingConversions(clientDb, { amount, cryptoCurrency, targetCurrency })
+      await this.persistPendingConversions(clientDb, { amount, cryptoCurrency, targetCurrency, transactionId })
     }
     catch (error) {
       const errorMessage

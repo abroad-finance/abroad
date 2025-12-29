@@ -8,12 +8,16 @@ import { GCPPubSubQueueHandler } from '../../platform/messaging/gcpPubSubQueueHa
 import { SlackNotifier } from '../../platform/notifications/slackNotifier'
 import { SocketIOWebSocketService } from '../../platform/notifications/socketIoWebSocketService'
 import { WebhookNotifier } from '../../platform/notifications/webhookNotifier'
+import { OutboxDispatcher } from '../../platform/outbox/OutboxDispatcher'
+import { OutboxRepository } from '../../platform/outbox/OutboxRepository'
 import { PrismaClientProvider } from '../../platform/persistence/prismaClientProvider'
 import { CachedSecretManager } from '../../platform/secrets/CachedSecretManager'
 import { BindingRegistration, registerBindings } from './bindingSupport'
 import { TYPES } from './types'
 
 const infrastructureBindings: ReadonlyArray<BindingRegistration<unknown>> = [
+  { bindSelf: true, identifier: OutboxRepository, implementation: OutboxRepository },
+  { identifier: TYPES.IOutboxDispatcher, implementation: OutboxDispatcher },
   { identifier: TYPES.IQueueHandler, implementation: GCPPubSubQueueHandler },
   { identifier: TYPES.IDatabaseClientProvider, implementation: PrismaClientProvider },
   { identifier: TYPES.ISecretManager, implementation: CachedSecretManager },

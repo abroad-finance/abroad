@@ -15,8 +15,6 @@ import z from 'zod'
 import { TYPES } from '../../../../app/container/types'
 import { ILogger } from '../../../../core/logging/types'
 import { IQueueHandler, QueueName } from '../../../../platform/messaging/queues'
-import { IDatabaseClientProvider } from '../../../../platform/persistence/IDatabaseClientProvider'
-import { ISecretManager } from '../../../../platform/secrets/ISecretManager'
 import { SolanaPaymentVerifier } from '../../infrastructure/wallets/SolanaPaymentVerifier'
 
 const solanaPaymentNotificationSchema = z.object({
@@ -33,16 +31,12 @@ interface SolanaPaymentNotificationRequest {
 @Security('ApiKeyAuth')
 @Security('BearerAuth')
 export class SolanaPaymentsController extends Controller {
-  private readonly paymentVerifier: SolanaPaymentVerifier
-
   public constructor(
-    @inject(TYPES.ISecretManager) secretManager: ISecretManager,
+    @inject(TYPES.SolanaPaymentVerifier) private readonly paymentVerifier: SolanaPaymentVerifier,
     @inject(TYPES.IQueueHandler) private readonly queueHandler: IQueueHandler,
-    @inject(TYPES.IDatabaseClientProvider) dbClientProvider: IDatabaseClientProvider,
     @inject(TYPES.ILogger) private readonly logger: ILogger,
   ) {
     super()
-    this.paymentVerifier = new SolanaPaymentVerifier(secretManager, dbClientProvider, logger)
   }
 
   /**

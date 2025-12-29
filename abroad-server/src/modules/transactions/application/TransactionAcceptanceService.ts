@@ -1,4 +1,10 @@
-import { Country, PaymentMethod, TargetCurrency, TransactionStatus } from '@prisma/client'
+import {
+  Country,
+  PaymentMethod,
+  Prisma,
+  TargetCurrency,
+  TransactionStatus,
+} from '@prisma/client'
 import { inject, injectable } from 'inversify'
 
 import { isKycExemptByAmount } from '../../../app/config/kyc'
@@ -35,6 +41,9 @@ type PartnerUserContext = {
   webhookUrl: string
 }
 
+type PaymentServiceInstance = ReturnType<IPaymentServiceFactory['getPaymentService']>
+type SerializableTx = Prisma.TransactionClient
+
 @injectable()
 export class TransactionAcceptanceService {
   private readonly logger: ScopedLogger
@@ -57,31 +66,74 @@ export class TransactionAcceptanceService {
     partner: PartnerUserContext,
   ): Promise<AcceptTransactionResponse> {
     const prismaClient = await this.prismaClientProvider.getClient()
-    const quote = await this.fetchQuote(prismaClient, request.quoteId, partner.id)
-    const paymentService = this.paymentServiceFactory.getPaymentService(quote.paymentMethod)
-    this.assertPaymentServiceIsEnabled(paymentService, quote.paymentMethod)
+    const decision = await prismaClient.$transaction(async (tx) => {
+      const quote = await this.fetchQuote(tx, request.quoteId, partner.id)
+      const paymentService = this.paymentServiceFactory.getPaymentService(quote.paymentMethod)
+      this.assertPaymentServiceIsEnabled(paymentService, quote.paymentMethod)
 
-    this.enforceTransactionAmountBounds(quote, paymentService, quote.paymentMethod)
-    await this.ensureAccountIsValid(paymentService, request.accountNumber)
+      this.enforceTransactionAmountBounds(quote, paymentService, quote.paymentMethod)
+      await this.ensureAccountIsValid(paymentService, request.accountNumber)
 
-    const partnerUser = await prismaClient.partnerUser.upsert({
-      create: {
-        partnerId: quote.partnerId,
-        userId: request.userId,
-      },
-      update: {},
-      where: {
-        partnerId_userId: {
+      const partnerUser = await tx.partnerUser.upsert({
+        create: {
           partnerId: quote.partnerId,
           userId: request.userId,
         },
-      },
-    })
+        update: {},
+        where: {
+          partnerId_userId: {
+            partnerId: quote.partnerId,
+            userId: request.userId,
+          },
+        },
+      })
 
-    const monthlyAmount = await this.calculateMonthlyAmount(prismaClient, partnerUser.id, quote.paymentMethod)
-    const totalUserAmountMonthly = monthlyAmount + quote.sourceAmount
-    const kycLink = await this.resolveKycLink(partner, totalUserAmountMonthly, quote.country, request.redirectUrl, partnerUser.id)
-    if (kycLink) {
+      const monthlyAmount = await this.calculateMonthlyAmount(tx, partnerUser.id, quote.paymentMethod)
+      const totalUserAmountMonthly = monthlyAmount + quote.sourceAmount
+      const shouldRequestKyc = this.shouldRequestKyc(partner, totalUserAmountMonthly)
+      if (shouldRequestKyc) {
+        return {
+          outcome: 'kyc',
+          partnerUserId: partnerUser.id,
+          quote: { country: quote.country },
+          totalUserAmountMonthly,
+        } as const
+      }
+
+      await this.enforceUserTransactionLimits(tx, partnerUser.id, quote, paymentService)
+      await this.enforcePaymentMethodLimits(tx, quote, paymentService)
+      await this.enforceLiquidity(paymentService, quote.targetAmount)
+      await this.enforcePartnerKybThreshold(tx, partner.id, quote.sourceAmount, partner.isKybApproved)
+
+      const transaction = await tx.transaction.create({
+        data: {
+          accountNumber: request.accountNumber,
+          partnerUserId: partnerUser.id,
+          qrCode: request.qrCode,
+          quoteId: quote.id,
+          status: TransactionStatus.AWAITING_PAYMENT,
+          taxId: request.taxId,
+        },
+        select: { bankCode: true, id: true },
+      })
+
+      return {
+        outcome: 'transaction',
+        partnerUserId: partnerUser.id,
+        quoteId: quote.id,
+        transaction,
+      } as const
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
+
+    if (decision.outcome === 'kyc') {
+      const kycLink = await this.resolveKycLinkAfterDecision(
+        partner,
+        decision.totalUserAmountMonthly,
+        decision.quote.country,
+        request.redirectUrl,
+        decision.partnerUserId,
+      )
+
       return {
         id: null,
         kycLink,
@@ -89,32 +141,38 @@ export class TransactionAcceptanceService {
       }
     }
 
-    await this.enforceUserTransactionLimits(prismaClient, partnerUser.id, quote, paymentService)
-    await this.enforcePaymentMethodLimits(prismaClient, quote, paymentService)
-    await this.enforceLiquidity(paymentService, quote.targetAmount)
-    await this.enforcePartnerKybThreshold(prismaClient, partner.id, quote.sourceAmount, partner.isKybApproved)
+    try {
+      const transactionReference = uuidToBase64(decision.transaction.id)
+      await this.webhookNotifier.notifyWebhook(
+        partner.webhookUrl,
+        {
+          data: toWebhookTransactionPayload(decision.transaction),
+          event: WebhookEvent.TRANSACTION_CREATED,
+        },
+      )
 
-    return this.createTransaction(prismaClient, {
-      accountNumber: request.accountNumber,
-      partner,
-      partnerUserId: partnerUser.id,
-      paymentMethod: quote.paymentMethod,
-      paymentService,
-      qrCode: request.qrCode,
-      quoteId: quote.id,
-      taxId: request.taxId,
-      userId: request.userId,
-    })
+      await this.publishUserNotification(prismaClient, decision.transaction.id, request.userId)
+
+      return {
+        id: decision.transaction.id,
+        kycLink: null,
+        transactionReference,
+      }
+    }
+    catch (error) {
+      this.logger.error('Error creating transaction', error)
+      throw new TransactionValidationError('We could not create your transaction right now. Please try again in a few moments.')
+    }
   }
 
-  private assertPaymentServiceIsEnabled(paymentService: ReturnType<IPaymentServiceFactory['getPaymentService']>, paymentMethod: PaymentMethod): void {
+  private assertPaymentServiceIsEnabled(paymentService: PaymentServiceInstance, paymentMethod: PaymentMethod): void {
     if (!paymentService.isEnabled) {
       throw new TransactionValidationError(`Payments via ${paymentMethod} are temporarily unavailable. Please try another method or retry shortly.`)
     }
   }
 
   private async calculateMonthlyAmount(
-    prismaClient: Awaited<ReturnType<IDatabaseClientProvider['getClient']>>,
+    prismaClient: SerializableTx,
     partnerUserId: string,
     paymentMethod: PaymentMethod,
   ): Promise<number> {
@@ -135,50 +193,8 @@ export class TransactionAcceptanceService {
     return userTransactionsMonthly.reduce((acc, transaction) => acc + transaction.quote.sourceAmount, 0)
   }
 
-  private async createTransaction(
-    prismaClient: Awaited<ReturnType<IDatabaseClientProvider['getClient']>>,
-    input: {
-      accountNumber: string
-      partner: PartnerUserContext
-      partnerUserId: string
-      paymentMethod: PaymentMethod
-      paymentService: ReturnType<IPaymentServiceFactory['getPaymentService']>
-      qrCode?: null | string
-      quoteId: string
-      taxId?: string
-      userId: string
-    },
-  ): Promise<AcceptTransactionResponse> {
-    try {
-      const transaction = await prismaClient.transaction.create({
-        data: {
-          accountNumber: input.accountNumber,
-          partnerUserId: input.partnerUserId,
-          qrCode: input.qrCode,
-          quoteId: input.quoteId,
-          status: TransactionStatus.AWAITING_PAYMENT,
-          taxId: input.taxId,
-        },
-      })
-      const webhookPayload = toWebhookTransactionPayload(transaction)
-      await this.webhookNotifier.notifyWebhook(input.partner.webhookUrl, { data: webhookPayload, event: WebhookEvent.TRANSACTION_CREATED })
-
-      await this.publishUserNotification(prismaClient, transaction.id, input.userId)
-
-      return {
-        id: transaction.id,
-        kycLink: null,
-        transactionReference: uuidToBase64(transaction.id),
-      }
-    }
-    catch (error) {
-      this.logger.error('Error creating transaction', error)
-      throw new TransactionValidationError('We could not create your transaction right now. Please try again in a few moments.')
-    }
-  }
-
   private async enforceLiquidity(
-    paymentService: ReturnType<IPaymentServiceFactory['getPaymentService']>,
+    paymentService: PaymentServiceInstance,
     targetAmount: number,
   ) {
     let availableLiquidity = 0
@@ -196,7 +212,7 @@ export class TransactionAcceptanceService {
   }
 
   private async enforcePartnerKybThreshold(
-    prismaClient: Awaited<ReturnType<IDatabaseClientProvider['getClient']>>,
+    prismaClient: SerializableTx,
     partnerId: string,
     sourceAmount: number,
     isKybApproved: boolean,
@@ -219,9 +235,9 @@ export class TransactionAcceptanceService {
   }
 
   private async enforcePaymentMethodLimits(
-    prismaClient: Awaited<ReturnType<IDatabaseClientProvider['getClient']>>,
+    prismaClient: SerializableTx,
     quote: { paymentMethod: PaymentMethod, targetAmount: number },
-    paymentService: ReturnType<IPaymentServiceFactory['getPaymentService']>,
+    paymentService: PaymentServiceInstance,
   ) {
     const transactionsToday = await prismaClient.transaction.findMany({
       include: { quote: true },
@@ -245,7 +261,7 @@ export class TransactionAcceptanceService {
 
   private enforceTransactionAmountBounds(
     quote: { targetAmount: number, targetCurrency: TargetCurrency },
-    paymentService: ReturnType<IPaymentServiceFactory['getPaymentService']>,
+    paymentService: PaymentServiceInstance,
     paymentMethod: PaymentMethod,
   ): void {
     if (quote.targetAmount < paymentService.MIN_USER_AMOUNT_PER_TRANSACTION) {
@@ -258,10 +274,10 @@ export class TransactionAcceptanceService {
   }
 
   private async enforceUserTransactionLimits(
-    prismaClient: Awaited<ReturnType<IDatabaseClientProvider['getClient']>>,
+    prismaClient: SerializableTx,
     partnerUserId: string,
     quote: { paymentMethod: PaymentMethod, targetAmount: number },
-    paymentService: ReturnType<IPaymentServiceFactory['getPaymentService']>,
+    paymentService: PaymentServiceInstance,
   ) {
     const userTransactionsToday = await prismaClient.transaction.findMany({
       include: { quote: true },
@@ -289,7 +305,7 @@ export class TransactionAcceptanceService {
   }
 
   private async ensureAccountIsValid(
-    paymentService: ReturnType<IPaymentServiceFactory['getPaymentService']>,
+    paymentService: PaymentServiceInstance,
     accountNumber: string,
   ) {
     const isAccountValid = await paymentService.verifyAccount({ account: accountNumber })
@@ -298,7 +314,7 @@ export class TransactionAcceptanceService {
     }
   }
 
-  private async fetchQuote(prismaClient: Awaited<ReturnType<IDatabaseClientProvider['getClient']>>, quoteId: string, partnerId: string) {
+  private async fetchQuote(prismaClient: SerializableTx, quoteId: string, partnerId: string) {
     const quote = await prismaClient.quote.findUnique({
       where: { id: quoteId, partnerId },
     })
@@ -343,15 +359,14 @@ export class TransactionAcceptanceService {
     }
   }
 
-  private async resolveKycLink(
+  private async resolveKycLinkAfterDecision(
     partner: PartnerUserContext,
     totalUserAmountMonthly: number,
     country: string,
     redirectUrl: string | undefined,
     partnerUserId: string,
   ): Promise<null | string> {
-    const shouldRequestKyc = partner.needsKyc && !isKycExemptByAmount(totalUserAmountMonthly)
-    if (!shouldRequestKyc) {
+    if (!this.shouldRequestKyc(partner, totalUserAmountMonthly)) {
       return null
     }
 
@@ -362,6 +377,10 @@ export class TransactionAcceptanceService {
       redirectUrl,
       userId: partnerUserId,
     })
+  }
+
+  private shouldRequestKyc(partner: PartnerUserContext, totalUserAmountMonthly: number): boolean {
+    return partner.needsKyc && !isKycExemptByAmount(totalUserAmountMonthly)
   }
 }
 

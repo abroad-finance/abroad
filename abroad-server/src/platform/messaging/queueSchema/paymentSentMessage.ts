@@ -9,6 +9,7 @@ export const PaymentSentMessageSchema = z.object({
   cryptoCurrency: z.nativeEnum(CryptoCurrency),
   paymentMethod: z.enum(SUPPORTED_PAYMENT_METHODS),
   targetCurrency: z.nativeEnum(TargetCurrency),
+  transactionId: z.string().uuid().optional(),
 })
 
 export type PaymentSentMessage = z.infer<typeof PaymentSentMessageSchema>

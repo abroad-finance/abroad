@@ -7,6 +7,7 @@ const typeKeys = [
   'IExchangeProviderFactory',
   'IKycService',
   'ILockManager',
+  'IOutboxDispatcher',
   'ILogger',
   'IPartnerService',
   'IPaymentService',
@@ -26,10 +27,12 @@ const typeKeys = [
   'QuoteUseCase',
   'ReceivedCryptoTransactionController',
   'ReceivedCryptoTransactionUseCase',
+  'SolanaPaymentVerifier',
   'SolanaWalletHandler',
   'StellarWalletHandler',
   'TransactionAcceptanceService',
   'TransactionStatusService',
+  'TransactionWorkflow',
 ] as const
 
 type TypeKey = typeof typeKeys[number]

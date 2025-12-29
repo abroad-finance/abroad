@@ -7,7 +7,9 @@ import {
   PartiallyDecodedInstruction,
   PublicKey,
 } from '@solana/web3.js'
+import { inject, injectable } from 'inversify'
 
+import { TYPES } from '../../../../app/container/types'
 import { ILogger } from '../../../../core/logging/types'
 import { ReceivedCryptoTransactionMessage } from '../../../../platform/messaging/queueSchema'
 import { IDatabaseClientProvider } from '../../../../platform/persistence/IDatabaseClientProvider'
@@ -40,11 +42,12 @@ type TransferCheckedInfo = {
   tokenAmount: TokenAmountInfo
 }
 
+@injectable()
 export class SolanaPaymentVerifier {
   public constructor(
-    private readonly secretManager: ISecretManager,
-    private readonly dbClientProvider: IDatabaseClientProvider,
-    private readonly logger: ILogger,
+    @inject(TYPES.ISecretManager) private readonly secretManager: ISecretManager,
+    @inject(TYPES.IDatabaseClientProvider) private readonly dbClientProvider: IDatabaseClientProvider,
+    @inject(TYPES.ILogger) private readonly logger: ILogger,
   ) {}
 
   public async buildPaymentContext(): Promise<SolanaPaymentContext> {
