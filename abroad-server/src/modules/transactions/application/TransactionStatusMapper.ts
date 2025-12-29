@@ -1,7 +1,17 @@
 import { TransactionStatus } from '@prisma/client'
 
 export class TransactionStatusMapper {
-  public mapProviderStatus(rawStatus: string): TransactionStatus {
+  public mapProviderStatus(provider: string, rawStatus: string): TransactionStatus {
+    const normalizedProvider = provider.toLowerCase()
+    switch (normalizedProvider) {
+      case 'transfero':
+        return this.mapDefault(rawStatus)
+      default:
+        return this.mapDefault(rawStatus)
+    }
+  }
+
+  private mapDefault(rawStatus: string): TransactionStatus {
     const normalized = rawStatus.toLowerCase()
     if ([
       'canceled',

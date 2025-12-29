@@ -107,7 +107,7 @@ export class TransactionWorkflow {
       scopedLogger.error('Unsupported payment method for provider status update', error)
       return
     }
-    const newStatus = this.statusMapper.mapProviderStatus(message.status)
+    const newStatus = this.statusMapper.mapProviderStatus(message.provider, message.status)
 
     if (newStatus === TransactionStatus.PROCESSING_PAYMENT) {
       scopedLogger.info('Provider status indicates processing; leaving transaction unchanged')
