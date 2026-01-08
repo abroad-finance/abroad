@@ -2,10 +2,11 @@ import { BlockchainNetwork, CryptoCurrency, PrismaClient, TransactionStatus } fr
 import { Horizon } from '@stellar/stellar-sdk'
 
 import { ILogger } from '../../../core/logging/types'
-import { IQueueHandler, QueueName } from '../../../platform/messaging/queues'
-import { ReceivedCryptoTransactionMessage } from '../../../platform/messaging/queueSchema'
+import { QueueName } from '../../../platform/messaging/queues'
+import { OutboxDispatcher } from '../../../platform/outbox/OutboxDispatcher'
 import { IDatabaseClientProvider } from '../../../platform/persistence/IDatabaseClientProvider'
 import { ISecretManager, Secrets } from '../../../platform/secrets/ISecretManager'
+import { IDepositVerifierRegistry } from '../../payments/application/contracts/IDepositVerifier'
 
 export type CheckUnprocessedStellarResponse = {
   alreadyProcessed: number
@@ -52,7 +53,8 @@ export class StellarReconciliationService {
   constructor(
     private readonly prismaProvider: IDatabaseClientProvider,
     private readonly secretManager: ISecretManager,
-    private readonly queueHandler: IQueueHandler,
+    private readonly outboxDispatcher: OutboxDispatcher,
+    private readonly verifierRegistry: IDepositVerifierRegistry,
     private readonly logger: ILogger,
   ) {}
 
@@ -408,17 +410,25 @@ export class StellarReconciliationService {
       return { cursor, result: 'alreadyProcessed', transactionId: transaction.id }
     }
 
-    const queueMessage: ReceivedCryptoTransactionMessage = {
-      addressFrom: payment.from,
-      amount: parseFloat(payment.amount),
-      blockchain: BlockchainNetwork.STELLAR,
-      cryptoCurrency: CryptoCurrency.USDC,
-      onChainId: payment.id,
-      transactionId: transaction.id,
-    }
-
     try {
-      await this.queueHandler.postMessage(QueueName.RECEIVED_CRYPTO_TRANSACTION, queueMessage)
+      const verifier = this.verifierRegistry.getVerifier(BlockchainNetwork.STELLAR)
+      const verification = await verifier.verifyNotification(payment.id, transaction.id)
+      if (verification.outcome === 'error') {
+        this.logger.warn('[PublicTransactionsController] Verification failed for Stellar payment', {
+          paymentId: payment.id,
+          reason: verification.reason,
+          status: verification.status,
+          transactionId: transaction.id,
+        })
+        return { cursor, result: 'halt', transactionId: transaction.id }
+      }
+
+      await this.outboxDispatcher.enqueueQueue(
+        QueueName.RECEIVED_CRYPTO_TRANSACTION,
+        verification.queueMessage,
+        'stellar.reconcile',
+        { deliverNow: true },
+      )
       return { cursor, result: 'enqueued', transactionId: transaction.id }
     }
     catch (error: unknown) {
