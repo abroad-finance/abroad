@@ -90,6 +90,7 @@ export class TransactionAcceptanceService {
           },
         },
       })
+      await this.lockPartnerUser(tx, partnerUser.id)
 
       const monthlyAmount = await this.calculateMonthlyAmount(tx, partnerUser.id, quote.paymentMethod)
       const totalUserAmountMonthly = monthlyAmount + quote.sourceAmount
@@ -329,6 +330,14 @@ export class TransactionAcceptanceService {
       return Country.CO
     }
     throw new TransactionValidationError(`KYC verification is not available for ${country}. Please provide a supported country or contact support.`)
+  }
+
+  private async lockPartnerUser(
+    prismaClient: SerializableTx,
+    partnerUserId: string,
+  ): Promise<void> {
+    // Serialize concurrent accept attempts for the same partner user to prevent limit races.
+    await prismaClient.$executeRaw`SELECT 1 FROM "PartnerUser" WHERE id = ${partnerUserId} FOR UPDATE`
   }
 
   private async publishUserNotification(
