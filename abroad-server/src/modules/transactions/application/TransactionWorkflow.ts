@@ -119,7 +119,10 @@ export class TransactionWorkflow {
 
     try {
       const walletHandler = this.refundService.resolveWalletHandler(message.blockchain)
-      const exchangeProvider = this.exchangeProviderFactory.getExchangeProvider(message.targetCurrency)
+      const exchangeProvider = this.exchangeProviderFactory.getExchangeProviderForCapability({
+        blockchain: message.blockchain,
+        targetCurrency: message.targetCurrency,
+      })
       const { address, memo } = await exchangeProvider.getExchangeAddress({
         blockchain: message.blockchain,
         cryptoCurrency: message.cryptoCurrency,

@@ -1,4 +1,4 @@
-import { TargetCurrency } from '@prisma/client'
+import { BlockchainNetwork, TargetCurrency } from '@prisma/client'
 import { inject, named } from 'inversify'
 
 import { TYPES } from '../../../app/container/types'
@@ -12,13 +12,20 @@ export class ExchangeProviderFactory implements IExchangeProviderFactory {
   ) { }
 
   getExchangeProvider(currency: TargetCurrency): IExchangeProvider {
-    switch (currency) {
-      case TargetCurrency.BRL:
-        return this.transferoExchangeProvider
-      case TargetCurrency.COP:
-        return this.binanceExchangeProvider
-      default:
-        throw new Error(`No exchange provider found for currency: ${currency}`)
+    return this.getExchangeProviderForCapability({ targetCurrency: currency })
+  }
+
+  getExchangeProviderForCapability(params: {
+    blockchain?: BlockchainNetwork
+    targetCurrency: TargetCurrency
+  }): IExchangeProvider {
+    const { targetCurrency } = params
+    if (targetCurrency === TargetCurrency.BRL) {
+      return this.transferoExchangeProvider
     }
+    if (targetCurrency === TargetCurrency.COP) {
+      return this.binanceExchangeProvider
+    }
+    throw new Error(`No exchange provider found for currency: ${targetCurrency}`)
   }
 }
