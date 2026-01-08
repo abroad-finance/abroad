@@ -69,6 +69,7 @@ export class OutboxDispatcher {
         this.logger.error(`[Outbox] delivery failed permanently (${context})`, normalized)
         await this.repository.markFailed(record.id, normalized, client)
         await this.safeNotifySlack(`[Outbox] Permanently failed to deliver ${record.type} (${record.id}); last error=${normalized.message}`)
+        await this.safePublishDeadLetter(normalized, record)
         return
       }
       const nextAttempt = new Date(Date.now() + backoffMs)
@@ -148,6 +149,24 @@ export class OutboxDispatcher {
     }
     catch (error) {
       this.logger.warn('[Outbox] Failed to notify Slack about permanent failure', error)
+    }
+  }
+
+  private async safePublishDeadLetter(error: Error, record: OutboxRecord): Promise<void> {
+    try {
+      await this.queueHandler.postMessage(QueueName.DEAD_LETTER, {
+        error: error.message,
+        originalQueue: 'outbox',
+        payload: {
+          id: record.id,
+          payload: record.payload,
+          type: record.type,
+        },
+        reason: 'delivery_failed',
+      })
+    }
+    catch (dlqErr) {
+      this.logger.warn('[Outbox] Failed to publish dead-letter for outbox delivery failure', dlqErr)
     }
   }
 }

@@ -102,5 +102,10 @@ describe('OutboxDispatcher', () => {
 
     expect(repository.markFailed).toHaveBeenCalledWith(failingRecord.id, expect.any(Error), undefined)
     expect(slackNotifier.sendMessage).toHaveBeenCalledWith(expect.stringContaining(failingRecord.id))
+    expect(queueHandler.postMessage).toHaveBeenCalledWith(QueueName.DEAD_LETTER, expect.objectContaining({
+      error: 'network down',
+      originalQueue: 'outbox',
+      reason: 'delivery_failed',
+    }))
   })
 })
