@@ -5,6 +5,7 @@ import { TYPES } from '../../../app/container/types'
 import { ValidationError } from '../../../core/errors'
 import { ILogger } from '../../../core/logging/types'
 import { IDatabaseClientProvider } from '../../../platform/persistence/IDatabaseClientProvider'
+import { LiquidityCacheService } from './LiquidityCacheService'
 import { IPaymentService } from './contracts/IPaymentService'
 import { IPaymentServiceFactory } from './contracts/IPaymentServiceFactory'
 import { assertSupportedPaymentMethod, DEFAULT_PAYMENT_METHOD, SupportedPaymentMethod } from './supportedPaymentMethods'
@@ -25,8 +26,6 @@ export interface OnboardResult {
   success: boolean
 }
 
-const LIQUIDITY_CACHE_TTL_MS = 5 * 60 * 1000
-
 @injectable()
 export class PaymentUseCase implements IPaymentUseCase {
   private readonly successMessage = 'Liquidity retrieved successfully'
@@ -36,6 +35,8 @@ export class PaymentUseCase implements IPaymentUseCase {
     private readonly paymentServiceFactory: IPaymentServiceFactory,
     @inject(TYPES.IDatabaseClientProvider)
     private readonly dbClientProvider: IDatabaseClientProvider,
+    @inject(LiquidityCacheService)
+    private readonly liquidityCacheService: LiquidityCacheService,
     @inject(TYPES.ILogger)
     private readonly logger: ILogger,
   ) { }
@@ -43,45 +44,19 @@ export class PaymentUseCase implements IPaymentUseCase {
   public async getLiquidity(paymentMethod?: SupportedPaymentMethod): Promise<LiquidityResult> {
     const { method, service } = this.resolvePaymentService(paymentMethod)
     try {
-      const clientDb = await this.dbClientProvider.getClient()
-      const providerRecord = await clientDb.paymentProvider.findUnique({ where: { id: method } })
-      const now = Date.now()
+      const cached = await this.liquidityCacheService.getLiquidity({
+        fetchLiquidity: () => service.getLiquidity(),
+        method,
+      })
 
-      if (!providerRecord) {
-        await clientDb.paymentProvider.create({
-          data: {
-            country: Country.CO,
-            id: method,
-            liquidity: 0,
-            name: method,
-          },
-        })
-      }
-
-      const persistedLiquidity = providerRecord?.liquidity ?? 0
-      const lastUpdatedAt = providerRecord?.updatedAt?.getTime()
-      const isFresh = typeof lastUpdatedAt === 'number' && now - lastUpdatedAt <= LIQUIDITY_CACHE_TTL_MS
-
-      if (persistedLiquidity !== 0 && isFresh) {
-        return {
-          liquidity: persistedLiquidity,
-          message: this.successMessage,
-          success: true,
-        }
-      }
-
-      const liquidity = await service.getLiquidity()
-      if (typeof liquidity === 'number') {
-        await clientDb.paymentProvider.update({
-          data: { liquidity },
-          where: { id: method },
-        })
+      if (!cached.success && cached.message) {
+        this.logger.error('[PaymentUseCase] Failed to retrieve liquidity', cached.message)
       }
 
       return {
-        liquidity: liquidity || 0,
-        message: this.successMessage,
-        success: true,
+        liquidity: cached.liquidity,
+        message: cached.message ?? this.successMessage,
+        success: cached.success,
       }
     }
     catch (error) {
