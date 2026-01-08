@@ -118,6 +118,8 @@ export class BrebPaymentService implements IPaymentService {
   public readonly percentageFee = 0
 
   public readonly provider = 'breb'
+  private readonly maxSendAttempts: number
+  private readonly retryDelayMs: number
 
   private accessTokenCache?: { expiresAt: number, value: string }
 
@@ -148,6 +150,8 @@ export class BrebPaymentService implements IPaymentService {
     @inject(TYPES.ISecretManager) private readonly secretManager: ISecretManager,
     @inject(TYPES.ILogger) private readonly logger: ILogger,
   ) {
+    this.maxSendAttempts = this.readNumberFromEnv('BREB_MAX_SEND_ATTEMPTS', 3)
+    this.retryDelayMs = this.readNumberFromEnv('BREB_RETRY_DELAY_MS', 500)
   }
 
   public async getLiquidity(): Promise<number> {
@@ -760,5 +764,12 @@ export class BrebPaymentService implements IPaymentService {
 
   private async sleep(ms: number): Promise<void> {
     await new Promise(resolve => setTimeout(resolve, ms))
+  }
+
+  private readNumberFromEnv(envKey: string, fallback: number): number {
+    const raw = process.env[envKey]
+    if (!raw) return fallback
+    const parsed = Number(raw)
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback
   }
 }

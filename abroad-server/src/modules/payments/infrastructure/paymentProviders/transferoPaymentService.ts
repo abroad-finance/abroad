@@ -55,8 +55,8 @@ export class TransferoPaymentService implements IPaymentService {
 
   public readonly percentageFee = 0.0
   public readonly provider = 'transfero'
-  private readonly maxSendAttempts = 3
-  private readonly retryDelayMs = 250
+  private readonly maxSendAttempts: number
+  private readonly retryDelayMs: number
 
   private readonly brazilDdds = new Set([
     '11', '12', '13', '14', '15', '16', '17', '18', '19',
@@ -79,7 +79,10 @@ export class TransferoPaymentService implements IPaymentService {
     @inject(TYPES.IDatabaseClientProvider) private databaseClientProvider: IDatabaseClientProvider,
     @inject(TYPES.IPixQrDecoder) private pixQrDecoder: IPixQrDecoder,
     @inject(TYPES.ILogger) private logger: ILogger,
-  ) { }
+  ) {
+    this.maxSendAttempts = this.readNumberFromEnv('TRANSFERO_MAX_SEND_ATTEMPTS', 3)
+    this.retryDelayMs = this.readNumberFromEnv('TRANSFERO_RETRY_DELAY_MS', 250)
+  }
 
   private static parseAmount(raw: number | string | undefined): null | number {
     if (typeof raw === 'number' && Number.isFinite(raw)) {
@@ -432,5 +435,12 @@ export class TransferoPaymentService implements IPaymentService {
 
   private async sleep(ms: number): Promise<void> {
     await new Promise(resolve => setTimeout(resolve, ms))
+  }
+
+  private readNumberFromEnv(envKey: string, fallback: number): number {
+    const raw = process.env[envKey]
+    if (!raw) return fallback
+    const parsed = Number(raw)
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback
   }
 }
