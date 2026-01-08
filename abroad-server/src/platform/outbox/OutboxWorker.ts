@@ -28,9 +28,9 @@ export class OutboxWorker {
     @inject(TYPES.ILogger) baseLogger: ILogger,
     options: OutboxWorkerOptions = {},
   ) {
-    this.batchSize = options.batchSize ?? 50
-    this.pollIntervalMs = options.pollIntervalMs ?? 1_000
-    this.slackOnFailure = options.slackOnFailure ?? true
+    this.batchSize = options.batchSize ?? this.readNumber('OUTBOX_BATCH_SIZE', 50)
+    this.pollIntervalMs = options.pollIntervalMs ?? this.readNumber('OUTBOX_POLL_INTERVAL_MS', 1_000)
+    this.slackOnFailure = options.slackOnFailure ?? this.readBoolean('OUTBOX_SLACK_ALERTS', true)
     this.logger = createScopedLogger(baseLogger, { scope: 'OutboxWorker' })
   }
 
@@ -96,5 +96,18 @@ export class OutboxWorker {
 
   private async sleep(ms: number): Promise<void> {
     await new Promise(resolve => setTimeout(resolve, ms))
+  }
+
+  private readNumber(envKey: string, fallback: number): number {
+    const raw = process.env[envKey]
+    if (!raw) return fallback
+    const parsed = Number(raw)
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback
+  }
+
+  private readBoolean(envKey: string, fallback: boolean): boolean {
+    const raw = process.env[envKey]
+    if (raw === undefined) return fallback
+    return raw.toLowerCase() === 'true'
   }
 }
