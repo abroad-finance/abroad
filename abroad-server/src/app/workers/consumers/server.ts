@@ -7,6 +7,7 @@ import { PaymentSentController } from '../../../modules/payments/interfaces/queu
 import { PaymentStatusUpdatedController } from '../../../modules/payments/interfaces/queue/PaymentStatusUpdatedController'
 import { ReceivedCryptoTransactionController } from '../../../modules/transactions/interfaces/queue/ReceivedCryptoTransactionController'
 import { BinanceBalanceUpdatedController } from '../../../modules/treasury/interfaces/queue/BinanceBalanceUpdatedController'
+import { DeadLetterController } from '../../../platform/messaging/DeadLetterController'
 import { iocContainer } from '../../container'
 import { TYPES } from '../../container/types'
 
@@ -43,6 +44,7 @@ export const createHealthHandler = (state: { live: boolean, ready: boolean }) =>
 // Keep module-level strong references to prevent GC
 const running: {
   binance?: BinanceBalanceUpdatedController
+  deadLetter?: DeadLetterController
   payment?: PaymentSentController
   paymentStatus?: PaymentStatusUpdatedController
   received?: ReceivedCryptoTransactionController
@@ -61,12 +63,17 @@ export function startConsumers(): void {
   const binance = iocContainer.get<BinanceBalanceUpdatedController>(
     TYPES.BinanceBalanceUpdatedController,
   )
+  const deadLetter = iocContainer.get<DeadLetterController>(
+    TYPES.DeadLetterController,
+  )
 
   running.received = received
   running.payment = payment
   running.paymentStatus = paymentStatus
   running.binance = binance
+  running.deadLetter = deadLetter
 
+  deadLetter.registerConsumers()
   received.registerConsumers()
   payment.registerConsumers()
   paymentStatus.registerConsumers()
@@ -87,6 +94,7 @@ export async function stopConsumers(): Promise<void> {
     running.received = undefined
     running.payment = undefined
     running.binance = undefined
+    running.deadLetter = undefined
   }
 }
 
