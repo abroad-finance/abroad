@@ -1,4 +1,4 @@
-import { Country, TargetCurrency } from '@prisma/client'
+import { Country } from '@prisma/client'
 import { inject, injectable } from 'inversify'
 
 import { TYPES } from '../../../app/container/types'
