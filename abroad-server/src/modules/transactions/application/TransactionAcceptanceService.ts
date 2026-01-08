@@ -523,11 +523,22 @@ export class TransactionAcceptanceService {
   }
 
   private monthlyAmountCap(paymentService: PaymentServiceInstance): number {
-    return paymentService.MAX_TOTAL_AMOUNT_PER_DAY * 31
+    return paymentService.MAX_TOTAL_AMOUNT_PER_DAY * this.monthlyMultiplier()
   }
 
   private monthlyCountCap(paymentService: PaymentServiceInstance): number {
-    return paymentService.MAX_USER_TRANSACTIONS_PER_DAY * 31
+    return paymentService.MAX_USER_TRANSACTIONS_PER_DAY * this.monthlyMultiplier()
+  }
+
+  private monthlyMultiplier(): number {
+    const raw = process.env.MONTHLY_LIMIT_MULTIPLIER_DAYS
+    if (!raw) return 31
+    const parsed = Number(raw)
+    if (!Number.isFinite(parsed) || parsed < 1) {
+      return 31
+    }
+    // Guard against extreme multipliers while preserving configuration flexibility.
+    return Math.min(parsed, 62)
   }
 }
 

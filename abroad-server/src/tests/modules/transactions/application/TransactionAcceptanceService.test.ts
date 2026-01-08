@@ -214,6 +214,20 @@ describe('TransactionAcceptanceService helpers', () => {
     )).rejects.toThrow('This payment method reached this month\'s partner limit. Please try again next month or use another method.')
   })
 
+  it('caps monthly limits using a configurable multiplier', () => {
+    const monthlyAmountCap = (service as unknown as {
+      monthlyAmountCap: (paymentSvc: ReturnType<typeof buildPaymentService>) => number
+    }).monthlyAmountCap
+    const monthlyCountCap = (service as unknown as {
+      monthlyCountCap: (paymentSvc: ReturnType<typeof buildPaymentService>) => number
+    }).monthlyCountCap
+
+    process.env.MONTHLY_LIMIT_MULTIPLIER_DAYS = '10'
+    expect(monthlyAmountCap(paymentService)).toBe(paymentService.MAX_TOTAL_AMOUNT_PER_DAY * 10)
+    expect(monthlyCountCap(paymentService)).toBe(paymentService.MAX_USER_TRANSACTIONS_PER_DAY * 10)
+    delete process.env.MONTHLY_LIMIT_MULTIPLIER_DAYS
+  })
+
   it('enforces partner KYB threshold using aggregates', async () => {
     const enforcePartnerKybThreshold = (service as unknown as {
       enforcePartnerKybThreshold: (
