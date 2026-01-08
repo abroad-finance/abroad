@@ -168,47 +168,58 @@ export class BrebPaymentService implements IPaymentService {
     qrCode?: null | string
     value: number
   }): Promise<PaymentSendResult> {
-    try {
-      const config = await this.getConfig()
-      const token = await this.getAccessToken(config)
+    let attempt = 0
+    while (attempt < this.maxSendAttempts) {
+      attempt += 1
+      try {
+        const config = await this.getConfig()
+        const token = await this.getAccessToken(config)
 
-      const keyDetails = await this.fetchKey(account, config, token)
-      if (!this.isKeyUsable(keyDetails)) {
-        this.logger.warn('[BreB] Invalid or mismatched key for account', { account })
-        return { code: 'permanent', reason: 'missing_transaction_id', success: false }
+        const keyDetails = await this.fetchKey(account, config, token)
+        if (!this.isKeyUsable(keyDetails)) {
+          this.logger.warn('[BreB] Invalid or mismatched key for account', { account })
+          return { code: 'permanent', reason: 'missing_transaction_id', success: false }
+        }
+
+        const sendPayload = this.buildSendPayload(keyDetails, value)
+        const sendResponse = await this.dispatchPayment(sendPayload, config, token)
+
+        if (!sendResponse?.moviiTxId) {
+          this.logger.error('[BreB] Send response missing transaction id', sendResponse)
+          return this.buildFailure('permanent', 'missing_transaction_id')
+        }
+
+        const resolvedRail = keyDetails.instructedAgent
+        if (!resolvedRail) {
+          this.logger.error('[BreB] Missing instructed agent on key details', { account })
+          return this.buildFailure('permanent', 'missing_instructed_agent')
+        }
+
+        const reportResult = await this.pollTransactionReport(sendResponse.moviiTxId, resolvedRail, config, token)
+        if (reportResult?.result === 'success') {
+          return { success: true, transactionId: sendResponse.moviiTxId }
+        }
+
+        if (reportResult?.result === 'pending') {
+          this.logger.warn('[BreB] Payment pending after timeout', { transactionId: sendResponse.moviiTxId })
+          return { code: 'retriable', reason: 'pending', success: false, transactionId: sendResponse.moviiTxId }
+        }
+
+        return this.buildFailure('permanent', reportResult?.result ?? 'unknown')
       }
-
-      const sendPayload = this.buildSendPayload(keyDetails, value)
-      const sendResponse = await this.dispatchPayment(sendPayload, config, token)
-
-      if (!sendResponse?.moviiTxId) {
-        this.logger.error('[BreB] Send response missing transaction id', sendResponse)
-        return this.buildFailure('permanent', 'missing_transaction_id')
+      catch (error) {
+        const reason = error instanceof Error ? error.message : 'Unknown error'
+        this.logger.error('[BreB] Payment submission failed', { account, reason })
+        const code = this.extractFailureCode(error)
+        const shouldRetry = code === 'retriable' && attempt < this.maxSendAttempts && this.isRetryableError(error)
+        if (!shouldRetry) {
+          return this.buildFailure(code, reason)
+        }
+        await this.sleep(this.retryDelayMs * attempt)
       }
-
-      const resolvedRail = keyDetails.instructedAgent
-      if (!resolvedRail) {
-        this.logger.error('[BreB] Missing instructed agent on key details', { account })
-        return this.buildFailure('permanent', 'missing_instructed_agent')
-      }
-
-      const reportResult = await this.pollTransactionReport(sendResponse.moviiTxId, resolvedRail, config, token)
-      if (reportResult?.result === 'success') {
-        return { success: true, transactionId: sendResponse.moviiTxId }
-      }
-
-      if (reportResult?.result === 'pending') {
-        this.logger.warn('[BreB] Payment pending after timeout', { transactionId: sendResponse.moviiTxId })
-        return { code: 'retriable', reason: 'pending', success: false, transactionId: sendResponse.moviiTxId }
-      }
-
-      return this.buildFailure('permanent', reportResult?.result ?? 'unknown')
     }
-    catch (error) {
-      const reason = error instanceof Error ? error.message : 'Unknown error'
-      this.logger.error('[BreB] Payment submission failed', { account, reason })
-      return this.buildFailure(this.extractFailureCode(error), reason)
-    }
+
+    return this.buildFailure('retriable', 'Maximum send attempts exceeded')
   }
 
   private buildFailure(code: PaymentFailureCode, reason?: string): PaymentSendResult {
@@ -221,6 +232,14 @@ export class BrebPaymentService implements IPaymentService {
       return 'permanent'
     }
     return 'retriable'
+  }
+
+  private isRetryableError(error: unknown): boolean {
+    const status = this.extractErrorStatus(error)
+    if (status && status >= 500) {
+      return true
+    }
+    return !status
   }
 
   private extractErrorStatus(error: unknown): number | undefined {
@@ -737,5 +756,9 @@ export class BrebPaymentService implements IPaymentService {
 
     const normalized = segment.trim()
     return /^\d+$/.test(normalized) || normalized.length >= 16
+  }
+
+  private async sleep(ms: number): Promise<void> {
+    await new Promise(resolve => setTimeout(resolve, ms))
   }
 }
