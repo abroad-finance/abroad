@@ -180,7 +180,9 @@ describe('ReceivedCryptoTransactionUseCase', () => {
   it('rejects invalid messages before touching the database', async () => {
     const harness = createHarness()
 
-    await harness.useCase.process({ transactionId: 'not-a-uuid' })
+    await expect(harness.useCase.process({ transactionId: 'not-a-uuid' })).rejects.toThrow(
+      /Invalid received crypto transaction message/,
+    )
 
     expect(harness.logger.error).toHaveBeenCalledWith(
       expect.stringContaining('Invalid message format'),
@@ -258,17 +260,17 @@ describe('ReceivedCryptoTransactionUseCase', () => {
     const harness = createHarness()
     harness.prisma.transaction.update.mockRejectedValueOnce(new Error('db error'))
 
-    await harness.useCase.process(baseMessage)
+    await expect(harness.useCase.process(baseMessage)).rejects.toThrow()
 
     expect(harness.logger.error).toHaveBeenCalledWith(
-      expect.stringContaining('Error updating transaction'),
+      expect.stringContaining('Failed to process received crypto transaction'),
       expect.objectContaining({
         context: expect.objectContaining({
           blockchain: baseMessage.blockchain,
           transactionId: baseMessage.transactionId,
         }),
       }),
-      expect.any(Error),
+      expect.anything(),
     )
     expect(harness.queueHandler.postMessage).not.toHaveBeenCalled()
   })

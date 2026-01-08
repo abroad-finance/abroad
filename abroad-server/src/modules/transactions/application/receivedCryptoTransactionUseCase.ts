@@ -26,7 +26,7 @@ export class ReceivedCryptoTransactionUseCase implements IReceivedCryptoTransact
 
     const parsedMessage = this.parseMessage(rawMessage, scopedLogger)
     if (!parsedMessage) {
-      return
+      throw new Error('Invalid received crypto transaction message')
     }
 
     try {
@@ -34,6 +34,7 @@ export class ReceivedCryptoTransactionUseCase implements IReceivedCryptoTransact
     }
     catch (error) {
       scopedLogger.error('Failed to process received crypto transaction', error)
+      throw error
     }
   }
 

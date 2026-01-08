@@ -41,7 +41,7 @@ export class PaymentStatusUpdatedController {
     const parsed = PaymentStatusUpdatedMessageSchema.safeParse(msg)
     if (!parsed.success) {
       scopedLogger.error('[PaymentStatusUpdated queue]: Invalid message format:', parsed.error)
-      return
+      throw new Error('Invalid payment status update message')
     }
     const message: PaymentStatusUpdatedMessage = parsed.data
 
@@ -51,6 +51,7 @@ export class PaymentStatusUpdatedController {
     catch (error) {
       const normalizedError = error instanceof Error ? error : new Error(String(error))
       scopedLogger.error('[PaymentStatusUpdated queue]: Error updating transaction:', normalizedError)
+      throw normalizedError
     }
   }
 }

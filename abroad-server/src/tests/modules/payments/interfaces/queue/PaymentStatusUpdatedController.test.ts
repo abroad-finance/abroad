@@ -41,7 +41,7 @@ describe('PaymentStatusUpdatedController', () => {
   it('rejects invalid messages and avoids workflow invocation', async () => {
     const handler = controller as unknown as { onPaymentStatusUpdated: (msg: unknown) => Promise<void> }
 
-    await handler.onPaymentStatusUpdated({ status: '' })
+    await expect(handler.onPaymentStatusUpdated({ status: '' })).rejects.toThrow(/Invalid payment status update message/)
 
     expect(logger.error).toHaveBeenCalledWith(
       expect.stringContaining('Invalid message format'),
@@ -69,13 +69,13 @@ describe('PaymentStatusUpdatedController', () => {
     const handler = controller as unknown as { onPaymentStatusUpdated: (msg: PaymentStatusUpdatedMessage) => Promise<void> }
     workflow.handleProviderStatusUpdate.mockRejectedValueOnce(new Error('boom'))
 
-    await handler.onPaymentStatusUpdated({
+    await expect(handler.onPaymentStatusUpdated({
       amount: 100,
       currency: TargetCurrency.BRL,
       externalId: 'ext-2',
       provider: 'transfero',
       status: 'failed',
-    })
+    })).rejects.toThrow('boom')
 
     expect(logger.error).toHaveBeenCalledWith(
       expect.stringContaining('Error updating transaction'),

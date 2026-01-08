@@ -25,7 +25,7 @@ export class PaymentSentUseCase implements IPaymentSentUseCase {
     })
     const message = this.parseMessage(rawMessage, logger)
     if (!message) {
-      return
+      throw new Error('Invalid payment sent message')
     }
 
     try {

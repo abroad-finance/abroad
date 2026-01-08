@@ -16,13 +16,13 @@ describe('PaymentSentUseCase.process', () => {
   it('ignores empty or invalid messages', async () => {
     const { logger, useCase, workflow } = buildUseCaseHarness()
 
-    await useCase.process({})
+    await expect(useCase.process({})).rejects.toThrow(/Invalid payment sent message/)
     expect(logger.error).toHaveBeenCalledWith(
       expect.stringContaining('Invalid message format'),
       expect.anything(),
     )
 
-    await useCase.process({ amount: 10 })
+    await expect(useCase.process({ amount: 10 })).rejects.toThrow(/Invalid payment sent message/)
     expect(logger.error).toHaveBeenCalledWith(
       expect.stringContaining('Invalid message format'),
       expect.anything(),
