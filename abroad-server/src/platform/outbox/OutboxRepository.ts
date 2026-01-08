@@ -76,13 +76,14 @@ export class OutboxRepository {
     })
   }
 
-  public async summarizeFailures(): Promise<{ delivering: number, failed: number }> {
+  public async summarizeFailures(): Promise<{ delivering: number, failed: number, pending: number }> {
     const client = await this.dbProvider.getClient()
-    const [failed, delivering] = await Promise.all([
+    const [failed, delivering, pending] = await Promise.all([
       client.outboxEvent.count({ where: { status: OutboxStatus.FAILED } }),
       client.outboxEvent.count({ where: { status: OutboxStatus.DELIVERING } }),
+      client.outboxEvent.count({ where: { status: OutboxStatus.PENDING } }),
     ])
-    return { delivering, failed }
+    return { delivering, failed, pending }
   }
 
   public async reschedule(

@@ -90,7 +90,7 @@ export class OutboxWorker {
     this.logger.warn('Outbox failure backlog detected', summary)
     if (!this.slackOnFailure) return
 
-    const message = `[OutboxWorker] Failed: ${summary.failed}, Delivering: ${summary.delivering}`
+    const message = `[OutboxWorker] Failed: ${summary.failed}, Delivering: ${summary.delivering}, Pending: ${summary.pending}`
     await this.dispatcher.enqueueSlack(message, 'outbox-worker')
   }
 
