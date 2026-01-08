@@ -409,26 +409,35 @@ export class TransactionWorkflow {
     },
   ): Promise<void> {
     const conversions = this.buildPendingConversionUpdates(params.cryptoCurrency, params.targetCurrency)
-    for (const conversion of conversions) {
-      await prismaClient.pendingConversions.upsert({
-        create: {
-          amount: params.amount,
-          side: 'SELL',
-          source: conversion.source,
-          symbol: conversion.symbol,
-          target: conversion.target,
-        },
-        update: {
-          amount: { increment: params.amount },
-        },
-        where: {
-          source_target: { source: conversion.source, target: conversion.target },
-        },
-      })
+    const run = async (tx: typeof prismaClient) => {
+      for (const conversion of conversions) {
+        await tx.pendingConversions.upsert({
+          create: {
+            amount: params.amount,
+            side: 'SELL',
+            source: conversion.source,
+            symbol: conversion.symbol,
+            target: conversion.target,
+          },
+          update: {
+            amount: { increment: params.amount },
+          },
+          where: {
+            source_target: { source: conversion.source, target: conversion.target },
+          },
+        })
+      }
+
+      if (params.transactionId) {
+        await this.repository.markExchangeHandoff(tx, params.transactionId)
+      }
     }
 
-    if (params.transactionId) {
-      await this.repository.markExchangeHandoff(prismaClient, params.transactionId)
+    if (typeof (prismaClient as unknown as { $transaction?: unknown }).$transaction === 'function') {
+      await (prismaClient as unknown as { $transaction: <T>(fn: (tx: typeof prismaClient) => Promise<T>) => Promise<T> }).$transaction(run)
+    }
+    else {
+      await run(prismaClient)
     }
   }
 
