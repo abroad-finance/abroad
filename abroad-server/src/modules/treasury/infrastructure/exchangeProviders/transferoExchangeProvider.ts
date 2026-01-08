@@ -7,7 +7,7 @@ import { TYPES } from '../../../../app/container/types'
 import { createScopedLogger, ScopedLogger } from '../../../../core/logging/scopedLogger'
 import { ILogger } from '../../../../core/logging/types'
 import { ISecretManager } from '../../../../platform/secrets/ISecretManager'
-import { IExchangeProvider } from '../../application/contracts/IExchangeProvider'
+import { ExchangeAddressResult, ExchangeFailureCode, IExchangeProvider } from '../../application/contracts/IExchangeProvider'
 
 @injectable()
 export class TransferoExchangeProvider implements IExchangeProvider {
@@ -70,9 +70,9 @@ export class TransferoExchangeProvider implements IExchangeProvider {
            */
   getExchangeAddress: IExchangeProvider['getExchangeAddress'] = async ({
     blockchain,
-  }) => {
+  }): Promise<ExchangeAddressResult> => {
     if (blockchain !== BlockchainNetwork.STELLAR) {
-      throw new Error(`Unsupported blockchain: ${blockchain}`)
+      return { code: 'validation', reason: `Unsupported blockchain: ${blockchain}`, success: false }
     }
 
     const { TRANSFERO_STELLAR_WALLET: transferoStellarWallet } = await this.secretManager.getSecrets([
@@ -81,6 +81,7 @@ export class TransferoExchangeProvider implements IExchangeProvider {
 
     return {
       address: transferoStellarWallet,
+      success: true,
     }
   }
 
@@ -160,5 +161,9 @@ export class TransferoExchangeProvider implements IExchangeProvider {
     this.cachedToken = { exp: now + seconds * 1000, value }
 
     return value
+  }
+
+  private buildFailure(code: ExchangeFailureCode, reason?: string): ExchangeAddressResult {
+    return { code, reason, success: false }
   }
 }

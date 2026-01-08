@@ -10,7 +10,7 @@ import { TYPES } from '../../../../app/container/types'
 import { createScopedLogger, ScopedLogger } from '../../../../core/logging/scopedLogger'
 import { ILogger } from '../../../../core/logging/types'
 import { ISecretManager } from '../../../../platform/secrets/ISecretManager'
-import { IExchangeProvider } from '../../application/contracts/IExchangeProvider'
+import { ExchangeAddressResult, ExchangeFailureCode, IExchangeProvider } from '../../application/contracts/IExchangeProvider'
 
 type BinanceBookTickerResponse = {
   askPrice: string
@@ -48,7 +48,7 @@ export class BinanceExchangeProvider implements IExchangeProvider {
    */
   getExchangeAddress: IExchangeProvider['getExchangeAddress'] = async (
     { blockchain, cryptoCurrency },
-  ) => {
+  ): Promise<ExchangeAddressResult> => {
     try {
       const {
         BINANCE_API_KEY,
@@ -85,11 +85,12 @@ export class BinanceExchangeProvider implements IExchangeProvider {
       return {
         address: data.address,
         memo: data.tag,
+        success: true,
       }
     }
     catch (error) {
       this.logger.error('Error fetching deposit address from Binance', error)
-      throw error
+      return this.buildFailure(this.extractFailureCode(error), this.describeError(error))
     }
   }
 
@@ -168,5 +169,27 @@ export class BinanceExchangeProvider implements IExchangeProvider {
       default:
         throw new Error(`Unsupported blockchain: ${blockchain}`)
     }
+  }
+
+  private buildFailure(code: ExchangeFailureCode, reason?: string): ExchangeAddressResult {
+    return { code, reason, success: false }
+  }
+
+  private describeError(error: unknown): string {
+    if (error instanceof Error) return error.message
+    if (typeof error === 'string') return error
+    try {
+      return JSON.stringify(error)
+    }
+    catch {
+      return 'unknown'
+    }
+  }
+
+  private extractFailureCode(error: unknown): ExchangeFailureCode {
+    const maybeAxios = error as { response?: { status?: number } }
+    const status = typeof maybeAxios?.response?.status === 'number' ? maybeAxios.response.status : undefined
+    if (status && status >= 400 && status < 500) return 'permanent'
+    return 'retriable'
   }
 }

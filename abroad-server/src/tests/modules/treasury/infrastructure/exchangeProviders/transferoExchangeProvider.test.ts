@@ -50,16 +50,17 @@ describe('TransferoExchangeProvider', () => {
         cryptoCurrency: CryptoCurrency.USDC,
       })
 
-      expect(address).toEqual({ address: 'stellar-wallet' })
+      expect(address).toEqual({ address: 'stellar-wallet', success: true })
     })
 
-    it('throws for unsupported blockchains', async () => {
+    it('returns failure for unsupported blockchains', async () => {
       const provider = createProvider()
 
-      await expect(provider.getExchangeAddress({
+      const result = await provider.getExchangeAddress({
         blockchain: BlockchainNetwork.SOLANA,
         cryptoCurrency: CryptoCurrency.USDC,
-      })).rejects.toThrow('Unsupported blockchain: SOLANA')
+      })
+      expect(result).toEqual({ code: 'validation', reason: 'Unsupported blockchain: SOLANA', success: false })
     })
   })
 

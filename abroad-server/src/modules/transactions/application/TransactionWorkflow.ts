@@ -15,6 +15,7 @@ import { WalletSendResult } from '../../payments/application/contracts/IWalletHa
 import { PayoutStatusAdapterRegistry } from '../../payments/application/PayoutStatusAdapterRegistry'
 import { isSupportedPaymentMethod } from '../../payments/application/supportedPaymentMethods'
 import { IExchangeProviderFactory } from '../../treasury/application/contracts/IExchangeProviderFactory'
+import { ExchangeAddressResult } from '../../treasury/application/contracts/IExchangeProvider'
 import { TransactionTransitionName } from './TransactionStateMachine'
 import { TransactionEventDispatcher } from './TransactionEventDispatcher'
 import { TransactionWithRelations } from './transactionNotificationTypes'
@@ -124,10 +125,19 @@ export class TransactionWorkflow {
         blockchain: message.blockchain,
         targetCurrency: message.targetCurrency,
       })
-      const { address, memo } = await exchangeProvider.getExchangeAddress({
+      const addressResult = await exchangeProvider.getExchangeAddress({
         blockchain: message.blockchain,
         cryptoCurrency: message.cryptoCurrency,
       })
+      if (!addressResult.success) {
+        scopedLogger.error('Failed to resolve exchange address', { code: addressResult.code, reason: addressResult.reason })
+        await this.outboxDispatcher.enqueueSlack(
+          `${this.logger.scope} Error resolving exchange address for ${message.cryptoCurrency} -> ${message.targetCurrency}; tx=${message.transactionId ?? 'n/a'} reason=${addressResult.reason ?? addressResult.code ?? 'unknown'}`,
+          'payment-sent',
+        )
+        return
+      }
+      const { address, memo } = addressResult
 
       const { success, transactionId: exchangeTransactionId } = await walletHandler.send({
         address,

@@ -6,14 +6,13 @@ export interface IExchangeProvider {
     sourceAmount: number
     sourceCurrency: CryptoCurrency
     targetCurrency: TargetCurrency
-  }): Promise<{ success: boolean }>
+  }): Promise<ExchangeOperationResult>
   readonly exchangePercentageFee: number
 
   getExchangeAddress(params: {
     blockchain: BlockchainNetwork
     cryptoCurrency: CryptoCurrency
-  }
-  ): Promise<{ address: string, memo?: string }>
+  }): Promise<ExchangeAddressResult>
 
   getExchangeRate(params: {
     sourceAmount: number
@@ -25,11 +24,20 @@ export interface IExchangeProvider {
     sourceCurrency: CryptoCurrency
     targetAmount: number
     targetCurrency: TargetCurrency
-  }
-  ): Promise<number>
+  }): Promise<number>
 }
 
 export type ExchangeProviderCapability = {
   blockchain?: BlockchainNetwork
   targetCurrency: TargetCurrency
 }
+
+export type ExchangeFailureCode = 'validation' | 'retriable' | 'permanent'
+
+export type ExchangeAddressResult =
+  | { success: true, address: string, memo?: string }
+  | { success: false, code?: ExchangeFailureCode, reason?: string }
+
+export type ExchangeOperationResult =
+  | { success: true }
+  | { success: false, code?: ExchangeFailureCode, reason?: string }

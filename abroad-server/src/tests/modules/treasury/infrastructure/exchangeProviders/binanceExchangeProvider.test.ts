@@ -75,20 +75,21 @@ describe('BinanceExchangeProvider', () => {
         },
       })
       expect(depositAddressMock).toHaveBeenCalledWith({ coin: CryptoCurrency.USDC, network: 'SOL' })
-      expect(result).toEqual({ address: 'addr-1', memo: 'memo-1' })
+      expect(result).toEqual({ address: 'addr-1', memo: 'memo-1', success: true })
     })
 
-    it('throws when Binance does not return an address', async () => {
+    it('returns failure when Binance does not return an address', async () => {
       depositAddressMock.mockResolvedValue({
         data: () => Promise.resolve({}),
       })
 
       const provider = createProvider()
 
-      await expect(provider.getExchangeAddress({
+      const result = await provider.getExchangeAddress({
         blockchain: BlockchainNetwork.STELLAR,
         cryptoCurrency: CryptoCurrency.USDC,
-      })).rejects.toThrow('No deposit address returned from Binance')
+      })
+      expect(result.success).toBe(false)
     })
 
     it('throws for unsupported blockchain networks', async () => {
