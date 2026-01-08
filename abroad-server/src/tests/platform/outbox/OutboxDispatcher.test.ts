@@ -1,3 +1,6 @@
+import { BlockchainNetwork, CryptoCurrency, PaymentMethod, TargetCurrency } from '@prisma/client'
+
+import { QueueName } from '../../../src/platform/messaging/queues'
 import { OutboxDispatcher } from '../../../src/platform/outbox/OutboxDispatcher'
 import { OutboxRecord } from '../../../src/platform/outbox/OutboxRepository'
 
@@ -23,10 +26,17 @@ describe('OutboxDispatcher', () => {
       reschedule: jest.fn(async () => {}),
     }
     const slackNotifier = { sendMessage: jest.fn(async () => {}) }
+    const queueHandler = { postMessage: jest.fn(async () => {}) }
     const webhookNotifier = { notifyWebhook: jest.fn(async () => {}) }
     const logger = { error: jest.fn(), info: jest.fn(), warn: jest.fn() }
-    const dispatcher = new OutboxDispatcher(repository as never, webhookNotifier as never, slackNotifier as never, logger as never)
-    return { dispatcher, logger, repository, slackNotifier, webhookNotifier }
+    const dispatcher = new OutboxDispatcher(
+      repository as never,
+      webhookNotifier as never,
+      slackNotifier as never,
+      queueHandler as never,
+      logger as never,
+    )
+    return { dispatcher, logger, queueHandler, repository, slackNotifier, webhookNotifier }
   }
 
   it('delivers slack messages immediately', async () => {
@@ -56,5 +66,25 @@ describe('OutboxDispatcher', () => {
     await dispatcher.enqueueSlack('queued', 'ctx', { deliverNow: false })
     expect(repository.create).toHaveBeenCalledWith('slack', { kind: 'slack', message: 'queued' }, expect.any(Date), undefined)
     expect(slackNotifier.sendMessage).not.toHaveBeenCalled()
+  })
+
+  it('delivers queue messages via queue handler', async () => {
+    const { dispatcher, queueHandler, repository } = buildMocks()
+    const payload = {
+      amount: 1,
+      blockchain: BlockchainNetwork.STELLAR,
+      cryptoCurrency: CryptoCurrency.USDC,
+      paymentMethod: PaymentMethod.PIX,
+      targetCurrency: TargetCurrency.BRL,
+      transactionId: '00000000-0000-0000-0000-000000000000',
+    }
+    await dispatcher.enqueueQueue(QueueName.PAYMENT_SENT, payload, 'ctx')
+    expect(repository.create).toHaveBeenCalledWith(
+      'queue',
+      { kind: 'queue', payload, queueName: QueueName.PAYMENT_SENT },
+      expect.any(Date),
+      undefined,
+    )
+    expect(queueHandler.postMessage).toHaveBeenCalledWith(QueueName.PAYMENT_SENT, payload)
   })
 })

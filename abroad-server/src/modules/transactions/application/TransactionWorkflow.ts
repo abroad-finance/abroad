@@ -36,14 +36,13 @@ export class TransactionWorkflow {
     @inject(PayoutStatusAdapterRegistry) private readonly payoutStatusAdapterRegistry: PayoutStatusAdapterRegistry,
     @inject(TYPES.IWalletHandlerFactory) walletHandlerFactory: IWalletHandlerFactory,
     @inject(TYPES.IExchangeProviderFactory) exchangeProviderFactory: IExchangeProviderFactory,
-    @inject(TYPES.IQueueHandler) queueHandler: import('../../../platform/messaging/queues').IQueueHandler,
     @inject(TYPES.IWebhookNotifier) webhookNotifier: IWebhookNotifier,
     @inject(TYPES.IOutboxDispatcher) outboxDispatcher: OutboxDispatcher,
     @inject(TYPES.ILogger) baseLogger: ILogger,
   ) {
     this.logger = createScopedLogger(baseLogger, { scope: 'TransactionWorkflow' })
     this.repository = new TransactionRepository(dbProvider)
-    this.dispatcher = new TransactionEventDispatcher(outboxDispatcher, queueHandler, baseLogger)
+    this.dispatcher = new TransactionEventDispatcher(outboxDispatcher, baseLogger)
     this.outboxDispatcher = outboxDispatcher
     this.refundService = new RefundService(walletHandlerFactory, baseLogger)
     this.exchangeProviderFactory = exchangeProviderFactory

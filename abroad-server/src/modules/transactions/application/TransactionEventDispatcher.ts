@@ -2,7 +2,7 @@ import { PrismaClient, TransactionStatus } from '@prisma/client'
 
 import { createScopedLogger, ScopedLogger } from '../../../core/logging/scopedLogger'
 import { ILogger } from '../../../core/logging/types'
-import { IQueueHandler, QueueName } from '../../../platform/messaging/queues'
+import { QueueName } from '../../../platform/messaging/queues'
 import { PaymentSentMessage } from '../../../platform/messaging/queueSchema'
 import { WebhookEvent } from '../../../platform/notifications/IWebhookNotifier'
 import { OutboxDispatcher } from '../../../platform/outbox/OutboxDispatcher'
@@ -15,7 +15,6 @@ export class TransactionEventDispatcher {
 
   public constructor(
     private readonly outboxDispatcher: OutboxDispatcher,
-    private readonly queueHandler: IQueueHandler,
     baseLogger: ILogger,
   ) {
     this.logger = createScopedLogger(baseLogger, { scope: 'TransactionEvents' })
@@ -42,11 +41,11 @@ export class TransactionEventDispatcher {
     }
 
     try {
-      await this.queueHandler.postMessage(QueueName.USER_NOTIFICATION, {
+      await this.outboxDispatcher.enqueueQueue(QueueName.USER_NOTIFICATION, {
         payload: JSON.stringify(payload),
         type,
         userId: transaction.partnerUser.userId,
-      })
+      }, `user-notification:${context}`, { client: options.prismaClient, deliverNow: options.deliverNow })
     }
     catch (error) {
       this.logger.warn(`Failed to publish websocket notification (${context})`, error)
@@ -92,7 +91,9 @@ export class TransactionEventDispatcher {
     }
 
     try {
-      await this.queueHandler.postMessage(QueueName.PAYMENT_SENT, message)
+      await this.outboxDispatcher.enqueueQueue(QueueName.PAYMENT_SENT, message, 'payment-sent', {
+        deliverNow: true,
+      })
     }
     catch (error) {
       this.logger.warn('Failed to publish payment sent notification', error)

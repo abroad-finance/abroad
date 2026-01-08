@@ -4,15 +4,23 @@ import { inject, injectable } from 'inversify'
 import { TYPES } from '../../app/container/types'
 import { createScopedLogger, ScopedLogger } from '../../core/logging/scopedLogger'
 import { ILogger } from '../../core/logging/types'
+import { IQueueHandler, QueueName, QueuePayloadByName } from '../messaging/queues'
 import { ISlackNotifier } from '../notifications/ISlackNotifier'
 import { IWebhookNotifier, WebhookEvent } from '../notifications/IWebhookNotifier'
 import { OutboxRecord, OutboxRepository } from './OutboxRepository'
 
-type OutboxPayload = { kind: 'slack', message: string } | {
-  kind: 'webhook'
-  payload: { data: Prisma.JsonValue, event: WebhookEvent }
-  target: string
-}
+type OutboxPayload =
+  | { kind: 'slack', message: string }
+  | {
+    kind: 'webhook'
+    payload: { data: Prisma.JsonValue, event: WebhookEvent }
+    target: string
+  }
+  | {
+    kind: 'queue'
+    payload: QueuePayloadByName[QueueName]
+    queueName: QueueName
+  }
 
 const MAX_ATTEMPTS = 5
 const DEFAULT_DELAY_MS = 5_000
@@ -31,6 +39,7 @@ export class OutboxDispatcher {
     @inject(OutboxRepository) private readonly repository: OutboxRepository,
     @inject(TYPES.IWebhookNotifier) private readonly webhookNotifier: IWebhookNotifier,
     @inject(TYPES.ISlackNotifier) private readonly slackNotifier: ISlackNotifier,
+    @inject(TYPES.IQueueHandler) private readonly queueHandler: IQueueHandler,
     @inject(TYPES.ILogger) baseLogger: ILogger,
   ) {
     this.logger = createScopedLogger(baseLogger, { scope: 'OutboxDispatcher' })
@@ -44,6 +53,9 @@ export class OutboxDispatcher {
       }
       else if (payload.kind === 'slack') {
         await this.slackNotifier.sendMessage(payload.message)
+      }
+      else if (payload.kind === 'queue') {
+        await this.queueHandler.postMessage(payload.queueName, payload.payload)
       }
       await this.repository.markDelivered(record.id, client)
     }
@@ -75,6 +87,24 @@ export class OutboxDispatcher {
     const record = await this.repository.create(
       'slack',
       { kind: 'slack', message },
+      options.availableAt ?? new Date(),
+      options.client,
+    )
+    if (deliverNow) {
+      await this.deliver(record, context, options.client)
+    }
+  }
+
+  public async enqueueQueue<Name extends QueueName>(
+    queueName: Name,
+    message: QueuePayloadByName[Name],
+    context: string,
+    options: EnqueueOptions = {},
+  ): Promise<void> {
+    const deliverNow = options.deliverNow ?? !options.client
+    const record = await this.repository.create(
+      'queue',
+      { kind: 'queue', payload: message, queueName },
       options.availableAt ?? new Date(),
       options.client,
     )
