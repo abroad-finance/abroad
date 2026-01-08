@@ -11,6 +11,7 @@ import { OutboxDispatcher } from '../../../platform/outbox/OutboxDispatcher'
 import { IDatabaseClientProvider } from '../../../platform/persistence/IDatabaseClientProvider'
 import { IPaymentServiceFactory } from '../../payments/application/contracts/IPaymentServiceFactory'
 import { IWalletHandlerFactory } from '../../payments/application/contracts/IWalletHandlerFactory'
+import { WalletSendResult } from '../../payments/application/contracts/IWalletHandler'
 import { PayoutStatusAdapterRegistry } from '../../payments/application/PayoutStatusAdapterRegistry'
 import { isSupportedPaymentMethod } from '../../payments/application/supportedPaymentMethods'
 import { IExchangeProviderFactory } from '../../treasury/application/contracts/IExchangeProviderFactory'
@@ -19,7 +20,7 @@ import { TransactionEventDispatcher } from './TransactionEventDispatcher'
 import { TransactionWithRelations } from './transactionNotificationTypes'
 import { TransactionRepository } from './TransactionRepository'
 
-type RefundResult = { success: boolean, transactionId?: string }
+type RefundResult = WalletSendResult
 
 @injectable()
 export class TransactionWorkflow {
@@ -118,7 +119,7 @@ export class TransactionWorkflow {
     }
 
     try {
-      const walletHandler = this.refundService.resolveWalletHandler(message.blockchain)
+    const walletHandler = this.refundService.resolveWalletHandler(message.blockchain)
       const exchangeProvider = this.exchangeProviderFactory.getExchangeProviderForCapability({
         blockchain: message.blockchain,
         targetCurrency: message.targetCurrency,
@@ -634,7 +635,7 @@ class RefundService {
     onChainId: string
   }): Promise<RefundResult> {
     const { amount, cryptoCurrency, network, onChainId } = params
-    const walletHandler = this.walletHandlerFactory.getWalletHandler(network)
+    const walletHandler = this.walletHandlerFactory.getWalletHandlerForCapability({ blockchain: network })
     const address = await walletHandler.getAddressFromTransaction({ onChainId })
     return walletHandler.send({ address, amount, cryptoCurrency })
   }
@@ -642,7 +643,7 @@ class RefundService {
   public async refundToSender(
     message: ReceivedCryptoTransactionMessage,
   ): Promise<RefundResult> {
-    const walletHandler = this.walletHandlerFactory.getWalletHandler(message.blockchain)
+    const walletHandler = this.walletHandlerFactory.getWalletHandlerForCapability({ blockchain: message.blockchain })
     return walletHandler.send({
       address: message.addressFrom,
       amount: message.amount,
@@ -651,6 +652,6 @@ class RefundService {
   }
 
   public resolveWalletHandler(blockchain: Parameters<IWalletHandlerFactory['getWalletHandler']>[0]) {
-    return this.walletHandlerFactory.getWalletHandler(blockchain)
+    return this.walletHandlerFactory.getWalletHandlerForCapability({ blockchain })
   }
 }

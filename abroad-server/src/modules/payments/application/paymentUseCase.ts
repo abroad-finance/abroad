@@ -1,4 +1,4 @@
-import { Country } from '@prisma/client'
+import { Country, TargetCurrency } from '@prisma/client'
 import { inject, injectable } from 'inversify'
 
 import { TYPES } from '../../../app/container/types'
@@ -97,7 +97,11 @@ export class PaymentUseCase implements IPaymentUseCase {
   private resolvePaymentService(paymentMethod?: SupportedPaymentMethod): { method: SupportedPaymentMethod, service: IPaymentService } {
     const method: SupportedPaymentMethod = paymentMethod ?? DEFAULT_PAYMENT_METHOD
     assertSupportedPaymentMethod(method)
-    const service = this.paymentServiceFactory.getPaymentService(method)
+    const baseService = this.paymentServiceFactory.getPaymentService(method)
+    const service = this.paymentServiceFactory.getPaymentServiceForCapability({
+      paymentMethod: method,
+      targetCurrency: baseService.currency,
+    })
 
     if (!service.isEnabled) {
       throw new Error(`Payment method ${method} is currently unavailable`)

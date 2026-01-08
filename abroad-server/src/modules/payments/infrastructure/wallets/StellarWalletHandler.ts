@@ -1,4 +1,4 @@
-import { CryptoCurrency } from '@prisma/client'
+import { BlockchainNetwork, CryptoCurrency } from '@prisma/client'
 import {
   Asset,
   Horizon,
@@ -16,7 +16,7 @@ import { createScopedLogger, ScopedLogger } from '../../../../core/logging/scope
 import { ILogger } from '../../../../core/logging/types'
 import { ILockManager } from '../../../../platform/cacheLock/ILockManager'
 import { ISecretManager } from '../../../../platform/secrets/ISecretManager'
-import { IWalletHandler } from '../../application/contracts/IWalletHandler'
+import { IWalletHandler, WalletSendResult } from '../../application/contracts/IWalletHandler'
 
 function safeMemo(m: string): string {
   // Memo.text must be <= 28 bytes (UTF-8). Trim if user passes longer text.
@@ -35,6 +35,7 @@ function toStellarAmount(n: number): string {
 @injectable()
 export class StellarWalletHandler implements IWalletHandler {
   private readonly logger: ScopedLogger
+  public readonly capability = { blockchain: BlockchainNetwork.STELLAR }
 
   constructor(
     @inject(TYPES.ISecretManager) private secretManager: ISecretManager,
@@ -75,7 +76,7 @@ export class StellarWalletHandler implements IWalletHandler {
     amount: number
     cryptoCurrency: CryptoCurrency
     memo?: string
-  }): Promise<{ success: boolean, transactionId?: string }> {
+  }): Promise<WalletSendResult> {
     try {
       if (cryptoCurrency !== CryptoCurrency.USDC) {
         throw new Error(`Unsupported cryptocurrency for Stellar: ${cryptoCurrency}`)
@@ -131,7 +132,10 @@ export class StellarWalletHandler implements IWalletHandler {
         result_codes: rc,
         status: err.response?.status,
       })
-      return { success: false }
+      const reason = err.response?.data
+        ? JSON.stringify(err.response.data)
+        : err.message ?? 'unknown'
+      return { code: 'retriable', reason, success: false }
     }
   }
 

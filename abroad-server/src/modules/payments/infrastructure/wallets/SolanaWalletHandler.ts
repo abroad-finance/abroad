@@ -1,5 +1,5 @@
 // src/modules/payments/infrastructure/wallets/SolanaWalletHandler.ts
-import { CryptoCurrency } from '@prisma/client'
+import { BlockchainNetwork, CryptoCurrency } from '@prisma/client'
 import { createTransferInstruction, getOrCreateAssociatedTokenAccount } from '@solana/spl-token'
 import {
   Connection,
@@ -15,7 +15,7 @@ import { inject, injectable } from 'inversify'
 import { TYPES } from '../../../../app/container/types'
 import { ILogger } from '../../../../core/logging/types'
 import { ISecretManager, Secrets } from '../../../../platform/secrets/ISecretManager'
-import { IWalletHandler } from '../../application/contracts/IWalletHandler'
+import { IWalletHandler, WalletSendResult } from '../../application/contracts/IWalletHandler'
 
 function decodeKeypairFromBase58Secret(secretBase58: string): Keypair {
   const secret = bs58.decode(secretBase58)
@@ -101,6 +101,7 @@ function toPlainDecimalString(n: number): string {
 
 @injectable()
 export class SolanaWalletHandler implements IWalletHandler {
+  public readonly capability = { blockchain: BlockchainNetwork.SOLANA }
   constructor(
     @inject(TYPES.ISecretManager) private secretManager: ISecretManager,
     @inject(TYPES.ILogger) private readonly logger: ILogger,
@@ -124,11 +125,11 @@ export class SolanaWalletHandler implements IWalletHandler {
     amount: number
     cryptoCurrency: CryptoCurrency
     memo?: string
-  }): Promise<{ success: boolean, transactionId?: string }> {
+  }): Promise<WalletSendResult> {
     try {
       if (cryptoCurrency !== CryptoCurrency.USDC) {
         this.logger.warn('Unsupported cryptocurrency for Solana', cryptoCurrency)
-        return { success: false }
+        return { code: 'validation', reason: 'unsupported_currency', success: false }
       }
 
       const rpcUrl = await this.secretManager.getSecret(Secrets.SOLANA_RPC_URL)
@@ -222,7 +223,7 @@ export class SolanaWalletHandler implements IWalletHandler {
         signature,
       })
 
-      return { success: false }
+      return { code: 'retriable', reason, success: false }
     }
   }
 

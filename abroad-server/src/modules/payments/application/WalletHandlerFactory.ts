@@ -19,6 +19,11 @@ export class WalletHandlerFactory implements IWalletHandlerFactory {
    * @returns A wallet handler implementation for the specified blockchain
    */
   getWalletHandler(blockchain: BlockchainNetwork): IWalletHandler {
+    return this.getWalletHandlerForCapability({ blockchain })
+  }
+
+  getWalletHandlerForCapability(params: { blockchain: BlockchainNetwork }): IWalletHandler {
+    const { blockchain } = params
     switch (blockchain) {
       case BlockchainNetwork.SOLANA:
         return this.solanaWalletHandler
