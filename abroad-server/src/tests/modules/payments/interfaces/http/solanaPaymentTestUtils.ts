@@ -186,9 +186,10 @@ export const createControllerContext = () => {
     prismaProvider,
     logger,
   )
+  const verifierRegistry = { getVerifier: jest.fn(() => verifier) }
 
   const controller = new SolanaPaymentsController(
-    verifier,
+    verifierRegistry as never,
     outboxDispatcher as never,
     logger,
   )
@@ -201,6 +202,7 @@ export const createControllerContext = () => {
     outboxDispatcher,
     prismaClient,
     secretManager,
+    verifierRegistry,
   }
 }
 

@@ -12,11 +12,13 @@ import {
 } from 'tsoa'
 import z from 'zod'
 
+import { BlockchainNetwork } from '@prisma/client'
+
 import { TYPES } from '../../../../app/container/types'
 import { ILogger } from '../../../../core/logging/types'
 import { QueueName } from '../../../../platform/messaging/queues'
 import { OutboxDispatcher } from '../../../../platform/outbox/OutboxDispatcher'
-import { SolanaPaymentVerifier } from '../../infrastructure/wallets/SolanaPaymentVerifier'
+import { IDepositVerifierRegistry } from '../../application/contracts/IDepositVerifier'
 
 const solanaPaymentNotificationSchema = z.object({
   on_chain_tx: z.string().min(1, 'On-chain transaction signature is required'),
@@ -33,7 +35,7 @@ interface SolanaPaymentNotificationRequest {
 @Security('BearerAuth')
 export class SolanaPaymentsController extends Controller {
   public constructor(
-    @inject(TYPES.SolanaPaymentVerifier) private readonly paymentVerifier: SolanaPaymentVerifier,
+    @inject(TYPES.IDepositVerifierRegistry) private readonly verifierRegistry: IDepositVerifierRegistry,
     @inject(TYPES.IOutboxDispatcher) private readonly outboxDispatcher: OutboxDispatcher,
     @inject(TYPES.ILogger) private readonly logger: ILogger,
   ) {
@@ -59,7 +61,8 @@ export class SolanaPaymentsController extends Controller {
     }
     const { on_chain_tx: onChainSignature, transaction_id: transactionId } = parsed.data
 
-    const verification = await this.paymentVerifier.verifyNotification(onChainSignature, transactionId)
+    const verifier = this.verifierRegistry.getVerifier(BlockchainNetwork.SOLANA)
+    const verification = await verifier.verifyNotification(onChainSignature, transactionId)
     if (verification.outcome === 'error') {
       if (verification.status === 404) {
         return notFoundResponse(404, { reason: verification.reason })
