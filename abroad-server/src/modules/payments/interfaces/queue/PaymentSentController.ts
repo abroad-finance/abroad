@@ -1,7 +1,9 @@
 import { inject } from 'inversify'
 
 import { TYPES } from '../../../../app/container/types'
+import { createScopedLogger } from '../../../../core/logging/scopedLogger'
 import { ILogger } from '../../../../core/logging/types'
+import { getCorrelationId } from '../../../../core/requestContext'
 import { IQueueHandler, QueueName } from '../../../../platform/messaging/queues'
 import { IPaymentSentUseCase } from '../../application/paymentSentUseCase'
 
@@ -36,6 +38,17 @@ export class PaymentSentController {
   }
 
   private async onPaymentSent(msg: unknown): Promise<void> {
-    await this.paymentSentUseCase.process(msg)
+    const scopedLogger = createScopedLogger(this.logger, {
+      correlationId: getCorrelationId(),
+      scope: 'PaymentSent queue',
+    })
+
+    try {
+      await this.paymentSentUseCase.process(msg)
+    }
+    catch (error) {
+      scopedLogger.error('[PaymentSent queue]: Error processing payment sent message', error)
+      throw error
+    }
   }
 }

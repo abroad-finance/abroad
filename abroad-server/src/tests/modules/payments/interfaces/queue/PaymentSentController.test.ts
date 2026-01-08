@@ -71,4 +71,25 @@ describe('PaymentSentController', () => {
     })
     expect(processSpy).toHaveBeenCalled()
   })
+
+  it('logs and rethrows when processing fails', async () => {
+    const queueHandler: MockQueueHandler = createMockQueueHandler()
+    const { useCase } = buildUseCaseHarness()
+    const logger: MockLogger = createMockLogger()
+    const controller = new PaymentSentController(logger, queueHandler, useCase)
+
+    controller.registerConsumers()
+    const handler = queueHandler.subscribeToQueue.mock.calls[0][1]
+
+    jest.spyOn(useCase, 'process').mockRejectedValueOnce(new Error('boom'))
+
+    await expect(handler({
+      amount: 10,
+      blockchain: BlockchainNetwork.STELLAR,
+      cryptoCurrency: CryptoCurrency.USDC,
+      paymentMethod: PaymentMethod.BREB,
+      targetCurrency: TargetCurrency.BRL,
+    })).rejects.toThrow('boom')
+    expect(logger.error).toHaveBeenCalled()
+  })
 })
