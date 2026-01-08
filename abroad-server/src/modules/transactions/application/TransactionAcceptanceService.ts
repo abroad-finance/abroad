@@ -11,8 +11,9 @@ import { isKycExemptByAmount } from '../../../app/config/kyc'
 import { TYPES } from '../../../app/container/types'
 import { createScopedLogger, ScopedLogger } from '../../../core/logging/scopedLogger'
 import { ILogger } from '../../../core/logging/types'
-import { IQueueHandler, QueueName } from '../../../platform/messaging/queues'
-import { IWebhookNotifier, WebhookEvent } from '../../../platform/notifications/IWebhookNotifier'
+import { QueueName } from '../../../platform/messaging/queues'
+import { WebhookEvent } from '../../../platform/notifications/IWebhookNotifier'
+import { OutboxDispatcher } from '../../../platform/outbox/OutboxDispatcher'
 import { IDatabaseClientProvider } from '../../../platform/persistence/IDatabaseClientProvider'
 import { IKycService } from '../../kyc/application/contracts/IKycService'
 import { IPaymentServiceFactory } from '../../payments/application/contracts/IPaymentServiceFactory'
@@ -54,8 +55,7 @@ export class TransactionAcceptanceService {
     @inject(TYPES.IPaymentServiceFactory)
     private readonly paymentServiceFactory: IPaymentServiceFactory,
     @inject(TYPES.IKycService) private readonly kycService: IKycService,
-    @inject(TYPES.IWebhookNotifier) private readonly webhookNotifier: IWebhookNotifier,
-    @inject(TYPES.IQueueHandler) private readonly queueHandler: IQueueHandler,
+    @inject(TYPES.IOutboxDispatcher) private readonly outboxDispatcher: OutboxDispatcher,
     @inject(TYPES.ILogger) logger: ILogger,
   ) {
     this.logger = createScopedLogger(logger, { scope: 'TransactionAcceptance' })
@@ -143,12 +143,13 @@ export class TransactionAcceptanceService {
 
     try {
       const transactionReference = uuidToBase64(decision.transaction.id)
-      await this.webhookNotifier.notifyWebhook(
+      const payload = toWebhookTransactionPayload(decision.transaction)
+
+      await this.outboxDispatcher.enqueueWebhook(
         partner.webhookUrl,
-        {
-          data: toWebhookTransactionPayload(decision.transaction),
-          event: WebhookEvent.TRANSACTION_CREATED,
-        },
+        { data: payload, event: WebhookEvent.TRANSACTION_CREATED },
+        'transaction.created',
+        { client: prismaClient, deliverNow: false },
       )
 
       await this.publishUserNotification(prismaClient, decision.transaction.id, request.userId)
@@ -348,11 +349,11 @@ export class TransactionAcceptanceService {
         where: { id: transactionId },
       })
 
-      await this.queueHandler.postMessage(QueueName.USER_NOTIFICATION, {
+      await this.outboxDispatcher.enqueueQueue(QueueName.USER_NOTIFICATION, {
         payload: JSON.stringify(full ? toWebhookTransactionPayload(full) : { id: transactionId }),
         type: 'transaction.created',
         userId,
-      })
+      }, 'transaction.created', { client: prismaClient, deliverNow: false })
     }
     catch (notifyErr) {
       this.logger.warn('Failed to publish transaction.created notification', notifyErr)

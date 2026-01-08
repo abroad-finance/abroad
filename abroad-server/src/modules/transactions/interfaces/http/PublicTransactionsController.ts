@@ -14,8 +14,7 @@ import {
 
 import { TYPES } from '../../../../app/container/types'
 import { ILogger } from '../../../../core/logging/types'
-import { IQueueHandler } from '../../../../platform/messaging/queues'
-import { IWebhookNotifier } from '../../../../platform/notifications/IWebhookNotifier'
+import { OutboxDispatcher } from '../../../../platform/outbox/OutboxDispatcher'
 import { IDatabaseClientProvider } from '../../../../platform/persistence/IDatabaseClientProvider'
 import { ISecretManager, Secrets } from '../../../../platform/secrets/ISecretManager'
 import { ExpiredTransactionService, type ExpiredTransactionsSummary } from '../../application/ExpiredTransactionService'
@@ -32,15 +31,13 @@ export class PublicTransactionsController extends Controller {
   constructor(
     @inject(TYPES.IDatabaseClientProvider) private prismaClientProvider: IDatabaseClientProvider,
     @inject(TYPES.ILogger) private readonly logger: ILogger,
-    @inject(TYPES.IWebhookNotifier) webhookNotifier: IWebhookNotifier,
-    @inject(TYPES.IQueueHandler) queueHandler: IQueueHandler,
+    @inject(TYPES.IOutboxDispatcher) outboxDispatcher: OutboxDispatcher,
     @inject(TYPES.ISecretManager) private readonly secretManager: ISecretManager,
   ) {
     super()
     this.expiredTransactionService = new ExpiredTransactionService(
       prismaClientProvider,
-      webhookNotifier,
-      queueHandler,
+      outboxDispatcher,
       this.logger,
     )
     this.stellarReconciliationService = new StellarReconciliationService(

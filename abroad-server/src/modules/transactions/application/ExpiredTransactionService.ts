@@ -8,8 +8,9 @@ import {
 } from '@prisma/client'
 
 import { ILogger } from '../../../core/logging/types'
-import { IQueueHandler, QueueName, UserNotificationMessage } from '../../../platform/messaging/queues'
-import { IWebhookNotifier, WebhookEvent } from '../../../platform/notifications/IWebhookNotifier'
+import { QueueName, UserNotificationMessage } from '../../../platform/messaging/queues'
+import { WebhookEvent } from '../../../platform/notifications/IWebhookNotifier'
+import { OutboxDispatcher } from '../../../platform/outbox/OutboxDispatcher'
 import { IDatabaseClientProvider } from '../../../platform/persistence/IDatabaseClientProvider'
 import { toWebhookTransactionPayload } from './transactionPayload'
 import { TransactionRepository } from './TransactionRepository'
@@ -29,8 +30,7 @@ type TransactionWithRelations = Transaction & {
 export class ExpiredTransactionService {
   constructor(
     private readonly prismaProvider: IDatabaseClientProvider,
-    private readonly webhookNotifier: IWebhookNotifier,
-    private readonly queueHandler: IQueueHandler,
+    private readonly outboxDispatcher: OutboxDispatcher,
     private readonly logger: ILogger,
   ) {
     this.repository = new TransactionRepository(prismaProvider)
@@ -128,22 +128,30 @@ export class ExpiredTransactionService {
       userId: transaction.partnerUser.userId,
     }
 
-    const [webhookResult, queueResult] = await Promise.allSettled([
-      this.webhookNotifier.notifyWebhook(webhookTarget, { data: webhookPayload, event: WebhookEvent.TRANSACTION_UPDATED }),
-      this.queueHandler.postMessage(QueueName.USER_NOTIFICATION, queueMessage),
-    ])
-
-    if (webhookResult.status === 'rejected') {
+    try {
+      await this.outboxDispatcher.enqueueWebhook(
+        webhookTarget,
+        { data: webhookPayload, event: WebhookEvent.TRANSACTION_UPDATED },
+        'transaction.expired',
+        { deliverNow: false },
+      )
+    }
+    catch (error) {
       this.logger.warn(
-        '[PublicTransactionsController] Failed to notify webhook for expired transaction',
-        { error: webhookResult.reason, transactionId: transaction.id },
+        '[PublicTransactionsController] Failed to enqueue webhook for expired transaction',
+        { error, transactionId: transaction.id },
       )
     }
 
-    if (queueResult.status === 'rejected') {
+    try {
+      await this.outboxDispatcher.enqueueQueue(QueueName.USER_NOTIFICATION, queueMessage, 'transaction.expired', {
+        deliverNow: false,
+      })
+    }
+    catch (error) {
       this.logger.warn(
         '[PublicTransactionsController] Failed to enqueue ws notification for expired transaction',
-        { error: queueResult.reason, transactionId: transaction.id },
+        { error, transactionId: transaction.id },
       )
     }
   }
