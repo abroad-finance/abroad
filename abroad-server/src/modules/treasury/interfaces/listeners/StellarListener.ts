@@ -8,9 +8,11 @@ import { inject, injectable } from 'inversify'
 import { TYPES } from '../../../../app/container/types'
 import { createScopedLogger, ScopedLogger } from '../../../../core/logging/scopedLogger'
 import { ILogger } from '../../../../core/logging/types'
-import { IQueueHandler, QueueName } from '../../../../platform/messaging/queues'
+import { QueueName } from '../../../../platform/messaging/queues'
 import { ReceivedCryptoTransactionMessage } from '../../../../platform/messaging/queueSchema'
+import { OutboxDispatcher } from '../../../../platform/outbox/OutboxDispatcher'
 import { IDatabaseClientProvider } from '../../../../platform/persistence/IDatabaseClientProvider'
+import { IDepositVerifierRegistry } from '../../../payments/application/contracts/IDepositVerifier'
 import { ISecretManager } from '../../../../platform/secrets/ISecretManager'
 
 // Minimal stream handle types returned by stellar-sdk stream()
@@ -29,10 +31,11 @@ export class StellarListener {
   private usdcIssuer!: string
 
   constructor(
-    @inject(TYPES.IQueueHandler) private queueHandler: IQueueHandler,
+    @inject(TYPES.IOutboxDispatcher) private readonly outboxDispatcher: OutboxDispatcher,
     @inject(TYPES.ISecretManager) private secretManager: ISecretManager,
     @inject(TYPES.IDatabaseClientProvider)
     private dbClientProvider: IDatabaseClientProvider,
+    @inject(TYPES.IDepositVerifierRegistry) private readonly depositVerifierRegistry: IDepositVerifierRegistry,
     @inject(TYPES.ILogger) baseLogger: ILogger,
   ) {
     this.logger = createScopedLogger(baseLogger, { scope: 'StellarListener', staticPayload: { queue: this.queueName } })
@@ -163,21 +166,26 @@ export class StellarListener {
         // Convert memo to a UUID if needed
         const transactionId = StellarListener.base64ToUuid(tx.memo)
 
-        const queueMessage: ReceivedCryptoTransactionMessage = {
-          addressFrom: payment.from,
-          amount: parseFloat(payment.amount),
-          blockchain: BlockchainNetwork.STELLAR,
-          cryptoCurrency: CryptoCurrency.USDC,
-          onChainId: payment.id,
-          transactionId: transactionId,
-        }
-
         try {
-          await this.queueHandler.postMessage(this.queueName, queueMessage)
-          this.logger.info(
-            'Sent message to queue',
-            { queueName: this.queueName, transactionId: queueMessage.transactionId },
+          const verifier = this.depositVerifierRegistry.getVerifier(BlockchainNetwork.STELLAR)
+          const outcome = await verifier.verifyNotification(payment.id, transactionId)
+          if (outcome.outcome === 'error') {
+            this.logger.warn('Skipping payment due to verification failure', {
+              paymentId: payment.id,
+              reason: outcome.reason,
+              status: outcome.status,
+              transactionId,
+            })
+            return
+          }
+
+          await this.outboxDispatcher.enqueueQueue(
+            this.queueName,
+            outcome.queueMessage,
+            'stellar.listener',
+            { deliverNow: true },
           )
+          this.logger.info('Sent message to queue', { queueName: this.queueName, transactionId: transactionId })
         }
         catch (error) {
           this.logger.error(
