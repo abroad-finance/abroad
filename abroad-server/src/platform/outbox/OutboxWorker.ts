@@ -9,6 +9,7 @@ import { OutboxRecord, OutboxRepository } from './OutboxRepository'
 type OutboxWorkerOptions = {
   batchSize?: number
   pollIntervalMs?: number
+  slackOnFailure?: boolean
 }
 
 @injectable()
@@ -18,6 +19,8 @@ export class OutboxWorker {
   private readonly batchSize: number
   private readonly logger: ReturnType<typeof createScopedLogger>
   private readonly pollIntervalMs: number
+  private readonly slackOnFailure: boolean
+  private lastFailureAlertAt = 0
 
   public constructor(
     @inject(OutboxRepository) private readonly repository: OutboxRepository,
@@ -27,6 +30,7 @@ export class OutboxWorker {
   ) {
     this.batchSize = options.batchSize ?? 50
     this.pollIntervalMs = options.pollIntervalMs ?? 1_000
+    this.slackOnFailure = options.slackOnFailure ?? true
     this.logger = createScopedLogger(baseLogger, { scope: 'OutboxWorker' })
   }
 
@@ -52,6 +56,7 @@ export class OutboxWorker {
     while (this.isRunning) {
       try {
         await this.runOnce()
+        await this.reportFailures()
       }
       catch (error) {
         this.logger.error('Error processing outbox batch', error)
@@ -67,6 +72,26 @@ export class OutboxWorker {
     catch (error) {
       this.logger.error('Failed delivering outbox record', { error, recordId: record.id })
     }
+  }
+
+  private async reportFailures(): Promise<void> {
+    const summary = await this.repository.summarizeFailures()
+    if (summary.failed === 0 && summary.delivering === 0) {
+      return
+    }
+
+    const now = Date.now()
+    const throttleMs = 60_000
+    if (now - this.lastFailureAlertAt < throttleMs) {
+      return
+    }
+    this.lastFailureAlertAt = now
+
+    this.logger.warn('Outbox failure backlog detected', summary)
+    if (!this.slackOnFailure) return
+
+    const message = `[OutboxWorker] Failed: ${summary.failed}, Delivering: ${summary.delivering}`
+    await this.dispatcher.enqueueSlack(message, 'outbox-worker')
   }
 
   private async sleep(ms: number): Promise<void> {

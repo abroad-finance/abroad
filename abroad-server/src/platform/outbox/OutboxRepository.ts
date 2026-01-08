@@ -76,6 +76,15 @@ export class OutboxRepository {
     })
   }
 
+  public async summarizeFailures(): Promise<{ delivering: number, failed: number }> {
+    const client = await this.dbProvider.getClient()
+    const [failed, delivering] = await Promise.all([
+      client.outboxEvent.count({ where: { status: OutboxStatus.FAILED } }),
+      client.outboxEvent.count({ where: { status: OutboxStatus.DELIVERING } }),
+    ])
+    return { delivering, failed }
+  }
+
   public async reschedule(
     id: string,
     nextAttempt: Date,
