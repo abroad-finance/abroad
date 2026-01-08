@@ -68,6 +68,7 @@ export class OutboxDispatcher {
       if (attempts >= MAX_ATTEMPTS) {
         this.logger.error(`[Outbox] delivery failed permanently (${context})`, normalized)
         await this.repository.markFailed(record.id, normalized, client)
+        await this.safeNotifySlack(`[Outbox] Permanently failed to deliver ${record.type} (${record.id}); last error=${normalized.message}`)
         return
       }
       const nextAttempt = new Date(Date.now() + backoffMs)
@@ -138,6 +139,15 @@ export class OutboxDispatcher {
     const pending = await this.repository.nextBatch()
     for (const record of pending) {
       await this.deliver(record, 'replay')
+    }
+  }
+
+  private async safeNotifySlack(message: string): Promise<void> {
+    try {
+      await this.slackNotifier.sendMessage(message)
+    }
+    catch (error) {
+      this.logger.warn('[Outbox] Failed to notify Slack about permanent failure', error)
     }
   }
 }

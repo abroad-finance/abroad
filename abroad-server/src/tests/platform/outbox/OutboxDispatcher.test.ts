@@ -87,4 +87,20 @@ describe('OutboxDispatcher', () => {
     )
     expect(queueHandler.postMessage).toHaveBeenCalledWith(QueueName.PAYMENT_SENT, payload)
   })
+
+  it('alerts slack when delivery fails permanently', async () => {
+    const { dispatcher, queueHandler, repository, slackNotifier } = buildMocks()
+    const failingRecord: OutboxRecord = {
+      ...baseRecord,
+      attempts: 4,
+      payload: { kind: 'queue', payload: { foo: 'bar' }, queueName: QueueName.USER_NOTIFICATION },
+      type: 'queue',
+    }
+    queueHandler.postMessage.mockRejectedValueOnce(new Error('network down'))
+
+    await dispatcher.deliver(failingRecord, 'ctx')
+
+    expect(repository.markFailed).toHaveBeenCalledWith(failingRecord.id, expect.any(Error), undefined)
+    expect(slackNotifier.sendMessage).toHaveBeenCalledWith(expect.stringContaining(failingRecord.id))
+  })
 })
