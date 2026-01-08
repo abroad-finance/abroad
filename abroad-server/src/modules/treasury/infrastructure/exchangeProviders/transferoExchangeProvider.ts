@@ -12,6 +12,7 @@ import { IExchangeProvider } from '../../application/contracts/IExchangeProvider
 @injectable()
 export class TransferoExchangeProvider implements IExchangeProvider {
   readonly exchangePercentageFee = 0.001
+  public readonly capability = { targetCurrency: TargetCurrency.BRL, blockchain: BlockchainNetwork.STELLAR }
 
   private cachedToken?: { exp: number, value: string }
   private readonly logger: ScopedLogger

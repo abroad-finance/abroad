@@ -26,6 +26,7 @@ const SUPPORTED_SYMBOLS = [
 
 @injectable()
 export class BinanceExchangeProvider implements IExchangeProvider {
+  public readonly capability = { targetCurrency: 'COP' as const, blockchain: undefined }
   public readonly exchangePercentageFee = 0.0085
   private readonly logger: ScopedLogger
 

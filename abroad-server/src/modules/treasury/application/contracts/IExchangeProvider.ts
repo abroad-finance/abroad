@@ -1,6 +1,7 @@
 import { BlockchainNetwork, CryptoCurrency, TargetCurrency } from '@prisma/client'
 
 export interface IExchangeProvider {
+  readonly capability?: ExchangeProviderCapability
   createMarketOrder(params: {
     sourceAmount: number
     sourceCurrency: CryptoCurrency
@@ -26,4 +27,9 @@ export interface IExchangeProvider {
     targetCurrency: TargetCurrency
   }
   ): Promise<number>
+}
+
+export type ExchangeProviderCapability = {
+  blockchain?: BlockchainNetwork
+  targetCurrency: TargetCurrency
 }
