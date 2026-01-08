@@ -28,6 +28,27 @@ export class ValidationError extends ApplicationError {
   }
 }
 
+export class UserError extends ApplicationError {
+  constructor(message: string, details?: unknown, statusCode = 400) {
+    super(statusCode, 'user_error', message, details)
+    this.name = 'UserError'
+  }
+}
+
+export class RetriableError extends ApplicationError {
+  constructor(message: string, details?: unknown, statusCode = 503) {
+    super(statusCode, 'retriable_error', message, details)
+    this.name = 'RetriableError'
+  }
+}
+
+export class InfrastructureError extends ApplicationError {
+  constructor(message: string, details?: unknown, statusCode = 502) {
+    super(statusCode, 'infrastructure_error', message, details)
+    this.name = 'InfrastructureError'
+  }
+}
+
 export const mapErrorToHttpResponse = (error: unknown): { body: Record<string, unknown>, status: number } => {
   const correlationId = getCorrelationId()
 
