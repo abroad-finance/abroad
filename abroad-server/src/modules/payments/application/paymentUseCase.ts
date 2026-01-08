@@ -2,6 +2,7 @@ import { Country } from '@prisma/client'
 import { inject, injectable } from 'inversify'
 
 import { TYPES } from '../../../app/container/types'
+import { ValidationError } from '../../../core/errors'
 import { ILogger } from '../../../core/logging/types'
 import { IDatabaseClientProvider } from '../../../platform/persistence/IDatabaseClientProvider'
 import { IPaymentService } from './contracts/IPaymentService'
@@ -112,7 +113,7 @@ export class PaymentUseCase implements IPaymentUseCase {
     })
 
     if (!service.isEnabled) {
-      throw new Error(`Payment method ${method} is currently unavailable`)
+      throw new ValidationError(`Payment method ${method} is currently unavailable`)
     }
 
     return { method, service }

@@ -15,6 +15,7 @@ import {
 } from 'tsoa'
 
 import { TYPES } from '../../../../app/container/types'
+import { mapErrorToHttpResponse } from '../../../../core/errors'
 import { IPaymentUseCase, LiquidityResult, OnboardResult } from '../../application/paymentUseCase'
 import { DEFAULT_PAYMENT_METHOD, SupportedPaymentMethod } from '../../application/supportedPaymentMethods'
 
@@ -50,11 +51,18 @@ export class PaymentsController extends Controller {
   @Response('400', 'Bad Request')
   @SuccessResponse('200', 'Liquidity retrieved successfully')
   public async getLiquidity(@Query() paymentMethod?: SupportedPaymentMethod): Promise<LiquidityResponse> {
-    const result = await this.paymentUseCase.getLiquidity(paymentMethod)
-    if (!result.success) {
-      this.setStatus(400)
+    try {
+      const result = await this.paymentUseCase.getLiquidity(paymentMethod)
+      if (!result.success) {
+        this.setStatus(400)
+      }
+      return result
     }
-    return result
+    catch (error) {
+      const mapped = mapErrorToHttpResponse(error)
+      this.setStatus(mapped.status)
+      return mapped.body as LiquidityResponse
+    }
   }
 
   /**
@@ -67,15 +75,22 @@ export class PaymentsController extends Controller {
   @Response('400', 'Bad Request')
   @SuccessResponse('200', 'User onboarded')
   public async onboardUser(@Body() requestBody: OnboardRequest): Promise<OnboardResponse> {
-    if (!requestBody.account) {
-      this.setStatus(400)
-      return { message: 'Account is required', success: false }
-    }
+    try {
+      if (!requestBody.account) {
+        this.setStatus(400)
+        return { message: 'Account is required', success: false }
+      }
 
-    const result = await this.paymentUseCase.onboardUser(requestBody.account, DEFAULT_PAYMENT_METHOD)
-    if (!result.success) {
-      this.setStatus(400)
+      const result = await this.paymentUseCase.onboardUser(requestBody.account, DEFAULT_PAYMENT_METHOD)
+      if (!result.success) {
+        this.setStatus(400)
+      }
+      return result
     }
-    return result
+    catch (error) {
+      const mapped = mapErrorToHttpResponse(error)
+      this.setStatus(mapped.status)
+      return mapped.body as OnboardResponse
+    }
   }
 }
