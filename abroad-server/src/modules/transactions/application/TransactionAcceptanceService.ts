@@ -91,6 +91,7 @@ export class TransactionAcceptanceService {
         },
       })
       await this.lockPartnerUser(tx, partnerUser.id)
+      await this.lockPartner(tx, partner.id)
 
       const monthlyAmount = await this.calculateMonthlyAmount(tx, partnerUser.id, quote.paymentMethod)
       const totalUserAmountMonthly = monthlyAmount + quote.sourceAmount
@@ -226,14 +227,14 @@ export class TransactionAcceptanceService {
       return
     }
 
-    const partnerTransactions = await prismaClient.transaction.findMany({
-      include: { partnerUser: true, quote: true },
+    const aggregate = await prismaClient.transaction.aggregate({
+      _sum: { sourceAmount: true },
       where: {
         partnerUser: { partnerId },
         status: TransactionStatus.PAYMENT_COMPLETED,
       },
     })
-    const partnerTotalAmount = partnerTransactions.reduce((sum, tx) => sum + tx.quote.sourceAmount, 0)
+    const partnerTotalAmount = aggregate._sum.sourceAmount ?? 0
     if (partnerTotalAmount + sourceAmount > 100) {
       throw new TransactionValidationError('This partner is limited to a total of $100 until KYB is approved. Please complete KYB to raise the limit.')
     }
@@ -330,6 +331,14 @@ export class TransactionAcceptanceService {
       return Country.CO
     }
     throw new TransactionValidationError(`KYC verification is not available for ${country}. Please provide a supported country or contact support.`)
+  }
+
+  private async lockPartner(
+    prismaClient: SerializableTx,
+    partnerId: string,
+  ): Promise<void> {
+    // Coarse lock to serialize partner-level aggregate checks.
+    await prismaClient.$executeRaw`SELECT 1 FROM "Partner" WHERE id = ${partnerId} FOR UPDATE`
   }
 
   private async lockPartnerUser(
