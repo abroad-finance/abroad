@@ -98,6 +98,10 @@ interface BrebTransactionStatusInfo {
 
 @injectable()
 export class BrebPaymentService implements IPaymentService {
+  public readonly capability = {
+    method: TargetCurrency.COP as unknown as import('@prisma/client').PaymentMethod,
+    targetCurrency: TargetCurrency.COP,
+  }
   public readonly currency = TargetCurrency.COP
   public readonly fixedFee = 0
 

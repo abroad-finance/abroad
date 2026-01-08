@@ -1,7 +1,11 @@
 // src/interfaces/IPaymentService.ts
-import { TargetCurrency } from '@prisma/client'
+import { PaymentMethod, TargetCurrency } from '@prisma/client'
 
 export interface IPaymentService {
+  readonly capability?: {
+    method: PaymentMethod
+    targetCurrency: TargetCurrency
+  }
   readonly currency: TargetCurrency
   readonly fixedFee: number
   /**
@@ -57,6 +61,11 @@ export type PaymentSendResult =
     success: false
     transactionId?: string
   }
+
+export type PaymentCapability = {
+  method: PaymentMethod
+  targetCurrency: TargetCurrency
+}
 
 export interface PaymentVerificationResult {
   code: PaymentFailureCode

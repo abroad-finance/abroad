@@ -38,6 +38,10 @@ type TransferoPayment = {
 
 @injectable()
 export class TransferoPaymentService implements IPaymentService {
+  public readonly capability = {
+    method: TargetCurrency.BRL as unknown as import('@prisma/client').PaymentMethod, // maintain current mapping
+    targetCurrency: TargetCurrency.BRL,
+  }
   public readonly currency: TargetCurrency = TargetCurrency.BRL
   public readonly fixedFee = 0.0
   public readonly isAsync = true
