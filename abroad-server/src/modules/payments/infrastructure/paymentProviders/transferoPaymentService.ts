@@ -6,7 +6,7 @@ import { TYPES } from '../../../../app/container/types'
 import { ILogger } from '../../../../core/logging/types'
 import { IDatabaseClientProvider } from '../../../../platform/persistence/IDatabaseClientProvider'
 import { ISecretManager } from '../../../../platform/secrets/ISecretManager'
-import { IPaymentService } from '../../application/contracts/IPaymentService'
+import { IPaymentService, PaymentFailureCode, PaymentSendResult } from '../../application/contracts/IPaymentService'
 import { IPixQrDecoder } from '../../application/contracts/IQrDecoder'
 
 type TransactionTransfero = {
@@ -150,7 +150,7 @@ export class TransferoPaymentService implements IPaymentService {
     id: string
     qrCode?: null | string
     value: number
-  }): Promise<import('../../application/contracts/IPaymentService').PaymentSendResult> {
+  }): Promise<PaymentSendResult> {
     try {
       const [taxId, token, config] = await Promise.all([
         this.getTransactionTaxId(id),
@@ -174,17 +174,28 @@ export class TransferoPaymentService implements IPaymentService {
       const paymentId = this.extractPaymentId(data)
       return paymentId
         ? { success: true, transactionId: paymentId }
-        : { code: 'permanent', reason: 'paymentId_missing', success: false }
+        : this.buildFailure('permanent', 'paymentId_missing')
     }
     catch (error) {
       const formatted = this.formatAxiosError(error)
       this.logger.error('Transfero sendPayment error:', formatted)
-      return {
-        code: 'retriable',
-        reason: formatted,
-        success: false,
+      const code = this.extractFailureCode(error)
+      return this.buildFailure(code, formatted)
+    }
+  }
+
+  private buildFailure(code: PaymentFailureCode, reason?: string): PaymentSendResult {
+    return { code, reason, success: false }
+  }
+
+  private extractFailureCode(error: unknown): PaymentFailureCode {
+    if (axios.isAxiosError(error)) {
+      const status = error.response?.status
+      if (status && status >= 400 && status < 500) {
+        return 'permanent'
       }
     }
+    return 'retriable'
   }
 
   public verifyAccount({ account }: { account: string }): Promise<boolean> {

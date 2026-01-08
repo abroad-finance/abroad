@@ -5,7 +5,7 @@ import { inject, injectable } from 'inversify'
 import { TYPES } from '../../../../app/container/types'
 import { ILogger } from '../../../../core/logging/types'
 import { ISecretManager } from '../../../../platform/secrets/ISecretManager'
-import { IPaymentService } from '../../application/contracts/IPaymentService'
+import { IPaymentService, PaymentFailureCode, PaymentSendResult } from '../../application/contracts/IPaymentService'
 
 interface BrebApiEnvelope<T> {
   code?: string
@@ -167,7 +167,7 @@ export class BrebPaymentService implements IPaymentService {
     id: string
     qrCode?: null | string
     value: number
-  }): Promise<import('../../application/contracts/IPaymentService').PaymentSendResult> {
+  }): Promise<PaymentSendResult> {
     try {
       const config = await this.getConfig()
       const token = await this.getAccessToken(config)
@@ -183,13 +183,13 @@ export class BrebPaymentService implements IPaymentService {
 
       if (!sendResponse?.moviiTxId) {
         this.logger.error('[BreB] Send response missing transaction id', sendResponse)
-        return { code: 'permanent', reason: 'missing_transaction_id', success: false }
+        return this.buildFailure('permanent', 'missing_transaction_id')
       }
 
       const resolvedRail = keyDetails.instructedAgent
       if (!resolvedRail) {
         this.logger.error('[BreB] Missing instructed agent on key details', { account })
-        return { code: 'permanent', reason: 'missing_instructed_agent', success: false }
+        return this.buildFailure('permanent', 'missing_instructed_agent')
       }
 
       const reportResult = await this.pollTransactionReport(sendResponse.moviiTxId, resolvedRail, config, token)
@@ -202,13 +202,30 @@ export class BrebPaymentService implements IPaymentService {
         return { code: 'retriable', reason: 'pending', success: false, transactionId: sendResponse.moviiTxId }
       }
 
-      return { code: 'permanent', reason: reportResult?.result ?? 'unknown', success: false, transactionId: sendResponse.moviiTxId }
+      return this.buildFailure('permanent', reportResult?.result ?? 'unknown')
     }
     catch (error) {
       const reason = error instanceof Error ? error.message : 'Unknown error'
       this.logger.error('[BreB] Payment submission failed', { account, reason })
-      return { code: 'retriable', reason, success: false }
+      return this.buildFailure(this.extractFailureCode(error), reason)
     }
+  }
+
+  private buildFailure(code: PaymentFailureCode, reason?: string): PaymentSendResult {
+    return { code, reason, success: false }
+  }
+
+  private extractFailureCode(error: unknown): PaymentFailureCode {
+    const status = this.extractErrorStatus(error)
+    if (status && status >= 400 && status < 500) {
+      return 'permanent'
+    }
+    return 'retriable'
+  }
+
+  private extractErrorStatus(error: unknown): number | undefined {
+    const maybeAxios = error as { response?: { status?: number } }
+    return typeof maybeAxios?.response?.status === 'number' ? maybeAxios.response.status : undefined
   }
 
   public async verifyAccount({

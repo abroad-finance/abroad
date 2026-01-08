@@ -518,7 +518,9 @@ export class TransactionWorkflow {
       const updatedTransaction = await this.applyTransition(prismaClient, {
         context: {
           providerTransactionId: paymentResponse.transactionId ?? null,
+          reason: paymentResponse.success ? undefined : paymentResponse.reason,
           sourceAddress: message.addressFrom,
+          status: paymentResponse.success ? undefined : paymentResponse.code,
         },
         idempotencyKey: this.buildIdempotencyKey('payout', transitionName, paymentResponse.transactionId ?? transaction.id),
         name: transitionName,
@@ -557,14 +559,16 @@ export class TransactionWorkflow {
           deliverNow: false,
           notes: {
             providerTransactionId: paymentResponse.transactionId ?? 'not-provided',
-            reason: paymentResponse.success ? undefined : paymentResponse.reason,
-            status: paymentResponse.success ? undefined : paymentResponse.code,
+            reason: paymentResponse.reason,
+            status: paymentResponse.code,
           },
           prismaClient,
           trigger: 'TransactionWorkflow',
         })
-        const refundResult = await this.refundService.refundToSender(message)
-        await this.recordRefundOnChainId(prismaClient, transaction.id, refundResult, logger)
+        if (paymentResponse.code !== 'retriable') {
+          const refundResult = await this.refundService.refundToSender(message)
+          await this.recordRefundOnChainId(prismaClient, transaction.id, refundResult, logger)
+        }
       }
     }
     catch (error) {

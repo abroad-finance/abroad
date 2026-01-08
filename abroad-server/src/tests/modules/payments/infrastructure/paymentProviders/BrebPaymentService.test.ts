@@ -227,7 +227,7 @@ describe('BrebPaymentService', () => {
         value: 10_000,
       })
 
-      expect(outcome).toEqual({ code: 'permanent', reason: 'missing_transaction_id', success: false, transactionId: 'tx-004' })
+      expect(outcome).toEqual({ code: 'permanent', reason: 'missing_transaction_id', success: false })
       expect(logger.error).toHaveBeenCalledWith('[BreB] Send response missing transaction id', { rail: 'ENT' })
     })
 
@@ -244,7 +244,7 @@ describe('BrebPaymentService', () => {
         value: 15_000,
       })
 
-      expect(result).toEqual({ code: 'retriable', reason: 'network down', success: false })
+      expect(result).toEqual({ code: 'permanent', reason: 'network down', success: false })
       expect(logger.error).toHaveBeenCalledWith(
         '[BreB] Failed to dispatch payment',
         expect.objectContaining({ responseData: 'network down' }),
