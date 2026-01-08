@@ -14,7 +14,8 @@ import z from 'zod'
 
 import { TYPES } from '../../../../app/container/types'
 import { ILogger } from '../../../../core/logging/types'
-import { IQueueHandler, QueueName } from '../../../../platform/messaging/queues'
+import { QueueName } from '../../../../platform/messaging/queues'
+import { OutboxDispatcher } from '../../../../platform/outbox/OutboxDispatcher'
 import { SolanaPaymentVerifier } from '../../infrastructure/wallets/SolanaPaymentVerifier'
 
 const solanaPaymentNotificationSchema = z.object({
@@ -33,7 +34,7 @@ interface SolanaPaymentNotificationRequest {
 export class SolanaPaymentsController extends Controller {
   public constructor(
     @inject(TYPES.SolanaPaymentVerifier) private readonly paymentVerifier: SolanaPaymentVerifier,
-    @inject(TYPES.IQueueHandler) private readonly queueHandler: IQueueHandler,
+    @inject(TYPES.IOutboxDispatcher) private readonly outboxDispatcher: OutboxDispatcher,
     @inject(TYPES.ILogger) private readonly logger: ILogger,
   ) {
     super()
@@ -66,13 +67,12 @@ export class SolanaPaymentsController extends Controller {
       return badRequestResponse(400, { reason: verification.reason })
     }
 
-    try {
-      await this.queueHandler.postMessage(QueueName.RECEIVED_CRYPTO_TRANSACTION, verification.queueMessage)
-    }
-    catch (error) {
-      this.logger.error('[SolanaPaymentsController] Failed to enqueue Solana payment', error)
-      throw error
-    }
+    await this.outboxDispatcher.enqueueQueue(
+      QueueName.RECEIVED_CRYPTO_TRANSACTION,
+      verification.queueMessage,
+      'solana.notify',
+      { deliverNow: true },
+    )
 
     this.setStatus(202)
     return { enqueued: true }
