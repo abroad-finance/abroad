@@ -5,6 +5,7 @@ import { PaymentServiceFactory } from '../../modules/payments/application/Paymen
 import { PaymentUseCase } from '../../modules/payments/application/paymentUseCase'
 import { PayoutStatusAdapterRegistry } from '../../modules/payments/application/PayoutStatusAdapterRegistry'
 import { WalletHandlerFactory } from '../../modules/payments/application/WalletHandlerFactory'
+import { DepositVerifierRegistry } from '../../modules/payments/application/DepositVerifierRegistry'
 import { BrebPaymentService } from '../../modules/payments/infrastructure/paymentProviders/brebPaymentService'
 import { PixQrDecoder } from '../../modules/payments/infrastructure/paymentProviders/PixQrDecoder'
 import { TransferoPaymentService } from '../../modules/payments/infrastructure/paymentProviders/transferoPaymentService'
@@ -27,6 +28,7 @@ import { TYPES } from './types'
 
 const domainBindings: ReadonlyArray<BindingRegistration<unknown>> = [
   { identifier: TYPES.IPaymentServiceFactory, implementation: PaymentServiceFactory },
+  { identifier: TYPES.IDepositVerifierRegistry, implementation: DepositVerifierRegistry },
   { bindSelf: true, identifier: PayoutStatusAdapterRegistry, implementation: PayoutStatusAdapterRegistry },
   { identifier: TYPES.IPayoutStatusAdapter, implementation: TransferoPayoutStatusAdapter, name: 'transfero' },
   { identifier: TYPES.IExchangeProviderFactory, implementation: ExchangeProviderFactory },
@@ -40,6 +42,7 @@ const domainBindings: ReadonlyArray<BindingRegistration<unknown>> = [
   { identifier: TYPES.StellarListener, implementation: StellarListener },
   { identifier: TYPES.IPaymentService, implementation: BrebPaymentService, name: 'breb' },
   { identifier: TYPES.IPaymentService, implementation: TransferoPaymentService, name: 'transfero' },
+  { identifier: TYPES.IDepositVerifier, implementation: SolanaPaymentVerifier, name: 'solana' },
   { identifier: TYPES.IExchangeProvider, implementation: BinanceExchangeProvider, name: 'binance' },
   { identifier: TYPES.IExchangeProvider, implementation: TransferoExchangeProvider, name: 'transfero' },
   { identifier: TYPES.TransactionAcceptanceService, implementation: TransactionAcceptanceService },

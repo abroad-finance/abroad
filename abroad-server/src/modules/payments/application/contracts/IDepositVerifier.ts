@@ -13,6 +13,10 @@ export interface IDepositVerifier {
   ): Promise<DepositVerificationError | DepositVerificationSuccess>
 }
 
+export interface IDepositVerifierRegistry {
+  getVerifier(blockchain: BlockchainNetwork): IDepositVerifier
+}
+
 export type DepositVerificationRequest = {
   blockchain: BlockchainNetwork
   cryptoCurrency: CryptoCurrency

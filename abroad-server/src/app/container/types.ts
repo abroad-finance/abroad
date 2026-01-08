@@ -3,6 +3,8 @@ const typeKeys = [
   'AppConfig',
   'BinanceBalanceUpdatedController',
   'IDatabaseClientProvider',
+  'IDepositVerifier',
+  'IDepositVerifierRegistry',
   'IExchangeProvider',
   'IExchangeProviderFactory',
   'IKycService',
