@@ -73,6 +73,7 @@ export class TransactionAcceptanceService {
         targetCurrency: quote.targetCurrency,
       })
       this.assertPaymentServiceIsEnabled(paymentService, quote.paymentMethod)
+      await this.lockPaymentMethod(tx, quote.paymentMethod)
 
       this.enforceTransactionAmountBounds(quote, paymentService, quote.paymentMethod)
       await this.ensureAccountIsValid(paymentService, request.accountNumber)
@@ -339,6 +340,14 @@ export class TransactionAcceptanceService {
   ): Promise<void> {
     // Coarse lock to serialize partner-level aggregate checks.
     await prismaClient.$executeRaw`SELECT 1 FROM "Partner" WHERE id = ${partnerId} FOR UPDATE`
+  }
+
+  private async lockPaymentMethod(
+    prismaClient: SerializableTx,
+    paymentMethod: PaymentMethod,
+  ): Promise<void> {
+    // Prevent concurrent acceptances from racing on method-level daily totals.
+    await prismaClient.$executeRaw`SELECT 1 FROM "PaymentProvider" WHERE id = ${paymentMethod} FOR UPDATE`
   }
 
   private async lockPartnerUser(
