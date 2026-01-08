@@ -24,6 +24,8 @@ export interface OnboardResult {
   success: boolean
 }
 
+const LIQUIDITY_CACHE_TTL_MS = 5 * 60 * 1000
+
 @injectable()
 export class PaymentUseCase implements IPaymentUseCase {
   private readonly successMessage = 'Liquidity retrieved successfully'
@@ -41,19 +43,25 @@ export class PaymentUseCase implements IPaymentUseCase {
     const { method, service } = this.resolvePaymentService(paymentMethod)
     try {
       const clientDb = await this.dbClientProvider.getClient()
-      const providerRecord = await clientDb.paymentProvider.upsert({
-        create: {
-          country: Country.CO,
-          id: method,
-          liquidity: 0,
-          name: method,
-        },
-        update: {},
-        where: { id: method },
-      })
+      const providerRecord = await clientDb.paymentProvider.findUnique({ where: { id: method } })
+      const now = Date.now()
 
-      const persistedLiquidity = providerRecord.liquidity
-      if (persistedLiquidity !== 0) {
+      if (!providerRecord) {
+        await clientDb.paymentProvider.create({
+          data: {
+            country: Country.CO,
+            id: method,
+            liquidity: 0,
+            name: method,
+          },
+        })
+      }
+
+      const persistedLiquidity = providerRecord?.liquidity ?? 0
+      const lastUpdatedAt = providerRecord?.updatedAt?.getTime()
+      const isFresh = typeof lastUpdatedAt === 'number' && now - lastUpdatedAt <= LIQUIDITY_CACHE_TTL_MS
+
+      if (persistedLiquidity !== 0 && isFresh) {
         return {
           liquidity: persistedLiquidity,
           message: this.successMessage,
@@ -62,7 +70,7 @@ export class PaymentUseCase implements IPaymentUseCase {
       }
 
       const liquidity = await service.getLiquidity()
-      if (liquidity) {
+      if (typeof liquidity === 'number') {
         await clientDb.paymentProvider.update({
           data: { liquidity },
           where: { id: method },

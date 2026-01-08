@@ -10,8 +10,9 @@ import { createMockLogger, MockLogger } from '../../../setup/mockFactories'
 
 type PrismaLike = {
   paymentProvider: {
+    create: jest.Mock
+    findUnique: jest.Mock
     update: jest.Mock
-    upsert: jest.Mock
   }
 }
 
@@ -40,11 +41,15 @@ const buildUseCase = ({
   paymentService = buildPaymentService(),
   paymentServiceFactory = {
     getPaymentService: jest.fn<IPaymentService, [PaymentMethod]>(() => paymentService),
+    getPaymentServiceForCapability: jest.fn<IPaymentService, [Parameters<IPaymentServiceFactory['getPaymentServiceForCapability']>[0]]>(
+      () => paymentService,
+    ),
   } as jest.Mocked<IPaymentServiceFactory>,
   prismaClient = {
     paymentProvider: {
+      create: jest.fn(),
+      findUnique: jest.fn(),
       update: jest.fn(),
-      upsert: jest.fn(),
     },
   } as PrismaLike,
 } = {}) => {
@@ -62,7 +67,12 @@ describe('PaymentUseCase', () => {
     const paymentService = buildPaymentService({ isEnabled: false })
     const { useCase } = buildUseCase({
       paymentService,
-      paymentServiceFactory: { getPaymentService: jest.fn<IPaymentService, [PaymentMethod]>(() => paymentService) } as jest.Mocked<IPaymentServiceFactory>,
+      paymentServiceFactory: {
+        getPaymentService: jest.fn<IPaymentService, [PaymentMethod]>(() => paymentService),
+        getPaymentServiceForCapability: jest.fn<IPaymentService, [Parameters<IPaymentServiceFactory['getPaymentServiceForCapability']>[0]]>(
+          () => paymentService,
+        ),
+      } as jest.Mocked<IPaymentServiceFactory>,
     })
 
     await expect(useCase.getLiquidity(PaymentMethod.BREB)).rejects.toThrow(/unavailable/i)
@@ -71,13 +81,15 @@ describe('PaymentUseCase', () => {
   it('returns cached liquidity without invoking the payment provider', async () => {
     const prismaClient: PrismaLike = {
       paymentProvider: {
-        update: jest.fn(),
-        upsert: jest.fn().mockResolvedValue({
+        create: jest.fn(),
+        findUnique: jest.fn().mockResolvedValue({
           country: Country.CO,
           id: PaymentMethod.BREB,
           liquidity: 250,
           name: PaymentMethod.BREB,
+          updatedAt: new Date(),
         }),
+        update: jest.fn(),
       },
     }
     const { paymentService, useCase } = buildUseCase({ prismaClient })
@@ -96,13 +108,15 @@ describe('PaymentUseCase', () => {
   it('fetches liquidity from the service and updates persistence when missing', async () => {
     const prismaClient: PrismaLike = {
       paymentProvider: {
-        update: jest.fn(),
-        upsert: jest.fn().mockResolvedValue({
+        create: jest.fn(),
+        findUnique: jest.fn().mockResolvedValue({
           country: Country.CO,
           id: PaymentMethod.BREB,
           liquidity: 0,
           name: PaymentMethod.BREB,
+          updatedAt: new Date(0),
         }),
+        update: jest.fn(),
       },
     }
     const paymentService = buildPaymentService({ getLiquidity: jest.fn(async () => 510) })
@@ -120,6 +134,33 @@ describe('PaymentUseCase', () => {
       message: 'Liquidity retrieved successfully',
       success: true,
     })
+  })
+
+  it('refreshes stale cached liquidity even when non-zero', async () => {
+    const prismaClient: PrismaLike = {
+      paymentProvider: {
+        create: jest.fn(),
+        findUnique: jest.fn().mockResolvedValue({
+          country: Country.CO,
+          id: PaymentMethod.BREB,
+          liquidity: 120,
+          name: PaymentMethod.BREB,
+          updatedAt: new Date(Date.now() - 10 * 60 * 1000),
+        }),
+        update: jest.fn(),
+      },
+    }
+    const paymentService = buildPaymentService({ getLiquidity: jest.fn(async () => 450) })
+    const { useCase } = buildUseCase({ paymentService, prismaClient })
+
+    const response = await useCase.getLiquidity(PaymentMethod.BREB)
+
+    expect(paymentService.getLiquidity).toHaveBeenCalled()
+    expect(prismaClient.paymentProvider.update).toHaveBeenCalledWith({
+      data: { liquidity: 450 },
+      where: { id: PaymentMethod.BREB },
+    })
+    expect(response.liquidity).toBe(450)
   })
 
   it('returns failure response when liquidity retrieval fails', async () => {
