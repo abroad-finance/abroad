@@ -68,7 +68,10 @@ export class TransactionAcceptanceService {
     const prismaClient = await this.prismaClientProvider.getClient()
     const decision = await prismaClient.$transaction(async (tx) => {
       const quote = await this.fetchQuote(tx, request.quoteId, partner.id)
-      const paymentService = this.paymentServiceFactory.getPaymentService(quote.paymentMethod)
+      const paymentService = this.paymentServiceFactory.getPaymentServiceForCapability({
+        paymentMethod: quote.paymentMethod,
+        targetCurrency: quote.targetCurrency,
+      })
       this.assertPaymentServiceIsEnabled(paymentService, quote.paymentMethod)
 
       this.enforceTransactionAmountBounds(quote, paymentService, quote.paymentMethod)

@@ -426,9 +426,10 @@ export class TransactionWorkflow {
   ): Promise<void> {
     let paymentService: ReturnType<IPaymentServiceFactory['getPaymentService']>
     try {
-      paymentService = this.paymentServiceFactory.getPaymentService(
-        transaction.quote.paymentMethod,
-      )
+      paymentService = this.paymentServiceFactory.getPaymentServiceForCapability({
+        paymentMethod: transaction.quote.paymentMethod,
+        targetCurrency: transaction.quote.targetCurrency,
+      })
     }
     catch (error) {
       logger.error('Unsupported payment method for payout', error)
