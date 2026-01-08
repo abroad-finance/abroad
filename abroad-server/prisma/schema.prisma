@@ -95,6 +95,7 @@ model Transaction {
   externalId    String?           @unique
   qrCode        String?
   exchangeHandoffAt DateTime?
+  transitions   TransactionTransition[]
 
   @@index([partnerUserId, status, createdAt], name: "transaction_partnerUser_status_createdAt_idx")
 }
@@ -120,6 +121,21 @@ model PendingConversions {
   side   OrderSide
 
   @@id([source, target])
+}
+
+model TransactionTransition {
+  id             String            @id @default(uuid())
+  transactionId  String
+  transaction    Transaction       @relation(fields: [transactionId], references: [id])
+  event          String
+  fromStatus     TransactionStatus
+  toStatus       TransactionStatus
+  idempotencyKey String
+  context        Json?
+  createdAt      DateTime          @default(now())
+
+  @@unique([transactionId, idempotencyKey])
+  @@index([transactionId, createdAt])
 }
 
 enum OutboxStatus {

@@ -12,6 +12,7 @@ import { IQueueHandler, QueueName, UserNotificationMessage } from '../../../plat
 import { IWebhookNotifier, WebhookEvent } from '../../../platform/notifications/IWebhookNotifier'
 import { IDatabaseClientProvider } from '../../../platform/persistence/IDatabaseClientProvider'
 import { toWebhookTransactionPayload } from './transactionPayload'
+import { TransactionRepository } from './TransactionRepository'
 
 export type ExpiredTransactionsSummary = {
   awaiting: number
@@ -31,7 +32,11 @@ export class ExpiredTransactionService {
     private readonly webhookNotifier: IWebhookNotifier,
     private readonly queueHandler: IQueueHandler,
     private readonly logger: ILogger,
-  ) {}
+  ) {
+    this.repository = new TransactionRepository(prismaProvider)
+  }
+
+  private readonly repository: TransactionRepository
 
   public async process(now: Date = new Date()): Promise<ExpiredTransactionsSummary> {
     const prismaClient = await this.prismaProvider.getClient()
@@ -70,31 +75,20 @@ export class ExpiredTransactionService {
     prismaClient: PrismaClient,
     transaction: TransactionWithRelations,
   ): Promise<null | TransactionWithRelations> {
-    try {
-      const result = await prismaClient.transaction.updateMany({
-        data: { status: TransactionStatus.PAYMENT_EXPIRED },
-        where: {
-          id: transaction.id,
-          status: TransactionStatus.AWAITING_PAYMENT,
-        },
+    const transitioned = await this.repository.applyExpiration(prismaClient, {
+      idempotencyKey: this.buildIdempotencyKey(transaction.id),
+      transactionId: transaction.id,
+    })
+
+    if (!transitioned) {
+      this.logger.warn('[PublicTransactionsController] Skipped expiration transition', {
+        currentStatus: transaction.status,
+        transactionId: transaction.id,
       })
-
-      if (result.count === 0) {
-        return null
-      }
-
-      return {
-        ...transaction,
-        status: TransactionStatus.PAYMENT_EXPIRED,
-      }
-    }
-    catch (error) {
-      this.logger.warn(
-        '[PublicTransactionsController] Failed to mark transaction as expired',
-        { error, transactionId: transaction.id },
-      )
       return null
     }
+
+    return transitioned
   }
 
   private async expireTransactions(
@@ -119,6 +113,10 @@ export class ExpiredTransactionService {
         status: TransactionStatus.AWAITING_PAYMENT,
       },
     })
+  }
+
+  private buildIdempotencyKey(transactionId: string): string {
+    return `expire|${transactionId}`
   }
 
   private async notifyUpdates(transaction: TransactionWithRelations): Promise<void> {

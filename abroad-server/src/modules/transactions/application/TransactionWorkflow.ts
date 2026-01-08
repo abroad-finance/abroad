@@ -1,4 +1,4 @@
-import { SupportedCurrency, TargetCurrency, TransactionStatus } from '@prisma/client'
+import { Prisma, SupportedCurrency, TargetCurrency, TransactionStatus } from '@prisma/client'
 import { inject, injectable } from 'inversify'
 
 import { TYPES } from '../../../app/container/types'
@@ -14,6 +14,7 @@ import { IWalletHandlerFactory } from '../../payments/application/contracts/IWal
 import { PayoutStatusAdapterRegistry } from '../../payments/application/PayoutStatusAdapterRegistry'
 import { isSupportedPaymentMethod } from '../../payments/application/supportedPaymentMethods'
 import { IExchangeProviderFactory } from '../../treasury/application/contracts/IExchangeProviderFactory'
+import { TransactionTransitionName } from './TransactionStateMachine'
 import { TransactionEventDispatcher } from './TransactionEventDispatcher'
 import { TransactionWithRelations } from './transactionNotificationTypes'
 import { TransactionRepository } from './TransactionRepository'
@@ -48,6 +49,25 @@ export class TransactionWorkflow {
     this.exchangeProviderFactory = exchangeProviderFactory
   }
 
+  private buildIdempotencyKey(...segments: Array<string | undefined>): string {
+    return segments
+      .filter((segment): segment is string => Boolean(segment && segment.trim()))
+      .join('|')
+  }
+
+  private async applyTransition(
+    prismaClient: Awaited<ReturnType<IDatabaseClientProvider['getClient']>>,
+    params: {
+      context?: Prisma.InputJsonValue
+      data?: Prisma.TransactionUpdateInput
+      idempotencyKey: string
+      name: TransactionTransitionName
+      transactionId: string
+    },
+  ): Promise<TransactionWithRelations | null> {
+    return this.repository.applyTransition(prismaClient, params)
+  }
+
   public async handleIncomingDeposit(message: ReceivedCryptoTransactionMessage): Promise<void> {
     const scopedLogger = this.logger.child({
       correlationId: getCorrelationId(),
@@ -59,10 +79,11 @@ export class TransactionWorkflow {
     })
 
     const prismaClient = await this.repository.getClient()
-    const transactionRecord = await this.repository.markProcessingAwaiting(
-      message.transactionId,
-      message.onChainId,
-    )
+    const transactionRecord = await this.repository.applyDepositReceived(prismaClient, {
+      idempotencyKey: this.buildIdempotencyKey('deposit', message.onChainId),
+      onChainId: message.onChainId,
+      transactionId: message.transactionId,
+    })
 
     if (!transactionRecord) {
       await this.handleNonAwaitingDeposit(prismaClient, message, scopedLogger)
@@ -171,7 +192,28 @@ export class TransactionWorkflow {
     }
 
     const prismaClient = await this.repository.getClient()
-    const updatedTransaction = await this.repository.updateStatus(prismaClient, transaction.id, newStatus)
+    const transitionName: TransactionTransitionName = newStatus === TransactionStatus.PAYMENT_COMPLETED
+      ? 'payment_completed'
+      : 'payment_failed'
+
+    const updatedTransaction = await this.applyTransition(prismaClient, {
+      context: {
+        externalId: message.externalId,
+        providerStatus: message.status,
+      },
+      idempotencyKey: this.buildIdempotencyKey('provider', message.externalId, message.status),
+      name: transitionName,
+      transactionId: transaction.id,
+    })
+
+    if (!updatedTransaction) {
+      scopedLogger.warn('Skipping provider status update due to invalid transition', {
+        externalId: message.externalId,
+        newStatus,
+        transactionId: transaction.id,
+      })
+      return
+    }
 
     await this.dispatcher.notifyPartnerAndUser(
       updatedTransaction,
@@ -308,11 +350,20 @@ export class TransactionWorkflow {
       },
     )
 
-    const updatedTransaction = await this.repository.updateStatus(
-      prismaClient,
-      transaction.id,
-      TransactionStatus.WRONG_AMOUNT,
-    )
+    const updatedTransaction = await this.applyTransition(prismaClient, {
+      context: {
+        expectedAmount: transaction.quote.sourceAmount,
+        receivedAmount: message.amount,
+      },
+      idempotencyKey: this.buildIdempotencyKey('wrong_amount', message.onChainId),
+      name: 'wrong_amount',
+      transactionId: transaction.id,
+    })
+
+    if (!updatedTransaction) {
+      logger.warn('Skipping wrong-amount handling due to invalid transition', { transactionId: transaction.id })
+      return
+    }
 
     await this.dispatcher.notifyPartnerAndUser(
       updatedTransaction,
@@ -382,11 +433,16 @@ export class TransactionWorkflow {
     }
     catch (error) {
       logger.error('Unsupported payment method for payout', error)
-      const failedTransaction = await this.repository.updateStatus(
-        prismaClient,
-        transaction.id,
-        TransactionStatus.PAYMENT_FAILED,
-      )
+      const failedTransaction = await this.applyTransition(prismaClient, {
+        idempotencyKey: this.buildIdempotencyKey('payout', 'unsupported', transaction.id),
+        name: 'payment_failed',
+        transactionId: transaction.id,
+      })
+
+      if (!failedTransaction) {
+        logger.warn('Failed to record unsupported payment method transition', { transactionId: transaction.id })
+        return
+      }
       await this.dispatcher.notifyPartnerAndUser(
         failedTransaction,
         WebhookEvent.TRANSACTION_UPDATED,
@@ -400,11 +456,16 @@ export class TransactionWorkflow {
     }
 
     if (!paymentService.isEnabled) {
-      const updatedTransaction = await this.repository.updateStatus(
-        prismaClient,
-        transaction.id,
-        TransactionStatus.PAYMENT_FAILED,
-      )
+      const updatedTransaction = await this.applyTransition(prismaClient, {
+        idempotencyKey: this.buildIdempotencyKey('payout', 'disabled', transaction.id),
+        name: 'payment_failed',
+        transactionId: transaction.id,
+      })
+
+      if (!updatedTransaction) {
+        logger.warn('Payment method disabled transition rejected', { transactionId: transaction.id })
+        return
+      }
 
       await this.dispatcher.notifyPartnerAndUser(
         updatedTransaction,
@@ -448,11 +509,25 @@ export class TransactionWorkflow {
         ? TransactionStatus.PAYMENT_COMPLETED
         : TransactionStatus.PAYMENT_FAILED
 
-      const updatedTransaction = await this.repository.updateStatus(
-        prismaClient,
-        transaction.id,
-        newStatus,
-      )
+      const transitionName: TransactionTransitionName = paymentResponse.success ? 'payment_completed' : 'payment_failed'
+
+      const updatedTransaction = await this.applyTransition(prismaClient, {
+        context: {
+          providerTransactionId: paymentResponse.transactionId ?? null,
+          sourceAddress: message.addressFrom,
+        },
+        idempotencyKey: this.buildIdempotencyKey('payout', transitionName, paymentResponse.transactionId ?? transaction.id),
+        name: transitionName,
+        transactionId: transaction.id,
+      })
+
+      if (!updatedTransaction) {
+        logger.warn('Skipping payout transition due to invalid state', {
+          id: transaction.id,
+          transitionName,
+        })
+        return
+      }
 
       await this.dispatcher.notifyPartnerAndUser(
         updatedTransaction,
@@ -486,11 +561,19 @@ export class TransactionWorkflow {
     }
     catch (error) {
       logger.error('Payment processing error', error)
-      const failedTransaction = await this.repository.updateStatus(
-        prismaClient,
-        transaction.id,
-        TransactionStatus.PAYMENT_FAILED,
-      )
+      const failedTransaction = await this.applyTransition(prismaClient, {
+        context: {
+          error: error instanceof Error ? error.message : 'unknown',
+        },
+        idempotencyKey: this.buildIdempotencyKey('payout', 'error', transaction.id),
+        name: 'payment_failed',
+        transactionId: transaction.id,
+      })
+
+      if (!failedTransaction) {
+        logger.warn('Failed to record payout error transition', { transactionId: transaction.id })
+        return
+      }
       await this.dispatcher.notifyPartnerAndUser(
         failedTransaction,
         WebhookEvent.TRANSACTION_UPDATED,
