@@ -24,6 +24,7 @@ const typeKeys = [
   'IWebhookNotifier',
   'IWebSocketService',
   'KycUseCase',
+  'OutboxWorker',
   'PaymentSentUseCase',
   'PaymentSentController',
   'PaymentStatusUpdatedController',
