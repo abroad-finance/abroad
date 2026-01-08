@@ -164,6 +164,56 @@ describe('TransactionAcceptanceService helpers', () => {
     }))
   })
 
+  it('rejects users exceeding their monthly payout totals via caps table', async () => {
+    const reserveUserMonthlyLimits = (service as unknown as {
+      reserveUserMonthlyLimits: (
+        prisma: { $executeRaw: jest.Mock<Promise<number>, [TemplateStringsArray, ...unknown[]]> },
+        partnerUserId: string,
+        paymentMethod: PaymentMethod,
+        targetAmount: number,
+        paymentSvc: ReturnType<typeof buildPaymentService>,
+      ) => Promise<void>
+    }).reserveUserMonthlyLimits
+
+    const prismaClient = {
+      $executeRaw: jest.fn(async () => 0),
+    }
+
+    await expect(reserveUserMonthlyLimits.call(
+      service,
+      prismaClient,
+      'partner-user-1',
+      PaymentMethod.PIX,
+      50,
+      paymentService,
+    )).rejects.toThrow('You reached this month\'s limit for this payment method. Try again next month or choose another method.')
+  })
+
+  it('rejects partners exceeding their monthly payout totals via caps table', async () => {
+    const reservePartnerMonthlyLimits = (service as unknown as {
+      reservePartnerMonthlyLimits: (
+        prisma: { $executeRaw: jest.Mock<Promise<number>, [TemplateStringsArray, ...unknown[]]> },
+        partnerId: string,
+        paymentMethod: PaymentMethod,
+        targetAmount: number,
+        paymentSvc: ReturnType<typeof buildPaymentService>,
+      ) => Promise<void>
+    }).reservePartnerMonthlyLimits
+
+    const prismaClient = {
+      $executeRaw: jest.fn(async () => 0),
+    }
+
+    await expect(reservePartnerMonthlyLimits.call(
+      service,
+      prismaClient,
+      'partner-id',
+      PaymentMethod.PIX,
+      50,
+      paymentService,
+    )).rejects.toThrow('This payment method reached this month\'s partner limit. Please try again next month or use another method.')
+  })
+
   it('enforces partner KYB threshold using aggregates', async () => {
     const enforcePartnerKybThreshold = (service as unknown as {
       enforcePartnerKybThreshold: (
