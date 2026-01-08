@@ -9,6 +9,8 @@ import { ISlackNotifier } from '../notifications/ISlackNotifier'
 import { IWebhookNotifier, WebhookEvent } from '../notifications/IWebhookNotifier'
 import { OutboxRecord, OutboxRepository } from './OutboxRepository'
 
+type PrismaClientLike = PrismaClient | Prisma.TransactionClient
+
 type OutboxPayload =
   | { kind: 'slack', message: string }
   | {
@@ -27,7 +29,7 @@ const DEFAULT_DELAY_MS = 5_000
 
 type EnqueueOptions = {
   availableAt?: Date
-  client?: PrismaClient
+  client?: PrismaClientLike
   deliverNow?: boolean
 }
 
@@ -45,7 +47,7 @@ export class OutboxDispatcher {
     this.logger = createScopedLogger(baseLogger, { scope: 'OutboxDispatcher' })
   }
 
-  public async deliver(record: OutboxRecord, context: string, client?: PrismaClient): Promise<void> {
+  public async deliver(record: OutboxRecord, context: string, client?: PrismaClientLike): Promise<void> {
     const payload = record.payload as OutboxPayload
     try {
       if (payload.kind === 'webhook') {

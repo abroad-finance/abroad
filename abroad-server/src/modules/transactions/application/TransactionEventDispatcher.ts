@@ -1,4 +1,4 @@
-import { PrismaClient, TransactionStatus } from '@prisma/client'
+import { Prisma, PrismaClient, TransactionStatus } from '@prisma/client'
 
 import { createScopedLogger, ScopedLogger } from '../../../core/logging/scopedLogger'
 import { ILogger } from '../../../core/logging/types'
@@ -9,6 +9,8 @@ import { OutboxDispatcher } from '../../../platform/outbox/OutboxDispatcher'
 import { TransactionWithRelations } from './transactionNotificationTypes'
 import { toWebhookTransactionPayload } from './transactionPayload'
 import { buildTransactionSlackMessage } from './transactionSlackFormatter'
+
+type PrismaClientLike = PrismaClient | Prisma.TransactionClient
 
 export class TransactionEventDispatcher {
   private readonly logger: ScopedLogger
@@ -25,7 +27,7 @@ export class TransactionEventDispatcher {
     event: WebhookEvent,
     type: 'transaction.created' | 'transaction.updated',
     context: string,
-    options: { deliverNow?: boolean, prismaClient?: PrismaClient } = {},
+    options: { deliverNow?: boolean, prismaClient?: PrismaClientLike } = {},
   ): Promise<void> {
     const payload = toWebhookTransactionPayload(transaction)
     try {
@@ -59,7 +61,7 @@ export class TransactionEventDispatcher {
       deliverNow?: boolean
       heading?: string
       notes?: Record<string, boolean | null | number | string | undefined>
-      prismaClient?: PrismaClient
+      prismaClient?: PrismaClientLike
       trigger: string
     },
   ): Promise<void> {

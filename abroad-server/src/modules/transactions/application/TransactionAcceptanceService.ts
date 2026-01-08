@@ -44,6 +44,8 @@ type PartnerUserContext = {
 
 type PaymentServiceInstance = ReturnType<IPaymentServiceFactory['getPaymentService']>
 type SerializableTx = Prisma.TransactionClient
+type DatabaseClient = Awaited<ReturnType<IDatabaseClientProvider['getClient']>>
+type PrismaClientLike = DatabaseClient | SerializableTx
 
 @injectable()
 export class TransactionAcceptanceService {
@@ -127,6 +129,22 @@ export class TransactionAcceptanceService {
         select: { bankCode: true, id: true },
       })
 
+      const payload = toWebhookTransactionPayload(transaction)
+
+      try {
+        await this.outboxDispatcher.enqueueWebhook(
+          partner.webhookUrl,
+          { data: payload, event: WebhookEvent.TRANSACTION_CREATED },
+          'transaction.created',
+          { client: tx, deliverNow: false },
+        )
+        await this.publishUserNotification(tx, transaction.id, request.userId)
+      }
+      catch (error) {
+        this.logger.error('Error enqueuing transaction.created notifications', error)
+        throw new TransactionValidationError('We could not create your transaction right now. Please try again in a few moments.')
+      }
+
       return {
         outcome: 'transaction',
         partnerUserId: partnerUser.id,
@@ -151,28 +169,11 @@ export class TransactionAcceptanceService {
       }
     }
 
-    try {
-      const transactionReference = uuidToBase64(decision.transaction.id)
-      const payload = toWebhookTransactionPayload(decision.transaction)
-
-      await this.outboxDispatcher.enqueueWebhook(
-        partner.webhookUrl,
-        { data: payload, event: WebhookEvent.TRANSACTION_CREATED },
-        'transaction.created',
-        { client: prismaClient, deliverNow: false },
-      )
-
-      await this.publishUserNotification(prismaClient, decision.transaction.id, request.userId)
-
-      return {
-        id: decision.transaction.id,
-        kycLink: null,
-        transactionReference,
-      }
-    }
-    catch (error) {
-      this.logger.error('Error creating transaction', error)
-      throw new TransactionValidationError('We could not create your transaction right now. Please try again in a few moments.')
+    const transactionReference = uuidToBase64(decision.transaction.id)
+    return {
+      id: decision.transaction.id,
+      kycLink: null,
+      transactionReference,
     }
   }
 
@@ -460,10 +461,10 @@ export class TransactionAcceptanceService {
   }
 
   private async publishUserNotification(
-    prismaClient: Awaited<ReturnType<IDatabaseClientProvider['getClient']>>,
+    prismaClient: PrismaClientLike,
     transactionId: string,
     userId: string,
-  ) {
+  ): Promise<void> {
     try {
       const full = await prismaClient.transaction.findUnique({
         include: {

@@ -4,6 +4,8 @@ import { inject, injectable } from 'inversify'
 import { TYPES } from '../../app/container/types'
 import { IDatabaseClientProvider } from '../persistence/IDatabaseClientProvider'
 
+type PrismaClientLike = PrismaClient | Prisma.TransactionClient
+
 export type OutboxRecord = {
   attempts: number
   availableAt: Date
@@ -27,7 +29,7 @@ export class OutboxRepository {
     type: string,
     payload: Prisma.JsonValue,
     availableAt: Date = new Date(),
-    client?: PrismaClient,
+    client?: PrismaClientLike,
   ): Promise<OutboxRecord> {
     const prisma = client ?? await this.dbProvider.getClient()
     const created = await prisma.outboxEvent.create({
@@ -40,7 +42,7 @@ export class OutboxRepository {
     return created
   }
 
-  public async markDelivered(id: string, client?: PrismaClient): Promise<void> {
+  public async markDelivered(id: string, client?: PrismaClientLike): Promise<void> {
     const prisma = client ?? await this.dbProvider.getClient()
     await prisma.outboxEvent.update({
       data: {
@@ -52,7 +54,7 @@ export class OutboxRepository {
     })
   }
 
-  public async markFailed(id: string, error: Error, client?: PrismaClient): Promise<void> {
+  public async markFailed(id: string, error: Error, client?: PrismaClientLike): Promise<void> {
     const prisma = client ?? await this.dbProvider.getClient()
     await prisma.outboxEvent.update({
       data: {
@@ -90,7 +92,7 @@ export class OutboxRepository {
     id: string,
     nextAttempt: Date,
     error: Error,
-    client?: PrismaClient,
+    client?: PrismaClientLike,
   ): Promise<void> {
     const prisma = client ?? await this.dbProvider.getClient()
     await prisma.outboxEvent.update({
