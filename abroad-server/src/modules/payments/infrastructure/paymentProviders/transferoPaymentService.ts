@@ -55,6 +55,8 @@ export class TransferoPaymentService implements IPaymentService {
 
   public readonly percentageFee = 0.0
   public readonly provider = 'transfero'
+  private readonly maxSendAttempts = 3
+  private readonly retryDelayMs = 250
 
   private readonly brazilDdds = new Set([
     '11', '12', '13', '14', '15', '16', '17', '18', '19',
@@ -151,37 +153,49 @@ export class TransferoPaymentService implements IPaymentService {
     qrCode?: null | string
     value: number
   }): Promise<PaymentSendResult> {
-    try {
-      const [taxId, token, config] = await Promise.all([
-        this.getTransactionTaxId(id),
-        this.getAccessToken(),
-        this.getTransferoConfig(),
-      ])
+    let attempt = 0
+    while (attempt < this.maxSendAttempts) {
+      attempt += 1
+      try {
+        const [taxId, token, config] = await Promise.all([
+          this.getTransactionTaxId(id),
+          this.getAccessToken(),
+          this.getTransferoConfig(),
+        ])
 
-      const contract = await this.buildContract({ account, qrCode, taxId, value })
+        const contract = await this.buildContract({ account, qrCode, taxId, value })
 
-      const { data } = await axios.post<TransactionTransfero>(
-        `${config.baseUrl}/api/v2.0/accounts/${config.accountId}/paymentgroup`,
-        contract,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
+        const { data } = await axios.post<TransactionTransfero>(
+          `${config.baseUrl}/api/v2.0/accounts/${config.accountId}/paymentgroup`,
+          contract,
+          {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
           },
-        },
-      )
+        )
 
-      const paymentId = this.extractPaymentId(data)
-      return paymentId
-        ? { success: true, transactionId: paymentId }
-        : this.buildFailure('permanent', 'paymentId_missing')
+        const paymentId = this.extractPaymentId(data)
+        return paymentId
+          ? { success: true, transactionId: paymentId }
+          : this.buildFailure('permanent', 'paymentId_missing')
+      }
+      catch (error) {
+        const formatted = this.formatAxiosError(error)
+        const code = this.extractFailureCode(error)
+        this.logger.error('Transfero sendPayment error:', formatted)
+
+        const shouldRetry = code === 'retriable' && attempt < this.maxSendAttempts && this.isRetryableError(error)
+        if (!shouldRetry) {
+          return this.buildFailure(code, formatted)
+        }
+
+        await this.sleep(this.retryDelayMs * attempt)
+      }
     }
-    catch (error) {
-      const formatted = this.formatAxiosError(error)
-      this.logger.error('Transfero sendPayment error:', formatted)
-      const code = this.extractFailureCode(error)
-      return this.buildFailure(code, formatted)
-    }
+
+    return this.buildFailure('retriable', 'Maximum send attempts exceeded')
   }
 
   private buildFailure(code: PaymentFailureCode, reason?: string): PaymentSendResult {
@@ -196,6 +210,18 @@ export class TransferoPaymentService implements IPaymentService {
       }
     }
     return 'retriable'
+  }
+
+  private isRetryableError(error: unknown): boolean {
+    if (axios.isAxiosError(error)) {
+      const status = error.response?.status
+      return !status || status >= 500
+    }
+    const message = error instanceof Error ? error.message.toLowerCase() : ''
+    if (message.includes('tax id is missing')) {
+      return false
+    }
+    return true
   }
 
   public verifyAccount({ account }: { account: string }): Promise<boolean> {
@@ -402,5 +428,9 @@ export class TransferoPaymentService implements IPaymentService {
 
   private stripToDigits(input: number | string): string {
     return String(input).replace(/\D+/g, '')
+  }
+
+  private async sleep(ms: number): Promise<void> {
+    await new Promise(resolve => setTimeout(resolve, ms))
   }
 }

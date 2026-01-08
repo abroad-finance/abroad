@@ -226,5 +226,25 @@ describe('TransferoPaymentService sendPayment', () => {
 
     expect(result).toEqual({ code: 'retriable', reason: JSON.stringify('plain axios'), success: false })
     expect(harness.logger.error).toHaveBeenCalledWith('Transfero sendPayment error:', JSON.stringify('plain axios'))
+    expect(mockedAxios.post).toHaveBeenCalledTimes(1)
+  })
+
+  it('retries retriable failures up to the max attempts', async () => {
+    const harness = stubTransaction()
+    mockedAxios.isAxiosError.mockReturnValue(true)
+    mockedAxios.post
+      .mockRejectedValueOnce({ message: 'plain axios' })
+      .mockRejectedValueOnce({ message: 'plain axios' })
+      .mockRejectedValueOnce({ message: 'plain axios' })
+
+    const result = await harness.service.sendPayment({
+      account: '123',
+      id: 'txn-plain',
+      qrCode: null,
+      value: 5,
+    })
+
+    expect(result).toEqual({ code: 'retriable', reason: JSON.stringify('plain axios'), success: false })
+    expect(mockedAxios.post).toHaveBeenCalledTimes(3)
   })
 })
