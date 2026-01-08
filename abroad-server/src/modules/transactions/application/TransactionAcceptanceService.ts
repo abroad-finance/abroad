@@ -183,21 +183,18 @@ export class TransactionAcceptanceService {
     partnerUserId: string,
     paymentMethod: PaymentMethod,
   ): Promise<number> {
-    const userTransactionsMonthly = await prismaClient.transaction.findMany({
-      include: { quote: true },
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+    const aggregate = await prismaClient.transaction.aggregate({
+      _sum: { sourceAmount: true },
       where: {
-        createdAt: {
-          gte: new Date(new Date().setDate(new Date().getDate() - 30)),
-        },
+        createdAt: { gte: thirtyDaysAgo },
         partnerUserId,
-        quote: {
-          paymentMethod,
-        },
+        quote: { paymentMethod },
         status: TransactionStatus.PAYMENT_COMPLETED,
       },
     })
 
-    return userTransactionsMonthly.reduce((acc, transaction) => acc + transaction.quote.sourceAmount, 0)
+    return aggregate._sum.sourceAmount ?? 0
   }
 
   private async enforceLiquidity(

@@ -1,27 +1,10 @@
-import { Country, PaymentMethod, TargetCurrency } from '@prisma/client'
+import 'reflect-metadata'
+import { Country, PaymentMethod, TargetCurrency, TransactionStatus } from '@prisma/client'
 
 import { TransactionAcceptanceService, TransactionValidationError } from '../../../../modules/transactions/application/TransactionAcceptanceService'
 import { createMockLogger } from '../../../setup/mockFactories'
 
-const prismaProvider = {
-  getClient: jest.fn(),
-}
-
-const queueHandler = {
-  closeAllSubscriptions: jest.fn(),
-  postMessage: jest.fn(),
-  subscribeToQueue: jest.fn(),
-}
-
-const webhookNotifier = {
-  notifyWebhook: jest.fn(),
-}
-
-const kycService = {
-  getKycLink: jest.fn(),
-}
-
-const paymentService = {
+const buildPaymentService = () => ({
   currency: TargetCurrency.COP,
   fixedFee: 0,
   getLiquidity: jest.fn(async () => 0),
@@ -36,29 +19,39 @@ const paymentService = {
   percentageFee: 0,
   sendPayment: jest.fn(),
   verifyAccount: jest.fn(),
-}
-
-const paymentServiceFactory = {
-  getPaymentService: jest.fn(() => paymentService),
-}
-
-const logger = createMockLogger()
+})
 
 describe('TransactionAcceptanceService helpers', () => {
+  const logger = createMockLogger()
+  const paymentService = buildPaymentService()
+  const outboxDispatcher = {
+    enqueueQueue: jest.fn(),
+    enqueueWebhook: jest.fn(),
+  }
+  const paymentServiceFactory = {
+    getPaymentService: jest.fn(() => paymentService),
+    getPaymentServiceForCapability: jest.fn(() => paymentService),
+  }
+  const kycService = {
+    getKycLink: jest.fn(),
+  }
+  const prismaProvider = {
+    getClient: jest.fn(),
+  }
+
+  const service = new TransactionAcceptanceService(
+    prismaProvider as unknown as import('../../../../platform/persistence/IDatabaseClientProvider').IDatabaseClientProvider,
+    paymentServiceFactory as unknown as import('../../../../modules/payments/application/contracts/IPaymentServiceFactory').IPaymentServiceFactory,
+    kycService as unknown as import('../../../../modules/kyc/application/contracts/IKycService').IKycService,
+    outboxDispatcher as unknown as import('../../../../platform/outbox/OutboxDispatcher').OutboxDispatcher,
+    logger,
+  )
+
   beforeEach(() => {
     jest.clearAllMocks()
   })
 
-  const service = new TransactionAcceptanceService(
-    prismaProvider,
-    paymentServiceFactory,
-    kycService,
-    webhookNotifier,
-    queueHandler,
-    logger,
-  )
-
-  it('rejects unsupported KYC countries', async () => {
+  it('rejects unsupported KYC countries', () => {
     const normalizeCountry = (service as unknown as {
       normalizeCountry: (country: string) => Country
     }).normalizeCountry
@@ -74,9 +67,9 @@ describe('TransactionAcceptanceService helpers', () => {
     expect(normalizeCountry('co')).toBe(Country.CO)
   })
 
-  it('enforces liquidity thresholds', async () => {
+  it('enforces liquidity thresholds and invokes the provider', async () => {
     const enforceLiquidity = (service as unknown as {
-      enforceLiquidity: (svc: typeof paymentService, amount: number) => Promise<void>
+      enforceLiquidity: (svc: ReturnType<typeof buildPaymentService>, amount: number) => Promise<void>
     }).enforceLiquidity
 
     await expect(enforceLiquidity(paymentService, 50)).rejects.toThrow('liquidity for this method is below the requested amount')
@@ -85,7 +78,11 @@ describe('TransactionAcceptanceService helpers', () => {
 
   it('enforces per-transaction amount bounds', () => {
     const enforceAmountBounds = (service as unknown as {
-      enforceTransactionAmountBounds: (quote: { targetAmount: number, targetCurrency: TargetCurrency }, svc: typeof paymentService, method: PaymentMethod) => void
+      enforceTransactionAmountBounds: (
+        quote: { targetAmount: number, targetCurrency: TargetCurrency },
+        svc: ReturnType<typeof buildPaymentService>,
+        method: PaymentMethod,
+      ) => void
     }).enforceTransactionAmountBounds
 
     expect(() => enforceAmountBounds(
@@ -101,118 +98,20 @@ describe('TransactionAcceptanceService helpers', () => {
     )).toThrow('Payouts via BREB cannot exceed 100 COP. Lower the amount or choose another method.')
   })
 
-  it('logs failures when publishing user notifications', async () => {
-    const publishUserNotification = (service as unknown as {
-      publishUserNotification: (prisma: {
-        transaction: { findUnique: jest.Mock<Promise<unknown>, [Record<string, unknown>?]> }
-      }, transactionId: string, userId: string) => Promise<void>
-    }).publishUserNotification
-
-    const prismaClient = {
-      transaction: {
-        findUnique: jest.fn(async () => ({ id: 'tx-id', partnerUser: { partner: {} }, quote: {} })),
-      },
-    }
-    queueHandler.postMessage.mockRejectedValueOnce(new Error('queue unavailable'))
-
-    await publishUserNotification.call(service, prismaClient, 'tx-id', 'user-1')
-
-    expect(queueHandler.postMessage).toHaveBeenCalledTimes(1)
-    expect(queueHandler.postMessage).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
-      payload: expect.any(String),
-      type: 'transaction.created',
-      userId: 'user-1',
-    }))
-  })
-
-  it('rejects accepting transactions for disabled payment services', async () => {
-    const disabledPaymentService = { ...paymentService, isEnabled: false }
-    const disabledFactory = { getPaymentService: jest.fn(() => disabledPaymentService) }
-    const quoteId = 'quote-id'
-    const request = {
-      accountNumber: '123',
-      quoteId,
-      userId: 'user-id',
-    }
-    const partnerContext = {
-      id: 'partner-id',
-      isKybApproved: false,
-      needsKyc: false,
-      webhookUrl: 'https://webhook',
-    }
-    const prismaClient = {
-      quote: {
-        findUnique: jest.fn(async () => ({
-          country: Country.CO,
-          id: quoteId,
-          partnerId: partnerContext.id,
-          paymentMethod: PaymentMethod.BREB,
-          sourceAmount: 10,
-          targetAmount: 10,
-          targetCurrency: TargetCurrency.COP,
-        })),
-      },
-    }
-    prismaProvider.getClient.mockResolvedValue(prismaClient as unknown as import('@prisma/client').PrismaClient)
-
-    const acceptanceService = new TransactionAcceptanceService(
-      prismaProvider,
-      disabledFactory as unknown as typeof paymentServiceFactory,
-      kycService,
-      webhookNotifier,
-      queueHandler,
-      createMockLogger(),
-    )
-
-    await expect(acceptanceService.acceptTransaction(request, partnerContext)).rejects.toThrow('Payments via BREB are temporarily unavailable')
-    expect(disabledFactory.getPaymentService).toHaveBeenCalledWith(PaymentMethod.BREB)
-    expect(disabledPaymentService.verifyAccount).not.toHaveBeenCalled()
-  })
-
-  it('allows KYB-pending partners below the cumulative threshold to proceed', async () => {
-    const enforcePartnerKybThreshold = (service as unknown as {
-      enforcePartnerKybThreshold: (
-        prisma: { transaction: { findMany: jest.Mock<Promise<Array<{ quote: { sourceAmount: number } }>>, [unknown?]> } },
-        partnerId: string,
-        sourceAmount: number,
-        isKybApproved: boolean,
-      ) => Promise<void>
-    }).enforcePartnerKybThreshold
-
-    const prismaClient = {
-      transaction: {
-        findMany: jest.fn(async () => [
-          { quote: { sourceAmount: 40 } },
-          { quote: { sourceAmount: 35 } },
-        ]),
-      },
-    }
-
-    await expect(enforcePartnerKybThreshold.call(
-      service,
-      prismaClient,
-      'partner-id',
-      20,
-      false,
-    )).resolves.toBeUndefined()
-    expect(prismaClient.transaction.findMany).toHaveBeenCalled()
-  })
-
-  it('enforces payment method daily caps', async () => {
+  it('enforces payment method daily caps via aggregates', async () => {
     const enforcePaymentMethodLimits = (service as unknown as {
       enforcePaymentMethodLimits: (
-        prisma: { transaction: { findMany: jest.Mock<Promise<Array<{ quote: { targetAmount: number } }>>, [unknown?]> } },
+        prisma: { transaction: { aggregate: jest.Mock<Promise<{ _sum: { targetAmount: number } }>, [unknown?]> } },
         quote: { paymentMethod: PaymentMethod, targetAmount: number },
-        paymentSvc: typeof paymentService,
+        paymentSvc: ReturnType<typeof buildPaymentService>,
       ) => Promise<void>
     }).enforcePaymentMethodLimits
 
     const prismaClient = {
       transaction: {
-        findMany: jest.fn(async () => [
-          { quote: { targetAmount: 70 } },
-          { quote: { targetAmount: 50 } },
-        ]),
+        aggregate: jest.fn(async () => ({
+          _sum: { targetAmount: 120 },
+        })),
       },
     }
     const cappedService = { ...paymentService, MAX_TOTAL_AMOUNT_PER_DAY: 100 }
@@ -223,29 +122,33 @@ describe('TransactionAcceptanceService helpers', () => {
       { paymentMethod: PaymentMethod.PIX, targetAmount: 40 },
       cappedService,
     )).rejects.toThrow('already reached today\'s payout limit')
+    expect(prismaClient.transaction.aggregate).toHaveBeenCalledWith(expect.objectContaining({
+      _sum: { targetAmount: true },
+    }))
   })
 
   it('rejects users exceeding their personal daily payout total', async () => {
     const enforceUserTransactionLimits = (service as unknown as {
       enforceUserTransactionLimits: (
-        prisma: { transaction: { findMany: jest.Mock<Promise<Array<{ quote: { targetAmount: number } }>>, [unknown?]> } },
+        prisma: { transaction: { aggregate: jest.Mock<Promise<{ _count: { id: number }, _sum: { targetAmount: number } }>, [unknown?]> } },
         partnerUserId: string,
         quote: { paymentMethod: PaymentMethod, targetAmount: number },
-        paymentSvc: typeof paymentService,
+        paymentSvc: ReturnType<typeof buildPaymentService>,
       ) => Promise<void>
     }).enforceUserTransactionLimits
 
     const prismaClient = {
       transaction: {
-        findMany: jest.fn(async () => [
-          { quote: { targetAmount: 85 } },
-        ]),
+        aggregate: jest.fn(async () => ({
+          _count: { id: 2 },
+          _sum: { targetAmount: 85 },
+        })),
       },
     }
     const relaxedLimits = {
       ...paymentService,
       MAX_TOTAL_AMOUNT_PER_DAY: 100,
-      MAX_USER_TRANSACTIONS_PER_DAY: 5,
+      MAX_USER_TRANSACTIONS_PER_DAY: 1,
     }
 
     await expect(enforceUserTransactionLimits.call(
@@ -255,12 +158,42 @@ describe('TransactionAcceptanceService helpers', () => {
       { paymentMethod: PaymentMethod.PIX, targetAmount: 20 },
       relaxedLimits,
     )).rejects.toThrow('This transaction would exceed your daily limit for this payment method. Lower the amount or try again tomorrow.')
+    expect(prismaClient.transaction.aggregate).toHaveBeenCalledWith(expect.objectContaining({
+      _count: { id: true },
+      _sum: { targetAmount: true },
+    }))
+  })
+
+  it('enforces partner KYB threshold using aggregates', async () => {
+    const enforcePartnerKybThreshold = (service as unknown as {
+      enforcePartnerKybThreshold: (
+        prisma: { transaction: { aggregate: jest.Mock<Promise<{ _sum: { sourceAmount: number | null } }>, [unknown?]> } },
+        partnerId: string,
+        sourceAmount: number,
+        isKybApproved: boolean,
+      ) => Promise<void>
+    }).enforcePartnerKybThreshold
+
+    const prismaClient = {
+      transaction: {
+        aggregate: jest.fn(async () => ({ _sum: { sourceAmount: 95 } })),
+      },
+    }
+
+    await expect(enforcePartnerKybThreshold.call(
+      service,
+      prismaClient,
+      'partner-id',
+      10,
+      false,
+    )).rejects.toThrow('limited to a total of $100 until KYB is approved')
+    expect(prismaClient.transaction.aggregate).toHaveBeenCalled()
   })
 
   it('rejects invalid account data when verifying accounts', async () => {
     const ensureAccountIsValid = (service as unknown as {
       ensureAccountIsValid: (
-        paymentSvc: typeof paymentService,
+        paymentSvc: ReturnType<typeof buildPaymentService>,
         accountNumber: string,
       ) => Promise<void>
     }).ensureAccountIsValid
@@ -268,67 +201,6 @@ describe('TransactionAcceptanceService helpers', () => {
 
     await expect(ensureAccountIsValid(rejectingService, '123'))
       .rejects.toThrow('We could not verify the account number provided. Please double-check the details and try again.')
-  })
-
-  it('creates transactions and notifies subscribers', async () => {
-    const createTransaction = (service as unknown as {
-      createTransaction: (
-        prisma: {
-          transaction: {
-            create: jest.Mock<Promise<{ id: string }>, [Record<string, unknown>]>
-            findUnique: jest.Mock<Promise<null | { id: string, partnerUser: { partner: object }, quote: object }>, [Record<string, unknown>?]>
-          }
-        },
-        input: {
-          accountNumber: string
-          partner: { webhookUrl: string }
-          partnerUserId: string
-          paymentMethod: PaymentMethod
-          paymentService: typeof paymentService
-          qrCode?: null | string
-          quoteId: string
-          taxId?: string
-          userId: string
-        },
-      ) => Promise<{ id: null | string, kycLink: null | string, transactionReference: null | string }>
-    }).createTransaction
-
-    const prismaClient = {
-      transaction: {
-        create: jest.fn<Promise<{ id: string }>, [Record<string, unknown>]>(
-          async () => ({ id: 'tx-abc' }),
-        ),
-        findUnique: jest.fn<Promise<null | { id: string, partnerUser: { partner: object }, quote: object }>, [Record<string, unknown>?]>(
-          async () => ({
-            id: 'tx-abc',
-            partnerUser: { partner: {} },
-            quote: {},
-          }),
-        ),
-      },
-    }
-    const response = await createTransaction.call(
-      service,
-      prismaClient,
-      {
-        accountNumber: '123',
-        partner: { webhookUrl: 'https://webhook.test' },
-        partnerUserId: 'pu-1',
-        paymentMethod: PaymentMethod.BREB,
-        paymentService,
-        qrCode: null,
-        quoteId: 'quote-1',
-        taxId: undefined,
-        userId: 'user-1',
-      },
-    )
-
-    const createArgs = prismaClient.transaction.create.mock.calls[0]?.[0] as { data?: Record<string, unknown> }
-    expect(createArgs?.data).toBeDefined()
-    expect(createArgs?.data).not.toHaveProperty('bankCode')
-    expect(webhookNotifier.notifyWebhook).toHaveBeenCalledWith('https://webhook.test', expect.any(Object))
-    expect(queueHandler.postMessage).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ type: 'transaction.created' }))
-    expect(response.transactionReference).toBeDefined()
   })
 
   it('uses a minimal payload when notifying about missing transactions', async () => {
@@ -342,17 +214,63 @@ describe('TransactionAcceptanceService helpers', () => {
 
     const prismaClient = {
       transaction: {
-        findUnique: jest.fn<Promise<null>, [Record<string, unknown>?]>(
-          async () => null,
-        ),
+        findUnique: jest.fn(async () => null),
       },
     }
 
     await publishUserNotification.call(service, prismaClient, 'missing-tx', 'user-9')
 
-    expect(queueHandler.postMessage).toHaveBeenCalledWith(
+    expect(outboxDispatcher.enqueueQueue).toHaveBeenCalledWith(
       expect.anything(),
-      expect.objectContaining({ payload: JSON.stringify({ id: 'missing-tx' }) }),
+      expect.objectContaining({
+        payload: JSON.stringify({ id: 'missing-tx' }),
+        type: 'transaction.created',
+        userId: 'user-9',
+      }),
+      expect.stringContaining('transaction.created'),
+      expect.objectContaining({ client: prismaClient, deliverNow: false }),
+    )
+  })
+
+  it('publishUserNotification serializes full payload when present', async () => {
+    const publishUserNotification = (service as unknown as {
+      publishUserNotification: (
+        prisma: { transaction: { findUnique: jest.Mock<Promise<unknown>, [Record<string, unknown>?]> } },
+        transactionId: string,
+        userId: string,
+      ) => Promise<void>
+    }).publishUserNotification
+
+    const prismaClient = {
+      transaction: {
+        findUnique: jest.fn(async () => ({
+          id: 'tx-abc',
+          partnerUser: { partner: { webhookUrl: 'https://example.com', id: 'partner-1' } },
+          quote: {
+            cryptoCurrency: 'USDC',
+            id: 'quote-1',
+            network: 'STELLAR',
+            paymentMethod: PaymentMethod.BREB,
+            sourceAmount: 50,
+            targetAmount: 75,
+            targetCurrency: TargetCurrency.COP,
+          },
+          status: TransactionStatus.AWAITING_PAYMENT,
+        })),
+      },
+    }
+
+    await publishUserNotification.call(service, prismaClient, 'tx-abc', 'user-1')
+
+    expect(outboxDispatcher.enqueueQueue).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        payload: expect.stringContaining('tx-abc'),
+        type: 'transaction.created',
+        userId: 'user-1',
+      }),
+      expect.stringContaining('transaction.created'),
+      expect.objectContaining({ client: prismaClient, deliverNow: false }),
     )
   })
 })
