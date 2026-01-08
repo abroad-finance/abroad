@@ -250,6 +250,28 @@ model PartnerUserDailyLimit {
   @@unique([partnerUserId, paymentMethod, day], name: "partner_user_method_day_unique")
 }
 
+model PartnerMonthlyLimit {
+  id            String         @id @default(uuid())
+  partnerId     String
+  paymentMethod PaymentMethod
+  month         DateTime
+  amount        Float          @default(0)
+  count         Int            @default(0)
+
+  @@unique([partnerId, paymentMethod, month], name: "partner_method_month_unique")
+}
+
+model PartnerUserMonthlyLimit {
+  id            String         @id @default(uuid())
+  partnerUserId String
+  paymentMethod PaymentMethod
+  month         DateTime
+  amount        Float          @default(0)
+  count         Int            @default(0)
+
+  @@unique([partnerUserId, paymentMethod, month], name: "partner_user_method_month_unique")
+}
+
 view TransactionQuoteView {
   id                   String
   transactionStatus    TransactionStatus

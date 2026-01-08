@@ -110,6 +110,8 @@ export class TransactionAcceptanceService {
       await this.enforcePaymentMethodLimits(tx, quote, paymentService)
       await this.enforceLiquidity(paymentService, quote.targetAmount)
       await this.enforcePartnerKybThreshold(tx, partner.id, quote.sourceAmount, partner.isKybApproved)
+      await this.reserveUserMonthlyLimits(tx, partnerUser.id, quote.paymentMethod, quote.targetAmount, paymentService)
+      await this.reservePartnerMonthlyLimits(tx, partner.id, quote.paymentMethod, quote.targetAmount, paymentService)
       await this.reserveUserDailyLimits(tx, partnerUser.id, quote.paymentMethod, quote.targetAmount, paymentService)
       await this.reservePartnerDailyLimits(tx, partner.id, quote.paymentMethod, quote.targetAmount, paymentService)
 
@@ -358,6 +360,31 @@ export class TransactionAcceptanceService {
     }
   }
 
+  private async reservePartnerMonthlyLimits(
+    prismaClient: SerializableTx,
+    partnerId: string,
+    paymentMethod: PaymentMethod,
+    targetAmount: number,
+    paymentService: PaymentServiceInstance,
+  ): Promise<void> {
+    const month = this.startOfMonth()
+    const updated = await prismaClient.$executeRaw`
+      INSERT INTO "PartnerMonthlyLimit" ("id", "partnerId", "paymentMethod", "month", "amount", "count")
+      VALUES (gen_random_uuid(), ${partnerId}, ${paymentMethod}::"PaymentMethod", ${month}, ${targetAmount}, 1)
+      ON CONFLICT ("partnerId", "paymentMethod", "month")
+      DO UPDATE SET
+        "amount" = "PartnerMonthlyLimit"."amount" + ${targetAmount},
+        "count" = "PartnerMonthlyLimit"."count" + 1
+      WHERE
+        "PartnerMonthlyLimit"."amount" + ${targetAmount} <= ${this.monthlyAmountCap(paymentService)}
+        AND "PartnerMonthlyLimit"."count" + 1 <= ${this.monthlyCountCap(paymentService)}
+    `
+
+    if (Number(updated) === 0) {
+      throw new TransactionValidationError('This payment method reached this month\'s partner limit. Please try again next month or use another method.')
+    }
+  }
+
   private async reserveUserDailyLimits(
     prismaClient: SerializableTx,
     partnerUserId: string,
@@ -380,6 +407,31 @@ export class TransactionAcceptanceService {
 
     if (Number(updated) === 0) {
       throw new TransactionValidationError('You reached today\'s limit for this payment method. Try again tomorrow or choose another method.')
+    }
+  }
+
+  private async reserveUserMonthlyLimits(
+    prismaClient: SerializableTx,
+    partnerUserId: string,
+    paymentMethod: PaymentMethod,
+    targetAmount: number,
+    paymentService: PaymentServiceInstance,
+  ): Promise<void> {
+    const month = this.startOfMonth()
+    const updated = await prismaClient.$executeRaw`
+      INSERT INTO "PartnerUserMonthlyLimit" ("id", "partnerUserId", "paymentMethod", "month", "amount", "count")
+      VALUES (gen_random_uuid(), ${partnerUserId}, ${paymentMethod}::"PaymentMethod", ${month}, ${targetAmount}, 1)
+      ON CONFLICT ("partnerUserId", "paymentMethod", "month")
+      DO UPDATE SET
+        "amount" = "PartnerUserMonthlyLimit"."amount" + ${targetAmount},
+        "count" = "PartnerUserMonthlyLimit"."count" + 1
+      WHERE
+        "PartnerUserMonthlyLimit"."amount" + ${targetAmount} <= ${this.monthlyAmountCap(paymentService)}
+        AND "PartnerUserMonthlyLimit"."count" + 1 <= ${this.monthlyCountCap(paymentService)}
+    `
+
+    if (Number(updated) === 0) {
+      throw new TransactionValidationError('You reached this month\'s limit for this payment method. Try again next month or choose another method.')
     }
   }
 
@@ -460,6 +512,21 @@ export class TransactionAcceptanceService {
     const now = new Date()
     now.setHours(0, 0, 0, 0)
     return now
+  }
+
+  private startOfMonth(): Date {
+    const now = new Date()
+    now.setDate(1)
+    now.setHours(0, 0, 0, 0)
+    return now
+  }
+
+  private monthlyAmountCap(paymentService: PaymentServiceInstance): number {
+    return paymentService.MAX_TOTAL_AMOUNT_PER_DAY * 31
+  }
+
+  private monthlyCountCap(paymentService: PaymentServiceInstance): number {
+    return paymentService.MAX_USER_TRANSACTIONS_PER_DAY * 31
   }
 }
 
