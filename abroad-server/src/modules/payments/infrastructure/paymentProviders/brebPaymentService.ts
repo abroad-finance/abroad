@@ -1,4 +1,4 @@
-import { TargetCurrency } from '@prisma/client'
+import { PaymentMethod, TargetCurrency } from '@prisma/client'
 import axios from 'axios'
 import { inject, injectable } from 'inversify'
 
@@ -99,7 +99,7 @@ interface BrebTransactionStatusInfo {
 @injectable()
 export class BrebPaymentService implements IPaymentService {
   public readonly capability = {
-    method: TargetCurrency.COP as unknown as import('@prisma/client').PaymentMethod,
+    method: PaymentMethod.BREB,
     targetCurrency: TargetCurrency.COP,
   }
   public readonly currency = TargetCurrency.COP

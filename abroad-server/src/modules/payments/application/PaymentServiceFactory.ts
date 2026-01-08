@@ -8,7 +8,7 @@ import { IPaymentServiceFactory } from './contracts/IPaymentServiceFactory'
 import { assertSupportedPaymentMethod, SupportedPaymentMethod } from './supportedPaymentMethods'
 
 type PaymentCapability = {
-  method: SupportedPaymentMethod
+  method: PaymentMethod
   targetCurrency: IPaymentService['currency']
 }
 
@@ -30,8 +30,8 @@ export class PaymentServiceFactory implements IPaymentServiceFactory {
       [PaymentMethod.PIX]: transferoPaymentService,
     }
     this.capabilityMap = [
-      { method: PaymentMethod.BREB, targetCurrency: brebPaymentService.currency },
-      { method: PaymentMethod.PIX, targetCurrency: transferoPaymentService.currency },
+      brebPaymentService.capability ?? { method: PaymentMethod.BREB, targetCurrency: brebPaymentService.currency },
+      transferoPaymentService.capability ?? { method: PaymentMethod.PIX, targetCurrency: transferoPaymentService.currency },
     ]
   }
 
