@@ -15,7 +15,7 @@ import { WalletSendResult } from '../../payments/application/contracts/IWalletHa
 import { PayoutStatusAdapterRegistry } from '../../payments/application/PayoutStatusAdapterRegistry'
 import { isSupportedPaymentMethod } from '../../payments/application/supportedPaymentMethods'
 import { IExchangeProviderFactory } from '../../treasury/application/contracts/IExchangeProviderFactory'
-import { ExchangeAddressResult } from '../../treasury/application/contracts/IExchangeProvider'
+import { RefundAttemptResult, RefundReservation } from './TransactionRepository'
 import { TransactionTransitionName } from './TransactionStateMachine'
 import { TransactionEventDispatcher } from './TransactionEventDispatcher'
 import { TransactionWithRelations } from './transactionNotificationTypes'
@@ -280,14 +280,18 @@ export class TransactionWorkflow {
     }
 
     try {
-      const refundResult = await this.refundService.refundByOnChainId({
-        amount: updatedTransaction.quote.sourceAmount,
-        cryptoCurrency: updatedTransaction.quote.cryptoCurrency,
-        network: updatedTransaction.quote.network,
-        onChainId: updatedTransaction.onChainId,
+      await this.attemptRefund(prismaClient, {
+        logger: scopedLogger,
+        reason: 'provider_failed',
+        refund: () => this.refundService.refundByOnChainId({
+          amount: updatedTransaction.quote.sourceAmount,
+          cryptoCurrency: updatedTransaction.quote.cryptoCurrency,
+          network: updatedTransaction.quote.network,
+          onChainId: updatedTransaction.onChainId as string,
+        }),
+        transactionId: updatedTransaction.id,
+        trigger: 'provider_status',
       })
-
-      await this.recordRefundOnChainId(prismaClient, updatedTransaction.id, refundResult, scopedLogger)
     }
     catch (error) {
       scopedLogger.error('Failed to refund after provider failure', error)
@@ -345,8 +349,13 @@ export class TransactionWorkflow {
       return
     }
 
-    const refundResult = await this.refundService.refundToSender(message)
-    await this.recordRefundOnChainId(prismaClient, transactionState.id, refundResult, logger)
+    await this.attemptRefund(prismaClient, {
+      logger,
+      reason: 'expired_transaction',
+      refund: () => this.refundService.refundToSender(message),
+      transactionId: transactionState.id,
+      trigger: 'non_awaiting_deposit',
+    })
   }
 
   private async handleWrongAmount(
@@ -386,8 +395,13 @@ export class TransactionWorkflow {
       { deliverNow: false, prismaClient },
     )
 
-    const refundResult = await this.refundService.refundToSender(message)
-    await this.recordRefundOnChainId(prismaClient, transaction.id, refundResult, logger)
+    await this.attemptRefund(prismaClient, {
+      logger,
+      reason: 'wrong_amount',
+      refund: () => this.refundService.refundToSender(message),
+      transactionId: transaction.id,
+      trigger: 'wrong_amount',
+    })
   }
 
   private async isExchangeHandoffRecorded(transactionId: string): Promise<boolean> {
@@ -473,8 +487,13 @@ export class TransactionWorkflow {
         'unsupported_payment_method',
         { deliverNow: false, prismaClient },
       )
-      const refundResult = await this.refundService.refundToSender(message)
-      await this.recordRefundOnChainId(prismaClient, transaction.id, refundResult, logger)
+      await this.attemptRefund(prismaClient, {
+        logger,
+        reason: 'unsupported_payment_method',
+        refund: () => this.refundService.refundToSender(message),
+        transactionId: transaction.id,
+        trigger: 'payout',
+      })
       return
     }
 
@@ -506,8 +525,13 @@ export class TransactionWorkflow {
         trigger: 'TransactionWorkflow',
       })
 
-      const refundResult = await this.refundService.refundToSender(message)
-      await this.recordRefundOnChainId(prismaClient, transaction.id, refundResult, logger)
+      await this.attemptRefund(prismaClient, {
+        logger,
+        reason: 'payment_disabled',
+        refund: () => this.refundService.refundToSender(message),
+        transactionId: transaction.id,
+        trigger: 'payout',
+      })
       return
     }
 
@@ -585,8 +609,13 @@ export class TransactionWorkflow {
           trigger: 'TransactionWorkflow',
         })
         if (paymentResponse.code !== 'retriable') {
-          const refundResult = await this.refundService.refundToSender(message)
-          await this.recordRefundOnChainId(prismaClient, transaction.id, refundResult, logger)
+          await this.attemptRefund(prismaClient, {
+            logger,
+            reason: paymentResponse.reason ?? 'payout_failed',
+            refund: () => this.refundService.refundToSender(message),
+            transactionId: transaction.id,
+            trigger: 'payout',
+          })
         }
       }
     }
@@ -613,31 +642,105 @@ export class TransactionWorkflow {
         { deliverNow: false, prismaClient },
       )
 
-      const refundResult = await this.refundService.refundToSender(message)
-      await this.recordRefundOnChainId(prismaClient, transaction.id, refundResult, logger)
+      await this.attemptRefund(prismaClient, {
+        logger,
+        reason: error instanceof Error ? error.message : 'unknown_payout_error',
+        refund: () => this.refundService.refundToSender(message),
+        transactionId: transaction.id,
+        trigger: 'payout',
+      })
     }
   }
 
-  private async recordRefundOnChainId(
+  private async attemptRefund(
     prismaClient: Awaited<ReturnType<IDatabaseClientProvider['getClient']>>,
-    transactionId: string,
-    refundResult: RefundResult,
-    logger: ScopedLogger,
+    params: {
+      logger: ScopedLogger
+      reason: string
+      refund: () => Promise<RefundResult>
+      transactionId: string
+      trigger: string
+    },
   ): Promise<void> {
-    if (!refundResult.success || !refundResult.transactionId) {
-      logger.warn(
-        'Refund transaction submission failed; no on-chain hash recorded',
-        { transactionId },
-      )
+    const idempotencyKey = this.buildIdempotencyKey('refund', params.transactionId)
+    const reservation = await this.repository.reserveRefund(prismaClient, {
+      idempotencyKey,
+      reason: params.reason,
+      transactionId: params.transactionId,
+      trigger: params.trigger,
+    })
+
+    if (!this.shouldSendRefund(reservation, params.logger, params.transactionId)) {
       return
     }
 
+    let refundResult: RefundResult
     try {
-      await this.repository.recordRefundOnChainId(prismaClient, transactionId, refundResult.transactionId)
+      refundResult = await params.refund()
     }
     catch (error) {
-      logger.error('Failed to persist refund transaction hash', error)
+      params.logger.error('Refund attempt threw unexpected error', error)
+      refundResult = { reason: error instanceof Error ? error.message : 'unknown_error', success: false }
     }
+
+    if (!refundResult.success) {
+      params.logger.warn('Refund attempt failed', {
+        reason: refundResult.reason,
+        transactionId: params.transactionId,
+      })
+    }
+
+    try {
+      await this.repository.recordRefundOutcome(prismaClient, {
+        idempotencyKey,
+        refundResult: this.normalizeRefundResult(refundResult),
+        transactionId: params.transactionId,
+      })
+    }
+    catch (error) {
+      params.logger.error('Failed to record refund outcome', error)
+    }
+  }
+
+  private normalizeRefundResult(result: RefundResult): RefundAttemptResult {
+    if (result.success) {
+      return { success: true, transactionId: result.transactionId }
+    }
+
+    return {
+      reason: result.reason,
+      success: false,
+      transactionId: result.transactionId,
+    }
+  }
+
+  private shouldSendRefund(
+    reservation: RefundReservation,
+    logger: ScopedLogger,
+    transactionId: string,
+  ): boolean {
+    if (reservation.outcome === 'reserved') {
+      return true
+    }
+
+    if (reservation.outcome === 'already_refunded') {
+      logger.info('Skipping refund; already recorded', {
+        refundOnChainId: reservation.refundOnChainId,
+        transactionId,
+      })
+      return false
+    }
+
+    if (reservation.outcome === 'in_flight') {
+      logger.info('Skipping refund; already in flight', {
+        attempts: reservation.attempts,
+        transactionId,
+      })
+      return false
+    }
+
+    logger.warn('Skipping refund; transaction missing', { transactionId })
+    return false
   }
 }
 
