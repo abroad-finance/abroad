@@ -82,21 +82,23 @@ export class GCPPubSubQueueHandler implements IQueueHandler {
         staticPayload: { messageId: msg.id },
       })
       await runWithCorrelationId(correlationId, async () => {
-        const data = this.parseMessage<Name>(queueName, msg, scopedLogger)
-        if (!data) {
+        const { parsed, raw } = this.parseMessage<Name>(queueName, msg, scopedLogger)
+        if (!parsed) {
           scopedLogger.warn('Dropping message due to parse failure')
+          await this.sendToDeadLetter(queueName, raw, 'parse_failed')
           msg.ack()
           return
         }
         scopedLogger.info('Received message from PubSub')
         try {
-          await Promise.resolve(callback(data))
+          await Promise.resolve(callback(parsed))
           scopedLogger.info('Acking message')
           msg.ack()
         }
         catch (err) {
           scopedLogger.error('Error handling PubSub message', err)
-          msg.nack?.()
+          await this.sendToDeadLetter(queueName, parsed, 'handler_failed', err)
+          msg.ack()
         }
       })
     })
@@ -117,14 +119,14 @@ export class GCPPubSubQueueHandler implements IQueueHandler {
     queueName: Name,
     msg: Message,
     logger: ScopedLogger,
-  ): QueuePayloadByName[Name] | undefined {
+  ): { parsed?: QueuePayloadByName[Name], raw: unknown } {
     let payload: unknown
     try {
       payload = JSON.parse(msg.data.toString())
     }
     catch (err) {
       logger.warn('Failed to parse PubSub message', { err, messageId: msg.id })
-      return undefined
+      return { raw: msg.data.toString() }
     }
 
     const schema = QueuePayloadSchemaByName[queueName]
@@ -134,9 +136,43 @@ export class GCPPubSubQueueHandler implements IQueueHandler {
         issues: parsed.error.issues,
         messageId: msg.id,
       })
-      return undefined
+      return { raw: payload }
     }
 
-    return parsed.data
+    return { parsed: parsed.data, raw: payload }
+  }
+
+  private async sendToDeadLetter(
+    queueName: QueueName,
+    payload: unknown,
+    reason: string,
+    error?: unknown,
+  ): Promise<void> {
+    if (queueName === QueueName.DEAD_LETTER) {
+      return
+    }
+
+    try {
+      const message: QueuePayloadByName[QueueName.DEAD_LETTER] = {
+        error: this.normalizeError(error),
+        originalQueue: queueName,
+        payload,
+        reason,
+      }
+      await this.postMessage(QueueName.DEAD_LETTER, message)
+    }
+    catch (dlqError) {
+      this.logger.error('Failed to post message to dead-letter queue', dlqError)
+    }
+  }
+
+  private normalizeError(error: unknown): string | undefined {
+    if (error instanceof Error) {
+      return error.message
+    }
+    if (typeof error === 'string') {
+      return error
+    }
+    return undefined
   }
 }

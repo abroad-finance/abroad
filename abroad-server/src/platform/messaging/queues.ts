@@ -4,6 +4,8 @@ import { ZodType } from 'zod'
 import {
   BinanceBalanceUpdatedMessage,
   BinanceBalanceUpdatedMessageSchema,
+  DeadLetterMessage,
+  DeadLetterMessageSchema,
   PaymentSentMessage,
   PaymentSentMessageSchema,
   PaymentStatusUpdatedMessage,
@@ -16,6 +18,7 @@ import {
 
 export enum QueueName {
   BINANCE_BALANCE_UPDATED = 'binance-balance-updated',
+  DEAD_LETTER = 'dead-letter',
   PAYMENT_SENT = 'payment-sent',
   PAYMENT_STATUS_UPDATED = 'payment-status-updated',
   RECEIVED_CRYPTO_TRANSACTION = 'received-crypto-transaction',
@@ -38,6 +41,7 @@ export interface IQueueHandler {
 
 export type QueuePayloadByName = {
   [QueueName.BINANCE_BALANCE_UPDATED]: BinanceBalanceUpdatedMessage
+  [QueueName.DEAD_LETTER]: DeadLetterMessage
   [QueueName.PAYMENT_SENT]: PaymentSentMessage
   [QueueName.PAYMENT_STATUS_UPDATED]: PaymentStatusUpdatedMessage
   [QueueName.RECEIVED_CRYPTO_TRANSACTION]: ReceivedCryptoTransactionMessage
@@ -50,6 +54,7 @@ type QueuePayloadSchemaMap = {
 
 export const QueuePayloadSchemaByName: QueuePayloadSchemaMap = {
   [QueueName.BINANCE_BALANCE_UPDATED]: BinanceBalanceUpdatedMessageSchema,
+  [QueueName.DEAD_LETTER]: DeadLetterMessageSchema,
   [QueueName.PAYMENT_SENT]: PaymentSentMessageSchema,
   [QueueName.PAYMENT_STATUS_UPDATED]: PaymentStatusUpdatedMessageSchema,
   [QueueName.RECEIVED_CRYPTO_TRANSACTION]: ReceivedCryptoTransactionMessageSchema,

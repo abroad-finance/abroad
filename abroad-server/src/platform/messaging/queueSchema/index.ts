@@ -8,6 +8,10 @@ export {
   PaymentStatusUpdatedMessageSchema,
 } from './paymentStatusUpdatedMessage'
 export {
+  DeadLetterMessage,
+  DeadLetterMessageSchema,
+} from './deadLetterMessage'
+export {
   ReceivedCryptoTransactionMessage,
   ReceivedCryptoTransactionMessageSchema,
 } from './receivedCryptoTransactionMessage'
