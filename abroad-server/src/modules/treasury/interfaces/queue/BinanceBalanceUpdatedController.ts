@@ -2,8 +2,11 @@ import { MainClient } from 'binance'
 import { inject, injectable } from 'inversify'
 
 import { TYPES } from '../../../../app/container/types'
+import { createScopedLogger } from '../../../../core/logging/scopedLogger'
 import { ILogger } from '../../../../core/logging/types'
+import { getCorrelationId } from '../../../../core/requestContext'
 import { IQueueHandler, QueueName } from '../../../../platform/messaging/queues'
+import { BinanceBalanceUpdatedMessageSchema } from '../../../../platform/messaging/queueSchema'
 import { IDatabaseClientProvider } from '../../../../platform/persistence/IDatabaseClientProvider'
 import { ISecretManager } from '../../../../platform/secrets/ISecretManager'
 
@@ -54,7 +57,18 @@ export class BinanceBalanceUpdatedController {
   /**
    * Handler for the balance‑updated event coming from the queue.
    */
-  private async onBalanceUpdated(): Promise<void> {
+  private async onBalanceUpdated(message: unknown): Promise<void> {
+    const scopedLogger = createScopedLogger(this.logger, {
+      correlationId: getCorrelationId(),
+      scope: 'BinanceBalanceUpdated queue',
+    })
+
+    const parsed = BinanceBalanceUpdatedMessageSchema.safeParse(message)
+    if (!parsed.success) {
+      scopedLogger.error('[BinanceBalanceUpdated queue]: Invalid message format', parsed.error)
+      throw new Error('Invalid binance balance update message')
+    }
+
     let client: MainClient | null = null
     try {
       // --- Initialise REST client -------------------------------------------------------
@@ -113,7 +127,8 @@ export class BinanceBalanceUpdatedController {
       }
     }
     catch (error) {
-      this.logger.error('[BinanceBalanceUpdated queue]: Error processing balance update:', error)
+      scopedLogger.error('[BinanceBalanceUpdated queue]: Error processing balance update:', error)
+      throw error
     }
   }
 

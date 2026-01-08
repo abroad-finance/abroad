@@ -71,6 +71,22 @@ describe('BinanceBalanceUpdatedController', () => {
     expect(queueHandler.subscribeToQueue).toHaveBeenCalled()
   })
 
+  it('rejects invalid messages before processing', async () => {
+    const controller = new BinanceBalanceUpdatedController(
+      logger,
+      queueHandler,
+      secretManager,
+      { getClient: jest.fn() } as unknown as IDatabaseClientProvider,
+    )
+    const runner = controller as unknown as { onBalanceUpdated: (msg: unknown) => Promise<void> }
+
+    await expect(runner.onBalanceUpdated({ invalid: true })).rejects.toThrow(/Invalid binance balance update message/)
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.stringContaining('Invalid message format'),
+      expect.anything(),
+    )
+  })
+
   it('processes pending conversions and skips already-reserved quantities', async () => {
     const pending: PendingConversion[] = [
       { amount: 0, side: 'SELL', source: 'USDC', symbol: 'USDCUSDT', target: 'USDT' }, // qty<=0 branch
@@ -92,8 +108,8 @@ describe('BinanceBalanceUpdatedController', () => {
       secretManager,
       provider,
     )
-    const runner = controller as unknown as { onBalanceUpdated: () => Promise<void> }
-    await runner.onBalanceUpdated()
+    const runner = controller as unknown as { onBalanceUpdated: (msg: unknown) => Promise<void> }
+    await runner.onBalanceUpdated({})
 
     expect(db.pendingConversions.findMany).toHaveBeenCalled()
     expect(updateMany).toHaveBeenCalledTimes(2)
@@ -117,8 +133,8 @@ describe('BinanceBalanceUpdatedController', () => {
       secretManager,
       provider,
     )
-    const runner = controller as unknown as { onBalanceUpdated: () => Promise<void> }
-    await runner.onBalanceUpdated()
+    const runner = controller as unknown as { onBalanceUpdated: (msg: unknown) => Promise<void> }
+    await expect(runner.onBalanceUpdated({})).rejects.toThrow()
 
     expect(logger.error).toHaveBeenCalledWith(
       '[BinanceBalanceUpdated queue]: Error processing balance update:',
