@@ -243,21 +243,16 @@ export class TransactionAcceptanceService {
     quote: { paymentMethod: PaymentMethod, targetAmount: number },
     paymentService: PaymentServiceInstance,
   ) {
-    const transactionsToday = await prismaClient.transaction.findMany({
-      include: { quote: true },
+    const todayStart = new Date(new Date().setHours(0, 0, 0, 0))
+    const aggregate = await prismaClient.transaction.aggregate({
+      _sum: { targetAmount: true },
       where: {
-        createdAt: {
-          gte: new Date(new Date().setHours(0, 0, 0, 0)),
-        },
-        quote: {
-          paymentMethod: quote.paymentMethod,
-        },
+        createdAt: { gte: todayStart },
+        quote: { paymentMethod: quote.paymentMethod },
         status: TransactionStatus.PAYMENT_COMPLETED,
       },
     })
-
-    const totalAmountToday = transactionsToday.reduce((acc, transaction) => acc + transaction.quote.targetAmount, 0)
-
+    const totalAmountToday = aggregate._sum.targetAmount ?? 0
     if (totalAmountToday + quote.targetAmount > paymentService.MAX_TOTAL_AMOUNT_PER_DAY) {
       throw new TransactionValidationError('This payment method already reached today\'s payout limit. Please try again tomorrow or use another method.')
     }
@@ -283,26 +278,24 @@ export class TransactionAcceptanceService {
     quote: { paymentMethod: PaymentMethod, targetAmount: number },
     paymentService: PaymentServiceInstance,
   ) {
-    const userTransactionsToday = await prismaClient.transaction.findMany({
-      include: { quote: true },
+    const todayStart = new Date(new Date().setHours(0, 0, 0, 0))
+    const aggregate = await prismaClient.transaction.aggregate({
+      _count: { id: true },
+      _sum: { targetAmount: true },
       where: {
-        createdAt: {
-          gte: new Date(new Date().setHours(0, 0, 0, 0)),
-        },
+        createdAt: { gte: todayStart },
         partnerUserId,
-        quote: {
-          paymentMethod: quote.paymentMethod,
-        },
+        quote: { paymentMethod: quote.paymentMethod },
         status: TransactionStatus.PAYMENT_COMPLETED,
       },
     })
 
-    if (userTransactionsToday.length >= paymentService.MAX_USER_TRANSACTIONS_PER_DAY) {
+    const count = aggregate._count.id ?? 0
+    if (count >= paymentService.MAX_USER_TRANSACTIONS_PER_DAY) {
       throw new TransactionValidationError('You reached the maximum number of transactions allowed today. Please try again tomorrow.')
     }
 
-    const totalUserAmount = userTransactionsToday.reduce((acc, transaction) => acc + transaction.quote.targetAmount, 0)
-
+    const totalUserAmount = aggregate._sum.targetAmount ?? 0
     if (totalUserAmount + quote.targetAmount > paymentService.MAX_TOTAL_AMOUNT_PER_DAY) {
       throw new TransactionValidationError('This transaction would exceed your daily limit for this payment method. Lower the amount or try again tomorrow.')
     }
