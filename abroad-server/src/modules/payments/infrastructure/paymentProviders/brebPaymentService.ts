@@ -113,6 +113,8 @@ export class BrebPaymentService implements IPaymentService {
 
   public readonly percentageFee = 0
 
+  public readonly provider = 'breb'
+
   private accessTokenCache?: { expiresAt: number, value: string }
 
   private readonly mandatoryKeyFields: ReadonlyArray<keyof BrebKeyDetails> = [
@@ -161,7 +163,7 @@ export class BrebPaymentService implements IPaymentService {
     id: string
     qrCode?: null | string
     value: number
-  }): Promise<{ success: false } | { success: true, transactionId: string }> {
+  }): Promise<import('../../application/contracts/IPaymentService').PaymentSendResult> {
     try {
       const config = await this.getConfig()
       const token = await this.getAccessToken(config)
@@ -169,7 +171,7 @@ export class BrebPaymentService implements IPaymentService {
       const keyDetails = await this.fetchKey(account, config, token)
       if (!this.isKeyUsable(keyDetails)) {
         this.logger.warn('[BreB] Invalid or mismatched key for account', { account })
-        return { success: false }
+        return { code: 'permanent', reason: 'missing_transaction_id', success: false }
       }
 
       const sendPayload = this.buildSendPayload(keyDetails, value)
@@ -177,13 +179,13 @@ export class BrebPaymentService implements IPaymentService {
 
       if (!sendResponse?.moviiTxId) {
         this.logger.error('[BreB] Send response missing transaction id', sendResponse)
-        return { success: false }
+        return { code: 'permanent', reason: 'missing_transaction_id', success: false }
       }
 
       const resolvedRail = keyDetails.instructedAgent
       if (!resolvedRail) {
         this.logger.error('[BreB] Missing instructed agent on key details', { account })
-        return { success: false }
+        return { code: 'permanent', reason: 'missing_instructed_agent', success: false }
       }
 
       const reportResult = await this.pollTransactionReport(sendResponse.moviiTxId, resolvedRail, config, token)
@@ -193,14 +195,15 @@ export class BrebPaymentService implements IPaymentService {
 
       if (reportResult?.result === 'pending') {
         this.logger.warn('[BreB] Payment pending after timeout', { transactionId: sendResponse.moviiTxId })
+        return { code: 'retriable', reason: 'pending', success: false, transactionId: sendResponse.moviiTxId }
       }
 
-      return { success: false }
+      return { code: 'permanent', reason: reportResult?.result ?? 'unknown', success: false, transactionId: sendResponse.moviiTxId }
     }
     catch (error) {
       const reason = error instanceof Error ? error.message : 'Unknown error'
       this.logger.error('[BreB] Payment submission failed', { account, reason })
-      return { success: false }
+      return { code: 'retriable', reason, success: false }
     }
   }
 

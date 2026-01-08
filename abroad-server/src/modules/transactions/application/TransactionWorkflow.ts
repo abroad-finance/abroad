@@ -550,7 +550,11 @@ export class TransactionWorkflow {
       else {
         await this.dispatcher.notifySlack(updatedTransaction, newStatus, {
           deliverNow: false,
-          notes: { providerTransactionId: paymentResponse.transactionId ?? 'not-provided' },
+          notes: {
+            providerTransactionId: paymentResponse.transactionId ?? 'not-provided',
+            reason: paymentResponse.success ? undefined : paymentResponse.reason,
+            status: paymentResponse.success ? undefined : paymentResponse.code,
+          },
           prismaClient,
           trigger: 'TransactionWorkflow',
         })

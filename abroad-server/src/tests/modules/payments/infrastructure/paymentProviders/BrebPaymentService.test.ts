@@ -227,7 +227,7 @@ describe('BrebPaymentService', () => {
         value: 10_000,
       })
 
-      expect(outcome).toEqual({ success: false })
+      expect(outcome).toEqual({ code: 'permanent', reason: 'missing_transaction_id', success: false, transactionId: 'tx-004' })
       expect(logger.error).toHaveBeenCalledWith('[BreB] Send response missing transaction id', { rail: 'ENT' })
     })
 
@@ -244,7 +244,7 @@ describe('BrebPaymentService', () => {
         value: 15_000,
       })
 
-      expect(result).toEqual({ success: false })
+      expect(result).toEqual({ code: 'retriable', reason: 'network down', success: false })
       expect(logger.error).toHaveBeenCalledWith(
         '[BreB] Failed to dispatch payment',
         expect.objectContaining({ responseData: 'network down' }),
@@ -264,7 +264,7 @@ describe('BrebPaymentService', () => {
         value: 15_000,
       })
 
-      expect(result).toEqual({ success: false })
+      expect(result).toEqual({ code: 'retriable', reason: 'pending', success: false, transactionId: 'tx-005' })
       expect(logger.warn).toHaveBeenCalledWith('[BreB] Payment pending after timeout', { transactionId: 'tx-005' })
     })
 
@@ -279,7 +279,7 @@ describe('BrebPaymentService', () => {
         value: 500,
       })
 
-      expect(result).toEqual({ success: false })
+      expect(result).toEqual({ code: 'retriable', reason: 'boom', success: false })
       expect(logger.error).toHaveBeenCalledWith('[BreB] Payment submission failed', { account: '123', reason: 'boom' })
     })
   })

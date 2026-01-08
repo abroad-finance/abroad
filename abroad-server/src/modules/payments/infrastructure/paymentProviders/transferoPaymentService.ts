@@ -50,6 +50,7 @@ export class TransferoPaymentService implements IPaymentService {
   public readonly MIN_USER_AMOUNT_PER_TRANSACTION = 0
 
   public readonly percentageFee = 0.0
+  public readonly provider = 'transfero'
 
   private readonly brazilDdds = new Set([
     '11', '12', '13', '14', '15', '16', '17', '18', '19',
@@ -145,7 +146,7 @@ export class TransferoPaymentService implements IPaymentService {
     id: string
     qrCode?: null | string
     value: number
-  }): Promise<{ success: false } | { success: true, transactionId: string }> {
+  }): Promise<import('../../application/contracts/IPaymentService').PaymentSendResult> {
     try {
       const [taxId, token, config] = await Promise.all([
         this.getTransactionTaxId(id),
@@ -169,11 +170,16 @@ export class TransferoPaymentService implements IPaymentService {
       const paymentId = this.extractPaymentId(data)
       return paymentId
         ? { success: true, transactionId: paymentId }
-        : { success: false }
+        : { code: 'permanent', reason: 'paymentId_missing', success: false }
     }
     catch (error) {
-      this.logger.error('Transfero sendPayment error:', this.formatAxiosError(error))
-      return { success: false }
+      const formatted = this.formatAxiosError(error)
+      this.logger.error('Transfero sendPayment error:', formatted)
+      return {
+        code: 'retriable',
+        reason: formatted,
+        success: false,
+      }
     }
   }
 

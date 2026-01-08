@@ -28,24 +28,49 @@ export interface IPaymentService {
 
   readonly percentageFee: number
 
+  readonly provider?: string
+
   sendPayment(params: {
     account: string
     id: string
     qrCode?: null | string
     value: number
-  }): Promise<
-    | {
-      success: false
-    }
-    | {
-      success: true
-      transactionId: string
-    }
-  >
+  }): Promise<PaymentSendResult>
 
   verifyAccount({
     account,
   }: {
     account: string
   }): Promise<boolean>
+}
+
+export type PaymentFailureCode = 'validation' | 'retriable' | 'permanent'
+
+export type PaymentSendResult =
+  | {
+    success: true
+    transactionId?: string
+  }
+  | {
+    code?: PaymentFailureCode
+    reason?: string
+    success: false
+    transactionId?: string
+  }
+
+export interface PaymentVerificationResult {
+  code: PaymentFailureCode
+  reason?: string
+  success: boolean
+}
+
+export interface PaymentLiquidityResult {
+  liquidity: number
+  message?: string
+  success: boolean
+}
+
+export interface PaymentOnboardResult {
+  message?: string
+  success: boolean
 }

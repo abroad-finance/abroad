@@ -186,7 +186,11 @@ describe('TransferoPaymentService sendPayment', () => {
       value: 10,
     })
 
-    expect(response).toEqual({ success: false })
+    expect(response).toEqual({
+      code: 'retriable',
+      reason: 'Partner user not found or tax ID is missing.',
+      success: false,
+    })
     expect(harness.logger.error).toHaveBeenCalledWith(
       'Transfero sendPayment error:',
       'Partner user not found or tax ID is missing.',
@@ -205,7 +209,7 @@ describe('TransferoPaymentService sendPayment', () => {
       value: 10,
     })
 
-    expect(result).toEqual({ success: false })
+    expect(result).toEqual({ code: 'retriable', reason: JSON.stringify({ reason: 'denied' }), success: false })
     expect(harness.logger.error).toHaveBeenCalledWith(
       'Transfero sendPayment error:',
       JSON.stringify({ reason: 'denied' }),
@@ -224,7 +228,7 @@ describe('TransferoPaymentService sendPayment', () => {
       value: 5,
     })
 
-    expect(result).toEqual({ success: false })
+    expect(result).toEqual({ code: 'retriable', reason: JSON.stringify('plain axios'), success: false })
     expect(harness.logger.error).toHaveBeenCalledWith('Transfero sendPayment error:', JSON.stringify('plain axios'))
   })
 })
