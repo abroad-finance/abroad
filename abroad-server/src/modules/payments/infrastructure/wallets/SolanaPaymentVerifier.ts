@@ -46,6 +46,8 @@ type TransferCheckedInfo = {
 @injectable()
 export class SolanaPaymentVerifier implements IDepositVerifier {
   public readonly supportedNetwork = BlockchainNetwork.SOLANA
+  private cachedConnection?: { connection: Connection, url: string }
+  private cachedTokenAccounts?: { depositWallet: string, tokenAccounts: PublicKey[], usdcMint: string }
 
   public constructor(
     @inject(TYPES.ISecretManager) private readonly secretManager: ISecretManager,
@@ -71,13 +73,11 @@ export class SolanaPaymentVerifier implements IDepositVerifier {
       throw new Error('Solana configuration is invalid')
     }
 
-    const depositTokenAccounts = await Promise.all([
-      getAssociatedTokenAddress(usdcMint, depositWallet, false, TOKEN_PROGRAM_ID),
-      getAssociatedTokenAddress(usdcMint, depositWallet, false, TOKEN_2022_PROGRAM_ID),
-    ])
+    const connection = this.getOrCreateConnection(rpcUrl)
+    const depositTokenAccounts = await this.getOrCreateTokenAccounts(depositWallet, usdcMint)
 
     return {
-      connection: new Connection(rpcUrl, 'confirmed'),
+      connection,
       tokenAccounts: [depositWallet, ...depositTokenAccounts],
       usdcMint,
     }
@@ -265,6 +265,41 @@ export class SolanaPaymentVerifier implements IDepositVerifier {
 
       return { outcome: 'error', reason, status: 400 }
     }
+  }
+
+  private getOrCreateConnection(rpcUrl: string): Connection {
+    if (this.cachedConnection && this.cachedConnection.url === rpcUrl) {
+      return this.cachedConnection.connection
+    }
+    const connection = new Connection(rpcUrl, 'confirmed')
+    this.cachedConnection = { connection, url: rpcUrl }
+    return connection
+  }
+
+  private async getOrCreateTokenAccounts(depositWallet: PublicKey, usdcMint: PublicKey): Promise<PublicKey[]> {
+    const depositKey = depositWallet.toBase58()
+    const mintKey = usdcMint.toBase58()
+
+    if (
+      this.cachedTokenAccounts
+      && this.cachedTokenAccounts.depositWallet === depositKey
+      && this.cachedTokenAccounts.usdcMint === mintKey
+    ) {
+      return this.cachedTokenAccounts.tokenAccounts
+    }
+
+    const tokenAccounts = await Promise.all([
+      getAssociatedTokenAddress(usdcMint, depositWallet, false, TOKEN_PROGRAM_ID),
+      getAssociatedTokenAddress(usdcMint, depositWallet, false, TOKEN_2022_PROGRAM_ID),
+    ])
+
+    this.cachedTokenAccounts = {
+      depositWallet: depositKey,
+      tokenAccounts,
+      usdcMint: mintKey,
+    }
+
+    return tokenAccounts
   }
 
   private extractTransferInfo(instruction: ParsedInstructionType): null | TransferCheckedInfo {
