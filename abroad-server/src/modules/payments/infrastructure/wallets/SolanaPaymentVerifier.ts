@@ -14,6 +14,7 @@ import { ILogger } from '../../../../core/logging/types'
 import { ReceivedCryptoTransactionMessage } from '../../../../platform/messaging/queueSchema'
 import { IDatabaseClientProvider } from '../../../../platform/persistence/IDatabaseClientProvider'
 import { ISecretManager, Secrets } from '../../../../platform/secrets/ISecretManager'
+import { DepositVerificationError, DepositVerificationSuccess, IDepositVerifier } from '../../application/contracts/IDepositVerifier'
 
 type ParsedInstructionType = ParsedInstruction | PartiallyDecodedInstruction
 
@@ -43,7 +44,9 @@ type TransferCheckedInfo = {
 }
 
 @injectable()
-export class SolanaPaymentVerifier {
+export class SolanaPaymentVerifier implements IDepositVerifier {
+  public readonly supportedNetwork = BlockchainNetwork.SOLANA
+
   public constructor(
     @inject(TYPES.ISecretManager) private readonly secretManager: ISecretManager,
     @inject(TYPES.IDatabaseClientProvider) private readonly dbClientProvider: IDatabaseClientProvider,
@@ -203,7 +206,7 @@ export class SolanaPaymentVerifier {
   public async verifyNotification(
     onChainSignature: string,
     transactionId: string,
-  ): Promise<SolanaPaymentVerificationResult> {
+  ): Promise<DepositVerificationError | DepositVerificationSuccess> {
     const prismaClient = await this.getPrismaClient()
     const transaction = await prismaClient.transaction.findUnique({
       include: { quote: true },
