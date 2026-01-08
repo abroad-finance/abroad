@@ -2,6 +2,7 @@ import { MainClient } from 'binance'
 import { inject, injectable } from 'inversify'
 
 import { TYPES } from '../../../../app/container/types'
+import { ValidationError } from '../../../../core/errors'
 import { createScopedLogger } from '../../../../core/logging/scopedLogger'
 import { ILogger } from '../../../../core/logging/types'
 import { getCorrelationId } from '../../../../core/requestContext'
@@ -66,7 +67,7 @@ export class BinanceBalanceUpdatedController {
     const parsed = BinanceBalanceUpdatedMessageSchema.safeParse(message)
     if (!parsed.success) {
       scopedLogger.error('[BinanceBalanceUpdated queue]: Invalid message format', parsed.error)
-      throw new Error('Invalid binance balance update message')
+      throw new ValidationError('Invalid binance balance update message', parsed.error.issues)
     }
 
     let client: MainClient | null = null

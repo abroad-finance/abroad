@@ -1,6 +1,7 @@
 import { inject, injectable } from 'inversify'
 
 import { TYPES } from '../../../app/container/types'
+import { ValidationError } from '../../../core/errors'
 import { createScopedLogger } from '../../../core/logging/scopedLogger'
 import { ILogger } from '../../../core/logging/types'
 import { getCorrelationId } from '../../../core/requestContext'
@@ -26,7 +27,7 @@ export class ReceivedCryptoTransactionUseCase implements IReceivedCryptoTransact
 
     const parsedMessage = this.parseMessage(rawMessage, scopedLogger)
     if (!parsedMessage) {
-      throw new Error('Invalid received crypto transaction message')
+      throw new ValidationError('Invalid received crypto transaction message')
     }
 
     try {

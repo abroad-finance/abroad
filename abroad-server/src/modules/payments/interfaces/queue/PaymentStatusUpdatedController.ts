@@ -1,6 +1,7 @@
 import { inject } from 'inversify'
 
 import { TYPES } from '../../../../app/container/types'
+import { ValidationError } from '../../../../core/errors'
 import { createScopedLogger } from '../../../../core/logging/scopedLogger'
 import { ILogger } from '../../../../core/logging/types'
 import { getCorrelationId } from '../../../../core/requestContext'
@@ -41,7 +42,7 @@ export class PaymentStatusUpdatedController {
     const parsed = PaymentStatusUpdatedMessageSchema.safeParse(msg)
     if (!parsed.success) {
       scopedLogger.error('[PaymentStatusUpdated queue]: Invalid message format:', parsed.error)
-      throw new Error('Invalid payment status update message')
+      throw new ValidationError('Invalid payment status update message', parsed.error.issues)
     }
     const message: PaymentStatusUpdatedMessage = parsed.data
 

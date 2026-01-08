@@ -1,6 +1,7 @@
 import { inject, injectable } from 'inversify'
 
 import { TYPES } from '../../../app/container/types'
+import { ValidationError } from '../../../core/errors'
 import { createScopedLogger } from '../../../core/logging/scopedLogger'
 import { ILogger } from '../../../core/logging/types'
 import { getCorrelationId } from '../../../core/requestContext'
@@ -25,7 +26,7 @@ export class PaymentSentUseCase implements IPaymentSentUseCase {
     })
     const message = this.parseMessage(rawMessage, logger)
     if (!message) {
-      throw new Error('Invalid payment sent message')
+      throw new ValidationError('Invalid payment sent message')
     }
 
     try {
