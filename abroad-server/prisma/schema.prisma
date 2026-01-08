@@ -228,6 +228,28 @@ model PaymentProvider {
   updatedAt DateTime @updatedAt
 }
 
+model PartnerDailyLimit {
+  id            String         @id @default(uuid())
+  partnerId     String
+  paymentMethod PaymentMethod
+  day           DateTime
+  amount        Float          @default(0)
+  count         Int            @default(0)
+
+  @@unique([partnerId, paymentMethod, day], name: "partner_method_day_unique")
+}
+
+model PartnerUserDailyLimit {
+  id            String         @id @default(uuid())
+  partnerUserId String
+  paymentMethod PaymentMethod
+  day           DateTime
+  amount        Float          @default(0)
+  count         Int            @default(0)
+
+  @@unique([partnerUserId, paymentMethod, day], name: "partner_user_method_day_unique")
+}
+
 view TransactionQuoteView {
   id                   String
   transactionStatus    TransactionStatus

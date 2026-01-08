@@ -110,6 +110,8 @@ export class TransactionAcceptanceService {
       await this.enforcePaymentMethodLimits(tx, quote, paymentService)
       await this.enforceLiquidity(paymentService, quote.targetAmount)
       await this.enforcePartnerKybThreshold(tx, partner.id, quote.sourceAmount, partner.isKybApproved)
+      await this.reserveUserDailyLimits(tx, partnerUser.id, quote.paymentMethod, quote.targetAmount, paymentService)
+      await this.reservePartnerDailyLimits(tx, partner.id, quote.paymentMethod, quote.targetAmount, paymentService)
 
       const transaction = await tx.transaction.create({
         data: {
@@ -331,6 +333,56 @@ export class TransactionAcceptanceService {
     throw new TransactionValidationError(`KYC verification is not available for ${country}. Please provide a supported country or contact support.`)
   }
 
+  private async reservePartnerDailyLimits(
+    prismaClient: SerializableTx,
+    partnerId: string,
+    paymentMethod: PaymentMethod,
+    targetAmount: number,
+    paymentService: PaymentServiceInstance,
+  ): Promise<void> {
+    const day = this.startOfDay()
+    const updated = await prismaClient.$executeRaw`
+      INSERT INTO "PartnerDailyLimit" ("id", "partnerId", "paymentMethod", "day", "amount", "count")
+      VALUES (gen_random_uuid(), ${partnerId}, ${paymentMethod}::"PaymentMethod", ${day}, ${targetAmount}, 1)
+      ON CONFLICT ("partnerId", "paymentMethod", "day")
+      DO UPDATE SET
+        "amount" = "PartnerDailyLimit"."amount" + ${targetAmount},
+        "count" = "PartnerDailyLimit"."count" + 1
+      WHERE
+        "PartnerDailyLimit"."amount" + ${targetAmount} <= ${paymentService.MAX_TOTAL_AMOUNT_PER_DAY}
+        AND "PartnerDailyLimit"."count" + 1 <= ${paymentService.MAX_USER_TRANSACTIONS_PER_DAY}
+    `
+
+    if (Number(updated) === 0) {
+      throw new TransactionValidationError('This payment method reached today\'s partner limit. Please try again tomorrow or use another method.')
+    }
+  }
+
+  private async reserveUserDailyLimits(
+    prismaClient: SerializableTx,
+    partnerUserId: string,
+    paymentMethod: PaymentMethod,
+    targetAmount: number,
+    paymentService: PaymentServiceInstance,
+  ): Promise<void> {
+    const day = this.startOfDay()
+    const updated = await prismaClient.$executeRaw`
+      INSERT INTO "PartnerUserDailyLimit" ("id", "partnerUserId", "paymentMethod", "day", "amount", "count")
+      VALUES (gen_random_uuid(), ${partnerUserId}, ${paymentMethod}::"PaymentMethod", ${day}, ${targetAmount}, 1)
+      ON CONFLICT ("partnerUserId", "paymentMethod", "day")
+      DO UPDATE SET
+        "amount" = "PartnerUserDailyLimit"."amount" + ${targetAmount},
+        "count" = "PartnerUserDailyLimit"."count" + 1
+      WHERE
+        "PartnerUserDailyLimit"."amount" + ${targetAmount} <= ${paymentService.MAX_TOTAL_AMOUNT_PER_DAY}
+        AND "PartnerUserDailyLimit"."count" + 1 <= ${paymentService.MAX_USER_TRANSACTIONS_PER_DAY}
+    `
+
+    if (Number(updated) === 0) {
+      throw new TransactionValidationError('You reached today\'s limit for this payment method. Try again tomorrow or choose another method.')
+    }
+  }
+
   private async lockPartner(
     prismaClient: SerializableTx,
     partnerId: string,
@@ -402,6 +454,12 @@ export class TransactionAcceptanceService {
 
   private shouldRequestKyc(partner: PartnerUserContext, totalUserAmountMonthly: number): boolean {
     return partner.needsKyc && !isKycExemptByAmount(totalUserAmountMonthly)
+  }
+
+  private startOfDay(): Date {
+    const now = new Date()
+    now.setHours(0, 0, 0, 0)
+    return now
   }
 }
 
