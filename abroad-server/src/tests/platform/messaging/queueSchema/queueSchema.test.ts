@@ -17,6 +17,13 @@ describe('queue schema validation', () => {
       externalId: 'ext-123',
       status: 'Processing',
     })).not.toThrow()
+
+    expect(() => PaymentStatusUpdatedMessageSchema.parse({
+      currency: TargetCurrency.COP,
+      externalId: 'ext-456',
+      provider: 'breb',
+      status: 'ACCP',
+    })).not.toThrow()
   })
 
   it('requires a user identifier for websocket notifications', () => {

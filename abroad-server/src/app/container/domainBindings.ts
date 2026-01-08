@@ -5,6 +5,7 @@ import { PaymentServiceFactory } from '../../modules/payments/application/Paymen
 import { PaymentUseCase } from '../../modules/payments/application/paymentUseCase'
 import { PayoutStatusAdapterRegistry } from '../../modules/payments/application/PayoutStatusAdapterRegistry'
 import { WalletHandlerFactory } from '../../modules/payments/application/WalletHandlerFactory'
+import { BrebPayoutStatusAdapter } from '../../modules/payments/infrastructure/BrebPayoutStatusAdapter'
 import { DepositVerifierRegistry } from '../../modules/payments/application/DepositVerifierRegistry'
 import { BrebPaymentService } from '../../modules/payments/infrastructure/paymentProviders/brebPaymentService'
 import { PixQrDecoder } from '../../modules/payments/infrastructure/paymentProviders/PixQrDecoder'
@@ -32,6 +33,7 @@ const domainBindings: ReadonlyArray<BindingRegistration<unknown>> = [
   { identifier: TYPES.IDepositVerifierRegistry, implementation: DepositVerifierRegistry },
   { bindSelf: true, identifier: PayoutStatusAdapterRegistry, implementation: PayoutStatusAdapterRegistry },
   { identifier: TYPES.IPayoutStatusAdapter, implementation: TransferoPayoutStatusAdapter, name: 'transfero' },
+  { identifier: TYPES.IPayoutStatusAdapter, implementation: BrebPayoutStatusAdapter, name: 'breb' },
   { identifier: TYPES.IExchangeProviderFactory, implementation: ExchangeProviderFactory },
   { identifier: TYPES.IWalletHandlerFactory, implementation: WalletHandlerFactory },
   { identifier: TYPES.IPixQrDecoder, implementation: PixQrDecoder },
