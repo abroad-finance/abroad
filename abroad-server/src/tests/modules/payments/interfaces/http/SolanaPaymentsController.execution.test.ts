@@ -18,7 +18,7 @@ describe('SolanaPaymentsController notifyPayment execution', () => {
   })
 
   it('enqueues a verified Solana USDC transfer to the configured wallet', async () => {
-    const { badRequest, controller, notFound, prismaClient, queueHandler } = createControllerContext()
+    const { badRequest, controller, notFound, outboxDispatcher, prismaClient } = createControllerContext()
 
     prismaClient.transaction.findUnique.mockResolvedValueOnce({
       accountNumber: 'acc',
@@ -52,7 +52,7 @@ describe('SolanaPaymentsController notifyPayment execution', () => {
     expect(result).toEqual({ enqueued: true })
     expect(badRequest).not.toHaveBeenCalled()
     expect(notFound).not.toHaveBeenCalled()
-    expectEnqueuedMessage(queueHandler, 2.5)
+    expectEnqueuedMessage(outboxDispatcher, 2.5)
   })
 
   it('returns bad request when the on-chain transaction is missing', async () => {

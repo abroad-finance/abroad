@@ -8,7 +8,7 @@ import type { ISecretManager, Secret } from '../../../../../platform/secrets/ISe
 
 import { SolanaPaymentsController } from '../../../../../modules/payments/interfaces/http/SolanaPaymentsController'
 import { QueueName } from '../../../../../platform/messaging/queues'
-import { createMockLogger, createMockQueueHandler, type MockLogger, type MockQueueHandler } from '../../../../setup/mockFactories'
+import { createMockLogger, type MockLogger } from '../../../../setup/mockFactories'
 
 type MockedPublicKey = {
   equals(other: unknown): boolean
@@ -179,13 +179,17 @@ export const createControllerContext = () => {
     getSecrets: jest.fn(),
   }
 
-  const queueHandler: MockQueueHandler = createMockQueueHandler()
   const logger: MockLogger = createMockLogger()
+  const outboxDispatcher = { enqueueQueue: jest.fn() }
+  const verifier = new (require('../../../../../modules/payments/infrastructure/wallets/SolanaPaymentVerifier').SolanaPaymentVerifier)(
+    secretManager,
+    prismaProvider,
+    logger,
+  )
 
   const controller = new SolanaPaymentsController(
-    secretManager,
-    queueHandler,
-    prismaProvider,
+    verifier,
+    outboxDispatcher as never,
     logger,
   )
 
@@ -194,19 +198,19 @@ export const createControllerContext = () => {
     controller,
     logger,
     notFound: jest.fn(),
+    outboxDispatcher,
     prismaClient,
-    queueHandler,
     secretManager,
   }
 }
 
-export const expectEnqueuedMessage = (queueHandler: MockQueueHandler, amount: number) => {
-  expect(queueHandler.postMessage).toHaveBeenCalledWith(QueueName.RECEIVED_CRYPTO_TRANSACTION, {
+export const expectEnqueuedMessage = (outboxDispatcher: { enqueueQueue: jest.Mock }, amount: number) => {
+  expect(outboxDispatcher.enqueueQueue).toHaveBeenCalledWith(QueueName.RECEIVED_CRYPTO_TRANSACTION, {
     addressFrom: 'sender-wallet',
     amount,
     blockchain: BlockchainNetwork.SOLANA,
     cryptoCurrency: CryptoCurrency.USDC,
     onChainId: onChainSignature,
     transactionId,
-  })
+  }, 'solana.notify', { deliverNow: true })
 }
