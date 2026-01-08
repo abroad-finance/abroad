@@ -26,7 +26,7 @@ const buildPaymentService = (label: string): IPaymentService => ({
 const buildExchangeProvider = (id: string): IExchangeProvider => ({
   createMarketOrder: async () => ({ success: true }),
   exchangePercentageFee: 0.01,
-  getExchangeAddress: async () => ({ address: `${id}-addr` }),
+  getExchangeAddress: async () => ({ address: `${id}-addr`, success: true }),
   getExchangeRate: async () => 1,
 })
 

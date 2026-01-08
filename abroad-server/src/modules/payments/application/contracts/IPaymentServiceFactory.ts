@@ -5,7 +5,7 @@ import { IPaymentService } from './IPaymentService'
 
 export interface IPaymentServiceFactory {
   getPaymentService(paymentMethod: PaymentMethod): IPaymentService
-  getPaymentServiceForCapability(params: {
+  getPaymentServiceForCapability?(params: {
     paymentMethod: PaymentMethod
     targetCurrency: IPaymentService['currency']
   }): IPaymentService

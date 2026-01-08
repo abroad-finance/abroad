@@ -1,5 +1,20 @@
 import { BlockchainNetwork, CryptoCurrency, TargetCurrency } from '@prisma/client'
 
+export type ExchangeAddressResult
+  = | { address: string, memo?: string, success: true }
+    | { code?: ExchangeFailureCode, reason?: string, success: false }
+
+export type ExchangeFailureCode = 'permanent' | 'retriable' | 'validation'
+
+export type ExchangeOperationResult
+  = | { code?: ExchangeFailureCode, reason?: string, success: false }
+    | { success: true }
+
+export type ExchangeProviderCapability = {
+  blockchain?: BlockchainNetwork
+  targetCurrency: TargetCurrency
+}
+
 export interface IExchangeProvider {
   readonly capability?: ExchangeProviderCapability
   createMarketOrder(params: {
@@ -26,18 +41,3 @@ export interface IExchangeProvider {
     targetCurrency: TargetCurrency
   }): Promise<number>
 }
-
-export type ExchangeProviderCapability = {
-  blockchain?: BlockchainNetwork
-  targetCurrency: TargetCurrency
-}
-
-export type ExchangeFailureCode = 'validation' | 'retriable' | 'permanent'
-
-export type ExchangeAddressResult =
-  | { success: true, address: string, memo?: string }
-  | { success: false, code?: ExchangeFailureCode, reason?: string }
-
-export type ExchangeOperationResult =
-  | { success: true }
-  | { success: false, code?: ExchangeFailureCode, reason?: string }

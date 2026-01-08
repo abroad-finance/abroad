@@ -1,7 +1,7 @@
 import { BlockchainNetwork, CryptoCurrency } from '@prisma/client'
 
 export interface IWalletHandler {
-  readonly capability: { blockchain: BlockchainNetwork }
+  readonly capability?: { blockchain: BlockchainNetwork }
   getAddressFromTransaction(
     transaction: { onChainId?: string }
   ): Promise<string>
@@ -9,7 +9,7 @@ export interface IWalletHandler {
   send(params: WalletSendParams): Promise<WalletSendResult>
 }
 
-export type WalletFailureCode = 'validation' | 'retriable' | 'permanent'
+export type WalletFailureCode = 'permanent' | 'retriable' | 'validation'
 
 export type WalletSendParams = {
   address: string
@@ -18,6 +18,6 @@ export type WalletSendParams = {
   memo?: string
 }
 
-export type WalletSendResult =
-  | { success: true, transactionId?: string }
-  | { code?: WalletFailureCode, reason?: string, success: false, transactionId?: string }
+export type WalletSendResult
+  = | { code?: WalletFailureCode, reason?: string, success: false, transactionId?: string }
+    | { success: true, transactionId?: string }

@@ -5,6 +5,7 @@ import type { IPaymentService } from '../../../../modules/payments/application/c
 import type { IPaymentServiceFactory } from '../../../../modules/payments/application/contracts/IPaymentServiceFactory'
 import type { IDatabaseClientProvider } from '../../../../platform/persistence/IDatabaseClientProvider'
 
+import { LiquidityCacheService } from '../../../../modules/payments/application/LiquidityCacheService'
 import { PaymentUseCase } from '../../../../modules/payments/application/paymentUseCase'
 import { createMockLogger, MockLogger } from '../../../setup/mockFactories'
 
@@ -57,9 +58,10 @@ const buildUseCase = ({
     getClient: jest.fn(async () => prismaClient as unknown as import('@prisma/client').PrismaClient),
   }
 
-  const useCase = new PaymentUseCase(paymentServiceFactory, dbProvider, logger as unknown as MockLogger)
+  const liquidityCacheService = new LiquidityCacheService(dbProvider as never, logger)
+  const useCase = new PaymentUseCase(paymentServiceFactory, dbProvider, liquidityCacheService, logger as unknown as MockLogger)
 
-  return { dbProvider, logger, paymentService, paymentServiceFactory, prismaClient, useCase }
+  return { dbProvider, liquidityCacheService, logger, paymentService, paymentServiceFactory, prismaClient, useCase }
 }
 
 describe('PaymentUseCase', () => {

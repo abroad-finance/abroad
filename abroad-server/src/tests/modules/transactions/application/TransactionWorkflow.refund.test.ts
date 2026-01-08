@@ -1,7 +1,7 @@
 import 'reflect-metadata'
 
 import { createScopedLogger } from '../../../../core/logging/scopedLogger'
-import { TransactionRepository, RefundReservation } from '../../../../modules/transactions/application/TransactionRepository'
+import { RefundReservation, TransactionRepository } from '../../../../modules/transactions/application/TransactionRepository'
 import { TransactionWorkflow } from '../../../../modules/transactions/application/TransactionWorkflow'
 import { createMockLogger } from '../../../setup/mockFactories'
 

@@ -26,7 +26,7 @@ const SUPPORTED_SYMBOLS = [
 
 @injectable()
 export class BinanceExchangeProvider implements IExchangeProvider {
-  public readonly capability = { targetCurrency: 'COP' as const, blockchain: undefined }
+  public readonly capability = { blockchain: undefined, targetCurrency: 'COP' as const }
   public readonly exchangePercentageFee = 0.0085
   private readonly logger: ScopedLogger
 
@@ -142,6 +142,28 @@ export class BinanceExchangeProvider implements IExchangeProvider {
     }
   }
 
+  private buildFailure(code: ExchangeFailureCode, reason?: string): ExchangeAddressResult {
+    return { code, reason, success: false }
+  }
+
+  private describeError(error: unknown): string {
+    if (error instanceof Error) return error.message
+    if (typeof error === 'string') return error
+    try {
+      return JSON.stringify(error)
+    }
+    catch {
+      return 'unknown'
+    }
+  }
+
+  private extractFailureCode(error: unknown): ExchangeFailureCode {
+    const maybeAxios = error as { response?: { status?: number } }
+    const status = typeof maybeAxios?.response?.status === 'number' ? maybeAxios.response.status : undefined
+    if (status && status >= 400 && status < 500) return 'permanent'
+    return 'retriable'
+  }
+
   /**
    * Generates HMAC SHA256 signature for Binance API
    * @param queryString The query string to sign
@@ -169,27 +191,5 @@ export class BinanceExchangeProvider implements IExchangeProvider {
       default:
         throw new Error(`Unsupported blockchain: ${blockchain}`)
     }
-  }
-
-  private buildFailure(code: ExchangeFailureCode, reason?: string): ExchangeAddressResult {
-    return { code, reason, success: false }
-  }
-
-  private describeError(error: unknown): string {
-    if (error instanceof Error) return error.message
-    if (typeof error === 'string') return error
-    try {
-      return JSON.stringify(error)
-    }
-    catch {
-      return 'unknown'
-    }
-  }
-
-  private extractFailureCode(error: unknown): ExchangeFailureCode {
-    const maybeAxios = error as { response?: { status?: number } }
-    const status = typeof maybeAxios?.response?.status === 'number' ? maybeAxios.response.status : undefined
-    if (status && status >= 400 && status < 500) return 'permanent'
-    return 'retriable'
   }
 }

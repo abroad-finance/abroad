@@ -102,6 +102,7 @@ export class BrebPaymentService implements IPaymentService {
     method: PaymentMethod.BREB,
     targetCurrency: TargetCurrency.COP,
   }
+
   public readonly currency = TargetCurrency.COP
   public readonly fixedFee = 0
 
@@ -118,11 +119,7 @@ export class BrebPaymentService implements IPaymentService {
   public readonly percentageFee = 0
 
   public readonly provider = 'breb'
-  private readonly maxSendAttempts: number
-  private readonly retryDelayMs: number
-
   private accessTokenCache?: { expiresAt: number, value: string }
-
   private readonly mandatoryKeyFields: ReadonlyArray<keyof BrebKeyDetails> = [
     'accountNumber',
     'documentNumber',
@@ -137,10 +134,14 @@ export class BrebPaymentService implements IPaymentService {
     'typeAccount',
   ]
 
+  private readonly maxSendAttempts: number
+
   private readonly pollConfig = {
     delayMs: 2_000,
     timeoutMs: 60_000,
   }
+
+  private readonly retryDelayMs: number
 
   private serviceConfig?: BrebServiceConfig
 
@@ -226,31 +227,6 @@ export class BrebPaymentService implements IPaymentService {
     return this.buildFailure('retriable', 'Maximum send attempts exceeded')
   }
 
-  private buildFailure(code: PaymentFailureCode, reason?: string): PaymentSendResult {
-    return { code, reason, success: false }
-  }
-
-  private extractFailureCode(error: unknown): PaymentFailureCode {
-    const status = this.extractErrorStatus(error)
-    if (status && status >= 400 && status < 500) {
-      return 'permanent'
-    }
-    return 'retriable'
-  }
-
-  private isRetryableError(error: unknown): boolean {
-    const status = this.extractErrorStatus(error)
-    if (status && status >= 500) {
-      return true
-    }
-    return !status
-  }
-
-  private extractErrorStatus(error: unknown): number | undefined {
-    const maybeAxios = error as { response?: { status?: number } }
-    return typeof maybeAxios?.response?.status === 'number' ? maybeAxios.response.status : undefined
-  }
-
   public async verifyAccount({
     account,
   }: {
@@ -267,6 +243,10 @@ export class BrebPaymentService implements IPaymentService {
       this.logger.warn('[BreB] Failed to verify account', { account, reason })
       return false
     }
+  }
+
+  private buildFailure(code: PaymentFailureCode, reason?: string): PaymentSendResult {
+    return { code, reason, success: false }
   }
 
   private buildHeaders(config: BrebServiceConfig, token: string, rail?: BrebRail): Record<string, string> {
@@ -364,6 +344,19 @@ export class BrebPaymentService implements IPaymentService {
       })
       return null
     }
+  }
+
+  private extractErrorStatus(error: unknown): number | undefined {
+    const maybeAxios = error as { response?: { status?: number } }
+    return typeof maybeAxios?.response?.status === 'number' ? maybeAxios.response.status : undefined
+  }
+
+  private extractFailureCode(error: unknown): PaymentFailureCode {
+    const status = this.extractErrorStatus(error)
+    if (status && status >= 400 && status < 500) {
+      return 'permanent'
+    }
+    return 'retriable'
   }
 
   private async fetchKey(
@@ -610,6 +603,14 @@ export class BrebPaymentService implements IPaymentService {
     return isActive
   }
 
+  private isRetryableError(error: unknown): boolean {
+    const status = this.extractErrorStatus(error)
+    if (status && status >= 500) {
+      return true
+    }
+    return !status
+  }
+
   private logBrebError({
     endpoint,
     error,
@@ -729,6 +730,13 @@ export class BrebPaymentService implements IPaymentService {
     return lastReport ? { report: lastReport, result: this.interpretReport(lastReport) } : null
   }
 
+  private readNumberFromEnv(envKey: string, fallback: number): number {
+    const raw = process.env[envKey]
+    if (!raw) return fallback
+    const parsed = Number(raw)
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback
+  }
+
   private redactHeaders(headers: Record<string, string>): Record<string, string> {
     const sensitiveHints = ['authorization', 'secret', 'token']
     return Object.entries(headers).reduce<Record<string, string>>((sanitized, [key, value]) => {
@@ -764,12 +772,5 @@ export class BrebPaymentService implements IPaymentService {
 
   private async sleep(ms: number): Promise<void> {
     await new Promise(resolve => setTimeout(resolve, ms))
-  }
-
-  private readNumberFromEnv(envKey: string, fallback: number): number {
-    const raw = process.env[envKey]
-    if (!raw) return fallback
-    const parsed = Number(raw)
-    return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback
   }
 }

@@ -6,11 +6,12 @@ import { QueueName } from '../../../platform/messaging/queues'
 import { PaymentSentMessage } from '../../../platform/messaging/queueSchema'
 import { WebhookEvent } from '../../../platform/notifications/IWebhookNotifier'
 import { OutboxDispatcher } from '../../../platform/outbox/OutboxDispatcher'
+import { isSupportedPaymentMethod } from '../../payments/application/supportedPaymentMethods'
 import { TransactionWithRelations } from './transactionNotificationTypes'
 import { toWebhookTransactionPayload } from './transactionPayload'
 import { buildTransactionSlackMessage } from './transactionSlackFormatter'
 
-type PrismaClientLike = PrismaClient | Prisma.TransactionClient
+type PrismaClientLike = Prisma.TransactionClient | PrismaClient
 
 export class TransactionEventDispatcher {
   private readonly logger: ScopedLogger
@@ -83,6 +84,10 @@ export class TransactionEventDispatcher {
     transaction: TransactionWithRelations,
   ): Promise<void> {
     const paymentMethod = transaction.quote.paymentMethod
+    if (!isSupportedPaymentMethod(paymentMethod)) {
+      this.logger.warn('Skipping payment sent notification for unsupported payment method', { paymentMethod })
+      return
+    }
     const message: PaymentSentMessage = {
       amount: transaction.quote.sourceAmount,
       blockchain: transaction.quote.network,

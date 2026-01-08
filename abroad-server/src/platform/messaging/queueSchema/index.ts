@@ -2,15 +2,15 @@ export {
   BinanceBalanceUpdatedMessage,
   BinanceBalanceUpdatedMessageSchema,
 } from './binanceBalanceUpdatedMessage'
+export {
+  DeadLetterMessage,
+  DeadLetterMessageSchema,
+} from './deadLetterMessage'
 export { PaymentSentMessage, PaymentSentMessageSchema } from './paymentSentMessage'
 export {
   PaymentStatusUpdatedMessage,
   PaymentStatusUpdatedMessageSchema,
 } from './paymentStatusUpdatedMessage'
-export {
-  DeadLetterMessage,
-  DeadLetterMessageSchema,
-} from './deadLetterMessage'
 export {
   ReceivedCryptoTransactionMessage,
   ReceivedCryptoTransactionMessageSchema,

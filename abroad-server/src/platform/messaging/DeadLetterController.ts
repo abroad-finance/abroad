@@ -3,9 +3,9 @@ import { inject, injectable } from 'inversify'
 import { TYPES } from '../../app/container/types'
 import { createScopedLogger, ScopedLogger } from '../../core/logging/scopedLogger'
 import { ILogger } from '../../core/logging/types'
+import { OutboxDispatcher } from '../outbox/OutboxDispatcher'
 import { IQueueHandler, QueueName } from './queues'
 import { DeadLetterMessage, DeadLetterMessageSchema } from './queueSchema'
-import { OutboxDispatcher } from '../outbox/OutboxDispatcher'
 
 @injectable()
 export class DeadLetterController {
@@ -33,6 +33,23 @@ export class DeadLetterController {
     }
   }
 
+  private async enqueueSlack(message: DeadLetterMessage): Promise<void> {
+    const headline = `[DLQ] ${message.originalQueue} (${message.reason})`
+    const body = message.error ? `error=${message.error}` : 'no error provided'
+    const payloadSnippet = this.previewPayload(message.payload)
+
+    try {
+      await this.outboxDispatcher.enqueueSlack(
+        `${headline} ${body} payload=${payloadSnippet}`,
+        'dead-letter',
+        { deliverNow: false },
+      )
+    }
+    catch (error) {
+      this.logger.error('[DeadLetter] Failed to enqueue Slack alert', error)
+    }
+  }
+
   private async onDeadLetter(message: unknown): Promise<void> {
     const parsed = DeadLetterMessageSchema.safeParse(message)
     if (!parsed.success) {
@@ -54,23 +71,6 @@ export class DeadLetterController {
     })
 
     await this.enqueueSlack(dlqMessage)
-  }
-
-  private async enqueueSlack(message: DeadLetterMessage): Promise<void> {
-    const headline = `[DLQ] ${message.originalQueue} (${message.reason})`
-    const body = message.error ? `error=${message.error}` : 'no error provided'
-    const payloadSnippet = this.previewPayload(message.payload)
-
-    try {
-      await this.outboxDispatcher.enqueueSlack(
-        `${headline} ${body} payload=${payloadSnippet}`,
-        'dead-letter',
-        { deliverNow: false },
-      )
-    }
-    catch (error) {
-      this.logger.error('[DeadLetter] Failed to enqueue Slack alert', error)
-    }
   }
 
   private previewPayload(payload: unknown): string {

@@ -1,26 +1,37 @@
 import 'reflect-metadata'
 import { PaymentMethod } from '@prisma/client'
 
-import { LiquidityCacheService } from '../../../../../modules/payments/application/LiquidityCacheService'
-import { createMockLogger } from '../../../../setup/mockFactories'
+import { LiquidityCacheService } from '../../../../modules/payments/application/LiquidityCacheService'
+import { createMockLogger } from '../../../setup/mockFactories'
 
 describe('LiquidityCacheService', () => {
   const now = Date.now()
   const recent = new Date(now - 60_000)
   const stale = new Date(now - 10 * 60_000)
 
-  const buildPrisma = (overrides: Partial<ReturnType<typeof buildPrismaClient>> = {}) => ({
-    paymentProvider: {
-      create: jest.fn(async () => undefined),
-      findUnique: jest.fn(async () => null),
-      update: jest.fn(async () => undefined),
-      ...overrides.paymentProvider,
-    },
+  type PaymentProviderMock = {
+    create: jest.Mock<Promise<undefined>, []>
+    findUnique: jest.Mock<Promise<null | { id: PaymentMethod, liquidity: number, updatedAt: Date }>, []>
+    update: jest.Mock<Promise<undefined>, [{ data: { liquidity: number }, where: { id: PaymentMethod } }]>
+  }
+
+  type PrismaClientMock = { paymentProvider: PaymentProviderMock }
+  type PrismaOverrides = { paymentProvider?: Partial<PaymentProviderMock> }
+
+  const buildPaymentProvider = (overrides?: Partial<PaymentProviderMock>): PaymentProviderMock => ({
+    create: jest.fn<Promise<undefined>, []>(async () => undefined),
+    findUnique: jest.fn<Promise<null | { id: PaymentMethod, liquidity: number, updatedAt: Date }>, []>(async () => null),
+    update: jest.fn<Promise<undefined>, [{ data: { liquidity: number }, where: { id: PaymentMethod } }]>(
+      async () => undefined,
+    ),
+    ...(overrides ?? {}),
   })
 
-  const buildPrismaClient = () => buildPrisma()
+  const buildPrisma = (overrides: PrismaOverrides = {}): PrismaClientMock => ({
+    paymentProvider: buildPaymentProvider(overrides.paymentProvider),
+  })
 
-  const buildService = (prismaOverrides?: Partial<ReturnType<typeof buildPrismaClient>>) => {
+  const buildService = (prismaOverrides?: PrismaOverrides) => {
     const prisma = buildPrisma(prismaOverrides)
     const provider = { getClient: jest.fn(async () => prisma) }
     const logger = createMockLogger()

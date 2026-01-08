@@ -4,8 +4,6 @@ import { inject, injectable } from 'inversify'
 import { TYPES } from '../../app/container/types'
 import { IDatabaseClientProvider } from '../persistence/IDatabaseClientProvider'
 
-type PrismaClientLike = PrismaClient | Prisma.TransactionClient
-
 export type OutboxRecord = {
   attempts: number
   availableAt: Date
@@ -18,6 +16,8 @@ export type OutboxRecord = {
   updatedAt: Date
 }
 
+type PrismaClientLike = Prisma.TransactionClient | PrismaClient
+
 @injectable()
 export class OutboxRepository {
   public constructor(
@@ -27,7 +27,7 @@ export class OutboxRepository {
 
   public async create(
     type: string,
-    payload: Prisma.JsonValue,
+    payload: Prisma.InputJsonValue,
     availableAt: Date = new Date(),
     client?: PrismaClientLike,
   ): Promise<OutboxRecord> {
@@ -78,16 +78,6 @@ export class OutboxRepository {
     })
   }
 
-  public async summarizeFailures(): Promise<{ delivering: number, failed: number, pending: number }> {
-    const client = await this.dbProvider.getClient()
-    const [failed, delivering, pending] = await Promise.all([
-      client.outboxEvent.count({ where: { status: OutboxStatus.FAILED } }),
-      client.outboxEvent.count({ where: { status: OutboxStatus.DELIVERING } }),
-      client.outboxEvent.count({ where: { status: OutboxStatus.PENDING } }),
-    ])
-    return { delivering, failed, pending }
-  }
-
   public async reschedule(
     id: string,
     nextAttempt: Date,
@@ -104,5 +94,15 @@ export class OutboxRepository {
       },
       where: { id },
     })
+  }
+
+  public async summarizeFailures(): Promise<{ delivering: number, failed: number, pending: number }> {
+    const client = await this.dbProvider.getClient()
+    const [failed, delivering, pending] = await Promise.all([
+      client.outboxEvent.count({ where: { status: OutboxStatus.FAILED } }),
+      client.outboxEvent.count({ where: { status: OutboxStatus.DELIVERING } }),
+      client.outboxEvent.count({ where: { status: OutboxStatus.PENDING } }),
+    ])
+    return { delivering, failed, pending }
   }
 }

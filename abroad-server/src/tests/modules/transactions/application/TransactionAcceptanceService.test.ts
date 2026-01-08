@@ -231,7 +231,7 @@ describe('TransactionAcceptanceService helpers', () => {
   it('enforces partner KYB threshold using aggregates', async () => {
     const enforcePartnerKybThreshold = (service as unknown as {
       enforcePartnerKybThreshold: (
-        prisma: { transaction: { aggregate: jest.Mock<Promise<{ _sum: { sourceAmount: number | null } }>, [unknown?]> } },
+        prisma: { transaction: { aggregate: jest.Mock<Promise<{ _sum: { sourceAmount: null | number } }>, [unknown?]> } },
         partnerId: string,
         sourceAmount: number,
         isKybApproved: boolean,
@@ -309,7 +309,7 @@ describe('TransactionAcceptanceService helpers', () => {
       transaction: {
         findUnique: jest.fn(async () => ({
           id: 'tx-abc',
-          partnerUser: { partner: { webhookUrl: 'https://example.com', id: 'partner-1' } },
+          partnerUser: { partner: { id: 'partner-1', webhookUrl: 'https://example.com' } },
           quote: {
             cryptoCurrency: 'USDC',
             id: 'quote-1',

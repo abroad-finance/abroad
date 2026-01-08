@@ -1,7 +1,7 @@
 import { TransactionStatus } from '@prisma/client'
 import { injectable, multiInject, optional } from 'inversify'
 
-import { TYPES } from '../../app/container/types'
+import { TYPES } from '../../../app/container/types'
 import { IPayoutStatusAdapter } from './contracts/IPayoutStatusAdapter'
 
 @injectable()

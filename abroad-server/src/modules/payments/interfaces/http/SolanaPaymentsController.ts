@@ -1,3 +1,4 @@
+import { BlockchainNetwork } from '@prisma/client'
 import { inject } from 'inversify'
 import {
   Body,
@@ -11,8 +12,6 @@ import {
   TsoaResponse,
 } from 'tsoa'
 import z from 'zod'
-
-import { BlockchainNetwork } from '@prisma/client'
 
 import { TYPES } from '../../../../app/container/types'
 import { ILogger } from '../../../../core/logging/types'

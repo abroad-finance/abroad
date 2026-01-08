@@ -1,11 +1,11 @@
 import { TransactionStatus } from '@prisma/client'
 
-export type TransactionTransitionName =
-  | 'deposit_received'
-  | 'expired'
-  | 'payment_completed'
-  | 'payment_failed'
-  | 'wrong_amount'
+export type TransactionTransitionName
+  = | 'deposit_received'
+    | 'expired'
+    | 'payment_completed'
+    | 'payment_failed'
+    | 'wrong_amount'
 
 type AllowedTransition = {
   from: ReadonlyArray<TransactionStatus>
@@ -35,6 +35,13 @@ const allowedTransitions: Record<TransactionTransitionName, AllowedTransition> =
   },
 }
 
+const TERMINAL_STATUSES: TransactionStatus[] = [
+  TransactionStatus.PAYMENT_COMPLETED,
+  TransactionStatus.PAYMENT_EXPIRED,
+  TransactionStatus.PAYMENT_FAILED,
+  TransactionStatus.WRONG_AMOUNT,
+]
+
 export class InvalidTransactionTransitionError extends Error {
   public constructor(
     public readonly current: TransactionStatus,
@@ -42,6 +49,10 @@ export class InvalidTransactionTransitionError extends Error {
   ) {
     super(`Invalid transition: ${current} -> ${requested}`)
   }
+}
+
+export function isTerminalStatus(status: TransactionStatus): boolean {
+  return TERMINAL_STATUSES.includes(status)
 }
 
 export function resolveTransition(
@@ -58,13 +69,4 @@ export function resolveTransition(
   }
 
   return rule.to
-}
-
-export function isTerminalStatus(status: TransactionStatus): boolean {
-  return [
-    TransactionStatus.PAYMENT_COMPLETED,
-    TransactionStatus.PAYMENT_FAILED,
-    TransactionStatus.PAYMENT_EXPIRED,
-    TransactionStatus.WRONG_AMOUNT,
-  ].includes(status)
 }

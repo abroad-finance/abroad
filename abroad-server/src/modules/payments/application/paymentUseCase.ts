@@ -1,13 +1,12 @@
-import { Country } from '@prisma/client'
 import { inject, injectable } from 'inversify'
 
 import { TYPES } from '../../../app/container/types'
 import { ValidationError } from '../../../core/errors'
 import { ILogger } from '../../../core/logging/types'
 import { IDatabaseClientProvider } from '../../../platform/persistence/IDatabaseClientProvider'
-import { LiquidityCacheService } from './LiquidityCacheService'
 import { IPaymentService } from './contracts/IPaymentService'
 import { IPaymentServiceFactory } from './contracts/IPaymentServiceFactory'
+import { LiquidityCacheService } from './LiquidityCacheService'
 import { assertSupportedPaymentMethod, DEFAULT_PAYMENT_METHOD, SupportedPaymentMethod } from './supportedPaymentMethods'
 
 export interface IPaymentUseCase {
@@ -82,10 +81,10 @@ export class PaymentUseCase implements IPaymentUseCase {
     const method: SupportedPaymentMethod = paymentMethod ?? DEFAULT_PAYMENT_METHOD
     assertSupportedPaymentMethod(method)
     const baseService = this.paymentServiceFactory.getPaymentService(method)
-    const service = this.paymentServiceFactory.getPaymentServiceForCapability({
+    const service = this.paymentServiceFactory.getPaymentServiceForCapability?.({
       paymentMethod: method,
       targetCurrency: baseService.currency,
-    })
+    }) ?? baseService
 
     if (!service.isEnabled) {
       throw new ValidationError(`Payment method ${method} is currently unavailable`)

@@ -1,5 +1,5 @@
 import { BlockchainNetwork } from '@prisma/client'
-import { inject, injectable, multiInject, optional } from 'inversify'
+import { injectable, multiInject, optional } from 'inversify'
 
 import { TYPES } from '../../../app/container/types'
 import { IDepositVerifier, IDepositVerifierRegistry } from './contracts/IDepositVerifier'

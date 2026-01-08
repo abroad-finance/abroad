@@ -5,7 +5,7 @@ import { inject, injectable, named } from 'inversify'
 import { TYPES } from '../../../app/container/types'
 import { IPaymentService } from './contracts/IPaymentService'
 import { IPaymentServiceFactory } from './contracts/IPaymentServiceFactory'
-import { assertSupportedPaymentMethod, SupportedPaymentMethod } from './supportedPaymentMethods'
+import { assertSupportedPaymentMethod } from './supportedPaymentMethods'
 
 type PaymentCapability = {
   method: PaymentMethod
@@ -14,8 +14,8 @@ type PaymentCapability = {
 
 @injectable()
 export class PaymentServiceFactory implements IPaymentServiceFactory {
-  private readonly serviceByMethod: Record<SupportedPaymentMethod, IPaymentService>
   private readonly capabilityMap: PaymentCapability[]
+  private readonly serviceByMethod: Partial<Record<PaymentMethod, IPaymentService>>
 
   constructor(
     @inject(TYPES.IPaymentService)
@@ -37,7 +37,11 @@ export class PaymentServiceFactory implements IPaymentServiceFactory {
 
   public getPaymentService(paymentMethod: PaymentMethod): IPaymentService {
     assertSupportedPaymentMethod(paymentMethod)
-    return this.serviceByMethod[paymentMethod]
+    const service = this.serviceByMethod[paymentMethod]
+    if (!service) {
+      throw new Error(`Payment service not registered for method ${paymentMethod}`)
+    }
+    return service
   }
 
   /**
@@ -54,7 +58,10 @@ export class PaymentServiceFactory implements IPaymentServiceFactory {
         && candidate.targetCurrency === params.targetCurrency,
     )
     if (capability) {
-      return this.serviceByMethod[capability.method]
+      const service = this.serviceByMethod[capability.method]
+      if (service) {
+        return service
+      }
     }
     return this.getPaymentService(params.paymentMethod)
   }

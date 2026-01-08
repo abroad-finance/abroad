@@ -4,7 +4,7 @@ import { IExchangeProvider } from './IExchangeProvider'
 
 export interface IExchangeProviderFactory {
   getExchangeProvider(currency: TargetCurrency): IExchangeProvider
-  getExchangeProviderForCapability(params: {
+  getExchangeProviderForCapability?(params: {
     blockchain?: BlockchainNetwork
     targetCurrency: TargetCurrency
   }): IExchangeProvider

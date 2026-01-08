@@ -1,5 +1,4 @@
 import 'reflect-metadata'
-
 import { OutboxStatus } from '@prisma/client'
 
 import { OutboxWorker } from '../../../platform/outbox/OutboxWorker'

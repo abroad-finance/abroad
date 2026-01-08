@@ -35,17 +35,17 @@ interface AcceptTransactionResponse {
   transactionReference: null | string
 }
 
+type DatabaseClient = Awaited<ReturnType<IDatabaseClientProvider['getClient']>>
+
 type PartnerUserContext = {
   id: string
   isKybApproved: boolean
   needsKyc: boolean
   webhookUrl: string
 }
-
 type PaymentServiceInstance = ReturnType<IPaymentServiceFactory['getPaymentService']>
-type SerializableTx = Prisma.TransactionClient
-type DatabaseClient = Awaited<ReturnType<IDatabaseClientProvider['getClient']>>
 type PrismaClientLike = DatabaseClient | SerializableTx
+type SerializableTx = Prisma.TransactionClient
 
 @injectable()
 export class TransactionAcceptanceService {
@@ -70,10 +70,11 @@ export class TransactionAcceptanceService {
     const prismaClient = await this.prismaClientProvider.getClient()
     const decision = await prismaClient.$transaction(async (tx) => {
       const quote = await this.fetchQuote(tx, request.quoteId, partner.id)
-      const paymentService = this.paymentServiceFactory.getPaymentServiceForCapability({
+      const basePaymentService = this.paymentServiceFactory.getPaymentService(quote.paymentMethod)
+      const paymentService = this.paymentServiceFactory.getPaymentServiceForCapability?.({
         paymentMethod: quote.paymentMethod,
         targetCurrency: quote.targetCurrency,
-      })
+      }) ?? basePaymentService
       this.assertPaymentServiceIsEnabled(paymentService, quote.paymentMethod)
       await this.lockPaymentMethod(tx, quote.paymentMethod)
 
@@ -177,6 +178,23 @@ export class TransactionAcceptanceService {
     }
   }
 
+  private async aggregateCompletedQuotes(
+    prismaClient: SerializableTx,
+    where: Prisma.QuoteWhereInput,
+  ): Promise<{ count: number, sourceAmount: number, targetAmount: number }> {
+    const aggregate = await prismaClient.quote.aggregate({
+      _count: { _all: true },
+      _sum: { sourceAmount: true, targetAmount: true },
+      where,
+    })
+
+    return {
+      count: aggregate._count?._all ?? 0,
+      sourceAmount: aggregate._sum?.sourceAmount ?? 0,
+      targetAmount: aggregate._sum?.targetAmount ?? 0,
+    }
+  }
+
   private assertPaymentServiceIsEnabled(paymentService: PaymentServiceInstance, paymentMethod: PaymentMethod): void {
     if (!paymentService.isEnabled) {
       throw new TransactionValidationError(`Payments via ${paymentMethod} are temporarily unavailable. Please try another method or retry shortly.`)
@@ -189,17 +207,18 @@ export class TransactionAcceptanceService {
     paymentMethod: PaymentMethod,
   ): Promise<number> {
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
-    const aggregate = await prismaClient.transaction.aggregate({
-      _sum: { sourceAmount: true },
-      where: {
-        createdAt: { gte: thirtyDaysAgo },
-        partnerUserId,
-        quote: { paymentMethod },
-        status: TransactionStatus.PAYMENT_COMPLETED,
+    const aggregate = await this.aggregateCompletedQuotes(prismaClient, {
+      paymentMethod,
+      transaction: {
+        is: {
+          createdAt: { gte: thirtyDaysAgo },
+          partnerUserId,
+          status: TransactionStatus.PAYMENT_COMPLETED,
+        },
       },
     })
 
-    return aggregate._sum.sourceAmount ?? 0
+    return aggregate.sourceAmount
   }
 
   private async enforceLiquidity(
@@ -230,14 +249,15 @@ export class TransactionAcceptanceService {
       return
     }
 
-    const aggregate = await prismaClient.transaction.aggregate({
-      _sum: { sourceAmount: true },
-      where: {
-        partnerUser: { partnerId },
-        status: TransactionStatus.PAYMENT_COMPLETED,
+    const aggregate = await this.aggregateCompletedQuotes(prismaClient, {
+      transaction: {
+        is: {
+          partnerUser: { partnerId },
+          status: TransactionStatus.PAYMENT_COMPLETED,
+        },
       },
     })
-    const partnerTotalAmount = aggregate._sum.sourceAmount ?? 0
+    const partnerTotalAmount = aggregate.sourceAmount
     if (partnerTotalAmount + sourceAmount > 100) {
       throw new TransactionValidationError('This partner is limited to a total of $100 until KYB is approved. Please complete KYB to raise the limit.')
     }
@@ -249,15 +269,16 @@ export class TransactionAcceptanceService {
     paymentService: PaymentServiceInstance,
   ) {
     const todayStart = new Date(new Date().setHours(0, 0, 0, 0))
-    const aggregate = await prismaClient.transaction.aggregate({
-      _sum: { targetAmount: true },
-      where: {
-        createdAt: { gte: todayStart },
-        quote: { paymentMethod: quote.paymentMethod },
-        status: TransactionStatus.PAYMENT_COMPLETED,
+    const aggregate = await this.aggregateCompletedQuotes(prismaClient, {
+      paymentMethod: quote.paymentMethod,
+      transaction: {
+        is: {
+          createdAt: { gte: todayStart },
+          status: TransactionStatus.PAYMENT_COMPLETED,
+        },
       },
     })
-    const totalAmountToday = aggregate._sum.targetAmount ?? 0
+    const totalAmountToday = aggregate.targetAmount
     if (totalAmountToday + quote.targetAmount > paymentService.MAX_TOTAL_AMOUNT_PER_DAY) {
       throw new TransactionValidationError('This payment method already reached today\'s payout limit. Please try again tomorrow or use another method.')
     }
@@ -284,23 +305,23 @@ export class TransactionAcceptanceService {
     paymentService: PaymentServiceInstance,
   ) {
     const todayStart = new Date(new Date().setHours(0, 0, 0, 0))
-    const aggregate = await prismaClient.transaction.aggregate({
-      _count: { id: true },
-      _sum: { targetAmount: true },
-      where: {
-        createdAt: { gte: todayStart },
-        partnerUserId,
-        quote: { paymentMethod: quote.paymentMethod },
-        status: TransactionStatus.PAYMENT_COMPLETED,
+    const aggregate = await this.aggregateCompletedQuotes(prismaClient, {
+      paymentMethod: quote.paymentMethod,
+      transaction: {
+        is: {
+          createdAt: { gte: todayStart },
+          partnerUserId,
+          status: TransactionStatus.PAYMENT_COMPLETED,
+        },
       },
     })
 
-    const count = aggregate._count.id ?? 0
+    const count = aggregate.count
     if (count >= paymentService.MAX_USER_TRANSACTIONS_PER_DAY) {
       throw new TransactionValidationError('You reached the maximum number of transactions allowed today. Please try again tomorrow.')
     }
 
-    const totalUserAmount = aggregate._sum.targetAmount ?? 0
+    const totalUserAmount = aggregate.targetAmount
     if (totalUserAmount + quote.targetAmount > paymentService.MAX_TOTAL_AMOUNT_PER_DAY) {
       throw new TransactionValidationError('This transaction would exceed your daily limit for this payment method. Lower the amount or try again tomorrow.')
     }
@@ -328,12 +349,80 @@ export class TransactionAcceptanceService {
     return quote
   }
 
+  private async lockPartner(
+    prismaClient: SerializableTx,
+    partnerId: string,
+  ): Promise<void> {
+    // Coarse lock to serialize partner-level aggregate checks.
+    await prismaClient.$executeRaw`SELECT 1 FROM "Partner" WHERE id = ${partnerId} FOR UPDATE`
+  }
+
+  private async lockPartnerUser(
+    prismaClient: SerializableTx,
+    partnerUserId: string,
+  ): Promise<void> {
+    // Serialize concurrent accept attempts for the same partner user to prevent limit races.
+    await prismaClient.$executeRaw`SELECT 1 FROM "PartnerUser" WHERE id = ${partnerUserId} FOR UPDATE`
+  }
+
+  private async lockPaymentMethod(
+    prismaClient: SerializableTx,
+    paymentMethod: PaymentMethod,
+  ): Promise<void> {
+    // Prevent concurrent acceptances from racing on method-level daily totals.
+    await prismaClient.$executeRaw`SELECT 1 FROM "PaymentProvider" WHERE id = ${paymentMethod} FOR UPDATE`
+  }
+
+  private monthlyAmountCap(paymentService: PaymentServiceInstance): number {
+    return paymentService.MAX_TOTAL_AMOUNT_PER_DAY * this.monthlyMultiplier()
+  }
+
+  private monthlyCountCap(paymentService: PaymentServiceInstance): number {
+    return paymentService.MAX_USER_TRANSACTIONS_PER_DAY * this.monthlyMultiplier()
+  }
+
+  private monthlyMultiplier(): number {
+    const raw = process.env.MONTHLY_LIMIT_MULTIPLIER_DAYS
+    if (!raw) return 31
+    const parsed = Number(raw)
+    if (!Number.isFinite(parsed) || parsed < 1) {
+      return 31
+    }
+    // Guard against extreme multipliers while preserving configuration flexibility.
+    return Math.min(parsed, 62)
+  }
+
   private normalizeCountry(country: string): Country {
     const upper = country.toUpperCase()
     if (upper === Country.CO) {
       return Country.CO
     }
     throw new TransactionValidationError(`KYC verification is not available for ${country}. Please provide a supported country or contact support.`)
+  }
+
+  private async publishUserNotification(
+    prismaClient: PrismaClientLike,
+    transactionId: string,
+    userId: string,
+  ): Promise<void> {
+    try {
+      const full = await prismaClient.transaction.findUnique({
+        include: {
+          partnerUser: { include: { partner: true } },
+          quote: true,
+        },
+        where: { id: transactionId },
+      })
+
+      await this.outboxDispatcher.enqueueQueue(QueueName.USER_NOTIFICATION, {
+        payload: JSON.stringify(full ? toWebhookTransactionPayload(full) : { id: transactionId }),
+        type: 'transaction.created',
+        userId,
+      }, 'transaction.created', { client: prismaClient, deliverNow: false })
+    }
+    catch (notifyErr) {
+      this.logger.warn('Failed to publish transaction.created notification', notifyErr)
+    }
   }
 
   private async reservePartnerDailyLimits(
@@ -436,55 +525,6 @@ export class TransactionAcceptanceService {
     }
   }
 
-  private async lockPartner(
-    prismaClient: SerializableTx,
-    partnerId: string,
-  ): Promise<void> {
-    // Coarse lock to serialize partner-level aggregate checks.
-    await prismaClient.$executeRaw`SELECT 1 FROM "Partner" WHERE id = ${partnerId} FOR UPDATE`
-  }
-
-  private async lockPaymentMethod(
-    prismaClient: SerializableTx,
-    paymentMethod: PaymentMethod,
-  ): Promise<void> {
-    // Prevent concurrent acceptances from racing on method-level daily totals.
-    await prismaClient.$executeRaw`SELECT 1 FROM "PaymentProvider" WHERE id = ${paymentMethod} FOR UPDATE`
-  }
-
-  private async lockPartnerUser(
-    prismaClient: SerializableTx,
-    partnerUserId: string,
-  ): Promise<void> {
-    // Serialize concurrent accept attempts for the same partner user to prevent limit races.
-    await prismaClient.$executeRaw`SELECT 1 FROM "PartnerUser" WHERE id = ${partnerUserId} FOR UPDATE`
-  }
-
-  private async publishUserNotification(
-    prismaClient: PrismaClientLike,
-    transactionId: string,
-    userId: string,
-  ): Promise<void> {
-    try {
-      const full = await prismaClient.transaction.findUnique({
-        include: {
-          partnerUser: { include: { partner: true } },
-          quote: true,
-        },
-        where: { id: transactionId },
-      })
-
-      await this.outboxDispatcher.enqueueQueue(QueueName.USER_NOTIFICATION, {
-        payload: JSON.stringify(full ? toWebhookTransactionPayload(full) : { id: transactionId }),
-        type: 'transaction.created',
-        userId,
-      }, 'transaction.created', { client: prismaClient, deliverNow: false })
-    }
-    catch (notifyErr) {
-      this.logger.warn('Failed to publish transaction.created notification', notifyErr)
-    }
-  }
-
   private async resolveKycLinkAfterDecision(
     partner: PartnerUserContext,
     totalUserAmountMonthly: number,
@@ -520,25 +560,6 @@ export class TransactionAcceptanceService {
     now.setDate(1)
     now.setHours(0, 0, 0, 0)
     return now
-  }
-
-  private monthlyAmountCap(paymentService: PaymentServiceInstance): number {
-    return paymentService.MAX_TOTAL_AMOUNT_PER_DAY * this.monthlyMultiplier()
-  }
-
-  private monthlyCountCap(paymentService: PaymentServiceInstance): number {
-    return paymentService.MAX_USER_TRANSACTIONS_PER_DAY * this.monthlyMultiplier()
-  }
-
-  private monthlyMultiplier(): number {
-    const raw = process.env.MONTHLY_LIMIT_MULTIPLIER_DAYS
-    if (!raw) return 31
-    const parsed = Number(raw)
-    if (!Number.isFinite(parsed) || parsed < 1) {
-      return 31
-    }
-    // Guard against extreme multipliers while preserving configuration flexibility.
-    return Math.min(parsed, 62)
   }
 }
 

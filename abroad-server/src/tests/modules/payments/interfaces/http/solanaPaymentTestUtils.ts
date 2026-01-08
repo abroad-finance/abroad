@@ -6,6 +6,7 @@ import { TOKEN_PROGRAM_ID } from '@solana/spl-token'
 import type { IDatabaseClientProvider } from '../../../../../platform/persistence/IDatabaseClientProvider'
 import type { ISecretManager, Secret } from '../../../../../platform/secrets/ISecretManager'
 
+import { SolanaPaymentVerifier } from '../../../../../modules/payments/infrastructure/wallets/SolanaPaymentVerifier'
 import { SolanaPaymentsController } from '../../../../../modules/payments/interfaces/http/SolanaPaymentsController'
 import { QueueName } from '../../../../../platform/messaging/queues'
 import { createMockLogger, type MockLogger } from '../../../../setup/mockFactories'
@@ -181,11 +182,7 @@ export const createControllerContext = () => {
 
   const logger: MockLogger = createMockLogger()
   const outboxDispatcher = { enqueueQueue: jest.fn() }
-  const verifier = new (require('../../../../../modules/payments/infrastructure/wallets/SolanaPaymentVerifier').SolanaPaymentVerifier)(
-    secretManager,
-    prismaProvider,
-    logger,
-  )
+  const verifier = new SolanaPaymentVerifier(secretManager, prismaProvider, logger)
   const verifierRegistry = { getVerifier: jest.fn(() => verifier) }
 
   const controller = new SolanaPaymentsController(

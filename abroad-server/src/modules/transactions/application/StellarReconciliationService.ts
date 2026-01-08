@@ -1,4 +1,4 @@
-import { BlockchainNetwork, CryptoCurrency, PrismaClient, TransactionStatus } from '@prisma/client'
+import { BlockchainNetwork, PrismaClient, TransactionStatus } from '@prisma/client'
 import { Horizon } from '@stellar/stellar-sdk'
 
 import { ILogger } from '../../../core/logging/types'

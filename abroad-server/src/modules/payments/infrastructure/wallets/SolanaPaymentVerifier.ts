@@ -11,7 +11,6 @@ import { inject, injectable } from 'inversify'
 
 import { TYPES } from '../../../../app/container/types'
 import { ILogger } from '../../../../core/logging/types'
-import { ReceivedCryptoTransactionMessage } from '../../../../platform/messaging/queueSchema'
 import { IDatabaseClientProvider } from '../../../../platform/persistence/IDatabaseClientProvider'
 import { ISecretManager, Secrets } from '../../../../platform/secrets/ISecretManager'
 import { DepositVerificationError, DepositVerificationSuccess, IDepositVerifier } from '../../application/contracts/IDepositVerifier'
@@ -24,11 +23,6 @@ type SolanaPaymentContext = {
   usdcMint: PublicKey
 }
 
-type SolanaPaymentVerificationError = { outcome: 'error', reason: string, status: 400 | 404 }
-
-type SolanaPaymentVerificationResult = SolanaPaymentVerificationError | SolanaPaymentVerificationSuccess
-
-type SolanaPaymentVerificationSuccess = { outcome: 'ok', queueMessage: ReceivedCryptoTransactionMessage }
 type TokenAmountInfo = {
   amount: string
   decimals: number
@@ -267,41 +261,6 @@ export class SolanaPaymentVerifier implements IDepositVerifier {
     }
   }
 
-  private getOrCreateConnection(rpcUrl: string): Connection {
-    if (this.cachedConnection && this.cachedConnection.url === rpcUrl) {
-      return this.cachedConnection.connection
-    }
-    const connection = new Connection(rpcUrl, 'confirmed')
-    this.cachedConnection = { connection, url: rpcUrl }
-    return connection
-  }
-
-  private async getOrCreateTokenAccounts(depositWallet: PublicKey, usdcMint: PublicKey): Promise<PublicKey[]> {
-    const depositKey = depositWallet.toBase58()
-    const mintKey = usdcMint.toBase58()
-
-    if (
-      this.cachedTokenAccounts
-      && this.cachedTokenAccounts.depositWallet === depositKey
-      && this.cachedTokenAccounts.usdcMint === mintKey
-    ) {
-      return this.cachedTokenAccounts.tokenAccounts
-    }
-
-    const tokenAccounts = await Promise.all([
-      getAssociatedTokenAddress(usdcMint, depositWallet, false, TOKEN_PROGRAM_ID),
-      getAssociatedTokenAddress(usdcMint, depositWallet, false, TOKEN_2022_PROGRAM_ID),
-    ])
-
-    this.cachedTokenAccounts = {
-      depositWallet: depositKey,
-      tokenAccounts,
-      usdcMint: mintKey,
-    }
-
-    return tokenAccounts
-  }
-
   private extractTransferInfo(instruction: ParsedInstructionType): null | TransferCheckedInfo {
     if (!('parsed' in instruction)) return null
 
@@ -347,6 +306,41 @@ export class SolanaPaymentVerifier implements IDepositVerifier {
         uiAmountString: typeof uiAmountString === 'string' ? uiAmountString : undefined,
       },
     }
+  }
+
+  private getOrCreateConnection(rpcUrl: string): Connection {
+    if (this.cachedConnection && this.cachedConnection.url === rpcUrl) {
+      return this.cachedConnection.connection
+    }
+    const connection = new Connection(rpcUrl, 'confirmed')
+    this.cachedConnection = { connection, url: rpcUrl }
+    return connection
+  }
+
+  private async getOrCreateTokenAccounts(depositWallet: PublicKey, usdcMint: PublicKey): Promise<PublicKey[]> {
+    const depositKey = depositWallet.toBase58()
+    const mintKey = usdcMint.toBase58()
+
+    if (
+      this.cachedTokenAccounts
+      && this.cachedTokenAccounts.depositWallet === depositKey
+      && this.cachedTokenAccounts.usdcMint === mintKey
+    ) {
+      return this.cachedTokenAccounts.tokenAccounts
+    }
+
+    const tokenAccounts = await Promise.all([
+      getAssociatedTokenAddress(usdcMint, depositWallet, false, TOKEN_PROGRAM_ID),
+      getAssociatedTokenAddress(usdcMint, depositWallet, false, TOKEN_2022_PROGRAM_ID),
+    ])
+
+    this.cachedTokenAccounts = {
+      depositWallet: depositKey,
+      tokenAccounts,
+      usdcMint: mintKey,
+    }
+
+    return tokenAccounts
   }
 
   private parseTokenAmount(tokenAmount: TokenAmountInfo): number {

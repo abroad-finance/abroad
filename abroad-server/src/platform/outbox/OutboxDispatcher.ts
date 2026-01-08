@@ -9,20 +9,20 @@ import { ISlackNotifier } from '../notifications/ISlackNotifier'
 import { IWebhookNotifier, WebhookEvent } from '../notifications/IWebhookNotifier'
 import { OutboxRecord, OutboxRepository } from './OutboxRepository'
 
-type PrismaClientLike = PrismaClient | Prisma.TransactionClient
-
-type OutboxPayload =
-  | { kind: 'slack', message: string }
-  | {
-    kind: 'webhook'
-    payload: { data: Prisma.JsonValue, event: WebhookEvent }
-    target: string
-  }
-  | {
+type OutboxPayload
+  = | {
     kind: 'queue'
     payload: QueuePayloadByName[QueueName]
     queueName: QueueName
   }
+  | { kind: 'slack', message: string }
+  | {
+    kind: 'webhook'
+    payload: { data: Prisma.InputJsonValue, event: WebhookEvent }
+    target: string
+  }
+
+type PrismaClientLike = Prisma.TransactionClient | PrismaClient
 
 const MAX_ATTEMPTS = 5
 const DEFAULT_DELAY_MS = 5_000
@@ -51,7 +51,10 @@ export class OutboxDispatcher {
     const payload = record.payload as OutboxPayload
     try {
       if (payload.kind === 'webhook') {
-        await this.webhookNotifier.notifyWebhook(payload.target, payload.payload)
+        await this.webhookNotifier.notifyWebhook(
+          payload.target,
+          { data: this.toWebhookPayloadData(payload.payload.data), event: payload.payload.event },
+        )
       }
       else if (payload.kind === 'slack') {
         await this.slackNotifier.sendMessage(payload.message)
@@ -81,16 +84,21 @@ export class OutboxDispatcher {
     }
   }
 
-  public async enqueueSlack(
-    message: string,
+  public async enqueueQueue<Name extends QueueName>(
+    queueName: Name,
+    message: QueuePayloadByName[Name],
     context: string,
     options: EnqueueOptions = {},
   ): Promise<void> {
-    if (!message.trim()) return
     const deliverNow = options.deliverNow ?? !options.client
+    const payload: OutboxPayload = {
+      kind: 'queue',
+      payload: message,
+      queueName,
+    }
     const record = await this.repository.create(
-      'slack',
-      { kind: 'slack', message },
+      'queue',
+      this.normalizePayload(payload),
       options.availableAt ?? new Date(),
       options.client,
     )
@@ -99,16 +107,17 @@ export class OutboxDispatcher {
     }
   }
 
-  public async enqueueQueue<Name extends QueueName>(
-    queueName: Name,
-    message: QueuePayloadByName[Name],
+  public async enqueueSlack(
+    message: string,
     context: string,
     options: EnqueueOptions = {},
   ): Promise<void> {
+    if (!message.trim()) return
     const deliverNow = options.deliverNow ?? !options.client
+    const payload: OutboxPayload = { kind: 'slack', message }
     const record = await this.repository.create(
-      'queue',
-      { kind: 'queue', payload: message, queueName },
+      'slack',
+      this.normalizePayload(payload),
       options.availableAt ?? new Date(),
       options.client,
     )
@@ -119,15 +128,23 @@ export class OutboxDispatcher {
 
   public async enqueueWebhook(
     target: null | string,
-    payload: { data: Prisma.JsonValue, event: WebhookEvent },
+    payload: { data: unknown, event: WebhookEvent },
     context: string,
     options: EnqueueOptions = {},
   ): Promise<void> {
     if (!target?.trim()) return
     const deliverNow = options.deliverNow ?? !options.client
+    const normalizedPayload: OutboxPayload = {
+      kind: 'webhook',
+      payload: {
+        data: this.normalizeJsonValue(payload.data),
+        event: payload.event,
+      },
+      target: target.trim(),
+    }
     const record = await this.repository.create(
       'webhook',
-      { kind: 'webhook', payload, target: target.trim() },
+      this.normalizePayload(normalizedPayload),
       options.availableAt ?? new Date(),
       options.client,
     )
@@ -140,6 +157,32 @@ export class OutboxDispatcher {
     const pending = await this.repository.nextBatch()
     for (const record of pending) {
       await this.deliver(record, 'replay')
+    }
+  }
+
+  private normalizeJsonValue(payload: unknown): Prisma.InputJsonValue {
+    const replacer = (_key: string, value: unknown) => (value instanceof Date ? value.toISOString() : value)
+    return JSON.parse(JSON.stringify(payload, replacer)) as Prisma.InputJsonValue
+  }
+
+  private normalizePayload(payload: OutboxPayload): Prisma.InputJsonValue {
+    if (payload.kind === 'slack') {
+      return payload
+    }
+
+    if (payload.kind === 'queue') {
+      return {
+        ...payload,
+        payload: this.normalizeJsonValue(payload.payload),
+      }
+    }
+
+    return {
+      ...payload,
+      payload: {
+        ...payload.payload,
+        data: this.normalizeJsonValue(payload.payload.data),
+      },
     }
   }
 
@@ -168,5 +211,12 @@ export class OutboxDispatcher {
     catch (dlqErr) {
       this.logger.warn('[Outbox] Failed to publish dead-letter for outbox delivery failure', dlqErr)
     }
+  }
+
+  private toWebhookPayloadData(data: Prisma.InputJsonValue): Record<string, unknown> {
+    if (data && typeof data === 'object' && !Array.isArray(data)) {
+      return data as Record<string, unknown>
+    }
+    return { value: data ?? null }
   }
 }

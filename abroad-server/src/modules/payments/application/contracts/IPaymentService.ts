@@ -48,30 +48,12 @@ export interface IPaymentService {
   }): Promise<boolean>
 }
 
-export type PaymentFailureCode = 'validation' | 'retriable' | 'permanent'
-
-export type PaymentSendResult =
-  | {
-    success: true
-    transactionId?: string
-  }
-  | {
-    code?: PaymentFailureCode
-    reason?: string
-    success: false
-    transactionId?: string
-  }
-
 export type PaymentCapability = {
   method: PaymentMethod
   targetCurrency: TargetCurrency
 }
 
-export interface PaymentVerificationResult {
-  code: PaymentFailureCode
-  reason?: string
-  success: boolean
-}
+export type PaymentFailureCode = 'permanent' | 'retriable' | 'validation'
 
 export interface PaymentLiquidityResult {
   liquidity: number
@@ -81,5 +63,23 @@ export interface PaymentLiquidityResult {
 
 export interface PaymentOnboardResult {
   message?: string
+  success: boolean
+}
+
+export type PaymentSendResult
+  = | {
+    code?: PaymentFailureCode
+    reason?: string
+    success: false
+    transactionId?: string
+  }
+  | {
+    success: true
+    transactionId?: string
+  }
+
+export interface PaymentVerificationResult {
+  code: PaymentFailureCode
+  reason?: string
   success: boolean
 }

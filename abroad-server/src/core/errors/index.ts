@@ -14,24 +14,17 @@ export class ApplicationError extends Error {
   }
 }
 
+export class InfrastructureError extends ApplicationError {
+  constructor(message: string, details?: unknown, statusCode = 502) {
+    super(statusCode, 'infrastructure_error', message, details)
+    this.name = 'InfrastructureError'
+  }
+}
+
 export class NotFoundError extends ApplicationError {
   constructor(message: string, details?: unknown) {
     super(404, 'not_found', message, details)
     this.name = 'NotFoundError'
-  }
-}
-
-export class ValidationError extends ApplicationError {
-  constructor(message: string, details?: unknown) {
-    super(400, 'validation_error', message, details)
-    this.name = 'ValidationError'
-  }
-}
-
-export class UserError extends ApplicationError {
-  constructor(message: string, details?: unknown, statusCode = 400) {
-    super(statusCode, 'user_error', message, details)
-    this.name = 'UserError'
   }
 }
 
@@ -42,10 +35,17 @@ export class RetriableError extends ApplicationError {
   }
 }
 
-export class InfrastructureError extends ApplicationError {
-  constructor(message: string, details?: unknown, statusCode = 502) {
-    super(statusCode, 'infrastructure_error', message, details)
-    this.name = 'InfrastructureError'
+export class UserError extends ApplicationError {
+  constructor(message: string, details?: unknown, statusCode = 400) {
+    super(statusCode, 'user_error', message, details)
+    this.name = 'UserError'
+  }
+}
+
+export class ValidationError extends ApplicationError {
+  constructor(message: string, details?: unknown) {
+    super(400, 'validation_error', message, details)
+    this.name = 'ValidationError'
   }
 }
 

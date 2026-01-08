@@ -14,13 +14,13 @@ type OutboxWorkerOptions = {
 
 @injectable()
 export class OutboxWorker {
-  private isRunning = false
-  private loopPromise: Promise<void> | null = null
   private readonly batchSize: number
+  private isRunning = false
+  private lastFailureAlertAt = 0
   private readonly logger: ReturnType<typeof createScopedLogger>
+  private loopPromise: null | Promise<void> = null
   private readonly pollIntervalMs: number
   private readonly slackOnFailure: boolean
-  private lastFailureAlertAt = 0
 
   public constructor(
     @inject(OutboxRepository) private readonly repository: OutboxRepository,
@@ -36,7 +36,7 @@ export class OutboxWorker {
 
   public async runOnce(): Promise<void> {
     const batch = await this.repository.nextBatch(this.batchSize)
-    await Promise.all(batch.map((record) => this.deliver(record)))
+    await Promise.all(batch.map(record => this.deliver(record)))
   }
 
   public start(): void {
@@ -49,6 +49,15 @@ export class OutboxWorker {
     this.isRunning = false
     if (this.loopPromise) {
       await this.loopPromise
+    }
+  }
+
+  private async deliver(record: OutboxRecord): Promise<void> {
+    try {
+      await this.dispatcher.deliver(record, 'outbox-worker')
+    }
+    catch (error) {
+      this.logger.error('Failed delivering outbox record', { error, recordId: record.id })
     }
   }
 
@@ -65,13 +74,17 @@ export class OutboxWorker {
     }
   }
 
-  private async deliver(record: OutboxRecord): Promise<void> {
-    try {
-      await this.dispatcher.deliver(record, 'outbox-worker')
-    }
-    catch (error) {
-      this.logger.error('Failed delivering outbox record', { error, recordId: record.id })
-    }
+  private readBoolean(envKey: string, fallback: boolean): boolean {
+    const raw = process.env[envKey]
+    if (raw === undefined) return fallback
+    return raw.toLowerCase() === 'true'
+  }
+
+  private readNumber(envKey: string, fallback: number): number {
+    const raw = process.env[envKey]
+    if (!raw) return fallback
+    const parsed = Number(raw)
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback
   }
 
   private async reportFailures(): Promise<void> {
@@ -96,18 +109,5 @@ export class OutboxWorker {
 
   private async sleep(ms: number): Promise<void> {
     await new Promise(resolve => setTimeout(resolve, ms))
-  }
-
-  private readNumber(envKey: string, fallback: number): number {
-    const raw = process.env[envKey]
-    if (!raw) return fallback
-    const parsed = Number(raw)
-    return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback
-  }
-
-  private readBoolean(envKey: string, fallback: boolean): boolean {
-    const raw = process.env[envKey]
-    if (raw === undefined) return fallback
-    return raw.toLowerCase() === 'true'
   }
 }

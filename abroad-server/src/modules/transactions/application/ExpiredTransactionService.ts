@@ -28,6 +28,8 @@ type TransactionWithRelations = Transaction & {
 }
 
 export class ExpiredTransactionService {
+  private readonly repository: TransactionRepository
+
   constructor(
     private readonly prismaProvider: IDatabaseClientProvider,
     private readonly outboxDispatcher: OutboxDispatcher,
@@ -35,8 +37,6 @@ export class ExpiredTransactionService {
   ) {
     this.repository = new TransactionRepository(prismaProvider)
   }
-
-  private readonly repository: TransactionRepository
 
   public async process(now: Date = new Date()): Promise<ExpiredTransactionsSummary> {
     const prismaClient = await this.prismaProvider.getClient()
@@ -69,6 +69,10 @@ export class ExpiredTransactionService {
       updated: updatedTransactions.length,
       updatedTransactionIds: updatedTransactions.map(tx => tx.id),
     }
+  }
+
+  private buildIdempotencyKey(transactionId: string): string {
+    return `expire|${transactionId}`
   }
 
   private async expireSingleTransaction(
@@ -113,10 +117,6 @@ export class ExpiredTransactionService {
         status: TransactionStatus.AWAITING_PAYMENT,
       },
     })
-  }
-
-  private buildIdempotencyKey(transactionId: string): string {
-    return `expire|${transactionId}`
   }
 
   private async notifyUpdates(transaction: TransactionWithRelations): Promise<void> {

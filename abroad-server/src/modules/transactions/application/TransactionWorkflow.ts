@@ -10,16 +10,16 @@ import { IWebhookNotifier, WebhookEvent } from '../../../platform/notifications/
 import { OutboxDispatcher } from '../../../platform/outbox/OutboxDispatcher'
 import { IDatabaseClientProvider } from '../../../platform/persistence/IDatabaseClientProvider'
 import { IPaymentServiceFactory } from '../../payments/application/contracts/IPaymentServiceFactory'
-import { IWalletHandlerFactory } from '../../payments/application/contracts/IWalletHandlerFactory'
 import { WalletSendResult } from '../../payments/application/contracts/IWalletHandler'
+import { IWalletHandlerFactory } from '../../payments/application/contracts/IWalletHandlerFactory'
 import { PayoutStatusAdapterRegistry } from '../../payments/application/PayoutStatusAdapterRegistry'
 import { isSupportedPaymentMethod } from '../../payments/application/supportedPaymentMethods'
 import { IExchangeProviderFactory } from '../../treasury/application/contracts/IExchangeProviderFactory'
-import { RefundAttemptResult, RefundReservation } from './TransactionRepository'
-import { TransactionTransitionName } from './TransactionStateMachine'
 import { TransactionEventDispatcher } from './TransactionEventDispatcher'
 import { TransactionWithRelations } from './transactionNotificationTypes'
+import { RefundAttemptResult, RefundReservation } from './TransactionRepository'
 import { TransactionRepository } from './TransactionRepository'
+import { TransactionTransitionName } from './TransactionStateMachine'
 
 type RefundResult = WalletSendResult
 
@@ -31,6 +31,7 @@ export class TransactionWorkflow {
   private readonly outboxDispatcher: OutboxDispatcher
   private readonly refundService: RefundService
   private readonly repository: TransactionRepository
+  private readonly scopeLabel = '[TransactionWorkflow]'
 
   constructor(
     @inject(TYPES.IDatabaseClientProvider) dbProvider: IDatabaseClientProvider,
@@ -48,25 +49,6 @@ export class TransactionWorkflow {
     this.outboxDispatcher = outboxDispatcher
     this.refundService = new RefundService(walletHandlerFactory, baseLogger)
     this.exchangeProviderFactory = exchangeProviderFactory
-  }
-
-  private buildIdempotencyKey(...segments: Array<string | undefined>): string {
-    return segments
-      .filter((segment): segment is string => Boolean(segment && segment.trim()))
-      .join('|')
-  }
-
-  private async applyTransition(
-    prismaClient: Awaited<ReturnType<IDatabaseClientProvider['getClient']>>,
-    params: {
-      context?: Prisma.InputJsonValue
-      data?: Prisma.TransactionUpdateInput
-      idempotencyKey: string
-      name: TransactionTransitionName
-      transactionId: string
-    },
-  ): Promise<TransactionWithRelations | null> {
-    return this.repository.applyTransition(prismaClient, params)
   }
 
   public async handleIncomingDeposit(message: ReceivedCryptoTransactionMessage): Promise<void> {
@@ -120,11 +102,11 @@ export class TransactionWorkflow {
     }
 
     try {
-    const walletHandler = this.refundService.resolveWalletHandler(message.blockchain)
-      const exchangeProvider = this.exchangeProviderFactory.getExchangeProviderForCapability({
+      const walletHandler = this.refundService.resolveWalletHandler(message.blockchain)
+      const exchangeProvider = this.exchangeProviderFactory.getExchangeProviderForCapability?.({
         blockchain: message.blockchain,
         targetCurrency: message.targetCurrency,
-      })
+      }) ?? this.exchangeProviderFactory.getExchangeProvider(message.targetCurrency)
       const addressResult = await exchangeProvider.getExchangeAddress({
         blockchain: message.blockchain,
         cryptoCurrency: message.cryptoCurrency,
@@ -132,7 +114,7 @@ export class TransactionWorkflow {
       if (!addressResult.success) {
         scopedLogger.error('Failed to resolve exchange address', { code: addressResult.code, reason: addressResult.reason })
         await this.outboxDispatcher.enqueueSlack(
-          `${this.logger.scope} Error resolving exchange address for ${message.cryptoCurrency} -> ${message.targetCurrency}; tx=${message.transactionId ?? 'n/a'} reason=${addressResult.reason ?? addressResult.code ?? 'unknown'}`,
+          `${this.scopeLabel} Error resolving exchange address for ${message.cryptoCurrency} -> ${message.targetCurrency}; tx=${message.transactionId ?? 'n/a'} reason=${addressResult.reason ?? addressResult.code ?? 'unknown'}`,
           'payment-sent',
         )
         return
@@ -148,7 +130,7 @@ export class TransactionWorkflow {
 
       if (!success) {
         await this.outboxDispatcher.enqueueSlack(
-          `${this.logger.scope} Error sending ${message.amount} ${message.cryptoCurrency} to exchange (${message.targetCurrency}); tx=${message.transactionId ?? 'n/a'} on-chain=${exchangeTransactionId ?? 'n/a'}`,
+          `${this.scopeLabel} Error sending ${message.amount} ${message.cryptoCurrency} to exchange (${message.targetCurrency}); tx=${message.transactionId ?? 'n/a'} on-chain=${exchangeTransactionId ?? 'n/a'}`,
           'payment-sent',
         )
         return
@@ -298,6 +280,75 @@ export class TransactionWorkflow {
     }
   }
 
+  private async applyTransition(
+    prismaClient: Awaited<ReturnType<IDatabaseClientProvider['getClient']>>,
+    params: {
+      context?: Prisma.InputJsonValue
+      data?: Prisma.TransactionUpdateInput
+      idempotencyKey: string
+      name: TransactionTransitionName
+      transactionId: string
+    },
+  ): Promise<null | TransactionWithRelations> {
+    return this.repository.applyTransition(prismaClient, params)
+  }
+
+  private async attemptRefund(
+    prismaClient: Awaited<ReturnType<IDatabaseClientProvider['getClient']>>,
+    params: {
+      logger: ScopedLogger
+      reason: string
+      refund: () => Promise<RefundResult>
+      transactionId: string
+      trigger: string
+    },
+  ): Promise<void> {
+    const idempotencyKey = this.buildIdempotencyKey('refund', params.transactionId)
+    const reservation = await this.repository.reserveRefund(prismaClient, {
+      idempotencyKey,
+      reason: params.reason,
+      transactionId: params.transactionId,
+      trigger: params.trigger,
+    })
+
+    if (!this.shouldSendRefund(reservation, params.logger, params.transactionId)) {
+      return
+    }
+
+    let refundResult: RefundResult
+    try {
+      refundResult = await params.refund()
+    }
+    catch (error) {
+      params.logger.error('Refund attempt threw unexpected error', error)
+      refundResult = { reason: error instanceof Error ? error.message : 'unknown_error', success: false }
+    }
+
+    if (!refundResult.success) {
+      params.logger.warn('Refund attempt failed', {
+        reason: refundResult.reason,
+        transactionId: params.transactionId,
+      })
+    }
+
+    try {
+      await this.repository.recordRefundOutcome(prismaClient, {
+        idempotencyKey,
+        refundResult: this.normalizeRefundResult(refundResult),
+        transactionId: params.transactionId,
+      })
+    }
+    catch (error) {
+      params.logger.error('Failed to record refund outcome', error)
+    }
+  }
+
+  private buildIdempotencyKey(...segments: Array<string | undefined>): string {
+    return segments
+      .filter((segment): segment is string => Boolean(segment && segment.trim()))
+      .join('|')
+  }
+
   private buildPendingConversionUpdates(
     cryptoCurrency: PaymentSentMessage['cryptoCurrency'],
     targetCurrency: PaymentSentMessage['targetCurrency'],
@@ -413,6 +464,18 @@ export class TransactionWorkflow {
     return Boolean(existing?.exchangeHandoffAt)
   }
 
+  private normalizeRefundResult(result: RefundResult): RefundAttemptResult {
+    if (result.success) {
+      return { success: true, transactionId: result.transactionId }
+    }
+
+    return {
+      reason: result.reason,
+      success: false,
+      transactionId: result.transactionId,
+    }
+  }
+
   private async persistPendingConversions(
     prismaClient: Awaited<ReturnType<IDatabaseClientProvider['getClient']>>,
     params: {
@@ -463,10 +526,11 @@ export class TransactionWorkflow {
   ): Promise<void> {
     let paymentService: ReturnType<IPaymentServiceFactory['getPaymentService']>
     try {
-      paymentService = this.paymentServiceFactory.getPaymentServiceForCapability({
+      const basePaymentService = this.paymentServiceFactory.getPaymentService(transaction.quote.paymentMethod)
+      paymentService = this.paymentServiceFactory.getPaymentServiceForCapability?.({
         paymentMethod: transaction.quote.paymentMethod,
         targetCurrency: transaction.quote.targetCurrency,
-      })
+      }) ?? basePaymentService
     }
     catch (error) {
       logger.error('Unsupported payment method for payout', error)
@@ -652,68 +716,6 @@ export class TransactionWorkflow {
     }
   }
 
-  private async attemptRefund(
-    prismaClient: Awaited<ReturnType<IDatabaseClientProvider['getClient']>>,
-    params: {
-      logger: ScopedLogger
-      reason: string
-      refund: () => Promise<RefundResult>
-      transactionId: string
-      trigger: string
-    },
-  ): Promise<void> {
-    const idempotencyKey = this.buildIdempotencyKey('refund', params.transactionId)
-    const reservation = await this.repository.reserveRefund(prismaClient, {
-      idempotencyKey,
-      reason: params.reason,
-      transactionId: params.transactionId,
-      trigger: params.trigger,
-    })
-
-    if (!this.shouldSendRefund(reservation, params.logger, params.transactionId)) {
-      return
-    }
-
-    let refundResult: RefundResult
-    try {
-      refundResult = await params.refund()
-    }
-    catch (error) {
-      params.logger.error('Refund attempt threw unexpected error', error)
-      refundResult = { reason: error instanceof Error ? error.message : 'unknown_error', success: false }
-    }
-
-    if (!refundResult.success) {
-      params.logger.warn('Refund attempt failed', {
-        reason: refundResult.reason,
-        transactionId: params.transactionId,
-      })
-    }
-
-    try {
-      await this.repository.recordRefundOutcome(prismaClient, {
-        idempotencyKey,
-        refundResult: this.normalizeRefundResult(refundResult),
-        transactionId: params.transactionId,
-      })
-    }
-    catch (error) {
-      params.logger.error('Failed to record refund outcome', error)
-    }
-  }
-
-  private normalizeRefundResult(result: RefundResult): RefundAttemptResult {
-    if (result.success) {
-      return { success: true, transactionId: result.transactionId }
-    }
-
-    return {
-      reason: result.reason,
-      success: false,
-      transactionId: result.transactionId,
-    }
-  }
-
   private shouldSendRefund(
     reservation: RefundReservation,
     logger: ScopedLogger,
@@ -761,7 +763,8 @@ class RefundService {
     onChainId: string
   }): Promise<RefundResult> {
     const { amount, cryptoCurrency, network, onChainId } = params
-    const walletHandler = this.walletHandlerFactory.getWalletHandlerForCapability({ blockchain: network })
+    const walletHandler = this.walletHandlerFactory.getWalletHandlerForCapability?.({ blockchain: network })
+      ?? this.walletHandlerFactory.getWalletHandler(network)
     const address = await walletHandler.getAddressFromTransaction({ onChainId })
     return walletHandler.send({ address, amount, cryptoCurrency })
   }
@@ -769,7 +772,8 @@ class RefundService {
   public async refundToSender(
     message: ReceivedCryptoTransactionMessage,
   ): Promise<RefundResult> {
-    const walletHandler = this.walletHandlerFactory.getWalletHandlerForCapability({ blockchain: message.blockchain })
+    const walletHandler = this.walletHandlerFactory.getWalletHandlerForCapability?.({ blockchain: message.blockchain })
+      ?? this.walletHandlerFactory.getWalletHandler(message.blockchain)
     return walletHandler.send({
       address: message.addressFrom,
       amount: message.amount,
@@ -778,6 +782,7 @@ class RefundService {
   }
 
   public resolveWalletHandler(blockchain: Parameters<IWalletHandlerFactory['getWalletHandler']>[0]) {
-    return this.walletHandlerFactory.getWalletHandlerForCapability({ blockchain })
+    return this.walletHandlerFactory.getWalletHandlerForCapability?.({ blockchain })
+      ?? this.walletHandlerFactory.getWalletHandler(blockchain)
   }
 }

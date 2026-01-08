@@ -42,8 +42,8 @@ export const createHealthHandler = (state: { live: boolean, ready: boolean }) =>
     res.end('not found')
   }
 
-let worker: OutboxWorker | null = null
-let repository: OutboxRepository | null = null
+let worker: null | OutboxWorker = null
+let repository: null | OutboxRepository = null
 
 export function startOutboxWorker(): void {
   worker = iocContainer.get<OutboxWorker>(TYPES.OutboxWorker)

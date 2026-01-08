@@ -1,7 +1,7 @@
 #!/usr/bin/env -S npx tsx
 // src/stellar/index.ts
 
-import { BlockchainNetwork, CryptoCurrency } from '@prisma/client'
+import { BlockchainNetwork } from '@prisma/client'
 import { Horizon } from '@stellar/stellar-sdk'
 import { inject, injectable } from 'inversify'
 
@@ -9,11 +9,10 @@ import { TYPES } from '../../../../app/container/types'
 import { createScopedLogger, ScopedLogger } from '../../../../core/logging/scopedLogger'
 import { ILogger } from '../../../../core/logging/types'
 import { QueueName } from '../../../../platform/messaging/queues'
-import { ReceivedCryptoTransactionMessage } from '../../../../platform/messaging/queueSchema'
 import { OutboxDispatcher } from '../../../../platform/outbox/OutboxDispatcher'
 import { IDatabaseClientProvider } from '../../../../platform/persistence/IDatabaseClientProvider'
-import { IDepositVerifierRegistry } from '../../../payments/application/contracts/IDepositVerifier'
 import { ISecretManager } from '../../../../platform/secrets/ISecretManager'
+import { IDepositVerifierRegistry } from '../../../payments/application/contracts/IDepositVerifier'
 
 // Minimal stream handle types returned by stellar-sdk stream()
 type StreamHandle = (() => void) | { close: () => void }

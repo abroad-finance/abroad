@@ -61,7 +61,8 @@ export class PaymentsController extends Controller {
     catch (error) {
       const mapped = mapErrorToHttpResponse(error)
       this.setStatus(mapped.status)
-      return mapped.body as LiquidityResponse
+      const reason = this.extractReason(mapped.body, 'Failed to retrieve liquidity')
+      return { liquidity: 0, message: reason, success: false }
     }
   }
 
@@ -90,7 +91,14 @@ export class PaymentsController extends Controller {
     catch (error) {
       const mapped = mapErrorToHttpResponse(error)
       this.setStatus(mapped.status)
-      return mapped.body as OnboardResponse
+      const reason = this.extractReason(mapped.body, 'Failed to onboard user')
+      return { message: reason, success: false }
     }
+  }
+
+  private extractReason(body: Record<string, unknown>, fallback: string): string {
+    const reason = (typeof body.reason === 'string' ? body.reason : undefined)
+      ?? (typeof body.message === 'string' ? body.message : undefined)
+    return reason ?? fallback
   }
 }

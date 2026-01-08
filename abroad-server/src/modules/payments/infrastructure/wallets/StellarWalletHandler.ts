@@ -34,8 +34,8 @@ function toStellarAmount(n: number): string {
 
 @injectable()
 export class StellarWalletHandler implements IWalletHandler {
-  private readonly logger: ScopedLogger
   public readonly capability = { blockchain: BlockchainNetwork.STELLAR }
+  private readonly logger: ScopedLogger
 
   constructor(
     @inject(TYPES.ISecretManager) private secretManager: ISecretManager,

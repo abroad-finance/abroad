@@ -42,6 +42,7 @@ export class TransferoPaymentService implements IPaymentService {
     method: PaymentMethod.PIX,
     targetCurrency: TargetCurrency.BRL,
   }
+
   public readonly currency: TargetCurrency = TargetCurrency.BRL
   public readonly fixedFee = 0.0
   public readonly isAsync = true
@@ -55,9 +56,6 @@ export class TransferoPaymentService implements IPaymentService {
 
   public readonly percentageFee = 0.0
   public readonly provider = 'transfero'
-  private readonly maxSendAttempts: number
-  private readonly retryDelayMs: number
-
   private readonly brazilDdds = new Set([
     '11', '12', '13', '14', '15', '16', '17', '18', '19',
     '21', '22', '24', '27', '28',
@@ -72,6 +70,10 @@ export class TransferoPaymentService implements IPaymentService {
   ])
 
   private cachedToken?: { exp: number, value: string }
+
+  private readonly maxSendAttempts: number
+
+  private readonly retryDelayMs: number
   private readonly transferCurrency = 'BRL'
 
   public constructor(
@@ -168,7 +170,7 @@ export class TransferoPaymentService implements IPaymentService {
 
         const contract = await this.buildContract({ account, qrCode, taxId, value })
 
-        const { data } = await axios.post<TransactionTransfero>(
+        const response = await axios.post<TransactionTransfero>(
           `${config.baseUrl}/api/v2.0/accounts/${config.accountId}/paymentgroup`,
           contract,
           {
@@ -178,6 +180,7 @@ export class TransferoPaymentService implements IPaymentService {
             },
           },
         )
+        const data = response?.data ?? response
 
         const paymentId = this.extractPaymentId(data)
         return paymentId
@@ -201,32 +204,6 @@ export class TransferoPaymentService implements IPaymentService {
     return this.buildFailure('retriable', 'Maximum send attempts exceeded')
   }
 
-  private buildFailure(code: PaymentFailureCode, reason?: string): PaymentSendResult {
-    return { code, reason, success: false }
-  }
-
-  private extractFailureCode(error: unknown): PaymentFailureCode {
-    if (axios.isAxiosError(error)) {
-      const status = error.response?.status
-      if (status && status >= 400 && status < 500) {
-        return 'permanent'
-      }
-    }
-    return 'retriable'
-  }
-
-  private isRetryableError(error: unknown): boolean {
-    if (axios.isAxiosError(error)) {
-      const status = error.response?.status
-      return !status || status >= 500
-    }
-    const message = error instanceof Error ? error.message.toLowerCase() : ''
-    if (message.includes('tax id is missing')) {
-      return false
-    }
-    return true
-  }
-
   public verifyAccount({ account }: { account: string }): Promise<boolean> {
     return Promise.resolve(Boolean(account))
   }
@@ -248,6 +225,10 @@ export class TransferoPaymentService implements IPaymentService {
     }
 
     return [this.buildPixPayment({ account, taxId, value })]
+  }
+
+  private buildFailure(code: PaymentFailureCode, reason?: string): PaymentSendResult {
+    return { code, reason, success: false }
   }
 
   private buildPixKey(account: string): string {
@@ -276,6 +257,16 @@ export class TransferoPaymentService implements IPaymentService {
       taxId: params.taxId,
       taxIdCountry: 'BRA',
     }
+  }
+
+  private extractFailureCode(error: unknown): PaymentFailureCode {
+    if (axios.isAxiosError(error)) {
+      const status = error.response?.status
+      if (status && status >= 400 && status < 500) {
+        return 'permanent'
+      }
+    }
+    return 'retriable'
   }
 
   private extractLiquidityFromBalance(
@@ -377,6 +368,18 @@ export class TransferoPaymentService implements IPaymentService {
     return digits.length === 10 || digits.length === 11
   }
 
+  private isRetryableError(error: unknown): boolean {
+    if (axios.isAxiosError(error)) {
+      const status = error.response?.status
+      return !status || status >= 500
+    }
+    const message = error instanceof Error ? error.message.toLowerCase() : ''
+    if (message.includes('tax id is missing')) {
+      return false
+    }
+    return true
+  }
+
   private isTollFreeNumber(digits: string): boolean {
     return /^0800\d{7}$/.test(digits)
   }
@@ -417,6 +420,13 @@ export class TransferoPaymentService implements IPaymentService {
     return normalized
   }
 
+  private readNumberFromEnv(envKey: string, fallback: number): number {
+    const raw = process.env[envKey]
+    if (!raw) return fallback
+    const parsed = Number(raw)
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback
+  }
+
   private removeCarrierPrefix(digits: string): string {
     if (/^0\d{2}\d{10,11}$/.test(digits)) {
       return digits.slice(3)
@@ -429,18 +439,11 @@ export class TransferoPaymentService implements IPaymentService {
     return digits
   }
 
-  private stripToDigits(input: number | string): string {
-    return String(input).replace(/\D+/g, '')
-  }
-
   private async sleep(ms: number): Promise<void> {
     await new Promise(resolve => setTimeout(resolve, ms))
   }
 
-  private readNumberFromEnv(envKey: string, fallback: number): number {
-    const raw = process.env[envKey]
-    if (!raw) return fallback
-    const parsed = Number(raw)
-    return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback
+  private stripToDigits(input: number | string): string {
+    return String(input).replace(/\D+/g, '')
   }
 }

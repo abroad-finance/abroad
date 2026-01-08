@@ -1,11 +1,10 @@
 import 'reflect-metadata'
-
 import { TargetCurrency } from '@prisma/client'
 
 import { PaymentStatusUpdatedController } from '../../../../../modules/payments/interfaces/queue/PaymentStatusUpdatedController'
+import { TransactionWorkflow } from '../../../../../modules/transactions/application/TransactionWorkflow'
 import { QueueName } from '../../../../../platform/messaging/queues'
 import { PaymentStatusUpdatedMessage } from '../../../../../platform/messaging/queueSchema'
-import { TransactionWorkflow } from '../../../../../modules/transactions/application/TransactionWorkflow'
 import { createMockLogger, createMockQueueHandler, MockLogger, MockQueueHandler } from '../../../../setup/mockFactories'
 
 describe('PaymentStatusUpdatedController', () => {

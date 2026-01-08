@@ -11,8 +11,8 @@ import { ExchangeAddressResult, ExchangeFailureCode, IExchangeProvider } from '.
 
 @injectable()
 export class TransferoExchangeProvider implements IExchangeProvider {
+  public readonly capability = { blockchain: BlockchainNetwork.STELLAR, targetCurrency: TargetCurrency.BRL }
   readonly exchangePercentageFee = 0.001
-  public readonly capability = { targetCurrency: TargetCurrency.BRL, blockchain: BlockchainNetwork.STELLAR }
 
   private cachedToken?: { exp: number, value: string }
   private readonly logger: ScopedLogger
@@ -128,6 +128,10 @@ export class TransferoExchangeProvider implements IExchangeProvider {
     }
   }
 
+  private buildFailure(code: ExchangeFailureCode, reason?: string): ExchangeAddressResult {
+    return { code, reason, success: false }
+  }
+
   /** OAuth2 client-credentials flow */
   private async getAccessToken(): Promise<string> {
     const now = Date.now()
@@ -161,9 +165,5 @@ export class TransferoExchangeProvider implements IExchangeProvider {
     this.cachedToken = { exp: now + seconds * 1000, value }
 
     return value
-  }
-
-  private buildFailure(code: ExchangeFailureCode, reason?: string): ExchangeAddressResult {
-    return { code, reason, success: false }
   }
 }

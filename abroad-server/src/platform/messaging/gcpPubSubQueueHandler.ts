@@ -115,6 +115,16 @@ export class GCPPubSubQueueHandler implements IQueueHandler {
     }
   }
 
+  private normalizeError(error: unknown): string | undefined {
+    if (error instanceof Error) {
+      return error.message
+    }
+    if (typeof error === 'string') {
+      return error
+    }
+    return undefined
+  }
+
   private parseMessage<Name extends QueueName>(
     queueName: Name,
     msg: Message,
@@ -164,15 +174,5 @@ export class GCPPubSubQueueHandler implements IQueueHandler {
     catch (dlqError) {
       this.logger.error('Failed to post message to dead-letter queue', dlqError)
     }
-  }
-
-  private normalizeError(error: unknown): string | undefined {
-    if (error instanceof Error) {
-      return error.message
-    }
-    if (typeof error === 'string') {
-      return error
-    }
-    return undefined
   }
 }
