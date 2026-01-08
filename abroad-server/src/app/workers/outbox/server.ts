@@ -3,6 +3,7 @@ import http from 'http'
 
 import { createScopedLogger } from '../../../core/logging/scopedLogger'
 import { ILogger } from '../../../core/logging/types'
+import { OutboxRepository } from '../../../platform/outbox/OutboxRepository'
 import { OutboxWorker } from '../../../platform/outbox/OutboxWorker'
 import { iocContainer } from '../../container'
 import { TYPES } from '../../container/types'
@@ -29,14 +30,24 @@ export const createHealthHandler = (state: { live: boolean, ready: boolean }) =>
       res.end(ok ? 'ready' : 'not ready')
       return
     }
+    if (url.startsWith('/stats')) {
+      void respondWithStats(res).catch((error) => {
+        logger.error('[outbox-worker] Failed to serve /stats', error)
+        res.statusCode = 500
+        res.end('error')
+      })
+      return
+    }
     res.statusCode = 404
     res.end('not found')
   }
 
 let worker: OutboxWorker | null = null
+let repository: OutboxRepository | null = null
 
 export function startOutboxWorker(): void {
   worker = iocContainer.get<OutboxWorker>(TYPES.OutboxWorker)
+  repository = iocContainer.get<OutboxRepository>(OutboxRepository)
   worker.start()
   health.ready = true
 }
@@ -47,8 +58,21 @@ export async function stopOutboxWorker(): Promise<void> {
   }
   finally {
     worker = null
+    repository = null
     health.ready = false
   }
+}
+
+async function respondWithStats(res: http.ServerResponse): Promise<void> {
+  if (!repository) {
+    res.statusCode = 503
+    res.end('outbox not ready')
+    return
+  }
+  const summary = await repository.summarizeFailures()
+  res.statusCode = 200
+  res.setHeader('content-type', 'application/json')
+  res.end(JSON.stringify(summary))
 }
 
 if (require.main === module) {
