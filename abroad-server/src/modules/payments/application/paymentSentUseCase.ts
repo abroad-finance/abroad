@@ -21,14 +21,20 @@ export class PaymentSentUseCase implements IPaymentSentUseCase {
   public async process(rawMessage: unknown): Promise<void> {
     const logger = createScopedLogger(this.logger, {
       correlationId: getCorrelationId(),
-      scope: '',
+      scope: 'PaymentSentUseCase',
     })
     const message = this.parseMessage(rawMessage, logger)
     if (!message) {
       return
     }
 
-    await this.workflow.handlePaymentSent(message)
+    try {
+      await this.workflow.handlePaymentSent(message)
+    }
+    catch (error) {
+      logger.error('[PaymentSent]: Failed to process payment sent message', error)
+      throw error
+    }
   }
 
   private parseMessage(msg: unknown, logger: ILogger): PaymentSentMessage | undefined {
