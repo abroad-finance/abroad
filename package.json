@@ -12,6 +12,7 @@
     "build:server": "npm -w abroad run build",
     "start:server": "npm -w abroad run start",
     "migrate:dev": "npm -w abroad run migrate:dev",
+    "checks:mandatory": "npm -w abroad run checks:mandatory",
     "dev:ui": "npm -w abroad-ui run dev",
     "build:ui": "npm -w abroad-ui run build",
     "dev": "npx concurrently -n server,ui -c auto \"npm -w abroad run dev\" \"npm -w abroad-ui run dev\"",

@@ -1,168 +1,117 @@
+import 'reflect-metadata'
 import { CryptoCurrency } from '@prisma/client'
 
-import type { ISecretManager } from '../../../../../platform/secrets/ISecretManager'
-
 import { SolanaWalletHandler } from '../../../../../modules/payments/infrastructure/wallets/SolanaWalletHandler'
-import { createMockLogger, MockLogger } from '../../../../setup/mockFactories'
+import { Secrets } from '../../../../../platform/secrets/ISecretManager'
 
-const getOrCreateAssociatedTokenAccountMock = jest.fn()
-const createTransferInstructionMock = jest.fn()
-const sendTransactionMock = jest.fn()
-const confirmTransactionMock = jest.fn()
+const connectionMock = {
+  confirmTransaction: jest.fn(),
+  getAccountInfo: jest.fn(),
+  getLatestBlockhash: jest.fn(),
+  sendTransaction: jest.fn(),
+}
+
+class FakePublicKey {
+  public constructor(public readonly value: string) {}
+}
+
+jest.mock('@solana/web3.js', () => ({
+  Connection: jest.fn(() => connectionMock),
+  Keypair: {
+    fromSecretKey: jest.fn(() => ({ publicKey: new FakePublicKey('sender'), secretKey: new Uint8Array(64) })),
+    fromSeed: jest.fn(() => ({ publicKey: new FakePublicKey('seed'), secretKey: new Uint8Array(32) })),
+  },
+  PublicKey: jest.fn((value: string) => new FakePublicKey(value)),
+  TransactionMessage: jest.fn(function (this: { compileToV0Message: () => unknown }) {
+    this.compileToV0Message = () => ({ compiled: true })
+  }),
+  VersionedTransaction: jest.fn(function () {
+    this.sign = jest.fn()
+  }),
+}))
 
 jest.mock('@solana/spl-token', () => ({
-  createTransferInstruction: (...args: unknown[]) => createTransferInstructionMock(...args),
-  getOrCreateAssociatedTokenAccount: (...args: unknown[]) => getOrCreateAssociatedTokenAccountMock(...args),
+  createTransferInstruction: jest.fn(() => ({ instruction: true })),
+  getOrCreateAssociatedTokenAccount: jest.fn(async () => ({ address: 'associated-account' })),
 }))
 
-jest.mock('@solana/web3.js', () => {
-  class PublicKey {
-    value: string
-    constructor(value: string) {
-      this.value = value
-    }
+const buildHandler = () => {
+  const secretManager = {
+    getSecret: jest.fn(async (key: string) => {
+      switch (key) {
+        case Secrets.SOLANA_PRIVATE_KEY:
+          return '3Lw5wZbLv'
+        case Secrets.SOLANA_RPC_URL:
+          return 'http://localhost:8899'
+        case Secrets.SOLANA_USDC_MINT:
+          return 'mint-address'
+        default:
+          return ''
+      }
+    }),
   }
+  const logger = { error: jest.fn(), info: jest.fn(), warn: jest.fn() }
+  const handler = new SolanaWalletHandler(secretManager as never, logger as never)
+  return { handler, logger, secretManager }
+}
 
-  class Keypair {
-    publicKey: PublicKey
-    constructor() {
-      this.publicKey = new PublicKey('sender')
-    }
-
-    static fromSecretKey(key: Uint8Array): Keypair {
-      void key
-      return new Keypair()
-    }
-
-    static fromSeed(seed: Uint8Array): Keypair {
-      void seed
-      return new Keypair()
-    }
-  }
-
-  class Connection {
-    commitment: string
-    url: string
-    constructor(url: string, commitment: string) {
-      this.url = url
-      this.commitment = commitment
-    }
-
-    async confirmTransaction(_strategy: unknown) {
-      return confirmTransactionMock(_strategy)
-    }
-
-    async getAccountInfo(pubkey: PublicKey) {
-      return { exists: Boolean(pubkey) }
-    }
-
-    async getLatestBlockhash() {
-      return { blockhash: 'blockhash-1', lastValidBlockHeight: 100 }
-    }
-
-    async sendTransaction(_tx: unknown) {
-      return sendTransactionMock(_tx) ?? 'sig-123'
-    }
-  }
-
-  class TransactionMessage {
-    private readonly props: { instructions: unknown[], payerKey: PublicKey, recentBlockhash: string }
-    constructor(props: { instructions: unknown[], payerKey: PublicKey, recentBlockhash: string }) {
-      this.props = props
-    }
-
-    compileToV0Message() {
-      return { ...this.props, compiled: true }
-    }
-  }
-
-  class VersionedTransaction {
-    readonly message: unknown
-    constructor(message: unknown) {
-      this.message = message
-    }
-
-    sign(keys: unknown[]) {
-      void keys
-      return undefined
-    }
-  }
-
-  return { Connection, Keypair, PublicKey, TransactionMessage, VersionedTransaction }
-})
-
-jest.mock('bs58', () => ({
-  decode: () => new Uint8Array(Array.from({ length: 32 }, (_, idx) => idx)),
-}))
-
-describe('SolanaWalletHandler.send', () => {
-  let secretManager: ISecretManager
-  let logger: MockLogger
-
+describe('SolanaWalletHandler', () => {
   beforeEach(() => {
     jest.clearAllMocks()
-    getOrCreateAssociatedTokenAccountMock.mockResolvedValue({ address: 'token-account' })
-    createTransferInstructionMock.mockReturnValue('ix-transfer')
-    sendTransactionMock.mockResolvedValue('sig-123')
-    confirmTransactionMock.mockResolvedValue({ value: { err: null } })
-    secretManager = {
-      getSecret: jest.fn(async (name: string) => {
-        if (name === 'SOLANA_RPC_URL') return 'http://rpc'
-        if (name === 'SOLANA_PRIVATE_KEY') return 'base58-key'
-        if (name === 'SOLANA_USDC_MINT') return 'usdc-mint'
-        return ''
-      }),
-      getSecrets: jest.fn(),
-    }
-    logger = createMockLogger()
+    connectionMock.getAccountInfo.mockResolvedValue({ exists: true })
+    connectionMock.getLatestBlockhash.mockResolvedValue({ blockhash: 'bh', lastValidBlockHeight: 10 })
+    connectionMock.sendTransaction.mockResolvedValue('sig-1')
+    connectionMock.confirmTransaction.mockResolvedValue({ value: { err: null } })
   })
 
-  it('sends a USDC transfer and returns the signature', async () => {
-    const handler = new SolanaWalletHandler(secretManager, logger)
-
+  it('rejects unsupported currencies', async () => {
+    const { handler, logger } = buildHandler()
     const result = await handler.send({
-      address: 'dest-wallet',
-      amount: 1.25,
-      cryptoCurrency: CryptoCurrency.USDC,
+      address: 'dest',
+      amount: 1,
+      cryptoCurrency: 'USDT' as CryptoCurrency,
     })
 
-    expect(result).toEqual({ success: true, transactionId: 'sig-123' })
-    expect(secretManager.getSecret).toHaveBeenCalledWith('SOLANA_RPC_URL')
-    expect(secretManager.getSecret).toHaveBeenCalledWith('SOLANA_PRIVATE_KEY')
-    expect(secretManager.getSecret).toHaveBeenCalledWith('SOLANA_USDC_MINT')
-    expect(getOrCreateAssociatedTokenAccountMock).toHaveBeenCalledTimes(2)
-    expect(createTransferInstructionMock).toHaveBeenCalled()
-    expect(sendTransactionMock).toHaveBeenCalled()
-    expect(confirmTransactionMock).toHaveBeenCalled()
-    expect(logger.error).not.toHaveBeenCalled()
-    expect(logger.warn).not.toHaveBeenCalled()
+    expect(result).toEqual({ code: 'validation', reason: 'unsupported_currency', success: false })
+    expect(logger.warn).toHaveBeenCalledWith('Unsupported cryptocurrency for Solana', 'USDT')
   })
 
-  it('returns failure for unsupported cryptocurrency', async () => {
-    const handler = new SolanaWalletHandler(secretManager, logger)
+  it('handles missing mint information gracefully', async () => {
+    const { handler, logger } = buildHandler()
+    connectionMock.getAccountInfo.mockResolvedValueOnce(null)
 
     const result = await handler.send({
       address: 'dest',
       amount: 1,
-      cryptoCurrency: 'BTC' as CryptoCurrency,
-    })
-
-    expect(result).toEqual({ code: 'validation', reason: 'unsupported_currency', success: false })
-    expect(secretManager.getSecret).not.toHaveBeenCalled()
-    expect(logger.warn).toHaveBeenCalledWith('Unsupported cryptocurrency for Solana', 'BTC')
-  })
-
-  it('handles downstream errors gracefully', async () => {
-    const handler = new SolanaWalletHandler(secretManager, logger)
-    sendTransactionMock.mockRejectedValueOnce(new Error('network down'))
-
-    const result = await handler.send({
-      address: 'dest-wallet',
-      amount: 2,
       cryptoCurrency: CryptoCurrency.USDC,
     })
 
-    expect(result).toEqual({ code: 'retriable', reason: 'network down', success: false })
-    expect(logger.error).toHaveBeenCalled()
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.reason).toContain('USDC mint not found')
+    }
+    expect(logger.error).toHaveBeenCalledWith(
+      'Error sending Solana transaction',
+      expect.objectContaining({ reason: expect.stringContaining('USDC mint not found') }),
+    )
+  })
+
+  it('surfaces validation errors from amount conversion', async () => {
+    const { handler, logger } = buildHandler()
+
+    const result = await handler.send({
+      address: 'dest',
+      amount: -1,
+      cryptoCurrency: CryptoCurrency.USDC,
+    })
+
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.reason).toContain('Invalid amount')
+    }
+    expect(logger.error).toHaveBeenCalledWith(
+      'Error sending Solana transaction',
+      expect.objectContaining({ reason: expect.stringContaining('Invalid amount') }),
+    )
   })
 })

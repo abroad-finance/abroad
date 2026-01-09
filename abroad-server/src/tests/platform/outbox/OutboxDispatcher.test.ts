@@ -112,4 +112,63 @@ describe('OutboxDispatcher', () => {
       reason: 'delivery_failed',
     }))
   })
+
+  it('reschedules delivery with backoff on transient failures', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2024-01-01T00:00:00.000Z'))
+    try {
+      const { dispatcher, queueHandler, repository } = buildMocks()
+      const transientFailure = new Error('transient')
+      queueHandler.postMessage.mockRejectedValueOnce(transientFailure)
+
+      const record: OutboxRecord = {
+        ...baseRecord,
+        attempts: 0,
+        payload: { kind: 'queue', payload: { foo: 'bar' }, queueName: QueueName.USER_NOTIFICATION },
+        type: 'queue',
+      }
+      await dispatcher.deliver(record, 'ctx')
+
+      expect(repository.reschedule).toHaveBeenCalledTimes(1)
+      const rescheduleCall = repository.reschedule.mock.calls[0]
+      if (!rescheduleCall) {
+        throw new Error('reschedule was not invoked')
+      }
+      const [rescheduledId, nextAttempt, error] = rescheduleCall as unknown as [string, Date, Error]
+      expect(rescheduledId).toBe(record.id)
+      expect(error).toBe(transientFailure)
+      expect(nextAttempt.toISOString()).toBe('2024-01-01T00:00:05.000Z')
+    }
+    finally {
+      jest.useRealTimers()
+    }
+  })
+
+  it('logs warnings when slack or dead-letter publishing fails on permanent errors', async () => {
+    const { dispatcher, logger, queueHandler, repository, slackNotifier } = buildMocks()
+    const permanentFailure = new Error('primary failure')
+    queueHandler.postMessage
+      .mockRejectedValueOnce(permanentFailure)
+      .mockRejectedValueOnce(new Error('dlq down'))
+    slackNotifier.sendMessage.mockRejectedValueOnce(new Error('slack down'))
+
+    const record: OutboxRecord = {
+      ...baseRecord,
+      attempts: 5,
+      payload: { kind: 'queue', payload: { foo: 'bar' }, queueName: QueueName.USER_NOTIFICATION },
+      type: 'queue',
+    }
+    await dispatcher.deliver(record, 'ctx')
+
+    expect(repository.markFailed).toHaveBeenCalledWith(record.id, permanentFailure, undefined)
+    expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining('Failed to notify Slack about permanent failure'), expect.any(Error))
+    expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining('Failed to publish dead-letter for outbox delivery failure'), expect.any(Error))
+  })
+
+  it('skips enqueueing when the payload is empty or target missing', async () => {
+    const { dispatcher, repository } = buildMocks()
+    await dispatcher.enqueueSlack('   ', 'ctx')
+    await dispatcher.enqueueWebhook(null, { data: { value: 1 }, event: 'TRANSACTION_UPDATED' as never }, 'ctx')
+
+    expect(repository.create).not.toHaveBeenCalled()
+  })
 })

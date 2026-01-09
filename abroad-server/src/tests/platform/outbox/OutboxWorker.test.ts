@@ -73,4 +73,54 @@ describe('OutboxWorker', () => {
       'outbox-worker',
     )
   })
+
+  it('throttles repeated failure alerts', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2024-01-01T00:00:00.000Z'))
+    const repository = {
+      nextBatch: jest.fn(async () => []),
+      summarizeFailures: jest.fn(async () => ({ delivering: 1, failed: 1 })),
+    }
+    const dispatcher = { deliver: jest.fn(), enqueueSlack: jest.fn(async () => undefined) }
+    const logger = { error: jest.fn(), info: jest.fn(), warn: jest.fn() }
+
+    const worker = new OutboxWorker(repository as never, dispatcher as never, logger as never, { slackOnFailure: true })
+    await worker.reportFailures()
+    await worker.reportFailures()
+
+    expect(dispatcher.enqueueSlack).toHaveBeenCalledTimes(1)
+    jest.useRealTimers()
+  })
+
+  it('logs delivery failures and continues processing', async () => {
+    const failingRecord = {
+      attempts: 0,
+      availableAt: new Date(),
+      createdAt: new Date(),
+      id: '1',
+      lastError: null,
+      payload: {},
+      status: OutboxStatus.PENDING,
+      type: 'queue',
+      updatedAt: new Date(),
+    }
+    const repository = {
+      nextBatch: jest.fn(async () => [failingRecord]),
+      summarizeFailures: jest.fn(async () => ({ delivering: 0, failed: 0 })),
+    }
+    const dispatcher = {
+      deliver: jest.fn(async () => {
+        throw new Error('dispatch failed')
+      }),
+      enqueueSlack: jest.fn(),
+    }
+    const logger = { error: jest.fn(), info: jest.fn(), warn: jest.fn() }
+
+    const worker = new OutboxWorker(repository as never, dispatcher as never, logger as never, { batchSize: 1 })
+    await worker.runOnce()
+
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.stringContaining('Failed delivering outbox record'),
+      expect.objectContaining({ recordId: '1' }),
+    )
+  })
 })
