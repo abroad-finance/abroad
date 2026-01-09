@@ -5,7 +5,13 @@ import { inject, injectable } from 'inversify'
 import { TYPES } from '../../../../app/container/types'
 import { ILogger } from '../../../../core/logging/types'
 import { ISecretManager } from '../../../../platform/secrets/ISecretManager'
-import { IPaymentService, PaymentFailureCode, PaymentSendResult } from '../../application/contracts/IPaymentService'
+import {
+  IPaymentService,
+  PaymentCapability,
+  PaymentFailureCode,
+  PaymentOnboardResult,
+  PaymentSendResult,
+} from '../../application/contracts/IPaymentService'
 
 interface BrebApiEnvelope<T> {
   code?: string
@@ -98,7 +104,7 @@ interface BrebTransactionStatusInfo {
 
 @injectable()
 export class BrebPaymentService implements IPaymentService {
-  public readonly capability = {
+  public readonly capability: PaymentCapability = {
     method: PaymentMethod.BREB,
     targetCurrency: TargetCurrency.COP,
   }
@@ -160,8 +166,8 @@ export class BrebPaymentService implements IPaymentService {
     return this.MAX_TOTAL_AMOUNT_PER_DAY
   }
 
-  public async onboardUser(): Promise<{ message?: string, success: boolean }> {
-    return { message: 'BreB does not require explicit onboarding', success: true }
+  public async onboardUser(): Promise<PaymentOnboardResult> {
+    return { message: 'BreB does not require explicit onboarding', success: true } satisfies PaymentOnboardResult
   }
 
   public async sendPayment({
@@ -213,7 +219,7 @@ export class BrebPaymentService implements IPaymentService {
         return this.buildFailure('permanent', reportResult?.result ?? 'unknown')
       }
       catch (error) {
-        const reason = error instanceof Error ? error.message : 'Unknown error'
+        const reason = this.formatFailureReason(error)
         this.logger.error('[BreB] Payment submission failed', { account, reason })
         const code = this.extractFailureCode(error)
         const shouldRetry = code === 'retriable' && attempt < this.maxSendAttempts && this.isRetryableError(error)
@@ -342,7 +348,7 @@ export class BrebPaymentService implements IPaymentService {
         method: 'POST',
         operation: 'Failed to dispatch payment',
       })
-      return null
+      throw error
     }
   }
 
@@ -352,10 +358,15 @@ export class BrebPaymentService implements IPaymentService {
   }
 
   private extractFailureCode(error: unknown): PaymentFailureCode {
-    const status = this.extractErrorStatus(error)
-    if (status && status >= 400 && status < 500) {
+    if (axios.isAxiosError(error)) {
+      const status = this.extractErrorStatus(error)
+      if (typeof status === 'number') {
+        if (status >= 500) return 'retriable'
+        if (status >= 400) return 'permanent'
+      }
       return 'permanent'
     }
+
     return 'retriable'
   }
 
@@ -470,6 +481,34 @@ export class BrebPaymentService implements IPaymentService {
     }
   }
 
+  private formatFailureReason(error: unknown): string {
+    if (axios.isAxiosError(error)) {
+      if (error.response?.data !== undefined) {
+        if (typeof error.response.data === 'string') {
+          return error.response.data
+        }
+        try {
+          return JSON.stringify(error.response.data)
+        }
+        catch {
+          return String(error.response.data)
+        }
+      }
+      if (error.message) return error.message
+      return 'Request failed'
+    }
+
+    if (error instanceof Error) {
+      return error.message
+    }
+    try {
+      return JSON.stringify(error)
+    }
+    catch {
+      return 'Unknown error'
+    }
+  }
+
   private async getAccessToken(config: BrebServiceConfig): Promise<string> {
     const now = Date.now()
     if (this.accessTokenCache && this.accessTokenCache.expiresAt > now) {
@@ -533,7 +572,7 @@ export class BrebPaymentService implements IPaymentService {
         method: 'POST',
         operation: 'Failed to obtain access token',
       })
-      throw new Error('BreB authentication failed')
+      throw error instanceof Error ? error : new Error('BreB authentication failed')
     }
   }
 
@@ -605,10 +644,10 @@ export class BrebPaymentService implements IPaymentService {
 
   private isRetryableError(error: unknown): boolean {
     const status = this.extractErrorStatus(error)
-    if (status && status >= 500) {
-      return true
+    if (typeof status === 'number') {
+      return status >= 500
     }
-    return !status
+    return false
   }
 
   private logBrebError({

@@ -4,6 +4,7 @@
     "src/app/http/server.ts",
     "src/app/workers/consumers/server.ts",
     "src/app/workers/listeners/server.ts",
+    "src/app/workers/outbox/server.ts",
     "src/app/workers/websocket/server.ts",
     "scripts/maintainability-report.ts",
     "scripts/seed-dev.ts"

@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client'
+import { BlockchainNetwork, CryptoCurrency, PrismaClient } from '@prisma/client'
 import * as StellarSdk from '@stellar/stellar-sdk'
 
 import type { IDatabaseClientProvider } from '../../../../../platform/persistence/IDatabaseClientProvider'
@@ -6,7 +6,7 @@ import type { ISecretManager } from '../../../../../platform/secrets/ISecretMana
 
 import { StellarListener } from '../../../../../modules/treasury/interfaces/listeners/StellarListener'
 import { QueueName, ReceivedCryptoTransactionMessage } from '../../../../../platform/messaging/queues'
-import { createMockLogger, createMockQueueHandler, MockQueueHandler } from '../../../../setup/mockFactories'
+import { createMockLogger } from '../../../../setup/mockFactories'
 
 interface HorizonMocks {
   cursor: jest.Mock
@@ -83,6 +83,29 @@ function createDbProvider(state: null | { lastPagingToken?: string } = null) {
   return { dbProvider, findUnique, upsert }
 }
 
+function createDepositVerifierRegistry() {
+  const verifyNotification = jest.fn(async (paymentId: string, transactionId: string) => ({
+    outcome: 'ok',
+    queueMessage: {
+      addressFrom: 'sender',
+      amount: 1,
+      blockchain: BlockchainNetwork.STELLAR,
+      cryptoCurrency: CryptoCurrency.USDC,
+      onChainId: paymentId,
+      transactionId,
+    } as ReceivedCryptoTransactionMessage,
+  }))
+
+  return {
+    getVerifier: jest.fn(() => ({ verifyNotification })),
+    verifyNotification,
+  }
+}
+
+function createOutboxDispatcher(enqueueQueue?: jest.Mock) {
+  return { enqueueQueue: enqueueQueue ?? jest.fn() }
+}
+
 function createPayment(overrides: Partial<TestPayment> = {}): TestPayment {
   const transaction = overrides.transaction
     ?? (() => Promise.resolve({ memo: Buffer.from('00112233445566778899aabbccddeeff', 'hex').toString('base64') }))
@@ -98,13 +121,6 @@ function createPayment(overrides: Partial<TestPayment> = {}): TestPayment {
     transaction,
     type: overrides.type ?? 'payment',
   }
-}
-
-function createQueueHandler(postMessage?: MockQueueHandler['postMessage']): MockQueueHandler {
-  if (postMessage) {
-    return createMockQueueHandler({ postMessage })
-  }
-  return createMockQueueHandler()
 }
 
 function createSecretManager(accountId = 'account-id', horizonUrl = 'https://horizon', usdcIssuer = 'issuer'): ISecretManager {
@@ -149,11 +165,18 @@ describe('StellarListener', () => {
 
   it('skips non-payment operations while preserving paging tokens', async () => {
     const horizonMocks = setupHorizonMock()
-    const queueHandler = createQueueHandler()
+    const outboxDispatcher = createOutboxDispatcher()
     const secretManager = createSecretManager()
     const { dbProvider, findUnique, upsert } = createDbProvider({ lastPagingToken: 'cursor-1' })
+    const { getVerifier } = createDepositVerifierRegistry()
 
-    const listener = new StellarListener(queueHandler, secretManager, dbProvider, createMockLogger())
+    const listener = new StellarListener(
+      outboxDispatcher as never,
+      secretManager,
+      dbProvider,
+      { getVerifier } as never,
+      createMockLogger(),
+    )
     await listener.start()
 
     expect(findUnique).toHaveBeenCalledWith({ where: { id: 'singleton' } })
@@ -167,7 +190,7 @@ describe('StellarListener', () => {
       update: { lastPagingToken: 'new-token' },
       where: { id: 'singleton' },
     })
-    expect(queueHandler.postMessage).not.toHaveBeenCalled()
+    expect(outboxDispatcher.enqueueQueue).not.toHaveBeenCalled()
 
     listener.stop()
     expect(horizonMocks.streamHandle.close).toHaveBeenCalled()
@@ -175,16 +198,23 @@ describe('StellarListener', () => {
 
   it('filters unsupported assets and memo-less payments before publishing', async () => {
     const horizonMocks = setupHorizonMock()
-    const postMessage: jest.MockedFunction<MockQueueHandler['postMessage']> = jest.fn()
-    postMessage.mockImplementationOnce(() => {
+    const enqueueQueue: jest.Mock = jest.fn()
+    enqueueQueue.mockImplementationOnce(() => {
       throw new Error('queue down')
     })
-    postMessage.mockResolvedValue(undefined)
-    const queueHandler = createQueueHandler(postMessage)
+    enqueueQueue.mockResolvedValue(undefined)
+    const outboxDispatcher = createOutboxDispatcher(enqueueQueue)
     const secretManager = createSecretManager('account-id', 'https://horizon', 'trusted-issuer')
     const { dbProvider, upsert } = createDbProvider()
+    const { getVerifier } = createDepositVerifierRegistry()
 
-    const listener = new StellarListener(queueHandler, secretManager, dbProvider, createMockLogger())
+    const listener = new StellarListener(
+      outboxDispatcher as never,
+      secretManager,
+      dbProvider,
+      { getVerifier } as never,
+      createMockLogger(),
+    )
     await listener.start()
 
     const handler = horizonMocks.streamHandlers[0]
@@ -203,9 +233,9 @@ describe('StellarListener', () => {
     }))
 
     expect(upsert).toHaveBeenCalledTimes(4)
-    expect(postMessage).toHaveBeenCalledTimes(1)
-    const queuedPayload = postMessage.mock.calls[0][1] as ReceivedCryptoTransactionMessage
-    expect(postMessage).toHaveBeenCalledWith(QueueName.RECEIVED_CRYPTO_TRANSACTION, queuedPayload)
+    expect(enqueueQueue).toHaveBeenCalledTimes(1)
+    const queuedPayload = enqueueQueue.mock.calls[0][1] as ReceivedCryptoTransactionMessage
+    expect(enqueueQueue).toHaveBeenCalledWith(QueueName.RECEIVED_CRYPTO_TRANSACTION, queuedPayload, 'stellar.listener', { deliverNow: true })
     expect(queuedPayload.transactionId).toBe('12345678-1234-5678-1234-567812345678')
 
     listener.stop()
@@ -213,10 +243,16 @@ describe('StellarListener', () => {
   })
 
   it('clears keep-alives and supports function-based stream cancellation on stop', () => {
-    const queueHandler = createQueueHandler()
+    const outboxDispatcher = createOutboxDispatcher()
     const secretManager = createSecretManager()
     const { dbProvider } = createDbProvider()
-    const listener = new StellarListener(queueHandler, secretManager, dbProvider, createMockLogger())
+    const listener = new StellarListener(
+      outboxDispatcher as never,
+      secretManager,
+      dbProvider,
+      { getVerifier: jest.fn() } as never,
+      createMockLogger(),
+    )
 
     const cancel = jest.fn()
     const internals = listener as unknown as { keepAlive?: NodeJS.Timeout, stream?: unknown }

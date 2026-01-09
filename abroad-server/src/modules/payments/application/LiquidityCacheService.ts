@@ -5,17 +5,17 @@ import { TYPES } from '../../../app/container/types'
 import { ILogger } from '../../../core/logging/types'
 import { IDatabaseClientProvider } from '../../../platform/persistence/IDatabaseClientProvider'
 
-export type LiquidityCacheResult = {
-  fromCache: boolean
-  liquidity: number
-  message?: string
-  success: boolean
-}
-
 type GetLiquidityParams = {
   fetchLiquidity: () => Promise<number>
   method: PaymentMethod
   now?: number
+}
+
+type LiquidityCacheResult = {
+  fromCache: boolean
+  liquidity: number
+  message?: string
+  success: boolean
 }
 
 @injectable()

@@ -46,6 +46,19 @@ type PartnerUserContext = {
 type PaymentServiceInstance = ReturnType<IPaymentServiceFactory['getPaymentService']>
 type PrismaClientLike = DatabaseClient | SerializableTx
 type SerializableTx = Prisma.TransactionClient
+type TransactionDecision
+  = | {
+    outcome: 'kyc'
+    partnerUserId: string
+    quote: { country: string }
+    totalUserAmountMonthly: number
+  }
+  | {
+    outcome: 'transaction'
+    partnerUserId: string
+    quoteId: string
+    transaction: { id: string }
+  }
 
 @injectable()
 export class TransactionAcceptanceService {
@@ -68,91 +81,101 @@ export class TransactionAcceptanceService {
     partner: PartnerUserContext,
   ): Promise<AcceptTransactionResponse> {
     const prismaClient = await this.prismaClientProvider.getClient()
-    const decision = await prismaClient.$transaction(async (tx) => {
-      const quote = await this.fetchQuote(tx, request.quoteId, partner.id)
-      const basePaymentService = this.paymentServiceFactory.getPaymentService(quote.paymentMethod)
-      const paymentService = this.paymentServiceFactory.getPaymentServiceForCapability?.({
-        paymentMethod: quote.paymentMethod,
-        targetCurrency: quote.targetCurrency,
-      }) ?? basePaymentService
-      this.assertPaymentServiceIsEnabled(paymentService, quote.paymentMethod)
-      await this.lockPaymentMethod(tx, quote.paymentMethod)
+    let decision: TransactionDecision
+    try {
+      decision = await prismaClient.$transaction<TransactionDecision>(async (tx) => {
+        const quote = await this.fetchQuote(tx, request.quoteId, partner.id)
+        const basePaymentService = this.paymentServiceFactory.getPaymentService(quote.paymentMethod)
+        const paymentService = this.paymentServiceFactory.getPaymentServiceForCapability?.({
+          paymentMethod: quote.paymentMethod,
+          targetCurrency: quote.targetCurrency,
+        }) ?? basePaymentService
+        this.assertPaymentServiceIsEnabled(paymentService, quote.paymentMethod)
+        await this.lockPaymentMethod(tx, quote.paymentMethod)
 
-      this.enforceTransactionAmountBounds(quote, paymentService, quote.paymentMethod)
-      await this.ensureAccountIsValid(paymentService, request.accountNumber)
+        this.enforceTransactionAmountBounds(quote, paymentService, quote.paymentMethod)
+        await this.ensureAccountIsValid(paymentService, request.accountNumber)
 
-      const partnerUser = await tx.partnerUser.upsert({
-        create: {
-          partnerId: quote.partnerId,
-          userId: request.userId,
-        },
-        update: {},
-        where: {
-          partnerId_userId: {
+        const partnerUser = await tx.partnerUser.upsert({
+          create: {
             partnerId: quote.partnerId,
             userId: request.userId,
           },
-        },
-      })
-      await this.lockPartnerUser(tx, partnerUser.id)
-      await this.lockPartner(tx, partner.id)
+          update: {},
+          where: {
+            partnerId_userId: {
+              partnerId: quote.partnerId,
+              userId: request.userId,
+            },
+          },
+        })
+        await this.lockPartnerUser(tx, partnerUser.id)
+        await this.lockPartner(tx, partner.id)
 
-      const monthlyAmount = await this.calculateMonthlyAmount(tx, partnerUser.id, quote.paymentMethod)
-      const totalUserAmountMonthly = monthlyAmount + quote.sourceAmount
-      const shouldRequestKyc = this.shouldRequestKyc(partner, totalUserAmountMonthly)
-      if (shouldRequestKyc) {
+        const monthlyAmount = await this.calculateMonthlyAmount(tx, partnerUser.id, quote.paymentMethod)
+        const totalUserAmountMonthly = monthlyAmount + quote.sourceAmount
+        const shouldRequestKyc = this.shouldRequestKyc(partner, totalUserAmountMonthly)
+        if (shouldRequestKyc) {
+          return {
+            outcome: 'kyc',
+            partnerUserId: partnerUser.id,
+            quote: { country: quote.country },
+            totalUserAmountMonthly,
+          } as const
+        }
+
+        await this.enforceUserTransactionLimits(tx, partnerUser.id, quote, paymentService)
+        await this.enforcePaymentMethodLimits(tx, quote, paymentService)
+        await this.enforceLiquidity(paymentService, quote.targetAmount)
+        await this.enforcePartnerKybThreshold(tx, partner.id, quote.sourceAmount, partner.isKybApproved)
+        await this.reserveUserMonthlyLimits(tx, partnerUser.id, quote.paymentMethod, quote.targetAmount, paymentService)
+        await this.reservePartnerMonthlyLimits(tx, partner.id, quote.paymentMethod, quote.targetAmount, paymentService)
+        await this.reserveUserDailyLimits(tx, partnerUser.id, quote.paymentMethod, quote.targetAmount, paymentService)
+        await this.reservePartnerDailyLimits(tx, partner.id, quote.paymentMethod, quote.targetAmount, paymentService)
+
+        const transaction = await tx.transaction.create({
+          data: {
+            accountNumber: request.accountNumber,
+            partnerUserId: partnerUser.id,
+            qrCode: request.qrCode,
+            quoteId: quote.id,
+            status: TransactionStatus.AWAITING_PAYMENT,
+            taxId: request.taxId,
+          },
+          select: { bankCode: true, id: true },
+        })
+
+        const payload = toWebhookTransactionPayload(transaction)
+
+        try {
+          await this.outboxDispatcher.enqueueWebhook(
+            partner.webhookUrl,
+            { data: payload, event: WebhookEvent.TRANSACTION_CREATED },
+            'transaction.created',
+            { client: tx, deliverNow: false },
+          )
+          await this.publishUserNotification(tx, transaction.id, request.userId)
+        }
+        catch (error) {
+          this.logger.error('Error enqueuing transaction.created notifications', error)
+          throw new TransactionValidationError('We could not create your transaction right now. Please try again in a few moments.')
+        }
+
         return {
-          outcome: 'kyc',
+          outcome: 'transaction',
           partnerUserId: partnerUser.id,
-          quote: { country: quote.country },
-          totalUserAmountMonthly,
-        } as const
-      }
-
-      await this.enforceUserTransactionLimits(tx, partnerUser.id, quote, paymentService)
-      await this.enforcePaymentMethodLimits(tx, quote, paymentService)
-      await this.enforceLiquidity(paymentService, quote.targetAmount)
-      await this.enforcePartnerKybThreshold(tx, partner.id, quote.sourceAmount, partner.isKybApproved)
-      await this.reserveUserMonthlyLimits(tx, partnerUser.id, quote.paymentMethod, quote.targetAmount, paymentService)
-      await this.reservePartnerMonthlyLimits(tx, partner.id, quote.paymentMethod, quote.targetAmount, paymentService)
-      await this.reserveUserDailyLimits(tx, partnerUser.id, quote.paymentMethod, quote.targetAmount, paymentService)
-      await this.reservePartnerDailyLimits(tx, partner.id, quote.paymentMethod, quote.targetAmount, paymentService)
-
-      const transaction = await tx.transaction.create({
-        data: {
-          accountNumber: request.accountNumber,
-          partnerUserId: partnerUser.id,
-          qrCode: request.qrCode,
           quoteId: quote.id,
-          status: TransactionStatus.AWAITING_PAYMENT,
-          taxId: request.taxId,
-        },
-        select: { bankCode: true, id: true },
-      })
-
-      const payload = toWebhookTransactionPayload(transaction)
-
-      try {
-        await this.outboxDispatcher.enqueueWebhook(
-          partner.webhookUrl,
-          { data: payload, event: WebhookEvent.TRANSACTION_CREATED },
-          'transaction.created',
-          { client: tx, deliverNow: false },
-        )
-        await this.publishUserNotification(tx, transaction.id, request.userId)
+          transaction,
+        } as const
+      }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
+    }
+    catch (error) {
+      if (error instanceof TransactionValidationError) {
+        throw error
       }
-      catch (error) {
-        this.logger.error('Error enqueuing transaction.created notifications', error)
-        throw new TransactionValidationError('We could not create your transaction right now. Please try again in a few moments.')
-      }
-
-      return {
-        outcome: 'transaction',
-        partnerUserId: partnerUser.id,
-        quoteId: quote.id,
-        transaction,
-      } as const
-    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
+      this.logger.error('Failed to accept transaction', error)
+      throw new TransactionValidationError('We could not create your transaction right now. Please try again in a few moments.')
+    }
 
     if (decision.outcome === 'kyc') {
       const kycLink = await this.resolveKycLinkAfterDecision(

@@ -33,6 +33,11 @@ jest.mock('@solana/web3.js', () => {
       void key
       return new Keypair()
     }
+
+    static fromSeed(seed: Uint8Array): Keypair {
+      void seed
+      return new Keypair()
+    }
   }
 
   class Connection {
@@ -45,6 +50,10 @@ jest.mock('@solana/web3.js', () => {
 
     async confirmTransaction(_strategy: unknown) {
       return confirmTransactionMock(_strategy)
+    }
+
+    async getAccountInfo(pubkey: PublicKey) {
+      return { exists: Boolean(pubkey) }
     }
 
     async getLatestBlockhash() {
@@ -83,7 +92,7 @@ jest.mock('@solana/web3.js', () => {
 })
 
 jest.mock('bs58', () => ({
-  decode: () => new Uint8Array([1, 2, 3]),
+  decode: () => new Uint8Array(Array.from({ length: 32 }, (_, idx) => idx)),
 }))
 
 describe('SolanaWalletHandler.send', () => {
@@ -95,7 +104,7 @@ describe('SolanaWalletHandler.send', () => {
     getOrCreateAssociatedTokenAccountMock.mockResolvedValue({ address: 'token-account' })
     createTransferInstructionMock.mockReturnValue('ix-transfer')
     sendTransactionMock.mockResolvedValue('sig-123')
-    confirmTransactionMock.mockResolvedValue(undefined)
+    confirmTransactionMock.mockResolvedValue({ value: { err: null } })
     secretManager = {
       getSecret: jest.fn(async (name: string) => {
         if (name === 'SOLANA_RPC_URL') return 'http://rpc'
@@ -138,7 +147,7 @@ describe('SolanaWalletHandler.send', () => {
       cryptoCurrency: 'BTC' as CryptoCurrency,
     })
 
-    expect(result).toEqual({ success: false })
+    expect(result).toEqual({ code: 'validation', reason: 'unsupported_currency', success: false })
     expect(secretManager.getSecret).not.toHaveBeenCalled()
     expect(logger.warn).toHaveBeenCalledWith('Unsupported cryptocurrency for Solana', 'BTC')
   })
@@ -153,7 +162,7 @@ describe('SolanaWalletHandler.send', () => {
       cryptoCurrency: CryptoCurrency.USDC,
     })
 
-    expect(result).toEqual({ success: false })
-    expect(logger.error).toHaveBeenCalledWith('Error sending Solana transaction', 'network down')
+    expect(result).toEqual({ code: 'retriable', reason: 'network down', success: false })
+    expect(logger.error).toHaveBeenCalled()
   })
 })

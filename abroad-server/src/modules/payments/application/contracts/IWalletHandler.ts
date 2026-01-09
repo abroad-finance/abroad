@@ -9,8 +9,6 @@ export interface IWalletHandler {
   send(params: WalletSendParams): Promise<WalletSendResult>
 }
 
-export type WalletFailureCode = 'permanent' | 'retriable' | 'validation'
-
 export type WalletSendParams = {
   address: string
   amount: number
@@ -21,3 +19,5 @@ export type WalletSendParams = {
 export type WalletSendResult
   = | { code?: WalletFailureCode, reason?: string, success: false, transactionId?: string }
     | { success: true, transactionId?: string }
+
+type WalletFailureCode = 'permanent' | 'retriable' | 'validation'

@@ -1,6 +1,6 @@
 import { TransactionStatus } from '@prisma/client'
 
-import { BrebPayoutStatusAdapter } from '../../../../../modules/payments/infrastructure/BrebPayoutStatusAdapter'
+import { BrebPayoutStatusAdapter } from '../../../../modules/payments/infrastructure/BrebPayoutStatusAdapter'
 
 describe('BrebPayoutStatusAdapter', () => {
   const adapter = new BrebPayoutStatusAdapter()

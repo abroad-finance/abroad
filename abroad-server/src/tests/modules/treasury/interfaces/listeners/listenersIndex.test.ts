@@ -16,10 +16,10 @@ describe('listeners/index', () => {
       to: jest.fn().mockReturnThis(),
     }))
     get.mockImplementation((identifier: unknown) => {
-      if (identifier === 'StellarListener') return stellar
+      if (identifier === TYPES.StellarListener || identifier === 'StellarListener') return stellar
       if (identifier === 'BinanceListener') return binance
       if (identifier === TYPES.ILogger) return logger
-      throw new Error(`Unknown identifier ${identifier}`)
+      throw new Error(`Unknown identifier ${String(identifier)}`)
     })
 
     jest.doMock('../../../../../app/container', () => ({ __esModule: true, iocContainer: mockContainer }))
@@ -41,7 +41,8 @@ describe('listeners/index', () => {
     listeners.startListeners()
 
     expect(bind).toHaveBeenCalled()
-    expect(get).toHaveBeenCalledWith('StellarListener')
+    expect(get).toHaveBeenCalledWith(TYPES.StellarListener)
+    expect(get).toHaveBeenCalledWith('BinanceListener')
     expect(stellar.start).toHaveBeenCalled()
     expect(binance.start).toHaveBeenCalled()
   })

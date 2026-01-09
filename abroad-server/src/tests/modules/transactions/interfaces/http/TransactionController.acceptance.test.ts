@@ -1,6 +1,7 @@
 import 'reflect-metadata'
 import { TransactionStatus } from '@prisma/client'
 
+import { QueueName } from '../../../../../platform/messaging/queues'
 import { baseQuote, buildAcceptController, partner, requestBody } from './transactionControllerAcceptance.fixtures'
 import { createBadRequestResponder } from './transactionControllerTestUtils'
 
@@ -32,11 +33,13 @@ describe('TransactionController acceptance flows', () => {
   })
 
   it('returns a KYC link when the partner requires verification', async () => {
-    const monthlyHistory = [{ quote: { paymentMethod: baseQuote.paymentMethod, sourceAmount: 10 }, status: TransactionStatus.PAYMENT_COMPLETED }]
-    const { controller, kycService } = buildAcceptController({
+    const { controller, kycService, prisma } = buildAcceptController({
       kycLink: 'https://kyc.test',
-      transactionFindMany: [monthlyHistory, [], []],
+      quote: { ...baseQuote, sourceAmount: 30 },
     })
+    prisma.quote.aggregate
+      .mockResolvedValueOnce({ _count: { _all: 0 }, _sum: { sourceAmount: 30, targetAmount: 0 } })
+      .mockResolvedValue({ _count: { _all: 0 }, _sum: { sourceAmount: 0, targetAmount: 0 } })
     const response = await controller.acceptTransaction(
       requestBody,
       { user: { ...partner, needsKyc: true } } as unknown as import('express').Request,
@@ -67,7 +70,7 @@ describe('TransactionController acceptance flows', () => {
 
   it('enforces per-user daily transaction limits', async () => {
     const priorTransactions = [{ quote: { paymentMethod: baseQuote.paymentMethod, targetAmount: 10 }, status: TransactionStatus.PAYMENT_COMPLETED }]
-    const { controller, paymentService } = buildAcceptController({
+    const { controller, paymentService, prisma } = buildAcceptController({
       paymentService: {
         getLiquidity: jest.fn().mockResolvedValue(1_000),
         MAX_TOTAL_AMOUNT_PER_DAY: 500,
@@ -76,6 +79,9 @@ describe('TransactionController acceptance flows', () => {
       },
       transactionFindMany: [[], priorTransactions, [], []],
     })
+    prisma.quote.aggregate
+      .mockResolvedValueOnce({ _count: { _all: 0 }, _sum: { sourceAmount: 0, targetAmount: 0 } })
+      .mockResolvedValue({ _count: { _all: 1 }, _sum: { sourceAmount: 0, targetAmount: 0 } })
 
     const response = await controller.acceptTransaction(requestBody, { user: partner } as unknown as import('express').Request, badRequest)
 
@@ -113,9 +119,14 @@ describe('TransactionController acceptance flows', () => {
       { quote: { paymentMethod: baseQuote.paymentMethod, sourceAmount: 60 }, status: TransactionStatus.PAYMENT_COMPLETED },
       { quote: { paymentMethod: baseQuote.paymentMethod, sourceAmount: 50 }, status: TransactionStatus.PAYMENT_COMPLETED },
     ]
-    const { controller } = buildAcceptController({
+    const { controller, prisma } = buildAcceptController({
       transactionFindMany: [[], [], [], partnerTransactions],
     })
+    prisma.quote.aggregate
+      .mockResolvedValueOnce({ _count: { _all: 0 }, _sum: { sourceAmount: 0, targetAmount: 0 } })
+      .mockResolvedValueOnce({ _count: { _all: 0 }, _sum: { sourceAmount: 0, targetAmount: 0 } })
+      .mockResolvedValueOnce({ _count: { _all: 0 }, _sum: { sourceAmount: 0, targetAmount: 0 } })
+      .mockResolvedValue({ _count: { _all: 0 }, _sum: { sourceAmount: 95, targetAmount: 0 } })
 
     const response = await controller.acceptTransaction(
       requestBody,
@@ -129,15 +140,17 @@ describe('TransactionController acceptance flows', () => {
   })
 
   it('creates a transaction and notifies downstream systems', async () => {
-    const { controller, prisma, queueHandler, webhookNotifier } = buildAcceptController()
+    const { controller, outboxDispatcher, prisma } = buildAcceptController()
 
     const response = await controller.acceptTransaction(requestBody, { user: partner } as unknown as import('express').Request, badRequest)
 
     expect(prisma.transaction.create).toHaveBeenCalled()
-    expect(webhookNotifier.notifyWebhook).toHaveBeenCalled()
-    expect(queueHandler.postMessage).toHaveBeenCalledWith(
-      'user-notification',
+    expect(outboxDispatcher.enqueueWebhook).toHaveBeenCalled()
+    expect(outboxDispatcher.enqueueQueue).toHaveBeenCalledWith(
+      QueueName.USER_NOTIFICATION,
       expect.objectContaining({ type: 'transaction.created' }),
+      expect.any(String),
+      expect.objectContaining({ deliverNow: false }),
     )
     expect(response.transaction_reference).toBeDefined()
   })

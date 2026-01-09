@@ -7,11 +7,21 @@ import { TYPES } from '../../../../app/container/types'
 import { createScopedLogger, ScopedLogger } from '../../../../core/logging/scopedLogger'
 import { ILogger } from '../../../../core/logging/types'
 import { ISecretManager } from '../../../../platform/secrets/ISecretManager'
-import { ExchangeAddressResult, ExchangeFailureCode, IExchangeProvider } from '../../application/contracts/IExchangeProvider'
+import {
+  ExchangeAddressResult,
+  ExchangeFailureCode,
+  ExchangeOperationResult,
+  ExchangeProviderCapability,
+  IExchangeProvider,
+} from '../../application/contracts/IExchangeProvider'
 
 @injectable()
 export class TransferoExchangeProvider implements IExchangeProvider {
-  public readonly capability = { blockchain: BlockchainNetwork.STELLAR, targetCurrency: TargetCurrency.BRL }
+  public readonly capability: ExchangeProviderCapability = {
+    blockchain: BlockchainNetwork.STELLAR,
+    targetCurrency: TargetCurrency.BRL,
+  }
+
   readonly exchangePercentageFee = 0.001
 
   private cachedToken?: { exp: number, value: string }
@@ -24,7 +34,7 @@ export class TransferoExchangeProvider implements IExchangeProvider {
     this.logger = createScopedLogger(baseLogger, { scope: 'TransferoExchangeProvider' })
   }
 
-  async createMarketOrder({ sourceAmount, sourceCurrency, targetCurrency }: { sourceAmount: number, sourceCurrency: CryptoCurrency, targetCurrency: TargetCurrency }): Promise<{ success: boolean }> {
+  async createMarketOrder({ sourceAmount, sourceCurrency, targetCurrency }: { sourceAmount: number, sourceCurrency: CryptoCurrency, targetCurrency: TargetCurrency }): Promise<ExchangeOperationResult> {
     try {
       const token = await this.getAccessToken()
       const { TRANSFERO_BASE_URL: apiUrl } = await this.secretManager.getSecrets([
@@ -56,11 +66,15 @@ export class TransferoExchangeProvider implements IExchangeProvider {
         { headers: { 'Accept': 'application/json', 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' } },
       )
 
-      return { success: acceptQuoteData.success }
+      if (acceptQuoteData.success) {
+        return { success: true }
+      }
+      return { code: 'retriable', reason: 'Transfero trade was not accepted', success: false }
     }
     catch (error) {
+      const reason = error instanceof Error ? error.message : 'Unknown error creating market order'
       this.logger.error('Error creating market order', error)
-      return { success: false }
+      return { code: 'retriable', reason, success: false }
     }
   }
 

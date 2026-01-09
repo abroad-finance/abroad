@@ -51,7 +51,7 @@ describe('startListeners', () => {
     stellarStopMock.mockResolvedValue(undefined)
     binanceStartMock.mockResolvedValue(undefined)
     getMock.mockImplementation((key: unknown) => {
-      if (key === 'StellarListener') return { start: stellarStartMock, stop: stellarStopMock }
+      if (key === TYPES.StellarListener) return { start: stellarStartMock, stop: stellarStopMock }
       if (key === 'BinanceListener') return { start: binanceStartMock }
       if (key === TYPES.ILogger) return logger
       return {}
@@ -61,9 +61,9 @@ describe('startListeners', () => {
   it('binds and starts both Stellar and Binance listeners', () => {
     startListeners()
 
-    expect(bindMock).toHaveBeenCalledWith('StellarListener')
     expect(bindMock).toHaveBeenCalledWith('BinanceListener')
-    expect(getMock).toHaveBeenCalledWith('StellarListener')
+    expect(getMock).toHaveBeenCalledWith(TYPES.ILogger)
+    expect(getMock).toHaveBeenCalledWith(TYPES.StellarListener)
     expect(getMock).toHaveBeenCalledWith('BinanceListener')
     expect(stellarStartMock).toHaveBeenCalled()
     expect(binanceStartMock).toHaveBeenCalled()

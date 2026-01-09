@@ -1,4 +1,12 @@
-import { ApplicationError, mapErrorToHttpResponse, NotFoundError, ValidationError } from '../../../core/errors'
+import {
+  ApplicationError,
+  InfrastructureError,
+  mapErrorToHttpResponse,
+  NotFoundError,
+  RetriableError,
+  UserError,
+  ValidationError,
+} from '../../../core/errors'
 import { getCorrelationId, runWithCorrelationId } from '../../../core/requestContext'
 
 describe('mapErrorToHttpResponse', () => {
@@ -73,5 +81,21 @@ describe('mapErrorToHttpResponse', () => {
 
     expect(status).toBe(429)
     expect(body).toMatchObject({ message: 'too many requests', reason: 'too many requests' })
+  })
+
+  it('provides specialized error codes and defaults', () => {
+    const infra = new InfrastructureError('downstream unavailable')
+    const retriable = new RetriableError('try again later')
+    const user = new UserError('bad input', { field: 'email' })
+
+    expect(infra.code).toBe('infrastructure_error')
+    expect(infra.statusCode).toBe(502)
+
+    expect(retriable.code).toBe('retriable_error')
+    expect(retriable.statusCode).toBe(503)
+
+    expect(user.code).toBe('user_error')
+    expect(user.statusCode).toBe(400)
+    expect(user.details).toEqual({ field: 'email' })
   })
 })

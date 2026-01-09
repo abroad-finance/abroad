@@ -101,14 +101,14 @@ describe('TransactionAcceptanceService helpers', () => {
   it('enforces payment method daily caps via aggregates', async () => {
     const enforcePaymentMethodLimits = (service as unknown as {
       enforcePaymentMethodLimits: (
-        prisma: { transaction: { aggregate: jest.Mock<Promise<{ _sum: { targetAmount: number } }>, [unknown?]> } },
+        prisma: { quote: { aggregate: jest.Mock<Promise<{ _sum: { targetAmount: number } }>, [unknown?]> } },
         quote: { paymentMethod: PaymentMethod, targetAmount: number },
         paymentSvc: ReturnType<typeof buildPaymentService>,
       ) => Promise<void>
     }).enforcePaymentMethodLimits
 
     const prismaClient = {
-      transaction: {
+      quote: {
         aggregate: jest.fn(async () => ({
           _sum: { targetAmount: 120 },
         })),
@@ -122,15 +122,16 @@ describe('TransactionAcceptanceService helpers', () => {
       { paymentMethod: PaymentMethod.PIX, targetAmount: 40 },
       cappedService,
     )).rejects.toThrow('already reached today\'s payout limit')
-    expect(prismaClient.transaction.aggregate).toHaveBeenCalledWith(expect.objectContaining({
-      _sum: { targetAmount: true },
+    expect(prismaClient.quote.aggregate).toHaveBeenCalledWith(expect.objectContaining({
+      _count: { _all: true },
+      _sum: { sourceAmount: true, targetAmount: true },
     }))
   })
 
   it('rejects users exceeding their personal daily payout total', async () => {
     const enforceUserTransactionLimits = (service as unknown as {
       enforceUserTransactionLimits: (
-        prisma: { transaction: { aggregate: jest.Mock<Promise<{ _count: { id: number }, _sum: { targetAmount: number } }>, [unknown?]> } },
+        prisma: { quote: { aggregate: jest.Mock<Promise<{ _count: { _all: number }, _sum: { targetAmount: number } }>, [unknown?]> } },
         partnerUserId: string,
         quote: { paymentMethod: PaymentMethod, targetAmount: number },
         paymentSvc: ReturnType<typeof buildPaymentService>,
@@ -138,9 +139,9 @@ describe('TransactionAcceptanceService helpers', () => {
     }).enforceUserTransactionLimits
 
     const prismaClient = {
-      transaction: {
+      quote: {
         aggregate: jest.fn(async () => ({
-          _count: { id: 2 },
+          _count: { _all: 0 },
           _sum: { targetAmount: 85 },
         })),
       },
@@ -158,9 +159,9 @@ describe('TransactionAcceptanceService helpers', () => {
       { paymentMethod: PaymentMethod.PIX, targetAmount: 20 },
       relaxedLimits,
     )).rejects.toThrow('This transaction would exceed your daily limit for this payment method. Lower the amount or try again tomorrow.')
-    expect(prismaClient.transaction.aggregate).toHaveBeenCalledWith(expect.objectContaining({
-      _count: { id: true },
-      _sum: { targetAmount: true },
+    expect(prismaClient.quote.aggregate).toHaveBeenCalledWith(expect.objectContaining({
+      _count: { _all: true },
+      _sum: { sourceAmount: true, targetAmount: true },
     }))
   })
 
@@ -176,7 +177,11 @@ describe('TransactionAcceptanceService helpers', () => {
     }).reserveUserMonthlyLimits
 
     const prismaClient = {
-      $executeRaw: jest.fn(async () => 0),
+      $executeRaw: jest.fn(async (sql: TemplateStringsArray, ...params: unknown[]) => {
+        void sql
+        void params
+        return 0
+      }),
     }
 
     await expect(reserveUserMonthlyLimits.call(
@@ -201,7 +206,11 @@ describe('TransactionAcceptanceService helpers', () => {
     }).reservePartnerMonthlyLimits
 
     const prismaClient = {
-      $executeRaw: jest.fn(async () => 0),
+      $executeRaw: jest.fn(async (sql: TemplateStringsArray, ...params: unknown[]) => {
+        void sql
+        void params
+        return 0
+      }),
     }
 
     await expect(reservePartnerMonthlyLimits.call(
@@ -223,15 +232,15 @@ describe('TransactionAcceptanceService helpers', () => {
     }).monthlyCountCap
 
     process.env.MONTHLY_LIMIT_MULTIPLIER_DAYS = '10'
-    expect(monthlyAmountCap(paymentService)).toBe(paymentService.MAX_TOTAL_AMOUNT_PER_DAY * 10)
-    expect(monthlyCountCap(paymentService)).toBe(paymentService.MAX_USER_TRANSACTIONS_PER_DAY * 10)
+    expect(monthlyAmountCap.call(service, paymentService)).toBe(paymentService.MAX_TOTAL_AMOUNT_PER_DAY * 10)
+    expect(monthlyCountCap.call(service, paymentService)).toBe(paymentService.MAX_USER_TRANSACTIONS_PER_DAY * 10)
     delete process.env.MONTHLY_LIMIT_MULTIPLIER_DAYS
   })
 
   it('enforces partner KYB threshold using aggregates', async () => {
     const enforcePartnerKybThreshold = (service as unknown as {
       enforcePartnerKybThreshold: (
-        prisma: { transaction: { aggregate: jest.Mock<Promise<{ _sum: { sourceAmount: null | number } }>, [unknown?]> } },
+        prisma: { quote: { aggregate: jest.Mock<Promise<{ _sum: { sourceAmount: null | number } }>, [unknown?]> } },
         partnerId: string,
         sourceAmount: number,
         isKybApproved: boolean,
@@ -239,7 +248,7 @@ describe('TransactionAcceptanceService helpers', () => {
     }).enforcePartnerKybThreshold
 
     const prismaClient = {
-      transaction: {
+      quote: {
         aggregate: jest.fn(async () => ({ _sum: { sourceAmount: 95 } })),
       },
     }
@@ -251,7 +260,7 @@ describe('TransactionAcceptanceService helpers', () => {
       10,
       false,
     )).rejects.toThrow('limited to a total of $100 until KYB is approved')
-    expect(prismaClient.transaction.aggregate).toHaveBeenCalled()
+    expect(prismaClient.quote.aggregate).toHaveBeenCalled()
   })
 
   it('rejects invalid account data when verifying accounts', async () => {

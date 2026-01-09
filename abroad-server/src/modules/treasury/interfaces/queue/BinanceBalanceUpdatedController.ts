@@ -128,7 +128,7 @@ export class BinanceBalanceUpdatedController {
       }
     }
     catch (error) {
-      scopedLogger.error('[BinanceBalanceUpdated queue]: Error processing balance update:', error)
+      scopedLogger.error('Error processing balance update:', error)
       throw error
     }
   }

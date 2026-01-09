@@ -23,7 +23,8 @@ const buildPaymentService = (label: string): IPaymentService => ({
   verifyAccount: async () => true,
 })
 
-const buildExchangeProvider = (id: string): IExchangeProvider => ({
+const buildExchangeProvider = (id: string, targetCurrency: TargetCurrency): IExchangeProvider => ({
+  capability: { blockchain: undefined, targetCurrency },
   createMarketOrder: async () => ({ success: true }),
   exchangePercentageFee: 0.01,
   getExchangeAddress: async () => ({ address: `${id}-addr`, success: true }),
@@ -49,8 +50,8 @@ describe('PaymentServiceFactory', () => {
 })
 
 describe('ExchangeProviderFactory', () => {
-  const transferoProvider = buildExchangeProvider('transfero')
-  const binanceProvider = buildExchangeProvider('binance')
+  const transferoProvider = buildExchangeProvider('transfero', TargetCurrency.BRL)
+  const binanceProvider = buildExchangeProvider('binance', TargetCurrency.COP)
 
   it('returns providers based on target currency', () => {
     const factory = new ExchangeProviderFactory(transferoProvider, binanceProvider)

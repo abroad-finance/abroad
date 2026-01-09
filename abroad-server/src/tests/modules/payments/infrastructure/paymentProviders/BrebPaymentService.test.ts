@@ -412,8 +412,7 @@ describe('BrebPaymentService', () => {
 
       mockedAxios.post.mockRejectedValueOnce(new Error('plain dispatch error'))
 
-      const result = await internals.dispatchPayment({ amount: 1 }, config, 'token')
-      expect(result).toBeNull()
+      await expect(internals.dispatchPayment({ amount: 1 }, config, 'token')).rejects.toThrow('plain dispatch error')
       expect(logger.error).toHaveBeenCalledWith(
         '[BreB] Failed to dispatch payment',
         expect.objectContaining({ message: 'plain dispatch error' }),

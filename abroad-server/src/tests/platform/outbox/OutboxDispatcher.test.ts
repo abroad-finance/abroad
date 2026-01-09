@@ -1,8 +1,8 @@
 import { BlockchainNetwork, CryptoCurrency, PaymentMethod, TargetCurrency } from '@prisma/client'
 
-import { QueueName } from '../../../src/platform/messaging/queues'
-import { OutboxDispatcher } from '../../../src/platform/outbox/OutboxDispatcher'
-import { OutboxRecord } from '../../../src/platform/outbox/OutboxRepository'
+import { QueueName } from '../../../platform/messaging/queues'
+import { OutboxDispatcher } from '../../../platform/outbox/OutboxDispatcher'
+import { OutboxRecord } from '../../../platform/outbox/OutboxRepository'
 
 describe('OutboxDispatcher', () => {
   const baseRecord: OutboxRecord = {
@@ -19,7 +19,11 @@ describe('OutboxDispatcher', () => {
 
   const buildMocks = () => {
     const repository = {
-      create: jest.fn(async () => baseRecord),
+      create: jest.fn(async (type: OutboxRecord['type'], payload: unknown) => ({
+        ...baseRecord,
+        payload: payload as OutboxRecord['payload'],
+        type,
+      })),
       markDelivered: jest.fn(async () => {}),
       markFailed: jest.fn(async () => {}),
       nextBatch: jest.fn(async () => [baseRecord]),

@@ -135,7 +135,7 @@ describe('SolanaPaymentsController notifyPayment execution', () => {
   })
 
   it('propagates queue errors when enqueuing verified payments', async () => {
-    const { badRequest, controller, prismaClient, queueHandler } = createControllerContext()
+    const { badRequest, controller, outboxDispatcher, prismaClient } = createControllerContext()
     prismaClient.transaction.findUnique.mockResolvedValueOnce({
       accountNumber: 'acc',
       id: transactionId,
@@ -174,8 +174,8 @@ describe('SolanaPaymentsController notifyPayment execution', () => {
       },
     } as unknown as ParsedTransactionWithMeta)
 
-    const postMock = queueHandler.postMessage as unknown as jest.Mock
-    postMock.mockRejectedValueOnce(new Error('queue down'))
+    const enqueueMock = outboxDispatcher.enqueueQueue as unknown as jest.Mock
+    enqueueMock.mockRejectedValueOnce(new Error('queue down'))
 
     await expect(
       controller.notifyPayment(

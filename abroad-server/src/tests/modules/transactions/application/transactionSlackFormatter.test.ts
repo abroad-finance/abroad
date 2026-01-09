@@ -14,6 +14,7 @@ const buildTransaction = (overrides: Partial<TransactionWithRelations> = {}): Tr
   accountNumber: '123456789',
   bankCode: 'bank-1',
   createdAt: new Date(),
+  exchangeHandoffAt: null,
   externalId: 'external-1',
   id: 'txn-1',
   onChainId: 'on-chain-1',

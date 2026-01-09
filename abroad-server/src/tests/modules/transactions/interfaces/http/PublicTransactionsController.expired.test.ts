@@ -3,10 +3,30 @@ import { BlockchainNetwork, CryptoCurrency, PaymentMethod, TransactionStatus } f
 
 import { PublicTransactionsController } from '../../../../../modules/transactions/interfaces/http/PublicTransactionsController'
 import { QueueName } from '../../../../../platform/messaging/queues'
-import { IWebhookNotifier } from '../../../../../platform/notifications/IWebhookNotifier'
 import { IDatabaseClientProvider } from '../../../../../platform/persistence/IDatabaseClientProvider'
 import { ISecretManager } from '../../../../../platform/secrets/ISecretManager'
-import { createMockLogger, createMockQueueHandler, type MockLogger, type MockQueueHandler } from '../../../../setup/mockFactories'
+import { createMockLogger, type MockLogger } from '../../../../setup/mockFactories'
+
+type PrismaTestClient = {
+  $transaction: jest.Mock<Promise<unknown>, [(tx: PrismaTestClient) => Promise<unknown>]>
+  transaction: PrismaTransactionDelegate
+  transactionTransition: PrismaTransitionDelegate
+}
+
+type PrismaTransactionDelegate = {
+  count: jest.Mock<Promise<number>, [unknown?]>
+  findMany: jest.Mock<Promise<TransactionFixture[]>, [unknown?]>
+  findUnique: jest.Mock<Promise<null | TransactionFixture>, [TransactionFindArgs]>
+  update: jest.Mock<Promise<null | TransactionFixture>, [TransactionFindArgs]>
+  updateMany: jest.Mock<Promise<{ count: number }>, [unknown?]>
+}
+
+type PrismaTransitionDelegate = {
+  create: jest.Mock<Promise<unknown>, [unknown?]>
+  findUnique: jest.Mock<Promise<unknown>, [unknown?]>
+}
+
+type TransactionFindArgs = { where: { id: string } }
 
 type TransactionFixture = {
   id: string
@@ -23,13 +43,24 @@ type TransactionFixture = {
   status: TransactionStatus
 }
 
-const buildPrismaClient = () => ({
-  transaction: {
-    count: jest.fn(),
-    findMany: jest.fn(),
-    updateMany: jest.fn(),
-  },
-})
+const buildPrismaClient = (): PrismaTestClient => {
+  const prismaClient: PrismaTestClient = {
+    $transaction: jest.fn<Promise<unknown>, [(tx: PrismaTestClient) => Promise<unknown>]>(),
+    transaction: {
+      count: jest.fn<Promise<number>, [unknown?]>(),
+      findMany: jest.fn<Promise<TransactionFixture[]>, [unknown?]>(),
+      findUnique: jest.fn<Promise<null | TransactionFixture>, [TransactionFindArgs]>(),
+      update: jest.fn<Promise<null | TransactionFixture>, [TransactionFindArgs]>(),
+      updateMany: jest.fn<Promise<{ count: number }>, [unknown?]>(),
+    },
+    transactionTransition: {
+      create: jest.fn<Promise<unknown>, [unknown?]>(),
+      findUnique: jest.fn<Promise<unknown>, [unknown?]>().mockResolvedValue(null),
+    },
+  }
+  prismaClient.$transaction.mockImplementation(async callback => callback(prismaClient))
+  return prismaClient
+}
 
 const buildContext = () => {
   const prismaClient = buildPrismaClient()
@@ -37,12 +68,13 @@ const buildContext = () => {
     getClient: jest.fn(async () => prismaClient as unknown as import('@prisma/client').PrismaClient),
   } as unknown as IDatabaseClientProvider
 
-  const webhookNotifier: IWebhookNotifier = {
-    notifyWebhook: jest.fn(async () => undefined),
+  const outboxDispatcher = {
+    enqueueQueue: jest.fn(),
+    enqueueWebhook: jest.fn(),
   }
-
-  const queueHandler: MockQueueHandler = createMockQueueHandler()
-
+  const depositVerifierRegistry = {
+    getVerifier: jest.fn(),
+  }
   const secretManager: ISecretManager = {
     getSecret: jest.fn(async () => ''),
     getSecrets: jest.fn(),
@@ -54,14 +86,13 @@ const buildContext = () => {
     controller: new PublicTransactionsController(
       prismaProvider,
       logger,
-      webhookNotifier,
-      queueHandler,
+      outboxDispatcher as never,
+      depositVerifierRegistry as never,
       secretManager,
     ),
     logger,
+    outboxDispatcher,
     prismaClient,
-    queueHandler,
-    webhookNotifier,
   }
 }
 
@@ -88,7 +119,7 @@ describe('PublicTransactionsController.checkExpiredTransactions', () => {
   })
 
   it('marks expired transactions and handles partial failures gracefully', async () => {
-    const { controller, logger, prismaClient, queueHandler, webhookNotifier } = buildContext()
+    const { controller, logger, outboxDispatcher, prismaClient } = buildContext()
     const expiredTransactions: TransactionFixture[] = [
       {
         id: 'tx-1',
@@ -145,28 +176,35 @@ describe('PublicTransactionsController.checkExpiredTransactions', () => {
 
     prismaClient.transaction.count.mockResolvedValueOnce(expiredTransactions.length)
     prismaClient.transaction.findMany.mockResolvedValueOnce(expiredTransactions)
+    prismaClient.transaction.findUnique.mockImplementation(async ({ where }: { where: { id: string } }) => {
+      return expiredTransactions.find(tx => tx.id === where.id) ?? null
+    })
+    prismaClient.transaction.update.mockImplementation(async ({ where }: { where: { id: string } }) => {
+      const current = expiredTransactions.find(tx => tx.id === where.id)
+      return current ? { ...current, status: TransactionStatus.PAYMENT_EXPIRED } : null
+    })
     prismaClient.transaction.updateMany
       .mockResolvedValueOnce({ count: 1 })
       .mockRejectedValueOnce(new Error('db error'))
       .mockResolvedValueOnce({ count: 0 })
 
-    const webhookMock = webhookNotifier.notifyWebhook as unknown as jest.Mock
+    const webhookMock = outboxDispatcher.enqueueWebhook as unknown as jest.Mock
     webhookMock.mockRejectedValueOnce(new Error('webhook down')).mockResolvedValue(undefined)
 
-    const queueMock = queueHandler.postMessage as unknown as jest.Mock
+    const queueMock = outboxDispatcher.enqueueQueue as unknown as jest.Mock
     queueMock.mockRejectedValueOnce(new Error('ws failed')).mockResolvedValue(undefined)
 
     const result = await controller.checkExpiredTransactions()
 
-    expect(prismaClient.transaction.updateMany).toHaveBeenCalledTimes(expiredTransactions.length)
-    expect(webhookNotifier.notifyWebhook).toHaveBeenCalledTimes(1)
-    expect(queueHandler.postMessage).toHaveBeenCalledWith(QueueName.USER_NOTIFICATION, expect.anything())
+    expect(prismaClient.transaction.update).toHaveBeenCalledTimes(expiredTransactions.length)
+    expect(outboxDispatcher.enqueueWebhook).toHaveBeenCalledTimes(expiredTransactions.length)
+    expect(outboxDispatcher.enqueueQueue).toHaveBeenCalledWith(QueueName.USER_NOTIFICATION, expect.anything(), expect.any(String), expect.any(Object))
     expect(logger.warn).toHaveBeenCalled()
     expect(result).toEqual({
       awaiting: expiredTransactions.length,
       expired: expiredTransactions.length,
-      updated: 1,
-      updatedTransactionIds: ['tx-1'],
+      updated: expiredTransactions.length,
+      updatedTransactionIds: expiredTransactions.map(tx => tx.id),
     })
   })
 })

@@ -41,11 +41,9 @@ const buildUseCase = ({
   logger = createMockLogger(),
   paymentService = buildPaymentService(),
   paymentServiceFactory = {
-    getPaymentService: jest.fn<IPaymentService, [PaymentMethod]>(() => paymentService),
-    getPaymentServiceForCapability: jest.fn<IPaymentService, [Parameters<IPaymentServiceFactory['getPaymentServiceForCapability']>[0]]>(
-      () => paymentService,
-    ),
-  } as jest.Mocked<IPaymentServiceFactory>,
+    getPaymentService: jest.fn(() => paymentService),
+    getPaymentServiceForCapability: jest.fn(() => paymentService),
+  } as unknown as jest.Mocked<IPaymentServiceFactory>,
   prismaClient = {
     paymentProvider: {
       create: jest.fn(),
@@ -70,11 +68,9 @@ describe('PaymentUseCase', () => {
     const { useCase } = buildUseCase({
       paymentService,
       paymentServiceFactory: {
-        getPaymentService: jest.fn<IPaymentService, [PaymentMethod]>(() => paymentService),
-        getPaymentServiceForCapability: jest.fn<IPaymentService, [Parameters<IPaymentServiceFactory['getPaymentServiceForCapability']>[0]]>(
-          () => paymentService,
-        ),
-      } as jest.Mocked<IPaymentServiceFactory>,
+        getPaymentService: jest.fn(() => paymentService),
+        getPaymentServiceForCapability: jest.fn(() => paymentService),
+      } as unknown as jest.Mocked<IPaymentServiceFactory>,
     })
 
     await expect(useCase.getLiquidity(PaymentMethod.BREB)).rejects.toThrow(/unavailable/i)

@@ -3,13 +3,12 @@ import { TargetCurrency } from '@prisma/client'
 import type { IKycService } from '../../../../../modules/kyc/application/contracts/IKycService'
 import type { IPaymentService } from '../../../../../modules/payments/application/contracts/IPaymentService'
 import type { IPaymentServiceFactory } from '../../../../../modules/payments/application/contracts/IPaymentServiceFactory'
-import type { IWebhookNotifier } from '../../../../../platform/notifications/IWebhookNotifier'
 import type { IDatabaseClientProvider } from '../../../../../platform/persistence/IDatabaseClientProvider'
 
 import { TransactionAcceptanceService } from '../../../../../modules/transactions/application/TransactionAcceptanceService'
 import { TransactionStatusService } from '../../../../../modules/transactions/application/TransactionStatusService'
 import { TransactionController } from '../../../../../modules/transactions/interfaces/http/TransactionController'
-import { createMockLogger, createMockQueueHandler } from '../../../../setup/mockFactories'
+import { createMockLogger } from '../../../../setup/mockFactories'
 
 export const createBadRequestResponder = () =>
   jest.fn((status: number, payload: { reason: string }) => {
@@ -53,22 +52,22 @@ export const buildMinimalController = () => {
   }
   const paymentServiceFactory: IPaymentServiceFactory = {
     getPaymentService: jest.fn(),
+    getPaymentServiceForCapability: jest.fn(),
   }
   const kycService: IKycService = {
     getKycLink: jest.fn(),
   }
-  const webhookNotifier: IWebhookNotifier = {
-    notifyWebhook: jest.fn(),
+  const outboxDispatcher = {
+    enqueueQueue: jest.fn(),
+    enqueueWebhook: jest.fn(),
   }
-  const queueHandler = createMockQueueHandler()
   const logger = createMockLogger()
 
   const acceptanceService = new TransactionAcceptanceService(
     dbProvider,
     paymentServiceFactory,
     kycService,
-    webhookNotifier,
-    queueHandler,
+    outboxDispatcher as never,
     logger,
   )
   const statusService = new TransactionStatusService(dbProvider)

@@ -1,7 +1,7 @@
 // src/services/binanceExchangeProvider.ts
 
 import { Wallet } from '@binance/wallet'
-import { BlockchainNetwork } from '@prisma/client'
+import { BlockchainNetwork, TargetCurrency } from '@prisma/client'
 import axios from 'axios'
 import crypto from 'crypto'
 import { inject, injectable } from 'inversify'
@@ -10,7 +10,13 @@ import { TYPES } from '../../../../app/container/types'
 import { createScopedLogger, ScopedLogger } from '../../../../core/logging/scopedLogger'
 import { ILogger } from '../../../../core/logging/types'
 import { ISecretManager } from '../../../../platform/secrets/ISecretManager'
-import { ExchangeAddressResult, ExchangeFailureCode, IExchangeProvider } from '../../application/contracts/IExchangeProvider'
+import {
+  ExchangeAddressResult,
+  ExchangeFailureCode,
+  ExchangeOperationResult,
+  ExchangeProviderCapability,
+  IExchangeProvider,
+} from '../../application/contracts/IExchangeProvider'
 
 type BinanceBookTickerResponse = {
   askPrice: string
@@ -26,7 +32,7 @@ const SUPPORTED_SYMBOLS = [
 
 @injectable()
 export class BinanceExchangeProvider implements IExchangeProvider {
-  public readonly capability = { blockchain: undefined, targetCurrency: 'COP' as const }
+  public readonly capability: ExchangeProviderCapability = { blockchain: undefined, targetCurrency: TargetCurrency.COP }
   public readonly exchangePercentageFee = 0.0085
   private readonly logger: ScopedLogger
 
@@ -37,9 +43,11 @@ export class BinanceExchangeProvider implements IExchangeProvider {
     this.logger = createScopedLogger(baseLogger, { scope: 'BinanceExchangeProvider' })
   }
 
-  createMarketOrder(): Promise<{ success: boolean }> {
-    throw new Error('Method not implemented.')
-  }
+  createMarketOrder: IExchangeProvider['createMarketOrder'] = async (): Promise<ExchangeOperationResult> => ({
+    code: 'permanent',
+    reason: 'Binance market orders are not supported in this service.',
+    success: false,
+  })
 
   /**
    * Gets a deposit address for the specified blockchain and crypto currency
@@ -49,6 +57,7 @@ export class BinanceExchangeProvider implements IExchangeProvider {
   getExchangeAddress: IExchangeProvider['getExchangeAddress'] = async (
     { blockchain, cryptoCurrency },
   ): Promise<ExchangeAddressResult> => {
+    const network = this.mapBlockchainToNetwork(blockchain)
     try {
       const {
         BINANCE_API_KEY,
@@ -60,7 +69,6 @@ export class BinanceExchangeProvider implements IExchangeProvider {
         'BINANCE_API_URL',
       ])
 
-      const network = this.mapBlockchainToNetwork(blockchain)
       const coin = cryptoCurrency
 
       const client = new Wallet({

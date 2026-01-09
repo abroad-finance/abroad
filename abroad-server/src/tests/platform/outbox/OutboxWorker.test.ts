@@ -67,7 +67,7 @@ describe('OutboxWorker', () => {
     await worker.runOnce()
     await worker.reportFailures()
 
-    expect(logger.warn).toHaveBeenCalledWith('Outbox failure backlog detected', { delivering: 1, failed: 2 })
+    expect(logger.warn).toHaveBeenCalledWith('[OutboxWorker] Outbox failure backlog detected', { delivering: 1, failed: 2 })
     expect(dispatcher.enqueueSlack).toHaveBeenCalledWith(
       expect.stringContaining('Failed: 2'),
       'outbox-worker',

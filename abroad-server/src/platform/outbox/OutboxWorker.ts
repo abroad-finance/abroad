@@ -34,6 +34,26 @@ export class OutboxWorker {
     this.logger = createScopedLogger(baseLogger, { scope: 'OutboxWorker' })
   }
 
+  public async reportFailures(): Promise<void> {
+    const summary = await this.repository.summarizeFailures()
+    if (summary.failed === 0 && summary.delivering === 0) {
+      return
+    }
+
+    const now = Date.now()
+    const throttleMs = 60_000
+    if (now - this.lastFailureAlertAt < throttleMs) {
+      return
+    }
+    this.lastFailureAlertAt = now
+
+    this.logger.warn('Outbox failure backlog detected', summary)
+    if (!this.slackOnFailure) return
+
+    const message = `[OutboxWorker] Failed: ${summary.failed}, Delivering: ${summary.delivering}, Pending: ${summary.pending}`
+    await this.dispatcher.enqueueSlack(message, 'outbox-worker')
+  }
+
   public async runOnce(): Promise<void> {
     const batch = await this.repository.nextBatch(this.batchSize)
     await Promise.all(batch.map(record => this.deliver(record)))
@@ -85,26 +105,6 @@ export class OutboxWorker {
     if (!raw) return fallback
     const parsed = Number(raw)
     return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback
-  }
-
-  private async reportFailures(): Promise<void> {
-    const summary = await this.repository.summarizeFailures()
-    if (summary.failed === 0 && summary.delivering === 0) {
-      return
-    }
-
-    const now = Date.now()
-    const throttleMs = 60_000
-    if (now - this.lastFailureAlertAt < throttleMs) {
-      return
-    }
-    this.lastFailureAlertAt = now
-
-    this.logger.warn('Outbox failure backlog detected', summary)
-    if (!this.slackOnFailure) return
-
-    const message = `[OutboxWorker] Failed: ${summary.failed}, Delivering: ${summary.delivering}, Pending: ${summary.pending}`
-    await this.dispatcher.enqueueSlack(message, 'outbox-worker')
   }
 
   private async sleep(ms: number): Promise<void> {

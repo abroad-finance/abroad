@@ -2,10 +2,7 @@
 import { PaymentMethod, TargetCurrency } from '@prisma/client'
 
 export interface IPaymentService {
-  readonly capability?: {
-    method: PaymentMethod
-    targetCurrency: TargetCurrency
-  }
+  readonly capability?: PaymentCapability
   readonly currency: TargetCurrency
   readonly fixedFee: number
   /**
@@ -25,10 +22,7 @@ export interface IPaymentService {
 
   onboardUser({ account }: {
     account: string
-  }): Promise<{
-    message?: string
-    success: boolean
-  }>
+  }): Promise<PaymentOnboardResult>
 
   readonly percentageFee: number
 
@@ -55,12 +49,6 @@ export type PaymentCapability = {
 
 export type PaymentFailureCode = 'permanent' | 'retriable' | 'validation'
 
-export interface PaymentLiquidityResult {
-  liquidity: number
-  message?: string
-  success: boolean
-}
-
 export interface PaymentOnboardResult {
   message?: string
   success: boolean
@@ -77,9 +65,3 @@ export type PaymentSendResult
     success: true
     transactionId?: string
   }
-
-export interface PaymentVerificationResult {
-  code: PaymentFailureCode
-  reason?: string
-  success: boolean
-}

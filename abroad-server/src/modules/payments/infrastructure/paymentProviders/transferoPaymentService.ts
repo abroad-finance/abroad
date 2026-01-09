@@ -6,7 +6,13 @@ import { TYPES } from '../../../../app/container/types'
 import { ILogger } from '../../../../core/logging/types'
 import { IDatabaseClientProvider } from '../../../../platform/persistence/IDatabaseClientProvider'
 import { ISecretManager } from '../../../../platform/secrets/ISecretManager'
-import { IPaymentService, PaymentFailureCode, PaymentSendResult } from '../../application/contracts/IPaymentService'
+import {
+  IPaymentService,
+  PaymentCapability,
+  PaymentFailureCode,
+  PaymentOnboardResult,
+  PaymentSendResult,
+} from '../../application/contracts/IPaymentService'
 import { IPixQrDecoder } from '../../application/contracts/IQrDecoder'
 
 type TransactionTransfero = {
@@ -38,7 +44,7 @@ type TransferoPayment = {
 
 @injectable()
 export class TransferoPaymentService implements IPaymentService {
-  public readonly capability = {
+  public readonly capability: PaymentCapability = {
     method: PaymentMethod.PIX,
     targetCurrency: TargetCurrency.BRL,
   }
@@ -143,8 +149,11 @@ export class TransferoPaymentService implements IPaymentService {
     }
   }
 
-  public onboardUser(): Promise<{ message?: string, success: boolean }> {
-    throw new Error('Method not implemented for this payment service.')
+  public onboardUser(): Promise<PaymentOnboardResult> {
+    return Promise.resolve({
+      message: 'Transfero handles onboarding out-of-band for partner accounts.',
+      success: true,
+    })
   }
 
   public async sendPayment({
@@ -262,9 +271,11 @@ export class TransferoPaymentService implements IPaymentService {
   private extractFailureCode(error: unknown): PaymentFailureCode {
     if (axios.isAxiosError(error)) {
       const status = error.response?.status
-      if (status && status >= 400 && status < 500) {
-        return 'permanent'
+      if (typeof status === 'number') {
+        if (status >= 500) return 'retriable'
+        if (status >= 400) return 'permanent'
       }
+      return error.response ? 'permanent' : 'retriable'
     }
     return 'retriable'
   }
@@ -371,7 +382,7 @@ export class TransferoPaymentService implements IPaymentService {
   private isRetryableError(error: unknown): boolean {
     if (axios.isAxiosError(error)) {
       const status = error.response?.status
-      return !status || status >= 500
+      return typeof status === 'number' ? status >= 500 : false
     }
     const message = error instanceof Error ? error.message.toLowerCase() : ''
     if (message.includes('tax id is missing')) {

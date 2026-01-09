@@ -5,10 +5,9 @@ import * as StellarSdk from '@stellar/stellar-sdk'
 
 import { PublicTransactionsController } from '../../../../../modules/transactions/interfaces/http/PublicTransactionsController'
 import { QueueName } from '../../../../../platform/messaging/queues'
-import { IWebhookNotifier } from '../../../../../platform/notifications/IWebhookNotifier'
 import { IDatabaseClientProvider } from '../../../../../platform/persistence/IDatabaseClientProvider'
 import { ISecretManager, Secret, Secrets } from '../../../../../platform/secrets/ISecretManager'
-import { createMockLogger, createMockQueueHandler, type MockLogger, type MockQueueHandler } from '../../../../setup/mockFactories'
+import { createMockLogger, type MockLogger } from '../../../../setup/mockFactories'
 
 jest.mock('@stellar/stellar-sdk', () => {
   const actual = jest.requireActual('@stellar/stellar-sdk')
@@ -177,11 +176,24 @@ const buildContext = () => {
     getClient: jest.fn(async () => prismaClient as unknown as import('@prisma/client').PrismaClient),
   } as unknown as IDatabaseClientProvider
 
-  const webhookNotifier: IWebhookNotifier = {
-    notifyWebhook: jest.fn(async () => undefined),
+  const outboxDispatcher = {
+    enqueueQueue: jest.fn(),
+    enqueueWebhook: jest.fn(),
   }
-
-  const queueHandler: MockQueueHandler = createMockQueueHandler()
+  const verifyNotification = jest.fn(async (paymentId: string, transactionId: string) => ({
+    outcome: 'ok' as const,
+    queueMessage: {
+      addressFrom: 'sender',
+      amount: 1,
+      blockchain: BlockchainNetwork.STELLAR,
+      cryptoCurrency: CryptoCurrency.USDC,
+      onChainId: paymentId,
+      transactionId,
+    },
+  }))
+  const depositVerifierRegistry = {
+    getVerifier: jest.fn(() => ({ verifyNotification })),
+  }
 
   const secretManager: ISecretManager = {
     getSecret: jest.fn(async (secret: Secret) => secrets[secret] ?? 'unused'),
@@ -194,13 +206,14 @@ const buildContext = () => {
     controller: new PublicTransactionsController(
       prismaProvider,
       logger,
-      webhookNotifier,
-      queueHandler,
+      outboxDispatcher as never,
+      depositVerifierRegistry as never,
       secretManager,
     ),
     logger,
+    outboxDispatcher,
     prismaClient,
-    queueHandler,
+    verifyNotification,
   }
 }
 
@@ -211,7 +224,7 @@ describe('PublicTransactionsController.checkUnprocessedStellarTransactions', () 
   })
 
   it('enqueues missing Stellar payments and advances the cursor', async () => {
-    const { controller, prismaClient, queueHandler } = buildContext()
+    const { controller, outboxDispatcher, prismaClient } = buildContext()
     prismaClient.stellarListenerState.findUnique.mockResolvedValueOnce({
       id: 'singleton',
       lastPagingToken: '100',
@@ -229,7 +242,7 @@ describe('PublicTransactionsController.checkUnprocessedStellarTransactions', () 
 
     const result = await controller.checkUnprocessedStellarTransactions()
 
-    expect(queueHandler.postMessage).toHaveBeenCalledTimes(1)
+    expect(outboxDispatcher.enqueueQueue).toHaveBeenCalledTimes(1)
     expect(prismaClient.transaction.findUnique).toHaveBeenCalledWith({
       select: { id: true, refundOnChainId: true, status: true },
       where: { id: transactionId },
@@ -250,7 +263,7 @@ describe('PublicTransactionsController.checkUnprocessedStellarTransactions', () 
   })
 
   it('returns early when no Stellar cursor exists', async () => {
-    const { controller, prismaClient, queueHandler } = buildContext()
+    const { controller, outboxDispatcher, prismaClient } = buildContext()
     prismaClient.stellarListenerState.findUnique.mockResolvedValueOnce(null)
 
     const result = await controller.checkUnprocessedStellarTransactions()
@@ -263,12 +276,12 @@ describe('PublicTransactionsController.checkUnprocessedStellarTransactions', () 
       scannedPayments: 0,
       startPagingToken: null,
     })
-    expect(queueHandler.postMessage).not.toHaveBeenCalled()
+    expect(outboxDispatcher.enqueueQueue).not.toHaveBeenCalled()
     expect(serverConstructor).not.toHaveBeenCalled()
   })
 
   it('skips non-USDC payments and halts on queue failures while keeping the cursor', async () => {
-    const { controller, logger, prismaClient, queueHandler } = buildContext()
+    const { controller, logger, outboxDispatcher, prismaClient } = buildContext()
     prismaClient.stellarListenerState.findUnique
       .mockResolvedValueOnce({
         id: 'singleton',
@@ -308,7 +321,7 @@ describe('PublicTransactionsController.checkUnprocessedStellarTransactions', () 
     })
 
     mockedStellar.__setPaymentRecords([nonUsdcPayment, failingPayment])
-    const queueMock = queueHandler.postMessage as unknown as jest.Mock
+    const queueMock = outboxDispatcher.enqueueQueue as unknown as jest.Mock
     queueMock.mockRejectedValueOnce(new Error('queue down'))
 
     const result = await controller.checkUnprocessedStellarTransactions()
@@ -343,26 +356,26 @@ describe('PublicTransactionsController.reconcileStellarPayment', () => {
   })
 
   it('rejects missing reconciliation secret headers', async () => {
-    const { controller, logger, queueHandler } = buildContext()
+    const { controller, logger, outboxDispatcher } = buildContext()
 
     await expect(controller.reconcileStellarPayment('payment-1')).rejects.toThrow('Unauthorized')
 
     expect(logger.warn).toHaveBeenCalledWith('[PublicTransactionsController] Missing Stellar reconciliation secret header')
-    expect(queueHandler.postMessage).not.toHaveBeenCalled()
+    expect(outboxDispatcher.enqueueQueue).not.toHaveBeenCalled()
     expect(serverConstructor).not.toHaveBeenCalled()
   })
 
   it('rejects invalid reconciliation secret headers', async () => {
-    const { controller, logger, queueHandler } = buildContext()
+    const { controller, logger, outboxDispatcher } = buildContext()
 
     await expect(controller.reconcileStellarPayment('payment-1', 'wrong-secret')).rejects.toThrow('Unauthorized')
 
     expect(logger.warn).toHaveBeenCalledWith('[PublicTransactionsController] Invalid Stellar reconciliation secret header')
-    expect(queueHandler.postMessage).not.toHaveBeenCalled()
+    expect(outboxDispatcher.enqueueQueue).not.toHaveBeenCalled()
   })
 
   it('returns invalid when payment id is empty', async () => {
-    const { controller, logger, queueHandler } = buildContext()
+    const { controller, logger, outboxDispatcher } = buildContext()
 
     const result = await controller.reconcileStellarPayment('  ', reconciliationSecret)
 
@@ -371,12 +384,12 @@ describe('PublicTransactionsController.reconcileStellarPayment', () => {
       '[PublicTransactionsController] Empty Stellar payment id provided for reconciliation',
       { paymentId: '  ' },
     )
-    expect(queueHandler.postMessage).not.toHaveBeenCalled()
+    expect(outboxDispatcher.enqueueQueue).not.toHaveBeenCalled()
     expect(serverConstructor).not.toHaveBeenCalled()
   })
 
   it('returns notFound when Horizon cannot locate the operation', async () => {
-    const { controller, logger, prismaClient, queueHandler } = buildContext()
+    const { controller, logger, outboxDispatcher, prismaClient } = buildContext()
     const notFoundError = Object.assign(new Error('missing'), { response: { status: 404 } })
     mockedStellar.__setOperationError(notFoundError)
 
@@ -385,7 +398,7 @@ describe('PublicTransactionsController.reconcileStellarPayment', () => {
     expect(result).toEqual({ paymentId: 'missing-payment', result: 'notFound', transactionId: null })
     expect(logger.error).not.toHaveBeenCalled()
     expect(prismaClient.transaction.findUnique).not.toHaveBeenCalled()
-    expect(queueHandler.postMessage).not.toHaveBeenCalled()
+    expect(outboxDispatcher.enqueueQueue).not.toHaveBeenCalled()
   })
 
   it('returns invalid when Horizon rejects the operation id', async () => {
@@ -492,7 +505,7 @@ describe('PublicTransactionsController.reconcileStellarPayment', () => {
   })
 
   it('returns alreadyProcessed when the transaction is not awaiting payment', async () => {
-    const { controller, prismaClient, queueHandler } = buildContext()
+    const { controller, outboxDispatcher, prismaClient } = buildContext()
     prismaClient.transaction.findUnique.mockResolvedValueOnce({
       id: transactionId,
       onChainId: 'stellar-hash',
@@ -503,11 +516,11 @@ describe('PublicTransactionsController.reconcileStellarPayment', () => {
     const result = await controller.reconcileStellarPayment('payment-processed', reconciliationSecret)
 
     expect(result).toEqual({ paymentId: 'payment-processed', result: 'alreadyProcessed', transactionId })
-    expect(queueHandler.postMessage).not.toHaveBeenCalled()
+    expect(outboxDispatcher.enqueueQueue).not.toHaveBeenCalled()
   })
 
   it('enqueues a matching payment and returns enqueued', async () => {
-    const { controller, prismaClient, queueHandler } = buildContext()
+    const { controller, outboxDispatcher, prismaClient } = buildContext()
     prismaClient.transaction.findUnique.mockResolvedValueOnce({
       id: transactionId,
       onChainId: null,
@@ -522,24 +535,22 @@ describe('PublicTransactionsController.reconcileStellarPayment', () => {
     const result = await controller.reconcileStellarPayment('payment-enqueued', reconciliationSecret)
 
     expect(result).toEqual({ paymentId: 'payment-enqueued', result: 'enqueued', transactionId })
-    expect(queueHandler.postMessage).toHaveBeenCalledWith(QueueName.RECEIVED_CRYPTO_TRANSACTION, {
-      addressFrom: 'sender-123',
-      amount: 42.5,
-      blockchain: BlockchainNetwork.STELLAR,
-      cryptoCurrency: CryptoCurrency.USDC,
-      onChainId: 'payment-enqueued',
-      transactionId,
-    })
+    expect(outboxDispatcher.enqueueQueue).toHaveBeenCalledWith(
+      QueueName.RECEIVED_CRYPTO_TRANSACTION,
+      expect.objectContaining({ transactionId }),
+      expect.any(String),
+      expect.objectContaining({ deliverNow: true }),
+    )
   })
 
   it('returns failed when enqueueing the payment fails', async () => {
-    const { controller, logger, prismaClient, queueHandler } = buildContext()
+    const { controller, logger, outboxDispatcher, prismaClient } = buildContext()
     prismaClient.transaction.findUnique.mockResolvedValueOnce({
       id: transactionId,
       onChainId: null,
       status: TransactionStatus.AWAITING_PAYMENT,
     })
-    const postMessage = queueHandler.postMessage as jest.MockedFunction<MockQueueHandler['postMessage']>
+    const postMessage = outboxDispatcher.enqueueQueue as jest.Mock
     postMessage.mockRejectedValueOnce(new Error('queue down'))
     mockedStellar.__setOperationResponse(buildPayment({ id: 'payment-queue-failure' }))
 

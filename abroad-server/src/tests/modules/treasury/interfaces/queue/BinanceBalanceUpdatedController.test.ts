@@ -137,7 +137,7 @@ describe('BinanceBalanceUpdatedController', () => {
     await expect(runner.onBalanceUpdated({})).rejects.toThrow()
 
     expect(logger.error).toHaveBeenCalledWith(
-      '[BinanceBalanceUpdated queue]: Error processing balance update:',
+      '[BinanceBalanceUpdated queue] Error processing balance update:',
       expect.any(Error),
     )
   })

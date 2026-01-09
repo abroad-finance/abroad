@@ -191,7 +191,7 @@ describe('TransferoExchangeProvider', () => {
         targetCurrency: TargetCurrency.BRL,
       })
 
-      expect(result).toEqual({ success: false })
+      expect(result).toEqual({ code: 'retriable', reason: 'network down', success: false })
     })
   })
 })
