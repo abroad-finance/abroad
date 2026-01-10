@@ -4,11 +4,15 @@ kind: Kustomization
 resources:
   - abroad-listeners.yaml
   - abroad-consumers.yaml
+  - abroad-outbox.yaml
 
 images:
   - name: abroad-listeners-container
     newName: us-east1-docker.pkg.dev/${PROJECT_ID}/cloud-run-source-deploy/${REPO_NAME}/${_SERVICE_NAME}
     newTag: ${COMMIT_SHA}
   - name: abroad-consumers-container
+    newName: us-east1-docker.pkg.dev/${PROJECT_ID}/cloud-run-source-deploy/${REPO_NAME}/${_SERVICE_NAME}
+    newTag: ${COMMIT_SHA}
+  - name: abroad-outbox-container
     newName: us-east1-docker.pkg.dev/${PROJECT_ID}/cloud-run-source-deploy/${REPO_NAME}/${_SERVICE_NAME}
     newTag: ${COMMIT_SHA}

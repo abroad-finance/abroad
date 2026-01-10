@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: abroad-outbox
+  labels:
+    app: abroad-outbox
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: abroad-outbox
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: abroad-outbox
+    spec:
+      serviceAccountName: abroad-stellar-sa
+      containers:
+        - name: abroad-outbox-container
+          image: abroad-outbox-container
+          command: ["node"]
+          args: ["dist/app/workers/outbox/server.js"]
+          imagePullPolicy: Always
+          env:
+            - name: HEALTH_PORT
+              value: "3000"
+          resources:
+            requests:
+              cpu: "1"
+              memory: "1Gi"
+            limits:
+              cpu: "2"
+              memory: "2Gi"
+          ports:
+            - name: http
+              containerPort: 3000
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3

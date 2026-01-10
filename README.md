@@ -85,6 +85,7 @@ Run both servers concurrently or in separate terminals.
   docker build -t abroad-api -f abroad-server/Dockerfile abroad-server
   ```
 - Kubernetes manifests now live under `abroad-server/k8s/`.
+- GKE workloads deployed via kustomize now include listeners, consumers, and the outbox worker health service.
 - Cloud Build config moved to `abroad-server/cloud/cloudbuild.yaml` and uses the new Dockerfile path.
 
 ## Contributing

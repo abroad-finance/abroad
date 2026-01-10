@@ -97,7 +97,7 @@ steps:
     args: ["apply", "-k", "abroad-server/k8s"]
     waitFor: ["Substitute kustomization", "Migrate"]
 
-  # 6. Wait for listener and consumer rollouts
+  # 6. Wait for listener, consumer, and outbox rollouts
   - id: Verify GKE rollouts
     name: gcr.io/cloud-builders/kubectl
     entrypoint: bash
@@ -110,6 +110,7 @@ steps:
       - |
         kubectl rollout status deployment/abroad-listeners --timeout=10s || true
         kubectl rollout status deployment/abroad-consumers --timeout=10s || true
+        kubectl rollout status deployment/abroad-outbox --timeout=10s || true
     waitFor: ["Deploy GKE workloads"]
 
 images:
