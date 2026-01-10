@@ -49,7 +49,7 @@
     "adminjs": "^7.8.17",
     "axios": "^1.11.0",
     "binance": "^3.0.5",
-    "body-parser": "^2.2.0",
+    "body-parser": "^2.2.1",
     "bs58": "^6.0.0",
     "commander": "^14.0.0",
     "cors": "^2.8.5",
