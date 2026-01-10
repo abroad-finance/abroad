@@ -37,7 +37,7 @@ interface BrebKeyDetails {
   typeAccount?: string
 }
 
-type BrebRail = 'ENT' | 'TFY'
+type BrebRail = string
 
 interface BrebSendPayload {
   creditor_account_number: string
@@ -151,8 +151,6 @@ export class BrebPaymentService implements IPaymentService {
 
   private serviceConfig?: BrebServiceConfig
 
-  private readonly supportedRails: ReadonlyArray<BrebRail> = ['ENT', 'TFY']
-
   public constructor(
     @inject(TYPES.ISecretManager) private readonly secretManager: ISecretManager,
     @inject(TYPES.ILogger) private readonly logger: ILogger,
@@ -196,14 +194,18 @@ export class BrebPaymentService implements IPaymentService {
         const sendResponse = await this.dispatchPayment(sendPayload, config, token)
 
         if (!sendResponse?.moviiTxId) {
-          this.logger.error('[BreB] Send response missing transaction id', sendResponse)
+          this.logger.error('[BreB] Send response missing transaction id', { responseRail: sendResponse?.rail ?? null })
           return this.buildFailure('permanent', 'missing_transaction_id')
         }
 
-        const resolvedRail = keyDetails.instructedAgent
+        const resolvedRail = this.resolveRailForReport(sendResponse.rail, keyDetails.instructedAgent)
         if (!resolvedRail) {
-          this.logger.error('[BreB] Missing instructed agent on key details', { account })
-          return this.buildFailure('permanent', 'missing_instructed_agent')
+          this.logger.error('[BreB] Unable to resolve rail for transaction status', {
+            account,
+            instructedAgent: keyDetails.instructedAgent,
+            responseRail: sendResponse.rail ?? null,
+          })
+          return this.buildFailure('permanent', 'missing_rail')
         }
 
         const reportResult = await this.pollTransactionReport(sendResponse.moviiTxId, resolvedRail, config, token)
@@ -265,8 +267,9 @@ export class BrebPaymentService implements IPaymentService {
       'x-product-code': config.productCode,
     }
 
-    if (rail) {
-      headers['x-rail'] = rail
+    const normalizedRail = this.normalizeRail(rail)
+    if (normalizedRail) {
+      headers['x-rail'] = normalizedRail
     }
 
     return headers
@@ -604,6 +607,39 @@ export class BrebPaymentService implements IPaymentService {
 
   private hasValue(value: BrebKeyDetails[keyof BrebKeyDetails]): value is string {
     return typeof value === 'string' && value.trim().length > 0
+  }
+
+  private normalizeRail(value: unknown): string | null {
+    if (typeof value !== 'string') {
+      return null
+    }
+
+    const trimmed = value.trim()
+    return trimmed.length > 0 ? trimmed : null
+  }
+
+  private resolveRailForReport(responseRail: unknown, instructedAgent: null | string | undefined): string | null {
+    const normalizedResponseRail = this.normalizeRail(responseRail)
+    if (normalizedResponseRail) {
+      return normalizedResponseRail
+    }
+
+    const normalizedKeyRail = this.normalizeRail(instructedAgent)
+    if (normalizedKeyRail) {
+      if (responseRail !== undefined && responseRail !== null) {
+        this.logger.warn('[BreB] Send response rail unusable, defaulting to instructed agent', {
+          instructedAgent,
+          responseRail,
+        })
+      }
+      return normalizedKeyRail
+    }
+
+    this.logger.error('[BreB] Unable to resolve rail for transaction status polling', {
+      instructedAgent: instructedAgent ?? null,
+      responseRail: responseRail ?? null,
+    })
+    return null
   }
 
   private interpretReport(report: BrebTransactionReport): BrebTransactionOutcome {

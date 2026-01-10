@@ -32,7 +32,7 @@ type BrebInternals = {
   ): Promise<unknown>
   fetchTransactionReport(
     transactionId: string,
-    rail: 'ENT' | 'TFY',
+    rail: string,
     config: BrebConfig,
     token: string,
   ): Promise<unknown>
@@ -44,7 +44,7 @@ type BrebInternals = {
   pollConfig: { delayMs: number, timeoutMs: number }
   pollTransactionReport(
     transactionId: string,
-    rail: 'ENT' | 'TFY',
+    rail: string,
     config: BrebConfig,
     token: string,
   ): Promise<null | { report: null | Record<string, unknown>, result: 'failure' | 'pending' | 'success' }>
@@ -93,7 +93,7 @@ const keyLookupResponse = (overrides: Partial<BrebKeyFixture> = {}) => ({
   data: { data: { ...defaultKeyDetails, ...overrides } },
 })
 
-const sendResponse = (moviiTxId: string | undefined = 'tx-001', rail: 'ENT' | 'TFY' = 'ENT') => ({
+const sendResponse = (moviiTxId: string | undefined = 'tx-001', rail: string = 'ENT') => ({
   data: { data: { moviiTxId, rail } },
 })
 
@@ -146,7 +146,7 @@ const primeAccessToken = (token: string = 'token-1', expiresIn: number = 3600) =
 const primeKeyLookup = (overrides: Partial<BrebKeyFixture> = {}) =>
   mockedAxios.get.mockResolvedValueOnce(keyLookupResponse(overrides))
 
-const primeSend = (moviiTxId?: string, rail: 'ENT' | 'TFY' = 'ENT') =>
+const primeSend = (moviiTxId?: string, rail: string = 'ENT') =>
   mockedAxios.post.mockResolvedValueOnce(sendResponse(moviiTxId, rail))
 
 const primeReport = (status: string) => mockedAxios.get.mockResolvedValueOnce(reportEnvelope(status))
@@ -228,7 +228,7 @@ describe('BrebPaymentService', () => {
       })
 
       expect(outcome).toEqual({ code: 'permanent', reason: 'missing_transaction_id', success: false })
-      expect(logger.error).toHaveBeenCalledWith('[BreB] Send response missing transaction id', { rail: 'ENT' })
+      expect(logger.error).toHaveBeenCalledWith('[BreB] Send response missing transaction id', { responseRail: 'ENT' })
     })
 
     it('handles dispatch failures gracefully', async () => {
@@ -266,6 +266,47 @@ describe('BrebPaymentService', () => {
 
       expect(result).toEqual({ code: 'retriable', reason: 'pending', success: false, transactionId: 'tx-005' })
       expect(logger.warn).toHaveBeenCalledWith('[BreB] Payment pending after timeout', { transactionId: 'tx-005' })
+    })
+
+    it('uses the rail provided by the send response when polling transaction status', async () => {
+      const { service } = setupService()
+      primeAccessToken()
+      primeKeyLookup({ instructedAgent: 'ENT' })
+      primeSend('tx-009', 'custom-rail-01')
+      primeReport('ACCP')
+
+      await service.sendPayment({
+        account: defaultKeyDetails.accountNumber,
+        id: 'txn-9',
+        value: 75_000,
+      })
+
+      const reportCall = mockedAxios.get.mock.calls.find(call => String(call[0]).includes('transaction-report'))
+      expect(reportCall?.[1]?.headers?.['x-rail']).toBe('custom-rail-01')
+    })
+
+    it('falls back to the key rail when the response rail is unusable', async () => {
+      const { logger, service } = setupService()
+      primeAccessToken()
+      primeKeyLookup({ instructedAgent: 'TFY' })
+      primeSend('tx-010', '   ')
+      primeReport('ACSC')
+
+      await service.sendPayment({
+        account: defaultKeyDetails.accountNumber,
+        id: 'txn-10',
+        value: 80_000,
+      })
+
+      const reportCall = mockedAxios.get.mock.calls.find(call => String(call[0]).includes('transaction-report'))
+      expect(reportCall?.[1]?.headers?.['x-rail']).toBe('TFY')
+      expect(logger.warn).toHaveBeenCalledWith(
+        '[BreB] Send response rail unusable, defaulting to instructed agent',
+        {
+          instructedAgent: 'TFY',
+          responseRail: '   ',
+        },
+      )
     })
 
     it('logs unexpected failures during submission', async () => {
