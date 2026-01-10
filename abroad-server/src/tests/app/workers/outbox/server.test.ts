@@ -1,7 +1,6 @@
 import { TYPES } from '../../../../app/container/types'
 import { createHealthHandler, startOutboxWorker, stopOutboxWorker } from '../../../../app/workers/outbox/server'
 import { OutboxRepository } from '../../../../platform/outbox/OutboxRepository'
-import { OutboxWorker } from '../../../../platform/outbox/OutboxWorker'
 import { createResponseRecorder, flushAsyncOperations, toIncomingMessage, toServerResponse } from '../../../setup/testHarness'
 
 jest.mock('../../../../app/container', () => {

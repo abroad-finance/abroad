@@ -87,7 +87,7 @@ describe('StellarDepositVerifier', () => {
     const missing = await verifier.verifyNotification('on-chain', 'txn-missing')
     expect(missing).toEqual({ outcome: 'error', reason: 'Transaction not found', status: 404 })
 
-    const { prisma: statusPrisma, verifier: statusVerifier } = buildVerifier({ status: TransactionStatus.PAYMENT_COMPLETED })
+    const { verifier: statusVerifier } = buildVerifier({ status: TransactionStatus.PAYMENT_COMPLETED })
     currentServer = { operations: () => ({ operation: () => ({ call: async () => buildPayment() }) }) }
     const notAwaiting = await statusVerifier.verifyNotification('on-chain', 'txn-1')
     if (notAwaiting.outcome === 'error') {
@@ -110,7 +110,7 @@ describe('StellarDepositVerifier', () => {
   })
 
   it('handles horizon failures and unsupported operations', async () => {
-    const { logger, verifier } = buildVerifier()
+    const { verifier } = buildVerifier()
     const notFoundError = Object.assign(new Error('missing'), { response: { status: 404 } })
     currentServer = {
       operations: () => ({

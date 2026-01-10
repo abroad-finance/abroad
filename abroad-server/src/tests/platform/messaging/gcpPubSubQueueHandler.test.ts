@@ -32,7 +32,7 @@ class FakeSubscription extends EventEmitter {
 }
 
 class FakeTopic {
-  public createSubscription = jest.fn(async (subscriptionName: string, _options: unknown) => {
+  public createSubscription = jest.fn(async (subscriptionName: string) => {
     const existing = subscriptions.get(subscriptionName) ?? new FakeSubscription(subscriptionName)
     subscriptions.set(subscriptionName, existing)
     subscriptionExists.set(subscriptionName, true)
@@ -238,6 +238,80 @@ describe('GCPPubSubQueueHandler Pub/Sub integration', () => {
       payload,
       reason: 'handler_failed',
     })
+  })
+
+  it('logs validation issues and dead-letters invalid payloads', async () => {
+    topicExists.set(QueueName.PAYMENT_SENT, true)
+    const handler = createHandler()
+    await handler.subscribeToQueue(QueueName.PAYMENT_SENT, async () => {})
+
+    const subscription = subscriptions.get(`${QueueName.PAYMENT_SENT}${config.pubSub.subscriptionSuffix}`)
+    const invalidPayload = { amount: '1', blockchain: 'bogus' }
+    const message = new FakeMessage(Buffer.from(JSON.stringify(invalidPayload)), 'msg-invalid')
+    subscription?.emit('message', message)
+    await new Promise(resolve => setImmediate(resolve))
+
+    expect(logger.warn).toHaveBeenCalledWith(
+      '[PubSubQueueHandler] Failed to validate PubSub message',
+      expect.objectContaining({
+        context: expect.objectContaining({
+          queueName: QueueName.PAYMENT_SENT,
+          subscriptionName: `${QueueName.PAYMENT_SENT}${config.pubSub.subscriptionSuffix}`,
+        }),
+      }),
+      expect.objectContaining({
+        issues: expect.any(Array),
+        messageId: 'msg-invalid',
+      }),
+    )
+    expect(message.ack).toHaveBeenCalled()
+    expect(publishedMessages).toHaveLength(1)
+    expect(JSON.parse(publishedMessages[0].data)).toMatchObject({
+      originalQueue: QueueName.PAYMENT_SENT,
+      payload: invalidPayload,
+      reason: 'parse_failed',
+    })
+  })
+
+  it('surfaces subscription errors through the logger', async () => {
+    const handler = createHandler()
+    await handler.subscribeToQueue(QueueName.PAYMENT_SENT, async () => {})
+
+    const subscription = subscriptions.get(`${QueueName.PAYMENT_SENT}${config.pubSub.subscriptionSuffix}`)
+    const subscriptionError = new Error('subscription-failure')
+    subscription?.emit('error', subscriptionError)
+
+    expect(logger.error).toHaveBeenCalledWith(
+      '[PubSubQueueHandler] Subscription error',
+      expect.objectContaining({
+        context: expect.objectContaining({
+          queueName: QueueName.PAYMENT_SENT,
+          subscriptionName: `${QueueName.PAYMENT_SENT}${config.pubSub.subscriptionSuffix}`,
+        }),
+      }),
+      { err: subscriptionError },
+    )
+  })
+
+  it('logs dead-letter failures without throwing', async () => {
+    const handler = createHandler()
+    const dlqFailure = new Error('dlq offline')
+    const throwingPostMessage: GCPPubSubQueueHandler['postMessage'] = jest.fn(async () => {
+      throw dlqFailure
+    })
+    ;(handler as unknown as { postMessage: typeof throwingPostMessage }).postMessage = throwingPostMessage
+
+    await (handler as unknown as { sendToDeadLetter: GCPPubSubQueueHandler['sendToDeadLetter'] }).sendToDeadLetter(
+      QueueName.PAYMENT_SENT,
+      { payload: true },
+      'handler_failed',
+      new Error('boom'),
+    )
+
+    expect(logger.error).toHaveBeenCalledWith(
+      '[PubSubQueueHandler] Failed to post message to dead-letter queue',
+      dlqFailure,
+    )
   })
 
   it('closes subscriptions when asked', async () => {
