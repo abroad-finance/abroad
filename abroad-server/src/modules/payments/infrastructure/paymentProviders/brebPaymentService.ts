@@ -609,39 +609,6 @@ export class BrebPaymentService implements IPaymentService {
     return typeof value === 'string' && value.trim().length > 0
   }
 
-  private normalizeRail(value: unknown): string | null {
-    if (typeof value !== 'string') {
-      return null
-    }
-
-    const trimmed = value.trim()
-    return trimmed.length > 0 ? trimmed : null
-  }
-
-  private resolveRailForReport(responseRail: unknown, instructedAgent: null | string | undefined): string | null {
-    const normalizedResponseRail = this.normalizeRail(responseRail)
-    if (normalizedResponseRail) {
-      return normalizedResponseRail
-    }
-
-    const normalizedKeyRail = this.normalizeRail(instructedAgent)
-    if (normalizedKeyRail) {
-      if (responseRail !== undefined && responseRail !== null) {
-        this.logger.warn('[BreB] Send response rail unusable, defaulting to instructed agent', {
-          instructedAgent,
-          responseRail,
-        })
-      }
-      return normalizedKeyRail
-    }
-
-    this.logger.error('[BreB] Unable to resolve rail for transaction status polling', {
-      instructedAgent: instructedAgent ?? null,
-      responseRail: responseRail ?? null,
-    })
-    return null
-  }
-
   private interpretReport(report: BrebTransactionReport): BrebTransactionOutcome {
     const statuses = [
       report.GlobalTransactionInfAndSts?.GlobalTxStatus,
@@ -779,6 +746,15 @@ export class BrebPaymentService implements IPaymentService {
     return `${'*'.repeat(maskedPrefixLength)}${visibleSuffix}`
   }
 
+  private normalizeRail(value: unknown): null | string {
+    if (typeof value !== 'string') {
+      return null
+    }
+
+    const trimmed = value.trim()
+    return trimmed.length > 0 ? trimmed : null
+  }
+
   private async pollTransactionReport(
     transactionId: string,
     rail: BrebRail,
@@ -820,6 +796,30 @@ export class BrebPaymentService implements IPaymentService {
       sanitized[key] = shouldRedact ? '<redacted>' : value
       return sanitized
     }, {})
+  }
+
+  private resolveRailForReport(responseRail: unknown, instructedAgent: null | string | undefined): null | string {
+    const normalizedResponseRail = this.normalizeRail(responseRail)
+    if (normalizedResponseRail) {
+      return normalizedResponseRail
+    }
+
+    const normalizedKeyRail = this.normalizeRail(instructedAgent)
+    if (normalizedKeyRail) {
+      if (responseRail !== undefined && responseRail !== null) {
+        this.logger.warn('[BreB] Send response rail unusable, defaulting to instructed agent', {
+          instructedAgent,
+          responseRail,
+        })
+      }
+      return normalizedKeyRail
+    }
+
+    this.logger.error('[BreB] Unable to resolve rail for transaction status polling', {
+      instructedAgent: instructedAgent ?? null,
+      responseRail: responseRail ?? null,
+    })
+    return null
   }
 
   private sanitizeUrlForLogs(url: string): string {
