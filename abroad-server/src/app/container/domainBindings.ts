@@ -44,7 +44,6 @@ const domainBindings: ReadonlyArray<BindingRegistration<unknown>> = [
   { identifier: TYPES.SolanaWalletHandler, implementation: SolanaWalletHandler },
   { identifier: TYPES.StellarListener, implementation: StellarListener },
   { identifier: TYPES.StellarWalletHandler, implementation: StellarWalletHandler },
-  { identifier: TYPES.StellarListener, implementation: StellarListener },
   { identifier: TYPES.IPaymentService, implementation: BrebPaymentService, name: 'breb' },
   { identifier: TYPES.IPaymentService, implementation: TransferoPaymentService, name: 'transfero' },
   { identifier: TYPES.IDepositVerifier, implementation: SolanaPaymentVerifier, name: 'solana' },

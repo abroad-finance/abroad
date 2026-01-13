@@ -24,7 +24,7 @@ export class OutboxWorker {
 
   public constructor(
     @inject(OutboxRepository) private readonly repository: OutboxRepository,
-    @inject(OutboxDispatcher) private readonly dispatcher: OutboxDispatcher,
+    @inject(TYPES.IOutboxDispatcher) private readonly dispatcher: OutboxDispatcher,
     @inject(TYPES.ILogger) baseLogger: ILogger,
     options: OutboxWorkerOptions = {},
   ) {
