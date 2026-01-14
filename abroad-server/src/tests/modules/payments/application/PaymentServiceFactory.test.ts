@@ -1,4 +1,4 @@
-import { PaymentMethod, TargetCurrency } from '@prisma/client'
+import { BlockchainNetwork, PaymentMethod, TargetCurrency } from '@prisma/client'
 
 import type { IPaymentService } from '../../../../modules/payments/application/contracts/IPaymentService'
 import type { IExchangeProvider } from '../../../../modules/treasury/application/contracts/IExchangeProvider'
@@ -23,8 +23,12 @@ const buildPaymentService = (label: string): IPaymentService => ({
   verifyAccount: async () => true,
 })
 
-const buildExchangeProvider = (id: string, targetCurrency: TargetCurrency): IExchangeProvider => ({
-  capability: { blockchain: undefined, targetCurrency },
+const buildExchangeProvider = (
+  id: string,
+  targetCurrency: TargetCurrency,
+  blockchain?: BlockchainNetwork,
+): IExchangeProvider => ({
+  capability: { blockchain, targetCurrency },
   createMarketOrder: async () => ({ success: true }),
   exchangePercentageFee: 0.01,
   getExchangeAddress: async () => ({ address: `${id}-addr`, success: true }),
@@ -109,5 +113,29 @@ describe('ExchangeProviderFactory', () => {
     const factory = new ExchangeProviderFactory(transferoProvider, binanceProvider)
 
     expect(() => factory.getExchangeProvider('USD' as TargetCurrency)).toThrow('No exchange provider found for currency: USD')
+  })
+
+  it('falls back to a blockchain-agnostic provider when no explicit chain match exists', () => {
+    const factory = new ExchangeProviderFactory(transferoProvider, binanceProvider)
+
+    const provider = factory.getExchangeProviderForCapability({
+      blockchain: BlockchainNetwork.STELLAR,
+      targetCurrency: TargetCurrency.COP,
+    })
+
+    expect(provider).toBe(binanceProvider)
+  })
+
+  it('prefers providers that explicitly support the requested blockchain', () => {
+    const copOnStellarProvider = buildExchangeProvider('cop-stellar', TargetCurrency.COP, BlockchainNetwork.STELLAR)
+    const copAgnosticProvider = buildExchangeProvider('cop-agnostic', TargetCurrency.COP)
+    const factory = new ExchangeProviderFactory(copOnStellarProvider, copAgnosticProvider)
+
+    const provider = factory.getExchangeProviderForCapability({
+      blockchain: BlockchainNetwork.STELLAR,
+      targetCurrency: TargetCurrency.COP,
+    })
+
+    expect(provider).toBe(copOnStellarProvider)
   })
 })

@@ -16,19 +16,42 @@ export class ExchangeProviderFactory implements IExchangeProviderFactory {
   }
 
   getExchangeProvider(currency: TargetCurrency): IExchangeProvider {
-    return this.getExchangeProviderForCapability({ targetCurrency: currency })
+    return this.resolveExchangeProvider({ targetCurrency: currency })
   }
 
   getExchangeProviderForCapability(params: {
     blockchain?: BlockchainNetwork
     targetCurrency: TargetCurrency
   }): IExchangeProvider {
-    const match = this.providers.find(provider =>
-      provider.capability
-      && provider.capability.targetCurrency === params.targetCurrency
-      && (params.blockchain === undefined || provider.capability.blockchain === params.blockchain),
-    )
-    if (match) return match
+    return this.resolveExchangeProvider(params)
+  }
+
+  private resolveExchangeProvider(params: {
+    blockchain?: BlockchainNetwork
+    targetCurrency: TargetCurrency
+  }): IExchangeProvider {
+    const candidates = this.providers.filter(provider =>
+      provider.capability?.targetCurrency === params.targetCurrency)
+    if (candidates.length === 0) {
+      throw new Error(`No exchange provider found for currency: ${params.targetCurrency}`)
+    }
+
+    if (!params.blockchain) {
+      return candidates[0]
+    }
+
+    const exactBlockchainMatch = candidates.find(provider =>
+      provider.capability?.blockchain === params.blockchain)
+    if (exactBlockchainMatch) {
+      return exactBlockchainMatch
+    }
+
+    const blockchainAgnosticProvider = candidates.find(provider =>
+      provider.capability?.blockchain === undefined)
+    if (blockchainAgnosticProvider) {
+      return blockchainAgnosticProvider
+    }
+
     throw new Error(`No exchange provider found for currency: ${params.targetCurrency}`)
   }
 }
