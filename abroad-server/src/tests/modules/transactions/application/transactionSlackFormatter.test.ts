@@ -88,6 +88,7 @@ describe('transactionSlackFormatter', () => {
     expect(message).toContain('References: External: external-1 | On-chain: on-chain-1 | Refund: refund-1')
     expect(message).toContain('Flags: reconciliation | stellar')
     expect(message).toContain('Notes: provider: transfero | providerAmount: 10 | providerStatus: processed')
+    expect(message).toContain('Country: 🇨🇴')
   })
 
   it('omits optional sections when data is absent', () => {
@@ -110,6 +111,7 @@ describe('transactionSlackFormatter', () => {
     expect(message).not.toContain('References:')
     expect(message).not.toContain('Notes:')
     expect(message).toContain('Payment: BREB | Network: STELLAR')
+    expect(message).toContain('Country: 🇨🇴')
     expect(message).toContain('❌ Payment failed | Status: PAYMENT_FAILED | Trigger: TransactionFormatterTest')
   })
 })

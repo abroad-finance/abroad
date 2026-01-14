@@ -1,4 +1,4 @@
-import { TransactionStatus } from '@prisma/client'
+import { Country, TransactionStatus } from '@prisma/client'
 
 import { TransactionWithRelations } from './transactionNotificationTypes'
 
@@ -17,6 +17,10 @@ const statusEmoji: Record<TransactionStatus, string> = {
   [TransactionStatus.PAYMENT_FAILED]: '❌',
   [TransactionStatus.PROCESSING_PAYMENT]: '🔄',
   [TransactionStatus.WRONG_AMOUNT]: '⚠️',
+}
+
+const COUNTRY_FLAGS: Readonly<Record<Country, string>> = {
+  [Country.CO]: '🇨🇴',
 }
 
 const joinSegments = (segments: Array<null | string | undefined>): string =>
@@ -67,8 +71,9 @@ export const buildTransactionSlackMessage = (
   ])
 
   const emoji = statusEmoji[context.status]
+  const countryIcon = COUNTRY_FLAGS[transaction.quote.country] ?? transaction.quote.country
   const lines = [
-    `${emoji} ${context.heading} | Status: ${context.status} | Trigger: ${context.trigger}`,
+    `${emoji} ${context.heading} | Status: ${context.status} | Trigger: ${context.trigger} | Country: ${countryIcon}`,
     joinSegments([
       `Transaction: ${transaction.id}`,
       `Quote: ${transaction.quote.id}`,
