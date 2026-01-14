@@ -72,6 +72,12 @@ const buildContext = () => {
     enqueueQueue: jest.fn(),
     enqueueWebhook: jest.fn(),
   }
+  const orphanRefundService = {
+    refundOrphanPayment: jest.fn().mockResolvedValue({
+      outcome: 'refunded',
+      refundTransactionId: null,
+    }),
+  }
   const depositVerifierRegistry = {
     getVerifier: jest.fn(),
   }
@@ -88,9 +94,11 @@ const buildContext = () => {
       logger,
       outboxDispatcher as never,
       depositVerifierRegistry as never,
+      orphanRefundService as never,
       secretManager,
     ),
     logger,
+    orphanRefundService,
     outboxDispatcher,
     prismaClient,
   }

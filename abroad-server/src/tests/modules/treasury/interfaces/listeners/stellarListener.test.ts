@@ -234,6 +234,7 @@ describe('StellarListener', () => {
     await handler.onmessage?.(createPayment({ to: 'other-account' }))
     await handler.onmessage?.(createPayment({ asset_issuer: 'untrusted' }))
     await handler.onmessage?.(createPayment({
+      asset_issuer: 'trusted-issuer',
       transaction: () => Promise.resolve({ memo: undefined }),
     }))
 

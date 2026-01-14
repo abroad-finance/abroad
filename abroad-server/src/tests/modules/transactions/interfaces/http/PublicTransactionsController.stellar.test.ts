@@ -195,6 +195,13 @@ const buildContext = () => {
     getVerifier: jest.fn(() => ({ verifyNotification })),
   }
 
+  const orphanRefundService = {
+    refundOrphanPayment: jest.fn().mockResolvedValue({
+      outcome: 'refunded',
+      refundTransactionId: 'mock-refund-id',
+    }),
+  }
+
   const secretManager: ISecretManager = {
     getSecret: jest.fn(async (secret: Secret) => secrets[secret] ?? 'unused'),
     getSecrets: jest.fn(),
@@ -208,9 +215,11 @@ const buildContext = () => {
       logger,
       outboxDispatcher as never,
       depositVerifierRegistry as never,
+      orphanRefundService as never,
       secretManager,
     ),
     logger,
+    orphanRefundService,
     outboxDispatcher,
     prismaClient,
     verifyNotification,
@@ -454,11 +463,17 @@ describe('PublicTransactionsController.reconcileStellarPayment', () => {
 
     const result = await controller.reconcileStellarPayment('payment-xlm', reconciliationSecret)
 
-    expect(result).toEqual({ paymentId: 'payment-xlm', result: 'irrelevant', transactionId: null })
+    expect(result).toEqual({
+      paymentId: 'payment-xlm',
+      reason: 'assetOrDestinationMismatch',
+      refundTransactionId: undefined,
+      result: 'irrelevant',
+      transactionId: null,
+    })
     expect(prismaClient.transaction.findUnique).not.toHaveBeenCalled()
   })
 
-  it('returns irrelevant when the payment memo is missing', async () => {
+  it('returns invalid when the payment memo is missing', async () => {
     const { controller, prismaClient } = buildContext()
     mockedStellar.__setOperationResponse(buildPayment({
       id: 'payment-missing-memo',
@@ -467,7 +482,13 @@ describe('PublicTransactionsController.reconcileStellarPayment', () => {
 
     const result = await controller.reconcileStellarPayment('payment-missing-memo', reconciliationSecret)
 
-    expect(result).toEqual({ paymentId: 'payment-missing-memo', result: 'irrelevant', transactionId: null })
+    expect(result).toEqual({
+      paymentId: 'payment-missing-memo',
+      reason: 'missingMemo',
+      refundTransactionId: 'mock-refund-id',
+      result: 'invalid',
+      transactionId: null,
+    })
     expect(prismaClient.transaction.findUnique).not.toHaveBeenCalled()
   })
 

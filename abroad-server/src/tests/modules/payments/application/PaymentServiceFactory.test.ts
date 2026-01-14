@@ -47,6 +47,51 @@ describe('PaymentServiceFactory', () => {
 
     expect(() => factory.getPaymentService('UNSUPPORTED' as PaymentMethod)).toThrow('Unsupported payment method: UNSUPPORTED')
   })
+
+  it('throws when a supported payment method lacks a configured service', () => {
+    const factory = new PaymentServiceFactory(brebService, transferoService)
+    const mutableFactory = factory as unknown as { serviceByMethod: Partial<Record<PaymentMethod, IPaymentService>> }
+    delete mutableFactory.serviceByMethod[PaymentMethod.PIX]
+
+    expect(() => factory.getPaymentService(PaymentMethod.PIX)).toThrow('Payment service not registered for method PIX')
+  })
+
+  it('resolves a payment service using capability when the target currency differs from the default', () => {
+    const brebWithExplicitCapability: IPaymentService = {
+      ...brebService,
+      capability: { method: PaymentMethod.BREB, targetCurrency: TargetCurrency.BRL },
+    }
+    const factory = new PaymentServiceFactory(brebWithExplicitCapability, transferoService)
+
+    const service = factory.getPaymentServiceForCapability({
+      paymentMethod: PaymentMethod.BREB,
+      targetCurrency: TargetCurrency.BRL,
+    })
+
+    expect(service).toBe(brebWithExplicitCapability)
+  })
+
+  it('falls back to a method lookup when no capability matches the requested currency', () => {
+    const factory = new PaymentServiceFactory(brebService, transferoService)
+
+    const service = factory.getPaymentServiceForCapability({
+      paymentMethod: PaymentMethod.PIX,
+      targetCurrency: TargetCurrency.BRL,
+    })
+
+    expect(service).toBe(transferoService)
+  })
+
+  it('throws when a capability is present but its service mapping is missing', () => {
+    const factory = new PaymentServiceFactory(brebService, transferoService)
+    const mutableFactory = factory as unknown as { serviceByMethod: Partial<Record<PaymentMethod, IPaymentService>> }
+    delete mutableFactory.serviceByMethod[PaymentMethod.BREB]
+
+    expect(() => factory.getPaymentServiceForCapability({
+      paymentMethod: PaymentMethod.BREB,
+      targetCurrency: brebService.currency,
+    })).toThrow('Payment service not registered for method BREB')
+  })
 })
 
 describe('ExchangeProviderFactory', () => {

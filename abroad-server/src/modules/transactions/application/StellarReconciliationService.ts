@@ -37,7 +37,7 @@ type PaymentLookupResult
 type PaymentProcessingOutcome
   = | { cursor: string, reason?: PaymentReconciliationReason, refundTransactionId?: null | string, result: 'invalid' | 'irrelevant' }
     | { cursor: string, reason?: PaymentReconciliationReason, result: 'alreadyProcessed' | 'enqueued' | 'missing', transactionId: string }
-    | { cursor: string, result: 'halt', transactionId?: string }
+    | { cursor: string, reason?: PaymentReconciliationReason, result: 'halt', transactionId?: string }
 
 type StellarPaymentContext = {
   accountId: string
