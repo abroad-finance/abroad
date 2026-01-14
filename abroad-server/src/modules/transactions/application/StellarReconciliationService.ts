@@ -19,6 +19,7 @@ export type CheckUnprocessedStellarResponse = {
 
 export type SingleStellarReconciliationResponse = {
   paymentId: string
+  reason?: PaymentReconciliationReason
   result: 'alreadyProcessed' | 'enqueued' | 'failed' | 'invalid' | 'irrelevant' | 'missing' | 'notFound'
   transactionId: null | string
 }
@@ -31,9 +32,14 @@ type PaymentLookupResult
     | { status: 'unsupported' }
 
 type PaymentProcessingOutcome
-  = | { cursor: string, result: 'alreadyProcessed' | 'enqueued' | 'missing', transactionId: string }
+  = | { cursor: string, reason?: PaymentReconciliationReason, result: 'alreadyProcessed' | 'enqueued' | 'missing', transactionId: string }
+    | { cursor: string, reason?: PaymentReconciliationReason, result: 'invalid' | 'irrelevant' }
     | { cursor: string, result: 'halt', transactionId?: string }
-    | { cursor: string, result: 'irrelevant' }
+
+type PaymentReconciliationReason
+  = | 'assetOrDestinationMismatch'
+    | 'invalidMemoFormat'
+    | 'missingMemo'
 
 type StellarPaymentContext = {
   accountId: string
@@ -123,8 +129,10 @@ export class StellarReconciliationService {
     }
 
     const transactionId = 'transactionId' in outcome ? outcome.transactionId : null
+    const reason = 'reason' in outcome ? outcome.reason : undefined
     return {
       paymentId: normalizedPaymentId,
+      reason,
       result: outcome.result,
       transactionId,
     }
@@ -141,6 +149,7 @@ export class StellarReconciliationService {
       case 'enqueued':
         summary.enqueued += 1
         break
+      case 'invalid':
       case 'irrelevant':
         break
       case 'missing':
@@ -184,23 +193,31 @@ export class StellarReconciliationService {
     return undefined
   }
 
-  private async extractTransactionId(payment: Horizon.ServerApi.PaymentOperationRecord): Promise<null | string> {
+  private async extractTransactionId(
+    payment: Horizon.ServerApi.PaymentOperationRecord,
+  ): Promise<{ reason: PaymentReconciliationReason, transactionId: null } | { reason?: undefined, transactionId: string }> {
     const transaction = await payment.transaction()
-    const memo = transaction.memo
+    const memo = transaction.memo?.trim()
 
     if (!memo) {
-      return null
+      return { reason: 'missingMemo', transactionId: null }
     }
 
     const buffer = Buffer.from(memo, 'base64')
+    if (buffer.length < 16) {
+      return { reason: 'invalidMemoFormat', transactionId: null }
+    }
+
     const hex = buffer.toString('hex')
-    return [
+    const transactionId = [
       hex.substring(0, 8),
       hex.substring(8, 12),
       hex.substring(12, 16),
       hex.substring(16, 20),
       hex.substring(20),
     ].join('-')
+
+    return { transactionId }
   }
 
   private async fetchPaymentById(server: Horizon.Server, paymentId: string): Promise<PaymentLookupResult> {
@@ -367,12 +384,12 @@ export class StellarReconciliationService {
     const cursor = payment.paging_token
 
     if (!this.isUsdcPaymentToWallet(payment, context.accountId, context.usdcIssuer)) {
-      return { cursor, result: 'irrelevant' }
+      return { cursor, reason: 'assetOrDestinationMismatch', result: 'irrelevant' }
     }
 
-    let transactionId: null | string
+    let transactionIdResult: Awaited<ReturnType<typeof this.extractTransactionId>>
     try {
-      transactionId = await this.extractTransactionId(payment)
+      transactionIdResult = await this.extractTransactionId(payment)
     }
     catch (error) {
       this.logger.error('[PublicTransactionsController] Failed to fetch/parse payment transaction', {
@@ -382,9 +399,14 @@ export class StellarReconciliationService {
       return { cursor, result: 'halt' }
     }
 
-    if (!transactionId) {
-      return { cursor, result: 'irrelevant' }
+    if (!transactionIdResult.transactionId) {
+      this.logger.warn('[PublicTransactionsController] Stellar payment missing usable memo; skipping reconciliation', {
+        paymentId: payment.id,
+        reason: transactionIdResult.reason,
+      })
+      return { cursor, reason: transactionIdResult.reason, result: 'invalid' }
     }
+    const transactionId = transactionIdResult.transactionId
 
     const transaction = await context.prismaClient.transaction.findUnique({
       select: { id: true, refundOnChainId: true, status: true },

@@ -66,7 +66,7 @@ const buildTransaction = (overrides: Partial<TransactionWithRelations> = {}): Tr
 
 describe('transactionSlackFormatter', () => {
   it('renders full detail including references and notes', () => {
-    const transaction = buildTransaction()
+    const transaction = buildTransaction({ quote: { ...buildTransaction().quote, targetCurrency: TargetCurrency.BRL } })
     const message = buildTransactionSlackMessage(transaction, {
       heading: 'Payment completed',
       notes: {
@@ -82,11 +82,11 @@ describe('transactionSlackFormatter', () => {
     expect(message).toContain(`Transaction: ${transaction.id}`)
     expect(message).toContain(`Quote: ${transaction.quote.id}`)
     expect(message).toContain(`Partner: ${transaction.partnerUser.partner.name} (${transaction.partnerUser.partner.id})`)
-    expect(message).toContain('Amounts: 10 USDC -> 20 COP')
+    expect(message).toContain('Amounts: 10 USDC -> 20 BRL')
     expect(message).toContain('Payment: BREB | Network: STELLAR | Account: 123456789')
     expect(message).toContain('References: External: external-1 | On-chain: on-chain-1 | Refund: refund-1')
     expect(message).toContain('Notes: provider: transfero | providerAmount: 10 | providerStatus: processed')
-    expect(message).toContain('Country: 🇨🇴')
+    expect(message).toContain('Country: 🇧🇷')
   })
 
   it('omits optional sections when data is absent', () => {

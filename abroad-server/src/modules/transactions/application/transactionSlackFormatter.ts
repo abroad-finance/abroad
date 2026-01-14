@@ -1,4 +1,4 @@
-import { Country, TransactionStatus } from '@prisma/client'
+import { TargetCurrency, TransactionStatus } from '@prisma/client'
 
 import { TransactionWithRelations } from './transactionNotificationTypes'
 
@@ -35,17 +35,22 @@ const buildNotesLine = (
   return renderedNotes.length > 0 ? `Notes: ${renderedNotes.join(' | ')}` : ''
 }
 
-const toCountryFlag = (country: Country): string => {
-  const normalized = country.trim().toUpperCase()
+const currencyCountryCode: Readonly<Record<TargetCurrency, string>> = {
+  [TargetCurrency.BRL]: 'BR',
+  [TargetCurrency.COP]: 'CO',
+}
+
+const toCountryFlag = (currency: TargetCurrency): string => {
+  const normalized = currencyCountryCode[currency]?.trim().toUpperCase()
   if (normalized.length !== 2) {
-    return country
+    return currency
   }
 
   const baseCodePoint = 0x1F1E6
   const offset = normalized.charCodeAt(0) - 65
   const offsetSecond = normalized.charCodeAt(1) - 65
   if (offset < 0 || offset > 25 || offsetSecond < 0 || offsetSecond > 25) {
-    return country
+    return currency
   }
 
   return String.fromCodePoint(baseCodePoint + offset, baseCodePoint + offsetSecond)
@@ -69,7 +74,7 @@ export const buildTransactionSlackMessage = (
   ])
 
   const emoji = statusEmoji[context.status]
-  const countryIcon = toCountryFlag(transaction.quote.country)
+  const countryIcon = toCountryFlag(transaction.quote.targetCurrency)
   const lines = [
     `${emoji} ${context.heading} | Status: ${context.status} | Trigger: ${context.trigger} | Country: ${countryIcon}`,
     joinSegments([
