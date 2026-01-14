@@ -60,6 +60,7 @@ export class TransactionEventDispatcher {
     status: TransactionStatus,
     options: {
       deliverNow?: boolean
+      flags?: string[]
       heading?: string
       notes?: Record<string, boolean | null | number | string | undefined>
       prismaClient?: PrismaClientLike
@@ -69,6 +70,7 @@ export class TransactionEventDispatcher {
     const heading = options.heading ?? (status === TransactionStatus.PAYMENT_COMPLETED ? 'Payment completed' : 'Payment failed')
     const message = buildTransactionSlackMessage(transaction, {
       heading,
+      flags: options.flags,
       notes: options.notes,
       status,
       trigger: options.trigger,

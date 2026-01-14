@@ -44,6 +44,21 @@ describe('ReceivedCryptoTransactionUseCase', () => {
     expect(harness.workflow.handleIncomingDeposit).toHaveBeenCalledWith(baseMessage)
   })
 
+  it('normalizes flags before handing off to the workflow', async () => {
+    const harness = buildHarness()
+    const messageWithFlags: ReceivedCryptoTransactionMessage = {
+      ...baseMessage,
+      flags: [' reconciliation ', 'stellar', 'reconciliation'],
+    }
+
+    await harness.useCase.process(messageWithFlags)
+
+    expect(harness.workflow.handleIncomingDeposit).toHaveBeenCalledWith({
+      ...baseMessage,
+      flags: ['reconciliation', 'stellar'],
+    })
+  })
+
   it('propagates workflow failures after logging', async () => {
     const harness = buildHarness()
     harness.workflow.handleIncomingDeposit.mockRejectedValueOnce(new Error('workflow down'))

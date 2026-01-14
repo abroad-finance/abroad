@@ -425,7 +425,10 @@ export class StellarReconciliationService {
 
       await this.outboxDispatcher.enqueueQueue(
         QueueName.RECEIVED_CRYPTO_TRANSACTION,
-        verification.queueMessage,
+        {
+          ...verification.queueMessage,
+          flags: this.appendReconciliationFlag(verification.queueMessage.flags),
+        },
         'stellar.reconcile',
         { deliverNow: true },
       )
@@ -518,5 +521,11 @@ export class StellarReconciliationService {
     }
 
     return earliestSeenToken
+  }
+
+  private appendReconciliationFlag(existingFlags: ReadonlyArray<string> | undefined): string[] {
+    const normalizedFlags = (existingFlags ?? []).map(flag => flag.trim()).filter(flag => flag.length > 0)
+    const mergedFlags = new Set<string>([...normalizedFlags, 'reconciliation'])
+    return Array.from(mergedFlags).slice(0, 10)
   }
 }

@@ -3,6 +3,7 @@ import { TransactionStatus } from '@prisma/client'
 import { TransactionWithRelations } from './transactionNotificationTypes'
 
 type TransactionSlackContext = {
+  flags?: ReadonlyArray<string>
   heading: string
   notes?: Record<string, boolean | null | number | string | undefined>
   status: TransactionStatus
@@ -33,6 +34,19 @@ const buildNotesLine = (
     .map(([label, value]) => `${label}: ${value}`)
 
   return renderedNotes.length > 0 ? `Notes: ${renderedNotes.join(' | ')}` : ''
+}
+
+const buildFlagsLine = (flags: ReadonlyArray<string> | undefined): string => {
+  if (!flags || flags.length === 0) {
+    return ''
+  }
+
+  const normalizedFlags = flags
+    .map(flag => flag.trim())
+    .filter(flag => flag.length > 0)
+
+  const uniqueFlags = Array.from(new Set(normalizedFlags))
+  return uniqueFlags.length > 0 ? `Flags: ${uniqueFlags.join(' | ')}` : ''
 }
 
 export const buildTransactionSlackMessage = (
@@ -69,6 +83,11 @@ export const buildTransactionSlackMessage = (
 
   if (references) {
     lines.push(`References: ${references}`)
+  }
+
+  const flagsLine = buildFlagsLine(context.flags)
+  if (flagsLine) {
+    lines.push(flagsLine)
   }
 
   const notesLine = buildNotesLine(context.notes)

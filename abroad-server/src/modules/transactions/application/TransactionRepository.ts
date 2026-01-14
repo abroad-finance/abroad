@@ -33,10 +33,12 @@ export class TransactionRepository {
     params: {
       idempotencyKey: string
       onChainId: string
+      flags?: string[]
       transactionId: string
     },
   ): Promise<TransactionWithRelations | undefined> {
     const updated = await this.applyTransition(prismaClient, {
+      context: this.buildDepositContext(params.flags),
       data: {
         onChainId: params.onChainId,
       },
@@ -153,6 +155,17 @@ export class TransactionRepository {
     return this.dbProvider.getClient()
   }
 
+  public async getDepositFlags(transactionId: string): Promise<string[]> {
+    const client = await this.dbProvider.getClient()
+    const transition = await client.transactionTransition.findFirst({
+      select: { context: true },
+      where: { event: 'deposit_received', transactionId },
+      orderBy: { createdAt: 'desc' },
+    })
+
+    return this.extractFlags(transition?.context)
+  }
+
   public async markExchangeHandoff(
     prismaClient: TransactionClient,
     transactionId: string,
@@ -161,6 +174,14 @@ export class TransactionRepository {
       data: { exchangeHandoffAt: new Date() },
       where: { exchangeHandoffAt: null, id: transactionId },
     })
+  }
+
+  private buildDepositContext(flags: string[] | undefined): Prisma.InputJsonValue | undefined {
+    const normalizedFlags = this.extractFlags(flags)
+    if (normalizedFlags.length === 0) {
+      return undefined
+    }
+    return { flags: normalizedFlags }
   }
 
   public async persistExternalId(
@@ -371,6 +392,25 @@ export class TransactionRepository {
       include: transactionNotificationInclude,
       where: { id: transactionId },
     })
+  }
+
+  private extractFlags(source: unknown): string[] {
+    const rawFlags = Array.isArray(source)
+      ? source
+      : (typeof source === 'object' && source !== null && !Array.isArray(source)
+        ? (source as { flags?: unknown }).flags
+        : undefined)
+
+    if (!Array.isArray(rawFlags)) {
+      return []
+    }
+
+    const normalized = rawFlags
+      .map(flag => (typeof flag === 'string' ? flag.trim() : ''))
+      .filter((flag): flag is string => flag.length > 0)
+
+    const uniqueFlags = Array.from(new Set(normalized))
+    return uniqueFlags.slice(0, 10)
   }
 
   private parseRefundContext(raw: null | Prisma.JsonValue | undefined): RefundContext {
