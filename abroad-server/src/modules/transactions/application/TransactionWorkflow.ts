@@ -61,10 +61,8 @@ export class TransactionWorkflow {
       },
     })
 
-    const messageFlags = this.normalizeFlags(message.flags)
     const prismaClient = await this.repository.getClient()
     const transactionRecord = await this.repository.applyDepositReceived(prismaClient, {
-      flags: messageFlags,
       idempotencyKey: this.buildIdempotencyKey('deposit', message.onChainId),
       onChainId: message.onChainId,
       transactionId: message.transactionId,
@@ -89,7 +87,7 @@ export class TransactionWorkflow {
       return
     }
 
-    await this.processPayout(prismaClient, transactionRecord, message, scopedLogger, messageFlags)
+    await this.processPayout(prismaClient, transactionRecord, message, scopedLogger)
   }
 
   public async handlePaymentSent(message: PaymentSentMessage): Promise<void> {
@@ -188,7 +186,6 @@ export class TransactionWorkflow {
       return
     }
 
-    const transactionFlags = this.normalizeFlags(await this.repository.getDepositFlags(transaction.id))
     const prismaClient = await this.repository.getClient()
     const transitionName: TransactionTransitionName = newStatus === TransactionStatus.PAYMENT_COMPLETED
       ? 'payment_completed'
@@ -228,7 +225,6 @@ export class TransactionWorkflow {
         {
           deliverNow: false,
           heading: 'Payment completed',
-          flags: transactionFlags,
           notes: {
             provider: message.provider,
             providerAmount: message.amount,
@@ -251,7 +247,6 @@ export class TransactionWorkflow {
       {
         deliverNow: false,
         heading: 'Payment failed',
-        flags: transactionFlags,
         notes: {
           provider: message.provider,
           providerStatus: message.status,
@@ -469,19 +464,6 @@ export class TransactionWorkflow {
     return Boolean(existing?.exchangeHandoffAt)
   }
 
-  private normalizeFlags(flags: string[] | undefined): string[] {
-    if (!flags) {
-      return []
-    }
-
-    const normalized = flags
-      .map(flag => flag.trim())
-      .filter(flag => flag.length > 0)
-
-    const uniqueFlags = Array.from(new Set(normalized))
-    return uniqueFlags.slice(0, 10)
-  }
-
   private normalizeRefundResult(result: RefundResult): RefundAttemptResult {
     if (result.success) {
       return { success: true, transactionId: result.transactionId }
@@ -541,7 +523,6 @@ export class TransactionWorkflow {
     transaction: TransactionWithRelations,
     message: ReceivedCryptoTransactionMessage,
     logger: ScopedLogger,
-    flags: string[],
   ): Promise<void> {
     let paymentService: ReturnType<IPaymentServiceFactory['getPaymentService']>
     try {
@@ -602,7 +583,6 @@ export class TransactionWorkflow {
 
       await this.dispatcher.notifySlack(updatedTransaction, TransactionStatus.PAYMENT_FAILED, {
         deliverNow: false,
-        flags,
         heading: 'Payment failed',
         notes: { reason: 'Payment method disabled' },
         prismaClient,
@@ -673,7 +653,6 @@ export class TransactionWorkflow {
       if (paymentResponse.success) {
         await this.dispatcher.notifySlack(updatedTransaction, newStatus, {
           deliverNow: false,
-          flags,
           notes: { sourceAddress: message.addressFrom },
           prismaClient,
           trigger: 'TransactionWorkflow',
@@ -685,7 +664,6 @@ export class TransactionWorkflow {
       else {
         await this.dispatcher.notifySlack(updatedTransaction, newStatus, {
           deliverNow: false,
-          flags,
           notes: {
             providerTransactionId: paymentResponse.transactionId ?? 'not-provided',
             reason: paymentResponse.reason,

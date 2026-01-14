@@ -68,7 +68,6 @@ describe('transactionSlackFormatter', () => {
   it('renders full detail including references and notes', () => {
     const transaction = buildTransaction()
     const message = buildTransactionSlackMessage(transaction, {
-      flags: ['reconciliation', 'stellar'],
       heading: 'Payment completed',
       notes: {
         provider: 'transfero',
@@ -86,7 +85,6 @@ describe('transactionSlackFormatter', () => {
     expect(message).toContain('Amounts: 10 USDC -> 20 COP')
     expect(message).toContain('Payment: BREB | Network: STELLAR | Account: 123456789')
     expect(message).toContain('References: External: external-1 | On-chain: on-chain-1 | Refund: refund-1')
-    expect(message).toContain('Flags: reconciliation | stellar')
     expect(message).toContain('Notes: provider: transfero | providerAmount: 10 | providerStatus: processed')
     expect(message).toContain('Country: 🇨🇴')
   })
@@ -106,7 +104,6 @@ describe('transactionSlackFormatter', () => {
     })
 
     expect(message).not.toContain('Account:')
-    expect(message).not.toContain('Flags:')
     expect(message).not.toContain('Bank:')
     expect(message).not.toContain('References:')
     expect(message).not.toContain('Notes:')
