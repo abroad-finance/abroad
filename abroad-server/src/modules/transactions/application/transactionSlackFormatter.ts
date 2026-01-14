@@ -18,10 +18,6 @@ const statusEmoji: Record<TransactionStatus, string> = {
   [TransactionStatus.WRONG_AMOUNT]: '⚠️',
 }
 
-const COUNTRY_FLAGS: Readonly<Record<Country, string>> = {
-  [Country.CO]: '🇨🇴',
-}
-
 const joinSegments = (segments: Array<null | string | undefined>): string =>
   segments.filter((segment): segment is string => Boolean(segment)).join(' | ')
 
@@ -37,6 +33,22 @@ const buildNotesLine = (
     .map(([label, value]) => `${label}: ${value}`)
 
   return renderedNotes.length > 0 ? `Notes: ${renderedNotes.join(' | ')}` : ''
+}
+
+const toCountryFlag = (country: Country): string => {
+  const normalized = country.trim().toUpperCase()
+  if (normalized.length !== 2) {
+    return country
+  }
+
+  const baseCodePoint = 0x1F1E6
+  const offset = normalized.charCodeAt(0) - 65
+  const offsetSecond = normalized.charCodeAt(1) - 65
+  if (offset < 0 || offset > 25 || offsetSecond < 0 || offsetSecond > 25) {
+    return country
+  }
+
+  return String.fromCodePoint(baseCodePoint + offset, baseCodePoint + offsetSecond)
 }
 
 export const buildTransactionSlackMessage = (
@@ -57,7 +69,7 @@ export const buildTransactionSlackMessage = (
   ])
 
   const emoji = statusEmoji[context.status]
-  const countryIcon = COUNTRY_FLAGS[transaction.quote.country] ?? transaction.quote.country
+  const countryIcon = toCountryFlag(transaction.quote.country)
   const lines = [
     `${emoji} ${context.heading} | Status: ${context.status} | Trigger: ${context.trigger} | Country: ${countryIcon}`,
     joinSegments([
