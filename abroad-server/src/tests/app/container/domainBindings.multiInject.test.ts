@@ -1,12 +1,10 @@
 import 'reflect-metadata'
-
 import { BlockchainNetwork, PrismaClient } from '@prisma/client'
 import { Container } from 'inversify'
 
+import { bindDomainServices } from '../../../app/container/domainBindings'
 import { TYPES } from '../../../app/container/types'
 import { ILogger } from '../../../core/logging/types'
-import { bindDomainServices } from '../../../app/container/domainBindings'
-import { IDepositVerifierRegistry } from '../../../modules/payments/application/contracts/IDepositVerifier'
 import { DepositVerifierRegistry } from '../../../modules/payments/application/DepositVerifierRegistry'
 import { PayoutStatusAdapterRegistry } from '../../../modules/payments/application/PayoutStatusAdapterRegistry'
 import { BrebPayoutStatusAdapter } from '../../../modules/payments/infrastructure/BrebPayoutStatusAdapter'
@@ -15,6 +13,20 @@ import { SolanaPaymentVerifier } from '../../../modules/payments/infrastructure/
 import { StellarDepositVerifier } from '../../../modules/payments/infrastructure/wallets/StellarDepositVerifier'
 import { IDatabaseClientProvider } from '../../../platform/persistence/IDatabaseClientProvider'
 import { ISecretManager, Secret, Secrets } from '../../../platform/secrets/ISecretManager'
+
+class StubDatabaseClientProvider implements IDatabaseClientProvider {
+  private readonly prismaClient: PrismaClient = {} as PrismaClient
+
+  async getClient(): Promise<PrismaClient> {
+    return this.prismaClient
+  }
+}
+
+class StubLogger implements ILogger {
+  error(): void {}
+  info(): void {}
+  warn(): void {}
+}
 
 class StubSecretManager implements ISecretManager {
   private readonly values: Record<Secret, string>
@@ -34,20 +46,6 @@ class StubSecretManager implements ISecretManager {
     const entries = secretNames.map(secretName => [secretName, this.values[secretName] ?? ''] as const)
     return Object.fromEntries(entries) as Record<T[number], string>
   }
-}
-
-class StubDatabaseClientProvider implements IDatabaseClientProvider {
-  private readonly prismaClient: PrismaClient = {} as PrismaClient
-
-  async getClient(): Promise<PrismaClient> {
-    return this.prismaClient
-  }
-}
-
-class StubLogger implements ILogger {
-  error(): void {}
-  info(): void {}
-  warn(): void {}
 }
 
 describe('domainBindings', () => {

@@ -102,6 +102,14 @@ function createDepositVerifierRegistry() {
   }
 }
 
+function createOrphanRefundService() {
+  const refundOrphanPayment = jest.fn().mockResolvedValue({
+    outcome: 'refunded',
+    refundTransactionId: 'refund-on-chain',
+  })
+  return { refundOrphanPayment }
+}
+
 function createOutboxDispatcher(enqueueQueue?: jest.Mock) {
   return { enqueueQueue: enqueueQueue ?? jest.fn() }
 }
@@ -169,12 +177,14 @@ describe('StellarListener', () => {
     const secretManager = createSecretManager()
     const { dbProvider, findUnique, upsert } = createDbProvider({ lastPagingToken: 'cursor-1' })
     const { getVerifier } = createDepositVerifierRegistry()
+    const orphanRefundService = createOrphanRefundService()
 
     const listener = new StellarListener(
       outboxDispatcher as never,
       secretManager,
       dbProvider,
       { getVerifier } as never,
+      orphanRefundService as never,
       createMockLogger(),
     )
     await listener.start()
@@ -207,12 +217,14 @@ describe('StellarListener', () => {
     const secretManager = createSecretManager('account-id', 'https://horizon', 'trusted-issuer')
     const { dbProvider, upsert } = createDbProvider()
     const { getVerifier } = createDepositVerifierRegistry()
+    const orphanRefundService = createOrphanRefundService()
 
     const listener = new StellarListener(
       outboxDispatcher as never,
       secretManager,
       dbProvider,
       { getVerifier } as never,
+      orphanRefundService as never,
       createMockLogger(),
     )
     await listener.start()
@@ -233,6 +245,7 @@ describe('StellarListener', () => {
     }))
 
     expect(upsert).toHaveBeenCalledTimes(4)
+    expect(orphanRefundService.refundOrphanPayment).toHaveBeenCalledTimes(1)
     expect(enqueueQueue).toHaveBeenCalledTimes(1)
     const queuedPayload = enqueueQueue.mock.calls[0][1] as ReceivedCryptoTransactionMessage
     expect(enqueueQueue).toHaveBeenCalledWith(QueueName.RECEIVED_CRYPTO_TRANSACTION, queuedPayload, 'stellar.listener', { deliverNow: true })
@@ -246,11 +259,13 @@ describe('StellarListener', () => {
     const outboxDispatcher = createOutboxDispatcher()
     const secretManager = createSecretManager()
     const { dbProvider } = createDbProvider()
+    const orphanRefundService = createOrphanRefundService()
     const listener = new StellarListener(
       outboxDispatcher as never,
       secretManager,
       dbProvider,
       { getVerifier: jest.fn() } as never,
+      orphanRefundService as never,
       createMockLogger(),
     )
 

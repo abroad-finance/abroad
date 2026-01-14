@@ -7,6 +7,8 @@ import { OutboxDispatcher } from '../../../platform/outbox/OutboxDispatcher'
 import { IDatabaseClientProvider } from '../../../platform/persistence/IDatabaseClientProvider'
 import { ISecretManager, Secrets } from '../../../platform/secrets/ISecretManager'
 import { IDepositVerifierRegistry } from '../../payments/application/contracts/IDepositVerifier'
+import { StellarOrphanRefundService } from './StellarOrphanRefundService'
+import { PaymentReconciliationReason } from './StellarTypes'
 
 export type CheckUnprocessedStellarResponse = {
   alreadyProcessed: number
@@ -20,6 +22,7 @@ export type CheckUnprocessedStellarResponse = {
 export type SingleStellarReconciliationResponse = {
   paymentId: string
   reason?: PaymentReconciliationReason
+  refundTransactionId?: null | string
   result: 'alreadyProcessed' | 'enqueued' | 'failed' | 'invalid' | 'irrelevant' | 'missing' | 'notFound'
   transactionId: null | string
 }
@@ -32,14 +35,9 @@ type PaymentLookupResult
     | { status: 'unsupported' }
 
 type PaymentProcessingOutcome
-  = | { cursor: string, reason?: PaymentReconciliationReason, result: 'alreadyProcessed' | 'enqueued' | 'missing', transactionId: string }
-    | { cursor: string, reason?: PaymentReconciliationReason, result: 'invalid' | 'irrelevant' }
+  = | { cursor: string, reason?: PaymentReconciliationReason, refundTransactionId?: null | string, result: 'invalid' | 'irrelevant' }
+    | { cursor: string, reason?: PaymentReconciliationReason, result: 'alreadyProcessed' | 'enqueued' | 'missing', transactionId: string }
     | { cursor: string, result: 'halt', transactionId?: string }
-
-type PaymentReconciliationReason
-  = | 'assetOrDestinationMismatch'
-    | 'invalidMemoFormat'
-    | 'missingMemo'
 
 type StellarPaymentContext = {
   accountId: string
@@ -60,6 +58,7 @@ export class StellarReconciliationService {
     private readonly prismaProvider: IDatabaseClientProvider,
     private readonly secretManager: ISecretManager,
     private readonly outboxDispatcher: OutboxDispatcher,
+    private readonly orphanRefundService: StellarOrphanRefundService,
     private readonly verifierRegistry: IDepositVerifierRegistry,
     private readonly logger: ILogger,
   ) {}
@@ -130,9 +129,11 @@ export class StellarReconciliationService {
 
     const transactionId = 'transactionId' in outcome ? outcome.transactionId : null
     const reason = 'reason' in outcome ? outcome.reason : undefined
+    const refundTransactionId = 'refundTransactionId' in outcome ? outcome.refundTransactionId ?? null : undefined
     return {
       paymentId: normalizedPaymentId,
       reason,
+      refundTransactionId,
       result: outcome.result,
       transactionId,
     }
@@ -400,11 +401,25 @@ export class StellarReconciliationService {
     }
 
     if (!transactionIdResult.transactionId) {
-      this.logger.warn('[PublicTransactionsController] Stellar payment missing usable memo; skipping reconciliation', {
-        paymentId: payment.id,
-        reason: transactionIdResult.reason,
+      const refundOutcome = await this.orphanRefundService.refundOrphanPayment({
+        payment,
+        reason: transactionIdResult.reason ?? 'missingMemo',
       })
-      return { cursor, reason: transactionIdResult.reason, result: 'invalid' }
+
+      if (refundOutcome.outcome === 'failed') {
+        this.logger.error('[PublicTransactionsController] Failed to refund orphan Stellar payment without memo', {
+          paymentId: payment.id,
+          reason: transactionIdResult.reason,
+        })
+        return { cursor, reason: transactionIdResult.reason, result: 'halt' }
+      }
+
+      return {
+        cursor,
+        reason: transactionIdResult.reason,
+        refundTransactionId: refundOutcome.refundTransactionId ?? null,
+        result: 'invalid',
+      }
     }
     const transactionId = transactionIdResult.transactionId
 

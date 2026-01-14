@@ -19,6 +19,7 @@ import { IDatabaseClientProvider } from '../../../../platform/persistence/IDatab
 import { ISecretManager, Secrets } from '../../../../platform/secrets/ISecretManager'
 import { IDepositVerifierRegistry } from '../../../payments/application/contracts/IDepositVerifier'
 import { ExpiredTransactionService, type ExpiredTransactionsSummary } from '../../application/ExpiredTransactionService'
+import { StellarOrphanRefundService } from '../../application/StellarOrphanRefundService'
 import { CheckUnprocessedStellarResponse, SingleStellarReconciliationResponse, StellarReconciliationService } from '../../application/StellarReconciliationService'
 
 const STELLAR_RECONCILIATION_HEADER = 'X-Abroad-Stellar-Reconciliation-Secret'
@@ -34,6 +35,7 @@ export class PublicTransactionsController extends Controller {
     @inject(TYPES.ILogger) private readonly logger: ILogger,
     @inject(TYPES.IOutboxDispatcher) outboxDispatcher: OutboxDispatcher,
     @inject(TYPES.IDepositVerifierRegistry) depositVerifierRegistry: IDepositVerifierRegistry,
+    @inject(TYPES.StellarOrphanRefundService) orphanRefundService: StellarOrphanRefundService,
     @inject(TYPES.ISecretManager) private readonly secretManager: ISecretManager,
   ) {
     super()
@@ -46,6 +48,7 @@ export class PublicTransactionsController extends Controller {
       prismaClientProvider,
       this.secretManager,
       outboxDispatcher,
+      orphanRefundService,
       depositVerifierRegistry,
       this.logger,
     )

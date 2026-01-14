@@ -35,6 +35,7 @@ const typeKeys = [
   'SolanaPaymentVerifier',
   'SolanaWalletHandler',
   'StellarWalletHandler',
+  'StellarOrphanRefundService',
   'StellarListener',
   'TransactionAcceptanceService',
   'TransactionStatusService',

@@ -18,6 +18,7 @@ import { StellarDepositVerifier } from '../../modules/payments/infrastructure/wa
 import { StellarWalletHandler } from '../../modules/payments/infrastructure/wallets/StellarWalletHandler'
 import { QuoteUseCase } from '../../modules/quotes/application/quoteUseCase'
 import { ReceivedCryptoTransactionUseCase } from '../../modules/transactions/application/receivedCryptoTransactionUseCase'
+import { StellarOrphanRefundService } from '../../modules/transactions/application/StellarOrphanRefundService'
 import { TransactionAcceptanceService } from '../../modules/transactions/application/TransactionAcceptanceService'
 import { TransactionStatusService } from '../../modules/transactions/application/TransactionStatusService'
 import { TransactionWorkflow } from '../../modules/transactions/application/TransactionWorkflow'
@@ -52,6 +53,7 @@ const domainBindings: ReadonlyArray<BindingRegistration<unknown>> = [
   { identifier: TYPES.IExchangeProvider, implementation: TransferoExchangeProvider, name: 'transfero' },
   { identifier: TYPES.TransactionAcceptanceService, implementation: TransactionAcceptanceService },
   { identifier: TYPES.TransactionStatusService, implementation: TransactionStatusService },
+  { identifier: TYPES.StellarOrphanRefundService, implementation: StellarOrphanRefundService },
   { identifier: TYPES.TransactionWorkflow, implementation: TransactionWorkflow },
   { identifier: TYPES.PaymentUseCase, implementation: PaymentUseCase },
   { identifier: TYPES.PaymentSentUseCase, implementation: PaymentSentUseCase },

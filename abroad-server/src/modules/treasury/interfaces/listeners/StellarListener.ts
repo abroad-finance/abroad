@@ -13,6 +13,8 @@ import { OutboxDispatcher } from '../../../../platform/outbox/OutboxDispatcher'
 import { IDatabaseClientProvider } from '../../../../platform/persistence/IDatabaseClientProvider'
 import { ISecretManager } from '../../../../platform/secrets/ISecretManager'
 import { IDepositVerifierRegistry } from '../../../payments/application/contracts/IDepositVerifier'
+import { StellarOrphanRefundService } from '../../../transactions/application/StellarOrphanRefundService'
+import { PaymentReconciliationReason } from '../../../transactions/application/StellarTypes'
 
 // Minimal stream handle types returned by stellar-sdk stream()
 type StreamHandle = (() => void) | { close: () => void }
@@ -35,6 +37,7 @@ export class StellarListener {
     @inject(TYPES.IDatabaseClientProvider)
     private dbClientProvider: IDatabaseClientProvider,
     @inject(TYPES.IDepositVerifierRegistry) private readonly depositVerifierRegistry: IDepositVerifierRegistry,
+    @inject(TYPES.StellarOrphanRefundService) private readonly orphanRefundService: StellarOrphanRefundService,
     @inject(TYPES.ILogger) baseLogger: ILogger,
   ) {
     this.logger = createScopedLogger(baseLogger, { scope: 'StellarListener', staticPayload: { queue: this.queueName } })
@@ -158,7 +161,7 @@ export class StellarListener {
         this.logger.info('Fetched full transaction details', { transactionId: tx.id })
 
         if (!tx.memo) {
-          this.logger.warn('Skipping message (no memo) in payment', { paymentId: payment.id })
+          await this.handleOrphanPayment(payment, 'missingMemo')
           return
         }
 
@@ -222,6 +225,24 @@ export class StellarListener {
         this.keepAlive = undefined
       }
       this.stream = undefined
+    }
+  }
+
+  private async handleOrphanPayment(
+    payment: Horizon.ServerApi.PaymentOperationRecord,
+    reason: PaymentReconciliationReason,
+  ): Promise<void> {
+    this.logger.warn('Received Stellar payment without memo; attempting refund', { paymentId: payment.id })
+    const outcome = await this.orphanRefundService.refundOrphanPayment({ payment, reason })
+    if (outcome.outcome === 'failed') {
+      this.logger.error('Failed to refund orphan Stellar payment', { paymentId: payment.id })
+    }
+    else {
+      this.logger.info('Processed orphan Stellar payment refund', {
+        outcome: outcome.outcome,
+        paymentId: payment.id,
+        refundTransactionId: outcome.refundTransactionId,
+      })
     }
   }
 }

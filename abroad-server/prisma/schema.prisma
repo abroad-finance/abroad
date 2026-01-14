@@ -113,6 +113,16 @@ model SolanaListenerState {
   lastProcessedSlot Int
 }
 
+model StellarOrphanRefund {
+  paymentId           String             @id
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  lastError           String?
+  reason              String?
+  refundTransactionId String?
+  status              OrphanRefundStatus
+}
+
 model PendingConversions {
   source SupportedCurrency
   target SupportedCurrency
@@ -178,6 +188,12 @@ enum TransactionStatus {
 enum OrderSide {
   BUY
   SELL
+}
+
+enum OrphanRefundStatus {
+  PENDING
+  FAILED
+  SUCCEEDED
 }
 
 enum CryptoCurrency {

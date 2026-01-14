@@ -10,18 +10,16 @@ import { IWebhookNotifier, WebhookEvent } from '../../../platform/notifications/
 import { OutboxDispatcher } from '../../../platform/outbox/OutboxDispatcher'
 import { IDatabaseClientProvider } from '../../../platform/persistence/IDatabaseClientProvider'
 import { IPaymentServiceFactory } from '../../payments/application/contracts/IPaymentServiceFactory'
-import { WalletSendResult } from '../../payments/application/contracts/IWalletHandler'
 import { IWalletHandlerFactory } from '../../payments/application/contracts/IWalletHandlerFactory'
 import { PayoutStatusAdapterRegistry } from '../../payments/application/PayoutStatusAdapterRegistry'
 import { isSupportedPaymentMethod } from '../../payments/application/supportedPaymentMethods'
 import { IExchangeProviderFactory } from '../../treasury/application/contracts/IExchangeProviderFactory'
+import { type RefundResult, RefundService } from './RefundService'
 import { TransactionEventDispatcher } from './TransactionEventDispatcher'
 import { TransactionWithRelations } from './transactionNotificationTypes'
 import { RefundAttemptResult, RefundReservation } from './TransactionRepository'
 import { TransactionRepository } from './TransactionRepository'
 import { TransactionTransitionName } from './TransactionStateMachine'
-
-type RefundResult = WalletSendResult
 
 @injectable()
 export class TransactionWorkflow {
@@ -743,46 +741,5 @@ export class TransactionWorkflow {
 
     logger.warn('Skipping refund; transaction missing', { transactionId })
     return false
-  }
-}
-
-class RefundService {
-  private readonly logger: ScopedLogger
-
-  constructor(
-    private readonly walletHandlerFactory: IWalletHandlerFactory,
-    baseLogger: ILogger,
-  ) {
-    this.logger = createScopedLogger(baseLogger, { scope: 'RefundService' })
-  }
-
-  public async refundByOnChainId(params: {
-    amount: number
-    cryptoCurrency: Parameters<RefundService['refundToSender']>[0]['cryptoCurrency']
-    network: Parameters<IWalletHandlerFactory['getWalletHandler']>[0]
-    onChainId: string
-  }): Promise<RefundResult> {
-    const { amount, cryptoCurrency, network, onChainId } = params
-    const walletHandler = this.walletHandlerFactory.getWalletHandlerForCapability?.({ blockchain: network })
-      ?? this.walletHandlerFactory.getWalletHandler(network)
-    const address = await walletHandler.getAddressFromTransaction({ onChainId })
-    return walletHandler.send({ address, amount, cryptoCurrency })
-  }
-
-  public async refundToSender(
-    message: ReceivedCryptoTransactionMessage,
-  ): Promise<RefundResult> {
-    const walletHandler = this.walletHandlerFactory.getWalletHandlerForCapability?.({ blockchain: message.blockchain })
-      ?? this.walletHandlerFactory.getWalletHandler(message.blockchain)
-    return walletHandler.send({
-      address: message.addressFrom,
-      amount: message.amount,
-      cryptoCurrency: message.cryptoCurrency,
-    })
-  }
-
-  public resolveWalletHandler(blockchain: Parameters<IWalletHandlerFactory['getWalletHandler']>[0]) {
-    return this.walletHandlerFactory.getWalletHandlerForCapability?.({ blockchain })
-      ?? this.walletHandlerFactory.getWalletHandler(blockchain)
   }
 }
