@@ -141,4 +141,98 @@ describe('BinanceBalanceUpdatedController', () => {
       expect.any(Error),
     )
   })
+
+  it('retries write conflicts before succeeding', async () => {
+    const conflictError = Object.assign(
+      new Error('Transaction failed due to a write conflict or a deadlock. Please retry your transaction'),
+      { code: 'P2034' },
+    )
+
+    const updateMany = jest.fn()
+      .mockRejectedValueOnce(conflictError)
+      .mockResolvedValueOnce({ count: 1 })
+
+    const db = {
+      $transaction: jest.fn(async (cb: (tx: unknown) => Promise<void>) => cb({ pendingConversions: { updateMany } })),
+      pendingConversions: {
+        findMany: jest.fn(async () => [
+          { amount: 3, side: 'SELL', source: 'USDT', symbol: 'USDTCOP', target: 'COP' },
+        ]),
+      },
+    }
+
+    const provider: IDatabaseClientProvider = {
+      getClient: jest.fn(async () => db as unknown as import('@prisma/client').PrismaClient),
+    } as unknown as IDatabaseClientProvider
+
+    const submitNewOrder = jest.fn(async () => undefined)
+    const getBalances = jest.fn(async () => [{ coin: 'USDT', free: '4' }])
+    ;(MainClient as jest.Mock).mockImplementation(() => ({
+      getBalances,
+      submitNewOrder,
+    }))
+
+    const controller = new BinanceBalanceUpdatedController(
+      logger,
+      queueHandler,
+      secretManager,
+      provider,
+    )
+    const runner = controller as unknown as { onBalanceUpdated: (msg: unknown) => Promise<void> }
+    const controllerInternals = controller as unknown as { delay: jest.Mock }
+    controllerInternals.delay = jest.fn(async () => undefined)
+
+    await runner.onBalanceUpdated({})
+
+    expect(updateMany).toHaveBeenCalledTimes(2)
+    expect(submitNewOrder).toHaveBeenCalledTimes(1)
+    expect(db.$transaction).toHaveBeenCalledTimes(2)
+  })
+
+  it('restores the reserved amount when the market order fails', async () => {
+    const updateMany = jest.fn().mockResolvedValue({ count: 1 })
+    const restoreUpdate = jest.fn().mockResolvedValue({ count: 1 })
+
+    const db = {
+      $transaction: jest.fn(async (cb: (tx: unknown) => Promise<unknown>) =>
+        cb({ pendingConversions: { update: restoreUpdate, updateMany } })),
+      pendingConversions: {
+        findMany: jest.fn(async () => [
+          { amount: 2, side: 'SELL', source: 'USDT', symbol: 'USDTCOP', target: 'COP' },
+        ]),
+      },
+    }
+
+    const provider: IDatabaseClientProvider = {
+      getClient: jest.fn(async () => db as unknown as import('@prisma/client').PrismaClient),
+    } as unknown as IDatabaseClientProvider
+
+    const submitNewOrder = jest.fn(async () => {
+      throw new Error('binance down')
+    })
+    const getBalances = jest.fn(async () => [{ coin: 'USDT', free: '2' }])
+    ;(MainClient as jest.Mock).mockImplementation(() => ({
+      getBalances,
+      submitNewOrder,
+    }))
+
+    const controller = new BinanceBalanceUpdatedController(
+      logger,
+      queueHandler,
+      secretManager,
+      provider,
+    )
+    const runner = controller as unknown as { onBalanceUpdated: (msg: unknown) => Promise<void> }
+    const controllerInternals = controller as unknown as { delay: jest.Mock }
+    controllerInternals.delay = jest.fn(async () => undefined)
+
+    await expect(runner.onBalanceUpdated({})).rejects.toThrow('binance down')
+
+    expect(updateMany).toHaveBeenCalledTimes(1)
+    expect(restoreUpdate).toHaveBeenCalledWith({
+      data: { amount: { increment: 2 } },
+      where: { source_target: { source: 'USDT', target: 'COP' } },
+    })
+    expect(db.$transaction).toHaveBeenCalledTimes(2)
+  })
 })
