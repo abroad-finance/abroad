@@ -75,6 +75,49 @@ const createClient = (overrides: Partial<MockTransactionClient> = {}): MockTrans
 })
 
 describe('TransactionRepository transitions', () => {
+  it('applies deposit transitions idempotently', async () => {
+    const existingTransitionClient = createClient({
+      transaction: {
+        ...defaultTransactionMocks(),
+        findUnique: jest.fn(async () => ({ ...baseTransaction, status: TransactionStatus.PROCESSING_PAYMENT } as never)),
+      },
+      transactionTransition: {
+        ...defaultTransitionMocks(),
+        findUnique: jest.fn(async () => ({ context: undefined, fromStatus: TransactionStatus.AWAITING_PAYMENT, toStatus: TransactionStatus.PROCESSING_PAYMENT })),
+      },
+    })
+    const { repository: existingRepository } = createRepository(existingTransitionClient)
+
+    await expect(existingRepository.applyDepositReceived(existingTransitionClient as never, {
+      idempotencyKey: 'deposit|on-chain-1',
+      onChainId: 'on-chain-1',
+      transactionId: baseTransaction.id,
+    })).resolves.toEqual({
+      transaction: expect.objectContaining({ status: TransactionStatus.PROCESSING_PAYMENT }),
+      transitionApplied: false,
+    })
+    expect(existingTransitionClient.transaction.update).not.toHaveBeenCalled()
+
+    const newTransitionClient = createClient({
+      transaction: {
+        ...defaultTransactionMocks(),
+        findUnique: jest.fn(async () => ({ ...baseTransaction, status: TransactionStatus.AWAITING_PAYMENT } as never)),
+        update: jest.fn(async () => ({ ...baseTransaction, onChainId: 'on-chain-2', status: TransactionStatus.PROCESSING_PAYMENT } as never)),
+      },
+    })
+    const { repository: newRepository } = createRepository(newTransitionClient)
+
+    await expect(newRepository.applyDepositReceived(newTransitionClient as never, {
+      idempotencyKey: 'deposit|on-chain-2',
+      onChainId: 'on-chain-2',
+      transactionId: baseTransaction.id,
+    })).resolves.toEqual({
+      transaction: expect.objectContaining({ onChainId: 'on-chain-2', status: TransactionStatus.PROCESSING_PAYMENT }),
+      transitionApplied: true,
+    })
+    expect(newTransitionClient.transaction.update).toHaveBeenCalled()
+  })
+
   it('returns existing transitions without reapplying', async () => {
     const client = createClient({
       transactionTransition: {
@@ -305,6 +348,106 @@ describe('TransactionRepository refunds', () => {
       trigger: 'manual',
     })).resolves.toEqual({ attempts: 2, outcome: 'reserved' })
     expect(failedClient.transactionTransition.update).toHaveBeenCalled()
+  })
+})
+
+describe('TransactionRepository payouts', () => {
+  it('reserves payouts across outcomes', async () => {
+    const missingClient = createClient({
+      transaction: {
+        ...defaultTransactionMocks(),
+        findUnique: jest.fn(async () => null),
+      },
+    })
+    const { repository: missingRepository } = createRepository(missingClient)
+    await expect(missingRepository.reservePayout(missingClient as never, {
+      idempotencyKey: 'payout-0',
+      transactionId: baseTransaction.id,
+    })).resolves.toEqual({ outcome: 'missing' })
+
+    const reservedClient = createClient({
+      transaction: {
+        ...defaultTransactionMocks(),
+        findUnique: jest.fn(async () => ({ ...baseTransaction, status: TransactionStatus.PROCESSING_PAYMENT } as never)),
+      },
+      transactionTransition: {
+        ...defaultTransitionMocks(),
+        findUnique: jest.fn(async () => null),
+      },
+    })
+    const { repository: reservedRepository } = createRepository(reservedClient)
+    await expect(reservedRepository.reservePayout(reservedClient as never, {
+      idempotencyKey: 'payout-1',
+      transactionId: baseTransaction.id,
+    })).resolves.toEqual({ attempts: 1, outcome: 'reserved' })
+    expect(reservedClient.transactionTransition.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        event: 'payout_dispatch',
+        idempotencyKey: 'payout-1',
+      }),
+    }))
+
+    const inflightClient = createClient({
+      transaction: {
+        ...defaultTransactionMocks(),
+        findUnique: jest.fn(async () => ({ ...baseTransaction, status: TransactionStatus.PROCESSING_PAYMENT } as never)),
+      },
+      transactionTransition: {
+        ...defaultTransitionMocks(),
+        findUnique: jest.fn(async () => ({ context: { attempts: 2, status: 'pending' } })),
+      },
+    })
+    const { repository: inflightRepository } = createRepository(inflightClient)
+    await expect(inflightRepository.reservePayout(inflightClient as never, {
+      idempotencyKey: 'payout-2',
+      transactionId: baseTransaction.id,
+    })).resolves.toEqual({ attempts: 2, outcome: 'in_flight' })
+
+    const completedClient = createClient({
+      transaction: {
+        ...defaultTransactionMocks(),
+        findUnique: jest.fn(async () => ({ ...baseTransaction, status: TransactionStatus.PROCESSING_PAYMENT } as never)),
+      },
+      transactionTransition: {
+        ...defaultTransitionMocks(),
+        findUnique: jest.fn(async () => ({ context: { attempts: 3, status: 'completed' } })),
+      },
+    })
+    const { repository: completedRepository } = createRepository(completedClient)
+    await expect(completedRepository.reservePayout(completedClient as never, {
+      idempotencyKey: 'payout-3',
+      transactionId: baseTransaction.id,
+    })).resolves.toEqual({ attempts: 3, outcome: 'completed' })
+  })
+
+  it('records payout results and preserves attempts', async () => {
+    const client = createClient({
+      transaction: {
+        ...defaultTransactionMocks(),
+        findUnique: jest.fn(async () => ({ ...baseTransaction, status: TransactionStatus.PROCESSING_PAYMENT } as never)),
+      },
+      transactionTransition: {
+        ...defaultTransitionMocks(),
+        findUnique: jest.fn(async () => ({ context: { attempts: 2, lastError: 'prior', status: 'pending' }, fromStatus: TransactionStatus.PROCESSING_PAYMENT, toStatus: TransactionStatus.PROCESSING_PAYMENT })),
+      },
+    })
+    const { repository } = createRepository(client)
+
+    await repository.recordPayoutResult(client as never, {
+      idempotencyKey: 'payout-4',
+      outcome: 'failed',
+      reason: 'network',
+      transactionId: baseTransaction.id,
+    })
+
+    expect(client.transactionTransition.upsert).toHaveBeenCalledWith(expect.objectContaining({
+      create: expect.objectContaining({ event: 'payout_dispatch', idempotencyKey: 'payout-4' }),
+      update: expect.objectContaining({
+        context: expect.objectContaining({ attempts: 2, lastError: 'network', status: 'failed' }),
+        fromStatus: TransactionStatus.PROCESSING_PAYMENT,
+        toStatus: TransactionStatus.PROCESSING_PAYMENT,
+      }),
+    }))
   })
 })
 

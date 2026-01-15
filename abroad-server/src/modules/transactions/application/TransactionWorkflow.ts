@@ -17,7 +17,7 @@ import { IExchangeProviderFactory } from '../../treasury/application/contracts/I
 import { type RefundResult, RefundService } from './RefundService'
 import { TransactionEventDispatcher } from './TransactionEventDispatcher'
 import { TransactionWithRelations } from './transactionNotificationTypes'
-import { RefundAttemptResult, RefundReservation } from './TransactionRepository'
+import { PayoutReservation, RefundAttemptResult, RefundReservation } from './TransactionRepository'
 import { TransactionRepository } from './TransactionRepository'
 import { TransactionTransitionName } from './TransactionStateMachine'
 
@@ -60,16 +60,18 @@ export class TransactionWorkflow {
     })
 
     const prismaClient = await this.repository.getClient()
-    const transactionRecord = await this.repository.applyDepositReceived(prismaClient, {
+    const depositResult = await this.repository.applyDepositReceived(prismaClient, {
       idempotencyKey: this.buildIdempotencyKey('deposit', message.onChainId),
       onChainId: message.onChainId,
       transactionId: message.transactionId,
     })
 
-    if (!transactionRecord) {
+    if (!depositResult) {
       await this.handleNonAwaitingDeposit(prismaClient, message, scopedLogger)
       return
     }
+
+    const { transaction: transactionRecord } = depositResult
 
     await this.dispatcher.notifyPartnerAndUser(
       transactionRecord,
@@ -85,7 +87,40 @@ export class TransactionWorkflow {
       return
     }
 
-    await this.processPayout(prismaClient, transactionRecord, message, scopedLogger)
+    const payoutReservation: PayoutReservation = await this.repository.reservePayout(prismaClient, {
+      idempotencyKey: this.buildIdempotencyKey('payout_dispatch', transactionRecord.id),
+      transactionId: transactionRecord.id,
+    })
+
+    if (payoutReservation.outcome !== 'reserved') {
+      scopedLogger.info('Skipping payout; already handled', {
+        attempts: payoutReservation.outcome === 'missing' ? 0 : payoutReservation.attempts,
+        outcome: payoutReservation.outcome,
+        transactionId: transactionRecord.id,
+      })
+      return
+    }
+
+    let payoutOutcome: { outcome: 'completed' | 'failed', reason?: string } = { outcome: 'completed' }
+
+    try {
+      await this.processPayout(prismaClient, transactionRecord, message, scopedLogger)
+    }
+    catch (error) {
+      payoutOutcome = {
+        outcome: 'failed',
+        reason: error instanceof Error ? error.message : 'unknown_payout_error',
+      }
+      throw error
+    }
+    finally {
+      await this.repository.recordPayoutResult(prismaClient, {
+        idempotencyKey: this.buildIdempotencyKey('payout_dispatch', transactionRecord.id),
+        outcome: payoutOutcome.outcome,
+        reason: payoutOutcome.reason,
+        transactionId: transactionRecord.id,
+      })
+    }
   }
 
   public async handlePaymentSent(message: PaymentSentMessage): Promise<void> {

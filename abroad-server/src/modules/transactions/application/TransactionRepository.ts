@@ -4,6 +4,12 @@ import { IDatabaseClientProvider } from '../../../platform/persistence/IDatabase
 import { transactionNotificationInclude, TransactionWithRelations } from './transactionNotificationTypes'
 import { InvalidTransactionTransitionError, resolveTransition, TransactionTransitionName } from './TransactionStateMachine'
 
+export type PayoutReservation
+  = | { attempts: number, outcome: 'completed' }
+    | { attempts: number, outcome: 'in_flight' }
+    | { attempts: number, outcome: 'reserved' }
+    | { outcome: 'missing' }
+
 export type RefundAttemptResult
   = | { reason?: string, success: false, transactionId?: string }
     | { success: true, transactionId?: string }
@@ -13,6 +19,12 @@ export type RefundReservation
     | { attempts: number, outcome: 'reserved' }
     | { outcome: 'already_refunded', refundOnChainId?: string }
     | { outcome: 'missing' }
+
+type PayoutContext = {
+  attempts: number
+  lastError?: string
+  status: 'completed' | 'failed' | 'pending'
+}
 
 type RefundContext = {
   attempts: number
@@ -35,7 +47,22 @@ export class TransactionRepository {
       onChainId: string
       transactionId: string
     },
-  ): Promise<TransactionWithRelations | undefined> {
+  ): Promise<
+    | undefined
+    | { transaction: TransactionWithRelations, transitionApplied: boolean }
+  > {
+    const wasAlreadyApplied = await this.hasTransition(prismaClient, {
+      idempotencyKey: params.idempotencyKey,
+      transactionId: params.transactionId,
+    })
+
+    if (wasAlreadyApplied) {
+      const existingTransaction = await this.loadTransaction(prismaClient, params.transactionId)
+      return existingTransaction
+        ? { transaction: existingTransaction, transitionApplied: false }
+        : undefined
+    }
+
     const updated = await this.applyTransition(prismaClient, {
       data: {
         onChainId: params.onChainId,
@@ -45,7 +72,7 @@ export class TransactionRepository {
       transactionId: params.transactionId,
     })
 
-    return updated ?? undefined
+    return updated ? { transaction: updated, transitionApplied: true } : undefined
   }
 
   public async applyExpiration(
@@ -186,6 +213,62 @@ export class TransactionRepository {
     return result.count > 0
   }
 
+  public async recordPayoutResult(
+    prismaClient: TransactionClient,
+    params: { idempotencyKey: string, outcome: 'completed' | 'failed', reason?: string, transactionId: string },
+  ): Promise<void> {
+    await this.withTransaction(prismaClient, async (tx) => {
+      const transaction = await tx.transaction.findUnique({
+        select: { status: true },
+        where: { id: params.transactionId },
+      })
+
+      if (!transaction) {
+        return
+      }
+
+      const existingTransition = await tx.transactionTransition.findUnique({
+        where: {
+          transactionId_idempotencyKey: {
+            idempotencyKey: params.idempotencyKey,
+            transactionId: params.transactionId,
+          },
+        },
+      })
+
+      const context = this.parsePayoutContext(existingTransition?.context)
+      const attempts = context.attempts > 0 ? context.attempts : 1
+
+      const updatedContext: PayoutContext = {
+        attempts,
+        lastError: params.outcome === 'completed' ? undefined : params.reason ?? context.lastError,
+        status: params.outcome === 'completed' ? 'completed' : 'failed',
+      }
+
+      await tx.transactionTransition.upsert({
+        create: {
+          context: this.serializePayoutContext(updatedContext),
+          event: 'payout_dispatch',
+          fromStatus: transaction.status,
+          idempotencyKey: params.idempotencyKey,
+          toStatus: transaction.status,
+          transactionId: params.transactionId,
+        },
+        update: {
+          context: this.serializePayoutContext(updatedContext),
+          fromStatus: existingTransition?.fromStatus ?? transaction.status,
+          toStatus: existingTransition?.toStatus ?? transaction.status,
+        },
+        where: {
+          transactionId_idempotencyKey: {
+            idempotencyKey: params.idempotencyKey,
+            transactionId: params.transactionId,
+          },
+        },
+      })
+    })
+  }
+
   public async recordRefundOnChainId(
     prismaClient: TransactionClient,
     transactionId: string,
@@ -262,6 +345,53 @@ export class TransactionRepository {
           where: { id: params.transactionId, refundOnChainId: null },
         })
       }
+    })
+  }
+
+  public async reservePayout(
+    prismaClient: TransactionClient,
+    params: { idempotencyKey: string, transactionId: string },
+  ): Promise<PayoutReservation> {
+    return this.withTransaction(prismaClient, async (tx) => {
+      const transaction = await tx.transaction.findUnique({
+        select: { id: true, status: true },
+        where: { id: params.transactionId },
+      })
+
+      if (!transaction) {
+        return { outcome: 'missing' }
+      }
+
+      const existingTransition = await tx.transactionTransition.findUnique({
+        where: {
+          transactionId_idempotencyKey: {
+            idempotencyKey: params.idempotencyKey,
+            transactionId: params.transactionId,
+          },
+        },
+      })
+
+      if (!existingTransition) {
+        await tx.transactionTransition.create({
+          data: {
+            context: this.serializePayoutContext({ attempts: 1, status: 'pending' }),
+            event: 'payout_dispatch',
+            fromStatus: transaction.status,
+            idempotencyKey: params.idempotencyKey,
+            toStatus: transaction.status,
+            transactionId: params.transactionId,
+          },
+        })
+
+        return { attempts: 1, outcome: 'reserved' }
+      }
+
+      const context = this.parsePayoutContext(existingTransition.context)
+      if (context.status === 'pending') {
+        return { attempts: context.attempts, outcome: 'in_flight' }
+      }
+
+      return { attempts: context.attempts, outcome: 'completed' }
     })
   }
 
@@ -363,6 +493,22 @@ export class TransactionRepository {
     })
   }
 
+  private async hasTransition(
+    prismaClient: TransactionClient,
+    params: { idempotencyKey: string, transactionId: string },
+  ): Promise<boolean> {
+    const existing = await prismaClient.transactionTransition.findUnique({
+      where: {
+        transactionId_idempotencyKey: {
+          idempotencyKey: params.idempotencyKey,
+          transactionId: params.transactionId,
+        },
+      },
+    })
+
+    return Boolean(existing)
+  }
+
   private async loadTransaction(
     prismaClient: TransactionClient,
     transactionId: string,
@@ -371,6 +517,19 @@ export class TransactionRepository {
       include: transactionNotificationInclude,
       where: { id: transactionId },
     })
+  }
+
+  private parsePayoutContext(raw: null | Prisma.JsonValue | undefined): PayoutContext {
+    if (!raw || typeof raw !== 'object') {
+      return { attempts: 0, status: 'pending' }
+    }
+
+    const context = raw as Record<string, unknown>
+    const attempts = Number.isFinite(context.attempts) ? Number(context.attempts) : 0
+    const status = context.status === 'completed' || context.status === 'failed' ? context.status : 'pending'
+    const lastError = typeof context.lastError === 'string' ? context.lastError : undefined
+
+    return { attempts, lastError, status }
   }
 
   private parseRefundContext(raw: null | Prisma.JsonValue | undefined): RefundContext {
@@ -394,6 +553,14 @@ export class TransactionRepository {
       refundTransactionId,
       status,
       trigger,
+    }
+  }
+
+  private serializePayoutContext(context: PayoutContext): Prisma.InputJsonValue {
+    return {
+      attempts: context.attempts,
+      ...(context.lastError !== undefined ? { lastError: context.lastError } : {}),
+      status: context.status,
     }
   }
 
