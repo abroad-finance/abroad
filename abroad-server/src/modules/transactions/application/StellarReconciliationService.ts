@@ -196,17 +196,24 @@ export class StellarReconciliationService {
 
   private async extractTransactionId(
     payment: Horizon.ServerApi.PaymentOperationRecord,
-  ): Promise<{ reason: PaymentReconciliationReason, transactionId: null } | { reason?: undefined, transactionId: string }> {
+  ): Promise<
+    | { reason: PaymentReconciliationReason, transactionHash: string, transactionId: null }
+    | { reason?: undefined, transactionHash: string, transactionId: string }
+  > {
     const transaction = await payment.transaction()
+    const transactionHash = transaction.id ?? payment.transaction_hash
+    if (!transactionHash) {
+      throw new Error('missing_transaction_hash')
+    }
     const memo = transaction.memo?.trim()
 
     if (!memo) {
-      return { reason: 'missingMemo', transactionId: null }
+      return { reason: 'missingMemo', transactionHash, transactionId: null }
     }
 
     const buffer = Buffer.from(memo, 'base64')
     if (buffer.length < 16) {
-      return { reason: 'invalidMemoFormat', transactionId: null }
+      return { reason: 'invalidMemoFormat', transactionHash, transactionId: null }
     }
 
     const hex = buffer.toString('hex')
@@ -218,7 +225,7 @@ export class StellarReconciliationService {
       hex.substring(20),
     ].join('-')
 
-    return { transactionId }
+    return { transactionHash, transactionId }
   }
 
   private async fetchPaymentById(server: Horizon.Server, paymentId: string): Promise<PaymentLookupResult> {
@@ -449,7 +456,7 @@ export class StellarReconciliationService {
 
     try {
       const verifier = this.verifierRegistry.getVerifier(BlockchainNetwork.STELLAR)
-      const verification = await verifier.verifyNotification(payment.id, transaction.id)
+      const verification = await verifier.verifyNotification(transactionIdResult.transactionHash, transaction.id)
       if (verification.outcome === 'error') {
         this.logger.warn('[PublicTransactionsController] Verification failed for Stellar payment', {
           paymentId: payment.id,

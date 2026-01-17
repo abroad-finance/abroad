@@ -53,6 +53,16 @@ export class StellarWalletHandler implements IWalletHandler {
     const horizonUrl = await this.secretManager.getSecret('STELLAR_HORIZON_URL')
     const server = new Horizon.Server(horizonUrl)
     try {
+      const tx = await server.transactions().transaction(onChainId).call()
+      if (tx.source_account) {
+        return tx.source_account
+      }
+    }
+    catch {
+      // Fall back to operation lookups for legacy on-chain identifiers.
+    }
+
+    try {
       const op = await server.operations().operation(onChainId).call()
       return op.source_account || ''
     }

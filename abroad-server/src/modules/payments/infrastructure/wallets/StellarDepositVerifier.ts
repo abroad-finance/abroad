@@ -52,27 +52,44 @@ export class StellarDepositVerifier implements IDepositVerifier {
     const { accountId, horizonUrl, usdcIssuer } = await this.getStellarSecrets()
     const server = new Horizon.Server(horizonUrl)
 
-    let payment: Horizon.ServerApi.PaymentOperationRecord
+    let transactionRecord: Horizon.ServerApi.TransactionRecord
     try {
-      const op = await server.operations().operation(onChainSignature).call()
-      if (!this.isPayment(op)) {
-        return { outcome: 'error', reason: 'Operation is not a payment', status: 400 }
-      }
-      payment = op
+      transactionRecord = await server.transactions().transaction(onChainSignature).call()
     }
     catch (error) {
       const status = this.extractErrorStatus(error) ?? 400
-      const reason = error instanceof Error ? error.message : 'Failed to fetch payment'
+      const reason = error instanceof Error ? error.message : 'Failed to fetch transaction'
       return { outcome: 'error', reason, status: status === 404 ? 404 : 400 }
     }
 
-    if (!this.isUsdcPaymentToWallet(payment, accountId, usdcIssuer)) {
-      return { outcome: 'error', reason: 'Payment does not target the configured USDC wallet', status: 400 }
+    let payment: Horizon.ServerApi.PaymentOperationRecord | undefined
+    try {
+      const operations = await server.operations().forTransaction(onChainSignature).call()
+      const paymentOps = operations.records.filter(
+        (op): op is Horizon.ServerApi.PaymentOperationRecord => this.isPayment(op),
+      )
+      if (paymentOps.length === 0) {
+        return { outcome: 'error', reason: 'Transaction does not include a payment operation', status: 400 }
+      }
+      payment = paymentOps.find(op => this.isUsdcPaymentToWallet(op, accountId, usdcIssuer))
+      if (!payment) {
+        return { outcome: 'error', reason: 'Payment does not target the configured USDC wallet', status: 400 }
+      }
+    }
+    catch (error) {
+      const status = this.extractErrorStatus(error) ?? 400
+      const reason = error instanceof Error ? error.message : 'Failed to fetch transaction operations'
+      return { outcome: 'error', reason, status: status === 404 ? 404 : 400 }
     }
 
-    const memo = await payment.transaction().then(tx => tx.memo).catch(() => null)
+    const memo = transactionRecord.memo?.trim() ?? null
     if (!memo) {
       return { outcome: 'error', reason: 'Payment is missing memo', status: 400 }
+    }
+
+    const decodedTransactionId = this.decodeMemo(memo)
+    if (decodedTransactionId !== transactionId) {
+      return { outcome: 'error', reason: 'Payment memo does not match transaction', status: 400 }
     }
 
     const queueMessage: ReceivedCryptoTransactionMessage = {
@@ -80,8 +97,8 @@ export class StellarDepositVerifier implements IDepositVerifier {
       amount: parseFloat(payment.amount),
       blockchain: BlockchainNetwork.STELLAR,
       cryptoCurrency: CryptoCurrency.USDC,
-      onChainId: payment.id,
-      transactionId: this.decodeMemo(memo),
+      onChainId: onChainSignature,
+      transactionId: decodedTransactionId,
     }
 
     return { outcome: 'ok', queueMessage }

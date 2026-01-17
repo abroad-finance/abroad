@@ -72,13 +72,29 @@ export class StellarOrphanRefundService {
       where: { paymentId: params.payment.id },
     })
 
+    const transactionHash = await this.resolveTransactionHash(params.payment)
+    if (!transactionHash) {
+      const reason = 'missing_transaction_hash'
+      await prisma.stellarOrphanRefund.update({
+        data: {
+          lastError: reason,
+          status: OrphanRefundStatus.FAILED,
+        },
+        where: { paymentId: params.payment.id },
+      })
+      this.logger.error('Unable to resolve Stellar transaction hash for orphan refund', {
+        paymentId: params.payment.id,
+      })
+      return { outcome: 'failed', reason }
+    }
+
     let refundResult: RefundResult
     try {
       refundResult = await this.refundService.refundByOnChainId({
         amount,
         cryptoCurrency: CryptoCurrency.USDC,
         network: BlockchainNetwork.STELLAR,
-        onChainId: params.payment.id,
+        onChainId: transactionHash,
       })
     }
     catch (error) {
@@ -130,5 +146,24 @@ export class StellarOrphanRefundService {
       refundTransactionId: refundResult.transactionId ?? null,
     })
     return { outcome: 'refunded', refundTransactionId: refundResult.transactionId ?? null }
+  }
+
+  private async resolveTransactionHash(
+    payment: Horizon.ServerApi.PaymentOperationRecord,
+  ): Promise<null | string> {
+    if (payment.transaction_hash) {
+      return payment.transaction_hash
+    }
+    try {
+      const transaction = await payment.transaction()
+      return transaction.id ?? null
+    }
+    catch (error) {
+      this.logger.error('Failed to load Stellar transaction for orphan refund', {
+        error,
+        paymentId: payment.id,
+      })
+      return null
+    }
   }
 }

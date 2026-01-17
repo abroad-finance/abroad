@@ -40,16 +40,16 @@ import { ISecretManager } from '../../../../platform/secrets/ISecretManager'
  */
 @injectable()
 export class BinanceBalanceUpdatedController {
+  private readonly baseRetryDelayMs = 75
+
+  private readonly maxRetryDelayMs = 1200
+  private readonly maxTransactionAttempts = 5
   constructor(
     @inject(TYPES.ILogger) private readonly logger: ILogger,
     @inject(TYPES.IQueueHandler) private readonly queueHandler: IQueueHandler,
     @inject(TYPES.ISecretManager) private readonly secretManager: ISecretManager,
     @inject(TYPES.IDatabaseClientProvider) private readonly dbClientProvider: IDatabaseClientProvider,
   ) {}
-
-  private readonly baseRetryDelayMs = 75
-  private readonly maxRetryDelayMs = 1200
-  private readonly maxTransactionAttempts = 5
 
   public registerConsumers(): void {
     this.logger.info(
@@ -60,6 +60,43 @@ export class BinanceBalanceUpdatedController {
       QueueName.BINANCE_BALANCE_UPDATED,
       this.onBalanceUpdated.bind(this),
     )
+  }
+
+  private computeRetryDelay(attempt: number): number {
+    const normalizedAttempt = Math.max(attempt, 1)
+    const exponentialBackoff = this.baseRetryDelayMs * (2 ** (normalizedAttempt - 1))
+    const jitter = Math.random() * this.baseRetryDelayMs
+    return Math.min(exponentialBackoff + jitter, this.maxRetryDelayMs)
+  }
+
+  private async delay(durationMs: number): Promise<void> {
+    await new Promise<void>((resolve) => {
+      setTimeout(() => resolve(), durationMs)
+    })
+  }
+
+  private getErrorMessage(error: unknown): string | undefined {
+    if (error instanceof Error) return error.message
+    if (typeof error === 'string') return error
+    return undefined
+  }
+
+  private isRetryableTransactionError(error: unknown): boolean {
+    const isKnownPrismaError = error instanceof Prisma.PrismaClientKnownRequestError
+    if (isKnownPrismaError && error.code === 'P2034') {
+      return true
+    }
+
+    if (typeof error === 'object' && error !== null && 'code' in error) {
+      const code = (error as { code?: unknown }).code
+      if (code === 'P2034') return true
+    }
+
+    if (error instanceof Error && error.message.includes('write conflict')) {
+      return true
+    }
+
+    return false
   }
 
   /**
@@ -223,42 +260,5 @@ export class BinanceBalanceUpdatedController {
     }
 
     throw lastError ?? new Error('Exhausted transaction retries without an error instance')
-  }
-
-  private computeRetryDelay(attempt: number): number {
-    const normalizedAttempt = Math.max(attempt, 1)
-    const exponentialBackoff = this.baseRetryDelayMs * (2 ** (normalizedAttempt - 1))
-    const jitter = Math.random() * this.baseRetryDelayMs
-    return Math.min(exponentialBackoff + jitter, this.maxRetryDelayMs)
-  }
-
-  private getErrorMessage(error: unknown): string | undefined {
-    if (error instanceof Error) return error.message
-    if (typeof error === 'string') return error
-    return undefined
-  }
-
-  private isRetryableTransactionError(error: unknown): boolean {
-    const isKnownPrismaError = error instanceof Prisma.PrismaClientKnownRequestError
-    if (isKnownPrismaError && error.code === 'P2034') {
-      return true
-    }
-
-    if (typeof error === 'object' && error !== null && 'code' in error) {
-      const code = (error as { code?: unknown }).code
-      if (code === 'P2034') return true
-    }
-
-    if (error instanceof Error && error.message.includes('write conflict')) {
-      return true
-    }
-
-    return false
-  }
-
-  private async delay(durationMs: number): Promise<void> {
-    await new Promise<void>((resolve) => {
-      setTimeout(() => resolve(), durationMs)
-    })
   }
 }

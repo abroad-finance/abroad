@@ -157,8 +157,13 @@ export class StellarListener {
           return
         }
 
-        const tx = await payment.transaction()
-        this.logger.info('Fetched full transaction details', { transactionId: tx.id })
+        const tx: Horizon.ServerApi.TransactionRecord = await payment.transaction()
+        const transactionHash = tx.id ?? payment.transaction_hash
+        if (!transactionHash) {
+          this.logger.error('Stellar transaction hash is missing', { paymentId: payment.id })
+          return
+        }
+        this.logger.info('Fetched full transaction details', { transactionId: transactionHash })
 
         if (!tx.memo) {
           await this.handleOrphanPayment(payment, 'missingMemo')
@@ -170,7 +175,7 @@ export class StellarListener {
 
         try {
           const verifier = this.depositVerifierRegistry.getVerifier(BlockchainNetwork.STELLAR)
-          const outcome = await verifier.verifyNotification(payment.id, transactionId)
+          const outcome = await verifier.verifyNotification(transactionHash, transactionId)
           if (outcome.outcome === 'error') {
             this.logger.warn('Skipping payment due to verification failure', {
               paymentId: payment.id,

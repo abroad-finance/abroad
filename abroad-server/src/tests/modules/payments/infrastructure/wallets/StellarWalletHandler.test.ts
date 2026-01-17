@@ -18,8 +18,9 @@ const operationsMock = jest.fn(() => ({
     call: operationCallMock,
   }),
 }))
-const existingTx = { id: 'existing-tx' }
-const transactionLookupMock = jest.fn(async () => existingTx)
+type MockTransactionRecord = { id?: string, source_account?: string }
+const existingTx: MockTransactionRecord = { id: 'existing-tx' }
+const transactionLookupMock: jest.Mock<Promise<MockTransactionRecord>, []> = jest.fn(async () => existingTx)
 const transactionsMock = jest.fn(() => ({
   transaction: () => ({
     call: transactionLookupMock,
@@ -137,6 +138,45 @@ describe('StellarWalletHandler', () => {
     expect(result).toEqual({ success: true, transactionId: 'tx-hash' })
   })
 
+  it('uses response data when send fails', async () => {
+    const handler = new StellarWalletHandler(secretManager as unknown as ISecretManager, lockManager as unknown as ILockManager, logger)
+    const responseError = Object.assign(new Error('bad request'), {
+      response: { data: { error: 'bad request' }, status: 400 },
+    })
+    submitTransactionMock.mockRejectedValueOnce(responseError)
+
+    const result = await handler.send({
+      address: 'DESTINATION',
+      amount: 1,
+      cryptoCurrency: CryptoCurrency.USDC,
+      memo: 'memo',
+    })
+
+    expect(result).toEqual({
+      code: 'retriable',
+      reason: JSON.stringify({ error: 'bad request' }),
+      success: false,
+    })
+  })
+
+  it('uses unknown reason when errors have no details', async () => {
+    const handler = new StellarWalletHandler(secretManager as unknown as ISecretManager, lockManager as unknown as ILockManager, logger)
+    submitTransactionMock.mockRejectedValueOnce({})
+
+    const result = await handler.send({
+      address: 'DESTINATION',
+      amount: 1,
+      cryptoCurrency: CryptoCurrency.USDC,
+      memo: 'memo',
+    })
+
+    expect(result).toEqual({
+      code: 'retriable',
+      reason: 'unknown',
+      success: false,
+    })
+  })
+
   it('trims long memos and skips memo when absent', async () => {
     ;(secretManager.getSecret as jest.Mock).mockResolvedValueOnce('https://horizon.test')
     ;(secretManager.getSecret as jest.Mock).mockResolvedValueOnce('secret-key')
@@ -179,6 +219,19 @@ describe('StellarWalletHandler', () => {
     expect(transactionLookupMock).toHaveBeenCalled()
   })
 
+  it('resubmits when timeout lookup yields no transaction', async () => {
+    const timeoutError = Object.assign(new Error('timeout'), { response: { status: 504 } })
+    submitTransactionMock.mockRejectedValueOnce(timeoutError).mockResolvedValueOnce({ hash: 'retry-hash' })
+    transactionLookupMock.mockResolvedValueOnce(undefined as unknown as MockTransactionRecord)
+    const handler = new StellarWalletHandler(secretManager as unknown as ISecretManager, lockManager as unknown as ILockManager, logger)
+    const server = new (jest.requireMock('@stellar/stellar-sdk').Horizon.Server)('https://horizon.test')
+
+    const result = await (handler as unknown as { submitWithRetry: (srv: unknown, tx: typeof builtTx) => Promise<unknown> }).submitWithRetry(server, builtTx)
+
+    expect(result).toEqual({ hash: 'retry-hash' })
+    expect(submitTransactionMock).toHaveBeenCalledTimes(2)
+  })
+
   it('retries once on submission timeout and returns existing transaction', async () => {
     const timeoutError = Object.assign(new Error('timeout'), {
       response: { status: 504 },
@@ -214,19 +267,37 @@ describe('StellarWalletHandler', () => {
     ).rejects.toThrow('bad request')
   })
 
-  it('resolves the source account address and surfaces horizon failures', async () => {
+  it('resolves the source account address and falls back to legacy operation ids', async () => {
     const handler = new StellarWalletHandler(secretManager as unknown as ISecretManager, lockManager as unknown as ILockManager, logger)
 
-    const address = await handler.getAddressFromTransaction({ onChainId: 'op-1' })
+    transactionLookupMock.mockResolvedValueOnce({ source_account: 'source-account' })
+    const address = await handler.getAddressFromTransaction({ onChainId: 'tx-1' })
     expect(address).toBe('source-account')
+    expect(operationCallMock).not.toHaveBeenCalled()
 
+    transactionLookupMock.mockResolvedValueOnce({})
+    operationCallMock.mockResolvedValueOnce({ source_account: 'fallback-source' })
+    const fallbackFromTx = await handler.getAddressFromTransaction({ onChainId: 'tx-2' })
+    expect(fallbackFromTx).toBe('fallback-source')
+
+    transactionLookupMock.mockRejectedValueOnce(new Error('not found'))
+    operationCallMock.mockResolvedValueOnce({ source_account: 'legacy-source' })
+    const legacy = await handler.getAddressFromTransaction({ onChainId: 'op-2' })
+    expect(legacy).toBe('legacy-source')
+
+    transactionLookupMock.mockRejectedValueOnce(new Error('not found'))
     operationCallMock.mockResolvedValueOnce({})
-    const fallback = await handler.getAddressFromTransaction({ onChainId: 'op-2' })
+    const fallback = await handler.getAddressFromTransaction({ onChainId: 'op-3' })
     expect(fallback).toBe('')
+  })
+
+  it('throws when both transaction and operation lookups fail', async () => {
+    const handler = new StellarWalletHandler(secretManager as unknown as ISecretManager, lockManager as unknown as ILockManager, logger)
 
     operationCallMock.mockRejectedValueOnce(new Error('horizon down'))
-    await expect(handler.getAddressFromTransaction({ onChainId: 'op-3' })).rejects.toThrow(
-      'Failed to fetch transaction with ID op-3',
+    transactionLookupMock.mockRejectedValueOnce(new Error('horizon down'))
+    await expect(handler.getAddressFromTransaction({ onChainId: 'op-4' })).rejects.toThrow(
+      'Failed to fetch transaction with ID op-4',
     )
   })
 

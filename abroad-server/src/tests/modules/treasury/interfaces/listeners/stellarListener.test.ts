@@ -30,7 +30,8 @@ interface TestPayment {
   id: string
   paging_token: string
   to: string
-  transaction: () => Promise<{ memo?: string }>
+  transaction: () => Promise<{ id?: string, memo?: string }>
+  transaction_hash?: string
   type: string
 }
 
@@ -116,7 +117,10 @@ function createOutboxDispatcher(enqueueQueue?: jest.Mock) {
 
 function createPayment(overrides: Partial<TestPayment> = {}): TestPayment {
   const transaction = overrides.transaction
-    ?? (() => Promise.resolve({ memo: Buffer.from('00112233445566778899aabbccddeeff', 'hex').toString('base64') }))
+    ?? (() => Promise.resolve({
+      id: 'tx-hash',
+      memo: Buffer.from('00112233445566778899aabbccddeeff', 'hex').toString('base64'),
+    }))
   return {
     amount: overrides.amount ?? '10.5',
     asset_code: overrides.asset_code ?? 'USDC',
@@ -127,6 +131,7 @@ function createPayment(overrides: Partial<TestPayment> = {}): TestPayment {
     paging_token: overrides.paging_token ?? 'paging-token',
     to: overrides.to ?? 'account-id',
     transaction,
+    transaction_hash: overrides.transaction_hash,
     type: overrides.type ?? 'payment',
   }
 }
@@ -216,7 +221,7 @@ describe('StellarListener', () => {
     const outboxDispatcher = createOutboxDispatcher(enqueueQueue)
     const secretManager = createSecretManager('account-id', 'https://horizon', 'trusted-issuer')
     const { dbProvider, upsert } = createDbProvider()
-    const { getVerifier } = createDepositVerifierRegistry()
+    const { getVerifier, verifyNotification } = createDepositVerifierRegistry()
     const orphanRefundService = createOrphanRefundService()
 
     const listener = new StellarListener(
@@ -235,14 +240,14 @@ describe('StellarListener', () => {
     await handler.onmessage?.(createPayment({ asset_issuer: 'untrusted' }))
     await handler.onmessage?.(createPayment({
       asset_issuer: 'trusted-issuer',
-      transaction: () => Promise.resolve({ memo: undefined }),
+      transaction: () => Promise.resolve({ id: 'tx-hash', memo: undefined }),
     }))
 
     const validMemo = Buffer.from('12345678123456781234567812345678', 'hex').toString('base64')
     await handler.onmessage?.(createPayment({
       asset_issuer: 'trusted-issuer',
       paging_token: 'valid-token',
-      transaction: () => Promise.resolve({ memo: validMemo }),
+      transaction: () => Promise.resolve({ id: 'tx-hash', memo: validMemo }),
     }))
 
     expect(upsert).toHaveBeenCalledTimes(4)
@@ -251,6 +256,7 @@ describe('StellarListener', () => {
     const queuedPayload = enqueueQueue.mock.calls[0][1] as ReceivedCryptoTransactionMessage
     expect(enqueueQueue).toHaveBeenCalledWith(QueueName.RECEIVED_CRYPTO_TRANSACTION, queuedPayload, 'stellar.listener', { deliverNow: true })
     expect(queuedPayload.transactionId).toBe('12345678-1234-5678-1234-567812345678')
+    expect(verifyNotification).toHaveBeenCalledWith('tx-hash', '12345678-1234-5678-1234-567812345678')
 
     listener.stop()
     expect(horizonMocks.streamHandle.close).toHaveBeenCalled()

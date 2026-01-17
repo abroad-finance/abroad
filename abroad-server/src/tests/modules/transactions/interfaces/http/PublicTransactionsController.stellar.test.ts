@@ -145,7 +145,11 @@ const basePayment: Horizon.ServerApi.PaymentOperationRecord = {
   id: 'payment-base',
   paging_token: '100',
   to: secrets[Secrets.STELLAR_ACCOUNT_ID],
-  transaction: async () => ({ memo: memoBase64 } as unknown as Horizon.ServerApi.TransactionRecord),
+  transaction: async () => ({
+    id: 'tx-hash',
+    memo: memoBase64,
+  } as unknown as Horizon.ServerApi.TransactionRecord),
+  transaction_hash: 'tx-hash',
   type: Horizon.HorizonApi.OperationResponseType.payment,
   type_i: Horizon.HorizonApi.OperationResponseTypeI.payment,
 } as unknown as Horizon.ServerApi.PaymentOperationRecord
@@ -180,14 +184,14 @@ const buildContext = () => {
     enqueueQueue: jest.fn(),
     enqueueWebhook: jest.fn(),
   }
-  const verifyNotification = jest.fn(async (paymentId: string, transactionId: string) => ({
+  const verifyNotification = jest.fn(async (transactionHash: string, transactionId: string) => ({
     outcome: 'ok' as const,
     queueMessage: {
       addressFrom: 'sender',
       amount: 1,
       blockchain: BlockchainNetwork.STELLAR,
       cryptoCurrency: CryptoCurrency.USDC,
-      onChainId: paymentId,
+      onChainId: transactionHash,
       transactionId,
     },
   }))
@@ -318,7 +322,10 @@ describe('PublicTransactionsController.checkUnprocessedStellarTransactions', () 
       from: 'sender-1',
       id: 'payment-1',
       paging_token: '150',
-      transaction: async () => ({ memo: altMemoBase64 } as unknown as Horizon.ServerApi.TransactionRecord),
+      transaction: async () => ({
+        id: 'tx-hash',
+        memo: altMemoBase64,
+      } as unknown as Horizon.ServerApi.TransactionRecord),
     })
 
     const failingPayment = buildPayment({
@@ -326,7 +333,10 @@ describe('PublicTransactionsController.checkUnprocessedStellarTransactions', () 
       from: 'sender-2',
       id: 'payment-2',
       paging_token: '175',
-      transaction: async () => ({ memo: altMemoBase64 } as unknown as Horizon.ServerApi.TransactionRecord),
+      transaction: async () => ({
+        id: 'tx-hash',
+        memo: altMemoBase64,
+      } as unknown as Horizon.ServerApi.TransactionRecord),
     })
 
     mockedStellar.__setPaymentRecords([nonUsdcPayment, failingPayment])
@@ -477,7 +487,10 @@ describe('PublicTransactionsController.reconcileStellarPayment', () => {
     const { controller, prismaClient } = buildContext()
     mockedStellar.__setOperationResponse(buildPayment({
       id: 'payment-missing-memo',
-      transaction: async () => ({ memo: undefined } as unknown as Horizon.ServerApi.TransactionRecord),
+      transaction: async () => ({
+        id: 'tx-hash',
+        memo: undefined,
+      } as unknown as Horizon.ServerApi.TransactionRecord),
     }))
 
     const result = await controller.reconcileStellarPayment('payment-missing-memo', reconciliationSecret)

@@ -34,6 +34,7 @@ Abroad sends JSON webhooks to notify your application about transaction lifecycl
 ```
 
 `data` mirrors the transaction record and may include nested quote fields on some events. To derive the memo for reconciliation, compute `transaction_reference` from `id` (Base64) or call `GET /transaction/{id}`.
+For Stellar payments, `onChainId` is the transaction hash.
 
 ## Authenticating webhooks
 
