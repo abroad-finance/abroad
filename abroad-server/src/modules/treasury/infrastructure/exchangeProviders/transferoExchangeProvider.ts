@@ -85,16 +85,25 @@ export class TransferoExchangeProvider implements IExchangeProvider {
   getExchangeAddress: IExchangeProvider['getExchangeAddress'] = async ({
     blockchain,
   }): Promise<ExchangeAddressResult> => {
-    if (blockchain !== BlockchainNetwork.STELLAR) {
+    const secretName = (() => {
+      switch (blockchain) {
+        case BlockchainNetwork.SOLANA:
+          return 'TRANSFERO_SOLANA_WALLET'
+        case BlockchainNetwork.STELLAR:
+          return 'TRANSFERO_STELLAR_WALLET'
+        default:
+          return undefined
+      }
+    })()
+
+    if (!secretName) {
       return { code: 'validation', reason: `Unsupported blockchain: ${blockchain}`, success: false }
     }
 
-    const { TRANSFERO_STELLAR_WALLET: transferoStellarWallet } = await this.secretManager.getSecrets([
-      'TRANSFERO_STELLAR_WALLET',
-    ])
+    const secrets = await this.secretManager.getSecrets([secretName])
 
     return {
-      address: transferoStellarWallet,
+      address: secrets[secretName],
       success: true,
     }
   }

@@ -30,6 +30,7 @@ const baseSecrets: Partial<Record<Secret, string>> = {
   TRANSFERO_CLIENT_ID: 'id-1',
   TRANSFERO_CLIENT_SCOPE: 'scope-1',
   TRANSFERO_CLIENT_SECRET: 'secret-1',
+  TRANSFERO_SOLANA_WALLET: 'solana-wallet',
   TRANSFERO_STELLAR_WALLET: 'stellar-wallet',
 }
 
@@ -53,11 +54,22 @@ describe('TransferoExchangeProvider', () => {
       expect(address).toEqual({ address: 'stellar-wallet', success: true })
     })
 
+    it('returns the configured solana wallet', async () => {
+      const provider = createProvider()
+
+      const address = await provider.getExchangeAddress({
+        blockchain: BlockchainNetwork.SOLANA,
+        cryptoCurrency: CryptoCurrency.USDC,
+      })
+
+      expect(address).toEqual({ address: 'solana-wallet', success: true })
+    })
+
     it('returns failure for unsupported blockchains', async () => {
       const provider = createProvider()
 
       const result = await provider.getExchangeAddress({
-        blockchain: BlockchainNetwork.SOLANA,
+        blockchain: 'UNSUPPORTED' as BlockchainNetwork,
         cryptoCurrency: CryptoCurrency.USDC,
       })
       expect(result).toEqual({ code: 'validation', reason: 'Unsupported blockchain: SOLANA', success: false })
