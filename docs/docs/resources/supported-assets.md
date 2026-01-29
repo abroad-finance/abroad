@@ -10,7 +10,7 @@ Abroad supports a specific set of blockchains, cryptocurrencies, and fiat curren
 
 | Asset | Symbol | Networks | Notes |
 | :--- | :--- | :--- | :--- |
-| USD Coin | **USDC** | Stellar, Solana | Primary asset used for quotes today. |
+| USD Coin | **USDC** | Stellar, Solana, Celo | Primary asset used for quotes today. |
 | Tether | **USDT** | Celo | Coming soon. |
 
 ## Fiat Currencies
@@ -24,8 +24,8 @@ Abroad supports a specific set of blockchains, cryptocurrencies, and fiat curren
 
 | Method | Payout currency | Recipient location | Crypto networks you can fund with |
 | :--- | :--- | :--- | :--- |
-| `BREB` | COP | Colombia | Stellar, Solana |
-| `PIX` | BRL | Brazil | Stellar, Solana |
+| `BREB` | COP | Colombia | Stellar, Solana, Celo |
+| `PIX` | BRL | Brazil | Stellar, Solana, Celo |
 
 The `network` you send in the quote defines which crypto rail you will fund on-chain. The payout is still in the local currency for the selected `payment_method`.
 

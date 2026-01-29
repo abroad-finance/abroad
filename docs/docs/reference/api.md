@@ -23,7 +23,7 @@ Calculate the crypto amount you need to send to deliver a target fiat amount.
 | :--- | :--- | :--- | :--- |
 | `amount` | `number` | Yes | Target amount in the fiat currency you want the recipient to receive. |
 | `crypto_currency` | `string` | Yes | Source cryptocurrency (`USDC`). |
-| `network` | `string` | Yes | Blockchain network (`STELLAR` or `SOLANA`). |
+| `network` | `string` | Yes | Blockchain network (`STELLAR`, `SOLANA`, or `CELO`). |
 | `payment_method` | `string` | Yes | Payout method (`BREB`, `PIX`). |
 | `target_currency` | `string` | Yes | Target fiat currency (`COP` or `BRL`). |
 
@@ -93,7 +93,7 @@ Calculate how much the recipient will receive for a specific crypto amount.
 | :--- | :--- | :--- | :--- |
 | `source_amount` | `number` | Yes | Crypto amount you plan to send (for example, `100` USDC). |
 | `crypto_currency` | `string` | Yes | Source cryptocurrency. |
-| `network` | `string` | Yes | Blockchain network. |
+| `network` | `string` | Yes | Blockchain network (`STELLAR`, `SOLANA`, or `CELO`). |
 | `payment_method` | `string` | Yes | Payout method (`BREB`, `PIX`). |
 | `target_currency` | `string` | Yes | Target fiat currency. |
 

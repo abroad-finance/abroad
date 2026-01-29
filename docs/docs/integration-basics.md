@@ -26,7 +26,8 @@ See [Authentication](./authentication) for concrete examples.
 ## IDs, time, and memos
 
 - `quote_id` is a UUID.  
-- `transaction_reference` is the Base64 form of the transaction ID; use it verbatim as the memo/notes field when sending crypto.  
+- `transaction_reference` is the Base64 form of the transaction ID; use it verbatim as the memo/notes field when sending **Stellar** payments.  
+- For **Solana** and **Celo** there is no memo; after broadcasting, call the network payment notification endpoint (see [Send Funds](./workflows/send-funds)).  
 - `expiration_time` is an epoch timestamp in milliseconds. Quotes are valid until that time (currently up to 1 hour).
 
 ## Supported values (request enums)
@@ -34,7 +35,7 @@ See [Authentication](./authentication) for concrete examples.
 | Field | Allowed values |
 | :--- | :--- |
 | `crypto_currency` | `USDC` |
-| `network` | `STELLAR`, `SOLANA` |
+| `network` | `STELLAR`, `SOLANA`, `CELO` |
 | `payment_method` | `BREB`, `PIX` |
 | `target_currency` | `COP`, `BRL` |
 

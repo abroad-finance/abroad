@@ -14,7 +14,7 @@ When sending funds on Stellar you **must** include the `transaction_reference` f
 If you send Stellar funds without the correct memo/reference, our system **cannot** automatically match the deposit to your transaction. This will result in delays or potential loss of funds.
 :::
 
-For Solana there is no memo. After broadcasting the transaction, call the Solana payment notification endpoint so we can confirm it on-chain and start the payout:
+For Solana and Celo there is no memo. After broadcasting the transaction, call the appropriate payment notification endpoint so we can confirm it on-chain and start the payout:
 
 ```bash
 curl -X POST https://api.abroad.finance/solana/payments/notify \
@@ -26,12 +26,23 @@ curl -X POST https://api.abroad.finance/solana/payments/notify \
   }'
 ```
 
+```bash
+curl -X POST https://api.abroad.finance/celo/payments/notify \
+  -H "X-API-Key: YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "transaction_id": "TRANSACTION_ID_FROM_ACCEPT",
+    "on_chain_tx": "CELO_TRANSACTION_HASH"
+  }'
+```
+
 ## Deposit Addresses
 
 | Network | Asset | Address |
 | :--- | :--- | :--- |
 | **Stellar** | USDC | `G... (Your Stellar Deposit Address)` |
 | **Solana** | USDC | `... (Your Solana Deposit Address)` |
+| **Celo** | USDC | `0x... (Your Celo Deposit Address)` |
 
 *Note: Please contact support or check your dashboard for the current production deposit addresses.*
 

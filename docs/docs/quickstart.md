@@ -110,9 +110,11 @@ If `kycLink` is not `null`, you **must** redirect the user to that URL to comple
 
 Send the `value` amount of crypto to the Abroad deposit address for the chosen `network`.
 
-:::danger Critical
-You **must** include the `transaction_reference` exactly as the memo/note in your crypto transfer. Failure to do so will result in lost funds.
+:::danger Critical (Stellar only)
+You **must** include the `transaction_reference` exactly as the memo/note in your Stellar transfer. Failure to do so will result in lost funds.
 :::
+
+For **Solana** or **Celo**, there is no memo. After broadcasting, call the corresponding notify endpoint so we can confirm the payment.
 
 See [Send Funds](./workflows/send-funds) for detailed instructions.
 
