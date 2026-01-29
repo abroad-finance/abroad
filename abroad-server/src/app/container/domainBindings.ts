@@ -12,6 +12,8 @@ import { BrebPaymentService } from '../../modules/payments/infrastructure/paymen
 import { PixQrDecoder } from '../../modules/payments/infrastructure/paymentProviders/PixQrDecoder'
 import { TransferoPaymentService } from '../../modules/payments/infrastructure/paymentProviders/transferoPaymentService'
 import { TransferoPayoutStatusAdapter } from '../../modules/payments/infrastructure/TransferoPayoutStatusAdapter'
+import { CeloPaymentVerifier } from '../../modules/payments/infrastructure/wallets/CeloPaymentVerifier'
+import { CeloWalletHandler } from '../../modules/payments/infrastructure/wallets/CeloWalletHandler'
 import { SolanaPaymentVerifier } from '../../modules/payments/infrastructure/wallets/SolanaPaymentVerifier'
 import { SolanaWalletHandler } from '../../modules/payments/infrastructure/wallets/SolanaWalletHandler'
 import { StellarDepositVerifier } from '../../modules/payments/infrastructure/wallets/StellarDepositVerifier'
@@ -24,6 +26,7 @@ import { TransactionStatusService } from '../../modules/transactions/application
 import { TransactionWorkflow } from '../../modules/transactions/application/TransactionWorkflow'
 import { ExchangeProviderFactory } from '../../modules/treasury/application/ExchangeProviderFactory'
 import { BinanceExchangeProvider } from '../../modules/treasury/infrastructure/exchangeProviders/binanceExchangeProvider'
+import { BinanceBrlExchangeProvider } from '../../modules/treasury/infrastructure/exchangeProviders/binanceExchangeProvider'
 import { TransferoExchangeProvider } from '../../modules/treasury/infrastructure/exchangeProviders/transferoExchangeProvider'
 import { StellarListener } from '../../modules/treasury/interfaces/listeners/StellarListener'
 import { PersonaWebhookService } from '../../modules/webhooks/application/PersonaWebhookService'
@@ -41,15 +44,19 @@ const domainBindings: ReadonlyArray<BindingRegistration<unknown>> = [
   { identifier: TYPES.IWalletHandlerFactory, implementation: WalletHandlerFactory },
   { identifier: TYPES.IPixQrDecoder, implementation: PixQrDecoder },
   { identifier: TYPES.QuoteUseCase, implementation: QuoteUseCase },
+  { identifier: TYPES.CeloWalletHandler, implementation: CeloWalletHandler },
   { identifier: TYPES.SolanaPaymentVerifier, implementation: SolanaPaymentVerifier },
   { identifier: TYPES.SolanaWalletHandler, implementation: SolanaWalletHandler },
   { identifier: TYPES.StellarListener, implementation: StellarListener },
   { identifier: TYPES.StellarWalletHandler, implementation: StellarWalletHandler },
   { identifier: TYPES.IPaymentService, implementation: BrebPaymentService, name: 'breb' },
   { identifier: TYPES.IPaymentService, implementation: TransferoPaymentService, name: 'transfero' },
+  { identifier: TYPES.CeloPaymentVerifier, implementation: CeloPaymentVerifier },
   { identifier: TYPES.IDepositVerifier, implementation: SolanaPaymentVerifier },
+  { identifier: TYPES.IDepositVerifier, implementation: CeloPaymentVerifier },
   { identifier: TYPES.IDepositVerifier, implementation: StellarDepositVerifier },
   { identifier: TYPES.IExchangeProvider, implementation: BinanceExchangeProvider, name: 'binance' },
+  { identifier: TYPES.IExchangeProvider, implementation: BinanceBrlExchangeProvider, name: 'binance-brl' },
   { identifier: TYPES.IExchangeProvider, implementation: TransferoExchangeProvider, name: 'transfero' },
   { identifier: TYPES.TransactionAcceptanceService, implementation: TransactionAcceptanceService },
   { identifier: TYPES.TransactionStatusService, implementation: TransactionStatusService },

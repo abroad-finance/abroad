@@ -1,8 +1,9 @@
 import { Wallet } from '@binance/wallet'
 import { BlockchainNetwork, CryptoCurrency, TargetCurrency } from '@prisma/client'
 import axios from 'axios'
+import crypto from 'crypto'
 
-import { BinanceExchangeProvider } from '../../../../../modules/treasury/infrastructure/exchangeProviders/binanceExchangeProvider'
+import { BinanceBrlExchangeProvider, BinanceExchangeProvider } from '../../../../../modules/treasury/infrastructure/exchangeProviders/binanceExchangeProvider'
 import { ISecretManager, Secret } from '../../../../../platform/secrets/ISecretManager'
 import { createMockLogger } from '../../../../setup/mockFactories'
 
@@ -54,6 +55,10 @@ describe('BinanceExchangeProvider', () => {
     const secretManager = new SecretManagerStub(secrets)
     return new BinanceExchangeProvider(secretManager, createMockLogger())
   }
+  const createBrlProvider = (secrets: Partial<Record<Secret, string>> = defaultSecrets) => {
+    const secretManager = new SecretManagerStub(secrets)
+    return new BinanceBrlExchangeProvider(secretManager, createMockLogger())
+  }
 
   describe('getExchangeAddress', () => {
     it('returns deposit address and memo for supported blockchains', async () => {
@@ -78,6 +83,36 @@ describe('BinanceExchangeProvider', () => {
       expect(result).toEqual({ address: 'addr-1', memo: 'memo-1', success: true })
     })
 
+    it('uses the configured Celo network override', async () => {
+      depositAddressMock.mockResolvedValue({
+        data: () => Promise.resolve({ address: 'addr-celo', tag: 'memo-celo' }),
+      })
+
+      const provider = createProvider({ ...defaultSecrets, BINANCE_CELO_NETWORK: 'CELO-MAINNET' })
+      const result = await provider.getExchangeAddress({
+        blockchain: BlockchainNetwork.CELO,
+        cryptoCurrency: CryptoCurrency.USDC,
+      })
+
+      expect(depositAddressMock).toHaveBeenCalledWith({ coin: CryptoCurrency.USDC, network: 'CELO-MAINNET' })
+      expect(result).toEqual({ address: 'addr-celo', memo: 'memo-celo', success: true })
+    })
+
+    it('defaults to the CELO network when no override is provided', async () => {
+      depositAddressMock.mockResolvedValue({
+        data: () => Promise.resolve({ address: 'addr-celo', tag: 'memo-celo' }),
+      })
+
+      const provider = createProvider()
+      const result = await provider.getExchangeAddress({
+        blockchain: BlockchainNetwork.CELO,
+        cryptoCurrency: CryptoCurrency.USDC,
+      })
+
+      expect(depositAddressMock).toHaveBeenCalledWith({ coin: CryptoCurrency.USDC, network: 'CELO' })
+      expect(result).toEqual({ address: 'addr-celo', memo: 'memo-celo', success: true })
+    })
+
     it('returns failure when Binance does not return an address', async () => {
       depositAddressMock.mockResolvedValue({
         data: () => Promise.resolve({}),
@@ -92,17 +127,57 @@ describe('BinanceExchangeProvider', () => {
       expect(result.success).toBe(false)
     })
 
-    it('throws for unsupported blockchain networks', async () => {
+    it('returns failure for unsupported blockchain networks', async () => {
       depositAddressMock.mockResolvedValue({
         data: () => Promise.resolve({ address: 'unused' }),
       })
 
       const provider = createProvider()
 
-      await expect(provider.getExchangeAddress({
+      const result = await provider.getExchangeAddress({
         blockchain: 'UNKNOWN' as unknown as BlockchainNetwork,
         cryptoCurrency: CryptoCurrency.USDC,
-      })).rejects.toThrow('Unsupported blockchain: UNKNOWN')
+      })
+      expect(result).toEqual({
+        code: 'retriable',
+        reason: 'Unsupported blockchain: UNKNOWN',
+        success: false,
+      })
+    })
+
+    it('returns permanent failure on 4xx Binance responses', async () => {
+      const error = Object.assign(new Error('bad request'), { response: { status: 400 } })
+      depositAddressMock.mockRejectedValue(error)
+
+      const provider = createProvider()
+
+      const result = await provider.getExchangeAddress({
+        blockchain: BlockchainNetwork.SOLANA,
+        cryptoCurrency: CryptoCurrency.USDC,
+      })
+
+      expect(result).toEqual({
+        code: 'permanent',
+        reason: 'bad request',
+        success: false,
+      })
+    })
+
+    it('returns retriable failure for non-error throws', async () => {
+      depositAddressMock.mockRejectedValue('boom')
+
+      const provider = createProvider()
+
+      const result = await provider.getExchangeAddress({
+        blockchain: BlockchainNetwork.SOLANA,
+        cryptoCurrency: CryptoCurrency.USDC,
+      })
+
+      expect(result).toEqual({
+        code: 'retriable',
+        reason: 'boom',
+        success: false,
+      })
     })
   })
 
@@ -130,7 +205,7 @@ describe('BinanceExchangeProvider', () => {
       )
     })
 
-    it('throws when the symbol is not supported', async () => {
+    it('throws when the symbol is not supported by the COP provider', async () => {
       const provider = createProvider()
 
       await expect(provider.getExchangeRate({
@@ -139,6 +214,29 @@ describe('BinanceExchangeProvider', () => {
         targetCurrency: TargetCurrency.BRL,
       })).rejects.toThrow('Unsupported symbol: USDCBRL')
       expect(mockedAxios.get).not.toHaveBeenCalled()
+    })
+
+    it('supports BRL rates via the BRL provider', async () => {
+      mockedAxios.get
+        .mockResolvedValueOnce({ data: { askPrice: '1.5', askQty: '1', bidPrice: '1.4', bidQty: '1', symbol: 'USDCUSDT' } })
+        .mockResolvedValueOnce({ data: { askPrice: '5.0', askQty: '1', bidPrice: '4.9', bidQty: '1', symbol: 'USDTBRL' } })
+
+      const provider = createBrlProvider()
+      const rate = await provider.getExchangeRate({
+        sourceAmount: 100,
+        sourceCurrency: CryptoCurrency.USDC,
+        targetCurrency: TargetCurrency.BRL,
+      })
+
+      expect(rate).toBeCloseTo(0.3)
+      expect(mockedAxios.get).toHaveBeenNthCalledWith(
+        1,
+        'https://binance.test/api/v3/ticker/bookTicker?symbol=USDCUSDT',
+      )
+      expect(mockedAxios.get).toHaveBeenNthCalledWith(
+        2,
+        'https://binance.test/api/v3/ticker/bookTicker?symbol=USDTBRL',
+      )
     })
 
     it('throws when Binance returns invalid pricing data', async () => {
@@ -154,5 +252,19 @@ describe('BinanceExchangeProvider', () => {
         targetCurrency: TargetCurrency.COP,
       })).rejects.toThrow('Invalid price data received from Binance')
     })
+  })
+
+  it('creates Binance signatures for authenticated requests', () => {
+    const provider = createProvider()
+    const internal = provider as unknown as { generateSignature: (queryString: string, apiSecret: string) => string }
+    const queryString = 'timestamp=1'
+    const apiSecret = 'top-secret'
+
+    const expected = crypto
+      .createHmac('sha256', apiSecret)
+      .update(queryString)
+      .digest('hex')
+
+    expect(internal.generateSignature(queryString, apiSecret)).toBe(expected)
   })
 })

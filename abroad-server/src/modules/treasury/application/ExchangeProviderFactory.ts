@@ -11,8 +11,9 @@ export class ExchangeProviderFactory implements IExchangeProviderFactory {
   public constructor(
     @inject(TYPES.IExchangeProvider) @named('transfero') transferoExchangeProvider: IExchangeProvider,
     @inject(TYPES.IExchangeProvider) @named('binance') binanceExchangeProvider: IExchangeProvider,
+    @inject(TYPES.IExchangeProvider) @named('binance-brl') binanceBrlExchangeProvider: IExchangeProvider,
   ) {
-    this.providers = [transferoExchangeProvider, binanceExchangeProvider]
+    this.providers = [transferoExchangeProvider, binanceExchangeProvider, binanceBrlExchangeProvider]
   }
 
   getExchangeProvider(currency: TargetCurrency): IExchangeProvider {

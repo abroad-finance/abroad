@@ -101,22 +101,23 @@ describe('PaymentServiceFactory', () => {
 describe('ExchangeProviderFactory', () => {
   const transferoProvider = buildExchangeProvider('transfero', TargetCurrency.BRL)
   const binanceProvider = buildExchangeProvider('binance', TargetCurrency.COP)
+  const binanceBrlProvider = buildExchangeProvider('binance-brl', TargetCurrency.BRL, BlockchainNetwork.CELO)
 
   it('returns providers based on target currency', () => {
-    const factory = new ExchangeProviderFactory(transferoProvider, binanceProvider)
+    const factory = new ExchangeProviderFactory(transferoProvider, binanceProvider, binanceBrlProvider)
 
     expect(factory.getExchangeProvider(TargetCurrency.BRL)).toBe(transferoProvider)
     expect(factory.getExchangeProvider(TargetCurrency.COP)).toBe(binanceProvider)
   })
 
   it('throws when no provider is configured for a currency', () => {
-    const factory = new ExchangeProviderFactory(transferoProvider, binanceProvider)
+    const factory = new ExchangeProviderFactory(transferoProvider, binanceProvider, binanceBrlProvider)
 
     expect(() => factory.getExchangeProvider('USD' as TargetCurrency)).toThrow('No exchange provider found for currency: USD')
   })
 
   it('falls back to a blockchain-agnostic provider when no explicit chain match exists', () => {
-    const factory = new ExchangeProviderFactory(transferoProvider, binanceProvider)
+    const factory = new ExchangeProviderFactory(transferoProvider, binanceProvider, binanceBrlProvider)
 
     const provider = factory.getExchangeProviderForCapability({
       blockchain: BlockchainNetwork.STELLAR,
@@ -129,7 +130,7 @@ describe('ExchangeProviderFactory', () => {
   it('prefers providers that explicitly support the requested blockchain', () => {
     const copOnStellarProvider = buildExchangeProvider('cop-stellar', TargetCurrency.COP, BlockchainNetwork.STELLAR)
     const copAgnosticProvider = buildExchangeProvider('cop-agnostic', TargetCurrency.COP)
-    const factory = new ExchangeProviderFactory(copOnStellarProvider, copAgnosticProvider)
+    const factory = new ExchangeProviderFactory(copOnStellarProvider, copAgnosticProvider, binanceBrlProvider)
 
     const provider = factory.getExchangeProviderForCapability({
       blockchain: BlockchainNetwork.STELLAR,

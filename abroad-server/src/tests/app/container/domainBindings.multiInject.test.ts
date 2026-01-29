@@ -9,6 +9,7 @@ import { DepositVerifierRegistry } from '../../../modules/payments/application/D
 import { PayoutStatusAdapterRegistry } from '../../../modules/payments/application/PayoutStatusAdapterRegistry'
 import { BrebPayoutStatusAdapter } from '../../../modules/payments/infrastructure/BrebPayoutStatusAdapter'
 import { TransferoPayoutStatusAdapter } from '../../../modules/payments/infrastructure/TransferoPayoutStatusAdapter'
+import { CeloPaymentVerifier } from '../../../modules/payments/infrastructure/wallets/CeloPaymentVerifier'
 import { SolanaPaymentVerifier } from '../../../modules/payments/infrastructure/wallets/SolanaPaymentVerifier'
 import { StellarDepositVerifier } from '../../../modules/payments/infrastructure/wallets/StellarDepositVerifier'
 import { IDatabaseClientProvider } from '../../../platform/persistence/IDatabaseClientProvider'
@@ -62,6 +63,7 @@ describe('domainBindings', () => {
   it('wires deposit verifiers for the registry', () => {
     const registry = container.get<DepositVerifierRegistry>(TYPES.IDepositVerifierRegistry)
 
+    expect(registry.getVerifier(BlockchainNetwork.CELO)).toBeInstanceOf(CeloPaymentVerifier)
     expect(registry.getVerifier(BlockchainNetwork.SOLANA)).toBeInstanceOf(SolanaPaymentVerifier)
     expect(registry.getVerifier(BlockchainNetwork.STELLAR)).toBeInstanceOf(StellarDepositVerifier)
   })

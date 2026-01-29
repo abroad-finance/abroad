@@ -72,7 +72,7 @@ describe('TransferoExchangeProvider', () => {
         blockchain: 'UNSUPPORTED' as BlockchainNetwork,
         cryptoCurrency: CryptoCurrency.USDC,
       })
-      expect(result).toEqual({ code: 'validation', reason: 'Unsupported blockchain: SOLANA', success: false })
+      expect(result).toEqual({ code: 'validation', reason: 'Unsupported blockchain: UNSUPPORTED', success: false })
     })
   })
 

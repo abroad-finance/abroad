@@ -26,21 +26,31 @@ type BinanceBookTickerResponse = {
   symbol: string
 }
 
-const SUPPORTED_SYMBOLS = [
-  'USDCCOP',
-]
+type BinanceProviderOptions = {
+  capability: ExchangeProviderCapability
+  loggerScope: string
+  supportedSymbols: string[]
+}
 
 @injectable()
 export class BinanceExchangeProvider implements IExchangeProvider {
-  public readonly capability: ExchangeProviderCapability = { blockchain: undefined, targetCurrency: TargetCurrency.COP }
+  public readonly capability: ExchangeProviderCapability
   public readonly exchangePercentageFee = 0.0085
   private readonly logger: ScopedLogger
+  private readonly supportedSymbols: Set<string>
 
   constructor(
     @inject(TYPES.ISecretManager) private secretManager: ISecretManager,
     @inject(TYPES.ILogger) baseLogger: ILogger,
+    options: BinanceProviderOptions = {
+      capability: { blockchain: undefined, targetCurrency: TargetCurrency.COP },
+      loggerScope: 'BinanceExchangeProvider',
+      supportedSymbols: ['USDCCOP'],
+    },
   ) {
-    this.logger = createScopedLogger(baseLogger, { scope: 'BinanceExchangeProvider' })
+    this.capability = options.capability
+    this.supportedSymbols = new Set(options.supportedSymbols)
+    this.logger = createScopedLogger(baseLogger, { scope: options.loggerScope })
   }
 
   createMarketOrder: IExchangeProvider['createMarketOrder'] = async (): Promise<ExchangeOperationResult> => ({
@@ -57,17 +67,20 @@ export class BinanceExchangeProvider implements IExchangeProvider {
   getExchangeAddress: IExchangeProvider['getExchangeAddress'] = async (
     { blockchain, cryptoCurrency },
   ): Promise<ExchangeAddressResult> => {
-    const network = this.mapBlockchainToNetwork(blockchain)
     try {
       const {
         BINANCE_API_KEY,
         BINANCE_API_SECRET,
         BINANCE_API_URL,
+        BINANCE_CELO_NETWORK,
       } = await this.secretManager.getSecrets([
         'BINANCE_API_KEY',
         'BINANCE_API_SECRET',
         'BINANCE_API_URL',
+        'BINANCE_CELO_NETWORK',
       ])
+
+      const network = this.mapBlockchainToNetwork(blockchain, BINANCE_CELO_NETWORK)
 
       const coin = cryptoCurrency
 
@@ -118,7 +131,7 @@ export class BinanceExchangeProvider implements IExchangeProvider {
       // Construct the trading pair symbol
       const symbol = `${sourceCurrency}${targetCurrency}`
 
-      if (!SUPPORTED_SYMBOLS.includes(symbol)) {
+      if (!this.supportedSymbols.has(symbol)) {
         throw new Error(`Unsupported symbol: ${symbol}`)
       }
 
@@ -190,8 +203,10 @@ export class BinanceExchangeProvider implements IExchangeProvider {
    * @param blockchain The blockchain network from our system
    * @returns The corresponding Binance network name
    */
-  private mapBlockchainToNetwork(blockchain: BlockchainNetwork): string {
+  private mapBlockchainToNetwork(blockchain: BlockchainNetwork, celoOverride?: string): string {
     switch (blockchain) {
+      case BlockchainNetwork.CELO:
+        return celoOverride?.trim() || 'CELO'
       case BlockchainNetwork.SOLANA:
         return 'SOL'
       case BlockchainNetwork.STELLAR:
@@ -199,5 +214,19 @@ export class BinanceExchangeProvider implements IExchangeProvider {
       default:
         throw new Error(`Unsupported blockchain: ${blockchain}`)
     }
+  }
+}
+
+@injectable()
+export class BinanceBrlExchangeProvider extends BinanceExchangeProvider {
+  constructor(
+    @inject(TYPES.ISecretManager) secretManager: ISecretManager,
+    @inject(TYPES.ILogger) baseLogger: ILogger,
+  ) {
+    super(secretManager, baseLogger, {
+      capability: { blockchain: BlockchainNetwork.CELO, targetCurrency: TargetCurrency.BRL },
+      loggerScope: 'BinanceExchangeProviderBRL',
+      supportedSymbols: ['USDCBRL'],
+    })
   }
 }

@@ -87,6 +87,8 @@ export class TransferoExchangeProvider implements IExchangeProvider {
   }): Promise<ExchangeAddressResult> => {
     const secretName = (() => {
       switch (blockchain) {
+        case BlockchainNetwork.CELO:
+          return undefined
         case BlockchainNetwork.SOLANA:
           return 'TRANSFERO_SOLANA_WALLET'
         case BlockchainNetwork.STELLAR:

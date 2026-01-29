@@ -217,6 +217,7 @@ enum SupportedCurrency {
 enum BlockchainNetwork {
   STELLAR
   SOLANA
+  CELO
 }
 
 enum Country {

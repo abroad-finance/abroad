@@ -3,6 +3,8 @@ const typeKeys = [
   'AppConfig',
   'DeadLetterController',
   'BinanceBalanceUpdatedController',
+  'CeloPaymentVerifier',
+  'CeloWalletHandler',
   'IDatabaseClientProvider',
   'IDepositVerifier',
   'IDepositVerifierRegistry',

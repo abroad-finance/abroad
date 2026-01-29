@@ -3,6 +3,7 @@ import { Container } from 'inversify'
 import { WalletAuthController } from '../../modules/auth/interfaces/http/WalletAuthController'
 import { PartnerController } from '../../modules/partners/interfaces/http/PartnerController'
 import { PartnerUserController } from '../../modules/partners/interfaces/http/PartnerUserController'
+import { CeloPaymentsController } from '../../modules/payments/interfaces/http/CeloPaymentsController'
 import { PaymentsController } from '../../modules/payments/interfaces/http/PaymentsController'
 import { QrDecoderController } from '../../modules/payments/interfaces/http/QrDecoderController'
 import { SolanaPaymentsController } from '../../modules/payments/interfaces/http/SolanaPaymentsController'
@@ -27,6 +28,7 @@ const controllerBindings: ReadonlyArray<BindingRegistration<unknown>> = [
   { bindSelf: true, identifier: QrDecoderController, implementation: QrDecoderController },
   { bindSelf: true, identifier: WalletAuthController, implementation: WalletAuthController },
   { bindSelf: true, identifier: SolanaPaymentsController, implementation: SolanaPaymentsController },
+  { bindSelf: true, identifier: CeloPaymentsController, implementation: CeloPaymentsController },
 ] as const
 
 export function bindHttpControllers(container: Container): void {

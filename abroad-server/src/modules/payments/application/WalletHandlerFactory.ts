@@ -9,6 +9,7 @@ import { IWalletHandlerFactory } from './contracts/IWalletHandlerFactory'
 @injectable()
 export class WalletHandlerFactory implements IWalletHandlerFactory {
   constructor(
+    @inject(TYPES.CeloWalletHandler) private celoWalletHandler: IWalletHandler,
     @inject(TYPES.SolanaWalletHandler) private solanaWalletHandler: IWalletHandler,
     @inject(TYPES.StellarWalletHandler) private stellarWalletHandler: IWalletHandler,
   ) {}
@@ -25,6 +26,8 @@ export class WalletHandlerFactory implements IWalletHandlerFactory {
   getWalletHandlerForCapability(params: { blockchain: BlockchainNetwork }): IWalletHandler {
     const { blockchain } = params
     switch (blockchain) {
+      case BlockchainNetwork.CELO:
+        return this.celoWalletHandler
       case BlockchainNetwork.SOLANA:
         return this.solanaWalletHandler
       case BlockchainNetwork.STELLAR:
