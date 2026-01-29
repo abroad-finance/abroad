@@ -89,7 +89,6 @@ export class CeloPaymentVerifier implements IDepositVerifier {
 
   private async buildReceiptContext(): Promise<CeloReceiptContext> {
     const {
-      CELO_CHAIN_ID: chainIdRaw,
       CELO_DEPOSIT_ADDRESS: depositAddressRaw,
       CELO_RPC_URL: rpcUrl,
       CELO_USDC_ADDRESS: usdcAddressRaw,
@@ -97,7 +96,6 @@ export class CeloPaymentVerifier implements IDepositVerifier {
       Secrets.CELO_RPC_URL,
       Secrets.CELO_DEPOSIT_ADDRESS,
       Secrets.CELO_USDC_ADDRESS,
-      Secrets.CELO_CHAIN_ID,
     ])
 
     const depositAddress = safeNormalizeAddress(depositAddressRaw)
@@ -111,8 +109,7 @@ export class CeloPaymentVerifier implements IDepositVerifier {
       throw new Error('Invalid Celo configuration')
     }
 
-    const chainId = this.parseChainId(chainIdRaw)
-    const provider = this.getOrCreateProvider(rpcUrl, chainId)
+    const provider = this.getOrCreateProvider(rpcUrl)
 
     return {
       depositAddress,
@@ -170,27 +167,15 @@ export class CeloPaymentVerifier implements IDepositVerifier {
     return { addressFrom, amount, success: true }
   }
 
-  private getOrCreateProvider(
-    rpcUrl: string,
-    chainId?: number,
-  ): ethers.providers.JsonRpcProvider {
+  private getOrCreateProvider(rpcUrl: string): ethers.providers.JsonRpcProvider {
     if (this.cachedProvider && this.cachedProvider.rpcUrl === rpcUrl) {
       return this.cachedProvider.provider
     }
 
-    const provider = chainId
-      ? new ethers.providers.JsonRpcProvider(rpcUrl, chainId)
-      : new ethers.providers.JsonRpcProvider(rpcUrl)
+    const provider = new ethers.providers.JsonRpcProvider(rpcUrl)
 
     this.cachedProvider = { provider, rpcUrl }
     return provider
-  }
-
-  private parseChainId(raw: string | undefined): number | undefined {
-    if (!raw) return undefined
-    const parsed = Number(raw)
-    if (!Number.isFinite(parsed) || parsed <= 0) return undefined
-    return parsed
   }
 
   private validateTransaction(transaction: {

@@ -102,7 +102,6 @@ export class CeloWalletHandler implements IWalletHandler {
 
   private async buildContext(): Promise<CeloWalletContext> {
     const {
-      CELO_CHAIN_ID: chainIdRaw,
       CELO_DEPOSIT_ADDRESS: depositAddressRaw,
       CELO_PRIVATE_KEY: privateKey,
       CELO_RPC_URL: rpcUrl,
@@ -112,7 +111,6 @@ export class CeloWalletHandler implements IWalletHandler {
       Secrets.CELO_PRIVATE_KEY,
       Secrets.CELO_DEPOSIT_ADDRESS,
       Secrets.CELO_USDC_ADDRESS,
-      Secrets.CELO_CHAIN_ID,
     ])
 
     const depositAddress = safeNormalizeAddress(depositAddressRaw)
@@ -121,8 +119,7 @@ export class CeloWalletHandler implements IWalletHandler {
       throw new Error('Invalid Celo address configuration')
     }
 
-    const chainId = this.parseChainId(chainIdRaw)
-    const provider = this.getOrCreateProvider(rpcUrl, chainId)
+    const provider = this.getOrCreateProvider(rpcUrl)
     const signer = new ethers.Wallet(privateKey, provider)
 
     return {
@@ -143,27 +140,15 @@ export class CeloWalletHandler implements IWalletHandler {
     return 'Unknown error'
   }
 
-  private getOrCreateProvider(
-    rpcUrl: string,
-    chainId?: number,
-  ): ethers.providers.JsonRpcProvider {
+  private getOrCreateProvider(rpcUrl: string): ethers.providers.JsonRpcProvider {
     if (this.cachedProvider && this.cachedProvider.rpcUrl === rpcUrl) {
       return this.cachedProvider.provider
     }
 
-    const provider = chainId
-      ? new ethers.providers.JsonRpcProvider(rpcUrl, chainId)
-      : new ethers.providers.JsonRpcProvider(rpcUrl)
+    const provider = new ethers.providers.JsonRpcProvider(rpcUrl)
 
     this.cachedProvider = { provider, rpcUrl }
     return provider
-  }
-
-  private parseChainId(raw: string | undefined): number | undefined {
-    if (!raw) return undefined
-    const parsed = Number(raw)
-    if (!Number.isFinite(parsed) || parsed <= 0) return undefined
-    return parsed
   }
 
   private toBaseUnits(amount: number, decimals: number): BigNumber {

@@ -72,15 +72,13 @@ export class BinanceExchangeProvider implements IExchangeProvider {
         BINANCE_API_KEY,
         BINANCE_API_SECRET,
         BINANCE_API_URL,
-        BINANCE_CELO_NETWORK,
       } = await this.secretManager.getSecrets([
         'BINANCE_API_KEY',
         'BINANCE_API_SECRET',
         'BINANCE_API_URL',
-        'BINANCE_CELO_NETWORK',
       ])
 
-      const network = this.mapBlockchainToNetwork(blockchain, BINANCE_CELO_NETWORK)
+      const network = this.mapBlockchainToNetwork(blockchain)
 
       const coin = cryptoCurrency
 
@@ -203,10 +201,10 @@ export class BinanceExchangeProvider implements IExchangeProvider {
    * @param blockchain The blockchain network from our system
    * @returns The corresponding Binance network name
    */
-  private mapBlockchainToNetwork(blockchain: BlockchainNetwork, celoOverride?: string): string {
+  private mapBlockchainToNetwork(blockchain: BlockchainNetwork): string {
     switch (blockchain) {
       case BlockchainNetwork.CELO:
-        return celoOverride?.trim() || 'CELO'
+        return 'CELO'
       case BlockchainNetwork.SOLANA:
         return 'SOL'
       case BlockchainNetwork.STELLAR:

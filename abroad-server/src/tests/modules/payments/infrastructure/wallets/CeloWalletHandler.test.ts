@@ -61,7 +61,6 @@ describe('CeloWalletHandler', () => {
 
   const buildHandler = (overrides?: Partial<Record<Secret, string>>) => {
     const secretManager = new SecretManagerStub({
-      CELO_CHAIN_ID: '42220',
       CELO_DEPOSIT_ADDRESS: depositAddress,
       CELO_PRIVATE_KEY: privateKey,
       CELO_RPC_URL: rpcUrl,
@@ -324,16 +323,6 @@ describe('CeloWalletHandler', () => {
     expect(internal.toPlainDecimalString(1e-7)).toBe('0.0000001')
     expect(internal.toPlainDecimalString(-1e-7)).toBe('-0.0000001')
     expect(internal.toPlainDecimalString(1e21)).toBe('1000000000000000000000')
-  })
-
-  it('parses chain ids from configuration', () => {
-    const handler = buildHandler()
-    const internal = handler as unknown as { parseChainId: (raw: string | undefined) => number | undefined }
-
-    expect(internal.parseChainId('42220')).toBe(42220)
-    expect(internal.parseChainId('0')).toBeUndefined()
-    expect(internal.parseChainId('not-a-number')).toBeUndefined()
-    expect(internal.parseChainId(undefined)).toBeUndefined()
   })
 
   it('returns retriable errors for string throws', async () => {

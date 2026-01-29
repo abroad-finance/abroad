@@ -64,7 +64,6 @@ describe('CeloPaymentVerifier', () => {
     overrides?: Partial<Record<Secret, string>>,
   ) => {
     const secretManager = new SecretManagerStub({
-      CELO_CHAIN_ID: '42220',
       CELO_DEPOSIT_ADDRESS: depositAddress,
       CELO_RPC_URL: rpcUrl,
       CELO_USDC_ADDRESS: usdcAddress,
@@ -433,24 +432,5 @@ describe('CeloPaymentVerifier', () => {
       reason: 'Invalid USDC transfer amount',
       status: 400,
     })
-  })
-
-  it('parses chain id values', () => {
-    const prismaClient = {
-      transaction: {
-        findFirst: jest.fn(),
-        findUnique: jest.fn(),
-      },
-    }
-    const dbProvider: IDatabaseClientProvider = {
-      getClient: async () => prismaClient as unknown as import('@prisma/client').PrismaClient,
-    }
-    const verifier = buildVerifier(dbProvider)
-    const internal = verifier as unknown as { parseChainId: (raw: string | undefined) => number | undefined }
-
-    expect(internal.parseChainId('42220')).toBe(42220)
-    expect(internal.parseChainId('0')).toBeUndefined()
-    expect(internal.parseChainId('NaN')).toBeUndefined()
-    expect(internal.parseChainId(undefined)).toBeUndefined()
   })
 })

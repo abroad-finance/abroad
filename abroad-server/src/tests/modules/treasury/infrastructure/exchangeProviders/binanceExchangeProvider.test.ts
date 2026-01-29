@@ -83,21 +83,6 @@ describe('BinanceExchangeProvider', () => {
       expect(result).toEqual({ address: 'addr-1', memo: 'memo-1', success: true })
     })
 
-    it('uses the configured Celo network override', async () => {
-      depositAddressMock.mockResolvedValue({
-        data: () => Promise.resolve({ address: 'addr-celo', tag: 'memo-celo' }),
-      })
-
-      const provider = createProvider({ ...defaultSecrets, BINANCE_CELO_NETWORK: 'CELO-MAINNET' })
-      const result = await provider.getExchangeAddress({
-        blockchain: BlockchainNetwork.CELO,
-        cryptoCurrency: CryptoCurrency.USDC,
-      })
-
-      expect(depositAddressMock).toHaveBeenCalledWith({ coin: CryptoCurrency.USDC, network: 'CELO-MAINNET' })
-      expect(result).toEqual({ address: 'addr-celo', memo: 'memo-celo', success: true })
-    })
-
     it('defaults to the CELO network when no override is provided', async () => {
       depositAddressMock.mockResolvedValue({
         data: () => Promise.resolve({ address: 'addr-celo', tag: 'memo-celo' }),
