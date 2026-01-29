@@ -1,5 +1,6 @@
 import {
-  Country,
+  KycStatus,
+  KYCTier,
   PaymentMethod,
   Prisma,
   TargetCurrency,
@@ -17,6 +18,7 @@ import { OutboxDispatcher } from '../../../platform/outbox/OutboxDispatcher'
 import { IDatabaseClientProvider } from '../../../platform/persistence/IDatabaseClientProvider'
 import { IKycService } from '../../kyc/application/contracts/IKycService'
 import { IPaymentServiceFactory } from '../../payments/application/contracts/IPaymentServiceFactory'
+import { getNextTier, type KycCountry } from '../../kyc/application/kycTierRules'
 import { uuidToBase64 } from '../infrastructure/transactionEncoding'
 import { toWebhookTransactionPayload } from './transactionPayload'
 
@@ -114,7 +116,13 @@ export class TransactionAcceptanceService {
 
         const monthlyAmount = await this.calculateMonthlyAmount(tx, partnerUser.id, quote.paymentMethod)
         const totalUserAmountMonthly = monthlyAmount + quote.sourceAmount
-        const shouldRequestKyc = this.shouldRequestKyc(partner, totalUserAmountMonthly)
+        const shouldRequestKyc = await this.shouldRequestKyc(
+          tx,
+          partner,
+          partnerUser.id,
+          totalUserAmountMonthly,
+          quote.country,
+        )
         if (shouldRequestKyc) {
           return {
             outcome: 'kyc',
@@ -179,7 +187,6 @@ export class TransactionAcceptanceService {
 
     if (decision.outcome === 'kyc') {
       const kycLink = await this.resolveKycLinkAfterDecision(
-        partner,
         decision.totalUserAmountMonthly,
         decision.quote.country,
         request.redirectUrl,
@@ -415,12 +422,24 @@ export class TransactionAcceptanceService {
     return Math.min(parsed, 62)
   }
 
-  private normalizeCountry(country: string): Country {
+  private normalizeCountry(country: string): KycCountry {
     const upper = country.toUpperCase()
-    if (upper === Country.CO) {
-      return Country.CO
+    if (upper === 'CO') {
+      return 'CO'
     }
     throw new TransactionValidationError(`KYC verification is not available for ${country}. Please provide a supported country or contact support.`)
+  }
+
+  private async fetchApprovedKycTier(
+    prismaClient: SerializableTx,
+    partnerUserId: string,
+  ): Promise<KYCTier> {
+    const approvedKyc = await prismaClient.partnerUserKyc.findFirst({
+      orderBy: { createdAt: 'desc' },
+      where: { partnerUserId, status: KycStatus.APPROVED },
+    })
+
+    return approvedKyc?.tier ?? KYCTier.NONE
   }
 
   private async publishUserNotification(
@@ -549,27 +568,45 @@ export class TransactionAcceptanceService {
   }
 
   private async resolveKycLinkAfterDecision(
-    partner: PartnerUserContext,
     totalUserAmountMonthly: number,
     country: string,
     redirectUrl: string | undefined,
     partnerUserId: string,
-  ): Promise<null | string> {
-    if (!this.shouldRequestKyc(partner, totalUserAmountMonthly)) {
-      return null
-    }
-
+  ): Promise<string> {
     const normalizedCountry = this.normalizeCountry(country)
-    return this.kycService.getKycLink({
+    const kycLink = await this.kycService.getKycLink({
       amount: totalUserAmountMonthly,
       country: normalizedCountry,
       redirectUrl,
       userId: partnerUserId,
     })
+
+    if (!kycLink) {
+      throw new TransactionValidationError('We could not start the verification process right now. Please try again in a few moments.')
+    }
+
+    return kycLink
   }
 
-  private shouldRequestKyc(partner: PartnerUserContext, totalUserAmountMonthly: number): boolean {
-    return partner.needsKyc && !isKycExemptByAmount(totalUserAmountMonthly)
+  private async shouldRequestKyc(
+    prismaClient: SerializableTx,
+    partner: PartnerUserContext,
+    partnerUserId: string,
+    totalUserAmountMonthly: number,
+    country: string,
+  ): Promise<boolean> {
+    if (!partner.needsKyc) {
+      return false
+    }
+
+    if (isKycExemptByAmount(totalUserAmountMonthly)) {
+      return false
+    }
+
+    const normalizedCountry = this.normalizeCountry(country)
+    const approvedTier = await this.fetchApprovedKycTier(prismaClient, partnerUserId)
+    const nextTier = getNextTier(normalizedCountry, totalUserAmountMonthly, approvedTier)
+    return nextTier !== null
   }
 
   private startOfDay(): Date {

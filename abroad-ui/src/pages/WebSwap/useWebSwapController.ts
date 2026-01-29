@@ -693,6 +693,12 @@ export const useWebSwapController = (): WebSwapControllerProps => {
         return
       }
 
+      if (!acceptedTxId) {
+        notifyError(t('swap.accept_error', 'No pudimos iniciar la transacción.'))
+        resetForNewTransaction()
+        return
+      }
+
       localStorage.removeItem(PENDING_TX_KEY)
 
       if (kit.walletId === 'sep24') {

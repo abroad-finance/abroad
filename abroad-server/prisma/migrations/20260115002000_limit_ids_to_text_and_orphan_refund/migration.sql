@@ -46,8 +46,8 @@ ALTER COLUMN "id" DROP DEFAULT,
 ALTER COLUMN "id" SET DATA TYPE TEXT,
 ADD CONSTRAINT "PartnerUserMonthlyLimit_pkey" PRIMARY KEY ("id");
 
--- CreateTable
-CREATE TABLE "public"."StellarOrphanRefund" (
+-- CreateTable (idempotent for environments where the table already exists)
+CREATE TABLE IF NOT EXISTS "public"."StellarOrphanRefund" (
     "paymentId" TEXT NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
@@ -60,13 +60,13 @@ CREATE TABLE "public"."StellarOrphanRefund" (
 );
 
 -- RenameIndex
-ALTER INDEX "public"."partner_method_day_unique" RENAME TO "PartnerDailyLimit_partnerId_paymentMethod_day_key";
+ALTER INDEX IF EXISTS "public"."partner_method_day_unique" RENAME TO "PartnerDailyLimit_partnerId_paymentMethod_day_key";
 
 -- RenameIndex
-ALTER INDEX "public"."partner_method_month_unique" RENAME TO "PartnerMonthlyLimit_partnerId_paymentMethod_month_key";
+ALTER INDEX IF EXISTS "public"."partner_method_month_unique" RENAME TO "PartnerMonthlyLimit_partnerId_paymentMethod_month_key";
 
 -- RenameIndex
-ALTER INDEX "public"."partner_user_method_day_unique" RENAME TO "PartnerUserDailyLimit_partnerUserId_paymentMethod_day_key";
+ALTER INDEX IF EXISTS "public"."partner_user_method_day_unique" RENAME TO "PartnerUserDailyLimit_partnerUserId_paymentMethod_day_key";
 
 -- RenameIndex
-ALTER INDEX "public"."partner_user_method_month_unique" RENAME TO "PartnerUserMonthlyLimit_partnerUserId_paymentMethod_month_key";
+ALTER INDEX IF EXISTS "public"."partner_user_method_month_unique" RENAME TO "PartnerUserMonthlyLimit_partnerUserId_paymentMethod_month_key";

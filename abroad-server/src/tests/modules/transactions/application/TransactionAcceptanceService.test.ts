@@ -1,5 +1,5 @@
 import 'reflect-metadata'
-import { Country, PaymentMethod, TargetCurrency, TransactionStatus } from '@prisma/client'
+import { PaymentMethod, TargetCurrency, TransactionStatus } from '@prisma/client'
 
 import { TransactionAcceptanceService, TransactionValidationError } from '../../../../modules/transactions/application/TransactionAcceptanceService'
 import { createMockLogger } from '../../../setup/mockFactories'
@@ -53,7 +53,7 @@ describe('TransactionAcceptanceService helpers', () => {
 
   it('rejects unsupported KYC countries', () => {
     const normalizeCountry = (service as unknown as {
-      normalizeCountry: (country: string) => Country
+      normalizeCountry: (country: string) => string
     }).normalizeCountry
 
     expect(() => normalizeCountry('BR')).toThrow(TransactionValidationError)
@@ -61,10 +61,10 @@ describe('TransactionAcceptanceService helpers', () => {
 
   it('normalizes supported countries case-insensitively', () => {
     const normalizeCountry = (service as unknown as {
-      normalizeCountry: (country: string) => Country
+      normalizeCountry: (country: string) => string
     }).normalizeCountry
 
-    expect(normalizeCountry('co')).toBe(Country.CO)
+    expect(normalizeCountry('co')).toBe('CO')
   })
 
   it('enforces liquidity thresholds and invokes the provider', async () => {

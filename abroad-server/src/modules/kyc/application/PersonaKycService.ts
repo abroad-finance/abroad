@@ -2,13 +2,11 @@ import { KycStatus, KYCTier } from '@prisma/client'
 import axios from 'axios'
 import { inject, injectable } from 'inversify'
 
-import { isKycExemptByAmount } from '../../../app/config/kyc'
 import { TYPES } from '../../../app/container/types'
 import { IDatabaseClientProvider } from '../../../platform/persistence/IDatabaseClientProvider'
 import { ISecretManager } from '../../../platform/secrets/ISecretManager'
 import { IKycService } from './contracts/IKycService'
-
-type Country = 'BR' | 'CO'
+import { getNextTier, type KycCountry } from './kycTierRules'
 
 @injectable()
 export class PersonaKycService implements IKycService {
@@ -111,7 +109,7 @@ export class PersonaKycService implements IKycService {
     return inquiryId
   }
 
-  private getInquiryTemplateIds = async (): Promise<Record<Country, Record<KYCTier, null | string>>> => {
+  private getInquiryTemplateIds = async (): Promise<Record<KycCountry, Record<KYCTier, null | string>>> => {
     const PERSONA_BASIC_INQUIRY_TEMPLATE_ID = 'itmpl_cV1CxdaysSpkxZfNZs7V1spRM5B1'
     const PERSONA_ENHANCED_INQUIRY_TEMPLATE_ID = 'itmpl_XTXBkm9FEunS9kU7kMav3kh4mSwj'
     return {
@@ -131,49 +129,4 @@ export class PersonaKycService implements IKycService {
   }
 }
 
-/* ---------------------------------------------------------------------------
- * Smart workflow resolver
- * ------------------------------------------------------------------------- */
-/**
- * Decide whether the user needs to complete an additional Persona KYC tier.
- *
- * @param country        "BR" or "CO"
- * @param amount         Transaction amount (BRL for BR, USD for CO)
- * @param existingTier   Highest KYC tier the user has already passed
- *                       — persist this per‑user in your DB / session.
- * @returns `string | null`
- *          → `workflowDefinitionId` to launch if *more* KYC is needed
- *          → `null` if the existing data already satisfies this operation
- */
-export function getNextTier(
-  country: Country,
-  amount: number,
-  existingTier: KYCTier = KYCTier.NONE,
-): KYCTier | null {
-  if (amount < 0) throw new Error('Amount cannot be negative')
-
-  if (isKycExemptByAmount(amount)) return null
-
-  const requiredTier = tierRule[country](amount)
-  if (tierOrder[existingTier] >= tierOrder[requiredTier]) return null
-
-  return requiredTier
-}
-
-// Numerical mapping for KYC tier comparison
-const tierOrder: Record<KYCTier, number> = {
-  [KYCTier.BASIC]: 1,
-  [KYCTier.ENHANCED]: 3,
-  [KYCTier.NONE]: 0,
-  [KYCTier.STANDARD]: 2,
-}
-
-/* ---------------------------------------------------------------------------
- * Lookup tables
- *
- * Note: KYCTier enum has numerical ordering for proper comparison
- * ------------------------------------------------------------------------- */
-const tierRule: Record<Country, (amount: number) => KYCTier> = {
-  BR: amount => amount < 1800 ? KYCTier.BASIC : KYCTier.ENHANCED,
-  CO: amount => amount < 10000 ? KYCTier.BASIC : KYCTier.ENHANCED,
-}
+export { getNextTier }
