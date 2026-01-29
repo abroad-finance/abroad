@@ -7,8 +7,20 @@
   - The primary key for the `PartnerUserMonthlyLimit` table will be changed. If it partially fails, the table could be left without primary key constraint.
 
 */
--- CreateEnum
-CREATE TYPE "public"."OrphanRefundStatus" AS ENUM ('PENDING', 'FAILED', 'SUCCEEDED');
+-- CreateEnum (idempotent for environments where the type already exists)
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_type t
+        JOIN pg_namespace n ON n.oid = t.typnamespace
+        WHERE t.typname = 'OrphanRefundStatus'
+          AND n.nspname = 'public'
+    ) THEN
+        CREATE TYPE "public"."OrphanRefundStatus" AS ENUM ('PENDING', 'FAILED', 'SUCCEEDED');
+    END IF;
+END
+$$;
 
 -- AlterTable
 ALTER TABLE "public"."PartnerDailyLimit" DROP CONSTRAINT "PartnerDailyLimit_pkey",
