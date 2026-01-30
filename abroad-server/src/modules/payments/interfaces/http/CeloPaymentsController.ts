@@ -47,7 +47,7 @@ export class CeloPaymentsController extends Controller {
   @Response<400, { reason: string }>(400, 'Bad Request')
   @Response<404, { reason: string }>(404, 'Not Found')
   @SuccessResponse('202', 'Payment enqueued')
-  public async notifyPayment(
+  public async notifyCeloPayment(
     @Body() requestBody: CeloPaymentNotificationRequest,
     @Res() badRequestResponse: TsoaResponse<400, { reason: string }>,
     @Res() notFoundResponse: TsoaResponse<404, { reason: string }>,
