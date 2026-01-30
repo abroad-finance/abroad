@@ -80,11 +80,12 @@ function decodeEmvCoE(qrCode: string): PixDecodedData {
         break
       case '60': // Merchant City
         break
-      case '62': // Additional Data Field
+      case '62': { // Additional Data Field
         // Contains reference field which often has the Pix key
         const refId = parseAdditionalDataField(value)
         if (refId) result.key = refId
         break
+      }
     }
   }
 

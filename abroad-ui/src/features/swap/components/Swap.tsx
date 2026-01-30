@@ -1,13 +1,9 @@
 import { useTranslate } from '@tolgee/react'
 import {
   ArrowLeftRight,
-  ChevronDown,
   ChevronsDown,
-  CircleDollarSign,
-  Landmark,
   Loader,
   ScanLine,
-  Timer,
   Wallet,
 } from 'lucide-react'
 import React, { useCallback } from 'react'
@@ -15,6 +11,8 @@ import React, { useCallback } from 'react'
 import { _36EnumsTargetCurrency as TargetCurrency } from '../../../api'
 import { Button } from '../../../shared/components/Button'
 import { TokenBadge } from '../../../shared/components/TokenBadge'
+import { CurrencySelector } from './CurrencySelector'
+import { SwapInfo } from './SwapInfo'
 
 export interface SwapProps {
   continueDisabled: boolean
@@ -211,109 +209,22 @@ export default function Swap({
             </div>
 
             {/* currency selector */}
-            <div className="relative ml-2 shrink-0" ref={currencyMenuRef}>
-              <button
-                aria-expanded={currencyMenuOpen}
-                aria-haspopup="listbox"
-                className="focus:outline-none cursor-pointer relative z-[1001]"
-                onClick={toggleCurrencyMenu}
-                type="button"
-              >
-                <TokenBadge
-                  alt={`${targetCurrency} Flag`}
-                  iconSrc={
-                    targetCurrency === TargetCurrency.BRL
-                      ? 'https://hatscripts.github.io/circle-flags/flags/br.svg'
-                      : 'https://hatscripts.github.io/circle-flags/flags/co.svg'
-                  }
-                  suffix={
-                    <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${currencyMenuOpen ? 'rotate-180' : ''}`} />
-                  }
-                  symbol={targetCurrency}
-                />
-              </button>
-
-              {currencyMenuOpen && (
-                <div
-                  className="absolute right-0 top-[calc(100%+8px)] z-[10000] bg-white/95 backdrop-blur-2xl rounded-2xl shadow-2xl ring-1 ring-black/10 p-1 space-y-0.5 w-full min-w-full"
-                  role="listbox"
-                >
-                  <button
-                    aria-selected={targetCurrency === TargetCurrency.COP}
-                    className={`w-full text-left rounded-xl p-3 cursor-pointer transition-all active:scale-95 flex items-center gap-3 ${targetCurrency === TargetCurrency.COP ? 'bg-[#356E6A]/10 text-[#356E6A] font-bold' : 'hover:bg-black/5'
-                      }`}
-                    onClick={() => selectCurrency(TargetCurrency.COP)}
-                    role="option"
-                    type="button"
-                  >
-                    <TokenBadge
-                      alt="Colombia flag"
-                      iconSrc="https://hatscripts.github.io/circle-flags/flags/co.svg"
-                      symbol="COP"
-                      transparent
-                    />
-                  </button>
-
-                  <button
-                    aria-selected={targetCurrency === TargetCurrency.BRL}
-                    className={`w-full text-left rounded-xl p-3 cursor-pointer transition-all active:scale-95 flex items-center gap-3 ${targetCurrency === TargetCurrency.BRL ? 'bg-[#356E6A]/10 text-[#356E6A] font-bold' : 'hover:bg-black/5'
-                      }`}
-                    onClick={() => selectCurrency(TargetCurrency.BRL)}
-                    role="option"
-                    type="button"
-                  >
-                    <TokenBadge
-                      alt="Brazil flag"
-                      iconSrc="https://hatscripts.github.io/circle-flags/flags/br.svg"
-                      symbol="BRL"
-                      transparent
-                    />
-                  </button>
-                </div>
-              )}
-            </div>
+            <CurrencySelector
+              currencyMenuOpen={currencyMenuOpen}
+              currencyMenuRef={currencyMenuRef}
+              selectCurrency={selectCurrency}
+              targetCurrency={targetCurrency}
+              toggleCurrencyMenu={toggleCurrencyMenu}
+            />
           </div>
         </div>
 
         {/* Info */}
-        <div className="flex-1 flex items-center justify-center w-full">
-          <div className="w-full" id="tx-info">
-            <div className="flex flex-col space-y-2">
-              {(targetCurrency === TargetCurrency.COP || targetCurrency === TargetCurrency.BRL) && (
-                <div
-                  className={`flex items-center space-x-2 ${isBelowMinimum ? 'text-red-600 font-bold' : 'opacity-70'}`}
-                  id="min-amount"
-                >
-                  <CircleDollarSign className="w-5 h-5" />
-                  <span>
-                    {targetCurrency === TargetCurrency.COP
-                      ? t('swap.min_amount_cop', 'Mínimo: $5.000 COP')
-                      : t('swap.min_amount_brl', 'Mínimo: R$1,00')}
-                  </span>
-                </div>
-              )}
-              <div className="flex items-center space-x-2" id="transfer-fee">
-                <Landmark className="w-5 h-5" />
-                <span>
-                  {t('swap.transfer_cost', 'Costo de Transferencia:')}{' '}
-                  <b>{transferFeeDisplay}</b>
-                </span>
-              </div>
-              <div className="flex items-center space-x-2" id="time">
-                <Timer className="w-5 h-5" />
-                <span>
-                  <b>{t('swap.immediate', 'Inmediato')}</b>
-                  {targetCurrency === TargetCurrency.COP && (
-                    <span className="opacity-70"> ({t('swap.breb_keys', 'Llaves Bre-B')})</span>
-                  )}
-                  {targetCurrency === TargetCurrency.BRL && (
-                    <span className="opacity-70"> (Pix)</span>
-                  )}
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
+        <SwapInfo
+          isBelowMinimum={isBelowMinimum}
+          targetCurrency={targetCurrency}
+          transferFeeDisplay={transferFeeDisplay}
+        />
 
         {/* Primary button (connect or continue) */}
         <Button

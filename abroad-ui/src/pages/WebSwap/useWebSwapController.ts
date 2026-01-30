@@ -312,7 +312,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     }
     if (state.loadingSource || state.loadingTarget) return '-'
     const numericSource = Number.parseFloat(state.sourceAmount)
-    const cleanedTarget = state.targetAmount.replaceAll('.', '').replace(/,/g, '.')
+    const cleanedTarget = state.targetAmount.replaceAll('.', '').replaceAll(',', '.')
     const numericTarget = Number.parseFloat(cleanedTarget)
     if (numericSource > 0 && !Number.isNaN(numericTarget) && numericTarget >= 0) {
       return formatTargetNumber((numericTarget + transferFee) / numericSource, 2)
@@ -339,13 +339,13 @@ export const useWebSwapController = (): WebSwapControllerProps => {
 
   const isPrimaryDisabled = useCallback(() => {
     const numericSource = Number.parseFloat(String(state.sourceAmount))
-    const cleanedTarget = String(state.targetAmount).replaceAll('.', '').replace(/,/g, '.')
+    const cleanedTarget = String(state.targetAmount).replaceAll('.', '').replaceAll(',', '.')
     const numericTarget = Number.parseFloat(cleanedTarget)
     return !(numericSource > 0 && numericTarget > 0)
   }, [state.sourceAmount, state.targetAmount])
 
   const isBelowMinimum = useMemo(() => {
-    const cleanedTarget = String(state.targetAmount).replaceAll('.', '').replace(/,/g, '.')
+    const cleanedTarget = String(state.targetAmount).replaceAll('.', '').replaceAll(',', '.')
     const numericTarget = Number.parseFloat(cleanedTarget)
     if (numericTarget <= 0) return false
 
@@ -509,8 +509,8 @@ export const useWebSwapController = (): WebSwapControllerProps => {
 
     if (state.unitRate && manualCalculation) {
       // Manual calculation fallback to show estimated conversion even if below minimum
-      const unitRateValue = Number.parseFloat(state.unitRate.replaceAll('.', '').replace(/,/g, '.'))
-      const inputNum = Number.parseFloat(inputValue.replaceAll('.', '').replace(/,/g, '.'))
+      const unitRateValue = Number.parseFloat(state.unitRate.replaceAll('.', '').replaceAll(',', '.'))
+      const inputNum = Number.parseFloat(inputValue.replaceAll('.', '').replaceAll(',', '.'))
 
       if (unitRateValue > 0 && inputNum > 0) {
         const calculated = manualCalculation(inputNum, unitRateValue)
@@ -599,7 +599,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     const controller = new AbortController()
     reverseAbortRef.current = controller
     const reqId = ++reverseReqIdRef.current
-    const normalized = value.replaceAll('.', '').replace(/,/g, '.')
+    const normalized = value.replaceAll('.', '').replaceAll(',', '.')
     const num = Number.parseFloat(normalized)
     if (Number.isNaN(num)) {
       dispatch({
@@ -645,14 +645,14 @@ export const useWebSwapController = (): WebSwapControllerProps => {
   ])
 
   const onSourceChange = useCallback((val: string) => {
-    const sanitized = val.replace(/[^0-9.]/g, '')
+    const sanitized = val.replaceAll(/[^0-9.]/g, '')
     dispatch({ sourceAmount: sanitized, type: 'SET_AMOUNTS' })
     quoteFromSource(sanitized)
   }, [quoteFromSource])
 
   const onTargetChange = useCallback((val: string) => {
     // Standard decoration logic: integer dots, preserve comma if typing
-    const digits = val.replace(/[^0-9,]/g, '')
+    const digits = val.replaceAll(/[^0-9,]/g, '')
     const parts = digits.split(',')
     if (parts[0]) {
       // Format with thousands separator using helper function
@@ -905,6 +905,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
 
         // UX Improvement: Notify parent (Vesseo) via postMessage
         // This allows the container app to handle the success screen immediately
+        const targetOrigin = import.meta.env.VITE_VESSEO_ORIGIN || 'https://app.vesseo.com'
         window.parent.postMessage({
           type: 'transaction_completed',
           status: 'success',
@@ -913,7 +914,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
           amount_in: state.sourceAmount,
           amount_out: state.targetAmount,
           currency_out: state.targetCurrency,
-        }, '*')
+        }, targetOrigin)
 
         // Slight delay to ensure message is processed if the app relies on it
         // before the redirect potentially unloads the page
