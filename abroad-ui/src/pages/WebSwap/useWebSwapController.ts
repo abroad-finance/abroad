@@ -47,6 +47,7 @@ import { SwapView } from '../../features/swap/types'
 import { ASSET_URLS, PENDING_TX_KEY } from '../../shared/constants'
 import { useWalletAuth } from '../../shared/hooks/useWalletAuth'
 import { hasMessage } from '../../shared/utils'
+import { formatWithThousandsSeparator } from '../../shared/utils/numberFormatter'
 
 type AcceptTransactionApiResponse = ApiClientResponse<acceptTransactionResponse, AcceptTransaction400>
 
@@ -306,9 +307,9 @@ export const useWebSwapController = (): WebSwapControllerProps => {
       return state.unitRate
     }
     if (state.loadingSource || state.loadingTarget) return '-'
-    const numericSource = parseFloat(state.sourceAmount)
+    const numericSource = Number.parseFloat(state.sourceAmount)
     const cleanedTarget = state.targetAmount.replace(/\./g, '').replace(/,/g, '.')
-    const numericTarget = parseFloat(cleanedTarget)
+    const numericTarget = Number.parseFloat(cleanedTarget)
     if (numericSource > 0 && !Number.isNaN(numericTarget) && numericTarget >= 0) {
       return formatTargetNumber((numericTarget + transferFee) / numericSource, 2)
     }
@@ -333,15 +334,15 @@ export const useWebSwapController = (): WebSwapControllerProps => {
   const isWalletConnected = Boolean(kit?.address)
 
   const isPrimaryDisabled = useCallback(() => {
-    const numericSource = parseFloat(String(state.sourceAmount))
+    const numericSource = Number.parseFloat(String(state.sourceAmount))
     const cleanedTarget = String(state.targetAmount).replace(/\./g, '').replace(/,/g, '.')
-    const numericTarget = parseFloat(cleanedTarget)
+    const numericTarget = Number.parseFloat(cleanedTarget)
     return !(numericSource > 0 && numericTarget > 0)
   }, [state.sourceAmount, state.targetAmount])
 
   const isBelowMinimum = useMemo(() => {
     const cleanedTarget = String(state.targetAmount).replace(/\./g, '').replace(/,/g, '.')
-    const numericTarget = parseFloat(cleanedTarget)
+    const numericTarget = Number.parseFloat(cleanedTarget)
     if (numericTarget <= 0) return false
 
     if (state.targetCurrency === TargetCurrency.COP) return numericTarget < 5000
@@ -350,8 +351,8 @@ export const useWebSwapController = (): WebSwapControllerProps => {
   }, [state.targetAmount, state.targetCurrency])
 
   const hasInsufficientFunds = useMemo(() => {
-    const numericSource = parseFloat(state.sourceAmount || '0')
-    const numericBalance = parseFloat(state.usdcBalance || '0')
+    const numericSource = Number.parseFloat(state.sourceAmount || '0')
+    const numericBalance = Number.parseFloat(state.usdcBalance || '0')
     return isAuthenticated && state.usdcBalance !== '' && numericSource > numericBalance
   }, [isAuthenticated, state.sourceAmount, state.usdcBalance])
 
@@ -437,7 +438,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
         dispatch({ loadingBalance: false, type: 'SET_LOADING_BALANCE' })
       }
     }
-    void fetchBalance()
+    fetchBalance()
   }, [isWalletConnected, kit?.address])
 
   // Fetch unit rate (1 USDC) when targetCurrency changes
@@ -474,7 +475,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
         dispatch({ type: 'SET_UNIT_RATE', unitRate: formatted })
       }
     }
-    void fetchUnitRate()
+    fetchUnitRate()
   }, [state.targetCurrency, formatTargetNumber, targetPaymentMethod])
 
   const quoteFromSource = useCallback(async (value: string) => {
@@ -485,7 +486,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     directAbortRef.current = controller
     const reqId = ++directReqIdRef.current
 
-    const num = parseFloat(value)
+    const num = Number.parseFloat(value)
     if (Number.isNaN(num)) {
       dispatch({
         quoteId: '', sourceAmount: value, targetAmount: '', type: 'SET_AMOUNTS',
@@ -526,7 +527,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
           dispatch({ quoteId: '', targetAmount: '', type: 'SET_AMOUNTS' })
         } else if (state.unitRate) {
           // Manual calculation fallback to show estimated conversion even if below minimum
-          const unitRateValue = parseFloat(state.unitRate.replace(/\./g, '').replace(/,/g, '.'))
+          const unitRateValue = Number.parseFloat(state.unitRate.replace(/\./g, '').replace(/,/g, '.'))
           if (unitRateValue > 0) {
             const manualTarget = num * unitRateValue
             dispatch({
@@ -571,7 +572,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     reverseAbortRef.current = controller
     const reqId = ++reverseReqIdRef.current
     const normalized = value.replace(/\./g, '').replace(/,/g, '.')
-    const num = parseFloat(normalized)
+    const num = Number.parseFloat(normalized)
     if (Number.isNaN(num)) {
       dispatch({
         quoteId: '', sourceAmount: '', targetAmount: value, type: 'SET_AMOUNTS',
@@ -612,7 +613,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
           dispatch({ quoteId: '', sourceAmount: '', type: 'SET_AMOUNTS' })
         } else if (state.unitRate) {
           // Manual calculation fallback to show estimated conversion even if below minimum
-          const unitRateValue = parseFloat(state.unitRate.replace(/\./g, '').replace(/,/g, '.'))
+          const unitRateValue = Number.parseFloat(state.unitRate.replace(/\./g, '').replace(/,/g, '.'))
           if (unitRateValue > 0) {
             const manualSource = num / unitRateValue
             dispatch({
@@ -650,7 +651,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
   const onSourceChange = useCallback((val: string) => {
     const sanitized = val.replace(/[^0-9.]/g, '')
     dispatch({ sourceAmount: sanitized, type: 'SET_AMOUNTS' })
-    void quoteFromSource(sanitized)
+    quoteFromSource(sanitized)
   }, [quoteFromSource])
 
   const onTargetChange = useCallback((val: string) => {
@@ -658,17 +659,18 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     const digits = val.replace(/[^0-9,]/g, '')
     const parts = digits.split(',')
     if (parts[0]) {
-      parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.')
+      // Format with thousands separator using helper function
+      parts[0] = formatWithThousandsSeparator(parts[0])
     }
     const formatted = parts.join(',')
 
     dispatch({ targetAmount: formatted, type: 'SET_AMOUNTS' })
-    void quoteFromTarget(formatted)
+    quoteFromTarget(formatted)
   }, [quoteFromTarget])
 
   const openQr = useCallback(() => {
     if (!isAuthenticated) {
-      void kit?.connect()
+      kit?.connect()
       return
     }
     dispatch({ isQrOpen: true, type: 'SET_QR_OPEN' })
@@ -785,7 +787,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
       if (pixKey) dispatch({ pixKey, type: 'SET_BANK_DETAILS' })
       if (taxIdDecoded && !taxIdDecoded.includes('*')) dispatch({ taxId: taxIdDecoded, type: 'SET_BANK_DETAILS' })
 
-      if (typeof amount === 'string' && parseFloat(amount) > 0) {
+      if (typeof amount === 'string' && Number.parseFloat(amount) > 0) {
         dispatch({ targetAmount: amount, type: 'SET_AMOUNTS' })
         await quoteFromTarget(amount)
         dispatch({ type: 'SET_VIEW', view: 'confirm-qr' })
@@ -986,7 +988,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
       dispatch({ type: 'SET_VIEW', view: 'bankDetails' })
       return
     }
-    void handleTransactionFlow()
+    handleTransactionFlow()
   }, [
     handleTransactionFlow,
     notifyError,
@@ -1096,3 +1098,5 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     view: state.view,
   }
 }
+
+

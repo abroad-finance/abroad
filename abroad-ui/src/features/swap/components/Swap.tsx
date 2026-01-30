@@ -160,7 +160,7 @@ export default function Swap({
                 ? <Loader className="animate-spin w-3 h-3" />
                 : (
                   <span className={`text-[10px] md:text-xs ${hasInsufficientFunds ? 'text-red-600 font-semibold' : 'opacity-60'}`}>
-                    {usdcBalance ? `${t('swap.balance_label', 'Balance:')} $${parseFloat(usdcBalance).toFixed(2)} USDC` : t('swap.no_balance', 'Sin saldo')}
+                    {usdcBalance ? `${t('swap.balance_label', 'Balance:')} ${Number.parseFloat(usdcBalance).toFixed(2)} USDC` : t('swap.no_balance', 'Sin saldo')}
                   </span>
                 )}
             </div>
