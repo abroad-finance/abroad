@@ -109,11 +109,11 @@ function parseAdditionalDataField(data: string): string | undefined {
  * @returns true if valid format
  */
 export function isValidPixKey(key: string): boolean {
-  if (!key || key.length < 3) return false
+  if (!key || key.length < 3 || key.length > 256) return false
 
   // Check if it's an email
   if (key.includes('@') && key.includes('.')) {
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(key)
+    return /^[^\s@]{1,64}@[^\s@]{1,255}\.[^\s@]{1,63}$/.test(key)
   }
 
   // Check if it's a CPF (11 digits)
