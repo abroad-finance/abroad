@@ -113,7 +113,9 @@ export function isValidPixKey(key: string): boolean {
 
   // Check if it's an email
   if (key.includes('@') && key.includes('.')) {
-    return /^[^\s@]{1,64}@[^\s@]{1,255}\.[^\s@]{1,63}$/.test(key)
+    // ReDoS safe regex: Excludes dots from the domain segments to avoid greedy matching overlaps
+    // Structure: local@domain_part(.domain_part)+
+    return /^[^\s@]+@[^\s@\.]+(\.[^\s@\.]+)+$/.test(key)
   }
 
   // Check if it's a CPF (11 digits)
