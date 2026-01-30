@@ -56,25 +56,29 @@ type QuoteApiResponse = ApiClientResponse<getQuoteResponse, GetQuote400>
 type ReverseQuoteApiResponse = ApiClientResponse<getReverseQuoteResponse, GetReverseQuote400>
 type SwapAction
   = | { accountNumber?: string, pixKey?: string, recipientName?: string, taxId?: string, type: 'SET_BANK_DETAILS' }
-    | { isDecodingQr: boolean, type: 'SET_DECODING' }
-    | { isDesktop: boolean, type: 'SET_DESKTOP' }
-    | { isQrOpen: boolean, type: 'SET_QR_OPEN' }
-    | { isWalletDetailsOpen: boolean, type: 'SET_WALLET_DETAILS_OPEN' }
-    | { loadingSource?: boolean, loadingTarget?: boolean, type: 'SET_LOADING' }
-    | { loadingSubmit: boolean, type: 'SET_SUBMITTING' }
-    | { payload: Partial<SwapControllerState>, type: 'HYDRATE' }
-    | { qrCode: null | string, type: 'SET_QR_CODE' }
-    | { quoteId?: string, sourceAmount?: string, targetAmount?: string, type: 'SET_AMOUNTS' }
-    | { targetCurrency: TargetCurrency, type: 'SET_TARGET_CURRENCY' }
-    | { transactionId: null | string, type: 'SET_TRANSACTION_ID' }
-    | { type: 'RESET' }
-    | { type: 'SET_VIEW', view: SwapView }
+  | { isDecodingQr: boolean, type: 'SET_DECODING' }
+  | { isDesktop: boolean, type: 'SET_DESKTOP' }
+  | { isQrOpen: boolean, type: 'SET_QR_OPEN' }
+  | { isWalletDetailsOpen: boolean, type: 'SET_WALLET_DETAILS_OPEN' }
+  | { loadingBalance: boolean, type: 'SET_LOADING_BALANCE' }
+  | { loadingSource?: boolean, loadingTarget?: boolean, type: 'SET_LOADING' }
+  | { loadingSubmit: boolean, type: 'SET_SUBMITTING' }
+  | { payload: Partial<SwapControllerState>, type: 'HYDRATE' }
+  | { qrCode: null | string, type: 'SET_QR_CODE' }
+  | { quoteId?: string, sourceAmount?: string, targetAmount?: string, type: 'SET_AMOUNTS' }
+  | { targetCurrency: TargetCurrency, type: 'SET_TARGET_CURRENCY' }
+  | { transactionId: null | string, type: 'SET_TRANSACTION_ID' }
+  | { type: 'RESET' }
+  | { type: 'SET_VIEW', view: SwapView }
+  | { type: 'SET_USDC_BALANCE', usdcBalance: string }
+  | { type: 'SET_UNIT_RATE', unitRate: string }
 type SwapControllerState = {
   accountNumber: string
   isDecodingQr: boolean
   isDesktop: boolean
   isQrOpen: boolean
   isWalletDetailsOpen: boolean
+  loadingBalance: boolean
   loadingSource: boolean
   loadingSubmit: boolean
   loadingTarget: boolean
@@ -87,6 +91,8 @@ type SwapControllerState = {
   targetCurrency: TargetCurrency
   taxId: string
   transactionId: null | string
+  unitRate: string
+  usdcBalance: string
   view: SwapView
 }
 
@@ -101,6 +107,7 @@ const createInitialState = (isDesktop: boolean): SwapControllerState => ({
   isDesktop,
   isQrOpen: false,
   isWalletDetailsOpen: false,
+  loadingBalance: false,
   loadingSource: false,
   loadingSubmit: false,
   loadingTarget: false,
@@ -113,6 +120,8 @@ const createInitialState = (isDesktop: boolean): SwapControllerState => ({
   targetCurrency: TargetCurrency.BRL,
   taxId: '',
   transactionId: null,
+  unitRate: '',
+  usdcBalance: '',
   view: 'swap',
 })
 
@@ -164,6 +173,12 @@ const reducer = (state: SwapControllerState, action: SwapAction): SwapController
       return { ...state, view: action.view }
     case 'SET_WALLET_DETAILS_OPEN':
       return { ...state, isWalletDetailsOpen: action.isWalletDetailsOpen }
+    case 'SET_LOADING_BALANCE':
+      return { ...state, loadingBalance: action.loadingBalance }
+    case 'SET_USDC_BALANCE':
+      return { ...state, usdcBalance: action.usdcBalance }
+    case 'SET_UNIT_RATE':
+      return { ...state, unitRate: action.unitRate }
     default:
       return state
   }
@@ -239,7 +254,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
   const initialDesktop = typeof window !== 'undefined' ? window.innerWidth >= 768 : true
   const [state, dispatch] = useReducer(reducer, createInitialState(initialDesktop))
   const { t } = useTranslate()
-  const { addNotice } = useNotices()
+  const { addNotice, clearNotices } = useNotices()
   const { kit, setKycUrl, walletAuthentication } = useWalletAuth()
 
   const lastEditedRef = useRef<'source' | 'target' | null>(null)
@@ -263,16 +278,20 @@ export const useWebSwapController = (): WebSwapControllerProps => {
   }).format(value), [targetLocale])
 
   const notifyError = useCallback((message: string, description?: string) => {
+    clearNotices()
     addNotice(formatError(message, description))
-  }, [addNotice])
+  }, [addNotice, clearNotices])
 
   const exchangeRateDisplay = useMemo(() => {
+    if (state.unitRate) {
+      return state.unitRate
+    }
     if (state.loadingSource || state.loadingTarget) return '-'
     const numericSource = parseFloat(state.sourceAmount)
     const cleanedTarget = state.targetAmount.replace(/\./g, '').replace(/,/g, '.')
     const numericTarget = parseFloat(cleanedTarget)
     if (numericSource > 0 && !Number.isNaN(numericTarget) && numericTarget >= 0) {
-      return `${targetSymbol}${formatTargetNumber((numericTarget + transferFee) / numericSource)}`
+      return formatTargetNumber((numericTarget + transferFee) / numericSource)
     }
     return '-'
   }, [
@@ -281,7 +300,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     state.loadingTarget,
     state.sourceAmount,
     state.targetAmount,
-    targetSymbol,
+    state.unitRate,
     transferFee,
   ])
 
@@ -292,6 +311,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
   ])
 
   const isAuthenticated = Boolean(walletAuthentication?.jwtToken)
+  const isWalletConnected = Boolean(kit?.address)
 
   const isPrimaryDisabled = useCallback(() => {
     const numericSource = parseFloat(String(state.sourceAmount))
@@ -301,10 +321,11 @@ export const useWebSwapController = (): WebSwapControllerProps => {
   }, [state.sourceAmount, state.targetAmount])
 
   const continueDisabled = useMemo(() => {
-    if (!isAuthenticated) return false
+    if (!isAuthenticated || !isWalletConnected) return false
     return isPrimaryDisabled() || !state.quoteId
   }, [
     isAuthenticated,
+    isWalletConnected,
     isPrimaryDisabled,
     state.quoteId,
   ])
@@ -355,6 +376,70 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     }
   }, [])
 
+  // Fetch USDC balance when wallet is connected
+  useEffect(() => {
+    const fetchBalance = async () => {
+      if (!isWalletConnected || !kit?.address) {
+        dispatch({ type: 'SET_USDC_BALANCE', usdcBalance: '' })
+        return
+      }
+      dispatch({ loadingBalance: true, type: 'SET_LOADING_BALANCE' })
+      try {
+        const account = await HORIZON_SERVER.loadAccount(kit.address)
+        const usdcAsset = account.balances.find(
+          (b): b is Horizon.HorizonApi.BalanceLineAsset =>
+            'asset_code' in b &&
+            b.asset_code === 'USDC' &&
+            b.asset_issuer === 'GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN',
+        )
+        const balance = usdcAsset?.balance ?? '0'
+        dispatch({ type: 'SET_USDC_BALANCE', usdcBalance: balance })
+      } catch {
+        dispatch({ type: 'SET_USDC_BALANCE', usdcBalance: '' })
+      } finally {
+        dispatch({ loadingBalance: false, type: 'SET_LOADING_BALANCE' })
+      }
+    }
+    void fetchBalance()
+  }, [isWalletConnected, kit?.address])
+
+  // Fetch unit rate (1 USDC) when targetCurrency changes
+  useEffect(() => {
+    const fetchUnitRate = async () => {
+      dispatch({ type: 'SET_UNIT_RATE', unitRate: '' })
+
+      const tryFetch = async (amount: number) => {
+        return await getReverseQuote({
+          crypto_currency: CryptoCurrency.USDC,
+          network: BlockchainNetwork.STELLAR,
+          payment_method: targetPaymentMethod,
+          source_amount: amount,
+          target_currency: state.targetCurrency,
+        }) as ReverseQuoteApiResponse
+      }
+
+      let response = await tryFetch(1)
+
+      // Fallback: If 1 USDC fails (e.g. COP min is ~$5000 COP), try with 10 USDC
+      if (response.status !== 200) {
+        const fallbackResponse = await tryFetch(10)
+        if (fallbackResponse.status === 200) {
+          const quote = fallbackResponse.data
+          const unitValue = quote.value / 10
+          dispatch({ type: 'SET_UNIT_RATE', unitRate: formatTargetNumber(unitValue) })
+          return
+        }
+      }
+
+      if (response.status === 200) {
+        const quote = response.data
+        const formatted = formatTargetNumber(quote.value)
+        dispatch({ type: 'SET_UNIT_RATE', unitRate: formatted })
+      }
+    }
+    void fetchUnitRate()
+  }, [state.targetCurrency, formatTargetNumber, targetPaymentMethod])
+
   const quoteFromSource = useCallback(async (value: string) => {
     lastEditedRef.current = 'source'
     directAbortRef.current?.abort()
@@ -390,7 +475,12 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     if (response.status !== 200) {
       if (!isAbortError(response)) {
         const reason = extractReason(response.data) || response.error?.message || t('swap.quote_error', 'Esta cotización superó el monto máximo permitido.')
-        notifyError(reason, response.error?.message)
+
+        // Suppress validation error if it is the minimum amount error (UX Feature)
+        const isMinAmountError = reason?.toLowerCase().includes('minimum allowed amount')
+        if (!isMinAmountError) {
+          notifyError(reason, response.error?.message)
+        }
       }
       dispatch({ loadingTarget: false, type: 'SET_LOADING' })
       return
@@ -451,7 +541,12 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     if (response.status !== 200) {
       if (!isAbortError(response)) {
         const reason = extractReason(response.data) || response.error?.message || t('swap.quote_error', 'Esta cotización superó el monto máximo permitido.')
-        notifyError(reason, response.error?.message)
+
+        // Suppress validation error if it is the minimum amount error (UX Feature)
+        const isMinAmountError = reason?.toLowerCase().includes('minimum allowed amount')
+        if (!isMinAmountError) {
+          notifyError(reason, response.error?.message)
+        }
       }
       dispatch({ loadingSource: false, type: 'SET_LOADING' })
       return
@@ -553,7 +648,8 @@ export const useWebSwapController = (): WebSwapControllerProps => {
   }, [])
 
   const onPrimaryAction = useCallback(async () => {
-    if (!isAuthenticated) {
+    // Always connect wallet first if either wallet or auth is missing
+    if (!isAuthenticated || !isWalletConnected) {
       await kit?.connect()
       return
     }
@@ -564,6 +660,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     dispatch({ type: 'SET_VIEW', view: 'bankDetails' })
   }, [
     isAuthenticated,
+    isWalletConnected,
     kit,
     notifyError,
     state.quoteId,
@@ -707,6 +804,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
         const onChangeCallbackUrl = queryParams.get('on_change_callback')
         const sepTransactionId = queryParams.get('transaction_id')
         const sepBaseUrl = import.meta.env.VITE_SEP_BASE_URL || 'http://localhost:8000'
+
         let url = encodeURI(
           `${sepBaseUrl}/sep24/transactions/withdraw/interactive/complete?amount_expected=${state.sourceAmount}&transaction_id=${sepTransactionId}`,
         )
@@ -719,7 +817,25 @@ export const useWebSwapController = (): WebSwapControllerProps => {
         if (transaction_reference) {
           url += `&memo=${encodeURIComponent(transaction_reference)}`
         }
-        window.location.href = url
+
+        // UX Improvement: Notify parent (Vesseo) via postMessage
+        // This allows the container app to handle the success screen immediately
+        window.parent.postMessage({
+          type: 'transaction_completed',
+          status: 'success',
+          transaction_id: acceptedTxId,
+          sep_transaction_id: sepTransactionId,
+          amount_in: state.sourceAmount,
+          amount_out: state.targetAmount,
+          currency_out: state.targetCurrency,
+        }, '*')
+
+        // Slight delay to ensure message is processed if the app relies on it
+        // before the redirect potentially unloads the page
+        setTimeout(() => {
+          window.location.href = url
+        }, 1000)
+
         return
       }
 
@@ -834,6 +950,8 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     currencyMenuRef,
     exchangeRateDisplay,
     isAuthenticated,
+    isWalletConnected,
+    loadingBalance: state.loadingBalance,
     loadingSource: state.loadingSource,
     loadingTarget: state.loadingTarget,
     onPrimaryAction,
@@ -848,6 +966,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     textColor: state.isDesktop ? 'white' : '#356E6A',
     toggleCurrencyMenu,
     transferFeeDisplay,
+    usdcBalance: state.usdcBalance,
   }
 
   const confirmQrProps: ConfirmQrProps = {
