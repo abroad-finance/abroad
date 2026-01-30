@@ -1,4 +1,4 @@
-import { Info, Wallet } from 'lucide-react'
+import { Info, User, Wallet } from 'lucide-react'
 import React, { memo } from 'react'
 
 import AbroadLogoColored from '../../../assets/Logos/AbroadLogoColored.svg'
@@ -43,8 +43,10 @@ export interface NavBarResponsiveProps {
   /** Mobile language selector slot */
   languageSelectorMobile?: React.ReactNode
   onWalletClick: () => void
-  walletInfo: { icon?: string
-    name: string }
+  walletInfo: {
+    icon?: string
+    name: string
+  }
 }
 
 /**
@@ -65,15 +67,15 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({
 }) => {
   const WalletIcon = address && walletInfo.icon
     ? (
-        <img
-          alt={`${walletInfo.name} wallet`}
-          className="w-8 h-8"
-          height={32}
-          loading="lazy"
-          src={walletInfo.icon}
-          width={32}
-        />
-      )
+      <img
+        alt={`${walletInfo.name} wallet`}
+        className="w-8 h-8"
+        height={32}
+        loading="lazy"
+        src={walletInfo.icon}
+        width={32}
+      />
+    )
     : <Wallet aria-hidden="true" className="w-5 h-5 text-white" />
 
   const renderUSDCBadge = (isMobile = false) => {
@@ -101,11 +103,11 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({
         {balanceLoading && address
           ? <div className={`${loadingSize} bg-white/20 rounded animate-pulse`} />
           : (
-              <span className={`${textColor} ${textSize} font-medium`}>
-                $
-                {address ? (isError ? '—' : balance) : '0.00'}
-              </span>
-            )}
+            <span className={`${textColor} ${textSize} font-medium`}>
+              $
+              {address ? (isError ? '—' : balance) : '0.00'}
+            </span>
+          )}
       </div>
     )
   }
@@ -155,6 +157,15 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({
             {/* Desktop Right Side */}
             <div className="hidden md:flex items-center space-x-4">
               {languageSelector}
+              {address && (
+                <button
+                  className="bg-white/90 backdrop-blur-xl rounded-xl p-2 flex items-center justify-center hover:bg-white transition-all shadow-sm ring-1 ring-black/5 active:scale-95 cursor-pointer"
+                  onClick={onWalletClick}
+                  type="button"
+                >
+                  <User className="w-5 h-5 text-abroad-dark" />
+                </button>
+              )}
               <button
                 aria-label={address ? labels.walletDetailsAria : labels.connectWalletAria}
                 className="cursor-pointer flex items-center space-x-3 bg-white/20 backdrop-blur-sm rounded-xl px-4 py-2 hover:bg-white/30 transition-colors duration-200"
@@ -174,6 +185,15 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({
             <div className="md:hidden">
               <div className="flex items-center space-x-3">
 
+                {address && (
+                  <button
+                    className="bg-white/90 backdrop-blur-xl rounded-xl p-2 flex items-center justify-center hover:bg-white transition-all shadow-sm ring-1 ring-black/5 active:scale-95 cursor-pointer"
+                    onClick={onWalletClick}
+                    type="button"
+                  >
+                    <User className="w-5 h-5 text-[#356E6A]" />
+                  </button>
+                )}
                 <button
                   aria-label={address ? labels.walletDetailsAria : labels.connectWalletAria}
                   className="flex items-center justify-center bg-[#356E6A]/5 backdrop-blur-xl rounded-xl pl-2 pr-1 py-2 border border-white/30 hover:bg-white/30 transition-colors duration-200 flex-1"
@@ -183,11 +203,11 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({
                   {address
                     ? renderUSDCBadge(true)
                     : (
-                        <div className="flex items-center space-x-2">
-                          <Wallet aria-hidden="true" className="w-5 h-5 text-[#356E6A]" />
-                          <span className="text-[#356E6A] text-sm font-medium">{labels.connectWallet}</span>
-                        </div>
-                      )}
+                      <div className="flex items-center space-x-2">
+                        <Wallet aria-hidden="true" className="w-5 h-5 text-[#356E6A]" />
+                        <span className="text-[#356E6A] text-sm font-medium">{labels.connectWallet}</span>
+                      </div>
+                    )}
                 </button>
                 {languageSelectorMobile}
               </div>

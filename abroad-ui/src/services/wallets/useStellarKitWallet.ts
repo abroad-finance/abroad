@@ -14,7 +14,7 @@ import {
   WalletConnectModule,
 } from '@creit.tech/stellar-wallets-kit/modules/walletconnect.module'
 // useStellarKitWallet.ts
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 import type { IWallet } from '../../interfaces/IWallet'
 import type { IWalletAuthentication } from '../../interfaces/IWalletAuthentication'
@@ -40,8 +40,24 @@ export function useStellarKitWallet(
 ): IWallet {
   const kitRef = useRef<null | StellarWalletsKit>(null)
 
-  const [address, setAddress] = useState<null | string>(null)
-  const [walletId, _setWalletId] = useState<null | string>(null)
+  const [address, _setAddress] = useState<null | string>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('abroad_wallet_address')
+    }
+    return null
+  })
+  const [walletId, _setWalletId] = useState<null | string>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('abroad_wallet_id')
+    }
+    return null
+  })
+
+  const setAddress = useCallback((addr: null | string) => {
+    _setAddress(addr)
+    if (addr) localStorage.setItem('abroad_wallet_address', addr)
+    else localStorage.removeItem('abroad_wallet_address')
+  }, [])
 
   const ensureKit = useCallback((): StellarWalletsKit => {
     if (!kitRef.current) {
@@ -57,9 +73,21 @@ export function useStellarKitWallet(
     const kit = ensureKit()
     if (id) {
       kit.setWallet(id)
+      localStorage.setItem('abroad_wallet_id', id)
+    }
+    else {
+      localStorage.removeItem('abroad_wallet_id')
     }
     _setWalletId(id)
   }, [ensureKit])
+
+  // Auto-initialize kit with persisted walletId
+  useEffect(() => {
+    if (walletId) {
+      const kit = ensureKit()
+      kit.setWallet(walletId)
+    }
+  }, [walletId, ensureKit])
 
   const signTransaction = useCallback(
     async ({ message }: { message: string }) => {
@@ -135,15 +163,15 @@ function buildModules() {
   return isMobileUA()
     ? [walletConnectModule]
     : [
-        new FreighterModule(),
-        new LobstrModule(),
-        new AlbedoModule(),
-        new LedgerModule(),
-        walletConnectModule,
-        new HotWalletModule(),
-        new xBullModule(),
-        new HanaModule(),
-      ]
+      new FreighterModule(),
+      new LobstrModule(),
+      new AlbedoModule(),
+      new LedgerModule(),
+      walletConnectModule,
+      new HotWalletModule(),
+      new xBullModule(),
+      new HanaModule(),
+    ]
 }
 
 function isMobileUA(): boolean {
