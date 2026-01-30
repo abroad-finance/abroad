@@ -84,11 +84,14 @@ const TxStatus = ({
   const renderAmount = () => {
     if (status === 'accepted') {
       return (
-        <span className="text-5xl font-bold text-abroad-dark md:text-white">
-          {' '}
-          {getAmount(targetCurrency, targetAmount)}
-          {' '}
-        </span>
+        <div className="flex flex-col items-center justify-center bg-white/20 rounded-2xl p-4 w-full mb-4">
+          <span className="text-sm uppercase tracking-wider text-abroad-dark md:text-white/80 font-bold mb-1">
+            {t('tx_status.amount_sent', 'Monto Enviado')}
+          </span>
+          <span className="text-4xl md:text-5xl font-bold text-abroad-dark md:text-white">
+            {getAmount(targetCurrency, targetAmount)}
+          </span>
+        </div>
       )
     }
   }
@@ -97,13 +100,15 @@ const TxStatus = ({
     switch (status) {
       case 'accepted':
         return (
-          <IconAnimated
-            icon="AnimatedCheck"
-            key={`icon-${status}`}
-            loop={false}
-            play
-            size={150}
-          />
+          <div className="bg-green-500/20 p-4 rounded-full mb-2">
+            <IconAnimated
+              icon="AnimatedCheck"
+              key={`icon-${status}`}
+              loop={false}
+              play
+              size={100}
+            />
+          </div>
         )
       case 'denied':
         return (
@@ -112,7 +117,7 @@ const TxStatus = ({
             key={`icon-${status}`}
             loop={false}
             play
-            size={150}
+            size={120}
           />
         )
       case 'inProgress':
@@ -133,7 +138,11 @@ const TxStatus = ({
   const renderStatusText = () => {
     switch (status) {
       case 'accepted':
-        return t('tx_status.accepted', 'Retiro Realizado')
+        return (
+          <span className="text-3xl md:text-4xl text-green-700 md:text-green-400">
+            {t('tx_status.success', '¡Transacción Exitosa!')}
+          </span>
+        )
       case 'denied':
         if (apiStatus === 'PAYMENT_EXPIRED') {
           return t('tx_status.expired', 'Transacción Expirada')
@@ -148,12 +157,19 @@ const TxStatus = ({
     switch (status) {
       case 'accepted':
         return (
-          <>
-            {t('tx_status.accepted.super', '¡Super!')}
-            <br />
-            {' '}
-            {t('tx_status.accepted.message', 'Todo salió bien y tu retiro ha sido exitoso.')}
-          </>
+          <div className="flex flex-col items-center gap-2">
+            <p className="text-lg">
+              {t('tx_status.accepted.message', 'Tu retiro ha sido procesado correctamente.')}
+            </p>
+            {transactionId && (
+              <div className="mt-4 flex flex-col items-center">
+                <span className="text-xs uppercase opacity-70">ID de Transacción</span>
+                <span className="font-mono bg-black/10 md:bg-white/10 px-2 py-1 rounded text-sm select-all">
+                  {transactionId}
+                </span>
+              </div>
+            )}
+          </div>
         )
       case 'denied':
         if (apiStatus === 'PAYMENT_EXPIRED') {
@@ -177,18 +193,20 @@ const TxStatus = ({
       {error && <div className="text-red-600 text-sm">{error}</div>}
 
       <div
-        className="relative w-[98%] max-w-[50vh] h-[60vh] bg-[#356E6A]/5 backdrop-blur-xl rounded-4xl p-6 flex flex-col items-center justify-center space-y-4"
+        className="relative w-[98%] max-w-[50vh] min-h-[60vh] bg-[#356E6A]/5 backdrop-blur-xl rounded-4xl p-6 flex flex-col items-center justify-center space-y-4"
         id="bg-container"
       >
-        {renderAmount()}
         {/* Status Icon */}
         <div>
           {renderIcon()}
         </div>
+
         {/* Title */}
         <div className="text-2xl font-bold  text-center text-abroad-dark md:text-white">
           {renderStatusText()}
         </div>
+
+        {renderAmount()}
 
         {/* Description */}
         <div className="text-center text-abroad-dark md:text-white">
