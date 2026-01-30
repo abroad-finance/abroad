@@ -57,7 +57,7 @@ function decodeEmvCoE(qrCode: string): PixDecodedData {
     currentPosition += 2
 
     // Length field (2 chars)
-    const length = parseInt(qrCode.substring(currentPosition, currentPosition + 2), 10)
+    const length = Number.parseInt(qrCode.substring(currentPosition, currentPosition + 2), 10)
     currentPosition += 2
 
     // Value field
@@ -97,7 +97,7 @@ function decodeEmvCoE(qrCode: string): PixDecodedData {
 function parseAdditionalDataField(data: string): string | undefined {
   // Look for reference field (ID 05)
   if (data.startsWith('05')) {
-    const refLength = parseInt(data.substring(2, 4), 10)
+    const refLength = Number.parseInt(data.substring(2, 4), 10)
     return data.substring(4, 4 + refLength)
   }
   return undefined
@@ -153,20 +153,20 @@ function isValidCpf(cpf: string): boolean {
   // Validate first check digit
   let sum = 0
   for (let i = 0; i < 9; i++) {
-    sum += parseInt(cpf[i]) * (10 - i)
+    sum += Number.parseInt(cpf[i]) * (10 - i)
   }
   let digit = (sum * 10) % 11
   if (digit === 10) digit = 0
-  if (digit !== parseInt(cpf[9])) return false
+  if (digit !== Number.parseInt(cpf[9])) return false
 
   // Validate second check digit
   sum = 0
   for (let i = 0; i < 10; i++) {
-    sum += parseInt(cpf[i]) * (11 - i)
+    sum += Number.parseInt(cpf[i]) * (11 - i)
   }
   digit = (sum * 10) % 11
   if (digit === 10) digit = 0
-  if (digit !== parseInt(cpf[10])) return false
+  if (digit !== Number.parseInt(cpf[10])) return false
 
   return true
 }
@@ -184,25 +184,25 @@ function isValidCnpj(cnpj: string): boolean {
   let sum = 0
   let weight = 5
   for (let i = 0; i < 12; i++) {
-    sum += parseInt(cnpj[i]) * weight
+    sum += Number.parseInt(cnpj[i]) * weight
     weight = weight === 2 ? 9 : weight - 1
   }
   let digit = sum % 11
   if (digit < 2) digit = 0
   else digit = 11 - digit
-  if (digit !== parseInt(cnpj[12])) return false
+  if (digit !== Number.parseInt(cnpj[12])) return false
 
   // Validate second check digit
   sum = 0
   weight = 6
   for (let i = 0; i < 13; i++) {
-    sum += parseInt(cnpj[i]) * weight
+    sum += Number.parseInt(cnpj[i]) * weight
     weight = weight === 2 ? 9 : weight - 1
   }
   digit = sum % 11
   if (digit < 2) digit = 0
   else digit = 11 - digit
-  if (digit !== parseInt(cnpj[13])) return false
+  if (digit !== Number.parseInt(cnpj[13])) return false
 
   return true
 }

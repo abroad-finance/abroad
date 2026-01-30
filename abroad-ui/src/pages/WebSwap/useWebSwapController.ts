@@ -242,6 +242,20 @@ const formatError = (message: string, description?: string) => ({
   message,
 })
 
+const getNestedError = (b: Record<string, unknown>): string | null => {
+  if (typeof b.reason === 'string') return b.reason
+  if (typeof b.message === 'string') return b.message
+  if (typeof b.error === 'string') return b.error
+
+  if (b.error && typeof b.error === 'object') {
+    const e = b.error as Record<string, unknown>
+    if (typeof e.message === 'string') return e.message
+  }
+
+  if (typeof b.code === 'string') return b.code
+  return null
+}
+
 const extractReason = (body: unknown): null | string => {
   if (Array.isArray(body)) {
     for (const item of body) {
@@ -252,17 +266,7 @@ const extractReason = (body: unknown): null | string => {
   }
 
   if (body && typeof body === 'object') {
-    const b = body as Record<string, unknown>
-    if (typeof b.reason === 'string') return b.reason
-    if (typeof b.message === 'string') return b.message
-    if (typeof b.error === 'string') return b.error
-
-    if (b.error && typeof b.error === 'object') {
-      const e = b.error as Record<string, unknown>
-      if (typeof e.message === 'string') return e.message
-    }
-
-    if (typeof b.code === 'string') return b.code
+    return getNestedError(body as Record<string, unknown>)
   }
 
   return null
@@ -308,7 +312,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     }
     if (state.loadingSource || state.loadingTarget) return '-'
     const numericSource = Number.parseFloat(state.sourceAmount)
-    const cleanedTarget = state.targetAmount.replace(/\./g, '').replace(/,/g, '.')
+    const cleanedTarget = state.targetAmount.replaceAll('.', '').replace(/,/g, '.')
     const numericTarget = Number.parseFloat(cleanedTarget)
     if (numericSource > 0 && !Number.isNaN(numericTarget) && numericTarget >= 0) {
       return formatTargetNumber((numericTarget + transferFee) / numericSource, 2)
@@ -335,13 +339,13 @@ export const useWebSwapController = (): WebSwapControllerProps => {
 
   const isPrimaryDisabled = useCallback(() => {
     const numericSource = Number.parseFloat(String(state.sourceAmount))
-    const cleanedTarget = String(state.targetAmount).replace(/\./g, '').replace(/,/g, '.')
+    const cleanedTarget = String(state.targetAmount).replaceAll('.', '').replace(/,/g, '.')
     const numericTarget = Number.parseFloat(cleanedTarget)
     return !(numericSource > 0 && numericTarget > 0)
   }, [state.sourceAmount, state.targetAmount])
 
   const isBelowMinimum = useMemo(() => {
-    const cleanedTarget = String(state.targetAmount).replace(/\./g, '').replace(/,/g, '.')
+    const cleanedTarget = String(state.targetAmount).replaceAll('.', '').replace(/,/g, '.')
     const numericTarget = Number.parseFloat(cleanedTarget)
     if (numericTarget <= 0) return false
 
@@ -478,6 +482,62 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     fetchUnitRate()
   }, [state.targetCurrency, formatTargetNumber, targetPaymentMethod])
 
+  const handleQuoteError = useCallback((
+    response: ApiClientResponse<any, any>,
+    inputValue: string,
+    mode: 'source' | 'target',
+    manualCalculation?: (val: number, rate: number) => number,
+  ) => {
+    if (isAbortError(response)) return
+
+    const reason = extractReason(response.data) || response.error?.message || t('swap.quote_error', 'Esta cotización superó el monto máximo permitido.')
+
+    // Suppress validation error if it is the minimum amount error or too small (UX Feature)
+    const isMinAmountError =
+      reason?.toLowerCase().includes('minimum allowed amount') ||
+      reason?.toLowerCase().includes('too small') ||
+      reason?.toLowerCase().includes('too_small') ||
+      (response.status === 400 && (reason?.toLowerCase().includes('amount') || reason?.toLowerCase().includes('too_small')))
+
+    if (!isMinAmountError) {
+      notifyError(reason, response.error?.message)
+      // Clear the OTHER field
+      if (mode === 'source') dispatch({ quoteId: '', targetAmount: '', type: 'SET_AMOUNTS' })
+      else dispatch({ quoteId: '', sourceAmount: '', type: 'SET_AMOUNTS' })
+      return
+    }
+
+    if (state.unitRate && manualCalculation) {
+      // Manual calculation fallback to show estimated conversion even if below minimum
+      const unitRateValue = Number.parseFloat(state.unitRate.replaceAll('.', '').replace(/,/g, '.'))
+      const inputNum = Number.parseFloat(inputValue.replaceAll('.', '').replace(/,/g, '.'))
+
+      if (unitRateValue > 0 && inputNum > 0) {
+        const calculated = manualCalculation(inputNum, unitRateValue)
+        if (mode === 'source') {
+          dispatch({
+            quoteId: '',
+            sourceAmount: inputValue,
+            targetAmount: formatTargetNumber(calculated, 2),
+            type: 'SET_AMOUNTS',
+          })
+        } else {
+          dispatch({
+            quoteId: '',
+            sourceAmount: calculated.toFixed(2),
+            targetAmount: inputValue,
+            type: 'SET_AMOUNTS',
+          })
+        }
+      }
+      return
+    }
+
+    // No unit rate yet, clear other field
+    if (mode === 'source') dispatch({ quoteId: '', targetAmount: '', type: 'SET_AMOUNTS' })
+    else dispatch({ quoteId: '', sourceAmount: '', type: 'SET_AMOUNTS' })
+  }, [dispatch, notifyError, state.unitRate, formatTargetNumber, t])
+
   const quoteFromSource = useCallback(async (value: string) => {
     lastEditedRef.current = 'source'
     directAbortRef.current?.abort()
@@ -511,37 +571,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     if (controller.signal.aborted || reqId !== directReqIdRef.current || lastEditedRef.current !== 'source') return
 
     if (response.status !== 200) {
-      if (!isAbortError(response)) {
-        const reason = extractReason(response.data) || response.error?.message || t('swap.quote_error', 'Esta cotización superó el monto máximo permitido.')
-
-        // Suppress validation error if it is the minimum amount error or too small (UX Feature)
-        const isMinAmountError =
-          reason?.toLowerCase().includes('minimum allowed amount') ||
-          reason?.toLowerCase().includes('too small') ||
-          reason?.toLowerCase().includes('too_small') ||
-          (response.status === 400 && (reason?.toLowerCase().includes('amount') || reason?.toLowerCase().includes('too_small')))
-
-        if (!isMinAmountError) {
-          notifyError(reason, response.error?.message)
-          // Clear target amount if we have a hard error and no fallback
-          dispatch({ quoteId: '', targetAmount: '', type: 'SET_AMOUNTS' })
-        } else if (state.unitRate) {
-          // Manual calculation fallback to show estimated conversion even if below minimum
-          const unitRateValue = Number.parseFloat(state.unitRate.replace(/\./g, '').replace(/,/g, '.'))
-          if (unitRateValue > 0) {
-            const manualTarget = num * unitRateValue
-            dispatch({
-              quoteId: '',
-              sourceAmount: value,
-              targetAmount: formatTargetNumber(manualTarget, 2),
-              type: 'SET_AMOUNTS',
-            })
-          }
-        } else {
-          // No unit rate yet, clear target
-          dispatch({ quoteId: '', targetAmount: '', type: 'SET_AMOUNTS' })
-        }
-      }
+      handleQuoteError(response, value, 'source', (input, rate) => input * rate)
       dispatch({ loadingTarget: false, type: 'SET_LOADING' })
       return
     }
@@ -555,12 +585,10 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     })
     dispatch({ loadingTarget: false, type: 'SET_LOADING' })
   }, [
+    handleQuoteError,
     formatTargetNumber,
-    notifyError,
     state.targetCurrency,
-    state.unitRate,
     targetPaymentMethod,
-    t,
   ])
 
   const quoteFromTarget = useCallback(async (value: string) => {
@@ -571,7 +599,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     const controller = new AbortController()
     reverseAbortRef.current = controller
     const reqId = ++reverseReqIdRef.current
-    const normalized = value.replace(/\./g, '').replace(/,/g, '.')
+    const normalized = value.replaceAll('.', '').replace(/,/g, '.')
     const num = Number.parseFloat(normalized)
     if (Number.isNaN(num)) {
       dispatch({
@@ -597,37 +625,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     if (controller.signal.aborted || reqId !== reverseReqIdRef.current || lastEditedRef.current !== 'target') return
 
     if (response.status !== 200) {
-      if (!isAbortError(response)) {
-        const reason = extractReason(response.data) || response.error?.message || t('swap.quote_error', 'Esta cotización superó el monto máximo permitido.')
-
-        // Suppress validation error if it is the minimum amount error or too small (UX Feature)
-        const isMinAmountError =
-          reason?.toLowerCase().includes('minimum allowed amount') ||
-          reason?.toLowerCase().includes('too small') ||
-          reason?.toLowerCase().includes('too_small') ||
-          (response.status === 400 && (reason?.toLowerCase().includes('amount') || reason?.toLowerCase().includes('too_small')))
-
-        if (!isMinAmountError) {
-          notifyError(reason, response.error?.message)
-          // Clear source amount if we have a hard error and no fallback
-          dispatch({ quoteId: '', sourceAmount: '', type: 'SET_AMOUNTS' })
-        } else if (state.unitRate) {
-          // Manual calculation fallback to show estimated conversion even if below minimum
-          const unitRateValue = Number.parseFloat(state.unitRate.replace(/\./g, '').replace(/,/g, '.'))
-          if (unitRateValue > 0) {
-            const manualSource = num / unitRateValue
-            dispatch({
-              quoteId: '',
-              sourceAmount: manualSource.toFixed(2),
-              targetAmount: value,
-              type: 'SET_AMOUNTS',
-            })
-          }
-        } else {
-          // No unit rate yet, clear source
-          dispatch({ quoteId: '', sourceAmount: '', type: 'SET_AMOUNTS' })
-        }
-      }
+      handleQuoteError(response, value, 'target', (input, rate) => input / rate)
       dispatch({ loadingSource: false, type: 'SET_LOADING' })
       return
     }
@@ -641,11 +639,9 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     })
     dispatch({ loadingSource: false, type: 'SET_LOADING' })
   }, [
-    notifyError,
+    handleQuoteError,
     state.targetCurrency,
-    state.unitRate,
     targetPaymentMethod,
-    t,
   ])
 
   const onSourceChange = useCallback((val: string) => {
