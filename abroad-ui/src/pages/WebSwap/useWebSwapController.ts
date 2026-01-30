@@ -133,6 +133,7 @@ const reducer = (state: SwapControllerState, action: SwapAction): SwapController
       return {
         ...createInitialState(state.isDesktop),
         targetCurrency: state.targetCurrency,
+        usdcBalance: state.usdcBalance,
       }
     case 'SET_AMOUNTS':
       return {
@@ -241,10 +242,28 @@ const formatError = (message: string, description?: string) => ({
 })
 
 const extractReason = (body: unknown): null | string => {
-  if (body && typeof body === 'object' && 'reason' in body) {
-    const reason = (body as { reason?: unknown }).reason
-    if (typeof reason === 'string') return reason
+  if (Array.isArray(body)) {
+    for (const item of body) {
+      const found = extractReason(item)
+      if (found) return found
+    }
+    return null
   }
+
+  if (body && typeof body === 'object') {
+    const b = body as Record<string, unknown>
+    if (typeof b.reason === 'string') return b.reason
+    if (typeof b.message === 'string') return b.message
+    if (typeof b.error === 'string') return b.error
+
+    if (b.error && typeof b.error === 'object') {
+      const e = b.error as Record<string, unknown>
+      if (typeof e.message === 'string') return e.message
+    }
+
+    if (typeof b.code === 'string') return b.code
+  }
+
   return null
 }
 
@@ -320,14 +339,25 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     return !(numericSource > 0 && numericTarget > 0)
   }, [state.sourceAmount, state.targetAmount])
 
+  const isBelowMinimum = useMemo(() => {
+    const cleanedTarget = String(state.targetAmount).replace(/\./g, '').replace(/,/g, '.')
+    const numericTarget = parseFloat(cleanedTarget)
+    if (numericTarget <= 0) return false
+
+    if (state.targetCurrency === TargetCurrency.COP) return numericTarget < 5000
+    if (state.targetCurrency === TargetCurrency.BRL) return numericTarget < 1
+    return false
+  }, [state.targetAmount, state.targetCurrency])
+
   const continueDisabled = useMemo(() => {
     if (!isAuthenticated || !isWalletConnected) return false
-    return isPrimaryDisabled() || !state.quoteId
+    return isPrimaryDisabled() || !state.quoteId || isBelowMinimum
   }, [
     isAuthenticated,
     isWalletConnected,
     isPrimaryDisabled,
     state.quoteId,
+    isBelowMinimum,
   ])
 
   const persistableView = state.view !== 'swap'
@@ -476,10 +506,27 @@ export const useWebSwapController = (): WebSwapControllerProps => {
       if (!isAbortError(response)) {
         const reason = extractReason(response.data) || response.error?.message || t('swap.quote_error', 'Esta cotización superó el monto máximo permitido.')
 
-        // Suppress validation error if it is the minimum amount error (UX Feature)
-        const isMinAmountError = reason?.toLowerCase().includes('minimum allowed amount')
+        // Suppress validation error if it is the minimum amount error or too small (UX Feature)
+        const isMinAmountError =
+          reason?.toLowerCase().includes('minimum allowed amount') ||
+          reason?.toLowerCase().includes('too small') ||
+          reason?.toLowerCase().includes('too_small') ||
+          (response.status === 400 && (reason?.toLowerCase().includes('amount') || reason?.toLowerCase().includes('too_small')))
+
         if (!isMinAmountError) {
           notifyError(reason, response.error?.message)
+        } else if (state.unitRate) {
+          // Manual calculation fallback to show estimated conversion even if below minimum
+          const unitRateValue = parseFloat(state.unitRate.replace(/\./g, '').replace(/,/g, '.'))
+          if (unitRateValue > 0) {
+            const manualTarget = num * unitRateValue
+            dispatch({
+              quoteId: '',
+              sourceAmount: value,
+              targetAmount: formatTargetNumber(manualTarget),
+              type: 'SET_AMOUNTS',
+            })
+          }
         }
       }
       dispatch({ loadingTarget: false, type: 'SET_LOADING' })
@@ -542,10 +589,27 @@ export const useWebSwapController = (): WebSwapControllerProps => {
       if (!isAbortError(response)) {
         const reason = extractReason(response.data) || response.error?.message || t('swap.quote_error', 'Esta cotización superó el monto máximo permitido.')
 
-        // Suppress validation error if it is the minimum amount error (UX Feature)
-        const isMinAmountError = reason?.toLowerCase().includes('minimum allowed amount')
+        // Suppress validation error if it is the minimum amount error or too small (UX Feature)
+        const isMinAmountError =
+          reason?.toLowerCase().includes('minimum allowed amount') ||
+          reason?.toLowerCase().includes('too small') ||
+          reason?.toLowerCase().includes('too_small') ||
+          (response.status === 400 && (reason?.toLowerCase().includes('amount') || reason?.toLowerCase().includes('too_small')))
+
         if (!isMinAmountError) {
           notifyError(reason, response.error?.message)
+        } else if (state.unitRate) {
+          // Manual calculation fallback to show estimated conversion even if below minimum
+          const unitRateValue = parseFloat(state.unitRate.replace(/\./g, '').replace(/,/g, '.'))
+          if (unitRateValue > 0) {
+            const manualSource = num / unitRateValue
+            dispatch({
+              quoteId: '',
+              sourceAmount: manualSource.toFixed(2),
+              targetAmount: value,
+              type: 'SET_AMOUNTS',
+            })
+          }
         }
       }
       dispatch({ loadingSource: false, type: 'SET_LOADING' })
@@ -950,6 +1014,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     currencyMenuRef,
     exchangeRateDisplay,
     isAuthenticated,
+    isBelowMinimum,
     isWalletConnected,
     loadingBalance: state.loadingBalance,
     loadingSource: state.loadingSource,
