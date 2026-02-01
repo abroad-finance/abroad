@@ -81,11 +81,11 @@ vi.mock('../api', () => ({
   _36EnumsBlockchainNetwork: { STELLAR: 'STELLAR' },
   _36EnumsCryptoCurrency: { USDC: 'USDC' },
   _36EnumsTargetCurrency: { BRL: 'BRL', COP: 'COP' },
-  SupportedPaymentMethod: { BREB: 'BREB', PIX: 'PIX' },
   acceptTransaction: mocked.acceptTransactionMock,
   decodeQrCodeBR: mocked.decodeQrCodeBRMock,
   getQuote: mocked.getQuoteMock,
   getReverseQuote: mocked.getReverseQuoteMock,
+  SupportedPaymentMethod: { BREB: 'BREB', PIX: 'PIX' },
 }))
 
 const mockKit: IWallet = {

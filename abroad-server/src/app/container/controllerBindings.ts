@@ -8,6 +8,7 @@ import { PaymentsController } from '../../modules/payments/interfaces/http/Payme
 import { QrDecoderController } from '../../modules/payments/interfaces/http/QrDecoderController'
 import { SolanaPaymentsController } from '../../modules/payments/interfaces/http/SolanaPaymentsController'
 import { FlowDefinitionController } from '../../modules/flows/interfaces/http/FlowDefinitionController'
+import { FlowInstanceController } from '../../modules/flows/interfaces/http/FlowInstanceController'
 import { QuoteController } from '../../modules/quotes/interfaces/http/QuoteController'
 import { PublicTransactionsController } from '../../modules/transactions/interfaces/http/PublicTransactionsController'
 import { TransactionController } from '../../modules/transactions/interfaces/http/TransactionController'
@@ -29,6 +30,7 @@ const controllerBindings: ReadonlyArray<BindingRegistration<unknown>> = [
   { bindSelf: true, identifier: SolanaPaymentsController, implementation: SolanaPaymentsController },
   { bindSelf: true, identifier: CeloPaymentsController, implementation: CeloPaymentsController },
   { bindSelf: true, identifier: FlowDefinitionController, implementation: FlowDefinitionController },
+  { bindSelf: true, identifier: FlowInstanceController, implementation: FlowInstanceController },
 ] as const
 
 export function bindHttpControllers(container: Container): void {

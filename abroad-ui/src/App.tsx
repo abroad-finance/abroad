@@ -11,6 +11,9 @@ import HiddenLogViewer from './shared/components/HiddenLogViewer'
 // Route-level code splitting
 const WebSwap = lazy(() => import('./pages/WebSwap/WebSwap'))
 const Meridian = lazy(() => import('./pages/Meridian/Meridian'))
+const FlowOpsList = lazy(() => import('./pages/Ops/FlowOpsList'))
+const FlowOpsDetail = lazy(() => import('./pages/Ops/FlowOpsDetail'))
+const FlowDefinitions = lazy(() => import('./pages/Ops/FlowDefinitions'))
 
 function App() {
   return (
@@ -25,6 +28,9 @@ function App() {
                 <Routes>
                   <Route element={<WebSwap />} path="/" />
                   <Route element={<Meridian />} path="/meridian" />
+                  <Route element={<FlowOpsList />} path="/ops/flows" />
+                  <Route element={<FlowOpsDetail />} path="/ops/flows/:flowInstanceId" />
+                  <Route element={<FlowDefinitions />} path="/ops/flows/definitions" />
                 </Routes>
               </Suspense>
             </Router>

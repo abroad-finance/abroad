@@ -27,6 +27,7 @@ import { SolanaWalletHandler } from '../../modules/payments/infrastructure/walle
 import { StellarDepositVerifier } from '../../modules/payments/infrastructure/wallets/StellarDepositVerifier'
 import { StellarWalletHandler } from '../../modules/payments/infrastructure/wallets/StellarWalletHandler'
 import { FlowDefinitionService } from '../../modules/flows/application/FlowDefinitionService'
+import { FlowAuditService } from '../../modules/flows/application/FlowAuditService'
 import { QuoteUseCase } from '../../modules/quotes/application/quoteUseCase'
 import { ReceivedCryptoTransactionUseCase } from '../../modules/transactions/application/receivedCryptoTransactionUseCase'
 import { StellarOrphanRefundService } from '../../modules/transactions/application/StellarOrphanRefundService'
@@ -73,6 +74,7 @@ const domainBindings: ReadonlyArray<BindingRegistration<unknown>> = [
   { identifier: TYPES.ReceivedCryptoTransactionUseCase, implementation: ReceivedCryptoTransactionUseCase },
   { bindSelf: true, identifier: PersonaWebhookService, implementation: PersonaWebhookService },
   { bindSelf: true, identifier: FlowDefinitionService, implementation: FlowDefinitionService },
+  { bindSelf: true, identifier: FlowAuditService, implementation: FlowAuditService },
   { identifier: TYPES.FlowExecutorRegistry, implementation: FlowExecutorRegistry },
   { identifier: TYPES.FlowOrchestrator, implementation: FlowOrchestrator },
   { bindSelf: true, identifier: RefundCoordinator, implementation: RefundCoordinator },

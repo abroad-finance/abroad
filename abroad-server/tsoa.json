@@ -18,6 +18,11 @@
         "in": "header",
         "name": "X-API-Key"
       },
+      "OpsApiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-OPS-API-KEY"
+      },
       "BearerAuth": {
         "type": "http",
         "scheme": "bearer",

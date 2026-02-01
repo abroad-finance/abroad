@@ -1,4 +1,4 @@
-import { FlowInstanceStatus, FlowStepStatus } from '@prisma/client'
+import { FlowInstanceStatus, FlowStepStatus, Prisma } from '@prisma/client'
 import { inject, injectable } from 'inversify'
 
 import { TYPES } from '../../../app/container/types'
@@ -66,7 +66,7 @@ export class FlowOrchestrator {
     const instance = await prisma.flowInstance.create({
       data: {
         currentStepOrder: snapshot.steps[0]?.stepOrder ?? null,
-        flowSnapshot: snapshot,
+        flowSnapshot: this.normalizeJson(snapshot),
         status: FlowInstanceStatus.IN_PROGRESS,
         steps: {
           create: snapshot.steps.map(step => ({
@@ -90,10 +90,10 @@ export class FlowOrchestrator {
 
     const signalRecord = await prisma.flowSignal.create({
       data: {
-        correlationKeys: signal.correlationKeys,
+        correlationKeys: this.normalizeJson(signal.correlationKeys),
         eventType: signal.eventType,
         flowInstanceId: flowInstance?.id ?? null,
-        payload: signal.payload,
+        payload: this.normalizeJson(signal.payload),
       },
     })
 
@@ -175,13 +175,14 @@ export class FlowOrchestrator {
     let claimed = await this.claimNextStep(prisma, flowInstanceId)
 
     while (claimed) {
+      const current = claimed
       const runtime = await this.buildRuntimeContext(flowInstanceId)
       const snapshot = this.readSnapshot(runtime.flowSnapshot)
-      const stepDefinition = snapshot.steps.find(step => step.stepOrder === claimed.stepOrder)
+      const stepDefinition = snapshot.steps.find(step => step.stepOrder === current.stepOrder)
       if (!stepDefinition) {
         await prisma.flowStepInstance.update({
           data: { status: FlowStepStatus.FAILED, endedAt: new Date(), error: { message: 'Step definition missing' } },
-          where: { id: claimed.id },
+          where: { id: current.id },
         })
         await prisma.flowInstance.update({
           data: { status: FlowInstanceStatus.FAILED },
@@ -190,7 +191,7 @@ export class FlowOrchestrator {
         return
       }
 
-      const executor = this.executorRegistry.get(claimed.stepType)
+      const executor = this.executorRegistry.get(current.stepType)
       await prisma.flowStepInstance.update({
         data: {
           input: this.normalizeJson({
@@ -198,15 +199,15 @@ export class FlowOrchestrator {
             context: runtime.context,
           }),
         },
-        where: { id: claimed.id },
+        where: { id: current.id },
       })
       const result = await executor.execute({
         config: stepDefinition.config,
         runtime,
-        stepOrder: claimed.stepOrder,
+        stepOrder: current.stepOrder,
       })
 
-      await this.persistStepOutcome(claimed.id, result)
+      await this.persistStepOutcome(current.id, result)
 
       if (result.outcome === 'waiting' || result.outcome === 'failed') {
         await prisma.flowInstance.update({
@@ -218,7 +219,7 @@ export class FlowOrchestrator {
         return
       }
 
-      const nextOrder = this.resolveNextOrder(snapshot.steps, claimed.stepOrder)
+      const nextOrder = this.resolveNextOrder(snapshot.steps, current.stepOrder)
       await prisma.flowInstance.update({
         data: { currentStepOrder: nextOrder },
         where: { id: flowInstanceId },
@@ -394,7 +395,7 @@ export class FlowOrchestrator {
     if (result.outcome === 'waiting') {
       await prisma.flowStepInstance.update({
         data: {
-          correlation: result.correlation ?? undefined,
+          correlation: result.correlation ? this.normalizeJson(result.correlation) : undefined,
           output: result.output ? this.normalizeJson(result.output) : undefined,
           status: FlowStepStatus.WAITING,
         },
@@ -405,9 +406,9 @@ export class FlowOrchestrator {
 
     await prisma.flowStepInstance.update({
       data: {
-        correlation: result.correlation ?? undefined,
+        correlation: result.correlation ? this.normalizeJson(result.correlation) : undefined,
         endedAt: now,
-        error: result.error ? { message: result.error } : undefined,
+        error: result.error ? this.normalizeJson({ message: result.error }) : undefined,
         output: result.output ? this.normalizeJson(result.output) : undefined,
         status: result.outcome === 'succeeded' ? FlowStepStatus.SUCCEEDED : FlowStepStatus.FAILED,
       },
@@ -422,8 +423,8 @@ export class FlowOrchestrator {
     return orders[currentIndex + 1]
   }
 
-  private normalizeJson(value: Record<string, unknown>): Record<string, unknown> {
-    return JSON.parse(JSON.stringify(value)) as Record<string, unknown>
+  private normalizeJson(value: unknown): Prisma.InputJsonValue {
+    return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue
   }
 
   private jsonToRecord(value: unknown): Record<string, unknown> {

@@ -10,7 +10,7 @@ import react from 'eslint-plugin-react'
 import newlineDestructuring from 'eslint-plugin-newline-destructuring';
 
 export default tseslint.config(
-  { ignores: ['dist'] },
+  { ignores: ['dist', 'src/api/index.ts'] },
 
   {
     files: ['**/src/**/*.{ts,tsx}'],

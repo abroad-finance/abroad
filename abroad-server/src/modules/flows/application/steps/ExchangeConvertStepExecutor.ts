@@ -124,9 +124,13 @@ export class ExchangeConvertStepExecutor implements FlowStepExecutor {
       if (isRetryable) {
         return {
           correlation: { provider: 'binance' },
-          error: message,
           outcome: 'waiting',
-          output: { amount, provider: 'binance', symbol: config.symbol },
+          output: {
+            amount,
+            provider: 'binance',
+            retryReason: message,
+            symbol: config.symbol,
+          },
         }
       }
       this.logger.error('Binance conversion failed', error)

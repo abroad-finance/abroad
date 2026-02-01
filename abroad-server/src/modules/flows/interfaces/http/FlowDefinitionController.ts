@@ -6,6 +6,7 @@ import {
   Patch,
   Path,
   Post,
+  Res,
   Response,
   Route,
   Security,
@@ -21,9 +22,8 @@ import {
   flowDefinitionSchema,
 } from '../../application/flowDefinitionSchemas'
 
-@Route('admin/flows')
-@Security('ApiKeyAuth')
-@Security('BearerAuth')
+@Route('ops/flows/definitions')
+@Security('OpsApiKeyAuth')
 export class FlowDefinitionController extends Controller {
   constructor(
     @inject(FlowDefinitionService) private readonly flowDefinitionService: FlowDefinitionService,
