@@ -1,4 +1,4 @@
-import { FlowStepType, TransactionStatus } from '@prisma/client'
+import { FlowStepType, PaymentMethod, TransactionStatus } from '@prisma/client'
 import { inject, injectable } from 'inversify'
 
 import { TYPES } from '../../../../app/container/types'
@@ -52,9 +52,10 @@ export class PayoutSendStepExecutor implements FlowStepExecutor {
       return { error: 'Transaction not found for payout', outcome: 'failed' }
     }
 
-    let paymentService = this.paymentServiceFactory.getPaymentService(transaction.quote.paymentMethod)
+    const paymentMethod = this.resolvePaymentMethod(params.config, transaction.quote.paymentMethod)
+    let paymentService = this.paymentServiceFactory.getPaymentService(paymentMethod)
     paymentService = this.paymentServiceFactory.getPaymentServiceForCapability?.({
-      paymentMethod: transaction.quote.paymentMethod,
+      paymentMethod,
       targetCurrency: transaction.quote.targetCurrency,
     }) ?? paymentService
 
@@ -81,10 +82,10 @@ export class PayoutSendStepExecutor implements FlowStepExecutor {
             : undefined,
           output: {
             externalId: paymentResponse.transactionId ?? null,
-            provider: paymentService.provider ?? transaction.quote.paymentMethod,
-          },
-          outcome: 'succeeded',
-        }
+          provider: paymentService.provider ?? paymentMethod,
+        },
+        outcome: 'succeeded',
+      }
       }
 
       const transitionName = paymentResponse.success ? 'payment_completed' : 'payment_failed'
@@ -115,17 +116,17 @@ export class PayoutSendStepExecutor implements FlowStepExecutor {
       if (paymentResponse.success) {
         await this.dispatcher.notifySlack(updated, TransactionStatus.PAYMENT_COMPLETED, {
           deliverNow: false,
-          notes: { provider: paymentService.provider ?? transaction.quote.paymentMethod },
-          prismaClient,
-          trigger: 'FlowPayoutSend',
-        })
+        notes: { provider: paymentService.provider ?? paymentMethod },
+        prismaClient,
+        trigger: 'FlowPayoutSend',
+      })
         return { outcome: 'succeeded', output: { provider: paymentService.provider ?? transaction.quote.paymentMethod } }
       }
 
       await this.dispatcher.notifySlack(updated, TransactionStatus.PAYMENT_FAILED, {
         deliverNow: false,
         notes: {
-          provider: paymentService.provider ?? transaction.quote.paymentMethod,
+          provider: paymentService.provider ?? paymentMethod,
           providerTransactionId: paymentResponse.transactionId ?? 'not-provided',
           reason: paymentResponse.reason,
           status: paymentResponse.code,
@@ -141,5 +142,12 @@ export class PayoutSendStepExecutor implements FlowStepExecutor {
       this.logger.error('Payout execution failed', error)
       return { error: message, outcome: 'failed' }
     }
+  }
+
+  private resolvePaymentMethod(config: Record<string, unknown>, fallback: PaymentMethod): PaymentMethod {
+    const configValue = typeof config.paymentMethod === 'string' ? config.paymentMethod : null
+    const normalized = configValue?.toUpperCase()
+    const method = Object.values(PaymentMethod).find(value => value === normalized)
+    return method ?? fallback
   }
 }

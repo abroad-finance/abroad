@@ -241,6 +241,11 @@ enum FlowPricingProvider {
   TRANSFERO
 }
 
+enum FlowCorridorStatus {
+  SUPPORTED
+  UNSUPPORTED
+}
+
 enum FlowStepType {
   PAYOUT_SEND
   EXCHANGE_SEND
@@ -361,16 +366,31 @@ model FlowDefinition {
   cryptoCurrency CryptoCurrency
   blockchain     BlockchainNetwork
   targetCurrency TargetCurrency
+  payoutProvider PaymentMethod
   pricingProvider FlowPricingProvider
   exchangeFeePct Float               @default(0)
   fixedFee       Float               @default(0)
   minAmount      Float?
   maxAmount      Float?
+  userSteps      Json
   createdAt      DateTime            @default(now())
   updatedAt      DateTime            @updatedAt
   steps          FlowStepDefinition[]
 
   @@unique([cryptoCurrency, blockchain, targetCurrency], name: "flow_corridor_unique")
+}
+
+model FlowCorridor {
+  id             String             @id @default(uuid())
+  cryptoCurrency CryptoCurrency
+  blockchain     BlockchainNetwork
+  targetCurrency TargetCurrency
+  status         FlowCorridorStatus @default(UNSUPPORTED)
+  reason         String?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  @@unique([cryptoCurrency, blockchain, targetCurrency], name: "flow_corridor_status_unique")
 }
 
 model FlowStepDefinition {

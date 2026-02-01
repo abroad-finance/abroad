@@ -1,7 +1,9 @@
 import { Container } from 'inversify'
 
 import { FlowExecutorRegistry } from '../../modules/flows/application/FlowExecutorRegistry'
+import { FlowDefinitionBuilder } from '../../modules/flows/application/FlowDefinitionBuilder'
 import { FlowOrchestrator } from '../../modules/flows/application/FlowOrchestrator'
+import { FlowCorridorService } from '../../modules/flows/application/FlowCorridorService'
 import { RefundCoordinator } from '../../modules/flows/application/RefundCoordinator'
 import { AwaitExchangeBalanceStepExecutor } from '../../modules/flows/application/steps/AwaitExchangeBalanceStepExecutor'
 import { AwaitProviderStatusStepExecutor } from '../../modules/flows/application/steps/AwaitProviderStatusStepExecutor'
@@ -73,7 +75,9 @@ const domainBindings: ReadonlyArray<BindingRegistration<unknown>> = [
   { identifier: TYPES.PaymentUseCase, implementation: PaymentUseCase },
   { identifier: TYPES.ReceivedCryptoTransactionUseCase, implementation: ReceivedCryptoTransactionUseCase },
   { bindSelf: true, identifier: PersonaWebhookService, implementation: PersonaWebhookService },
+  { bindSelf: true, identifier: FlowDefinitionBuilder, implementation: FlowDefinitionBuilder },
   { bindSelf: true, identifier: FlowDefinitionService, implementation: FlowDefinitionService },
+  { bindSelf: true, identifier: FlowCorridorService, implementation: FlowCorridorService },
   { bindSelf: true, identifier: FlowAuditService, implementation: FlowAuditService },
   { identifier: TYPES.FlowExecutorRegistry, implementation: FlowExecutorRegistry },
   { identifier: TYPES.FlowOrchestrator, implementation: FlowOrchestrator },

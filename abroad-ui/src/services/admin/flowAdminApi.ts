@@ -1,5 +1,7 @@
 import type { ApiResult, HttpRequestConfig } from '../http/types'
 import type {
+  FlowCorridorListResponse,
+  FlowCorridorUpdateInput,
   FlowDefinition,
   FlowDefinitionInput,
   FlowInstanceDetail,
@@ -66,6 +68,26 @@ export const listFlowInstances = async (params: {
 export const listFlowDefinitions = async (): Promise<FlowDefinition[]> => {
   const result = await adminRequest<FlowDefinition[]>('/ops/flows/definitions', {
     method: 'GET',
+  })
+
+  return unwrap(result)
+}
+
+export const listFlowCorridors = async (): Promise<FlowCorridorListResponse> => {
+  const result = await adminRequest<FlowCorridorListResponse>('/ops/flows/corridors', {
+    method: 'GET',
+  })
+
+  return unwrap(result)
+}
+
+export const updateFlowCorridor = async (
+  payload: FlowCorridorUpdateInput,
+): Promise<FlowCorridorListResponse['corridors'][number]> => {
+  const result = await adminRequest<FlowCorridorListResponse['corridors'][number]>('/ops/flows/corridors', {
+    body: JSON.stringify(payload),
+    headers: { 'Content-Type': 'application/json' },
+    method: 'PATCH',
   })
 
   return unwrap(result)

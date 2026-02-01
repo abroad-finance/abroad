@@ -1,68 +1,39 @@
 import {
-  useCallback, useEffect, useMemo, useRef, useState,
+  useCallback, useEffect, useMemo, useState,
 } from 'react'
 import { Link } from 'react-router-dom'
 
 import {
   createFlowDefinition,
+  listFlowCorridors,
   listFlowDefinitions,
+  updateFlowCorridor,
   updateFlowDefinition,
 } from '../../services/admin/flowAdminApi'
 import {
+  FlowBusinessStep,
+  FlowCorridor,
+  FlowCorridorSupportStatus,
   FlowDefinition,
   FlowDefinitionInput,
   FlowPricingProvider,
-  FlowStepCompletionPolicy,
-  FlowStepType,
+  FlowVenue,
+  PaymentMethod,
+  SupportedCurrency,
 } from '../../services/admin/flowTypes'
 import { useOpsApiKey } from '../../services/admin/opsAuthStore'
 import OpsApiKeyPanel from './OpsApiKeyPanel'
 
-const blockchains = [
-  'STELLAR',
-  'SOLANA',
-  'CELO',
-] as const
-const cryptoCurrencies = ['USDC'] as const
-const targetCurrencies = ['COP', 'BRL'] as const
+const venues: FlowVenue[] = ['BINANCE', 'TRANSFERO']
+const payoutProviders: PaymentMethod[] = ['BREB', 'PIX']
 const pricingProviders: FlowPricingProvider[] = ['BINANCE', 'TRANSFERO']
-const stepTypes: FlowStepType[] = [
-  'PAYOUT_SEND',
-  'AWAIT_PROVIDER_STATUS',
-  'EXCHANGE_SEND',
-  'AWAIT_EXCHANGE_BALANCE',
-  'EXCHANGE_CONVERT',
-  'TREASURY_TRANSFER',
+const supportedCurrencies: SupportedCurrency[] = [
+  'USDC',
+  'USDT',
+  'COP',
+  'BRL',
 ]
-const completionPolicies: FlowStepCompletionPolicy[] = ['SYNC', 'AWAIT_EVENT']
-
-const stepHints: Record<FlowStepType, string> = {
-  AWAIT_EXCHANGE_BALANCE: 'Wait for exchange balance update signal.',
-  AWAIT_PROVIDER_STATUS: 'Wait for provider webhook status update (uses externalId).',
-  EXCHANGE_CONVERT: 'Execute a market conversion on exchange.',
-  EXCHANGE_SEND: 'Send crypto from hot wallet to exchange deposit address.',
-  PAYOUT_SEND: 'Send payout to the user via payment provider.',
-  TREASURY_TRANSFER: 'Withdraw assets between venues (e.g., Binance → Transfero).',
-}
-
-const defaultConfigForStep = (stepType: FlowStepType): Record<string, unknown> => {
-  switch (stepType) {
-    case 'AWAIT_EXCHANGE_BALANCE':
-      return { provider: 'binance' }
-    case 'AWAIT_PROVIDER_STATUS':
-      return {}
-    case 'EXCHANGE_CONVERT':
-      return { provider: 'binance', side: 'SELL', symbol: 'USDCUSDT' }
-    case 'EXCHANGE_SEND':
-      return {}
-    case 'PAYOUT_SEND':
-      return {}
-    case 'TREASURY_TRANSFER':
-      return { asset: 'USDC', destinationProvider: 'transfero', sourceProvider: 'binance' }
-  }
-}
-
-const formatDate = (value: string) => new Date(value).toLocaleString()
+const transferoSourceAssets: SupportedCurrency[] = ['USDC', 'USDT']
 
 type DefinitionDraft = {
   blockchain: string
@@ -74,25 +45,57 @@ type DefinitionDraft = {
   maxAmount: string
   minAmount: string
   name: string
+  payoutProvider: PaymentMethod
   pricingProvider: FlowPricingProvider
-  steps: StepDraft[]
+  steps: FlowBusinessStep[]
   targetCurrency: string
-}
-
-type StepDraft = {
-  completionPolicy: FlowStepCompletionPolicy
-  configText: string
-  id?: string
-  signalMatchText: string
-  stepType: FlowStepType
 }
 
 type ValidationErrorMap = Record<string, string>
 
-const toJsonText = (value: null | Record<string, unknown> | undefined): string => {
-  if (!value || Object.keys(value).length === 0) return ''
-  return JSON.stringify(value, null, 2)
+const buildCorridorKey = (corridor: {
+  blockchain: string
+  cryptoCurrency: string
+  targetCurrency: string
+}): string => `${corridor.cryptoCurrency}:${corridor.blockchain}:${corridor.targetCurrency}`
+
+const formatDate = (value: null | string | undefined): string => {
+  if (!value) return '—'
+  return new Date(value).toLocaleString()
 }
+
+const defaultPayoutProvider = (targetCurrency: string): PaymentMethod => (
+  targetCurrency === 'BRL' ? 'PIX' : 'BREB'
+)
+
+const defaultPricingProvider = (targetCurrency: string): FlowPricingProvider => (
+  targetCurrency === 'BRL' ? 'TRANSFERO' : 'BINANCE'
+)
+
+const getConvertFromOptions = (venue: FlowVenue): SupportedCurrency[] => (
+  venue === 'TRANSFERO' ? transferoSourceAssets : supportedCurrencies
+)
+
+const getConvertToOptions = (venue: FlowVenue, targetCurrency: string): SupportedCurrency[] => (
+  venue === 'TRANSFERO'
+    ? [targetCurrency as SupportedCurrency]
+    : supportedCurrencies
+)
+
+const buildEmptyDraft = (corridor: FlowCorridor): DefinitionDraft => ({
+  blockchain: corridor.blockchain,
+  cryptoCurrency: corridor.cryptoCurrency,
+  enabled: true,
+  exchangeFeePct: '0',
+  fixedFee: '0',
+  maxAmount: '',
+  minAmount: '',
+  name: '',
+  payoutProvider: defaultPayoutProvider(corridor.targetCurrency),
+  pricingProvider: defaultPricingProvider(corridor.targetCurrency),
+  steps: [{ type: 'PAYOUT' }],
+  targetCurrency: corridor.targetCurrency,
+})
 
 const fromDefinition = (definition: FlowDefinition): DefinitionDraft => ({
   blockchain: definition.blockchain,
@@ -104,36 +107,10 @@ const fromDefinition = (definition: FlowDefinition): DefinitionDraft => ({
   maxAmount: definition.maxAmount === null ? '' : String(definition.maxAmount),
   minAmount: definition.minAmount === null ? '' : String(definition.minAmount),
   name: definition.name,
+  payoutProvider: definition.payoutProvider,
   pricingProvider: definition.pricingProvider,
-  steps: definition.steps
-    .sort((a, b) => a.stepOrder - b.stepOrder)
-    .map(step => ({
-      completionPolicy: step.completionPolicy,
-      configText: toJsonText(step.config),
-      id: step.id,
-      signalMatchText: toJsonText(step.signalMatch ?? undefined),
-      stepType: step.stepType,
-    })),
+  steps: definition.steps.length > 0 ? definition.steps : [{ type: 'PAYOUT' }],
   targetCurrency: definition.targetCurrency,
-})
-
-const buildEmptyDraft = (): DefinitionDraft => ({
-  blockchain: blockchains[0],
-  cryptoCurrency: cryptoCurrencies[0],
-  enabled: true,
-  exchangeFeePct: '0',
-  fixedFee: '0',
-  maxAmount: '',
-  minAmount: '',
-  name: '',
-  pricingProvider: pricingProviders[0],
-  steps: [{
-    completionPolicy: 'SYNC',
-    configText: toJsonText(defaultConfigForStep('PAYOUT_SEND')),
-    signalMatchText: '',
-    stepType: 'PAYOUT_SEND',
-  }],
-  targetCurrency: targetCurrencies[0],
 })
 
 const parseNumberField = (value: string, fallback: number): number => {
@@ -154,26 +131,14 @@ const isNumeric = (value: string): boolean => {
   return Number.isFinite(parsed)
 }
 
-const parseJsonRecord = (value: string, allowEmpty: boolean): { error?: string, ok: boolean, value?: Record<string, unknown> } => {
-  if (!value.trim()) {
-    return allowEmpty ? { ok: true, value: {} } : { error: 'Required JSON object.', ok: false }
-  }
-  try {
-    const parsed = JSON.parse(value) as unknown
-    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-      return { ok: true, value: parsed as Record<string, unknown> }
-    }
-    return { error: 'Must be a JSON object.', ok: false }
-  }
-  catch (err) {
-    return { error: err instanceof Error ? err.message : 'Invalid JSON', ok: false }
-  }
-}
+const isTargetCurrency = (value: SupportedCurrency): boolean => value === 'BRL' || value === 'COP'
 
 const FlowDefinitions = () => {
   const opsApiKey = useOpsApiKey()
+  const [corridors, setCorridors] = useState<FlowCorridor[]>([])
+  const [corridorSummary, setCorridorSummary] = useState<null | { defined: number, missing: number, total: number, unsupported: number }>(null)
   const [definitions, setDefinitions] = useState<FlowDefinition[]>([])
-  const [selectedId, setSelectedId] = useState<null | string>(null)
+  const [selectedKey, setSelectedKey] = useState<null | string>(null)
   const [draft, setDraft] = useState<DefinitionDraft | null>(null)
   const [baseline, setBaseline] = useState<null | string>(null)
   const [loading, setLoading] = useState(false)
@@ -181,59 +146,58 @@ const FlowDefinitions = () => {
   const [error, setError] = useState<null | string>(null)
   const [validationErrors, setValidationErrors] = useState<ValidationErrorMap>({})
   const [search, setSearch] = useState('')
-  const [newStepType, setNewStepType] = useState<FlowStepType>('PAYOUT_SEND')
-  const draftRef = useRef<DefinitionDraft | null>(null)
-  const selectedIdRef = useRef<null | string>(null)
+  const [filter, setFilter] = useState<'all' | 'defined' | 'missing' | 'unsupported'>('all')
+  const [unsupportedReason, setUnsupportedReason] = useState('')
+  const [newStepType, setNewStepType] = useState<'CONVERT' | 'MOVE_TO_EXCHANGE' | 'TRANSFER_VENUE'>('MOVE_TO_EXCHANGE')
 
-  useEffect(() => {
-    draftRef.current = draft
-  }, [draft])
+  const definitionsById = useMemo(() => new Map(definitions.map(def => [def.id, def])), [definitions])
+  const corridorByKey = useMemo(() => new Map(corridors.map(corridor => [buildCorridorKey(corridor), corridor])), [corridors])
 
-  useEffect(() => {
-    selectedIdRef.current = selectedId
-  }, [selectedId])
+  const selectedCorridor = selectedKey ? corridorByKey.get(selectedKey) ?? null : null
 
   const isDirty = useMemo(() => {
     if (!draft || !baseline) return false
     return JSON.stringify(draft) !== baseline
   }, [baseline, draft])
 
-  const filteredDefinitions = useMemo(() => {
-    if (!search.trim()) return definitions
+  const filteredCorridors = useMemo(() => {
     const term = search.trim().toLowerCase()
-    return definitions.filter(item => (
-      item.name.toLowerCase().includes(term)
-      || item.cryptoCurrency.toLowerCase().includes(term)
-      || item.blockchain.toLowerCase().includes(term)
-      || item.targetCurrency.toLowerCase().includes(term)
-    ))
-  }, [definitions, search])
+    return corridors.filter((corridor) => {
+      if (filter === 'defined' && corridor.status !== 'DEFINED') return false
+      if (filter === 'missing' && corridor.status !== 'MISSING') return false
+      if (filter === 'unsupported' && corridor.status !== 'UNSUPPORTED') return false
+      if (!term) return true
+      const label = `${corridor.cryptoCurrency} ${corridor.blockchain} ${corridor.targetCurrency}`.toLowerCase()
+      return label.includes(term)
+    })
+  }, [
+    corridors,
+    filter,
+    search,
+  ])
 
-  const loadDefinitions = useCallback(async () => {
+  const loadData = useCallback(async () => {
     if (!opsApiKey) {
+      setCorridors([])
+      setCorridorSummary(null)
       setDefinitions([])
       setDraft(null)
-      setSelectedId(null)
+      setSelectedKey(null)
       setBaseline(null)
       return
     }
+
     setLoading(true)
     setError(null)
+
     try {
-      const list = await listFlowDefinitions()
-      const currentSelectedId = selectedIdRef.current
-      const currentDraft = draftRef.current
-      setDefinitions(list)
-      if (!currentSelectedId && !currentDraft && list.length > 0) {
-        const next = list[0]
-        const nextDraft = fromDefinition(next)
-        setSelectedId(next.id)
-        setDraft(nextDraft)
-        setBaseline(JSON.stringify(nextDraft))
-      }
+      const [corridorResult, definitionResult] = await Promise.all([listFlowCorridors(), listFlowDefinitions()])
+      setCorridors(corridorResult.corridors)
+      setCorridorSummary(corridorResult.summary)
+      setDefinitions(definitionResult)
     }
     catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load flow definitions')
+      setError(err instanceof Error ? err.message : 'Failed to load corridor coverage')
     }
     finally {
       setLoading(false)
@@ -241,25 +205,17 @@ const FlowDefinitions = () => {
   }, [opsApiKey])
 
   useEffect(() => {
-    void loadDefinitions()
-  }, [loadDefinitions])
+    void loadData()
+  }, [loadData])
 
-  const selectDefinition = (definition: FlowDefinition) => {
-    const nextDraft = fromDefinition(definition)
-    setSelectedId(definition.id)
+  const selectCorridor = (corridor: FlowCorridor) => {
+    setSelectedKey(buildCorridorKey(corridor))
+    const definition = corridor.definitionId ? definitionsById.get(corridor.definitionId) : null
+    const nextDraft = definition ? fromDefinition(definition) : buildEmptyDraft(corridor)
     setDraft(nextDraft)
     setBaseline(JSON.stringify(nextDraft))
     setValidationErrors({})
-    setError(null)
-  }
-
-  const handleNewDefinition = () => {
-    const nextDraft = buildEmptyDraft()
-    setSelectedId(null)
-    setDraft(nextDraft)
-    setBaseline(JSON.stringify(nextDraft))
-    setValidationErrors({})
-    setError(null)
+    setUnsupportedReason(corridor.unsupportedReason ?? '')
   }
 
   const updateDraftField = (field: keyof DefinitionDraft, value: boolean | string) => {
@@ -267,7 +223,7 @@ const FlowDefinitions = () => {
     setDraft({ ...draft, [field]: value })
   }
 
-  const updateStepDraft = (index: number, updater: (step: StepDraft) => StepDraft) => {
+  const updateStep = (index: number, updater: (step: FlowBusinessStep) => FlowBusinessStep) => {
     if (!draft) return
     const steps = draft.steps.map((step, idx) => (idx === index ? updater(step) : step))
     setDraft({ ...draft, steps })
@@ -275,9 +231,10 @@ const FlowDefinitions = () => {
 
   const reorderStep = (index: number, direction: 'down' | 'up') => {
     if (!draft) return
+    if (index === 0) return
     const steps = [...draft.steps]
     const targetIndex = direction === 'up' ? index - 1 : index + 1
-    if (targetIndex < 0 || targetIndex >= steps.length) return
+    if (targetIndex <= 0 || targetIndex >= steps.length) return
     const temp = steps[index]
     steps[index] = steps[targetIndex]
     steps[targetIndex] = temp
@@ -286,20 +243,31 @@ const FlowDefinitions = () => {
 
   const removeStep = (index: number) => {
     if (!draft) return
+    if (index === 0) return
     const steps = draft.steps.filter((_, idx) => idx !== index)
     setDraft({ ...draft, steps })
   }
 
   const addStep = () => {
     if (!draft) return
-    const completionPolicy: FlowStepCompletionPolicy = newStepType.startsWith('AWAIT') ? 'AWAIT_EVENT' : 'SYNC'
-    const step: StepDraft = {
-      completionPolicy,
-      configText: toJsonText(defaultConfigForStep(newStepType)),
-      signalMatchText: '',
-      stepType: newStepType,
-    }
-    setDraft({ ...draft, steps: [...draft.steps, step] })
+    const baseAsset = draft.cryptoCurrency as SupportedCurrency
+    const newStep: FlowBusinessStep = newStepType === 'MOVE_TO_EXCHANGE'
+      ? { type: 'MOVE_TO_EXCHANGE', venue: 'BINANCE' }
+      : newStepType === 'TRANSFER_VENUE'
+        ? {
+            asset: baseAsset,
+            fromVenue: 'BINANCE',
+            toVenue: 'TRANSFERO',
+            type: 'TRANSFER_VENUE',
+          }
+        : {
+            fromAsset: baseAsset,
+            toAsset: draft.targetCurrency as SupportedCurrency,
+            type: 'CONVERT',
+            venue: 'BINANCE',
+          }
+
+    setDraft({ ...draft, steps: [...draft.steps, newStep] })
   }
 
   const validateDraft = (draftToValidate: DefinitionDraft): { errors: ValidationErrorMap, ok: boolean, payload?: FlowDefinitionInput } => {
@@ -328,35 +296,73 @@ const FlowDefinitions = () => {
       errors.maxAmount = 'Maximum amount must be greater than minimum amount.'
     }
 
-    const parsedSteps = draftToValidate.steps.map((step, index) => {
-      const configResult = parseJsonRecord(step.configText, true)
-      if (!configResult.ok) {
-        errors[`config-${index}`] = configResult.error ?? 'Invalid config'
+    if (draftToValidate.steps.length === 0 || draftToValidate.steps[0].type !== 'PAYOUT') {
+      errors.steps = 'The flow must start with a payout step.'
+    }
+
+    let currentLocation: 'HOT_WALLET' | FlowVenue = 'HOT_WALLET'
+    let currentAsset = draftToValidate.cryptoCurrency as SupportedCurrency
+
+    draftToValidate.steps.forEach((step, index) => {
+      if (index === 0 && step.type !== 'PAYOUT') {
+        errors[`step-${index}`] = 'First step must be payout.'
+        return
       }
 
-      let signalMatch: Record<string, unknown> | undefined
-      if (step.signalMatchText.trim()) {
-        const signalResult = parseJsonRecord(step.signalMatchText, false)
-        if (!signalResult.ok) {
-          errors[`signal-${index}`] = signalResult.error ?? 'Invalid signal match'
-        }
-        else {
-          signalMatch = signalResult.value
-        }
+      if (index > 0 && step.type === 'PAYOUT') {
+        errors[`step-${index}`] = 'Payout step can only be first.'
+        return
       }
 
-      return {
-        completionPolicy: step.completionPolicy,
-        config: configResult.value ?? {},
-        signalMatch,
-        stepOrder: index + 1,
-        stepType: step.stepType,
+      if (step.type === 'MOVE_TO_EXCHANGE') {
+        if (currentLocation !== 'HOT_WALLET') {
+          errors[`step-${index}`] = 'Funds must be in hot wallet to move to an exchange.'
+        }
+        currentLocation = step.venue
+        return
+      }
+
+      if (step.type === 'CONVERT') {
+        if (currentLocation !== step.venue) {
+          errors[`step-${index}`] = `Conversion requires funds at ${step.venue}.`
+        }
+        if (currentAsset !== step.fromAsset) {
+          errors[`step-${index}`] = `Conversion source asset must be ${currentAsset}.`
+        }
+        if (step.fromAsset === step.toAsset) {
+          errors[`step-${index}`] = 'Conversion assets must be different.'
+        }
+        if (step.venue === 'TRANSFERO') {
+          if (!isTargetCurrency(step.toAsset)) {
+            errors[`step-${index}`] = 'Transfero conversions must end in fiat.'
+          }
+          if (step.toAsset !== draftToValidate.targetCurrency) {
+            errors[`step-${index}`] = 'Transfero conversion must target the corridor fiat currency.'
+          }
+          if (isTargetCurrency(step.fromAsset)) {
+            errors[`step-${index}`] = 'Transfero conversion source must be a crypto asset.'
+          }
+        }
+        currentAsset = step.toAsset
+        return
+      }
+
+      if (step.type === 'TRANSFER_VENUE') {
+        if (currentLocation !== step.fromVenue) {
+          errors[`step-${index}`] = `Transfer requires funds at ${step.fromVenue}.`
+        }
+        if (step.fromVenue === step.toVenue) {
+          errors[`step-${index}`] = 'Transfer venues must be different.'
+        }
+        if (step.fromVenue !== 'BINANCE') {
+          errors[`step-${index}`] = 'Only Binance can be used as a transfer source today.'
+        }
+        if (currentAsset !== step.asset) {
+          errors[`step-${index}`] = `Transfer asset must be ${currentAsset}.`
+        }
+        currentLocation = step.toVenue
       }
     })
-
-    if (draftToValidate.steps.length === 0) {
-      errors.steps = 'At least one step is required.'
-    }
 
     if (Object.keys(errors).length > 0) {
       return { errors, ok: false }
@@ -371,8 +377,9 @@ const FlowDefinitions = () => {
       maxAmount: parseOptionalNumber(draftToValidate.maxAmount),
       minAmount: parseOptionalNumber(draftToValidate.minAmount),
       name: draftToValidate.name.trim(),
+      payoutProvider: draftToValidate.payoutProvider,
       pricingProvider: draftToValidate.pricingProvider,
-      steps: parsedSteps,
+      steps: draftToValidate.steps,
       targetCurrency: draftToValidate.targetCurrency,
     }
 
@@ -396,8 +403,12 @@ const FlowDefinitions = () => {
         ? await updateFlowDefinition(draft.id, validation.payload)
         : await createFlowDefinition(validation.payload)
 
-      await loadDefinitions()
-      selectDefinition(saved)
+      await loadData()
+      const nextDraft = fromDefinition(saved)
+      setSelectedKey(buildCorridorKey(saved))
+      setDraft(nextDraft)
+      setBaseline(JSON.stringify(nextDraft))
+      setValidationErrors({})
       setError(null)
     }
     catch (err) {
@@ -408,6 +419,33 @@ const FlowDefinitions = () => {
     }
   }
 
+  const handleCorridorStatus = async (status: FlowCorridorSupportStatus) => {
+    if (!selectedCorridor) return
+    setSaving(true)
+    setError(null)
+
+    try {
+      await updateFlowCorridor({
+        blockchain: selectedCorridor.blockchain,
+        cryptoCurrency: selectedCorridor.cryptoCurrency,
+        reason: unsupportedReason.trim() || undefined,
+        status,
+        targetCurrency: selectedCorridor.targetCurrency,
+      })
+      await loadData()
+    }
+    catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update corridor status')
+    }
+    finally {
+      setSaving(false)
+    }
+  }
+
+  const corridorTitle = (corridor: FlowCorridor): string => (
+    `${corridor.cryptoCurrency} · ${corridor.blockchain} → ${corridor.targetCurrency}`
+  )
+
   return (
     <div className="min-h-screen bg-[#F7F3EC] text-[#1A1A1A]">
       <div className="relative overflow-hidden">
@@ -416,17 +454,17 @@ const FlowDefinitions = () => {
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
               <Link className="text-sm text-[#1B4D48] hover:text-[#356E6A]" to="/ops/flows">← Back to runs</Link>
-              <div className="mt-3 text-sm uppercase tracking-[0.3em] text-[#356E6A]">Flow Studio</div>
-              <h1 className="text-3xl md:text-4xl font-semibold">Flow Definition Editor</h1>
+              <div className="mt-3 text-sm uppercase tracking-[0.3em] text-[#356E6A]">Flow Coverage</div>
+              <h1 className="text-3xl md:text-4xl font-semibold">Corridor Flow Builder</h1>
               <p className="text-sm text-[#4B5563] max-w-xl mt-2">
-                Build corridor pipelines step-by-step. Changes apply to new transactions only.
+                Define the business pipeline for each corridor. System logic handles payouts, waits, and refunds automatically.
               </p>
             </div>
             <div className="flex items-center gap-3">
               <button
                 className="px-4 py-2 rounded-xl border border-[#1B4D48] text-[#1B4D48] bg-white/70 hover:bg-white transition"
                 disabled={!opsApiKey || loading}
-                onClick={() => void loadDefinitions()}
+                onClick={() => void loadData()}
                 type="button"
               >
                 Refresh
@@ -444,66 +482,92 @@ const FlowDefinitions = () => {
 
           {!opsApiKey && (
             <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
-              Ops API key required to load flow definitions.
+              Ops API key required to load corridor coverage.
             </div>
           )}
 
-          <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-[1.2fr_2fr]">
+          <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-4">
+            <div className="rounded-2xl border border-white/70 bg-white/80 p-4 shadow-[0_16px_40px_-35px_rgba(15,23,42,0.45)]">
+              <div className="text-xs uppercase tracking-[0.3em] text-[#6B7280]">Total</div>
+              <div className="mt-2 text-2xl font-semibold">{corridorSummary?.total ?? '—'}</div>
+            </div>
+            <div className="rounded-2xl border border-white/70 bg-white/80 p-4 shadow-[0_16px_40px_-35px_rgba(15,23,42,0.45)]">
+              <div className="text-xs uppercase tracking-[0.3em] text-[#6B7280]">Defined</div>
+              <div className="mt-2 text-2xl font-semibold text-emerald-700">{corridorSummary?.defined ?? '—'}</div>
+            </div>
+            <div className="rounded-2xl border border-white/70 bg-white/80 p-4 shadow-[0_16px_40px_-35px_rgba(15,23,42,0.45)]">
+              <div className="text-xs uppercase tracking-[0.3em] text-[#6B7280]">Missing</div>
+              <div className="mt-2 text-2xl font-semibold text-rose-700">{corridorSummary?.missing ?? '—'}</div>
+            </div>
+            <div className="rounded-2xl border border-white/70 bg-white/80 p-4 shadow-[0_16px_40px_-35px_rgba(15,23,42,0.45)]">
+              <div className="text-xs uppercase tracking-[0.3em] text-[#6B7280]">Unsupported</div>
+              <div className="mt-2 text-2xl font-semibold text-amber-700">{corridorSummary?.unsupported ?? '—'}</div>
+            </div>
+          </div>
+
+          <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-[1.1fr_2fr]">
             <div className="rounded-2xl border border-white/70 bg-white/80 p-5 shadow-[0_20px_45px_-35px_rgba(15,23,42,0.45)]">
-              <div className="flex items-center justify-between">
-                <div className="text-sm font-semibold">Definitions</div>
-                <button
-                  className="rounded-xl border border-[#356E6A] bg-[#356E6A] px-3 py-1 text-xs font-semibold text-white hover:bg-[#2B5B57]"
-                  disabled={!opsApiKey}
-                  onClick={handleNewDefinition}
-                  type="button"
-                >
-                  + New
-                </button>
-              </div>
-              <div className="mt-4">
+              <div className="flex flex-col gap-3">
+                <div className="text-sm font-semibold">Corridors</div>
                 <input
                   className="w-full rounded-xl border border-[#DADADA] bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#356E6A]/40"
                   onChange={event => setSearch(event.target.value)}
-                  placeholder="Search by name or corridor"
+                  placeholder="Search corridor"
                   value={search}
                 />
+                <div className="flex flex-wrap gap-2 text-xs">
+                  {[
+                    'all',
+                    'defined',
+                    'missing',
+                    'unsupported',
+                  ].map(value => (
+                    <button
+                      className={`rounded-full border px-3 py-1 ${filter === value ? 'border-[#356E6A] bg-[#356E6A]/10 text-[#1B4D48]' : 'border-[#DADADA] text-[#6B7280]'}`}
+                      key={value}
+                      onClick={() => setFilter(value as typeof filter)}
+                      type="button"
+                    >
+                      {value}
+                    </button>
+                  ))}
+                </div>
               </div>
               <div className="mt-4 space-y-3">
                 {loading && (
-                  <div className="text-xs text-[#6B7280]">Loading definitions...</div>
+                  <div className="text-xs text-[#6B7280]">Loading corridors...</div>
                 )}
-                {!loading && opsApiKey && filteredDefinitions.length === 0 && (
+                {!loading && opsApiKey && filteredCorridors.length === 0 && (
                   <div className="rounded-xl border border-dashed border-[#C6C6C6] bg-white/70 px-4 py-6 text-center text-xs text-[#6B7280]">
-                    No definitions found.
+                    No corridors found.
                   </div>
                 )}
-                {filteredDefinitions.map(definition => (
+                {filteredCorridors.map(corridor => (
                   <button
                     className={`w-full text-left rounded-xl border px-4 py-3 transition ${
-                      selectedId === definition.id
+                      selectedKey === buildCorridorKey(corridor)
                         ? 'border-[#356E6A] bg-[#356E6A]/10'
                         : 'border-white/70 bg-white/60 hover:bg-white'
                     }`}
-                    key={definition.id}
-                    onClick={() => selectDefinition(definition)}
+                    key={buildCorridorKey(corridor)}
+                    onClick={() => selectCorridor(corridor)}
                     type="button"
                   >
-                    <div className="text-sm font-semibold">{definition.name}</div>
-                    <div className="text-xs text-[#6B7280]">
-                      {definition.cryptoCurrency}
-                      {' '}
-                      ·
-                      {definition.blockchain}
-                      {' '}
-                      →
-                      {definition.targetCurrency}
-                    </div>
-                    <div className="mt-1 text-[11px] text-[#6B7280]">
-                      {definition.steps.length}
-                      {' '}
-                      steps · Updated
-                      {formatDate(definition.updatedAt)}
+                    <div className="text-sm font-semibold">{corridorTitle(corridor)}</div>
+                    <div className="mt-1 flex items-center gap-2 text-[11px] text-[#6B7280]">
+                      <span className={`rounded-full px-2 py-[2px] ${
+                        corridor.status === 'DEFINED'
+                          ? 'bg-emerald-100 text-emerald-700'
+                          : corridor.status === 'UNSUPPORTED'
+                            ? 'bg-amber-100 text-amber-700'
+                            : 'bg-rose-100 text-rose-700'
+                      }`}
+                      >
+                        {corridor.status === 'DEFINED' ? 'Defined' : corridor.status === 'UNSUPPORTED' ? 'Unsupported' : 'Missing'}
+                      </span>
+                      {corridor.definitionName && (
+                        <span>{corridor.definitionName}</span>
+                      )}
                     </div>
                   </button>
                 ))}
@@ -511,13 +575,17 @@ const FlowDefinitions = () => {
             </div>
 
             <div className="rounded-2xl border border-white/70 bg-white/80 p-6 shadow-[0_20px_45px_-35px_rgba(15,23,42,0.45)]">
-              {draft
+              {draft && selectedCorridor
                 ? (
                     <>
                       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                         <div>
-                          <div className="text-xs uppercase tracking-wider text-[#6B7280]">Definition editor</div>
-                          <div className="text-lg font-semibold">{draft.id ? 'Edit Flow' : 'New Flow'}</div>
+                          <div className="text-xs uppercase tracking-wider text-[#6B7280]">Corridor</div>
+                          <div className="text-lg font-semibold">{corridorTitle(selectedCorridor)}</div>
+                          <div className="text-xs text-[#6B7280]">
+                            Updated
+                            {formatDate(selectedCorridor.updatedAt)}
+                          </div>
                         </div>
                         <div className="flex flex-wrap items-center gap-2">
                           <button
@@ -538,7 +606,7 @@ const FlowDefinitions = () => {
                             onClick={() => void handleSave()}
                             type="button"
                           >
-                            {saving ? 'Saving…' : 'Save definition'}
+                            {saving ? 'Saving…' : draft.id ? 'Save flow' : 'Create flow'}
                           </button>
                         </div>
                       </div>
@@ -568,37 +636,13 @@ const FlowDefinitions = () => {
                           </button>
                         </div>
                         <div>
-                          <label className="text-xs uppercase tracking-wider text-[#5B6B6A]">Blockchain</label>
+                          <label className="text-xs uppercase tracking-wider text-[#5B6B6A]">Payout Provider</label>
                           <select
                             className="mt-2 w-full rounded-xl border border-[#DADADA] bg-white px-3 py-2 text-sm"
-                            onChange={event => updateDraftField('blockchain', event.target.value)}
-                            value={draft.blockchain}
+                            onChange={event => updateDraftField('payoutProvider', event.target.value)}
+                            value={draft.payoutProvider}
                           >
-                            {blockchains.map(item => (
-                              <option key={item} value={item}>{item}</option>
-                            ))}
-                          </select>
-                        </div>
-                        <div>
-                          <label className="text-xs uppercase tracking-wider text-[#5B6B6A]">Crypto</label>
-                          <select
-                            className="mt-2 w-full rounded-xl border border-[#DADADA] bg-white px-3 py-2 text-sm"
-                            onChange={event => updateDraftField('cryptoCurrency', event.target.value)}
-                            value={draft.cryptoCurrency}
-                          >
-                            {cryptoCurrencies.map(item => (
-                              <option key={item} value={item}>{item}</option>
-                            ))}
-                          </select>
-                        </div>
-                        <div>
-                          <label className="text-xs uppercase tracking-wider text-[#5B6B6A]">Target Currency</label>
-                          <select
-                            className="mt-2 w-full rounded-xl border border-[#DADADA] bg-white px-3 py-2 text-sm"
-                            onChange={event => updateDraftField('targetCurrency', event.target.value)}
-                            value={draft.targetCurrency}
-                          >
-                            {targetCurrencies.map(item => (
+                            {payoutProviders.map(item => (
                               <option key={item} value={item}>{item}</option>
                             ))}
                           </select>
@@ -607,7 +651,7 @@ const FlowDefinitions = () => {
                           <label className="text-xs uppercase tracking-wider text-[#5B6B6A]">Pricing Provider</label>
                           <select
                             className="mt-2 w-full rounded-xl border border-[#DADADA] bg-white px-3 py-2 text-sm"
-                            onChange={event => updateDraftField('pricingProvider', event.target.value as FlowPricingProvider)}
+                            onChange={event => updateDraftField('pricingProvider', event.target.value)}
                             value={draft.pricingProvider}
                           >
                             {pricingProviders.map(item => (
@@ -668,21 +712,28 @@ const FlowDefinitions = () => {
                         </div>
                       </div>
 
+                      <div className="mt-6 rounded-2xl border border-dashed border-[#C6C6C6] bg-white/60 p-4">
+                        <div className="text-sm font-semibold">System enforced gates</div>
+                        <p className="mt-1 text-xs text-[#6B7280]">
+                          Payout confirmation and refunds are handled automatically. Exchange balance waits are inserted when funds move between venues.
+                        </p>
+                      </div>
+
                       <div className="mt-8">
                         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                           <div>
-                            <div className="text-sm font-semibold">Steps</div>
-                            <div className="text-xs text-[#6B7280]">Define the execution pipeline order.</div>
+                            <div className="text-sm font-semibold">Pipeline Steps</div>
+                            <div className="text-xs text-[#6B7280]">Business steps only — no technical configuration required.</div>
                           </div>
                           <div className="flex flex-wrap items-center gap-2">
                             <select
                               className="rounded-xl border border-[#DADADA] bg-white px-3 py-2 text-xs"
-                              onChange={event => setNewStepType(event.target.value as FlowStepType)}
+                              onChange={event => setNewStepType(event.target.value as typeof newStepType)}
                               value={newStepType}
                             >
-                              {stepTypes.map(item => (
-                                <option key={item} value={item}>{item}</option>
-                              ))}
+                              <option value="MOVE_TO_EXCHANGE">Move to exchange</option>
+                              <option value="CONVERT">Convert</option>
+                              <option value="TRANSFER_VENUE">Transfer venue</option>
                             </select>
                             <button
                               className="rounded-xl border border-[#356E6A] bg-[#356E6A] px-3 py-2 text-xs font-semibold text-white hover:bg-[#2B5B57]"
@@ -702,21 +753,32 @@ const FlowDefinitions = () => {
                           {draft.steps.map((step, index) => (
                             <div
                               className="rounded-2xl border border-white/70 bg-white/90 p-4 shadow-[0_10px_30px_-25px_rgba(15,23,42,0.35)]"
-                              key={`${step.stepType}-${index}`}
+                              key={`${step.type}-${index}`}
                             >
                               <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                                 <div>
                                   <div className="text-xs uppercase tracking-wider text-[#6B7280]">
                                     Step
+                                    {' '}
                                     {index + 1}
                                   </div>
-                                  <div className="text-base font-semibold">{step.stepType}</div>
-                                  <div className="text-xs text-[#6B7280]">{stepHints[step.stepType]}</div>
+                                  <div className="text-base font-semibold">
+                                    {step.type === 'PAYOUT'
+                                      ? 'Payout to user'
+                                      : step.type === 'MOVE_TO_EXCHANGE'
+                                        ? 'Move to exchange'
+                                        : step.type === 'CONVERT'
+                                          ? 'Convert'
+                                          : 'Transfer venue'}
+                                  </div>
+                                  {validationErrors[`step-${index}`] && (
+                                    <div className="mt-1 text-xs text-rose-600">{validationErrors[`step-${index}`]}</div>
+                                  )}
                                 </div>
                                 <div className="flex items-center gap-2">
                                   <button
                                     className="rounded-lg border border-[#DADADA] bg-white px-2 py-1 text-xs"
-                                    disabled={index === 0}
+                                    disabled={index <= 1}
                                     onClick={() => reorderStep(index, 'up')}
                                     type="button"
                                   >
@@ -724,7 +786,7 @@ const FlowDefinitions = () => {
                                   </button>
                                   <button
                                     className="rounded-lg border border-[#DADADA] bg-white px-2 py-1 text-xs"
-                                    disabled={index === draft.steps.length - 1}
+                                    disabled={index === 0 || index >= draft.steps.length - 1}
                                     onClick={() => reorderStep(index, 'down')}
                                     type="button"
                                   >
@@ -732,6 +794,7 @@ const FlowDefinitions = () => {
                                   </button>
                                   <button
                                     className="rounded-lg border border-rose-200 bg-rose-50 px-2 py-1 text-xs text-rose-600"
+                                    disabled={index === 0}
                                     onClick={() => removeStep(index)}
                                     type="button"
                                   >
@@ -740,80 +803,168 @@ const FlowDefinitions = () => {
                                 </div>
                               </div>
 
-                              <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-[1fr_1fr]">
-                                <div>
-                                  <label className="text-xs uppercase tracking-wider text-[#5B6B6A]">Step Type</label>
+                              {step.type === 'MOVE_TO_EXCHANGE' && (
+                                <div className="mt-4">
+                                  <label className="text-xs uppercase tracking-wider text-[#5B6B6A]">Venue</label>
                                   <select
                                     className="mt-2 w-full rounded-xl border border-[#DADADA] bg-white px-3 py-2 text-sm"
-                                    onChange={event => updateStepDraft(index, prev => ({
+                                    onChange={event => updateStep(index, prev => ({
                                       ...prev,
-                                      stepType: event.target.value as FlowStepType,
+                                      venue: event.target.value as FlowVenue,
                                     }))}
-                                    value={step.stepType}
+                                    value={step.venue}
                                   >
-                                    {stepTypes.map(item => (
+                                    {venues.map(item => (
                                       <option key={item} value={item}>{item}</option>
                                     ))}
                                   </select>
                                 </div>
-                                <div>
-                                  <label className="text-xs uppercase tracking-wider text-[#5B6B6A]">Completion</label>
-                                  <select
-                                    className="mt-2 w-full rounded-xl border border-[#DADADA] bg-white px-3 py-2 text-sm"
-                                    onChange={event => updateStepDraft(index, prev => ({
-                                      ...prev,
-                                      completionPolicy: event.target.value as FlowStepCompletionPolicy,
-                                    }))}
-                                    value={step.completionPolicy}
-                                  >
-                                    {completionPolicies.map(item => (
-                                      <option key={item} value={item}>{item}</option>
-                                    ))}
-                                  </select>
-                                </div>
-                              </div>
+                              )}
 
-                              <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
-                                <div>
-                                  <label className="text-xs uppercase tracking-wider text-[#5B6B6A]">Config (JSON)</label>
-                                  <textarea
-                                    className="mt-2 h-36 w-full rounded-xl border border-[#DADADA] bg-white px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-[#356E6A]/40"
-                                    onChange={event => updateStepDraft(index, prev => ({
-                                      ...prev,
-                                      configText: event.target.value,
-                                    }))}
-                                    placeholder="{}"
-                                    value={step.configText}
-                                  />
-                                  {validationErrors[`config-${index}`] && (
-                                    <div className="mt-1 text-xs text-rose-600">{validationErrors[`config-${index}`]}</div>
-                                  )}
+                              {step.type === 'CONVERT' && (
+                                <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
+                                  <div>
+                                    <label className="text-xs uppercase tracking-wider text-[#5B6B6A]">Venue</label>
+                                    <select
+                                      className="mt-2 w-full rounded-xl border border-[#DADADA] bg-white px-3 py-2 text-sm"
+                                      onChange={event => updateStep(index, prev => ({
+                                        ...prev,
+                                        venue: event.target.value as FlowVenue,
+                                      }))}
+                                      value={step.venue}
+                                    >
+                                      {venues.map(item => (
+                                        <option key={item} value={item}>{item}</option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                  <div>
+                                    <label className="text-xs uppercase tracking-wider text-[#5B6B6A]">From</label>
+                                    <select
+                                      className="mt-2 w-full rounded-xl border border-[#DADADA] bg-white px-3 py-2 text-sm"
+                                      onChange={event => updateStep(index, prev => ({
+                                        ...prev,
+                                        fromAsset: event.target.value as SupportedCurrency,
+                                      }))}
+                                      value={step.fromAsset}
+                                    >
+                                      {getConvertFromOptions(step.venue).map(item => (
+                                        <option key={item} value={item}>{item}</option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                  <div>
+                                    <label className="text-xs uppercase tracking-wider text-[#5B6B6A]">To</label>
+                                    <select
+                                      className="mt-2 w-full rounded-xl border border-[#DADADA] bg-white px-3 py-2 text-sm"
+                                      onChange={event => updateStep(index, prev => ({
+                                        ...prev,
+                                        toAsset: event.target.value as SupportedCurrency,
+                                      }))}
+                                      value={step.toAsset}
+                                    >
+                                      {getConvertToOptions(step.venue, draft.targetCurrency).map(item => (
+                                        <option key={item} value={item}>{item}</option>
+                                      ))}
+                                    </select>
+                                  </div>
                                 </div>
-                                <div>
-                                  <label className="text-xs uppercase tracking-wider text-[#5B6B6A]">Signal Match (JSON)</label>
-                                  <textarea
-                                    className="mt-2 h-36 w-full rounded-xl border border-[#DADADA] bg-white px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-[#356E6A]/40"
-                                    onChange={event => updateStepDraft(index, prev => ({
-                                      ...prev,
-                                      signalMatchText: event.target.value,
-                                    }))}
-                                    placeholder='{"externalId": "..."}'
-                                    value={step.signalMatchText}
-                                  />
-                                  {validationErrors[`signal-${index}`] && (
-                                    <div className="mt-1 text-xs text-rose-600">{validationErrors[`signal-${index}`]}</div>
-                                  )}
+                              )}
+
+                              {step.type === 'TRANSFER_VENUE' && (
+                                <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
+                                  <div>
+                                    <label className="text-xs uppercase tracking-wider text-[#5B6B6A]">From Venue</label>
+                                    <select
+                                      className="mt-2 w-full rounded-xl border border-[#DADADA] bg-white px-3 py-2 text-sm"
+                                      onChange={event => updateStep(index, prev => ({
+                                        ...prev,
+                                        fromVenue: event.target.value as FlowVenue,
+                                      }))}
+                                      value={step.fromVenue}
+                                    >
+                                      {['BINANCE' as FlowVenue].map(item => (
+                                        <option key={item} value={item}>{item}</option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                  <div>
+                                    <label className="text-xs uppercase tracking-wider text-[#5B6B6A]">To Venue</label>
+                                    <select
+                                      className="mt-2 w-full rounded-xl border border-[#DADADA] bg-white px-3 py-2 text-sm"
+                                      onChange={event => updateStep(index, prev => ({
+                                        ...prev,
+                                        toVenue: event.target.value as FlowVenue,
+                                      }))}
+                                      value={step.toVenue}
+                                    >
+                                      {['TRANSFERO' as FlowVenue].map(item => (
+                                        <option key={item} value={item}>{item}</option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                  <div>
+                                    <label className="text-xs uppercase tracking-wider text-[#5B6B6A]">Asset</label>
+                                    <select
+                                      className="mt-2 w-full rounded-xl border border-[#DADADA] bg-white px-3 py-2 text-sm"
+                                      onChange={event => updateStep(index, prev => ({
+                                        ...prev,
+                                        asset: event.target.value as SupportedCurrency,
+                                      }))}
+                                      value={step.asset}
+                                    >
+                                      {transferoSourceAssets.map(item => (
+                                        <option key={item} value={item}>{item}</option>
+                                      ))}
+                                    </select>
+                                  </div>
                                 </div>
-                              </div>
+                              )}
                             </div>
                           ))}
+                        </div>
+                      </div>
+
+                      <div className="mt-8 rounded-2xl border border-white/70 bg-white/60 p-4">
+                        <div className="text-sm font-semibold">Corridor Support</div>
+                        <p className="mt-1 text-xs text-[#6B7280]">
+                          Mark corridors as unsupported to prevent new transactions from being processed.
+                        </p>
+                        <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-[2fr_auto]">
+                          <input
+                            className="rounded-xl border border-[#DADADA] bg-white px-3 py-2 text-sm"
+                            onChange={event => setUnsupportedReason(event.target.value)}
+                            placeholder="Optional reason"
+                            value={unsupportedReason}
+                          />
+                          {selectedCorridor.status === 'UNSUPPORTED'
+                            ? (
+                                <button
+                                  className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-semibold text-emerald-700"
+                                  disabled={saving}
+                                  onClick={() => void handleCorridorStatus('SUPPORTED')}
+                                  type="button"
+                                >
+                                  Mark Supported
+                                </button>
+                              )
+                            : (
+                                <button
+                                  className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-xs font-semibold text-amber-700"
+                                  disabled={saving}
+                                  onClick={() => void handleCorridorStatus('UNSUPPORTED')}
+                                  type="button"
+                                >
+                                  Mark Unsupported
+                                </button>
+                              )}
                         </div>
                       </div>
                     </>
                   )
                 : (
                     <div className="rounded-xl border border-dashed border-[#C6C6C6] bg-white/70 px-6 py-12 text-center text-sm text-[#6B7280]">
-                      Select a flow definition to edit or create a new one.
+                      Select a corridor to create or edit its flow.
                     </div>
                   )}
             </div>

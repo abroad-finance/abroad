@@ -17,6 +17,59 @@ export const flowStepStatuses = [
   'SKIPPED',
 ] as const
 
+export type FlowBusinessStep
+  = | {
+    asset: SupportedCurrency
+    fromVenue: FlowVenue
+    toVenue: FlowVenue
+    type: 'TRANSFER_VENUE'
+  }
+  | {
+    fromAsset: SupportedCurrency
+    toAsset: SupportedCurrency
+    type: 'CONVERT'
+    venue: FlowVenue
+  }
+  | { type: 'MOVE_TO_EXCHANGE', venue: FlowVenue }
+  | { type: 'PAYOUT' }
+
+export type FlowCorridor = {
+  blockchain: string
+  cryptoCurrency: string
+  definitionId?: null | string
+  definitionName?: null | string
+  enabled?: boolean | null
+  payoutProvider?: null | PaymentMethod
+  status: FlowCorridorStatus
+  targetCurrency: string
+  unsupportedReason?: null | string
+  updatedAt?: null | string
+}
+
+export type FlowCorridorListResponse = {
+  corridors: FlowCorridor[]
+  summary: FlowCorridorSummary
+}
+
+export type FlowCorridorStatus = 'DEFINED' | 'MISSING' | 'UNSUPPORTED'
+
+export type FlowCorridorSummary = {
+  defined: number
+  missing: number
+  total: number
+  unsupported: number
+}
+
+export type FlowCorridorSupportStatus = 'SUPPORTED' | 'UNSUPPORTED'
+
+export type FlowCorridorUpdateInput = {
+  blockchain: string
+  cryptoCurrency: string
+  reason?: string
+  status: FlowCorridorSupportStatus
+  targetCurrency: string
+}
+
 export type FlowDefinition = {
   blockchain: string
   createdAt: string
@@ -28,8 +81,9 @@ export type FlowDefinition = {
   maxAmount: null | number
   minAmount: null | number
   name: string
+  payoutProvider: PaymentMethod
   pricingProvider: FlowPricingProvider
-  steps: FlowStepDefinition[]
+  steps: FlowBusinessStep[]
   targetCurrency: string
   updatedAt: string
 }
@@ -43,14 +97,9 @@ export type FlowDefinitionInput = {
   maxAmount?: null | number
   minAmount?: null | number
   name: string
+  payoutProvider: PaymentMethod
   pricingProvider: FlowPricingProvider
-  steps: Array<{
-    completionPolicy: FlowStepCompletionPolicy
-    config: Record<string, unknown>
-    signalMatch?: Record<string, unknown>
-    stepOrder: number
-    stepType: FlowStepType
-  }>
+  steps: FlowBusinessStep[]
   targetCurrency: string
 }
 
@@ -120,6 +169,7 @@ export type FlowSnapshotDefinition = {
   maxAmount: null | number
   minAmount: null | number
   name: string
+  payoutProvider: PaymentMethod
   pricingProvider: FlowPricingProvider
   targetCurrency: string
 }
@@ -133,18 +183,6 @@ export type FlowSnapshotStep = {
 }
 
 export type FlowStepCompletionPolicy = 'AWAIT_EVENT' | 'SYNC'
-
-export type FlowStepDefinition = {
-  completionPolicy: FlowStepCompletionPolicy
-  config: Record<string, unknown>
-  createdAt: string
-  flowDefinitionId: string
-  id: string
-  signalMatch?: null | Record<string, unknown>
-  stepOrder: number
-  stepType: FlowStepType
-  updatedAt: string
-}
 
 export type FlowStepInstance = {
   attempts: number
@@ -211,3 +249,9 @@ export type FlowTransactionSummary = {
   refundOnChainId: null | string
   status: string
 }
+
+export type FlowVenue = 'BINANCE' | 'TRANSFERO'
+
+export type PaymentMethod = 'BREB' | 'PIX'
+
+export type SupportedCurrency = 'BRL' | 'COP' | 'USDC' | 'USDT'

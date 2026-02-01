@@ -1,11 +1,16 @@
-import { FlowInstanceStatus, FlowStepStatus, Prisma } from '@prisma/client'
+import {
+  FlowCorridorStatus,
+  FlowInstanceStatus,
+  FlowStepStatus,
+  Prisma,
+} from '@prisma/client'
 import { inject, injectable } from 'inversify'
 
 import { TYPES } from '../../../app/container/types'
 import { createScopedLogger, ScopedLogger } from '../../../core/logging/scopedLogger'
 import { ILogger } from '../../../core/logging/types'
 import { IDatabaseClientProvider } from '../../../platform/persistence/IDatabaseClientProvider'
-import { flowDefinitionSchema } from './flowDefinitionSchemas'
+import { flowSnapshotSchema } from './flowDefinitionSchemas'
 import { FlowExecutorRegistry } from './FlowExecutorRegistry'
 import { FlowContext, FlowSignalInput, FlowSnapshot, FlowSnapshotStep, FlowStepRuntimeContext } from './flowTypes'
 
@@ -47,6 +52,19 @@ export class FlowOrchestrator {
       throw new FlowNotFoundError('Transaction not found')
     }
 
+    const unsupported = await prisma.flowCorridor.findFirst({
+      where: {
+        blockchain: transaction.quote.network,
+        cryptoCurrency: transaction.quote.cryptoCurrency,
+        status: FlowCorridorStatus.UNSUPPORTED,
+        targetCurrency: transaction.quote.targetCurrency,
+      },
+    })
+
+    if (unsupported) {
+      throw new FlowNotFoundError('Corridor is explicitly unsupported')
+    }
+
     const definition = await prisma.flowDefinition.findFirst({
       include: { steps: { orderBy: { stepOrder: 'asc' } } },
       where: {
@@ -59,6 +77,10 @@ export class FlowOrchestrator {
 
     if (!definition) {
       throw new FlowNotFoundError('No flow definition found for corridor')
+    }
+
+    if (definition.payoutProvider !== transaction.quote.paymentMethod) {
+      throw new FlowNotFoundError('Flow payout provider does not match transaction payment method')
     }
 
     const snapshot = this.buildSnapshot(definition)
@@ -322,6 +344,7 @@ export class FlowOrchestrator {
     fixedFee: number
     maxAmount: number | null
     minAmount: number | null
+    payoutProvider: FlowSnapshot['definition']['payoutProvider']
     pricingProvider: FlowSnapshot['definition']['pricingProvider']
     targetCurrency: FlowSnapshot['definition']['targetCurrency']
     steps: Array<{
@@ -342,6 +365,7 @@ export class FlowOrchestrator {
         maxAmount: definition.maxAmount,
         minAmount: definition.minAmount,
         name: definition.name,
+        payoutProvider: definition.payoutProvider,
         pricingProvider: definition.pricingProvider,
         targetCurrency: definition.targetCurrency,
       },
@@ -357,7 +381,7 @@ export class FlowOrchestrator {
 
   private readSnapshot(raw: unknown): FlowSnapshot {
     const candidate = raw as FlowSnapshot
-    const parse = flowDefinitionSchema.safeParse({
+    const parse = flowSnapshotSchema.safeParse({
       blockchain: candidate.definition.blockchain,
       cryptoCurrency: candidate.definition.cryptoCurrency,
       exchangeFeePct: candidate.definition.exchangeFeePct,
@@ -365,6 +389,7 @@ export class FlowOrchestrator {
       maxAmount: candidate.definition.maxAmount ?? undefined,
       minAmount: candidate.definition.minAmount ?? undefined,
       name: candidate.definition.name,
+      payoutProvider: candidate.definition.payoutProvider,
       pricingProvider: candidate.definition.pricingProvider,
       steps: candidate.steps.map(step => ({
         completionPolicy: step.completionPolicy,

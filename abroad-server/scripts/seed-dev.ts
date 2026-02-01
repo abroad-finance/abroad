@@ -315,6 +315,12 @@ type FlowStepSeed = {
   stepType: FlowStepType
 }
 
+type FlowBusinessStepSeed =
+  | { type: 'PAYOUT' }
+  | { type: 'MOVE_TO_EXCHANGE', venue: 'BINANCE' | 'TRANSFERO' }
+  | { type: 'CONVERT', venue: 'BINANCE' | 'TRANSFERO', fromAsset: 'USDC' | 'USDT', toAsset: 'BRL' | 'COP' | 'USDT' }
+  | { type: 'TRANSFER_VENUE', asset: 'USDC' | 'USDT', fromVenue: 'BINANCE', toVenue: 'TRANSFERO' }
+
 type FlowDefinitionSeed = {
   blockchain: BlockchainNetwork
   cryptoCurrency: CryptoCurrency
@@ -323,8 +329,10 @@ type FlowDefinitionSeed = {
   maxAmount: number | null
   minAmount: number | null
   name: string
+  payoutProvider: PaymentMethod
   pricingProvider: FlowPricingProvider
-  steps: FlowStepSeed[]
+  steps: FlowBusinessStepSeed[]
+  systemSteps: FlowStepSeed[]
   targetCurrency: TargetCurrency
 }
 
@@ -361,11 +369,18 @@ async function seedFlowDefinitions() {
       maxAmount: null,
       minAmount: 10,
       name: 'USDC Stellar → COP (Binance)',
+      payoutProvider: PaymentMethod.BREB,
       pricingProvider: FlowPricingProvider.BINANCE,
       steps: [
+        { type: 'PAYOUT' },
+        { type: 'MOVE_TO_EXCHANGE', venue: 'BINANCE' },
+        { type: 'CONVERT', venue: 'BINANCE', fromAsset: 'USDC', toAsset: 'USDT' },
+        { type: 'CONVERT', venue: 'BINANCE', fromAsset: 'USDT', toAsset: 'COP' },
+      ],
+      systemSteps: [
         {
           completionPolicy: FlowStepCompletionPolicy.SYNC,
-          config: {},
+          config: { paymentMethod: 'BREB' },
           stepOrder: 1,
           stepType: FlowStepType.PAYOUT_SEND,
         },
@@ -404,11 +419,17 @@ async function seedFlowDefinitions() {
       maxAmount: null,
       minAmount: 20,
       name: 'USDC Solana → BRL (Transfero)',
+      payoutProvider: PaymentMethod.PIX,
       pricingProvider: FlowPricingProvider.TRANSFERO,
       steps: [
+        { type: 'PAYOUT' },
+        { type: 'MOVE_TO_EXCHANGE', venue: 'TRANSFERO' },
+        { type: 'CONVERT', venue: 'TRANSFERO', fromAsset: 'USDC', toAsset: 'BRL' },
+      ],
+      systemSteps: [
         {
           completionPolicy: FlowStepCompletionPolicy.SYNC,
-          config: {},
+          config: { paymentMethod: 'PIX' },
           stepOrder: 1,
           stepType: FlowStepType.PAYOUT_SEND,
         },
@@ -425,13 +446,19 @@ async function seedFlowDefinitions() {
           stepType: FlowStepType.EXCHANGE_SEND,
         },
         {
+          completionPolicy: FlowStepCompletionPolicy.AWAIT_EVENT,
+          config: { provider: 'transfero' },
+          stepOrder: 4,
+          stepType: FlowStepType.AWAIT_EXCHANGE_BALANCE,
+        },
+        {
           completionPolicy: FlowStepCompletionPolicy.SYNC,
           config: {
             provider: 'transfero',
             sourceCurrency: 'USDC',
             targetCurrency: TargetCurrency.BRL,
           },
-          stepOrder: 4,
+          stepOrder: 5,
           stepType: FlowStepType.EXCHANGE_CONVERT,
         },
       ],
@@ -448,7 +475,7 @@ async function seedFlowDefinitions() {
       },
     })
 
-    const stepCreates = seed.steps.map(step => ({
+    const stepCreates = seed.systemSteps.map(step => ({
       completionPolicy: step.completionPolicy,
       config: normalizeJson(step.config),
       signalMatch: step.signalMatch ? normalizeJson(step.signalMatch) : undefined,
@@ -466,9 +493,11 @@ async function seedFlowDefinitions() {
           maxAmount: seed.maxAmount,
           minAmount: seed.minAmount,
           name: seed.name,
+          payoutProvider: seed.payoutProvider,
           pricingProvider: seed.pricingProvider,
           steps: { create: stepCreates },
           targetCurrency: seed.targetCurrency,
+          userSteps: normalizeJson(seed.steps),
         },
       })
       continue
@@ -484,9 +513,11 @@ async function seedFlowDefinitions() {
         maxAmount: seed.maxAmount,
         minAmount: seed.minAmount,
         name: seed.name,
+        payoutProvider: seed.payoutProvider,
         pricingProvider: seed.pricingProvider,
         steps: { create: stepCreates },
         targetCurrency: seed.targetCurrency,
+        userSteps: normalizeJson(seed.steps),
       },
       where: { id: existing.id },
     })
@@ -614,6 +645,11 @@ async function seedFlowInstances() {
       {
         status: FlowStepStatus.READY,
         stepOrder: 4,
+        stepType: FlowStepType.AWAIT_EXCHANGE_BALANCE,
+      },
+      {
+        status: FlowStepStatus.READY,
+        stepOrder: 5,
         stepType: FlowStepType.EXCHANGE_CONVERT,
       },
     ],
@@ -632,6 +668,7 @@ function buildSnapshot(definition: FlowDefinitionWithSteps): Prisma.InputJsonVal
       maxAmount: definition.maxAmount,
       minAmount: definition.minAmount,
       name: definition.name,
+      payoutProvider: definition.payoutProvider,
       pricingProvider: definition.pricingProvider,
       targetCurrency: definition.targetCurrency,
     },

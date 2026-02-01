@@ -26,6 +26,7 @@ export type FlowSnapshotDefinitionDto = {
   maxAmount: number | null
   minAmount: number | null
   name: string
+  payoutProvider: PaymentMethod
   pricingProvider: FlowPricingProvider
   targetCurrency: TargetCurrency
 }
