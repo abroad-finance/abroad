@@ -1,7 +1,7 @@
 // src/services/binanceExchangeProvider.ts
 
 import { Wallet } from '@binance/wallet'
-import { BlockchainNetwork, TargetCurrency } from '@prisma/client'
+import { BlockchainNetwork, CryptoCurrency, TargetCurrency } from '@prisma/client'
 import axios from 'axios'
 import crypto from 'crypto'
 import { inject, injectable } from 'inversify'
@@ -45,7 +45,7 @@ export class BinanceExchangeProvider implements IExchangeProvider {
     options: BinanceProviderOptions = {
       capability: { blockchain: undefined, targetCurrency: TargetCurrency.COP },
       loggerScope: 'BinanceExchangeProvider',
-      supportedSymbols: ['USDCCOP'],
+      supportedSymbols: ['USDCCOP', 'USDTCOP'],
     },
   ) {
     this.capability = options.capability
@@ -135,17 +135,22 @@ export class BinanceExchangeProvider implements IExchangeProvider {
 
       this.logger.warn('Falling back to USDT pairs', { sourceCurrency, targetCurrency })
 
-      // Get source currency to USDT rate
-      const sourceToUSDT = await axios.get<BinanceBookTickerResponse>(
-        `${BINANCE_API_URL}/api/v3/ticker/bookTicker?symbol=${sourceCurrency}USDT`,
-      )
+      let sourcePrice: number
+      if (sourceCurrency === CryptoCurrency.USDT) {
+        sourcePrice = 1
+      }
+      else {
+        const sourceToUSDT = await axios.get<BinanceBookTickerResponse>(
+          `${BINANCE_API_URL}/api/v3/ticker/bookTicker?symbol=${sourceCurrency}USDT`,
+        )
+        sourcePrice = parseFloat(sourceToUSDT.data.askPrice)
+      }
 
       // Get target currency to USDT rate
       const targetToUSDT = await axios.get<BinanceBookTickerResponse>(
         `${BINANCE_API_URL}/api/v3/ticker/bookTicker?symbol=USDT${targetCurrency}`,
       )
 
-      const sourcePrice = parseFloat(sourceToUSDT.data.askPrice)
       const targetPrice = parseFloat(targetToUSDT.data.askPrice)
 
       if (isNaN(sourcePrice) || isNaN(targetPrice)) {
@@ -224,7 +229,7 @@ export class BinanceBrlExchangeProvider extends BinanceExchangeProvider {
     super(secretManager, baseLogger, {
       capability: { blockchain: BlockchainNetwork.CELO, targetCurrency: TargetCurrency.BRL },
       loggerScope: 'BinanceExchangeProviderBRL',
-      supportedSymbols: ['USDCBRL'],
+      supportedSymbols: ['USDCBRL', 'USDTBRL'],
     })
   }
 }

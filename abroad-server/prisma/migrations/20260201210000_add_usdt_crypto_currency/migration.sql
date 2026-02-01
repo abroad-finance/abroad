@@ -1,0 +1,1 @@
+ALTER TYPE "CryptoCurrency" ADD VALUE IF NOT EXISTS 'USDT';

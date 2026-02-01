@@ -198,6 +198,7 @@ enum OrphanRefundStatus {
 
 enum CryptoCurrency {
   USDC
+  USDT
 }
 
 enum KYCTier {
