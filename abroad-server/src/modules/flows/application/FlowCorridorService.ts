@@ -24,7 +24,7 @@ export class FlowCorridorService {
 
   public async list(): Promise<FlowCorridorListDto> {
     const client = await this.dbProvider.getClient()
-    const [definitions, overrides] = await Promise.all([
+    const [definitions, overrides, enabledAssets] = await Promise.all([
       client.flowDefinition.findMany({
         select: {
           blockchain: true,
@@ -39,6 +39,9 @@ export class FlowCorridorService {
       }),
       client.flowCorridor.findMany({
         where: { status: FlowCorridorStatus.UNSUPPORTED },
+      }),
+      client.cryptoAssetConfig.findMany({
+        where: { enabled: true, mintAddress: { not: null } },
       }),
     ])
 
@@ -69,55 +72,52 @@ export class FlowCorridorService {
 
     const corridors: FlowCorridorDto[] = []
 
-    const cryptoValues = Object.values(CryptoCurrency) as CryptoCurrency[]
-    const blockchainValues = Object.values(BlockchainNetwork) as BlockchainNetwork[]
     const targetValues = Object.values(TargetCurrency) as TargetCurrency[]
 
-    for (const cryptoCurrency of cryptoValues) {
-      for (const blockchain of blockchainValues) {
-        for (const targetCurrency of targetValues) {
-          const corridorKey = this.key(cryptoCurrency, blockchain, targetCurrency)
-          const override = overrideMap.get(corridorKey)
-          const definition = definitionMap.get(corridorKey)
+    for (const asset of enabledAssets) {
+      const { blockchain, cryptoCurrency } = asset
+      for (const targetCurrency of targetValues) {
+        const corridorKey = this.key(cryptoCurrency, blockchain, targetCurrency)
+        const override = overrideMap.get(corridorKey)
+        const definition = definitionMap.get(corridorKey)
 
-          if (override) {
-            corridors.push({
-              blockchain,
-              cryptoCurrency,
-              status: 'UNSUPPORTED',
-              targetCurrency,
-              unsupportedReason: override.reason,
-            })
-            continue
-          }
-
-          if (definition && definition.enabled) {
-            corridors.push({
-              blockchain,
-              cryptoCurrency,
-              definitionId: definition.id,
-              definitionName: definition.name,
-              enabled: definition.enabled,
-              payoutProvider: definition.payoutProvider,
-              status: 'DEFINED',
-              targetCurrency,
-              updatedAt: definition.updatedAt,
-            })
-            continue
-          }
-
+        if (override) {
           corridors.push({
             blockchain,
             cryptoCurrency,
-            definitionId: definition?.id ?? null,
-            definitionName: definition?.name ?? null,
-            enabled: definition?.enabled,
-            payoutProvider: definition?.payoutProvider ?? null,
-            status: 'MISSING',
+            status: 'UNSUPPORTED',
             targetCurrency,
-            updatedAt: definition?.updatedAt ?? null,
+            unsupportedReason: override.reason,
           })
+          continue
         }
+
+        if (definition && definition.enabled) {
+          corridors.push({
+            blockchain,
+            cryptoCurrency,
+            definitionId: definition.id,
+            definitionName: definition.name,
+            enabled: definition.enabled,
+            payoutProvider: definition.payoutProvider,
+            status: 'DEFINED',
+            targetCurrency,
+            updatedAt: definition.updatedAt,
+          })
+          continue
+        }
+
+        corridors.push({
+          blockchain,
+          cryptoCurrency,
+          definitionId: definition?.id ?? null,
+          definitionName: definition?.name ?? null,
+          enabled: definition?.enabled,
+          payoutProvider: definition?.payoutProvider ?? null,
+          status: 'MISSING',
+          targetCurrency,
+          updatedAt: definition?.updatedAt ?? null,
+        })
       }
     }
 

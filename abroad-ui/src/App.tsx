@@ -14,6 +14,7 @@ const Meridian = lazy(() => import('./pages/Meridian/Meridian'))
 const FlowOpsList = lazy(() => import('./pages/Ops/FlowOpsList'))
 const FlowOpsDetail = lazy(() => import('./pages/Ops/FlowOpsDetail'))
 const FlowDefinitions = lazy(() => import('./pages/Ops/FlowDefinitions'))
+const CryptoAssets = lazy(() => import('./pages/Ops/CryptoAssets'))
 
 function App() {
   return (
@@ -31,6 +32,7 @@ function App() {
                   <Route element={<FlowOpsList />} path="/ops/flows" />
                   <Route element={<FlowOpsDetail />} path="/ops/flows/:flowInstanceId" />
                   <Route element={<FlowDefinitions />} path="/ops/flows/definitions" />
+                  <Route element={<CryptoAssets />} path="/ops/crypto-assets" />
                 </Routes>
               </Suspense>
             </Router>

@@ -1,6 +1,12 @@
 // src/modules/payments/infrastructure/wallets/SolanaWalletHandler.ts
-import { BlockchainNetwork, CryptoCurrency } from '@prisma/client'
-import { createTransferInstruction, getOrCreateAssociatedTokenAccount } from '@solana/spl-token'
+import { BlockchainNetwork } from '@prisma/client'
+import {
+  createTransferInstruction,
+  getMint,
+  getOrCreateAssociatedTokenAccount,
+  TOKEN_2022_PROGRAM_ID,
+  TOKEN_PROGRAM_ID,
+} from '@solana/spl-token'
 import {
   Connection,
   Keypair,
@@ -16,6 +22,7 @@ import { inject, injectable } from 'inversify'
 import { TYPES } from '../../../../app/container/types'
 import { ILogger } from '../../../../core/logging/types'
 import { ISecretManager, Secrets } from '../../../../platform/secrets/ISecretManager'
+import { CryptoAssetConfigService } from '../../application/CryptoAssetConfigService'
 import { IWalletHandler, WalletSendParams, WalletSendResult } from '../../application/contracts/IWalletHandler'
 
 function decodeKeypairFromBase58Secret(secretBase58: string): Keypair {
@@ -112,6 +119,7 @@ export class SolanaWalletHandler implements IWalletHandler {
   public readonly capability = { blockchain: BlockchainNetwork.SOLANA }
   constructor(
     @inject(TYPES.ISecretManager) private secretManager: ISecretManager,
+    @inject(CryptoAssetConfigService) private readonly assetConfigService: CryptoAssetConfigService,
     @inject(TYPES.ILogger) private readonly logger: ILogger,
   ) {}
 
@@ -126,45 +134,50 @@ export class SolanaWalletHandler implements IWalletHandler {
    */
   async send({ address, amount, cryptoCurrency }: WalletSendParams): Promise<WalletSendResult> {
     try {
-      if (cryptoCurrency !== CryptoCurrency.USDC) {
+      const assetConfig = await this.assetConfigService.getActiveMint({
+        blockchain: BlockchainNetwork.SOLANA,
+        cryptoCurrency,
+      })
+      if (!assetConfig) {
         this.logger.warn('Unsupported cryptocurrency for Solana', cryptoCurrency)
         return { code: 'validation', reason: 'unsupported_currency', success: false }
       }
 
       const rpcUrl = await this.secretManager.getSecret(Secrets.SOLANA_RPC_URL)
       const privateKeyBase58 = await this.secretManager.getSecret(Secrets.SOLANA_PRIVATE_KEY)
-      const usdcMintAddress = await this.secretManager.getSecret(Secrets.SOLANA_USDC_MINT)
 
       const connection = new Connection(rpcUrl, 'confirmed')
       const senderKeypair = decodeKeypairFromBase58Secret(privateKeyBase58)
       const destinationPubkey = new PublicKey(address)
-      const usdcMint = new PublicKey(usdcMintAddress)
+      const mintPubkey = new PublicKey(assetConfig.mintAddress)
 
-      // Guard: mint must exist on this cluster (catches mainnet/devnet mismatch)
-      const mintInfo = await connection.getAccountInfo(usdcMint, 'confirmed')
-      if (!mintInfo) {
-        throw new Error(
-          'USDC mint not found on this cluster (check SOLANA_RPC_URL vs SOLANA_USDC_MINT).',
-        )
-      }
+      const mintInfo = await this.fetchMintInfo(connection, mintPubkey)
 
       // Ensure token accounts exist (payer = sender)
       const senderTokenAccount = await getOrCreateAssociatedTokenAccount(
         connection,
         senderKeypair,
-        usdcMint,
+        mintPubkey,
         senderKeypair.publicKey,
+        false,
+        'confirmed',
+        undefined,
+        mintInfo.programId,
       )
 
       const destinationTokenAccount = await getOrCreateAssociatedTokenAccount(
         connection,
         senderKeypair,
-        usdcMint,
+        mintPubkey,
         destinationPubkey,
+        false,
+        'confirmed',
+        undefined,
+        mintInfo.programId,
       )
 
-      // USDC has 6 decimals on Solana
-      const amountInBaseUnits = toBaseUnits(amount, 6)
+      const decimals = assetConfig.decimals ?? mintInfo.decimals
+      const amountInBaseUnits = toBaseUnits(amount, decimals)
 
       const transferInstruction = createTransferInstruction(
         senderTokenAccount.address,
@@ -247,6 +260,26 @@ export class SolanaWalletHandler implements IWalletHandler {
     }
     catch {
       return String(error)
+    }
+  }
+
+  private async fetchMintInfo(
+    connection: Connection,
+    mint: PublicKey,
+  ): Promise<{ decimals: number, programId: PublicKey }> {
+    try {
+      const mintInfo = await getMint(connection, mint, 'confirmed', TOKEN_PROGRAM_ID)
+      return { decimals: mintInfo.decimals, programId: TOKEN_PROGRAM_ID }
+    }
+    catch {
+      try {
+        const mintInfo = await getMint(connection, mint, 'confirmed', TOKEN_2022_PROGRAM_ID)
+        return { decimals: mintInfo.decimals, programId: TOKEN_2022_PROGRAM_ID }
+      }
+      catch (error) {
+        this.logger.error('Solana mint not found on this cluster', { error, mint: mint.toBase58() })
+        throw new Error('Token mint not found on this cluster')
+      }
     }
   }
 }

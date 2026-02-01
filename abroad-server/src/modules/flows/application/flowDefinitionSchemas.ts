@@ -68,8 +68,8 @@ export type FlowDefinitionInput = {
   enabled?: boolean
   exchangeFeePct?: number
   fixedFee?: number
-  maxAmount?: number
-  minAmount?: number
+  maxAmount?: number | null
+  minAmount?: number | null
   name: string
   payoutProvider: PaymentMethod
   pricingProvider: FlowPricingProvider
@@ -91,8 +91,8 @@ export const flowDefinitionSchema: z.ZodType<FlowDefinitionInput> = z.object({
   enabled: z.boolean().optional(),
   exchangeFeePct: z.number().min(0).optional(),
   fixedFee: z.number().min(0).optional(),
-  maxAmount: z.number().min(0).optional(),
-  minAmount: z.number().min(0).optional(),
+  maxAmount: z.number().min(0).nullable().optional(),
+  minAmount: z.number().min(0).nullable().optional(),
   name: z.string().min(1),
   payoutProvider: z.nativeEnum(PaymentMethod),
   pricingProvider: z.nativeEnum(FlowPricingProvider),

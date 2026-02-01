@@ -1,4 +1,4 @@
-import { BlockchainNetwork, CryptoCurrency } from '@prisma/client'
+import { BlockchainNetwork } from '@prisma/client'
 import {
   Asset,
   Horizon,
@@ -16,6 +16,7 @@ import { createScopedLogger, ScopedLogger } from '../../../../core/logging/scope
 import { ILogger } from '../../../../core/logging/types'
 import { ILockManager } from '../../../../platform/cacheLock/ILockManager'
 import { ISecretManager } from '../../../../platform/secrets/ISecretManager'
+import { CryptoAssetConfigService } from '../../application/CryptoAssetConfigService'
 import { IWalletHandler, WalletSendParams, WalletSendResult } from '../../application/contracts/IWalletHandler'
 
 function safeMemo(m: string): string {
@@ -39,6 +40,7 @@ export class StellarWalletHandler implements IWalletHandler {
 
   constructor(
     @inject(TYPES.ISecretManager) private secretManager: ISecretManager,
+    @inject(CryptoAssetConfigService) private readonly assetConfigService: CryptoAssetConfigService,
     @inject(TYPES.ILockManager) private lockManager: ILockManager,
     @inject(TYPES.ILogger) baseLogger: ILogger,
   ) {
@@ -83,13 +85,16 @@ export class StellarWalletHandler implements IWalletHandler {
     memo,
   }: WalletSendParams): Promise<WalletSendResult> {
     try {
-      if (cryptoCurrency !== CryptoCurrency.USDC) {
+      const assetConfig = await this.assetConfigService.getActiveMint({
+        blockchain: BlockchainNetwork.STELLAR,
+        cryptoCurrency,
+      })
+      if (!assetConfig) {
         throw new Error(`Unsupported cryptocurrency for Stellar: ${cryptoCurrency}`)
       }
 
       const horizonUrl = await this.secretManager.getSecret('STELLAR_HORIZON_URL')
       const privateKey = await this.secretManager.getSecret('STELLAR_PRIVATE_KEY')
-      const usdcIssuer = await this.secretManager.getSecret('STELLAR_USDC_ISSUER')
 
       const server = new Horizon.Server(horizonUrl)
       const sourceKeypair = Keypair.fromSecret(privateKey)
@@ -101,7 +106,7 @@ export class StellarWalletHandler implements IWalletHandler {
         const sourceAccount = await server.loadAccount(sourcePublicKey)
         const fee = await server.fetchBaseFee()
 
-        const usdcAsset = new Asset(cryptoCurrency, usdcIssuer)
+        const stellarAsset = new Asset(cryptoCurrency, assetConfig.mintAddress)
         const amountStr = toStellarAmount(amount)
 
         const builder = new TransactionBuilder(sourceAccount, {
@@ -114,7 +119,7 @@ export class StellarWalletHandler implements IWalletHandler {
         builder.addOperation(
           Operation.payment({
             amount: amountStr,
-            asset: usdcAsset,
+            asset: stellarAsset,
             destination: address,
           }),
         )

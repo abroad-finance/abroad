@@ -393,6 +393,19 @@ model FlowCorridor {
   @@unique([cryptoCurrency, blockchain, targetCurrency], name: "flow_corridor_status_unique")
 }
 
+model CryptoAssetConfig {
+  id             String            @id @default(uuid())
+  cryptoCurrency CryptoCurrency
+  blockchain     BlockchainNetwork
+  mintAddress    String?
+  decimals       Int?
+  enabled        Boolean           @default(true)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  @@unique([cryptoCurrency, blockchain], name: "crypto_asset_unique")
+}
+
 model FlowStepDefinition {
   id               String                   @id @default(uuid())
   flowDefinitionId String

@@ -8,6 +8,7 @@ import { ILogger } from '../../../../core/logging/types'
 import { ReceivedCryptoTransactionMessage } from '../../../../platform/messaging/queueSchema'
 import { IDatabaseClientProvider } from '../../../../platform/persistence/IDatabaseClientProvider'
 import { ISecretManager, Secrets } from '../../../../platform/secrets/ISecretManager'
+import { CryptoAssetConfigService } from '../../application/CryptoAssetConfigService'
 import { DepositVerificationError, DepositVerificationSuccess, IDepositVerifier } from '../../application/contracts/IDepositVerifier'
 
 @injectable()
@@ -18,6 +19,7 @@ export class StellarDepositVerifier implements IDepositVerifier {
   constructor(
     @inject(TYPES.IDatabaseClientProvider) private readonly dbProvider: IDatabaseClientProvider,
     @inject(TYPES.ISecretManager) private readonly secretManager: ISecretManager,
+    @inject(CryptoAssetConfigService) private readonly assetConfigService: CryptoAssetConfigService,
     @inject(TYPES.ILogger) baseLogger: ILogger,
   ) {
     this.logger = createScopedLogger(baseLogger, { scope: 'StellarDepositVerifier' })
@@ -45,11 +47,15 @@ export class StellarDepositVerifier implements IDepositVerifier {
       return { outcome: 'error', reason: 'Transaction is not set for Stellar', status: 400 }
     }
 
-    if (transaction.quote.cryptoCurrency !== CryptoCurrency.USDC) {
+    const assetConfig = await this.assetConfigService.getActiveMint({
+      blockchain: BlockchainNetwork.STELLAR,
+      cryptoCurrency: transaction.quote.cryptoCurrency,
+    })
+    if (!assetConfig) {
       return { outcome: 'error', reason: 'Unsupported currency for Stellar payments', status: 400 }
     }
 
-    const { accountId, horizonUrl, usdcIssuer } = await this.getStellarSecrets()
+    const { accountId, horizonUrl } = await this.getStellarSecrets()
     const server = new Horizon.Server(horizonUrl)
 
     let transactionRecord: Horizon.ServerApi.TransactionRecord
@@ -71,9 +77,11 @@ export class StellarDepositVerifier implements IDepositVerifier {
       if (paymentOps.length === 0) {
         return { outcome: 'error', reason: 'Transaction does not include a payment operation', status: 400 }
       }
-      payment = paymentOps.find(op => this.isUsdcPaymentToWallet(op, accountId, usdcIssuer))
+      payment = paymentOps.find(op => (
+        this.isPaymentToWallet(op, accountId, transaction.quote.cryptoCurrency, assetConfig.mintAddress)
+      ))
       if (!payment) {
-        return { outcome: 'error', reason: 'Payment does not target the configured USDC wallet', status: 400 }
+        return { outcome: 'error', reason: 'Payment does not target the configured wallet', status: 400 }
       }
     }
     catch (error) {
@@ -96,7 +104,7 @@ export class StellarDepositVerifier implements IDepositVerifier {
       addressFrom: payment.from,
       amount: parseFloat(payment.amount),
       blockchain: BlockchainNetwork.STELLAR,
-      cryptoCurrency: CryptoCurrency.USDC,
+      cryptoCurrency: transaction.quote.cryptoCurrency,
       onChainId: onChainSignature,
       transactionId: decodedTransactionId,
     }
@@ -128,29 +136,29 @@ export class StellarDepositVerifier implements IDepositVerifier {
     return undefined
   }
 
-  private async getStellarSecrets(): Promise<{ accountId: string, horizonUrl: string, usdcIssuer: string }> {
-    const [accountId, horizonUrl, usdcIssuer] = await Promise.all([
+  private async getStellarSecrets(): Promise<{ accountId: string, horizonUrl: string }> {
+    const [accountId, horizonUrl] = await Promise.all([
       this.secretManager.getSecret(Secrets.STELLAR_ACCOUNT_ID),
       this.secretManager.getSecret(Secrets.STELLAR_HORIZON_URL),
-      this.secretManager.getSecret(Secrets.STELLAR_USDC_ISSUER),
     ])
 
-    return { accountId, horizonUrl, usdcIssuer }
+    return { accountId, horizonUrl }
   }
 
   private isPayment(record: Horizon.ServerApi.OperationRecord): record is Horizon.ServerApi.PaymentOperationRecord {
     return record.type === 'payment'
   }
 
-  private isUsdcPaymentToWallet(
+  private isPaymentToWallet(
     payment: Horizon.ServerApi.PaymentOperationRecord,
     accountId: string,
-    usdcIssuer: string,
+    cryptoCurrency: CryptoCurrency,
+    issuer: string,
   ): boolean {
-    const isUsdcAsset = payment.asset_type === 'credit_alphanum4'
-      && payment.asset_code === 'USDC'
-      && payment.asset_issuer === usdcIssuer
+    const isTokenAsset = (payment.asset_type === 'credit_alphanum4' || payment.asset_type === 'credit_alphanum12')
+      && payment.asset_code === cryptoCurrency
+      && payment.asset_issuer === issuer
 
-    return payment.to === accountId && isUsdcAsset
+    return payment.to === accountId && isTokenAsset
   }
 }

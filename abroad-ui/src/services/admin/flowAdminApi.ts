@@ -1,5 +1,8 @@
 import type { ApiResult, HttpRequestConfig } from '../http/types'
 import type {
+  CryptoAssetCoverage,
+  CryptoAssetCoverageResponse,
+  CryptoAssetUpdateInput,
   FlowCorridorListResponse,
   FlowCorridorUpdateInput,
   FlowDefinition,
@@ -68,6 +71,24 @@ export const listFlowInstances = async (params: {
 export const listFlowDefinitions = async (): Promise<FlowDefinition[]> => {
   const result = await adminRequest<FlowDefinition[]>('/ops/flows/definitions', {
     method: 'GET',
+  })
+
+  return unwrap(result)
+}
+
+export const listCryptoAssets = async (): Promise<CryptoAssetCoverageResponse> => {
+  const result = await adminRequest<CryptoAssetCoverageResponse>('/ops/crypto-assets', {
+    method: 'GET',
+  })
+
+  return unwrap(result)
+}
+
+export const updateCryptoAsset = async (payload: CryptoAssetUpdateInput): Promise<CryptoAssetCoverage> => {
+  const result = await adminRequest<CryptoAssetCoverage>('/ops/crypto-assets', {
+    body: JSON.stringify(payload),
+    headers: { 'Content-Type': 'application/json' },
+    method: 'PATCH',
   })
 
   return unwrap(result)

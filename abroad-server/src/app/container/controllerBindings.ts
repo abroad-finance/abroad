@@ -4,6 +4,7 @@ import { WalletAuthController } from '../../modules/auth/interfaces/http/WalletA
 import { PartnerController } from '../../modules/partners/interfaces/http/PartnerController'
 import { PartnerUserController } from '../../modules/partners/interfaces/http/PartnerUserController'
 import { CeloPaymentsController } from '../../modules/payments/interfaces/http/CeloPaymentsController'
+import { CryptoAssetController } from '../../modules/payments/interfaces/http/CryptoAssetController'
 import { PaymentsController } from '../../modules/payments/interfaces/http/PaymentsController'
 import { QrDecoderController } from '../../modules/payments/interfaces/http/QrDecoderController'
 import { SolanaPaymentsController } from '../../modules/payments/interfaces/http/SolanaPaymentsController'
@@ -26,6 +27,7 @@ const controllerBindings: ReadonlyArray<BindingRegistration<unknown>> = [
   { bindSelf: true, identifier: TransactionsController, implementation: TransactionsController },
   { bindSelf: true, identifier: PublicTransactionsController, implementation: PublicTransactionsController },
   { bindSelf: true, identifier: PaymentsController, implementation: PaymentsController },
+  { bindSelf: true, identifier: CryptoAssetController, implementation: CryptoAssetController },
   { bindSelf: true, identifier: QrDecoderController, implementation: QrDecoderController },
   { bindSelf: true, identifier: WalletAuthController, implementation: WalletAuthController },
   { bindSelf: true, identifier: SolanaPaymentsController, implementation: SolanaPaymentsController },

@@ -17,6 +17,38 @@ export const flowStepStatuses = [
   'SKIPPED',
 ] as const
 
+export type CryptoAssetCoverage = {
+  blockchain: string
+  cryptoCurrency: string
+  decimals?: null | number
+  enabled: boolean
+  mintAddress?: null | string
+  status: CryptoAssetCoverageStatus
+  updatedAt?: null | string
+}
+
+export type CryptoAssetCoverageResponse = {
+  assets: CryptoAssetCoverage[]
+  summary: CryptoAssetCoverageSummary
+}
+
+export type CryptoAssetCoverageStatus = 'CONFIGURED' | 'MISSING'
+
+export type CryptoAssetCoverageSummary = {
+  configured: number
+  enabled: number
+  missing: number
+  total: number
+}
+
+export type CryptoAssetUpdateInput = {
+  blockchain: string
+  cryptoCurrency: string
+  decimals?: null | number
+  enabled: boolean
+  mintAddress?: null | string
+}
+
 export type FlowBusinessStep
   = | {
     asset: SupportedCurrency

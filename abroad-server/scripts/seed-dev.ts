@@ -43,6 +43,7 @@ async function main() {
   console.info('🌱 Seeding development data...')
   await seedPartners()
   await seedPaymentProviders()
+  await seedCryptoAssets()
   await seedFlowDefinitions()
   await seedFlowInstances()
   console.info('✅ Development data ready.')
@@ -269,6 +270,55 @@ async function seedPartners() {
     },
     where: { id: 'txn-dev-beta-1' },
   })
+}
+
+async function seedCryptoAssets() {
+  const entries = [
+    {
+      blockchain: BlockchainNetwork.STELLAR,
+      cryptoCurrency: CryptoCurrency.USDC,
+      decimals: 7,
+      envMint: process.env.STELLAR_USDC_ISSUER,
+    },
+    {
+      blockchain: BlockchainNetwork.SOLANA,
+      cryptoCurrency: CryptoCurrency.USDC,
+      decimals: 6,
+      envMint: process.env.SOLANA_USDC_MINT,
+    },
+    {
+      blockchain: BlockchainNetwork.CELO,
+      cryptoCurrency: CryptoCurrency.USDC,
+      decimals: 6,
+      envMint: process.env.CELO_USDC_ADDRESS,
+    },
+  ] as const
+
+  await Promise.all(entries.map(async (entry) => {
+    const mintAddress = entry.envMint?.trim() || null
+    const enabled = Boolean(mintAddress)
+
+    await prisma.cryptoAssetConfig.upsert({
+      create: {
+        blockchain: entry.blockchain,
+        cryptoCurrency: entry.cryptoCurrency,
+        decimals: enabled ? entry.decimals : null,
+        enabled,
+        mintAddress,
+      },
+      update: {
+        decimals: enabled ? entry.decimals : null,
+        enabled,
+        mintAddress,
+      },
+      where: {
+        crypto_asset_unique: {
+          blockchain: entry.blockchain,
+          cryptoCurrency: entry.cryptoCurrency,
+        },
+      },
+    })
+  }))
 }
 
 async function seedPaymentProviders() {

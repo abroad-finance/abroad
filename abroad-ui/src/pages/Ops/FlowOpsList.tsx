@@ -114,6 +114,12 @@ const FlowOpsList = () => {
               >
                 Edit Definitions
               </Link>
+              <Link
+                className="px-4 py-2 rounded-xl border border-[#356E6A] text-[#356E6A] bg-white/70 hover:bg-white transition text-sm font-medium"
+                to="/ops/crypto-assets"
+              >
+                Crypto Assets
+              </Link>
               <button
                 className="px-4 py-2 rounded-xl border border-[#1B4D48] text-[#1B4D48] bg-white/70 hover:bg-white transition"
                 disabled={!opsApiKey}

@@ -453,7 +453,10 @@ const FlowDefinitions = () => {
         <div className="relative max-w-7xl mx-auto px-6 py-10">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
-              <Link className="text-sm text-[#1B4D48] hover:text-[#356E6A]" to="/ops/flows">← Back to runs</Link>
+              <div className="flex flex-wrap items-center gap-4 text-sm">
+                <Link className="text-[#1B4D48] hover:text-[#356E6A]" to="/ops/flows">← Back to runs</Link>
+                <Link className="text-[#1B4D48] hover:text-[#356E6A]" to="/ops/crypto-assets">Crypto asset coverage</Link>
+              </div>
               <div className="mt-3 text-sm uppercase tracking-[0.3em] text-[#356E6A]">Flow Coverage</div>
               <h1 className="text-3xl md:text-4xl font-semibold">Corridor Flow Builder</h1>
               <p className="text-sm text-[#4B5563] max-w-xl mt-2">

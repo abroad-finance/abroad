@@ -28,6 +28,7 @@ import { SolanaPaymentVerifier } from '../../modules/payments/infrastructure/wal
 import { SolanaWalletHandler } from '../../modules/payments/infrastructure/wallets/SolanaWalletHandler'
 import { StellarDepositVerifier } from '../../modules/payments/infrastructure/wallets/StellarDepositVerifier'
 import { StellarWalletHandler } from '../../modules/payments/infrastructure/wallets/StellarWalletHandler'
+import { CryptoAssetConfigService } from '../../modules/payments/application/CryptoAssetConfigService'
 import { FlowDefinitionService } from '../../modules/flows/application/FlowDefinitionService'
 import { FlowAuditService } from '../../modules/flows/application/FlowAuditService'
 import { QuoteUseCase } from '../../modules/quotes/application/quoteUseCase'
@@ -66,6 +67,7 @@ const domainBindings: ReadonlyArray<BindingRegistration<unknown>> = [
   { identifier: TYPES.IDepositVerifier, implementation: SolanaPaymentVerifier },
   { identifier: TYPES.IDepositVerifier, implementation: CeloPaymentVerifier },
   { identifier: TYPES.IDepositVerifier, implementation: StellarDepositVerifier },
+  { bindSelf: true, identifier: CryptoAssetConfigService, implementation: CryptoAssetConfigService },
   { identifier: TYPES.IExchangeProvider, implementation: BinanceExchangeProvider, name: 'binance' },
   { identifier: TYPES.IExchangeProvider, implementation: BinanceBrlExchangeProvider, name: 'binance-brl' },
   { identifier: TYPES.IExchangeProvider, implementation: TransferoExchangeProvider, name: 'transfero' },
