@@ -1,4 +1,4 @@
-import { BlockchainNetwork, CryptoCurrency, PaymentMethod, TargetCurrency } from '@prisma/client'
+import { TargetCurrency } from '@prisma/client'
 
 import { QueueName } from '../../../platform/messaging/queues'
 import { OutboxDispatcher } from '../../../platform/outbox/OutboxDispatcher'
@@ -76,20 +76,19 @@ describe('OutboxDispatcher', () => {
     const { dispatcher, queueHandler, repository } = buildMocks()
     const payload = {
       amount: 1,
-      blockchain: BlockchainNetwork.STELLAR,
-      cryptoCurrency: CryptoCurrency.USDC,
-      paymentMethod: PaymentMethod.PIX,
-      targetCurrency: TargetCurrency.BRL,
-      transactionId: '00000000-0000-0000-0000-000000000000',
+      currency: TargetCurrency.BRL,
+      externalId: 'ext-00000000',
+      provider: 'transfero',
+      status: 'processed',
     }
-    await dispatcher.enqueueQueue(QueueName.PAYMENT_SENT, payload, 'ctx')
+    await dispatcher.enqueueQueue(QueueName.PAYMENT_STATUS_UPDATED, payload, 'ctx')
     expect(repository.create).toHaveBeenCalledWith(
       'queue',
-      { kind: 'queue', payload, queueName: QueueName.PAYMENT_SENT },
+      { kind: 'queue', payload, queueName: QueueName.PAYMENT_STATUS_UPDATED },
       expect.any(Date),
       undefined,
     )
-    expect(queueHandler.postMessage).toHaveBeenCalledWith(QueueName.PAYMENT_SENT, payload)
+    expect(queueHandler.postMessage).toHaveBeenCalledWith(QueueName.PAYMENT_STATUS_UPDATED, payload)
   })
 
   it('alerts slack when delivery fails permanently', async () => {

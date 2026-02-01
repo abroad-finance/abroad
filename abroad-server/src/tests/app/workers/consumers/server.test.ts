@@ -4,7 +4,6 @@ import { createMockQueueHandler, MockQueueHandler } from '../../../setup/mockFac
 import { createResponseRecorder, mockProcessExit, toIncomingMessage, toServerResponse } from '../../../setup/testHarness'
 
 const receivedController = { registerConsumers: jest.fn() }
-const paymentController = { registerConsumers: jest.fn() }
 const paymentStatusController = { registerConsumers: jest.fn() }
 const binanceController = { registerConsumers: jest.fn() }
 const deadLetterController = { registerConsumers: jest.fn() }
@@ -34,8 +33,6 @@ describe('consumers lifecycle', () => {
           return deadLetterController
         case TYPES.IQueueHandler:
           return queueHandler
-        case TYPES.PaymentSentController:
-          return paymentController
         case TYPES.PaymentStatusUpdatedController:
           return paymentStatusController
         case TYPES.ReceivedCryptoTransactionController:
@@ -50,7 +47,6 @@ describe('consumers lifecycle', () => {
     startConsumers()
 
     expect(receivedController.registerConsumers).toHaveBeenCalled()
-    expect(paymentController.registerConsumers).toHaveBeenCalled()
     expect(paymentStatusController.registerConsumers).toHaveBeenCalled()
     expect(binanceController.registerConsumers).toHaveBeenCalled()
     expect(deadLetterController.registerConsumers).toHaveBeenCalled()
@@ -69,8 +65,6 @@ describe('consumers lifecycle', () => {
           return binanceController
         case TYPES.IQueueHandler:
           return queueHandler
-        case TYPES.PaymentSentController:
-          return paymentController
         case TYPES.PaymentStatusUpdatedController:
           return paymentStatusController
         case TYPES.ReceivedCryptoTransactionController:
@@ -95,8 +89,6 @@ describe('consumers entrypoint health server', () => {
           return deadLetterController
         case TYPES.IQueueHandler:
           return queueHandler
-        case TYPES.PaymentSentController:
-          return paymentController
         case TYPES.PaymentStatusUpdatedController:
           return paymentStatusController
         case TYPES.ReceivedCryptoTransactionController:

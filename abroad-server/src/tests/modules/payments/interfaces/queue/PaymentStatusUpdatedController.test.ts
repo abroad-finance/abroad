@@ -2,26 +2,26 @@ import 'reflect-metadata'
 import { TargetCurrency } from '@prisma/client'
 
 import { PaymentStatusUpdatedController } from '../../../../../modules/payments/interfaces/queue/PaymentStatusUpdatedController'
-import { TransactionWorkflow } from '../../../../../modules/transactions/application/TransactionWorkflow'
 import { QueueName } from '../../../../../platform/messaging/queues'
 import { PaymentStatusUpdatedMessage } from '../../../../../platform/messaging/queueSchema'
 import { createMockLogger, createMockQueueHandler, MockLogger, MockQueueHandler } from '../../../../setup/mockFactories'
+import { FlowOrchestrator } from '../../../../../modules/flows/application/FlowOrchestrator'
 
 describe('PaymentStatusUpdatedController', () => {
   let controller: PaymentStatusUpdatedController
   let logger: MockLogger
   let queueHandler: MockQueueHandler
-  let workflow: jest.Mocked<TransactionWorkflow>
+  let orchestrator: jest.Mocked<Pick<FlowOrchestrator, 'handleSignal'>>
 
   beforeEach(() => {
     logger = createMockLogger()
     queueHandler = createMockQueueHandler()
-    workflow = {
-      handleProviderStatusUpdate: jest.fn(),
-    } as unknown as jest.Mocked<TransactionWorkflow>
+    orchestrator = {
+      handleSignal: jest.fn(),
+    }
 
     controller = new PaymentStatusUpdatedController(
-      workflow,
+      orchestrator as FlowOrchestrator,
       queueHandler,
       logger,
     )
@@ -46,10 +46,10 @@ describe('PaymentStatusUpdatedController', () => {
       expect.stringContaining('Invalid message format'),
       expect.anything(),
     )
-    expect(workflow.handleProviderStatusUpdate).not.toHaveBeenCalled()
+    expect(orchestrator.handleSignal).not.toHaveBeenCalled()
   })
 
-  it('delegates valid messages to the workflow', async () => {
+  it('delegates valid messages to the flow orchestrator', async () => {
     const handler = controller as unknown as { onPaymentStatusUpdated: (msg: PaymentStatusUpdatedMessage) => Promise<void> }
     const message: PaymentStatusUpdatedMessage = {
       amount: 100,
@@ -61,12 +61,22 @@ describe('PaymentStatusUpdatedController', () => {
 
     await handler.onPaymentStatusUpdated(message)
 
-    expect(workflow.handleProviderStatusUpdate).toHaveBeenCalledWith(message)
+    expect(orchestrator.handleSignal).toHaveBeenCalledWith({
+      correlationKeys: { externalId: message.externalId },
+      eventType: 'payment.status.updated',
+      payload: {
+        amount: message.amount,
+        currency: message.currency,
+        externalId: message.externalId,
+        provider: message.provider,
+        status: message.status,
+      },
+    })
   })
 
-  it('logs when the workflow throws', async () => {
+  it('logs when the orchestrator throws', async () => {
     const handler = controller as unknown as { onPaymentStatusUpdated: (msg: PaymentStatusUpdatedMessage) => Promise<void> }
-    workflow.handleProviderStatusUpdate.mockRejectedValueOnce(new Error('boom'))
+    orchestrator.handleSignal.mockRejectedValueOnce(new Error('boom'))
 
     await expect(handler.onPaymentStatusUpdated({
       amount: 100,
@@ -77,7 +87,7 @@ describe('PaymentStatusUpdatedController', () => {
     })).rejects.toThrow('boom')
 
     expect(logger.error).toHaveBeenCalledWith(
-      expect.stringContaining('Error updating transaction'),
+      expect.stringContaining('Error updating flow'),
       expect.any(Error),
     )
   })

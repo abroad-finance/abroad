@@ -1,8 +1,16 @@
 import { Container } from 'inversify'
 
+import { FlowExecutorRegistry } from '../../modules/flows/application/FlowExecutorRegistry'
+import { FlowOrchestrator } from '../../modules/flows/application/FlowOrchestrator'
+import { RefundCoordinator } from '../../modules/flows/application/RefundCoordinator'
+import { AwaitExchangeBalanceStepExecutor } from '../../modules/flows/application/steps/AwaitExchangeBalanceStepExecutor'
+import { AwaitProviderStatusStepExecutor } from '../../modules/flows/application/steps/AwaitProviderStatusStepExecutor'
+import { ExchangeConvertStepExecutor } from '../../modules/flows/application/steps/ExchangeConvertStepExecutor'
+import { ExchangeSendStepExecutor } from '../../modules/flows/application/steps/ExchangeSendStepExecutor'
+import { PayoutSendStepExecutor } from '../../modules/flows/application/steps/PayoutSendStepExecutor'
+import { TreasuryTransferStepExecutor } from '../../modules/flows/application/steps/TreasuryTransferStepExecutor'
 import { DepositVerifierRegistry } from '../../modules/payments/application/DepositVerifierRegistry'
 import { LiquidityCacheService } from '../../modules/payments/application/LiquidityCacheService'
-import { PaymentSentUseCase } from '../../modules/payments/application/paymentSentUseCase'
 import { PaymentServiceFactory } from '../../modules/payments/application/PaymentServiceFactory'
 import { PaymentUseCase } from '../../modules/payments/application/paymentUseCase'
 import { PayoutStatusAdapterRegistry } from '../../modules/payments/application/PayoutStatusAdapterRegistry'
@@ -18,12 +26,12 @@ import { SolanaPaymentVerifier } from '../../modules/payments/infrastructure/wal
 import { SolanaWalletHandler } from '../../modules/payments/infrastructure/wallets/SolanaWalletHandler'
 import { StellarDepositVerifier } from '../../modules/payments/infrastructure/wallets/StellarDepositVerifier'
 import { StellarWalletHandler } from '../../modules/payments/infrastructure/wallets/StellarWalletHandler'
+import { FlowDefinitionService } from '../../modules/flows/application/FlowDefinitionService'
 import { QuoteUseCase } from '../../modules/quotes/application/quoteUseCase'
 import { ReceivedCryptoTransactionUseCase } from '../../modules/transactions/application/receivedCryptoTransactionUseCase'
 import { StellarOrphanRefundService } from '../../modules/transactions/application/StellarOrphanRefundService'
 import { TransactionAcceptanceService } from '../../modules/transactions/application/TransactionAcceptanceService'
 import { TransactionStatusService } from '../../modules/transactions/application/TransactionStatusService'
-import { TransactionWorkflow } from '../../modules/transactions/application/TransactionWorkflow'
 import { ExchangeProviderFactory } from '../../modules/treasury/application/ExchangeProviderFactory'
 import { BinanceExchangeProvider } from '../../modules/treasury/infrastructure/exchangeProviders/binanceExchangeProvider'
 import { BinanceBrlExchangeProvider } from '../../modules/treasury/infrastructure/exchangeProviders/binanceExchangeProvider'
@@ -61,11 +69,19 @@ const domainBindings: ReadonlyArray<BindingRegistration<unknown>> = [
   { identifier: TYPES.TransactionAcceptanceService, implementation: TransactionAcceptanceService },
   { identifier: TYPES.TransactionStatusService, implementation: TransactionStatusService },
   { identifier: TYPES.StellarOrphanRefundService, implementation: StellarOrphanRefundService },
-  { identifier: TYPES.TransactionWorkflow, implementation: TransactionWorkflow },
   { identifier: TYPES.PaymentUseCase, implementation: PaymentUseCase },
-  { identifier: TYPES.PaymentSentUseCase, implementation: PaymentSentUseCase },
   { identifier: TYPES.ReceivedCryptoTransactionUseCase, implementation: ReceivedCryptoTransactionUseCase },
   { bindSelf: true, identifier: PersonaWebhookService, implementation: PersonaWebhookService },
+  { bindSelf: true, identifier: FlowDefinitionService, implementation: FlowDefinitionService },
+  { identifier: TYPES.FlowExecutorRegistry, implementation: FlowExecutorRegistry },
+  { identifier: TYPES.FlowOrchestrator, implementation: FlowOrchestrator },
+  { bindSelf: true, identifier: RefundCoordinator, implementation: RefundCoordinator },
+  { identifier: TYPES.FlowStepExecutor, implementation: PayoutSendStepExecutor },
+  { identifier: TYPES.FlowStepExecutor, implementation: AwaitProviderStatusStepExecutor },
+  { identifier: TYPES.FlowStepExecutor, implementation: ExchangeSendStepExecutor },
+  { identifier: TYPES.FlowStepExecutor, implementation: ExchangeConvertStepExecutor },
+  { identifier: TYPES.FlowStepExecutor, implementation: AwaitExchangeBalanceStepExecutor },
+  { identifier: TYPES.FlowStepExecutor, implementation: TreasuryTransferStepExecutor },
 ] as const
 
 export function bindDomainServices(container: Container): void {

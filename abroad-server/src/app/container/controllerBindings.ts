@@ -7,11 +7,11 @@ import { CeloPaymentsController } from '../../modules/payments/interfaces/http/C
 import { PaymentsController } from '../../modules/payments/interfaces/http/PaymentsController'
 import { QrDecoderController } from '../../modules/payments/interfaces/http/QrDecoderController'
 import { SolanaPaymentsController } from '../../modules/payments/interfaces/http/SolanaPaymentsController'
+import { FlowDefinitionController } from '../../modules/flows/interfaces/http/FlowDefinitionController'
 import { QuoteController } from '../../modules/quotes/interfaces/http/QuoteController'
 import { PublicTransactionsController } from '../../modules/transactions/interfaces/http/PublicTransactionsController'
 import { TransactionController } from '../../modules/transactions/interfaces/http/TransactionController'
 import { TransactionsController } from '../../modules/transactions/interfaces/http/TransactionsController'
-import { ConversionController } from '../../modules/treasury/interfaces/http/ConversionController'
 import { WebhookController } from '../../modules/webhooks/interfaces/http/WebhookController'
 import { BindingRegistration, registerBindings } from './bindingSupport'
 
@@ -19,7 +19,6 @@ const controllerBindings: ReadonlyArray<BindingRegistration<unknown>> = [
   { bindSelf: true, identifier: WebhookController, implementation: WebhookController },
   { bindSelf: true, identifier: PartnerController, implementation: PartnerController },
   { bindSelf: true, identifier: PartnerUserController, implementation: PartnerUserController },
-  { bindSelf: true, identifier: ConversionController, implementation: ConversionController },
   { bindSelf: true, identifier: QuoteController, implementation: QuoteController },
   { bindSelf: true, identifier: TransactionController, implementation: TransactionController },
   { bindSelf: true, identifier: TransactionsController, implementation: TransactionsController },
@@ -29,6 +28,7 @@ const controllerBindings: ReadonlyArray<BindingRegistration<unknown>> = [
   { bindSelf: true, identifier: WalletAuthController, implementation: WalletAuthController },
   { bindSelf: true, identifier: SolanaPaymentsController, implementation: SolanaPaymentsController },
   { bindSelf: true, identifier: CeloPaymentsController, implementation: CeloPaymentsController },
+  { bindSelf: true, identifier: FlowDefinitionController, implementation: FlowDefinitionController },
 ] as const
 
 export function bindHttpControllers(container: Container): void {

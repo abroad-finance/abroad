@@ -1,17 +1,9 @@
-import { BlockchainNetwork, CryptoCurrency, PaymentMethod, TargetCurrency } from '.prisma/client'
+import { TargetCurrency } from '.prisma/client'
 
-import { PaymentSentMessageSchema, PaymentStatusUpdatedMessageSchema, UserNotificationMessageSchema } from '../../../../platform/messaging/queueSchema'
+import { PaymentStatusUpdatedMessageSchema, UserNotificationMessageSchema } from '../../../../platform/messaging/queueSchema'
 
 describe('queue schema validation', () => {
-  it('accepts valid payment sent and status update messages', () => {
-    expect(() => PaymentSentMessageSchema.parse({
-      amount: 25,
-      blockchain: BlockchainNetwork.STELLAR,
-      cryptoCurrency: CryptoCurrency.USDC,
-      paymentMethod: PaymentMethod.BREB,
-      targetCurrency: TargetCurrency.COP,
-    })).not.toThrow()
-
+  it('accepts valid payment status update messages', () => {
     expect(() => PaymentStatusUpdatedMessageSchema.parse({
       currency: TargetCurrency.COP,
       externalId: 'ext-123',

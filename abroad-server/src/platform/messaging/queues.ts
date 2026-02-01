@@ -6,8 +6,6 @@ import {
   BinanceBalanceUpdatedMessageSchema,
   DeadLetterMessage,
   DeadLetterMessageSchema,
-  PaymentSentMessage,
-  PaymentSentMessageSchema,
   PaymentStatusUpdatedMessage,
   PaymentStatusUpdatedMessageSchema,
   ReceivedCryptoTransactionMessage,
@@ -19,7 +17,6 @@ import {
 export enum QueueName {
   BINANCE_BALANCE_UPDATED = 'binance-balance-updated',
   DEAD_LETTER = 'dead-letter',
-  PAYMENT_SENT = 'payment-sent',
   PAYMENT_STATUS_UPDATED = 'payment-status-updated',
   RECEIVED_CRYPTO_TRANSACTION = 'received-crypto-transaction',
   USER_NOTIFICATION = 'user-notification',
@@ -42,7 +39,6 @@ export interface IQueueHandler {
 export type QueuePayloadByName = {
   [QueueName.BINANCE_BALANCE_UPDATED]: BinanceBalanceUpdatedMessage
   [QueueName.DEAD_LETTER]: DeadLetterMessage
-  [QueueName.PAYMENT_SENT]: PaymentSentMessage
   [QueueName.PAYMENT_STATUS_UPDATED]: PaymentStatusUpdatedMessage
   [QueueName.RECEIVED_CRYPTO_TRANSACTION]: ReceivedCryptoTransactionMessage
   [QueueName.USER_NOTIFICATION]: UserNotificationMessage
@@ -55,7 +51,6 @@ type QueuePayloadSchemaMap = {
 export const QueuePayloadSchemaByName: QueuePayloadSchemaMap = {
   [QueueName.BINANCE_BALANCE_UPDATED]: BinanceBalanceUpdatedMessageSchema,
   [QueueName.DEAD_LETTER]: DeadLetterMessageSchema,
-  [QueueName.PAYMENT_SENT]: PaymentSentMessageSchema,
   [QueueName.PAYMENT_STATUS_UPDATED]: PaymentStatusUpdatedMessageSchema,
   [QueueName.RECEIVED_CRYPTO_TRANSACTION]: ReceivedCryptoTransactionMessageSchema,
   [QueueName.USER_NOTIFICATION]: UserNotificationMessageSchema,

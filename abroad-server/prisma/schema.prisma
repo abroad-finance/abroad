@@ -236,6 +236,42 @@ enum TargetCurrency {
   BRL
 }
 
+enum FlowPricingProvider {
+  BINANCE
+  TRANSFERO
+}
+
+enum FlowStepType {
+  PAYOUT_SEND
+  EXCHANGE_SEND
+  EXCHANGE_CONVERT
+  TREASURY_TRANSFER
+  AWAIT_PROVIDER_STATUS
+  AWAIT_EXCHANGE_BALANCE
+}
+
+enum FlowStepCompletionPolicy {
+  SYNC
+  AWAIT_EVENT
+}
+
+enum FlowInstanceStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  WAITING
+  FAILED
+  COMPLETED
+}
+
+enum FlowStepStatus {
+  READY
+  RUNNING
+  WAITING
+  SUCCEEDED
+  FAILED
+  SKIPPED
+}
+
 model PaymentProvider {
   id        String   @id
   name      String
@@ -316,4 +352,86 @@ view TransactionQuoteView {
 
   @@unique([id])
   @@map("TransactionQuoteView")
+}
+
+model FlowDefinition {
+  id             String               @id @default(uuid())
+  name           String
+  enabled        Boolean              @default(true)
+  cryptoCurrency CryptoCurrency
+  blockchain     BlockchainNetwork
+  targetCurrency TargetCurrency
+  pricingProvider FlowPricingProvider
+  exchangeFeePct Float               @default(0)
+  fixedFee       Float               @default(0)
+  minAmount      Float?
+  maxAmount      Float?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  steps          FlowStepDefinition[]
+
+  @@unique([cryptoCurrency, blockchain, targetCurrency], name: "flow_corridor_unique")
+}
+
+model FlowStepDefinition {
+  id               String                   @id @default(uuid())
+  flowDefinitionId String
+  flowDefinition   FlowDefinition           @relation(fields: [flowDefinitionId], references: [id], onDelete: Cascade)
+  stepOrder        Int
+  stepType         FlowStepType
+  completionPolicy FlowStepCompletionPolicy
+  config           Json
+  signalMatch      Json?
+  createdAt        DateTime                 @default(now())
+  updatedAt        DateTime                 @updatedAt
+
+  @@index([flowDefinitionId])
+  @@unique([flowDefinitionId, stepOrder], name: "flow_step_order_unique")
+}
+
+model FlowInstance {
+  id             String             @id @default(uuid())
+  transactionId  String             @unique
+  status         FlowInstanceStatus @default(NOT_STARTED)
+  currentStepOrder Int?
+  flowSnapshot   Json
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  steps          FlowStepInstance[]
+}
+
+model FlowStepInstance {
+  id             String        @id @default(uuid())
+  flowInstanceId String
+  flowInstance   FlowInstance  @relation(fields: [flowInstanceId], references: [id], onDelete: Cascade)
+  stepOrder      Int
+  stepType       FlowStepType
+  status         FlowStepStatus @default(READY)
+  attempts       Int           @default(0)
+  maxAttempts    Int           @default(3)
+  input          Json?
+  output         Json?
+  error          Json?
+  correlation    Json?
+  startedAt      DateTime?
+  endedAt        DateTime?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@index([flowInstanceId])
+  @@unique([flowInstanceId, stepOrder], name: "flow_step_instance_order_unique")
+}
+
+model FlowSignal {
+  id             String   @id @default(uuid())
+  flowInstanceId String?
+  stepInstanceId String?
+  eventType      String
+  correlationKeys Json
+  payload        Json
+  createdAt      DateTime @default(now())
+  consumedAt     DateTime?
+
+  @@index([eventType])
+  @@index([consumedAt])
 }
