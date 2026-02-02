@@ -369,6 +369,7 @@ export class BrebPaymentService implements IPaymentService {
           durationMs: Date.now() - requestStartedAt,
           rail: payload.creditor_instructed_agent,
           transactionId: response.data?.data?.moviiTxId ?? null,
+          ...(this.extractEnvelopeMetadata(response.data) ?? {}),
         },
         method: 'POST',
         responseData: response.data?.data ?? null,
@@ -390,6 +391,23 @@ export class BrebPaymentService implements IPaymentService {
       })
       throw error
     }
+  }
+
+  private extractEnvelopeMetadata(envelope: BrebApiEnvelope<unknown> | null | undefined): null | {
+    responseCode: null | string
+    responseMessage: null | string
+  } {
+    if (!envelope || typeof envelope !== 'object') {
+      return null
+    }
+
+    const responseCode = typeof envelope.code === 'string' ? envelope.code : null
+    const responseMessage = typeof envelope.message === 'string' ? envelope.message : null
+    if (!responseCode && !responseMessage) {
+      return null
+    }
+
+    return { responseCode, responseMessage }
   }
 
   private extractErrorStatus(error: unknown): number | undefined {
@@ -439,6 +457,7 @@ export class BrebPaymentService implements IPaymentService {
           durationMs: Date.now() - requestStartedAt,
           hasKey: Boolean(response.data?.data),
           keyState: response.data?.data?.keyState ?? null,
+          ...(this.extractEnvelopeMetadata(response.data) ?? {}),
         },
         method: 'GET',
         responseData: response.data.data,
@@ -498,6 +517,7 @@ export class BrebPaymentService implements IPaymentService {
           durationMs: Date.now() - requestStartedAt,
           rail,
           reportAvailable: Boolean(response.data?.data),
+          ...(this.extractEnvelopeMetadata(response.data) ?? {}),
         },
         method: 'GET',
         responseData: response.data?.data ?? null,
@@ -705,11 +725,13 @@ export class BrebPaymentService implements IPaymentService {
     operation: string
   }): void {
     if (axios.isAxiosError(error)) {
+      const envelopeMetadata = this.extractEnvelopeMetadata(error.response?.data)
       this.logger.error(`[BreB] ${operation}`, {
         endpoint: this.sanitizeUrlForLogs(endpoint),
         message: error.message,
         method,
         responseData: this.sanitizeProviderPayload(error.response?.data ?? null),
+        ...(envelopeMetadata ? { responseCode: envelopeMetadata.responseCode, responseMessage: envelopeMetadata.responseMessage } : {}),
         status: error.response?.status ?? null,
         ...(metadata ? { metadata } : {}),
       })

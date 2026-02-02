@@ -228,7 +228,13 @@ describe('BrebPaymentService', () => {
       })
 
       expect(outcome).toEqual({ code: 'permanent', reason: 'missing_transaction_id', success: false })
-      expect(logger.error).toHaveBeenCalledWith('[BreB] Send response missing transaction id', { responseRail: 'ENT' })
+      expect(logger.error).toHaveBeenCalledWith(
+        '[BreB] Send response missing transaction id',
+        expect.objectContaining({
+          responseData: { rail: 'ENT' },
+          responseRail: 'ENT',
+        }),
+      )
     })
 
     it('handles dispatch failures gracefully', async () => {
@@ -265,7 +271,10 @@ describe('BrebPaymentService', () => {
       })
 
       expect(result).toEqual({ code: 'retriable', reason: 'pending', success: false, transactionId: 'tx-005' })
-      expect(logger.warn).toHaveBeenCalledWith('[BreB] Payment pending after timeout', { transactionId: 'tx-005' })
+      expect(logger.warn).toHaveBeenCalledWith(
+        '[BreB] Payment pending after timeout',
+        expect.objectContaining({ transactionId: 'tx-005' }),
+      )
     })
 
     it('includes transaction ids when the provider reports failure', async () => {
@@ -337,7 +346,10 @@ describe('BrebPaymentService', () => {
       })
 
       expect(result).toEqual({ code: 'retriable', reason: 'boom', success: false })
-      expect(logger.error).toHaveBeenCalledWith('[BreB] Payment submission failed', { account: '123', reason: 'boom' })
+      expect(logger.error).toHaveBeenCalledWith(
+        '[BreB] Payment submission failed',
+        expect.objectContaining({ account: '123', reason: 'boom' }),
+      )
     })
   })
 

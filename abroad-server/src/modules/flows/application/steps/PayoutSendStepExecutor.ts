@@ -11,12 +11,14 @@ import { IPaymentServiceFactory } from '../../../payments/application/contracts/
 import { TransactionEventDispatcher } from '../../../transactions/application/TransactionEventDispatcher'
 import { TransactionRepository } from '../../../transactions/application/TransactionRepository'
 import { FlowStepExecutionResult, FlowStepExecutor, FlowStepRuntimeContext } from '../flowTypes'
+import { RefundCoordinator } from '../RefundCoordinator'
 
 @injectable()
 export class PayoutSendStepExecutor implements FlowStepExecutor {
   public readonly stepType = FlowStepType.PAYOUT_SEND
   private readonly dispatcher: TransactionEventDispatcher
   private readonly logger: ScopedLogger
+  private readonly refundCoordinator: RefundCoordinator
   private readonly repository: TransactionRepository
 
   constructor(
@@ -24,10 +26,12 @@ export class PayoutSendStepExecutor implements FlowStepExecutor {
     @inject(TYPES.IPaymentServiceFactory) private readonly paymentServiceFactory: IPaymentServiceFactory,
     @inject(TYPES.ILogger) baseLogger: ILogger,
     @inject(TYPES.IOutboxDispatcher) outboxDispatcher: OutboxDispatcher,
+    @inject(RefundCoordinator) refundCoordinator: RefundCoordinator,
   ) {
     this.repository = new TransactionRepository(dbProvider)
     this.dispatcher = new TransactionEventDispatcher(outboxDispatcher, baseLogger)
     this.logger = createScopedLogger(baseLogger, { scope: 'FlowPayoutSend' })
+    this.refundCoordinator = refundCoordinator
   }
 
   public async execute(params: {
@@ -148,6 +152,32 @@ export class PayoutSendStepExecutor implements FlowStepExecutor {
         trigger: 'FlowPayoutSend',
       })
 
+      if (!this.shouldRefund(paymentResponse)) {
+        this.logger.info('Skipping refund for payout failure', {
+          code: paymentResponse.code ?? null,
+          reason: paymentResponse.reason ?? null,
+          transactionId: updated.id,
+        })
+        return { error: paymentResponse.reason ?? 'payout_failed', outcome: 'failed' }
+      }
+
+      if (!updated.onChainId) {
+        this.logger.warn('Skipping refund for payout failure; missing onChainId', {
+          transactionId: updated.id,
+        })
+        return { error: paymentResponse.reason ?? 'payout_failed', outcome: 'failed' }
+      }
+
+      await this.refundCoordinator.refundByOnChainId({
+        amount: updated.quote.sourceAmount,
+        cryptoCurrency: updated.quote.cryptoCurrency,
+        network: updated.quote.network,
+        onChainId: updated.onChainId,
+        reason: 'provider_failed',
+        transactionId: updated.id,
+        trigger: 'flow_payout_send',
+      })
+
       return { error: paymentResponse.reason ?? 'payout_failed', outcome: 'failed' }
     }
     catch (error) {
@@ -162,5 +192,12 @@ export class PayoutSendStepExecutor implements FlowStepExecutor {
     const normalized = configValue?.toUpperCase()
     const method = Object.values(PaymentMethod).find(value => value === normalized)
     return method ?? fallback
+  }
+
+  private shouldRefund(paymentResponse: { code?: 'permanent' | 'retriable' | 'validation', success: boolean }): boolean {
+    if (paymentResponse.success) {
+      return false
+    }
+    return paymentResponse.code !== 'retriable'
   }
 }
