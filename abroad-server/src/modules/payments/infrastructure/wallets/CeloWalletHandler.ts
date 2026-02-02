@@ -1,4 +1,4 @@
-import { BlockchainNetwork, CryptoCurrency } from '@prisma/client'
+import { BlockchainNetwork } from '@prisma/client'
 import { BigNumber, ethers } from 'ethers'
 import { inject, injectable } from 'inversify'
 
@@ -6,22 +6,30 @@ import { TYPES } from '../../../../app/container/types'
 import { ILogger } from '../../../../core/logging/types'
 import { ISecretManager, Secrets } from '../../../../platform/secrets/ISecretManager'
 import { IWalletHandler, WalletSendParams, WalletSendResult } from '../../application/contracts/IWalletHandler'
-import { parseErc20Transfers, safeNormalizeAddress } from './celoErc20'
+import { CryptoAssetConfigService } from '../../application/CryptoAssetConfigService'
+import { fetchErc20Decimals, parseErc20Transfers, safeNormalizeAddress } from './celoErc20'
 
-type CeloWalletContext = {
+type CeloReceiptContext = {
   depositAddress: string
   provider: ethers.providers.JsonRpcProvider
+}
+
+type CeloSendContext = {
+  provider: ethers.providers.JsonRpcProvider
   signer: ethers.Wallet
-  usdcAddress: string
+  tokenAddress: string
+  tokenDecimals: number
 }
 
 @injectable()
 export class CeloWalletHandler implements IWalletHandler {
   public readonly capability = { blockchain: BlockchainNetwork.CELO }
   private cachedProvider?: { provider: ethers.providers.JsonRpcProvider, rpcUrl: string }
+  private readonly tokenDecimalsCache = new Map<string, number>()
 
   public constructor(
     @inject(TYPES.ISecretManager) private readonly secretManager: ISecretManager,
+    @inject(CryptoAssetConfigService) private readonly assetConfigService: CryptoAssetConfigService,
     @inject(TYPES.ILogger) private readonly logger: ILogger,
   ) {}
 
@@ -30,7 +38,7 @@ export class CeloWalletHandler implements IWalletHandler {
       throw new Error('Missing on-chain transaction id')
     }
 
-    const context = await this.buildContext()
+    const context = await this.buildReceiptContext()
     const receipt = await context.provider.getTransactionReceipt(onChainId)
     if (!receipt) {
       throw new Error('Transaction not found on Celo')
@@ -40,16 +48,31 @@ export class CeloWalletHandler implements IWalletHandler {
       throw new Error('Transaction failed on-chain')
     }
 
-    const transfers = parseErc20Transfers(receipt, context.usdcAddress)
-      .filter(transfer => transfer.to === context.depositAddress)
+    const enabledAssets = await this.assetConfigService.listEnabledAssets(BlockchainNetwork.CELO)
+    const validAssets = enabledAssets.flatMap((asset) => {
+      const tokenAddress = safeNormalizeAddress(asset.mintAddress)
+      if (!tokenAddress) {
+        return []
+      }
+      return [{ tokenAddress }]
+    })
+
+    if (validAssets.length === 0) {
+      throw new Error('No enabled Celo assets configured for this wallet')
+    }
+
+    const transfers = validAssets.flatMap(asset => (
+      parseErc20Transfers(receipt, asset.tokenAddress)
+        .filter(transfer => transfer.to === context.depositAddress)
+    ))
 
     if (transfers.length === 0) {
-      throw new Error('No USDC transfer to the configured wallet found in this transaction')
+      throw new Error('No transfer to the configured wallet found in this transaction')
     }
 
     const uniqueSenders = new Set(transfers.map(transfer => transfer.from))
     if (uniqueSenders.size > 1) {
-      throw new Error('Multiple senders found for USDC transfers')
+      throw new Error('Multiple senders found for token transfers')
     }
 
     const sender = transfers[0]?.from
@@ -61,25 +84,29 @@ export class CeloWalletHandler implements IWalletHandler {
   }
 
   public async send({ address, amount, cryptoCurrency }: WalletSendParams): Promise<WalletSendResult> {
-    if (cryptoCurrency !== CryptoCurrency.USDC) {
-      this.logger.warn('[CeloWalletHandler] Unsupported cryptocurrency', cryptoCurrency)
-      return { code: 'validation', reason: 'unsupported_currency', success: false }
-    }
-
     if (!Number.isFinite(amount) || amount <= 0) {
       return { code: 'validation', reason: 'invalid_amount', success: false }
     }
 
     try {
-      const context = await this.buildContext()
+      const assetConfig = await this.assetConfigService.getActiveMint({
+        blockchain: BlockchainNetwork.CELO,
+        cryptoCurrency,
+      })
+      if (!assetConfig) {
+        this.logger.warn('[CeloWalletHandler] Unsupported cryptocurrency', cryptoCurrency)
+        return { code: 'validation', reason: 'unsupported_currency', success: false }
+      }
+
+      const context = await this.buildSendContext(assetConfig)
       const destination = safeNormalizeAddress(address)
       if (!destination) {
         return { code: 'validation', reason: 'invalid_destination', success: false }
       }
 
-      const amountInBaseUnits = this.toBaseUnits(amount, 6)
+      const amountInBaseUnits = this.toBaseUnits(amount, context.tokenDecimals)
       const erc20 = new ethers.Contract(
-        context.usdcAddress,
+        context.tokenAddress,
         ['function transfer(address to, uint256 value) returns (bool)'],
         context.signer,
       )
@@ -95,38 +122,53 @@ export class CeloWalletHandler implements IWalletHandler {
     }
     catch (error: unknown) {
       const reason = this.describeError(error)
-      this.logger.error('[CeloWalletHandler] Failed to send USDC', { error, reason })
+      this.logger.error('[CeloWalletHandler] Failed to send token', { error, reason })
       return { code: 'retriable', reason, success: false }
     }
   }
 
-  private async buildContext(): Promise<CeloWalletContext> {
+  private async buildReceiptContext(): Promise<CeloReceiptContext> {
     const {
       CELO_DEPOSIT_ADDRESS: depositAddressRaw,
-      CELO_PRIVATE_KEY: privateKey,
       CELO_RPC_URL: rpcUrl,
-      CELO_USDC_ADDRESS: usdcAddressRaw,
     } = await this.secretManager.getSecrets([
       Secrets.CELO_RPC_URL,
-      Secrets.CELO_PRIVATE_KEY,
       Secrets.CELO_DEPOSIT_ADDRESS,
-      Secrets.CELO_USDC_ADDRESS,
     ])
 
     const depositAddress = safeNormalizeAddress(depositAddressRaw)
-    const usdcAddress = safeNormalizeAddress(usdcAddressRaw)
-    if (!depositAddress || !usdcAddress) {
+    if (!depositAddress) {
       throw new Error('Invalid Celo address configuration')
     }
 
     const provider = this.getOrCreateProvider(rpcUrl)
-    const signer = new ethers.Wallet(privateKey, provider)
 
     return {
       depositAddress,
       provider,
+    }
+  }
+
+  private async buildSendContext(assetConfig: { decimals: null | number, mintAddress: string }): Promise<CeloSendContext> {
+    const { CELO_PRIVATE_KEY: privateKey, CELO_RPC_URL: rpcUrl } = await this.secretManager.getSecrets([
+      Secrets.CELO_RPC_URL,
+      Secrets.CELO_PRIVATE_KEY,
+    ])
+
+    const provider = this.getOrCreateProvider(rpcUrl)
+    const signer = new ethers.Wallet(privateKey, provider)
+    const tokenAddress = safeNormalizeAddress(assetConfig.mintAddress)
+    if (!tokenAddress) {
+      throw new Error('Invalid token address configuration')
+    }
+
+    const tokenDecimals = await this.resolveTokenDecimals(provider, tokenAddress, assetConfig.decimals)
+
+    return {
+      provider,
       signer,
-      usdcAddress,
+      tokenAddress,
+      tokenDecimals,
     }
   }
 
@@ -149,6 +191,25 @@ export class CeloWalletHandler implements IWalletHandler {
 
     this.cachedProvider = { provider, rpcUrl }
     return provider
+  }
+
+  private async resolveTokenDecimals(
+    provider: ethers.providers.JsonRpcProvider,
+    tokenAddress: string,
+    configuredDecimals: null | number,
+  ): Promise<number> {
+    if (typeof configuredDecimals === 'number' && Number.isInteger(configuredDecimals) && configuredDecimals >= 0) {
+      return configuredDecimals
+    }
+
+    const cached = this.tokenDecimalsCache.get(tokenAddress)
+    if (cached !== undefined) {
+      return cached
+    }
+
+    const decimals = await fetchErc20Decimals(provider, tokenAddress)
+    this.tokenDecimalsCache.set(tokenAddress, decimals)
+    return decimals
   }
 
   private toBaseUnits(amount: number, decimals: number): BigNumber {

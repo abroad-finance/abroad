@@ -1,4 +1,10 @@
-import { Country, KycStatus, KYCTier, PaymentMethod, TargetCurrency } from '@prisma/client'
+import {
+  Country,
+  KycStatus,
+  KYCTier,
+  PaymentMethod,
+  TargetCurrency,
+} from '@prisma/client'
 
 import type { IKycService } from '../../../../../modules/kyc/application/contracts/IKycService'
 import type { IPaymentService } from '../../../../../modules/payments/application/contracts/IPaymentService'

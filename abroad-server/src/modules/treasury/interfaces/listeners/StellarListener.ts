@@ -1,7 +1,7 @@
 #!/usr/bin/env -S npx tsx
 // src/stellar/index.ts
 
-import { BlockchainNetwork } from '@prisma/client'
+import { BlockchainNetwork, CryptoCurrency } from '@prisma/client'
 import { Horizon } from '@stellar/stellar-sdk'
 import { inject, injectable } from 'inversify'
 
@@ -13,6 +13,7 @@ import { OutboxDispatcher } from '../../../../platform/outbox/OutboxDispatcher'
 import { IDatabaseClientProvider } from '../../../../platform/persistence/IDatabaseClientProvider'
 import { ISecretManager } from '../../../../platform/secrets/ISecretManager'
 import { IDepositVerifierRegistry } from '../../../payments/application/contracts/IDepositVerifier'
+import { CryptoAssetConfigService } from '../../../payments/application/CryptoAssetConfigService'
 import { StellarOrphanRefundService } from '../../../transactions/application/StellarOrphanRefundService'
 import { PaymentReconciliationReason } from '../../../transactions/application/StellarTypes'
 
@@ -22,6 +23,8 @@ type StreamHandle = (() => void) | { close: () => void }
 @injectable()
 export class StellarListener {
   private accountId!: string
+  private assetCache?: { assets: Map<string, CryptoCurrency>, expiresAt: number }
+  private readonly assetCacheTtlMs = 60_000
   private horizonUrl!: string
   private keepAlive?: ReturnType<typeof setInterval>
   private readonly logger: ScopedLogger
@@ -29,7 +32,6 @@ export class StellarListener {
   private server?: Horizon.Server
   // Keep strong references so the stream isn't GC'd.
   private stream?: StreamHandle
-  private usdcIssuer!: string
 
   constructor(
     @inject(TYPES.IOutboxDispatcher) private readonly outboxDispatcher: OutboxDispatcher,
@@ -38,6 +40,7 @@ export class StellarListener {
     private dbClientProvider: IDatabaseClientProvider,
     @inject(TYPES.IDepositVerifierRegistry) private readonly depositVerifierRegistry: IDepositVerifierRegistry,
     @inject(TYPES.StellarOrphanRefundService) private readonly orphanRefundService: StellarOrphanRefundService,
+    @inject(CryptoAssetConfigService) private readonly assetConfigService: CryptoAssetConfigService,
     @inject(TYPES.ILogger) baseLogger: ILogger,
   ) {
     this.logger = createScopedLogger(baseLogger, { scope: 'StellarListener', staticPayload: { queue: this.queueName } })
@@ -68,15 +71,12 @@ export class StellarListener {
     const {
       STELLAR_ACCOUNT_ID,
       STELLAR_HORIZON_URL,
-      STELLAR_USDC_ISSUER,
     } = await this.secretManager.getSecrets([
       'STELLAR_ACCOUNT_ID',
       'STELLAR_HORIZON_URL',
-      'STELLAR_USDC_ISSUER',
     ])
     this.accountId = STELLAR_ACCOUNT_ID
     this.horizonUrl = STELLAR_HORIZON_URL
-    this.usdcIssuer = STELLAR_USDC_ISSUER
 
     this.logger.info('Initializing Horizon server for account', { accountId: this.accountId })
 
@@ -125,34 +125,23 @@ export class StellarListener {
           return
         }
 
-        // Filter for USDC payments
-        if (
-          payment.to !== this.accountId
-          || payment.asset_type !== 'credit_alphanum4'
-          || payment.asset_code !== 'USDC'
-          || !payment.asset_issuer
-        ) {
+        if (payment.to !== this.accountId) {
           this.logger.warn(
-            'Skipping message (wrong type, recipient, or asset).',
-            {
-              assetCode: payment.asset_code,
-              assetIssuer: payment.asset_issuer,
-              assetType: payment.asset_type,
-              recipient: payment.to,
-              type: payment.type,
-            },
+            'Skipping payment (wrong recipient).',
+            { recipient: payment.to },
           )
           return
         }
 
-        const usdcAssetIssuers = [
-          this.usdcIssuer,
-        ]
-
-        if (!usdcAssetIssuers.includes(payment.asset_issuer)) {
+        const cryptoCurrency = await this.resolvePaymentAsset(payment)
+        if (!cryptoCurrency) {
           this.logger.warn(
-            'Skipping payment. USDC Asset Issuer is not allowed.',
-            { assetIssuer: payment.asset_issuer },
+            'Skipping payment (unsupported asset).',
+            {
+              assetCode: payment.asset_code,
+              assetIssuer: payment.asset_issuer,
+              assetType: payment.asset_type,
+            },
           )
           return
         }
@@ -163,7 +152,7 @@ export class StellarListener {
           this.logger.error('Stellar transaction hash is missing', { paymentId: payment.id })
           return
         }
-        this.logger.info('Fetched full transaction details', { transactionId: transactionHash })
+        this.logger.info('Fetched full transaction details', { cryptoCurrency, transactionId: transactionHash })
 
         if (!tx.memo) {
           await this.handleOrphanPayment(payment, 'missingMemo')
@@ -233,6 +222,26 @@ export class StellarListener {
     }
   }
 
+  private assetKey(assetCode: string, issuer: string): string {
+    return `${assetCode}:${issuer}`
+  }
+
+  private async getEnabledAssetMap(): Promise<Map<string, CryptoCurrency>> {
+    const now = Date.now()
+    if (this.assetCache && this.assetCache.expiresAt > now) {
+      return this.assetCache.assets
+    }
+
+    const assets = await this.assetConfigService.listEnabledAssets(BlockchainNetwork.STELLAR)
+    const map = new Map<string, CryptoCurrency>()
+    assets.forEach((asset) => {
+      map.set(this.assetKey(asset.cryptoCurrency, asset.mintAddress), asset.cryptoCurrency)
+    })
+
+    this.assetCache = { assets: map, expiresAt: now + this.assetCacheTtlMs }
+    return map
+  }
+
   private async handleOrphanPayment(
     payment: Horizon.ServerApi.PaymentOperationRecord,
     reason: PaymentReconciliationReason,
@@ -249,5 +258,19 @@ export class StellarListener {
         refundTransactionId: outcome.refundTransactionId,
       })
     }
+  }
+
+  private async resolvePaymentAsset(
+    payment: Horizon.ServerApi.PaymentOperationRecord,
+  ): Promise<CryptoCurrency | null> {
+    if (payment.asset_type !== 'credit_alphanum4' && payment.asset_type !== 'credit_alphanum12') {
+      return null
+    }
+    if (!payment.asset_code || !payment.asset_issuer) {
+      return null
+    }
+
+    const assetMap = await this.getEnabledAssetMap()
+    return assetMap.get(this.assetKey(payment.asset_code, payment.asset_issuer)) ?? null
   }
 }

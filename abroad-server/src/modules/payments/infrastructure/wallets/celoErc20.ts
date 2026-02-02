@@ -91,3 +91,36 @@ export const toDecimalAmount = (amount: BigNumber, decimals: number): number => 
   }
   return parsed
 }
+
+export const fetchErc20Decimals = async (
+  provider: ethers.providers.JsonRpcProvider,
+  tokenAddress: string,
+): Promise<number> => {
+  const erc20 = new ethers.Contract(
+    tokenAddress,
+    ['function decimals() view returns (uint8)'],
+    provider,
+  )
+
+  const raw = (await erc20.decimals()) as unknown
+
+  let decimals: null | number = null
+  if (typeof raw === 'number') {
+    decimals = raw
+  }
+  else if (BigNumber.isBigNumber(raw)) {
+    decimals = raw.toNumber()
+  }
+  else if (typeof raw === 'string') {
+    const parsed = Number.parseInt(raw, 10)
+    if (Number.isInteger(parsed)) {
+      decimals = parsed
+    }
+  }
+
+  if (decimals === null || !Number.isInteger(decimals) || decimals < 0) {
+    throw new Error('Invalid token decimals returned from contract')
+  }
+
+  return decimals
+}

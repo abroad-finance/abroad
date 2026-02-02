@@ -14,13 +14,14 @@ import { ILogger } from '../../../../core/logging/types'
 import { IDatabaseClientProvider } from '../../../../platform/persistence/IDatabaseClientProvider'
 import { ISecretManager, Secrets } from '../../../../platform/secrets/ISecretManager'
 import { DepositVerificationError, DepositVerificationSuccess, IDepositVerifier } from '../../application/contracts/IDepositVerifier'
+import { CryptoAssetConfigService } from '../../application/CryptoAssetConfigService'
 
 type ParsedInstructionType = ParsedInstruction | PartiallyDecodedInstruction
 
 type SolanaPaymentContext = {
+  assetMint: PublicKey
   connection: Connection
   tokenAccounts: PublicKey[]
-  usdcMint: PublicKey
 }
 
 type TokenAmountInfo = {
@@ -41,39 +42,43 @@ type TransferCheckedInfo = {
 export class SolanaPaymentVerifier implements IDepositVerifier {
   public readonly supportedNetwork = BlockchainNetwork.SOLANA
   private cachedConnection?: { connection: Connection, url: string }
-  private cachedTokenAccounts?: { depositWallet: string, tokenAccounts: PublicKey[], usdcMint: string }
+  private cachedTokenAccounts?: { depositWallet: string, mint: string, tokenAccounts: PublicKey[] }
 
   public constructor(
     @inject(TYPES.ISecretManager) private readonly secretManager: ISecretManager,
     @inject(TYPES.IDatabaseClientProvider) private readonly dbClientProvider: IDatabaseClientProvider,
+    @inject(CryptoAssetConfigService) private readonly assetConfigService: CryptoAssetConfigService,
     @inject(TYPES.ILogger) private readonly logger: ILogger,
   ) {}
 
-  public async buildPaymentContext(): Promise<SolanaPaymentContext> {
-    const [rpcUrl, depositWalletAddress, usdcMintAddress] = await Promise.all([
+  public async buildPaymentContext(cryptoCurrency: CryptoCurrency): Promise<SolanaPaymentContext> {
+    const [rpcUrl, depositWalletAddress, assetConfig] = await Promise.all([
       this.secretManager.getSecret(Secrets.SOLANA_RPC_URL),
       this.secretManager.getSecret(Secrets.SOLANA_ADDRESS),
-      this.secretManager.getSecret(Secrets.SOLANA_USDC_MINT),
+      this.assetConfigService.getActiveMint({
+        blockchain: BlockchainNetwork.SOLANA,
+        cryptoCurrency,
+      }),
     ])
 
     const depositWallet = this.safePublicKey(depositWalletAddress)
-    const usdcMint = this.safePublicKey(usdcMintAddress)
+    const assetMint = this.safePublicKey(assetConfig?.mintAddress)
 
-    if (!depositWallet || !usdcMint) {
+    if (!depositWallet || !assetMint) {
       this.logger.error('[SolanaPaymentsController] Invalid Solana configuration', {
         depositWalletAddress,
-        usdcMintAddress,
+        mintAddress: assetConfig?.mintAddress ?? null,
       })
       throw new Error('Solana configuration is invalid')
     }
 
     const connection = this.getOrCreateConnection(rpcUrl)
-    const depositTokenAccounts = await this.getOrCreateTokenAccounts(depositWallet, usdcMint)
+    const depositTokenAccounts = await this.getOrCreateTokenAccounts(depositWallet, assetMint)
 
     return {
+      assetMint,
       connection,
       tokenAccounts: [depositWallet, ...depositTokenAccounts],
-      usdcMint,
     }
   }
 
@@ -113,7 +118,7 @@ export class SolanaPaymentVerifier implements IDepositVerifier {
     return txDetails
   }
 
-  public findUsdcTransferToWallet(
+  public findTokenTransferToWallet(
     txDetails: ParsedTransactionWithMeta,
     walletTokenAccounts: PublicKey[],
     allowedMints: PublicKey[],
@@ -178,10 +183,10 @@ export class SolanaPaymentVerifier implements IDepositVerifier {
     }
   }
 
-  public validateTransaction(transaction: {
+  public async validateTransaction(transaction: {
     quote: { cryptoCurrency: CryptoCurrency, network: BlockchainNetwork }
     status: TransactionStatus
-  }): string | undefined {
+  }): Promise<string | undefined> {
     if (transaction.status !== TransactionStatus.AWAITING_PAYMENT) {
       return 'Transaction is not awaiting payment'
     }
@@ -190,7 +195,11 @@ export class SolanaPaymentVerifier implements IDepositVerifier {
       return 'Transaction is not set for Solana'
     }
 
-    if (transaction.quote.cryptoCurrency !== CryptoCurrency.USDC) {
+    const assetConfig = await this.assetConfigService.getActiveMint({
+      blockchain: BlockchainNetwork.SOLANA,
+      cryptoCurrency: transaction.quote.cryptoCurrency,
+    })
+    if (!assetConfig) {
       return 'Unsupported currency for Solana payments'
     }
 
@@ -211,7 +220,7 @@ export class SolanaPaymentVerifier implements IDepositVerifier {
       return { outcome: 'error', reason: 'Transaction not found', status: 404 }
     }
 
-    const validationError = this.validateTransaction(transaction)
+    const validationError = await this.validateTransaction(transaction)
     if (validationError) {
       return { outcome: 'error', reason: validationError, status: 400 }
     }
@@ -221,16 +230,16 @@ export class SolanaPaymentVerifier implements IDepositVerifier {
       return { outcome: 'error', reason: duplicateReason, status: 400 }
     }
 
-    const { connection, tokenAccounts, usdcMint } = await this.buildPaymentContext()
+    const { assetMint, connection, tokenAccounts } = await this.buildPaymentContext(transaction.quote.cryptoCurrency)
 
     try {
       const txDetails = await this.fetchOnChainTransaction(connection, onChainSignature)
-      const transfer = this.findUsdcTransferToWallet(txDetails, tokenAccounts, [usdcMint])
+      const transfer = this.findTokenTransferToWallet(txDetails, tokenAccounts, [assetMint])
 
       if (!transfer) {
         return {
           outcome: 'error',
-          reason: 'No USDC transfer to the configured wallet found in this transaction',
+          reason: 'No transfer to the configured wallet found in this transaction',
           status: 400,
         }
       }
@@ -241,7 +250,7 @@ export class SolanaPaymentVerifier implements IDepositVerifier {
           addressFrom: transfer.source,
           amount: transfer.amount,
           blockchain: BlockchainNetwork.SOLANA,
-          cryptoCurrency: CryptoCurrency.USDC,
+          cryptoCurrency: transaction.quote.cryptoCurrency,
           onChainId: onChainSignature,
           transactionId: transaction.id,
         },
@@ -317,27 +326,27 @@ export class SolanaPaymentVerifier implements IDepositVerifier {
     return connection
   }
 
-  private async getOrCreateTokenAccounts(depositWallet: PublicKey, usdcMint: PublicKey): Promise<PublicKey[]> {
+  private async getOrCreateTokenAccounts(depositWallet: PublicKey, mint: PublicKey): Promise<PublicKey[]> {
     const depositKey = depositWallet.toBase58()
-    const mintKey = usdcMint.toBase58()
+    const mintKey = mint.toBase58()
 
     if (
       this.cachedTokenAccounts
       && this.cachedTokenAccounts.depositWallet === depositKey
-      && this.cachedTokenAccounts.usdcMint === mintKey
+      && this.cachedTokenAccounts.mint === mintKey
     ) {
       return this.cachedTokenAccounts.tokenAccounts
     }
 
     const tokenAccounts = await Promise.all([
-      getAssociatedTokenAddress(usdcMint, depositWallet, false, TOKEN_PROGRAM_ID),
-      getAssociatedTokenAddress(usdcMint, depositWallet, false, TOKEN_2022_PROGRAM_ID),
+      getAssociatedTokenAddress(mint, depositWallet, false, TOKEN_PROGRAM_ID),
+      getAssociatedTokenAddress(mint, depositWallet, false, TOKEN_2022_PROGRAM_ID),
     ])
 
     this.cachedTokenAccounts = {
       depositWallet: depositKey,
+      mint: mintKey,
       tokenAccounts,
-      usdcMint: mintKey,
     }
 
     return tokenAccounts

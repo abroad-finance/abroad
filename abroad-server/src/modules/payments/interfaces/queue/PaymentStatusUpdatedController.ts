@@ -7,15 +7,15 @@ import { ILogger } from '../../../../core/logging/types'
 import { getCorrelationId } from '../../../../core/requestContext'
 import { IQueueHandler, QueueName } from '../../../../platform/messaging/queues'
 import { PaymentStatusUpdatedMessage, PaymentStatusUpdatedMessageSchema } from '../../../../platform/messaging/queueSchema'
-import { TransactionWorkflow } from '../../../transactions/application/TransactionWorkflow'
+import { FlowOrchestrator } from '../../../flows/application/FlowOrchestrator'
 
 /**
  * Consumes payment status update messages coming from providers like Transfero
- * and delegates processing to the transaction workflow.
+ * and delegates processing to the flow orchestrator.
  */
 export class PaymentStatusUpdatedController {
   public constructor(
-    @inject(TYPES.TransactionWorkflow) private readonly workflow: TransactionWorkflow,
+    @inject(TYPES.FlowOrchestrator) private readonly orchestrator: FlowOrchestrator,
     @inject(TYPES.IQueueHandler) private readonly queueHandler: IQueueHandler,
     @inject(TYPES.ILogger) private readonly logger: ILogger,
   ) { }
@@ -47,11 +47,21 @@ export class PaymentStatusUpdatedController {
     const message: PaymentStatusUpdatedMessage = parsed.data
 
     try {
-      await this.workflow.handleProviderStatusUpdate(message)
+      await this.orchestrator.handleSignal({
+        correlationKeys: { externalId: message.externalId },
+        eventType: 'payment.status.updated',
+        payload: {
+          amount: message.amount ?? 0,
+          currency: message.currency,
+          externalId: message.externalId,
+          provider: message.provider,
+          status: message.status,
+        },
+      })
     }
     catch (error) {
       const normalizedError = error instanceof Error ? error : new Error(String(error))
-      scopedLogger.error('[PaymentStatusUpdated queue]: Error updating transaction:', normalizedError)
+      scopedLogger.error('[PaymentStatusUpdated queue]: Error updating flow:', normalizedError)
       throw normalizedError
     }
   }

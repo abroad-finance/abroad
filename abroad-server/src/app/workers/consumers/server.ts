@@ -3,7 +3,6 @@ import http from 'http'
 
 import { createScopedLogger } from '../../../core/logging/scopedLogger'
 import { ILogger } from '../../../core/logging/types'
-import { PaymentSentController } from '../../../modules/payments/interfaces/queue/PaymentSentController'
 import { PaymentStatusUpdatedController } from '../../../modules/payments/interfaces/queue/PaymentStatusUpdatedController'
 import { ReceivedCryptoTransactionController } from '../../../modules/transactions/interfaces/queue/ReceivedCryptoTransactionController'
 import { BinanceBalanceUpdatedController } from '../../../modules/treasury/interfaces/queue/BinanceBalanceUpdatedController'
@@ -45,7 +44,6 @@ export const createHealthHandler = (state: { live: boolean, ready: boolean }) =>
 const running: {
   binance?: BinanceBalanceUpdatedController
   deadLetter?: DeadLetterController
-  payment?: PaymentSentController
   paymentStatus?: PaymentStatusUpdatedController
   received?: ReceivedCryptoTransactionController
 } = {}
@@ -53,9 +51,6 @@ const running: {
 export function startConsumers(): void {
   const received = iocContainer.get<ReceivedCryptoTransactionController>(
     TYPES.ReceivedCryptoTransactionController,
-  )
-  const payment = iocContainer.get<PaymentSentController>(
-    TYPES.PaymentSentController,
   )
   const paymentStatus = iocContainer.get<PaymentStatusUpdatedController>(
     TYPES.PaymentStatusUpdatedController,
@@ -68,14 +63,12 @@ export function startConsumers(): void {
   )
 
   running.received = received
-  running.payment = payment
   running.paymentStatus = paymentStatus
   running.binance = binance
   running.deadLetter = deadLetter
 
   deadLetter.registerConsumers()
   received.registerConsumers()
-  payment.registerConsumers()
   paymentStatus.registerConsumers()
   binance.registerConsumers()
 
@@ -92,7 +85,7 @@ export async function stopConsumers(): Promise<void> {
   }
   finally {
     running.received = undefined
-    running.payment = undefined
+    running.paymentStatus = undefined
     running.binance = undefined
     running.deadLetter = undefined
   }

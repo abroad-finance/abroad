@@ -6,11 +6,14 @@ import { Request } from 'express'
 import { IPartnerService } from '../../modules/partners/application/contracts/IPartnerService'
 import { iocContainer } from '../container'
 import { TYPES } from '../container/types'
+import { OpsAuthService } from './OpsAuthService'
+
+type AuthContext = Partner | { kind: 'ops' }
 
 export async function expressAuthentication(
   request: Request,
   securityName: string,
-): Promise<Partner> {
+): Promise<AuthContext> {
   const partnerService = iocContainer.get<IPartnerService>(
     TYPES.IPartnerService,
   )
@@ -36,6 +39,26 @@ export async function expressAuthentication(
     catch {
       throw new Error('Invalid token or partner not found')
     }
+  }
+
+  if (securityName === 'OpsApiKeyAuth') {
+    const headerKey = request.header('X-OPS-API-KEY')
+    if (!headerKey) {
+      throw new Error('Ops API key not provided')
+    }
+
+    const opsAuthService = iocContainer.get<OpsAuthService>(TYPES.IOpsAuthService)
+    let expected: string
+    try {
+      expected = await opsAuthService.getOpsApiKey()
+    }
+    catch (error) {
+      throw new Error('Ops API key not configured')
+    }
+    if (!expected || headerKey !== expected) {
+      throw new Error('Invalid ops API key')
+    }
+    return { kind: 'ops' }
   }
 
   throw new Error('Invalid security scheme')

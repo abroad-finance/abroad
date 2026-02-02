@@ -5,6 +5,9 @@ const typeKeys = [
   'BinanceBalanceUpdatedController',
   'CeloPaymentVerifier',
   'CeloWalletHandler',
+  'FlowExecutorRegistry',
+  'FlowOrchestrator',
+  'FlowStepExecutor',
   'IDatabaseClientProvider',
   'IDepositVerifier',
   'IDepositVerifierRegistry',
@@ -15,6 +18,7 @@ const typeKeys = [
   'IOutboxDispatcher',
   'ILogger',
   'IPartnerService',
+  'IOpsAuthService',
   'IPaymentService',
   'IPaymentServiceFactory',
   'IPayoutStatusAdapter',
@@ -27,8 +31,6 @@ const typeKeys = [
   'IWebSocketService',
   'KycUseCase',
   'OutboxWorker',
-  'PaymentSentUseCase',
-  'PaymentSentController',
   'PaymentStatusUpdatedController',
   'PaymentUseCase',
   'QuoteUseCase',
@@ -41,7 +43,6 @@ const typeKeys = [
   'StellarListener',
   'TransactionAcceptanceService',
   'TransactionStatusService',
-  'TransactionWorkflow',
 ] as const
 
 type TypeKey = typeof typeKeys[number]

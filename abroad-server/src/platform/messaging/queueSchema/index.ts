@@ -6,7 +6,6 @@ export {
   DeadLetterMessage,
   DeadLetterMessageSchema,
 } from './deadLetterMessage'
-export { PaymentSentMessage, PaymentSentMessageSchema } from './paymentSentMessage'
 export {
   PaymentStatusUpdatedMessage,
   PaymentStatusUpdatedMessageSchema,

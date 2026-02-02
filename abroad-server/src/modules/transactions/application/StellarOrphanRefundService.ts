@@ -7,6 +7,7 @@ import { createScopedLogger, ScopedLogger } from '../../../core/logging/scopedLo
 import { ILogger } from '../../../core/logging/types'
 import { IDatabaseClientProvider } from '../../../platform/persistence/IDatabaseClientProvider'
 import { IWalletHandlerFactory } from '../../payments/application/contracts/IWalletHandlerFactory'
+import { CryptoAssetConfigService } from '../../payments/application/CryptoAssetConfigService'
 import { type RefundResult, RefundService } from './RefundService'
 import { PaymentReconciliationReason } from './StellarTypes'
 
@@ -24,6 +25,7 @@ export class StellarOrphanRefundService {
   constructor(
     @inject(TYPES.IDatabaseClientProvider) private readonly prismaProvider: IDatabaseClientProvider,
     @inject(TYPES.IWalletHandlerFactory) walletHandlerFactory: IWalletHandlerFactory,
+    @inject(CryptoAssetConfigService) private readonly assetConfigService: CryptoAssetConfigService,
     @inject(TYPES.ILogger) baseLogger: ILogger,
   ) {
     this.logger = createScopedLogger(baseLogger, { scope: 'StellarOrphanRefundService' })
@@ -55,6 +57,30 @@ export class StellarOrphanRefundService {
     }
     if (existing?.status === OrphanRefundStatus.PENDING) {
       return { outcome: 'in_flight', refundTransactionId: existing.refundTransactionId }
+    }
+
+    const cryptoCurrency = await this.resolveCryptoCurrency(params.payment)
+    if (!cryptoCurrency) {
+      await prisma.stellarOrphanRefund.upsert({
+        create: {
+          lastError: 'unsupported_asset',
+          paymentId: params.payment.id,
+          reason: params.reason,
+          status: OrphanRefundStatus.FAILED,
+        },
+        update: {
+          lastError: 'unsupported_asset',
+          reason: params.reason,
+          status: OrphanRefundStatus.FAILED,
+        },
+        where: { paymentId: params.payment.id },
+      })
+      this.logger.error('Skipping orphan refund due to unsupported asset', {
+        assetCode: params.payment.asset_code,
+        assetIssuer: params.payment.asset_issuer,
+        paymentId: params.payment.id,
+      })
+      return { outcome: 'failed', reason: 'unsupported_asset' }
     }
 
     // Mark as pending to avoid parallel refunds before performing the on-chain operation.
@@ -92,7 +118,7 @@ export class StellarOrphanRefundService {
     try {
       refundResult = await this.refundService.refundByOnChainId({
         amount,
-        cryptoCurrency: CryptoCurrency.USDC,
+        cryptoCurrency,
         network: BlockchainNetwork.STELLAR,
         onChainId: transactionHash,
       })
@@ -146,6 +172,24 @@ export class StellarOrphanRefundService {
       refundTransactionId: refundResult.transactionId ?? null,
     })
     return { outcome: 'refunded', refundTransactionId: refundResult.transactionId ?? null }
+  }
+
+  private async resolveCryptoCurrency(
+    payment: Horizon.ServerApi.PaymentOperationRecord,
+  ): Promise<CryptoCurrency | null> {
+    if (payment.asset_type !== 'credit_alphanum4' && payment.asset_type !== 'credit_alphanum12') {
+      return null
+    }
+
+    if (!payment.asset_code || !payment.asset_issuer) {
+      return null
+    }
+
+    const asset = await this.assetConfigService.resolveStellarAsset({
+      assetCode: payment.asset_code,
+      issuer: payment.asset_issuer,
+    })
+    return asset?.cryptoCurrency ?? null
   }
 
   private async resolveTransactionHash(

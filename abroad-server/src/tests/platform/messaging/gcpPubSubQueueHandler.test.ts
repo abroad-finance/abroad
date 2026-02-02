@@ -1,5 +1,5 @@
 import 'reflect-metadata'
-import { BlockchainNetwork, CryptoCurrency, TargetCurrency } from '@prisma/client'
+import { TargetCurrency } from '@prisma/client'
 import EventEmitter from 'events'
 
 import { RuntimeConfiguration } from '../../../app/config/runtime'
@@ -98,13 +98,12 @@ const config = {
 const createHandler = (): GCPPubSubQueueHandler =>
   new GCPPubSubQueueHandler(secretManager as never, logger, config)
 
-const createPaymentSentPayload = (): QueuePayloadByName[QueueName.PAYMENT_SENT] => ({
+const createPaymentStatusUpdatedPayload = (): QueuePayloadByName[QueueName.PAYMENT_STATUS_UPDATED] => ({
   amount: 1,
-  blockchain: BlockchainNetwork.STELLAR,
-  cryptoCurrency: CryptoCurrency.USDC,
-  paymentMethod: 'PIX',
-  targetCurrency: TargetCurrency.BRL,
-  transactionId: '00000000-0000-0000-0000-000000000000',
+  currency: TargetCurrency.BRL,
+  externalId: 'ext-00000000',
+  provider: 'transfero',
+  status: 'processed',
 })
 
 beforeEach(() => {
@@ -137,7 +136,7 @@ describe('GCPPubSubQueueHandler dead-letter handling', () => {
     ;(handler as unknown as { postMessage: typeof postMessage }).postMessage = postMessage
 
     await (handler as unknown as { sendToDeadLetter: GCPPubSubQueueHandler['sendToDeadLetter'] }).sendToDeadLetter(
-      QueueName.PAYMENT_SENT,
+      QueueName.PAYMENT_STATUS_UPDATED,
       { payload: true },
       'handler_failed',
       new Error('boom'),
@@ -147,7 +146,7 @@ describe('GCPPubSubQueueHandler dead-letter handling', () => {
       QueueName.DEAD_LETTER,
       expect.objectContaining({
         error: 'boom',
-        originalQueue: QueueName.PAYMENT_SENT,
+        originalQueue: QueueName.PAYMENT_STATUS_UPDATED,
         payload: { payload: true },
         reason: 'handler_failed',
       }),
@@ -160,7 +159,7 @@ describe('GCPPubSubQueueHandler Pub/Sub integration', () => {
     const handler = createHandler()
     const message = {
       error: undefined,
-      originalQueue: QueueName.PAYMENT_SENT,
+      originalQueue: QueueName.PAYMENT_STATUS_UPDATED,
       payload: { example: true },
       reason: 'parse_failed',
     }
@@ -174,20 +173,20 @@ describe('GCPPubSubQueueHandler Pub/Sub integration', () => {
   })
 
   it('subscribes to queues, validates payloads, and acks on success', async () => {
-    topicExists.set(QueueName.PAYMENT_SENT, true)
+    topicExists.set(QueueName.PAYMENT_STATUS_UPDATED, true)
     const handler = createHandler()
     const callback = jest.fn()
-    await handler.subscribeToQueue(QueueName.PAYMENT_SENT, callback)
+    await handler.subscribeToQueue(QueueName.PAYMENT_STATUS_UPDATED, callback)
 
-    const subscription = subscriptions.get(`${QueueName.PAYMENT_SENT}${config.pubSub.subscriptionSuffix}`)
+    const subscription = subscriptions.get(`${QueueName.PAYMENT_STATUS_UPDATED}${config.pubSub.subscriptionSuffix}`)
     expect(subscription).toBeDefined()
-    const topic = topics.get(QueueName.PAYMENT_SENT)
+    const topic = topics.get(QueueName.PAYMENT_STATUS_UPDATED)
     expect(topic?.createSubscription).toHaveBeenCalledWith(
-      `${QueueName.PAYMENT_SENT}${config.pubSub.subscriptionSuffix}`,
+      `${QueueName.PAYMENT_STATUS_UPDATED}${config.pubSub.subscriptionSuffix}`,
       { ackDeadlineSeconds: config.pubSub.ackDeadlineSeconds },
     )
 
-    const payload = createPaymentSentPayload()
+    const payload = createPaymentStatusUpdatedPayload()
     const message = new FakeMessage(Buffer.from(JSON.stringify(payload)), 'msg-success')
     subscription?.emit('message', message)
     await new Promise(resolve => setImmediate(resolve))
@@ -199,9 +198,9 @@ describe('GCPPubSubQueueHandler Pub/Sub integration', () => {
 
   it('sends parse failures to the dead-letter queue and still acks', async () => {
     const handler = createHandler()
-    await handler.subscribeToQueue(QueueName.PAYMENT_SENT, async () => {})
+    await handler.subscribeToQueue(QueueName.PAYMENT_STATUS_UPDATED, async () => {})
 
-    const subscription = subscriptions.get(`${QueueName.PAYMENT_SENT}${config.pubSub.subscriptionSuffix}`)
+    const subscription = subscriptions.get(`${QueueName.PAYMENT_STATUS_UPDATED}${config.pubSub.subscriptionSuffix}`)
     const message = new FakeMessage(Buffer.from('{not-json'), 'msg-parse')
     subscription?.emit('message', message)
     await new Promise(resolve => setImmediate(resolve))
@@ -210,21 +209,21 @@ describe('GCPPubSubQueueHandler Pub/Sub integration', () => {
     expect(publishedMessages).toHaveLength(1)
     expect(publishedMessages[0].topic).toBe(QueueName.DEAD_LETTER)
     expect(JSON.parse(publishedMessages[0].data)).toMatchObject({
-      originalQueue: QueueName.PAYMENT_SENT,
+      originalQueue: QueueName.PAYMENT_STATUS_UPDATED,
       reason: 'parse_failed',
     })
   })
 
   it('captures handler errors and posts normalized failures to DLQ', async () => {
-    topicExists.set(QueueName.PAYMENT_SENT, true)
+    topicExists.set(QueueName.PAYMENT_STATUS_UPDATED, true)
     const handler = createHandler()
     const failingCallback = jest.fn(() => {
       throw 'handler boom'
     })
-    await handler.subscribeToQueue(QueueName.PAYMENT_SENT, failingCallback)
+    await handler.subscribeToQueue(QueueName.PAYMENT_STATUS_UPDATED, failingCallback)
 
-    const subscription = subscriptions.get(`${QueueName.PAYMENT_SENT}${config.pubSub.subscriptionSuffix}`)
-    const payload = createPaymentSentPayload()
+    const subscription = subscriptions.get(`${QueueName.PAYMENT_STATUS_UPDATED}${config.pubSub.subscriptionSuffix}`)
+    const payload = createPaymentStatusUpdatedPayload()
     const message = new FakeMessage(Buffer.from(JSON.stringify(payload)), 'msg-failure')
     subscription?.emit('message', message)
     await new Promise(resolve => setImmediate(resolve))
@@ -234,18 +233,18 @@ describe('GCPPubSubQueueHandler Pub/Sub integration', () => {
     expect(publishedMessages).toHaveLength(1)
     expect(JSON.parse(publishedMessages[0].data)).toMatchObject({
       error: 'handler boom',
-      originalQueue: QueueName.PAYMENT_SENT,
+      originalQueue: QueueName.PAYMENT_STATUS_UPDATED,
       payload,
       reason: 'handler_failed',
     })
   })
 
   it('logs validation issues and dead-letters invalid payloads', async () => {
-    topicExists.set(QueueName.PAYMENT_SENT, true)
+    topicExists.set(QueueName.PAYMENT_STATUS_UPDATED, true)
     const handler = createHandler()
-    await handler.subscribeToQueue(QueueName.PAYMENT_SENT, async () => {})
+    await handler.subscribeToQueue(QueueName.PAYMENT_STATUS_UPDATED, async () => {})
 
-    const subscription = subscriptions.get(`${QueueName.PAYMENT_SENT}${config.pubSub.subscriptionSuffix}`)
+    const subscription = subscriptions.get(`${QueueName.PAYMENT_STATUS_UPDATED}${config.pubSub.subscriptionSuffix}`)
     const invalidPayload = { amount: '1', blockchain: 'bogus' }
     const message = new FakeMessage(Buffer.from(JSON.stringify(invalidPayload)), 'msg-invalid')
     subscription?.emit('message', message)
@@ -255,8 +254,8 @@ describe('GCPPubSubQueueHandler Pub/Sub integration', () => {
       '[PubSubQueueHandler] Failed to validate PubSub message',
       expect.objectContaining({
         context: expect.objectContaining({
-          queueName: QueueName.PAYMENT_SENT,
-          subscriptionName: `${QueueName.PAYMENT_SENT}${config.pubSub.subscriptionSuffix}`,
+          queueName: QueueName.PAYMENT_STATUS_UPDATED,
+          subscriptionName: `${QueueName.PAYMENT_STATUS_UPDATED}${config.pubSub.subscriptionSuffix}`,
         }),
       }),
       expect.objectContaining({
@@ -267,7 +266,7 @@ describe('GCPPubSubQueueHandler Pub/Sub integration', () => {
     expect(message.ack).toHaveBeenCalled()
     expect(publishedMessages).toHaveLength(1)
     expect(JSON.parse(publishedMessages[0].data)).toMatchObject({
-      originalQueue: QueueName.PAYMENT_SENT,
+      originalQueue: QueueName.PAYMENT_STATUS_UPDATED,
       payload: invalidPayload,
       reason: 'parse_failed',
     })
@@ -275,9 +274,9 @@ describe('GCPPubSubQueueHandler Pub/Sub integration', () => {
 
   it('surfaces subscription errors through the logger', async () => {
     const handler = createHandler()
-    await handler.subscribeToQueue(QueueName.PAYMENT_SENT, async () => {})
+    await handler.subscribeToQueue(QueueName.PAYMENT_STATUS_UPDATED, async () => {})
 
-    const subscription = subscriptions.get(`${QueueName.PAYMENT_SENT}${config.pubSub.subscriptionSuffix}`)
+    const subscription = subscriptions.get(`${QueueName.PAYMENT_STATUS_UPDATED}${config.pubSub.subscriptionSuffix}`)
     const subscriptionError = new Error('subscription-failure')
     subscription?.emit('error', subscriptionError)
 
@@ -285,8 +284,8 @@ describe('GCPPubSubQueueHandler Pub/Sub integration', () => {
       '[PubSubQueueHandler] Subscription error',
       expect.objectContaining({
         context: expect.objectContaining({
-          queueName: QueueName.PAYMENT_SENT,
-          subscriptionName: `${QueueName.PAYMENT_SENT}${config.pubSub.subscriptionSuffix}`,
+          queueName: QueueName.PAYMENT_STATUS_UPDATED,
+          subscriptionName: `${QueueName.PAYMENT_STATUS_UPDATED}${config.pubSub.subscriptionSuffix}`,
         }),
       }),
       { err: subscriptionError },
@@ -302,7 +301,7 @@ describe('GCPPubSubQueueHandler Pub/Sub integration', () => {
     ;(handler as unknown as { postMessage: typeof throwingPostMessage }).postMessage = throwingPostMessage
 
     await (handler as unknown as { sendToDeadLetter: GCPPubSubQueueHandler['sendToDeadLetter'] }).sendToDeadLetter(
-      QueueName.PAYMENT_SENT,
+      QueueName.PAYMENT_STATUS_UPDATED,
       { payload: true },
       'handler_failed',
       new Error('boom'),
@@ -316,11 +315,11 @@ describe('GCPPubSubQueueHandler Pub/Sub integration', () => {
 
   it('closes subscriptions when asked', async () => {
     const handler = createHandler()
-    await handler.subscribeToQueue(QueueName.PAYMENT_SENT, async () => {})
+    await handler.subscribeToQueue(QueueName.PAYMENT_STATUS_UPDATED, async () => {})
     await handler.subscribeToQueue(QueueName.DEAD_LETTER, async () => {})
 
     const subNames = [
-      `${QueueName.PAYMENT_SENT}${config.pubSub.subscriptionSuffix}`,
+      `${QueueName.PAYMENT_STATUS_UPDATED}${config.pubSub.subscriptionSuffix}`,
       `${QueueName.DEAD_LETTER}${config.pubSub.subscriptionSuffix}`,
     ]
     await handler.closeAllSubscriptions?.()

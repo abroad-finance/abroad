@@ -13,6 +13,7 @@ import { OutboxRepository } from '../../platform/outbox/OutboxRepository'
 import { OutboxWorker } from '../../platform/outbox/OutboxWorker'
 import { PrismaClientProvider } from '../../platform/persistence/prismaClientProvider'
 import { CachedSecretManager } from '../../platform/secrets/CachedSecretManager'
+import { OpsAuthService } from '../http/OpsAuthService'
 import { BindingRegistration, registerBindings } from './bindingSupport'
 import { TYPES } from './types'
 
@@ -30,6 +31,7 @@ const infrastructureBindings: ReadonlyArray<BindingRegistration<unknown>> = [
   { identifier: TYPES.ILockManager, implementation: RedisLockManager },
   { identifier: TYPES.IPartnerService, implementation: PartnerService },
   { identifier: TYPES.IKycService, implementation: PersonaKycService },
+  { identifier: TYPES.IOpsAuthService, implementation: OpsAuthService },
 ] as const
 
 export function bindInfrastructure(container: Container): void {

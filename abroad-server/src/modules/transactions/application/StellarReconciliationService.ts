@@ -1,4 +1,4 @@
-import { BlockchainNetwork, PrismaClient, TransactionStatus } from '@prisma/client'
+import { BlockchainNetwork, CryptoCurrency, PrismaClient, TransactionStatus } from '@prisma/client'
 import { Horizon } from '@stellar/stellar-sdk'
 
 import { ILogger } from '../../../core/logging/types'
@@ -7,6 +7,7 @@ import { OutboxDispatcher } from '../../../platform/outbox/OutboxDispatcher'
 import { IDatabaseClientProvider } from '../../../platform/persistence/IDatabaseClientProvider'
 import { ISecretManager, Secrets } from '../../../platform/secrets/ISecretManager'
 import { IDepositVerifierRegistry } from '../../payments/application/contracts/IDepositVerifier'
+import { CryptoAssetConfigService } from '../../payments/application/CryptoAssetConfigService'
 import { StellarOrphanRefundService } from './StellarOrphanRefundService'
 import { PaymentReconciliationReason } from './StellarTypes'
 
@@ -41,8 +42,8 @@ type PaymentProcessingOutcome
 
 type StellarPaymentContext = {
   accountId: string
+  assetMap: Map<string, CryptoCurrency>
   prismaClient: PrismaClient
-  usdcIssuer: string
 }
 
 type StellarReconciliationContext = StellarPaymentContext & {
@@ -59,6 +60,7 @@ export class StellarReconciliationService {
     private readonly secretManager: ISecretManager,
     private readonly outboxDispatcher: OutboxDispatcher,
     private readonly orphanRefundService: StellarOrphanRefundService,
+    private readonly assetConfigService: CryptoAssetConfigService,
     private readonly verifierRegistry: IDepositVerifierRegistry,
     private readonly logger: ILogger,
   ) {}
@@ -72,8 +74,9 @@ export class StellarReconciliationService {
       return this.buildEmptySummary()
     }
 
-    const { accountId, horizonUrl, usdcIssuer } = await this.getStellarSecrets()
+    const { accountId, horizonUrl } = await this.getStellarSecrets()
     const server = new Horizon.Server(horizonUrl)
+    const assetMap = await this.buildAssetMap()
     const scanStartPagingToken = await this.rewindPagingToken(
       server,
       accountId,
@@ -83,11 +86,11 @@ export class StellarReconciliationService {
 
     const summary = await this.reconcileStellarPayments({
       accountId,
+      assetMap,
       prismaClient,
       scanStartPagingToken,
       server,
       storedPagingToken,
-      usdcIssuer,
     })
 
     await this.persistPagingToken(prismaClient, storedPagingToken, summary.endPagingToken)
@@ -105,8 +108,9 @@ export class StellarReconciliationService {
     }
 
     const prismaClient = await this.prismaProvider.getClient()
-    const { accountId, horizonUrl, usdcIssuer } = await this.getStellarSecrets()
+    const { accountId, horizonUrl } = await this.getStellarSecrets()
     const server = new Horizon.Server(horizonUrl)
+    const assetMap = await this.buildAssetMap()
 
     const lookupResult = await this.fetchPaymentById(server, normalizedPaymentId)
     if (lookupResult.status === 'failed') {
@@ -122,7 +126,7 @@ export class StellarReconciliationService {
       return { paymentId: normalizedPaymentId, result: 'irrelevant', transactionId: null }
     }
 
-    const outcome = await this.processPayment(lookupResult.payment, { accountId, prismaClient, usdcIssuer })
+    const outcome = await this.processPayment(lookupResult.payment, { accountId, assetMap, prismaClient })
     if (outcome.result === 'halt') {
       return { paymentId: normalizedPaymentId, result: 'failed', transactionId: outcome.transactionId ?? null }
     }
@@ -159,6 +163,19 @@ export class StellarReconciliationService {
       default:
         break
     }
+  }
+
+  private assetKey(assetCode: string, issuer: string): string {
+    return `${assetCode}:${issuer}`
+  }
+
+  private async buildAssetMap(): Promise<Map<string, CryptoCurrency>> {
+    const assets = await this.assetConfigService.listEnabledAssets(BlockchainNetwork.STELLAR)
+    const map = new Map<string, CryptoCurrency>()
+    assets.forEach((asset) => {
+      map.set(this.assetKey(asset.cryptoCurrency, asset.mintAddress), asset.cryptoCurrency)
+    })
+    return map
   }
 
   private buildEmptySummary(): CheckUnprocessedStellarResponse {
@@ -296,14 +313,13 @@ export class StellarReconciliationService {
     return state?.lastPagingToken ?? null
   }
 
-  private async getStellarSecrets(): Promise<{ accountId: string, horizonUrl: string, usdcIssuer: string }> {
-    const [accountId, horizonUrl, usdcIssuer] = await Promise.all([
+  private async getStellarSecrets(): Promise<{ accountId: string, horizonUrl: string }> {
+    const [accountId, horizonUrl] = await Promise.all([
       this.secretManager.getSecret(Secrets.STELLAR_ACCOUNT_ID),
       this.secretManager.getSecret(Secrets.STELLAR_HORIZON_URL),
-      this.secretManager.getSecret(Secrets.STELLAR_USDC_ISSUER),
     ])
 
-    return { accountId, horizonUrl, usdcIssuer }
+    return { accountId, horizonUrl }
   }
 
   private isBadRequestError(error: unknown): boolean {
@@ -318,18 +334,6 @@ export class StellarReconciliationService {
     record: Horizon.ServerApi.OperationRecord,
   ): record is Horizon.ServerApi.PaymentOperationRecord {
     return record.type === 'payment'
-  }
-
-  private isUsdcPaymentToWallet(
-    payment: Horizon.ServerApi.PaymentOperationRecord,
-    accountId: string,
-    usdcIssuer: string,
-  ): boolean {
-    const isUsdcAsset = payment.asset_type === 'credit_alphanum4'
-      && payment.asset_code === 'USDC'
-      && payment.asset_issuer === usdcIssuer
-
-    return payment.to === accountId && isUsdcAsset
   }
 
   private async* iterateStellarPayments(
@@ -391,7 +395,11 @@ export class StellarReconciliationService {
   ): Promise<PaymentProcessingOutcome> {
     const cursor = payment.paging_token
 
-    if (!this.isUsdcPaymentToWallet(payment, context.accountId, context.usdcIssuer)) {
+    if (payment.to !== context.accountId) {
+      return { cursor, reason: 'assetOrDestinationMismatch', result: 'irrelevant' }
+    }
+
+    if (!this.resolvePaymentAsset(payment, context.assetMap)) {
       return { cursor, reason: 'assetOrDestinationMismatch', result: 'irrelevant' }
     }
 
@@ -512,6 +520,19 @@ export class StellarReconciliationService {
     }
 
     return summary
+  }
+
+  private resolvePaymentAsset(
+    payment: Horizon.ServerApi.PaymentOperationRecord,
+    assetMap: Map<string, CryptoCurrency>,
+  ): CryptoCurrency | null {
+    if (payment.asset_type !== 'credit_alphanum4' && payment.asset_type !== 'credit_alphanum12') {
+      return null
+    }
+    if (!payment.asset_code || !payment.asset_issuer) {
+      return null
+    }
+    return assetMap.get(this.assetKey(payment.asset_code, payment.asset_issuer)) ?? null
   }
 
   private async rewindPagingToken(

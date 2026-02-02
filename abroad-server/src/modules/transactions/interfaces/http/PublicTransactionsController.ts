@@ -18,6 +18,7 @@ import { OutboxDispatcher } from '../../../../platform/outbox/OutboxDispatcher'
 import { IDatabaseClientProvider } from '../../../../platform/persistence/IDatabaseClientProvider'
 import { ISecretManager, Secrets } from '../../../../platform/secrets/ISecretManager'
 import { IDepositVerifierRegistry } from '../../../payments/application/contracts/IDepositVerifier'
+import { CryptoAssetConfigService } from '../../../payments/application/CryptoAssetConfigService'
 import { ExpiredTransactionService, type ExpiredTransactionsSummary } from '../../application/ExpiredTransactionService'
 import { StellarOrphanRefundService } from '../../application/StellarOrphanRefundService'
 import { CheckUnprocessedStellarResponse, SingleStellarReconciliationResponse, StellarReconciliationService } from '../../application/StellarReconciliationService'
@@ -36,6 +37,7 @@ export class PublicTransactionsController extends Controller {
     @inject(TYPES.IOutboxDispatcher) outboxDispatcher: OutboxDispatcher,
     @inject(TYPES.IDepositVerifierRegistry) depositVerifierRegistry: IDepositVerifierRegistry,
     @inject(TYPES.StellarOrphanRefundService) orphanRefundService: StellarOrphanRefundService,
+    @inject(CryptoAssetConfigService) assetConfigService: CryptoAssetConfigService,
     @inject(TYPES.ISecretManager) private readonly secretManager: ISecretManager,
   ) {
     super()
@@ -49,6 +51,7 @@ export class PublicTransactionsController extends Controller {
       this.secretManager,
       outboxDispatcher,
       orphanRefundService,
+      assetConfigService,
       depositVerifierRegistry,
       this.logger,
     )

@@ -30,7 +30,7 @@ describe('DeadLetterController', () => {
 
     const message: DeadLetterMessage = {
       error: 'boom',
-      originalQueue: QueueName.PAYMENT_SENT,
+      originalQueue: QueueName.PAYMENT_STATUS_UPDATED,
       payload: { foo: 'bar' },
       reason: 'handler_failed',
     }
@@ -111,7 +111,7 @@ describe('DeadLetterController', () => {
 
     await enqueue.call(controller, {
       error: 'oops',
-      originalQueue: QueueName.PAYMENT_SENT,
+      originalQueue: QueueName.PAYMENT_STATUS_UPDATED,
       payload: { data: 'sample' },
       reason: 'unroutable',
     })
