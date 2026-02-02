@@ -18,6 +18,7 @@ const typeKeys = [
   'IOutboxDispatcher',
   'ILogger',
   'IPartnerService',
+  'IOpsAuthService',
   'IPaymentService',
   'IPaymentServiceFactory',
   'IPayoutStatusAdapter',

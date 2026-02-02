@@ -6,6 +6,7 @@ import { Request } from 'express'
 import { IPartnerService } from '../../modules/partners/application/contracts/IPartnerService'
 import { iocContainer } from '../container'
 import { TYPES } from '../container/types'
+import { OpsAuthService } from './OpsAuthService'
 
 type AuthContext = Partner | { kind: 'ops' }
 
@@ -42,14 +43,19 @@ export async function expressAuthentication(
 
   if (securityName === 'OpsApiKeyAuth') {
     const headerKey = request.header('X-OPS-API-KEY')
-    const expected = process.env.OPS_API_KEY
-    if (!expected) {
-      throw new Error('Ops API key not configured')
-    }
     if (!headerKey) {
       throw new Error('Ops API key not provided')
     }
-    if (headerKey !== expected) {
+
+    const opsAuthService = iocContainer.get<OpsAuthService>(TYPES.IOpsAuthService)
+    let expected: string
+    try {
+      expected = await opsAuthService.getOpsApiKey()
+    }
+    catch (error) {
+      throw new Error('Ops API key not configured')
+    }
+    if (!expected || headerKey !== expected) {
       throw new Error('Invalid ops API key')
     }
     return { kind: 'ops' }
