@@ -71,6 +71,10 @@ export class PayoutSendStepExecutor implements FlowStepExecutor {
         value: transaction.quote.targetAmount,
       })
 
+      if (paymentResponse.transactionId) {
+        await this.repository.recordExternalIdIfMissing(prismaClient, transaction.id, paymentResponse.transactionId)
+      }
+
       if (paymentService.isAsync) {
         if (!paymentResponse.success) {
           return { error: paymentResponse.reason ?? 'payout_failed', outcome: 'failed' }

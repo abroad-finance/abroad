@@ -178,6 +178,7 @@ export class BrebPaymentService implements IPaymentService {
     value: number
   }): Promise<PaymentSendResult> {
     let attempt = 0
+    let lastTransactionId: null | string = null
     while (attempt < this.maxSendAttempts) {
       attempt += 1
       try {
@@ -194,9 +195,13 @@ export class BrebPaymentService implements IPaymentService {
         const sendResponse = await this.dispatchPayment(sendPayload, config, token)
 
         if (!sendResponse?.moviiTxId) {
-          this.logger.error('[BreB] Send response missing transaction id', { responseRail: sendResponse?.rail ?? null })
+          this.logger.error('[BreB] Send response missing transaction id', {
+            responseData: this.sanitizeProviderPayload(sendResponse ?? null),
+            responseRail: sendResponse?.rail ?? null,
+          })
           return this.buildFailure('permanent', 'missing_transaction_id')
         }
+        lastTransactionId = sendResponse.moviiTxId
 
         const resolvedRail = this.resolveRailForReport(sendResponse.rail, keyDetails.instructedAgent)
         if (!resolvedRail) {
@@ -204,35 +209,61 @@ export class BrebPaymentService implements IPaymentService {
             account,
             instructedAgent: keyDetails.instructedAgent,
             responseRail: sendResponse.rail ?? null,
+            transactionId: sendResponse.moviiTxId,
           })
-          return this.buildFailure('permanent', 'missing_rail')
+          return this.buildFailure('permanent', 'missing_rail', lastTransactionId)
         }
 
         const reportResult = await this.pollTransactionReport(sendResponse.moviiTxId, resolvedRail, config, token)
+        const reportSummary = this.summarizeReport(reportResult?.report ?? null)
         if (reportResult?.result === 'success') {
           return { success: true, transactionId: sendResponse.moviiTxId }
         }
 
         if (reportResult?.result === 'pending') {
-          this.logger.warn('[BreB] Payment pending after timeout', { transactionId: sendResponse.moviiTxId })
+          this.logger.warn('[BreB] Payment pending after timeout', {
+            rail: resolvedRail,
+            report: reportSummary,
+            transactionId: sendResponse.moviiTxId,
+          })
           return { code: 'retriable', reason: 'pending', success: false, transactionId: sendResponse.moviiTxId }
         }
 
-        return this.buildFailure('permanent', reportResult?.result ?? 'unknown')
+        if (reportResult?.result === 'failure') {
+          this.logger.warn('[BreB] Payment rejected by provider', {
+            rail: resolvedRail,
+            report: reportSummary,
+            transactionId: sendResponse.moviiTxId,
+          })
+        }
+        else if (!reportResult) {
+          this.logger.warn('[BreB] Payment status unavailable', {
+            rail: resolvedRail,
+            report: reportSummary,
+            transactionId: sendResponse.moviiTxId,
+          })
+        }
+
+        return this.buildFailure('permanent', reportResult?.result ?? 'unknown', lastTransactionId)
       }
       catch (error) {
         const reason = this.formatFailureReason(error)
-        this.logger.error('[BreB] Payment submission failed', { account, reason })
+        this.logger.error('[BreB] Payment submission failed', {
+          account,
+          attempt,
+          reason,
+          transactionId: lastTransactionId ?? null,
+        })
         const code = this.extractFailureCode(error)
         const shouldRetry = code === 'retriable' && attempt < this.maxSendAttempts && this.isRetryableError(error)
         if (!shouldRetry) {
-          return this.buildFailure(code, reason)
+          return this.buildFailure(code, reason, lastTransactionId ?? undefined)
         }
         await this.sleep(this.retryDelayMs * attempt)
       }
     }
 
-    return this.buildFailure('retriable', 'Maximum send attempts exceeded')
+    return this.buildFailure('retriable', 'Maximum send attempts exceeded', lastTransactionId ?? undefined)
   }
 
   public async verifyAccount({
@@ -253,8 +284,13 @@ export class BrebPaymentService implements IPaymentService {
     }
   }
 
-  private buildFailure(code: PaymentFailureCode, reason?: string): PaymentSendResult {
-    return { code, reason, success: false }
+  private buildFailure(code: PaymentFailureCode, reason?: string, transactionId?: null | string): PaymentSendResult {
+    return {
+      code,
+      ...(reason ? { reason } : {}),
+      success: false,
+      ...(transactionId ? { transactionId } : {}),
+    }
   }
 
   private buildHeaders(config: BrebServiceConfig, token: string, rail?: BrebRail): Record<string, string> {
@@ -335,6 +371,7 @@ export class BrebPaymentService implements IPaymentService {
           transactionId: response.data?.data?.moviiTxId ?? null,
         },
         method: 'POST',
+        responseData: response.data?.data ?? null,
         status: response.status,
       })
       return response.data?.data ?? null
@@ -463,6 +500,7 @@ export class BrebPaymentService implements IPaymentService {
           reportAvailable: Boolean(response.data?.data),
         },
         method: 'GET',
+        responseData: response.data?.data ?? null,
         status: response.status,
       })
 
@@ -671,7 +709,7 @@ export class BrebPaymentService implements IPaymentService {
         endpoint: this.sanitizeUrlForLogs(endpoint),
         message: error.message,
         method,
-        responseData: error.response?.data ?? null,
+        responseData: this.sanitizeProviderPayload(error.response?.data ?? null),
         status: error.response?.status ?? null,
         ...(metadata ? { metadata } : {}),
       })
@@ -705,7 +743,7 @@ export class BrebPaymentService implements IPaymentService {
       headers: this.redactHeaders(headers),
       method,
       ...(metadata ? { metadata } : {}),
-      ...(payload === undefined ? {} : { payload }),
+      ...(payload === undefined ? {} : { payload: this.sanitizeProviderPayload(payload) }),
     })
   }
 
@@ -726,7 +764,7 @@ export class BrebPaymentService implements IPaymentService {
       endpoint: this.sanitizeUrlForLogs(endpoint),
       method,
       status,
-      ...(responseData === undefined ? {} : { responseData }),
+      ...(responseData === undefined ? {} : { responseData: this.sanitizeProviderPayload(responseData) }),
       ...(metadata ? { metadata } : {}),
     })
   }
@@ -822,6 +860,65 @@ export class BrebPaymentService implements IPaymentService {
     return null
   }
 
+  private sanitizeProviderPayload(payload: unknown): unknown {
+    const visited = new WeakSet<object>()
+    const redactKeys = new Set([
+      'authorization',
+      'clientsecret',
+      'password',
+      'secret',
+      'token',
+    ])
+    const maskKeys = new Set([
+      'account',
+      'accountnumber',
+      'documentnumber',
+      'keyid',
+      'partyidentifier',
+      'partysystemidentifier',
+      'transactiondirectoryid',
+    ])
+
+    const shouldRedact = (key: string) => {
+      const normalized = key.toLowerCase()
+      return Array.from(redactKeys).some(entry => normalized.includes(entry))
+    }
+
+    const shouldMask = (key: string) => maskKeys.has(key.toLowerCase())
+
+    const sanitize = (value: unknown, key?: string): unknown => {
+      if (value === null || value === undefined) return value
+      if (typeof value === 'string') {
+        if (key && shouldMask(key)) {
+          return this.maskIdentifier(value)
+        }
+        return value
+      }
+      if (typeof value !== 'object') return value
+      if (Array.isArray(value)) {
+        return value.map(entry => sanitize(entry))
+      }
+
+      if (visited.has(value)) {
+        return '[Circular]'
+      }
+      visited.add(value)
+
+      const record = value as Record<string, unknown>
+      const sanitized: Record<string, unknown> = {}
+      for (const [childKey, childValue] of Object.entries(record)) {
+        if (shouldRedact(childKey)) {
+          sanitized[childKey] = '<redacted>'
+          continue
+        }
+        sanitized[childKey] = sanitize(childValue, childKey)
+      }
+      return sanitized
+    }
+
+    return sanitize(payload)
+  }
+
   private sanitizeUrlForLogs(url: string): string {
     try {
       const parsedUrl = new URL(url)
@@ -847,5 +944,30 @@ export class BrebPaymentService implements IPaymentService {
 
   private async sleep(ms: number): Promise<void> {
     await new Promise(resolve => setTimeout(resolve, ms))
+  }
+
+  private summarizeReport(report: BrebTransactionReport | null): null | Record<string, unknown> {
+    if (!report) return null
+    const debtor = report.Debtor?.TransactionInfAndSts
+    const creditor = report.Creditor?.TransactionInfAndSts
+    const global = report.GlobalTransactionInfAndSts
+
+    const responseCodes = [debtor?.ResponseCode, creditor?.ResponseCode]
+      .filter((value): value is string => Boolean(value))
+    const reasons = [debtor?.TransactionStatusRsnInf, creditor?.TransactionStatusRsnInf]
+      .filter((value): value is string => Boolean(value))
+
+    return {
+      amount: global?.OriginalCtrlSumAmt ?? null,
+      creditorStatus: creditor?.TransactionStatus ?? null,
+      currency: global?.Currency ?? null,
+      debtorStatus: debtor?.TransactionStatus ?? null,
+      globalStatus: global?.GlobalTxStatus ?? null,
+      reason: reasons.length > 0 ? reasons : null,
+      responseCodes: responseCodes.length > 0 ? responseCodes : null,
+      timestamp: global?.TransactionDateTime ?? null,
+      transactionDirectoryId: report.TransactionDirectoryId ?? null,
+      transactionId: report.TransactionID ?? null,
+    }
   }
 }

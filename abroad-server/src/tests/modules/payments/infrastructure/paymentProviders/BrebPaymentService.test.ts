@@ -268,6 +268,22 @@ describe('BrebPaymentService', () => {
       expect(logger.warn).toHaveBeenCalledWith('[BreB] Payment pending after timeout', { transactionId: 'tx-005' })
     })
 
+    it('includes transaction ids when the provider reports failure', async () => {
+      const { service } = setupService()
+      primeAccessToken()
+      primeKeyLookup()
+      primeSend('tx-006')
+      primeReport('RJCT')
+
+      const result = await service.sendPayment({
+        account: defaultKeyDetails.accountNumber,
+        id: 'txn-6',
+        value: 15_000,
+      })
+
+      expect(result).toEqual({ code: 'permanent', reason: 'failure', success: false, transactionId: 'tx-006' })
+    })
+
     it('uses the rail provided by the send response when polling transaction status', async () => {
       const { service } = setupService()
       primeAccessToken()
