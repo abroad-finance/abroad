@@ -44,7 +44,6 @@ export class AwaitProviderStatusStepExecutor implements FlowStepExecutor {
     stepOrder: number
   }): Promise<FlowStepExecutionResult> {
     void params.config
-    void params.stepOrder
     const { runtime } = params
     const prismaClient = await this.repository.getClient()
     const transaction = await prismaClient.transaction.findUnique({
@@ -56,15 +55,22 @@ export class AwaitProviderStatusStepExecutor implements FlowStepExecutor {
       return { error: 'Transaction not found for provider status wait', outcome: 'failed' }
     }
 
-    if (!transaction.externalId) {
+    const externalId = await this.ensureExternalId({
+      prismaClient,
+      runtime,
+      stepOrder: params.stepOrder,
+      transaction: { externalId: transaction.externalId, id: transaction.id },
+    })
+
+    if (!externalId) {
       return { error: 'Transaction externalId missing for provider status wait', outcome: 'failed' }
     }
 
     return {
-      correlation: { externalId: transaction.externalId },
+      correlation: { externalId },
       outcome: 'waiting',
       output: {
-        externalId: transaction.externalId,
+        externalId,
         provider: transaction.quote.paymentMethod,
       },
     }
@@ -77,7 +83,6 @@ export class AwaitProviderStatusStepExecutor implements FlowStepExecutor {
     stepOrder: number
   }): Promise<FlowStepSignalResult> {
     void params.config
-    void params.stepOrder
     const { runtime, signal } = params
     const prismaClient = await this.repository.getClient()
 
@@ -90,7 +95,13 @@ export class AwaitProviderStatusStepExecutor implements FlowStepExecutor {
       return { error: 'Transaction not found for provider status signal', outcome: 'failed' }
     }
 
-    const externalId = transaction.externalId
+    const externalId = await this.ensureExternalId({
+      prismaClient,
+      runtime,
+      signalExternalId: signal.correlationKeys.externalId,
+      stepOrder: params.stepOrder,
+      transaction: { externalId: transaction.externalId, id: transaction.id },
+    })
     if (!externalId) {
       return { error: 'Transaction externalId missing for provider status signal', outcome: 'failed' }
     }
@@ -179,5 +190,70 @@ export class AwaitProviderStatusStepExecutor implements FlowStepExecutor {
     }
 
     return { error: 'Provider reported payment failure', outcome: 'failed' }
+  }
+
+  private extractExternalId(output: Record<string, unknown> | undefined): null | string {
+    if (!output) return null
+    const candidate = output.externalId
+    return typeof candidate === 'string' && candidate.length > 0 ? candidate : null
+  }
+
+  private resolveExternalIdFromRuntime(
+    runtime: FlowStepRuntimeContext,
+    stepOrder: number,
+  ): null | string {
+    if (stepOrder > 1) {
+      const previousOutput = runtime.stepOutputs.get(stepOrder - 1)
+      const fromPrevious = this.extractExternalId(previousOutput)
+      if (fromPrevious) {
+        return fromPrevious
+      }
+    }
+
+    for (const output of runtime.stepOutputs.values()) {
+      const candidate = this.extractExternalId(output)
+      if (candidate) {
+        return candidate
+      }
+    }
+
+    return null
+  }
+
+  private async ensureExternalId(params: {
+    prismaClient: Awaited<ReturnType<TransactionRepository['getClient']>>
+    runtime: FlowStepRuntimeContext
+    signalExternalId?: unknown
+    stepOrder: number
+    transaction: { externalId: null | string, id: string }
+  }): Promise<null | string> {
+    if (params.transaction.externalId) {
+      return params.transaction.externalId
+    }
+
+    const fromRuntime = this.resolveExternalIdFromRuntime(params.runtime, params.stepOrder)
+    const fromSignal = typeof params.signalExternalId === 'string' && params.signalExternalId.length > 0
+      ? params.signalExternalId
+      : null
+    const resolved = fromRuntime ?? fromSignal
+
+    if (!resolved) {
+      return null
+    }
+
+    const persisted = await this.repository.recordExternalIdIfMissing(
+      params.prismaClient,
+      params.transaction.id,
+      resolved,
+    )
+
+    if (persisted) {
+      this.logger.warn('Backfilled missing externalId for provider status', {
+        externalId: resolved,
+        transactionId: params.transaction.id,
+      })
+    }
+
+    return resolved
   }
 }

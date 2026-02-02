@@ -213,6 +213,18 @@ export class TransactionRepository {
     return result.count > 0
   }
 
+  public async recordExternalIdIfMissing(
+    prismaClient: TransactionClient,
+    transactionId: string,
+    externalId: string,
+  ): Promise<boolean> {
+    const result = await prismaClient.transaction.updateMany({
+      data: { externalId },
+      where: { id: transactionId, externalId: null },
+    })
+    return result.count > 0
+  }
+
   public async recordPayoutResult(
     prismaClient: TransactionClient,
     params: { idempotencyKey: string, outcome: 'completed' | 'failed', reason?: string, transactionId: string },

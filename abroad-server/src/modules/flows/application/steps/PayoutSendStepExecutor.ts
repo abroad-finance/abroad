@@ -71,21 +71,30 @@ export class PayoutSendStepExecutor implements FlowStepExecutor {
         value: transaction.quote.targetAmount,
       })
 
-      if (paymentResponse.success && paymentResponse.transactionId) {
-        await this.repository.persistExternalId(prismaClient, transaction.id, paymentResponse.transactionId)
-      }
-
       if (paymentService.isAsync) {
+        if (!paymentResponse.success) {
+          return { error: paymentResponse.reason ?? 'payout_failed', outcome: 'failed' }
+        }
+
+        const externalId = paymentResponse.transactionId
+        if (!externalId) {
+          return { error: 'Payout provider did not return transaction id', outcome: 'failed' }
+        }
+
+        await this.repository.persistExternalId(prismaClient, transaction.id, externalId)
+
         return {
-          correlation: paymentResponse.transactionId
-            ? { externalId: paymentResponse.transactionId }
-            : undefined,
+          correlation: { externalId },
           outcome: 'succeeded',
           output: {
-            externalId: paymentResponse.transactionId ?? null,
+            externalId,
             provider: paymentService.provider ?? paymentMethod,
           },
         }
+      }
+
+      if (paymentResponse.success && paymentResponse.transactionId) {
+        await this.repository.persistExternalId(prismaClient, transaction.id, paymentResponse.transactionId)
       }
 
       const transitionName = paymentResponse.success ? 'payment_completed' : 'payment_failed'

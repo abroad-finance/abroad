@@ -42,7 +42,10 @@ export class FlowDefinitionBuilder {
   public build(input: FlowDefinitionInput): FlowSystemStep[] {
     this.ensurePayoutFirst(input.steps)
 
-    const payoutService = this.paymentServiceFactory.getPaymentService(input.payoutProvider)
+    const payoutService = this.paymentServiceFactory.getPaymentServiceForCapability?.({
+      paymentMethod: input.payoutProvider,
+      targetCurrency: input.targetCurrency,
+    }) ?? this.paymentServiceFactory.getPaymentService(input.payoutProvider)
     const systemSteps: FlowSystemStep[] = []
 
     const startAsset = input.cryptoCurrency as SupportedCurrency
