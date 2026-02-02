@@ -3,6 +3,7 @@ import {
   Body,
   Controller,
   Get,
+  OperationId,
   Patch,
   Res,
   Response,
@@ -31,6 +32,7 @@ export class CryptoAssetController extends Controller {
   }
 
   @Patch()
+  @OperationId('CryptoAssetUpdate')
   @Response<400, { reason: string }>(400, 'Bad Request')
   @SuccessResponse('200', 'Crypto asset updated')
   public async update(

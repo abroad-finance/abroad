@@ -3,6 +3,7 @@ import { inject } from 'inversify'
 import {
   Body,
   Controller,
+  OperationId,
   Post,
   Res,
   Response,
@@ -44,6 +45,7 @@ export class CeloPaymentsController extends Controller {
    * It verifies the on-chain transaction and enqueues the same workflow used by the Stellar listener.
    */
   @Post('notify')
+  @OperationId('CeloPaymentsNotifyPayment')
   @Response<400, { reason: string }>(400, 'Bad Request')
   @Response<404, { reason: string }>(404, 'Not Found')
   @SuccessResponse('202', 'Payment enqueued')

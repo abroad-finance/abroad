@@ -3,6 +3,7 @@ import {
   Body,
   Controller,
   Get,
+  OperationId,
   Patch,
   Path,
   Post,
@@ -58,6 +59,7 @@ export class FlowDefinitionController extends Controller {
   }
 
   @Patch('{flowId}')
+  @OperationId('FlowDefinitionUpdate')
   @Response<400, { reason: string }>(400, 'Bad Request')
   @SuccessResponse('200', 'Flow definition updated')
   public async update(

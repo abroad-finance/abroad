@@ -51,14 +51,14 @@ const buildDrafts = (assets: CryptoAssetCoverage[]): DraftMap => {
   return drafts
 }
 
-const normalizeDecimals = (value: string): { error?: string, value: null | number } => {
+const normalizeDecimals = (value: string): { error: null | string, value: null | number } => {
   const trimmed = value.trim()
-  if (!trimmed) return { value: null }
+  if (!trimmed) return { error: null, value: null }
   const parsed = Number(trimmed)
   if (!Number.isInteger(parsed) || parsed < 0) {
     return { error: 'Decimals must be a non-negative integer', value: null }
   }
-  return { value: parsed }
+  return { error: null, value: parsed }
 }
 
 const mintPlaceholder = (blockchain: string): string => {
@@ -151,8 +151,9 @@ const CryptoAssets = () => {
     }
 
     const decimalsResult = normalizeDecimals(draft.decimals)
-    if (decimalsResult.error) {
-      setRowErrors(prev => ({ ...prev, [key]: decimalsResult.error }))
+    const decimalsError = decimalsResult.error
+    if (decimalsError !== null) {
+      setRowErrors(prev => ({ ...prev, [key]: decimalsError }))
       return
     }
 
