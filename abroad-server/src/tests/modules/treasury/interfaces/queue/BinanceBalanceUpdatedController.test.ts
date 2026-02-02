@@ -1,14 +1,14 @@
 import 'reflect-metadata'
 
+import { FlowOrchestrator } from '../../../../../modules/flows/application/FlowOrchestrator'
 import { BinanceBalanceUpdatedController } from '../../../../../modules/treasury/interfaces/queue/BinanceBalanceUpdatedController'
 import { QueueName } from '../../../../../platform/messaging/queues'
 import { createMockLogger, createMockQueueHandler, MockLogger, MockQueueHandler } from '../../../../setup/mockFactories'
-import { FlowOrchestrator } from '../../../../../modules/flows/application/FlowOrchestrator'
 
 const buildController = (overrides?: {
   logger?: MockLogger
-  queueHandler?: MockQueueHandler
   orchestrator?: jest.Mocked<Pick<FlowOrchestrator, 'handleSignal'>>
+  queueHandler?: MockQueueHandler
 }) => {
   const logger = overrides?.logger ?? createMockLogger()
   const queueHandler = overrides?.queueHandler ?? createMockQueueHandler()
@@ -19,7 +19,7 @@ const buildController = (overrides?: {
     orchestrator as FlowOrchestrator,
   )
 
-  return { controller, logger, queueHandler, orchestrator }
+  return { controller, logger, orchestrator, queueHandler }
 }
 
 describe('BinanceBalanceUpdatedController', () => {

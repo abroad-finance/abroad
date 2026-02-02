@@ -10,7 +10,6 @@ import { IDatabaseClientProvider } from '../../../../platform/persistence/IDatab
 import { PayoutStatusAdapterRegistry } from '../../../payments/application/PayoutStatusAdapterRegistry'
 import { TransactionEventDispatcher } from '../../../transactions/application/TransactionEventDispatcher'
 import { TransactionRepository } from '../../../transactions/application/TransactionRepository'
-import { RefundCoordinator } from '../RefundCoordinator'
 import {
   FlowSignalInput,
   FlowStepExecutionResult,
@@ -18,6 +17,7 @@ import {
   FlowStepRuntimeContext,
   FlowStepSignalResult,
 } from '../flowTypes'
+import { RefundCoordinator } from '../RefundCoordinator'
 
 @injectable()
 export class AwaitProviderStatusStepExecutor implements FlowStepExecutor {
@@ -48,7 +48,7 @@ export class AwaitProviderStatusStepExecutor implements FlowStepExecutor {
     const { runtime } = params
     const prismaClient = await this.repository.getClient()
     const transaction = await prismaClient.transaction.findUnique({
-      include: { quote: true, partnerUser: { include: { partner: true } } },
+      include: { partnerUser: { include: { partner: true } }, quote: true },
       where: { id: runtime.context.transactionId },
     })
 
@@ -62,11 +62,11 @@ export class AwaitProviderStatusStepExecutor implements FlowStepExecutor {
 
     return {
       correlation: { externalId: transaction.externalId },
+      outcome: 'waiting',
       output: {
         externalId: transaction.externalId,
         provider: transaction.quote.paymentMethod,
       },
-      outcome: 'waiting',
     }
   }
 
@@ -82,7 +82,7 @@ export class AwaitProviderStatusStepExecutor implements FlowStepExecutor {
     const prismaClient = await this.repository.getClient()
 
     const transaction = await prismaClient.transaction.findUnique({
-      include: { quote: true, partnerUser: { include: { partner: true } } },
+      include: { partnerUser: { include: { partner: true } }, quote: true },
       where: { id: runtime.context.transactionId },
     })
 

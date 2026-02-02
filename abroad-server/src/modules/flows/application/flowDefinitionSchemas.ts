@@ -14,23 +14,23 @@ import { z } from 'zod'
 const configSchema = z.record(z.string().min(1), z.unknown())
 const signalMatchSchema = z.record(z.string().min(1), z.unknown())
 
-export type FlowVenue = 'BINANCE' | 'TRANSFERO'
-
-export type FlowBusinessStep =
-  | { type: 'PAYOUT' }
-  | { type: 'MOVE_TO_EXCHANGE', venue: FlowVenue }
-  | {
-    type: 'CONVERT'
-    venue: FlowVenue
-    fromAsset: SupportedCurrency
-    toAsset: SupportedCurrency
-  }
-  | {
-    type: 'TRANSFER_VENUE'
+export type FlowBusinessStep
+  = | {
     asset: SupportedCurrency
     fromVenue: FlowVenue
     toVenue: FlowVenue
+    type: 'TRANSFER_VENUE'
   }
+  | {
+    fromAsset: SupportedCurrency
+    toAsset: SupportedCurrency
+    type: 'CONVERT'
+    venue: FlowVenue
+  }
+  | { type: 'MOVE_TO_EXCHANGE', venue: FlowVenue }
+  | { type: 'PAYOUT' }
+
+export type FlowVenue = 'BINANCE' | 'TRANSFERO'
 
 const flowVenueSchema = z.enum(['BINANCE', 'TRANSFERO'])
 
@@ -41,26 +41,18 @@ export const flowBusinessStepSchema = z.discriminatedUnion('type', [
     venue: flowVenueSchema,
   }),
   z.object({
-    type: z.literal('CONVERT'),
-    venue: flowVenueSchema,
     fromAsset: z.nativeEnum(SupportedCurrency),
     toAsset: z.nativeEnum(SupportedCurrency),
+    type: z.literal('CONVERT'),
+    venue: flowVenueSchema,
   }),
   z.object({
-    type: z.literal('TRANSFER_VENUE'),
     asset: z.nativeEnum(SupportedCurrency),
     fromVenue: flowVenueSchema,
     toVenue: flowVenueSchema,
+    type: z.literal('TRANSFER_VENUE'),
   }),
 ])
-
-export type FlowStepDefinitionInput = {
-  completionPolicy: FlowStepCompletionPolicy
-  config: Record<string, unknown>
-  signalMatch?: Record<string, unknown>
-  stepOrder: number
-  stepType: FlowStepType
-}
 
 export type FlowDefinitionInput = {
   blockchain: BlockchainNetwork
@@ -68,13 +60,21 @@ export type FlowDefinitionInput = {
   enabled?: boolean
   exchangeFeePct?: number
   fixedFee?: number
-  maxAmount?: number | null
-  minAmount?: number | null
+  maxAmount?: null | number
+  minAmount?: null | number
   name: string
   payoutProvider: PaymentMethod
   pricingProvider: FlowPricingProvider
   steps: FlowBusinessStep[]
   targetCurrency: TargetCurrency
+}
+
+export type FlowStepDefinitionInput = {
+  completionPolicy: FlowStepCompletionPolicy
+  config: Record<string, unknown>
+  signalMatch?: Record<string, unknown>
+  stepOrder: number
+  stepType: FlowStepType
 }
 
 export const flowStepDefinitionSchema: z.ZodType<FlowStepDefinitionInput> = z.object({
@@ -114,16 +114,37 @@ export const flowSnapshotSchema = z.object({
   targetCurrency: z.nativeEnum(TargetCurrency),
 })
 
-export type FlowStepDefinitionDto = {
-  completionPolicy: FlowStepCompletionPolicy
-  config: Record<string, unknown>
-  createdAt: Date
-  flowDefinitionId: string
-  id: string
-  signalMatch?: Record<string, unknown> | null
-  stepOrder: number
-  stepType: FlowStepType
-  updatedAt: Date
+export type FlowCorridorDto = {
+  blockchain: BlockchainNetwork
+  cryptoCurrency: CryptoCurrency
+  definitionId?: null | string
+  definitionName?: null | string
+  enabled?: boolean
+  payoutProvider?: null | PaymentMethod
+  status: 'DEFINED' | 'MISSING' | 'UNSUPPORTED'
+  targetCurrency: TargetCurrency
+  unsupportedReason?: null | string
+  updatedAt?: Date | null
+}
+
+export type FlowCorridorListDto = {
+  corridors: FlowCorridorDto[]
+  summary: FlowCorridorSummaryDto
+}
+
+export type FlowCorridorSummaryDto = {
+  defined: number
+  missing: number
+  total: number
+  unsupported: number
+}
+
+export type FlowCorridorUpdateInput = {
+  blockchain: BlockchainNetwork
+  cryptoCurrency: CryptoCurrency
+  reason?: string
+  status: FlowCorridorStatus
+  targetCurrency: TargetCurrency
 }
 
 export type FlowDefinitionDto = {
@@ -134,8 +155,8 @@ export type FlowDefinitionDto = {
   exchangeFeePct: number
   fixedFee: number
   id: string
-  maxAmount: number | null
-  minAmount: number | null
+  maxAmount: null | number
+  minAmount: null | number
   name: string
   payoutProvider: PaymentMethod
   pricingProvider: FlowPricingProvider
@@ -146,37 +167,16 @@ export type FlowDefinitionDto = {
 
 export type FlowDefinitionUpdateInput = FlowDefinitionInput
 
-export type FlowCorridorSummaryDto = {
-  defined: number
-  missing: number
-  total: number
-  unsupported: number
-}
-
-export type FlowCorridorDto = {
-  blockchain: BlockchainNetwork
-  cryptoCurrency: CryptoCurrency
-  definitionId?: string | null
-  definitionName?: string | null
-  enabled?: boolean
-  payoutProvider?: PaymentMethod | null
-  status: 'DEFINED' | 'MISSING' | 'UNSUPPORTED'
-  targetCurrency: TargetCurrency
-  unsupportedReason?: string | null
-  updatedAt?: Date | null
-}
-
-export type FlowCorridorListDto = {
-  corridors: FlowCorridorDto[]
-  summary: FlowCorridorSummaryDto
-}
-
-export type FlowCorridorUpdateInput = {
-  blockchain: BlockchainNetwork
-  cryptoCurrency: CryptoCurrency
-  reason?: string
-  status: FlowCorridorStatus
-  targetCurrency: TargetCurrency
+export type FlowStepDefinitionDto = {
+  completionPolicy: FlowStepCompletionPolicy
+  config: Record<string, unknown>
+  createdAt: Date
+  flowDefinitionId: string
+  id: string
+  signalMatch?: null | Record<string, unknown>
+  stepOrder: number
+  stepType: FlowStepType
+  updatedAt: Date
 }
 
 export const flowCorridorUpdateSchema: z.ZodType<FlowCorridorUpdateInput> = z.object({

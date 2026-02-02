@@ -8,12 +8,32 @@ import {
   TargetCurrency,
 } from '@prisma/client'
 
-export type FlowSnapshotStep = {
-  completionPolicy: FlowStepCompletionPolicy
-  config: Record<string, unknown>
-  signalMatch?: Record<string, unknown> | null
-  stepOrder: number
-  stepType: FlowStepType
+export type CorrelationKeys = Record<string, boolean | number | string>
+
+export type FlowContext = {
+  accountNumber: string
+  bankCode: string
+  blockchain: BlockchainNetwork
+  cryptoCurrency: CryptoCurrency
+  externalId: null | string
+  onChainId: null | string
+  partnerId: string
+  partnerUserId: string
+  paymentMethod: PaymentMethod
+  qrCode: null | string
+  quoteId: string
+  sourceAmount: number
+  targetAmount: number
+  targetCurrency: TargetCurrency
+  taxId: null | string
+  transactionId: string
+}
+
+export type FlowSignalInput = {
+  correlationKeys: CorrelationKeys
+  eventType: string
+  payload: Record<string, unknown>
+  transactionId?: string
 }
 
 export type FlowSnapshot = {
@@ -23,8 +43,8 @@ export type FlowSnapshot = {
     exchangeFeePct: number
     fixedFee: number
     id: string
-    maxAmount: number | null
-    minAmount: number | null
+    maxAmount: null | number
+    minAmount: null | number
     name: string
     payoutProvider: PaymentMethod
     pricingProvider: FlowPricingProvider
@@ -33,52 +53,46 @@ export type FlowSnapshot = {
   steps: FlowSnapshotStep[]
 }
 
-export type FlowContext = {
-  accountNumber: string
-  bankCode: string
-  blockchain: BlockchainNetwork
-  cryptoCurrency: CryptoCurrency
-  externalId: string | null
-  onChainId: string | null
-  partnerId: string
-  partnerUserId: string
-  paymentMethod: PaymentMethod
-  qrCode: string | null
-  quoteId: string
-  sourceAmount: number
-  targetAmount: number
-  targetCurrency: TargetCurrency
-  taxId: string | null
-  transactionId: string
+export type FlowSnapshotStep = {
+  completionPolicy: FlowStepCompletionPolicy
+  config: Record<string, unknown>
+  signalMatch?: null | Record<string, unknown>
+  stepOrder: number
+  stepType: FlowStepType
 }
 
-export type CorrelationKeys = Record<string, boolean | number | string>
-
-export type FlowStepExecutionResult =
-  | {
-    correlation?: CorrelationKeys
-    output?: Record<string, unknown>
-    outcome: 'succeeded'
-  }
-  | {
+export type FlowStepExecutionResult
+  = | {
     correlation: CorrelationKeys
-    output?: Record<string, unknown>
     outcome: 'waiting'
+    output?: Record<string, unknown>
   }
   | {
     correlation?: CorrelationKeys
     error: string
-    output?: Record<string, unknown>
     outcome: 'failed'
+    output?: Record<string, unknown>
+  }
+  | {
+    correlation?: CorrelationKeys
+    outcome: 'succeeded'
+    output?: Record<string, unknown>
   }
 
-export type FlowStepSignalResult = FlowStepExecutionResult
+export interface FlowStepExecutor {
+  execute(params: {
+    config: Record<string, unknown>
+    runtime: FlowStepRuntimeContext
+    stepOrder: number
+  }): Promise<FlowStepExecutionResult>
+  handleSignal?: (params: {
+    config: Record<string, unknown>
+    runtime: FlowStepRuntimeContext
+    signal: FlowSignalInput
+    stepOrder: number
+  }) => Promise<FlowStepSignalResult>
 
-export type FlowSignalInput = {
-  correlationKeys: CorrelationKeys
-  eventType: string
-  payload: Record<string, unknown>
-  transactionId?: string
+  readonly stepType: FlowStepType
 }
 
 export type FlowStepRuntimeContext = {
@@ -86,18 +100,4 @@ export type FlowStepRuntimeContext = {
   stepOutputs: Map<number, Record<string, unknown>>
 }
 
-export interface FlowStepExecutor {
-  readonly stepType: FlowStepType
-  execute(params: {
-    config: Record<string, unknown>
-    runtime: FlowStepRuntimeContext
-    stepOrder: number
-  }): Promise<FlowStepExecutionResult>
-
-  handleSignal?: (params: {
-    config: Record<string, unknown>
-    runtime: FlowStepRuntimeContext
-    signal: FlowSignalInput
-    stepOrder: number
-  }) => Promise<FlowStepSignalResult>
-}
+export type FlowStepSignalResult = FlowStepExecutionResult

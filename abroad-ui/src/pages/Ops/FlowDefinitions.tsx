@@ -34,6 +34,14 @@ const supportedCurrencies: SupportedCurrency[] = [
   'BRL',
 ]
 const transferoSourceAssets: SupportedCurrency[] = ['USDC', 'USDT']
+const pricingProviderDefaults: Record<FlowPricingProvider, { exchangeFeePct: number }> = {
+  BINANCE: { exchangeFeePct: 0.0085 },
+  TRANSFERO: { exchangeFeePct: 0.001 },
+}
+const payoutProviderDefaults: Record<PaymentMethod, { fixedFee: number, maxAmount: null | number, minAmount: null | number }> = {
+  BREB: { fixedFee: 0, maxAmount: 5_000_000, minAmount: 5_000 },
+  PIX: { fixedFee: 0, maxAmount: null, minAmount: 0 },
+}
 
 type DefinitionDraft = {
   blockchain: string
@@ -82,20 +90,42 @@ const getConvertToOptions = (venue: FlowVenue, targetCurrency: string): Supporte
     : supportedCurrencies
 )
 
-const buildEmptyDraft = (corridor: FlowCorridor): DefinitionDraft => ({
-  blockchain: corridor.blockchain,
-  cryptoCurrency: corridor.cryptoCurrency,
-  enabled: true,
-  exchangeFeePct: '0',
-  fixedFee: '0',
-  maxAmount: '',
-  minAmount: '',
-  name: '',
-  payoutProvider: defaultPayoutProvider(corridor.targetCurrency),
-  pricingProvider: defaultPricingProvider(corridor.targetCurrency),
-  steps: [{ type: 'PAYOUT' }],
-  targetCurrency: corridor.targetCurrency,
-})
+const toAmountInput = (value: null | number): string => (value === null ? '' : String(value))
+
+const getPayoutDefaults = (provider: PaymentMethod): { fixedFee: string, maxAmount: string, minAmount: string } => {
+  const defaults = payoutProviderDefaults[provider]
+  return {
+    fixedFee: String(defaults.fixedFee),
+    maxAmount: toAmountInput(defaults.maxAmount),
+    minAmount: toAmountInput(defaults.minAmount),
+  }
+}
+
+const getPricingDefaults = (provider: FlowPricingProvider): string => (
+  String(pricingProviderDefaults[provider].exchangeFeePct)
+)
+
+const buildEmptyDraft = (corridor: FlowCorridor): DefinitionDraft => {
+  const payoutProvider = defaultPayoutProvider(corridor.targetCurrency)
+  const pricingProvider = defaultPricingProvider(corridor.targetCurrency)
+  const payoutDefaults = getPayoutDefaults(payoutProvider)
+  const exchangeFeePct = getPricingDefaults(pricingProvider)
+
+  return {
+    blockchain: corridor.blockchain,
+    cryptoCurrency: corridor.cryptoCurrency,
+    enabled: true,
+    exchangeFeePct,
+    fixedFee: payoutDefaults.fixedFee,
+    maxAmount: payoutDefaults.maxAmount,
+    minAmount: payoutDefaults.minAmount,
+    name: '',
+    payoutProvider,
+    pricingProvider,
+    steps: [{ type: 'PAYOUT' }],
+    targetCurrency: corridor.targetCurrency,
+  }
+}
 
 const fromDefinition = (definition: FlowDefinition): DefinitionDraft => ({
   blockchain: definition.blockchain,
@@ -220,6 +250,49 @@ const FlowDefinitions = () => {
 
   const updateDraftField = (field: keyof DefinitionDraft, value: boolean | string) => {
     if (!draft) return
+
+    if (field === 'payoutProvider' && typeof value === 'string') {
+      const nextProvider = value as PaymentMethod
+      const currentDefaults = getPayoutDefaults(draft.payoutProvider)
+      const nextDefaults = getPayoutDefaults(nextProvider)
+
+      const nextDraft: DefinitionDraft = {
+        ...draft,
+        payoutProvider: nextProvider,
+      }
+
+      if (draft.fixedFee === currentDefaults.fixedFee) {
+        nextDraft.fixedFee = nextDefaults.fixedFee
+      }
+      if (draft.minAmount === currentDefaults.minAmount) {
+        nextDraft.minAmount = nextDefaults.minAmount
+      }
+      if (draft.maxAmount === currentDefaults.maxAmount) {
+        nextDraft.maxAmount = nextDefaults.maxAmount
+      }
+
+      setDraft(nextDraft)
+      return
+    }
+
+    if (field === 'pricingProvider' && typeof value === 'string') {
+      const nextProvider = value as FlowPricingProvider
+      const currentDefault = getPricingDefaults(draft.pricingProvider)
+      const nextDefault = getPricingDefaults(nextProvider)
+
+      const nextDraft: DefinitionDraft = {
+        ...draft,
+        pricingProvider: nextProvider,
+      }
+
+      if (draft.exchangeFeePct === currentDefault) {
+        nextDraft.exchangeFeePct = nextDefault
+      }
+
+      setDraft(nextDraft)
+      return
+    }
+
     setDraft({ ...draft, [field]: value })
   }
 
@@ -690,7 +763,14 @@ const FlowDefinitions = () => {
                           )}
                         </div>
                         <div>
-                          <label className="text-xs uppercase tracking-wider text-[#5B6B6A]">Min Amount</label>
+                          <label className="text-xs uppercase tracking-wider text-[#5B6B6A]">
+                            Min Amount
+                            <span className="ml-1">
+                              (
+                              {draft.targetCurrency}
+                              )
+                            </span>
+                          </label>
                           <input
                             className="mt-2 w-full rounded-xl border border-[#DADADA] bg-white px-3 py-2 text-sm"
                             onChange={event => updateDraftField('minAmount', event.target.value)}
@@ -702,7 +782,14 @@ const FlowDefinitions = () => {
                           )}
                         </div>
                         <div>
-                          <label className="text-xs uppercase tracking-wider text-[#5B6B6A]">Max Amount</label>
+                          <label className="text-xs uppercase tracking-wider text-[#5B6B6A]">
+                            Max Amount
+                            <span className="ml-1">
+                              (
+                              {draft.targetCurrency}
+                              )
+                            </span>
+                          </label>
                           <input
                             className="mt-2 w-full rounded-xl border border-[#DADADA] bg-white px-3 py-2 text-sm"
                             onChange={event => updateDraftField('maxAmount', event.target.value)}

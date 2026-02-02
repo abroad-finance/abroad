@@ -4,7 +4,13 @@ import { z } from 'zod'
 
 import { TYPES } from '../../../../app/container/types'
 import { ILogger } from '../../../../core/logging/types'
-import { FlowSignalInput, FlowStepExecutionResult, FlowStepExecutor, FlowStepRuntimeContext, FlowStepSignalResult } from '../flowTypes'
+import {
+  FlowSignalInput,
+  FlowStepExecutionResult,
+  FlowStepExecutor,
+  FlowStepRuntimeContext,
+  FlowStepSignalResult,
+} from '../flowTypes'
 
 const awaitExchangeBalanceConfigSchema = z.object({
   provider: z.enum(['binance', 'transfero']).default('binance'),
@@ -30,8 +36,8 @@ export class AwaitExchangeBalanceStepExecutor implements FlowStepExecutor {
 
     return {
       correlation: { provider: parsed.data.provider },
-      output: { provider: parsed.data.provider },
       outcome: 'waiting',
+      output: { provider: parsed.data.provider },
     }
   }
 

@@ -13,15 +13,15 @@ import { TYPES } from '../../../../app/container/types'
 import { ILogger } from '../../../../core/logging/types'
 import { IDatabaseClientProvider } from '../../../../platform/persistence/IDatabaseClientProvider'
 import { ISecretManager, Secrets } from '../../../../platform/secrets/ISecretManager'
-import { CryptoAssetConfigService } from '../../application/CryptoAssetConfigService'
 import { DepositVerificationError, DepositVerificationSuccess, IDepositVerifier } from '../../application/contracts/IDepositVerifier'
+import { CryptoAssetConfigService } from '../../application/CryptoAssetConfigService'
 
 type ParsedInstructionType = ParsedInstruction | PartiallyDecodedInstruction
 
 type SolanaPaymentContext = {
+  assetMint: PublicKey
   connection: Connection
   tokenAccounts: PublicKey[]
-  assetMint: PublicKey
 }
 
 type TokenAmountInfo = {
@@ -42,7 +42,7 @@ type TransferCheckedInfo = {
 export class SolanaPaymentVerifier implements IDepositVerifier {
   public readonly supportedNetwork = BlockchainNetwork.SOLANA
   private cachedConnection?: { connection: Connection, url: string }
-  private cachedTokenAccounts?: { depositWallet: string, tokenAccounts: PublicKey[], mint: string }
+  private cachedTokenAccounts?: { depositWallet: string, mint: string, tokenAccounts: PublicKey[] }
 
   public constructor(
     @inject(TYPES.ISecretManager) private readonly secretManager: ISecretManager,
@@ -76,9 +76,9 @@ export class SolanaPaymentVerifier implements IDepositVerifier {
     const depositTokenAccounts = await this.getOrCreateTokenAccounts(depositWallet, assetMint)
 
     return {
+      assetMint,
       connection,
       tokenAccounts: [depositWallet, ...depositTokenAccounts],
-      assetMint,
     }
   }
 
@@ -230,7 +230,7 @@ export class SolanaPaymentVerifier implements IDepositVerifier {
       return { outcome: 'error', reason: duplicateReason, status: 400 }
     }
 
-    const { connection, tokenAccounts, assetMint } = await this.buildPaymentContext(transaction.quote.cryptoCurrency)
+    const { assetMint, connection, tokenAccounts } = await this.buildPaymentContext(transaction.quote.cryptoCurrency)
 
     try {
       const txDetails = await this.fetchOnChainTransaction(connection, onChainSignature)

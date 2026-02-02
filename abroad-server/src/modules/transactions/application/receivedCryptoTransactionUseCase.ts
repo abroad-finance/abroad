@@ -83,18 +83,6 @@ export class ReceivedCryptoTransactionUseCase implements IReceivedCryptoTransact
     }
   }
 
-  private parseMessage(
-    raw: unknown,
-    scopedLogger: ReturnType<typeof createScopedLogger>,
-  ): ReceivedCryptoTransactionMessage | undefined {
-    const parsed = ReceivedCryptoTransactionMessageSchema.safeParse(raw)
-    if (!parsed.success) {
-      scopedLogger.error('Invalid message format', parsed.error)
-      return undefined
-    }
-    return parsed.data
-  }
-
   private async handleNonAwaitingDeposit(
     prismaClient: Awaited<ReturnType<IDatabaseClientProvider['getClient']>>,
     message: ReceivedCryptoTransactionMessage,
@@ -185,5 +173,17 @@ export class ReceivedCryptoTransactionUseCase implements IReceivedCryptoTransact
       transactionId,
       trigger: 'wrong_amount',
     })
+  }
+
+  private parseMessage(
+    raw: unknown,
+    scopedLogger: ReturnType<typeof createScopedLogger>,
+  ): ReceivedCryptoTransactionMessage | undefined {
+    const parsed = ReceivedCryptoTransactionMessageSchema.safeParse(raw)
+    if (!parsed.success) {
+      scopedLogger.error('Invalid message format', parsed.error)
+      return undefined
+    }
+    return parsed.data
   }
 }

@@ -17,8 +17,8 @@ import { WebhookEvent } from '../../../platform/notifications/IWebhookNotifier'
 import { OutboxDispatcher } from '../../../platform/outbox/OutboxDispatcher'
 import { IDatabaseClientProvider } from '../../../platform/persistence/IDatabaseClientProvider'
 import { IKycService } from '../../kyc/application/contracts/IKycService'
-import { IPaymentServiceFactory } from '../../payments/application/contracts/IPaymentServiceFactory'
 import { getNextTier, type KycCountry } from '../../kyc/application/kycTierRules'
+import { IPaymentServiceFactory } from '../../payments/application/contracts/IPaymentServiceFactory'
 import { uuidToBase64 } from '../infrastructure/transactionEncoding'
 import { toWebhookTransactionPayload } from './transactionPayload'
 
@@ -367,6 +367,18 @@ export class TransactionAcceptanceService {
     }
   }
 
+  private async fetchApprovedKycTier(
+    prismaClient: SerializableTx,
+    partnerUserId: string,
+  ): Promise<KYCTier> {
+    const approvedKyc = await prismaClient.partnerUserKyc.findFirst({
+      orderBy: { createdAt: 'desc' },
+      where: { partnerUserId, status: KycStatus.APPROVED },
+    })
+
+    return approvedKyc?.tier ?? KYCTier.NONE
+  }
+
   private async fetchQuote(prismaClient: SerializableTx, quoteId: string, partnerId: string) {
     const quote = await prismaClient.quote.findUnique({
       where: { id: quoteId, partnerId },
@@ -428,18 +440,6 @@ export class TransactionAcceptanceService {
       return 'CO'
     }
     throw new TransactionValidationError(`KYC verification is not available for ${country}. Please provide a supported country or contact support.`)
-  }
-
-  private async fetchApprovedKycTier(
-    prismaClient: SerializableTx,
-    partnerUserId: string,
-  ): Promise<KYCTier> {
-    const approvedKyc = await prismaClient.partnerUserKyc.findFirst({
-      orderBy: { createdAt: 'desc' },
-      where: { partnerUserId, status: KycStatus.APPROVED },
-    })
-
-    return approvedKyc?.tier ?? KYCTier.NONE
   }
 
   private async publishUserNotification(

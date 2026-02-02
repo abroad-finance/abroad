@@ -11,16 +11,16 @@ export type CryptoAssetCoverageDto = {
   updatedAt?: Date | null
 }
 
+export type CryptoAssetCoverageResponse = {
+  assets: CryptoAssetCoverageDto[]
+  summary: CryptoAssetCoverageSummary
+}
+
 export type CryptoAssetCoverageSummary = {
   configured: number
   enabled: number
   missing: number
   total: number
-}
-
-export type CryptoAssetCoverageResponse = {
-  assets: CryptoAssetCoverageDto[]
-  summary: CryptoAssetCoverageSummary
 }
 
 export type CryptoAssetUpdateInput = {

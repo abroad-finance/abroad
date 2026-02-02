@@ -5,8 +5,8 @@ import { inject, injectable } from 'inversify'
 import { TYPES } from '../../../../app/container/types'
 import { ILogger } from '../../../../core/logging/types'
 import { ISecretManager, Secrets } from '../../../../platform/secrets/ISecretManager'
-import { CryptoAssetConfigService } from '../../application/CryptoAssetConfigService'
 import { IWalletHandler, WalletSendParams, WalletSendResult } from '../../application/contracts/IWalletHandler'
+import { CryptoAssetConfigService } from '../../application/CryptoAssetConfigService'
 import { fetchErc20Decimals, parseErc20Transfers, safeNormalizeAddress } from './celoErc20'
 
 type CeloReceiptContext = {
@@ -49,7 +49,7 @@ export class CeloWalletHandler implements IWalletHandler {
     }
 
     const enabledAssets = await this.assetConfigService.listEnabledAssets(BlockchainNetwork.CELO)
-    const validAssets = enabledAssets.flatMap(asset => {
+    const validAssets = enabledAssets.flatMap((asset) => {
       const tokenAddress = safeNormalizeAddress(asset.mintAddress)
       if (!tokenAddress) {
         return []
@@ -172,25 +172,6 @@ export class CeloWalletHandler implements IWalletHandler {
     }
   }
 
-  private async resolveTokenDecimals(
-    provider: ethers.providers.JsonRpcProvider,
-    tokenAddress: string,
-    configuredDecimals: null | number,
-  ): Promise<number> {
-    if (typeof configuredDecimals === 'number' && Number.isInteger(configuredDecimals) && configuredDecimals >= 0) {
-      return configuredDecimals
-    }
-
-    const cached = this.tokenDecimalsCache.get(tokenAddress)
-    if (cached !== undefined) {
-      return cached
-    }
-
-    const decimals = await fetchErc20Decimals(provider, tokenAddress)
-    this.tokenDecimalsCache.set(tokenAddress, decimals)
-    return decimals
-  }
-
   private describeError(error: unknown): string {
     if (error instanceof Error) {
       return error.message || 'Error'
@@ -210,6 +191,25 @@ export class CeloWalletHandler implements IWalletHandler {
 
     this.cachedProvider = { provider, rpcUrl }
     return provider
+  }
+
+  private async resolveTokenDecimals(
+    provider: ethers.providers.JsonRpcProvider,
+    tokenAddress: string,
+    configuredDecimals: null | number,
+  ): Promise<number> {
+    if (typeof configuredDecimals === 'number' && Number.isInteger(configuredDecimals) && configuredDecimals >= 0) {
+      return configuredDecimals
+    }
+
+    const cached = this.tokenDecimalsCache.get(tokenAddress)
+    if (cached !== undefined) {
+      return cached
+    }
+
+    const decimals = await fetchErc20Decimals(provider, tokenAddress)
+    this.tokenDecimalsCache.set(tokenAddress, decimals)
+    return decimals
   }
 
   private toBaseUnits(amount: number, decimals: number): BigNumber {

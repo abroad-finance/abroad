@@ -4,14 +4,14 @@ import { z } from 'zod'
 
 import { TYPES } from '../../../app/container/types'
 import { IDatabaseClientProvider } from '../../../platform/persistence/IDatabaseClientProvider'
+import { FlowDefinitionBuilder, FlowDefinitionBuilderError } from './FlowDefinitionBuilder'
 import {
   FlowBusinessStep,
+  flowBusinessStepSchema,
   FlowDefinitionDto,
   FlowDefinitionInput,
   FlowDefinitionUpdateInput,
-  flowBusinessStepSchema,
 } from './flowDefinitionSchemas'
-import { FlowDefinitionBuilder, FlowDefinitionBuilderError } from './FlowDefinitionBuilder'
 
 export class FlowDefinitionValidationError extends Error {
   constructor(message: string) {
@@ -28,15 +28,6 @@ export class FlowDefinitionService {
     @inject(FlowDefinitionBuilder)
     private readonly builder: FlowDefinitionBuilder,
   ) {}
-
-  public async list(): Promise<FlowDefinitionDto[]> {
-    const client = await this.dbProvider.getClient()
-    const definitions = await client.flowDefinition.findMany({
-      orderBy: { createdAt: 'desc' },
-    })
-
-    return definitions.map(definition => this.toDto(definition))
-  }
 
   public async create(payload: FlowDefinitionInput): Promise<FlowDefinitionDto> {
     const client = await this.dbProvider.getClient()
@@ -74,6 +65,15 @@ export class FlowDefinitionService {
       }
       throw error
     }
+  }
+
+  public async list(): Promise<FlowDefinitionDto[]> {
+    const client = await this.dbProvider.getClient()
+    const definitions = await client.flowDefinition.findMany({
+      orderBy: { createdAt: 'desc' },
+    })
+
+    return definitions.map(definition => this.toDto(definition))
   }
 
   public async update(flowId: string, payload: FlowDefinitionUpdateInput): Promise<FlowDefinitionDto> {
@@ -118,36 +118,42 @@ export class FlowDefinitionService {
     }
   }
 
-  private toStepCreate(step: ReturnType<FlowDefinitionBuilder['build']>[number]): Prisma.FlowStepDefinitionCreateWithoutFlowDefinitionInput {
-    return {
-      completionPolicy: step.completionPolicy,
-      config: this.normalizeJson(step.config),
-      signalMatch: step.signalMatch ? this.normalizeJson(step.signalMatch) : undefined,
-      stepOrder: step.stepOrder,
-      stepType: step.stepType,
-    }
+  private buildSystemSteps(payload: FlowDefinitionInput): ReturnType<FlowDefinitionBuilder['build']> {
+    return this.builder.build(payload)
+  }
+
+  private isUniqueConstraintError(error: unknown): boolean {
+    return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002'
   }
 
   private normalizeJson(value: unknown): Prisma.InputJsonValue {
     return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue
   }
 
+  private parseUserSteps(value: Prisma.JsonValue): FlowBusinessStep[] {
+    const parsed = z.array(flowBusinessStepSchema).safeParse(value)
+    if (parsed.success) {
+      return parsed.data
+    }
+    return []
+  }
+
   private toDto(definition: {
-    id: string
-    name: string
-    enabled: boolean
-    cryptoCurrency: FlowDefinitionDto['cryptoCurrency']
     blockchain: FlowDefinitionDto['blockchain']
-    targetCurrency: FlowDefinitionDto['targetCurrency']
-    payoutProvider: FlowDefinitionDto['payoutProvider']
-    pricingProvider: FlowDefinitionDto['pricingProvider']
+    createdAt: Date
+    cryptoCurrency: FlowDefinitionDto['cryptoCurrency']
+    enabled: boolean
     exchangeFeePct: number
     fixedFee: number
-    minAmount: number | null
-    maxAmount: number | null
-    userSteps: Prisma.JsonValue
-    createdAt: Date
+    id: string
+    maxAmount: null | number
+    minAmount: null | number
+    name: string
+    payoutProvider: FlowDefinitionDto['payoutProvider']
+    pricingProvider: FlowDefinitionDto['pricingProvider']
+    targetCurrency: FlowDefinitionDto['targetCurrency']
     updatedAt: Date
+    userSteps: Prisma.JsonValue
   }): FlowDefinitionDto {
     return {
       blockchain: definition.blockchain,
@@ -168,19 +174,13 @@ export class FlowDefinitionService {
     }
   }
 
-  private isUniqueConstraintError(error: unknown): boolean {
-    return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002'
-  }
-
-  private parseUserSteps(value: Prisma.JsonValue): FlowBusinessStep[] {
-    const parsed = z.array(flowBusinessStepSchema).safeParse(value)
-    if (parsed.success) {
-      return parsed.data
+  private toStepCreate(step: ReturnType<FlowDefinitionBuilder['build']>[number]): Prisma.FlowStepDefinitionCreateWithoutFlowDefinitionInput {
+    return {
+      completionPolicy: step.completionPolicy,
+      config: this.normalizeJson(step.config),
+      signalMatch: step.signalMatch ? this.normalizeJson(step.signalMatch) : undefined,
+      stepOrder: step.stepOrder,
+      stepType: step.stepType,
     }
-    return []
-  }
-
-  private buildSystemSteps(payload: FlowDefinitionInput): ReturnType<FlowDefinitionBuilder['build']> {
-    return this.builder.build(payload)
   }
 }

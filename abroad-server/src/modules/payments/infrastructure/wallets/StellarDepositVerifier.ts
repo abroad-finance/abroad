@@ -8,8 +8,8 @@ import { ILogger } from '../../../../core/logging/types'
 import { ReceivedCryptoTransactionMessage } from '../../../../platform/messaging/queueSchema'
 import { IDatabaseClientProvider } from '../../../../platform/persistence/IDatabaseClientProvider'
 import { ISecretManager, Secrets } from '../../../../platform/secrets/ISecretManager'
-import { CryptoAssetConfigService } from '../../application/CryptoAssetConfigService'
 import { DepositVerificationError, DepositVerificationSuccess, IDepositVerifier } from '../../application/contracts/IDepositVerifier'
+import { CryptoAssetConfigService } from '../../application/CryptoAssetConfigService'
 
 @injectable()
 export class StellarDepositVerifier implements IDepositVerifier {

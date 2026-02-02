@@ -6,9 +6,15 @@ import { TYPES } from '../../../../app/container/types'
 import { ILogger } from '../../../../core/logging/types'
 import { IDatabaseClientProvider } from '../../../../platform/persistence/IDatabaseClientProvider'
 import { ISecretManager, Secrets } from '../../../../platform/secrets/ISecretManager'
-import { CryptoAssetConfigService } from '../../application/CryptoAssetConfigService'
 import { DepositVerificationError, DepositVerificationSuccess, IDepositVerifier } from '../../application/contracts/IDepositVerifier'
-import { fetchErc20Decimals, parseErc20Transfers, safeNormalizeAddress, sumTransfers, toDecimalAmount } from './celoErc20'
+import { CryptoAssetConfigService } from '../../application/CryptoAssetConfigService'
+import {
+  fetchErc20Decimals,
+  parseErc20Transfers,
+  safeNormalizeAddress,
+  sumTransfers,
+  toDecimalAmount,
+} from './celoErc20'
 
 type CeloReceiptContext = {
   depositAddress: string
@@ -189,21 +195,6 @@ export class CeloPaymentVerifier implements IDepositVerifier {
     return provider
   }
 
-  private validateTransaction(transaction: {
-    quote: { cryptoCurrency: CryptoCurrency, network: BlockchainNetwork }
-    status: TransactionStatus
-  }): string | undefined {
-    if (transaction.status !== TransactionStatus.AWAITING_PAYMENT) {
-      return 'Transaction is not awaiting payment'
-    }
-
-    if (transaction.quote.network !== BlockchainNetwork.CELO) {
-      return 'Transaction is not set for Celo'
-    }
-
-    return undefined
-  }
-
   private async resolveTokenDecimals(
     provider: ethers.providers.JsonRpcProvider,
     tokenAddress: string,
@@ -221,5 +212,20 @@ export class CeloPaymentVerifier implements IDepositVerifier {
     const decimals = await fetchErc20Decimals(provider, tokenAddress)
     this.tokenDecimalsCache.set(tokenAddress, decimals)
     return decimals
+  }
+
+  private validateTransaction(transaction: {
+    quote: { cryptoCurrency: CryptoCurrency, network: BlockchainNetwork }
+    status: TransactionStatus
+  }): string | undefined {
+    if (transaction.status !== TransactionStatus.AWAITING_PAYMENT) {
+      return 'Transaction is not awaiting payment'
+    }
+
+    if (transaction.quote.network !== BlockchainNetwork.CELO) {
+      return 'Transaction is not set for Celo'
+    }
+
+    return undefined
   }
 }

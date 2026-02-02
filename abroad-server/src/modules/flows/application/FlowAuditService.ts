@@ -17,110 +17,15 @@ import { IDatabaseClientProvider } from '../../../platform/persistence/IDatabase
 import { FlowOrchestrator } from './FlowOrchestrator'
 import { FlowSnapshot } from './flowTypes'
 
-export type FlowSnapshotDefinitionDto = {
-  blockchain: BlockchainNetwork
-  cryptoCurrency: CryptoCurrency
-  exchangeFeePct: number
-  fixedFee: number
-  id: string
-  maxAmount: number | null
-  minAmount: number | null
-  name: string
-  payoutProvider: PaymentMethod
-  pricingProvider: FlowPricingProvider
-  targetCurrency: TargetCurrency
-}
-
-export type FlowStepSummaryDto = {
-  failed: number
-  ready: number
-  running: number
-  skipped: number
-  succeeded: number
-  total: number
-  waiting: number
-}
-
 export type FlowInstanceCurrentStepDto = {
   status: FlowStepStatus
   stepOrder: number
   stepType: FlowStepType
 }
 
-export type FlowInstanceSummaryDto = {
-  createdAt: Date
-  currentStep: FlowInstanceCurrentStepDto | null
-  currentStepOrder: number | null
-  definition: FlowSnapshotDefinitionDto | null
-  id: string
-  status: FlowInstanceStatus
-  stepSummary: FlowStepSummaryDto
-  transaction: FlowTransactionSummaryDto | null
-  transactionId: string
-  updatedAt: Date
-}
-
-export type FlowInstanceListResponse = {
-  items: FlowInstanceSummaryDto[]
-  page: number
-  pageSize: number
-  total: number
-}
-
-export type FlowStepInstanceDto = {
-  attempts: number
-  correlation: Record<string, unknown> | null
-  createdAt: Date
-  endedAt: Date | null
-  error: Record<string, unknown> | null
-  flowInstanceId: string
-  id: string
-  input: Record<string, unknown> | null
-  maxAttempts: number
-  output: Record<string, unknown> | null
-  startedAt: Date | null
-  status: FlowStepStatus
-  stepOrder: number
-  stepType: FlowStepType
-  updatedAt: Date
-}
-
-export type FlowSignalDto = {
-  consumedAt: Date | null
-  correlationKeys: Record<string, unknown>
-  createdAt: Date
-  eventType: string
-  id: string
-  payload: Record<string, unknown>
-  stepInstanceId: string | null
-}
-
-export type FlowTransactionSummaryDto = {
-  externalId: string | null
-  id: string
-  onChainId: string | null
-  refundOnChainId: string | null
-  status: TransactionStatus
-}
-
-export type FlowTransactionDetailDto = FlowTransactionSummaryDto & {
-  accountNumber: string
-  bankCode: string
-  createdAt: Date
-  paymentMethod: PaymentMethod
-  quote: {
-    cryptoCurrency: CryptoCurrency
-    network: BlockchainNetwork
-    sourceAmount: number
-    targetAmount: number
-    targetCurrency: TargetCurrency
-  }
-  taxId: string | null
-}
-
 export type FlowInstanceDetailDto = {
   createdAt: Date
-  currentStepOrder: number | null
+  currentStepOrder: null | number
   definition: FlowSnapshotDefinitionDto | null
   flowSnapshot: FlowSnapshot | null
   id: string
@@ -140,19 +45,107 @@ export type FlowInstanceListFilters = {
   transactionId?: string
 }
 
-export type FlowStepAction = 'retry' | 'requeue'
+export type FlowInstanceListResponse = {
+  items: FlowInstanceSummaryDto[]
+  page: number
+  pageSize: number
+  total: number
+}
+
+export type FlowInstanceSummaryDto = {
+  createdAt: Date
+  currentStep: FlowInstanceCurrentStepDto | null
+  currentStepOrder: null | number
+  definition: FlowSnapshotDefinitionDto | null
+  id: string
+  status: FlowInstanceStatus
+  stepSummary: FlowStepSummaryDto
+  transaction: FlowTransactionSummaryDto | null
+  transactionId: string
+  updatedAt: Date
+}
+
+export type FlowSignalDto = {
+  consumedAt: Date | null
+  correlationKeys: Record<string, unknown>
+  createdAt: Date
+  eventType: string
+  id: string
+  payload: Record<string, unknown>
+  stepInstanceId: null | string
+}
+
+export type FlowSnapshotDefinitionDto = {
+  blockchain: BlockchainNetwork
+  cryptoCurrency: CryptoCurrency
+  exchangeFeePct: number
+  fixedFee: number
+  id: string
+  maxAmount: null | number
+  minAmount: null | number
+  name: string
+  payoutProvider: PaymentMethod
+  pricingProvider: FlowPricingProvider
+  targetCurrency: TargetCurrency
+}
+
+export type FlowStepAction = 'requeue' | 'retry'
+
+export type FlowStepInstanceDto = {
+  attempts: number
+  correlation: null | Record<string, unknown>
+  createdAt: Date
+  endedAt: Date | null
+  error: null | Record<string, unknown>
+  flowInstanceId: string
+  id: string
+  input: null | Record<string, unknown>
+  maxAttempts: number
+  output: null | Record<string, unknown>
+  startedAt: Date | null
+  status: FlowStepStatus
+  stepOrder: number
+  stepType: FlowStepType
+  updatedAt: Date
+}
+
+export type FlowStepSummaryDto = {
+  failed: number
+  ready: number
+  running: number
+  skipped: number
+  succeeded: number
+  total: number
+  waiting: number
+}
+
+export type FlowTransactionDetailDto = FlowTransactionSummaryDto & {
+  accountNumber: string
+  bankCode: string
+  createdAt: Date
+  paymentMethod: PaymentMethod
+  quote: {
+    cryptoCurrency: CryptoCurrency
+    network: BlockchainNetwork
+    sourceAmount: number
+    targetAmount: number
+    targetCurrency: TargetCurrency
+  }
+  taxId: null | string
+}
+
+export type FlowTransactionSummaryDto = {
+  externalId: null | string
+  id: string
+  onChainId: null | string
+  refundOnChainId: null | string
+  status: TransactionStatus
+}
 
 export class FlowInstanceNotFoundError extends Error {
   constructor(message: string) {
     super(message)
     this.name = 'FlowInstanceNotFoundError'
-  }
-}
-
-export class FlowStepNotFoundError extends Error {
-  constructor(message: string) {
-    super(message)
-    this.name = 'FlowStepNotFoundError'
   }
 }
 
@@ -163,78 +156,19 @@ export class FlowStepActionError extends Error {
   }
 }
 
+export class FlowStepNotFoundError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'FlowStepNotFoundError'
+  }
+}
+
 @injectable()
 export class FlowAuditService {
   constructor(
     @inject(TYPES.IDatabaseClientProvider) private readonly dbProvider: IDatabaseClientProvider,
     @inject(TYPES.FlowOrchestrator) private readonly orchestrator: FlowOrchestrator,
   ) {}
-
-  public async list(filters: FlowInstanceListFilters): Promise<FlowInstanceListResponse> {
-    const page = this.normalizePage(filters.page)
-    const pageSize = this.normalizePageSize(filters.pageSize)
-    const where = this.buildWhere(filters)
-
-    const client = await this.dbProvider.getClient()
-    const [total, instances] = await client.$transaction([
-      client.flowInstance.count({ where }),
-      client.flowInstance.findMany({
-        include: { steps: true },
-        orderBy: { updatedAt: 'desc' },
-        skip: (page - 1) * pageSize,
-        take: pageSize,
-        where,
-      }),
-    ])
-
-    const transactionIds = instances.map(instance => instance.transactionId)
-    const transactions = await client.transaction.findMany({
-      select: {
-        externalId: true,
-        id: true,
-        onChainId: true,
-        refundOnChainId: true,
-        status: true,
-      },
-      where: { id: { in: transactionIds } },
-    })
-    const transactionById = new Map(transactions.map(tx => [tx.id, tx]))
-
-    const items = instances.map(instance => {
-      const definition = this.extractDefinition(instance.flowSnapshot)
-      const stepSummary = this.buildStepSummary(instance.steps)
-      const currentStep = this.buildCurrentStep(instance.steps, instance.currentStepOrder)
-      const transaction = transactionById.get(instance.transactionId) ?? null
-
-      return {
-        createdAt: instance.createdAt,
-        currentStep,
-        currentStepOrder: instance.currentStepOrder,
-        definition,
-        id: instance.id,
-        status: instance.status,
-        stepSummary,
-        transaction: transaction
-          ? {
-            externalId: transaction.externalId,
-            id: transaction.id,
-            onChainId: transaction.onChainId,
-            refundOnChainId: transaction.refundOnChainId,
-            status: transaction.status,
-          }
-          : null,
-        transactionId: instance.transactionId,
-        updatedAt: instance.updatedAt,
-      }
-    })
-
-    return {
-      items,
-      page,
-      pageSize,
-      total,
-    }
-  }
 
   public async getInstance(flowInstanceId: string): Promise<FlowInstanceDetailDto> {
     const client = await this.dbProvider.getClient()
@@ -293,27 +227,93 @@ export class FlowAuditService {
       })),
       transaction: transaction
         ? {
-          accountNumber: transaction.accountNumber,
-          bankCode: transaction.bankCode,
-          createdAt: transaction.createdAt,
-          externalId: transaction.externalId,
-          id: transaction.id,
-          onChainId: transaction.onChainId,
-          paymentMethod: transaction.quote.paymentMethod,
-          quote: {
-            cryptoCurrency: transaction.quote.cryptoCurrency,
-            network: transaction.quote.network,
-            sourceAmount: transaction.quote.sourceAmount,
-            targetAmount: transaction.quote.targetAmount,
-            targetCurrency: transaction.quote.targetCurrency,
-          },
-          refundOnChainId: transaction.refundOnChainId,
-          status: transaction.status,
-          taxId: transaction.taxId ?? null,
-        }
+            accountNumber: transaction.accountNumber,
+            bankCode: transaction.bankCode,
+            createdAt: transaction.createdAt,
+            externalId: transaction.externalId,
+            id: transaction.id,
+            onChainId: transaction.onChainId,
+            paymentMethod: transaction.quote.paymentMethod,
+            quote: {
+              cryptoCurrency: transaction.quote.cryptoCurrency,
+              network: transaction.quote.network,
+              sourceAmount: transaction.quote.sourceAmount,
+              targetAmount: transaction.quote.targetAmount,
+              targetCurrency: transaction.quote.targetCurrency,
+            },
+            refundOnChainId: transaction.refundOnChainId,
+            status: transaction.status,
+            taxId: transaction.taxId ?? null,
+          }
         : null,
       transactionId: instance.transactionId,
       updatedAt: instance.updatedAt,
+    }
+  }
+
+  public async list(filters: FlowInstanceListFilters): Promise<FlowInstanceListResponse> {
+    const page = this.normalizePage(filters.page)
+    const pageSize = this.normalizePageSize(filters.pageSize)
+    const where = this.buildWhere(filters)
+
+    const client = await this.dbProvider.getClient()
+    const [total, instances] = await client.$transaction([
+      client.flowInstance.count({ where }),
+      client.flowInstance.findMany({
+        include: { steps: true },
+        orderBy: { updatedAt: 'desc' },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        where,
+      }),
+    ])
+
+    const transactionIds = instances.map(instance => instance.transactionId)
+    const transactions = await client.transaction.findMany({
+      select: {
+        externalId: true,
+        id: true,
+        onChainId: true,
+        refundOnChainId: true,
+        status: true,
+      },
+      where: { id: { in: transactionIds } },
+    })
+    const transactionById = new Map(transactions.map(tx => [tx.id, tx]))
+
+    const items = instances.map((instance) => {
+      const definition = this.extractDefinition(instance.flowSnapshot)
+      const stepSummary = this.buildStepSummary(instance.steps)
+      const currentStep = this.buildCurrentStep(instance.steps, instance.currentStepOrder)
+      const transaction = transactionById.get(instance.transactionId) ?? null
+
+      return {
+        createdAt: instance.createdAt,
+        currentStep,
+        currentStepOrder: instance.currentStepOrder,
+        definition,
+        id: instance.id,
+        status: instance.status,
+        stepSummary,
+        transaction: transaction
+          ? {
+              externalId: transaction.externalId,
+              id: transaction.id,
+              onChainId: transaction.onChainId,
+              refundOnChainId: transaction.refundOnChainId,
+              status: transaction.status,
+            }
+          : null,
+        transactionId: instance.transactionId,
+        updatedAt: instance.updatedAt,
+      }
+    })
+
+    return {
+      items,
+      page,
+      pageSize,
+      total,
     }
   }
 
@@ -341,8 +341,8 @@ export class FlowAuditService {
       data: {
         correlation: Prisma.DbNull,
         endedAt: null,
-        status: FlowStepStatus.READY,
         startedAt: null,
+        status: FlowStepStatus.READY,
       },
       where: { id: step.id },
     })
@@ -376,6 +376,57 @@ export class FlowAuditService {
     }
   }
 
+  private buildCurrentStep(
+    steps: Array<{ status: FlowStepStatus, stepOrder: number, stepType: FlowStepType }>,
+    currentStepOrder: null | number,
+  ): FlowInstanceCurrentStepDto | null {
+    if (currentStepOrder === null) return null
+    const step = steps.find(candidate => candidate.stepOrder === currentStepOrder)
+    if (!step) return null
+    return {
+      status: step.status,
+      stepOrder: step.stepOrder,
+      stepType: step.stepType,
+    }
+  }
+
+  private buildStepSummary(steps: Array<{ status: FlowStepStatus }>): FlowStepSummaryDto {
+    const summary: FlowStepSummaryDto = {
+      failed: 0,
+      ready: 0,
+      running: 0,
+      skipped: 0,
+      succeeded: 0,
+      total: steps.length,
+      waiting: 0,
+    }
+
+    for (const step of steps) {
+      switch (step.status) {
+        case FlowStepStatus.FAILED:
+          summary.failed += 1
+          break
+        case FlowStepStatus.READY:
+          summary.ready += 1
+          break
+        case FlowStepStatus.RUNNING:
+          summary.running += 1
+          break
+        case FlowStepStatus.SKIPPED:
+          summary.skipped += 1
+          break
+        case FlowStepStatus.SUCCEEDED:
+          summary.succeeded += 1
+          break
+        case FlowStepStatus.WAITING:
+          summary.waiting += 1
+          break
+      }
+    }
+
+    return summary
+  }
+
   private buildWhere(filters: FlowInstanceListFilters): Prisma.FlowInstanceWhereInput {
     const where: Prisma.FlowInstanceWhereInput = {}
 
@@ -398,57 +449,6 @@ export class FlowAuditService {
     return where
   }
 
-  private buildStepSummary(steps: Array<{ status: FlowStepStatus }>): FlowStepSummaryDto {
-    const summary: FlowStepSummaryDto = {
-      failed: 0,
-      ready: 0,
-      running: 0,
-      skipped: 0,
-      succeeded: 0,
-      total: steps.length,
-      waiting: 0,
-    }
-
-    for (const step of steps) {
-      switch (step.status) {
-        case FlowStepStatus.READY:
-          summary.ready += 1
-          break
-        case FlowStepStatus.RUNNING:
-          summary.running += 1
-          break
-        case FlowStepStatus.WAITING:
-          summary.waiting += 1
-          break
-        case FlowStepStatus.SUCCEEDED:
-          summary.succeeded += 1
-          break
-        case FlowStepStatus.FAILED:
-          summary.failed += 1
-          break
-        case FlowStepStatus.SKIPPED:
-          summary.skipped += 1
-          break
-      }
-    }
-
-    return summary
-  }
-
-  private buildCurrentStep(
-    steps: Array<{ status: FlowStepStatus, stepOrder: number, stepType: FlowStepType }>,
-    currentStepOrder: number | null,
-  ): FlowInstanceCurrentStepDto | null {
-    if (currentStepOrder === null) return null
-    const step = steps.find(candidate => candidate.stepOrder === currentStepOrder)
-    if (!step) return null
-    return {
-      status: step.status,
-      stepOrder: step.stepOrder,
-      stepType: step.stepType,
-    }
-  }
-
   private extractDefinition(flowSnapshot: unknown): FlowSnapshotDefinitionDto | null {
     const snapshot = this.extractSnapshot(flowSnapshot)
     return snapshot?.definition ?? null
@@ -461,14 +461,6 @@ export class FlowAuditService {
     return snapshot
   }
 
-  private toRecord(value: Prisma.JsonValue | null): Record<string, unknown> | null {
-    if (value === null || value === undefined) return null
-    if (typeof value === 'object' && !Array.isArray(value)) {
-      return value as Record<string, unknown>
-    }
-    return { value }
-  }
-
   private normalizePage(page?: number): number {
     if (!page || page < 1) return 1
     return Math.floor(page)
@@ -479,8 +471,16 @@ export class FlowAuditService {
     return Math.min(Math.floor(pageSize), 200)
   }
 
-  private normalizeStuckMinutes(stuckMinutes?: number): number | null {
+  private normalizeStuckMinutes(stuckMinutes?: number): null | number {
     if (!stuckMinutes || stuckMinutes <= 0) return null
     return Math.floor(stuckMinutes)
+  }
+
+  private toRecord(value: null | Prisma.JsonValue): null | Record<string, unknown> {
+    if (value === null || value === undefined) return null
+    if (typeof value === 'object' && !Array.isArray(value)) {
+      return value as Record<string, unknown>
+    }
+    return { value }
   }
 }

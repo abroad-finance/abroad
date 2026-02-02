@@ -3,11 +3,7 @@ import { inject, injectable } from 'inversify'
 
 import { TYPES } from '../../../app/container/types'
 import { IDatabaseClientProvider } from '../../../platform/persistence/IDatabaseClientProvider'
-import {
-  CryptoAssetCoverageDto,
-  CryptoAssetCoverageResponse,
-  CryptoAssetUpdateInput,
-} from './cryptoAssetSchemas'
+import { CryptoAssetCoverageDto, CryptoAssetCoverageResponse, CryptoAssetUpdateInput } from './cryptoAssetSchemas'
 
 export type EnabledCryptoAsset = {
   blockchain: BlockchainNetwork
@@ -30,12 +26,35 @@ export class CryptoAssetConfigService {
     private readonly dbProvider: IDatabaseClientProvider,
   ) {}
 
+  public async getActiveMint(params: {
+    blockchain: BlockchainNetwork
+    cryptoCurrency: CryptoCurrency
+  }): Promise<null | { decimals: null | number, mintAddress: string }> {
+    const client = await this.dbProvider.getClient()
+    const config = await client.cryptoAssetConfig.findFirst({
+      where: {
+        blockchain: params.blockchain,
+        cryptoCurrency: params.cryptoCurrency,
+        enabled: true,
+      },
+    })
+
+    if (!config || !config.mintAddress) {
+      return null
+    }
+
+    return {
+      decimals: config.decimals ?? null,
+      mintAddress: config.mintAddress,
+    }
+  }
+
   public async listCoverage(): Promise<CryptoAssetCoverageResponse> {
     const client = await this.dbProvider.getClient()
     const configs = await client.cryptoAssetConfig.findMany()
 
     const configMap = new Map<string, typeof configs[number]>()
-    configs.forEach(config => {
+    configs.forEach((config) => {
       configMap.set(this.key(config.cryptoCurrency, config.blockchain), config)
     })
 
@@ -98,7 +117,7 @@ export class CryptoAssetConfigService {
     })
 
     const assets: EnabledCryptoAsset[] = []
-    configs.forEach(config => {
+    configs.forEach((config) => {
       if (!config.mintAddress) {
         return
       }
@@ -112,6 +131,48 @@ export class CryptoAssetConfigService {
     })
 
     return assets
+  }
+
+  public async requireActiveMint(params: {
+    blockchain: BlockchainNetwork
+    cryptoCurrency: CryptoCurrency
+  }): Promise<{ decimals: null | number, mintAddress: string }> {
+    const config = await this.getActiveMint(params)
+    if (!config) {
+      throw new CryptoAssetConfigError('Unsupported crypto asset configuration')
+    }
+    return config
+  }
+
+  public async resolveStellarAsset(params: {
+    assetCode: string
+    issuer: string
+  }): Promise<EnabledCryptoAsset | null> {
+    const cryptoCurrency = this.parseCryptoCurrency(params.assetCode)
+    if (!cryptoCurrency) {
+      return null
+    }
+
+    const client = await this.dbProvider.getClient()
+    const config = await client.cryptoAssetConfig.findFirst({
+      where: {
+        blockchain: BlockchainNetwork.STELLAR,
+        cryptoCurrency,
+        enabled: true,
+        mintAddress: params.issuer,
+      },
+    })
+
+    if (!config?.mintAddress) {
+      return null
+    }
+
+    return {
+      blockchain: config.blockchain,
+      cryptoCurrency: config.cryptoCurrency,
+      decimals: config.decimals ?? null,
+      mintAddress: config.mintAddress,
+    }
   }
 
   public async upsert(input: CryptoAssetUpdateInput): Promise<CryptoAssetCoverageDto> {
@@ -155,71 +216,6 @@ export class CryptoAssetConfigService {
     }
 
     return updated
-  }
-
-  public async getActiveMint(params: {
-    blockchain: BlockchainNetwork
-    cryptoCurrency: CryptoCurrency
-  }): Promise<{ decimals: null | number, mintAddress: string } | null> {
-    const client = await this.dbProvider.getClient()
-    const config = await client.cryptoAssetConfig.findFirst({
-      where: {
-        blockchain: params.blockchain,
-        cryptoCurrency: params.cryptoCurrency,
-        enabled: true,
-      },
-    })
-
-    if (!config || !config.mintAddress) {
-      return null
-    }
-
-    return {
-      decimals: config.decimals ?? null,
-      mintAddress: config.mintAddress,
-    }
-  }
-
-  public async resolveStellarAsset(params: {
-    assetCode: string
-    issuer: string
-  }): Promise<EnabledCryptoAsset | null> {
-    const cryptoCurrency = this.parseCryptoCurrency(params.assetCode)
-    if (!cryptoCurrency) {
-      return null
-    }
-
-    const client = await this.dbProvider.getClient()
-    const config = await client.cryptoAssetConfig.findFirst({
-      where: {
-        blockchain: BlockchainNetwork.STELLAR,
-        cryptoCurrency,
-        enabled: true,
-        mintAddress: params.issuer,
-      },
-    })
-
-    if (!config?.mintAddress) {
-      return null
-    }
-
-    return {
-      blockchain: config.blockchain,
-      cryptoCurrency: config.cryptoCurrency,
-      decimals: config.decimals ?? null,
-      mintAddress: config.mintAddress,
-    }
-  }
-
-  public async requireActiveMint(params: {
-    blockchain: BlockchainNetwork
-    cryptoCurrency: CryptoCurrency
-  }): Promise<{ decimals: null | number, mintAddress: string }> {
-    const config = await this.getActiveMint(params)
-    if (!config) {
-      throw new CryptoAssetConfigError('Unsupported crypto asset configuration')
-    }
-    return config
   }
 
   private key(cryptoCurrency: CryptoCurrency, blockchain: BlockchainNetwork): string {

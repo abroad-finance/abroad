@@ -13,12 +13,7 @@ import {
 } from 'tsoa'
 
 import { FlowCorridorService } from '../../application/FlowCorridorService'
-import {
-  FlowCorridorDto,
-  FlowCorridorListDto,
-  FlowCorridorUpdateInput,
-  flowCorridorUpdateSchema,
-} from '../../application/flowDefinitionSchemas'
+import { FlowCorridorDto, FlowCorridorListDto, FlowCorridorUpdateInput, flowCorridorUpdateSchema } from '../../application/flowDefinitionSchemas'
 
 @Route('ops/flows/corridors')
 @Security('OpsApiKeyAuth')

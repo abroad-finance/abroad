@@ -1,9 +1,4 @@
-import {
-  FlowCorridorStatus,
-  FlowInstanceStatus,
-  FlowStepStatus,
-  Prisma,
-} from '@prisma/client'
+import { FlowCorridorStatus, FlowInstanceStatus, FlowStepStatus, Prisma } from '@prisma/client'
 import { inject, injectable } from 'inversify'
 
 import { TYPES } from '../../../app/container/types'
@@ -12,7 +7,13 @@ import { ILogger } from '../../../core/logging/types'
 import { IDatabaseClientProvider } from '../../../platform/persistence/IDatabaseClientProvider'
 import { flowSnapshotSchema } from './flowDefinitionSchemas'
 import { FlowExecutorRegistry } from './FlowExecutorRegistry'
-import { FlowContext, FlowSignalInput, FlowSnapshot, FlowSnapshotStep, FlowStepRuntimeContext } from './flowTypes'
+import {
+  FlowContext,
+  FlowSignalInput,
+  FlowSnapshot,
+  FlowSnapshotStep,
+  FlowStepRuntimeContext,
+} from './flowTypes'
 
 export class FlowNotFoundError extends Error {
   constructor(message: string) {
@@ -31,77 +32,6 @@ export class FlowOrchestrator {
     @inject(TYPES.ILogger) baseLogger: ILogger,
   ) {
     this.logger = createScopedLogger(baseLogger, { scope: 'FlowOrchestrator' })
-  }
-
-  public async startFlow(transactionId: string): Promise<void> {
-    const prisma = await this.dbProvider.getClient()
-
-    const existing = await prisma.flowInstance.findUnique({ where: { transactionId } })
-    if (existing) {
-      this.logger.info('Flow instance already exists; resuming', { flowInstanceId: existing.id, transactionId })
-      await this.run(existing.id)
-      return
-    }
-
-    const transaction = await prisma.transaction.findUnique({
-      include: { quote: true, partnerUser: { include: { partner: true } } },
-      where: { id: transactionId },
-    })
-
-    if (!transaction) {
-      throw new FlowNotFoundError('Transaction not found')
-    }
-
-    const unsupported = await prisma.flowCorridor.findFirst({
-      where: {
-        blockchain: transaction.quote.network,
-        cryptoCurrency: transaction.quote.cryptoCurrency,
-        status: FlowCorridorStatus.UNSUPPORTED,
-        targetCurrency: transaction.quote.targetCurrency,
-      },
-    })
-
-    if (unsupported) {
-      throw new FlowNotFoundError('Corridor is explicitly unsupported')
-    }
-
-    const definition = await prisma.flowDefinition.findFirst({
-      include: { steps: { orderBy: { stepOrder: 'asc' } } },
-      where: {
-        blockchain: transaction.quote.network,
-        cryptoCurrency: transaction.quote.cryptoCurrency,
-        enabled: true,
-        targetCurrency: transaction.quote.targetCurrency,
-      },
-    })
-
-    if (!definition) {
-      throw new FlowNotFoundError('No flow definition found for corridor')
-    }
-
-    if (definition.payoutProvider !== transaction.quote.paymentMethod) {
-      throw new FlowNotFoundError('Flow payout provider does not match transaction payment method')
-    }
-
-    const snapshot = this.buildSnapshot(definition)
-
-    const instance = await prisma.flowInstance.create({
-      data: {
-        currentStepOrder: snapshot.steps[0]?.stepOrder ?? null,
-        flowSnapshot: this.normalizeJson(snapshot),
-        status: FlowInstanceStatus.IN_PROGRESS,
-        steps: {
-          create: snapshot.steps.map(step => ({
-            stepOrder: step.stepOrder,
-            stepType: step.stepType,
-          })),
-        },
-        transactionId: transaction.id,
-      },
-    })
-
-    this.logger.info('Flow instance created', { flowInstanceId: instance.id, transactionId })
-    await this.run(instance.id)
   }
 
   public async handleSignal(signal: FlowSignalInput): Promise<void> {
@@ -203,7 +133,7 @@ export class FlowOrchestrator {
       const stepDefinition = snapshot.steps.find(step => step.stepOrder === current.stepOrder)
       if (!stepDefinition) {
         await prisma.flowStepInstance.update({
-          data: { status: FlowStepStatus.FAILED, endedAt: new Date(), error: { message: 'Step definition missing' } },
+          data: { endedAt: new Date(), error: { message: 'Step definition missing' }, status: FlowStepStatus.FAILED },
           where: { id: current.id },
         })
         await prisma.flowInstance.update({
@@ -256,6 +186,77 @@ export class FlowOrchestrator {
     })
   }
 
+  public async startFlow(transactionId: string): Promise<void> {
+    const prisma = await this.dbProvider.getClient()
+
+    const existing = await prisma.flowInstance.findUnique({ where: { transactionId } })
+    if (existing) {
+      this.logger.info('Flow instance already exists; resuming', { flowInstanceId: existing.id, transactionId })
+      await this.run(existing.id)
+      return
+    }
+
+    const transaction = await prisma.transaction.findUnique({
+      include: { partnerUser: { include: { partner: true } }, quote: true },
+      where: { id: transactionId },
+    })
+
+    if (!transaction) {
+      throw new FlowNotFoundError('Transaction not found')
+    }
+
+    const unsupported = await prisma.flowCorridor.findFirst({
+      where: {
+        blockchain: transaction.quote.network,
+        cryptoCurrency: transaction.quote.cryptoCurrency,
+        status: FlowCorridorStatus.UNSUPPORTED,
+        targetCurrency: transaction.quote.targetCurrency,
+      },
+    })
+
+    if (unsupported) {
+      throw new FlowNotFoundError('Corridor is explicitly unsupported')
+    }
+
+    const definition = await prisma.flowDefinition.findFirst({
+      include: { steps: { orderBy: { stepOrder: 'asc' } } },
+      where: {
+        blockchain: transaction.quote.network,
+        cryptoCurrency: transaction.quote.cryptoCurrency,
+        enabled: true,
+        targetCurrency: transaction.quote.targetCurrency,
+      },
+    })
+
+    if (!definition) {
+      throw new FlowNotFoundError('No flow definition found for corridor')
+    }
+
+    if (definition.payoutProvider !== transaction.quote.paymentMethod) {
+      throw new FlowNotFoundError('Flow payout provider does not match transaction payment method')
+    }
+
+    const snapshot = this.buildSnapshot(definition)
+
+    const instance = await prisma.flowInstance.create({
+      data: {
+        currentStepOrder: snapshot.steps[0]?.stepOrder ?? null,
+        flowSnapshot: this.normalizeJson(snapshot),
+        status: FlowInstanceStatus.IN_PROGRESS,
+        steps: {
+          create: snapshot.steps.map(step => ({
+            stepOrder: step.stepOrder,
+            stepType: step.stepType,
+          })),
+        },
+        transactionId: transaction.id,
+      },
+    })
+
+    this.logger.info('Flow instance created', { flowInstanceId: instance.id, transactionId })
+    await this.run(instance.id)
+  }
+
   private async buildRuntimeContext(flowInstanceId: string): Promise<FlowStepRuntimeContext & { flowSnapshot: unknown }> {
     const prisma = await this.dbProvider.getClient()
     const instance = await prisma.flowInstance.findUnique({
@@ -268,7 +269,7 @@ export class FlowOrchestrator {
     }
 
     const transaction = await prisma.transaction.findUnique({
-      include: { quote: true, partnerUser: true },
+      include: { partnerUser: true, quote: true },
       where: { id: instance.transactionId },
     })
 
@@ -309,6 +310,50 @@ export class FlowOrchestrator {
     }
   }
 
+  private buildSnapshot(definition: {
+    blockchain: FlowSnapshot['definition']['blockchain']
+    cryptoCurrency: FlowSnapshot['definition']['cryptoCurrency']
+    exchangeFeePct: number
+    fixedFee: number
+    id: string
+    maxAmount: null | number
+    minAmount: null | number
+    name: string
+    payoutProvider: FlowSnapshot['definition']['payoutProvider']
+    pricingProvider: FlowSnapshot['definition']['pricingProvider']
+    steps: Array<{
+      completionPolicy: FlowSnapshotStep['completionPolicy']
+      config: unknown
+      signalMatch: null | unknown
+      stepOrder: number
+      stepType: FlowSnapshotStep['stepType']
+    }>
+    targetCurrency: FlowSnapshot['definition']['targetCurrency']
+  }): FlowSnapshot {
+    return {
+      definition: {
+        blockchain: definition.blockchain,
+        cryptoCurrency: definition.cryptoCurrency,
+        exchangeFeePct: definition.exchangeFeePct,
+        fixedFee: definition.fixedFee,
+        id: definition.id,
+        maxAmount: definition.maxAmount,
+        minAmount: definition.minAmount,
+        name: definition.name,
+        payoutProvider: definition.payoutProvider,
+        pricingProvider: definition.pricingProvider,
+        targetCurrency: definition.targetCurrency,
+      },
+      steps: definition.steps.map(step => ({
+        completionPolicy: step.completionPolicy,
+        config: this.jsonToRecord(step.config),
+        signalMatch: step.signalMatch ? this.jsonToRecord(step.signalMatch) : null,
+        stepOrder: step.stepOrder,
+        stepType: step.stepType,
+      })),
+    }
+  }
+
   private async claimNextStep(prisma: Awaited<ReturnType<IDatabaseClientProvider['getClient']>>, flowInstanceId: string) {
     const next = await prisma.flowStepInstance.findFirst({
       orderBy: { stepOrder: 'asc' },
@@ -335,48 +380,55 @@ export class FlowOrchestrator {
     return next
   }
 
-  private buildSnapshot(definition: {
-    id: string
-    name: string
-    blockchain: FlowSnapshot['definition']['blockchain']
-    cryptoCurrency: FlowSnapshot['definition']['cryptoCurrency']
-    exchangeFeePct: number
-    fixedFee: number
-    maxAmount: number | null
-    minAmount: number | null
-    payoutProvider: FlowSnapshot['definition']['payoutProvider']
-    pricingProvider: FlowSnapshot['definition']['pricingProvider']
-    targetCurrency: FlowSnapshot['definition']['targetCurrency']
-    steps: Array<{
-      stepOrder: number
-      stepType: FlowSnapshotStep['stepType']
-      completionPolicy: FlowSnapshotStep['completionPolicy']
-      config: unknown
-      signalMatch: unknown | null
-    }>
-  }): FlowSnapshot {
-    return {
-      definition: {
-        blockchain: definition.blockchain,
-        cryptoCurrency: definition.cryptoCurrency,
-        exchangeFeePct: definition.exchangeFeePct,
-        fixedFee: definition.fixedFee,
-        id: definition.id,
-        maxAmount: definition.maxAmount,
-        minAmount: definition.minAmount,
-        name: definition.name,
-        payoutProvider: definition.payoutProvider,
-        pricingProvider: definition.pricingProvider,
-        targetCurrency: definition.targetCurrency,
-      },
-      steps: definition.steps.map(step => ({
-        completionPolicy: step.completionPolicy,
-        config: this.jsonToRecord(step.config),
-        signalMatch: step.signalMatch ? this.jsonToRecord(step.signalMatch) : null,
-        stepOrder: step.stepOrder,
-        stepType: step.stepType,
-      })),
+  private jsonToRecord(value: unknown): Record<string, unknown> {
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      return value as Record<string, unknown>
     }
+    return { value }
+  }
+
+  private matchesCorrelation(
+    expected: Record<string, unknown>,
+    actual: Record<string, boolean | number | string>,
+  ): boolean {
+    return Object.entries(expected).every(([key, value]) => actual[key] === value)
+  }
+
+  private normalizeJson(value: unknown): Prisma.InputJsonValue {
+    return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue
+  }
+
+  private async persistStepOutcome(stepInstanceId: string, result: {
+    correlation?: Record<string, unknown>
+    error?: string
+    outcome: 'failed' | 'succeeded' | 'waiting'
+    output?: Record<string, unknown>
+  }): Promise<void> {
+    const prisma = await this.dbProvider.getClient()
+    const now = new Date()
+
+    if (result.outcome === 'waiting') {
+      await prisma.flowStepInstance.update({
+        data: {
+          correlation: result.correlation ? this.normalizeJson(result.correlation) : undefined,
+          output: result.output ? this.normalizeJson(result.output) : undefined,
+          status: FlowStepStatus.WAITING,
+        },
+        where: { id: stepInstanceId },
+      })
+      return
+    }
+
+    await prisma.flowStepInstance.update({
+      data: {
+        correlation: result.correlation ? this.normalizeJson(result.correlation) : undefined,
+        endedAt: now,
+        error: result.error ? this.normalizeJson({ message: result.error }) : undefined,
+        output: result.output ? this.normalizeJson(result.output) : undefined,
+        status: result.outcome === 'succeeded' ? FlowStepStatus.SUCCEEDED : FlowStepStatus.FAILED,
+      },
+      where: { id: stepInstanceId },
+    })
   }
 
   private readSnapshot(raw: unknown): FlowSnapshot {
@@ -408,61 +460,10 @@ export class FlowOrchestrator {
     return candidate
   }
 
-  private async persistStepOutcome(stepInstanceId: string, result: {
-    outcome: 'succeeded' | 'waiting' | 'failed'
-    output?: Record<string, unknown>
-    correlation?: Record<string, unknown>
-    error?: string
-  }): Promise<void> {
-    const prisma = await this.dbProvider.getClient()
-    const now = new Date()
-
-    if (result.outcome === 'waiting') {
-      await prisma.flowStepInstance.update({
-        data: {
-          correlation: result.correlation ? this.normalizeJson(result.correlation) : undefined,
-          output: result.output ? this.normalizeJson(result.output) : undefined,
-          status: FlowStepStatus.WAITING,
-        },
-        where: { id: stepInstanceId },
-      })
-      return
-    }
-
-    await prisma.flowStepInstance.update({
-      data: {
-        correlation: result.correlation ? this.normalizeJson(result.correlation) : undefined,
-        endedAt: now,
-        error: result.error ? this.normalizeJson({ message: result.error }) : undefined,
-        output: result.output ? this.normalizeJson(result.output) : undefined,
-        status: result.outcome === 'succeeded' ? FlowStepStatus.SUCCEEDED : FlowStepStatus.FAILED,
-      },
-      where: { id: stepInstanceId },
-    })
-  }
-
-  private resolveNextOrder(steps: FlowSnapshotStep[], current: number): number | null {
+  private resolveNextOrder(steps: FlowSnapshotStep[], current: number): null | number {
     const orders = steps.map(step => step.stepOrder).sort((a, b) => a - b)
     const currentIndex = orders.indexOf(current)
     if (currentIndex < 0 || currentIndex + 1 >= orders.length) return null
     return orders[currentIndex + 1]
-  }
-
-  private normalizeJson(value: unknown): Prisma.InputJsonValue {
-    return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue
-  }
-
-  private jsonToRecord(value: unknown): Record<string, unknown> {
-    if (value && typeof value === 'object' && !Array.isArray(value)) {
-      return value as Record<string, unknown>
-    }
-    return { value }
-  }
-
-  private matchesCorrelation(
-    expected: Record<string, unknown>,
-    actual: Record<string, boolean | number | string>,
-  ): boolean {
-    return Object.entries(expected).every(([key, value]) => actual[key] === value)
   }
 }

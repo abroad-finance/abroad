@@ -23,6 +23,8 @@ type StreamHandle = (() => void) | { close: () => void }
 @injectable()
 export class StellarListener {
   private accountId!: string
+  private assetCache?: { assets: Map<string, CryptoCurrency>, expiresAt: number }
+  private readonly assetCacheTtlMs = 60_000
   private horizonUrl!: string
   private keepAlive?: ReturnType<typeof setInterval>
   private readonly logger: ScopedLogger
@@ -30,8 +32,6 @@ export class StellarListener {
   private server?: Horizon.Server
   // Keep strong references so the stream isn't GC'd.
   private stream?: StreamHandle
-  private assetCache?: { assets: Map<string, CryptoCurrency>, expiresAt: number }
-  private readonly assetCacheTtlMs = 60_000
 
   constructor(
     @inject(TYPES.IOutboxDispatcher) private readonly outboxDispatcher: OutboxDispatcher,
@@ -222,6 +222,26 @@ export class StellarListener {
     }
   }
 
+  private assetKey(assetCode: string, issuer: string): string {
+    return `${assetCode}:${issuer}`
+  }
+
+  private async getEnabledAssetMap(): Promise<Map<string, CryptoCurrency>> {
+    const now = Date.now()
+    if (this.assetCache && this.assetCache.expiresAt > now) {
+      return this.assetCache.assets
+    }
+
+    const assets = await this.assetConfigService.listEnabledAssets(BlockchainNetwork.STELLAR)
+    const map = new Map<string, CryptoCurrency>()
+    assets.forEach((asset) => {
+      map.set(this.assetKey(asset.cryptoCurrency, asset.mintAddress), asset.cryptoCurrency)
+    })
+
+    this.assetCache = { assets: map, expiresAt: now + this.assetCacheTtlMs }
+    return map
+  }
+
   private async handleOrphanPayment(
     payment: Horizon.ServerApi.PaymentOperationRecord,
     reason: PaymentReconciliationReason,
@@ -252,25 +272,5 @@ export class StellarListener {
 
     const assetMap = await this.getEnabledAssetMap()
     return assetMap.get(this.assetKey(payment.asset_code, payment.asset_issuer)) ?? null
-  }
-
-  private async getEnabledAssetMap(): Promise<Map<string, CryptoCurrency>> {
-    const now = Date.now()
-    if (this.assetCache && this.assetCache.expiresAt > now) {
-      return this.assetCache.assets
-    }
-
-    const assets = await this.assetConfigService.listEnabledAssets(BlockchainNetwork.STELLAR)
-    const map = new Map<string, CryptoCurrency>()
-    assets.forEach(asset => {
-      map.set(this.assetKey(asset.cryptoCurrency, asset.mintAddress), asset.cryptoCurrency)
-    })
-
-    this.assetCache = { assets: map, expiresAt: now + this.assetCacheTtlMs }
-    return map
-  }
-
-  private assetKey(assetCode: string, issuer: string): string {
-    return `${assetCode}:${issuer}`
   }
 }

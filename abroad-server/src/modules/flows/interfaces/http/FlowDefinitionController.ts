@@ -14,13 +14,8 @@ import {
   TsoaResponse,
 } from 'tsoa'
 
+import { FlowDefinitionDto, FlowDefinitionInput, flowDefinitionSchema, FlowDefinitionUpdateInput } from '../../application/flowDefinitionSchemas'
 import { FlowDefinitionService, FlowDefinitionValidationError } from '../../application/FlowDefinitionService'
-import {
-  FlowDefinitionDto,
-  FlowDefinitionInput,
-  FlowDefinitionUpdateInput,
-  flowDefinitionSchema,
-} from '../../application/flowDefinitionSchemas'
 
 @Route('ops/flows/definitions')
 @Security('OpsApiKeyAuth')
@@ -29,12 +24,6 @@ export class FlowDefinitionController extends Controller {
     @inject(FlowDefinitionService) private readonly flowDefinitionService: FlowDefinitionService,
   ) {
     super()
-  }
-
-  @Get()
-  @SuccessResponse('200', 'Flow definitions retrieved')
-  public async list(): Promise<FlowDefinitionDto[]> {
-    return this.flowDefinitionService.list()
   }
 
   @Post()
@@ -60,6 +49,12 @@ export class FlowDefinitionController extends Controller {
       }
       throw error
     }
+  }
+
+  @Get()
+  @SuccessResponse('200', 'Flow definitions retrieved')
+  public async list(): Promise<FlowDefinitionDto[]> {
+    return this.flowDefinitionService.list()
   }
 
   @Patch('{flowId}')

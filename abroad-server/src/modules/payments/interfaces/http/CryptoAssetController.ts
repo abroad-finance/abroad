@@ -12,13 +12,8 @@ import {
   TsoaResponse,
 } from 'tsoa'
 
-import { CryptoAssetConfigService, CryptoAssetConfigError } from '../../application/CryptoAssetConfigService'
-import {
-  CryptoAssetCoverageDto,
-  CryptoAssetCoverageResponse,
-  CryptoAssetUpdateInput,
-  cryptoAssetUpdateSchema,
-} from '../../application/cryptoAssetSchemas'
+import { CryptoAssetConfigError, CryptoAssetConfigService } from '../../application/CryptoAssetConfigService'
+import { CryptoAssetCoverageDto, CryptoAssetCoverageResponse, CryptoAssetUpdateInput, cryptoAssetUpdateSchema } from '../../application/cryptoAssetSchemas'
 
 @Route('ops/crypto-assets')
 @Security('OpsApiKeyAuth')

@@ -6,8 +6,8 @@ import { TYPES } from '../../../app/container/types'
 import { createScopedLogger, ScopedLogger } from '../../../core/logging/scopedLogger'
 import { ILogger } from '../../../core/logging/types'
 import { IDatabaseClientProvider } from '../../../platform/persistence/IDatabaseClientProvider'
-import { CryptoAssetConfigService } from '../../payments/application/CryptoAssetConfigService'
 import { IWalletHandlerFactory } from '../../payments/application/contracts/IWalletHandlerFactory'
+import { CryptoAssetConfigService } from '../../payments/application/CryptoAssetConfigService'
 import { type RefundResult, RefundService } from './RefundService'
 import { PaymentReconciliationReason } from './StellarTypes'
 
@@ -63,10 +63,10 @@ export class StellarOrphanRefundService {
     if (!cryptoCurrency) {
       await prisma.stellarOrphanRefund.upsert({
         create: {
+          lastError: 'unsupported_asset',
           paymentId: params.payment.id,
           reason: params.reason,
           status: OrphanRefundStatus.FAILED,
-          lastError: 'unsupported_asset',
         },
         update: {
           lastError: 'unsupported_asset',
@@ -174,6 +174,24 @@ export class StellarOrphanRefundService {
     return { outcome: 'refunded', refundTransactionId: refundResult.transactionId ?? null }
   }
 
+  private async resolveCryptoCurrency(
+    payment: Horizon.ServerApi.PaymentOperationRecord,
+  ): Promise<CryptoCurrency | null> {
+    if (payment.asset_type !== 'credit_alphanum4' && payment.asset_type !== 'credit_alphanum12') {
+      return null
+    }
+
+    if (!payment.asset_code || !payment.asset_issuer) {
+      return null
+    }
+
+    const asset = await this.assetConfigService.resolveStellarAsset({
+      assetCode: payment.asset_code,
+      issuer: payment.asset_issuer,
+    })
+    return asset?.cryptoCurrency ?? null
+  }
+
   private async resolveTransactionHash(
     payment: Horizon.ServerApi.PaymentOperationRecord,
   ): Promise<null | string> {
@@ -191,23 +209,5 @@ export class StellarOrphanRefundService {
       })
       return null
     }
-  }
-
-  private async resolveCryptoCurrency(
-    payment: Horizon.ServerApi.PaymentOperationRecord,
-  ): Promise<null | CryptoCurrency> {
-    if (payment.asset_type !== 'credit_alphanum4' && payment.asset_type !== 'credit_alphanum12') {
-      return null
-    }
-
-    if (!payment.asset_code || !payment.asset_issuer) {
-      return null
-    }
-
-    const asset = await this.assetConfigService.resolveStellarAsset({
-      assetCode: payment.asset_code,
-      issuer: payment.asset_issuer,
-    })
-    return asset?.cryptoCurrency ?? null
   }
 }

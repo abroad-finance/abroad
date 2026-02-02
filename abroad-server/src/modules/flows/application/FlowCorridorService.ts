@@ -9,11 +9,7 @@ import { inject, injectable } from 'inversify'
 
 import { TYPES } from '../../../app/container/types'
 import { IDatabaseClientProvider } from '../../../platform/persistence/IDatabaseClientProvider'
-import {
-  FlowCorridorDto,
-  FlowCorridorListDto,
-  FlowCorridorUpdateInput,
-} from './flowDefinitionSchemas'
+import { FlowCorridorDto, FlowCorridorListDto, FlowCorridorUpdateInput } from './flowDefinitionSchemas'
 
 @injectable()
 export class FlowCorridorService {
@@ -45,8 +41,8 @@ export class FlowCorridorService {
       }),
     ])
 
-    const overrideMap = new Map<string, { reason: string | null }>()
-    overrides.forEach(item => {
+    const overrideMap = new Map<string, { reason: null | string }>()
+    overrides.forEach((item) => {
       overrideMap.set(this.key(item.cryptoCurrency, item.blockchain, item.targetCurrency), {
         reason: item.reason ?? null,
       })
@@ -60,7 +56,7 @@ export class FlowCorridorService {
       updatedAt: Date
     }>()
 
-    definitions.forEach(def => {
+    definitions.forEach((def) => {
       definitionMap.set(this.key(def.cryptoCurrency, def.blockchain, def.targetCurrency), {
         enabled: def.enabled,
         id: def.id,

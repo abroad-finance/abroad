@@ -16,8 +16,8 @@ import { createScopedLogger, ScopedLogger } from '../../../../core/logging/scope
 import { ILogger } from '../../../../core/logging/types'
 import { ILockManager } from '../../../../platform/cacheLock/ILockManager'
 import { ISecretManager } from '../../../../platform/secrets/ISecretManager'
-import { CryptoAssetConfigService } from '../../application/CryptoAssetConfigService'
 import { IWalletHandler, WalletSendParams, WalletSendResult } from '../../application/contracts/IWalletHandler'
+import { CryptoAssetConfigService } from '../../application/CryptoAssetConfigService'
 
 function safeMemo(m: string): string {
   // Memo.text must be <= 28 bytes (UTF-8). Trim if user passes longer text.

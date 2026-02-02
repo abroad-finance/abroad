@@ -1,5 +1,5 @@
-import { FlowStepType, TargetCurrency } from '@prisma/client'
 import { Wallet } from '@binance/wallet'
+import { FlowStepType, TargetCurrency } from '@prisma/client'
 import { inject, injectable } from 'inversify'
 import { z } from 'zod'
 
@@ -8,7 +8,7 @@ import { createScopedLogger, ScopedLogger } from '../../../../core/logging/scope
 import { ILogger } from '../../../../core/logging/types'
 import { ISecretManager } from '../../../../platform/secrets/ISecretManager'
 import { IExchangeProviderFactory } from '../../../treasury/application/contracts/IExchangeProviderFactory'
-import { amountSourceSchema, AmountSource, resolveAmount } from '../flowAmountResolver'
+import { AmountSource, amountSourceSchema, resolveAmount } from '../flowAmountResolver'
 import { FlowStepExecutionResult, FlowStepExecutor, FlowStepRuntimeContext } from '../flowTypes'
 
 const treasuryTransferConfigSchema = z.object({

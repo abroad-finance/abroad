@@ -11,12 +11,12 @@ import { TYPES } from '../../../app/container/types'
 import { IPaymentServiceFactory } from '../../payments/application/contracts/IPaymentServiceFactory'
 import { FlowBusinessStep, FlowDefinitionInput, FlowVenue } from './flowDefinitionSchemas'
 
-export class FlowDefinitionBuilderError extends Error {
-  constructor(message: string) {
-    super(message)
-    this.name = 'FlowDefinitionBuilderError'
-  }
+type BuildState = {
+  asset: SupportedCurrency
+  location: FlowLocation
 }
+
+type FlowLocation = 'HOT_WALLET' | FlowVenue
 
 type FlowSystemStep = {
   completionPolicy: FlowStepCompletionPolicy
@@ -26,11 +26,11 @@ type FlowSystemStep = {
   stepType: FlowStepType
 }
 
-type FlowLocation = FlowVenue | 'HOT_WALLET'
-
-type BuildState = {
-  asset: SupportedCurrency
-  location: FlowLocation
+export class FlowDefinitionBuilderError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'FlowDefinitionBuilderError'
+  }
 }
 
 @injectable()
@@ -69,17 +69,22 @@ export class FlowDefinitionBuilder {
     }))
   }
 
-  private ensurePayoutFirst(steps: FlowBusinessStep[]): void {
-    if (steps.length === 0) {
-      throw new FlowDefinitionBuilderError('At least one step is required')
+  private buildAwaitProviderStatus(): FlowSystemStep {
+    return {
+      completionPolicy: FlowStepCompletionPolicy.AWAIT_EVENT,
+      config: {},
+      stepOrder: 1,
+      stepType: FlowStepType.AWAIT_PROVIDER_STATUS,
     }
-    const [first] = steps
-    if (first.type !== 'PAYOUT') {
-      throw new FlowDefinitionBuilderError('Flow must start with a payout step')
-    }
-    const extraPayout = steps.slice(1).find(step => step.type === 'PAYOUT')
-    if (extraPayout) {
-      throw new FlowDefinitionBuilderError('Payout step can only appear once and must be first')
+  }
+
+  private buildBinanceConvert(
+    step: Extract<FlowBusinessStep, { type: 'CONVERT' }>,
+  ): { side: 'BUY' | 'SELL', symbol: string } {
+    const symbol = `${step.fromAsset}${step.toAsset}`
+    return {
+      side: 'SELL',
+      symbol,
     }
   }
 
@@ -92,58 +97,39 @@ export class FlowDefinitionBuilder {
     }
   }
 
-  private buildAwaitProviderStatus(): FlowSystemStep {
-    return {
-      completionPolicy: FlowStepCompletionPolicy.AWAIT_EVENT,
-      config: {},
-      stepOrder: 1,
-      stepType: FlowStepType.AWAIT_PROVIDER_STATUS,
-    }
-  }
-
-  private expandStep(
-    step: FlowBusinessStep,
-    state: BuildState,
+  private buildTransferoConvert(
+    step: Extract<FlowBusinessStep, { type: 'CONVERT' }>,
     targetCurrency: TargetCurrency,
-  ): { state: BuildState, systemSteps: FlowSystemStep[] } {
-    switch (step.type) {
-      case 'MOVE_TO_EXCHANGE':
-        return this.expandMoveToExchange(step, state)
-      case 'CONVERT':
-        return this.expandConvert(step, state, targetCurrency)
-      case 'TRANSFER_VENUE':
-        return this.expandTransferVenue(step, state, targetCurrency)
-      case 'PAYOUT':
-      default:
-        throw new FlowDefinitionBuilderError('Unexpected payout step outside first position')
+  ): { sourceCurrency: SupportedCurrency, targetCurrency: TargetCurrency } {
+    if (!this.isTargetCurrency(step.toAsset)) {
+      throw new FlowDefinitionBuilderError('Transfero conversions must end in a fiat currency')
+    }
+
+    if (step.toAsset !== targetCurrency) {
+      throw new FlowDefinitionBuilderError('Transfero conversion must target the corridor fiat currency')
+    }
+
+    if (this.isTargetCurrency(step.fromAsset)) {
+      throw new FlowDefinitionBuilderError('Transfero conversion source must be a crypto asset')
+    }
+
+    return {
+      sourceCurrency: step.fromAsset,
+      targetCurrency: step.toAsset,
     }
   }
 
-  private expandMoveToExchange(
-    step: Extract<FlowBusinessStep, { type: 'MOVE_TO_EXCHANGE' }>,
-    state: BuildState,
-  ): { state: BuildState, systemSteps: FlowSystemStep[] } {
-    if (state.location !== 'HOT_WALLET') {
-      throw new FlowDefinitionBuilderError('Funds must be in hot wallet before moving to an exchange')
+  private ensurePayoutFirst(steps: FlowBusinessStep[]): void {
+    if (steps.length === 0) {
+      throw new FlowDefinitionBuilderError('At least one step is required')
     }
-
-    const provider = this.mapVenueToProvider(step.venue)
-    return {
-      state: { ...state, location: step.venue },
-      systemSteps: [
-        {
-          completionPolicy: FlowStepCompletionPolicy.SYNC,
-          config: { provider },
-          stepOrder: 1,
-          stepType: FlowStepType.EXCHANGE_SEND,
-        },
-        {
-          completionPolicy: FlowStepCompletionPolicy.AWAIT_EVENT,
-          config: { provider },
-          stepOrder: 1,
-          stepType: FlowStepType.AWAIT_EXCHANGE_BALANCE,
-        },
-      ],
+    const [first] = steps
+    if (first.type !== 'PAYOUT') {
+      throw new FlowDefinitionBuilderError('Flow must start with a payout step')
+    }
+    const extraPayout = steps.slice(1).find(step => step.type === 'PAYOUT')
+    if (extraPayout) {
+      throw new FlowDefinitionBuilderError('Payout step can only appear once and must be first')
     }
   }
 
@@ -183,6 +169,52 @@ export class FlowDefinitionBuilder {
           stepType: FlowStepType.EXCHANGE_CONVERT,
         },
       ],
+    }
+  }
+
+  private expandMoveToExchange(
+    step: Extract<FlowBusinessStep, { type: 'MOVE_TO_EXCHANGE' }>,
+    state: BuildState,
+  ): { state: BuildState, systemSteps: FlowSystemStep[] } {
+    if (state.location !== 'HOT_WALLET') {
+      throw new FlowDefinitionBuilderError('Funds must be in hot wallet before moving to an exchange')
+    }
+
+    const provider = this.mapVenueToProvider(step.venue)
+    return {
+      state: { ...state, location: step.venue },
+      systemSteps: [
+        {
+          completionPolicy: FlowStepCompletionPolicy.SYNC,
+          config: { provider },
+          stepOrder: 1,
+          stepType: FlowStepType.EXCHANGE_SEND,
+        },
+        {
+          completionPolicy: FlowStepCompletionPolicy.AWAIT_EVENT,
+          config: { provider },
+          stepOrder: 1,
+          stepType: FlowStepType.AWAIT_EXCHANGE_BALANCE,
+        },
+      ],
+    }
+  }
+
+  private expandStep(
+    step: FlowBusinessStep,
+    state: BuildState,
+    targetCurrency: TargetCurrency,
+  ): { state: BuildState, systemSteps: FlowSystemStep[] } {
+    switch (step.type) {
+      case 'CONVERT':
+        return this.expandConvert(step, state, targetCurrency)
+      case 'MOVE_TO_EXCHANGE':
+        return this.expandMoveToExchange(step, state)
+      case 'TRANSFER_VENUE':
+        return this.expandTransferVenue(step, state, targetCurrency)
+      case 'PAYOUT':
+      default:
+        throw new FlowDefinitionBuilderError('Unexpected payout step outside first position')
     }
   }
 
@@ -230,38 +262,6 @@ export class FlowDefinitionBuilder {
           stepType: FlowStepType.AWAIT_EXCHANGE_BALANCE,
         },
       ],
-    }
-  }
-
-  private buildBinanceConvert(
-    step: Extract<FlowBusinessStep, { type: 'CONVERT' }>,
-  ): { side: 'BUY' | 'SELL', symbol: string } {
-    const symbol = `${step.fromAsset}${step.toAsset}`
-    return {
-      side: 'SELL',
-      symbol,
-    }
-  }
-
-  private buildTransferoConvert(
-    step: Extract<FlowBusinessStep, { type: 'CONVERT' }>,
-    targetCurrency: TargetCurrency,
-  ): { sourceCurrency: SupportedCurrency, targetCurrency: TargetCurrency } {
-    if (!this.isTargetCurrency(step.toAsset)) {
-      throw new FlowDefinitionBuilderError('Transfero conversions must end in a fiat currency')
-    }
-
-    if (step.toAsset !== targetCurrency) {
-      throw new FlowDefinitionBuilderError('Transfero conversion must target the corridor fiat currency')
-    }
-
-    if (this.isTargetCurrency(step.fromAsset)) {
-      throw new FlowDefinitionBuilderError('Transfero conversion source must be a crypto asset')
-    }
-
-    return {
-      sourceCurrency: step.fromAsset,
-      targetCurrency: step.toAsset,
     }
   }
 

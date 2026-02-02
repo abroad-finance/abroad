@@ -6,8 +6,8 @@ import { QueueName } from '../../../platform/messaging/queues'
 import { OutboxDispatcher } from '../../../platform/outbox/OutboxDispatcher'
 import { IDatabaseClientProvider } from '../../../platform/persistence/IDatabaseClientProvider'
 import { ISecretManager, Secrets } from '../../../platform/secrets/ISecretManager'
-import { CryptoAssetConfigService } from '../../payments/application/CryptoAssetConfigService'
 import { IDepositVerifierRegistry } from '../../payments/application/contracts/IDepositVerifier'
+import { CryptoAssetConfigService } from '../../payments/application/CryptoAssetConfigService'
 import { StellarOrphanRefundService } from './StellarOrphanRefundService'
 import { PaymentReconciliationReason } from './StellarTypes'
 
@@ -126,7 +126,7 @@ export class StellarReconciliationService {
       return { paymentId: normalizedPaymentId, result: 'irrelevant', transactionId: null }
     }
 
-    const outcome = await this.processPayment(lookupResult.payment, { accountId, prismaClient, assetMap })
+    const outcome = await this.processPayment(lookupResult.payment, { accountId, assetMap, prismaClient })
     if (outcome.result === 'halt') {
       return { paymentId: normalizedPaymentId, result: 'failed', transactionId: outcome.transactionId ?? null }
     }
@@ -163,6 +163,19 @@ export class StellarReconciliationService {
       default:
         break
     }
+  }
+
+  private assetKey(assetCode: string, issuer: string): string {
+    return `${assetCode}:${issuer}`
+  }
+
+  private async buildAssetMap(): Promise<Map<string, CryptoCurrency>> {
+    const assets = await this.assetConfigService.listEnabledAssets(BlockchainNetwork.STELLAR)
+    const map = new Map<string, CryptoCurrency>()
+    assets.forEach((asset) => {
+      map.set(this.assetKey(asset.cryptoCurrency, asset.mintAddress), asset.cryptoCurrency)
+    })
+    return map
   }
 
   private buildEmptySummary(): CheckUnprocessedStellarResponse {
@@ -321,32 +334,6 @@ export class StellarReconciliationService {
     record: Horizon.ServerApi.OperationRecord,
   ): record is Horizon.ServerApi.PaymentOperationRecord {
     return record.type === 'payment'
-  }
-
-  private resolvePaymentAsset(
-    payment: Horizon.ServerApi.PaymentOperationRecord,
-    assetMap: Map<string, CryptoCurrency>,
-  ): CryptoCurrency | null {
-    if (payment.asset_type !== 'credit_alphanum4' && payment.asset_type !== 'credit_alphanum12') {
-      return null
-    }
-    if (!payment.asset_code || !payment.asset_issuer) {
-      return null
-    }
-    return assetMap.get(this.assetKey(payment.asset_code, payment.asset_issuer)) ?? null
-  }
-
-  private async buildAssetMap(): Promise<Map<string, CryptoCurrency>> {
-    const assets = await this.assetConfigService.listEnabledAssets(BlockchainNetwork.STELLAR)
-    const map = new Map<string, CryptoCurrency>()
-    assets.forEach(asset => {
-      map.set(this.assetKey(asset.cryptoCurrency, asset.mintAddress), asset.cryptoCurrency)
-    })
-    return map
-  }
-
-  private assetKey(assetCode: string, issuer: string): string {
-    return `${assetCode}:${issuer}`
   }
 
   private async* iterateStellarPayments(
@@ -533,6 +520,19 @@ export class StellarReconciliationService {
     }
 
     return summary
+  }
+
+  private resolvePaymentAsset(
+    payment: Horizon.ServerApi.PaymentOperationRecord,
+    assetMap: Map<string, CryptoCurrency>,
+  ): CryptoCurrency | null {
+    if (payment.asset_type !== 'credit_alphanum4' && payment.asset_type !== 'credit_alphanum12') {
+      return null
+    }
+    if (!payment.asset_code || !payment.asset_issuer) {
+      return null
+    }
+    return assetMap.get(this.assetKey(payment.asset_code, payment.asset_issuer)) ?? null
   }
 
   private async rewindPagingToken(

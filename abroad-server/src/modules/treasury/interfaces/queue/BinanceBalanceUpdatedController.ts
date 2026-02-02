@@ -2,7 +2,7 @@ import { inject, injectable } from 'inversify'
 
 import { TYPES } from '../../../../app/container/types'
 import { ValidationError } from '../../../../core/errors'
-import { createScopedLogger, ScopedLogger } from '../../../../core/logging/scopedLogger'
+import { createScopedLogger } from '../../../../core/logging/scopedLogger'
 import { ILogger } from '../../../../core/logging/types'
 import { getCorrelationId } from '../../../../core/requestContext'
 import { IQueueHandler, QueueName } from '../../../../platform/messaging/queues'

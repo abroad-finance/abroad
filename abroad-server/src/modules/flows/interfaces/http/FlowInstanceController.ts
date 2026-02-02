@@ -1,3 +1,4 @@
+import { FlowInstanceStatus } from '@prisma/client'
 import { inject } from 'inversify'
 import {
   Controller,
@@ -22,7 +23,6 @@ import {
   FlowStepInstanceDto,
   FlowStepNotFoundError,
 } from '../../application/FlowAuditService'
-import { FlowInstanceStatus } from '@prisma/client'
 
 @Route('ops/flows/instances')
 @Security('OpsApiKeyAuth')
@@ -31,6 +31,23 @@ export class FlowInstanceController extends Controller {
     @inject(FlowAuditService) private readonly auditService: FlowAuditService,
   ) {
     super()
+  }
+
+  @Get('{flowInstanceId}')
+  @Response<404, { reason: string }>(404, 'Not Found')
+  public async getInstance(
+    @Path() flowInstanceId: string,
+    @Res() notFound: TsoaResponse<404, { reason: string }>,
+  ): Promise<FlowInstanceDetailDto> {
+    try {
+      return await this.auditService.getInstance(flowInstanceId)
+    }
+    catch (error) {
+      if (error instanceof FlowInstanceNotFoundError) {
+        return notFound(404, { reason: error.message })
+      }
+      throw error
+    }
   }
 
   @Get()
@@ -51,18 +68,24 @@ export class FlowInstanceController extends Controller {
     })
   }
 
-  @Get('{flowInstanceId}')
+  @Post('{flowInstanceId}/steps/{stepInstanceId}/requeue')
+  @Response<400, { reason: string }>(400, 'Bad Request')
   @Response<404, { reason: string }>(404, 'Not Found')
-  public async getInstance(
+  public async requeueStep(
     @Path() flowInstanceId: string,
+    @Path() stepInstanceId: string,
+    @Res() badRequest: TsoaResponse<400, { reason: string }>,
     @Res() notFound: TsoaResponse<404, { reason: string }>,
-  ): Promise<FlowInstanceDetailDto> {
+  ): Promise<FlowStepInstanceDto> {
     try {
-      return await this.auditService.getInstance(flowInstanceId)
+      return await this.auditService.resetStep(flowInstanceId, stepInstanceId, 'requeue')
     }
     catch (error) {
-      if (error instanceof FlowInstanceNotFoundError) {
+      if (error instanceof FlowStepNotFoundError) {
         return notFound(404, { reason: error.message })
+      }
+      if (error instanceof FlowStepActionError) {
+        return badRequest(400, { reason: error.message })
       }
       throw error
     }
@@ -79,29 +102,6 @@ export class FlowInstanceController extends Controller {
   ): Promise<FlowStepInstanceDto> {
     try {
       return await this.auditService.resetStep(flowInstanceId, stepInstanceId, 'retry')
-    }
-    catch (error) {
-      if (error instanceof FlowStepNotFoundError) {
-        return notFound(404, { reason: error.message })
-      }
-      if (error instanceof FlowStepActionError) {
-        return badRequest(400, { reason: error.message })
-      }
-      throw error
-    }
-  }
-
-  @Post('{flowInstanceId}/steps/{stepInstanceId}/requeue')
-  @Response<400, { reason: string }>(400, 'Bad Request')
-  @Response<404, { reason: string }>(404, 'Not Found')
-  public async requeueStep(
-    @Path() flowInstanceId: string,
-    @Path() stepInstanceId: string,
-    @Res() badRequest: TsoaResponse<400, { reason: string }>,
-    @Res() notFound: TsoaResponse<404, { reason: string }>,
-  ): Promise<FlowStepInstanceDto> {
-    try {
-      return await this.auditService.resetStep(flowInstanceId, stepInstanceId, 'requeue')
     }
     catch (error) {
       if (error instanceof FlowStepNotFoundError) {

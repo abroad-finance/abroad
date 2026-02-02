@@ -22,8 +22,8 @@ import { inject, injectable } from 'inversify'
 import { TYPES } from '../../../../app/container/types'
 import { ILogger } from '../../../../core/logging/types'
 import { ISecretManager, Secrets } from '../../../../platform/secrets/ISecretManager'
-import { CryptoAssetConfigService } from '../../application/CryptoAssetConfigService'
 import { IWalletHandler, WalletSendParams, WalletSendResult } from '../../application/contracts/IWalletHandler'
+import { CryptoAssetConfigService } from '../../application/CryptoAssetConfigService'
 
 function decodeKeypairFromBase58Secret(secretBase58: string): Keypair {
   let secret: Uint8Array

@@ -8,16 +8,16 @@ import { createScopedLogger, ScopedLogger } from '../../../../core/logging/scope
 import { ILogger } from '../../../../core/logging/types'
 import { ISecretManager } from '../../../../platform/secrets/ISecretManager'
 import { IExchangeProviderFactory } from '../../../treasury/application/contracts/IExchangeProviderFactory'
-import { amountSourceSchema, AmountSource, resolveAmount } from '../flowAmountResolver'
+import { AmountSource, amountSourceSchema, resolveAmount } from '../flowAmountResolver'
 import { FlowStepExecutionResult, FlowStepExecutor, FlowStepRuntimeContext } from '../flowTypes'
 
 const exchangeConvertConfigSchema = z.object({
   amountSource: amountSourceSchema.optional(),
   provider: z.enum(['binance', 'transfero']),
   side: z.enum(['BUY', 'SELL']).optional(),
+  sourceCurrency: z.string().min(1).optional(),
   symbol: z.string().min(3).optional(),
   targetCurrency: z.nativeEnum(TargetCurrency).optional(),
-  sourceCurrency: z.string().min(1).optional(),
 })
 
 @injectable()

@@ -1,11 +1,11 @@
 import 'reflect-metadata'
 import { TargetCurrency } from '@prisma/client'
 
+import { FlowOrchestrator } from '../../../../../modules/flows/application/FlowOrchestrator'
 import { PaymentStatusUpdatedController } from '../../../../../modules/payments/interfaces/queue/PaymentStatusUpdatedController'
 import { QueueName } from '../../../../../platform/messaging/queues'
 import { PaymentStatusUpdatedMessage } from '../../../../../platform/messaging/queueSchema'
 import { createMockLogger, createMockQueueHandler, MockLogger, MockQueueHandler } from '../../../../setup/mockFactories'
-import { FlowOrchestrator } from '../../../../../modules/flows/application/FlowOrchestrator'
 
 describe('PaymentStatusUpdatedController', () => {
   let controller: PaymentStatusUpdatedController

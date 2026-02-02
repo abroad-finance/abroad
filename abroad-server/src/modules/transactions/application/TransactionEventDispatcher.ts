@@ -77,5 +77,4 @@ export class TransactionEventDispatcher {
       deliverNow: options.deliverNow,
     })
   }
-
 }

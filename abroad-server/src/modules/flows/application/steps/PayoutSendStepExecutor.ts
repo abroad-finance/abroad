@@ -10,14 +10,14 @@ import { IDatabaseClientProvider } from '../../../../platform/persistence/IDatab
 import { IPaymentServiceFactory } from '../../../payments/application/contracts/IPaymentServiceFactory'
 import { TransactionEventDispatcher } from '../../../transactions/application/TransactionEventDispatcher'
 import { TransactionRepository } from '../../../transactions/application/TransactionRepository'
-import { FlowStepExecutor, FlowStepExecutionResult, FlowStepRuntimeContext } from '../flowTypes'
+import { FlowStepExecutionResult, FlowStepExecutor, FlowStepRuntimeContext } from '../flowTypes'
 
 @injectable()
 export class PayoutSendStepExecutor implements FlowStepExecutor {
   public readonly stepType = FlowStepType.PAYOUT_SEND
+  private readonly dispatcher: TransactionEventDispatcher
   private readonly logger: ScopedLogger
   private readonly repository: TransactionRepository
-  private readonly dispatcher: TransactionEventDispatcher
 
   constructor(
     @inject(TYPES.IDatabaseClientProvider) dbProvider: IDatabaseClientProvider,
@@ -80,12 +80,12 @@ export class PayoutSendStepExecutor implements FlowStepExecutor {
           correlation: paymentResponse.transactionId
             ? { externalId: paymentResponse.transactionId }
             : undefined,
+          outcome: 'succeeded',
           output: {
             externalId: paymentResponse.transactionId ?? null,
-          provider: paymentService.provider ?? paymentMethod,
-        },
-        outcome: 'succeeded',
-      }
+            provider: paymentService.provider ?? paymentMethod,
+          },
+        }
       }
 
       const transitionName = paymentResponse.success ? 'payment_completed' : 'payment_failed'
@@ -116,10 +116,10 @@ export class PayoutSendStepExecutor implements FlowStepExecutor {
       if (paymentResponse.success) {
         await this.dispatcher.notifySlack(updated, TransactionStatus.PAYMENT_COMPLETED, {
           deliverNow: false,
-        notes: { provider: paymentService.provider ?? paymentMethod },
-        prismaClient,
-        trigger: 'FlowPayoutSend',
-      })
+          notes: { provider: paymentService.provider ?? paymentMethod },
+          prismaClient,
+          trigger: 'FlowPayoutSend',
+        })
         return { outcome: 'succeeded', output: { provider: paymentService.provider ?? transaction.quote.paymentMethod } }
       }
 
