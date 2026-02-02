@@ -135,16 +135,23 @@ export class TransactionRepository {
         where: { id: params.transactionId },
       })
 
-      await tx.transactionTransition.create({
-        data: {
-          context: params.context,
-          event: params.name,
-          fromStatus: current.status,
-          idempotencyKey: params.idempotencyKey,
-          toStatus,
-          transactionId: params.transactionId,
-        },
-      })
+      try {
+        await tx.transactionTransition.create({
+          data: {
+            context: params.context,
+            event: params.name,
+            fromStatus: current.status,
+            idempotencyKey: params.idempotencyKey,
+            toStatus,
+            transactionId: params.transactionId,
+          },
+        })
+      }
+      catch (error) {
+        if (!this.isDuplicateTransitionError(error)) {
+          throw error
+        }
+      }
 
       return updated
     })
@@ -201,6 +208,18 @@ export class TransactionRepository {
     })
   }
 
+  public async recordExternalIdIfMissing(
+    prismaClient: TransactionClient,
+    transactionId: string,
+    externalId: string,
+  ): Promise<boolean> {
+    const result = await prismaClient.transaction.updateMany({
+      data: { externalId },
+      where: { externalId: null, id: transactionId },
+    })
+    return result.count > 0
+  }
+
   public async recordOnChainIdIfMissing(
     prismaClient: TransactionClient,
     transactionId: string,
@@ -209,18 +228,6 @@ export class TransactionRepository {
     const result = await prismaClient.transaction.updateMany({
       data: { onChainId },
       where: { id: transactionId, onChainId: null },
-    })
-    return result.count > 0
-  }
-
-  public async recordExternalIdIfMissing(
-    prismaClient: TransactionClient,
-    transactionId: string,
-    externalId: string,
-  ): Promise<boolean> {
-    const result = await prismaClient.transaction.updateMany({
-      data: { externalId },
-      where: { id: transactionId, externalId: null },
     })
     return result.count > 0
   }
@@ -519,6 +526,16 @@ export class TransactionRepository {
     })
 
     return Boolean(existing)
+  }
+
+  private isDuplicateTransitionError(error: unknown): boolean {
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      return error.code === 'P2002'
+    }
+    if (error && typeof error === 'object' && 'code' in error) {
+      return (error as { code?: string }).code === 'P2002'
+    }
+    return false
   }
 
   private async loadTransaction(

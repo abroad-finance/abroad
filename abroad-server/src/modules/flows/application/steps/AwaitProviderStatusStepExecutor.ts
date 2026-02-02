@@ -192,34 +192,6 @@ export class AwaitProviderStatusStepExecutor implements FlowStepExecutor {
     return { error: 'Provider reported payment failure', outcome: 'failed' }
   }
 
-  private extractExternalId(output: Record<string, unknown> | undefined): null | string {
-    if (!output) return null
-    const candidate = output.externalId
-    return typeof candidate === 'string' && candidate.length > 0 ? candidate : null
-  }
-
-  private resolveExternalIdFromRuntime(
-    runtime: FlowStepRuntimeContext,
-    stepOrder: number,
-  ): null | string {
-    if (stepOrder > 1) {
-      const previousOutput = runtime.stepOutputs.get(stepOrder - 1)
-      const fromPrevious = this.extractExternalId(previousOutput)
-      if (fromPrevious) {
-        return fromPrevious
-      }
-    }
-
-    for (const output of runtime.stepOutputs.values()) {
-      const candidate = this.extractExternalId(output)
-      if (candidate) {
-        return candidate
-      }
-    }
-
-    return null
-  }
-
   private async ensureExternalId(params: {
     prismaClient: Awaited<ReturnType<TransactionRepository['getClient']>>
     runtime: FlowStepRuntimeContext
@@ -255,5 +227,33 @@ export class AwaitProviderStatusStepExecutor implements FlowStepExecutor {
     }
 
     return resolved
+  }
+
+  private extractExternalId(output: Record<string, unknown> | undefined): null | string {
+    if (!output) return null
+    const candidate = output.externalId
+    return typeof candidate === 'string' && candidate.length > 0 ? candidate : null
+  }
+
+  private resolveExternalIdFromRuntime(
+    runtime: FlowStepRuntimeContext,
+    stepOrder: number,
+  ): null | string {
+    if (stepOrder > 1) {
+      const previousOutput = runtime.stepOutputs.get(stepOrder - 1)
+      const fromPrevious = this.extractExternalId(previousOutput)
+      if (fromPrevious) {
+        return fromPrevious
+      }
+    }
+
+    for (const output of runtime.stepOutputs.values()) {
+      const candidate = this.extractExternalId(output)
+      if (candidate) {
+        return candidate
+      }
+    }
+
+    return null
   }
 }

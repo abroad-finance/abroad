@@ -1,7 +1,7 @@
 import { inject, injectable } from 'inversify'
 
-import { TYPES } from '../container/types'
 import { ISecretManager, Secrets } from '../../platform/secrets/ISecretManager'
+import { TYPES } from '../container/types'
 
 @injectable()
 export class OpsAuthService {

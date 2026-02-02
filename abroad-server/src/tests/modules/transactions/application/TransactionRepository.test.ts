@@ -2,6 +2,7 @@ import {
   BlockchainNetwork,
   CryptoCurrency,
   PaymentMethod,
+  Prisma,
   TargetCurrency,
   TransactionStatus,
 } from '@prisma/client'
@@ -200,6 +201,35 @@ describe('TransactionRepository transitions', () => {
     }))
     expect(innerClient.transactionTransition.create).toHaveBeenCalled()
     expect(updated?.status).toBe(TransactionStatus.PROCESSING_PAYMENT)
+  })
+
+  it('treats duplicate transition inserts as idempotent', async () => {
+    const duplicateError = new Prisma.PrismaClientKnownRequestError(
+      'Unique constraint failed on the fields: (transactionId,idempotencyKey)',
+      {
+        clientVersion: '6.14.0',
+        code: 'P2002',
+        meta: { target: ['transactionId', 'idempotencyKey'] },
+      },
+    )
+    const client = createClient({
+      transactionTransition: {
+        ...defaultTransitionMocks(),
+        create: jest.fn(async () => {
+          throw duplicateError
+        }),
+      },
+    })
+    const { repository } = createRepository(client)
+
+    await expect(repository.applyTransition(client as never, {
+      idempotencyKey: 'idem-dup',
+      name: 'deposit_received',
+      transactionId: baseTransaction.id,
+    })).resolves.toEqual(expect.objectContaining({
+      status: TransactionStatus.PROCESSING_PAYMENT,
+    }))
+    expect(client.transactionTransition.create).toHaveBeenCalled()
   })
 })
 

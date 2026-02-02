@@ -52,7 +52,7 @@ export async function expressAuthentication(
     try {
       expected = await opsAuthService.getOpsApiKey()
     }
-    catch (error) {
+    catch {
       throw new Error('Ops API key not configured')
     }
     if (!expected || headerKey !== expected) {

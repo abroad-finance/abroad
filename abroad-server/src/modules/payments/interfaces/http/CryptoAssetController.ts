@@ -31,8 +31,8 @@ export class CryptoAssetController extends Controller {
     return this.cryptoAssetService.listCoverage()
   }
 
-  @Patch()
   @OperationId('CryptoAssetUpdate')
+  @Patch()
   @Response<400, { reason: string }>(400, 'Bad Request')
   @SuccessResponse('200', 'Crypto asset updated')
   public async update(

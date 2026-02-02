@@ -1,9 +1,7 @@
 import { FlowStepType } from '@prisma/client'
-import { inject, injectable } from 'inversify'
+import { injectable } from 'inversify'
 import { z } from 'zod'
 
-import { TYPES } from '../../../../app/container/types'
-import { ILogger } from '../../../../core/logging/types'
 import {
   FlowSignalInput,
   FlowStepExecutionResult,
@@ -20,7 +18,7 @@ const awaitExchangeBalanceConfigSchema = z.object({
 export class AwaitExchangeBalanceStepExecutor implements FlowStepExecutor {
   public readonly stepType = FlowStepType.AWAIT_EXCHANGE_BALANCE
 
-  constructor(@inject(TYPES.ILogger) _baseLogger: ILogger) {}
+  constructor() {}
 
   public async execute(params: {
     config: Record<string, unknown>

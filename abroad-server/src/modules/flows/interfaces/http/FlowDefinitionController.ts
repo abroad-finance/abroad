@@ -58,8 +58,8 @@ export class FlowDefinitionController extends Controller {
     return this.flowDefinitionService.list()
   }
 
-  @Patch('{flowId}')
   @OperationId('FlowDefinitionUpdate')
+  @Patch('{flowId}')
   @Response<400, { reason: string }>(400, 'Bad Request')
   @SuccessResponse('200', 'Flow definition updated')
   public async update(

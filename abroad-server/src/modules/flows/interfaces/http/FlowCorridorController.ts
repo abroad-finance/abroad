@@ -31,8 +31,8 @@ export class FlowCorridorController extends Controller {
     return this.corridorService.list()
   }
 
-  @Patch()
   @OperationId('FlowCorridorUpdate')
+  @Patch()
   @Response<400, { reason: string }>(400, 'Bad Request')
   @SuccessResponse('200', 'Flow corridor updated')
   public async update(

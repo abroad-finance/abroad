@@ -46,8 +46,8 @@ export class SolanaPaymentsController extends Controller {
    * Partners call this endpoint after sending a Solana payment so we can match it.
    * It verifies the on-chain transaction and enqueues the same workflow used by the Stellar listener.
    */
-  @Post('notify')
   @OperationId('SolanaPaymentsNotifyPayment')
+  @Post('notify')
   @Response<400, { reason: string }>(400, 'Bad Request')
   @Response<404, { reason: string }>(404, 'Not Found')
   @SuccessResponse('202', 'Payment enqueued')
