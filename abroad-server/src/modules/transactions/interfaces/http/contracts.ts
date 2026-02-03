@@ -1,6 +1,8 @@
 import { TransactionStatus } from '@prisma/client'
 import { z } from 'zod'
 
+import { PaymentContext } from '../../../payments/application/PaymentContextService'
+
 export const acceptTransactionRequestSchema = z.object({
   account_number: z.string().min(1, 'Account number is required'),
   qr_code: z.string().nullable().optional(),
@@ -22,6 +24,7 @@ export interface AcceptTransactionRequest {
 export interface AcceptTransactionResponse {
   id: null | string
   kycLink: null | string
+  payment_context?: null | PaymentContext
   transaction_reference: null | string
 }
 

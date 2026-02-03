@@ -34,6 +34,7 @@ const walletConnectModule = new WalletConnectModule({
 })
 
 const network = WalletNetwork.PUBLIC
+const STELLAR_CHAIN_ID = import.meta.env.VITE_STELLAR_CHAIN_ID || 'stellar:pubnet'
 
 export function useStellarKitWallet(
   { walletAuth }: { walletAuth: IWalletAuthentication },
@@ -88,12 +89,16 @@ export function useStellarKitWallet(
           const { address } = await kit.getAddress()
           setAddress(address)
           if (!address) throw new Error('Failed to get wallet address')
-          await walletAuth.authenticate(address, async (challenge: string) => {
-            const { signedTxXdr } = await kit.signTransaction(challenge, {
-              address,
-              networkPassphrase: network,
-            })
-            return signedTxXdr
+          await walletAuth.authenticate({
+            address,
+            chainId: STELLAR_CHAIN_ID,
+            signMessage: async (challenge: string) => {
+              const { signedTxXdr } = await kit.signTransaction(challenge, {
+                address,
+                networkPassphrase: network,
+              })
+              return signedTxXdr
+            },
           })
         }
         catch (err) {
@@ -124,6 +129,7 @@ export function useStellarKitWallet(
   // Return an object compatible with IWallet
   return {
     address,
+    chainId: STELLAR_CHAIN_ID,
     connect,
     disconnect,
     signTransaction,

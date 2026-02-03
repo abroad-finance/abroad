@@ -1,3 +1,5 @@
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import js from '@eslint/js'
 import globals from 'globals'
 import reactHooks from 'eslint-plugin-react-hooks'
@@ -8,6 +10,9 @@ import perfectionist from 'eslint-plugin-perfectionist'
 import importPlugin from 'eslint-plugin-import'
 import react from 'eslint-plugin-react'
 import newlineDestructuring from 'eslint-plugin-newline-destructuring';
+
+const basePath = dirname(fileURLToPath(import.meta.url))
+const srcGlob = (...segments) => join(basePath, 'src', ...segments)
 
 export default tseslint.config(
   { ignores: ['dist', 'src/api/index.ts'] },
@@ -54,22 +59,18 @@ export default tseslint.config(
       'import/no-restricted-paths': [
         'error',
         {
+          basePath,
           zones: [
-            {
-              target: './src/shared/components',
-              from: './src',
-              except: ['./assets', './shared/constants']
-            },
             {
               target: './src/features/**/components/**/*',
               from: './src/**/*',
               except: [
-                '**/features/**/constants/**/*',
-                '**/shared/**/*',
-                '**/assets/**/*',
-                '**/api/**/*',
-                '**/types/**/*',
-                '**/contexts/**/*',
+                srcGlob('features', '**', 'constants', '**', '*'),
+                srcGlob('**', 'shared', '**', '*'),
+                srcGlob('**', 'assets', '**', '*'),
+                srcGlob('**', 'api', '**', '*'),
+                srcGlob('**', 'types', '**', '*'),
+                srcGlob('**', 'contexts', '**', '*'),
               ],
             },
           ],

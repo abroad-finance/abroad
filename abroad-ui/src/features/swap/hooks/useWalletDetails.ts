@@ -40,7 +40,7 @@ type Transaction = TransactionListItem
 export function useWalletDetails(params: Params = {}): WalletDetailsProps {
   const { onClose } = params
   const { t } = useTranslate()
-  const { kit, walletAuthentication } = useWalletAuth()
+  const { wallet, walletAuthentication } = useWalletAuth()
 
   const [copiedAddress, setCopiedAddress] = useState(false)
   const [usdcBalance, setUsdcBalance] = useState<string>('0.00')
@@ -112,7 +112,8 @@ export function useWalletDetails(params: Params = {}): WalletDetailsProps {
       return
     }
 
-    if (!kit?.address) {
+    const userId = wallet?.address && wallet?.chainId ? `${wallet.chainId}:${wallet.address}` : null
+    if (!userId) {
       setTransactionError(t('wallet_details.error.no_address', 'No wallet address connected'))
       return
     }
@@ -127,7 +128,7 @@ export function useWalletDetails(params: Params = {}): WalletDetailsProps {
       setTransactionError(null)
 
       const response = await listPartnerTransactions({
-        externalUserId: kit.address,
+        externalUserId: userId,
         page,
         pageSize: pageSizeRef.current,
       }, { signal: abortController.signal }) as ListTransactionsResult
@@ -184,17 +185,20 @@ export function useWalletDetails(params: Params = {}): WalletDetailsProps {
   }, [
     walletAuthentication?.jwtToken,
     t,
-    kit?.address,
+    wallet?.address,
+    wallet?.chainId,
   ])
 
   // Effects
   useEffect(() => {
-    if (kit?.address) fetchUSDCBalanceWithLoading(kit.address)
-    if (kit?.address && walletAuthentication?.jwtToken) {
+    const isStellar = wallet?.chainId?.startsWith('stellar:') ?? false
+    if (isStellar && wallet?.address) fetchUSDCBalanceWithLoading(wallet.address)
+    if (wallet?.address && wallet?.chainId && walletAuthentication?.jwtToken) {
       loadTransactions({ append: false, page: 1 })
     }
   }, [
-    kit?.address,
+    wallet?.address,
+    wallet?.chainId,
     walletAuthentication?.jwtToken,
     fetchUSDCBalanceWithLoading,
     loadTransactions,
@@ -202,12 +206,14 @@ export function useWalletDetails(params: Params = {}): WalletDetailsProps {
 
   // Subscribe to websocket notifications to refresh transactions and balance
   const refreshFromEvent = useCallback(() => {
-    if (!kit?.address || !walletAuthentication?.jwtToken) return
+    if (!wallet?.address || !wallet?.chainId || !walletAuthentication?.jwtToken) return
     void loadTransactions({ append: false, page: 1 })
-    if (kit?.address) fetchUSDCBalanceWithLoading(kit.address)
+    const isStellar = wallet.chainId.startsWith('stellar:')
+    if (isStellar) fetchUSDCBalanceWithLoading(wallet.address)
   }, [
     fetchUSDCBalanceWithLoading,
-    kit?.address,
+    wallet?.address,
+    wallet?.chainId,
     loadTransactions,
     walletAuthentication?.jwtToken,
   ])
@@ -220,32 +226,37 @@ export function useWalletDetails(params: Params = {}): WalletDetailsProps {
 
   // Handlers exposed to component
   const onRefreshBalance = useCallback(() => {
-    if (kit?.address && !isLoadingBalance) fetchUSDCBalanceWithLoading(kit.address)
+    if (!wallet?.address || !wallet?.chainId) return
+    if (!wallet.chainId.startsWith('stellar:')) return
+    if (!isLoadingBalance) fetchUSDCBalanceWithLoading(wallet.address)
   }, [
-    kit?.address,
+    wallet?.address,
+    wallet?.chainId,
     isLoadingBalance,
     fetchUSDCBalanceWithLoading,
   ])
 
   const onRefreshTransactions = useCallback(() => {
-    if (!walletAuthentication?.jwtToken || !kit?.address) return
+    if (!walletAuthentication?.jwtToken || !wallet?.address || !wallet?.chainId) return
     if (isLoadingTransactions || isLoadingMoreTransactions) return
     loadTransactions({ append: false, page: 1 })
   }, [
     walletAuthentication?.jwtToken,
-    kit?.address,
+    wallet?.address,
+    wallet?.chainId,
     isLoadingTransactions,
     isLoadingMoreTransactions,
     loadTransactions,
   ])
 
   const onLoadMoreTransactions = useCallback(() => {
-    if (!walletAuthentication?.jwtToken || !kit?.address) return
+    if (!walletAuthentication?.jwtToken || !wallet?.address || !wallet?.chainId) return
     if (!pagination.hasMore || isLoadingTransactions || isLoadingMoreTransactions) return
     loadTransactions({ append: true, page: pagination.currentPage + 1 })
   }, [
     walletAuthentication?.jwtToken,
-    kit?.address,
+    wallet?.address,
+    wallet?.chainId,
     pagination.hasMore,
     pagination.currentPage,
     isLoadingTransactions,
@@ -255,22 +266,22 @@ export function useWalletDetails(params: Params = {}): WalletDetailsProps {
 
   const onCopyAddress = useCallback(async () => {
     try {
-      if (kit?.address) {
-        await navigator.clipboard.writeText(kit.address)
+      if (wallet?.address) {
+        await navigator.clipboard.writeText(wallet.address)
         setCopiedAddress(true)
         setTimeout(() => setCopiedAddress(false), 2000)
       }
     }
     catch { /* swallow */ }
-  }, [kit?.address])
+  }, [wallet?.address])
 
   const onDisconnectWallet = useCallback(async () => {
     try {
-      await kit?.disconnect()
+      await wallet?.disconnect()
       onClose?.()
     }
     catch { /* swallow */ }
-  }, [kit, onClose])
+  }, [wallet, onClose])
 
   const getStatusStyle = useCallback((status: string) => {
     switch (status) {
@@ -306,7 +317,7 @@ export function useWalletDetails(params: Params = {}): WalletDetailsProps {
   }, [])
 
   return {
-    address: kit?.address || null,
+    address: wallet?.address || null,
     copiedAddress,
     formatDate,
     getStatusStyle,

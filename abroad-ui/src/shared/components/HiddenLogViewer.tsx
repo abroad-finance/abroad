@@ -80,8 +80,13 @@ export const HiddenLogViewer: React.FC = () => {
         const store = window.__appLogs
         store.push(entry)
         if (store.length > MAX_LOGS) store.splice(0, store.length - MAX_LOGS)
-        // Fire a custom event so listeners can update without tight coupling
-        window.dispatchEvent(new CustomEvent('app-log', { detail: entry }))
+        // Fire a custom event asynchronously to avoid state updates during render
+        const schedule = typeof queueMicrotask === 'function'
+          ? queueMicrotask
+          : (cb: () => void) => window.setTimeout(cb, 0)
+        schedule(() => {
+          window.dispatchEvent(new CustomEvent('app-log', { detail: entry }))
+        })
       }
       catch {
         // ignore logging failures

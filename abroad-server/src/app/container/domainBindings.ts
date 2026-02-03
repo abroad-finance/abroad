@@ -6,6 +6,7 @@ import { FlowDefinitionBuilder } from '../../modules/flows/application/FlowDefin
 import { FlowDefinitionService } from '../../modules/flows/application/FlowDefinitionService'
 import { FlowExecutorRegistry } from '../../modules/flows/application/FlowExecutorRegistry'
 import { FlowOrchestrator } from '../../modules/flows/application/FlowOrchestrator'
+import { PublicCorridorService } from '../../modules/flows/application/PublicCorridorService'
 import { RefundCoordinator } from '../../modules/flows/application/RefundCoordinator'
 import { AwaitExchangeBalanceStepExecutor } from '../../modules/flows/application/steps/AwaitExchangeBalanceStepExecutor'
 import { AwaitProviderStatusStepExecutor } from '../../modules/flows/application/steps/AwaitProviderStatusStepExecutor'
@@ -16,6 +17,7 @@ import { TreasuryTransferStepExecutor } from '../../modules/flows/application/st
 import { CryptoAssetConfigService } from '../../modules/payments/application/CryptoAssetConfigService'
 import { DepositVerifierRegistry } from '../../modules/payments/application/DepositVerifierRegistry'
 import { LiquidityCacheService } from '../../modules/payments/application/LiquidityCacheService'
+import { PaymentContextService } from '../../modules/payments/application/PaymentContextService'
 import { PaymentServiceFactory } from '../../modules/payments/application/PaymentServiceFactory'
 import { PaymentUseCase } from '../../modules/payments/application/paymentUseCase'
 import { PayoutStatusAdapterRegistry } from '../../modules/payments/application/PayoutStatusAdapterRegistry'
@@ -68,6 +70,7 @@ const domainBindings: ReadonlyArray<BindingRegistration<unknown>> = [
   { identifier: TYPES.IDepositVerifier, implementation: CeloPaymentVerifier },
   { identifier: TYPES.IDepositVerifier, implementation: StellarDepositVerifier },
   { bindSelf: true, identifier: CryptoAssetConfigService, implementation: CryptoAssetConfigService },
+  { bindSelf: true, identifier: PaymentContextService, implementation: PaymentContextService },
   { identifier: TYPES.IExchangeProvider, implementation: BinanceExchangeProvider, name: 'binance' },
   { identifier: TYPES.IExchangeProvider, implementation: BinanceBrlExchangeProvider, name: 'binance-brl' },
   { identifier: TYPES.IExchangeProvider, implementation: TransferoExchangeProvider, name: 'transfero' },
@@ -80,6 +83,7 @@ const domainBindings: ReadonlyArray<BindingRegistration<unknown>> = [
   { bindSelf: true, identifier: FlowDefinitionBuilder, implementation: FlowDefinitionBuilder },
   { bindSelf: true, identifier: FlowDefinitionService, implementation: FlowDefinitionService },
   { bindSelf: true, identifier: FlowCorridorService, implementation: FlowCorridorService },
+  { bindSelf: true, identifier: PublicCorridorService, implementation: PublicCorridorService },
   { bindSelf: true, identifier: FlowAuditService, implementation: FlowAuditService },
   { identifier: TYPES.FlowExecutorRegistry, implementation: FlowExecutorRegistry },
   { identifier: TYPES.FlowOrchestrator, implementation: FlowOrchestrator },

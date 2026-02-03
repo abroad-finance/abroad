@@ -28,7 +28,7 @@ const TxStatus = ({
   transactionId,
 }: TxStatusProps): React.JSX.Element => {
   const { t } = useTranslate()
-  const { kit } = useWalletAuth()
+  const { wallet } = useWalletAuth()
   const [status, setStatus] = useState<UiStatus>('inProgress')
   const [apiStatus, setApiStatus] = useState<ApiStatus | undefined>(undefined)
   const [error, setError] = useState<null | string>(null)
@@ -59,13 +59,14 @@ const TxStatus = ({
   }
 
   const handleTxEvent = useCallback((payload: { id?: string, status?: ApiStatus }) => {
-    if (!transactionId || !kit?.address) return
+    if (!transactionId || !wallet?.address || !wallet?.chainId) return
     if (!payload || payload.id !== transactionId) return
     const apiStatusValue = payload.status
     setApiStatus(apiStatusValue)
     setStatus(mapStatus(apiStatusValue))
   }, [
-    kit?.address,
+    wallet?.address,
+    wallet?.chainId,
     mapStatus,
     transactionId,
   ])

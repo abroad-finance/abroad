@@ -106,6 +106,7 @@ function useUSDCBalance(address?: null | string, horizonUrl = DEFAULT_HORIZON_UR
 const normalizeWalletKind = (id?: null | string) => {
   if (!id) return 'unknown'
   const v = id.toLowerCase()
+  if (v.includes('wallet-connect')) return 'walletconnect'
   if (v.includes('freighter')) return 'freighter'
   if (v.includes('hana')) return 'hana'
   if (v.includes('lobstr')) return 'lobstr'
@@ -134,9 +135,10 @@ export function useNavBarResponsive({
   onWalletDetails,
   usdcIssuer = DEFAULT_USDC_ISSUER,
 }: UseNavBarResponsiveArgs = {}): UseNavBarResponsiveResult {
-  const { kit } = useWalletAuth()
+  const { wallet } = useWalletAuth()
   const { t } = useTranslate()
-  const { balance, loading: balanceLoading, refetch } = useUSDCBalance(kit?.address, horizonUrl, usdcIssuer)
+  const isStellar = wallet?.chainId?.startsWith('stellar:') ?? false
+  const { balance, loading: balanceLoading, refetch } = useUSDCBalance(isStellar ? wallet?.address : null, horizonUrl, usdcIssuer)
 
   const refreshBalance = useCallback(() => {
     void refetch()
@@ -148,22 +150,28 @@ export function useNavBarResponsive({
   const handleDirectWalletConnect = useCallback(async () => {
     if (onWalletConnect) return onWalletConnect()
     try {
-      await kit?.connect()
+      if (!wallet) return
+      if (wallet.walletId === 'wallet-connect') {
+        const fallbackChainId = wallet.chainId || import.meta.env.VITE_STELLAR_CHAIN_ID || 'stellar:pubnet'
+        await wallet.connect({ chainId: fallbackChainId })
+        return
+      }
+      await wallet.connect()
     }
     catch { /* noop */ }
-  }, [onWalletConnect, kit])
+  }, [onWalletConnect, wallet])
 
   const onWalletClick = useCallback(() => {
-    if (kit?.address) onWalletDetails?.()
+    if (wallet?.address) onWalletDetails?.()
     else handleDirectWalletConnect()
   }, [
-    kit?.address,
+    wallet?.address,
     onWalletDetails,
     handleDirectWalletConnect,
   ])
 
   const walletInfo = useMemo(() => {
-    const kind = normalizeWalletKind(kit?.walletId)
+    const kind = normalizeWalletKind(wallet?.walletId)
     const map: Record<string, { icon?: string
       name: string }> = {
       freighter: { name: 'Freighter' },
@@ -171,11 +179,12 @@ export function useNavBarResponsive({
       lobstr: { name: 'Lobstr' },
       rabet: { name: 'Rabet' },
       stellar: { name: 'Stellar Wallet' },
-      unknown: { name: 'Stellar Wallet' },
+      unknown: { name: 'Wallet' },
+      walletconnect: { name: 'WalletConnect' },
       xbull: { name: 'xBull' },
     }
     return map[kind] || map.unknown
-  }, [kit?.walletId])
+  }, [wallet?.walletId])
 
   const labels = useMemo(() => ({
     connectWallet: t('navbar.connect_wallet', 'Conectar Billetera'),
@@ -186,7 +195,7 @@ export function useNavBarResponsive({
   }), [t])
 
   return {
-    address: kit?.address || null,
+    address: wallet?.address || null,
     balance,
     balanceLoading,
     infoUrl,

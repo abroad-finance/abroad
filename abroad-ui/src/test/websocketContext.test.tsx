@@ -52,6 +52,7 @@ vi.mock('socket.io-client', () => ({
 
 const mockKit: IWallet = {
   address: 'GADDR',
+  chainId: 'stellar:pubnet',
   connect: vi.fn(),
   disconnect: vi.fn(),
   signTransaction: vi.fn(async () => ({ signedTxXdr: 'xdr', signerAddress: 'GADDR' })),
@@ -73,9 +74,9 @@ describe('WebSocketProvider', () => {
 
     render(
       <WalletAuthContext.Provider value={{
-        kit: mockKit,
         kycUrl: null,
         setKycUrl: vi.fn(),
+        wallet: mockKit,
         walletAuthentication: {
           authenticate: vi.fn(),
           getAuthToken: vi.fn(),

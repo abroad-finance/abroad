@@ -2,26 +2,29 @@ import {
   useCallback, useEffect, useRef, useState,
 } from 'react'
 
-import type { ApiClientResponse } from '../api/customClient'
 import type { IWalletAuthentication } from '../interfaces/IWalletAuthentication'
+import type { ApiResult } from './http/types'
 
-import {
-  challenge,
-  type challengeResponse,
-  refresh,
-  type refreshResponse,
-  verify,
-  type verifyResponse,
-} from '../api'
 import { authTokenStore } from './auth/authTokenStore'
-
-type JwtPayload = { exp?: number }
+import { httpClient } from './http/httpClient'
 
 const REFRESH_GRACE_MS = 60_000
 
-type ChallengeResult = ApiClientResponse<challengeResponse>
-type RefreshResult = ApiClientResponse<refreshResponse>
-type VerifyResult = ApiClientResponse<verifyResponse>
+type ChallengeResponse = {
+  format?: 'utf8' | 'xdr'
+  message?: string
+  xdr?: string
+}
+
+type JwtPayload = { exp?: number }
+
+type RefreshResponse = { token: string }
+
+type VerifyResponse = { token: string }
+
+type WalletAuthError = {
+  reason?: string
+}
 
 const extractReason = (body: unknown): null | string => {
   if (body && typeof body === 'object' && 'reason' in body) {
@@ -51,6 +54,14 @@ const safeParseJwt = (token: string): JwtPayload => {
   }
 }
 
+const buildJsonRequest = async <TData, TError = WalletAuthError>(path: string, payload: unknown): Promise<ApiResult<TData, TError>> => {
+  return httpClient.request(path, {
+    body: JSON.stringify(payload),
+    headers: { 'Content-Type': 'application/json' },
+    method: 'POST',
+  })
+}
+
 export const useWalletAuthentication = (): IWalletAuthentication => {
   const [jwtToken, setTokenState] = useState<null | string>(() => authTokenStore.getToken())
   const refreshTimeoutRef = useRef<null | number>(null)
@@ -68,7 +79,7 @@ export const useWalletAuthentication = (): IWalletAuthentication => {
   }, [])
 
   const refreshAuthToken = useCallback(async ({ token }: { token: string }): Promise<{ token: string }> => {
-    const res = await refresh({ token }) as RefreshResult
+    const res = await buildJsonRequest<RefreshResponse>('/walletAuth/refresh', { token })
     const data = ensureOk(res, 'Failed to refresh token')
     return { token: data.token }
   }, [])
@@ -110,28 +121,37 @@ export const useWalletAuthentication = (): IWalletAuthentication => {
     return unsubscribe
   }, [])
 
-  const getChallengeMessage = useCallback(async ({ address }: { address: string }): Promise<{ message: string }> => {
-    const res = await challenge({ address }) as ChallengeResult
+  const getChallengeMessage = useCallback(async ({ address, chainId }: { address: string, chainId: string }): Promise<{ message: string }> => {
+    const res = await buildJsonRequest<ChallengeResponse>('/walletAuth/challenge', { address, chainId })
     const data = ensureOk(res, 'Failed to fetch challenge')
-    return { message: data.xdr }
+    const message = data.message ?? data.xdr
+    if (!message) {
+      throw new Error('Invalid challenge response')
+    }
+    return { message }
   }, [])
 
-  const getAuthToken = useCallback(async ({ address, signedMessage }: {
+  const getAuthToken = useCallback(async ({ address, chainId, signedMessage }: {
     address: string
+    chainId: string
     signedMessage: string
   }): Promise<{ token: string }> => {
-    const res = await verify({
-      address,
-      signedXDR: signedMessage,
-    }) as VerifyResult
+    const payload = chainId.startsWith('stellar:')
+      ? { address, chainId, signedXDR: signedMessage }
+      : { address, chainId, signature: signedMessage }
+    const res = await buildJsonRequest<VerifyResponse>('/walletAuth/verify', payload)
     const data = ensureOk(res, 'Failed to verify signature')
     return { token: data.token }
   }, [])
 
-  const authenticate = useCallback(async (address: string, signMessage: (message: string) => Promise<string>) => {
-    const { message } = await getChallengeMessage({ address })
-    const signedXdr = await signMessage(message)
-    const { token } = await getAuthToken({ address, signedMessage: signedXdr })
+  const authenticate = useCallback(async ({ address, chainId, signMessage }: {
+    address: string
+    chainId: string
+    signMessage: (message: string) => Promise<string>
+  }) => {
+    const { message } = await getChallengeMessage({ address, chainId })
+    const signed = await signMessage(message)
+    const { token } = await getAuthToken({ address, chainId, signedMessage: signed })
     setJwtToken(token)
     return { token }
   }, [

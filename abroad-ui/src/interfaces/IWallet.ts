@@ -1,9 +1,13 @@
 export interface IWallet {
   readonly address: null | string
 
-  connect(): Promise<void>
+  readonly chainId: null | string
+
+  connect(options?: WalletConnectOptions): Promise<void>
 
   disconnect(): Promise<void>
+
+  request?<TResult>(request: WalletConnectRequest): Promise<TResult>
 
   signTransaction(
     { message }: { message: string },
@@ -11,4 +15,22 @@ export interface IWallet {
     signerAddress?: string }>
 
   readonly walletId: null | string
+}
+
+export type WalletConnectMetadata = {
+  chainId: string
+  events: string[]
+  methods: string[]
+  namespace: string
+}
+
+export type WalletConnectOptions = {
+  chainId?: string
+  walletConnect?: WalletConnectMetadata
+}
+
+export type WalletConnectRequest = {
+  chainId: string
+  method: string
+  params: Array<unknown> | Record<string, unknown>
 }

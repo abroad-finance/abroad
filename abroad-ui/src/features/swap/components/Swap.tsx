@@ -15,6 +15,12 @@ import { Button } from '../../../shared/components/Button'
 import { TokenBadge } from '../../../shared/components/TokenBadge'
 
 export interface SwapProps {
+  assetMenuOpen: boolean
+  assetMenuRef: React.RefObject<HTMLDivElement | null>
+  assetOptions: Array<{ key: string, label: string }>
+  chainMenuOpen: boolean
+  chainMenuRef: React.RefObject<HTMLDivElement | null>
+  chainOptions: Array<{ key: string, label: string }>
   continueDisabled: boolean
   currencyMenuOpen: boolean
   currencyMenuRef: React.RefObject<HTMLDivElement | null>
@@ -26,17 +32,30 @@ export interface SwapProps {
   onSourceChange: (value: string) => void
   onTargetChange: (value: string) => void
   openQr: () => void
+  selectAssetOption: (key: string) => void
+  selectChain: (key: string) => void
   selectCurrency: (currency: (typeof TargetCurrency)[keyof typeof TargetCurrency]) => void
+  selectedAssetLabel: string
+  selectedChainLabel: string
   sourceAmount: string
+  sourceSymbol: string
   targetAmount: string
   targetCurrency: (typeof TargetCurrency)[keyof typeof TargetCurrency]
   targetSymbol: string
   textColor?: string
+  toggleAssetMenu: () => void
+  toggleChainMenu: () => void
   toggleCurrencyMenu: () => void
   transferFeeDisplay: string // e.g. 'R$0,00'
 }
 
 export default function Swap({
+  assetMenuOpen,
+  assetMenuRef,
+  assetOptions,
+  chainMenuOpen,
+  chainMenuRef,
+  chainOptions,
   continueDisabled,
   currencyMenuOpen,
   currencyMenuRef,
@@ -48,11 +67,18 @@ export default function Swap({
   onSourceChange,
   onTargetChange,
   openQr,
+  selectAssetOption,
+  selectChain,
   selectCurrency,
+  selectedAssetLabel,
+  selectedChainLabel,
   sourceAmount,
+  sourceSymbol,
   targetAmount,
   targetCurrency,
   targetSymbol,
+  toggleAssetMenu,
+  toggleChainMenu,
   toggleCurrencyMenu,
   transferFeeDisplay,
 }: SwapProps): React.JSX.Element {
@@ -77,25 +103,61 @@ export default function Swap({
             )}
           </div>
 
-          {targetCurrency === TargetCurrency.BRL && (
-            <button
-              aria-label={t('swap.scan_qr_aria', 'Escanear QR')}
-              className="p-2 cursor-pointer rounded-full hover:bg-white/30 focus:outline-none focus:ring-2 focus:ring-[#356E6A]/40 transition"
-              onClick={openQr}
-              type="button"
-            >
-              <ScanLine className="w-8 h-8" />
-            </button>
-          )}
+          <div className="flex items-center gap-2">
+            <div className="relative" ref={chainMenuRef}>
+              <button
+                aria-expanded={chainMenuOpen}
+                aria-haspopup="listbox"
+                className="focus:outline-none cursor-pointer"
+                onClick={toggleChainMenu}
+                type="button"
+              >
+                <TokenBadge symbol={selectedChainLabel} />
+              </button>
+
+              {chainMenuOpen && chainOptions.length > 1 && (
+                <div
+                  className="absolute right-0 top-[calc(100%+8px)] z-[70] bg-white/95 backdrop-blur-xl rounded-xl shadow-lg p-2 space-y-1 min-w-[160px]"
+                  role="listbox"
+                >
+                  {chainOptions.map(option => (
+                    <button
+                      aria-selected={option.label === selectedChainLabel}
+                      className="cursor-pointer w-full text-left hover:bg-black/5 rounded-lg px-1 py-1"
+                      key={option.key}
+                      onClick={() => selectChain(option.key)}
+                      role="option"
+                      type="button"
+                    >
+                      <TokenBadge symbol={option.label} />
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {targetCurrency === TargetCurrency.BRL && (
+              <button
+                aria-label={t('swap.scan_qr_aria', 'Escanear QR')}
+                className="p-2 cursor-pointer rounded-full hover:bg-white/30 focus:outline-none focus:ring-2 focus:ring-[#356E6A]/40 transition"
+                onClick={openQr}
+                type="button"
+              >
+                <ScanLine className="w-8 h-8" />
+              </button>
+            )}
+          </div>
         </div>
 
         {/* SOURCE */}
         <div
-          className="w-full bg-white/60 backdrop-blur-xl rounded-2xl p-4 md:py-6 md:px-6 flex items-center justify-between"
+          className="relative z-20 w-full bg-white/60 backdrop-blur-xl rounded-2xl p-4 md:py-6 md:px-6 flex items-center justify-between"
           id="source-amount"
         >
           <div className="flex-1 flex items-center gap-2 min-w-0">
-            <span className="text-xl md:text-2xl font-bold shrink-0">$</span>
+            <span className="text-xl md:text-2xl font-bold shrink-0">
+              {sourceSymbol}
+            </span>
             {loadingSource
               ? (
                   <Loader className="animate-spin w-6 h-6" />
@@ -113,17 +175,43 @@ export default function Swap({
                   />
                 )}
           </div>
-          <TokenBadge
-            alt="USDC Token Logo"
-            iconSrc="https://storage.googleapis.com/cdn-abroad/Icons/Tokens/USDC%20Token.svg"
-            symbol="USDC"
-          />
+          <div className="relative ml-2 shrink-0" ref={assetMenuRef}>
+            <button
+              aria-expanded={assetMenuOpen}
+              aria-haspopup="listbox"
+              className="focus:outline-none cursor-pointer"
+              onClick={toggleAssetMenu}
+              type="button"
+            >
+              <TokenBadge symbol={selectedAssetLabel} />
+            </button>
+
+            {assetMenuOpen && assetOptions.length > 1 && (
+              <div
+                className="absolute right-0 top-[calc(100%+8px)] z-[60] bg-white/95 backdrop-blur-xl rounded-xl shadow-lg p-2 space-y-1 min-w-[160px]"
+                role="listbox"
+              >
+                {assetOptions.map(option => (
+                  <button
+                    aria-selected={option.label === selectedAssetLabel}
+                    className="cursor-pointer w-full text-left hover:bg-black/5 rounded-lg px-1 py-1"
+                    key={option.key}
+                    onClick={() => selectAssetOption(option.key)}
+                    role="option"
+                    type="button"
+                  >
+                    <TokenBadge symbol={option.label} />
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* TARGET or Connect notice */}
 
         <div
-          className="relative w-full bg-white/60 backdrop-blur-xl rounded-2xl p-4 md:py-6 md:px-6 flex items-center justify-between"
+          className="relative z-10 w-full bg-white/60 backdrop-blur-xl rounded-2xl p-4 md:py-6 md:px-6 flex items-center justify-between"
           id="target-amount"
         >
           {/* chevrons */}
@@ -176,7 +264,7 @@ export default function Swap({
 
             {currencyMenuOpen && (
               <div
-                className="absolute left-0 top-[calc(100%+8px)] z-50 bg-white/95 backdrop-blur-xl rounded-xl shadow-lg p-2 space-y-1 min-w-[100px]"
+                className="absolute left-0 top-[calc(100%+8px)] z-[40] bg-white/95 backdrop-blur-xl rounded-xl shadow-lg p-2 space-y-1 min-w-[100px]"
                 role="listbox"
               >
                 <button

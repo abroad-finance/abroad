@@ -68,6 +68,7 @@
     "reflect-metadata": "^0.2.2",
     "socket.io": "^4.8.1",
     "swagger-ui-express": "^5.0.1",
+    "tweetnacl": "^1.0.3",
     "tsoa": "^6.6.0",
     "typhonjs-escomplex": "^0.1.0",
     "uuid": "^11.1.0",

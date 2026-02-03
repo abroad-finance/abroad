@@ -63,6 +63,7 @@ vi.mock('../api', () => ({
 
 const mockKit: IWallet = {
   address: 'GADDR',
+  chainId: 'stellar:pubnet',
   connect: vi.fn(),
   disconnect: vi.fn(),
   signTransaction: vi.fn(async () => ({ signedTxXdr: 'xdr', signerAddress: 'GADDR' })),
@@ -80,9 +81,9 @@ const mockAuth: IWalletAuthentication = {
 
 const Wrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   <WalletAuthContext.Provider value={{
-    kit: mockKit,
     kycUrl: null,
     setKycUrl: vi.fn(),
+    wallet: mockKit,
     walletAuthentication: mockAuth,
   }}
   >

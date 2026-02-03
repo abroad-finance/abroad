@@ -1,17 +1,14 @@
 import { WalletConnectModal } from '@walletconnect/modal'
 import SignClient from '@walletconnect/sign-client'
 import { getSdkError } from '@walletconnect/utils'
-// useWalletConnectWallet.ts
 import { useCallback, useRef, useState } from 'react'
 
-import type { IWallet } from '../../interfaces/IWallet'
+import type { IWallet, WalletConnectRequest } from '../../interfaces/IWallet'
 import type { IWalletAuthentication } from '../../interfaces/IWalletAuthentication'
 
 import { WALLET_CONNECT_ID } from '../../shared/constants'
 
-const STELLAR_CHAIN = 'stellar:pubnet'
-const WC_METHOD_SIGN = 'stellar_signXDR'
-const SESSION_STORE_KEY = 'wc:stellar:session'
+const SESSION_STORE_PREFIX = 'wc:session:'
 
 type WCMetadata = {
   description: string
@@ -28,13 +25,41 @@ const metadata: WCMetadata = {
   url: 'https://app.abroad.finance',
 }
 
-/**
- * React hook that provides an IWallet-like interface using WalletConnect v2.
- *
- * Usage:
- *   const wallet = useWalletConnectWallet(walletAuth)
- *   const { authToken } = await wallet.connect()
- */
+const buildStoreKey = (chainId: string) => `${SESSION_STORE_PREFIX}${chainId}`
+
+const caip10ToAddress = (caip10: string) => {
+  const parts = caip10.split(':')
+  return parts[2] ?? ''
+}
+
+const toBase64 = (bytes: Uint8Array): string => {
+  let binary = ''
+  bytes.forEach((byte) => {
+    binary += String.fromCharCode(byte)
+  })
+  return btoa(binary)
+}
+
+const fromBase64 = (value: string): Uint8Array => {
+  const binary = atob(value)
+  const bytes = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i += 1) {
+    bytes[i] = binary.charCodeAt(i)
+  }
+  return bytes
+}
+
+const resolveNamespaceFromChainId = (chainId: string): string => {
+  if (chainId.startsWith('eip155:')) return 'eip155'
+  if (chainId.startsWith('solana:')) return 'solana'
+  if (chainId.startsWith('stellar:')) return 'stellar'
+  return 'eip155'
+}
+
+const resolveStellarNetwork = (chainId: string): 'PUBLIC' | 'TESTNET' => {
+  return chainId.toLowerCase().includes('test') ? 'TESTNET' : 'PUBLIC'
+}
+
 export function useWalletConnectWallet({ walletAuth }: {
   walletAuth: IWalletAuthentication
 },
@@ -44,6 +69,7 @@ export function useWalletConnectWallet({ walletAuth }: {
   const modalRef = useRef<null | WalletConnectModal>(null)
 
   const [address, setAddress] = useState<null | string>(null)
+  const [chainId, setChainId] = useState<null | string>(null)
 
   const ensureModal = useCallback(() => {
     if (typeof window === 'undefined') {
@@ -54,12 +80,6 @@ export function useWalletConnectWallet({ walletAuth }: {
     }
     return modalRef.current
   }, [])
-
-  const caip10ToAddress = (caip10: string) => {
-    // "stellar:pubnet:GABC...XYZ" -> third segment is address
-    const parts = caip10.split(':')
-    return parts[2] ?? ''
-  }
 
   const ensureClient = useCallback(async () => {
     if (!clientRef.current) {
@@ -72,98 +92,161 @@ export function useWalletConnectWallet({ walletAuth }: {
       })
       clientRef.current = client
 
-      // Try to restore persisted session
-      const raw = localStorage.getItem(SESSION_STORE_KEY)
-      if (raw) {
-        try {
-          const { topic } = JSON.parse(raw) as { topic?: string }
-          if (topic && client.session.get(topic)) {
-            topicRef.current = topic
-          }
-          else {
-            localStorage.removeItem(SESSION_STORE_KEY)
-          }
-        }
-        catch {
-          localStorage.removeItem(SESSION_STORE_KEY)
-        }
-      }
-
-      // Clean up persisted topic if the wallet deletes the session
       client.on('session_delete', () => {
         topicRef.current = undefined
-        localStorage.removeItem(SESSION_STORE_KEY)
+        if (typeof window !== 'undefined' && chainId) {
+          localStorage.removeItem(buildStoreKey(chainId))
+        }
       })
     }
     return clientRef.current
-  }, [])
+  }, [chainId])
 
-  const getAddress = useCallback(async () => {
-    if (!clientRef.current) throw new Error('WalletConnect client not initialized')
-    if (!topicRef.current) throw new Error('No active WalletConnect session')
-    const ns = clientRef.current.session.get(topicRef.current)?.namespaces?.stellar
-    const caip10 = ns?.accounts?.[0]
-    if (!caip10) throw new Error('No Stellar account in session')
-    return { address: caip10ToAddress(caip10) }
-  }, [])
-
-  const signTransaction: IWallet['signTransaction'] = useCallback(async ({ message }) => {
-    if (!clientRef.current) throw new Error('WalletConnect client not initialized')
-    if (!topicRef.current) throw new Error('No active WalletConnect session')
-
-    const result = await clientRef.current.request<{ signedXDR: string }>({
-      chainId: STELLAR_CHAIN,
-      request: {
-        method: WC_METHOD_SIGN,
-        params: { xdr: message },
-      },
-      topic: topicRef.current,
-    })
-
-    const ns = clientRef.current.session.get(topicRef.current)?.namespaces?.stellar
-    const addr = ns?.accounts?.length ? caip10ToAddress(ns.accounts[0]) : undefined
-    return {
-      signedTxXdr: result.signedXDR,
-      signerAddress: addr,
+  const tryRestoreSession = useCallback(async (client: SignClient, targetChainId: string, namespace: string) => {
+    if (typeof window === 'undefined') return false
+    const raw = localStorage.getItem(buildStoreKey(targetChainId))
+    if (!raw) return false
+    try {
+      const { topic } = JSON.parse(raw) as { topic?: string }
+      if (!topic) return false
+      const session = client.session.get(topic)
+      if (!session) {
+        localStorage.removeItem(buildStoreKey(targetChainId))
+        return false
+      }
+      topicRef.current = topic
+      setChainId(targetChainId)
+      const ns = session.namespaces?.[namespace]
+      const caip10 = ns?.accounts?.[0]
+      if (caip10) {
+        setAddress(caip10ToAddress(caip10))
+      }
+      return true
+    }
+    catch {
+      localStorage.removeItem(buildStoreKey(targetChainId))
+      return false
     }
   }, [])
 
-  const connect: IWallet['connect'] = useCallback(async () => {
+  const request = useCallback(async <TResult>(req: WalletConnectRequest): Promise<TResult> => {
     const client = await ensureClient()
-    const { approval, uri } = await client.connect({
-      requiredNamespaces: {
-        stellar: {
-          chains: [STELLAR_CHAIN],
-          events: [],
-          methods: [WC_METHOD_SIGN],
-        },
+    if (!topicRef.current) throw new Error('No active WalletConnect session')
+    return client.request<TResult>({
+      chainId: req.chainId,
+      request: {
+        method: req.method,
+        params: req.params,
       },
+      topic: topicRef.current,
     })
+  }, [ensureClient])
 
-    if (!uri) throw new Error('No WalletConnect URI')
+  const signAuthMessage = useCallback(async (params: {
+    address: string
+    chainId: string
+    message: string
+  }): Promise<string> => {
+    const { address, chainId, message } = params
+    const namespace = resolveNamespaceFromChainId(chainId)
 
-    const modal = ensureModal()
-    await modal.openModal({ uri })
-    const session = await approval()
-    topicRef.current = session.topic
+    if (namespace === 'solana') {
+      const encoded = toBase64(new TextEncoder().encode(message))
+      const result = await request<{ signature: string }>({
+        chainId,
+        method: 'solana_signMessage',
+        params: {
+          message: encoded,
+          pubkey: address,
+        },
+      })
+      return result.signature
+    }
 
-    // Persist session (auto-recover on reload)
-    localStorage.setItem(SESSION_STORE_KEY, JSON.stringify({ topic: topicRef.current }))
+    if (namespace === 'stellar') {
+      const result = await request<{ signedXDR: string }>({
+        chainId,
+        method: 'stellar_signXDR',
+        params: {
+          network: resolveStellarNetwork(chainId),
+          xdr: message,
+        },
+      })
+      return result.signedXDR
+    }
 
-    await modal.closeModal()
+    return request<string>({
+      chainId,
+      method: 'personal_sign',
+      params: [message, address],
+    })
+  }, [request])
 
-    const { address } = await getAddress()
-    setAddress(address)
-    if (!address) throw new Error('Failed to get wallet address')
-    await walletAuth.authenticate(address, async (message: string) => {
-      const { signedTxXdr } = await signTransaction({ message })
-      return signedTxXdr
+  const connect: IWallet['connect'] = useCallback(async (options) => {
+    const targetChainId = options?.walletConnect?.chainId || options?.chainId
+    const wcMeta = options?.walletConnect
+    if (!targetChainId) throw new Error('WalletConnect chainId is required')
+
+    const namespace = wcMeta?.namespace || resolveNamespaceFromChainId(targetChainId)
+    const methods = wcMeta?.methods || (namespace === 'solana'
+      ? ['solana_signMessage', 'solana_signTransaction']
+      : namespace === 'stellar'
+        ? ['stellar_signXDR']
+        : ['personal_sign', 'eth_sendTransaction'])
+    const events = wcMeta?.events || []
+
+    const client = await ensureClient()
+    const restored = await tryRestoreSession(client, targetChainId, namespace)
+    if (!restored) {
+      const { approval, uri } = await client.connect({
+        requiredNamespaces: {
+          [namespace]: {
+            chains: [targetChainId],
+            events,
+            methods,
+          },
+        },
+      })
+
+      if (!uri) throw new Error('No WalletConnect URI')
+
+      const modal = ensureModal()
+      await modal.openModal({ uri })
+      const session = await approval()
+      topicRef.current = session.topic
+      await modal.closeModal()
+
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(buildStoreKey(targetChainId), JSON.stringify({ topic: session.topic }))
+      }
+    }
+
+    const session = client.session.get(topicRef.current as string)
+    const ns = session?.namespaces?.[namespace]
+    const caip10 = ns?.accounts?.[0]
+    const resolvedAddress = caip10 ? caip10ToAddress(caip10) : ''
+
+    if (!resolvedAddress) {
+      throw new Error('Failed to get wallet address')
+    }
+
+    setAddress(resolvedAddress)
+    setChainId(targetChainId)
+
+    await walletAuth.authenticate({
+      address: resolvedAddress,
+      chainId: targetChainId,
+      signMessage: (message: string) => signAuthMessage({
+        address: resolvedAddress,
+        chainId: targetChainId,
+        message,
+      }),
     })
   }, [
     ensureClient,
     ensureModal,
-    getAddress,
-    signTransaction,
+    signAuthMessage,
+    tryRestoreSession,
     walletAuth,
   ])
 
@@ -175,19 +258,57 @@ export function useWalletConnectWallet({ walletAuth }: {
         topic: topicRef.current,
       })
       topicRef.current = undefined
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem(SESSION_STORE_KEY)
+      if (typeof window !== 'undefined' && chainId) {
+        localStorage.removeItem(buildStoreKey(chainId))
       }
     }
     setAddress(null)
+    setChainId(null)
     walletAuth.setJwtToken(null)
-  }, [ensureClient, walletAuth])
+  }, [
+    chainId,
+    ensureClient,
+    walletAuth,
+  ])
+
+  const signTransaction: IWallet['signTransaction'] = useCallback(async ({ message }) => {
+    if (!chainId) throw new Error('WalletConnect chainId is not set')
+    const namespace = resolveNamespaceFromChainId(chainId)
+
+    if (namespace !== 'stellar') {
+      throw new Error('signTransaction is only supported for Stellar via WalletConnect')
+    }
+
+    const result = await request<{ signedXDR: string }>({
+      chainId,
+      method: 'stellar_signXDR',
+      params: {
+        network: resolveStellarNetwork(chainId),
+        xdr: message,
+      },
+    })
+
+    return {
+      signedTxXdr: result.signedXDR,
+      signerAddress: address || undefined,
+    }
+  }, [
+    address,
+    chainId,
+    request,
+  ])
 
   return {
     address,
+    chainId,
     connect,
     disconnect,
+    request,
     signTransaction,
     walletId: 'wallet-connect',
   }
+}
+
+export const decodeWalletConnectSolanaTx = (base64Tx: string): Uint8Array => {
+  return fromBase64(base64Tx)
 }

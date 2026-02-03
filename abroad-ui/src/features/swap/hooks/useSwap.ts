@@ -3,18 +3,13 @@ import {
   useCallback, useEffect, useMemo, useRef, useState,
 } from 'react'
 
+import type { PublicCorridor } from '../../../services/public/types'
 import type { SwapProps } from '../components/Swap'
 import type { SwapView } from '../types'
 
-import {
-  _36EnumsBlockchainNetwork as BlockchainNetwork,
-  _36EnumsCryptoCurrency as CryptoCurrency,
-  getQuote,
-  getReverseQuote,
-  SupportedPaymentMethod as PaymentMethod,
-  _36EnumsTargetCurrency as TargetCurrency,
-} from '../../../api'
+import { _36EnumsTargetCurrency as TargetCurrency } from '../../../api'
 import { useNotices } from '../../../contexts/NoticeContext'
+import { fetchPublicCorridors, requestQuote, requestReverseQuote } from '../../../services/public/publicApi'
 // ⛔️ Removed: import { useDebounce } from '../../../shared/hooks'
 import { useWalletAuth } from '../../../shared/hooks/useWalletAuth'
 
@@ -35,6 +30,32 @@ type UseSwapArgs = {
 const COP_TRANSFER_FEE = 0.0
 const BRL_TRANSFER_FEE = 0.0
 
+const corridorKeyOf = (corridor: PublicCorridor): string => (
+  `${corridor.cryptoCurrency}:${corridor.blockchain}:${corridor.targetCurrency}`
+)
+
+const chainKeyOf = (corridor: PublicCorridor): string => (
+  `${corridor.blockchain}:${corridor.chainId}`
+)
+
+const formatChainLabel = (value: string): string => {
+  const normalized = value.toLowerCase().replace(/_/g, ' ')
+  return normalized.replace(/\b\w/g, char => char.toUpperCase())
+}
+
+const formatChainIdLabel = (value: string): string => {
+  if (!value) return ''
+  const [, ...rest] = value.split(':')
+  return rest.length > 0 ? rest.join(':') : value
+}
+
+const buildChainLabel = (corridor: PublicCorridor, includeChainId: boolean): string => {
+  const base = formatChainLabel(corridor.blockchain)
+  if (!includeChainId) return base
+  const chainIdLabel = formatChainIdLabel(corridor.chainId)
+  return chainIdLabel ? `${base} (${chainIdLabel})` : base
+}
+
 export const useSwap = ({
   isDesktop,
   quoteId,
@@ -51,15 +72,82 @@ export const useSwap = ({
   const textColor = isDesktop ? 'white' : '#356E6A'
   const { t } = useTranslate()
   const { addNotice } = useNotices()
-  const { kit, walletAuthentication } = useWalletAuth()
+  const { wallet, walletAuthentication } = useWalletAuth()
+  const [corridors, setCorridors] = useState<PublicCorridor[]>([])
+  const [corridorError, setCorridorError] = useState<null | string>(null)
+  const [corridorKey, setCorridorKey] = useState('')
+  const [chainKey, setChainKey] = useState('')
 
   // Derived by currency
   const targetLocale = targetCurrency === TargetCurrency.BRL ? 'pt-BR' : 'es-CO'
   const targetSymbol = targetCurrency === TargetCurrency.BRL ? 'R$' : '$'
-  const targetPaymentMethod
-    = targetCurrency === TargetCurrency.BRL ? PaymentMethod.PIX : PaymentMethod.BREB
+  const availableCorridors = useMemo(
+    () => corridors.filter(corridor => corridor.targetCurrency === targetCurrency),
+    [corridors, targetCurrency],
+  )
+  const selectedCorridor = useMemo(() => {
+    const match = availableCorridors.find(corridor => corridorKeyOf(corridor) === corridorKey)
+    if (match && (!chainKey || chainKeyOf(match) === chainKey)) return match
+    if (chainKey) {
+      return availableCorridors.find(corridor => chainKeyOf(corridor) === chainKey) ?? null
+    }
+    return availableCorridors[0] ?? null
+  }, [
+    availableCorridors,
+    chainKey,
+    corridorKey,
+  ])
+  const activeChainKey = useMemo(() => (
+    chainKey || (selectedCorridor ? chainKeyOf(selectedCorridor) : '')
+  ), [chainKey, selectedCorridor])
+  const chainFilteredCorridors = useMemo(() => {
+    if (!activeChainKey) return availableCorridors
+    return availableCorridors.filter(corridor => chainKeyOf(corridor) === activeChainKey)
+  }, [activeChainKey, availableCorridors])
+  const chainVariants = useMemo(() => {
+    const map = new Map<string, Set<string>>()
+    availableCorridors.forEach((corridor) => {
+      const current = map.get(corridor.blockchain) ?? new Set<string>()
+      current.add(corridor.chainId)
+      map.set(corridor.blockchain, current)
+    })
+    return map
+  }, [availableCorridors])
+  const chainOptions = useMemo(() => {
+    const seen = new Map<string, PublicCorridor>()
+    availableCorridors.forEach((corridor) => {
+      const key = chainKeyOf(corridor)
+      if (!seen.has(key)) seen.set(key, corridor)
+    })
+    return Array.from(seen.entries()).map(([key, corridor]) => {
+      const includeChainId = (chainVariants.get(corridor.blockchain)?.size ?? 0) > 1
+      return {
+        key,
+        label: buildChainLabel(corridor, includeChainId),
+      }
+    })
+  }, [availableCorridors, chainVariants])
+  const targetPaymentMethod = selectedCorridor?.paymentMethod ?? (targetCurrency === TargetCurrency.BRL ? 'PIX' : 'BREB')
   const transferFee
     = targetCurrency === TargetCurrency.BRL ? BRL_TRANSFER_FEE : COP_TRANSFER_FEE
+  const sourceSymbol = selectedCorridor?.cryptoCurrency ?? ''
+  const assetOptions = useMemo(() => chainFilteredCorridors.map(corridor => ({
+    key: corridorKeyOf(corridor),
+    label: corridor.cryptoCurrency,
+  })), [chainFilteredCorridors])
+  const selectedAssetLabel = useMemo(() => {
+    if (!selectedCorridor) return t('swap.asset_placeholder', 'Selecciona activo')
+    return selectedCorridor.cryptoCurrency
+  }, [selectedCorridor, t])
+  const selectedChainLabel = useMemo(() => {
+    if (!selectedCorridor) return t('swap.chain_placeholder', 'Selecciona red')
+    const includeChainId = (chainVariants.get(selectedCorridor.blockchain)?.size ?? 0) > 1
+    return buildChainLabel(selectedCorridor, includeChainId)
+  }, [
+    chainVariants,
+    selectedCorridor,
+    t,
+  ])
 
   // Local UI state
   const [loadingSource, setLoadingSource] = useState(false) // typing in target field -> fetching source
@@ -70,6 +158,12 @@ export const useSwap = ({
   const currencyMenuRef = useRef<HTMLDivElement | null>(null)
   // Prevent immediate close from the same click that opens the menu
   const skipNextDocumentClickRef = useRef(false)
+  const [assetMenuOpen, setAssetMenuOpen] = useState(false)
+  const assetMenuRef = useRef<HTMLDivElement | null>(null)
+  const skipNextAssetClickRef = useRef(false)
+  const [chainMenuOpen, setChainMenuOpen] = useState(false)
+  const chainMenuRef = useRef<HTMLDivElement | null>(null)
+  const skipNextChainClickRef = useRef(false)
 
   // Request-cancellation + stale-response protection --------------------------
   // Track which side the user edited last (to avoid cross-updates)
@@ -93,7 +187,7 @@ export const useSwap = ({
     [targetLocale],
   )
 
-  const isAuthenticated = Boolean(walletAuthentication?.jwtToken)
+  const isAuthenticated = Boolean(walletAuthentication?.jwtToken && wallet?.address && wallet?.chainId)
 
   const isButtonDisabled = useCallback(() => {
     const numericSource = parseFloat(String(sourceAmount))
@@ -130,10 +224,87 @@ export const useSwap = ({
   )
 
   // API calls -----------------------------------------------------------------
+  useEffect(() => {
+    let active = true
+    fetchPublicCorridors()
+      .then((data) => {
+        if (!active) return
+        setCorridors(data.corridors)
+        setCorridorError(null)
+      })
+      .catch((err) => {
+        if (!active) return
+        const message = err instanceof Error ? err.message : 'Failed to load corridors'
+        setCorridorError(message)
+      })
+    return () => {
+      active = false
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!selectedCorridor) return
+    const key = corridorKeyOf(selectedCorridor)
+    if (corridorKey !== key) {
+      setCorridorKey(key)
+    }
+    const chain = chainKeyOf(selectedCorridor)
+    if (chainKey !== chain) {
+      setChainKey(chain)
+    }
+  }, [
+    chainKey,
+    corridorKey,
+    selectedCorridor,
+  ])
+
+  useEffect(() => {
+    if (!corridorError) return
+    addNotice({
+      description: corridorError,
+      kind: 'error',
+      message: t('swap.corridor_load_error', 'No pudimos cargar los activos disponibles.'),
+    })
+  }, [
+    addNotice,
+    corridorError,
+    t,
+  ])
+
+  const connectWallet = useCallback(async () => {
+    if (!wallet || !selectedCorridor) return
+    const options = wallet.walletId === 'wallet-connect'
+      ? {
+          chainId: selectedCorridor.chainId,
+          walletConnect: selectedCorridor.walletConnect,
+        }
+      : undefined
+    await wallet.connect(options)
+  }, [selectedCorridor, wallet])
+
+  useEffect(() => {
+    if (!wallet?.address || !wallet?.chainId || !selectedCorridor) return
+    if (wallet.chainId === selectedCorridor.chainId) return
+    wallet.disconnect().catch(() => undefined)
+  }, [selectedCorridor, wallet])
+
+  const formatCryptoAmount = useCallback((value: number) => {
+    if (!Number.isFinite(value)) return ''
+    return new Intl.NumberFormat('en-US', {
+      maximumFractionDigits: 8,
+      minimumFractionDigits: 0,
+      useGrouping: false,
+    }).format(value)
+  }, [])
 
   // SOURCE → TARGET (user edits source; we compute target)
   const fetchDirectConversion = useCallback(
     async (value: string) => {
+      const corridor = selectedCorridor
+      if (!corridor) {
+        addNotice({ kind: 'error', message: t('swap.corridor_error', 'No corridor available for this currency.') })
+        return
+      }
       // Cancel any in-flight SOURCE→TARGET request; also cancel the opposite to avoid cross-updates.
       directAbortRef.current?.abort()
       reverseAbortRef.current?.abort()
@@ -153,13 +324,13 @@ export const useSwap = ({
       setQuoteId('') // invalidate previous quote
       try {
         // NOTE: We pass an AbortSignal as a 2nd arg; ensure your API helper forwards it to fetch/axios.
-        const response = await (getReverseQuote)(
+        const response = await requestReverseQuote(
           {
-            crypto_currency: CryptoCurrency.USDC,
-            network: BlockchainNetwork.STELLAR,
+            crypto_currency: corridor.cryptoCurrency,
+            network: corridor.blockchain,
             payment_method: targetPaymentMethod,
             source_amount: num,
-            target_currency: targetCurrency,
+            target_currency: corridor.targetCurrency,
           },
           { signal: controller.signal },
         )
@@ -167,14 +338,16 @@ export const useSwap = ({
         // If this request is no longer the latest, or user switched fields, ignore.
         if (controller.signal.aborted || reqId !== directReqIdRef.current || lastEditedRef.current !== 'source') return
 
-        if (response.status === 200) {
-          const formatted = formatTargetNumber(response.data.value)
-          setQuoteId(response.data.quote_id)
-          setTargetAmount(formatted)
+        if (!response.ok) {
+          if (response.error?.type !== 'aborted') {
+            addNotice({ kind: 'error', message: t('swap.quote_error', 'This quote exceeded the maximum allowed amount.') })
+          }
+          return
         }
-        else {
-          addNotice({ kind: 'error', message: t('swap.quote_error', 'This quote exceeded the maximum allowed amount.') })
-        }
+
+        const formatted = formatTargetNumber(response.data.value)
+        setQuoteId(response.data.quote_id)
+        setTargetAmount(formatted)
       }
       catch (error: unknown) {
         if (
@@ -194,11 +367,11 @@ export const useSwap = ({
     },
     [
       formatTargetNumber,
+      selectedCorridor,
       setQuoteId,
       setTargetAmount,
       addNotice,
       t,
-      targetCurrency,
       targetPaymentMethod,
     ],
   )
@@ -206,6 +379,11 @@ export const useSwap = ({
   // TARGET → SOURCE (user edits target; we compute source)
   const fetchReverseConversion = useCallback(
     async (value: string) => {
+      const corridor = selectedCorridor
+      if (!corridor) {
+        addNotice({ kind: 'error', message: t('swap.corridor_error', 'No corridor available for this currency.') })
+        return
+      }
       // Cancel any in-flight TARGET→SOURCE request; also cancel the opposite to avoid cross-updates.
       reverseAbortRef.current?.abort()
       directAbortRef.current?.abort()
@@ -225,26 +403,28 @@ export const useSwap = ({
       setLoadingSource(true)
       setQuoteId('') // invalidate previous quote
       try {
-        const response = await (getQuote)(
+        const response = await requestQuote(
           {
             amount: num,
-            crypto_currency: CryptoCurrency.USDC,
-            network: BlockchainNetwork.STELLAR,
+            crypto_currency: corridor.cryptoCurrency,
+            network: corridor.blockchain,
             payment_method: targetPaymentMethod,
-            target_currency: targetCurrency,
+            target_currency: corridor.targetCurrency,
           },
           { signal: controller.signal },
         )
 
         if (controller.signal.aborted || reqId !== reverseReqIdRef.current || lastEditedRef.current !== 'target') return
 
-        if (response.status === 200) {
-          setQuoteId(response.data.quote_id)
-          setSourceAmount(response.data.value.toFixed(2))
+        if (!response.ok) {
+          if (response.error?.type !== 'aborted') {
+            addNotice({ kind: 'error', message: t('swap.quote_error', 'This quote exceeded the maximum allowed amount.') })
+          }
+          return
         }
-        else {
-          addNotice({ kind: 'error', message: t('swap.quote_error', 'This quote exceeded the maximum allowed amount.') })
-        }
+
+        setQuoteId(response.data.quote_id)
+        setSourceAmount(formatCryptoAmount(response.data.value))
       }
       catch (error: unknown) {
         if (
@@ -263,11 +443,12 @@ export const useSwap = ({
       }
     },
     [
+      formatCryptoAmount,
+      selectedCorridor,
       setQuoteId,
       setSourceAmount,
       addNotice,
       t,
-      targetCurrency,
       targetPaymentMethod,
     ],
   )
@@ -298,16 +479,50 @@ export const useSwap = ({
 
   const openQr = useCallback(() => {
     if (!isAuthenticated) {
-      kit?.connect()
+      void connectWallet()
       return
     }
     setIsQrOpen(true)
     setTargetCurrency(TargetCurrency.BRL)
   }, [
     isAuthenticated,
-    kit,
+    connectWallet,
     setIsQrOpen,
     setTargetCurrency,
+  ])
+
+  const toggleAssetMenu = useCallback(() => {
+    if (assetOptions.length <= 1) return
+    setAssetMenuOpen((v) => {
+      const next = !v
+      if (!v && next) {
+        skipNextAssetClickRef.current = true
+        setCurrencyMenuOpen(false)
+        setChainMenuOpen(false)
+      }
+      return next
+    })
+  }, [assetOptions.length])
+
+  const selectAssetOption = useCallback((key: string) => {
+    setAssetMenuOpen(false)
+    setCorridorKey(key)
+    const selected = availableCorridors.find(corridor => corridorKeyOf(corridor) === key)
+    if (selected) setChainKey(chainKeyOf(selected))
+    lastEditedRef.current = null
+    directAbortRef.current?.abort()
+    reverseAbortRef.current?.abort()
+    setQuoteId('')
+    setSourceAmount('')
+    setTargetAmount('')
+    setDisplayedTRM(0)
+  }, [
+    availableCorridors,
+    setCorridorKey,
+    setChainKey,
+    setQuoteId,
+    setSourceAmount,
+    setTargetAmount,
   ])
 
   const toggleCurrencyMenu = useCallback(() => {
@@ -316,15 +531,62 @@ export const useSwap = ({
       if (!v && next) {
         // Opening menu: ignore the very next document click
         skipNextDocumentClickRef.current = true
+        setAssetMenuOpen(false)
+        setChainMenuOpen(false)
       }
       return next
     })
   }, [])
 
+  const toggleChainMenu = useCallback(() => {
+    if (chainOptions.length <= 1) return
+    setChainMenuOpen((v) => {
+      const next = !v
+      if (!v && next) {
+        skipNextChainClickRef.current = true
+        setAssetMenuOpen(false)
+        setCurrencyMenuOpen(false)
+      }
+      return next
+    })
+  }, [chainOptions.length])
+
+  const selectChain = useCallback((key: string) => {
+    setChainMenuOpen(false)
+    setChainKey(key)
+    const currentCrypto = selectedCorridor?.cryptoCurrency
+    const next = availableCorridors.find(corridor => (
+      chainKeyOf(corridor) === key && corridor.cryptoCurrency === currentCrypto
+    )) ?? availableCorridors.find(corridor => chainKeyOf(corridor) === key)
+    if (next) {
+      setCorridorKey(corridorKeyOf(next))
+    }
+    else {
+      setCorridorKey('')
+    }
+    lastEditedRef.current = null
+    directAbortRef.current?.abort()
+    reverseAbortRef.current?.abort()
+    setQuoteId('')
+    setSourceAmount('')
+    setTargetAmount('')
+    setDisplayedTRM(0)
+  }, [
+    availableCorridors,
+    selectedCorridor,
+    setCorridorKey,
+    setChainKey,
+    setQuoteId,
+    setSourceAmount,
+    setTargetAmount,
+  ])
+
   const selectCurrency = useCallback(
     (currency: (typeof TargetCurrency)[keyof typeof TargetCurrency]) => {
       setCurrencyMenuOpen(false)
       setTargetCurrency(currency)
+      setCorridorKey('')
+      setChainKey('')
 
       // Reset any quote data to avoid using stale results after changing currency.
       lastEditedRef.current = null
@@ -336,6 +598,7 @@ export const useSwap = ({
       setDisplayedTRM(0)
     },
     [
+      setCorridorKey,
       setQuoteId,
       setSourceAmount,
       setTargetAmount,
@@ -346,7 +609,7 @@ export const useSwap = ({
   const onPrimaryAction = useCallback(async () => {
     if (!isAuthenticated) {
       // Connect wallet
-      await kit?.connect()
+      await connectWallet()
       return
     }
     if (!quoteId) {
@@ -357,7 +620,7 @@ export const useSwap = ({
     setView('bankDetails')
   }, [
     isAuthenticated,
-    kit,
+    connectWallet,
     quoteId,
     addNotice,
     setView,
@@ -422,6 +685,64 @@ export const useSwap = ({
     }
   }, [currencyMenuOpen])
 
+  useEffect(() => {
+    if (!assetMenuOpen) return
+
+    const onDocumentClick = (event: MouseEvent) => {
+      if (skipNextAssetClickRef.current) {
+        skipNextAssetClickRef.current = false
+        return
+      }
+      const container = assetMenuRef.current
+      if (!container) return
+
+      const path = (event as unknown as { composedPath?: () => EventTarget[] }).composedPath?.()
+      const clickedInside = path ? path.includes(container) : container.contains(event.target as Node)
+
+      if (!clickedInside) setAssetMenuOpen(false)
+    }
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setAssetMenuOpen(false)
+    }
+
+    document.addEventListener('click', onDocumentClick)
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('click', onDocumentClick)
+      document.removeEventListener('keydown', onKeyDown)
+    }
+  }, [assetMenuOpen])
+
+  useEffect(() => {
+    if (!chainMenuOpen) return
+
+    const onDocumentClick = (event: MouseEvent) => {
+      if (skipNextChainClickRef.current) {
+        skipNextChainClickRef.current = false
+        return
+      }
+      const container = chainMenuRef.current
+      if (!container) return
+
+      const path = (event as unknown as { composedPath?: () => EventTarget[] }).composedPath?.()
+      const clickedInside = path ? path.includes(container) : container.contains(event.target as Node)
+
+      if (!clickedInside) setChainMenuOpen(false)
+    }
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setChainMenuOpen(false)
+    }
+
+    document.addEventListener('click', onDocumentClick)
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('click', onDocumentClick)
+      document.removeEventListener('keydown', onKeyDown)
+    }
+  }, [chainMenuOpen])
+
   // Cleanup on unmount: abort any in-flight requests
   useEffect(() => {
     return () => {
@@ -433,6 +754,12 @@ export const useSwap = ({
   // Return props for stateless view -------------------------------------------
   return {
     // Primary action
+    assetMenuOpen,
+    assetMenuRef,
+    assetOptions,
+    chainMenuOpen,
+    chainMenuRef,
+    chainOptions,
     continueDisabled,
     currencyMenuOpen,
     currencyMenuRef,
@@ -449,9 +776,14 @@ export const useSwap = ({
     onTargetChange,
     // QR + currency menu
     openQr,
+    selectAssetOption,
+    selectChain,
     selectCurrency,
+    selectedAssetLabel,
+    selectedChainLabel,
     // Amounts & loaders
     sourceAmount,
+    sourceSymbol,
     targetAmount,
 
     targetCurrency,
@@ -460,6 +792,8 @@ export const useSwap = ({
     // UI look & currency
     textColor,
 
+    toggleAssetMenu,
+    toggleChainMenu,
     toggleCurrencyMenu,
     transferFeeDisplay,
   }

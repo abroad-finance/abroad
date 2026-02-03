@@ -17,6 +17,8 @@ import {
 import { Body, Post } from 'tsoa'
 
 import { TYPES } from '../../../../app/container/types'
+import { IDatabaseClientProvider } from '../../../../platform/persistence/IDatabaseClientProvider'
+import { PaymentContextService } from '../../../payments/application/PaymentContextService'
 import { TransactionAcceptanceService, TransactionValidationError } from '../../application/TransactionAcceptanceService'
 import { TransactionStatusService } from '../../application/TransactionStatusService'
 import { type AcceptTransactionRequest, acceptTransactionRequestSchema, type AcceptTransactionResponse, type TransactionStatusResponse } from './contracts'
@@ -25,6 +27,7 @@ import { type AcceptTransactionRequest, acceptTransactionRequestSchema, type Acc
 @Security('ApiKeyAuth')
 @Security('BearerAuth')
 export class TransactionController extends Controller {
+  private readonly paymentContextService: PaymentContextService
   private readonly transactionAcceptanceService: TransactionAcceptanceService
   private readonly transactionStatusService: TransactionStatusService
   constructor(
@@ -32,10 +35,15 @@ export class TransactionController extends Controller {
     transactionAcceptanceService: TransactionAcceptanceService,
     @inject(TYPES.TransactionStatusService)
     transactionStatusService: TransactionStatusService,
+    @inject(PaymentContextService)
+    paymentContextService: PaymentContextService,
+    @inject(TYPES.IDatabaseClientProvider)
+    private readonly dbProvider: IDatabaseClientProvider,
   ) {
     super()
     this.transactionAcceptanceService = transactionAcceptanceService
     this.transactionStatusService = transactionStatusService
+    this.paymentContextService = paymentContextService
   }
 
   /**
@@ -86,9 +94,14 @@ export class TransactionController extends Controller {
         partnerContext,
       )
 
+      const paymentContext = response.id && !response.kycLink
+        ? await this.buildPaymentContext(response.id, response.transactionReference)
+        : null
+
       return {
         id: response.id,
         kycLink: response.kycLink,
+        payment_context: paymentContext,
         transaction_reference: response.transactionReference,
       }
     }
@@ -127,5 +140,24 @@ export class TransactionController extends Controller {
       transaction_reference: status.transactionReference,
       user_id: status.userId,
     }
+  }
+
+  private async buildPaymentContext(transactionId: string, transactionReference: null | string) {
+    const prisma = await this.dbProvider.getClient()
+    const transaction = await prisma.transaction.findUnique({
+      include: { quote: true },
+      where: { id: transactionId },
+    })
+
+    if (!transaction) {
+      return null
+    }
+
+    return this.paymentContextService.build({
+      amount: transaction.quote.sourceAmount,
+      blockchain: transaction.quote.network,
+      cryptoCurrency: transaction.quote.cryptoCurrency,
+      transactionReference,
+    })
   }
 }

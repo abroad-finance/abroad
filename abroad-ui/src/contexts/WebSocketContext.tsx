@@ -72,7 +72,7 @@ const normalizePayload = <E extends EventName>(event: E, payload: unknown): WebS
 }
 
 export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { kit } = useWalletAuth()
+  const { wallet } = useWalletAuth()
   const socketRef = useRef<null | Socket>(null)
   const listenersRef = useRef<Map<EventName, Set<ListenerEntry<EventName>>>>(new Map())
   const [connected, setConnected] = useState(false)
@@ -115,10 +115,11 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   }, [])
 
   const connectSocket = useCallback(() => {
-    if (!kit?.address) return
+    const userId = wallet?.address && wallet?.chainId ? `${wallet.chainId}:${wallet.address}` : null
+    if (!userId) return
     const url = resolveWsUrl()
     const socket = io(url, {
-      auth: { userId: kit.address },
+      auth: { userId },
       autoConnect: true,
       reconnection: true,
       reconnectionAttempts: Infinity,
@@ -152,10 +153,14 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       socket.disconnect()
       socketRef.current = null
     }
-  }, [attachStoredListeners, kit?.address])
+  }, [
+    attachStoredListeners,
+    wallet?.address,
+    wallet?.chainId,
+  ])
 
   useEffect(() => {
-    if (!kit?.address) {
+    if (!wallet?.address || !wallet?.chainId) {
       setConnected(false)
       setError(null)
       socketRef.current?.disconnect()
@@ -166,7 +171,11 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     return () => {
       teardown?.()
     }
-  }, [connectSocket, kit?.address])
+  }, [
+    connectSocket,
+    wallet?.address,
+    wallet?.chainId,
+  ])
 
   const value = useMemo<WebSocketApi>(() => ({
     connected,

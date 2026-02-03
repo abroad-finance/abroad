@@ -39,6 +39,7 @@ export interface WebSwapControllerProps {
   isDecodingQr: boolean
   isQrOpen: boolean
   isWalletDetailsOpen: boolean
+  onWalletConnect: () => Promise<void>
   resetForNewTransaction: () => void
   swapViewProps: SwapProps
   targetAmount: string
@@ -61,6 +62,7 @@ const WebSwap: React.FC = () => {
     isDecodingQr,
     isQrOpen,
     isWalletDetailsOpen,
+    onWalletConnect,
     resetForNewTransaction,
     swapViewProps,
     targetAmount,
@@ -70,7 +72,7 @@ const WebSwap: React.FC = () => {
   } = useWebSwapController()
 
   // Components controllers
-  const navBar = useNavBarResponsive({ onWalletDetails: handleWalletDetailsOpen })
+  const navBar = useNavBarResponsive({ onWalletConnect, onWalletDetails: handleWalletDetailsOpen })
   const languageSelector = useLanguageSelector()
   const walletDetails = useWalletDetails({ onClose: handleWalletDetailsClose })
 

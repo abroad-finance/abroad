@@ -10,7 +10,7 @@ export const WalletAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [kycUrl, _setKycUrl] = useState<null | string>(() => localStorage.getItem('kycUrl'))
   const walletAuthentication = useWalletAuthentication()
   const walletFactory = useWalletFactory({ walletAuth: walletAuthentication })
-  const kit = useMemo(() => {
+  const defaultWallet = useMemo(() => {
     const searchParams = new URLSearchParams(window.location.search)
     if (searchParams.get('token')) {
       // If there's a token in the URL, force using sep24 wallet to handle it.
@@ -20,6 +20,7 @@ export const WalletAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     const walletType = getWalletTypeByDevice()
     return walletFactory.getWalletHandler(walletType)
   }, [walletFactory])
+  const [wallet, setWallet] = useState(defaultWallet)
 
   const setKycUrl = useCallback((url: null | string) => {
     _setKycUrl(url)
@@ -33,9 +34,12 @@ export const WalletAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   return (
     <WalletAuthContext.Provider value={{
-      kit,
+      defaultWallet,
+      getWalletHandler: walletFactory.getWalletHandler,
       kycUrl,
+      setActiveWallet: setWallet,
       setKycUrl,
+      wallet,
       walletAuthentication,
     }}
     >

@@ -54,15 +54,20 @@ describe('useWalletAuthentication', () => {
     const { result } = renderHook(() => useWalletAuthentication())
 
     await act(async () => {
-      await result.current.authenticate('GADDR', async (message) => {
-        expect(message).toBe('challenge-xdr')
-        return 'signed-xdr'
+      await result.current.authenticate({
+        address: 'GADDR',
+        chainId: 'stellar:public',
+        signMessage: async (message: string) => {
+          expect(message).toBe('challenge-xdr')
+          return 'signed-xdr'
+        },
       })
     })
 
     expect(mocked.challengeMock).toHaveBeenCalled()
     expect(mocked.verifyMock).toHaveBeenCalledWith({
       address: 'GADDR',
+      chainId: 'stellar:public',
       signedXDR: 'signed-xdr',
     })
     expect(authTokenStore.getToken()).toBe(token)

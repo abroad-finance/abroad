@@ -7,6 +7,7 @@ export const useSep24Wallet = ({ walletAuthentication }: {
   walletAuthentication: IWalletAuthentication
 }): IWallet => {
   const [address, setAddress] = useState<null | string>(null)
+  const chainId = import.meta.env.VITE_STELLAR_CHAIN_ID || 'stellar:pubnet'
 
   const connect = async () => {
     // The SEP-24 wallet is connected via URL parameters, so nothing to do here
@@ -39,6 +40,7 @@ export const useSep24Wallet = ({ walletAuthentication }: {
 
   return {
     address,
+    chainId,
     connect,
     disconnect,
     signTransaction,

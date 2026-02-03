@@ -32,7 +32,7 @@ const mocked = vi.hoisted(() => {
     status: null,
   } as const
 
-  const getQuoteMock = vi.fn((request: { amount: number }, opts?: { signal?: AbortSignal }) => new Promise((resolve) => {
+  const requestQuoteMock = vi.fn((request: { amount: number }, opts?: { signal?: AbortSignal }) => new Promise((resolve) => {
     const timer = setTimeout(() => {
       resolve({
         data: { quote_id: `q-${request.amount}`, value: request.amount * 2 },
@@ -47,7 +47,7 @@ const mocked = vi.hoisted(() => {
     })
   }))
 
-  const getReverseQuoteMock = vi.fn(async () => ({
+  const requestReverseQuoteMock = vi.fn(async () => ({
     data: { quote_id: 'reverse-quote', value: 5 },
     headers: new Headers(),
     ok: true,
@@ -61,35 +61,61 @@ const mocked = vi.hoisted(() => {
     status: 200,
   }))
 
-  const acceptTransactionMock = vi.fn(async () => ({
-    data: { id: 'tx-1', kycLink: null, transaction_reference: 'ref' },
+  const acceptTransactionRequestMock = vi.fn(async () => ({
+    data: {
+      id: 'tx-1', kycLink: null, payment_context: null, transaction_reference: 'ref',
+    },
     headers: new Headers(),
     ok: true,
     status: 200,
   }))
 
+  const fetchPublicCorridorsMock = vi.fn(async () => ({
+    corridors: [{
+      blockchain: 'STELLAR',
+      chainFamily: 'stellar',
+      chainId: 'stellar:pubnet',
+      cryptoCurrency: 'USDC',
+      maxAmount: null,
+      minAmount: null,
+      notify: { endpoint: null, required: false },
+      paymentMethod: 'BREB',
+      targetCurrency: 'BRL',
+      walletConnect: {
+        chainId: 'stellar:pubnet',
+        events: [],
+        methods: ['stellar_signXDR'],
+        namespace: 'stellar',
+      },
+    }],
+  }))
+
   return {
     abortResult,
-    acceptTransactionMock,
+    acceptTransactionRequestMock,
     decodeQrCodeBRMock,
-    getQuoteMock,
-    getReverseQuoteMock,
+    fetchPublicCorridorsMock,
+    requestQuoteMock,
+    requestReverseQuoteMock,
   }
 })
 
 vi.mock('../api', () => ({
-  _36EnumsBlockchainNetwork: { STELLAR: 'STELLAR' },
-  _36EnumsCryptoCurrency: { USDC: 'USDC' },
   _36EnumsTargetCurrency: { BRL: 'BRL', COP: 'COP' },
-  acceptTransaction: mocked.acceptTransactionMock,
   decodeQrCodeBR: mocked.decodeQrCodeBRMock,
-  getQuote: mocked.getQuoteMock,
-  getReverseQuote: mocked.getReverseQuoteMock,
-  SupportedPaymentMethod: { BREB: 'BREB', PIX: 'PIX' },
+}))
+
+vi.mock('../services/public/publicApi', () => ({
+  acceptTransactionRequest: mocked.acceptTransactionRequestMock,
+  fetchPublicCorridors: mocked.fetchPublicCorridorsMock,
+  notifyPayment: vi.fn(),
+  requestQuote: mocked.requestQuoteMock,
+  requestReverseQuote: mocked.requestReverseQuoteMock,
 }))
 
 const mockKit: IWallet = {
   address: 'GADDR',
+  chainId: 'stellar:pubnet',
   connect: vi.fn(),
   disconnect: vi.fn(),
   signTransaction: vi.fn(async () => ({ signedTxXdr: 'signed-xdr', signerAddress: 'GADDR' })),
@@ -108,9 +134,12 @@ const mockWalletAuthentication: IWalletAuthentication = {
 const Wrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   <NoticeProvider>
     <WalletAuthContext.Provider value={{
-      kit: mockKit,
+      defaultWallet: mockKit,
+      getWalletHandler: vi.fn(() => mockKit),
       kycUrl: null,
+      setActiveWallet: vi.fn(),
       setKycUrl: vi.fn(),
+      wallet: mockKit,
       walletAuthentication: mockWalletAuthentication,
     }}
     >
@@ -132,6 +161,11 @@ describe('useWebSwapController', () => {
   it('aborts stale quote requests', async () => {
     const { result } = renderHook(() => useWebSwapController(), { wrapper: Wrapper })
 
+    await act(async () => {
+      await Promise.resolve()
+      await mocked.fetchPublicCorridorsMock.mock.results[0]?.value
+    })
+
     act(() => {
       result.current.swapViewProps.onTargetChange('10')
       result.current.swapViewProps.onTargetChange('20')
@@ -141,8 +175,8 @@ describe('useWebSwapController', () => {
       vi.runAllTimers()
     })
 
-    expect(mocked.getQuoteMock).toHaveBeenCalledTimes(2)
-    expect(result.current.swapViewProps.sourceAmount).toBe('40.00')
+    expect(mocked.requestQuoteMock).toHaveBeenCalledTimes(2)
+    expect(result.current.swapViewProps.sourceAmount).toBe('40')
     expect(result.current.swapViewProps.targetAmount).toBe('20')
   })
 
