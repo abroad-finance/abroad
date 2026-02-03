@@ -1,5 +1,5 @@
 import {
-  useCallback, useEffect, useRef, useState,
+  useCallback, useEffect, useMemo, useRef, useState,
 } from 'react'
 
 import type { IWalletAuthentication } from '../interfaces/IWalletAuthentication'
@@ -160,13 +160,25 @@ export const useWalletAuthentication = (): IWalletAuthentication => {
     setJwtToken,
   ])
 
-  return {
+  const onTokenChange = useCallback((listener: (token: null | string) => void) => {
+    return authTokenStore.subscribe(listener)
+  }, [])
+
+  return useMemo(() => ({
     authenticate,
     getAuthToken,
     getChallengeMessage,
     jwtToken,
-    onTokenChange: authTokenStore.subscribe.bind(authTokenStore),
+    onTokenChange,
     refreshAuthToken,
     setJwtToken,
-  }
+  }), [
+    authenticate,
+    getAuthToken,
+    getChallengeMessage,
+    jwtToken,
+    onTokenChange,
+    refreshAuthToken,
+    setJwtToken,
+  ])
 }

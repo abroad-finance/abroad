@@ -1,7 +1,7 @@
 import { WalletConnectModal } from '@walletconnect/modal'
 import SignClient from '@walletconnect/sign-client'
 import { getSdkError } from '@walletconnect/utils'
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 
 import type { IWallet, WalletConnectRequest } from '../../interfaces/IWallet'
 import type { IWalletAuthentication } from '../../interfaces/IWalletAuthentication'
@@ -211,7 +211,7 @@ export function useWalletConnectWallet({ walletAuth }: {
       if (!uri) throw new Error('No WalletConnect URI')
 
       const modal = ensureModal()
-      await modal.openModal({ uri })
+      await modal.openModal({ uri, chains: [targetChainId] })
       const session = await approval()
       topicRef.current = session.topic
       await modal.closeModal()
@@ -298,7 +298,7 @@ export function useWalletConnectWallet({ walletAuth }: {
     request,
   ])
 
-  return {
+  return useMemo(() => ({
     address,
     chainId,
     connect,
@@ -306,7 +306,14 @@ export function useWalletConnectWallet({ walletAuth }: {
     request,
     signTransaction,
     walletId: 'wallet-connect',
-  }
+  }), [
+    address,
+    chainId,
+    connect,
+    disconnect,
+    request,
+    signTransaction,
+  ])
 }
 
 export const decodeWalletConnectSolanaTx = (base64Tx: string): Uint8Array => {

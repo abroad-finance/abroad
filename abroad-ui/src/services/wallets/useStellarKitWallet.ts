@@ -14,7 +14,7 @@ import {
   WalletConnectModule,
 } from '@creit.tech/stellar-wallets-kit/modules/walletconnect.module'
 // useStellarKitWallet.ts
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 
 import type { IWallet } from '../../interfaces/IWallet'
 import type { IWalletAuthentication } from '../../interfaces/IWalletAuthentication'
@@ -127,14 +127,20 @@ export function useStellarKitWallet(
   ])
 
   // Return an object compatible with IWallet
-  return {
+  return useMemo(() => ({
     address,
     chainId: STELLAR_CHAIN_ID,
     connect,
     disconnect,
     signTransaction,
     walletId,
-  }
+  }), [
+    address,
+    connect,
+    disconnect,
+    signTransaction,
+    walletId,
+  ])
 }
 
 function buildModules() {

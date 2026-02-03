@@ -363,16 +363,16 @@ export const useWebSwapController = (): WebSwapControllerProps => {
   }, [activeChainKey, availableCorridors])
   const chainVariants = useMemo(() => {
     const map = new Map<string, Set<string>>()
-    availableCorridors.forEach((corridor) => {
+    corridors.forEach((corridor) => {
       const current = map.get(corridor.blockchain) ?? new Set<string>()
       current.add(corridor.chainId)
       map.set(corridor.blockchain, current)
     })
     return map
-  }, [availableCorridors])
+  }, [corridors])
   const chainOptions = useMemo(() => {
     const seen = new Map<string, PublicCorridor>()
-    availableCorridors.forEach((corridor) => {
+    corridors.forEach((corridor) => {
       const key = chainKeyOf(corridor)
       if (!seen.has(key)) seen.set(key, corridor)
     })
@@ -383,7 +383,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
         label: buildChainLabel(corridor, includeChainId),
       }
     })
-  }, [availableCorridors, chainVariants])
+  }, [chainVariants, corridors])
   const assetOptions = useMemo(() => chainFilteredCorridors.map(corridor => ({
     key: corridorKeyOf(corridor),
     label: corridor.cryptoCurrency,
@@ -863,13 +863,30 @@ export const useWebSwapController = (): WebSwapControllerProps => {
       dispatch({ corridorKey: corridorKeyOf(next), type: 'SET_CORRIDOR' })
     }
     else {
-      dispatch({ corridorKey: '', type: 'SET_CORRIDOR' })
+      const fallback = corridors.find(corridor => (
+        chainKeyOf(corridor) === key && corridor.cryptoCurrency === currentCrypto
+      )) ?? corridors.find(corridor => chainKeyOf(corridor) === key)
+      if (fallback) {
+        if (fallback.targetCurrency !== state.targetCurrency) {
+          dispatch({ type: 'RESET' })
+          dispatch({ targetCurrency: fallback.targetCurrency, type: 'SET_TARGET_CURRENCY' })
+        }
+        dispatch({ corridorKey: corridorKeyOf(fallback), type: 'SET_CORRIDOR' })
+      }
+      else {
+        dispatch({ corridorKey: '', type: 'SET_CORRIDOR' })
+      }
     }
     dispatch({ quoteId: '', type: 'SET_AMOUNTS' })
     lastEditedRef.current = null
     directAbortRef.current?.abort()
     reverseAbortRef.current?.abort()
-  }, [availableCorridors, selectedCorridor])
+  }, [
+    availableCorridors,
+    corridors,
+    selectedCorridor,
+    state.targetCurrency,
+  ])
 
   useEffect(() => {
     if (!currencyMenuOpen) return

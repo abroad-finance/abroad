@@ -106,16 +106,16 @@ export const useSwap = ({
   }, [activeChainKey, availableCorridors])
   const chainVariants = useMemo(() => {
     const map = new Map<string, Set<string>>()
-    availableCorridors.forEach((corridor) => {
+    corridors.forEach((corridor) => {
       const current = map.get(corridor.blockchain) ?? new Set<string>()
       current.add(corridor.chainId)
       map.set(corridor.blockchain, current)
     })
     return map
-  }, [availableCorridors])
+  }, [corridors])
   const chainOptions = useMemo(() => {
     const seen = new Map<string, PublicCorridor>()
-    availableCorridors.forEach((corridor) => {
+    corridors.forEach((corridor) => {
       const key = chainKeyOf(corridor)
       if (!seen.has(key)) seen.set(key, corridor)
     })
@@ -126,7 +126,7 @@ export const useSwap = ({
         label: buildChainLabel(corridor, includeChainId),
       }
     })
-  }, [availableCorridors, chainVariants])
+  }, [chainVariants, corridors])
   const targetPaymentMethod = selectedCorridor?.paymentMethod ?? (targetCurrency === TargetCurrency.BRL ? 'PIX' : 'BREB')
   const transferFee
     = targetCurrency === TargetCurrency.BRL ? BRL_TRANSFER_FEE : COP_TRANSFER_FEE
@@ -562,7 +562,18 @@ export const useSwap = ({
       setCorridorKey(corridorKeyOf(next))
     }
     else {
-      setCorridorKey('')
+      const fallback = corridors.find(corridor => (
+        chainKeyOf(corridor) === key && corridor.cryptoCurrency === currentCrypto
+      )) ?? corridors.find(corridor => chainKeyOf(corridor) === key)
+      if (fallback) {
+        if (fallback.targetCurrency !== targetCurrency) {
+          setTargetCurrency(fallback.targetCurrency)
+        }
+        setCorridorKey(corridorKeyOf(fallback))
+      }
+      else {
+        setCorridorKey('')
+      }
     }
     lastEditedRef.current = null
     directAbortRef.current?.abort()
@@ -573,12 +584,15 @@ export const useSwap = ({
     setDisplayedTRM(0)
   }, [
     availableCorridors,
+    corridors,
     selectedCorridor,
     setCorridorKey,
     setChainKey,
     setQuoteId,
     setSourceAmount,
     setTargetAmount,
+    setTargetCurrency,
+    targetCurrency,
   ])
 
   const selectCurrency = useCallback(
