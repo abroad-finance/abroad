@@ -1,6 +1,12 @@
 import { _36EnumsTargetCurrency as TargetCurrency } from '../../api'
 import { WalletType } from '../../interfaces/IWalletFactory'
 
+// Re-export number formatter utilities
+export * from './numberFormatter'
+
+// Re-export QR parser utilities
+export * from './qrParser'
+
 // Minimal safe type-guard for objects that have a string `message` property.
 export const hasMessage = (v: unknown): v is { message: string } => typeof v === 'object' && v !== null && 'message' in v && typeof (v as Record<string, unknown>)['message'] === 'string'
 

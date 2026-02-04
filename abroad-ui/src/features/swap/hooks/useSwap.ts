@@ -462,5 +462,12 @@ export const useSwap = ({
 
     toggleCurrencyMenu,
     transferFeeDisplay,
+
+    // New properties to satisfy SwapProps
+    isBelowMinimum: false,
+    hasInsufficientFunds: false,
+    loadingBalance: false,
+    usdcBalance: '',
+    isWalletConnected: isAuthenticated,
   }
 }

@@ -47,6 +47,7 @@ import { SwapView } from '../../features/swap/types'
 import { ASSET_URLS, PENDING_TX_KEY } from '../../shared/constants'
 import { useWalletAuth } from '../../shared/hooks/useWalletAuth'
 import { hasMessage } from '../../shared/utils'
+import { formatWithThousandsSeparator } from '../../shared/utils/numberFormatter'
 
 type AcceptTransactionApiResponse = ApiClientResponse<acceptTransactionResponse, AcceptTransaction400>
 
@@ -56,25 +57,29 @@ type QuoteApiResponse = ApiClientResponse<getQuoteResponse, GetQuote400>
 type ReverseQuoteApiResponse = ApiClientResponse<getReverseQuoteResponse, GetReverseQuote400>
 type SwapAction
   = | { accountNumber?: string, pixKey?: string, recipientName?: string, taxId?: string, type: 'SET_BANK_DETAILS' }
-    | { isDecodingQr: boolean, type: 'SET_DECODING' }
-    | { isDesktop: boolean, type: 'SET_DESKTOP' }
-    | { isQrOpen: boolean, type: 'SET_QR_OPEN' }
-    | { isWalletDetailsOpen: boolean, type: 'SET_WALLET_DETAILS_OPEN' }
-    | { loadingSource?: boolean, loadingTarget?: boolean, type: 'SET_LOADING' }
-    | { loadingSubmit: boolean, type: 'SET_SUBMITTING' }
-    | { payload: Partial<SwapControllerState>, type: 'HYDRATE' }
-    | { qrCode: null | string, type: 'SET_QR_CODE' }
-    | { quoteId?: string, sourceAmount?: string, targetAmount?: string, type: 'SET_AMOUNTS' }
-    | { targetCurrency: TargetCurrency, type: 'SET_TARGET_CURRENCY' }
-    | { transactionId: null | string, type: 'SET_TRANSACTION_ID' }
-    | { type: 'RESET' }
-    | { type: 'SET_VIEW', view: SwapView }
+  | { isDecodingQr: boolean, type: 'SET_DECODING' }
+  | { isDesktop: boolean, type: 'SET_DESKTOP' }
+  | { isQrOpen: boolean, type: 'SET_QR_OPEN' }
+  | { isWalletDetailsOpen: boolean, type: 'SET_WALLET_DETAILS_OPEN' }
+  | { loadingBalance: boolean, type: 'SET_LOADING_BALANCE' }
+  | { loadingSource?: boolean, loadingTarget?: boolean, type: 'SET_LOADING' }
+  | { loadingSubmit: boolean, type: 'SET_SUBMITTING' }
+  | { payload: Partial<SwapControllerState>, type: 'HYDRATE' }
+  | { qrCode: null | string, type: 'SET_QR_CODE' }
+  | { quoteId?: string, sourceAmount?: string, targetAmount?: string, type: 'SET_AMOUNTS' }
+  | { targetCurrency: TargetCurrency, type: 'SET_TARGET_CURRENCY' }
+  | { transactionId: null | string, type: 'SET_TRANSACTION_ID' }
+  | { type: 'RESET' }
+  | { type: 'SET_VIEW', view: SwapView }
+  | { type: 'SET_USDC_BALANCE', usdcBalance: string }
+  | { type: 'SET_UNIT_RATE', unitRate: string }
 type SwapControllerState = {
   accountNumber: string
   isDecodingQr: boolean
   isDesktop: boolean
   isQrOpen: boolean
   isWalletDetailsOpen: boolean
+  loadingBalance: boolean
   loadingSource: boolean
   loadingSubmit: boolean
   loadingTarget: boolean
@@ -87,6 +92,8 @@ type SwapControllerState = {
   targetCurrency: TargetCurrency
   taxId: string
   transactionId: null | string
+  unitRate: string
+  usdcBalance: string
   view: SwapView
 }
 
@@ -101,6 +108,7 @@ const createInitialState = (isDesktop: boolean): SwapControllerState => ({
   isDesktop,
   isQrOpen: false,
   isWalletDetailsOpen: false,
+  loadingBalance: false,
   loadingSource: false,
   loadingSubmit: false,
   loadingTarget: false,
@@ -113,6 +121,8 @@ const createInitialState = (isDesktop: boolean): SwapControllerState => ({
   targetCurrency: TargetCurrency.BRL,
   taxId: '',
   transactionId: null,
+  unitRate: '',
+  usdcBalance: '',
   view: 'swap',
 })
 
@@ -124,6 +134,7 @@ const reducer = (state: SwapControllerState, action: SwapAction): SwapController
       return {
         ...createInitialState(state.isDesktop),
         targetCurrency: state.targetCurrency,
+        usdcBalance: state.usdcBalance,
       }
     case 'SET_AMOUNTS':
       return {
@@ -164,6 +175,12 @@ const reducer = (state: SwapControllerState, action: SwapAction): SwapController
       return { ...state, view: action.view }
     case 'SET_WALLET_DETAILS_OPEN':
       return { ...state, isWalletDetailsOpen: action.isWalletDetailsOpen }
+    case 'SET_LOADING_BALANCE':
+      return { ...state, loadingBalance: action.loadingBalance }
+    case 'SET_USDC_BALANCE':
+      return { ...state, usdcBalance: action.usdcBalance }
+    case 'SET_UNIT_RATE':
+      return { ...state, unitRate: action.unitRate }
     default:
       return state
   }
@@ -225,11 +242,33 @@ const formatError = (message: string, description?: string) => ({
   message,
 })
 
-const extractReason = (body: unknown): null | string => {
-  if (body && typeof body === 'object' && 'reason' in body) {
-    const reason = (body as { reason?: unknown }).reason
-    if (typeof reason === 'string') return reason
+const getNestedError = (b: Record<string, unknown>): string | null => {
+  if (typeof b.reason === 'string') return b.reason
+  if (typeof b.message === 'string') return b.message
+  if (typeof b.error === 'string') return b.error
+
+  if (b.error && typeof b.error === 'object') {
+    const e = b.error as Record<string, unknown>
+    if (typeof e.message === 'string') return e.message
   }
+
+  if (typeof b.code === 'string') return b.code
+  return null
+}
+
+const extractReason = (body: unknown): null | string => {
+  if (Array.isArray(body)) {
+    for (const item of body) {
+      const found = extractReason(item)
+      if (found) return found
+    }
+    return null
+  }
+
+  if (body && typeof body === 'object') {
+    return getNestedError(body as Record<string, unknown>)
+  }
+
   return null
 }
 
@@ -239,7 +278,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
   const initialDesktop = typeof window !== 'undefined' ? window.innerWidth >= 768 : true
   const [state, dispatch] = useReducer(reducer, createInitialState(initialDesktop))
   const { t } = useTranslate()
-  const { addNotice } = useNotices()
+  const { addNotice, clearNotices } = useNotices()
   const { kit, setKycUrl, walletAuthentication } = useWalletAuth()
 
   const lastEditedRef = useRef<'source' | 'target' | null>(null)
@@ -257,22 +296,26 @@ export const useWebSwapController = (): WebSwapControllerProps => {
   const targetPaymentMethod = state.targetCurrency === TargetCurrency.BRL ? PaymentMethod.PIX : PaymentMethod.BREB
   const transferFee = state.targetCurrency === TargetCurrency.BRL ? BRL_TRANSFER_FEE : COP_TRANSFER_FEE
 
-  const formatTargetNumber = useCallback((value: number) => new Intl.NumberFormat(targetLocale, {
-    maximumFractionDigits: 2,
-    minimumFractionDigits: 2,
+  const formatTargetNumber = useCallback((value: number, decimals = 2) => new Intl.NumberFormat(targetLocale, {
+    maximumFractionDigits: decimals,
+    minimumFractionDigits: decimals,
   }).format(value), [targetLocale])
 
   const notifyError = useCallback((message: string, description?: string) => {
+    clearNotices()
     addNotice(formatError(message, description))
-  }, [addNotice])
+  }, [addNotice, clearNotices])
 
   const exchangeRateDisplay = useMemo(() => {
+    if (state.unitRate) {
+      return state.unitRate
+    }
     if (state.loadingSource || state.loadingTarget) return '-'
-    const numericSource = parseFloat(state.sourceAmount)
-    const cleanedTarget = state.targetAmount.replace(/\./g, '').replace(/,/g, '.')
-    const numericTarget = parseFloat(cleanedTarget)
+    const numericSource = Number.parseFloat(state.sourceAmount)
+    const cleanedTarget = state.targetAmount.replaceAll('.', '').replaceAll(',', '.')
+    const numericTarget = Number.parseFloat(cleanedTarget)
     if (numericSource > 0 && !Number.isNaN(numericTarget) && numericTarget >= 0) {
-      return `${targetSymbol}${formatTargetNumber((numericTarget + transferFee) / numericSource)}`
+      return formatTargetNumber((numericTarget + transferFee) / numericSource, 2)
     }
     return '-'
   }, [
@@ -281,32 +324,52 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     state.loadingTarget,
     state.sourceAmount,
     state.targetAmount,
-    targetSymbol,
+    state.unitRate,
     transferFee,
   ])
 
-  const transferFeeDisplay = useMemo(() => `${targetSymbol}${formatTargetNumber(transferFee)}`, [
+  const transferFeeDisplay = useMemo(() => `${targetSymbol}${formatTargetNumber(transferFee, 2)}`, [
     formatTargetNumber,
     targetSymbol,
     transferFee,
   ])
 
   const isAuthenticated = Boolean(walletAuthentication?.jwtToken)
+  const isWalletConnected = Boolean(kit?.address)
 
   const isPrimaryDisabled = useCallback(() => {
-    const numericSource = parseFloat(String(state.sourceAmount))
-    const cleanedTarget = String(state.targetAmount).replace(/\./g, '').replace(/,/g, '.')
-    const numericTarget = parseFloat(cleanedTarget)
+    const numericSource = Number.parseFloat(String(state.sourceAmount))
+    const cleanedTarget = String(state.targetAmount).replaceAll('.', '').replaceAll(',', '.')
+    const numericTarget = Number.parseFloat(cleanedTarget)
     return !(numericSource > 0 && numericTarget > 0)
   }, [state.sourceAmount, state.targetAmount])
 
+  const isBelowMinimum = useMemo(() => {
+    const cleanedTarget = String(state.targetAmount).replaceAll('.', '').replaceAll(',', '.')
+    const numericTarget = Number.parseFloat(cleanedTarget)
+    if (numericTarget <= 0) return false
+
+    if (state.targetCurrency === TargetCurrency.COP) return numericTarget < 5000
+    if (state.targetCurrency === TargetCurrency.BRL) return numericTarget < 1
+    return false
+  }, [state.targetAmount, state.targetCurrency])
+
+  const hasInsufficientFunds = useMemo(() => {
+    const numericSource = Number.parseFloat(state.sourceAmount || '0')
+    const numericBalance = Number.parseFloat(state.usdcBalance || '0')
+    return isAuthenticated && state.usdcBalance !== '' && numericSource > numericBalance
+  }, [isAuthenticated, state.sourceAmount, state.usdcBalance])
+
   const continueDisabled = useMemo(() => {
-    if (!isAuthenticated) return false
-    return isPrimaryDisabled() || !state.quoteId
+    if (!isAuthenticated || !isWalletConnected) return false
+    return isPrimaryDisabled() || !state.quoteId || isBelowMinimum || hasInsufficientFunds
   }, [
     isAuthenticated,
+    isWalletConnected,
     isPrimaryDisabled,
     state.quoteId,
+    isBelowMinimum,
+    hasInsufficientFunds,
   ])
 
   const persistableView = state.view !== 'swap'
@@ -355,6 +418,126 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     }
   }, [])
 
+  // Fetch USDC balance when wallet is connected
+  useEffect(() => {
+    const fetchBalance = async () => {
+      if (!isWalletConnected || !kit?.address) {
+        dispatch({ type: 'SET_USDC_BALANCE', usdcBalance: '' })
+        return
+      }
+      dispatch({ loadingBalance: true, type: 'SET_LOADING_BALANCE' })
+      try {
+        const account = await HORIZON_SERVER.loadAccount(kit.address)
+        const usdcAsset = account.balances.find(
+          (b): b is Horizon.HorizonApi.BalanceLineAsset =>
+            'asset_code' in b &&
+            b.asset_code === 'USDC' &&
+            b.asset_issuer === 'GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN',
+        )
+        const balance = usdcAsset?.balance ?? '0'
+        dispatch({ type: 'SET_USDC_BALANCE', usdcBalance: balance })
+      } catch {
+        dispatch({ type: 'SET_USDC_BALANCE', usdcBalance: '' })
+      } finally {
+        dispatch({ loadingBalance: false, type: 'SET_LOADING_BALANCE' })
+      }
+    }
+    fetchBalance()
+  }, [isWalletConnected, kit?.address])
+
+  // Fetch unit rate (1 USDC) when targetCurrency changes
+  useEffect(() => {
+    const fetchUnitRate = async () => {
+      dispatch({ type: 'SET_UNIT_RATE', unitRate: '' })
+
+      const tryFetch = async (amount: number) => {
+        return await getReverseQuote({
+          crypto_currency: CryptoCurrency.USDC,
+          network: BlockchainNetwork.STELLAR,
+          payment_method: targetPaymentMethod,
+          source_amount: amount,
+          target_currency: state.targetCurrency,
+        }) as ReverseQuoteApiResponse
+      }
+
+      let response = await tryFetch(1)
+
+      // Fallback: If 1 USDC fails (e.g. COP min is ~$5000 COP), try with 10 USDC
+      if (response.status !== 200) {
+        const fallbackResponse = await tryFetch(10)
+        if (fallbackResponse.status === 200) {
+          const quote = fallbackResponse.data
+          const unitValue = quote.value / 10
+          dispatch({ type: 'SET_UNIT_RATE', unitRate: formatTargetNumber(unitValue) })
+          return
+        }
+      }
+
+      if (response.status === 200) {
+        const quote = response.data
+        const formatted = formatTargetNumber(quote.value)
+        dispatch({ type: 'SET_UNIT_RATE', unitRate: formatted })
+      }
+    }
+    fetchUnitRate()
+  }, [state.targetCurrency, formatTargetNumber, targetPaymentMethod])
+
+  const handleQuoteError = useCallback((
+    response: ApiClientResponse<any, any>,
+    inputValue: string,
+    mode: 'source' | 'target',
+    manualCalculation?: (val: number, rate: number) => number,
+  ) => {
+    if (isAbortError(response)) return
+
+    const reason = extractReason(response.data) || response.error?.message || t('swap.quote_error', 'Esta cotización superó el monto máximo permitido.')
+
+    // Suppress validation error if it is the minimum amount error or too small (UX Feature)
+    const isMinAmountError =
+      reason?.toLowerCase().includes('minimum allowed amount') ||
+      reason?.toLowerCase().includes('too small') ||
+      reason?.toLowerCase().includes('too_small') ||
+      (response.status === 400 && (reason?.toLowerCase().includes('amount') || reason?.toLowerCase().includes('too_small')))
+
+    if (!isMinAmountError) {
+      notifyError(reason, response.error?.message)
+      // Clear the OTHER field
+      if (mode === 'source') dispatch({ quoteId: '', targetAmount: '', type: 'SET_AMOUNTS' })
+      else dispatch({ quoteId: '', sourceAmount: '', type: 'SET_AMOUNTS' })
+      return
+    }
+
+    if (state.unitRate && manualCalculation) {
+      // Manual calculation fallback to show estimated conversion even if below minimum
+      const unitRateValue = Number.parseFloat(state.unitRate.replaceAll('.', '').replaceAll(',', '.'))
+      const inputNum = Number.parseFloat(inputValue.replaceAll('.', '').replaceAll(',', '.'))
+
+      if (unitRateValue > 0 && inputNum > 0) {
+        const calculated = manualCalculation(inputNum, unitRateValue)
+        if (mode === 'source') {
+          dispatch({
+            quoteId: '',
+            sourceAmount: inputValue,
+            targetAmount: formatTargetNumber(calculated, 2),
+            type: 'SET_AMOUNTS',
+          })
+        } else {
+          dispatch({
+            quoteId: '',
+            sourceAmount: calculated.toFixed(2),
+            targetAmount: inputValue,
+            type: 'SET_AMOUNTS',
+          })
+        }
+      }
+      return
+    }
+
+    // No unit rate yet, clear other field
+    if (mode === 'source') dispatch({ quoteId: '', targetAmount: '', type: 'SET_AMOUNTS' })
+    else dispatch({ quoteId: '', sourceAmount: '', type: 'SET_AMOUNTS' })
+  }, [dispatch, notifyError, state.unitRate, formatTargetNumber, t])
+
   const quoteFromSource = useCallback(async (value: string) => {
     lastEditedRef.current = 'source'
     directAbortRef.current?.abort()
@@ -363,7 +546,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     directAbortRef.current = controller
     const reqId = ++directReqIdRef.current
 
-    const num = parseFloat(value)
+    const num = Number.parseFloat(value)
     if (Number.isNaN(num)) {
       dispatch({
         quoteId: '', sourceAmount: value, targetAmount: '', type: 'SET_AMOUNTS',
@@ -388,29 +571,24 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     if (controller.signal.aborted || reqId !== directReqIdRef.current || lastEditedRef.current !== 'source') return
 
     if (response.status !== 200) {
-      if (!isAbortError(response)) {
-        const reason = extractReason(response.data) || response.error?.message || t('swap.quote_error', 'Esta cotización superó el monto máximo permitido.')
-        notifyError(reason, response.error?.message)
-      }
+      handleQuoteError(response, value, 'source', (input, rate) => input * rate)
       dispatch({ loadingTarget: false, type: 'SET_LOADING' })
       return
     }
 
     const quote = response.data
-    const formatted = formatTargetNumber(quote.value)
     dispatch({
       quoteId: quote.quote_id,
       sourceAmount: value,
-      targetAmount: formatted,
+      targetAmount: formatTargetNumber(quote.value, 2),
       type: 'SET_AMOUNTS',
     })
     dispatch({ loadingTarget: false, type: 'SET_LOADING' })
   }, [
+    handleQuoteError,
     formatTargetNumber,
-    notifyError,
     state.targetCurrency,
     targetPaymentMethod,
-    t,
   ])
 
   const quoteFromTarget = useCallback(async (value: string) => {
@@ -421,10 +599,8 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     const controller = new AbortController()
     reverseAbortRef.current = controller
     const reqId = ++reverseReqIdRef.current
-
-    const raw = value.replace(/[^0-9.,]/g, '')
-    const normalized = raw.replace(/\./g, '').replace(/,/g, '.')
-    const num = parseFloat(normalized)
+    const normalized = value.replaceAll('.', '').replaceAll(',', '.')
+    const num = Number.parseFloat(normalized)
     if (Number.isNaN(num)) {
       dispatch({
         quoteId: '', sourceAmount: '', targetAmount: value, type: 'SET_AMOUNTS',
@@ -449,10 +625,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     if (controller.signal.aborted || reqId !== reverseReqIdRef.current || lastEditedRef.current !== 'target') return
 
     if (response.status !== 200) {
-      if (!isAbortError(response)) {
-        const reason = extractReason(response.data) || response.error?.message || t('swap.quote_error', 'Esta cotización superó el monto máximo permitido.')
-        notifyError(reason, response.error?.message)
-      }
+      handleQuoteError(response, value, 'target', (input, rate) => input / rate)
       dispatch({ loadingSource: false, type: 'SET_LOADING' })
       return
     }
@@ -466,27 +639,34 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     })
     dispatch({ loadingSource: false, type: 'SET_LOADING' })
   }, [
-    notifyError,
+    handleQuoteError,
     state.targetCurrency,
     targetPaymentMethod,
-    t,
   ])
 
   const onSourceChange = useCallback((val: string) => {
-    const sanitized = val.replace(/[^0-9.]/g, '')
+    const sanitized = val.replaceAll(/[^0-9.]/g, '')
     dispatch({ sourceAmount: sanitized, type: 'SET_AMOUNTS' })
-    void quoteFromSource(sanitized)
+    quoteFromSource(sanitized)
   }, [quoteFromSource])
 
   const onTargetChange = useCallback((val: string) => {
-    const sanitized = val.replace(/[^0-9.,]/g, '')
-    dispatch({ targetAmount: sanitized, type: 'SET_AMOUNTS' })
-    void quoteFromTarget(sanitized)
+    // Standard decoration logic: integer dots, preserve comma if typing
+    const digits = val.replaceAll(/[^0-9,]/g, '')
+    const parts = digits.split(',')
+    if (parts[0]) {
+      // Format with thousands separator using helper function
+      parts[0] = formatWithThousandsSeparator(parts[0])
+    }
+    const formatted = parts.join(',')
+
+    dispatch({ targetAmount: formatted, type: 'SET_AMOUNTS' })
+    quoteFromTarget(formatted)
   }, [quoteFromTarget])
 
   const openQr = useCallback(() => {
     if (!isAuthenticated) {
-      void kit?.connect()
+      kit?.connect()
       return
     }
     dispatch({ isQrOpen: true, type: 'SET_QR_OPEN' })
@@ -553,7 +733,8 @@ export const useWebSwapController = (): WebSwapControllerProps => {
   }, [])
 
   const onPrimaryAction = useCallback(async () => {
-    if (!isAuthenticated) {
+    // Always connect wallet first if either wallet or auth is missing
+    if (!isAuthenticated || !isWalletConnected) {
       await kit?.connect()
       return
     }
@@ -564,6 +745,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     dispatch({ type: 'SET_VIEW', view: 'bankDetails' })
   }, [
     isAuthenticated,
+    isWalletConnected,
     kit,
     notifyError,
     state.quoteId,
@@ -601,7 +783,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
       if (pixKey) dispatch({ pixKey, type: 'SET_BANK_DETAILS' })
       if (taxIdDecoded && !taxIdDecoded.includes('*')) dispatch({ taxId: taxIdDecoded, type: 'SET_BANK_DETAILS' })
 
-      if (typeof amount === 'string' && parseFloat(amount) > 0) {
+      if (typeof amount === 'string' && Number.parseFloat(amount) > 0) {
         dispatch({ targetAmount: amount, type: 'SET_AMOUNTS' })
         await quoteFromTarget(amount)
         dispatch({ type: 'SET_VIEW', view: 'confirm-qr' })
@@ -707,6 +889,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
         const onChangeCallbackUrl = queryParams.get('on_change_callback')
         const sepTransactionId = queryParams.get('transaction_id')
         const sepBaseUrl = import.meta.env.VITE_SEP_BASE_URL || 'http://localhost:8000'
+
         let url = encodeURI(
           `${sepBaseUrl}/sep24/transactions/withdraw/interactive/complete?amount_expected=${state.sourceAmount}&transaction_id=${sepTransactionId}`,
         )
@@ -719,7 +902,26 @@ export const useWebSwapController = (): WebSwapControllerProps => {
         if (transaction_reference) {
           url += `&memo=${encodeURIComponent(transaction_reference)}`
         }
-        window.location.href = url
+
+        // UX Improvement: Notify parent (Vesseo) via postMessage
+        // This allows the container app to handle the success screen immediately
+        const targetOrigin = import.meta.env.VITE_VESSEO_ORIGIN || 'https://app.vesseo.com'
+        window.parent.postMessage({
+          type: 'transaction_completed',
+          status: 'success',
+          transaction_id: acceptedTxId,
+          sep_transaction_id: sepTransactionId,
+          amount_in: state.sourceAmount,
+          amount_out: state.targetAmount,
+          currency_out: state.targetCurrency,
+        }, targetOrigin)
+
+        // Slight delay to ensure message is processed if the app relies on it
+        // before the redirect potentially unloads the page
+        setTimeout(() => {
+          window.location.href = url
+        }, 1000)
+
         return
       }
 
@@ -783,7 +985,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
       dispatch({ type: 'SET_VIEW', view: 'bankDetails' })
       return
     }
-    void handleTransactionFlow()
+    handleTransactionFlow()
   }, [
     handleTransactionFlow,
     notifyError,
@@ -834,6 +1036,10 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     currencyMenuRef,
     exchangeRateDisplay,
     isAuthenticated,
+    isBelowMinimum,
+    hasInsufficientFunds,
+    isWalletConnected,
+    loadingBalance: state.loadingBalance,
     loadingSource: state.loadingSource,
     loadingTarget: state.loadingTarget,
     onPrimaryAction,
@@ -848,6 +1054,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     textColor: state.isDesktop ? 'white' : '#356E6A',
     toggleCurrencyMenu,
     transferFeeDisplay,
+    usdcBalance: state.usdcBalance,
   }
 
   const confirmQrProps: ConfirmQrProps = {
@@ -888,3 +1095,5 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     view: state.view,
   }
 }
+
+

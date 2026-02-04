@@ -2,7 +2,6 @@
 import React, { useMemo } from 'react'
 
 import { _36EnumsTargetCurrency as TargetCurrency } from '../../../api'
-import AnimatedHeroText from '../../../shared/components/AnimatedHeroText'
 import ImageAttribution from '../../../shared/components/ImageAttribution'
 import { ASSET_URLS } from '../../../shared/constants'
 import { SwapView } from '../types'
@@ -54,8 +53,8 @@ const WebSwapLayout: React.FC<WebSwapLayoutProps & WebSwapLayoutSlots> = ({ slot
       {/* ---------- Mobile (<= md) ---------- */}
       <div className="md:hidden flex flex-col w-full">
         {/* Swap Interface */}
-        <div className="min-h-[600px] h-[calc(100vh-80px)] bg-green-50 flex items-center justify-center p-4">
-          <div className="w-full max-w-md">
+        <div className="min-h-[calc(100dvh-80px)] bg-green-50 flex flex-col items-center justify-start p-4 pt-10">
+          <div className="w-full max-w-md pb-20">
             {renderSwap}
           </div>
         </div>
@@ -65,8 +64,8 @@ const WebSwapLayout: React.FC<WebSwapLayoutProps & WebSwapLayoutSlots> = ({ slot
       <div className="hidden md:flex flex-row w-full h-full">
         {/* Left Column - Marketing */}
         <div className="w-1/2 flex flex-col justify-center relative px-4 py-10 sm:px-6 lg:px-8">
-          <div className="text-6xl max-w-xl">
-            <AnimatedHeroText currency={targetCurrency} />
+          <div className="text-6xl max-w-xl font-bold">
+            Pague e transfira para o {targetCurrency} com Abroad
           </div>
           <ImageAttribution
             className="absolute bottom-5 left-5"
