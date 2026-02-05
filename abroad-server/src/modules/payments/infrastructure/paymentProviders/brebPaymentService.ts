@@ -102,6 +102,11 @@ interface BrebTransactionStatusInfo {
   TransactionStatusRsnInf?: string
 }
 
+interface MoviiLiquidityResponse {
+  body?: Array<{ saldo: string }>
+  statusCode?: number
+}
+
 @injectable()
 export class BrebPaymentService implements IPaymentService {
   public readonly capability: PaymentCapability = {
@@ -160,8 +165,40 @@ export class BrebPaymentService implements IPaymentService {
   }
 
   public async getLiquidity(): Promise<number> {
-    // BreB does not expose liquidity; use method-level limit as a conservative estimate.
-    return this.MAX_TOTAL_AMOUNT_PER_DAY
+    try {
+      const { MOVII_BALANCE_ACCOUNT_ID: accountId, MOVII_BALANCE_API_KEY: apiKey } = await this.secretManager.getSecrets([
+        'MOVII_BALANCE_API_KEY',
+        'MOVII_BALANCE_ACCOUNT_ID',
+      ] as const)
+
+      const url = `https://apigw-data.movii.com.co/traguatan/?id=${encodeURIComponent(accountId)}`
+      const headers = {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+      }
+
+      const { data } = await axios.get<MoviiLiquidityResponse>(url, { headers })
+      const saldoStr = data?.body?.[0]?.saldo
+      const saldo = typeof saldoStr === 'string' ? Number.parseFloat(saldoStr) : Number.NaN
+      if (!Number.isFinite(saldo)) {
+        this.logger.warn('[BreB] Liquidity response missing balance', {
+          accountId: this.maskIdentifier(accountId),
+          statusCode: data?.statusCode ?? null,
+        })
+        return 0
+      }
+
+      return saldo
+    }
+    catch (error) {
+      const reason = error instanceof Error ? error.message : 'Unknown error'
+      const status = this.extractErrorStatus(error)
+      this.logger.error('[BreB] Error fetching liquidity', {
+        reason,
+        ...(typeof status === 'number' ? { status } : {}),
+      })
+      return 0
+    }
   }
 
   public async onboardUser(): Promise<PaymentOnboardResult> {
