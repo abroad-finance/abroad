@@ -353,8 +353,10 @@ export class ExchangeConvertStepExecutor implements FlowStepExecutor {
   }
 
   private getNotionalFilter(filters: BinanceFilter[]): BinanceNotionalFilter | undefined {
-    return filters.find(filter => filter.filterType === 'NOTIONAL' || filter.filterType === 'MIN_NOTIONAL')
+    return (
+      filters.find(filter => filter.filterType === 'NOTIONAL' || filter.filterType === 'MIN_NOTIONAL')
       as BinanceNotionalFilter | undefined
+    )
   }
 
   private buildBinanceUrl(baseUrl: string, path: string): string {
