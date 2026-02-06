@@ -237,6 +237,32 @@ describe('TransactionAcceptanceService helpers', () => {
     delete process.env.MONTHLY_LIMIT_MULTIPLIER_DAYS
   })
 
+  it('normalizes non-finite caps for SQL comparisons', () => {
+    const dailyAmountCap = (service as unknown as {
+      dailyAmountCap: (paymentSvc: ReturnType<typeof buildPaymentService>) => number
+    }).dailyAmountCap
+    const dailyCountCap = (service as unknown as {
+      dailyCountCap: (paymentSvc: ReturnType<typeof buildPaymentService>) => number
+    }).dailyCountCap
+    const monthlyAmountCap = (service as unknown as {
+      monthlyAmountCap: (paymentSvc: ReturnType<typeof buildPaymentService>) => number
+    }).monthlyAmountCap
+    const monthlyCountCap = (service as unknown as {
+      monthlyCountCap: (paymentSvc: ReturnType<typeof buildPaymentService>) => number
+    }).monthlyCountCap
+
+    const unboundedService = {
+      ...paymentService,
+      MAX_TOTAL_AMOUNT_PER_DAY: Number.POSITIVE_INFINITY,
+      MAX_USER_TRANSACTIONS_PER_DAY: Number.POSITIVE_INFINITY,
+    }
+
+    expect(dailyAmountCap.call(service, unboundedService)).toBe(Number.MAX_SAFE_INTEGER)
+    expect(dailyCountCap.call(service, unboundedService)).toBe(2_147_483_647)
+    expect(monthlyAmountCap.call(service, unboundedService)).toBe(Number.MAX_SAFE_INTEGER)
+    expect(monthlyCountCap.call(service, unboundedService)).toBe(2_147_483_647)
+  })
+
   it('enforces partner KYB threshold using aggregates', async () => {
     const enforcePartnerKybThreshold = (service as unknown as {
       enforcePartnerKybThreshold: (

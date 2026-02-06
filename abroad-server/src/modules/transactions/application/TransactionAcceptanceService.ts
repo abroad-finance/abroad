@@ -415,12 +415,32 @@ export class TransactionAcceptanceService {
     await prismaClient.$executeRaw`SELECT 1 FROM "PaymentProvider" WHERE id = ${paymentMethod} FOR UPDATE`
   }
 
+  private static readonly UNBOUNDED_AMOUNT_CAP = Number.MAX_SAFE_INTEGER
+  private static readonly UNBOUNDED_COUNT_CAP = 2_147_483_647
+
+  // Prisma serializes non-finite numbers as NULL in SQL. Use finite sentinels for cap checks.
+  private normalizeAmountCap(value: number): number {
+    return Number.isFinite(value) ? value : TransactionAcceptanceService.UNBOUNDED_AMOUNT_CAP
+  }
+
+  private normalizeCountCap(value: number): number {
+    return Number.isFinite(value) ? value : TransactionAcceptanceService.UNBOUNDED_COUNT_CAP
+  }
+
+  private dailyAmountCap(paymentService: PaymentServiceInstance): number {
+    return this.normalizeAmountCap(paymentService.MAX_TOTAL_AMOUNT_PER_DAY)
+  }
+
+  private dailyCountCap(paymentService: PaymentServiceInstance): number {
+    return this.normalizeCountCap(paymentService.MAX_USER_TRANSACTIONS_PER_DAY)
+  }
+
   private monthlyAmountCap(paymentService: PaymentServiceInstance): number {
-    return paymentService.MAX_TOTAL_AMOUNT_PER_DAY * this.monthlyMultiplier()
+    return this.normalizeAmountCap(paymentService.MAX_TOTAL_AMOUNT_PER_DAY * this.monthlyMultiplier())
   }
 
   private monthlyCountCap(paymentService: PaymentServiceInstance): number {
-    return paymentService.MAX_USER_TRANSACTIONS_PER_DAY * this.monthlyMultiplier()
+    return this.normalizeCountCap(paymentService.MAX_USER_TRANSACTIONS_PER_DAY * this.monthlyMultiplier())
   }
 
   private monthlyMultiplier(): number {
@@ -483,8 +503,8 @@ export class TransactionAcceptanceService {
         "amount" = "PartnerDailyLimit"."amount" + ${targetAmount},
         "count" = "PartnerDailyLimit"."count" + 1
       WHERE
-        "PartnerDailyLimit"."amount" + ${targetAmount} <= ${paymentService.MAX_TOTAL_AMOUNT_PER_DAY}
-        AND "PartnerDailyLimit"."count" + 1 <= ${paymentService.MAX_USER_TRANSACTIONS_PER_DAY}
+        "PartnerDailyLimit"."amount" + ${targetAmount} <= ${this.dailyAmountCap(paymentService)}
+        AND "PartnerDailyLimit"."count" + 1 <= ${this.dailyCountCap(paymentService)}
     `
 
     if (Number(updated) === 0) {
@@ -533,8 +553,8 @@ export class TransactionAcceptanceService {
         "amount" = "PartnerUserDailyLimit"."amount" + ${targetAmount},
         "count" = "PartnerUserDailyLimit"."count" + 1
       WHERE
-        "PartnerUserDailyLimit"."amount" + ${targetAmount} <= ${paymentService.MAX_TOTAL_AMOUNT_PER_DAY}
-        AND "PartnerUserDailyLimit"."count" + 1 <= ${paymentService.MAX_USER_TRANSACTIONS_PER_DAY}
+        "PartnerUserDailyLimit"."amount" + ${targetAmount} <= ${this.dailyAmountCap(paymentService)}
+        AND "PartnerUserDailyLimit"."count" + 1 <= ${this.dailyCountCap(paymentService)}
     `
 
     if (Number(updated) === 0) {
