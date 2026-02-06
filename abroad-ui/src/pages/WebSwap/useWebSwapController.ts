@@ -974,11 +974,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
       }
 
       const amountRaw = decoded.amount
-      const amountText = typeof amountRaw === 'number'
-        ? amountRaw.toString()
-        : typeof amountRaw === 'string'
-          ? amountRaw
-          : null
+      const amountText = typeof amountRaw === 'string' ? amountRaw : null
       const normalizedAmount = amountText?.replace(',', '.').trim() ?? ''
       const parsedAmount = normalizedAmount ? Number.parseFloat(normalizedAmount) : Number.NaN
       const pixKey = decoded?.account
