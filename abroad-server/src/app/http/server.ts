@@ -11,6 +11,7 @@ import packageJson from '../../../package.json'
 import { mapErrorToHttpResponse } from '../../core/errors'
 import { ILogger } from '../../core/logging/types'
 import { requestContextMiddleware } from '../../core/requestContext'
+import { initSentry, setupSentryExpressErrorHandler } from '../../platform/observability/sentry'
 import { initAdmin } from '../admin/admin'
 import { RuntimeConfig } from '../config/runtime'
 import { iocContainer } from '../container'
@@ -18,6 +19,7 @@ import { TYPES } from '../container/types'
 import { RegisterRoutes } from './routes'
 
 dotenv.config()
+initSentry({ serviceName: 'abroad-api' })
 
 const app = express()
 const logger = iocContainer.get<ILogger>(TYPES.ILogger)
@@ -122,6 +124,9 @@ app.get('/', (req: Request, res: Response) => {
 // ---------------
 // Error handling
 // ---------------
+// Sentry error handler must be registered after all routes, before other error middleware.
+setupSentryExpressErrorHandler(app)
+
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
   logger.error('API error', err)

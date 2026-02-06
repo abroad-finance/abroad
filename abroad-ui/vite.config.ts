@@ -1,6 +1,7 @@
 /// <reference types="vitest" />
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
+import { sentryVitePlugin } from '@sentry/vite-plugin'
 import type { PluginOption, UserConfig } from 'vite'
 import { defineConfig } from 'vite'
 import crypto from 'node:crypto'
@@ -22,6 +23,42 @@ const plugins: PluginOption[] = [
   react({ include: '**/*.tsx' }),
   tailwindcss(),
 ]
+
+const readEnv = (key: string): string | undefined => {
+  const raw = process.env[key]
+  const trimmed = raw?.trim()
+  return trimmed ? trimmed : undefined
+}
+
+const resolveReleaseName = (): string | undefined => (
+  readEnv('SENTRY_RELEASE')
+  ?? readEnv('COMMIT_SHA')
+  ?? readEnv('GITHUB_SHA')
+  ?? readEnv('VERCEL_GIT_COMMIT_SHA')
+  ?? readEnv('SOURCE_VERSION')
+)
+
+const sentryAuthToken = readEnv('SENTRY_AUTH_TOKEN')
+const sentryOrg = readEnv('SENTRY_ORG')
+const sentryProject = readEnv('SENTRY_PROJECT')
+const sentryRelease = resolveReleaseName()
+const enableSentrySourcemaps = Boolean(sentryAuthToken && sentryOrg && sentryProject && sentryRelease)
+
+if (enableSentrySourcemaps && sentryAuthToken && sentryOrg && sentryProject && sentryRelease) {
+  plugins.push(
+    ...sentryVitePlugin({
+      authToken: sentryAuthToken,
+      org: sentryOrg,
+      project: sentryProject,
+      release: { name: sentryRelease },
+      sourcemaps: {
+        assets: ['./dist/assets/**'],
+        filesToDeleteAfterUpload: ['./dist/assets/**/*.map'],
+      },
+      telemetry: false,
+    }),
+  )
+}
 
 const config: VitestEnabledConfig = {
   root: __dirname,
@@ -61,7 +98,7 @@ const config: VitestEnabledConfig = {
         },
       },
     },
-    sourcemap: false,
+    sourcemap: enableSentrySourcemaps ? 'hidden' : false,
   },
   define: {
     'global': 'globalThis',

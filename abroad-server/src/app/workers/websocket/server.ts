@@ -5,10 +5,12 @@ import { ILogger } from '../../../core/logging/types'
 import { WebSocketBridge } from '../../../modules/realtime/application/WebSocketBridge'
 import { IQueueHandler } from '../../../platform/messaging/queues'
 import { IWebSocketService } from '../../../platform/notifications/IWebSocketService'
+import { initSentry } from '../../../platform/observability/sentry'
 import { iocContainer } from '../../container'
 import { TYPES } from '../../container/types'
 
 dotenv.config()
+initSentry({ serviceName: 'abroad-websocket-bridge' })
 
 async function main() {
   const logger = resolveLogger()

@@ -3,12 +3,14 @@ import http from 'http'
 
 import { createScopedLogger } from '../../../core/logging/scopedLogger'
 import { ILogger } from '../../../core/logging/types'
+import { initSentry } from '../../../platform/observability/sentry'
 import { OutboxRepository } from '../../../platform/outbox/OutboxRepository'
 import { OutboxWorker } from '../../../platform/outbox/OutboxWorker'
 import { iocContainer } from '../../container'
 import { TYPES } from '../../container/types'
 
 dotenv.config()
+initSentry({ serviceName: 'abroad-outbox-worker' })
 
 const health = { live: true, ready: false }
 const baseLogger = iocContainer.get<ILogger>(TYPES.ILogger)

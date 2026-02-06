@@ -61,6 +61,23 @@ Run both servers concurrently or in separate terminals.
   npm run lint      # ESLint (skip lint errors when fixing code)
   ```
 
+## Observability (Sentry)
+
+Sentry is optional in both `abroad-server` and `abroad-ui`.
+
+- Backend (`abroad-server`) runtime env vars:
+  - `SENTRY_DSN`
+  - `SENTRY_ENVIRONMENT` (defaults to `NODE_ENV`)
+  - `SENTRY_RELEASE` (optional)
+- Frontend (`abroad-ui`) runtime env vars:
+  - `VITE_SENTRY_DSN`
+  - `VITE_SENTRY_ENVIRONMENT` (defaults to `import.meta.env.MODE`)
+  - `VITE_SENTRY_RELEASE` (optional)
+- Frontend sourcemap upload during build (CI only):
+  - `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT`
+  - `SENTRY_RELEASE` (or a CI commit SHA env var such as `GITHUB_SHA`)
+  - Ensure `VITE_SENTRY_RELEASE` matches the release name used for upload, otherwise Sentry cannot apply sourcemaps.
+
 ## Project Structure
 
 ```text

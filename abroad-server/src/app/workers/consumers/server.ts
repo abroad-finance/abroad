@@ -7,10 +7,12 @@ import { PaymentStatusUpdatedController } from '../../../modules/payments/interf
 import { ReceivedCryptoTransactionController } from '../../../modules/transactions/interfaces/queue/ReceivedCryptoTransactionController'
 import { BinanceBalanceUpdatedController } from '../../../modules/treasury/interfaces/queue/BinanceBalanceUpdatedController'
 import { DeadLetterController } from '../../../platform/messaging/DeadLetterController'
+import { initSentry } from '../../../platform/observability/sentry'
 import { iocContainer } from '../../container'
 import { TYPES } from '../../container/types'
 
 dotenv.config()
+initSentry({ serviceName: 'abroad-consumers' })
 
 // Simple in-process health state
 const health = {

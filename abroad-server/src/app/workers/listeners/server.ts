@@ -4,11 +4,13 @@ import http from 'http'
 import { createScopedLogger } from '../../../core/logging/scopedLogger'
 import { ILogger } from '../../../core/logging/types'
 import { startListeners } from '../../../modules/treasury/interfaces/listeners'
+import { initSentry } from '../../../platform/observability/sentry'
 import { RuntimeConfig } from '../../config/runtime'
 import { iocContainer } from '../../container'
 import { TYPES } from '../../container/types'
 
 dotenv.config()
+initSentry({ serviceName: 'abroad-listeners' })
 
 const baseLogger = iocContainer.get<ILogger>(TYPES.ILogger)
 const logger = createScopedLogger(baseLogger, { scope: 'listeners' })
