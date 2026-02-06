@@ -1,3 +1,4 @@
+import { FlowStepStatus, FlowStepType } from '@prisma/client'
 import { inject, injectable } from 'inversify'
 
 import { TYPES } from '../../../../app/container/types'
@@ -7,6 +8,7 @@ import { ILogger } from '../../../../core/logging/types'
 import { getCorrelationId } from '../../../../core/requestContext'
 import { IQueueHandler, QueueName } from '../../../../platform/messaging/queues'
 import { BinanceBalanceUpdatedMessageSchema } from '../../../../platform/messaging/queueSchema'
+import { IDatabaseClientProvider } from '../../../../platform/persistence/IDatabaseClientProvider'
 import { FlowOrchestrator } from '../../../flows/application/FlowOrchestrator'
 
 /**
@@ -19,6 +21,7 @@ export class BinanceBalanceUpdatedController {
     @inject(TYPES.ILogger) private readonly logger: ILogger,
     @inject(TYPES.IQueueHandler) private readonly queueHandler: IQueueHandler,
     @inject(TYPES.FlowOrchestrator) private readonly orchestrator: FlowOrchestrator,
+    @inject(TYPES.IDatabaseClientProvider) private readonly dbProvider: IDatabaseClientProvider,
   ) {}
 
   public registerConsumers(): void {
@@ -45,11 +48,51 @@ export class BinanceBalanceUpdatedController {
     }
 
     try {
-      await this.orchestrator.handleSignal({
-        correlationKeys: { provider: 'binance' },
-        eventType: 'exchange.balance.updated',
-        payload: { provider: 'binance' },
+      const prisma = await this.dbProvider.getClient()
+      const provider = 'binance'
+      const waitingSteps = await prisma.flowStepInstance.findMany({
+        distinct: ['flowInstanceId'],
+        select: { flowInstance: { select: { transactionId: true } } },
+        where: {
+          correlation: { path: ['provider'], equals: provider },
+          status: FlowStepStatus.WAITING,
+          stepType: FlowStepType.AWAIT_EXCHANGE_BALANCE,
+        },
       })
+
+      if (waitingSteps.length === 0) {
+        scopedLogger.info('[BinanceBalanceUpdated queue]: No waiting flow steps for provider', { provider })
+        return
+      }
+
+      const errors: Error[] = []
+      for (const step of waitingSteps) {
+        const transactionId = step.flowInstance?.transactionId
+        if (!transactionId) {
+          scopedLogger.warn('[BinanceBalanceUpdated queue]: Missing transactionId for waiting step', { provider })
+          continue
+        }
+        try {
+          await this.orchestrator.handleSignal({
+            correlationKeys: { provider },
+            eventType: 'exchange.balance.updated',
+            payload: { provider },
+            transactionId,
+          })
+        }
+        catch (error) {
+          const normalized = error instanceof Error ? error : new Error(String(error))
+          errors.push(normalized)
+          scopedLogger.error('[BinanceBalanceUpdated queue]: Error updating flow for transaction', {
+            error: normalized,
+            transactionId,
+          })
+        }
+      }
+
+      if (errors.length > 0) {
+        throw errors[0]
+      }
     }
     catch (error) {
       scopedLogger.error('Error processing balance update signal', error)

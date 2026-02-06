@@ -144,3 +144,4 @@ stryker-tmp/
 abroad-server/reports/
 abroad-server/src/app/http/swagger.json
 abroad-server/src/app/http/routes.ts
+*key.json

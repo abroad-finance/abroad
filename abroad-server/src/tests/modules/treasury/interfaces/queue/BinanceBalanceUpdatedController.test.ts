@@ -3,9 +3,21 @@ import 'reflect-metadata'
 import { FlowOrchestrator } from '../../../../../modules/flows/application/FlowOrchestrator'
 import { BinanceBalanceUpdatedController } from '../../../../../modules/treasury/interfaces/queue/BinanceBalanceUpdatedController'
 import { QueueName } from '../../../../../platform/messaging/queues'
+import type { IDatabaseClientProvider } from '../../../../../platform/persistence/IDatabaseClientProvider'
 import { createMockLogger, createMockQueueHandler, MockLogger, MockQueueHandler } from '../../../../setup/mockFactories'
 
+type WaitingStep = { flowInstance: { transactionId: string } }
+
+const createDbProvider = (steps: WaitingStep[] = []): IDatabaseClientProvider => ({
+  getClient: jest.fn(async () => ({
+    flowStepInstance: {
+      findMany: jest.fn(async () => steps),
+    },
+  })),
+}) as IDatabaseClientProvider
+
 const buildController = (overrides?: {
+  dbProvider?: IDatabaseClientProvider
   logger?: MockLogger
   orchestrator?: jest.Mocked<Pick<FlowOrchestrator, 'handleSignal'>>
   queueHandler?: MockQueueHandler
@@ -13,13 +25,15 @@ const buildController = (overrides?: {
   const logger = overrides?.logger ?? createMockLogger()
   const queueHandler = overrides?.queueHandler ?? createMockQueueHandler()
   const orchestrator = overrides?.orchestrator ?? ({ handleSignal: jest.fn() })
+  const dbProvider = overrides?.dbProvider ?? createDbProvider()
   const controller = new BinanceBalanceUpdatedController(
     logger,
     queueHandler,
     orchestrator as FlowOrchestrator,
+    dbProvider,
   )
 
-  return { controller, logger, orchestrator, queueHandler }
+  return { controller, dbProvider, logger, orchestrator, queueHandler }
 }
 
 describe('BinanceBalanceUpdatedController', () => {
@@ -48,7 +62,9 @@ describe('BinanceBalanceUpdatedController', () => {
   })
 
   it('emits a flow signal when the balance update is valid', async () => {
-    const { controller, orchestrator } = buildController()
+    const { controller, orchestrator } = buildController({
+      dbProvider: createDbProvider([{ flowInstance: { transactionId: 'tx-1' } }]),
+    })
     const runner = controller as unknown as { onBalanceUpdated: (msg: unknown) => Promise<void> }
 
     await runner.onBalanceUpdated({})
@@ -57,11 +73,13 @@ describe('BinanceBalanceUpdatedController', () => {
       correlationKeys: { provider: 'binance' },
       eventType: 'exchange.balance.updated',
       payload: { provider: 'binance' },
+      transactionId: 'tx-1',
     })
   })
 
   it('logs when the orchestrator throws', async () => {
     const { controller, logger, orchestrator } = buildController({
+      dbProvider: createDbProvider([{ flowInstance: { transactionId: 'tx-1' } }]),
       orchestrator: { handleSignal: jest.fn().mockRejectedValueOnce(new Error('boom')) },
     })
     const runner = controller as unknown as { onBalanceUpdated: (msg: unknown) => Promise<void> }

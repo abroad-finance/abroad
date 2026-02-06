@@ -6,6 +6,7 @@ import { createScopedLogger } from '../../../../core/logging/scopedLogger'
 import { ILogger } from '../../../../core/logging/types'
 import { getCorrelationId } from '../../../../core/requestContext'
 import { IQueueHandler, QueueName } from '../../../../platform/messaging/queues'
+import { IDatabaseClientProvider } from '../../../../platform/persistence/IDatabaseClientProvider'
 import { PaymentStatusUpdatedMessage, PaymentStatusUpdatedMessageSchema } from '../../../../platform/messaging/queueSchema'
 import { FlowOrchestrator } from '../../../flows/application/FlowOrchestrator'
 
@@ -18,6 +19,7 @@ export class PaymentStatusUpdatedController {
     @inject(TYPES.FlowOrchestrator) private readonly orchestrator: FlowOrchestrator,
     @inject(TYPES.IQueueHandler) private readonly queueHandler: IQueueHandler,
     @inject(TYPES.ILogger) private readonly logger: ILogger,
+    @inject(TYPES.IDatabaseClientProvider) private readonly dbProvider: IDatabaseClientProvider,
   ) { }
 
   public registerConsumers() {
@@ -47,6 +49,19 @@ export class PaymentStatusUpdatedController {
     const message: PaymentStatusUpdatedMessage = parsed.data
 
     try {
+      const prisma = await this.dbProvider.getClient()
+      const transaction = await prisma.transaction.findUnique({
+        select: { id: true },
+        where: { externalId: message.externalId },
+      })
+
+      if (!transaction) {
+        scopedLogger.warn('[PaymentStatusUpdated queue]: Transaction not found for externalId', {
+          externalId: message.externalId,
+        })
+        return
+      }
+
       await this.orchestrator.handleSignal({
         correlationKeys: { externalId: message.externalId },
         eventType: 'payment.status.updated',
@@ -57,6 +72,7 @@ export class PaymentStatusUpdatedController {
           provider: message.provider,
           status: message.status,
         },
+        transactionId: transaction.id,
       })
     }
     catch (error) {
