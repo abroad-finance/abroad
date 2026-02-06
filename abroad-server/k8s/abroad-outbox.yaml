@@ -26,6 +26,15 @@ spec:
           env:
             - name: HEALTH_PORT
               value: "3000"
+            - name: SENTRY_DSN
+              valueFrom:
+                secretKeyRef:
+                  name: sentry-dsn
+                  key: SENTRY_DSN
+            - name: SENTRY_ENVIRONMENT
+              value: "${_SENTRY_ENVIRONMENT}"
+            - name: SENTRY_RELEASE
+              value: "${COMMIT_SHA}"
           resources:
             requests:
               cpu: "1"
