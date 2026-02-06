@@ -968,7 +968,19 @@ export const useWebSwapController = (): WebSwapControllerProps => {
         return
       }
       const decoded = response.data && 'decoded' in response.data ? response.data.decoded : null
-      const amount = decoded?.amount
+      if (!decoded) {
+        notifyError(t('swap.qr_decode_error', 'No pudimos decodificar este QR.'))
+        return
+      }
+
+      const amountRaw = decoded.amount
+      const amountText = typeof amountRaw === 'number'
+        ? amountRaw.toString()
+        : typeof amountRaw === 'string'
+          ? amountRaw
+          : null
+      const normalizedAmount = amountText?.replace(',', '.').trim() ?? ''
+      const parsedAmount = normalizedAmount ? Number.parseFloat(normalizedAmount) : Number.NaN
       const pixKey = decoded?.account
       const taxIdDecoded = decoded?.taxId
       const name = decoded?.name
@@ -977,11 +989,15 @@ export const useWebSwapController = (): WebSwapControllerProps => {
       if (pixKey) dispatch({ pixKey, type: 'SET_BANK_DETAILS' })
       if (taxIdDecoded && !taxIdDecoded.includes('*')) dispatch({ taxId: taxIdDecoded, type: 'SET_BANK_DETAILS' })
 
-      if (typeof amount === 'string' && parseFloat(amount) > 0) {
-        dispatch({ targetAmount: amount, type: 'SET_AMOUNTS' })
-        await quoteFromTarget(amount)
+      if (Number.isFinite(parsedAmount) && parsedAmount > 0) {
+        dispatch({ targetAmount: normalizedAmount, type: 'SET_AMOUNTS' })
+        await quoteFromTarget(normalizedAmount)
         dispatch({ type: 'SET_VIEW', view: 'confirm-qr' })
+        return
       }
+
+      notifyError(t('swap.qr_missing_amount', 'Este QR no incluye un monto. Ingresa el monto para continuar.'))
+      dispatch({ type: 'SET_VIEW', view: 'swap' })
     }
     catch (e) {
       if (!controller.signal.aborted) {
