@@ -33,6 +33,10 @@ RUN --mount=type=cache,id=npm,target=/root/.npm \
 FROM base AS production
 # Lightweight copy—only the artefacts required at runtime
 ENV NODE_ENV=production
+ARG SENTRY_ENVIRONMENT
+ARG SENTRY_RELEASE
+ENV SENTRY_ENVIRONMENT=$SENTRY_ENVIRONMENT
+ENV SENTRY_RELEASE=$SENTRY_RELEASE
 COPY --from=deps      /app/node_modules        ./node_modules
 COPY --from=prisma    /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=build     /app/dist                ./dist
