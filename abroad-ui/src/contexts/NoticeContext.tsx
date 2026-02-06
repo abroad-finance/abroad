@@ -2,7 +2,9 @@ import React, {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react'
 
@@ -23,21 +25,43 @@ const NoticeContext = createContext<NoticeContextValue>({
 })
 
 const buildId = () => crypto.randomUUID?.() || `notice-${Date.now()}-${Math.random().toString(16).slice(2)}`
+const ERROR_AUTO_DISMISS_MS = 5_000
 
 export const NoticeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [notices, setNotices] = useState<Notice[]>([])
+  const timeoutsRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
+
+  const removeNotice = useCallback((id: string) => {
+    const timeoutId = timeoutsRef.current.get(id)
+    if (timeoutId) {
+      clearTimeout(timeoutId)
+      timeoutsRef.current.delete(id)
+    }
+    setNotices(prev => prev.filter(n => n.id !== id))
+  }, [])
 
   const addNotice = useCallback((notice: Omit<Notice, 'id'>) => {
     const id = buildId()
     setNotices(prev => [...prev, { ...notice, id }])
+    if (notice.kind === 'error') {
+      const timeoutId = setTimeout(() => {
+        removeNotice(id)
+      }, ERROR_AUTO_DISMISS_MS)
+      timeoutsRef.current.set(id, timeoutId)
+    }
     return id
+  }, [removeNotice])
+
+  const clearNotices = useCallback(() => {
+    timeoutsRef.current.forEach(timeoutId => clearTimeout(timeoutId))
+    timeoutsRef.current.clear()
+    setNotices([])
   }, [])
 
-  const removeNotice = useCallback((id: string) => {
-    setNotices(prev => prev.filter(n => n.id !== id))
+  useEffect(() => () => {
+    timeoutsRef.current.forEach(timeoutId => clearTimeout(timeoutId))
+    timeoutsRef.current.clear()
   }, [])
-
-  const clearNotices = useCallback(() => setNotices([]), [])
 
   const value = useMemo<NoticeContextValue>(() => ({
     addNotice,
