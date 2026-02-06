@@ -68,7 +68,7 @@ steps:
       - --labels=managed-by=gcp-cloud-build-deploy-cloud-run,commit-sha=$COMMIT_SHA,gcb-build-id=$BUILD_ID,gcb-trigger-id=$_TRIGGER_ID
       - --region=$_DEPLOY_REGION
       - --update-env-vars=SENTRY_ENVIRONMENT=$_SENTRY_ENVIRONMENT,SENTRY_RELEASE=$COMMIT_SHA
-      - --update-secrets=SENTRY_DSN=$_SENTRY_DSN_SECRET:latest
+      - --update-secrets=SENTRY_DSN=SENTRY_DSN:latest
       - --quiet
       - --async
     waitFor: ["Migrate"]
@@ -89,7 +89,7 @@ steps:
       - --command=node
       - --args=dist/app/workers/websocket/server.js
       - --update-env-vars=SENTRY_ENVIRONMENT=$_SENTRY_ENVIRONMENT,SENTRY_RELEASE=$COMMIT_SHA
-      - --update-secrets=SENTRY_DSN=$_SENTRY_DSN_SECRET:latest
+      - --update-secrets=SENTRY_DSN=SENTRY_DSN:latest
       - --async
     waitFor: ["Migrate"]
 
@@ -133,7 +133,6 @@ substitutions:
   _PLATFORM: managed
   _SERVICE_NAME: abroad-api
   _WS_SERVICE_NAME: abroad-ws
-  _SENTRY_DSN_SECRET: SENTRY_DSN
   _SENTRY_ENVIRONMENT: production
   _TRIGGER_ID: ""
   _GKE_CLUSTER: ""
