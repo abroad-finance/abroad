@@ -117,10 +117,10 @@ steps:
       - -c
       - |
         set -euo pipefail
-        gcloud container clusters get-credentials "$CLOUDSDK_CONTAINER_CLUSTER" --region "$CLOUDSDK_COMPUTE_REGION" --project "$PROJECT_ID"
+        gcloud container clusters get-credentials "$$CLOUDSDK_CONTAINER_CLUSTER" --region "$$CLOUDSDK_COMPUTE_REGION" --project "$$PROJECT_ID"
 
         # Strip accidental trailing newlines from Secret Manager values.
-        sentry_dsn="$(printf '%s' "${SENTRY_DSN:-}" | tr -d '\r\n')"
+        sentry_dsn="$(printf '%s' "$$SENTRY_DSN" | tr -d '\r\n')"
         if [ -z "$sentry_dsn" ]; then
           echo "SENTRY_DSN secret is empty." >&2
           exit 1
