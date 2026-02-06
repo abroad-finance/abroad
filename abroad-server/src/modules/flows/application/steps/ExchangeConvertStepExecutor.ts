@@ -51,8 +51,8 @@ type BinanceBookTickerResponse = {
 }
 
 type BinanceOrderPayload = {
-  quoteOrderQty?: string
-  quantity?: string
+  quoteOrderQty?: number
+  quantity?: number
   side: 'BUY' | 'SELL'
   symbol: string
   type: 'MARKET'
@@ -235,7 +235,7 @@ export class ExchangeConvertStepExecutor implements FlowStepExecutor {
     }
 
     if (!symbolInfo) {
-      const orderPayload: BinanceOrderPayload = { side, symbol, type: 'MARKET', quantity: amount.toString() }
+      const orderPayload: BinanceOrderPayload = { side, symbol, type: 'MARKET', quantity: amount }
       return { adjustedAmount: amount, orderPayload }
     }
 
@@ -257,7 +257,7 @@ export class ExchangeConvertStepExecutor implements FlowStepExecutor {
       }
 
       const orderPayload: BinanceOrderPayload = {
-        quoteOrderQty: this.formatAmount(amount, quotePrecision),
+        quoteOrderQty: this.roundToPrecision(amount, quotePrecision),
         side,
         symbol,
         type: 'MARKET',
@@ -307,7 +307,7 @@ export class ExchangeConvertStepExecutor implements FlowStepExecutor {
 
     const decimals = this.decimalsFromStep(lotFilter.stepSize)
     const orderPayload: BinanceOrderPayload = {
-      quantity: this.formatAmount(adjusted, decimals),
+      quantity: this.roundToPrecision(adjusted, decimals),
       side,
       symbol,
       type: 'MARKET',
@@ -353,10 +353,8 @@ export class ExchangeConvertStepExecutor implements FlowStepExecutor {
   }
 
   private getNotionalFilter(filters: BinanceFilter[]): BinanceNotionalFilter | undefined {
-    return (
-      filters.find(filter => filter.filterType === 'NOTIONAL' || filter.filterType === 'MIN_NOTIONAL')
-      as BinanceNotionalFilter | undefined
-    )
+    const found = filters.find(filter => filter.filterType === 'NOTIONAL' || filter.filterType === 'MIN_NOTIONAL')
+    return found as BinanceNotionalFilter | undefined
   }
 
   private buildBinanceUrl(baseUrl: string, path: string): string {
@@ -380,9 +378,11 @@ export class ExchangeConvertStepExecutor implements FlowStepExecutor {
     return Math.floor(amount * scale + 1e-8) / scale
   }
 
-  private formatAmount(amount: number, decimals: number): string {
+  private roundToPrecision(amount: number, decimals: number): number {
     const normalizedDecimals = Math.max(0, Math.min(decimals, 12))
-    return normalizedDecimals === 0 ? Math.trunc(amount).toString() : amount.toFixed(normalizedDecimals)
+    if (normalizedDecimals === 0) return Math.trunc(amount)
+    // Convert through string to clamp floating point tails (e.g., 1.1000000003).
+    return Number(amount.toFixed(normalizedDecimals))
   }
 
   private parseNumber(value: string | undefined): number | undefined {
