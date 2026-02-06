@@ -1,3 +1,5 @@
+import type { TargetCurrency } from '../../api'
+
 export type AcceptTransactionRequest = {
   account_number: string
   qr_code?: null | string
@@ -51,7 +53,7 @@ export type PublicCorridor = {
   minAmount: null | number
   notify: NotifyMetadata
   paymentMethod: string
-  targetCurrency: string
+  targetCurrency: TargetCurrency
   walletConnect: WalletConnectMetadata
 }
 
