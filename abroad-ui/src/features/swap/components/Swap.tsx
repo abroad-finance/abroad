@@ -126,63 +126,76 @@ export default function Swap({
         className="w-[98%] max-w-md min-h-[60vh] bg-white/30 backdrop-blur-2xl rounded-[2rem] p-5 md:p-8 flex flex-col items-center justify-center space-y-2 lg:space-y-4 shadow-[0_8px_32px_rgba(53,110,106,0.08)] border border-white/40"
         id="background-container"
       >
-        {/* Title + Subtitle + Exchange Rate */}
-        <div className="flex-1 flex items-start justify-between w-full pt-2">
-          <div className="flex flex-col space-y-3">
-            <div className="text-[1.8rem] md:text-[2rem] font-bold leading-tight tracking-tight">
-              <span>{t('swap.title', 'Paga o envía')}</span>
-            </div>
-            {/* Exchange rate */}
-            <div className="flex items-center gap-1.5 text-base md:text-lg font-medium opacity-80 mt-1 mb-2 md:mb-4">
-              <ArrowLeftRight className="w-4 h-4" />
-              <span>
-                1 {sourceSymbol} = <b>{exchangeRateDisplay}</b>
+        {/* Title + QR button */}
+        <div className="flex items-center justify-between w-full pt-2">
+          <div className="text-[1.8rem] md:text-[2rem] font-bold leading-tight tracking-tight">
+            <span>
+              {t('swap.title', 'Pay or send')}
+              {' '}
+              <span className="opacity-60">
+                {targetCurrency === TargetCurrency.BRL
+                  ? t('swap.to_country_br', 'to Brazil')
+                  : t('swap.to_country_co', 'to Colombia')}
               </span>
-            </div>
+            </span>
           </div>
 
-          <div className="flex items-center gap-2">
-            <div className="relative" ref={chainMenuRef}>
-              <button
-                aria-expanded={chainMenuOpen}
-                aria-haspopup="listbox"
-                className="focus:outline-none cursor-pointer"
-                onClick={toggleChainMenu}
-                type="button"
-              >
-                <TokenBadge iconSrc={getChainIcon(selectedChainLabel)} symbol={selectedChainLabel} />
-              </button>
+          {targetCurrency === TargetCurrency.BRL && (
+            <button
+              aria-label={t('swap.scan_qr_aria', 'Escanear QR')}
+              className="p-2 cursor-pointer bg-white/60 backdrop-blur-xl rounded-full hover:bg-white focus:outline-none focus:ring-2 focus:ring-[#356E6A]/40 transition shadow-sm shrink-0"
+              onClick={openQr}
+              type="button"
+            >
+              <ScanLine className="w-8 h-8" />
+            </button>
+          )}
+        </div>
 
-              {chainMenuOpen && chainOptions.length > 1 && (
-                <div
-                  className="absolute right-0 top-[calc(100%+8px)] z-[70] bg-white/95 backdrop-blur-2xl rounded-2xl shadow-2xl ring-1 ring-black/10 p-1 space-y-0.5 min-w-[160px]"
-                  role="listbox"
-                >
-                  {chainOptions.map(option => (
-                    <button
-                      aria-selected={option.label === selectedChainLabel}
-                      className={`cursor-pointer w-full text-left rounded-xl px-1 py-1 transition-all active:scale-95${option.label === selectedChainLabel ? ' bg-[#356E6A]/10' : ' hover:bg-black/5'}`}
-                      key={option.key}
-                      onClick={() => selectChain(option.key)}
-                      role="option"
-                      type="button"
-                    >
-                      <TokenBadge iconSrc={getChainIcon(option.label)} symbol={option.label} transparent />
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+        {/* Chain selector + Exchange rate */}
+        <div className="flex items-center justify-between w-full">
+          <div className="flex items-center gap-1.5 text-base md:text-lg font-medium opacity-80">
+            <ArrowLeftRight className="w-4 h-4" />
+            <span>
+              1 {sourceSymbol} = <b>{exchangeRateDisplay}</b>
+            </span>
+          </div>
 
-            {targetCurrency === TargetCurrency.BRL && (
-              <button
-                aria-label={t('swap.scan_qr_aria', 'Escanear QR')}
-                className="p-2 cursor-pointer bg-white/60 backdrop-blur-xl rounded-full hover:bg-white focus:outline-none focus:ring-2 focus:ring-[#356E6A]/40 transition shadow-sm"
-                onClick={openQr}
-                type="button"
+          <div className="relative shrink-0" ref={chainMenuRef}>
+            <button
+              aria-expanded={chainMenuOpen}
+              aria-haspopup="listbox"
+              className="focus:outline-none cursor-pointer"
+              onClick={toggleChainMenu}
+              type="button"
+            >
+              <TokenBadge
+                iconSrc={getChainIcon(selectedChainLabel)}
+                suffix={chainOptions.length > 1
+                  ? <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${chainMenuOpen ? 'rotate-180' : ''}`} />
+                  : undefined}
+                symbol={selectedChainLabel}
+              />
+            </button>
+
+            {chainMenuOpen && chainOptions.length > 1 && (
+              <div
+                className="absolute right-0 top-[calc(100%+8px)] z-[70] bg-white/95 backdrop-blur-2xl rounded-2xl shadow-2xl ring-1 ring-black/10 p-1 space-y-0.5 min-w-[160px]"
+                role="listbox"
               >
-                <ScanLine className="w-8 h-8" />
-              </button>
+                {chainOptions.map(option => (
+                  <button
+                    aria-selected={option.label === selectedChainLabel}
+                    className={`cursor-pointer w-full text-left rounded-xl px-1 py-1 transition-all active:scale-95${option.label === selectedChainLabel ? ' bg-[#356E6A]/10' : ' hover:bg-black/5'}`}
+                    key={option.key}
+                    onClick={() => selectChain(option.key)}
+                    role="option"
+                    type="button"
+                  >
+                    <TokenBadge iconSrc={getChainIcon(option.label)} symbol={option.label} transparent />
+                  </button>
+                ))}
+              </div>
             )}
           </div>
         </div>
@@ -226,7 +239,13 @@ export default function Swap({
                 onClick={toggleAssetMenu}
                 type="button"
               >
-                <TokenBadge iconSrc={CRYPTO_ICONS[selectedAssetLabel]} symbol={selectedAssetLabel} />
+                <TokenBadge
+                  iconSrc={CRYPTO_ICONS[selectedAssetLabel]}
+                  suffix={assetOptions.length > 1
+                    ? <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${assetMenuOpen ? 'rotate-180' : ''}`} />
+                    : undefined}
+                  symbol={selectedAssetLabel}
+                />
               </button>
 
               {assetMenuOpen && assetOptions.length > 1 && (
