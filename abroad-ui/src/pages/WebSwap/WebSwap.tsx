@@ -107,7 +107,19 @@ const WebSwap: React.FC = () => {
             kycNeeded: (
               <UserVerification onApproved={handleKycApproved} onClose={handleBackToSwap} />
             ),
-            swap: <Swap {...swapViewProps} />,
+            swap: (
+              <Swap
+                {...swapViewProps}
+                hasInsufficientFunds={
+                  swapViewProps.isAuthenticated
+                  && !!walletDetails.usdcBalance
+                  && !!swapViewProps.sourceAmount
+                  && parseFloat(swapViewProps.sourceAmount) > parseFloat(walletDetails.usdcBalance.replace(/,/g, ''))
+                }
+                loadingBalance={walletDetails.isLoadingBalance}
+                usdcBalance={walletDetails.usdcBalance}
+              />
+            ),
             txStatus: (
               <TxStatus
                 onNewTransaction={resetForNewTransaction}

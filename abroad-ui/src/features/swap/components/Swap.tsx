@@ -15,6 +15,21 @@ import React, { useCallback } from 'react'
 import { _36EnumsTargetCurrency as TargetCurrency } from '../../../api'
 import { Button } from '../../../shared/components/Button'
 import { TokenBadge } from '../../../shared/components/TokenBadge'
+import { ASSET_URLS } from '../../../shared/constants'
+
+const CRYPTO_ICONS: Record<string, string> = {
+  USDC: ASSET_URLS.USDC_TOKEN_ICON,
+  USDT: ASSET_URLS.USDT_TOKEN_ICON,
+}
+
+const CHAIN_ICON_PREFIXES: Array<[string, string]> = [
+  ['Stellar', ASSET_URLS.STELLAR_CHAIN_ICON],
+  ['Solana', ASSET_URLS.SOLANA_CHAIN_ICON],
+  ['Celo', ASSET_URLS.CELO_CHAIN_ICON],
+]
+
+const getChainIcon = (label: string): string | undefined =>
+  CHAIN_ICON_PREFIXES.find(([prefix]) => label.startsWith(prefix))?.[1]
 
 export interface SwapProps {
   assetMenuOpen: boolean
@@ -27,8 +42,11 @@ export interface SwapProps {
   currencyMenuOpen: boolean
   currencyMenuRef: React.RefObject<HTMLDivElement | null>
   exchangeRateDisplay: string // e.g. '-', 'R$5,43'
+  hasInsufficientFunds?: boolean
+  isAboveMaximum: boolean
   isAuthenticated: boolean
   isBelowMinimum: boolean
+  loadingBalance?: boolean
   loadingSource: boolean
   loadingTarget: boolean
   onPrimaryAction: () => void
@@ -50,6 +68,7 @@ export interface SwapProps {
   toggleChainMenu: () => void
   toggleCurrencyMenu: () => void
   transferFeeDisplay: string // e.g. 'R$0,00'
+  usdcBalance?: string
 }
 
 export default function Swap({
@@ -63,8 +82,11 @@ export default function Swap({
   currencyMenuOpen,
   currencyMenuRef,
   exchangeRateDisplay,
+  hasInsufficientFunds,
+  isAboveMaximum,
   isAuthenticated,
   isBelowMinimum,
+  loadingBalance,
   loadingSource,
   loadingTarget,
   onPrimaryAction,
@@ -85,6 +107,7 @@ export default function Swap({
   toggleChainMenu,
   toggleCurrencyMenu,
   transferFeeDisplay,
+  usdcBalance,
 }: SwapProps): React.JSX.Element {
   const { t } = useTranslate()
 
@@ -127,24 +150,24 @@ export default function Swap({
                 onClick={toggleChainMenu}
                 type="button"
               >
-                <TokenBadge symbol={selectedChainLabel} />
+                <TokenBadge iconSrc={getChainIcon(selectedChainLabel)} symbol={selectedChainLabel} />
               </button>
 
               {chainMenuOpen && chainOptions.length > 1 && (
                 <div
-                  className="absolute right-0 top-[calc(100%+8px)] z-[70] bg-white/95 backdrop-blur-xl rounded-xl shadow-lg p-2 space-y-1 min-w-[160px]"
+                  className="absolute right-0 top-[calc(100%+8px)] z-[70] bg-white/95 backdrop-blur-2xl rounded-2xl shadow-2xl ring-1 ring-black/10 p-1 space-y-0.5 min-w-[160px]"
                   role="listbox"
                 >
                   {chainOptions.map(option => (
                     <button
                       aria-selected={option.label === selectedChainLabel}
-                      className="cursor-pointer w-full text-left hover:bg-black/5 rounded-lg px-1 py-1"
+                      className={`cursor-pointer w-full text-left rounded-xl px-1 py-1 transition-all active:scale-95${option.label === selectedChainLabel ? ' bg-[#356E6A]/10' : ' hover:bg-black/5'}`}
                       key={option.key}
                       onClick={() => selectChain(option.key)}
                       role="option"
                       type="button"
                     >
-                      <TokenBadge symbol={option.label} />
+                      <TokenBadge iconSrc={getChainIcon(option.label)} symbol={option.label} transparent />
                     </button>
                   ))}
                 </div>
@@ -166,68 +189,89 @@ export default function Swap({
 
         {/* SOURCE */}
         <div
-          className="relative z-20 w-full bg-white/60 backdrop-blur-xl rounded-2xl p-4 md:py-6 md:px-6 flex items-center justify-between"
+          className={`relative z-20 w-full bg-white/60 backdrop-blur-xl rounded-2xl p-4 md:py-6 md:px-6 flex flex-col${hasInsufficientFunds ? ' ring-2 ring-red-500' : ''}`}
           id="source-amount"
         >
-          <div className="flex-1 flex items-center gap-2 min-w-0">
-            <span className="text-xl md:text-2xl font-bold shrink-0">
-              {sourceSymbol}
-            </span>
-            {loadingSource
-              ? (
-                  <Loader className="animate-spin w-6 h-6" />
-                )
-              : (
-                  <input
-                    className="w-full bg-transparent font-bold focus:outline-none text-xl md:text-2xl"
-                    inputMode="decimal"
-                    onFocus={handleFocus}
-                    onChange={e => onSourceChange(e.target.value)}
-                    pattern="[0-9.]*"
-                    placeholder="0.00"
+          <span className="text-[10px] md:text-xs opacity-50 mb-1">
+            {t('swap.from_balance', 'De tu balance')}
+          </span>
+          <div className="flex items-center justify-between">
+            <div className="flex-1 flex items-center gap-2 min-w-0">
+              <span className="text-xl md:text-2xl font-bold shrink-0">
+                {sourceSymbol}
+              </span>
+              {loadingSource
+                ? (
+                    <Loader className="animate-spin w-6 h-6" />
+                  )
+                : (
+                    <input
+                      className="w-full bg-transparent font-bold focus:outline-none text-xl md:text-2xl"
+                      inputMode="decimal"
+                      onFocus={handleFocus}
+                      onChange={e => onSourceChange(e.target.value)}
+                      pattern="[0-9.]*"
+                      placeholder="0.00"
 
-                    type="text"
-                    value={sourceAmount}
-                  />
-                )}
-          </div>
-          <div className="relative ml-2 shrink-0" ref={assetMenuRef}>
-            <button
-              aria-expanded={assetMenuOpen}
-              aria-haspopup="listbox"
-              className="focus:outline-none cursor-pointer"
-              onClick={toggleAssetMenu}
-              type="button"
-            >
-              <TokenBadge symbol={selectedAssetLabel} />
-            </button>
-
-            {assetMenuOpen && assetOptions.length > 1 && (
-              <div
-                className="absolute right-0 top-[calc(100%+8px)] z-[60] bg-white/95 backdrop-blur-xl rounded-xl shadow-lg p-2 space-y-1 min-w-[160px]"
-                role="listbox"
+                      type="text"
+                      value={sourceAmount}
+                    />
+                  )}
+            </div>
+            <div className="relative ml-2 shrink-0" ref={assetMenuRef}>
+              <button
+                aria-expanded={assetMenuOpen}
+                aria-haspopup="listbox"
+                className="focus:outline-none cursor-pointer"
+                onClick={toggleAssetMenu}
+                type="button"
               >
-                {assetOptions.map(option => (
-                  <button
-                    aria-selected={option.label === selectedAssetLabel}
-                    className="cursor-pointer w-full text-left hover:bg-black/5 rounded-lg px-1 py-1"
-                    key={option.key}
-                    onClick={() => selectAssetOption(option.key)}
-                    role="option"
-                    type="button"
-                  >
-                    <TokenBadge symbol={option.label} />
-                  </button>
-                ))}
-              </div>
-            )}
+                <TokenBadge iconSrc={CRYPTO_ICONS[selectedAssetLabel]} symbol={selectedAssetLabel} />
+              </button>
+
+              {assetMenuOpen && assetOptions.length > 1 && (
+                <div
+                  className="absolute right-0 top-[calc(100%+8px)] z-[60] bg-white/95 backdrop-blur-2xl rounded-2xl shadow-2xl ring-1 ring-black/10 p-1 space-y-0.5 min-w-[160px]"
+                  role="listbox"
+                >
+                  {assetOptions.map(option => (
+                    <button
+                      aria-selected={option.label === selectedAssetLabel}
+                      className={`cursor-pointer w-full text-left rounded-xl px-1 py-1 transition-all active:scale-95${option.label === selectedAssetLabel ? ' bg-[#356E6A]/10' : ' hover:bg-black/5'}`}
+                      key={option.key}
+                      onClick={() => selectAssetOption(option.key)}
+                      role="option"
+                      type="button"
+                    >
+                      <TokenBadge iconSrc={CRYPTO_ICONS[option.label]} symbol={option.label} transparent />
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
+          {isAuthenticated && usdcBalance !== undefined && (
+            <div className={`text-[10px] md:text-xs mt-1${hasInsufficientFunds ? ' text-red-500' : ' opacity-60'}`}>
+              {loadingBalance
+                ? <Loader className="inline animate-spin w-3 h-3" />
+                : (
+                    <>
+                      {t('swap.balance', 'Balance:')}
+                      {' '}
+                      $
+                      {usdcBalance}
+                      {' '}
+                      {selectedAssetLabel}
+                    </>
+                  )}
+            </div>
+          )}
         </div>
 
         {/* TARGET or Connect notice */}
 
         <div
-          className={`relative w-full backdrop-blur-xl rounded-2xl p-4 md:py-6 md:px-6 flex items-center justify-between transition-colors duration-300 ${currencyMenuOpen ? 'z-50' : 'z-10'} ${isBelowMinimum
+          className={`relative w-full backdrop-blur-xl rounded-2xl p-4 md:py-6 md:px-6 flex flex-col transition-colors duration-300 ${currencyMenuOpen ? 'z-50' : 'z-10'} ${isBelowMinimum || isAboveMaximum
             ? 'bg-red-500/10 border border-red-500/30'
             : 'bg-white/60'
           }`}
@@ -238,7 +282,12 @@ export default function Swap({
             <ChevronsDown className="w-4 h-4" color="#356E6A" />
           </div>
 
+          <span className="text-[10px] md:text-xs opacity-50 mb-1">
+            {t('swap.you_pay', 'Pagarás')}
+          </span>
+
           {/* input */}
+          <div className="flex items-center justify-between">
           <div className="flex-1 flex items-center gap-2 min-w-0">
             <span className="text-xl md:text-2xl font-bold shrink-0">
               {targetSymbol}
@@ -322,6 +371,7 @@ export default function Swap({
               </div>
             )}
           </div>
+          </div>
         </div>
 
         {/* Info */}
@@ -338,6 +388,17 @@ export default function Swap({
                     {targetCurrency === TargetCurrency.COP
                       ? t('swap.min_amount_cop', 'Mínimo: $5.000 COP')
                       : t('swap.min_amount_brl', 'Mínimo: R$1,00')}
+                  </span>
+                </div>
+              )}
+              {targetCurrency === TargetCurrency.COP && (
+                <div
+                  className={`flex items-center space-x-2 ${isAboveMaximum ? 'text-red-600 font-bold' : 'opacity-70'}`}
+                  id="max-amount"
+                >
+                  <CircleDollarSign className="w-5 h-5" />
+                  <span>
+                    {t('swap.max_amount_cop', 'Máximo: $5.000.000 COP')}
                   </span>
                 </div>
               )}

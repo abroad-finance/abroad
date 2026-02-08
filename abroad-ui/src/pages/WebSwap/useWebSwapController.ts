@@ -439,10 +439,13 @@ export const useWebSwapController = (): WebSwapControllerProps => {
   const targetPaymentMethod = selectedCorridor?.paymentMethod ?? 'BREB'
   const transferFee = state.targetCurrency === TargetCurrency.BRL ? BRL_TRANSFER_FEE : COP_TRANSFER_FEE
 
-  const formatTargetNumber = useCallback((value: number) => new Intl.NumberFormat(targetLocale, {
-    maximumFractionDigits: 2,
-    minimumFractionDigits: 2,
-  }).format(value), [targetLocale])
+  const formatTargetNumber = useCallback((value: number) => {
+    const isBRL = state.targetCurrency === TargetCurrency.BRL
+    return new Intl.NumberFormat(targetLocale, {
+      maximumFractionDigits: isBRL ? 2 : 0,
+      minimumFractionDigits: isBRL ? 2 : 0,
+    }).format(value)
+  }, [targetLocale, state.targetCurrency])
 
   const formatCryptoAmount = useCallback((value: number) => {
     if (!Number.isFinite(value)) return ''
@@ -524,6 +527,16 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     return numericTarget < min
   }, [quoteBelowMinimum, selectedCorridor, state.targetAmount])
 
+  const isAboveMaximum = useMemo(() => {
+    if (!selectedCorridor) return false
+    const max = selectedCorridor.targetCurrency === 'COP' ? 5_000_000 : 0
+    if (!max) return false
+    const cleanedTarget = String(state.targetAmount).replace(/\./g, '').replace(/,/g, '.')
+    const numericTarget = parseFloat(cleanedTarget)
+    if (Number.isNaN(numericTarget) || numericTarget <= 0) return false
+    return numericTarget > max
+  }, [selectedCorridor, state.targetAmount])
+
   const isPrimaryDisabled = useCallback(() => {
     const numericSource = parseFloat(String(state.sourceAmount))
     const cleanedTarget = String(state.targetAmount).replace(/\./g, '').replace(/,/g, '.')
@@ -533,8 +546,9 @@ export const useWebSwapController = (): WebSwapControllerProps => {
 
   const continueDisabled = useMemo(() => {
     if (!isAuthenticated) return false
-    return isPrimaryDisabled() || !state.quoteId || isBelowMinimum
+    return isPrimaryDisabled() || !state.quoteId || isBelowMinimum || isAboveMaximum
   }, [
+    isAboveMaximum,
     isAuthenticated,
     isBelowMinimum,
     isPrimaryDisabled,
@@ -759,8 +773,21 @@ export const useWebSwapController = (): WebSwapControllerProps => {
 
   const onTargetChange = useCallback((val: string) => {
     const sanitized = val.replace(/[^0-9.,]/g, '')
-    dispatch({ targetAmount: sanitized, type: 'SET_AMOUNTS' })
-    void quoteFromTarget(sanitized)
+    // Strip existing thousand separators (dots), split on comma (decimal sep)
+    const stripped = sanitized.replace(/\./g, '')
+    const parts = stripped.split(',')
+    const intPart = parts[0] || ''
+    // Format integer part with dot thousand separators
+    const num = parseInt(intPart, 10)
+    const formattedInt = Number.isNaN(num) || intPart === ''
+      ? intPart
+      : num.toLocaleString('es-CO', { useGrouping: true, maximumFractionDigits: 0 })
+    // Reassemble: keep decimal part exactly as user typed
+    const formatted = parts.length > 1
+      ? `${formattedInt},${parts[1]}`
+      : formattedInt
+    dispatch({ targetAmount: formatted, type: 'SET_AMOUNTS' })
+    void quoteFromTarget(formatted)
   }, [quoteFromTarget])
 
   const openQr = useCallback(() => {
@@ -1436,6 +1463,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     currencyMenuRef,
     exchangeRateDisplay,
     isAuthenticated,
+    isAboveMaximum,
     isBelowMinimum,
     loadingSource: state.loadingSource,
     loadingTarget: state.loadingTarget,
