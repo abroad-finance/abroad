@@ -2,7 +2,7 @@ import { useTranslate } from '@tolgee/react'
 import {
   ArrowLeftRight,
   ChevronDown,
-  ChevronsDown,
+  ArrowDownUp,
   CircleDollarSign,
   Landmark,
   Loader,
@@ -123,17 +123,17 @@ export default function Swap({
   return (
     <div className="flex-1 flex items-center justify-center w-full flex-col text-abroad-dark md:text-white">
       <div
-        className="w-[98%] max-w-md min-h-[60vh] bg-[#356E6A]/5 backdrop-blur-xl rounded-4xl p-4 md:p-6 flex flex-col items-center justify-center space-y-1 lg:space-y-4"
+        className="w-[98%] max-w-md min-h-[60vh] bg-white/30 backdrop-blur-2xl rounded-[2rem] p-5 md:p-8 flex flex-col items-center justify-center space-y-2 lg:space-y-4 shadow-[0_8px_32px_rgba(53,110,106,0.08)] border border-white/40"
         id="background-container"
       >
         {/* Title + Subtitle + Exchange Rate */}
         <div className="flex-1 flex items-start justify-between w-full pt-2">
           <div className="flex flex-col space-y-3">
-            <div className="text-[1.6rem] md:text-[1.8rem] font-bold leading-[1.6]">
-              <span>{t('swap.title', 'Paga o Transfiere')}</span>
+            <div className="text-[1.8rem] md:text-[2rem] font-bold leading-tight tracking-tight">
+              <span>{t('swap.title', 'Paga o envía')}</span>
             </div>
-            {/* Exchange rate moved here with more spacing */}
-            <div className="flex items-center gap-1.5 text-sm md:text-base opacity-80 mt-1 mb-2 md:mb-4">
+            {/* Exchange rate */}
+            <div className="flex items-center gap-1.5 text-base md:text-lg font-medium opacity-80 mt-1 mb-2 md:mb-4">
               <ArrowLeftRight className="w-4 h-4" />
               <span>
                 1 {sourceSymbol} = <b>{exchangeRateDisplay}</b>
@@ -189,15 +189,15 @@ export default function Swap({
 
         {/* SOURCE */}
         <div
-          className={`relative z-20 w-full bg-white/60 backdrop-blur-xl rounded-2xl p-4 md:py-6 md:px-6 flex flex-col${hasInsufficientFunds ? ' ring-2 ring-red-500' : ''}`}
+          className={`relative z-20 w-full bg-white/50 backdrop-blur-xl rounded-3xl p-5 md:py-7 md:px-7 flex flex-col${hasInsufficientFunds ? ' ring-2 ring-red-500' : ''}`}
           id="source-amount"
         >
-          <span className="text-[10px] md:text-xs opacity-50 mb-1">
+          <span className="text-xs md:text-sm opacity-60 font-medium mb-1">
             {t('swap.from_balance', 'De tu balance')}
           </span>
           <div className="flex items-center justify-between">
             <div className="flex-1 flex items-center gap-2 min-w-0">
-              <span className="text-xl md:text-2xl font-bold shrink-0">
+              <span className="text-2xl md:text-3xl font-bold shrink-0 text-abroad-dark">
                 {sourceSymbol}
               </span>
               {loadingSource
@@ -206,7 +206,7 @@ export default function Swap({
                   )
                 : (
                     <input
-                      className="w-full bg-transparent font-bold focus:outline-none text-xl md:text-2xl"
+                      className="w-full bg-transparent font-bold focus:outline-none text-2xl md:text-3xl text-abroad-dark"
                       inputMode="decimal"
                       onFocus={handleFocus}
                       onChange={e => onSourceChange(e.target.value)}
@@ -251,7 +251,7 @@ export default function Swap({
             </div>
           </div>
           {isAuthenticated && usdcBalance !== undefined && (
-            <div className={`text-[10px] md:text-xs mt-1${hasInsufficientFunds ? ' text-red-500' : ' opacity-60'}`}>
+            <div className={`text-xs md:text-sm mt-1${hasInsufficientFunds ? ' text-red-500' : ' opacity-60'}`}>
               {loadingBalance
                 ? <Loader className="inline animate-spin w-3 h-3" />
                 : (
@@ -271,25 +271,25 @@ export default function Swap({
         {/* TARGET or Connect notice */}
 
         <div
-          className={`relative w-full backdrop-blur-xl rounded-2xl p-4 md:py-6 md:px-6 flex flex-col transition-colors duration-300 ${currencyMenuOpen ? 'z-50' : 'z-10'} ${isBelowMinimum || isAboveMaximum
+          className={`relative w-full backdrop-blur-xl rounded-3xl p-5 md:py-7 md:px-7 flex flex-col transition-colors duration-300 ${currencyMenuOpen ? 'z-50' : 'z-10'} ${isBelowMinimum || isAboveMaximum
             ? 'bg-red-500/10 border border-red-500/30'
-            : 'bg-white/60'
+            : 'bg-white/50'
           }`}
           id="target-amount"
         >
           {/* chevrons */}
-          <div className="absolute -top-4 left-1/2 -translate-x-1/2 w-8 h-8 bg-[#356E6A]/5 rounded-full grid place-items-center">
-            <ChevronsDown className="w-4 h-4" color="#356E6A" />
+          <div className="absolute -top-5 left-1/2 -translate-x-1/2 w-10 h-10 bg-white rounded-full grid place-items-center shadow-md border border-abroad-light/20 z-30">
+            <ArrowDownUp className="w-5 h-5 text-abroad-dark" />
           </div>
 
-          <span className="text-[10px] md:text-xs opacity-50 mb-1">
+          <span className="text-xs md:text-sm opacity-60 font-medium mb-1">
             {t('swap.you_pay', 'Pagarás')}
           </span>
 
           {/* input */}
           <div className="flex items-center justify-between">
           <div className="flex-1 flex items-center gap-2 min-w-0">
-            <span className="text-xl md:text-2xl font-bold shrink-0">
+            <span className="text-2xl md:text-3xl font-bold shrink-0 text-abroad-dark">
               {targetSymbol}
             </span>
             {loadingTarget
@@ -298,7 +298,7 @@ export default function Swap({
                 )
               : (
                   <input
-                    className="w-full bg-transparent font-bold focus:outline-none text-xl md:text-2xl"
+                    className="w-full bg-transparent font-bold focus:outline-none text-2xl md:text-3xl text-abroad-dark"
                     inputMode="decimal"
                     onFocus={handleFocus}
                     onChange={e => onTargetChange(e.target.value)}
@@ -375,9 +375,9 @@ export default function Swap({
         </div>
 
         {/* Info */}
-        <div className="flex-1 flex items-center justify-center w-full">
+        <div className="flex-1 flex items-center justify-center w-full pt-2">
           <div className="w-full" id="tx-info">
-            <div className="flex flex-col space-y-2">
+            <div className="flex flex-col space-y-3">
               {(targetCurrency === TargetCurrency.COP || targetCurrency === TargetCurrency.BRL) && (
                 <div
                   className={`flex items-center space-x-2 ${isBelowMinimum ? 'text-red-600 font-bold' : 'opacity-70'}`}
@@ -425,7 +425,7 @@ export default function Swap({
 
       {/* Primary button (connect or continue) */}
       <Button
-        className="mt-4 w-[98%] max-w-md py-4 cursor-pointer"
+        className="mt-5 w-[98%] max-w-md py-5 cursor-pointer rounded-2xl"
         disabled={continueDisabled}
         onClick={onPrimaryAction}
       >

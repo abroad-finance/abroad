@@ -88,7 +88,7 @@ const WebSwap: React.FC = () => {
       />
 
       {/* Shared Navigation */}
-      <div className="relative z-10 bg-green-50 md:bg-transparent">
+      <div className="relative z-10 bg-gradient-to-br from-[#e8f5f0] to-[#d4ede4] md:bg-transparent">
         <NavBarResponsive
           {...navBar}
           languageSelector={<LanguageSelector {...languageSelector} />}

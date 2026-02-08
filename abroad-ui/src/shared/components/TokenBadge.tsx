@@ -21,7 +21,7 @@ const getFallbackInitials = (symbol: string): string => {
 }
 
 export const TokenBadge: React.FC<TokenBadgeProps> = ({ alt, iconSrc, suffix, symbol, transparent }) => (
-  <div className={`${transparent ? 'p-0' : 'bg-white/60 backdrop-blur-xl px-4 py-2'} rounded-4xl flex items-center justify-center text-abroad-dark`}>
+  <div className={`${transparent ? 'p-0' : 'bg-white/70 backdrop-blur-xl px-4 py-2.5 shadow-sm'} rounded-4xl flex items-center justify-center text-abroad-dark`}>
     {iconSrc
       ? (
           <img

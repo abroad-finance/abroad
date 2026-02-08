@@ -54,7 +54,7 @@ const WebSwapLayout: React.FC<WebSwapLayoutProps & WebSwapLayoutSlots> = ({ slot
       {/* ---------- Mobile (<= md) ---------- */}
       <div className="md:hidden flex flex-col w-full">
         {/* Swap Interface */}
-        <div className="min-h-[600px] h-[calc(100vh-80px)] bg-green-50 flex items-center justify-center p-4">
+        <div className="min-h-[600px] h-[calc(100vh-80px)] bg-gradient-to-br from-[#e8f5f0] to-[#d4ede4] flex items-center justify-center px-4 py-6">
           <div className="w-full max-w-md">
             {renderSwap}
           </div>

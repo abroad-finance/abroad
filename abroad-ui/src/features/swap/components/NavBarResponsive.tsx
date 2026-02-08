@@ -195,7 +195,7 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({
                 )}
                 <button
                   aria-label={address ? labels.walletDetailsAria : labels.connectWalletAria}
-                  className="flex items-center justify-center bg-[#356E6A]/5 backdrop-blur-xl rounded-xl pl-2 pr-1 py-2 border border-white/30 hover:bg-white/30 transition-colors duration-200 flex-1"
+                  className="flex items-center justify-center bg-white/50 backdrop-blur-xl rounded-2xl px-3 py-2 border border-white/40 shadow-sm hover:bg-white/60 transition-colors duration-200 flex-1"
                   onClick={onWalletClick}
                   type="button"
                 >
