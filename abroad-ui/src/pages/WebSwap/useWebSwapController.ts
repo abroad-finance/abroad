@@ -512,7 +512,16 @@ export const useWebSwapController = (): WebSwapControllerProps => {
   useEffect(() => {
     if (!wallet?.address || !wallet?.chainId || !selectedCorridor) return
     if (wallet.chainId === selectedCorridor.chainId) return
-    wallet.disconnect().catch(() => undefined)
+    // Instead of disconnecting, silently try to restore a saved session
+    // for the new chain. If no session exists, do nothing — the user
+    // can click "Connect Wallet" manually.
+    if (wallet.walletId === 'wallet-connect' && selectedCorridor.walletConnect) {
+      wallet.connect({
+        chainId: selectedCorridor.chainId,
+        silentRestore: true,
+        walletConnect: selectedCorridor.walletConnect,
+      }).catch(() => undefined)
+    }
   }, [selectedCorridor, wallet])
 
   const isBelowMinimum = useMemo(() => {
