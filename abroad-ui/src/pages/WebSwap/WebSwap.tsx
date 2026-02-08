@@ -77,7 +77,7 @@ const WebSwap: React.FC = () => {
   const walletDetails = useWalletDetails({ onClose: handleWalletDetailsClose })
 
   return (
-    <div className="w-screen min-h-screen md:h-screen md:overflow-hidden flex flex-col">
+    <div className="w-full min-h-[100dvh] md:h-screen md:overflow-hidden flex flex-col overflow-x-hidden">
       {/* Desktop page background with crossfade (no white flash) */}
       <BackgroundCrossfade
         backgroundAttachment="fixed"

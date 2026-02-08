@@ -1,5 +1,7 @@
 import { useTranslate } from '@tolgee/react'
 import {
+  ArrowLeftRight,
+  ChevronDown,
   ChevronsDown,
   CircleDollarSign,
   Landmark,
@@ -8,7 +10,7 @@ import {
   Timer,
   Wallet,
 } from 'lucide-react'
-import React from 'react'
+import React, { useCallback } from 'react'
 
 import { _36EnumsTargetCurrency as TargetCurrency } from '../../../api'
 import { Button } from '../../../shared/components/Button'
@@ -26,6 +28,7 @@ export interface SwapProps {
   currencyMenuRef: React.RefObject<HTMLDivElement | null>
   exchangeRateDisplay: string // e.g. '-', 'R$5,43'
   isAuthenticated: boolean
+  isBelowMinimum: boolean
   loadingSource: boolean
   loadingTarget: boolean
   onPrimaryAction: () => void
@@ -61,6 +64,7 @@ export default function Swap({
   currencyMenuRef,
   exchangeRateDisplay,
   isAuthenticated,
+  isBelowMinimum,
   loadingSource,
   loadingTarget,
   onPrimaryAction,
@@ -84,23 +88,34 @@ export default function Swap({
 }: SwapProps): React.JSX.Element {
   const { t } = useTranslate()
 
+  // Handler to scroll input into view on mobile focus
+  const handleFocus = useCallback((e: React.FocusEvent<HTMLInputElement>) => {
+    const input = e.currentTarget
+    input.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    setTimeout(() => {
+      input.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }, 300)
+  }, [])
+
   return (
     <div className="flex-1 flex items-center justify-center w-full flex-col text-abroad-dark md:text-white">
       <div
         className="w-[98%] max-w-md min-h-[60vh] bg-[#356E6A]/5 backdrop-blur-xl rounded-4xl p-4 md:p-6 flex flex-col items-center justify-center space-y-1 lg:space-y-4"
         id="background-container"
       >
-        {/* Title + Subtitle */}
-        <div className="flex-1 flex items-center justify-between w-full">
-          <div className="flex flex-col">
-            <div className="text-xl md:text-xl font-bold">
+        {/* Title + Subtitle + Exchange Rate */}
+        <div className="flex-1 flex items-start justify-between w-full pt-2">
+          <div className="flex flex-col space-y-3">
+            <div className="text-[1.6rem] md:text-[1.8rem] font-bold leading-[1.6]">
               <span>{t('swap.title', 'Paga o Transfiere')}</span>
             </div>
-            {targetCurrency === TargetCurrency.BRL && (
-              <div className="text-xs md:text-sm opacity-75">
-                {t('swap.subtitle', 'Escribe los datos o escanea un QR de Pix')}
-              </div>
-            )}
+            {/* Exchange rate moved here with more spacing */}
+            <div className="flex items-center gap-1.5 text-sm md:text-base opacity-80 mt-1 mb-2 md:mb-4">
+              <ArrowLeftRight className="w-4 h-4" />
+              <span>
+                1 {sourceSymbol} = <b>{exchangeRateDisplay}</b>
+              </span>
+            </div>
           </div>
 
           <div className="flex items-center gap-2">
@@ -139,7 +154,7 @@ export default function Swap({
             {targetCurrency === TargetCurrency.BRL && (
               <button
                 aria-label={t('swap.scan_qr_aria', 'Escanear QR')}
-                className="p-2 cursor-pointer rounded-full hover:bg-white/30 focus:outline-none focus:ring-2 focus:ring-[#356E6A]/40 transition"
+                className="p-2 cursor-pointer bg-white/60 backdrop-blur-xl rounded-full hover:bg-white focus:outline-none focus:ring-2 focus:ring-[#356E6A]/40 transition shadow-sm"
                 onClick={openQr}
                 type="button"
               >
@@ -166,6 +181,7 @@ export default function Swap({
                   <input
                     className="w-full bg-transparent font-bold focus:outline-none text-xl md:text-2xl"
                     inputMode="decimal"
+                    onFocus={handleFocus}
                     onChange={e => onSourceChange(e.target.value)}
                     pattern="[0-9.]*"
                     placeholder="0.00"
@@ -211,7 +227,10 @@ export default function Swap({
         {/* TARGET or Connect notice */}
 
         <div
-          className="relative z-10 w-full bg-white/60 backdrop-blur-xl rounded-2xl p-4 md:py-6 md:px-6 flex items-center justify-between"
+          className={`relative w-full backdrop-blur-xl rounded-2xl p-4 md:py-6 md:px-6 flex items-center justify-between transition-colors duration-300 ${currencyMenuOpen ? 'z-50' : 'z-10'} ${isBelowMinimum
+            ? 'bg-red-500/10 border border-red-500/30'
+            : 'bg-white/60'
+          }`}
           id="target-amount"
         >
           {/* chevrons */}
@@ -232,6 +251,7 @@ export default function Swap({
                   <input
                     className="w-full bg-transparent font-bold focus:outline-none text-xl md:text-2xl"
                     inputMode="decimal"
+                    onFocus={handleFocus}
                     onChange={e => onTargetChange(e.target.value)}
                     pattern="[0-9.,]*"
                     placeholder="0,00"
@@ -247,7 +267,7 @@ export default function Swap({
             <button
               aria-expanded={currencyMenuOpen}
               aria-haspopup="listbox"
-              className="focus:outline-none cursor-pointer"
+              className="focus:outline-none cursor-pointer relative z-[1001]"
               onClick={toggleCurrencyMenu}
               type="button"
             >
@@ -258,18 +278,21 @@ export default function Swap({
                     ? 'https://hatscripts.github.io/circle-flags/flags/br.svg'
                     : 'https://hatscripts.github.io/circle-flags/flags/co.svg'
                 }
+                suffix={
+                  <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${currencyMenuOpen ? 'rotate-180' : ''}`} />
+                }
                 symbol={targetCurrency}
               />
             </button>
 
             {currencyMenuOpen && (
               <div
-                className="absolute left-0 top-[calc(100%+8px)] z-[40] bg-white/95 backdrop-blur-xl rounded-xl shadow-lg p-2 space-y-1 min-w-[100px]"
+                className="absolute right-0 top-[calc(100%+8px)] z-[10000] bg-white/95 backdrop-blur-2xl rounded-2xl shadow-2xl ring-1 ring-black/10 p-1 space-y-0.5 w-full min-w-full"
                 role="listbox"
               >
                 <button
                   aria-selected={targetCurrency === TargetCurrency.COP}
-                  className="w-full text-left hover:bg-black/5 rounded-lg px-1 py-1 cursor-pointer"
+                  className={`w-full text-left rounded-xl p-3 cursor-pointer transition-all active:scale-95 flex items-center gap-3 ${targetCurrency === TargetCurrency.COP ? 'bg-[#356E6A]/10 text-[#356E6A] font-bold' : 'hover:bg-black/5'}`}
                   onClick={() => selectCurrency(TargetCurrency.COP)}
                   role="option"
                   type="button"
@@ -278,12 +301,13 @@ export default function Swap({
                     alt="Colombia flag"
                     iconSrc="https://hatscripts.github.io/circle-flags/flags/co.svg"
                     symbol="COP"
+                    transparent
                   />
                 </button>
 
                 <button
                   aria-selected={targetCurrency === TargetCurrency.BRL}
-                  className="cursor-pointer w-full text-left hover:bg-black/5 rounded-lg px-1 py-1"
+                  className={`w-full text-left rounded-xl p-3 cursor-pointer transition-all active:scale-95 flex items-center gap-3 ${targetCurrency === TargetCurrency.BRL ? 'bg-[#356E6A]/10 text-[#356E6A] font-bold' : 'hover:bg-black/5'}`}
                   onClick={() => selectCurrency(TargetCurrency.BRL)}
                   role="option"
                   type="button"
@@ -292,6 +316,7 @@ export default function Swap({
                     alt="Brazil flag"
                     iconSrc="https://hatscripts.github.io/circle-flags/flags/br.svg"
                     symbol="BRL"
+                    transparent
                   />
                 </button>
               </div>
@@ -303,14 +328,19 @@ export default function Swap({
         <div className="flex-1 flex items-center justify-center w-full">
           <div className="w-full" id="tx-info">
             <div className="flex flex-col space-y-2">
-              <div className="flex items-center space-x-2" id="trm">
-                <CircleDollarSign className="w-5 h-5" />
-                <span>
-                  {t('swap.exchange_rate', 'Tasa de Cambio:')}
-                  {' '}
-                  <b>{exchangeRateDisplay}</b>
-                </span>
-              </div>
+              {(targetCurrency === TargetCurrency.COP || targetCurrency === TargetCurrency.BRL) && (
+                <div
+                  className={`flex items-center space-x-2 ${isBelowMinimum ? 'text-red-600 font-bold' : 'opacity-70'}`}
+                  id="min-amount"
+                >
+                  <CircleDollarSign className="w-5 h-5" />
+                  <span>
+                    {targetCurrency === TargetCurrency.COP
+                      ? t('swap.min_amount_cop', 'Mínimo: $5.000 COP')
+                      : t('swap.min_amount_brl', 'Mínimo: R$1,00')}
+                  </span>
+                </div>
+              )}
               <div className="flex items-center space-x-2" id="transfer-fee">
                 <Landmark className="w-5 h-5" />
                 <span>
