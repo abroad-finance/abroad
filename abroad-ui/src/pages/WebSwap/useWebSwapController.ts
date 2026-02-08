@@ -314,6 +314,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
   const directReqIdRef = useRef(0)
   const reverseReqIdRef = useRef(0)
   const decodeAbortRef = useRef<AbortController | null>(null)
+  const [quoteBelowMinimum, setQuoteBelowMinimum] = useState(false)
 
   useEffect(() => {
     let active = true
@@ -511,6 +512,18 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     wallet.disconnect().catch(() => undefined)
   }, [selectedCorridor, wallet])
 
+  const isBelowMinimum = useMemo(() => {
+    if (quoteBelowMinimum) return true
+    if (!selectedCorridor) return false
+    const min = selectedCorridor.minAmount
+      || (selectedCorridor.targetCurrency === 'BRL' ? 1 : 0)
+    if (!min) return false
+    const cleanedTarget = String(state.targetAmount).replace(/\./g, '').replace(/,/g, '.')
+    const numericTarget = parseFloat(cleanedTarget)
+    if (Number.isNaN(numericTarget) || numericTarget <= 0) return false
+    return numericTarget < min
+  }, [quoteBelowMinimum, selectedCorridor, state.targetAmount])
+
   const isPrimaryDisabled = useCallback(() => {
     const numericSource = parseFloat(String(state.sourceAmount))
     const cleanedTarget = String(state.targetAmount).replace(/\./g, '').replace(/,/g, '.')
@@ -520,9 +533,10 @@ export const useWebSwapController = (): WebSwapControllerProps => {
 
   const continueDisabled = useMemo(() => {
     if (!isAuthenticated) return false
-    return isPrimaryDisabled() || !state.quoteId
+    return isPrimaryDisabled() || !state.quoteId || isBelowMinimum
   }, [
     isAuthenticated,
+    isBelowMinimum,
     isPrimaryDisabled,
     state.quoteId,
   ])
@@ -612,13 +626,27 @@ export const useWebSwapController = (): WebSwapControllerProps => {
 
     if (!response.ok) {
       if (!isAbortError(response)) {
-        const reason = extractReason(response.error?.body) || response.error?.message || t('swap.quote_error', 'Esta cotización superó el monto máximo permitido.')
-        notifyError(reason, response.error?.message)
+        // Suppress popup for 400 errors — the inline isBelowMinimum
+        // validation will handle the visual feedback instead.
+        const status = response.error?.status
+        if (status === 400) {
+          const reason = extractReason(response.error?.body) || ''
+          setQuoteBelowMinimum(reason.toLowerCase().includes('minimum'))
+          dispatch({
+            quoteId: '', sourceAmount: value, targetAmount: '', type: 'SET_AMOUNTS',
+          })
+        }
+        else {
+          setQuoteBelowMinimum(false)
+          const reason = extractReason(response.error?.body) || response.error?.message || t('swap.quote_error', 'Esta cotización superó el monto máximo permitido.')
+          notifyError(reason, response.error?.message)
+        }
       }
       dispatch({ loadingTarget: false, type: 'SET_LOADING' })
       return
     }
 
+    setQuoteBelowMinimum(false)
     const quote = response.data
     const formatted = formatTargetNumber(quote.value)
     dispatch({
@@ -660,6 +688,17 @@ export const useWebSwapController = (): WebSwapControllerProps => {
       return
     }
 
+    // Skip API call if below minimum — inline validation handles the UI
+    const minAmount = selectedCorridor.minAmount
+      || (selectedCorridor.targetCurrency === 'BRL' ? 1 : 0)
+    if (minAmount && num < minAmount) {
+      dispatch({
+        quoteId: '', sourceAmount: '', targetAmount: value, type: 'SET_AMOUNTS',
+      })
+      dispatch({ loadingSource: false, type: 'SET_LOADING' })
+      return
+    }
+
     dispatch({ loadingSource: true, type: 'SET_LOADING' })
     dispatch({ quoteId: '', type: 'SET_AMOUNTS' })
     const response = await requestQuote(
@@ -677,13 +716,25 @@ export const useWebSwapController = (): WebSwapControllerProps => {
 
     if (!response.ok) {
       if (!isAbortError(response)) {
-        const reason = extractReason(response.error?.body) || response.error?.message || t('swap.quote_error', 'Esta cotización superó el monto máximo permitido.')
-        notifyError(reason, response.error?.message)
+        const status = response.error?.status
+        if (status === 400) {
+          const reason = extractReason(response.error?.body) || ''
+          setQuoteBelowMinimum(reason.toLowerCase().includes('minimum'))
+          dispatch({
+            quoteId: '', sourceAmount: '', targetAmount: value, type: 'SET_AMOUNTS',
+          })
+        }
+        else {
+          setQuoteBelowMinimum(false)
+          const reason = extractReason(response.error?.body) || response.error?.message || t('swap.quote_error', 'Esta cotización superó el monto máximo permitido.')
+          notifyError(reason, response.error?.message)
+        }
       }
       dispatch({ loadingSource: false, type: 'SET_LOADING' })
       return
     }
 
+    setQuoteBelowMinimum(false)
     const quote = response.data
     dispatch({
       quoteId: quote.quote_id,
@@ -1385,6 +1436,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     currencyMenuRef,
     exchangeRateDisplay,
     isAuthenticated,
+    isBelowMinimum,
     loadingSource: state.loadingSource,
     loadingTarget: state.loadingTarget,
     onPrimaryAction,
