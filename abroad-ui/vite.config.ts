@@ -112,6 +112,7 @@ const config: VitestEnabledConfig = {
   },
   plugins,
   server: {
+    allowedHosts: true,
     watch: {
       usePolling: true,
     },
