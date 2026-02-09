@@ -2,7 +2,7 @@
 const typeKeys = [
   'AppConfig',
   'DeadLetterController',
-  'BinanceBalanceUpdatedController',
+  'ExchangeBalanceUpdatedController',
   'CeloPaymentVerifier',
   'CeloWalletHandler',
   'FlowExecutorRegistry',

@@ -7,6 +7,10 @@ export {
   DeadLetterMessageSchema,
 } from './deadLetterMessage'
 export {
+  ExchangeBalanceUpdatedMessage,
+  ExchangeBalanceUpdatedMessageSchema,
+} from './exchangeBalanceUpdatedMessage'
+export {
   PaymentStatusUpdatedMessage,
   PaymentStatusUpdatedMessageSchema,
 } from './paymentStatusUpdatedMessage'

@@ -103,7 +103,7 @@ describe('BinanceListener', () => {
       eventType: 'somethingElse',
     })
 
-    expect(queueHandler.postMessage).toHaveBeenCalledWith(QueueName.BINANCE_BALANCE_UPDATED, {})
+    expect(queueHandler.postMessage).toHaveBeenCalledWith(QueueName.EXCHANGE_BALANCE_UPDATED, { provider: 'binance' })
     expect(logger.info).toHaveBeenCalled()
     expect(logger.warn).toHaveBeenCalled()
   })

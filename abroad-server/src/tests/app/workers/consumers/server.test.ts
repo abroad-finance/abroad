@@ -5,7 +5,7 @@ import { createResponseRecorder, mockProcessExit, toIncomingMessage, toServerRes
 
 const receivedController = { registerConsumers: jest.fn() }
 const paymentStatusController = { registerConsumers: jest.fn() }
-const binanceController = { registerConsumers: jest.fn() }
+const exchangeBalanceUpdatedController = { registerConsumers: jest.fn() }
 const deadLetterController = { registerConsumers: jest.fn() }
 let queueHandler: MockQueueHandler
 
@@ -27,8 +27,8 @@ describe('consumers lifecycle', () => {
     getMock.mockReset()
     getMock.mockImplementation((token: unknown) => {
       switch (token) {
-        case TYPES.BinanceBalanceUpdatedController:
-          return binanceController
+        case TYPES.ExchangeBalanceUpdatedController:
+          return exchangeBalanceUpdatedController
         case TYPES.DeadLetterController:
           return deadLetterController
         case TYPES.IQueueHandler:
@@ -48,7 +48,7 @@ describe('consumers lifecycle', () => {
 
     expect(receivedController.registerConsumers).toHaveBeenCalled()
     expect(paymentStatusController.registerConsumers).toHaveBeenCalled()
-    expect(binanceController.registerConsumers).toHaveBeenCalled()
+    expect(exchangeBalanceUpdatedController.registerConsumers).toHaveBeenCalled()
     expect(deadLetterController.registerConsumers).toHaveBeenCalled()
 
     await stopConsumers()
@@ -61,8 +61,8 @@ describe('consumers lifecycle', () => {
     })
     getMock.mockImplementation((token: unknown) => {
       switch (token) {
-        case TYPES.BinanceBalanceUpdatedController:
-          return binanceController
+        case TYPES.ExchangeBalanceUpdatedController:
+          return exchangeBalanceUpdatedController
         case TYPES.IQueueHandler:
           return queueHandler
         case TYPES.PaymentStatusUpdatedController:
@@ -83,8 +83,8 @@ describe('consumers entrypoint health server', () => {
     queueHandler = createMockQueueHandler()
     getMock.mockImplementation((token: unknown) => {
       switch (token) {
-        case TYPES.BinanceBalanceUpdatedController:
-          return binanceController
+        case TYPES.ExchangeBalanceUpdatedController:
+          return exchangeBalanceUpdatedController
         case TYPES.DeadLetterController:
           return deadLetterController
         case TYPES.IQueueHandler:
