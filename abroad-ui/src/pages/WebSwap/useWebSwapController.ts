@@ -1461,28 +1461,18 @@ export const useWebSwapController = (): WebSwapControllerProps => {
   }
 
   const swapProps: SwapProps = {
-    assetMenuOpen,
-    assetMenuRef,
-    assetOptions,
-    chainMenuOpen,
-    chainMenuRef,
-    chainOptions,
     continueDisabled,
-    currencyMenuOpen,
-    currencyMenuRef,
     exchangeRateDisplay,
     isAuthenticated,
     isAboveMaximum,
     isBelowMinimum,
     loadingSource: state.loadingSource,
     loadingTarget: state.loadingTarget,
+    onOpenSourceModal: () => { /* handled in WebSwap */ },
+    onOpenTargetModal: () => { /* handled in WebSwap */ },
     onPrimaryAction,
     onSourceChange,
     onTargetChange,
-    openQr,
-    selectAssetOption,
-    selectChain,
-    selectCurrency,
     selectedAssetLabel,
     selectedChainLabel,
     sourceAmount: state.sourceAmount,
@@ -1490,10 +1480,6 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     targetAmount: state.targetAmount,
     targetCurrency: state.targetCurrency,
     targetSymbol,
-    textColor: state.isDesktop ? 'white' : '#356E6A',
-    toggleAssetMenu,
-    toggleChainMenu,
-    toggleCurrencyMenu,
     transferFeeDisplay,
   }
 
@@ -1515,7 +1501,9 @@ export const useWebSwapController = (): WebSwapControllerProps => {
   }, [])
 
   return {
+    assetOptions,
     bankDetailsProps,
+    chainOptions,
     closeQr: () => dispatch({ isQrOpen: false, type: 'SET_QR_OPEN' }),
     confirmQrProps,
     currentBgUrl,
@@ -1529,6 +1517,10 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     isWalletDetailsOpen: state.isWalletDetailsOpen,
     onWalletConnect: connectWallet,
     resetForNewTransaction,
+    selectAssetOption,
+    selectChain,
+    selectCurrency,
+    selectedChainKey: activeChainKey,
     swapViewProps: swapProps,
     targetAmount: state.targetAmount,
     targetCurrency: state.targetCurrency,
