@@ -1,7 +1,7 @@
 import 'reflect-metadata'
 
 import { FlowOrchestrator } from '../../../../../modules/flows/application/FlowOrchestrator'
-import { BinanceBalanceUpdatedController } from '../../../../../modules/treasury/interfaces/queue/BinanceBalanceUpdatedController'
+import { ExchangeBalanceUpdatedController } from '../../../../../modules/treasury/interfaces/queue/ExchangeBalanceUpdatedController'
 import { QueueName } from '../../../../../platform/messaging/queues'
 import type { IDatabaseClientProvider } from '../../../../../platform/persistence/IDatabaseClientProvider'
 import { createMockLogger, createMockQueueHandler, MockLogger, MockQueueHandler } from '../../../../setup/mockFactories'
@@ -14,7 +14,7 @@ const createDbProvider = (steps: WaitingStep[] = []): IDatabaseClientProvider =>
       findMany: jest.fn(async () => steps),
     },
   })),
-}) as IDatabaseClientProvider
+}) as unknown as IDatabaseClientProvider
 
 const buildController = (overrides?: {
   dbProvider?: IDatabaseClientProvider
@@ -26,24 +26,24 @@ const buildController = (overrides?: {
   const queueHandler = overrides?.queueHandler ?? createMockQueueHandler()
   const orchestrator = overrides?.orchestrator ?? ({ handleSignal: jest.fn() })
   const dbProvider = overrides?.dbProvider ?? createDbProvider()
-  const controller = new BinanceBalanceUpdatedController(
+  const controller = new ExchangeBalanceUpdatedController(
     logger,
     queueHandler,
-    orchestrator as FlowOrchestrator,
+    orchestrator as unknown as FlowOrchestrator,
     dbProvider,
   )
 
   return { controller, dbProvider, logger, orchestrator, queueHandler }
 }
 
-describe('BinanceBalanceUpdatedController', () => {
+describe('ExchangeBalanceUpdatedController', () => {
   it('registers the consumer', () => {
     const { controller, queueHandler } = buildController()
 
     controller.registerConsumers()
 
     expect(queueHandler.subscribeToQueue).toHaveBeenCalledWith(
-      QueueName.BINANCE_BALANCE_UPDATED,
+      QueueName.EXCHANGE_BALANCE_UPDATED,
       expect.any(Function),
     )
   })
@@ -52,7 +52,7 @@ describe('BinanceBalanceUpdatedController', () => {
     const { controller, logger, orchestrator } = buildController()
     const runner = controller as unknown as { onBalanceUpdated: (msg: unknown) => Promise<void> }
 
-    await expect(runner.onBalanceUpdated({ invalid: true })).rejects.toThrow(/Invalid binance balance update message/)
+    await expect(runner.onBalanceUpdated({ invalid: true })).rejects.toThrow(/Invalid exchange balance update message/)
 
     expect(logger.error).toHaveBeenCalledWith(
       expect.stringContaining('Invalid message format'),
@@ -61,18 +61,18 @@ describe('BinanceBalanceUpdatedController', () => {
     expect(orchestrator.handleSignal).not.toHaveBeenCalled()
   })
 
-  it('emits a flow signal when the balance update is valid', async () => {
+  it('emits a flow signal when the update is valid', async () => {
     const { controller, orchestrator } = buildController({
       dbProvider: createDbProvider([{ flowInstance: { transactionId: 'tx-1' } }]),
     })
     const runner = controller as unknown as { onBalanceUpdated: (msg: unknown) => Promise<void> }
 
-    await runner.onBalanceUpdated({})
+    await runner.onBalanceUpdated({ provider: 'transfero' })
 
     expect(orchestrator.handleSignal).toHaveBeenCalledWith({
-      correlationKeys: { provider: 'binance' },
+      correlationKeys: { provider: 'transfero' },
       eventType: 'exchange.balance.updated',
-      payload: { provider: 'binance' },
+      payload: { provider: 'transfero' },
       transactionId: 'tx-1',
     })
   })
@@ -84,10 +84,10 @@ describe('BinanceBalanceUpdatedController', () => {
     })
     const runner = controller as unknown as { onBalanceUpdated: (msg: unknown) => Promise<void> }
 
-    await expect(runner.onBalanceUpdated({})).rejects.toThrow('boom')
+    await expect(runner.onBalanceUpdated({ provider: 'binance' })).rejects.toThrow('boom')
 
     expect(logger.error).toHaveBeenCalledWith(
-      expect.stringContaining('Error processing balance update signal'),
+      expect.stringContaining('Error processing exchange balance update signal'),
       expect.any(Error),
     )
     expect(orchestrator.handleSignal).toHaveBeenCalledTimes(1)

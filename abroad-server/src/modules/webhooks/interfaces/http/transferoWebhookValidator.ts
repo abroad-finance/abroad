@@ -5,7 +5,7 @@ import { PaymentStatusUpdatedMessage } from '../../../../platform/messaging/queu
 
 const transferoWebhookSchema = z.object({
   Amount: z.number().optional(),
-  Currency: z.enum(TargetCurrency),
+  Currency: z.nativeEnum(TargetCurrency),
   PaymentId: z.string().min(1),
   PaymentStatus: z.string().min(1),
 }).loose()

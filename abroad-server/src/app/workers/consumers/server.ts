@@ -5,7 +5,7 @@ import { createScopedLogger } from '../../../core/logging/scopedLogger'
 import { ILogger } from '../../../core/logging/types'
 import { PaymentStatusUpdatedController } from '../../../modules/payments/interfaces/queue/PaymentStatusUpdatedController'
 import { ReceivedCryptoTransactionController } from '../../../modules/transactions/interfaces/queue/ReceivedCryptoTransactionController'
-import { BinanceBalanceUpdatedController } from '../../../modules/treasury/interfaces/queue/BinanceBalanceUpdatedController'
+import { ExchangeBalanceUpdatedController } from '../../../modules/treasury/interfaces/queue/ExchangeBalanceUpdatedController'
 import { DeadLetterController } from '../../../platform/messaging/DeadLetterController'
 import { initSentry } from '../../../platform/observability/sentry'
 import { iocContainer } from '../../container'
@@ -44,7 +44,7 @@ export const createHealthHandler = (state: { live: boolean, ready: boolean }) =>
 
 // Keep module-level strong references to prevent GC
 const running: {
-  binance?: BinanceBalanceUpdatedController
+  exchangeBalanceUpdated?: ExchangeBalanceUpdatedController
   deadLetter?: DeadLetterController
   paymentStatus?: PaymentStatusUpdatedController
   received?: ReceivedCryptoTransactionController
@@ -57,8 +57,8 @@ export function startConsumers(): void {
   const paymentStatus = iocContainer.get<PaymentStatusUpdatedController>(
     TYPES.PaymentStatusUpdatedController,
   )
-  const binance = iocContainer.get<BinanceBalanceUpdatedController>(
-    TYPES.BinanceBalanceUpdatedController,
+  const exchangeBalanceUpdated = iocContainer.get<ExchangeBalanceUpdatedController>(
+    TYPES.ExchangeBalanceUpdatedController,
   )
   const deadLetter = iocContainer.get<DeadLetterController>(
     TYPES.DeadLetterController,
@@ -66,13 +66,13 @@ export function startConsumers(): void {
 
   running.received = received
   running.paymentStatus = paymentStatus
-  running.binance = binance
+  running.exchangeBalanceUpdated = exchangeBalanceUpdated
   running.deadLetter = deadLetter
 
   deadLetter.registerConsumers()
   received.registerConsumers()
   paymentStatus.registerConsumers()
-  binance.registerConsumers()
+  exchangeBalanceUpdated.registerConsumers()
 
   // Mark ready after consumers and auth init are set up
   health.ready = true
@@ -88,7 +88,7 @@ export async function stopConsumers(): Promise<void> {
   finally {
     running.received = undefined
     running.paymentStatus = undefined
-    running.binance = undefined
+    running.exchangeBalanceUpdated = undefined
     running.deadLetter = undefined
   }
 }

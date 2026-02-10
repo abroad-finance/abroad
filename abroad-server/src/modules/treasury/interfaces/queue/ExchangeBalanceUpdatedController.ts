@@ -6,17 +6,20 @@ import { ValidationError } from '../../../../core/errors'
 import { createScopedLogger } from '../../../../core/logging/scopedLogger'
 import { ILogger } from '../../../../core/logging/types'
 import { getCorrelationId } from '../../../../core/requestContext'
+import { ExchangeBalanceUpdatedMessageSchema } from '../../../../platform/messaging/queueSchema'
 import { IQueueHandler, QueueName } from '../../../../platform/messaging/queues'
-import { BinanceBalanceUpdatedMessageSchema } from '../../../../platform/messaging/queueSchema'
 import { IDatabaseClientProvider } from '../../../../platform/persistence/IDatabaseClientProvider'
 import { FlowOrchestrator } from '../../../flows/application/FlowOrchestrator'
 
 /**
- * Listens for balance‑update events from Binance and emits flow signals
- * so waiting exchange steps can resume.
+ * Listens for exchange balance updates (any exchange) and emits flow signals
+ * so waiting `AWAIT_EXCHANGE_BALANCE` steps can resume.
+ *
+ * This is intentionally coarse-grained today (correlated primarily by provider),
+ * so it should be hardened with more specific correlation keys once available.
  */
 @injectable()
-export class BinanceBalanceUpdatedController {
+export class ExchangeBalanceUpdatedController {
   constructor(
     @inject(TYPES.ILogger) private readonly logger: ILogger,
     @inject(TYPES.IQueueHandler) private readonly queueHandler: IQueueHandler,
@@ -26,30 +29,33 @@ export class BinanceBalanceUpdatedController {
 
   public registerConsumers(): void {
     this.logger.info(
-      '[BinanceBalanceUpdated queue]: Registering consumer for queue:',
-      QueueName.BINANCE_BALANCE_UPDATED,
+      '[ExchangeBalanceUpdated queue]: Registering consumer for queue:',
+      QueueName.EXCHANGE_BALANCE_UPDATED,
     )
-    this.queueHandler.subscribeToQueue(
-      QueueName.BINANCE_BALANCE_UPDATED,
+    void this.queueHandler.subscribeToQueue(
+      QueueName.EXCHANGE_BALANCE_UPDATED,
       this.onBalanceUpdated.bind(this),
-    )
+    ).catch((error) => {
+      this.logger.error('[ExchangeBalanceUpdated queue]: Error in consumer registration:', error)
+    })
   }
 
   private async onBalanceUpdated(message: unknown): Promise<void> {
     const scopedLogger = createScopedLogger(this.logger, {
       correlationId: getCorrelationId(),
-      scope: 'BinanceBalanceUpdated queue',
+      scope: 'ExchangeBalanceUpdated queue',
     })
 
-    const parsed = BinanceBalanceUpdatedMessageSchema.safeParse(message)
+    const parsed = ExchangeBalanceUpdatedMessageSchema.safeParse(message)
     if (!parsed.success) {
-      scopedLogger.error('[BinanceBalanceUpdated queue]: Invalid message format', parsed.error)
-      throw new ValidationError('Invalid binance balance update message', parsed.error.issues)
+      scopedLogger.error('[ExchangeBalanceUpdated queue]: Invalid message format', parsed.error)
+      throw new ValidationError('Invalid exchange balance update message', parsed.error.issues)
     }
+
+    const provider = parsed.data.provider
 
     try {
       const prisma = await this.dbProvider.getClient()
-      const provider = 'binance'
       const waitingSteps = await prisma.flowStepInstance.findMany({
         distinct: ['flowInstanceId'],
         select: { flowInstance: { select: { transactionId: true } } },
@@ -61,7 +67,7 @@ export class BinanceBalanceUpdatedController {
       })
 
       if (waitingSteps.length === 0) {
-        scopedLogger.info('[BinanceBalanceUpdated queue]: No waiting flow steps for provider', { provider })
+        scopedLogger.info('[ExchangeBalanceUpdated queue]: No waiting flow steps for provider', { provider })
         return
       }
 
@@ -69,9 +75,10 @@ export class BinanceBalanceUpdatedController {
       for (const step of waitingSteps) {
         const transactionId = step.flowInstance?.transactionId
         if (!transactionId) {
-          scopedLogger.warn('[BinanceBalanceUpdated queue]: Missing transactionId for waiting step', { provider })
+          scopedLogger.warn('[ExchangeBalanceUpdated queue]: Missing transactionId for waiting step', { provider })
           continue
         }
+
         try {
           await this.orchestrator.handleSignal({
             correlationKeys: { provider },
@@ -83,7 +90,7 @@ export class BinanceBalanceUpdatedController {
         catch (error) {
           const normalized = error instanceof Error ? error : new Error(String(error))
           errors.push(normalized)
-          scopedLogger.error('[BinanceBalanceUpdated queue]: Error updating flow for transaction', {
+          scopedLogger.error('[ExchangeBalanceUpdated queue]: Error updating flow for transaction', {
             error: normalized,
             transactionId,
           })
@@ -95,8 +102,9 @@ export class BinanceBalanceUpdatedController {
       }
     }
     catch (error) {
-      scopedLogger.error('Error processing balance update signal', error)
+      scopedLogger.error('Error processing exchange balance update signal', error)
       throw error
     }
   }
 }
+

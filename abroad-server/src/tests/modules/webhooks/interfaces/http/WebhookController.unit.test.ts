@@ -80,6 +80,30 @@ describe('WebhookController', () => {
     }))
   })
 
+  it('validates and enqueues Transfero balance webhooks', async () => {
+    const { badRequest, serverError } = setupResponses()
+    const request = { headers: { 'x-id': '1' } } as unknown as ExpressRequest
+
+    const invalid = await controller.handleTransferoBalanceWebhook({}, request, badRequest, serverError)
+    expect(invalid).toEqual({ message: 'Invalid webhook payload', success: false })
+    expect(badRequest).toHaveBeenCalled()
+
+    const validPayload = {
+      accountId: '000',
+      amount: 100.0,
+      blockchain: 'None',
+      createdAt: '2024-10-15T18:17:03.1451537+00:00',
+      externalId: 'DCBA4321',
+      referenceId: 'TESTE2410151703145154TESTE',
+      status: 'DepositCreated',
+      taxId: '12345678910',
+      taxIdCountry: 'BRA',
+    }
+    const result = await controller.handleTransferoBalanceWebhook(validPayload, request, badRequest, serverError)
+    expect(result).toEqual({ message: 'Webhook processed successfully', success: true })
+    expect(queueHandler.postMessage).toHaveBeenCalledWith(QueueName.EXCHANGE_BALANCE_UPDATED, { provider: 'transfero' })
+  })
+
   it('logs and returns server errors on Transfero failures', async () => {
     const { badRequest, serverError } = setupResponses()
     const request = { headers: { 'x-id': '1' } } as unknown as ExpressRequest
