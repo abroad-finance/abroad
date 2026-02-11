@@ -105,6 +105,14 @@ const WebSwap: React.FC = () => {
   const languageSelector = useLanguageSelector()
   const walletDetails = useWalletDetails({ onClose: handleWalletDetailsClose })
 
+  const handleBalanceClick = useCallback(() => {
+    if (walletDetails.usdcBalance) {
+      const raw = walletDetails.usdcBalance.replace(/,/g, '')
+      swapViewProps.onSourceChange(raw)
+    }
+  }, [walletDetails.usdcBalance, swapViewProps.onSourceChange])
+
+
   // Modal state for source (chain + token) and target (currency)
   const [sourceModalOpen, setSourceModalOpen] = useState(false)
   const [targetModalOpen, setTargetModalOpen] = useState(false)
@@ -203,9 +211,12 @@ const WebSwap: React.FC = () => {
                   && parseFloat(swapViewProps.sourceAmount) > parseFloat(walletDetails.usdcBalance.replace(/,/g, ''))
                 }
                 loadingBalance={walletDetails.isLoadingBalance}
+                onBalanceClick={handleBalanceClick}
+                onDisconnect={walletDetails.onDisconnectWallet}
                 onOpenSourceModal={openSourceModal}
                 onOpenTargetModal={openTargetModal}
                 usdcBalance={walletDetails.usdcBalance}
+                walletAddress={walletDetails.address}
               />
             ),
             txStatus: (

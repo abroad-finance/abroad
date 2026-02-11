@@ -7,6 +7,7 @@ import {
   Loader,
   Timer,
   Wallet,
+  X,
 } from 'lucide-react'
 import React, { useCallback } from 'react'
 
@@ -41,6 +42,8 @@ export interface SwapProps {
   loadingBalance?: boolean
   loadingSource: boolean
   loadingTarget: boolean
+  onBalanceClick?: () => void
+  onDisconnect?: () => void
   onOpenSourceModal: () => void
   onOpenTargetModal: () => void
   onPrimaryAction: () => void
@@ -55,6 +58,7 @@ export interface SwapProps {
   targetSymbol: string
   transferFeeDisplay: string
   usdcBalance?: string
+  walletAddress?: null | string
 }
 
 export default function Swap({
@@ -67,6 +71,8 @@ export default function Swap({
   loadingBalance,
   loadingSource,
   loadingTarget,
+  onBalanceClick,
+  onDisconnect,
   onOpenSourceModal,
   onOpenTargetModal,
   onPrimaryAction,
@@ -81,6 +87,7 @@ export default function Swap({
   targetSymbol,
   transferFeeDisplay,
   usdcBalance,
+  walletAddress,
 }: SwapProps): React.JSX.Element {
   const { t } = useTranslate()
 
@@ -88,6 +95,10 @@ export default function Swap({
     const input = e.currentTarget
     setTimeout(() => input.scrollIntoView({ behavior: 'smooth', block: 'center' }), 150)
   }, [])
+
+  const truncatedAddress = walletAddress
+    ? `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`
+    : null
 
   const chainIcon = getChainIcon(selectedChainLabel)
   const assetIcon = CRYPTO_ICONS[selectedAssetLabel]
@@ -154,10 +165,35 @@ export default function Swap({
             </button>
           </div>
 
-          {/* Connect wallet / balance */}
-          <div className="mt-2">
-            {!isAuthenticated
+          {/* Wallet address + Balance row (Allbridge-style) */}
+          <div className="flex items-center justify-between mt-2">
+            {isAuthenticated && truncatedAddress
               ? (
+                  <div
+                    className="flex items-center gap-2 rounded-full px-3 py-1.5"
+                    style={{
+                      background: 'var(--ab-badge-bg)',
+                      border: '1px solid var(--ab-badge-border)',
+                    }}
+                  >
+                    {chainIcon && <img alt={selectedChainLabel} className="w-4 h-4 rounded-full" src={chainIcon} />}
+                    <span className="text-xs font-medium" style={{ color: 'var(--ab-text)' }}>
+                      {truncatedAddress}
+                    </span>
+                    {onDisconnect && (
+                      <button
+                        aria-label="Disconnect wallet"
+                        className="cursor-pointer p-0.5 rounded-full transition-colors"
+                        onClick={onDisconnect}
+                        style={{ color: 'var(--ab-text-muted)' }}
+                        type="button"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                )
+              : (
                   <button
                     className="text-sm font-medium cursor-pointer transition-colors"
                     onClick={onPrimaryAction}
@@ -166,17 +202,23 @@ export default function Swap({
                   >
                     {t('swap.connect_wallet', 'Connect wallet')}
                   </button>
-                )
-              : usdcBalance !== undefined && (
-                  <span
-                    className={`text-xs ${hasInsufficientFunds ? 'text-red-500' : ''}`}
-                    style={hasInsufficientFunds ? undefined : { color: 'var(--ab-text-muted)' }}
-                  >
-                    {loadingBalance
-                      ? <Loader className="inline animate-spin w-3 h-3" />
-                      : `${t('swap.balance', 'Balance:')} $${usdcBalance} ${selectedAssetLabel}`}
-                  </span>
                 )}
+
+            {isAuthenticated && usdcBalance !== undefined && (
+              <button
+                aria-label={t('swap.use_max_balance', 'Use max balance')}
+                className={`flex items-center gap-1.5 cursor-pointer transition-colors ${hasInsufficientFunds ? 'text-red-500' : ''}`}
+                onClick={onBalanceClick}
+                style={hasInsufficientFunds ? undefined : { color: 'var(--ab-text-muted)' }}
+                type="button"
+              >
+                <Wallet className="w-3.5 h-3.5" />
+                {assetIcon && <img alt={selectedAssetLabel} className="w-4 h-4 rounded-full" src={assetIcon} />}
+                {loadingBalance
+                  ? <Loader className="animate-spin w-3 h-3" />
+                  : <span className="text-xs font-medium">{usdcBalance}</span>}
+              </button>
+            )}
           </div>
         </div>
 

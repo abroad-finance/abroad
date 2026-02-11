@@ -66,31 +66,6 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({
       )
     : <Wallet aria-hidden="true" className="w-4.5 h-4.5" style={{ color: 'var(--ab-text)' }} />
 
-  const renderBalance = () => {
-    if (!address) return null
-    const isError = balance === 'Error'
-    return (
-      <div
-        aria-busy={balanceLoading}
-        aria-live="polite"
-        className="flex items-center gap-1 rounded-lg px-2 py-0.5"
-        style={{ background: 'var(--ab-hover)' }}
-      >
-        <img
-          alt="USDC"
-          className="w-4 h-4"
-          src="https://storage.googleapis.com/cdn-abroad/Icons/Tokens/USDC%20Token.svg"
-        />
-        {balanceLoading
-          ? <div className="w-10 h-3 rounded animate-pulse" style={{ background: 'var(--ab-separator)' }} />
-          : (
-              <span className="text-xs font-medium" style={{ color: 'var(--ab-text)' }}>
-                ${isError ? '—' : balance}
-              </span>
-            )}
-      </div>
-    )
-  }
 
   return (
     <nav className={`w-full px-4 pt-4 ${className}`} role="navigation">
@@ -139,21 +114,6 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({
                   <User className="w-4 h-4" style={{ color: 'var(--ab-text)' }} />
                 </button>
               )}
-
-              {/* Wallet button */}
-              <button
-                aria-label={address ? labels.walletDetailsAria : labels.connectWalletAria}
-                className="flex items-center gap-2 rounded-xl px-3 py-2 transition-colors cursor-pointer"
-                onClick={onWalletClick}
-                style={{ background: 'var(--ab-badge-bg)', border: '1px solid var(--ab-badge-border)' }}
-                type="button"
-              >
-                {WalletIcon}
-                <span className="text-sm font-medium hidden sm:inline" style={{ color: 'var(--ab-text)' }}>
-                  {address ? formatWalletAddress(address, labels.notConnected) : labels.connectWallet}
-                </span>
-                {renderBalance()}
-              </button>
 
               {/* Info button */}
               <button
