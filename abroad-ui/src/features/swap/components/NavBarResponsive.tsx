@@ -1,18 +1,11 @@
-import { Info, User, Wallet } from 'lucide-react'
+import { Info, Moon, Sun, User, Wallet } from 'lucide-react'
 import React, { memo } from 'react'
 
 import AbroadLogoColored from '../../../assets/Logos/AbroadLogoColored.svg'
 import AbroadLogoWhite from '../../../assets/Logos/AbroadLogoWhite.svg'
 
-/**
- * ----------------------------------------------------------------------------
- * Utilities & Types
- * ----------------------------------------------------------------------------
- */
-type ClassValue = false | null | string | undefined
-const cn = (...classes: ClassValue[]) => classes.filter(Boolean).join(' ')
+/* ── Utils ── */
 
-// Accept a translated fallback label to avoid calling hooks outside components
 const formatWalletAddress = (address?: null | string, notConnectedLabel?: string) => {
   if (!address) return notConnectedLabel || 'No conectado'
   const trimmed = address.trim()
@@ -20,17 +13,15 @@ const formatWalletAddress = (address?: null | string, notConnectedLabel?: string
   return `${trimmed.slice(0, 6)}...${trimmed.slice(-4)}`
 }
 
-/**
- * ----------------------------------------------------------------------------
- * Props
- * ----------------------------------------------------------------------------
- */
+/* ── Props ── */
+
 export interface NavBarResponsiveProps {
   address?: null | string
   balance: string
   balanceLoading: boolean
   className?: string
   infoUrl: string
+  isDark?: boolean
   labels: {
     connectWallet: string
     connectWalletAria: string
@@ -38,10 +29,9 @@ export interface NavBarResponsiveProps {
     notConnected: string
     walletDetailsAria: string
   }
-  /** Desktop language selector slot */
   languageSelector?: React.ReactNode
-  /** Mobile language selector slot */
   languageSelectorMobile?: React.ReactNode
+  onToggleTheme?: () => void
   onWalletClick: () => void
   walletInfo: {
     icon?: string
@@ -49,19 +39,17 @@ export interface NavBarResponsiveProps {
   }
 }
 
-/**
- * Fetch the USDC balance for a Stellar account. Returns a numeric string (e.g., "12,345.67").
- * On failure or no trustline, returns "0.00". Distinguishes simple transient errors with "Error".
- */
 const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({
   address,
   balance,
   balanceLoading,
   className = '',
   infoUrl,
+  isDark = false,
   labels,
   languageSelector,
   languageSelectorMobile,
+  onToggleTheme,
   onWalletClick,
   walletInfo,
 }) => {
@@ -69,147 +57,114 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({
     ? (
         <img
           alt={`${walletInfo.name} wallet`}
-          className="w-8 h-8"
-          height={32}
+          className="w-7 h-7"
+          height={28}
           loading="lazy"
           src={walletInfo.icon}
-          width={32}
+          width={28}
         />
       )
-    : <Wallet aria-hidden="true" className="w-5 h-5 text-white" />
+    : <Wallet aria-hidden="true" className="w-4.5 h-4.5" style={{ color: 'var(--ab-text)' }} />
 
-  const renderUSDCBadge = (isMobile = false) => {
-    if (!address && !isMobile) return null
-    const iconSize = 'w-4 h-4'
-    const textSize = 'text-sm'
-    const loadingSize = isMobile ? 'w-10 h-3' : 'w-12 h-4'
-    const textColor = isMobile ? 'text-[#356E6A]' : 'text-white'
+  const renderBalance = () => {
+    if (!address) return null
     const isError = balance === 'Error'
     return (
       <div
         aria-busy={balanceLoading}
         aria-live="polite"
-        className="flex items-center space-x-1 bg-white/30 rounded-lg px-2 py-1"
-        title={isError ? 'Network error while fetching balance' : 'USDC balance'}
+        className="flex items-center gap-1 rounded-lg px-2 py-0.5"
+        style={{ background: 'var(--ab-hover)' }}
       >
         <img
           alt="USDC"
-          className={iconSize}
-          height={16}
-          loading="lazy"
+          className="w-4 h-4"
           src="https://storage.googleapis.com/cdn-abroad/Icons/Tokens/USDC%20Token.svg"
-          width={16}
         />
-        {balanceLoading && address
-          ? <div className={`${loadingSize} bg-white/20 rounded animate-pulse`} />
+        {balanceLoading
+          ? <div className="w-10 h-3 rounded animate-pulse" style={{ background: 'var(--ab-separator)' }} />
           : (
-              <span className={`${textColor} ${textSize} font-medium`}>
-                $
-                {address ? (isError ? '—' : balance) : '0.00'}
+              <span className="text-xs font-medium" style={{ color: 'var(--ab-text)' }}>
+                ${isError ? '—' : balance}
               </span>
             )}
       </div>
     )
   }
 
-  const renderInfoButton = (isMobile = false) => {
-    const buttonClasses = isMobile
-      ? 'p-2 rounded-full bg-[#356E6A]/5 hover:bg-[#356E6A]/10 transition-colors duration-200'
-      : 'p-2 rounded-full bg-white/20 hover:bg-white/30 transition-colors duration-200'
-    const iconColor = isMobile ? 'text-[#356E6A]' : 'text-white'
-    return (
-      <button
-        aria-label={labels.infoAriaLabel}
-        className={buttonClasses}
-        onClick={() => { if (typeof window !== 'undefined') window.open(infoUrl, '_blank', 'noopener,noreferrer') }}
-        type="button"
-      >
-        <Info aria-hidden="true" className={cn('w-5 h-5', iconColor)} />
-      </button>
-    )
-  }
-
   return (
-    <nav className={cn('w-full px-4 pt-4', className)} role="navigation">
-      <div className="max-w-8xl mx-auto bg-transparent md:bg-[#356E6A]/5 backdrop-blur-md rounded-2xl">
-        <div className="sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
+    <nav className={`w-full px-4 pt-4 ${className}`} role="navigation">
+      <div
+        className="max-w-8xl mx-auto rounded-2xl backdrop-blur-md"
+        style={{ background: 'var(--ab-hover)' }}
+      >
+        <div className="px-3 sm:px-6">
+          <div className="flex items-center justify-between h-14">
             {/* Logo */}
             <div className="flex-shrink-0">
-              {/* Mobile Logo - Colored */}
               <img
                 alt="Abroad"
-                className="h-8 w-auto md:hidden"
-                height={32}
-                src={AbroadLogoColored}
-                width={32}
-              />
-              {/* Desktop Logo - White */}
-              <img
-                alt="Abroad"
-                className="h-8 w-auto hidden md:block"
-                height={32}
-                src={AbroadLogoWhite}
-                width={32}
+                className="h-7 w-auto"
+                src={isDark ? AbroadLogoWhite : AbroadLogoColored}
               />
             </div>
 
-            {/* Desktop Right Side */}
-            <div className="hidden md:flex items-center space-x-4">
-              {languageSelector}
-              {address && (
+            {/* Right Side */}
+            <div className="flex items-center gap-2">
+              {/* Language selector */}
+              <div className="hidden md:block">{languageSelector}</div>
+              <div className="md:hidden">{languageSelectorMobile}</div>
+
+              {/* Theme toggle */}
+              {onToggleTheme && (
                 <button
-                  className="bg-white/90 backdrop-blur-xl rounded-xl p-2 flex items-center justify-center hover:bg-white transition-all shadow-sm ring-1 ring-black/5 active:scale-95 cursor-pointer"
-                  onClick={onWalletClick}
+                  aria-label="Toggle theme"
+                  className="p-2 rounded-full transition-colors cursor-pointer"
+                  onClick={onToggleTheme}
+                  style={{ color: 'var(--ab-text-secondary)' }}
                   type="button"
                 >
-                  <User className="w-5 h-5 text-abroad-dark" />
+                  {isDark ? <Sun className="w-4.5 h-4.5" /> : <Moon className="w-4.5 h-4.5" />}
                 </button>
               )}
+
+              {/* User button (when connected) */}
+              {address && (
+                <button
+                  className="p-2 rounded-full transition-colors cursor-pointer"
+                  onClick={onWalletClick}
+                  style={{ background: 'var(--ab-badge-bg)', border: '1px solid var(--ab-badge-border)' }}
+                  type="button"
+                >
+                  <User className="w-4 h-4" style={{ color: 'var(--ab-text)' }} />
+                </button>
+              )}
+
+              {/* Wallet button */}
               <button
                 aria-label={address ? labels.walletDetailsAria : labels.connectWalletAria}
-                className="cursor-pointer flex items-center space-x-3 bg-white/20 backdrop-blur-sm rounded-xl px-4 py-2 hover:bg-white/30 transition-colors duration-200"
+                className="flex items-center gap-2 rounded-xl px-3 py-2 transition-colors cursor-pointer"
                 onClick={onWalletClick}
+                style={{ background: 'var(--ab-badge-bg)', border: '1px solid var(--ab-badge-border)' }}
                 type="button"
               >
                 {WalletIcon}
-                <span className="text-white text-md font-medium">
+                <span className="text-sm font-medium hidden sm:inline" style={{ color: 'var(--ab-text)' }}>
                   {address ? formatWalletAddress(address, labels.notConnected) : labels.connectWallet}
                 </span>
-                {renderUSDCBadge(false)}
+                {renderBalance()}
               </button>
-              {renderInfoButton(false)}
-            </div>
 
-            {/* Mobile Right Side */}
-            <div className="md:hidden">
-              <div className="flex items-center space-x-3">
-                {address && (
-                  <button
-                    className="bg-white/90 backdrop-blur-xl rounded-xl p-2 flex items-center justify-center hover:bg-white transition-all shadow-sm ring-1 ring-black/5 active:scale-95 cursor-pointer"
-                    onClick={onWalletClick}
-                    type="button"
-                  >
-                    <User className="w-5 h-5 text-[#356E6A]" />
-                  </button>
-                )}
-                <button
-                  aria-label={address ? labels.walletDetailsAria : labels.connectWalletAria}
-                  className="flex items-center justify-center bg-white/50 backdrop-blur-xl rounded-2xl px-3 py-2 border border-white/40 shadow-sm hover:bg-white/60 transition-colors duration-200 flex-1"
-                  onClick={onWalletClick}
-                  type="button"
-                >
-                  {address
-                    ? renderUSDCBadge(true)
-                    : (
-                        <div className="flex items-center space-x-2">
-                          <Wallet aria-hidden="true" className="w-5 h-5 text-[#356E6A]" />
-                          <span className="text-[#356E6A] text-sm font-medium">{labels.connectWallet}</span>
-                        </div>
-                      )}
-                </button>
-                {languageSelectorMobile}
-              </div>
+              {/* Info button */}
+              <button
+                aria-label={labels.infoAriaLabel}
+                className="p-2 rounded-full transition-colors cursor-pointer"
+                onClick={() => window.open(infoUrl, '_blank', 'noopener,noreferrer')}
+                style={{ color: 'var(--ab-text-secondary)' }}
+                type="button"
+              >
+                <Info aria-hidden="true" className="w-4.5 h-4.5" />
+              </button>
             </div>
           </div>
         </div>

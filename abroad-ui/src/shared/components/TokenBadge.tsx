@@ -1,10 +1,10 @@
 import React from 'react'
 
 interface TokenBadgeProps {
-  alt?: string // alt text for icon
-  iconSrc?: string // token icon URL
+  alt?: string
+  iconSrc?: string
   suffix?: React.ReactNode
-  symbol: string // token symbol text
+  symbol: string
   transparent?: boolean
 }
 
@@ -21,21 +21,34 @@ const getFallbackInitials = (symbol: string): string => {
 }
 
 export const TokenBadge: React.FC<TokenBadgeProps> = ({ alt, iconSrc, suffix, symbol, transparent }) => (
-  <div className={`${transparent ? 'p-0' : 'bg-white/70 backdrop-blur-xl px-4 py-2.5 shadow-sm'} rounded-4xl flex items-center justify-center text-abroad-dark`}>
+  <div
+    className={`${transparent ? 'p-0' : 'rounded-full px-3 py-1.5'} flex items-center justify-center`}
+    style={transparent
+      ? undefined
+      : {
+          background: 'var(--ab-badge-bg)',
+          border: '1px solid var(--ab-badge-border)',
+        }}
+  >
     {iconSrc
       ? (
           <img
             alt={alt || symbol}
-            className="w-8 h-8 mr-2"
+            className="w-6 h-6 mr-2 rounded-full"
             src={iconSrc}
           />
         )
       : (
-          <div className="w-8 h-8 mr-2 rounded-full bg-white/80 border border-black/10 flex items-center justify-center text-[10px] font-semibold">
+          <div
+            className="w-6 h-6 mr-2 rounded-full flex items-center justify-center text-[10px] font-semibold"
+            style={{ background: 'var(--ab-hover)', color: 'var(--ab-text)' }}
+          >
             {getFallbackInitials(symbol)}
           </div>
         )}
-    <span className={`truncate max-w-[160px]${suffix ? ' mr-0.5' : ''}`}>{symbol}</span>
-    {suffix}
+    <span className="truncate max-w-[160px] text-sm font-medium" style={{ color: 'var(--ab-text)' }}>
+      {symbol}
+    </span>
+    {suffix && <span className="ml-1">{suffix}</span>}
   </div>
 )
