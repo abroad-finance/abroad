@@ -35,6 +35,7 @@ export class PartnerController extends Controller {
    * Create a new partner and Firebase user
    */
   @Hidden()
+  @Security('OpsApiKeyAuth')
   @Post()
   @Response<400, { reason: string }>(400, 'Bad Request')
   @SuccessResponse('201', 'Partner created')

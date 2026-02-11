@@ -1,4 +1,3 @@
-import type { ApiResult, HttpRequestConfig } from '../http/types'
 import type {
   CryptoAssetCoverage,
   CryptoAssetCoverageResponse,
@@ -13,39 +12,7 @@ import type {
   FlowStepInstance,
 } from './flowTypes'
 
-import { httpClient } from '../http/httpClient'
-import { getOpsApiKey } from './opsAuthStore'
-
-const mergeHeaders = (...sets: Array<HeadersInit | undefined>): Headers => {
-  const merged = new Headers()
-  sets.forEach((set) => {
-    if (!set) return
-    const asHeaders = new Headers(set)
-    asHeaders.forEach((value, key) => merged.set(key, value))
-  })
-  return merged
-}
-
-const adminRequest = async <TData, TError = unknown>(
-  path: string,
-  config: HttpRequestConfig & { method: NonNullable<HttpRequestConfig['method']> },
-): Promise<ApiResult<TData, TError>> => {
-  const opsApiKey = getOpsApiKey()
-  if (!opsApiKey) {
-    throw new Error('Ops API key is required')
-  }
-  const headers = mergeHeaders({ 'X-OPS-API-KEY': opsApiKey }, config.headers)
-  return httpClient.request(path, {
-    ...config,
-    headers,
-  })
-}
-
-const unwrap = <TData>(result: ApiResult<TData>): TData => {
-  if (result.ok) return result.data
-  const message = result.error.message || 'Request failed'
-  throw new Error(message)
-}
+import { adminRequest, unwrapAdminResult } from './adminRequest'
 
 export const listFlowInstances = async (params: {
   page?: number
@@ -65,7 +32,7 @@ export const listFlowInstances = async (params: {
     },
   })
 
-  return unwrap(result)
+  return unwrapAdminResult(result)
 }
 
 export const listFlowDefinitions = async (): Promise<FlowDefinition[]> => {
@@ -73,7 +40,7 @@ export const listFlowDefinitions = async (): Promise<FlowDefinition[]> => {
     method: 'GET',
   })
 
-  return unwrap(result)
+  return unwrapAdminResult(result)
 }
 
 export const listCryptoAssets = async (): Promise<CryptoAssetCoverageResponse> => {
@@ -81,7 +48,7 @@ export const listCryptoAssets = async (): Promise<CryptoAssetCoverageResponse> =
     method: 'GET',
   })
 
-  return unwrap(result)
+  return unwrapAdminResult(result)
 }
 
 export const updateCryptoAsset = async (payload: CryptoAssetUpdateInput): Promise<CryptoAssetCoverage> => {
@@ -91,7 +58,7 @@ export const updateCryptoAsset = async (payload: CryptoAssetUpdateInput): Promis
     method: 'PATCH',
   })
 
-  return unwrap(result)
+  return unwrapAdminResult(result)
 }
 
 export const listFlowCorridors = async (): Promise<FlowCorridorListResponse> => {
@@ -99,7 +66,7 @@ export const listFlowCorridors = async (): Promise<FlowCorridorListResponse> => 
     method: 'GET',
   })
 
-  return unwrap(result)
+  return unwrapAdminResult(result)
 }
 
 export const updateFlowCorridor = async (
@@ -111,7 +78,7 @@ export const updateFlowCorridor = async (
     method: 'PATCH',
   })
 
-  return unwrap(result)
+  return unwrapAdminResult(result)
 }
 
 export const createFlowDefinition = async (payload: FlowDefinitionInput): Promise<FlowDefinition> => {
@@ -121,7 +88,7 @@ export const createFlowDefinition = async (payload: FlowDefinitionInput): Promis
     method: 'POST',
   })
 
-  return unwrap(result)
+  return unwrapAdminResult(result)
 }
 
 export const updateFlowDefinition = async (
@@ -134,7 +101,7 @@ export const updateFlowDefinition = async (
     method: 'PATCH',
   })
 
-  return unwrap(result)
+  return unwrapAdminResult(result)
 }
 
 export const getFlowInstance = async (flowInstanceId: string): Promise<FlowInstanceDetail> => {
@@ -142,7 +109,7 @@ export const getFlowInstance = async (flowInstanceId: string): Promise<FlowInsta
     method: 'GET',
   })
 
-  return unwrap(result)
+  return unwrapAdminResult(result)
 }
 
 export const retryFlowStep = async (
@@ -154,7 +121,7 @@ export const retryFlowStep = async (
     { method: 'POST' },
   )
 
-  return unwrap(result)
+  return unwrapAdminResult(result)
 }
 
 export const requeueFlowStep = async (
@@ -166,5 +133,5 @@ export const requeueFlowStep = async (
     { method: 'POST' },
   )
 
-  return unwrap(result)
+  return unwrapAdminResult(result)
 }
