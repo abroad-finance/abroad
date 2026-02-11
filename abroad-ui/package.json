@@ -29,7 +29,7 @@
     "@tailwindcss/vite": "^4.1.11",
     "@tolgee/react": "^6.2.7",
     "@yudiel/react-qr-scanner": "^2.3.1",
-    "axios": "^1.11.0",
+    "axios": "^1.13.5",
     "eslint-plugin-newline-destructuring": "^1.2.2",
     "ethers": "^6.15.0",
     "framer-motion": "^12.23.12",
