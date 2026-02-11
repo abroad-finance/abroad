@@ -1,6 +1,5 @@
 import 'reflect-metadata'
 import { Prisma } from '@prisma/client'
-import * as admin from 'firebase-admin'
 
 import type { IDatabaseClientProvider } from '../../../../platform/persistence/IDatabaseClientProvider'
 
@@ -61,8 +60,6 @@ const buildPartnerMock = (): PartnerDelegateMock => {
 }
 
 describe('OpsPartnerService', () => {
-  const createUser = jest.fn()
-  const deleteUser = jest.fn()
   let partner: PartnerDelegateMock
   let dbProvider: IDatabaseClientProvider
   let service: OpsPartnerService
@@ -74,9 +71,6 @@ describe('OpsPartnerService', () => {
       getClient: jest.fn(async () => ({ partner }) as unknown as import('@prisma/client').PrismaClient),
     }
     service = new OpsPartnerService(dbProvider)
-    jest.spyOn(admin, 'auth').mockReturnValue({ createUser, deleteUser } as unknown as admin.auth.Auth)
-    createUser.mockResolvedValue(undefined as unknown as admin.auth.UserRecord)
-    deleteUser.mockResolvedValue(undefined)
   })
 
   it('lists partners with hasApiKey projection', async () => {
@@ -104,23 +98,16 @@ describe('OpsPartnerService', () => {
     })
   })
 
-  it('creates partner, firebase user, and returns one-time plaintext key', async () => {
+  it('creates partner and returns one-time plaintext key', async () => {
     const result = await service.createPartner({
       company: 'Acme',
       country: 'CO',
       email: 'acme@example.com',
       firstName: 'Ada',
       lastName: 'Lovelace',
-      password: 'supersecret',
       phone: '555-0000',
     })
 
-    expect(createUser).toHaveBeenCalledWith(expect.objectContaining({
-      displayName: 'Acme',
-      email: 'acme@example.com',
-      password: 'supersecret',
-      uid: expect.any(String),
-    }))
     expect(partner.create).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({
         apiKey: hashPartnerApiKey(result.apiKey),
@@ -136,7 +123,7 @@ describe('OpsPartnerService', () => {
     expect(result.partner.hasApiKey).toBe(true)
   })
 
-  it('rolls back firebase user when partner creation fails', async () => {
+  it('throws a domain validation error when partner creation fails', async () => {
     partner.create.mockRejectedValueOnce(new Error('db down'))
 
     await expect(service.createPartner({
@@ -145,13 +132,8 @@ describe('OpsPartnerService', () => {
       email: 'acme@example.com',
       firstName: 'Ada',
       lastName: 'Lovelace',
-      password: 'supersecret',
       phone: '555-0000',
     })).rejects.toThrow(OpsPartnerValidationError)
-
-    expect(createUser).toHaveBeenCalledTimes(1)
-    expect(deleteUser).toHaveBeenCalledTimes(1)
-    expect(deleteUser).toHaveBeenCalledWith(expect.any(String))
   })
 
   it('rotates partner API key and returns one-time plaintext key', async () => {

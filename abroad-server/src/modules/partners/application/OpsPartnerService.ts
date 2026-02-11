@@ -1,7 +1,4 @@
-import { randomUUID } from 'crypto'
-
 import { Partner, Prisma } from '@prisma/client'
-import * as admin from 'firebase-admin'
 import { inject, injectable } from 'inversify'
 
 import { TYPES } from '../../../app/container/types'
@@ -16,7 +13,6 @@ export type OpsPartnerCreateInput = {
   email: string
   firstName: string
   lastName: string
-  password: string
   phone?: string
 }
 
@@ -79,24 +75,6 @@ export class OpsPartnerService {
 
   public async createPartner(input: OpsPartnerCreateInput): Promise<OpsPartnerCreateResult> {
     const prisma = await this.dbProvider.getClient()
-    const partnerId = randomUUID()
-    let createdFirebaseUser = false
-
-    try {
-      await admin.auth().createUser({
-        displayName: input.company,
-        email: input.email,
-        password: input.password,
-        uid: partnerId,
-      })
-      createdFirebaseUser = true
-    }
-    catch (error) {
-      if (this.isFirebaseEmailAlreadyExists(error)) {
-        throw new OpsPartnerValidationError('Partner email already exists')
-      }
-      throw new OpsPartnerValidationError('Failed to create Firebase user')
-    }
 
     try {
       for (let attempt = 1; attempt <= API_KEY_RETRY_ATTEMPTS; attempt += 1) {
@@ -108,7 +86,6 @@ export class OpsPartnerService {
               country: input.country,
               email: input.email,
               firstName: input.firstName,
-              id: partnerId,
               lastName: input.lastName,
               name: input.company,
               phone: input.phone,
@@ -130,15 +107,8 @@ export class OpsPartnerService {
       throw new OpsPartnerValidationError('Failed to generate a unique partner API key')
     }
     catch (error) {
-      if (createdFirebaseUser) {
-        await admin.auth().deleteUser(partnerId).catch(() => undefined)
-      }
-
       if (this.isUniqueConstraintFor(error, 'email')) {
         throw new OpsPartnerValidationError('Partner email already exists')
-      }
-      if (this.isUniqueConstraintFor(error, 'id')) {
-        throw new OpsPartnerValidationError('Partner id already exists')
       }
       if (error instanceof OpsPartnerValidationError) {
         throw error
@@ -211,18 +181,6 @@ export class OpsPartnerService {
     }
 
     throw new OpsPartnerValidationError('Failed to generate a unique partner API key')
-  }
-
-  private isFirebaseEmailAlreadyExists(error: unknown): boolean {
-    if (typeof error !== 'object' || error === null) {
-      return false
-    }
-    if (!('code' in error)) {
-      return false
-    }
-
-    const firebaseError = error as { code?: unknown }
-    return firebaseError.code === 'auth/email-already-exists'
   }
 
   private isNotFoundError(error: unknown): boolean {

@@ -2,7 +2,6 @@
 
 import { Partner } from '@prisma/client'
 import { Request as RequestExpress } from 'express'
-import * as admin from 'firebase-admin'
 import { inject } from 'inversify'
 import {
   Body,
@@ -32,7 +31,7 @@ export class PartnerController extends Controller {
   }
 
   /**
-   * Create a new partner and Firebase user
+   * Create a new partner
    */
   @Hidden()
   @Security('OpsApiKeyAuth')
@@ -69,17 +68,6 @@ export class PartnerController extends Controller {
       return badRequest(400, { reason: 'Failed to create partner in the database' })
     }
 
-    try {
-      await admin.auth().createUser({
-        displayName: partnerData.company,
-        email: partnerData.email,
-        password: partnerData.password,
-        uid: partner.id,
-      })
-    }
-    catch {
-      return badRequest(400, { reason: 'Failed to create Firebase user' })
-    }
     return created(201, {
       id: partner.id,
     })

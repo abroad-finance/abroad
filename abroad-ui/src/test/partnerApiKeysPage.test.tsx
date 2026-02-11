@@ -64,7 +64,6 @@ describe('PartnerApiKeys page', () => {
     await user.type(screen.getByPlaceholderText('First name'), 'Ada')
     await user.type(screen.getByPlaceholderText('Last name'), 'Lovelace')
     await user.type(screen.getByPlaceholderText('Email'), 'acme@example.com')
-    await user.type(screen.getByPlaceholderText('Password (min 8 chars)'), 'supersecret')
     await user.click(screen.getByRole('button', { name: 'Create Partner & Generate Key' }))
 
     await screen.findByText('One-Time API Key')
@@ -74,7 +73,6 @@ describe('PartnerApiKeys page', () => {
       email: 'acme@example.com',
       firstName: 'Ada',
       lastName: 'Lovelace',
-      password: 'supersecret',
     }))
   })
 

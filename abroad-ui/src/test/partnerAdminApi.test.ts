@@ -57,7 +57,6 @@ describe('partnerAdminApi', () => {
           email: string
           firstName: string
           lastName: string
-          password: string
           phone?: string
         }
         expect(body.company).toBe('Acme')
@@ -93,7 +92,6 @@ describe('partnerAdminApi', () => {
       email: 'acme@example.com',
       firstName: 'Ada',
       lastName: 'Lovelace',
-      password: 'supersecret',
     })
     const rotated = await rotatePartnerApiKey('partner-1')
     await revokePartnerApiKey('partner-1')

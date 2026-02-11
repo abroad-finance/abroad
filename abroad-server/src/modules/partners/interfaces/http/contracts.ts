@@ -8,7 +8,6 @@ export interface CreatePartnerRequest {
   email: string
   firstName: string
   lastName: string
-  password: string
   phone?: string
 }
 
@@ -18,7 +17,6 @@ export const createPartnerRequestSchema = z.object({
   email: z.string().email(),
   firstName: z.string().min(1),
   lastName: z.string().min(1),
-  password: z.string().min(8),
   phone: z.string().optional(),
 }).strict() satisfies z.ZodType<CreatePartnerRequest>
 

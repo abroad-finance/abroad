@@ -19,7 +19,6 @@ type CreatePartnerDraft = {
   email: string
   firstName: string
   lastName: string
-  password: string
   phone: string
 }
 
@@ -36,7 +35,6 @@ const emptyDraft: CreatePartnerDraft = {
   email: '',
   firstName: '',
   lastName: '',
-  password: '',
   phone: '',
 }
 
@@ -49,7 +47,6 @@ const validateDraft = (draft: CreatePartnerDraft): null | string => {
   if (!draft.lastName.trim()) return 'Last name is required.'
   if (!draft.email.trim()) return 'Email is required.'
   if (!draft.email.includes('@')) return 'Email format is invalid.'
-  if (draft.password.trim().length < 8) return 'Password must be at least 8 characters.'
   return null
 }
 
@@ -107,7 +104,6 @@ const PartnerApiKeys = () => {
     email: draft.email.trim(),
     firstName: draft.firstName.trim(),
     lastName: draft.lastName.trim(),
-    password: draft.password,
     phone: draft.phone.trim() || undefined,
   })
 
@@ -343,14 +339,6 @@ const PartnerApiKeys = () => {
                   placeholder="Email"
                   type="email"
                   value={draft.email}
-                />
-                <input
-                  autoComplete="new-password"
-                  className="rounded-xl border border-[#DADADA] bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#356E6A]/40"
-                  onChange={event => setDraft(current => ({ ...current, password: event.target.value }))}
-                  placeholder="Password (min 8 chars)"
-                  type="password"
-                  value={draft.password}
                 />
                 <button
                   className="mt-1 rounded-xl border border-[#356E6A] bg-[#356E6A] px-4 py-2 text-sm font-medium text-white hover:bg-[#2B5B57] transition disabled:opacity-60"
