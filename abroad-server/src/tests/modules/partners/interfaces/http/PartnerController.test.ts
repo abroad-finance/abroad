@@ -2,8 +2,6 @@ import 'reflect-metadata'
 import type { Partner } from '@prisma/client'
 import type { TsoaResponse } from '@tsoa/runtime'
 
-import * as admin from 'firebase-admin'
-
 import type { IDatabaseClientProvider } from '../../../../../platform/persistence/IDatabaseClientProvider'
 
 import { PartnerController } from '../../../../../modules/partners/interfaces/http/PartnerController'
@@ -58,11 +56,8 @@ const setupTsoaResponses = () => {
 }
 
 describe('PartnerController', () => {
-  const createUser = jest.fn()
-
   beforeEach(() => {
     jest.resetAllMocks()
-    jest.spyOn(admin, 'auth').mockReturnValue({ createUser } as unknown as admin.auth.Auth)
   })
 
   it('rejects invalid payloads with a 400', async () => {
@@ -72,7 +67,7 @@ describe('PartnerController', () => {
 
     const response = await controller.createPartner(
       // missing required fields
-      { company: '', country: '', email: 'bad-email', firstName: '', lastName: '', password: '', phone: '' },
+      { company: '', country: '', email: 'bad-email', firstName: '', lastName: '', phone: '' },
       badRequest,
       created,
     )
@@ -95,7 +90,6 @@ describe('PartnerController', () => {
         email: 'acme@example.com',
         firstName: 'Ada',
         lastName: 'Lovelace',
-        password: 'supersecret',
         phone: '123',
       },
       badRequest,
@@ -106,34 +100,9 @@ describe('PartnerController', () => {
     expect(created).not.toHaveBeenCalled()
   })
 
-  it('returns a 400 when firebase user creation fails', async () => {
-    const { badRequest, created } = setupTsoaResponses()
-    const { dbProvider } = buildDbProvider()
-    createUser.mockRejectedValueOnce(new Error('firebase down'))
-    const controller = new PartnerController(dbProvider)
-
-    const response = await controller.createPartner(
-      {
-        company: 'Acme',
-        country: 'CO',
-        email: 'acme@example.com',
-        firstName: 'Ada',
-        lastName: 'Lovelace',
-        password: 'supersecret',
-        phone: '123',
-      },
-      badRequest,
-      created,
-    )
-
-    expect(response).toEqual({ reason: 'Failed to create Firebase user' })
-    expect(created).not.toHaveBeenCalled()
-  })
-
   it('creates the partner and returns the id on success', async () => {
     const { badRequest, created } = setupTsoaResponses()
     const { dbProvider, partnerCreate } = buildDbProvider({ id: 'partner-123' })
-    createUser.mockResolvedValueOnce(undefined as unknown as admin.auth.UserRecord)
     const controller = new PartnerController(dbProvider)
 
     const response = await controller.createPartner(
@@ -143,7 +112,6 @@ describe('PartnerController', () => {
         email: 'acme@example.com',
         firstName: 'Ada',
         lastName: 'Lovelace',
-        password: 'supersecret',
         phone: '123',
       },
       badRequest,

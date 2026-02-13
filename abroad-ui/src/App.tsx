@@ -15,6 +15,7 @@ const FlowOpsList = lazy(() => import('./pages/Ops/FlowOpsList'))
 const FlowOpsDetail = lazy(() => import('./pages/Ops/FlowOpsDetail'))
 const FlowDefinitions = lazy(() => import('./pages/Ops/FlowDefinitions'))
 const CryptoAssets = lazy(() => import('./pages/Ops/CryptoAssets'))
+const PartnerApiKeys = lazy(() => import('./pages/Ops/PartnerApiKeys'))
 
 function App() {
   return (
@@ -33,6 +34,7 @@ function App() {
                   <Route element={<FlowOpsDetail />} path="/ops/flows/:flowInstanceId" />
                   <Route element={<FlowDefinitions />} path="/ops/flows/definitions" />
                   <Route element={<CryptoAssets />} path="/ops/crypto-assets" />
+                  <Route element={<PartnerApiKeys />} path="/ops/partners" />
                 </Routes>
               </Suspense>
             </Router>
