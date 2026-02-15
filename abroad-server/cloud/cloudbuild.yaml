@@ -54,16 +54,29 @@ steps:
       - _SENTRY_ENVIRONMENT=$_SENTRY_ENVIRONMENT
     waitFor: ["-"]
 
-  # 3. Apply database migrations with the freshly-built image
-  - id: Migrate
-    name: $_AR_HOSTNAME/$PROJECT_ID/cloud-run-source-deploy/$REPO_NAME/$_SERVICE_NAME:$COMMIT_SHA
-    entrypoint: sh
+  # 3. Apply database migrations via Cloud Run Job using the freshly-built image
+  - id: Update migrate job image
+    name: gcr.io/cloud-builders/gcloud
     args:
-      - -c
-      - |
-        cd /app && npx prisma migrate deploy
-    secretEnv: ["DATABASE_URL"]
+      - run
+      - jobs
+      - update
+      - abroad-migrate
+      - --region=$_DEPLOY_REGION
+      - --image=$_AR_HOSTNAME/$PROJECT_ID/cloud-run-source-deploy/$REPO_NAME/$_SERVICE_NAME:$COMMIT_SHA
+      - --quiet
     waitFor: ["Build & Push (cached)"]
+
+  - id: Execute migrate job
+    name: gcr.io/cloud-builders/gcloud
+    args:
+      - run
+      - jobs
+      - execute
+      - abroad-migrate
+      - --region=$_DEPLOY_REGION
+      - --wait
+    waitFor: ["Update migrate job image"]
 
   # 4. Deploy to Cloud Run after migrations
   - id: Deploy Cloud Run
@@ -82,7 +95,7 @@ steps:
       - --update-secrets=SENTRY_DSN=SENTRY_DSN:latest
       - --quiet
       - --async
-    waitFor: ["Migrate"]
+    waitFor: ["Execute migrate job"]
 
   # 4b. Deploy the WebSocket bridge as a separate Cloud Run service
   - id: Deploy Cloud Run (ws)
@@ -102,7 +115,7 @@ steps:
       - --update-env-vars=SENTRY_ENVIRONMENT=$_SENTRY_ENVIRONMENT,SENTRY_RELEASE=$COMMIT_SHA
       - --update-secrets=SENTRY_DSN=SENTRY_DSN:latest
       - --async
-    waitFor: ["Migrate"]
+    waitFor: ["Execute migrate job"]
 
   # 4c. Sync the GKE secret so workers can read SENTRY_DSN via env vars
   - id: Sync GKE secrets
@@ -140,7 +153,7 @@ steps:
       - CLOUDSDK_CONTAINER_CLUSTER=$_GKE_CLUSTER
       - PROJECT_ID=$PROJECT_ID
     args: ["apply", "-k", "abroad-server/k8s"]
-    waitFor: ["Substitute kustomization", "Migrate", "Sync GKE secrets"]
+    waitFor: ["Substitute kustomization", "Execute migrate job", "Sync GKE secrets"]
 
   # 6. Wait for listener, consumer, and outbox rollouts
   - id: Verify GKE rollouts
