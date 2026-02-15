@@ -171,8 +171,7 @@ steps:
         kubectl rollout status deployment/abroad-outbox --timeout=10s || true
     waitFor: ["Deploy GKE workloads"]
 
-images:
-  - $_AR_HOSTNAME/$PROJECT_ID/cloud-run-source-deploy/$REPO_NAME/$_SERVICE_NAME:$COMMIT_SHA
+# images list removed: docker buildx already pushes the image; Cloud Build post-check fails on buildx manifest lists
 
 options:
   substitutionOption: ALLOW_LOOSE
