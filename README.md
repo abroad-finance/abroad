@@ -73,6 +73,9 @@ Sentry is optional in both `abroad-server` and `abroad-ui`.
   - `VITE_SENTRY_DSN`
   - `VITE_SENTRY_ENVIRONMENT` (defaults to `import.meta.env.MODE`)
   - `VITE_SENTRY_RELEASE` (optional)
+  - `VITE_SENTRY_TRACES_SAMPLE_RATE` (default `0`)
+  - `VITE_SENTRY_REPLAYS_SESSION_SAMPLE_RATE` (default `0`)
+  - `VITE_SENTRY_REPLAYS_ON_ERROR_SAMPLE_RATE` (default `1`)
 - Frontend sourcemap upload during build (CI only):
   - `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT`
   - `SENTRY_RELEASE` (or a CI commit SHA env var such as `GITHUB_SHA`)

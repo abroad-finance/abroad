@@ -76,9 +76,19 @@ const readEnv = (key: string): string | undefined => {
   return trimmed ? trimmed : undefined
 }
 
+const readNumericEnv = (key: string, fallback: number): number => {
+  const value = readEnv(key)
+  if (!value) return fallback
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : fallback
+}
+
 const dsn = readEnv('VITE_SENTRY_DSN')
 const environment = readEnv('VITE_SENTRY_ENVIRONMENT') ?? import.meta.env.MODE ?? 'development'
 const release = readEnv('VITE_SENTRY_RELEASE')
+const tracesSampleRate = readNumericEnv('VITE_SENTRY_TRACES_SAMPLE_RATE', 0)
+const replaysSessionSampleRate = readNumericEnv('VITE_SENTRY_REPLAYS_SESSION_SAMPLE_RATE', 0)
+const replaysOnErrorSampleRate = readNumericEnv('VITE_SENTRY_REPLAYS_ON_ERROR_SAMPLE_RATE', 1)
 
 export const sentryEnabled = Boolean(dsn) && import.meta.env.MODE !== 'test'
 
@@ -97,7 +107,17 @@ if (sentryEnabled && dsn) {
     },
     dsn,
     environment,
+    integrations: [
+      Sentry.browserTracingIntegration(),
+      Sentry.replayIntegration({
+        maskAllText: true,
+        blockAllMedia: true,
+      }),
+    ],
     release,
+    replaysOnErrorSampleRate,
+    replaysSessionSampleRate,
     sendDefaultPii: false,
+    tracesSampleRate,
   })
 }
