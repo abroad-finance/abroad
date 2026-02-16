@@ -308,7 +308,13 @@ export const useWebSwapController = (): WebSwapControllerProps => {
   const [corridorError, setCorridorError] = useState<null | string>(null)
   const [chainKey, setChainKey] = useState('')
 
+  const sep24TokenPresent = useMemo(() => {
+    if (typeof window === 'undefined') return false
+    return new URLSearchParams(window.location.search).has('token')
+  }, [])
+
   const lastEditedRef = useRef<'source' | 'target' | null>(null)
+  const sep24AutoSelectedRef = useRef(false)
   const directAbortRef = useRef<AbortController | null>(null)
   const reverseAbortRef = useRef<AbortController | null>(null)
   const directReqIdRef = useRef(0)
@@ -417,6 +423,35 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     chainKey,
     selectedCorridor,
     state.corridorKey,
+  ])
+
+  useEffect(() => {
+    if (sep24AutoSelectedRef.current) return
+    if (!sep24TokenPresent) return
+    const stellarCorridor = corridors.find(corridor => corridor.chainFamily === 'stellar')
+    if (!stellarCorridor) return
+
+    sep24AutoSelectedRef.current = true
+
+    const nextChainKey = chainKeyOf(stellarCorridor)
+    const nextCorridorKey = corridorKeyOf(stellarCorridor)
+
+    if (state.targetCurrency !== stellarCorridor.targetCurrency) {
+      dispatch({ targetCurrency: stellarCorridor.targetCurrency, type: 'SET_TARGET_CURRENCY' })
+    }
+    if (chainKey !== nextChainKey) {
+      setChainKey(nextChainKey)
+    }
+    if (state.corridorKey !== nextCorridorKey) {
+      dispatch({ corridorKey: nextCorridorKey, type: 'SET_CORRIDOR' })
+      dispatch({ quoteId: '', sourceAmount: '', targetAmount: '', type: 'SET_AMOUNTS' })
+    }
+  }, [
+    chainKey,
+    corridors,
+    sep24TokenPresent,
+    state.corridorKey,
+    state.targetCurrency,
   ])
 
   useEffect(() => {

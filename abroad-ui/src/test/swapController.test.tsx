@@ -150,6 +150,7 @@ const Wrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
 
 beforeEach(() => {
   vi.useFakeTimers()
+  window.history.replaceState({}, '', '/')
 })
 
 afterEach(() => {
@@ -178,6 +179,58 @@ describe('useWebSwapController', () => {
     expect(mocked.requestQuoteMock).toHaveBeenCalledTimes(2)
     expect(result.current.swapViewProps.sourceAmount).toBe('40')
     expect(result.current.swapViewProps.targetAmount).toBe('20')
+  })
+
+  it('auto-selects Stellar when SEP-24 token is present in URL', async () => {
+    mocked.fetchPublicCorridorsMock.mockResolvedValueOnce({
+      corridors: [
+        {
+          blockchain: 'BASE',
+          chainFamily: 'evm',
+          chainId: 'eip155:8453',
+          cryptoCurrency: 'USDC',
+          maxAmount: null,
+          minAmount: null,
+          notify: { endpoint: null, required: false },
+          paymentMethod: 'BREB',
+          targetCurrency: 'BRL',
+          walletConnect: {
+            chainId: 'eip155:8453',
+            events: [],
+            methods: ['eth_sendTransaction'],
+            namespace: 'eip155',
+          },
+        },
+        {
+          blockchain: 'STELLAR',
+          chainFamily: 'stellar',
+          chainId: 'stellar:pubnet',
+          cryptoCurrency: 'USDC',
+          maxAmount: null,
+          minAmount: null,
+          notify: { endpoint: null, required: false },
+          paymentMethod: 'BREB',
+          targetCurrency: 'BRL',
+          walletConnect: {
+            chainId: 'stellar:pubnet',
+            events: [],
+            methods: ['stellar_signXDR'],
+            namespace: 'stellar',
+          },
+        },
+      ],
+    })
+
+    window.history.replaceState({}, '', '/?token=sep24-token&address=GADDR')
+
+    const { result } = renderHook(() => useWebSwapController(), { wrapper: Wrapper })
+
+    await act(async () => {
+      await Promise.resolve()
+      await mocked.fetchPublicCorridorsMock.mock.results[0]?.value
+    })
+
+    expect(result.current.swapViewProps.selectedChainLabel).toBe('Stellar')
   })
 
   it('does not advance confirm flow without amounts', () => {
