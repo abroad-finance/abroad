@@ -11,6 +11,7 @@ import { httpClient } from './http/httpClient'
 const REFRESH_GRACE_MS = 60_000
 
 type ChallengeResponse = {
+  challengeToken?: string
   format?: 'utf8' | 'xdr'
   message?: string
   xdr?: string
@@ -121,24 +122,38 @@ export const useWalletAuthentication = (): IWalletAuthentication => {
     return unsubscribe
   }, [])
 
-  const getChallengeMessage = useCallback(async ({ address, chainId }: { address: string, chainId: string }): Promise<{ message: string }> => {
+  const getChallengeMessage = useCallback(async ({ address, chainId }: { address: string, chainId: string }): Promise<{ challengeToken?: string, message: string }> => {
     const res = await buildJsonRequest<ChallengeResponse>('/walletAuth/challenge', { address, chainId })
     const data = ensureOk(res, 'Failed to fetch challenge')
     const message = data.message ?? data.xdr
     if (!message) {
       throw new Error('Invalid challenge response')
     }
-    return { message }
+    return {
+      challengeToken: data.challengeToken,
+      message,
+    }
   }, [])
 
-  const getAuthToken = useCallback(async ({ address, chainId, signedMessage }: {
+  const getAuthToken = useCallback(async ({ address, challengeToken, chainId, signedMessage }: {
     address: string
+    challengeToken?: string
     chainId: string
     signedMessage: string
   }): Promise<{ token: string }> => {
     const payload = chainId.startsWith('stellar:')
-      ? { address, chainId, signedXDR: signedMessage }
-      : { address, chainId, signature: signedMessage }
+      ? {
+        address,
+        chainId,
+        challengeToken,
+        signedXDR: signedMessage,
+      }
+      : {
+        address,
+        chainId,
+        challengeToken,
+        signature: signedMessage,
+      }
     const res = await buildJsonRequest<VerifyResponse>('/walletAuth/verify', payload)
     const data = ensureOk(res, 'Failed to verify signature')
     return { token: data.token }
@@ -149,9 +164,14 @@ export const useWalletAuthentication = (): IWalletAuthentication => {
     chainId: string
     signMessage: (message: string) => Promise<string>
   }) => {
-    const { message } = await getChallengeMessage({ address, chainId })
+    const { challengeToken, message } = await getChallengeMessage({ address, chainId })
     const signed = await signMessage(message)
-    const { token } = await getAuthToken({ address, chainId, signedMessage: signed })
+    const { token } = await getAuthToken({
+      address,
+      challengeToken,
+      chainId,
+      signedMessage: signed,
+    })
     setJwtToken(token)
     return { token }
   }, [
