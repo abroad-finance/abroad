@@ -52,14 +52,25 @@ jobs:
         working-directory: abroad-ui
         env:
           UI_DOTENV: ${{ secrets.UI_DOTENV }}
+          VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
         run: |
           set -euo pipefail
           if [ -z "${UI_DOTENV:-}" ]; then
             echo "::error::UI_DOTENV secret is not set or empty"
             exit 1
           fi
-          # Write exact contents without extra newlines or interpolation
+          if [ -z "${VITE_SENTRY_DSN:-}" ]; then
+            echo "::error::VITE_SENTRY_DSN secret is not set or empty"
+            exit 1
+          fi
+          # Write exact base contents without interpolation
           printf "%s" "$UI_DOTENV" > .env
+          # Ensure frontend Sentry DSN is present for runtime error reporting
+          if grep -q '^VITE_SENTRY_DSN=' .env; then
+            sed -i "s|^VITE_SENTRY_DSN=.*$|VITE_SENTRY_DSN=${VITE_SENTRY_DSN}|" .env
+          else
+            printf "\nVITE_SENTRY_DSN=%s\n" "$VITE_SENTRY_DSN" >> .env
+          fi
 
       - name: Install workspace deps
         if: steps.check.outputs.on_main == 'true'
