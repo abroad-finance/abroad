@@ -5,6 +5,7 @@ import {
   CircleDollarSign,
   Landmark,
   Loader,
+  ScanLine,
   Timer,
   Wallet,
   X,
@@ -47,6 +48,7 @@ export interface SwapProps {
   onOpenSourceModal: () => void
   onOpenTargetModal: () => void
   onPrimaryAction: () => void
+  openQr?: () => void
   onSourceChange: (value: string) => void
   onTargetChange: (value: string) => void
   selectedAssetLabel: string
@@ -76,6 +78,7 @@ export default function Swap({
   onOpenSourceModal,
   onOpenTargetModal,
   onPrimaryAction,
+  openQr,
   onSourceChange,
   onTargetChange,
   selectedAssetLabel,
@@ -115,6 +118,24 @@ export default function Swap({
       >
         {/* Source Section */}
         <div className="p-4 pb-3">
+          {/* QR button for BRL */}
+          {targetCurrency === TargetCurrency.BRL && openQr && (
+            <div className="flex justify-end mb-2">
+              <button
+                aria-label="Escanear QR"
+                className="p-2 rounded-full cursor-pointer transition-colors"
+                onClick={openQr}
+                style={{
+                  background: 'var(--ab-badge-bg)',
+                  border: '1px solid var(--ab-badge-border)',
+                }}
+                type="button"
+              >
+                <ScanLine className="w-5 h-5" style={{ color: 'var(--ab-text)' }} />
+              </button>
+            </div>
+          )}
+
           {/* Amount + Token selector */}
           <div className="flex items-center justify-between gap-3">
             <div className="flex-1 min-w-0">

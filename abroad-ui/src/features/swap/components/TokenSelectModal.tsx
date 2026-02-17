@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { Search, X } from 'lucide-react'
 import React, { useCallback, useMemo, useState } from 'react'
+import { useTranslate } from '@tolgee/react'
 
 import { ASSET_URLS } from '../../../shared/constants'
 
@@ -62,6 +63,7 @@ const TokenSelectModal: React.FC<TokenSelectModalProps> = ({
   title,
   tokens,
 }) => {
+  const { t } = useTranslate()
   const [search, setSearch] = useState('')
 
   const filteredTokens = useMemo(() => {
@@ -75,8 +77,7 @@ const TokenSelectModal: React.FC<TokenSelectModalProps> = ({
   const handleSelect = useCallback((key: string) => {
     onSelectToken(key)
     setSearch('')
-    onClose()
-  }, [onSelectToken, onClose])
+  }, [onSelectToken])
 
   const handleChainSelect = useCallback((key: string) => {
     onSelectChain?.(key)
@@ -144,7 +145,7 @@ const TokenSelectModal: React.FC<TokenSelectModalProps> = ({
               <input
                 className="w-full bg-transparent text-sm focus:outline-none"
                 onChange={e => setSearch(e.target.value)}
-                placeholder="Search"
+                placeholder={t('token_select.search', 'Search')}
                 style={{ color: 'var(--ab-text)' }}
                 type="text"
                 value={search}
@@ -192,7 +193,7 @@ const TokenSelectModal: React.FC<TokenSelectModalProps> = ({
                     <>
                       {icon && <img alt="" className="w-5 h-5 rounded-full" src={icon} />}
                       <span className="text-sm font-medium" style={{ color: 'var(--ab-text-secondary)' }}>
-                        {chain?.label} tokens
+                        {t('token_select.chain_tokens', '{chain} tokens', { chain: chain?.label })}
                       </span>
                     </>
                   )
@@ -204,7 +205,7 @@ const TokenSelectModal: React.FC<TokenSelectModalProps> = ({
             <div className="space-y-1 max-h-60 overflow-y-auto">
               {filteredTokens.length === 0 && (
                 <p className="text-center py-4 text-sm" style={{ color: 'var(--ab-text-muted)' }}>
-                  No results
+                  {t('token_select.no_results', 'No results')}
                 </p>
               )}
               {filteredTokens.map(token => {

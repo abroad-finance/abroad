@@ -20,8 +20,11 @@ export const WalletAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
 
     // Restore persisted wallet type, or fall back to device default
-    const persisted = localStorage.getItem(WALLET_TYPE_KEY) as WalletType | null
-    const walletType = persisted || getWalletTypeByDevice()
+    const persisted = localStorage.getItem(WALLET_TYPE_KEY)
+    const validTypes: WalletType[] = ['wallet-connect', 'stellar-kit', 'sep24']
+    const walletType = persisted && validTypes.includes(persisted as WalletType)
+      ? (persisted as WalletType)
+      : getWalletTypeByDevice()
     return walletFactory.getWalletHandler(walletType)
   }, [walletFactory])
   const [wallet, _setWallet] = useState(defaultWallet)
@@ -29,12 +32,12 @@ export const WalletAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const setWallet = useCallback((w: typeof defaultWallet) => {
     _setWallet(w)
     // Persist the wallet type so it survives page refresh
-    if (w.walletId === 'wallet-connect') {
-      localStorage.setItem(WALLET_TYPE_KEY, 'wallet-connect')
-    }
-    else {
-      localStorage.setItem(WALLET_TYPE_KEY, 'stellar-kit')
-    }
+    const walletType: WalletType = w.walletId === 'wallet-connect'
+      ? 'wallet-connect'
+      : w.walletId === 'sep24'
+        ? 'sep24'
+        : 'stellar-kit'
+    localStorage.setItem(WALLET_TYPE_KEY, walletType)
   }, [])
 
   const setKycUrl = useCallback((url: null | string) => {

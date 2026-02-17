@@ -512,15 +512,16 @@ export const useWebSwapController = (): WebSwapControllerProps => {
   useEffect(() => {
     if (!wallet?.address || !wallet?.chainId || !selectedCorridor) return
     if (wallet.chainId === selectedCorridor.chainId) return
-    // Instead of disconnecting, silently try to restore a saved session
-    // for the new chain. If no session exists, do nothing — the user
-    // can click "Connect Wallet" manually.
+    // Silently try to restore a saved session for the new chain.
+    // If no session exists, disconnect so the UI reflects the need to reconnect.
     if (wallet.walletId === 'wallet-connect' && selectedCorridor.walletConnect) {
       wallet.connect({
         chainId: selectedCorridor.chainId,
         silentRestore: true,
         walletConnect: selectedCorridor.walletConnect,
-      }).catch(() => undefined)
+      }).catch(() => {
+        void wallet.disconnect()
+      })
     }
   }, [selectedCorridor, wallet])
 
@@ -538,7 +539,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
 
   const isAboveMaximum = useMemo(() => {
     if (!selectedCorridor) return false
-    const max = selectedCorridor.targetCurrency === 'COP' ? 5_000_000 : 0
+    const max = selectedCorridor.maxAmount || 0
     if (!max) return false
     const cleanedTarget = String(state.targetAmount).replace(/\./g, '').replace(/,/g, '.')
     const numericTarget = parseFloat(cleanedTarget)
@@ -625,6 +626,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
 
     const num = parseFloat(value)
     if (Number.isNaN(num)) {
+      setQuoteBelowMinimum(false)
       dispatch({
         quoteId: '', sourceAmount: value, targetAmount: '', type: 'SET_AMOUNTS',
       })
@@ -704,6 +706,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     const normalized = raw.replace(/\./g, '').replace(/,/g, '.')
     const num = parseFloat(normalized)
     if (Number.isNaN(num)) {
+      setQuoteBelowMinimum(false)
       dispatch({
         quoteId: '', sourceAmount: '', targetAmount: value, type: 'SET_AMOUNTS',
       })
@@ -839,6 +842,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
 
   const selectAssetOption = useCallback((key: string) => {
     setAssetMenuOpen()
+    setQuoteBelowMinimum(false)
     dispatch({ corridorKey: key, type: 'SET_CORRIDOR' })
     const selected = availableCorridors.find(corridor => corridorKeyOf(corridor) === key)
     if (selected) setChainKey(chainKeyOf(selected))
@@ -932,6 +936,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     setCurrencyMenuOpen()
     dispatch({ type: 'RESET' })
     dispatch({ targetCurrency: currency, type: 'SET_TARGET_CURRENCY' })
+    setQuoteBelowMinimum(false)
     dispatch({ corridorKey: '', type: 'SET_CORRIDOR' })
     setChainKey('')
     lastEditedRef.current = null
@@ -1516,6 +1521,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     isQrOpen: state.isQrOpen,
     isWalletDetailsOpen: state.isWalletDetailsOpen,
     onWalletConnect: connectWallet,
+    openQr,
     resetForNewTransaction,
     selectAssetOption,
     selectChain,
