@@ -1,17 +1,8 @@
-import { Info, Moon, Sun, User, Wallet } from 'lucide-react'
+import { Info, Moon, Sun, User } from 'lucide-react'
 import React, { memo } from 'react'
 
 import AbroadLogoColored from '../../../assets/Logos/AbroadLogoColored.svg'
 import AbroadLogoWhite from '../../../assets/Logos/AbroadLogoWhite.svg'
-
-/* ── Utils ── */
-
-const formatWalletAddress = (address?: null | string, notConnectedLabel?: string) => {
-  if (!address) return notConnectedLabel || 'No conectado'
-  const trimmed = address.trim()
-  if (trimmed.length <= 10) return trimmed
-  return `${trimmed.slice(0, 6)}...${trimmed.slice(-4)}`
-}
 
 /* ── Props ── */
 
@@ -41,8 +32,6 @@ export interface NavBarResponsiveProps {
 
 const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({
   address,
-  balance,
-  balanceLoading,
   className = '',
   infoUrl,
   isDark = false,
@@ -51,22 +40,7 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({
   languageSelectorMobile,
   onToggleTheme,
   onWalletClick,
-  walletInfo,
 }) => {
-  const WalletIcon = address && walletInfo.icon
-    ? (
-        <img
-          alt={`${walletInfo.name} wallet`}
-          className="w-7 h-7"
-          height={28}
-          loading="lazy"
-          src={walletInfo.icon}
-          width={28}
-        />
-      )
-    : <Wallet aria-hidden="true" className="w-4.5 h-4.5" style={{ color: 'var(--ab-text)' }} />
-
-
   return (
     <nav className={`w-full px-4 pt-4 ${className}`} role="navigation">
       <div
@@ -106,6 +80,7 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({
               {/* User button (when connected) */}
               {address && (
                 <button
+                  aria-label={labels.walletDetailsAria}
                   className="p-2 rounded-full transition-colors cursor-pointer"
                   onClick={onWalletClick}
                   style={{ background: 'var(--ab-badge-bg)', border: '1px solid var(--ab-badge-border)' }}

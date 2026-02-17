@@ -199,7 +199,10 @@ export function useWalletConnectWallet({ walletAuth }: {
     const restored = await tryRestoreSession(client, targetChainId, namespace)
 
     // In silent mode, only restore saved sessions — never open the QR modal
-    if (!restored && options?.silentRestore) return
+    if (options?.silentRestore) {
+      if (!restored) throw new Error('No saved session for this chain')
+      return
+    }
 
     if (!restored) {
       const { approval, uri } = await client.connect({
