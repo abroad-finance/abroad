@@ -10,6 +10,7 @@ import { TYPES } from '../../../app/container/types'
 import { IDatabaseClientProvider } from '../../../platform/persistence/IDatabaseClientProvider'
 import { ISecretManager } from '../../../platform/secrets/ISecretManager'
 import { IPartnerService } from './contracts/IPartnerService'
+import { hashPartnerApiKey } from './partnerApiKey'
 
 interface SepTokenPayload extends jwt.JwtPayload {
   client_domain?: string
@@ -43,7 +44,7 @@ export class PartnerService implements IPartnerService {
 
     const prismaClient = await this.databaseClientProvider.getClient()
 
-    const hashedApiKey = this.hashApiKey(normalizedApiKey)
+    const hashedApiKey = hashPartnerApiKey(normalizedApiKey)
 
     const partner = await this.findPartnerByApiKey(prismaClient, hashedApiKey)
 
@@ -128,10 +129,6 @@ export class PartnerService implements IPartnerService {
     return prismaClient.partner.findFirst({
       where: { clientDomainHash },
     })
-  }
-
-  private hashApiKey(apiKey: string): string {
-    return sha512_224(apiKey)
   }
 
   private hashClientDomain(clientDomain: string): string {
