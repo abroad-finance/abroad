@@ -4,7 +4,7 @@ type Theme = 'dark' | 'light' | 'system'
 const STORAGE_KEY = 'abroad:theme'
 
 function getSystemPreference(): 'dark' | 'light' {
-  if (typeof window === 'undefined') return 'light'
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return 'light'
   return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
 }
 
@@ -35,11 +35,16 @@ export function useTheme() {
 
   // Listen for system preference changes when theme is 'system'
   useEffect(() => {
-    if (theme !== 'system') return
+    if (theme !== 'system' || typeof window.matchMedia !== 'function') return
     const mq = window.matchMedia('(prefers-color-scheme: dark)')
     const handler = () => applyTheme(getSystemPreference())
-    mq.addEventListener('change', handler)
-    return () => mq.removeEventListener('change', handler)
+    if (typeof mq.addEventListener === 'function') {
+      mq.addEventListener('change', handler)
+      return () => mq.removeEventListener('change', handler)
+    }
+    // Fallback for older Safari
+    mq.addListener(handler)
+    return () => mq.removeListener(handler)
   }, [theme])
 
   const setTheme = useCallback((t: Theme) => {

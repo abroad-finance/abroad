@@ -1,5 +1,6 @@
-import React, { lazy, Suspense, useCallback, useState } from 'react'
+import React, { lazy, Suspense, useCallback, useMemo, useState } from 'react'
 import { Loader } from 'lucide-react'
+import { useTranslate } from '@tolgee/react'
 
 import { useWebSwapController } from './useWebSwapController'
 
@@ -45,6 +46,7 @@ export interface WebSwapControllerProps {
   isQrOpen: boolean
   isWalletDetailsOpen: boolean
   onWalletConnect: () => Promise<void>
+  openQr: () => void
   resetForNewTransaction: () => void
   selectAssetOption: (key: string) => void
   selectChain: (key: string) => void
@@ -88,6 +90,7 @@ const WebSwap: React.FC = () => {
     isQrOpen,
     isWalletDetailsOpen,
     onWalletConnect,
+    openQr,
     resetForNewTransaction,
     selectAssetOption,
     selectChain,
@@ -104,6 +107,7 @@ const WebSwap: React.FC = () => {
   const navBar = useNavBarResponsive({ onWalletConnect, onWalletDetails: handleWalletDetailsOpen })
   const languageSelector = useLanguageSelector()
   const walletDetails = useWalletDetails({ onClose: handleWalletDetailsClose })
+  const { t } = useTranslate()
 
   const handleBalanceClick = useCallback(() => {
     if (walletDetails.usdcBalance) {
@@ -138,20 +142,20 @@ const WebSwap: React.FC = () => {
   }))
 
   // Build target currency options
-  const targetCurrencyTokens: TokenOption[] = [
+  const targetCurrencyTokens: TokenOption[] = useMemo(() => [
     {
       icon: 'https://hatscripts.github.io/circle-flags/flags/br.svg',
       key: 'BRL',
       label: 'BRL',
-      subtitle: 'Brazilian Real',
+      subtitle: t('swap.currency_brl', 'Brazilian Real'),
     },
     {
       icon: 'https://hatscripts.github.io/circle-flags/flags/co.svg',
       key: 'COP',
       label: 'COP',
-      subtitle: 'Colombian Peso',
+      subtitle: t('swap.currency_cop', 'Colombian Peso'),
     },
-  ]
+  ], [t])
 
   const handleSourceTokenSelect = useCallback((key: string) => {
     selectAssetOption(key)
@@ -215,6 +219,7 @@ const WebSwap: React.FC = () => {
                 onDisconnect={walletDetails.onDisconnectWallet}
                 onOpenSourceModal={openSourceModal}
                 onOpenTargetModal={openTargetModal}
+                openQr={openQr}
                 usdcBalance={walletDetails.usdcBalance}
                 walletAddress={walletDetails.address}
               />
@@ -244,7 +249,7 @@ const WebSwap: React.FC = () => {
         open={sourceModalOpen}
         selectedChainKey={selectedChainKey}
         selectedTokenKey={assetOptions.find(a => a.label === swapViewProps.selectedAssetLabel)?.key}
-        title="Swap from"
+        title={t('swap.modal_swap_from', 'Swap from')}
         tokens={sourceTokens}
       />
 
@@ -255,7 +260,7 @@ const WebSwap: React.FC = () => {
         onSelectToken={handleTargetCurrencySelect}
         open={targetModalOpen}
         selectedTokenKey={String(targetCurrency)}
-        title="Swap to"
+        title={t('swap.modal_swap_to', 'Swap to')}
         tokens={targetCurrencyTokens}
       />
 
