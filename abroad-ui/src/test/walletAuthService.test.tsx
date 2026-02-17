@@ -65,11 +65,11 @@ describe('useWalletAuthentication', () => {
     })
 
     expect(mocked.challengeMock).toHaveBeenCalled()
-    expect(mocked.verifyMock).toHaveBeenCalledWith({
+    expect(mocked.verifyMock).toHaveBeenCalledWith(expect.objectContaining({
       address: 'GADDR',
       chainId: 'stellar:public',
       signedXDR: 'signed-xdr',
-    })
+    }))
     expect(authTokenStore.getToken()).toBe(token)
   })
 

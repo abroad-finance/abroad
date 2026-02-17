@@ -25,6 +25,7 @@ interface ChallengeRequest {
 }
 
 interface ChallengeResponse {
+  challengeToken: string
   format: 'utf8' | 'xdr'
   message: string
   xdr?: string
@@ -35,6 +36,7 @@ interface RefreshResponse { token: string }
 
 interface VerifyRequest {
   address: string
+  challengeToken?: string
   chainId?: string
   signature?: string
   signedXDR?: string
@@ -70,12 +72,23 @@ export class WalletAuthController extends Controller {
       )
 
       challenges.set(key, { expiresAt: Date.now() + CHALLENGE_TTL_MS, message: xdr })
-      return { format: 'xdr', message: xdr, xdr }
+      const challengeToken = this.createChallengeToken(STELLAR_SEP_JWT_SECRET, key, xdr)
+      return {
+        challengeToken,
+        format: 'xdr',
+        message: xdr,
+        xdr,
+      }
     }
 
     const message = this.buildChallengeMessage(resolvedChainId, body.address)
     challenges.set(key, { expiresAt: Date.now() + CHALLENGE_TTL_MS, message })
-    return { format: 'utf8', message }
+    const challengeToken = this.createChallengeToken(STELLAR_SEP_JWT_SECRET, key, message)
+    return {
+      challengeToken,
+      format: 'utf8',
+      message,
+    }
   }
 
   @Post('refresh')
@@ -105,10 +118,13 @@ export class WalletAuthController extends Controller {
     const { STELLAR_HOME_DOMAIN, STELLAR_NETWORK_PASSPHRASE, STELLAR_SEP_JWT_SECRET, STELLAR_SERVER_KP, STELLAR_WEB_AUTH_DOMAIN } = await this.getSecrets()
     const resolvedChainId = this.resolveChainId(body.chainId, STELLAR_NETWORK_PASSPHRASE)
     const key = this.challengeKey(resolvedChainId, body.address)
-    const outstanding = challenges.get(key)
+    const outstandingMessage = this.resolveOutstandingChallenge(
+      STELLAR_SEP_JWT_SECRET,
+      key,
+      body.challengeToken,
+    )
 
-    if (!outstanding || outstanding.expiresAt < Date.now()) {
-      challenges.delete(key)
+    if (!outstandingMessage) {
       this.setStatus(400)
       throw new Error('No outstanding challenge for this account')
     }
@@ -146,7 +162,7 @@ export class WalletAuthController extends Controller {
       throw new Error('Signature is required')
     }
 
-    const verified = this.verifyNonStellarSignature(resolvedChainId, body.address, outstanding.message, body.signature)
+    const verified = this.verifyNonStellarSignature(resolvedChainId, body.address, outstandingMessage, body.signature)
     if (!verified) {
       this.setStatus(401)
       throw new Error('Invalid signature')
@@ -159,6 +175,45 @@ export class WalletAuthController extends Controller {
       { expiresIn: '1h' },
     )
     return { token }
+  }
+
+  private createChallengeToken(secret: string, subject: string, message: string): string {
+    return jwt.sign(
+      {
+        msg: message,
+        typ: 'wallet_challenge',
+      },
+      secret,
+      {
+        expiresIn: Math.floor(CHALLENGE_TTL_MS / 1000),
+        subject,
+      },
+    )
+  }
+
+  private resolveOutstandingChallenge(secret: string, key: string, challengeToken?: string): null | string {
+    if (challengeToken && challengeToken.trim().length > 0) {
+      try {
+        const payload = jwt.verify(challengeToken, secret) as jwt.JwtPayload & {
+          msg?: string
+          typ?: string
+        }
+        if (payload.typ === 'wallet_challenge' && payload.sub === key && typeof payload.msg === 'string' && payload.msg.length > 0) {
+          return payload.msg
+        }
+      }
+      catch {
+        // Fall back to in-memory challenge for backward compatibility.
+      }
+    }
+
+    const outstanding = challenges.get(key)
+    if (!outstanding || outstanding.expiresAt < Date.now()) {
+      challenges.delete(key)
+      return null
+    }
+
+    return outstanding.message
   }
 
   private buildChallengeMessage(chainId: string, address: string): string {
