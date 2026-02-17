@@ -14,7 +14,7 @@ import {
   WalletConnectModule,
 } from '@creit.tech/stellar-wallets-kit/modules/walletconnect.module'
 // useStellarKitWallet.ts
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import type { IWallet } from '../../interfaces/IWallet'
 import type { IWalletAuthentication } from '../../interfaces/IWalletAuthentication'
@@ -36,13 +36,29 @@ const walletConnectModule = new WalletConnectModule({
 const network = WalletNetwork.PUBLIC
 const STELLAR_CHAIN_ID = import.meta.env.VITE_STELLAR_CHAIN_ID || 'stellar:pubnet'
 
+const SK_WALLET_ID_KEY = 'abroad:stellar:walletId'
+const SK_ADDRESS_KEY = 'abroad:stellar:address'
+
 export function useStellarKitWallet(
   { walletAuth }: { walletAuth: IWalletAuthentication },
 ): IWallet {
   const kitRef = useRef<null | StellarWalletsKit>(null)
+  const restoringRef = useRef(false)
 
-  const [address, setAddress] = useState<null | string>(null)
-  const [walletId, _setWalletId] = useState<null | string>(null)
+  const [address, _setAddress] = useState<null | string>(() => {
+    if (typeof window !== 'undefined') return localStorage.getItem(SK_ADDRESS_KEY)
+    return null
+  })
+  const [walletId, _setWalletId] = useState<null | string>(() => {
+    if (typeof window !== 'undefined') return localStorage.getItem(SK_WALLET_ID_KEY)
+    return null
+  })
+
+  const setAddress = useCallback((addr: null | string) => {
+    _setAddress(addr)
+    if (addr) localStorage.setItem(SK_ADDRESS_KEY, addr)
+    else localStorage.removeItem(SK_ADDRESS_KEY)
+  }, [])
 
   const ensureKit = useCallback((): StellarWalletsKit => {
     if (!kitRef.current) {
@@ -58,9 +74,46 @@ export function useStellarKitWallet(
     const kit = ensureKit()
     if (id) {
       kit.setWallet(id)
+      localStorage.setItem(SK_WALLET_ID_KEY, id)
+    }
+    else {
+      localStorage.removeItem(SK_WALLET_ID_KEY)
     }
     _setWalletId(id)
   }, [ensureKit])
+
+  // Auto-reconnect on mount if a previous session was persisted
+  useEffect(() => {
+    const storedWalletId = localStorage.getItem(SK_WALLET_ID_KEY)
+    const storedAddress = localStorage.getItem(SK_ADDRESS_KEY)
+    if (!storedWalletId || !storedAddress || restoringRef.current) return
+
+    restoringRef.current = true
+    const kit = ensureKit()
+    kit.setWallet(storedWalletId)
+
+    kit.getAddress({ skipRequestAccess: true })
+      .then(({ address: resolved }) => {
+        if (resolved) {
+          setAddress(resolved)
+          _setWalletId(storedWalletId)
+        }
+        else {
+          setAddress(null)
+          localStorage.removeItem(SK_WALLET_ID_KEY)
+          localStorage.removeItem(SK_ADDRESS_KEY)
+        }
+      })
+      .catch(() => {
+        // Wallet extension not available or user revoked — clear persisted state
+        setAddress(null)
+        localStorage.removeItem(SK_WALLET_ID_KEY)
+        localStorage.removeItem(SK_ADDRESS_KEY)
+      })
+      .finally(() => {
+        restoringRef.current = false
+      })
+  }, [ensureKit, setAddress])
 
   const signTransaction = useCallback(
     async ({ message }: { message: string }) => {
@@ -119,9 +172,12 @@ export function useStellarKitWallet(
     await kit.disconnect()
     setWalletId(null)
     setAddress(null)
+    localStorage.removeItem(SK_WALLET_ID_KEY)
+    localStorage.removeItem(SK_ADDRESS_KEY)
     walletAuth.setJwtToken(null)
   }, [
     ensureKit,
+    setAddress,
     setWalletId,
     walletAuth,
   ])

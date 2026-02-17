@@ -6,3 +6,49 @@
   --color-abroad-mid: #26A17B;
   --color-abroad-light: #73B9A3;
 }
+
+/* ── Light mode (default) ── */
+:root {
+  --ab-bg: #e8f5f0;
+  --ab-bg-end: #d4ede4;
+  --ab-card: rgba(255, 255, 255, 0.6);
+  --ab-card-border: rgba(53, 110, 106, 0.1);
+  --ab-input: #f0f7f5;
+  --ab-input-border: rgba(53, 110, 106, 0.08);
+  --ab-text: #1a3a37;
+  --ab-text-secondary: #4a7a75;
+  --ab-text-muted: #7a9e9a;
+  --ab-btn: #5a9a8f;
+  --ab-btn-hover: #4a8a7f;
+  --ab-btn-text: #ffffff;
+  --ab-separator: rgba(53, 110, 106, 0.1);
+  --ab-modal-bg: #ffffff;
+  --ab-modal-border: rgba(53, 110, 106, 0.08);
+  --ab-badge-bg: rgba(255, 255, 255, 0.7);
+  --ab-badge-border: rgba(53, 110, 106, 0.12);
+  --ab-hover: rgba(53, 110, 106, 0.06);
+  --ab-selected: rgba(53, 110, 106, 0.1);
+}
+
+/* ── Dark mode ── */
+.dark {
+  --ab-bg: #0d2b26;
+  --ab-bg-end: #0d2b26;
+  --ab-card: rgba(26, 63, 56, 0.8);
+  --ab-card-border: rgba(42, 90, 80, 0.5);
+  --ab-input: #0d2b26;
+  --ab-input-border: rgba(42, 90, 80, 0.5);
+  --ab-text: #e0f0ec;
+  --ab-text-secondary: #a0c8c0;
+  --ab-text-muted: #6a9a92;
+  --ab-btn: #5a9a8f;
+  --ab-btn-hover: #6aaa9f;
+  --ab-btn-text: #ffffff;
+  --ab-separator: rgba(42, 90, 80, 0.4);
+  --ab-modal-bg: #1a3f38;
+  --ab-modal-border: rgba(42, 90, 80, 0.5);
+  --ab-badge-bg: rgba(13, 43, 38, 0.8);
+  --ab-badge-border: rgba(42, 90, 80, 0.5);
+  --ab-hover: rgba(90, 154, 143, 0.1);
+  --ab-selected: rgba(90, 154, 143, 0.2);
+}

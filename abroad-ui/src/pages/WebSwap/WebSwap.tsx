@@ -1,9 +1,8 @@
-import React from 'react'
-import { lazy, Suspense } from 'react'
+import React, { lazy, Suspense, useCallback, useMemo, useState } from 'react'
+import { Loader } from 'lucide-react'
+import { useTranslate } from '@tolgee/react'
 
 import { useWebSwapController } from './useWebSwapController'
-const QrScannerFullScreen = lazy(() => import('../../features/swap/components/QrScannerFullScreen'))
-import { Loader } from 'lucide-react'
 
 import type { BankDetailsRouteProps } from '../../features/swap/components/BankDetailsRoute'
 import type { ConfirmQrProps } from '../../features/swap/components/ConfirmQr'
@@ -14,6 +13,8 @@ import BankDetailsRoute from '../../features/swap/components/BankDetailsRoute'
 import ConfirmQr from '../../features/swap/components/ConfirmQr'
 import NavBarResponsive from '../../features/swap/components/NavBarResponsive'
 import Swap from '../../features/swap/components/Swap'
+import TokenSelectModal from '../../features/swap/components/TokenSelectModal'
+import type { ChainOption, TokenOption } from '../../features/swap/components/TokenSelectModal'
 import TxStatus from '../../features/swap/components/TxStatus'
 import UserVerification from '../../features/swap/components/UserVerification'
 import WaitSign from '../../features/swap/components/WaitSign'
@@ -24,10 +25,15 @@ import { SwapView } from '../../features/swap/types'
 import BackgroundCrossfade from '../../shared/components/BackgroundCrossfade'
 import LanguageSelector from '../../shared/components/LanguageSelector'
 import { ModalOverlay } from '../../shared/components/ModalOverlay'
+import { ASSET_URLS } from '../../shared/constants'
 import { useLanguageSelector, useNavBarResponsive } from '../../shared/hooks'
 
+const QrScannerFullScreen = lazy(() => import('../../features/swap/components/QrScannerFullScreen'))
+
 export interface WebSwapControllerProps {
+  assetOptions: Array<{ key: string, label: string }>
   bankDetailsProps: BankDetailsRouteProps
+  chainOptions: Array<{ key: string, label: string }>
   closeQr: () => void
   confirmQrProps: ConfirmQrProps
   currentBgUrl: string
@@ -40,7 +46,12 @@ export interface WebSwapControllerProps {
   isQrOpen: boolean
   isWalletDetailsOpen: boolean
   onWalletConnect: () => Promise<void>
+  openQr: () => void
   resetForNewTransaction: () => void
+  selectAssetOption: (key: string) => void
+  selectChain: (key: string) => void
+  selectCurrency: (currency: TargetCurrency) => void
+  selectedChainKey: string
   swapViewProps: SwapProps
   targetAmount: string
   targetCurrency: TargetCurrency
@@ -48,9 +59,25 @@ export interface WebSwapControllerProps {
   view: SwapView
 }
 
+/* ── Token/chain icon helpers ── */
+
+const CRYPTO_ICONS: Record<string, string> = {
+  USDC: ASSET_URLS.USDC_TOKEN_ICON,
+  USDT: ASSET_URLS.USDT_TOKEN_ICON,
+}
+
+const CHAIN_ICON_MAP: Record<string, string> = {
+  Celo: ASSET_URLS.CELO_CHAIN_ICON,
+  Solana: ASSET_URLS.SOLANA_CHAIN_ICON,
+  Stellar: ASSET_URLS.STELLAR_CHAIN_ICON,
+}
+
 const WebSwap: React.FC = () => {
+  const controller = useWebSwapController()
   const {
+    assetOptions,
     bankDetailsProps,
+    chainOptions,
     closeQr,
     confirmQrProps,
     currentBgUrl,
@@ -63,22 +90,93 @@ const WebSwap: React.FC = () => {
     isQrOpen,
     isWalletDetailsOpen,
     onWalletConnect,
+    openQr,
     resetForNewTransaction,
+    selectAssetOption,
+    selectChain,
+    selectCurrency,
+    selectedChainKey,
     swapViewProps,
     targetAmount,
     targetCurrency,
     transactionId,
     view,
-  } = useWebSwapController()
+  } = controller
 
   // Components controllers
   const navBar = useNavBarResponsive({ onWalletConnect, onWalletDetails: handleWalletDetailsOpen })
   const languageSelector = useLanguageSelector()
   const walletDetails = useWalletDetails({ onClose: handleWalletDetailsClose })
+  const { t } = useTranslate()
+
+  const handleBalanceClick = useCallback(() => {
+    if (walletDetails.usdcBalance) {
+      const raw = walletDetails.usdcBalance.replace(/,/g, '')
+      swapViewProps.onSourceChange(raw)
+    }
+  }, [walletDetails.usdcBalance, swapViewProps.onSourceChange])
+
+
+  // Modal state for source (chain + token) and target (currency)
+  const [sourceModalOpen, setSourceModalOpen] = useState(false)
+  const [targetModalOpen, setTargetModalOpen] = useState(false)
+
+  const openSourceModal = useCallback(() => setSourceModalOpen(true), [])
+  const closeSourceModal = useCallback(() => setSourceModalOpen(false), [])
+  const openTargetModal = useCallback(() => setTargetModalOpen(true), [])
+  const closeTargetModal = useCallback(() => setTargetModalOpen(false), [])
+
+  // Build chain options for modal
+  const sourceChains: ChainOption[] = chainOptions.map(c => ({
+    icon: Object.entries(CHAIN_ICON_MAP).find(([prefix]) => c.label.startsWith(prefix))?.[1],
+    key: c.key,
+    label: c.label,
+  }))
+
+  // Build token options for modal
+  const sourceTokens: TokenOption[] = assetOptions.map(a => ({
+    icon: CRYPTO_ICONS[a.label],
+    key: a.key,
+    label: a.label,
+    subtitle: a.label,
+  }))
+
+  // Build target currency options
+  const targetCurrencyTokens: TokenOption[] = useMemo(() => [
+    {
+      icon: 'https://hatscripts.github.io/circle-flags/flags/br.svg',
+      key: 'BRL',
+      label: 'BRL',
+      subtitle: t('swap.currency_brl', 'Brazilian Real'),
+    },
+    {
+      icon: 'https://hatscripts.github.io/circle-flags/flags/co.svg',
+      key: 'COP',
+      label: 'COP',
+      subtitle: t('swap.currency_cop', 'Colombian Peso'),
+    },
+  ], [t])
+
+  const handleSourceTokenSelect = useCallback((key: string) => {
+    selectAssetOption(key)
+    setSourceModalOpen(false)
+  }, [selectAssetOption])
+
+  const handleSourceChainSelect = useCallback((key: string) => {
+    selectChain(key)
+  }, [selectChain])
+
+  const handleTargetCurrencySelect = useCallback((key: string) => {
+    selectCurrency(key as TargetCurrency)
+    setTargetModalOpen(false)
+  }, [selectCurrency])
 
   return (
-    <div className="w-screen min-h-screen md:h-screen md:overflow-hidden flex flex-col">
-      {/* Desktop page background with crossfade (no white flash) */}
+    <div
+      className="w-full min-h-[100dvh] md:h-screen md:overflow-hidden flex flex-col overflow-x-hidden"
+      style={{ background: 'var(--ab-bg)' }}
+    >
+      {/* Desktop page background with crossfade */}
       <BackgroundCrossfade
         backgroundAttachment="fixed"
         imageUrl={currentBgUrl}
@@ -88,7 +186,7 @@ const WebSwap: React.FC = () => {
       />
 
       {/* Shared Navigation */}
-      <div className="relative z-10 bg-green-50 md:bg-transparent">
+      <div className="relative z-10">
         <NavBarResponsive
           {...navBar}
           languageSelector={<LanguageSelector {...languageSelector} />}
@@ -107,7 +205,25 @@ const WebSwap: React.FC = () => {
             kycNeeded: (
               <UserVerification onApproved={handleKycApproved} onClose={handleBackToSwap} />
             ),
-            swap: <Swap {...swapViewProps} />,
+            swap: (
+              <Swap
+                {...swapViewProps}
+                hasInsufficientFunds={
+                  swapViewProps.isAuthenticated
+                  && !!walletDetails.usdcBalance
+                  && !!swapViewProps.sourceAmount
+                  && parseFloat(swapViewProps.sourceAmount) > parseFloat(walletDetails.usdcBalance.replace(/,/g, ''))
+                }
+                loadingBalance={walletDetails.isLoadingBalance}
+                onBalanceClick={handleBalanceClick}
+                onDisconnect={walletDetails.onDisconnectWallet}
+                onOpenSourceModal={openSourceModal}
+                onOpenTargetModal={openTargetModal}
+                openQr={openQr}
+                usdcBalance={walletDetails.usdcBalance}
+                walletAddress={walletDetails.address}
+              />
+            ),
             txStatus: (
               <TxStatus
                 onNewTransaction={resetForNewTransaction}
@@ -124,7 +240,31 @@ const WebSwap: React.FC = () => {
         />
       </main>
 
-      {/* Top-level Modals */}
+      {/* Source Modal (chain + token selection) */}
+      <TokenSelectModal
+        chains={sourceChains}
+        onClose={closeSourceModal}
+        onSelectChain={handleSourceChainSelect}
+        onSelectToken={handleSourceTokenSelect}
+        open={sourceModalOpen}
+        selectedChainKey={selectedChainKey}
+        selectedTokenKey={assetOptions.find(a => a.label === swapViewProps.selectedAssetLabel)?.key}
+        title={t('swap.modal_swap_from', 'Swap from')}
+        tokens={sourceTokens}
+      />
+
+      {/* Target Modal (currency selection) */}
+      <TokenSelectModal
+        chains={[]}
+        onClose={closeTargetModal}
+        onSelectToken={handleTargetCurrencySelect}
+        open={targetModalOpen}
+        selectedTokenKey={String(targetCurrency)}
+        title={t('swap.modal_swap_to', 'Swap to')}
+        tokens={targetCurrencyTokens}
+      />
+
+      {/* Wallet Details Modal */}
       <ModalOverlay
         onClose={handleWalletDetailsClose}
         open={!!isWalletDetailsOpen}
@@ -133,23 +273,21 @@ const WebSwap: React.FC = () => {
       </ModalOverlay>
 
       {/* Full-screen QR Scanner */}
-      {isQrOpen
-        && (
-          <Suspense fallback={null}>
-            <QrScannerFullScreen onClose={closeQr} onResult={handleQrResult} />
-          </Suspense>
-        )}
+      {isQrOpen && (
+        <Suspense fallback={null}>
+          <QrScannerFullScreen onClose={closeQr} onResult={handleQrResult} />
+        </Suspense>
+      )}
 
       {/* Decoding overlay */}
-      {isDecodingQr
-        && (
-          <div className="fixed inset-0 z-[1100] bg-black/60 backdrop-blur-sm flex items-center justify-center">
-            <div className="flex flex-col items-center gap-3 text-white">
-              <Loader className="w-8 h-8 animate-spin" />
-              <p className="text-sm">Decodificando QR…</p>
-            </div>
+      {isDecodingQr && (
+        <div className="fixed inset-0 z-[1100] bg-black/60 backdrop-blur-sm flex items-center justify-center">
+          <div className="flex flex-col items-center gap-3 text-white">
+            <Loader className="w-8 h-8 animate-spin" />
+            <p className="text-sm">Decodificando QR...</p>
           </div>
-        )}
+        </div>
+      )}
     </div>
   )
 }

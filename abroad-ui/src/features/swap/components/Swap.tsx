@@ -1,40 +1,56 @@
 import { useTranslate } from '@tolgee/react'
 import {
-  ChevronsDown,
+  ArrowDownUp,
+  ChevronRight,
   CircleDollarSign,
   Landmark,
   Loader,
   ScanLine,
   Timer,
   Wallet,
+  X,
 } from 'lucide-react'
-import React from 'react'
+import React, { useCallback } from 'react'
 
 import { _36EnumsTargetCurrency as TargetCurrency } from '../../../api'
-import { Button } from '../../../shared/components/Button'
-import { TokenBadge } from '../../../shared/components/TokenBadge'
+import { ASSET_URLS } from '../../../shared/constants'
+
+/* ── Icon maps ── */
+
+const CRYPTO_ICONS: Record<string, string> = {
+  USDC: ASSET_URLS.USDC_TOKEN_ICON,
+  USDT: ASSET_URLS.USDT_TOKEN_ICON,
+}
+
+const CHAIN_ICONS: Record<string, string> = {
+  Celo: ASSET_URLS.CELO_CHAIN_ICON,
+  Solana: ASSET_URLS.SOLANA_CHAIN_ICON,
+  Stellar: ASSET_URLS.STELLAR_CHAIN_ICON,
+}
+
+const getChainIcon = (label: string): string | undefined =>
+  Object.entries(CHAIN_ICONS).find(([prefix]) => label.startsWith(prefix))?.[1]
+
+/* ── Props ── */
 
 export interface SwapProps {
-  assetMenuOpen: boolean
-  assetMenuRef: React.RefObject<HTMLDivElement | null>
-  assetOptions: Array<{ key: string, label: string }>
-  chainMenuOpen: boolean
-  chainMenuRef: React.RefObject<HTMLDivElement | null>
-  chainOptions: Array<{ key: string, label: string }>
   continueDisabled: boolean
-  currencyMenuOpen: boolean
-  currencyMenuRef: React.RefObject<HTMLDivElement | null>
-  exchangeRateDisplay: string // e.g. '-', 'R$5,43'
+  exchangeRateDisplay: string
+  hasInsufficientFunds?: boolean
+  isAboveMaximum: boolean
   isAuthenticated: boolean
+  isBelowMinimum: boolean
+  loadingBalance?: boolean
   loadingSource: boolean
   loadingTarget: boolean
+  onBalanceClick?: () => void
+  onDisconnect?: () => void
+  onOpenSourceModal: () => void
+  onOpenTargetModal: () => void
   onPrimaryAction: () => void
+  openQr?: () => void
   onSourceChange: (value: string) => void
   onTargetChange: (value: string) => void
-  openQr: () => void
-  selectAssetOption: (key: string) => void
-  selectChain: (key: string) => void
-  selectCurrency: (currency: (typeof TargetCurrency)[keyof typeof TargetCurrency]) => void
   selectedAssetLabel: string
   selectedChainLabel: string
   sourceAmount: string
@@ -42,34 +58,29 @@ export interface SwapProps {
   targetAmount: string
   targetCurrency: (typeof TargetCurrency)[keyof typeof TargetCurrency]
   targetSymbol: string
-  textColor?: string
-  toggleAssetMenu: () => void
-  toggleChainMenu: () => void
-  toggleCurrencyMenu: () => void
-  transferFeeDisplay: string // e.g. 'R$0,00'
+  transferFeeDisplay: string
+  usdcBalance?: string
+  walletAddress?: null | string
 }
 
 export default function Swap({
-  assetMenuOpen,
-  assetMenuRef,
-  assetOptions,
-  chainMenuOpen,
-  chainMenuRef,
-  chainOptions,
   continueDisabled,
-  currencyMenuOpen,
-  currencyMenuRef,
   exchangeRateDisplay,
+  hasInsufficientFunds,
+  isAboveMaximum,
   isAuthenticated,
+  isBelowMinimum,
+  loadingBalance,
   loadingSource,
   loadingTarget,
+  onBalanceClick,
+  onDisconnect,
+  onOpenSourceModal,
+  onOpenTargetModal,
   onPrimaryAction,
+  openQr,
   onSourceChange,
   onTargetChange,
-  openQr,
-  selectAssetOption,
-  selectChain,
-  selectCurrency,
   selectedAssetLabel,
   selectedChainLabel,
   sourceAmount,
@@ -77,278 +88,298 @@ export default function Swap({
   targetAmount,
   targetCurrency,
   targetSymbol,
-  toggleAssetMenu,
-  toggleChainMenu,
-  toggleCurrencyMenu,
   transferFeeDisplay,
+  usdcBalance,
+  walletAddress,
 }: SwapProps): React.JSX.Element {
   const { t } = useTranslate()
 
+  const handleFocus = useCallback((e: React.FocusEvent<HTMLInputElement>) => {
+    const input = e.currentTarget
+    setTimeout(() => input.scrollIntoView({ behavior: 'smooth', block: 'center' }), 150)
+  }, [])
+
+  const truncatedAddress = walletAddress
+    ? `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`
+    : null
+
+  const chainIcon = getChainIcon(selectedChainLabel)
+  const assetIcon = CRYPTO_ICONS[selectedAssetLabel]
+
   return (
-    <div className="flex-1 flex items-center justify-center w-full flex-col text-abroad-dark md:text-white">
+    <div className="flex flex-col w-full max-w-md mx-auto gap-3">
+      {/* ── Card ── */}
       <div
-        className="w-[98%] max-w-md min-h-[60vh] bg-[#356E6A]/5 backdrop-blur-xl rounded-4xl p-4 md:p-6 flex flex-col items-center justify-center space-y-1 lg:space-y-4"
-        id="background-container"
+        className="rounded-2xl p-1"
+        style={{
+          background: 'var(--ab-card)',
+          border: '1px solid var(--ab-card-border)',
+        }}
       >
-        {/* Title + Subtitle */}
-        <div className="flex-1 flex items-center justify-between w-full">
-          <div className="flex flex-col">
-            <div className="text-xl md:text-xl font-bold">
-              <span>{t('swap.title', 'Paga o Transfiere')}</span>
-            </div>
-            {targetCurrency === TargetCurrency.BRL && (
-              <div className="text-xs md:text-sm opacity-75">
-                {t('swap.subtitle', 'Escribe los datos o escanea un QR de Pix')}
-              </div>
-            )}
-          </div>
-
-          <div className="flex items-center gap-2">
-            <div className="relative" ref={chainMenuRef}>
+        {/* Source Section */}
+        <div className="p-4 pb-3">
+          {/* QR button for BRL */}
+          {targetCurrency === TargetCurrency.BRL && openQr && (
+            <div className="flex justify-end mb-2">
               <button
-                aria-expanded={chainMenuOpen}
-                aria-haspopup="listbox"
-                className="focus:outline-none cursor-pointer"
-                onClick={toggleChainMenu}
-                type="button"
-              >
-                <TokenBadge symbol={selectedChainLabel} />
-              </button>
-
-              {chainMenuOpen && chainOptions.length > 1 && (
-                <div
-                  className="absolute right-0 top-[calc(100%+8px)] z-[70] bg-white/95 backdrop-blur-xl rounded-xl shadow-lg p-2 space-y-1 min-w-[160px]"
-                  role="listbox"
-                >
-                  {chainOptions.map(option => (
-                    <button
-                      aria-selected={option.label === selectedChainLabel}
-                      className="cursor-pointer w-full text-left hover:bg-black/5 rounded-lg px-1 py-1"
-                      key={option.key}
-                      onClick={() => selectChain(option.key)}
-                      role="option"
-                      type="button"
-                    >
-                      <TokenBadge symbol={option.label} />
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {targetCurrency === TargetCurrency.BRL && (
-              <button
-                aria-label={t('swap.scan_qr_aria', 'Escanear QR')}
-                className="p-2 cursor-pointer rounded-full hover:bg-white/30 focus:outline-none focus:ring-2 focus:ring-[#356E6A]/40 transition"
+                aria-label="Escanear QR"
+                className="p-2 rounded-full cursor-pointer transition-colors"
                 onClick={openQr}
+                style={{
+                  background: 'var(--ab-badge-bg)',
+                  border: '1px solid var(--ab-badge-border)',
+                }}
                 type="button"
               >
-                <ScanLine className="w-8 h-8" />
+                <ScanLine className="w-5 h-5" style={{ color: 'var(--ab-text)' }} />
               </button>
-            )}
-          </div>
-        </div>
+            </div>
+          )}
 
-        {/* SOURCE */}
-        <div
-          className="relative z-20 w-full bg-white/60 backdrop-blur-xl rounded-2xl p-4 md:py-6 md:px-6 flex items-center justify-between"
-          id="source-amount"
-        >
-          <div className="flex-1 flex items-center gap-2 min-w-0">
-            <span className="text-xl md:text-2xl font-bold shrink-0">
-              {sourceSymbol}
-            </span>
-            {loadingSource
-              ? (
-                  <Loader className="animate-spin w-6 h-6" />
-                )
-              : (
-                  <input
-                    className="w-full bg-transparent font-bold focus:outline-none text-xl md:text-2xl"
-                    inputMode="decimal"
-                    onChange={e => onSourceChange(e.target.value)}
-                    pattern="[0-9.]*"
-                    placeholder="0.00"
+          {/* Amount + Token selector */}
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex-1 min-w-0">
+              {loadingSource
+                ? <Loader className="animate-spin w-6 h-6" style={{ color: 'var(--ab-text-muted)' }} />
+                : (
+                    <input
+                      className="w-full bg-transparent font-semibold focus:outline-none text-3xl"
+                      inputMode="decimal"
+                      onChange={e => onSourceChange(e.target.value)}
+                      onFocus={handleFocus}
+                      pattern="[0-9.]*"
+                      placeholder="0.0"
+                      style={{ color: hasInsufficientFunds ? '#ef4444' : 'var(--ab-text)' }}
+                      type="text"
+                      value={sourceAmount}
+                    />
+                  )}
+            </div>
 
-                    type="text"
-                    value={sourceAmount}
-                  />
-                )}
-          </div>
-          <div className="relative ml-2 shrink-0" ref={assetMenuRef}>
+            {/* Token badge → opens source modal */}
             <button
-              aria-expanded={assetMenuOpen}
-              aria-haspopup="listbox"
-              className="focus:outline-none cursor-pointer"
-              onClick={toggleAssetMenu}
+              className="shrink-0 flex items-center gap-2 rounded-full px-3 py-2 cursor-pointer transition-colors"
+              onClick={onOpenSourceModal}
+              style={{
+                background: 'var(--ab-badge-bg)',
+                border: '1px solid var(--ab-badge-border)',
+              }}
               type="button"
             >
-              <TokenBadge symbol={selectedAssetLabel} />
+              {assetIcon && <img alt={selectedAssetLabel} className="w-6 h-6 rounded-full" src={assetIcon} />}
+              {chainIcon && (
+                <img
+                  alt={selectedChainLabel}
+                  className="w-4 h-4 rounded-full -ml-3 ring-2 ring-[var(--ab-modal-bg)]"
+                  src={chainIcon}
+                />
+              )}
+              <div className="text-left ml-1">
+                <span className="text-sm font-semibold" style={{ color: 'var(--ab-text)' }}>
+                  {selectedAssetLabel}
+                </span>
+                <span className="text-[10px] block leading-tight" style={{ color: 'var(--ab-text-muted)' }}>
+                  from {selectedChainLabel}
+                </span>
+              </div>
+              <ChevronRight className="w-4 h-4" style={{ color: 'var(--ab-text-muted)' }} />
             </button>
+          </div>
 
-            {assetMenuOpen && assetOptions.length > 1 && (
-              <div
-                className="absolute right-0 top-[calc(100%+8px)] z-[60] bg-white/95 backdrop-blur-xl rounded-xl shadow-lg p-2 space-y-1 min-w-[160px]"
-                role="listbox"
-              >
-                {assetOptions.map(option => (
+          {/* Wallet address + Balance row (Allbridge-style) */}
+          <div className="flex items-center justify-between mt-2">
+            {isAuthenticated && truncatedAddress
+              ? (
+                  <div
+                    className="flex items-center gap-2 rounded-full px-3 py-1.5"
+                    style={{
+                      background: 'var(--ab-badge-bg)',
+                      border: '1px solid var(--ab-badge-border)',
+                    }}
+                  >
+                    {chainIcon && <img alt={selectedChainLabel} className="w-4 h-4 rounded-full" src={chainIcon} />}
+                    <span className="text-xs font-medium" style={{ color: 'var(--ab-text)' }}>
+                      {truncatedAddress}
+                    </span>
+                    {onDisconnect && (
+                      <button
+                        aria-label="Disconnect wallet"
+                        className="cursor-pointer p-0.5 rounded-full transition-colors"
+                        onClick={onDisconnect}
+                        style={{ color: 'var(--ab-text-muted)' }}
+                        type="button"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                )
+              : (
                   <button
-                    aria-selected={option.label === selectedAssetLabel}
-                    className="cursor-pointer w-full text-left hover:bg-black/5 rounded-lg px-1 py-1"
-                    key={option.key}
-                    onClick={() => selectAssetOption(option.key)}
-                    role="option"
+                    className="text-sm font-medium cursor-pointer transition-colors"
+                    onClick={onPrimaryAction}
+                    style={{ color: 'var(--ab-btn)' }}
                     type="button"
                   >
-                    <TokenBadge symbol={option.label} />
+                    {t('swap.connect_wallet', 'Connect wallet')}
                   </button>
-                ))}
-              </div>
+                )}
+
+            {isAuthenticated && usdcBalance !== undefined && (
+              <button
+                aria-label={t('swap.use_max_balance', 'Use max balance')}
+                className={`flex items-center gap-1.5 cursor-pointer transition-colors ${hasInsufficientFunds ? 'text-red-500' : ''}`}
+                onClick={onBalanceClick}
+                style={hasInsufficientFunds ? undefined : { color: 'var(--ab-text-muted)' }}
+                type="button"
+              >
+                <Wallet className="w-3.5 h-3.5" />
+                {assetIcon && <img alt={selectedAssetLabel} className="w-4 h-4 rounded-full" src={assetIcon} />}
+                {loadingBalance
+                  ? <Loader className="animate-spin w-3 h-3" />
+                  : <span className="text-xs font-medium">{usdcBalance}</span>}
+              </button>
             )}
           </div>
         </div>
 
-        {/* TARGET or Connect notice */}
-
-        <div
-          className="relative z-10 w-full bg-white/60 backdrop-blur-xl rounded-2xl p-4 md:py-6 md:px-6 flex items-center justify-between"
-          id="target-amount"
-        >
-          {/* chevrons */}
-          <div className="absolute -top-4 left-1/2 -translate-x-1/2 w-8 h-8 bg-[#356E6A]/5 rounded-full grid place-items-center">
-            <ChevronsDown className="w-4 h-4" color="#356E6A" />
+        {/* ── Separator with swap button ── */}
+        <div className="relative flex items-center justify-center h-0">
+          <div className="absolute w-full" style={{ borderTop: '1px solid var(--ab-separator)' }} />
+          <div
+            className="relative z-10 w-9 h-9 rounded-full flex items-center justify-center shadow-sm"
+            style={{
+              background: 'var(--ab-card)',
+              border: '1px solid var(--ab-separator)',
+            }}
+          >
+            <ArrowDownUp className="w-4 h-4" style={{ color: 'var(--ab-text-muted)' }} />
           </div>
+        </div>
 
-          {/* input */}
-          <div className="flex-1 flex items-center gap-2 min-w-0">
-            <span className="text-xl md:text-2xl font-bold shrink-0">
-              {targetSymbol}
-            </span>
-            {loadingTarget
-              ? (
-                  <Loader className="animate-spin w-6 h-6" />
-                )
-              : (
-                  <input
-                    className="w-full bg-transparent font-bold focus:outline-none text-xl md:text-2xl"
-                    inputMode="decimal"
-                    onChange={e => onTargetChange(e.target.value)}
-                    pattern="[0-9.,]*"
-                    placeholder="0,00"
+        {/* Target Section */}
+        <div className={`p-4 pt-3 ${isBelowMinimum || isAboveMaximum ? 'rounded-b-xl ring-1 ring-red-500/30' : ''}`}>
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex-1 min-w-0">
+              {loadingTarget
+                ? <Loader className="animate-spin w-6 h-6" style={{ color: 'var(--ab-text-muted)' }} />
+                : (
+                    <input
+                      className="w-full bg-transparent font-semibold focus:outline-none text-3xl"
+                      inputMode="decimal"
+                      onChange={e => onTargetChange(e.target.value)}
+                      onFocus={handleFocus}
+                      pattern="[0-9.,]*"
+                      placeholder="0.0"
+                      style={{ color: (isBelowMinimum || isAboveMaximum) ? '#ef4444' : 'var(--ab-text)' }}
+                      type="text"
+                      value={targetAmount}
+                    />
+                  )}
+            </div>
 
-                    type="text"
-                    value={targetAmount}
-                  />
-                )}
-          </div>
-
-          {/* currency selector */}
-          <div className="relative ml-2 shrink-0" ref={currencyMenuRef}>
+            {/* Currency badge → opens target modal */}
             <button
-              aria-expanded={currencyMenuOpen}
-              aria-haspopup="listbox"
-              className="focus:outline-none cursor-pointer"
-              onClick={toggleCurrencyMenu}
+              className="shrink-0 flex items-center gap-2 rounded-full px-3 py-2 cursor-pointer transition-colors"
+              onClick={onOpenTargetModal}
+              style={{
+                background: 'var(--ab-badge-bg)',
+                border: '1px solid var(--ab-badge-border)',
+              }}
               type="button"
             >
-              <TokenBadge
-                alt={`${targetCurrency} Flag`}
-                iconSrc={
+              <img
+                alt={`${targetCurrency} flag`}
+                className="w-6 h-6 rounded-full"
+                src={
                   targetCurrency === TargetCurrency.BRL
                     ? 'https://hatscripts.github.io/circle-flags/flags/br.svg'
                     : 'https://hatscripts.github.io/circle-flags/flags/co.svg'
                 }
-                symbol={targetCurrency}
               />
+              <span className="text-sm font-semibold" style={{ color: 'var(--ab-text)' }}>
+                {targetCurrency}
+              </span>
+              <ChevronRight className="w-4 h-4" style={{ color: 'var(--ab-text-muted)' }} />
             </button>
-
-            {currencyMenuOpen && (
-              <div
-                className="absolute left-0 top-[calc(100%+8px)] z-[40] bg-white/95 backdrop-blur-xl rounded-xl shadow-lg p-2 space-y-1 min-w-[100px]"
-                role="listbox"
-              >
-                <button
-                  aria-selected={targetCurrency === TargetCurrency.COP}
-                  className="w-full text-left hover:bg-black/5 rounded-lg px-1 py-1 cursor-pointer"
-                  onClick={() => selectCurrency(TargetCurrency.COP)}
-                  role="option"
-                  type="button"
-                >
-                  <TokenBadge
-                    alt="Colombia flag"
-                    iconSrc="https://hatscripts.github.io/circle-flags/flags/co.svg"
-                    symbol="COP"
-                  />
-                </button>
-
-                <button
-                  aria-selected={targetCurrency === TargetCurrency.BRL}
-                  className="cursor-pointer w-full text-left hover:bg-black/5 rounded-lg px-1 py-1"
-                  onClick={() => selectCurrency(TargetCurrency.BRL)}
-                  role="option"
-                  type="button"
-                >
-                  <TokenBadge
-                    alt="Brazil flag"
-                    iconSrc="https://hatscripts.github.io/circle-flags/flags/br.svg"
-                    symbol="BRL"
-                  />
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Info */}
-        <div className="flex-1 flex items-center justify-center w-full">
-          <div className="w-full" id="tx-info">
-            <div className="flex flex-col space-y-2">
-              <div className="flex items-center space-x-2" id="trm">
-                <CircleDollarSign className="w-5 h-5" />
-                <span>
-                  {t('swap.exchange_rate', 'Tasa de Cambio:')}
-                  {' '}
-                  <b>{exchangeRateDisplay}</b>
-                </span>
-              </div>
-              <div className="flex items-center space-x-2" id="transfer-fee">
-                <Landmark className="w-5 h-5" />
-                <span>
-                  {t('swap.transfer_cost', 'Costo de Transferencia:')}
-                  {' '}
-                  <b>{transferFeeDisplay}</b>
-                </span>
-              </div>
-              <div className="flex items-center space-x-2" id="time">
-                <Timer className="w-5 h-5" />
-                <span>
-                  {t('swap.time', 'Tiempo:')}
-                  {' '}
-                  <b>{t('swap.time_value', '10 - 30 segundos')}</b>
-                </span>
-              </div>
-            </div>
           </div>
         </div>
       </div>
 
-      {/* Primary button (connect or continue) */}
-      <Button
-        className="mt-4 w-[98%] max-w-md py-4 cursor-pointer"
+      {/* ── Info Section ── */}
+      <div
+        className="rounded-2xl px-4 py-3 space-y-2 text-xs"
+        style={{
+          background: 'var(--ab-card)',
+          border: '1px solid var(--ab-card-border)',
+          color: 'var(--ab-text-secondary)',
+        }}
+      >
+        {/* Exchange rate */}
+        <div className="flex items-center justify-between">
+          <span>{t('swap.rate', 'Rate')}</span>
+          <span className="font-medium" style={{ color: 'var(--ab-text)' }}>
+            1 {sourceSymbol} = {exchangeRateDisplay}
+          </span>
+        </div>
+
+        {/* Fee */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1.5">
+            <Landmark className="w-3.5 h-3.5" />
+            <span>{t('swap.transfer_cost', 'Transfer fee')}</span>
+          </div>
+          <span className="font-medium" style={{ color: 'var(--ab-text)' }}>{transferFeeDisplay}</span>
+        </div>
+
+        {/* Time */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1.5">
+            <Timer className="w-3.5 h-3.5" />
+            <span>{t('swap.time', 'Time')}</span>
+          </div>
+          <span className="font-medium" style={{ color: 'var(--ab-text)' }}>~30s</span>
+        </div>
+
+        {/* Min/Max warnings */}
+        {isBelowMinimum && (
+          <div className="flex items-center gap-1.5 text-red-500 font-medium">
+            <CircleDollarSign className="w-3.5 h-3.5" />
+            <span>
+              {targetCurrency === TargetCurrency.COP
+                ? t('swap.min_amount_cop', 'Min: $5.000 COP')
+                : t('swap.min_amount_brl', 'Min: R$1,00')}
+            </span>
+          </div>
+        )}
+        {isAboveMaximum && (
+          <div className="flex items-center gap-1.5 text-red-500 font-medium">
+            <CircleDollarSign className="w-3.5 h-3.5" />
+            <span>{t('swap.max_amount_cop', 'Max: $5.000.000 COP')}</span>
+          </div>
+        )}
+      </div>
+
+      {/* ── Primary Action Button ── */}
+      <button
+        className="w-full py-4 rounded-2xl text-base font-semibold transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
         disabled={continueDisabled}
         onClick={onPrimaryAction}
+        style={{
+          background: continueDisabled ? 'var(--ab-separator)' : 'var(--ab-btn)',
+          color: continueDisabled ? 'var(--ab-text-muted)' : 'var(--ab-btn-text)',
+        }}
+        type="button"
       >
         {!isAuthenticated
           ? (
-              <div className="flex items-center justify-center space-x-2">
+              <div className="flex items-center justify-center gap-2">
                 <Wallet className="w-5 h-5" />
-                <span>{t('swap.connect_wallet', 'Conectar Billetera')}</span>
+                <span>{t('swap.connect_wallet', 'Connect wallet')}</span>
               </div>
             )
-          : (
-              t('swap.continue', 'Continuar')
-            )}
-      </Button>
+          : t('swap.continue', 'Send')}
+      </button>
     </div>
   )
 }

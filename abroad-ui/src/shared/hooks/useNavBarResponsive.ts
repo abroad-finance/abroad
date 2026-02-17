@@ -7,6 +7,7 @@ import {
 import type { NavBarResponsiveProps } from '../../features/swap/components/NavBarResponsive'
 
 import { useWebSocketSubscription } from '../../contexts/WebSocketContext'
+import { useTheme } from './useTheme'
 import { useWalletAuth } from './useWalletAuth'
 
 const DEFAULT_HORIZON_URL = 'https://horizon.stellar.org'
@@ -125,7 +126,7 @@ interface UseNavBarResponsiveArgs {
 }
 
 type UseNavBarResponsiveResult = Pick<NavBarResponsiveProps,
-  'address' | 'balance' | 'balanceLoading' | 'infoUrl' | 'labels' | 'onWalletClick' | 'walletInfo'
+  'address' | 'balance' | 'balanceLoading' | 'infoUrl' | 'isDark' | 'labels' | 'onToggleTheme' | 'onWalletClick' | 'walletInfo'
 >
 
 export function useNavBarResponsive({
@@ -137,6 +138,7 @@ export function useNavBarResponsive({
 }: UseNavBarResponsiveArgs = {}): UseNavBarResponsiveResult {
   const { wallet } = useWalletAuth()
   const { t } = useTranslate()
+  const { isDark, toggleTheme } = useTheme()
   const isStellar = wallet?.chainId?.startsWith('stellar:') ?? false
   const { balance, loading: balanceLoading, refetch } = useUSDCBalance(isStellar ? wallet?.address : null, horizonUrl, usdcIssuer)
 
@@ -199,7 +201,9 @@ export function useNavBarResponsive({
     balance,
     balanceLoading,
     infoUrl,
+    isDark,
     labels,
+    onToggleTheme: toggleTheme,
     onWalletClick,
     walletInfo,
   }
