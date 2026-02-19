@@ -61,6 +61,22 @@ export interface SwapProps {
   transferFeeDisplay: string
   usdcBalance?: string
   walletAddress?: null | string
+  // Optional menu/options (when driven by useSwap instead of useWebSwapController)
+  assetMenuOpen?: boolean
+  assetMenuRef?: React.RefObject<HTMLDivElement | null>
+  assetOptions?: Array<{ key: string; label: string }>
+  chainMenuOpen?: boolean
+  chainMenuRef?: React.RefObject<HTMLDivElement | null>
+  chainOptions?: Array<{ key: string; label: string }>
+  currencyMenuOpen?: boolean
+  currencyMenuRef?: React.RefObject<HTMLDivElement | null>
+  selectAssetOption?: (key: string) => void
+  selectChain?: (key: string) => void
+  selectCurrency?: (currency: (typeof TargetCurrency)[keyof typeof TargetCurrency]) => void
+  textColor?: string
+  toggleAssetMenu?: () => void
+  toggleChainMenu?: () => void
+  toggleCurrencyMenu?: () => void
 }
 
 export default function Swap({
@@ -87,7 +103,7 @@ export default function Swap({
   sourceSymbol,
   targetAmount,
   targetCurrency,
-  targetSymbol,
+  targetSymbol: _targetSymbol,
   transferFeeDisplay,
   usdcBalance,
   walletAddress,

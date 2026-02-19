@@ -767,7 +767,6 @@ export const useSwap = ({
 
   // Return props for stateless view -------------------------------------------
   return {
-    // Primary action
     assetMenuOpen,
     assetMenuRef,
     assetOptions,
@@ -777,35 +776,29 @@ export const useSwap = ({
     continueDisabled,
     currencyMenuOpen,
     currencyMenuRef,
-
     exchangeRateDisplay,
+    isAboveMaximum: false,
     isAuthenticated,
+    isBelowMinimum: false,
     loadingSource,
     loadingTarget,
-
+    onOpenSourceModal: () => {},
+    onOpenTargetModal: () => {},
     onPrimaryAction,
-    // Handlers
     onSourceChange,
-
     onTargetChange,
-    // QR + currency menu
     openQr,
     selectAssetOption,
     selectChain,
     selectCurrency,
     selectedAssetLabel,
     selectedChainLabel,
-    // Amounts & loaders
     sourceAmount,
     sourceSymbol,
     targetAmount,
-
     targetCurrency,
-    // Derived display
     targetSymbol,
-    // UI look & currency
     textColor,
-
     toggleAssetMenu,
     toggleChainMenu,
     toggleCurrencyMenu,

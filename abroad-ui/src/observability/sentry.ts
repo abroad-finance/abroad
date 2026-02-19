@@ -83,18 +83,20 @@ const release = readEnv('VITE_SENTRY_RELEASE')
 export const sentryEnabled = Boolean(dsn) && import.meta.env.MODE !== 'test'
 
 if (sentryEnabled && dsn) {
+  type SentryOptions = Parameters<typeof Sentry.init>[0]
+  type BeforeSendFn = NonNullable<SentryOptions>['beforeSend']
+  const beforeSend: BeforeSendFn = (event, _hint) => {
+    const e = event as { request?: unknown; extra?: unknown }
+    if (e.request) {
+      e.request = redactValue(e.request, { ...DEFAULT_REDACTION, maxDepth: 3 }) as typeof e.request
+    }
+    if (e.extra) {
+      e.extra = redactValue(e.extra, DEFAULT_REDACTION) as typeof e.extra
+    }
+    return event
+  }
   Sentry.init({
-    beforeSend: (event) => {
-      if (event.request) {
-        event.request = redactValue(event.request, { ...DEFAULT_REDACTION, maxDepth: 3 }) as typeof event.request
-      }
-
-      if (event.extra) {
-        event.extra = redactValue(event.extra, DEFAULT_REDACTION) as typeof event.extra
-      }
-
-      return event
-    },
+    beforeSend,
     dsn,
     environment,
     release,

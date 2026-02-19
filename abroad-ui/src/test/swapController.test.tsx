@@ -247,7 +247,7 @@ describe('useWebSwapController', () => {
     const { result } = renderHook(() => useWebSwapController(), { wrapper: Wrapper })
 
     act(() => {
-      result.current.swapViewProps.selectCurrency('COP')
+      result.current.selectCurrency('COP')
       result.current.bankDetailsProps.onAccountNumberChange('BREB-KEY-123456')
     })
 

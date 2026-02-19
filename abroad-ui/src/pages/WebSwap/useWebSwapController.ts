@@ -18,7 +18,7 @@ import {
   TransactionBuilder,
 } from '@stellar/stellar-sdk'
 import { useTranslate } from '@tolgee/react'
-import { ethers } from 'ethers'
+import { getAddress, Interface, parseUnits } from 'ethers'
 import {
   useCallback,
   useEffect,
@@ -143,7 +143,7 @@ const parseAmountUnits = (amount: string, decimals: number): bigint => {
   const normalized = amount.trim()
   const cleaned = normalized.endsWith('.') ? normalized.slice(0, -1) : normalized
   if (!cleaned) throw new Error('Amount is required')
-  return ethers.parseUnits(cleaned, decimals)
+  return parseUnits(cleaned, decimals)
 }
 
 const createInitialState = (isDesktop: boolean): SwapControllerState => ({
@@ -552,7 +552,6 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     if (wallet.walletId === 'wallet-connect' && selectedCorridor.walletConnect) {
       wallet.connect({
         chainId: selectedCorridor.chainId,
-        silentRestore: true,
         walletConnect: selectedCorridor.walletConnect,
       }).catch(() => {
         void wallet.disconnect()
@@ -686,7 +685,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
 
     if (!response.ok) {
       if (!isAbortError(response)) {
-        // Suppress popup for 400 errors — the inline isBelowMinimum
+        // Suppress popup for 400 errors ��� the inline isBelowMinimum
         // validation will handle the visual feedback instead.
         const status = response.error?.status
         if (status === 400) {
@@ -698,7 +697,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
         }
         else {
           setQuoteBelowMinimum(false)
-          const reason = extractReason(response.error?.body) || response.error?.message || t('swap.quote_error', 'Esta cotización superó el monto máximo permitido.')
+          const reason = extractReason(response.error?.body) || response.error?.message || t('swap.quote_error', 'Esta cotizaci?n super? el monto m?ximo permitido.')
           notifyError(reason, response.error?.message)
         }
       }
@@ -749,7 +748,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
       return
     }
 
-    // Skip API call if below minimum — inline validation handles the UI
+    // Skip API call if below minimum ��� inline validation handles the UI
     const minAmount = selectedCorridor.minAmount
       || (selectedCorridor.targetCurrency === 'BRL' ? 1 : 0)
     if (minAmount && num < minAmount) {
@@ -787,7 +786,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
         }
         else {
           setQuoteBelowMinimum(false)
-          const reason = extractReason(response.error?.body) || response.error?.message || t('swap.quote_error', 'Esta cotización superó el monto máximo permitido.')
+          const reason = extractReason(response.error?.body) || response.error?.message || t('swap.quote_error', 'Esta cotizaci?n super? el monto m?ximo permitido.')
           notifyError(reason, response.error?.message)
         }
       }
@@ -858,7 +857,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
   const skipNextAssetClickRef = useRef(false)
   const [assetMenuOpen, setAssetMenuOpen] = useReducer((s: boolean) => !s, false)
 
-  const toggleAssetMenu = useCallback(() => {
+  const _toggleAssetMenu = useCallback(() => {
     if (assetOptions.length <= 1) return
     if (!assetMenuOpen) {
       if (currencyMenuOpen) setCurrencyMenuOpen()
@@ -887,7 +886,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     reverseAbortRef.current?.abort()
   }, [availableCorridors])
 
-  const toggleCurrencyMenu = useCallback(() => {
+  const _toggleCurrencyMenu = useCallback(() => {
     if (!currencyMenuOpen) {
       if (assetMenuOpen) setAssetMenuOpen()
       if (chainMenuOpen) setChainMenuOpen()
@@ -902,7 +901,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     currencyMenuOpen,
   ])
 
-  const toggleChainMenu = useCallback(() => {
+  const _toggleChainMenu = useCallback(() => {
     if (chainOptions.length <= 1) return
     if (!chainMenuOpen) {
       if (assetMenuOpen) setAssetMenuOpen()
@@ -1060,7 +1059,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
       return
     }
     if (!state.quoteId) {
-      notifyError(t('swap.wait_for_quote', 'Espera la cotización antes de continuar'))
+      notifyError(t('swap.wait_for_quote', 'Espera la cotizaci?n antes de continuar'))
       return
     }
     dispatch({ type: 'SET_VIEW', view: 'bankDetails' })
@@ -1181,7 +1180,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
         throw new Error(t('swap.errors.missing_corridor', 'No hay un corredor disponible.'))
       }
       if (!state.quoteId) {
-        throw new Error(t('swap.errors.missing_quote', 'Falta la cotización o la dirección de la billetera.'))
+        throw new Error(t('swap.errors.missing_quote', 'Falta la cotizaci?n o la direcci?n de la billetera.'))
       }
       if (!wallet?.address || !walletUserId || !wallet.chainId) {
         throw new Error(t('swap.errors.missing_wallet', 'Conecta tu billetera antes de continuar.'))
@@ -1204,7 +1203,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
 
       if (!response.ok) {
         if (!isAbortError(response)) {
-          const reason = extractReason(response.error?.body) || response.error?.message || t('swap.accept_error', 'No pudimos iniciar la transacción.')
+          const reason = extractReason(response.error?.body) || response.error?.message || t('swap.accept_error', 'No pudimos iniciar la transacci?n.')
           notifyError(reason, response.error?.message)
         }
         return
@@ -1224,7 +1223,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
       }
 
       if (!acceptedTxId) {
-        notifyError(t('swap.accept_error', 'No pudimos iniciar la transacción.'))
+        notifyError(t('swap.accept_error', 'No pudimos iniciar la transacci?n.'))
         resetForNewTransaction()
         return
       }
@@ -1254,13 +1253,13 @@ export const useWebSwapController = (): WebSwapControllerProps => {
       }
 
       if (!paymentContext) {
-        throw new Error(t('swap.errors.payment_context', 'No se pudo preparar la transacción.'))
+        throw new Error(t('swap.errors.payment_context', 'No se pudo preparar la transacci?n.'))
       }
       if (wallet.chainId && wallet.chainId !== paymentContext.chainId) {
-        throw new Error(t('swap.errors.network_mismatch', 'La billetera está conectada a otra red.'))
+        throw new Error(t('swap.errors.network_mismatch', 'La billetera est? conectada a otra red.'))
       }
       if (!paymentContext.depositAddress) {
-        throw new Error(t('swap.errors.missing_deposit', 'Falta la dirección de depósito.'))
+        throw new Error(t('swap.errors.missing_deposit', 'Falta la direcci?n de dep?sito.'))
       }
 
       const amountString = state.sourceAmount.trim() || String(paymentContext.amount)
@@ -1271,7 +1270,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
       if (paymentContext.chainFamily === 'stellar') {
         const assetIssuer = paymentContext.mintAddress
         if (!assetIssuer) {
-          throw new Error(t('swap.errors.missing_asset', 'Falta la configuración del activo.'))
+          throw new Error(t('swap.errors.missing_asset', 'Falta la configuraci?n del activo.'))
         }
         const horizonUrl = paymentContext.rpcUrl || 'https://horizon.stellar.org'
         const networkPassphrase = resolveStellarNetworkPassphrase(paymentContext.chainId)
@@ -1297,10 +1296,10 @@ export const useWebSwapController = (): WebSwapControllerProps => {
           throw new Error(t('swap.errors.wallet_unsupported', 'La billetera no soporta esta red.'))
         }
         if (!paymentContext.rpcUrl) {
-          throw new Error(t('swap.errors.missing_rpc', 'No se configuró el RPC para esta red.'))
+          throw new Error(t('swap.errors.missing_rpc', 'No se configur? el RPC para esta red.'))
         }
         if (!paymentContext.mintAddress) {
-          throw new Error(t('swap.errors.missing_asset', 'Falta la configuración del activo.'))
+          throw new Error(t('swap.errors.missing_asset', 'Falta la configuraci?n del activo.'))
         }
         if (paymentContext.decimals == null) {
           throw new Error(t('swap.errors.missing_decimals', 'Faltan los decimales del activo.'))
@@ -1358,7 +1357,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
         })
         const signedBase64 = typeof signed === 'string' ? signed : signed.signedTransaction || signed.transaction
         if (!signedBase64) {
-          throw new Error(t('swap.errors.wallet_signature', 'No se pudo firmar la transacción.'))
+          throw new Error(t('swap.errors.wallet_signature', 'No se pudo firmar la transacci?n.'))
         }
         const signature = await connection.sendRawTransaction(fromBase64(signedBase64))
         onChainTx = signature
@@ -1368,15 +1367,15 @@ export const useWebSwapController = (): WebSwapControllerProps => {
           throw new Error(t('swap.errors.wallet_unsupported', 'La billetera no soporta esta red.'))
         }
         if (!paymentContext.mintAddress) {
-          throw new Error(t('swap.errors.missing_asset', 'Falta la configuración del activo.'))
+          throw new Error(t('swap.errors.missing_asset', 'Falta la configuraci?n del activo.'))
         }
         if (paymentContext.decimals == null) {
           throw new Error(t('swap.errors.missing_decimals', 'Faltan los decimales del activo.'))
         }
         const amountUnits = parseAmountUnits(amountString, paymentContext.decimals)
-        const toAddress = ethers.getAddress(paymentContext.depositAddress)
-        const tokenAddress = ethers.getAddress(paymentContext.mintAddress)
-        const iface = new ethers.Interface(['function transfer(address to, uint256 value)'])
+        const toAddress = getAddress(paymentContext.depositAddress)
+        const tokenAddress = getAddress(paymentContext.mintAddress)
+        const iface = new Interface(['function transfer(address to, uint256 value)'])
         const data = iface.encodeFunctionData('transfer', [toAddress, amountUnits])
         const txRequest = {
           data,
@@ -1390,7 +1389,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
           params: [txRequest],
         })
         if (typeof txHash !== 'string' || !txHash) {
-          throw new Error(t('swap.errors.wallet_signature', 'No se pudo firmar la transacción.'))
+          throw new Error(t('swap.errors.wallet_signature', 'No se pudo firmar la transacci?n.'))
         }
         onChainTx = txHash
       }
@@ -1419,7 +1418,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
         ? err.message
         : hasMessage(err)
           ? err.message
-          : t('swap.transaction_error', 'Error en la transacción')
+          : t('swap.transaction_error', 'Error en la transacci?n')
       notifyError(userMessage)
       resetForNewTransaction()
     }
@@ -1451,7 +1450,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
       return
     }
     if (state.targetCurrency === TargetCurrency.BRL && (!state.taxId || !state.pixKey)) {
-      notifyError(t('confirm_qr.missing_data', 'Faltan datos para completar la transacción.'))
+      notifyError(t('confirm_qr.missing_data', 'Faltan datos para completar la transacci?n.'))
       dispatch({ type: 'SET_VIEW', view: 'bankDetails' })
       return
     }
@@ -1520,6 +1519,9 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     targetAmount: state.targetAmount,
     targetCurrency: state.targetCurrency,
     targetSymbol,
+    toggleAssetMenu: _toggleAssetMenu,
+    toggleChainMenu: _toggleChainMenu,
+    toggleCurrencyMenu: _toggleCurrencyMenu,
     transferFeeDisplay,
   }
 
