@@ -79,11 +79,7 @@ export class PayoutSendStepExecutor implements FlowStepExecutor {
         await this.repository.recordExternalIdIfMissing(prismaClient, transaction.id, paymentResponse.transactionId)
       }
 
-      if (paymentService.isAsync) {
-        if (!paymentResponse.success) {
-          return { error: paymentResponse.reason ?? 'payout_failed', outcome: 'failed' }
-        }
-
+      if (paymentService.isAsync && paymentResponse.success) {
         const externalId = paymentResponse.transactionId
         if (!externalId) {
           return { error: 'Payout provider did not return transaction id', outcome: 'failed' }
