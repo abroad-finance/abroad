@@ -26,6 +26,7 @@ export type WalletConnectMetadata = {
 
 export type WalletConnectOptions = {
   chainId?: string
+  silentRestore?: boolean
   walletConnect?: WalletConnectMetadata
 }
 
