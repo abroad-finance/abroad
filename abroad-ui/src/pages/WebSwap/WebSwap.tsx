@@ -109,12 +109,16 @@ const WebSwap: React.FC = () => {
   const walletDetails = useWalletDetails({ onClose: handleWalletDetailsClose })
   const { t } = useTranslate()
 
+  const sourceAssetBalance = swapViewProps.selectedAssetLabel === 'USDT'
+    ? walletDetails.usdtBalance
+    : walletDetails.usdcBalance
+
   const handleBalanceClick = useCallback(() => {
-    if (walletDetails.usdcBalance) {
-      const raw = walletDetails.usdcBalance.replace(/,/g, '')
+    if (sourceAssetBalance) {
+      const raw = sourceAssetBalance.replace(/,/g, '')
       swapViewProps.onSourceChange(raw)
     }
-  }, [walletDetails.usdcBalance, swapViewProps.onSourceChange])
+  }, [sourceAssetBalance, swapViewProps.onSourceChange])
 
 
   // Modal state for source (chain + token) and target (currency)
@@ -210,9 +214,9 @@ const WebSwap: React.FC = () => {
                 {...swapViewProps}
                 hasInsufficientFunds={
                   swapViewProps.isAuthenticated
-                  && !!walletDetails.usdcBalance
+                  && !!sourceAssetBalance
                   && !!swapViewProps.sourceAmount
-                  && parseFloat(swapViewProps.sourceAmount) > parseFloat(walletDetails.usdcBalance.replace(/,/g, ''))
+                  && parseFloat(swapViewProps.sourceAmount) > parseFloat(sourceAssetBalance.replace(/,/g, ''))
                 }
                 loadingBalance={walletDetails.isLoadingBalance}
                 onBalanceClick={handleBalanceClick}
@@ -220,7 +224,7 @@ const WebSwap: React.FC = () => {
                 onOpenSourceModal={openSourceModal}
                 onOpenTargetModal={openTargetModal}
                 openQr={openQr}
-                usdcBalance={walletDetails.usdcBalance}
+                usdcBalance={sourceAssetBalance}
                 walletAddress={walletDetails.address}
               />
             ),
@@ -269,7 +273,10 @@ const WebSwap: React.FC = () => {
         onClose={handleWalletDetailsClose}
         open={!!isWalletDetailsOpen}
       >
-        <WalletDetails {...walletDetails} />
+        <WalletDetails
+          {...walletDetails}
+          selectedAssetLabel={swapViewProps.selectedAssetLabel}
+        />
       </ModalOverlay>
 
       {/* Full-screen QR Scanner */}

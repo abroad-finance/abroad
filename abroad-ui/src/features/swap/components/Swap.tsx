@@ -186,7 +186,7 @@ export default function Swap({
               {chainIcon && (
                 <img
                   alt={selectedChainLabel}
-                  className="w-4 h-4 rounded-full -ml-3 ring-2 ring-[var(--ab-modal-bg)]"
+                  className="w-4 h-4 rounded-full -ml-[12px] -mb-[15px] ring-2 ring-[var(--ab-modal-bg)]"
                   src={chainIcon}
                 />
               )}
