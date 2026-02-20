@@ -81,10 +81,16 @@ export const useSwap = ({
   // Derived by currency
   const targetLocale = targetCurrency === TargetCurrency.BRL ? 'pt-BR' : 'es-CO'
   const targetSymbol = targetCurrency === TargetCurrency.BRL ? 'R$' : '$'
-  const availableCorridors = useMemo(
-    () => corridors.filter(corridor => corridor.targetCurrency === targetCurrency),
-    [corridors, targetCurrency],
-  )
+  const availableCorridors = useMemo(() => {
+    const filtered = corridors.filter(corridor => corridor.targetCurrency === targetCurrency)
+    return [...filtered].sort((a, b) => {
+      const aStellar = a.blockchain.toLowerCase() === 'stellar'
+      const bStellar = b.blockchain.toLowerCase() === 'stellar'
+      if (aStellar && !bStellar) return -1
+      if (!aStellar && bStellar) return 1
+      return 0
+    })
+  }, [corridors, targetCurrency])
   const selectedCorridor = useMemo(() => {
     const match = availableCorridors.find(corridor => corridorKeyOf(corridor) === corridorKey)
     if (match && (!chainKey || chainKeyOf(match) === chainKey)) return match
@@ -119,12 +125,18 @@ export const useSwap = ({
       const key = chainKeyOf(corridor)
       if (!seen.has(key)) seen.set(key, corridor)
     })
-    return Array.from(seen.entries()).map(([key, corridor]) => {
+    const entries = Array.from(seen.entries()).map(([key, corridor]) => {
       const includeChainId = (chainVariants.get(corridor.blockchain)?.size ?? 0) > 1
-      return {
-        key,
-        label: buildChainLabel(corridor, includeChainId),
-      }
+      return { key, label: buildChainLabel(corridor, includeChainId) }
+    })
+    return entries.sort((a, b) => {
+      const corridorA = seen.get(a.key)
+      const corridorB = seen.get(b.key)
+      const aStellar = corridorA?.blockchain.toLowerCase() === 'stellar'
+      const bStellar = corridorB?.blockchain.toLowerCase() === 'stellar'
+      if (aStellar && !bStellar) return -1
+      if (!aStellar && bStellar) return 1
+      return 0
     })
   }, [chainVariants, corridors])
   const targetPaymentMethod = selectedCorridor?.paymentMethod ?? (targetCurrency === TargetCurrency.BRL ? 'PIX' : 'BREB')
@@ -506,9 +518,18 @@ export const useSwap = ({
 
   const selectAssetOption = useCallback((key: string) => {
     setAssetMenuOpen(false)
-    setCorridorKey(key)
     const selected = availableCorridors.find(corridor => corridorKeyOf(corridor) === key)
-    if (selected) setChainKey(chainKeyOf(selected))
+    if (selected) {
+      if (
+        wallet?.address
+        && wallet?.chainId
+        && selected.chainId !== wallet.chainId
+      ) {
+        void wallet.disconnect().catch(() => undefined)
+      }
+      setChainKey(chainKeyOf(selected))
+    }
+    setCorridorKey(key)
     lastEditedRef.current = null
     directAbortRef.current?.abort()
     reverseAbortRef.current?.abort()
@@ -523,6 +544,7 @@ export const useSwap = ({
     setQuoteId,
     setSourceAmount,
     setTargetAmount,
+    wallet,
   ])
 
   const toggleCurrencyMenu = useCallback(() => {
@@ -553,27 +575,39 @@ export const useSwap = ({
 
   const selectChain = useCallback((key: string) => {
     setChainMenuOpen(false)
-    setChainKey(key)
     const currentCrypto = selectedCorridor?.cryptoCurrency
     const next = availableCorridors.find(corridor => (
       chainKeyOf(corridor) === key && corridor.cryptoCurrency === currentCrypto
     )) ?? availableCorridors.find(corridor => chainKeyOf(corridor) === key)
+    const fallback = !next
+      ? corridors.find(corridor => (
+          chainKeyOf(corridor) === key && corridor.cryptoCurrency === currentCrypto
+        )) ?? corridors.find(corridor => chainKeyOf(corridor) === key)
+      : null
+    const nextCorridor = next ?? fallback
+
+    // Al cambiar de cadena: desconectar wallet para que la UI no muestre saldo/dirección de la cadena anterior
+    if (
+      wallet?.address
+      && wallet?.chainId
+      && nextCorridor
+      && nextCorridor.chainId !== wallet.chainId
+    ) {
+      void wallet.disconnect().catch(() => undefined)
+    }
+
+    setChainKey(key)
     if (next) {
       setCorridorKey(corridorKeyOf(next))
     }
+    else if (fallback) {
+      if (fallback.targetCurrency !== targetCurrency) {
+        setTargetCurrency(fallback.targetCurrency)
+      }
+      setCorridorKey(corridorKeyOf(fallback))
+    }
     else {
-      const fallback = corridors.find(corridor => (
-        chainKeyOf(corridor) === key && corridor.cryptoCurrency === currentCrypto
-      )) ?? corridors.find(corridor => chainKeyOf(corridor) === key)
-      if (fallback) {
-        if (fallback.targetCurrency !== targetCurrency) {
-          setTargetCurrency(fallback.targetCurrency)
-        }
-        setCorridorKey(corridorKeyOf(fallback))
-      }
-      else {
-        setCorridorKey('')
-      }
+      setCorridorKey('')
     }
     lastEditedRef.current = null
     directAbortRef.current?.abort()
@@ -593,6 +627,7 @@ export const useSwap = ({
     setTargetAmount,
     setTargetCurrency,
     targetCurrency,
+    wallet,
   ])
 
   const selectCurrency = useCallback(

@@ -345,10 +345,16 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     [state.targetCurrency],
   )
   const targetSymbol = state.targetCurrency === TargetCurrency.BRL ? 'R$' : '$'
-  const availableCorridors = useMemo(
-    () => corridors.filter(corridor => corridor.targetCurrency === state.targetCurrency),
-    [corridors, state.targetCurrency],
-  )
+  const availableCorridors = useMemo(() => {
+    const filtered = corridors.filter(corridor => corridor.targetCurrency === state.targetCurrency)
+    return [...filtered].sort((a, b) => {
+      const aStellar = a.blockchain.toLowerCase() === 'stellar'
+      const bStellar = b.blockchain.toLowerCase() === 'stellar'
+      if (aStellar && !bStellar) return -1
+      if (!aStellar && bStellar) return 1
+      return 0
+    })
+  }, [corridors, state.targetCurrency])
   const selectedCorridor = useMemo(() => {
     const match = availableCorridors.find(corridor => corridorKeyOf(corridor) === state.corridorKey)
     if (match && (!chainKey || chainKeyOf(match) === chainKey)) return match
@@ -383,12 +389,18 @@ export const useWebSwapController = (): WebSwapControllerProps => {
       const key = chainKeyOf(corridor)
       if (!seen.has(key)) seen.set(key, corridor)
     })
-    return Array.from(seen.entries()).map(([key, corridor]) => {
+    const entries = Array.from(seen.entries()).map(([key, corridor]) => {
       const includeChainId = (chainVariants.get(corridor.blockchain)?.size ?? 0) > 1
-      return {
-        key,
-        label: buildChainLabel(corridor, includeChainId),
-      }
+      return { key, label: buildChainLabel(corridor, includeChainId) }
+    })
+    return entries.sort((a, b) => {
+      const corridorA = seen.get(a.key)
+      const corridorB = seen.get(b.key)
+      const aStellar = corridorA?.blockchain.toLowerCase() === 'stellar'
+      const bStellar = corridorB?.blockchain.toLowerCase() === 'stellar'
+      if (aStellar && !bStellar) return -1
+      if (!aStellar && bStellar) return 1
+      return 0
     })
   }, [chainVariants, corridors])
   const assetOptions = useMemo(() => chainFilteredCorridors.map(corridor => ({

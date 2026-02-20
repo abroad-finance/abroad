@@ -28,6 +28,9 @@
   --ab-badge-border: rgba(53, 110, 106, 0.12);
   --ab-hover: rgba(53, 110, 106, 0.06);
   --ab-selected: rgba(53, 110, 106, 0.1);
+  /* Wallet details panel: clear with very subtle light green tint */
+  --ab-wallet-panel-bg: rgba(232, 245, 240, 0.92);
+  --ab-wallet-panel-border: rgba(53, 110, 106, 0.14);
 }
 
 /* ── Dark mode ── */
@@ -51,4 +54,6 @@
   --ab-badge-border: rgba(42, 90, 80, 0.5);
   --ab-hover: rgba(90, 154, 143, 0.1);
   --ab-selected: rgba(90, 154, 143, 0.2);
+  --ab-wallet-panel-bg: rgba(26, 58, 52, 0.88);
+  --ab-wallet-panel-border: rgba(42, 90, 80, 0.5);
 }
