@@ -53,8 +53,10 @@ const WebSwapLayout: React.FC<WebSwapLayoutProps & WebSwapLayoutSlots> = ({ slot
     <div className="w-full overflow-scroll">
       {/* ---------- Mobile (<= md) ---------- */}
       <div className="md:hidden flex flex-col w-full">
-        {/* Swap Interface */}
-        <div className="min-h-[600px] h-[calc(100vh-80px)] bg-green-50 flex items-center justify-center p-4">
+        <div
+          className="min-h-[600px] h-[calc(100vh-80px)] flex items-center justify-center px-4 py-6"
+          style={{ background: 'linear-gradient(135deg, var(--ab-bg), var(--ab-bg-end))' }}
+        >
           <div className="w-full max-w-md">
             {renderSwap}
           </div>
@@ -79,7 +81,7 @@ const WebSwapLayout: React.FC<WebSwapLayoutProps & WebSwapLayoutSlots> = ({ slot
           <div className="w-full max-w-md">
             {renderSwap}
           </div>
-          <div className="absolute bottom-5 right-5 flex items-center gap-3 text-white font-sans text-base">
+          <div className="absolute bottom-5 right-5 flex items-center gap-3 font-sans text-base" style={{ color: 'var(--ab-text-muted)' }}>
             <span>powered by</span>
             <img alt="Stellar" className="h-9 w-auto" src={ASSET_URLS.STELLAR_LOGO} />
           </div>

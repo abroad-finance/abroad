@@ -12,6 +12,7 @@ export interface WalletDetailsProps {
   address: null | string
   copiedAddress: boolean
   formatDate: (dateString: string) => string
+  formatDateWithTime: (dateString: string) => string
   getStatusStyle: (status: string) => string
   getStatusText: (status: string) => string
   hasMoreTransactions: boolean
@@ -24,11 +25,13 @@ export interface WalletDetailsProps {
   onLoadMoreTransactions: () => void
   onRefreshBalance: () => void
   onRefreshTransactions: () => void
+  selectedAssetLabel?: string
   selectedTransaction: null | TransactionListItem
   setSelectedTransaction: (transaction: null | TransactionListItem) => void
   transactionError: null | string
   transactions: TransactionListItem[]
   usdcBalance: string
+  usdtBalance: string
 }
 
 // Stateless controlled component. All data & handlers provided via props.
@@ -36,6 +39,7 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({
   address,
   copiedAddress,
   formatDate,
+  formatDateWithTime,
   getStatusStyle,
   getStatusText,
   hasMoreTransactions,
@@ -48,13 +52,16 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({
   onLoadMoreTransactions,
   onRefreshBalance,
   onRefreshTransactions,
+  selectedAssetLabel,
   selectedTransaction,
   setSelectedTransaction,
   transactionError,
   transactions,
   usdcBalance,
+  usdtBalance,
 }) => {
   const { t } = useTranslate()
+  const sourceBalance = selectedAssetLabel === 'USDT' ? usdtBalance : usdcBalance
 
   const formatWalletAddress = (addr: null | string) => {
     if (!addr) return t('wallet_details.not_connected', 'No conectado')
@@ -86,66 +93,75 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({
         type: 'spring',
       }}
     >
-      <div className="bg-white rounded-t-4xl md:rounded-4xl shadow-lg border border-gray-200 p-4 relative w-full h-full md:h-full md:flex md:flex-col overflow-y-auto">
+      <div
+        className="rounded-t-4xl md:rounded-4xl p-4 relative w-full h-full md:h-full md:flex md:flex-col overflow-y-auto backdrop-blur-xl"
+        style={{ background: 'var(--ab-wallet-panel-bg)', border: '1px solid var(--ab-wallet-panel-border)', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.08)' }}
+      >
         {/* Close Button */}
         {onClose && (
           <button
-            className="absolute top-4 right-4 p-1 rounded-full hover:bg-gray-100 transition-colors duration-200 cursor-pointer z-10"
+            className="absolute top-4 right-4 p-1.5 rounded-full transition-colors duration-200 cursor-pointer z-10"
             onClick={onClose}
+            style={{ background: 'var(--ab-hover)' }}
+            type="button"
           >
-            <X className="w-5 h-5 text-gray-400 hover:text-gray-600" />
+            <X className="w-5 h-5" style={{ color: 'var(--ab-text-muted)' }} />
           </button>
         )}
 
         {/* Header */}
         <div className="mb-6 pr-8 text-center mt-2 md:mt-4">
-          <h2 className="text-2xl font-semibold text-gray-900 mb-2">
+          <h2 className="text-2xl font-semibold mb-2" style={{ color: 'var(--ab-text)' }}>
             {t('wallet_details.header.title', 'Tu Cuenta')}
           </h2>
-          <p className="text-md text-gray-600">
+          <p className="text-md" style={{ color: 'var(--ab-text-muted)' }}>
             {t('wallet_details.header.subtitle', 'Gestiona tu billetera y consulta el historial de transacciones')}
           </p>
         </div>
 
-        {/* Wallet Address & Balance Card */}
+        {/* Wallet Address & Balance Card - glass */}
         <div
-          className="border border-gray-200 rounded-xl p-6 py-8 mb-6 bg-cover bg-center bg-no-repeat"
-          style={{ backgroundImage: 'url(https://static.vecteezy.com/system/resources/previews/026/493/927/non_2x/abstract-gradient-dark-green-liquid-wave-background-free-vector.jpg)' }}
+          className="rounded-2xl p-6 py-8 mb-6 backdrop-blur-md"
+          style={{ background: 'var(--ab-badge-bg)', border: '1px solid var(--ab-badge-border)' }}
         >
-          {/* Wallet Address Section */}
           <div className="flex items-center justify-between mb-4">
-            <span className="text-white font-mono text-sm break-all">{formatWalletAddress(address)}</span>
+            <span className="font-mono text-sm break-all" style={{ color: 'var(--ab-text)' }}>{formatWalletAddress(address)}</span>
             <div className="flex space-x-2">
               <button
-                className="p-1 hover:bg-red-100 hover:bg-opacity-20 rounded transition-colors duration-200"
+                className="p-1.5 rounded-lg transition-colors duration-200"
                 onClick={onDisconnectWallet}
+                style={{ background: 'var(--ab-hover)' }}
                 title={t('wallet_details.actions.disconnect', 'Desconectar billetera')}
+                type="button"
               >
-                <svg className="w-4 h-4 text-red-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: 'var(--ab-text-muted)' }}>
                   <path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} />
                 </svg>
               </button>
               <button
-                className="p-1 hover:bg-white hover:bg-opacity-20 rounded transition-colors duration-200"
+                className="p-1.5 rounded-lg transition-colors duration-200"
                 onClick={onCopyAddress}
+                style={{ background: 'var(--ab-hover)' }}
                 title={t('wallet_details.actions.copy_address', 'Copiar dirección')}
+                type="button"
               >
-                <Copy className="w-4 h-4 text-white" />
+                <Copy className="w-4 h-4" style={{ color: 'var(--ab-text)' }} />
               </button>
               <button
-                className="p-1 hover:bg-white hover:bg-opacity-20 rounded transition-colors duration-200"
+                className="p-1.5 rounded-lg transition-colors duration-200"
                 onClick={() => window.open(`https://stellar.expert/explorer/public/account/${address}`, '_blank')}
+                style={{ background: 'var(--ab-hover)' }}
                 title={t('wallet_details.actions.view_explorer', 'Ver en explorador')}
+                type="button"
               >
-                <ExternalLink className="w-4 h-4 text-white" />
+                <ExternalLink className="w-4 h-4" style={{ color: 'var(--ab-text)' }} />
               </button>
             </div>
           </div>
           {copiedAddress && (
-            <div className="text-green-300 text-xs mb-4">{t('wallet_details.toast.copied', '¡Dirección copiada!')}</div>
+            <div className="text-xs mb-4" style={{ color: 'var(--ab-btn)' }}>{t('wallet_details.toast.copied', '¡Dirección copiada!')}</div>
           )}
 
-          {/* Balance Section */}
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
               <img
@@ -155,23 +171,24 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({
               />
               {isLoadingBalance
                 ? (
-                    <div className="w-32 h-9 bg-white/20 rounded animate-pulse"></div>
+                    <div className="h-9 w-32 rounded-lg animate-pulse" style={{ background: 'var(--ab-separator)' }} />
                   )
                 : (
-                    <span className="text-white font-bold text-4xl">
+                    <span className="font-bold text-4xl" style={{ color: 'var(--ab-text)' }}>
                       $
-                      {usdcBalance}
+                      {sourceBalance}
                     </span>
                   )}
             </div>
-            {/* Refresh Balance Button */}
             <button
-              className="p-2 hover:bg-white hover:bg-opacity-20 rounded-full transition-colors duration-200 disabled:opacity-50"
+              className="p-2 rounded-full transition-colors duration-200 disabled:opacity-50"
               disabled={isLoadingBalance}
               onClick={onRefreshBalance}
+              style={{ background: 'var(--ab-hover)' }}
               title={t('wallet_details.actions.refresh_balance', 'Actualizar balance')}
+              type="button"
             >
-              <RefreshCw className={`w-4 h-4 text-white ${isLoadingBalance ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`w-4 h-4 ${isLoadingBalance ? 'animate-spin' : ''}`} style={{ color: 'var(--ab-text)' }} />
             </button>
           </div>
         </div>
@@ -179,20 +196,22 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({
         {/* Transaction History */}
         <div className="flex-1">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-gray-800 font-medium text-lg">{t('wallet_details.transactions.title', 'Historial de Transacciones')}</h3>
+            <h3 className="font-medium text-lg" style={{ color: 'var(--ab-text)' }}>{t('wallet_details.transactions.title', 'Historial de Transacciones')}</h3>
             <button
-              className="p-2 hover:bg-gray-100 rounded-full transition-colors duration-200 disabled:opacity-50"
+              className="p-2 rounded-full transition-colors duration-200 disabled:opacity-50"
               disabled={isLoadingTransactions}
               onClick={onRefreshTransactions}
+              style={{ background: 'var(--ab-hover)' }}
               title={t('wallet_details.actions.refresh_transactions', 'Actualizar transacciones')}
+              type="button"
             >
-              <RefreshCw className={`w-4 h-4 text-gray-600 ${isLoadingTransactions ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`w-4 h-4 ${isLoadingTransactions ? 'animate-spin' : ''}`} style={{ color: 'var(--ab-text)' }} />
             </button>
           </div>
 
           {transactionError && (
-            <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-4">
-              <p className="text-red-700 text-sm">{transactionError}</p>
+            <div className="rounded-xl p-4 mb-4" style={{ background: 'var(--ab-hover)', border: '1px solid var(--ab-separator)' }}>
+              <p className="text-sm" style={{ color: 'var(--ab-text)' }}>{transactionError}</p>
             </div>
           )}
 
@@ -200,16 +219,16 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({
             ? (
                 <div className="space-y-3">
                   {[...Array(3)].map((_, index) => (
-                    <div className="bg-gray-50 border border-gray-200 rounded-xl p-4" key={index}>
+                    <div className="rounded-xl p-4" key={index} style={{ background: 'var(--ab-badge-bg)', border: '1px solid var(--ab-badge-border)' }}>
                       <div className="animate-pulse">
                         <div className="flex justify-between items-center mb-2">
-                          <div className="h-4 bg-gray-200 rounded w-24"></div>
-                          <div className="h-6 bg-gray-200 rounded w-20"></div>
+                          <div className="h-4 rounded w-24" style={{ background: 'var(--ab-separator)' }} />
+                          <div className="h-6 rounded w-20" style={{ background: 'var(--ab-separator)' }} />
                         </div>
-                        <div className="h-4 bg-gray-200 rounded w-32 mb-3"></div>
+                        <div className="h-4 rounded w-32 mb-3" style={{ background: 'var(--ab-separator)' }} />
                         <div className="flex justify-between items-center">
-                          <div className="h-6 bg-gray-200 rounded w-20"></div>
-                          <div className="h-6 bg-gray-200 rounded w-24"></div>
+                          <div className="h-6 rounded w-20" style={{ background: 'var(--ab-separator)' }} />
+                          <div className="h-6 rounded w-24" style={{ background: 'var(--ab-separator)' }} />
                         </div>
                       </div>
                     </div>
@@ -222,6 +241,7 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({
                     ? (
                         <TransactionDetail
                           formatDate={formatDate}
+                          formatDateWithTime={formatDateWithTime}
                           getStatusStyle={getStatusStyle}
                           getStatusText={getStatusText}
                           onBack={() => setSelectedTransaction(null)}
@@ -233,39 +253,29 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({
                         <>
                           {transactions.map((transaction: TransactionListItem) => (
                             <div
-                              className="bg-gray-50 border border-gray-200 rounded-xl p-4 hover:bg-gray-100 transition-colors duration-200 cursor-pointer"
+                              className="rounded-xl p-4 transition-colors duration-200 cursor-pointer"
                               key={transaction.id}
                               onClick={() => setSelectedTransaction(transaction)}
                               onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setSelectedTransaction(transaction) }}
                               role="button"
+                              style={{ background: 'var(--ab-badge-bg)', border: '1px solid var(--ab-badge-border)' }}
                               tabIndex={0}
                             >
                               <div className="flex items-center justify-between mb-2">
-                                <div className="flex items-center space-x-2">
-                                  <span className="text-gray-600 text-sm">{formatDate(transaction.createdAt)}</span>
-                                </div>
+                                <span className="text-sm" style={{ color: 'var(--ab-text-muted)' }}>{formatDate(transaction.createdAt)}</span>
                                 <span className={`text-xs px-2 py-1 rounded-full ${getStatusStyle(transaction.status)}`}>
                                   {getStatusText(transaction.status)}
                                 </span>
                               </div>
-
                               <div className="mb-2">
-                                <span className="text-gray-500 text-xs">{t('wallet_details.transactions.to', 'Para:')}</span>
-                                <span className="text-gray-700 font-mono text-sm">
-                                  {transaction.accountNumber}
-                                </span>
+                                <span className="text-xs" style={{ color: 'var(--ab-text-muted)' }}>{t('wallet_details.transactions.to', 'Para:')} </span>
+                                <span className="font-mono text-sm" style={{ color: 'var(--ab-text)' }}>{transaction.accountNumber}</span>
                               </div>
-
                               <div className="flex justify-between items-center">
                                 <div className="flex items-center space-x-1">
-                                  <img
-                                    alt="USDC"
-                                    className="w-4 h-4"
-                                    src="https://storage.googleapis.com/cdn-abroad/Icons/Tokens/USDC%20Token.svg"
-                                  />
-                                  <span className="text-gray-700 text-xl font-bold">
-                                    $
-                                    {transaction.quote.sourceAmount.toFixed(2)}
+                                  <img alt="USDC" className="w-4 h-4" src="https://storage.googleapis.com/cdn-abroad/Icons/Tokens/USDC%20Token.svg" />
+                                  <span className="text-xl font-bold" style={{ color: 'var(--ab-text)' }}>
+                                    ${transaction.quote.sourceAmount.toFixed(2)}
                                   </span>
                                 </div>
                                 <div className="flex items-center space-x-1">
@@ -278,14 +288,11 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({
                                         : 'https://hatscripts.github.io/circle-flags/flags/co.svg'
                                     }
                                   />
-                                  <span className="text-gray-700 text-xl font-bold">
+                                  <span className="text-xl font-bold" style={{ color: 'var(--ab-text)' }}>
                                     {transaction.quote.targetCurrency === 'BRL' ? 'R$' : '$'}
                                     {transaction.quote.targetAmount.toLocaleString(
                                       transaction.quote.targetCurrency === 'BRL' ? 'pt-BR' : 'es-CO',
-                                      {
-                                        maximumFractionDigits: 2,
-                                        minimumFractionDigits: 2,
-                                      },
+                                      { maximumFractionDigits: 2, minimumFractionDigits: 2 },
                                     )}
                                   </span>
                                 </div>
@@ -295,13 +302,14 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({
 
                           {hasMoreTransactions && (
                             <button
-                              className="w-full flex items-center justify-center gap-2 border border-dashed border-gray-300 rounded-xl px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 transition-colors duration-200 disabled:opacity-50"
+                              className="w-full flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition-colors duration-200 disabled:opacity-50"
                               disabled={isLoadingMoreTransactions}
                               onClick={onLoadMoreTransactions}
+                              style={{ border: '1px dashed var(--ab-separator)', color: 'var(--ab-text-muted)' }}
                               type="button"
                             >
                               {isLoadingMoreTransactions && (
-                                <RefreshCw className="w-4 h-4 text-gray-600 animate-spin" />
+                                <RefreshCw className="w-4 h-4 animate-spin" style={{ color: 'var(--ab-text-muted)' }} />
                               )}
                               <span>
                                 {isLoadingMoreTransactions
@@ -317,27 +325,18 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({
 
           {!isLoadingTransactions && transactions.length === 0 && !transactionError && (
             <div className="text-center py-8">
-              {/* Skeleton card - 60% smaller than regular transaction cards */}
-              <div className="bg-gray-50 border border-gray-200 rounded-xl p-2.5 mb-4 mx-auto max-w-[60%] relative">
-                <div>
-                  <div className="flex justify-between items-center mb-1.5">
-                    <div className="h-3 bg-gray-200 rounded w-16"></div>
-                    <div className="h-4 bg-gray-200 rounded w-12"></div>
-                  </div>
-                  <div className="h-3 bg-gray-200 rounded w-20 mb-2"></div>
-                  <div className="flex justify-between items-center">
-                    <div className="h-4 bg-gray-200 rounded w-12"></div>
-                    <div className="h-4 bg-gray-200 rounded w-16"></div>
-                  </div>
+              <div className="rounded-xl p-2.5 mb-4 mx-auto max-w-[60%]" style={{ background: 'var(--ab-badge-bg)', border: '1px solid var(--ab-badge-border)' }}>
+                <div className="flex justify-between items-center mb-1.5">
+                  <div className="h-3 rounded w-16" style={{ background: 'var(--ab-separator)' }} />
+                  <div className="h-4 rounded w-12" style={{ background: 'var(--ab-separator)' }} />
                 </div>
-                {/* Alert sign overlay - top right corner */}
-                <div className="absolute -top-2 -right-2">
-                  <div className="bg-orange-200 text-white rounded-full w-5 h-5 flex items-center justify-center text-sm font-bold">
-                    !
-                  </div>
+                <div className="h-3 rounded w-20 mb-2" style={{ background: 'var(--ab-separator)' }} />
+                <div className="flex justify-between items-center">
+                  <div className="h-4 rounded w-12" style={{ background: 'var(--ab-separator)' }} />
+                  <div className="h-4 rounded w-16" style={{ background: 'var(--ab-separator)' }} />
                 </div>
               </div>
-              <div className="text-gray-400 text-sm">
+              <div className="text-sm" style={{ color: 'var(--ab-text-muted)' }}>
                 <div className="font-medium mb-1">{t('wallet_details.empty.no_transactions', 'No hay transacciones aún')}</div>
                 <div className="text-xs">{t('wallet_details.empty.hint', 'Cuando hagas tu primera transacción, aparecerá aquí.')}</div>
               </div>
@@ -346,7 +345,7 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="text-xs text-gray-500 leading-relaxed text-center mt-6 pt-4 border-t border-gray-200">
+        <div className="text-xs leading-relaxed text-center mt-6 pt-4" style={{ color: 'var(--ab-text-muted)', borderTop: '1px solid var(--ab-separator)' }}>
           {t('wallet_details.footer.realtime_note', 'Los datos de transacciones se actualizan en tiempo real')}
         </div>
       </div>
