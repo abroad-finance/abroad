@@ -99,11 +99,11 @@ type PrismaClientLike = {
 
 const transactionId = '123e4567-e89b-12d3-a456-426614174000'
 const memoBase64 = Buffer.from(transactionId.replace(/-/g, ''), 'hex').toString('base64')
+const stellarUsdcIssuer = 'usdc-issuer'
 const secrets: Record<string, string> = {
   STELLAR_ACCOUNT_ID: 'stellar-account',
   STELLAR_HORIZON_URL: 'http://horizon.local',
   STELLAR_RECONCILIATION_SECRET: 'stellar-reconcile-secret',
-  STELLAR_USDC_ISSUER: 'usdc-issuer',
 }
 const reconciliationSecret = secrets[Secrets.STELLAR_RECONCILIATION_SECRET]
 
@@ -138,7 +138,7 @@ const basePayment: Horizon.ServerApi.PaymentOperationRecord = {
   },
   amount: '1',
   asset_code: 'USDC',
-  asset_issuer: secrets[Secrets.STELLAR_USDC_ISSUER],
+  asset_issuer: stellarUsdcIssuer,
   asset_type: 'credit_alphanum4',
   created_at: '',
   from: 'sender',
@@ -210,6 +210,15 @@ const buildContext = () => {
     getSecret: jest.fn(async (secret: Secret) => secrets[secret] ?? 'unused'),
     getSecrets: jest.fn(),
   }
+  const assetConfigService = {
+    listEnabledAssets: jest.fn(async () => ([
+      {
+        blockchain: BlockchainNetwork.STELLAR,
+        cryptoCurrency: CryptoCurrency.USDC,
+        mintAddress: stellarUsdcIssuer,
+      },
+    ])),
+  }
 
   const logger: MockLogger = createMockLogger()
 
@@ -220,6 +229,7 @@ const buildContext = () => {
       outboxDispatcher as never,
       depositVerifierRegistry as never,
       orphanRefundService as never,
+      assetConfigService as never,
       secretManager,
     ),
     logger,
