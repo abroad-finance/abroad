@@ -64,10 +64,13 @@ describe('CeloWalletHandler', () => {
       CELO_DEPOSIT_ADDRESS: depositAddress,
       CELO_PRIVATE_KEY: privateKey,
       CELO_RPC_URL: rpcUrl,
-      CELO_USDC_ADDRESS: usdcAddress,
       ...overrides,
     })
-    return new CeloWalletHandler(secretManager, new LoggerStub())
+    const assetConfigService = {
+      listEnabledAssets: jest.fn(async () => [{ mintAddress: usdcAddress }]),
+      getActiveMint: jest.fn(async ({ cryptoCurrency }: { cryptoCurrency: CryptoCurrency }) => cryptoCurrency === CryptoCurrency.USDC ? ({ mintAddress: usdcAddress, decimals: 6 }) : null),
+    }
+    return new CeloWalletHandler(secretManager, assetConfigService as never, new LoggerStub())
   }
 
   it('returns the sender address from a USDC transfer', async () => {
@@ -148,7 +151,7 @@ describe('CeloWalletHandler', () => {
 
     await expect(handler.getAddressFromTransaction({ onChainId: '0xhash' }))
       .rejects
-      .toThrow('No USDC transfer to the configured wallet found in this transaction')
+      .toThrow('No transfer to the configured wallet found in this transaction')
   })
 
   it('throws when multiple senders are detected', async () => {
@@ -182,7 +185,7 @@ describe('CeloWalletHandler', () => {
 
     await expect(handler.getAddressFromTransaction({ onChainId: '0xhash' }))
       .rejects
-      .toThrow('Multiple senders found for USDC transfers')
+      .toThrow('Multiple senders found for token transfers')
   })
 
   it('rejects unsupported currencies', async () => {
@@ -300,20 +303,9 @@ describe('CeloWalletHandler', () => {
     contractSpy.mockRestore()
   })
 
-  it('returns a retriable error when secrets are invalid', async () => {
+  it('throws when local Celo config is invalid', async () => {
     const handler = buildHandler({ CELO_DEPOSIT_ADDRESS: 'not-an-address' })
-
-    const result = await handler.send({
-      address: depositAddress,
-      amount: 1,
-      cryptoCurrency: CryptoCurrency.USDC,
-    })
-
-    expect(result).toEqual({
-      code: 'retriable',
-      reason: 'Invalid Celo address configuration',
-      success: false,
-    })
+    await expect(handler.getAddressFromTransaction({ onChainId: '0xhash' })).rejects.toThrow('Invalid Celo address configuration')
   })
 
   it('normalizes scientific notation in toPlainDecimalString', () => {

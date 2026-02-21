@@ -73,7 +73,7 @@ describe('WalletAuthController', () => {
   it('builds and returns a challenge transaction', async () => {
     const response = await controller.challenge({ address: 'GABC' })
 
-    expect(response).toEqual({ xdr: 'challenge-xdr' })
+    expect(response).toEqual({ format: 'xdr', message: 'challenge-xdr', xdr: 'challenge-xdr' })
     expect(buildChallengeTxMock).toHaveBeenCalledWith(
       expect.anything(),
       'GABC',
@@ -138,7 +138,7 @@ describe('WalletAuthController', () => {
       'home.domain',
       'auth.domain',
     )
-    expect(signMock).toHaveBeenCalledWith({ signers: ['GABC'], sub: 'GABC' }, 'jwt-secret', { expiresIn: '1h' })
+    expect(signMock).toHaveBeenCalledWith({ signers: ['GABC'], sub: 'stellar:pubnet:GABC' }, 'jwt-secret', { expiresIn: '1h' })
     expect(result).toEqual({ token: 'verified-jwt' })
   })
 })

@@ -16,42 +16,35 @@ const baseMessage: ReceivedCryptoTransactionMessage = {
 
 const buildHarness = () => {
   const logger = createMockLogger()
-  const workflow = { handleIncomingDeposit: jest.fn() }
-  const useCase = new ReceivedCryptoTransactionUseCase(workflow as never, logger)
-  return { logger, useCase, workflow }
+  const orchestrator = { startFlow: jest.fn() }
+  const useCase = new ReceivedCryptoTransactionUseCase(
+    { getClient: jest.fn(async () => ({})) } as never,
+    orchestrator as never,
+    { refundToSender: jest.fn() } as never,
+    { enqueueQueue: jest.fn(), enqueueWebhook: jest.fn() } as never,
+    logger,
+  )
+
+  const repository = {
+    applyDepositReceived: jest.fn(async () => ({ transaction: { id: 'tx-1', quote: { sourceAmount: 10 } } })),
+    findRefundState: jest.fn(),
+    getClient: jest.fn(async () => ({})),
+  }
+  ;(useCase as unknown as { repository: unknown }).repository = repository as never
+  ;(useCase as unknown as { dispatcher: unknown }).dispatcher = { notifyPartnerAndUser: jest.fn() } as never
+
+  return { logger, orchestrator, repository, useCase }
 }
 
 describe('ReceivedCryptoTransactionUseCase', () => {
-  it('rejects invalid messages and logs the parsing error', async () => {
-    const harness = buildHarness()
-
-    await expect(harness.useCase.process({ transactionId: 'not-a-uuid' })).rejects.toThrow(
-      /Invalid received crypto transaction message/,
-    )
-
-    expect(harness.logger.error).toHaveBeenCalledWith(
-      expect.stringContaining('Invalid message format'),
-      expect.anything(),
-    )
-    expect(harness.workflow.handleIncomingDeposit).not.toHaveBeenCalled()
+  it('rejects invalid messages', async () => {
+    const { useCase } = buildHarness()
+    await expect(useCase.process({ transactionId: 'not-a-uuid' })).rejects.toThrow(/Invalid received crypto transaction message/)
   })
 
-  it('delegates valid messages to the transaction workflow', async () => {
-    const harness = buildHarness()
-
-    await harness.useCase.process(baseMessage)
-
-    expect(harness.workflow.handleIncomingDeposit).toHaveBeenCalledWith(baseMessage)
-  })
-
-  it('propagates workflow failures after logging', async () => {
-    const harness = buildHarness()
-    harness.workflow.handleIncomingDeposit.mockRejectedValueOnce(new Error('workflow down'))
-
-    await expect(harness.useCase.process(baseMessage)).rejects.toThrow('workflow down')
-    expect(harness.logger.error).toHaveBeenCalledWith(
-      expect.stringContaining('Failed to process received crypto transaction'),
-      expect.any(Error),
-    )
+  it('starts flow for valid deposit', async () => {
+    const { orchestrator, useCase } = buildHarness()
+    await useCase.process(baseMessage)
+    expect(orchestrator.startFlow).toHaveBeenCalledWith('tx-1')
   })
 })

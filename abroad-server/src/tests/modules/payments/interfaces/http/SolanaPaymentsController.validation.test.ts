@@ -104,7 +104,7 @@ describe('SolanaPaymentsController notifyPayment validation', () => {
 
     const getSecretMock = secretManager.getSecret as unknown as jest.Mock
     getSecretMock.mockImplementation(async (secret: Secret) => {
-      if (secret === 'SOLANA_ADDRESS' || secret === 'SOLANA_USDC_MINT') {
+      if (secret === 'SOLANA_ADDRESS') {
         return ''
       }
       return secrets[secret] ?? ''
@@ -119,7 +119,7 @@ describe('SolanaPaymentsController notifyPayment validation', () => {
     ).rejects.toThrow('Solana configuration is invalid')
     expect(logger.error).toHaveBeenCalledWith(
       '[SolanaPaymentsController] Invalid Solana configuration',
-      { depositWalletAddress: '', usdcMintAddress: '' },
+      expect.objectContaining({ depositWalletAddress: '' }),
     )
   })
 

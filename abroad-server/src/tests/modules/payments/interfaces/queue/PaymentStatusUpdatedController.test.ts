@@ -1,11 +1,12 @@
 import 'reflect-metadata'
 import { TargetCurrency } from '@prisma/client'
 
+import type { IDatabaseClientProvider } from '../../../../../platform/persistence/IDatabaseClientProvider'
+
 import { FlowOrchestrator } from '../../../../../modules/flows/application/FlowOrchestrator'
 import { PaymentStatusUpdatedController } from '../../../../../modules/payments/interfaces/queue/PaymentStatusUpdatedController'
 import { QueueName } from '../../../../../platform/messaging/queues'
 import { PaymentStatusUpdatedMessage } from '../../../../../platform/messaging/queueSchema'
-import type { IDatabaseClientProvider } from '../../../../../platform/persistence/IDatabaseClientProvider'
 import { createMockLogger, createMockQueueHandler, MockLogger, MockQueueHandler } from '../../../../setup/mockFactories'
 
 describe('PaymentStatusUpdatedController', () => {
@@ -21,16 +22,13 @@ describe('PaymentStatusUpdatedController', () => {
     orchestrator = {
       handleSignal: jest.fn(),
     }
+    const prisma = { transaction: { findUnique: jest.fn() } }
     dbProvider = {
-      getClient: jest.fn(async () => ({
-        transaction: {
-          findUnique: jest.fn(),
-        },
-      })),
-    } as IDatabaseClientProvider
+      getClient: jest.fn(async () => prisma as unknown as import('@prisma/client').PrismaClient),
+    } as unknown as IDatabaseClientProvider
 
     controller = new PaymentStatusUpdatedController(
-      orchestrator as FlowOrchestrator,
+      orchestrator as unknown as FlowOrchestrator,
       queueHandler,
       logger,
       dbProvider,
@@ -69,8 +67,8 @@ describe('PaymentStatusUpdatedController', () => {
       status: 'processed',
     }
     const prisma = await dbProvider.getClient()
-    ;(prisma as unknown as { transaction: { findUnique: jest.Mock } }).transaction.findUnique =
-      jest.fn().mockResolvedValue({ id: 'tx-1' })
+    ;(prisma as unknown as { transaction: { findUnique: jest.Mock } }).transaction.findUnique
+      = jest.fn().mockResolvedValue({ id: 'tx-1' })
 
     await handler.onPaymentStatusUpdated(message)
 
@@ -92,8 +90,8 @@ describe('PaymentStatusUpdatedController', () => {
     const handler = controller as unknown as { onPaymentStatusUpdated: (msg: PaymentStatusUpdatedMessage) => Promise<void> }
     orchestrator.handleSignal.mockRejectedValueOnce(new Error('boom'))
     const prisma = await dbProvider.getClient()
-    ;(prisma as unknown as { transaction: { findUnique: jest.Mock } }).transaction.findUnique =
-      jest.fn().mockResolvedValue({ id: 'tx-2' })
+    ;(prisma as unknown as { transaction: { findUnique: jest.Mock } }).transaction.findUnique
+      = jest.fn().mockResolvedValue({ id: 'tx-2' })
 
     await expect(handler.onPaymentStatusUpdated({
       amount: 100,

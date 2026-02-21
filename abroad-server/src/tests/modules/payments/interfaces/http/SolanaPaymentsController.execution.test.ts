@@ -131,7 +131,7 @@ describe('SolanaPaymentsController notifyPayment execution', () => {
       badRequest,
       jest.fn(),
     ) as unknown as { reason: string }
-    expect(missingTransfer.reason).toBe('No USDC transfer to the configured wallet found in this transaction')
+    expect(missingTransfer.reason).toBe('No transfer to the configured wallet found in this transaction')
   })
 
   it('propagates queue errors when enqueuing verified payments', async () => {

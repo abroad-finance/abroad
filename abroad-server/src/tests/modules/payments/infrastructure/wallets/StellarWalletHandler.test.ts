@@ -86,6 +86,7 @@ describe('StellarWalletHandler', () => {
     withLock: jest.fn(async (_key: string, _ttl: number, fn: () => Promise<string>) => fn()),
   }
   const logger = createMockLogger()
+  const assetConfigService = { getActiveMint: jest.fn(async ({ cryptoCurrency }: { cryptoCurrency: CryptoCurrency }) => cryptoCurrency === CryptoCurrency.USDC ? ({ mintAddress: 'issuer' }) : null) }
 
   beforeEach(() => {
     jest.clearAllMocks()
@@ -108,7 +109,7 @@ describe('StellarWalletHandler', () => {
   })
 
   it('rejects unsupported currencies', async () => {
-    const handler = new StellarWalletHandler(secretManager as unknown as ISecretManager, lockManager as unknown as ILockManager, logger)
+    const handler = new StellarWalletHandler(secretManager as unknown as ISecretManager, assetConfigService as never, lockManager as unknown as ILockManager, logger)
     const result = await handler.send({
       address: 'dest',
       amount: 1,
@@ -123,9 +124,8 @@ describe('StellarWalletHandler', () => {
   it('sends USDC payments and returns transaction id', async () => {
     ;(secretManager.getSecret as jest.Mock).mockResolvedValueOnce('https://horizon.test')
     ;(secretManager.getSecret as jest.Mock).mockResolvedValueOnce('secret-key')
-    ;(secretManager.getSecret as jest.Mock).mockResolvedValueOnce('issuer')
 
-    const handler = new StellarWalletHandler(secretManager as unknown as ISecretManager, lockManager as unknown as ILockManager, logger)
+    const handler = new StellarWalletHandler(secretManager as unknown as ISecretManager, assetConfigService as never, lockManager as unknown as ILockManager, logger)
     const result = await handler.send({
       address: 'DESTINATION',
       amount: 12.345678,
@@ -139,7 +139,7 @@ describe('StellarWalletHandler', () => {
   })
 
   it('uses response data when send fails', async () => {
-    const handler = new StellarWalletHandler(secretManager as unknown as ISecretManager, lockManager as unknown as ILockManager, logger)
+    const handler = new StellarWalletHandler(secretManager as unknown as ISecretManager, assetConfigService as never, lockManager as unknown as ILockManager, logger)
     const responseError = Object.assign(new Error('bad request'), {
       response: { data: { error: 'bad request' }, status: 400 },
     })
@@ -160,7 +160,7 @@ describe('StellarWalletHandler', () => {
   })
 
   it('uses unknown reason when errors have no details', async () => {
-    const handler = new StellarWalletHandler(secretManager as unknown as ISecretManager, lockManager as unknown as ILockManager, logger)
+    const handler = new StellarWalletHandler(secretManager as unknown as ISecretManager, assetConfigService as never, lockManager as unknown as ILockManager, logger)
     submitTransactionMock.mockRejectedValueOnce({})
 
     const result = await handler.send({
@@ -180,8 +180,7 @@ describe('StellarWalletHandler', () => {
   it('trims long memos and skips memo when absent', async () => {
     ;(secretManager.getSecret as jest.Mock).mockResolvedValueOnce('https://horizon.test')
     ;(secretManager.getSecret as jest.Mock).mockResolvedValueOnce('secret-key')
-    ;(secretManager.getSecret as jest.Mock).mockResolvedValueOnce('issuer')
-    const handler = new StellarWalletHandler(secretManager as unknown as ISecretManager, lockManager as unknown as ILockManager, logger)
+    const handler = new StellarWalletHandler(secretManager as unknown as ISecretManager, assetConfigService as never, lockManager as unknown as ILockManager, logger)
 
     const longMemo = 'x'.repeat(40)
     await handler.send({
@@ -209,7 +208,7 @@ describe('StellarWalletHandler', () => {
   it('returns existing transactions without resubmitting on timeout', async () => {
     const timeoutError = Object.assign(new Error('timeout'), { response: { status: 504 } })
     submitTransactionMock.mockRejectedValueOnce(timeoutError)
-    const handler = new StellarWalletHandler(secretManager as unknown as ISecretManager, lockManager as unknown as ILockManager, logger)
+    const handler = new StellarWalletHandler(secretManager as unknown as ISecretManager, assetConfigService as never, lockManager as unknown as ILockManager, logger)
     const server = new (jest.requireMock('@stellar/stellar-sdk').Horizon.Server)('https://horizon.test')
 
     const result = await (handler as unknown as { submitWithRetry: (srv: unknown, tx: typeof builtTx) => Promise<unknown> }).submitWithRetry(server, builtTx)
@@ -223,7 +222,7 @@ describe('StellarWalletHandler', () => {
     const timeoutError = Object.assign(new Error('timeout'), { response: { status: 504 } })
     submitTransactionMock.mockRejectedValueOnce(timeoutError).mockResolvedValueOnce({ hash: 'retry-hash' })
     transactionLookupMock.mockResolvedValueOnce(undefined as unknown as MockTransactionRecord)
-    const handler = new StellarWalletHandler(secretManager as unknown as ISecretManager, lockManager as unknown as ILockManager, logger)
+    const handler = new StellarWalletHandler(secretManager as unknown as ISecretManager, assetConfigService as never, lockManager as unknown as ILockManager, logger)
     const server = new (jest.requireMock('@stellar/stellar-sdk').Horizon.Server)('https://horizon.test')
 
     const result = await (handler as unknown as { submitWithRetry: (srv: unknown, tx: typeof builtTx) => Promise<unknown> }).submitWithRetry(server, builtTx)
@@ -237,7 +236,7 @@ describe('StellarWalletHandler', () => {
       response: { status: 504 },
     })
     submitTransactionMock.mockRejectedValueOnce(timeoutError).mockResolvedValueOnce({ hash: 'retry-hash' })
-    const handler = new StellarWalletHandler(secretManager as unknown as ISecretManager, lockManager as unknown as ILockManager, logger)
+    const handler = new StellarWalletHandler(secretManager as unknown as ISecretManager, assetConfigService as never, lockManager as unknown as ILockManager, logger)
     const server = new (jest.requireMock('@stellar/stellar-sdk').Horizon.Server)('https://horizon.test')
     ;(server as unknown as { transactions: () => { transaction: () => { call: () => Promise<never> } } }).transactions = () => ({
       transaction: () => ({
@@ -254,7 +253,7 @@ describe('StellarWalletHandler', () => {
   })
 
   it('detects timeouts by message and rethrows non-timeout failures', async () => {
-    const handler = new StellarWalletHandler(secretManager as unknown as ISecretManager, lockManager as unknown as ILockManager, logger)
+    const handler = new StellarWalletHandler(secretManager as unknown as ISecretManager, assetConfigService as never, lockManager as unknown as ILockManager, logger)
     const server = new (jest.requireMock('@stellar/stellar-sdk').Horizon.Server)('https://horizon.test')
 
     submitTransactionMock.mockRejectedValueOnce(new Error('request timed out'))
@@ -268,7 +267,7 @@ describe('StellarWalletHandler', () => {
   })
 
   it('resolves the source account address and falls back to legacy operation ids', async () => {
-    const handler = new StellarWalletHandler(secretManager as unknown as ISecretManager, lockManager as unknown as ILockManager, logger)
+    const handler = new StellarWalletHandler(secretManager as unknown as ISecretManager, assetConfigService as never, lockManager as unknown as ILockManager, logger)
 
     transactionLookupMock.mockResolvedValueOnce({ source_account: 'source-account' })
     const address = await handler.getAddressFromTransaction({ onChainId: 'tx-1' })
@@ -292,7 +291,7 @@ describe('StellarWalletHandler', () => {
   })
 
   it('throws when both transaction and operation lookups fail', async () => {
-    const handler = new StellarWalletHandler(secretManager as unknown as ISecretManager, lockManager as unknown as ILockManager, logger)
+    const handler = new StellarWalletHandler(secretManager as unknown as ISecretManager, assetConfigService as never, lockManager as unknown as ILockManager, logger)
 
     operationCallMock.mockRejectedValueOnce(new Error('horizon down'))
     transactionLookupMock.mockRejectedValueOnce(new Error('horizon down'))
@@ -302,7 +301,7 @@ describe('StellarWalletHandler', () => {
   })
 
   it('throws when no onChainId is provided', async () => {
-    const handler = new StellarWalletHandler(secretManager as unknown as ISecretManager, lockManager as unknown as ILockManager, logger)
+    const handler = new StellarWalletHandler(secretManager as unknown as ISecretManager, assetConfigService as never, lockManager as unknown as ILockManager, logger)
     await expect(handler.getAddressFromTransaction({ onChainId: undefined })).rejects.toThrow(
       'onChainId is required to get address from transaction',
     )
