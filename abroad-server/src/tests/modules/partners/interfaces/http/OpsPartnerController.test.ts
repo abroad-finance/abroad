@@ -27,7 +27,7 @@ const buildService = (): jest.Mocked<OpsPartnerServiceMock> => ({
       needsKyc: true,
     },
   }
-  })),
+  }),
   listPartners: jest.fn(async (_params) => {
     void _params
     return {
@@ -43,7 +43,7 @@ const buildService = (): jest.Mocked<OpsPartnerServiceMock> => ({
     pageSize: 20,
     total: 1,
   }
-  })),
+  }),
   revokeApiKey: jest.fn(async (_partnerId: string) => {
     void _partnerId
     return undefined
@@ -61,7 +61,7 @@ const buildService = (): jest.Mocked<OpsPartnerServiceMock> => ({
       needsKyc: true,
     },
   }
-  })),
+  }),
 })
 
 const badRequestResponder = (): TsoaResponse<400, { reason: string }> => (
