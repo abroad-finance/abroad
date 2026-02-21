@@ -72,8 +72,9 @@ export const buildMinimalController = () => {
   )
   const statusService = new TransactionStatusService(dbProvider)
 
+  const paymentContextService = { build: jest.fn(() => null) }
   return {
-    controller: new TransactionController(acceptanceService, statusService),
+    controller: new TransactionController(acceptanceService, statusService, paymentContextService as never, dbProvider),
     prisma,
   }
 }

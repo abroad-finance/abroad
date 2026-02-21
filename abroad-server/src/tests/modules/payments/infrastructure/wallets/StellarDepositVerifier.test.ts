@@ -97,15 +97,14 @@ const buildVerifier = (transactionOverrides?: Partial<{ currency: CryptoCurrency
           return accountId
         case Secrets.STELLAR_HORIZON_URL:
           return horizonUrl
-        case Secrets.STELLAR_USDC_ISSUER:
-          return usdcIssuer
         default:
           return ''
       }
     }),
   }
   const logger = { error: jest.fn(), info: jest.fn(), warn: jest.fn() }
-  const verifier = new StellarDepositVerifier(dbProvider as never, secretManager as never, logger as never)
+  const assetConfigService = { getActiveMint: jest.fn(async ({ cryptoCurrency }: { cryptoCurrency: CryptoCurrency }) => cryptoCurrency === CryptoCurrency.USDC ? ({ mintAddress: usdcIssuer }) : null) }
+  const verifier = new StellarDepositVerifier(dbProvider as never, secretManager as never, assetConfigService as never, logger as never)
   return { dbProvider, logger, prisma, secretManager, verifier }
 }
 

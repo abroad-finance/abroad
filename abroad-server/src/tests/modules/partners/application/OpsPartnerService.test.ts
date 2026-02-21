@@ -51,7 +51,10 @@ const buildPartnerMock = (): PartnerDelegateMock => {
     })),
     findMany: jest.fn(async (
       _args: { orderBy: { createdAt: 'desc' }, skip: number, take: number },
-    ): Promise<PartnerModel[]> => []),
+    ): Promise<PartnerModel[]> => {
+      void _args
+      return []
+    }),
     update: jest.fn(async ({ data, where }: { data: { apiKey: null | string }, where: { id: string } }) => basePartner({
       apiKey: data.apiKey,
       id: where.id,
