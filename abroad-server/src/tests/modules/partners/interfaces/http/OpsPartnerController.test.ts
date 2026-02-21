@@ -14,7 +14,9 @@ OpsPartnerService,
 >
 
 const buildService = (): jest.Mocked<OpsPartnerServiceMock> => ({
-  createPartner: jest.fn(async (_input) => ({
+  createPartner: jest.fn(async (_input) => {
+    void _input
+    return {
     apiKey: 'partner_test_key',
     partner: {
       createdAt: new Date('2024-01-01T00:00:00.000Z'),
@@ -24,8 +26,11 @@ const buildService = (): jest.Mocked<OpsPartnerServiceMock> => ({
       name: 'Partner One',
       needsKyc: true,
     },
+  }
   })),
-  listPartners: jest.fn(async (_params) => ({
+  listPartners: jest.fn(async (_params) => {
+    void _params
+    return {
     items: [{
       createdAt: new Date('2024-01-01T00:00:00.000Z'),
       hasApiKey: true,
@@ -37,9 +42,15 @@ const buildService = (): jest.Mocked<OpsPartnerServiceMock> => ({
     page: 1,
     pageSize: 20,
     total: 1,
+  }
   })),
-  revokeApiKey: jest.fn(async (_partnerId: string) => undefined),
-  rotateApiKey: jest.fn(async (_partnerId: string) => ({
+  revokeApiKey: jest.fn(async (_partnerId: string) => {
+    void _partnerId
+    return undefined
+  }),
+  rotateApiKey: jest.fn(async (_partnerId: string) => {
+    void _partnerId
+    return {
     apiKey: 'partner_rotated_key',
     partner: {
       createdAt: new Date('2024-01-01T00:00:00.000Z'),
@@ -49,6 +60,7 @@ const buildService = (): jest.Mocked<OpsPartnerServiceMock> => ({
       name: 'Partner One',
       needsKyc: true,
     },
+  }
   })),
 })
 
