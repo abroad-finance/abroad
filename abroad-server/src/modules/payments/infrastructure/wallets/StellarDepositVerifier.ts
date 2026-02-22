@@ -39,7 +39,9 @@ export class StellarDepositVerifier implements IDepositVerifier {
       return { outcome: 'error', reason: 'Transaction not found', status: 404 }
     }
 
-    if (transaction.status !== TransactionStatus.AWAITING_PAYMENT) {
+    const isAwaitingPayment = transaction.status === TransactionStatus.AWAITING_PAYMENT
+    const isExpiredPayment = transaction.status === TransactionStatus.PAYMENT_EXPIRED
+    if (!isAwaitingPayment && !isExpiredPayment) {
       return { outcome: 'error', reason: 'Transaction is not awaiting payment', status: 400 }
     }
 

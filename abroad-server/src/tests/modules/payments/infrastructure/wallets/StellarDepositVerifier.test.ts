@@ -139,6 +139,27 @@ describe('StellarDepositVerifier', () => {
     }
   })
 
+  it('accepts PAYMENT_EXPIRED transactions for reconciliation/refund processing', async () => {
+    const memoUuid = '00000000-0000-0000-0000-000000000123'
+    const memo = Buffer.from(memoUuid.replace(/-/g, ''), 'hex').toString('base64')
+    const { verifier } = buildVerifier({ status: TransactionStatus.PAYMENT_EXPIRED })
+    setServer(buildTransactionRecord({ memo }), [buildPayment({ id: 'payment-expired' })])
+
+    const result = await verifier.verifyNotification('tx-hash', memoUuid)
+
+    expect(result).toEqual({
+      outcome: 'ok',
+      queueMessage: {
+        addressFrom: 'sender',
+        amount: 10,
+        blockchain: BlockchainNetwork.STELLAR,
+        cryptoCurrency: CryptoCurrency.USDC,
+        onChainId: 'tx-hash',
+        transactionId: memoUuid,
+      },
+    })
+  })
+
   it('handles horizon failures and unsupported operations', async () => {
     const { verifier } = buildVerifier()
     const notFoundError = Object.assign(new Error('missing'), { response: { status: 404 } })

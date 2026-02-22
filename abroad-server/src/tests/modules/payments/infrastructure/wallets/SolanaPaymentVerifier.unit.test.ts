@@ -54,10 +54,24 @@ describe('SolanaPaymentVerifier helpers', () => {
     const prismaClient = { transaction: { findUnique: jest.fn(async () => ({ id: 'txn-1', quote: { cryptoCurrency: CryptoCurrency.USDC, network: BlockchainNetwork.SOLANA }, status: TransactionStatus.AWAITING_PAYMENT })) } } as never
     jest.spyOn(verifier, 'getPrismaClient').mockResolvedValue(prismaClient)
     jest.spyOn(verifier, 'ensureUniqueOnChainId').mockResolvedValue(undefined)
-    jest.spyOn(verifier, 'buildPaymentContext').mockResolvedValue({ connection: {} as Connection, tokenAccounts: [], assetMint: TOKEN_PROGRAM_ID })
+    jest.spyOn(verifier, 'buildPaymentContext').mockResolvedValue({ assetMint: TOKEN_PROGRAM_ID, connection: {} as Connection, tokenAccounts: [] })
     jest.spyOn(verifier, 'fetchOnChainTransaction').mockRejectedValueOnce(new Error('Transaction failed on-chain'))
     const result = await verifier.verifyNotification('on-chain-sig', 'txn-1')
     expect(result).toEqual({ outcome: 'error', reason: 'Transaction failed on-chain', status: 400 })
     expect(logger.error).toHaveBeenCalled()
+  })
+
+  it('allows PAYMENT_EXPIRED transactions during validation for refund processing', async () => {
+    const { verifier } = buildVerifier()
+
+    const validationError = await verifier.validateTransaction({
+      quote: {
+        cryptoCurrency: CryptoCurrency.USDC,
+        network: BlockchainNetwork.SOLANA,
+      },
+      status: TransactionStatus.PAYMENT_EXPIRED,
+    })
+
+    expect(validationError).toBeUndefined()
   })
 })

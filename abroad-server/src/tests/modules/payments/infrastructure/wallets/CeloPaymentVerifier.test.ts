@@ -68,7 +68,7 @@ describe('CeloPaymentVerifier', () => {
       CELO_RPC_URL: rpcUrl,
       ...overrides,
     })
-    const assetConfigService = { getActiveMint: jest.fn(async ({ cryptoCurrency }: { cryptoCurrency: CryptoCurrency }) => cryptoCurrency === CryptoCurrency.USDC ? ({ mintAddress: usdcAddress, decimals: 6 }) : null) }
+    const assetConfigService = { getActiveMint: jest.fn(async ({ cryptoCurrency }: { cryptoCurrency: CryptoCurrency }) => cryptoCurrency === CryptoCurrency.USDC ? ({ decimals: 6, mintAddress: usdcAddress }) : null) }
     return new CeloPaymentVerifier(secretManager, dbProvider, assetConfigService as never, new LoggerStub())
   }
 
@@ -165,6 +165,52 @@ describe('CeloPaymentVerifier', () => {
       outcome: 'error',
       reason: 'Transaction is not awaiting payment',
       status: 400,
+    })
+  })
+
+  it('accepts PAYMENT_EXPIRED transactions for reconciliation/refund processing', async () => {
+    const receipt = buildReceipt({
+      amount: ethers.utils.parseUnits('2.5', 6),
+      from: senderAddress,
+      to: depositAddress,
+      token: usdcAddress,
+    })
+
+    const prismaClient = {
+      transaction: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'tx-expired',
+          quote: { cryptoCurrency: CryptoCurrency.USDC, network: BlockchainNetwork.CELO },
+          status: TransactionStatus.PAYMENT_EXPIRED,
+        }),
+      },
+    }
+
+    const dbProvider: IDatabaseClientProvider = {
+      getClient: async () => prismaClient as unknown as import('@prisma/client').PrismaClient,
+    }
+
+    const verifier = buildVerifier(dbProvider)
+    ;(verifier as unknown as { cachedProvider?: { provider: ethers.providers.JsonRpcProvider, rpcUrl: string } }).cachedProvider = {
+      provider: {
+        getTransactionReceipt: jest.fn().mockResolvedValue(receipt),
+      } as unknown as ethers.providers.JsonRpcProvider,
+      rpcUrl,
+    }
+
+    const result = await verifier.verifyNotification('0xhash-expired', 'tx-expired')
+
+    expect(result).toEqual({
+      outcome: 'ok',
+      queueMessage: {
+        addressFrom: ethers.utils.getAddress(senderAddress),
+        amount: 2.5,
+        blockchain: BlockchainNetwork.CELO,
+        cryptoCurrency: CryptoCurrency.USDC,
+        onChainId: '0xhash-expired',
+        transactionId: 'tx-expired',
+      },
     })
   })
 

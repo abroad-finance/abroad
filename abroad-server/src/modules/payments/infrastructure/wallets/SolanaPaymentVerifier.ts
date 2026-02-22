@@ -187,7 +187,9 @@ export class SolanaPaymentVerifier implements IDepositVerifier {
     quote: { cryptoCurrency: CryptoCurrency, network: BlockchainNetwork }
     status: TransactionStatus
   }): Promise<string | undefined> {
-    if (transaction.status !== TransactionStatus.AWAITING_PAYMENT) {
+    const isAwaitingPayment = transaction.status === TransactionStatus.AWAITING_PAYMENT
+    const isExpiredPayment = transaction.status === TransactionStatus.PAYMENT_EXPIRED
+    if (!isAwaitingPayment && !isExpiredPayment) {
       return 'Transaction is not awaiting payment'
     }
 
