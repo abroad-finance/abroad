@@ -70,3 +70,4 @@ Status flow:
 - **Quote expired:** You will see `PAYMENT_EXPIRED` if funds arrive after the `expiration_time`. Create a fresh quote and transaction.  
 - **Wrong amount:** If fewer funds arrive than quoted, the transaction moves to `WRONG_AMOUNT` and we attempt to refund the crypto to the sender address. Create a new quote/transaction for the corrected amount.  
 - **Missing memo:** If the Stellar memo/reference is missing or incorrect, the funds cannot be matched automatically. Contact support with the on-chain hash to reconcile.
+- **OPS recovery:** Operations can trigger hash-based reconciliation via `POST /ops/transactions/reconcile-hash` using `X-OPS-API-KEY`.

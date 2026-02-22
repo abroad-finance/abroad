@@ -14,6 +14,7 @@ import { ExchangeConvertStepExecutor } from '../../modules/flows/application/ste
 import { ExchangeSendStepExecutor } from '../../modules/flows/application/steps/ExchangeSendStepExecutor'
 import { PayoutSendStepExecutor } from '../../modules/flows/application/steps/PayoutSendStepExecutor'
 import { TreasuryTransferStepExecutor } from '../../modules/flows/application/steps/TreasuryTransferStepExecutor'
+import { OpsPartnerService } from '../../modules/partners/application/OpsPartnerService'
 import { CryptoAssetConfigService } from '../../modules/payments/application/CryptoAssetConfigService'
 import { DepositVerifierRegistry } from '../../modules/payments/application/DepositVerifierRegistry'
 import { LiquidityCacheService } from '../../modules/payments/application/LiquidityCacheService'
@@ -22,7 +23,6 @@ import { PaymentServiceFactory } from '../../modules/payments/application/Paymen
 import { PaymentUseCase } from '../../modules/payments/application/paymentUseCase'
 import { PayoutStatusAdapterRegistry } from '../../modules/payments/application/PayoutStatusAdapterRegistry'
 import { WalletHandlerFactory } from '../../modules/payments/application/WalletHandlerFactory'
-import { OpsPartnerService } from '../../modules/partners/application/OpsPartnerService'
 import { BrebPayoutStatusAdapter } from '../../modules/payments/infrastructure/BrebPayoutStatusAdapter'
 import { BrebPaymentService } from '../../modules/payments/infrastructure/paymentProviders/brebPaymentService'
 import { PixQrDecoder } from '../../modules/payments/infrastructure/paymentProviders/PixQrDecoder'
@@ -35,6 +35,7 @@ import { SolanaWalletHandler } from '../../modules/payments/infrastructure/walle
 import { StellarDepositVerifier } from '../../modules/payments/infrastructure/wallets/StellarDepositVerifier'
 import { StellarWalletHandler } from '../../modules/payments/infrastructure/wallets/StellarWalletHandler'
 import { QuoteUseCase } from '../../modules/quotes/application/quoteUseCase'
+import { OpsTransactionReconciliationService } from '../../modules/transactions/application/OpsTransactionReconciliationService'
 import { ReceivedCryptoTransactionUseCase } from '../../modules/transactions/application/receivedCryptoTransactionUseCase'
 import { StellarOrphanRefundService } from '../../modules/transactions/application/StellarOrphanRefundService'
 import { TransactionAcceptanceService } from '../../modules/transactions/application/TransactionAcceptanceService'
@@ -78,6 +79,7 @@ const domainBindings: ReadonlyArray<BindingRegistration<unknown>> = [
   { identifier: TYPES.TransactionAcceptanceService, implementation: TransactionAcceptanceService },
   { identifier: TYPES.TransactionStatusService, implementation: TransactionStatusService },
   { identifier: TYPES.StellarOrphanRefundService, implementation: StellarOrphanRefundService },
+  { bindSelf: true, identifier: OpsTransactionReconciliationService, implementation: OpsTransactionReconciliationService },
   { identifier: TYPES.PaymentUseCase, implementation: PaymentUseCase },
   { identifier: TYPES.ReceivedCryptoTransactionUseCase, implementation: ReceivedCryptoTransactionUseCase },
   { bindSelf: true, identifier: PersonaWebhookService, implementation: PersonaWebhookService },

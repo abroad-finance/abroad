@@ -203,6 +203,58 @@ Paginated list scoped to your partner and a single external user.
 
 ---
 
+## OPS Reconciliation
+
+These endpoints are for operations tooling and require the `X-OPS-API-KEY` header.
+
+### Reconcile Transaction By Hash (`POST /ops/transactions/reconcile-hash`)
+
+Reconcile a blockchain transaction hash/signature and enqueue processing when a valid pending transaction is found.
+
+#### Request body
+
+| Field | Type | Required | Description |
+| :--- | :--- | :--- | :--- |
+| `blockchain` | `string` | Yes | One of `STELLAR`, `SOLANA`, `CELO`. |
+| `on_chain_tx` | `string` | Yes | Blockchain transaction hash/signature. |
+| `transaction_id` | `string` | No | Abroad transaction id. Required for unresolved `SOLANA` / `CELO` hashes. |
+
+#### Example
+
+```bash
+curl -X POST https://api.abroad.finance/ops/transactions/reconcile-hash \
+  -H "X-OPS-API-KEY: YOUR_OPS_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "blockchain": "STELLAR",
+    "on_chain_tx": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  }'
+```
+
+#### Response
+
+```json
+{
+  "blockchain": "STELLAR",
+  "on_chain_tx": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "result": "enqueued",
+  "transaction_id": "550e8400-e29b-41d4-a716-446655440000",
+  "transaction_status": "AWAITING_PAYMENT",
+  "reason": null
+}
+```
+
+Result values:
+
+- `alreadyProcessed`: hash already linked to a processed transaction.
+- `enqueued`: reconciliation was accepted and queued.
+- `unresolved`: no heuristic matching is performed (typically missing `transaction_id` for `SOLANA`/`CELO`).
+- `invalid`: payload/chain data did not validate.
+- `notFound`: hash was not found on-chain or in expected context.
+- `failed`: reconciliation execution failed unexpectedly.
+
+---
+
 ## Payment metadata
 
 ### List banks (`GET /payments/banks`)
