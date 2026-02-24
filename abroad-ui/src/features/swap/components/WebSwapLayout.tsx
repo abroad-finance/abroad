@@ -3,6 +3,7 @@ import { useTolgee, useTranslate } from '@tolgee/react'
 import React, { useMemo } from 'react'
 
 import { _36EnumsTargetCurrency as TargetCurrency } from '../../../api'
+import { BRAND_TITLE_STYLE } from '../../../shared/constants'
 import { getSwapPageTitleDefault } from '../constants/swapPageTitles'
 import { SwapView } from '../types'
 
@@ -69,10 +70,7 @@ const WebSwapLayout: React.FC<WebSwapLayoutProps & WebSwapLayoutSlots> = ({ slot
         >
           <h1
             className="text-3xl font-black text-center w-full"
-            style={{
-              color: 'var(--color-emerald-700)',
-              fontFamily: '"Airbnb Cereal"',
-            }}
+            style={BRAND_TITLE_STYLE}
           >
             {pageTitle}
           </h1>
@@ -93,10 +91,7 @@ const WebSwapLayout: React.FC<WebSwapLayoutProps & WebSwapLayoutSlots> = ({ slot
         >
           <h1
             className="text-3xl font-black text-center w-full"
-            style={{
-              color: 'var(--color-emerald-700)',
-              fontFamily: '"Airbnb Cereal"',
-            }}
+            style={BRAND_TITLE_STYLE}
           >
             {pageTitle}
           </h1>

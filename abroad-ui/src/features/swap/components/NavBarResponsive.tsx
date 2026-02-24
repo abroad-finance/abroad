@@ -5,6 +5,7 @@ import React, { memo } from 'react'
 
 import AbroadLogoColored from '../../../assets/Logos/AbroadLogoColored.svg'
 import AbroadLogoWhite from '../../../assets/Logos/AbroadLogoWhite.svg'
+import { BRAND_TITLE_STYLE } from '../../../shared/constants'
 
 /* ── Props ── */
 
@@ -112,7 +113,7 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({
           />
           <span
             className="text-sm font-semibold"
-            style={{ color: 'var(--color-emerald-700)', fontFamily: '"Airbnb Cereal"' }}
+            style={BRAND_TITLE_STYLE}
           >
             Swap
           </span>

@@ -4,6 +4,8 @@ import { X } from 'lucide-react'
 import React from 'react'
 import { createPortal } from 'react-dom'
 
+import { BRAND_TITLE_STYLE } from '../constants'
+
 export interface LanguageSelectorProps {
   ariaLabel?: string
   className?: string
@@ -118,7 +120,7 @@ const LanguageSelector: React.FC<LanguageSelectorProps> = ({
           className="hidden md:inline"
           style={
             variant === 'desktop'
-              ? { color: 'var(--color-emerald-700)', fontFamily: '"Airbnb Cereal"' }
+              ? BRAND_TITLE_STYLE
               : undefined
           }
         >
