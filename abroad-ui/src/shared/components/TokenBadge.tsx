@@ -20,7 +20,13 @@ const getFallbackInitials = (symbol: string): string => {
   return initials || trimmed[0].toUpperCase()
 }
 
-export const TokenBadge: React.FC<TokenBadgeProps> = ({ alt, iconSrc, suffix, symbol, transparent }) => (
+export const TokenBadge: React.FC<TokenBadgeProps> = ({
+  alt,
+  iconSrc,
+  suffix,
+  symbol,
+  transparent,
+}) => (
   <div
     className={`${transparent ? 'p-0' : 'rounded-full px-3 py-1.5'} flex items-center justify-center`}
     style={transparent

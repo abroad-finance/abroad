@@ -1,7 +1,9 @@
 import { useTranslate } from '@tolgee/react'
 import { Scanner } from '@yudiel/react-qr-scanner'
 import { ScanLine, X } from 'lucide-react'
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import React, {
+  useCallback, useEffect, useRef, useState,
+} from 'react'
 
 interface QrScannerFullScreenProps {
   onClose: () => void
@@ -34,7 +36,7 @@ const extractScanText = (result: unknown): string => {
 
 const QrScannerFullScreen: React.FC<QrScannerFullScreenProps> = ({ onClose, onResult }) => {
   const { t } = useTranslate()
-  const [cameraError, setCameraError] = useState<string | null>(null)
+  const [cameraError, setCameraError] = useState<null | string>(null)
   const hasResultRef = useRef(false)
 
   useEffect(() => {
@@ -83,34 +85,34 @@ const QrScannerFullScreen: React.FC<QrScannerFullScreenProps> = ({ onClose, onRe
         {/* Camera view */}
         {cameraError
           ? (
-            <div className="flex h-full items-center justify-center px-6 text-center">
-              <div className="max-w-sm">
-                <p className="text-lg font-semibold">{t('qr_scanner.error_title', 'No pudimos abrir la cámara')}</p>
-                <p className="text-sm text-white/80 mt-2">{cameraError}</p>
-                <p className="text-xs text-white/60 mt-4">{t('qr_scanner.error_hint', 'Puedes cerrar este modal y pegar el código manualmente.')}</p>
+              <div className="flex h-full items-center justify-center px-6 text-center">
+                <div className="max-w-sm">
+                  <p className="text-lg font-semibold">{t('qr_scanner.error_title', 'No pudimos abrir la cámara')}</p>
+                  <p className="text-sm text-white/80 mt-2">{cameraError}</p>
+                  <p className="text-xs text-white/60 mt-4">{t('qr_scanner.error_hint', 'Puedes cerrar este modal y pegar el código manualmente.')}</p>
+                </div>
               </div>
-            </div>
-          )
+            )
           : (
-            <Scanner
-              components={{ finder: true }}
-              constraints={{ facingMode: 'environment' }}
-              onError={handleError}
-              onScan={handleScan}
-              styles={{
-                container: {
-                  height: '100%',
-                  maxHeight: '85vh',
-                  width: '100%',
-                },
-                video: {
-                  height: '100%',
-                  objectFit: 'cover',
-                  width: '100%',
-                },
-              }}
-            />
-          )}
+              <Scanner
+                components={{ finder: true }}
+                constraints={{ facingMode: 'environment' }}
+                onError={handleError}
+                onScan={handleScan}
+                styles={{
+                  container: {
+                    height: '100%',
+                    maxHeight: '85vh',
+                    width: '100%',
+                  },
+                  video: {
+                    height: '100%',
+                    objectFit: 'cover',
+                    width: '100%',
+                  },
+                }}
+              />
+            )}
 
         {/* Bottom help text */}
         {!cameraError && (

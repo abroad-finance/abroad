@@ -7,6 +7,11 @@ export type OpsCreatePartnerInput = {
   phone?: string
 }
 
+export type OpsCreatePartnerResponse = {
+  apiKey: string
+  partner: OpsPartner
+}
+
 export type OpsPartner = {
   country?: string
   createdAt: string
@@ -26,11 +31,6 @@ export type OpsPartnerListResponse = {
   page: number
   pageSize: number
   total: number
-}
-
-export type OpsCreatePartnerResponse = {
-  apiKey: string
-  partner: OpsPartner
 }
 
 export type OpsRotatePartnerApiKeyResponse = {

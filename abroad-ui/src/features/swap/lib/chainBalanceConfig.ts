@@ -4,10 +4,10 @@
  * Solana and EVM (e.g. Celo) show USDC + USDT.
  */
 export interface ChainBalanceConfig {
+  decimals: number
   rpcUrl: string
   usdcAddress: string
   usdtAddress: string
-  decimals: number
 }
 
 const SOLANA_MAINNET: ChainBalanceConfig = {
@@ -25,11 +25,11 @@ const CELO_MAINNET: ChainBalanceConfig = {
 }
 
 const EVM_CHAINS: Record<string, ChainBalanceConfig> = {
-  '42220': CELO_MAINNET,
+  42220: CELO_MAINNET,
   // Add more eip155 chainIds as needed (e.g. 1 for Ethereum mainnet).
 }
 
-export function getChainBalanceConfig(chainId: string): null | ChainBalanceConfig {
+export function getChainBalanceConfig(chainId: string): ChainBalanceConfig | null {
   if (chainId.startsWith('solana:')) return SOLANA_MAINNET
   if (chainId.startsWith('eip155:')) {
     const numericId = chainId.replace(/^eip155:/, '')

@@ -1,6 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import {
+  useCallback, useEffect, useMemo, useState,
+} from 'react'
 import { Link } from 'react-router-dom'
 
+import { useOpsApiKey } from '../../services/admin/opsAuthStore'
 import {
   createPartner,
   listPartners,
@@ -8,7 +11,6 @@ import {
   rotatePartnerApiKey,
 } from '../../services/admin/partnerAdminApi'
 import { OpsCreatePartnerInput, OpsPartner } from '../../services/admin/partnerTypes'
-import { useOpsApiKey } from '../../services/admin/opsAuthStore'
 import OpsApiKeyPanel from './OpsApiKeyPanel'
 
 const pageSize = 20

@@ -9,13 +9,13 @@ import {
   test,
 } from 'vitest'
 
+import { clearOpsApiKey, setOpsApiKey } from '../services/admin/opsAuthStore'
 import {
   createPartner,
   listPartners,
   revokePartnerApiKey,
   rotatePartnerApiKey,
 } from '../services/admin/partnerAdminApi'
-import { clearOpsApiKey, setOpsApiKey } from '../services/admin/opsAuthStore'
 
 const baseUrl = 'https://api.abroad.finance'
 const server = setupServer()

@@ -3,24 +3,6 @@ import { useCallback, useEffect, useState } from 'react'
 type Theme = 'dark' | 'light' | 'system'
 const STORAGE_KEY = 'abroad:theme'
 
-function getSystemPreference(): 'dark' | 'light' {
-  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return 'light'
-  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
-}
-
-function resolveTheme(theme: Theme): 'dark' | 'light' {
-  return theme === 'system' ? getSystemPreference() : theme
-}
-
-function applyTheme(resolved: 'dark' | 'light') {
-  const root = document.documentElement
-  if (resolved === 'dark') {
-    root.classList.add('dark')
-  } else {
-    root.classList.remove('dark')
-  }
-}
-
 export function useTheme() {
   const [theme, setThemeState] = useState<Theme>(() => {
     if (typeof window === 'undefined') return 'light'
@@ -57,5 +39,26 @@ export function useTheme() {
     setTheme(next)
   }, [isDark, setTheme])
 
-  return { isDark, setTheme, theme, toggleTheme }
+  return {
+    isDark, setTheme, theme, toggleTheme,
+  }
+}
+
+function applyTheme(resolved: 'dark' | 'light') {
+  const root = document.documentElement
+  if (resolved === 'dark') {
+    root.classList.add('dark')
+  }
+  else {
+    root.classList.remove('dark')
+  }
+}
+
+function getSystemPreference(): 'dark' | 'light' {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return 'light'
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+}
+
+function resolveTheme(theme: Theme): 'dark' | 'light' {
+  return theme === 'system' ? getSystemPreference() : theme
 }

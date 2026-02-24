@@ -34,7 +34,16 @@ const getChainIcon = (label: string): string | undefined =>
 /* ── Props ── */
 
 export interface SwapProps {
+  // Optional menu/options (when driven by useSwap instead of useWebSwapController)
+  assetMenuOpen?: boolean
+  assetMenuRef?: React.RefObject<HTMLDivElement | null>
+  assetOptions?: Array<{ key: string, label: string }>
+  chainMenuOpen?: boolean
+  chainMenuRef?: React.RefObject<HTMLDivElement | null>
+  chainOptions?: Array<{ key: string, label: string }>
   continueDisabled: boolean
+  currencyMenuOpen?: boolean
+  currencyMenuRef?: React.RefObject<HTMLDivElement | null>
   exchangeRateDisplay: string
   hasInsufficientFunds?: boolean
   isAboveMaximum: boolean
@@ -48,9 +57,12 @@ export interface SwapProps {
   onOpenSourceModal: () => void
   onOpenTargetModal: () => void
   onPrimaryAction: () => void
-  openQr?: () => void
   onSourceChange: (value: string) => void
   onTargetChange: (value: string) => void
+  openQr?: () => void
+  selectAssetOption?: (key: string) => void
+  selectChain?: (key: string) => void
+  selectCurrency?: (currency: (typeof TargetCurrency)[keyof typeof TargetCurrency]) => void
   selectedAssetLabel: string
   selectedChainLabel: string
   sourceAmount: string
@@ -58,25 +70,13 @@ export interface SwapProps {
   targetAmount: string
   targetCurrency: (typeof TargetCurrency)[keyof typeof TargetCurrency]
   targetSymbol: string
-  transferFeeDisplay: string
-  usdcBalance?: string
-  walletAddress?: null | string
-  // Optional menu/options (when driven by useSwap instead of useWebSwapController)
-  assetMenuOpen?: boolean
-  assetMenuRef?: React.RefObject<HTMLDivElement | null>
-  assetOptions?: Array<{ key: string; label: string }>
-  chainMenuOpen?: boolean
-  chainMenuRef?: React.RefObject<HTMLDivElement | null>
-  chainOptions?: Array<{ key: string; label: string }>
-  currencyMenuOpen?: boolean
-  currencyMenuRef?: React.RefObject<HTMLDivElement | null>
-  selectAssetOption?: (key: string) => void
-  selectChain?: (key: string) => void
-  selectCurrency?: (currency: (typeof TargetCurrency)[keyof typeof TargetCurrency]) => void
   textColor?: string
   toggleAssetMenu?: () => void
   toggleChainMenu?: () => void
   toggleCurrencyMenu?: () => void
+  transferFeeDisplay: string
+  usdcBalance?: string
+  walletAddress?: null | string
 }
 
 export default function Swap({
@@ -94,16 +94,15 @@ export default function Swap({
   onOpenSourceModal,
   onOpenTargetModal,
   onPrimaryAction,
-  openQr,
   onSourceChange,
   onTargetChange,
+  openQr,
   selectedAssetLabel,
   selectedChainLabel,
   sourceAmount,
   sourceSymbol,
   targetAmount,
   targetCurrency,
-  targetSymbol: _targetSymbol,
   transferFeeDisplay,
   usdcBalance,
   walletAddress,
@@ -195,7 +194,9 @@ export default function Swap({
                   {selectedAssetLabel}
                 </span>
                 <span className="text-[10px] block leading-tight" style={{ color: 'var(--ab-text-muted)' }}>
-                  from {selectedChainLabel}
+                  from
+                  {' '}
+                  {selectedChainLabel}
                 </span>
               </div>
               <ChevronRight className="w-4 h-4" style={{ color: 'var(--ab-text-muted)' }} />
@@ -335,7 +336,13 @@ export default function Swap({
         <div className="flex items-center justify-between">
           <span>{t('swap.rate', 'Rate')}</span>
           <span className="font-medium" style={{ color: 'var(--ab-text)' }}>
-            1 {sourceSymbol} = {exchangeRateDisplay}
+            1
+            {' '}
+            {sourceSymbol}
+            {' '}
+            =
+            {' '}
+            {exchangeRateDisplay}
           </span>
         </div>
 

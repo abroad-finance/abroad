@@ -183,42 +183,39 @@ describe('useWebSwapController', () => {
 
   it('auto-selects Stellar when SEP-24 token is present in URL', async () => {
     mocked.fetchPublicCorridorsMock.mockResolvedValueOnce({
-      corridors: [
-        {
-          blockchain: 'BASE',
-          chainFamily: 'evm',
+      corridors: [{
+        blockchain: 'BASE',
+        chainFamily: 'evm',
+        chainId: 'eip155:8453',
+        cryptoCurrency: 'USDC',
+        maxAmount: null,
+        minAmount: null,
+        notify: { endpoint: null, required: false },
+        paymentMethod: 'BREB',
+        targetCurrency: 'BRL',
+        walletConnect: {
           chainId: 'eip155:8453',
-          cryptoCurrency: 'USDC',
-          maxAmount: null,
-          minAmount: null,
-          notify: { endpoint: null, required: false },
-          paymentMethod: 'BREB',
-          targetCurrency: 'BRL',
-          walletConnect: {
-            chainId: 'eip155:8453',
-            events: [],
-            methods: ['eth_sendTransaction'],
-            namespace: 'eip155',
-          },
+          events: [],
+          methods: ['eth_sendTransaction'],
+          namespace: 'eip155',
         },
-        {
-          blockchain: 'STELLAR',
-          chainFamily: 'stellar',
+      }, {
+        blockchain: 'STELLAR',
+        chainFamily: 'stellar',
+        chainId: 'stellar:pubnet',
+        cryptoCurrency: 'USDC',
+        maxAmount: null,
+        minAmount: null,
+        notify: { endpoint: null, required: false },
+        paymentMethod: 'BREB',
+        targetCurrency: 'BRL',
+        walletConnect: {
           chainId: 'stellar:pubnet',
-          cryptoCurrency: 'USDC',
-          maxAmount: null,
-          minAmount: null,
-          notify: { endpoint: null, required: false },
-          paymentMethod: 'BREB',
-          targetCurrency: 'BRL',
-          walletConnect: {
-            chainId: 'stellar:pubnet',
-            events: [],
-            methods: ['stellar_signXDR'],
-            namespace: 'stellar',
-          },
+          events: [],
+          methods: ['stellar_signXDR'],
+          namespace: 'stellar',
         },
-      ],
+      }],
     })
 
     window.history.replaceState({}, '', '/?token=sep24-token&address=GADDR')

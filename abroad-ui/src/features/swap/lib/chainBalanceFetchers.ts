@@ -1,12 +1,12 @@
 import { getAssociatedTokenAddress } from '@solana/spl-token'
 import { Connection, PublicKey } from '@solana/web3.js'
-import { Contract, formatUnits, getAddress, JsonRpcProvider } from 'ethers'
+import {
+  Contract, formatUnits, getAddress, JsonRpcProvider,
+} from 'ethers'
 
 import { getChainBalanceConfig } from './chainBalanceConfig'
 
-const ERC20_ABI = [
-  'function balanceOf(address account) view returns (uint256)',
-] as const
+const ERC20_ABI = ['function balanceOf(address account) view returns (uint256)'] as const
 
 export async function fetchNonStellarBalances(
   address: string,
@@ -28,15 +28,9 @@ export async function fetchNonStellarBalances(
       const owner = new PublicKey(address)
       const usdcMint = new PublicKey(config.usdcAddress)
       const usdtMint = new PublicKey(config.usdtAddress)
-      const [usdcAta, usdtAta] = await Promise.all([
-        getAssociatedTokenAddress(usdcMint, owner),
-        getAssociatedTokenAddress(usdtMint, owner),
-      ])
-      const [usdcAccount, usdtAccount] = await Promise.all([
-        connection.getAccountInfo(usdcAta),
-        connection.getAccountInfo(usdtAta),
-      ])
-      const parseTokenAccount = (info: { data: Uint8Array } | null): number => {
+      const [usdcAta, usdtAta] = await Promise.all([getAssociatedTokenAddress(usdcMint, owner), getAssociatedTokenAddress(usdtMint, owner)])
+      const [usdcAccount, usdtAccount] = await Promise.all([connection.getAccountInfo(usdcAta), connection.getAccountInfo(usdtAta)])
+      const parseTokenAccount = (info: null | { data: Uint8Array }): number => {
         if (!info?.data || info.data.length < 72) return 0
         const view = new DataView(info.data.buffer, info.data.byteOffset + 64, 8)
         const raw = view.getBigUint64(0, true)
@@ -57,10 +51,7 @@ export async function fetchNonStellarBalances(
       const provider = new JsonRpcProvider(config.rpcUrl)
       const usdc = new Contract(getAddress(config.usdcAddress), ERC20_ABI, provider)
       const usdt = new Contract(getAddress(config.usdtAddress), ERC20_ABI, provider)
-      const [usdcRaw, usdtRaw] = await Promise.all([
-        usdc.balanceOf(getAddress(address)),
-        usdt.balanceOf(getAddress(address)),
-      ])
+      const [usdcRaw, usdtRaw] = await Promise.all([usdc.balanceOf(getAddress(address)), usdt.balanceOf(getAddress(address))])
       const usdcNum = parseFloat(formatUnits(usdcRaw, config.decimals))
       const usdtNum = parseFloat(formatUnits(usdtRaw, config.decimals))
       return { usdc: format(usdcNum), usdt: format(usdtNum) }

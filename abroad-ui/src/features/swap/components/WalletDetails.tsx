@@ -134,7 +134,7 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({
                 title={t('wallet_details.actions.disconnect', 'Desconectar billetera')}
                 type="button"
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: 'var(--ab-text-muted)' }}>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" style={{ color: 'var(--ab-text-muted)' }} viewBox="0 0 24 24">
                   <path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} />
                 </svg>
               </button>
@@ -268,14 +268,18 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({
                                 </span>
                               </div>
                               <div className="mb-2">
-                                <span className="text-xs" style={{ color: 'var(--ab-text-muted)' }}>{t('wallet_details.transactions.to', 'Para:')} </span>
+                                <span className="text-xs" style={{ color: 'var(--ab-text-muted)' }}>
+                                  {t('wallet_details.transactions.to', 'Para:')}
+                                  {' '}
+                                </span>
                                 <span className="font-mono text-sm" style={{ color: 'var(--ab-text)' }}>{transaction.accountNumber}</span>
                               </div>
                               <div className="flex justify-between items-center">
                                 <div className="flex items-center space-x-1">
                                   <img alt="USDC" className="w-4 h-4" src="https://storage.googleapis.com/cdn-abroad/Icons/Tokens/USDC%20Token.svg" />
                                   <span className="text-xl font-bold" style={{ color: 'var(--ab-text)' }}>
-                                    ${transaction.quote.sourceAmount.toFixed(2)}
+                                    $
+                                    {transaction.quote.sourceAmount.toFixed(2)}
                                   </span>
                                 </div>
                                 <div className="flex items-center space-x-1">
@@ -345,7 +349,7 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="text-xs leading-relaxed text-center mt-6 pt-4" style={{ color: 'var(--ab-text-muted)', borderTop: '1px solid var(--ab-separator)' }}>
+        <div className="text-xs leading-relaxed text-center mt-6 pt-4" style={{ borderTop: '1px solid var(--ab-separator)', color: 'var(--ab-text-muted)' }}>
           {t('wallet_details.footer.realtime_note', 'Los datos de transacciones se actualizan en tiempo real')}
         </div>
       </div>

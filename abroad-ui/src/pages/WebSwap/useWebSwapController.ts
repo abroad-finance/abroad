@@ -457,7 +457,9 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     }
     if (state.corridorKey !== nextCorridorKey) {
       dispatch({ corridorKey: nextCorridorKey, type: 'SET_CORRIDOR' })
-      dispatch({ quoteId: '', sourceAmount: '', targetAmount: '', type: 'SET_AMOUNTS' })
+      dispatch({
+        quoteId: '', sourceAmount: '', targetAmount: '', type: 'SET_AMOUNTS',
+      })
     }
   }, [
     chainKey,
@@ -581,7 +583,11 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     const numericTarget = parseFloat(cleanedTarget)
     if (Number.isNaN(numericTarget) || numericTarget <= 0) return false
     return numericTarget < min
-  }, [quoteBelowMinimum, selectedCorridor, state.targetAmount])
+  }, [
+    quoteBelowMinimum,
+    selectedCorridor,
+    state.targetAmount,
+  ])
 
   const isAboveMaximum = useMemo(() => {
     if (!selectedCorridor) return false
@@ -697,7 +703,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
 
     if (!response.ok) {
       if (!isAbortError(response)) {
-        // Suppress popup for 400 errors ÿÿÿ the inline isBelowMinimum
+        // Suppress popup for 400 errors ï¿½ï¿½ï¿½ the inline isBelowMinimum
         // validation will handle the visual feedback instead.
         const status = response.error?.status
         if (status === 400) {
@@ -760,7 +766,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
       return
     }
 
-    // Skip API call if below minimum ÿÿÿ inline validation handles the UI
+    // Skip API call if below minimum ï¿½ï¿½ï¿½ inline validation handles the UI
     const minAmount = selectedCorridor.minAmount
       || (selectedCorridor.targetCurrency === 'BRL' ? 1 : 0)
     if (minAmount && num < minAmount) {
@@ -839,7 +845,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     const num = parseInt(intPart, 10)
     const formattedInt = Number.isNaN(num) || intPart === ''
       ? intPart
-      : num.toLocaleString('es-CO', { useGrouping: true, maximumFractionDigits: 0 })
+      : num.toLocaleString('es-CO', { maximumFractionDigits: 0, useGrouping: true })
     // Reassemble: keep decimal part exactly as user typed
     const formatted = parts.length > 1
       ? `${formattedInt},${parts[1]}`
@@ -1514,8 +1520,8 @@ export const useWebSwapController = (): WebSwapControllerProps => {
   const swapProps: SwapProps = {
     continueDisabled,
     exchangeRateDisplay,
-    isAuthenticated,
     isAboveMaximum,
+    isAuthenticated,
     isBelowMinimum,
     loadingSource: state.loadingSource,
     loadingTarget: state.loadingTarget,

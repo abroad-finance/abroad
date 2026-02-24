@@ -1,12 +1,13 @@
-import React, { lazy, Suspense, useCallback, useMemo, useState } from 'react'
-import { Loader } from 'lucide-react'
 import { useTranslate } from '@tolgee/react'
-
-import { useWebSwapController } from './useWebSwapController'
+import { Loader } from 'lucide-react'
+import React, {
+  lazy, Suspense, useCallback, useMemo, useState,
+} from 'react'
 
 import type { BankDetailsRouteProps } from '../../features/swap/components/BankDetailsRoute'
 import type { ConfirmQrProps } from '../../features/swap/components/ConfirmQr'
 import type { SwapProps } from '../../features/swap/components/Swap'
+import type { ChainOption, TokenOption } from '../../features/swap/components/TokenSelectModal'
 
 import { _36EnumsTargetCurrency as TargetCurrency } from '../../api/index'
 import BankDetailsRoute from '../../features/swap/components/BankDetailsRoute'
@@ -14,7 +15,6 @@ import ConfirmQr from '../../features/swap/components/ConfirmQr'
 import NavBarResponsive from '../../features/swap/components/NavBarResponsive'
 import Swap from '../../features/swap/components/Swap'
 import TokenSelectModal from '../../features/swap/components/TokenSelectModal'
-import type { ChainOption, TokenOption } from '../../features/swap/components/TokenSelectModal'
 import TxStatus from '../../features/swap/components/TxStatus'
 import UserVerification from '../../features/swap/components/UserVerification'
 import WaitSign from '../../features/swap/components/WaitSign'
@@ -27,6 +27,7 @@ import LanguageSelector from '../../shared/components/LanguageSelector'
 import { ModalOverlay } from '../../shared/components/ModalOverlay'
 import { ASSET_URLS } from '../../shared/constants'
 import { useLanguageSelector, useNavBarResponsive } from '../../shared/hooks'
+import { useWebSwapController } from './useWebSwapController'
 
 const QrScannerFullScreen = lazy(() => import('../../features/swap/components/QrScannerFullScreen'))
 
@@ -118,8 +119,7 @@ const WebSwap: React.FC = () => {
       const raw = sourceAssetBalance.replace(/,/g, '')
       swapViewProps.onSourceChange(raw)
     }
-  }, [sourceAssetBalance, swapViewProps.onSourceChange])
-
+  }, [sourceAssetBalance, swapViewProps])
 
   // Modal state for source (chain + token) and target (currency)
   const [sourceModalOpen, setSourceModalOpen] = useState(false)
@@ -146,20 +146,17 @@ const WebSwap: React.FC = () => {
   }))
 
   // Build target currency options
-  const targetCurrencyTokens: TokenOption[] = useMemo(() => [
-    {
-      icon: 'https://hatscripts.github.io/circle-flags/flags/br.svg',
-      key: 'BRL',
-      label: 'BRL',
-      subtitle: t('swap.currency_brl', 'Brazilian Real'),
-    },
-    {
-      icon: 'https://hatscripts.github.io/circle-flags/flags/co.svg',
-      key: 'COP',
-      label: 'COP',
-      subtitle: t('swap.currency_cop', 'Colombian Peso'),
-    },
-  ], [t])
+  const targetCurrencyTokens: TokenOption[] = useMemo(() => [{
+    icon: 'https://hatscripts.github.io/circle-flags/flags/br.svg',
+    key: 'BRL',
+    label: 'BRL',
+    subtitle: t('swap.currency_brl', 'Brazilian Real'),
+  }, {
+    icon: 'https://hatscripts.github.io/circle-flags/flags/co.svg',
+    key: 'COP',
+    label: 'COP',
+    subtitle: t('swap.currency_cop', 'Colombian Peso'),
+  }], [t])
 
   const handleSourceTokenSelect = useCallback((key: string) => {
     selectAssetOption(key)

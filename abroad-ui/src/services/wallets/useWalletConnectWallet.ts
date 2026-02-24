@@ -1,7 +1,9 @@
 import { WalletConnectModal } from '@walletconnect/modal'
 import SignClient from '@walletconnect/sign-client'
 import { getSdkError } from '@walletconnect/utils'
-import { useCallback, useMemo, useRef, useState } from 'react'
+import {
+  useCallback, useMemo, useRef, useState,
+} from 'react'
 
 import type { IWallet, WalletConnectRequest } from '../../interfaces/IWallet'
 import type { IWalletAuthentication } from '../../interfaces/IWalletAuthentication'
@@ -211,7 +213,7 @@ export function useWalletConnectWallet({ walletAuth }: {
       if (!uri) throw new Error('No WalletConnect URI')
 
       const modal = ensureModal()
-      await modal.openModal({ uri, chains: [targetChainId] })
+      await modal.openModal({ chains: [targetChainId], uri })
       const session = await approval()
       topicRef.current = session.topic
       await modal.closeModal()

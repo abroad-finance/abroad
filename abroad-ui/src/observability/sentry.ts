@@ -85,8 +85,8 @@ export const sentryEnabled = Boolean(dsn) && import.meta.env.MODE !== 'test'
 if (sentryEnabled && dsn) {
   type SentryOptions = Parameters<typeof Sentry.init>[0]
   type BeforeSendFn = NonNullable<SentryOptions>['beforeSend']
-  const beforeSend: BeforeSendFn = (event, _hint) => {
-    const e = event as { request?: unknown; extra?: unknown }
+  const beforeSend: BeforeSendFn = (event) => {
+    const e = event as { extra?: unknown, request?: unknown }
     if (e.request) {
       e.request = redactValue(e.request, { ...DEFAULT_REDACTION, maxDepth: 3 }) as typeof e.request
     }

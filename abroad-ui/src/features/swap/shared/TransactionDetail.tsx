@@ -1,5 +1,7 @@
 import { useTranslate } from '@tolgee/react'
-import { ArrowLeft, Calendar, ChevronDown, ChevronUp, Hash, HelpCircle, Send, Wallet } from 'lucide-react'
+import {
+  ArrowLeft, Calendar, ChevronDown, ChevronUp, Hash, HelpCircle, Send, Wallet,
+} from 'lucide-react'
 import React, { useMemo, useState } from 'react'
 
 import { TransactionListItem } from '../../../api'
@@ -17,22 +19,30 @@ export interface TransactionDetailProps {
 type TableRow = { label: string, value: string }
 
 const LABEL_MAP: Record<string, string> = {
+  accountNumber: 'Account number',
+  createdAt: 'Date & time',
   id: 'ID',
   partnerUserId: 'Partner user ID',
-  accountNumber: 'Account number',
-  status: 'Status',
-  createdAt: 'Date & time',
-  transactionReference: 'Transaction reference',
   sourceAmount: 'Source amount (USDC)',
+  status: 'Status',
   targetAmount: 'Target amount',
   targetCurrency: 'Target currency',
+  transactionReference: 'Transaction reference',
 }
 
 function labelFromKey(key: string): string {
-  return LABEL_MAP[key] ?? key.replace(/([A-Z])/g, ' $1').replace(/^./, (s) => s.toUpperCase()).trim()
+  return LABEL_MAP[key] ?? key.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase()).trim()
 }
 
-const TOP_LEVEL_ORDER = ['id', 'partnerUserId', 'accountNumber', 'status', 'createdAt', 'transactionReference', 'quote']
+const TOP_LEVEL_ORDER = [
+  'id',
+  'partnerUserId',
+  'accountNumber',
+  'status',
+  'createdAt',
+  'transactionReference',
+  'quote',
+]
 
 function flattenToTableRows(
   transaction: TransactionListItem,
@@ -42,7 +52,7 @@ function flattenToTableRows(
   const rows: TableRow[] = []
   const tx = transaction as Record<string, unknown>
   const keys = Object.keys(tx)
-  const ordered = [...TOP_LEVEL_ORDER.filter((k) => keys.includes(k)), ...keys.filter((k) => !TOP_LEVEL_ORDER.includes(k))]
+  const ordered = [...TOP_LEVEL_ORDER.filter(k => keys.includes(k)), ...keys.filter(k => !TOP_LEVEL_ORDER.includes(k))]
   for (const key of ordered) {
     if (key === 'quote' && tx.quote != null && typeof tx.quote === 'object') {
       const q = tx.quote as Record<string, unknown>
@@ -84,7 +94,11 @@ const TransactionDetail: React.FC<TransactionDetailProps> = ({
 
   const tableRows = useMemo(
     () => flattenToTableRows(transaction, formatDateWithTime, getStatusText),
-    [transaction, formatDateWithTime, getStatusText],
+    [
+      transaction,
+      formatDateWithTime,
+      getStatusText,
+    ],
   )
 
   return (
@@ -149,13 +163,21 @@ const TransactionDetail: React.FC<TransactionDetailProps> = ({
               <span className="text-xs" style={{ color: 'var(--ab-text-muted)' }}>{t('wallet_details.transactions.from_amount', 'Sent')}</span>
             </div>
             <span className="text-lg font-bold" style={{ color: 'var(--ab-text)' }}>
-              $ {transaction.quote.sourceAmount.toFixed(2)} USDC
+              $
+              {' '}
+              {transaction.quote.sourceAmount.toFixed(2)}
+              {' '}
+              USDC
             </span>
           </div>
           <div className="flex-1 rounded-lg p-3" style={{ background: 'var(--ab-hover)' }}>
             <div className="text-xs mb-1" style={{ color: 'var(--ab-text-muted)' }}>{t('wallet_details.transactions.to_amount', 'Received')}</div>
             <span className="text-lg font-bold" style={{ color: 'var(--ab-text)' }}>
-              {targetSymbol} {targetFormatted} {transaction.quote.targetCurrency}
+              {targetSymbol}
+              {' '}
+              {targetFormatted}
+              {' '}
+              {transaction.quote.targetCurrency}
             </span>
           </div>
         </div>
@@ -173,7 +195,7 @@ const TransactionDetail: React.FC<TransactionDetailProps> = ({
         <div className="pt-4" style={{ borderTop: '1px solid var(--ab-separator)' }}>
           <button
             className="flex items-center justify-between w-full py-2 px-3 rounded-lg text-left text-sm font-medium transition-colors"
-            onClick={() => setShowFullDetails((v) => !v)}
+            onClick={() => setShowFullDetails(v => !v)}
             style={{ background: 'var(--ab-hover)', color: 'var(--ab-text)' }}
             type="button"
           >
@@ -195,7 +217,7 @@ const TransactionDetail: React.FC<TransactionDetailProps> = ({
                     </tr>
                   </thead>
                   <tbody>
-                    {tableRows.map((row) => (
+                    {tableRows.map(row => (
                       <tr key={row.label} style={{ borderBottom: '1px solid var(--ab-separator)' }}>
                         <td className="py-3 px-4 align-top whitespace-nowrap" style={{ color: 'var(--ab-text-muted)' }}>{row.label}</td>
                         <td className="py-3 px-4 font-mono break-all" style={{ color: 'var(--ab-text)' }}>{row.value}</td>

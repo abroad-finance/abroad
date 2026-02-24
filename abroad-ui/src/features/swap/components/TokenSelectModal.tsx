@@ -1,23 +1,23 @@
+import { useTranslate } from '@tolgee/react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Search, X } from 'lucide-react'
 import React, { useCallback, useMemo, useState } from 'react'
-import { useTranslate } from '@tolgee/react'
 
 import { ASSET_URLS } from '../../../shared/constants'
 
 /* ── Types ── */
+
+export interface ChainOption {
+  icon?: string
+  key: string
+  label: string
+}
 
 export interface TokenOption {
   icon?: string
   key: string
   label: string
   subtitle?: string
-}
-
-export interface ChainOption {
-  icon?: string
-  key: string
-  label: string
 }
 
 interface TokenSelectModalProps {
@@ -155,7 +155,7 @@ const TokenSelectModal: React.FC<TokenSelectModalProps> = ({
             {/* Chain Grid */}
             {chains.length > 0 && (
               <div className="flex flex-wrap gap-2 mb-5">
-                {chains.map(chain => {
+                {chains.map((chain) => {
                   const isSelected = chain.key === selectedChainKey
                   const icon = resolveIcon(chain.label, chain.icon)
                   return (
@@ -208,7 +208,7 @@ const TokenSelectModal: React.FC<TokenSelectModalProps> = ({
                   {t('token_select.no_results', 'No results')}
                 </p>
               )}
-              {filteredTokens.map(token => {
+              {filteredTokens.map((token) => {
                 const isSelected = token.key === selectedTokenKey
                 const icon = token.icon || CHAIN_ICONS[token.label] || CURRENCY_ICONS[token.label]
                 return (

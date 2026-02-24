@@ -1,4 +1,6 @@
-import { Info, Moon, Sun, User } from 'lucide-react'
+import {
+  Info, Moon, Sun, User,
+} from 'lucide-react'
 import React, { memo } from 'react'
 
 import AbroadLogoColored from '../../../assets/Logos/AbroadLogoColored.svg'

@@ -581,8 +581,8 @@ export const useSwap = ({
     )) ?? availableCorridors.find(corridor => chainKeyOf(corridor) === key)
     const fallback = !next
       ? corridors.find(corridor => (
-          chainKeyOf(corridor) === key && corridor.cryptoCurrency === currentCrypto
-        )) ?? corridors.find(corridor => chainKeyOf(corridor) === key)
+        chainKeyOf(corridor) === key && corridor.cryptoCurrency === currentCrypto
+      )) ?? corridors.find(corridor => chainKeyOf(corridor) === key)
       : null
     const nextCorridor = next ?? fallback
 
