@@ -22,7 +22,6 @@ import WalletDetails from '../../features/swap/components/WalletDetails'
 import WebSwapLayout from '../../features/swap/components/WebSwapLayout'
 import { useWalletDetails } from '../../features/swap/hooks/useWalletDetails'
 import { SwapView } from '../../features/swap/types'
-import BackgroundCrossfade from '../../shared/components/BackgroundCrossfade'
 import LanguageSelector from '../../shared/components/LanguageSelector'
 import { ModalOverlay } from '../../shared/components/ModalOverlay'
 import { ASSET_URLS } from '../../shared/constants'
@@ -81,7 +80,6 @@ const WebSwap: React.FC = () => {
     chainOptions,
     closeQr,
     confirmQrProps,
-    currentBgUrl,
     handleBackToSwap,
     handleKycApproved,
     handleQrResult,
@@ -174,18 +172,8 @@ const WebSwap: React.FC = () => {
 
   return (
     <div
-      className="w-full min-h-[100dvh] md:h-screen md:overflow-hidden flex flex-col overflow-x-hidden"
-      style={{ background: 'var(--ab-bg)' }}
+      className="w-full h-[100dvh] md:h-screen overflow-hidden flex flex-col bg-gradient-to-br from-[var(--ab-bg)] to-[var(--ab-bg-end)]"
     >
-      {/* Desktop page background with crossfade */}
-      <BackgroundCrossfade
-        backgroundAttachment="fixed"
-        imageUrl={currentBgUrl}
-        positionClass="absolute inset-0"
-        visibilityClass="hidden md:block"
-        zIndexClass="z-0"
-      />
-
       {/* Shared Navigation */}
       <div className="relative z-10">
         <NavBarResponsive
@@ -198,7 +186,7 @@ const WebSwap: React.FC = () => {
       </div>
 
       {/* Main Content Area */}
-      <main className="flex-1 relative z-10 flex">
+      <main className="flex-1 min-h-0 relative z-10 flex">
         <WebSwapLayout
           slots={{
             bankDetails: <BankDetailsRoute {...bankDetailsProps} />,
@@ -240,6 +228,40 @@ const WebSwap: React.FC = () => {
           view={view}
         />
       </main>
+
+      {/* Desktop footer (Allbridge-style) */}
+      <footer
+        className="hidden md:flex items-center justify-center gap-6 h-[74px] px-6 border-t border-[var(--ab-separator)] flex-shrink-0 relative z-10"
+        style={{ background: 'var(--ab-card)' }}
+      >
+        <a
+          className="text-sm font-medium hover:underline"
+          href="https://linktr.ee/Abroad.finance"
+          rel="noopener noreferrer"
+          style={{ color: 'var(--ab-text-secondary)' }}
+          target="_blank"
+        >
+          {t('footer.guides', 'Guides')}
+        </a>
+        <a
+          className="text-sm font-medium hover:underline"
+          href="https://linktr.ee/Abroad.finance"
+          rel="noopener noreferrer"
+          style={{ color: 'var(--ab-text-secondary)' }}
+          target="_blank"
+        >
+          {t('footer.need_help', 'Need help?')}
+        </a>
+        <div className="flex items-center gap-2 ml-2" style={{ color: 'var(--ab-text-muted)' }}>
+          <span className="text-sm">powered by</span>
+          <img
+            alt="Stellar"
+            className="h-6 w-auto"
+            src={ASSET_URLS.STELLAR_LOGO}
+            style={{ filter: 'invert(1)' }}
+          />
+        </div>
+      </footer>
 
       {/* Source Modal (chain + token selection) */}
       <TokenSelectModal

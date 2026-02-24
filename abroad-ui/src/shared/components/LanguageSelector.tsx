@@ -92,7 +92,7 @@ const LanguageSelector: React.FC<LanguageSelectorProps> = ({
   const triggerClasses
     = variant === 'mobile'
       ? 'flex items-center gap-1 bg-[#356E6A]/5 border border-white/30 text-[#356E6A] text-xs font-medium px-2 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#356E6A]/40 hover:bg-[#356E6A]/10'
-      : 'flex items-center gap-2 bg-white/20 text-white text-sm font-medium px-3 py-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-white/40 hover:bg-white/30 cursor-pointer'
+      : 'flex items-center gap-2 bg-white/20 text-sm font-medium px-3 py-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-white/40 hover:bg-white/30 cursor-pointer'
 
   const handleConfirm = () => {
     if (draft !== value) onChange(draft)
@@ -114,7 +114,16 @@ const LanguageSelector: React.FC<LanguageSelectorProps> = ({
           loading="lazy"
           src={`https://hatscripts.github.io/circle-flags/flags/${currentMeta.flag}.svg`}
         />
-        <span className="hidden md:inline">{currentMeta.name}</span>
+        <span
+          className="hidden md:inline"
+          style={
+            variant === 'desktop'
+              ? { fontFamily: '"Airbnb Cereal"', color: 'var(--color-emerald-700)' }
+              : undefined
+          }
+        >
+          {currentMeta.name}
+        </span>
       </button>
 
       {/* Side Modal - Portal to document body level */}

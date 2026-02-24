@@ -1,10 +1,9 @@
 // WebSwapLayout.tsx
+import { useTolgee, useTranslate } from '@tolgee/react'
 import React, { useMemo } from 'react'
 
+import { getSwapPageTitleDefault } from '../../../i18n/swapPageTitles'
 import { _36EnumsTargetCurrency as TargetCurrency } from '../../../api'
-import AnimatedHeroText from '../../../shared/components/AnimatedHeroText'
-import ImageAttribution from '../../../shared/components/ImageAttribution'
-import { ASSET_URLS } from '../../../shared/constants'
 import { SwapView } from '../types'
 
 export interface WebSwapLayoutProps {
@@ -24,6 +23,15 @@ type WebSwapLayoutSlots = {
 }
 
 const WebSwapLayout: React.FC<WebSwapLayoutProps & WebSwapLayoutSlots> = ({ slots, targetCurrency, view }) => {
+  const { t } = useTranslate()
+  const tolgee = useTolgee()
+  const lang = tolgee.getLanguage()
+
+  const pageTitle =
+    targetCurrency === TargetCurrency.BRL
+      ? t('swap.page_title_brl', getSwapPageTitleDefault(lang, 'brl'))
+      : t('swap.page_title_cop', getSwapPageTitleDefault(lang, 'cop'))
+
   const renderSwap = useMemo(() => {
     switch (view) {
       case 'bankDetails':
@@ -50,41 +58,49 @@ const WebSwapLayout: React.FC<WebSwapLayoutProps & WebSwapLayoutSlots> = ({ slot
   ])
 
   return (
-    <div className="w-full overflow-scroll">
+    <div
+      className="w-full overflow-x-hidden overflow-y-auto md:overflow-hidden min-h-0 flex-1 flex flex-col md:items-center md:justify-center md:px-4 md:py-8"
+    >
       {/* ---------- Mobile (<= md) ---------- */}
       <div className="md:hidden flex flex-col w-full">
         <div
-          className="min-h-[600px] h-[calc(100vh-80px)] flex items-center justify-center px-4 py-6"
+          className="min-h-[600px] h-[calc(100vh-80px)] flex flex-col items-center justify-center px-4 py-6 gap-6"
           style={{ background: 'linear-gradient(135deg, var(--ab-bg), var(--ab-bg-end))' }}
         >
+          <h1
+            className="text-3xl font-black text-center w-full"
+            style={{
+              fontFamily: '"Airbnb Cereal"',
+              color: 'var(--color-emerald-700)',
+            }}
+          >
+            {pageTitle}
+          </h1>
           <div className="w-full max-w-md">
             {renderSwap}
           </div>
         </div>
       </div>
 
-      {/* ---------- Desktop (>= md) ---------- */}
-      <div className="hidden md:flex flex-row w-full h-full">
-        {/* Left Column - Marketing */}
-        <div className="w-1/2 flex flex-col justify-center relative px-4 py-10 sm:px-6 lg:px-8">
-          <div className="text-6xl max-w-xl">
-            <AnimatedHeroText currency={targetCurrency} />
-          </div>
-          <ImageAttribution
-            className="absolute bottom-5 left-5"
-            currency={String(targetCurrency)}
-          />
-        </div>
-
-        {/* Right Column - Swap Interface */}
-        <div className="w-1/2 flex flex-col justify-center items-center p-10 relative">
-          <div className="w-full max-w-md">
-            {renderSwap}
-          </div>
-          <div className="absolute bottom-5 right-5 flex items-center gap-3 font-sans text-base" style={{ color: 'var(--ab-text-muted)' }}>
-            <span>powered by</span>
-            <img alt="Stellar" className="h-9 w-auto" src={ASSET_URLS.STELLAR_LOGO} />
-          </div>
+      {/* ---------- Desktop (>= md): single section, centered, 30% larger ---------- */}
+      <div className="hidden md:flex flex-1 min-h-0 w-full min-w-[552px] max-w-[552px] flex-col items-center justify-center">
+        <div
+          className="w-full max-w-[424px] flex flex-col items-center gap-6"
+          style={{
+            transform: 'scale(1.3)',
+            transformOrigin: 'center center',
+          }}
+        >
+          <h1
+            className="text-3xl font-black text-center w-full"
+            style={{
+              fontFamily: '"Airbnb Cereal"',
+              color: 'var(--color-emerald-700)',
+            }}
+          >
+            {pageTitle}
+          </h1>
+          {renderSwap}
         </div>
       </div>
     </div>
