@@ -5,6 +5,7 @@ import {
 import React, { useMemo, useState } from 'react'
 
 import { TransactionListItem } from '../../../api'
+import { AB_STYLES } from '../../../shared/constants'
 
 export interface TransactionDetailProps {
   formatDate: (dateString: string) => string
@@ -107,7 +108,7 @@ const TransactionDetail: React.FC<TransactionDetailProps> = ({
       style={{ background: 'var(--ab-badge-bg)', border: '1px solid var(--ab-badge-border)' }}
     >
       <div className="flex items-center justify-between mb-5">
-        <h4 className="text-lg font-semibold" style={{ color: 'var(--ab-text)' }}>
+        <h4 className="text-lg font-semibold" style={AB_STYLES.text}>
           {t('wallet_details.transactions.detail_title', 'Transaction details')}
         </h4>
         <div className="flex items-center gap-2">
@@ -115,15 +116,15 @@ const TransactionDetail: React.FC<TransactionDetailProps> = ({
             aria-label={t('wallet_details.actions.support', 'Support')}
             className="p-2 rounded-lg transition-colors"
             onClick={onSupport}
-            style={{ background: 'var(--ab-hover)' }}
+            style={AB_STYLES.hoverBg}
             type="button"
           >
-            <HelpCircle className="w-5 h-5" style={{ color: 'var(--ab-text)' }} />
+            <HelpCircle className="w-5 h-5" style={AB_STYLES.text} />
           </button>
           <button
             className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors"
             onClick={onBack}
-            style={{ background: 'var(--ab-hover)', color: 'var(--ab-text)' }}
+            style={AB_STYLES.hoverAndText}
             type="button"
           >
             <ArrowLeft className="w-4 h-4" />
@@ -135,34 +136,34 @@ const TransactionDetail: React.FC<TransactionDetailProps> = ({
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Calendar className="w-4 h-4" style={{ color: 'var(--ab-text-muted)' }} />
-            <span className="text-xs" style={{ color: 'var(--ab-text-muted)' }}>{t('wallet_details.transactions.date', 'Date')}</span>
+            <Calendar className="w-4 h-4" style={AB_STYLES.textMuted} />
+            <span className="text-xs" style={AB_STYLES.textMuted}>{t('wallet_details.transactions.date', 'Date')}</span>
           </div>
-          <span className="text-sm font-medium" style={{ color: 'var(--ab-text)' }}>{formatDateWithTime(transaction.createdAt)}</span>
+          <span className="text-sm font-medium" style={AB_STYLES.text}>{formatDateWithTime(transaction.createdAt)}</span>
         </div>
 
         <div className="flex items-center justify-between">
-          <span className="text-xs" style={{ color: 'var(--ab-text-muted)' }}>{t('wallet_details.transactions.status', 'Status')}</span>
+          <span className="text-xs" style={AB_STYLES.textMuted}>{t('wallet_details.transactions.status', 'Status')}</span>
           <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${getStatusStyle(transaction.status)}`}>
             {getStatusText(transaction.status)}
           </span>
         </div>
 
-        <div className="rounded-lg p-3" style={{ background: 'var(--ab-hover)' }}>
+        <div className="rounded-lg p-3" style={AB_STYLES.hoverBg}>
           <div className="flex items-center gap-2 mb-1">
-            <Wallet className="w-4 h-4" style={{ color: 'var(--ab-text-muted)' }} />
-            <span className="text-xs" style={{ color: 'var(--ab-text-muted)' }}>{t('wallet_details.transactions.to', 'Destination account')}</span>
+            <Wallet className="w-4 h-4" style={AB_STYLES.textMuted} />
+            <span className="text-xs" style={AB_STYLES.textMuted}>{t('wallet_details.transactions.to', 'Destination account')}</span>
           </div>
-          <span className="font-mono text-sm break-all" style={{ color: 'var(--ab-text)' }}>{transaction.accountNumber}</span>
+          <span className="font-mono text-sm break-all" style={AB_STYLES.text}>{transaction.accountNumber}</span>
         </div>
 
         <div className="flex gap-4">
-          <div className="flex-1 rounded-lg p-3" style={{ background: 'var(--ab-hover)' }}>
+          <div className="flex-1 rounded-lg p-3" style={AB_STYLES.hoverBg}>
             <div className="flex items-center gap-2 mb-1">
-              <Send className="w-4 h-4" style={{ color: 'var(--ab-text-muted)' }} />
-              <span className="text-xs" style={{ color: 'var(--ab-text-muted)' }}>{t('wallet_details.transactions.from_amount', 'Sent')}</span>
+              <Send className="w-4 h-4" style={AB_STYLES.textMuted} />
+              <span className="text-xs" style={AB_STYLES.textMuted}>{t('wallet_details.transactions.from_amount', 'Sent')}</span>
             </div>
-            <span className="text-lg font-bold" style={{ color: 'var(--ab-text)' }}>
+            <span className="text-lg font-bold" style={AB_STYLES.text}>
               $
               {' '}
               {transaction.quote.sourceAmount.toFixed(2)}
@@ -170,9 +171,9 @@ const TransactionDetail: React.FC<TransactionDetailProps> = ({
               USDC
             </span>
           </div>
-          <div className="flex-1 rounded-lg p-3" style={{ background: 'var(--ab-hover)' }}>
-            <div className="text-xs mb-1" style={{ color: 'var(--ab-text-muted)' }}>{t('wallet_details.transactions.to_amount', 'Received')}</div>
-            <span className="text-lg font-bold" style={{ color: 'var(--ab-text)' }}>
+          <div className="flex-1 rounded-lg p-3" style={AB_STYLES.hoverBg}>
+            <div className="text-xs mb-1" style={AB_STYLES.textMuted}>{t('wallet_details.transactions.to_amount', 'Received')}</div>
+            <span className="text-lg font-bold" style={AB_STYLES.text}>
               {targetSymbol}
               {' '}
               {targetFormatted}
@@ -183,44 +184,44 @@ const TransactionDetail: React.FC<TransactionDetailProps> = ({
         </div>
 
         {(transaction as unknown as { transactionReference?: string }).transactionReference && (
-          <div className="flex items-center gap-2 pt-2" style={{ borderTop: '1px solid var(--ab-separator)' }}>
-            <Hash className="w-4 h-4 shrink-0" style={{ color: 'var(--ab-text-muted)' }} />
+          <div className="flex items-center gap-2 pt-2" style={AB_STYLES.borderTopSeparator}>
+            <Hash className="w-4 h-4 shrink-0" style={AB_STYLES.textMuted} />
             <div>
-              <span className="text-xs" style={{ color: 'var(--ab-text-muted)' }}>{t('wallet_details.transactions.reference', 'Reference')}</span>
-              <span className="block font-mono text-sm break-all" style={{ color: 'var(--ab-text)' }}>{(transaction as unknown as { transactionReference: string }).transactionReference}</span>
+              <span className="text-xs" style={AB_STYLES.textMuted}>{t('wallet_details.transactions.reference', 'Reference')}</span>
+              <span className="block font-mono text-sm break-all" style={AB_STYLES.text}>{(transaction as unknown as { transactionReference: string }).transactionReference}</span>
             </div>
           </div>
         )}
 
-        <div className="pt-4" style={{ borderTop: '1px solid var(--ab-separator)' }}>
+        <div className="pt-4" style={AB_STYLES.borderTopSeparator}>
           <button
             className="flex items-center justify-between w-full py-2 px-3 rounded-lg text-left text-sm font-medium transition-colors"
             onClick={() => setShowFullDetails(v => !v)}
-            style={{ background: 'var(--ab-hover)', color: 'var(--ab-text)' }}
+            style={AB_STYLES.hoverAndText}
             type="button"
           >
             <span>{t('wallet_details.transactions.full_details', 'Full details')}</span>
             {showFullDetails ? <ChevronUp className="w-4 h-4 shrink-0" /> : <ChevronDown className="w-4 h-4 shrink-0" />}
           </button>
           {showFullDetails && (
-            <div className="mt-3 rounded-lg overflow-hidden" style={{ background: 'var(--ab-hover)', border: '1px solid var(--ab-separator)' }}>
+            <div className="mt-3 rounded-lg overflow-hidden" style={AB_STYLES.hoverBorder}>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm" style={{ borderCollapse: 'collapse' }}>
                   <thead>
-                    <tr style={{ borderBottom: '1px solid var(--ab-separator)' }}>
-                      <th className="text-left py-3 px-4 font-medium" style={{ color: 'var(--ab-text-muted)' }}>
+                    <tr style={AB_STYLES.borderBottomSeparator}>
+                      <th className="text-left py-3 px-4 font-medium" style={AB_STYLES.textMuted}>
                         {t('wallet_details.transactions.table.field', 'Field')}
                       </th>
-                      <th className="text-left py-3 px-4 font-medium" style={{ color: 'var(--ab-text-muted)' }}>
+                      <th className="text-left py-3 px-4 font-medium" style={AB_STYLES.textMuted}>
                         {t('wallet_details.transactions.table.value', 'Value')}
                       </th>
                     </tr>
                   </thead>
                   <tbody>
                     {tableRows.map(row => (
-                      <tr key={row.label} style={{ borderBottom: '1px solid var(--ab-separator)' }}>
-                        <td className="py-3 px-4 align-top whitespace-nowrap" style={{ color: 'var(--ab-text-muted)' }}>{row.label}</td>
-                        <td className="py-3 px-4 font-mono break-all" style={{ color: 'var(--ab-text)' }}>{row.value}</td>
+                      <tr key={row.label} style={AB_STYLES.borderBottomSeparator}>
+                        <td className="py-3 px-4 align-top whitespace-nowrap" style={AB_STYLES.textMuted}>{row.label}</td>
+                        <td className="py-3 px-4 font-mono break-all" style={AB_STYLES.text}>{row.value}</td>
                       </tr>
                     ))}
                   </tbody>

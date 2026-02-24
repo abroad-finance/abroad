@@ -18,6 +18,21 @@ export const BRAND_TITLE_STYLE: CSSProperties = {
   fontFamily: '"Airbnb Cereal"',
 }
 
+/** Shared theme styles to reduce duplicated lines (SonarCloud new_duplicated_lines_density). */
+export const AB_STYLES = {
+  badgeBg: { background: 'var(--ab-badge-bg)', border: '1px solid var(--ab-badge-border)' } as CSSProperties,
+  borderBottomSeparator: { borderBottom: '1px solid var(--ab-separator)' } as CSSProperties,
+  borderTopSeparator: { borderTop: '1px solid var(--ab-separator)' } as CSSProperties,
+  btnColor: { color: 'var(--ab-btn)' } as CSSProperties,
+  cardBg: { background: 'var(--ab-card)', border: '1px solid var(--ab-card-border)' } as CSSProperties,
+  hoverAndText: { background: 'var(--ab-hover)', color: 'var(--ab-text)' } as CSSProperties,
+  hoverBg: { background: 'var(--ab-hover)' } as CSSProperties,
+  hoverBorder: { background: 'var(--ab-hover)', border: '1px solid var(--ab-separator)' } as CSSProperties,
+  separatorBg: { background: 'var(--ab-separator)' } as CSSProperties,
+  text: { color: 'var(--ab-text)' } as CSSProperties,
+  textMuted: { color: 'var(--ab-text-muted)' } as CSSProperties,
+} as const
+
 export const PENDING_TX_KEY = 'pendingTransaction'
 
 export const WALLET_CONNECT_ID = '5686074a7981cd147a5f0d7434a6d4b7'
