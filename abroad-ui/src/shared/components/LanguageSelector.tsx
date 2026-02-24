@@ -118,7 +118,7 @@ const LanguageSelector: React.FC<LanguageSelectorProps> = ({
           className="hidden md:inline"
           style={
             variant === 'desktop'
-              ? { fontFamily: '"Airbnb Cereal"', color: 'var(--color-emerald-700)' }
+              ? { color: 'var(--color-emerald-700)', fontFamily: '"Airbnb Cereal"' }
               : undefined
           }
         >

@@ -50,7 +50,7 @@ function flattenToTableRows(
   getStatusText: (status: string) => string,
 ): TableRow[] {
   const rows: TableRow[] = []
-  const tx = transaction as Record<string, unknown>
+  const tx = transaction as unknown as Record<string, unknown>
   const keys = Object.keys(tx)
   const ordered = [...TOP_LEVEL_ORDER.filter(k => keys.includes(k)), ...keys.filter(k => !TOP_LEVEL_ORDER.includes(k))]
   for (const key of ordered) {
@@ -182,12 +182,12 @@ const TransactionDetail: React.FC<TransactionDetailProps> = ({
           </div>
         </div>
 
-        {(transaction as { transactionReference?: string }).transactionReference && (
+        {(transaction as unknown as { transactionReference?: string }).transactionReference && (
           <div className="flex items-center gap-2 pt-2" style={{ borderTop: '1px solid var(--ab-separator)' }}>
             <Hash className="w-4 h-4 shrink-0" style={{ color: 'var(--ab-text-muted)' }} />
             <div>
               <span className="text-xs" style={{ color: 'var(--ab-text-muted)' }}>{t('wallet_details.transactions.reference', 'Reference')}</span>
-              <span className="block font-mono text-sm break-all" style={{ color: 'var(--ab-text)' }}>{(transaction as { transactionReference: string }).transactionReference}</span>
+              <span className="block font-mono text-sm break-all" style={{ color: 'var(--ab-text)' }}>{(transaction as unknown as { transactionReference: string }).transactionReference}</span>
             </div>
           </div>
         )}

@@ -112,7 +112,7 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({
           />
           <span
             className="text-sm font-semibold"
-            style={{ fontFamily: '"Airbnb Cereal"', color: 'var(--color-emerald-700)' }}
+            style={{ color: 'var(--color-emerald-700)', fontFamily: '"Airbnb Cereal"' }}
           >
             Swap
           </span>

@@ -2,8 +2,8 @@
 import { useTolgee, useTranslate } from '@tolgee/react'
 import React, { useMemo } from 'react'
 
-import { getSwapPageTitleDefault } from '../../../i18n/swapPageTitles'
 import { _36EnumsTargetCurrency as TargetCurrency } from '../../../api'
+import { getSwapPageTitleDefault } from '../constants/swapPageTitles'
 import { SwapView } from '../types'
 
 export interface WebSwapLayoutProps {
@@ -27,8 +27,8 @@ const WebSwapLayout: React.FC<WebSwapLayoutProps & WebSwapLayoutSlots> = ({ slot
   const tolgee = useTolgee()
   const lang = tolgee.getLanguage()
 
-  const pageTitle =
-    targetCurrency === TargetCurrency.BRL
+  const pageTitle
+    = targetCurrency === TargetCurrency.BRL
       ? t('swap.page_title_brl', getSwapPageTitleDefault(lang, 'brl'))
       : t('swap.page_title_cop', getSwapPageTitleDefault(lang, 'cop'))
 
@@ -70,8 +70,8 @@ const WebSwapLayout: React.FC<WebSwapLayoutProps & WebSwapLayoutSlots> = ({ slot
           <h1
             className="text-3xl font-black text-center w-full"
             style={{
-              fontFamily: '"Airbnb Cereal"',
               color: 'var(--color-emerald-700)',
+              fontFamily: '"Airbnb Cereal"',
             }}
           >
             {pageTitle}
@@ -94,8 +94,8 @@ const WebSwapLayout: React.FC<WebSwapLayoutProps & WebSwapLayoutSlots> = ({ slot
           <h1
             className="text-3xl font-black text-center w-full"
             style={{
-              fontFamily: '"Airbnb Cereal"',
               color: 'var(--color-emerald-700)',
+              fontFamily: '"Airbnb Cereal"',
             }}
           >
             {pageTitle}
