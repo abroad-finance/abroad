@@ -24,7 +24,7 @@ import { useWalletDetails } from '../../features/swap/hooks/useWalletDetails'
 import { SwapView } from '../../features/swap/types'
 import LanguageSelector from '../../shared/components/LanguageSelector'
 import { ModalOverlay } from '../../shared/components/ModalOverlay'
-import { ASSET_URLS } from '../../shared/constants'
+import { AB_STYLES, ASSET_URLS } from '../../shared/constants'
 import { useLanguageSelector, useNavBarResponsive } from '../../shared/hooks'
 import { useWebSwapController } from './useWebSwapController'
 
@@ -232,13 +232,13 @@ const WebSwap: React.FC = () => {
       {/* Desktop footer (Allbridge-style) */}
       <footer
         className="hidden md:flex items-center justify-center gap-6 h-[74px] px-6 border-t border-[var(--ab-separator)] flex-shrink-0 relative z-10"
-        style={{ background: 'var(--ab-card)' }}
+        style={AB_STYLES.cardBgOnly}
       >
         <a
           className="text-sm font-medium hover:underline"
           href="https://linktr.ee/Abroad.finance"
           rel="noopener noreferrer"
-          style={{ color: 'var(--ab-text-secondary)' }}
+          style={AB_STYLES.textSecondary}
           target="_blank"
         >
           {t('footer.guides', 'Guides')}
@@ -247,12 +247,12 @@ const WebSwap: React.FC = () => {
           className="text-sm font-medium hover:underline"
           href="https://linktr.ee/Abroad.finance"
           rel="noopener noreferrer"
-          style={{ color: 'var(--ab-text-secondary)' }}
+          style={AB_STYLES.textSecondary}
           target="_blank"
         >
           {t('footer.need_help', 'Need help?')}
         </a>
-        <div className="flex items-center gap-2 ml-2" style={{ color: 'var(--ab-text-muted)' }}>
+        <div className="flex items-center gap-2 ml-2" style={AB_STYLES.textMuted}>
           <span className="text-sm">powered by</span>
           <img
             alt="Stellar"

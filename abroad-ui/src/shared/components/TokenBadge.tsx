@@ -1,5 +1,7 @@
 import React from 'react'
 
+import { AB_STYLES } from '../constants'
+
 interface TokenBadgeProps {
   alt?: string
   iconSrc?: string
@@ -29,12 +31,7 @@ export const TokenBadge: React.FC<TokenBadgeProps> = ({
 }) => (
   <div
     className={`${transparent ? 'p-0' : 'rounded-full px-3 py-1.5'} flex items-center justify-center`}
-    style={transparent
-      ? undefined
-      : {
-          background: 'var(--ab-badge-bg)',
-          border: '1px solid var(--ab-badge-border)',
-        }}
+    style={transparent ? undefined : AB_STYLES.badgeBg}
   >
     {iconSrc
       ? (
@@ -47,12 +44,12 @@ export const TokenBadge: React.FC<TokenBadgeProps> = ({
       : (
           <div
             className="w-6 h-6 mr-2 rounded-full flex items-center justify-center text-[10px] font-semibold"
-            style={{ background: 'var(--ab-hover)', color: 'var(--ab-text)' }}
+            style={AB_STYLES.hoverAndText}
           >
             {getFallbackInitials(symbol)}
           </div>
         )}
-    <span className="truncate max-w-[160px] text-sm font-medium" style={{ color: 'var(--ab-text)' }}>
+    <span className="truncate max-w-[160px] text-sm font-medium" style={AB_STYLES.text}>
       {symbol}
     </span>
     {suffix && <span className="ml-1">{suffix}</span>}

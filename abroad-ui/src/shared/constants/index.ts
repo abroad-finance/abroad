@@ -25,12 +25,14 @@ export const AB_STYLES = {
   borderTopSeparator: { borderTop: '1px solid var(--ab-separator)' } as CSSProperties,
   btnColor: { color: 'var(--ab-btn)' } as CSSProperties,
   cardBg: { background: 'var(--ab-card)', border: '1px solid var(--ab-card-border)' } as CSSProperties,
+  cardBgOnly: { background: 'var(--ab-card)' } as CSSProperties,
   hoverAndText: { background: 'var(--ab-hover)', color: 'var(--ab-text)' } as CSSProperties,
   hoverBg: { background: 'var(--ab-hover)' } as CSSProperties,
   hoverBorder: { background: 'var(--ab-hover)', border: '1px solid var(--ab-separator)' } as CSSProperties,
   separatorBg: { background: 'var(--ab-separator)' } as CSSProperties,
   text: { color: 'var(--ab-text)' } as CSSProperties,
   textMuted: { color: 'var(--ab-text-muted)' } as CSSProperties,
+  textSecondary: { color: 'var(--ab-text-secondary)' } as CSSProperties,
 } as const
 
 export const PENDING_TX_KEY = 'pendingTransaction'

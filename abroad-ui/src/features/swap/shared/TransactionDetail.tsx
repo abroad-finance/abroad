@@ -105,7 +105,7 @@ const TransactionDetail: React.FC<TransactionDetailProps> = ({
   return (
     <div
       className="rounded-xl p-4 backdrop-blur-md"
-      style={{ background: 'var(--ab-badge-bg)', border: '1px solid var(--ab-badge-border)' }}
+      style={AB_STYLES.badgeBg}
     >
       <div className="flex items-center justify-between mb-5">
         <h4 className="text-lg font-semibold" style={AB_STYLES.text}>

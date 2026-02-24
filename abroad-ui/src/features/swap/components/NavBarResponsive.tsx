@@ -5,7 +5,7 @@ import React, { memo } from 'react'
 
 import AbroadLogoColored from '../../../assets/Logos/AbroadLogoColored.svg'
 import AbroadLogoWhite from '../../../assets/Logos/AbroadLogoWhite.svg'
-import { BRAND_TITLE_STYLE } from '../../../shared/constants'
+import { AB_STYLES, BRAND_TITLE_STYLE } from '../../../shared/constants'
 
 /* ── Props ── */
 
@@ -82,7 +82,7 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({
                     style={{ background: 'var(--ab-badge-bg)', border: '1px solid var(--ab-badge-border)' }}
                     type="button"
                   >
-                    <User className="w-4 h-4" style={{ color: 'var(--ab-text)' }} />
+                    <User className="w-4 h-4" style={AB_STYLES.text} />
                   </button>
                 )}
                 <button
@@ -103,7 +103,7 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({
       {/* Desktop: Allbridge-style flat toolbar (64px) */}
       <div
         className="hidden md:flex items-center justify-between h-16 px-6 w-full border-b border-[var(--ab-separator)]"
-        style={{ background: 'var(--ab-card)' }}
+        style={AB_STYLES.cardBgOnly}
       >
         <div className="flex items-center gap-8">
           <img
@@ -139,7 +139,7 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({
               style={{ background: 'var(--ab-badge-bg)', border: '1px solid var(--ab-badge-border)' }}
               type="button"
             >
-              <User className="w-4 h-4" style={{ color: 'var(--ab-text)' }} />
+              <User className="w-4 h-4" style={AB_STYLES.text} />
             </button>
           )}
           <button

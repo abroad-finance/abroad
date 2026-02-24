@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { Search, X } from 'lucide-react'
 import React, { useCallback, useMemo, useState } from 'react'
 
-import { ASSET_URLS } from '../../../shared/constants'
+import { AB_STYLES, ASSET_URLS } from '../../../shared/constants'
 
 /* ── Types ── */
 
@@ -120,13 +120,13 @@ const TokenSelectModal: React.FC<TokenSelectModalProps> = ({
           >
             {/* Header */}
             <div className="flex items-center justify-between mb-5">
-              <h2 className="text-xl font-semibold" style={{ color: 'var(--ab-text)' }}>
+              <h2 className="text-xl font-semibold" style={AB_STYLES.text}>
                 {title}
               </h2>
               <button
                 className="p-1.5 rounded-full transition-colors cursor-pointer"
                 onClick={handleClose}
-                style={{ color: 'var(--ab-text-muted)' }}
+                style={AB_STYLES.textMuted}
                 type="button"
               >
                 <X className="w-5 h-5" />
@@ -141,12 +141,12 @@ const TokenSelectModal: React.FC<TokenSelectModalProps> = ({
                 border: '1px solid var(--ab-input-border)',
               }}
             >
-              <Search className="w-4 h-4 shrink-0" style={{ color: 'var(--ab-text-muted)' }} />
+              <Search className="w-4 h-4 shrink-0" style={AB_STYLES.textMuted} />
               <input
                 className="w-full bg-transparent text-sm focus:outline-none"
                 onChange={e => setSearch(e.target.value)}
                 placeholder={t('token_select.search', 'Search')}
-                style={{ color: 'var(--ab-text)' }}
+                style={AB_STYLES.text}
                 type="text"
                 value={search}
               />
@@ -192,7 +192,7 @@ const TokenSelectModal: React.FC<TokenSelectModalProps> = ({
                   return (
                     <>
                       {icon && <img alt="" className="w-5 h-5 rounded-full" src={icon} />}
-                      <span className="text-sm font-medium" style={{ color: 'var(--ab-text-secondary)' }}>
+                      <span className="text-sm font-medium" style={AB_STYLES.textSecondary}>
                         {t('token_select.chain_tokens', '{chain} tokens', { chain: chain?.label })}
                       </span>
                     </>
@@ -204,7 +204,7 @@ const TokenSelectModal: React.FC<TokenSelectModalProps> = ({
             {/* Token List */}
             <div className="space-y-1 max-h-60 overflow-y-auto">
               {filteredTokens.length === 0 && (
-                <p className="text-center py-4 text-sm" style={{ color: 'var(--ab-text-muted)' }}>
+                <p className="text-center py-4 text-sm" style={AB_STYLES.textMuted}>
                   {t('token_select.no_results', 'No results')}
                 </p>
               )}
@@ -226,17 +226,17 @@ const TokenSelectModal: React.FC<TokenSelectModalProps> = ({
                       : (
                           <div
                             className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold"
-                            style={{ background: 'var(--ab-hover)', color: 'var(--ab-text)' }}
+                            style={AB_STYLES.hoverAndText}
                           >
                             {token.label.slice(0, 2)}
                           </div>
                         )}
                     <div className="text-left">
-                      <div className="font-medium text-sm" style={{ color: 'var(--ab-text)' }}>
+                      <div className="font-medium text-sm" style={AB_STYLES.text}>
                         {token.label}
                       </div>
                       {token.subtitle && (
-                        <div className="text-xs" style={{ color: 'var(--ab-text-muted)' }}>
+                        <div className="text-xs" style={AB_STYLES.textMuted}>
                           {token.subtitle}
                         </div>
                       )}
