@@ -78,7 +78,7 @@ describe('OutboxDispatcher', () => {
       amount: 1,
       currency: TargetCurrency.BRL,
       externalId: 'ext-00000000',
-      provider: 'transfero',
+      provider: 'transfero' as const,
       status: 'processed',
     }
     await dispatcher.enqueueQueue(QueueName.PAYMENT_STATUS_UPDATED, payload, 'ctx')

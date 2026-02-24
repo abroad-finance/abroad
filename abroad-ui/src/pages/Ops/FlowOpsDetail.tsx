@@ -128,6 +128,7 @@ const FlowOpsDetail = () => {
                 <Link className="text-[#1B4D48] hover:text-[#356E6A]" to="/ops/flows">← Back to flows</Link>
                 <Link className="text-[#1B4D48] hover:text-[#356E6A]" to="/ops/flows/definitions">Edit definitions</Link>
                 <Link className="text-[#1B4D48] hover:text-[#356E6A]" to="/ops/partners">Partners & API keys</Link>
+                <Link className="text-[#1B4D48] hover:text-[#356E6A]" to="/ops/transactions/reconcile">Reconcile hash</Link>
               </div>
               <div className="mt-3 text-sm uppercase tracking-[0.3em] text-[#356E6A]">Flow Instance</div>
               <h1 className="text-3xl md:text-4xl font-semibold">{headerDefinition}</h1>

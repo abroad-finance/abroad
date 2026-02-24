@@ -15,6 +15,7 @@ import { PaymentsNotifyController } from '../../modules/payments/interfaces/http
 import { QrDecoderController } from '../../modules/payments/interfaces/http/QrDecoderController'
 import { SolanaPaymentsController } from '../../modules/payments/interfaces/http/SolanaPaymentsController'
 import { QuoteController } from '../../modules/quotes/interfaces/http/QuoteController'
+import { OpsTransactionsController } from '../../modules/transactions/interfaces/http/OpsTransactionsController'
 import { PublicTransactionsController } from '../../modules/transactions/interfaces/http/PublicTransactionsController'
 import { TransactionController } from '../../modules/transactions/interfaces/http/TransactionController'
 import { TransactionsController } from '../../modules/transactions/interfaces/http/TransactionsController'
@@ -30,6 +31,7 @@ const controllerBindings: ReadonlyArray<BindingRegistration<unknown>> = [
   { bindSelf: true, identifier: TransactionController, implementation: TransactionController },
   { bindSelf: true, identifier: TransactionsController, implementation: TransactionsController },
   { bindSelf: true, identifier: PublicTransactionsController, implementation: PublicTransactionsController },
+  { bindSelf: true, identifier: OpsTransactionsController, implementation: OpsTransactionsController },
   { bindSelf: true, identifier: PaymentsController, implementation: PaymentsController },
   { bindSelf: true, identifier: CryptoAssetController, implementation: CryptoAssetController },
   { bindSelf: true, identifier: QrDecoderController, implementation: QrDecoderController },

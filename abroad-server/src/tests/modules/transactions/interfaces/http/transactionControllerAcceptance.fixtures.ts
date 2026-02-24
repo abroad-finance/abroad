@@ -117,7 +117,8 @@ export const buildAcceptController = (
   const transactionsPerCall = overrides?.transactionFindMany ?? [[], [], [], []]
   prisma.transaction.findMany.mockImplementation(async () => transactionsPerCall.shift() ?? [])
 
-  const controller = new TransactionController(acceptanceService, statusService)
+  const paymentContextService = { build: jest.fn(() => null) }
+  const controller = new TransactionController(acceptanceService, statusService, paymentContextService as never, dbProvider)
 
   return {
     controller,

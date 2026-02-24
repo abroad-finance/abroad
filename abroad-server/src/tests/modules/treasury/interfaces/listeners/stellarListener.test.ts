@@ -136,11 +136,10 @@ function createPayment(overrides: Partial<TestPayment> = {}): TestPayment {
   }
 }
 
-function createSecretManager(accountId = 'account-id', horizonUrl = 'https://horizon', usdcIssuer = 'issuer'): ISecretManager {
+function createSecretManager(accountId = 'account-id', horizonUrl = 'https://horizon'): ISecretManager {
   const values: Record<string, string> = {
     STELLAR_ACCOUNT_ID: accountId,
     STELLAR_HORIZON_URL: horizonUrl,
-    STELLAR_USDC_ISSUER: usdcIssuer,
   }
   const getSecrets: jest.MockedFunction<ISecretManager['getSecrets']> = jest.fn(async (secretNames) => {
     const entries = secretNames.map(secretName => [secretName, values[secretName] ?? ''] as const)
@@ -149,8 +148,7 @@ function createSecretManager(accountId = 'account-id', horizonUrl = 'https://hor
   return {
     getSecret: jest.fn()
       .mockResolvedValueOnce(accountId)
-      .mockResolvedValueOnce(horizonUrl)
-      .mockResolvedValueOnce(usdcIssuer),
+      .mockResolvedValueOnce(horizonUrl),
     getSecrets,
   }
 }
@@ -190,6 +188,7 @@ describe('StellarListener', () => {
       dbProvider,
       { getVerifier } as never,
       orphanRefundService as never,
+      { listEnabledAssets: jest.fn(async () => [{ cryptoCurrency: CryptoCurrency.USDC, mintAddress: 'trusted-issuer' }]) } as never,
       createMockLogger(),
     )
     await listener.start()
@@ -219,7 +218,7 @@ describe('StellarListener', () => {
     })
     enqueueQueue.mockResolvedValue(undefined)
     const outboxDispatcher = createOutboxDispatcher(enqueueQueue)
-    const secretManager = createSecretManager('account-id', 'https://horizon', 'trusted-issuer')
+    const secretManager = createSecretManager('account-id', 'https://horizon')
     const { dbProvider, upsert } = createDbProvider()
     const { getVerifier, verifyNotification } = createDepositVerifierRegistry()
     const orphanRefundService = createOrphanRefundService()
@@ -230,6 +229,7 @@ describe('StellarListener', () => {
       dbProvider,
       { getVerifier } as never,
       orphanRefundService as never,
+      { listEnabledAssets: jest.fn(async () => [{ cryptoCurrency: CryptoCurrency.USDC, mintAddress: 'trusted-issuer' }]) } as never,
       createMockLogger(),
     )
     await listener.start()
@@ -273,6 +273,7 @@ describe('StellarListener', () => {
       dbProvider,
       { getVerifier: jest.fn() } as never,
       orphanRefundService as never,
+      { listEnabledAssets: jest.fn(async () => [{ cryptoCurrency: CryptoCurrency.USDC, mintAddress: 'trusted-issuer' }]) } as never,
       createMockLogger(),
     )
 

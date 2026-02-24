@@ -110,7 +110,6 @@ export const transactionId = '11111111-1111-4111-8111-111111111111'
 export const secrets: Record<string, string> = {
   SOLANA_ADDRESS: 'deposit-wallet',
   SOLANA_RPC_URL: 'http://solana-rpc',
-  SOLANA_USDC_MINT: 'usdc-mint',
 }
 
 export const buildTransaction = (overrides?: Partial<TransactionRecord>): TransactionRecord => {
@@ -144,7 +143,7 @@ export const buildTransferInstruction = (overrides?: Partial<ParsedInstruction>)
   parsed: {
     info: {
       destination: secrets.SOLANA_ADDRESS,
-      mint: secrets.SOLANA_USDC_MINT,
+      mint: 'usdc-mint',
       source: 'sender-wallet',
       tokenAmount: {
         amount: '2500000',
@@ -182,7 +181,10 @@ export const createControllerContext = () => {
 
   const logger: MockLogger = createMockLogger()
   const outboxDispatcher = { enqueueQueue: jest.fn() }
-  const verifier = new SolanaPaymentVerifier(secretManager, prismaProvider, logger)
+  const assetConfigService = {
+    getActiveMint: jest.fn(async ({ cryptoCurrency }: { cryptoCurrency: CryptoCurrency }) => cryptoCurrency === CryptoCurrency.USDC ? ({ mintAddress: 'usdc-mint' }) : null),
+  }
+  const verifier = new SolanaPaymentVerifier(secretManager, prismaProvider, assetConfigService as never, logger)
   const verifierRegistry = { getVerifier: jest.fn(() => verifier) }
 
   const controller = new SolanaPaymentsController(

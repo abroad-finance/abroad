@@ -66,10 +66,10 @@ describe('CeloPaymentVerifier', () => {
     const secretManager = new SecretManagerStub({
       CELO_DEPOSIT_ADDRESS: depositAddress,
       CELO_RPC_URL: rpcUrl,
-      CELO_USDC_ADDRESS: usdcAddress,
       ...overrides,
     })
-    return new CeloPaymentVerifier(secretManager, dbProvider, new LoggerStub())
+    const assetConfigService = { getActiveMint: jest.fn(async ({ cryptoCurrency }: { cryptoCurrency: CryptoCurrency }) => cryptoCurrency === CryptoCurrency.USDC ? ({ decimals: 6, mintAddress: usdcAddress }) : null) }
+    return new CeloPaymentVerifier(secretManager, dbProvider, assetConfigService as never, new LoggerStub())
   }
 
   it('returns ok for a valid USDC transfer', async () => {
@@ -165,6 +165,52 @@ describe('CeloPaymentVerifier', () => {
       outcome: 'error',
       reason: 'Transaction is not awaiting payment',
       status: 400,
+    })
+  })
+
+  it('accepts PAYMENT_EXPIRED transactions for reconciliation/refund processing', async () => {
+    const receipt = buildReceipt({
+      amount: ethers.utils.parseUnits('2.5', 6),
+      from: senderAddress,
+      to: depositAddress,
+      token: usdcAddress,
+    })
+
+    const prismaClient = {
+      transaction: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'tx-expired',
+          quote: { cryptoCurrency: CryptoCurrency.USDC, network: BlockchainNetwork.CELO },
+          status: TransactionStatus.PAYMENT_EXPIRED,
+        }),
+      },
+    }
+
+    const dbProvider: IDatabaseClientProvider = {
+      getClient: async () => prismaClient as unknown as import('@prisma/client').PrismaClient,
+    }
+
+    const verifier = buildVerifier(dbProvider)
+    ;(verifier as unknown as { cachedProvider?: { provider: ethers.providers.JsonRpcProvider, rpcUrl: string } }).cachedProvider = {
+      provider: {
+        getTransactionReceipt: jest.fn().mockResolvedValue(receipt),
+      } as unknown as ethers.providers.JsonRpcProvider,
+      rpcUrl,
+    }
+
+    const result = await verifier.verifyNotification('0xhash-expired', 'tx-expired')
+
+    expect(result).toEqual({
+      outcome: 'ok',
+      queueMessage: {
+        addressFrom: ethers.utils.getAddress(senderAddress),
+        amount: 2.5,
+        blockchain: BlockchainNetwork.CELO,
+        cryptoCurrency: CryptoCurrency.USDC,
+        onChainId: '0xhash-expired',
+        transactionId: 'tx-expired',
+      },
     })
   })
 
@@ -389,7 +435,7 @@ describe('CeloPaymentVerifier', () => {
 
     expect(result).toEqual({
       outcome: 'error',
-      reason: 'Multiple senders found for USDC transfers',
+      reason: 'Multiple senders found for token transfers',
       status: 400,
     })
   })
@@ -429,7 +475,7 @@ describe('CeloPaymentVerifier', () => {
 
     expect(result).toEqual({
       outcome: 'error',
-      reason: 'Invalid USDC transfer amount',
+      reason: 'Invalid token transfer amount',
       status: 400,
     })
   })

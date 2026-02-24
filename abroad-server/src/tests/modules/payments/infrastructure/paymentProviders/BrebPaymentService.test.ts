@@ -167,6 +167,11 @@ describe('BrebPaymentService', () => {
   describe('service basics', () => {
     it('exposes static liquidity and onboarding responses', async () => {
       const { service } = setupService()
+      mockedAxios.get.mockResolvedValueOnce({
+        data: {
+          body: [{ saldo: String(service.MAX_TOTAL_AMOUNT_PER_DAY) }],
+        },
+      })
 
       await expect(service.getLiquidity()).resolves.toBe(service.MAX_TOTAL_AMOUNT_PER_DAY)
       await expect(service.onboardUser()).resolves.toEqual({

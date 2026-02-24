@@ -95,6 +95,7 @@ const buildContext = () => {
       outboxDispatcher as never,
       depositVerifierRegistry as never,
       orphanRefundService as never,
+      { listEnabledAssets: jest.fn(async () => []) } as never,
       secretManager,
     ),
     logger,

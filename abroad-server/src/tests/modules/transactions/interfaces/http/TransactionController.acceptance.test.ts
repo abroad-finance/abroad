@@ -47,7 +47,7 @@ describe('TransactionController acceptance flows', () => {
     )
 
     expect(kycService.getKycLink).toHaveBeenCalled()
-    expect(response).toEqual({ id: null, kycLink: 'https://kyc.test', transaction_reference: null })
+    expect(response).toEqual({ id: null, kycLink: 'https://kyc.test', payment_context: null, transaction_reference: null })
   })
 
   it('skips KYC when the user already meets the required tier', async () => {
@@ -65,6 +65,7 @@ describe('TransactionController acceptance flows', () => {
     expect(response).toEqual({
       id: '11111111-2222-3333-4444-555555555555',
       kycLink: null,
+      payment_context: null,
       transaction_reference: Buffer.from('11111111222233334444555555555555', 'hex').toString('base64'),
     })
   })
@@ -98,6 +99,7 @@ describe('TransactionController acceptance flows', () => {
     expect(response).toEqual({
       id: '11111111-2222-3333-4444-555555555555',
       kycLink: null,
+      payment_context: null,
       transaction_reference: expectedReference,
     })
   })
