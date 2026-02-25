@@ -57,10 +57,6 @@ const STELLAR_CHAIN_ID = import.meta.env.VITE_STELLAR_CHAIN_ID || 'stellar:pubne
 const WALLETCONNECT_ACCOUNTS_ERROR =
   'WalletConnect session is not ready yet. Please scan the QR code with your wallet app and approve the connection, then try again.'
 
-/** Max time to wait for WalletConnect session to be ready (user scans QR and approves) */
-const WALLETCONNECT_WAIT_MS = 120_000
-const WALLETCONNECT_POLL_INTERVAL_MS = 1_500
-
 function getErrorMessage(err: unknown): string {
   if (err instanceof Error) return err.message
   if (err && typeof err === 'object' && 'message' in err) {

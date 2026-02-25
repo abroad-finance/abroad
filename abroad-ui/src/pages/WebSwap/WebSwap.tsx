@@ -103,7 +103,6 @@ const WebSwap: React.FC = () => {
     isDecodingQr,
     isQrOpen,
     isWalletDetailsOpen,
-    onWalletConnect,
     openQr,
     requestConnectAfterChainSelect,
     resetForNewTransaction,
