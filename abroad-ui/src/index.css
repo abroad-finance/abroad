@@ -1,36 +1,6 @@
 @import "tailwindcss";
 @import "./fonts.css";
 
-/* Urbanist font */
-@font-face {
-  font-family: 'Urbanist';
-  src: url('https://fonts.gstatic.com/s/urbanist/v11/L0x5DF4xlVMF-BfR8bXMIjhFq3-OXg.woff2') format('woff2');
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'Urbanist';
-  src: url('https://fonts.gstatic.com/s/urbanist/v11/L0x5DF4xlVMF-BfR8bXMIjhLq3-OXg.woff2') format('woff2');
-  font-weight: 500;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'Urbanist';
-  src: url('https://fonts.gstatic.com/s/urbanist/v11/L0x5DF4xlVMF-BfR8bXMIjhFqf3-OXg.woff2') format('woff2');
-  font-weight: 600;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'Urbanist';
-  src: url('https://fonts.gstatic.com/s/urbanist/v11/L0x5DF4xlVMF-BfR8bXMIjhhqf3-OXg.woff2') format('woff2');
-  font-weight: 700;
-  font-style: normal;
-  font-display: swap;
-}
-
 @theme {
   /* ── Brand palette ── */
   --color-abroad-dark: #356E6A;
@@ -68,7 +38,6 @@
 
   /* ── Custom font ── */
   --font-cereal: "Airbnb Cereal";
-  --font-urbanist: "Urbanist";
 
   /* ── Custom shadow ── */
   --shadow-panel: 0 25px 50px -12px rgba(0, 0, 0, 0.08);

@@ -66,7 +66,7 @@ export default function HomeScreen({
             />
             {t('home.live_badge', 'Live in Colombia & Brazil')}
           </div>
-          <h1 className="font-urbanist mb-4 text-[44px] font-bold leading-tight tracking-[-1px] text-[var(--ab-text)]">
+          <h1 className="font-cereal mb-4 text-[44px] font-bold leading-tight tracking-[-1px] text-[var(--ab-text)]">
             {t('home.headline_1', 'Spend your stablecoins at')}
             <br />
             <span className="text-[var(--ab-green)]">
@@ -98,7 +98,7 @@ export default function HomeScreen({
           </div>
           <button
             className={cn(
-              'font-urbanist rounded-2xl bg-[var(--ab-green)] px-10 py-4 text-base font-semibold text-white',
+              'font-cereal rounded-2xl bg-[var(--ab-green)] px-10 py-4 text-base font-semibold text-white',
               'transition-[transform,opacity] duration-[0.4s] ease-[cubic-bezier(0.16,1,0.3,1)]',
               'hover:opacity-95 active:scale-[0.98]',
             )}
@@ -141,7 +141,7 @@ export default function HomeScreen({
           <p className="mb-2 text-[11px] font-bold uppercase tracking-[2px] text-[var(--ab-text-muted)]">
             {t('home.your_balance', 'Your Balance')}
           </p>
-          <p className="font-urbanist text-[36px] font-bold tracking-[-1px] text-[var(--ab-text)]">
+          <p className="font-cereal text-[36px] font-bold tracking-[-1px] text-[var(--ab-text)]">
             ${balance}
             {' '}
             <span className="text-base text-[var(--ab-green)]">{selectedTokenLabel}</span>
@@ -180,7 +180,7 @@ export default function HomeScreen({
             📱
           </div>
           <div className="min-w-0 flex-1">
-            <div className="font-urbanist mb-1 text-[19px] font-semibold">
+            <div className="font-cereal mb-1 text-[19px] font-semibold">
               {t('home.scan_qr_pay', 'Scan QR & Pay')}
             </div>
             <div className="text-[13px] text-white/80">
@@ -203,7 +203,7 @@ export default function HomeScreen({
             ⌨️
           </div>
           <div className="min-w-0 flex-1">
-            <div className="font-urbanist mb-0.5 text-[17px] font-semibold text-[var(--ab-text)]">
+            <div className="font-cereal mb-0.5 text-[17px] font-semibold text-[var(--ab-text)]">
               {t('home.enter_manual', 'Enter Amount Manually')}
             </div>
             <div className="text-[13px] text-[var(--ab-text-muted)]">

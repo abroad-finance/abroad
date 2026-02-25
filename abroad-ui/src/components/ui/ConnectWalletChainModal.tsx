@@ -79,7 +79,7 @@ export function ConnectWalletChainModal({
           style={{ backgroundColor: 'var(--ab-bg-card, #fff)' }}
         >
           <div className="mb-6 flex items-center justify-between">
-            <h3 className="font-urbanist text-xl font-semibold" style={{ color: 'var(--ab-text, #111827)' }}>
+            <h3 className="font-cereal text-xl font-bold" style={{ color: 'var(--ab-text, #111827)' }}>
               Connect wallet
             </h3>
             <button
@@ -121,7 +121,7 @@ export function ConnectWalletChainModal({
                     />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <div className="font-urbanist text-base font-semibold" style={{ color: 'var(--ab-text, #111827)' }}>
+                    <div className="font-cereal text-base font-semibold" style={{ color: 'var(--ab-text, #111827)' }}>
                       {chainName}
                     </div>
                     <div className="text-xs" style={{ color: 'var(--ab-text-muted, #9ca3af)' }}>
