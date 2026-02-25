@@ -10,8 +10,15 @@ import type { SwapView } from '../types'
 import { _36EnumsTargetCurrency as TargetCurrency } from '../../../api'
 import { useNotices } from '../../../contexts/NoticeContext'
 import { fetchPublicCorridors, requestQuote, requestReverseQuote } from '../../../services/public/publicApi'
-// ⛔️ Removed: import { useDebounce } from '../../../shared/hooks'
-import { useWalletAuth } from '../../../shared/hooks/useWalletAuth'
+import { useMenuCloseOnOutsideClick, useWalletAuth } from '../../../shared/hooks'
+import {
+  BRL_TRANSFER_FEE,
+  buildChainLabel,
+  chainKeyOf,
+  COP_TRANSFER_FEE,
+  corridorKeyOf,
+  sortStellarFirst,
+} from '../utils/corridorHelpers'
 
 type UseSwapArgs = {
   isDesktop: boolean
@@ -25,35 +32,6 @@ type UseSwapArgs = {
   sourceAmount: string
   targetAmount: string
   targetCurrency: (typeof TargetCurrency)[keyof typeof TargetCurrency]
-}
-
-const COP_TRANSFER_FEE = 0.0
-const BRL_TRANSFER_FEE = 0.0
-
-const corridorKeyOf = (corridor: PublicCorridor): string => (
-  `${corridor.cryptoCurrency}:${corridor.blockchain}:${corridor.targetCurrency}`
-)
-
-const chainKeyOf = (corridor: PublicCorridor): string => (
-  `${corridor.blockchain}:${corridor.chainId}`
-)
-
-const formatChainLabel = (value: string): string => {
-  const normalized = value.toLowerCase().replace(/_/g, ' ')
-  return normalized.replace(/\b\w/g, char => char.toUpperCase())
-}
-
-const formatChainIdLabel = (value: string): string => {
-  if (!value) return ''
-  const [, ...rest] = value.split(':')
-  return rest.length > 0 ? rest.join(':') : value
-}
-
-const buildChainLabel = (corridor: PublicCorridor, includeChainId: boolean): string => {
-  const base = formatChainLabel(corridor.blockchain)
-  if (!includeChainId) return base
-  const chainIdLabel = formatChainIdLabel(corridor.chainId)
-  return chainIdLabel ? `${base} (${chainIdLabel})` : base
 }
 
 export const useSwap = ({
@@ -83,13 +61,7 @@ export const useSwap = ({
   const targetSymbol = targetCurrency === TargetCurrency.BRL ? 'R$' : '$'
   const availableCorridors = useMemo(() => {
     const filtered = corridors.filter(corridor => corridor.targetCurrency === targetCurrency)
-    return [...filtered].sort((a, b) => {
-      const aStellar = a.blockchain.toLowerCase() === 'stellar'
-      const bStellar = b.blockchain.toLowerCase() === 'stellar'
-      if (aStellar && !bStellar) return -1
-      if (!aStellar && bStellar) return 1
-      return 0
-    })
+    return sortStellarFirst(filtered)
   }, [corridors, targetCurrency])
   const selectedCorridor = useMemo(() => {
     const match = availableCorridors.find(corridor => corridorKeyOf(corridor) === corridorKey)
@@ -703,94 +675,24 @@ export const useSwap = ({
   // useEffect(() => { ... }, [sourceDebouncedAmount])
   // useEffect(() => { ... }, [targetDebounceAmount])
 
-  // Close currency menu on outside click and Escape
-  useEffect(() => {
-    if (!currencyMenuOpen) return
-
-    const onDocumentClick = (event: MouseEvent) => {
-      if (skipNextDocumentClickRef.current) {
-        skipNextDocumentClickRef.current = false
-        return
-      }
-      const container = currencyMenuRef.current
-      if (!container) return
-
-      // Prefer composedPath for better accuracy across trees
-      const path = (event as unknown as { composedPath?: () => EventTarget[] }).composedPath?.()
-      const clickedInside = path ? path.includes(container) : container.contains(event.target as Node)
-
-      if (!clickedInside) setCurrencyMenuOpen(false)
-    }
-
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setCurrencyMenuOpen(false)
-    }
-
-    document.addEventListener('click', onDocumentClick)
-    document.addEventListener('keydown', onKeyDown)
-    return () => {
-      document.removeEventListener('click', onDocumentClick)
-      document.removeEventListener('keydown', onKeyDown)
-    }
-  }, [currencyMenuOpen])
-
-  useEffect(() => {
-    if (!assetMenuOpen) return
-
-    const onDocumentClick = (event: MouseEvent) => {
-      if (skipNextAssetClickRef.current) {
-        skipNextAssetClickRef.current = false
-        return
-      }
-      const container = assetMenuRef.current
-      if (!container) return
-
-      const path = (event as unknown as { composedPath?: () => EventTarget[] }).composedPath?.()
-      const clickedInside = path ? path.includes(container) : container.contains(event.target as Node)
-
-      if (!clickedInside) setAssetMenuOpen(false)
-    }
-
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setAssetMenuOpen(false)
-    }
-
-    document.addEventListener('click', onDocumentClick)
-    document.addEventListener('keydown', onKeyDown)
-    return () => {
-      document.removeEventListener('click', onDocumentClick)
-      document.removeEventListener('keydown', onKeyDown)
-    }
-  }, [assetMenuOpen])
-
-  useEffect(() => {
-    if (!chainMenuOpen) return
-
-    const onDocumentClick = (event: MouseEvent) => {
-      if (skipNextChainClickRef.current) {
-        skipNextChainClickRef.current = false
-        return
-      }
-      const container = chainMenuRef.current
-      if (!container) return
-
-      const path = (event as unknown as { composedPath?: () => EventTarget[] }).composedPath?.()
-      const clickedInside = path ? path.includes(container) : container.contains(event.target as Node)
-
-      if (!clickedInside) setChainMenuOpen(false)
-    }
-
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setChainMenuOpen(false)
-    }
-
-    document.addEventListener('click', onDocumentClick)
-    document.addEventListener('keydown', onKeyDown)
-    return () => {
-      document.removeEventListener('click', onDocumentClick)
-      document.removeEventListener('keydown', onKeyDown)
-    }
-  }, [chainMenuOpen])
+  useMenuCloseOnOutsideClick({
+    isOpen: currencyMenuOpen,
+    menuRef: currencyMenuRef,
+    onClose: () => setCurrencyMenuOpen(false),
+    skipNextRef: skipNextDocumentClickRef,
+  })
+  useMenuCloseOnOutsideClick({
+    isOpen: assetMenuOpen,
+    menuRef: assetMenuRef,
+    onClose: () => setAssetMenuOpen(false),
+    skipNextRef: skipNextAssetClickRef,
+  })
+  useMenuCloseOnOutsideClick({
+    isOpen: chainMenuOpen,
+    menuRef: chainMenuRef,
+    onClose: () => setChainMenuOpen(false),
+    skipNextRef: skipNextChainClickRef,
+  })
 
   // Cleanup on unmount: abort any in-flight requests
   useEffect(() => {

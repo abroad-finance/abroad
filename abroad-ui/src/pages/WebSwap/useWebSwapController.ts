@@ -45,10 +45,18 @@ import { useNotices } from '../../contexts/NoticeContext'
 import { BRL_BACKGROUND_IMAGE } from '../../features/swap/constants'
 import { SwapView } from '../../features/swap/types'
 import {
+  BRL_TRANSFER_FEE,
+  buildChainLabel,
+  chainKeyOf,
+  COP_TRANSFER_FEE,
+  corridorKeyOf,
+  sortStellarFirst,
+} from '../../features/swap/utils/corridorHelpers'
+import {
   acceptTransactionRequest, fetchPublicCorridors, notifyPayment, requestQuote, requestReverseQuote,
 } from '../../services/public/publicApi'
 import { ASSET_URLS, PENDING_TX_KEY } from '../../shared/constants'
-import { useWalletAuth } from '../../shared/hooks/useWalletAuth'
+import { useMenuCloseOnOutsideClick, useWalletAuth } from '../../shared/hooks'
 import { hasMessage } from '../../shared/utils'
 
 type DecodeQrApiResponse = ApiClientResponse<decodeQrCodeBRResponse, DecodeQrCodeBR400>
@@ -88,33 +96,6 @@ type SwapControllerState = {
   taxId: string
   transactionId: null | string
   view: SwapView
-}
-
-const COP_TRANSFER_FEE = 0.0
-const BRL_TRANSFER_FEE = 0.0
-const corridorKeyOf = (corridor: PublicCorridor): string => (
-  `${corridor.cryptoCurrency}:${corridor.blockchain}:${corridor.targetCurrency}`
-)
-const chainKeyOf = (corridor: PublicCorridor): string => (
-  `${corridor.blockchain}:${corridor.chainId}`
-)
-
-const formatChainLabel = (value: string): string => {
-  const normalized = value.toLowerCase().replace(/_/g, ' ')
-  return normalized.replace(/\b\w/g, char => char.toUpperCase())
-}
-
-const formatChainIdLabel = (value: string): string => {
-  if (!value) return ''
-  const [, ...rest] = value.split(':')
-  return rest.length > 0 ? rest.join(':') : value
-}
-
-const buildChainLabel = (corridor: PublicCorridor, includeChainId: boolean): string => {
-  const base = formatChainLabel(corridor.blockchain)
-  if (!includeChainId) return base
-  const chainIdLabel = formatChainIdLabel(corridor.chainId)
-  return chainIdLabel ? `${base} (${chainIdLabel})` : base
 }
 
 const resolveStellarNetworkPassphrase = (chainId: null | string): string => {
@@ -347,13 +328,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
   const targetSymbol = state.targetCurrency === TargetCurrency.BRL ? 'R$' : '$'
   const availableCorridors = useMemo(() => {
     const filtered = corridors.filter(corridor => corridor.targetCurrency === state.targetCurrency)
-    return [...filtered].sort((a, b) => {
-      const aStellar = a.blockchain.toLowerCase() === 'stellar'
-      const bStellar = b.blockchain.toLowerCase() === 'stellar'
-      if (aStellar && !bStellar) return -1
-      if (!aStellar && bStellar) return 1
-      return 0
-    })
+    return sortStellarFirst(filtered)
   }, [corridors, state.targetCurrency])
   const selectedCorridor = useMemo(() => {
     const match = availableCorridors.find(corridor => corridorKeyOf(corridor) === state.corridorKey)
@@ -936,53 +911,18 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     currencyMenuOpen,
   ])
 
-  useEffect(() => {
-    if (!assetMenuOpen) return
-    const onDocumentClick = (event: MouseEvent) => {
-      if (skipNextAssetClickRef.current) {
-        skipNextAssetClickRef.current = false
-        return
-      }
-      const container = assetMenuRef.current
-      if (!container) return
-      const path = (event as unknown as { composedPath?: () => EventTarget[] }).composedPath?.()
-      const clickedInside = path ? path.includes(container) : container.contains(event.target as Node)
-      if (!clickedInside) setAssetMenuOpen()
-    }
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setAssetMenuOpen()
-    }
-    document.addEventListener('click', onDocumentClick)
-    document.addEventListener('keydown', onKeyDown)
-    return () => {
-      document.removeEventListener('click', onDocumentClick)
-      document.removeEventListener('keydown', onKeyDown)
-    }
-  }, [assetMenuOpen])
-
-  useEffect(() => {
-    if (!chainMenuOpen) return
-    const onDocumentClick = (event: MouseEvent) => {
-      if (skipNextChainClickRef.current) {
-        skipNextChainClickRef.current = false
-        return
-      }
-      const container = chainMenuRef.current
-      if (!container) return
-      const path = (event as unknown as { composedPath?: () => EventTarget[] }).composedPath?.()
-      const clickedInside = path ? path.includes(container) : container.contains(event.target as Node)
-      if (!clickedInside) setChainMenuOpen()
-    }
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setChainMenuOpen()
-    }
-    document.addEventListener('click', onDocumentClick)
-    document.addEventListener('keydown', onKeyDown)
-    return () => {
-      document.removeEventListener('click', onDocumentClick)
-      document.removeEventListener('keydown', onKeyDown)
-    }
-  }, [chainMenuOpen])
+  useMenuCloseOnOutsideClick({
+    isOpen: assetMenuOpen,
+    menuRef: assetMenuRef,
+    onClose: setAssetMenuOpen,
+    skipNextRef: skipNextAssetClickRef,
+  })
+  useMenuCloseOnOutsideClick({
+    isOpen: chainMenuOpen,
+    menuRef: chainMenuRef,
+    onClose: setChainMenuOpen,
+    skipNextRef: skipNextChainClickRef,
+  })
 
   const selectCurrency = useCallback((currency: TargetCurrency) => {
     setCurrencyMenuOpen()
@@ -1032,29 +972,12 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     state.targetCurrency,
   ])
 
-  useEffect(() => {
-    if (!currencyMenuOpen) return
-    const onDocumentClick = (event: MouseEvent) => {
-      if (skipNextDocumentClickRef.current) {
-        skipNextDocumentClickRef.current = false
-        return
-      }
-      const container = currencyMenuRef.current
-      if (!container) return
-      const path = (event as unknown as { composedPath?: () => EventTarget[] }).composedPath?.()
-      const clickedInside = path ? path.includes(container) : container.contains(event.target as Node)
-      if (!clickedInside) setCurrencyMenuOpen()
-    }
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setCurrencyMenuOpen()
-    }
-    document.addEventListener('click', onDocumentClick)
-    document.addEventListener('keydown', onKeyDown)
-    return () => {
-      document.removeEventListener('click', onDocumentClick)
-      document.removeEventListener('keydown', onKeyDown)
-    }
-  }, [currencyMenuOpen])
+  useMenuCloseOnOutsideClick({
+    isOpen: currencyMenuOpen,
+    menuRef: currencyMenuRef,
+    onClose: setCurrencyMenuOpen,
+    skipNextRef: skipNextDocumentClickRef,
+  })
 
   const handleBackToSwap = useCallback(() => {
     localStorage.removeItem(PENDING_TX_KEY)
