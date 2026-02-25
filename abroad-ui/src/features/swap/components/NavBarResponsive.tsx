@@ -95,6 +95,7 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({
           compact
           onClick={onOpenChainModal}
           tokenLabel={selectedTokenLabel}
+          className="hidden md:flex"
         />
       )}
       {isConnected && (
@@ -133,26 +134,15 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({
 
   return (
     <nav className={cn('sticky top-0 z-[100] w-full border-b', className)} style={{ backgroundColor: 'var(--ab-bg-card)', borderColor: 'var(--ab-border)' }} role="navigation">
-      {/* Mobile: full width bar */}
+      {/* Mobile: full width bar - only logo and connect button */}
       <div className="md:hidden px-4 py-3">
         <div className="flex items-center justify-between">
-          <div className="flex flex-shrink-0 items-center gap-3">
+          <div className="flex flex-shrink-0 items-center">
             <img
               alt="Abroad"
               className="h-6 w-auto"
               src={isDark ? AbroadLogoWhite : AbroadLogoColored}
             />
-            {isConnected && onHistoryClick && (
-              <button
-                className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold"
-                style={{ backgroundColor: 'var(--ab-bg-muted)', color: 'var(--ab-text-secondary)', borderColor: 'var(--ab-border)', borderWidth: '1px' }}
-                onClick={onHistoryClick}
-                type="button"
-              >
-                <Clock className="h-3.5 w-3.5" />
-                {labels.history ?? 'History'}
-              </button>
-            )}
           </div>
           <div className="flex items-center gap-2">
             <div className="md:hidden">{languageSelectorMobile}</div>
