@@ -4,7 +4,6 @@ import React from 'react'
 
 import { ASSET_URLS } from '../../shared/constants'
 import { Overlay } from './Overlay'
-import { cn } from '../../shared/utils'
 
 const CHAIN_CONFIG: Record<string, { bg: string, color: string, icon: string, wallets: string }> = {
   Celo: {
@@ -73,24 +72,26 @@ export function ConnectWalletChainModal({
       <Overlay onClose={onClose}>
         <motion.div
           animate={{ opacity: 1, scale: 1, y: 0 }}
-          className="w-full max-w-[400px] rounded-3xl bg-white p-6 shadow-[0_24px_80px_rgba(0,0,0,0.12)] dark:bg-ab-card"
+          className="w-full max-w-[400px] rounded-3xl bg-white p-6 shadow-[0_24px_80px_rgba(0,0,0,0.12)]"
           exit={{ opacity: 0, scale: 0.98, y: 8 }}
           initial={{ opacity: 0, scale: 0.98, y: 8 }}
           transition={{ duration: 0.2, ease: 'easeOut' }}
+          style={{ backgroundColor: 'var(--ab-bg-card, #fff)' }}
         >
           <div className="mb-6 flex items-center justify-between">
-            <h3 className="font-urbanist text-xl font-semibold text-gray-900 dark:text-white">
+            <h3 className="font-urbanist text-xl font-semibold" style={{ color: 'var(--ab-text, #111827)' }}>
               Connect wallet
             </h3>
             <button
-              className="flex h-9 w-9 items-center justify-center rounded-xl bg-gray-100 text-gray-500 transition-colors hover:bg-gray-200 dark:bg-ab-bg-muted dark:text-gray-400 dark:hover:bg-ab-hover"
+              className="flex h-9 w-9 items-center justify-center rounded-xl transition-colors"
+              style={{ backgroundColor: 'var(--ab-bg-muted, #f5f7f9)', color: 'var(--ab-text-muted, #9ca3af)' }}
               onClick={onClose}
               type="button"
             >
               <X className="h-4 w-4" />
             </button>
           </div>
-          <p className="mb-6 text-sm text-gray-500 dark:text-ab-text-secondary">
+          <p className="mb-6 text-sm" style={{ color: 'var(--ab-text-secondary, #5f6b7a)' }}>
             Choose the blockchain you want to use. Then we&apos;ll show the right wallet options.
           </p>
 
@@ -100,10 +101,11 @@ export function ConnectWalletChainModal({
               const chainName = getChainName(chain.label)
               return (
                 <button
-                  className={cn(
-                    'flex items-center gap-4 rounded-2xl border-2 px-5 py-4 text-left transition-all duration-200',
-                    'border-gray-200 bg-gray-50 hover:border-ab-green hover:bg-ab-green-soft dark:border-ab-border dark:bg-ab-bg-subtle dark:hover:border-ab-green',
-                  )}
+                  className="flex items-center gap-4 rounded-2xl border-2 px-5 py-4 text-left transition-all duration-200"
+                  style={{
+                    borderColor: 'var(--ab-border, #e8ecf0)',
+                    backgroundColor: 'var(--ab-bg-subtle, #f8faf9)',
+                  }}
                   key={chain.key}
                   onClick={() => handleSelect(chain.key)}
                   type="button"
@@ -119,14 +121,14 @@ export function ConnectWalletChainModal({
                     />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <div className="font-urbanist text-base font-semibold text-gray-900 dark:text-white">
+                    <div className="font-urbanist text-base font-semibold" style={{ color: 'var(--ab-text, #111827)' }}>
                       {chainName}
                     </div>
-                    <div className="text-xs text-gray-500 dark:text-ab-text-muted">
+                    <div className="text-xs" style={{ color: 'var(--ab-text-muted, #9ca3af)' }}>
                       {config.wallets}
                     </div>
                   </div>
-                  <ChevronRight className="h-5 w-5 text-gray-400" />
+                  <ChevronRight className="h-5 w-5" style={{ color: 'var(--ab-text-muted, #9ca3af)' }} />
                 </button>
               )
             })}
