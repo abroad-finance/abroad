@@ -1,5 +1,5 @@
 import { PublicKey } from '@solana/web3.js'
-import { Keypair, WebAuth } from '@stellar/stellar-sdk'
+import { Keypair, StrKey, WebAuth } from '@stellar/stellar-sdk'
 import bs58 from 'bs58'
 import { ethers } from 'ethers'
 import { inject } from 'inversify'
@@ -7,6 +7,7 @@ import jwt from 'jsonwebtoken'
 import { Body, Controller, Post, Route } from 'tsoa'
 import nacl from 'tweetnacl'
 
+import { UserError, ValidationError } from '../../../../core/errors'
 import { TYPES } from '../../../../app/container/types'
 import { ISecretManager } from '../../../../platform/secrets/ISecretManager'
 
@@ -57,19 +58,35 @@ export class WalletAuthController extends Controller {
   public async challenge(
     @Body() body: ChallengeRequest,
   ): Promise<ChallengeResponse> {
-    const { STELLAR_HOME_DOMAIN, STELLAR_NETWORK_PASSPHRASE, STELLAR_SERVER_KP, STELLAR_WEB_AUTH_DOMAIN } = await this.getSecrets()
-    const resolvedChainId = this.resolveChainId(body.chainId, STELLAR_NETWORK_PASSPHRASE)
+    const {
+      STELLAR_HOME_DOMAIN,
+      STELLAR_NETWORK_PASSPHRASE,
+      STELLAR_SEP_JWT_SECRET,
+      STELLAR_SERVER_KP,
+      STELLAR_WEB_AUTH_DOMAIN,
+    } = await this.getSecrets()
+    const resolvedChainId = this.resolveChainId(body.chainId, body.address, STELLAR_NETWORK_PASSPHRASE)
     const key = this.challengeKey(resolvedChainId, body.address)
 
     if (this.isStellarChain(resolvedChainId)) {
-      const xdr = WebAuth.buildChallengeTx(
-        STELLAR_SERVER_KP,
-        body.address,
-        STELLAR_HOME_DOMAIN,
-        300,
-        STELLAR_NETWORK_PASSPHRASE,
-        STELLAR_WEB_AUTH_DOMAIN,
-      )
+      if (!StrKey.isValidEd25519PublicKey(body.address)) {
+        throw new ValidationError('Invalid Stellar address')
+      }
+
+      let xdr: string
+      try {
+        xdr = WebAuth.buildChallengeTx(
+          STELLAR_SERVER_KP,
+          body.address,
+          STELLAR_HOME_DOMAIN,
+          300,
+          STELLAR_NETWORK_PASSPHRASE,
+          STELLAR_WEB_AUTH_DOMAIN,
+        )
+      }
+      catch {
+        throw new ValidationError('Unable to build Stellar challenge for this address')
+      }
 
       challenges.set(key, { expiresAt: Date.now() + CHALLENGE_TTL_MS, message: xdr })
       const challengeToken = this.createChallengeToken(STELLAR_SEP_JWT_SECRET, key, xdr)
@@ -106,8 +123,7 @@ export class WalletAuthController extends Controller {
       return { token: newToken }
     }
     catch {
-      this.setStatus(401)
-      throw new Error('Invalid token')
+      throw new UserError('Invalid token', undefined, 401)
     }
   }
 
@@ -116,7 +132,7 @@ export class WalletAuthController extends Controller {
     @Body() body: VerifyRequest,
   ): Promise<VerifyResponse> {
     const { STELLAR_HOME_DOMAIN, STELLAR_NETWORK_PASSPHRASE, STELLAR_SEP_JWT_SECRET, STELLAR_SERVER_KP, STELLAR_WEB_AUTH_DOMAIN } = await this.getSecrets()
-    const resolvedChainId = this.resolveChainId(body.chainId, STELLAR_NETWORK_PASSPHRASE)
+    const resolvedChainId = this.resolveChainId(body.chainId, body.address, STELLAR_NETWORK_PASSPHRASE)
     const key = this.challengeKey(resolvedChainId, body.address)
     const outstandingMessage = this.resolveOutstandingChallenge(
       STELLAR_SEP_JWT_SECRET,
@@ -125,14 +141,12 @@ export class WalletAuthController extends Controller {
     )
 
     if (!outstandingMessage) {
-      this.setStatus(400)
-      throw new Error('No outstanding challenge for this account')
+      throw new ValidationError('No outstanding challenge for this account')
     }
 
     if (this.isStellarChain(resolvedChainId)) {
       if (!body.signedXDR) {
-        this.setStatus(400)
-        throw new Error('Signed XDR is required')
+        throw new ValidationError('Signed XDR is required')
       }
 
       const signers = WebAuth.verifyChallengeTxSigners(
@@ -144,8 +158,7 @@ export class WalletAuthController extends Controller {
         STELLAR_WEB_AUTH_DOMAIN,
       )
       if (signers.length === 0) {
-        this.setStatus(401)
-        throw new Error('Missing or invalid client signature')
+        throw new UserError('Missing or invalid client signature', undefined, 401)
       }
 
       challenges.delete(key)
@@ -158,14 +171,12 @@ export class WalletAuthController extends Controller {
     }
 
     if (!body.signature) {
-      this.setStatus(400)
-      throw new Error('Signature is required')
+      throw new ValidationError('Signature is required')
     }
 
     const verified = this.verifyNonStellarSignature(resolvedChainId, body.address, outstandingMessage, body.signature)
     if (!verified) {
-      this.setStatus(401)
-      throw new Error('Invalid signature')
+      throw new UserError('Invalid signature', undefined, 401)
     }
 
     challenges.delete(key)
@@ -282,9 +293,22 @@ export class WalletAuthController extends Controller {
     return chainId.startsWith('stellar:')
   }
 
-  private resolveChainId(chainId: string | undefined, passphrase: string): string {
+  private resolveChainId(chainId: string | undefined, address: string, passphrase: string): string {
     if (chainId && chainId.trim().length > 0) return chainId.trim()
-    return this.resolveStellarChainId(passphrase)
+
+    if (StrKey.isValidEd25519PublicKey(address)) {
+      return this.resolveStellarChainId(passphrase)
+    }
+
+    if (ethers.utils.isAddress(address)) {
+      return 'eip155:1'
+    }
+
+    if (this.isValidSolanaAddress(address)) {
+      return 'solana:mainnet'
+    }
+
+    throw new ValidationError('chainId is required for this wallet address')
   }
 
   private resolveStellarChainId(passphrase: string): string {
@@ -292,6 +316,16 @@ export class WalletAuthController extends Controller {
       return 'stellar:testnet'
     }
     return 'stellar:pubnet'
+  }
+
+  private isValidSolanaAddress(address: string): boolean {
+    try {
+      void new PublicKey(address)
+      return true
+    }
+    catch {
+      return false
+    }
   }
 
   private verifyEvmSignature(address: string, message: string, signature: string): boolean {

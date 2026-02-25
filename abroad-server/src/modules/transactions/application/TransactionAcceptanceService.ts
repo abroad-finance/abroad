@@ -175,7 +175,11 @@ export class TransactionAcceptanceService {
           quoteId: quote.id,
           transaction,
         } as const
-      }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
+      }, {
+        isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+        maxWait: this.interactiveTransactionMaxWaitMs(),
+        timeout: this.interactiveTransactionTimeoutMs(),
+      })
     }
     catch (error) {
       if (error instanceof TransactionValidationError) {
@@ -452,6 +456,26 @@ export class TransactionAcceptanceService {
     }
     // Guard against extreme multipliers while preserving configuration flexibility.
     return Math.min(parsed, 62)
+  }
+
+  private interactiveTransactionMaxWaitMs(): number {
+    return this.readBoundedIntEnv('TRANSACTION_ACCEPTANCE_TX_MAX_WAIT_MS', 5_000, 1_000, 30_000)
+  }
+
+  private interactiveTransactionTimeoutMs(): number {
+    return this.readBoundedIntEnv('TRANSACTION_ACCEPTANCE_TX_TIMEOUT_MS', 15_000, 5_000, 60_000)
+  }
+
+  private readBoundedIntEnv(key: string, fallback: number, min: number, max: number): number {
+    const raw = process.env[key]
+    if (!raw) return fallback
+
+    const parsed = Number.parseInt(raw, 10)
+    if (Number.isNaN(parsed)) {
+      return fallback
+    }
+
+    return Math.min(Math.max(parsed, min), max)
   }
 
   private normalizeCountry(country: string): KycCountry {
