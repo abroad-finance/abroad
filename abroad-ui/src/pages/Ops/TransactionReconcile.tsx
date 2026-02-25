@@ -63,27 +63,27 @@ const TransactionReconcile = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#F7F3EC] text-[#1A1A1A]">
+    <div className="ops-page">
       <div className="relative overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(27,94,89,0.18),_transparent_55%)]" />
         <div className="relative max-w-4xl mx-auto px-6 py-10">
           <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
             <div>
-              <div className="text-sm uppercase tracking-[0.3em] text-[#356E6A]">Operations</div>
+              <div className="text-sm uppercase tracking-[0.3em] text-abroad-dark">Operations</div>
               <h1 className="text-3xl md:text-4xl font-semibold">Transaction Hash Reconcile</h1>
-              <p className="text-sm text-[#4B5563] max-w-xl mt-2">
+              <p className="text-sm text-gray-600 max-w-xl mt-2">
                 Trigger blockchain hash reconciliation through OPS-only controls.
               </p>
             </div>
             <div className="flex items-center gap-3">
               <Link
-                className="px-4 py-2 rounded-xl border border-[#356E6A] text-[#356E6A] bg-white/70 hover:bg-white transition text-sm font-medium"
+                className="ops-nav-link"
                 to="/ops/flows"
               >
                 Flow Control Room
               </Link>
               <Link
-                className="px-4 py-2 rounded-xl border border-[#356E6A] text-[#356E6A] bg-white/70 hover:bg-white transition text-sm font-medium"
+                className="ops-nav-link"
                 to="/ops/partners"
               >
                 Partners
@@ -107,9 +107,9 @@ const TransactionReconcile = () => {
           >
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <label className="flex flex-col">
-                <span className="text-xs uppercase tracking-wider text-[#5B6B6A]">Blockchain</span>
+                <span className="ops-label">Blockchain</span>
                 <select
-                  className="mt-2 rounded-xl border border-[#DADADA] bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#356E6A]/40"
+                  className="mt-2 ops-input"
                   onChange={event => setBlockchain(event.target.value as ReconciliationBlockchain)}
                   value={blockchain}
                 >
@@ -119,9 +119,9 @@ const TransactionReconcile = () => {
                 </select>
               </label>
               <label className="flex flex-col">
-                <span className="text-xs uppercase tracking-wider text-[#5B6B6A]">Transaction ID (optional)</span>
+                <span className="ops-label">Transaction ID (optional)</span>
                 <input
-                  className="mt-2 rounded-xl border border-[#DADADA] bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#356E6A]/40"
+                  className="mt-2 ops-input"
                   onChange={event => setTransactionId(event.target.value)}
                   placeholder="UUID (required for unresolved SOLANA/CELO hashes)"
                   value={transactionId}
@@ -129,15 +129,15 @@ const TransactionReconcile = () => {
               </label>
             </div>
             <label className="flex flex-col">
-              <span className="text-xs uppercase tracking-wider text-[#5B6B6A]">On-chain hash / signature</span>
+              <span className="ops-label">On-chain hash / signature</span>
               <input
-                className="mt-2 rounded-xl border border-[#DADADA] bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#356E6A]/40"
+                className="mt-2 ops-input"
                 onChange={event => setOnChainTx(event.target.value)}
                 placeholder="Paste tx hash/signature"
                 value={onChainTx}
               />
             </label>
-            <div className="text-xs text-[#6B7280]">
+            <div className="text-xs text-gray-500">
               This endpoint does not use heuristic matching. If SOLANA/CELO hash is not linked yet, provide
               {' '}
               <code>transaction_id</code>
@@ -145,7 +145,7 @@ const TransactionReconcile = () => {
             </div>
             <div className="flex justify-end">
               <button
-                className="rounded-xl border border-[#356E6A] bg-[#356E6A] px-4 py-2 text-sm font-medium text-white hover:bg-[#2B5B57] transition disabled:cursor-not-allowed disabled:opacity-60"
+                className="ops-btn-primary disabled:cursor-not-allowed disabled:opacity-60"
                 disabled={isSubmitDisabled}
                 type="submit"
               >
@@ -166,23 +166,23 @@ const TransactionReconcile = () => {
                 <span className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${resultClasses[result.result]}`}>
                   {result.result}
                 </span>
-                <span className="text-xs uppercase tracking-wider text-[#64748B]">{result.blockchain}</span>
+                <span className="text-xs uppercase tracking-wider text-slate-500">{result.blockchain}</span>
               </div>
               <dl className="mt-4 space-y-2 text-sm">
                 <div className="grid grid-cols-[130px_1fr] gap-2">
-                  <dt className="text-[#6B7280]">On-chain</dt>
+                  <dt className="text-gray-500">On-chain</dt>
                   <dd className="font-mono break-all">{result.on_chain_tx}</dd>
                 </div>
                 <div className="grid grid-cols-[130px_1fr] gap-2">
-                  <dt className="text-[#6B7280]">Transaction ID</dt>
+                  <dt className="text-gray-500">Transaction ID</dt>
                   <dd>{result.transaction_id ?? '—'}</dd>
                 </div>
                 <div className="grid grid-cols-[130px_1fr] gap-2">
-                  <dt className="text-[#6B7280]">Transaction Status</dt>
+                  <dt className="text-gray-500">Transaction Status</dt>
                   <dd>{result.transaction_status ?? '—'}</dd>
                 </div>
                 <div className="grid grid-cols-[130px_1fr] gap-2">
-                  <dt className="text-[#6B7280]">Reason</dt>
+                  <dt className="text-gray-500">Reason</dt>
                   <dd>{result.reason ?? '—'}</dd>
                 </div>
               </dl>

@@ -10,8 +10,15 @@ import type { SwapView } from '../types'
 import { _36EnumsTargetCurrency as TargetCurrency } from '../../../api'
 import { useNotices } from '../../../contexts/NoticeContext'
 import { fetchPublicCorridors, requestQuote, requestReverseQuote } from '../../../services/public/publicApi'
-// ⛔️ Removed: import { useDebounce } from '../../../shared/hooks'
-import { useWalletAuth } from '../../../shared/hooks/useWalletAuth'
+import { useMenuCloseOnOutsideClick, useWalletAuth } from '../../../shared/hooks'
+import {
+  BRL_TRANSFER_FEE,
+  buildChainLabel,
+  chainKeyOf,
+  COP_TRANSFER_FEE,
+  corridorKeyOf,
+  sortStellarFirst,
+} from '../utils/corridorHelpers'
 
 type UseSwapArgs = {
   isDesktop: boolean
@@ -27,35 +34,6 @@ type UseSwapArgs = {
   targetCurrency: (typeof TargetCurrency)[keyof typeof TargetCurrency]
 }
 
-const COP_TRANSFER_FEE = 0.0
-const BRL_TRANSFER_FEE = 0.0
-
-const corridorKeyOf = (corridor: PublicCorridor): string => (
-  `${corridor.cryptoCurrency}:${corridor.blockchain}:${corridor.targetCurrency}`
-)
-
-const chainKeyOf = (corridor: PublicCorridor): string => (
-  `${corridor.blockchain}:${corridor.chainId}`
-)
-
-const formatChainLabel = (value: string): string => {
-  const normalized = value.toLowerCase().replace(/_/g, ' ')
-  return normalized.replace(/\b\w/g, char => char.toUpperCase())
-}
-
-const formatChainIdLabel = (value: string): string => {
-  if (!value) return ''
-  const [, ...rest] = value.split(':')
-  return rest.length > 0 ? rest.join(':') : value
-}
-
-const buildChainLabel = (corridor: PublicCorridor, includeChainId: boolean): string => {
-  const base = formatChainLabel(corridor.blockchain)
-  if (!includeChainId) return base
-  const chainIdLabel = formatChainIdLabel(corridor.chainId)
-  return chainIdLabel ? `${base} (${chainIdLabel})` : base
-}
-
 export const useSwap = ({
   isDesktop,
   quoteId,
@@ -69,7 +47,7 @@ export const useSwap = ({
   targetAmount,
   targetCurrency,
 }: UseSwapArgs): SwapProps => {
-  const textColor = isDesktop ? 'white' : '#356E6A'
+  const textColor = isDesktop ? 'white' : 'var(--color-abroad-dark)'
   const { t } = useTranslate()
   const { addNotice } = useNotices()
   const { wallet, walletAuthentication } = useWalletAuth()
@@ -81,10 +59,10 @@ export const useSwap = ({
   // Derived by currency
   const targetLocale = targetCurrency === TargetCurrency.BRL ? 'pt-BR' : 'es-CO'
   const targetSymbol = targetCurrency === TargetCurrency.BRL ? 'R$' : '$'
-  const availableCorridors = useMemo(
-    () => corridors.filter(corridor => corridor.targetCurrency === targetCurrency),
-    [corridors, targetCurrency],
-  )
+  const availableCorridors = useMemo(() => {
+    const filtered = corridors.filter(corridor => corridor.targetCurrency === targetCurrency)
+    return sortStellarFirst(filtered)
+  }, [corridors, targetCurrency])
   const selectedCorridor = useMemo(() => {
     const match = availableCorridors.find(corridor => corridorKeyOf(corridor) === corridorKey)
     if (match && (!chainKey || chainKeyOf(match) === chainKey)) return match
@@ -119,12 +97,18 @@ export const useSwap = ({
       const key = chainKeyOf(corridor)
       if (!seen.has(key)) seen.set(key, corridor)
     })
-    return Array.from(seen.entries()).map(([key, corridor]) => {
+    const entries = Array.from(seen.entries()).map(([key, corridor]) => {
       const includeChainId = (chainVariants.get(corridor.blockchain)?.size ?? 0) > 1
-      return {
-        key,
-        label: buildChainLabel(corridor, includeChainId),
-      }
+      return { key, label: buildChainLabel(corridor, includeChainId) }
+    })
+    return entries.sort((a, b) => {
+      const corridorA = seen.get(a.key)
+      const corridorB = seen.get(b.key)
+      const aStellar = corridorA?.blockchain.toLowerCase() === 'stellar'
+      const bStellar = corridorB?.blockchain.toLowerCase() === 'stellar'
+      if (aStellar && !bStellar) return -1
+      if (!aStellar && bStellar) return 1
+      return 0
     })
   }, [chainVariants, corridors])
   const targetPaymentMethod = selectedCorridor?.paymentMethod ?? (targetCurrency === TargetCurrency.BRL ? 'PIX' : 'BREB')
@@ -506,9 +490,18 @@ export const useSwap = ({
 
   const selectAssetOption = useCallback((key: string) => {
     setAssetMenuOpen(false)
-    setCorridorKey(key)
     const selected = availableCorridors.find(corridor => corridorKeyOf(corridor) === key)
-    if (selected) setChainKey(chainKeyOf(selected))
+    if (selected) {
+      if (
+        wallet?.address
+        && wallet?.chainId
+        && selected.chainId !== wallet.chainId
+      ) {
+        void wallet.disconnect().catch(() => undefined)
+      }
+      setChainKey(chainKeyOf(selected))
+    }
+    setCorridorKey(key)
     lastEditedRef.current = null
     directAbortRef.current?.abort()
     reverseAbortRef.current?.abort()
@@ -523,6 +516,7 @@ export const useSwap = ({
     setQuoteId,
     setSourceAmount,
     setTargetAmount,
+    wallet,
   ])
 
   const toggleCurrencyMenu = useCallback(() => {
@@ -553,27 +547,39 @@ export const useSwap = ({
 
   const selectChain = useCallback((key: string) => {
     setChainMenuOpen(false)
-    setChainKey(key)
     const currentCrypto = selectedCorridor?.cryptoCurrency
     const next = availableCorridors.find(corridor => (
       chainKeyOf(corridor) === key && corridor.cryptoCurrency === currentCrypto
     )) ?? availableCorridors.find(corridor => chainKeyOf(corridor) === key)
+    const fallback = !next
+      ? corridors.find(corridor => (
+        chainKeyOf(corridor) === key && corridor.cryptoCurrency === currentCrypto
+      )) ?? corridors.find(corridor => chainKeyOf(corridor) === key)
+      : null
+    const nextCorridor = next ?? fallback
+
+    // Al cambiar de cadena: desconectar wallet para que la UI no muestre saldo/dirección de la cadena anterior
+    if (
+      wallet?.address
+      && wallet?.chainId
+      && nextCorridor
+      && nextCorridor.chainId !== wallet.chainId
+    ) {
+      void wallet.disconnect().catch(() => undefined)
+    }
+
+    setChainKey(key)
     if (next) {
       setCorridorKey(corridorKeyOf(next))
     }
+    else if (fallback) {
+      if (fallback.targetCurrency !== targetCurrency) {
+        setTargetCurrency(fallback.targetCurrency)
+      }
+      setCorridorKey(corridorKeyOf(fallback))
+    }
     else {
-      const fallback = corridors.find(corridor => (
-        chainKeyOf(corridor) === key && corridor.cryptoCurrency === currentCrypto
-      )) ?? corridors.find(corridor => chainKeyOf(corridor) === key)
-      if (fallback) {
-        if (fallback.targetCurrency !== targetCurrency) {
-          setTargetCurrency(fallback.targetCurrency)
-        }
-        setCorridorKey(corridorKeyOf(fallback))
-      }
-      else {
-        setCorridorKey('')
-      }
+      setCorridorKey('')
     }
     lastEditedRef.current = null
     directAbortRef.current?.abort()
@@ -593,6 +599,7 @@ export const useSwap = ({
     setTargetAmount,
     setTargetCurrency,
     targetCurrency,
+    wallet,
   ])
 
   const selectCurrency = useCallback(
@@ -668,94 +675,24 @@ export const useSwap = ({
   // useEffect(() => { ... }, [sourceDebouncedAmount])
   // useEffect(() => { ... }, [targetDebounceAmount])
 
-  // Close currency menu on outside click and Escape
-  useEffect(() => {
-    if (!currencyMenuOpen) return
-
-    const onDocumentClick = (event: MouseEvent) => {
-      if (skipNextDocumentClickRef.current) {
-        skipNextDocumentClickRef.current = false
-        return
-      }
-      const container = currencyMenuRef.current
-      if (!container) return
-
-      // Prefer composedPath for better accuracy across trees
-      const path = (event as unknown as { composedPath?: () => EventTarget[] }).composedPath?.()
-      const clickedInside = path ? path.includes(container) : container.contains(event.target as Node)
-
-      if (!clickedInside) setCurrencyMenuOpen(false)
-    }
-
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setCurrencyMenuOpen(false)
-    }
-
-    document.addEventListener('click', onDocumentClick)
-    document.addEventListener('keydown', onKeyDown)
-    return () => {
-      document.removeEventListener('click', onDocumentClick)
-      document.removeEventListener('keydown', onKeyDown)
-    }
-  }, [currencyMenuOpen])
-
-  useEffect(() => {
-    if (!assetMenuOpen) return
-
-    const onDocumentClick = (event: MouseEvent) => {
-      if (skipNextAssetClickRef.current) {
-        skipNextAssetClickRef.current = false
-        return
-      }
-      const container = assetMenuRef.current
-      if (!container) return
-
-      const path = (event as unknown as { composedPath?: () => EventTarget[] }).composedPath?.()
-      const clickedInside = path ? path.includes(container) : container.contains(event.target as Node)
-
-      if (!clickedInside) setAssetMenuOpen(false)
-    }
-
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setAssetMenuOpen(false)
-    }
-
-    document.addEventListener('click', onDocumentClick)
-    document.addEventListener('keydown', onKeyDown)
-    return () => {
-      document.removeEventListener('click', onDocumentClick)
-      document.removeEventListener('keydown', onKeyDown)
-    }
-  }, [assetMenuOpen])
-
-  useEffect(() => {
-    if (!chainMenuOpen) return
-
-    const onDocumentClick = (event: MouseEvent) => {
-      if (skipNextChainClickRef.current) {
-        skipNextChainClickRef.current = false
-        return
-      }
-      const container = chainMenuRef.current
-      if (!container) return
-
-      const path = (event as unknown as { composedPath?: () => EventTarget[] }).composedPath?.()
-      const clickedInside = path ? path.includes(container) : container.contains(event.target as Node)
-
-      if (!clickedInside) setChainMenuOpen(false)
-    }
-
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setChainMenuOpen(false)
-    }
-
-    document.addEventListener('click', onDocumentClick)
-    document.addEventListener('keydown', onKeyDown)
-    return () => {
-      document.removeEventListener('click', onDocumentClick)
-      document.removeEventListener('keydown', onKeyDown)
-    }
-  }, [chainMenuOpen])
+  useMenuCloseOnOutsideClick({
+    isOpen: currencyMenuOpen,
+    menuRef: currencyMenuRef,
+    onClose: () => setCurrencyMenuOpen(false),
+    skipNextRef: skipNextDocumentClickRef,
+  })
+  useMenuCloseOnOutsideClick({
+    isOpen: assetMenuOpen,
+    menuRef: assetMenuRef,
+    onClose: () => setAssetMenuOpen(false),
+    skipNextRef: skipNextAssetClickRef,
+  })
+  useMenuCloseOnOutsideClick({
+    isOpen: chainMenuOpen,
+    menuRef: chainMenuRef,
+    onClose: () => setChainMenuOpen(false),
+    skipNextRef: skipNextChainClickRef,
+  })
 
   // Cleanup on unmount: abort any in-flight requests
   useEffect(() => {
@@ -767,7 +704,6 @@ export const useSwap = ({
 
   // Return props for stateless view -------------------------------------------
   return {
-    // Primary action
     assetMenuOpen,
     assetMenuRef,
     assetOptions,
@@ -777,35 +713,29 @@ export const useSwap = ({
     continueDisabled,
     currencyMenuOpen,
     currencyMenuRef,
-
     exchangeRateDisplay,
+    isAboveMaximum: false,
     isAuthenticated,
+    isBelowMinimum: false,
     loadingSource,
     loadingTarget,
-
+    onOpenSourceModal: () => {},
+    onOpenTargetModal: () => {},
     onPrimaryAction,
-    // Handlers
     onSourceChange,
-
     onTargetChange,
-    // QR + currency menu
     openQr,
     selectAssetOption,
     selectChain,
     selectCurrency,
     selectedAssetLabel,
     selectedChainLabel,
-    // Amounts & loaders
     sourceAmount,
     sourceSymbol,
     targetAmount,
-
     targetCurrency,
-    // Derived display
     targetSymbol,
-    // UI look & currency
     textColor,
-
     toggleAssetMenu,
     toggleChainMenu,
     toggleCurrencyMenu,

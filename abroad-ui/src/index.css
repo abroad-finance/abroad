@@ -2,7 +2,124 @@
 @import "./fonts.css";
 
 @theme {
+  /* ── Brand palette ── */
   --color-abroad-dark: #356E6A;
   --color-abroad-mid: #26A17B;
   --color-abroad-light: #73B9A3;
+
+  /* ── Theme-aware tokens: reference --ab-* so dark mode works automatically ── */
+  --color-ab-bg: var(--ab-bg);
+  --color-ab-card: var(--ab-card);
+  --color-ab-card-border: var(--ab-card-border);
+  --color-ab-input: var(--ab-input);
+  --color-ab-input-border: var(--ab-input-border);
+  --color-ab-text: var(--ab-text);
+  --color-ab-text-secondary: var(--ab-text-secondary);
+  --color-ab-text-muted: var(--ab-text-muted);
+  --color-ab-btn: var(--ab-btn);
+  --color-ab-btn-hover: var(--ab-btn-hover);
+  --color-ab-btn-text: var(--ab-btn-text);
+  --color-ab-separator: var(--ab-separator);
+  --color-ab-modal-bg: var(--ab-modal-bg);
+  --color-ab-modal-border: var(--ab-modal-border);
+  --color-ab-badge-bg: var(--ab-badge-bg);
+  --color-ab-badge-border: var(--ab-badge-border);
+  --color-ab-hover: var(--ab-hover);
+  --color-ab-selected: var(--ab-selected);
+  --color-ab-wallet-panel-bg: var(--ab-wallet-panel-bg);
+  --color-ab-wallet-panel-border: var(--ab-wallet-panel-border);
+  --color-ab-error: #ef4444;
+
+  /* ── Custom font ── */
+  --font-cereal: "Airbnb Cereal";
+
+  /* ── Custom shadow ── */
+  --shadow-panel: 0 25px 50px -12px rgba(0, 0, 0, 0.08);
+
+  /* ── Ops admin panel tokens (always light, no dark variant) ── */
+  --color-ops-bg: #F7F3EC;
+  --color-ops-text: #1A1A1A;
+  --color-ops-label: #5B6B6A;
+  --color-ops-brand: #1B4D48;
+  --color-ops-brand-hover: #2B5B57;
+  --color-ops-border: #DADADA;
+}
+
+/* ── Light mode (default) ── */
+:root {
+  --ab-bg: #e8f5f0;
+  --ab-bg-end: #d4ede4;
+  --ab-card: rgba(255, 255, 255, 0.6);
+  --ab-card-border: rgba(53, 110, 106, 0.1);
+  --ab-input: #f0f7f5;
+  --ab-input-border: rgba(53, 110, 106, 0.08);
+  --ab-text: #1a3a37;
+  --ab-text-secondary: #4a7a75;
+  --ab-text-muted: #7a9e9a;
+  --ab-btn: #5a9a8f;
+  --ab-btn-hover: #4a8a7f;
+  --ab-btn-text: #ffffff;
+  --ab-separator: rgba(53, 110, 106, 0.1);
+  --ab-modal-bg: #ffffff;
+  --ab-modal-border: rgba(53, 110, 106, 0.08);
+  --ab-badge-bg: rgba(255, 255, 255, 0.7);
+  --ab-badge-border: rgba(53, 110, 106, 0.12);
+  --ab-hover: rgba(53, 110, 106, 0.06);
+  --ab-selected: rgba(53, 110, 106, 0.1);
+  /* Wallet details panel: clear with very subtle light green tint */
+  --ab-wallet-panel-bg: rgba(232, 245, 240, 0.92);
+  --ab-wallet-panel-border: rgba(53, 110, 106, 0.14);
+}
+
+/* ── Dark mode ── */
+.dark {
+  --ab-bg: #0d2b26;
+  --ab-bg-end: #0d2b26;
+  --ab-card: rgba(26, 63, 56, 0.8);
+  --ab-card-border: rgba(42, 90, 80, 0.5);
+  --ab-input: #0d2b26;
+  --ab-input-border: rgba(42, 90, 80, 0.5);
+  --ab-text: #e0f0ec;
+  --ab-text-secondary: #a0c8c0;
+  --ab-text-muted: #6a9a92;
+  --ab-btn: #5a9a8f;
+  --ab-btn-hover: #6aaa9f;
+  --ab-btn-text: #ffffff;
+  --ab-separator: rgba(42, 90, 80, 0.4);
+  --ab-modal-bg: #1a3f38;
+  --ab-modal-border: rgba(42, 90, 80, 0.5);
+  --ab-badge-bg: rgba(13, 43, 38, 0.8);
+  --ab-badge-border: rgba(42, 90, 80, 0.5);
+  --ab-hover: rgba(90, 154, 143, 0.1);
+  --ab-selected: rgba(90, 154, 143, 0.2);
+  --ab-wallet-panel-bg: rgba(26, 58, 52, 0.88);
+  --ab-wallet-panel-border: rgba(42, 90, 80, 0.5);
+}
+
+/* ── Ops admin panel component classes ── */
+@layer components {
+  /* Page wrapper: warm beige bg, always light */
+  .ops-page {
+    @apply min-h-screen bg-ops-bg text-ops-text;
+  }
+  /* Standard text input / select */
+  .ops-input {
+    @apply rounded-xl border border-ops-border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-abroad-dark/40;
+  }
+  /* Uppercase tracking label */
+  .ops-label {
+    @apply text-xs uppercase tracking-[0.3em] text-ops-label;
+  }
+  /* Primary CTA button (filled brand) */
+  .ops-btn-primary {
+    @apply rounded-xl border border-abroad-dark bg-abroad-dark px-4 py-2 text-sm font-medium text-white hover:bg-ops-brand-hover transition;
+  }
+  /* Ghost/outline button (hollow brand) */
+  .ops-btn-ghost {
+    @apply px-4 py-2 rounded-xl border border-ops-brand text-ops-brand bg-white/70 hover:bg-white transition;
+  }
+  /* Navigation link pill used in every Ops page header */
+  .ops-nav-link {
+    @apply px-4 py-2 rounded-xl border border-abroad-dark text-abroad-dark bg-white/70 hover:bg-white transition text-sm font-medium;
+  }
 }

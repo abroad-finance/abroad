@@ -1,9 +1,14 @@
 import React from 'react'
 
+import { AB_STYLES } from '../constants'
+import { cn } from '../utils'
+
 interface TokenBadgeProps {
-  alt?: string // alt text for icon
-  iconSrc?: string // token icon URL
-  symbol: string // token symbol text
+  alt?: string
+  iconSrc?: string
+  suffix?: React.ReactNode
+  symbol: string
+  transparent?: boolean
 }
 
 const getFallbackInitials = (symbol: string): string => {
@@ -18,21 +23,35 @@ const getFallbackInitials = (symbol: string): string => {
   return initials || trimmed[0].toUpperCase()
 }
 
-export const TokenBadge: React.FC<TokenBadgeProps> = ({ alt, iconSrc, symbol }) => (
-  <div className="bg-white/60 backdrop-blur-xl rounded-4xl px-4 py-2 flex items-center justify-center text-abroad-dark">
+export const TokenBadge: React.FC<TokenBadgeProps> = ({
+  alt,
+  iconSrc,
+  suffix,
+  symbol,
+  transparent,
+}) => (
+  <div
+    className={cn(
+      transparent ? 'p-0' : `rounded-full px-3 py-1.5 ${AB_STYLES.badgeBg}`,
+      'flex items-center justify-center',
+    )}
+  >
     {iconSrc
       ? (
           <img
             alt={alt || symbol}
-            className="w-8 h-8 mr-2"
+            className="w-6 h-6 mr-2 rounded-full"
             src={iconSrc}
           />
         )
       : (
-          <div className="w-8 h-8 mr-2 rounded-full bg-white/80 border border-black/10 flex items-center justify-center text-[10px] font-semibold">
+          <div className={cn('w-6 h-6 mr-2 rounded-full flex items-center justify-center text-[10px] font-semibold', AB_STYLES.hoverAndText)}>
             {getFallbackInitials(symbol)}
           </div>
         )}
-    <span className="truncate max-w-[160px]">{symbol}</span>
+    <span className={cn('truncate max-w-[160px] text-sm font-medium', AB_STYLES.text)}>
+      {symbol}
+    </span>
+    {suffix && <span className="ml-1">{suffix}</span>}
   </div>
 )

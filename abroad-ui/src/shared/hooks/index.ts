@@ -1,3 +1,5 @@
 export { useDebounce } from './useDebounce'
 export { useLanguageSelector } from './useLanguageSelector'
+export { useMenuCloseOnOutsideClick } from './useMenuCloseOnOutsideClick'
 export { useNavBarResponsive } from './useNavBarResponsive'
+export { useWalletAuth } from './useWalletAuth'

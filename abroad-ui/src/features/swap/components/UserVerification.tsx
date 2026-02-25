@@ -67,7 +67,7 @@ const UserVerification = ({ onApproved, onClose }: UserVerificationProps): React
   useWebSocketSubscription('kyc.updated', handleKycUpdate)
   return (
     <div className="flex-1 flex items-center justify-center w-full flex-col">
-      <div className="w-[98%] max-w-md min-h-[60vh] bg-[#356E6A]/5 backdrop-blur-xl rounded-4xl p-4 md:p-6 flex flex-col items-center justify-center space-y-1 lg:space-y-4 text-abroad-dark md:text-white">
+      <div className="w-full max-w-md min-h-[60vh] bg-abroad-dark/5 backdrop-blur-xl rounded-2xl p-4 md:p-6 flex flex-col items-center justify-center space-y-1 lg:space-y-4 text-abroad-dark md:text-[var(--ab-text)]">
         <button
           aria-label="Close"
           className="fixed top-4 right-4 z-20 rounded-full bg-white/90 p-2 shadow-md md:top-6 md:right-6"
@@ -89,7 +89,7 @@ const UserVerification = ({ onApproved, onClose }: UserVerificationProps): React
         </p>
       </div>
       <Button
-        className="mt-4 w-[90%] max-w-md py-4 cursor-pointer"
+        className="mt-4 w-full py-4 cursor-pointer"
         loading={loading}
         onClick={handleKycRedirect}
       >

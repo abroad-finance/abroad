@@ -1,4 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import {
+  useCallback, useEffect, useMemo, useState,
+} from 'react'
 
 import { IWallet } from '../../interfaces/IWallet'
 import { IWalletAuthentication } from '../../interfaces/IWalletAuthentication'

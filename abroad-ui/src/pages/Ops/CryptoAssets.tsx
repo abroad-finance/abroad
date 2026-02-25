@@ -193,39 +193,39 @@ const CryptoAssets = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#F7F3EC] text-[#1A1A1A]">
+    <div className="ops-page">
       <div className="relative overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(27,94,89,0.18),_transparent_55%)]" />
         <div className="relative max-w-6xl mx-auto px-6 py-10">
           <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
             <div>
-              <div className="text-sm uppercase tracking-[0.3em] text-[#356E6A]">Operations</div>
+              <div className="text-sm uppercase tracking-[0.3em] text-abroad-dark">Operations</div>
               <h1 className="text-3xl md:text-4xl font-semibold">Crypto Asset Coverage</h1>
-              <p className="text-sm text-[#4B5563] max-w-xl mt-2">
+              <p className="text-sm text-gray-600 max-w-xl mt-2">
                 Control which crypto + chain combinations are enabled and provide the mint or issuer address for each.
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-3">
               <Link
-                className="px-4 py-2 rounded-xl border border-[#356E6A] text-[#356E6A] bg-white/70 hover:bg-white transition text-sm font-medium"
+                className="ops-nav-link"
                 to="/ops/flows"
               >
                 Flow Ops
               </Link>
               <Link
-                className="px-4 py-2 rounded-xl border border-[#356E6A] text-[#356E6A] bg-white/70 hover:bg-white transition text-sm font-medium"
+                className="ops-nav-link"
                 to="/ops/flows/definitions"
               >
                 Flow Definitions
               </Link>
               <Link
-                className="px-4 py-2 rounded-xl border border-[#356E6A] text-[#356E6A] bg-white/70 hover:bg-white transition text-sm font-medium"
+                className="ops-nav-link"
                 to="/ops/partners"
               >
                 Partners
               </Link>
               <button
-                className="px-4 py-2 rounded-xl border border-[#1B4D48] text-[#1B4D48] bg-white/70 hover:bg-white transition"
+                className="ops-btn-ghost"
                 disabled={!opsApiKey}
                 onClick={() => void loadData()}
                 type="button"
@@ -239,19 +239,19 @@ const CryptoAssets = () => {
 
           <div className="mt-8 grid gap-4 md:grid-cols-4">
             <div className="rounded-2xl border border-white/70 bg-white/80 px-5 py-4 shadow-[0_20px_45px_-35px_rgba(15,23,42,0.45)]">
-              <div className="text-xs uppercase tracking-[0.3em] text-[#5B6B6A]">Total</div>
-              <div className="mt-2 text-2xl font-semibold text-[#1F2937]">{summary?.total ?? '—'}</div>
+              <div className="ops-label">Total</div>
+              <div className="mt-2 text-2xl font-semibold text-gray-800">{summary?.total ?? '—'}</div>
             </div>
             <div className="rounded-2xl border border-white/70 bg-white/80 px-5 py-4 shadow-[0_20px_45px_-35px_rgba(15,23,42,0.45)]">
-              <div className="text-xs uppercase tracking-[0.3em] text-[#5B6B6A]">Configured</div>
+              <div className="ops-label">Configured</div>
               <div className="mt-2 text-2xl font-semibold text-emerald-700">{summary?.configured ?? '—'}</div>
             </div>
             <div className="rounded-2xl border border-white/70 bg-white/80 px-5 py-4 shadow-[0_20px_45px_-35px_rgba(15,23,42,0.45)]">
-              <div className="text-xs uppercase tracking-[0.3em] text-[#5B6B6A]">Enabled</div>
-              <div className="mt-2 text-2xl font-semibold text-[#356E6A]">{summary?.enabled ?? '—'}</div>
+              <div className="ops-label">Enabled</div>
+              <div className="mt-2 text-2xl font-semibold text-abroad-dark">{summary?.enabled ?? '—'}</div>
             </div>
             <div className="rounded-2xl border border-white/70 bg-white/80 px-5 py-4 shadow-[0_20px_45px_-35px_rgba(15,23,42,0.45)]">
-              <div className="text-xs uppercase tracking-[0.3em] text-[#5B6B6A]">Missing</div>
+              <div className="ops-label">Missing</div>
               <div className="mt-2 text-2xl font-semibold text-amber-700">{summary?.missing ?? '—'}</div>
             </div>
           </div>
@@ -260,14 +260,14 @@ const CryptoAssets = () => {
             <div className="flex flex-1 flex-col gap-2 md:flex-row md:items-center">
               <div className="flex-1">
                 <input
-                  className="w-full rounded-xl border border-[#DADADA] bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#356E6A]/40"
+                  className="w-full ops-input"
                   onChange={event => setSearch(event.target.value)}
                   placeholder="Search by asset or chain"
                   value={search}
                 />
               </div>
               <select
-                className="rounded-xl border border-[#DADADA] bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#356E6A]/40"
+                className="ops-input"
                 onChange={event => setFilter(event.target.value as typeof filter)}
                 value={filter}
               >
@@ -292,7 +292,7 @@ const CryptoAssets = () => {
           )}
 
           <div className="mt-6 rounded-2xl border border-white/70 bg-white/80 shadow-[0_20px_45px_-35px_rgba(15,23,42,0.45)]">
-            <div className="grid grid-cols-[1.2fr_1fr_1fr_1.6fr_0.6fr_1fr_auto] gap-3 border-b border-white/70 px-5 py-3 text-xs uppercase tracking-[0.3em] text-[#5B6B6A]">
+            <div className="grid grid-cols-[1.2fr_1fr_1fr_1.6fr_0.6fr_1fr_auto] gap-3 border-b border-white/70 px-5 py-3 ops-label">
               <div>Asset</div>
               <div>Status</div>
               <div>Enabled</div>
@@ -312,8 +312,8 @@ const CryptoAssets = () => {
                   <div className="px-5 py-4" key={key}>
                     <div className="grid grid-cols-[1.2fr_1fr_1fr_1.6fr_0.6fr_1fr_auto] gap-3 items-center">
                       <div>
-                        <div className="text-sm font-semibold text-[#1F2937]">{asset.cryptoCurrency}</div>
-                        <div className="text-xs text-[#6B7280]">{asset.blockchain}</div>
+                        <div className="text-sm font-semibold text-gray-800">{asset.cryptoCurrency}</div>
+                        <div className="text-xs text-gray-500">{asset.blockchain}</div>
                       </div>
                       <div>
                         <span className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${statusClasses[asset.status]}`}>
@@ -321,10 +321,10 @@ const CryptoAssets = () => {
                         </span>
                       </div>
                       <div>
-                        <label className="inline-flex items-center gap-2 text-sm text-[#1F2937]">
+                        <label className="inline-flex items-center gap-2 text-sm text-gray-800">
                           <input
                             checked={draft?.enabled ?? false}
-                            className="h-4 w-4 rounded border-[#DADADA] text-[#356E6A] focus:ring-[#356E6A]"
+                            className="h-4 w-4 rounded border-ops-border text-abroad-dark focus:ring-abroad-dark"
                             onChange={event => setDraftValue(key, { enabled: event.target.checked })}
                             type="checkbox"
                           />
@@ -333,7 +333,7 @@ const CryptoAssets = () => {
                       </div>
                       <div>
                         <input
-                          className="w-full rounded-xl border border-[#DADADA] bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#356E6A]/40"
+                          className="w-full ops-input"
                           onChange={event => setDraftValue(key, { mintAddress: event.target.value })}
                           placeholder={mintPlaceholder(asset.blockchain)}
                           value={draft?.mintAddress ?? ''}
@@ -341,7 +341,7 @@ const CryptoAssets = () => {
                       </div>
                       <div>
                         <input
-                          className="w-full rounded-xl border border-[#DADADA] bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#356E6A]/40"
+                          className="w-full ops-input"
                           min={0}
                           onChange={event => setDraftValue(key, { decimals: event.target.value })}
                           placeholder="Auto"
@@ -349,10 +349,10 @@ const CryptoAssets = () => {
                           value={draft?.decimals ?? ''}
                         />
                       </div>
-                      <div className="text-sm text-[#6B7280]">{formatDate(asset.updatedAt)}</div>
+                      <div className="text-sm text-gray-500">{formatDate(asset.updatedAt)}</div>
                       <div className="flex items-center justify-end gap-2">
                         <button
-                          className="rounded-xl border border-[#356E6A] bg-[#356E6A] px-4 py-2 text-sm font-medium text-white hover:bg-[#2B5B57] transition disabled:opacity-50"
+                          className="ops-btn-primary disabled:opacity-50"
                           disabled={!dirty || savingRow}
                           onClick={() => void handleSave(asset)}
                           type="button"
@@ -368,7 +368,7 @@ const CryptoAssets = () => {
                 )
               })}
               {filteredAssets.length === 0 && (
-                <div className="px-5 py-6 text-sm text-[#6B7280]">No assets match this filter.</div>
+                <div className="px-5 py-6 text-sm text-gray-500">No assets match this filter.</div>
               )}
             </div>
           </div>

@@ -85,7 +85,7 @@ const TxStatus = ({
   const renderAmount = () => {
     if (status === 'accepted') {
       return (
-        <span className="text-5xl font-bold text-abroad-dark md:text-white">
+        <span className="text-5xl font-bold text-abroad-dark md:text-[var(--ab-text)]">
           {' '}
           {getAmount(targetCurrency, targetAmount)}
           {' '}
@@ -178,7 +178,7 @@ const TxStatus = ({
       {error && <div className="text-red-600 text-sm">{error}</div>}
 
       <div
-        className="relative w-[98%] max-w-[50vh] h-[60vh] bg-[#356E6A]/5 backdrop-blur-xl rounded-4xl p-6 flex flex-col items-center justify-center space-y-4"
+        className="relative w-full max-w-md min-h-[60vh] bg-abroad-dark/5 backdrop-blur-xl rounded-2xl p-6 flex flex-col items-center justify-center space-y-4"
         id="bg-container"
       >
         {renderAmount()}
@@ -187,19 +187,19 @@ const TxStatus = ({
           {renderIcon()}
         </div>
         {/* Title */}
-        <div className="text-2xl font-bold  text-center text-abroad-dark md:text-white">
+        <div className="text-2xl font-bold text-center text-abroad-dark md:text-[var(--ab-text)]">
           {renderStatusText()}
         </div>
 
         {/* Description */}
-        <div className="text-center text-abroad-dark md:text-white">
+        <div className="text-center text-abroad-dark md:text-[var(--ab-text)]">
           {renderSubtitle()}
         </div>
       </div>
 
       {(status === 'accepted' || status === 'denied') && (
         <Button
-          className="mt-4 w-[90%] max-w-[50vh] py-4"
+          className="mt-4 w-full py-4"
           onClick={status === 'accepted' ? onNewTransaction : onRetry}
         >
           {status === 'accepted'

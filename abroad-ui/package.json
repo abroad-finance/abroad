@@ -29,11 +29,10 @@
     "@tailwindcss/vite": "^4.1.11",
     "@tolgee/react": "^6.2.7",
     "@yudiel/react-qr-scanner": "^2.3.1",
-    "axios": "^1.11.0",
+    "clsx": "^2.1.1",
     "eslint-plugin-newline-destructuring": "^1.2.2",
     "ethers": "^6.15.0",
     "framer-motion": "^12.23.12",
-    "inversify": "^7.9.1",
     "lottie-web": "^5.13.0",
     "lucide-react": "^0.539.0",
     "persona": "^5.3.1",
@@ -41,6 +40,7 @@
     "react-dom": "^19.1.1",
     "react-router-dom": "^7.8.0",
     "socket.io-client": "^4.7.5",
+    "tailwind-merge": "^3.5.0",
     "tailwindcss": "^4.1.11"
   },
   "devDependencies": {

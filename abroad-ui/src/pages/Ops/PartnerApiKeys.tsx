@@ -1,6 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import {
+  useCallback, useEffect, useMemo, useState,
+} from 'react'
 import { Link } from 'react-router-dom'
 
+import { useOpsApiKey } from '../../services/admin/opsAuthStore'
 import {
   createPartner,
   listPartners,
@@ -8,7 +11,6 @@ import {
   rotatePartnerApiKey,
 } from '../../services/admin/partnerAdminApi'
 import { OpsCreatePartnerInput, OpsPartner } from '../../services/admin/partnerTypes'
-import { useOpsApiKey } from '../../services/admin/opsAuthStore'
 import OpsApiKeyPanel from './OpsApiKeyPanel'
 
 const pageSize = 20
@@ -198,39 +200,39 @@ const PartnerApiKeys = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#F7F3EC] text-[#1A1A1A]">
+    <div className="ops-page">
       <div className="relative overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(27,94,89,0.18),_transparent_55%)]" />
         <div className="relative max-w-7xl mx-auto px-6 py-10">
           <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
             <div>
-              <div className="text-sm uppercase tracking-[0.3em] text-[#356E6A]">Operations</div>
+              <div className="text-sm uppercase tracking-[0.3em] text-abroad-dark">Operations</div>
               <h1 className="text-3xl md:text-4xl font-semibold">Partners & API Keys</h1>
-              <p className="text-sm text-[#4B5563] max-w-2xl mt-2">
+              <p className="text-sm text-gray-600 max-w-2xl mt-2">
                 Create partner accounts, issue one-time API keys, rotate compromised keys, and revoke access.
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-3">
               <Link
-                className="px-4 py-2 rounded-xl border border-[#356E6A] text-[#356E6A] bg-white/70 hover:bg-white transition text-sm font-medium"
+                className="ops-nav-link"
                 to="/ops/flows"
               >
                 Flow Ops
               </Link>
               <Link
-                className="px-4 py-2 rounded-xl border border-[#356E6A] text-[#356E6A] bg-white/70 hover:bg-white transition text-sm font-medium"
+                className="ops-nav-link"
                 to="/ops/flows/definitions"
               >
                 Flow Definitions
               </Link>
               <Link
-                className="px-4 py-2 rounded-xl border border-[#356E6A] text-[#356E6A] bg-white/70 hover:bg-white transition text-sm font-medium"
+                className="ops-nav-link"
                 to="/ops/crypto-assets"
               >
                 Crypto Assets
               </Link>
               <button
-                className="px-4 py-2 rounded-xl border border-[#1B4D48] text-[#1B4D48] bg-white/70 hover:bg-white transition"
+                className="ops-btn-ghost"
                 disabled={!opsApiKey || loading}
                 onClick={() => void loadPartners()}
                 type="button"
@@ -296,24 +298,24 @@ const PartnerApiKeys = () => {
 
           <div className="mt-8 grid gap-6 xl:grid-cols-[1.1fr_1.9fr]">
             <div className="rounded-2xl border border-white/70 bg-white/80 p-5 shadow-[0_20px_45px_-35px_rgba(15,23,42,0.45)]">
-              <div className="text-xs uppercase tracking-[0.3em] text-[#5B6B6A]">Create Partner</div>
+              <div className="ops-label">Create Partner</div>
               <h2 className="mt-2 text-xl font-semibold">Onboard New Partner</h2>
               <div className="mt-4 grid grid-cols-1 gap-3">
                 <input
-                  className="rounded-xl border border-[#DADADA] bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#356E6A]/40"
+                  className="ops-input"
                   onChange={event => setDraft(current => ({ ...current, company: event.target.value }))}
                   placeholder="Company"
                   value={draft.company}
                 />
                 <div className="grid grid-cols-2 gap-3">
                   <input
-                    className="rounded-xl border border-[#DADADA] bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#356E6A]/40"
+                    className="ops-input"
                     onChange={event => setDraft(current => ({ ...current, country: event.target.value }))}
                     placeholder="Country"
                     value={draft.country}
                   />
                   <input
-                    className="rounded-xl border border-[#DADADA] bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#356E6A]/40"
+                    className="ops-input"
                     onChange={event => setDraft(current => ({ ...current, phone: event.target.value }))}
                     placeholder="Phone (optional)"
                     value={draft.phone}
@@ -321,27 +323,27 @@ const PartnerApiKeys = () => {
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <input
-                    className="rounded-xl border border-[#DADADA] bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#356E6A]/40"
+                    className="ops-input"
                     onChange={event => setDraft(current => ({ ...current, firstName: event.target.value }))}
                     placeholder="First name"
                     value={draft.firstName}
                   />
                   <input
-                    className="rounded-xl border border-[#DADADA] bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#356E6A]/40"
+                    className="ops-input"
                     onChange={event => setDraft(current => ({ ...current, lastName: event.target.value }))}
                     placeholder="Last name"
                     value={draft.lastName}
                   />
                 </div>
                 <input
-                  className="rounded-xl border border-[#DADADA] bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#356E6A]/40"
+                  className="ops-input"
                   onChange={event => setDraft(current => ({ ...current, email: event.target.value }))}
                   placeholder="Email"
                   type="email"
                   value={draft.email}
                 />
                 <button
-                  className="mt-1 rounded-xl border border-[#356E6A] bg-[#356E6A] px-4 py-2 text-sm font-medium text-white hover:bg-[#2B5B57] transition disabled:opacity-60"
+                  className="mt-1 ops-btn-primary disabled:opacity-60"
                   disabled={!opsApiKey || creating}
                   onClick={() => void handleCreatePartner()}
                   type="button"
@@ -354,10 +356,10 @@ const PartnerApiKeys = () => {
             <div className="rounded-2xl border border-white/70 bg-white/80 p-5 shadow-[0_20px_45px_-35px_rgba(15,23,42,0.45)]">
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-xs uppercase tracking-[0.3em] text-[#5B6B6A]">Partner Directory</div>
+                  <div className="ops-label">Partner Directory</div>
                   <h2 className="mt-2 text-xl font-semibold">Current Partners</h2>
                 </div>
-                <div className="text-xs text-[#6B7280]">
+                <div className="text-xs text-gray-500">
                   Page
                   {' '}
                   {page}
@@ -371,7 +373,7 @@ const PartnerApiKeys = () => {
               <div className="mt-4 overflow-x-auto">
                 <table className="w-full min-w-[760px] text-sm">
                   <thead>
-                    <tr className="text-left text-xs uppercase tracking-wider text-[#6B7280]">
+                    <tr className="text-left text-xs uppercase tracking-wider text-gray-500">
                       <th className="px-2 py-2">Partner</th>
                       <th className="px-2 py-2">Contact</th>
                       <th className="px-2 py-2">Created</th>
@@ -381,20 +383,20 @@ const PartnerApiKeys = () => {
                   </thead>
                   <tbody>
                     {partners.map(partner => (
-                      <tr className="border-t border-[#ECECEC]" key={partner.id}>
+                      <tr className="border-t border-neutral-200" key={partner.id}>
                         <td className="px-2 py-3">
                           <div className="font-medium">{partner.name}</div>
-                          <div className="text-xs text-[#6B7280]">{partner.id}</div>
+                          <div className="text-xs text-gray-500">{partner.id}</div>
                         </td>
                         <td className="px-2 py-3">
                           <div>{partner.email || '—'}</div>
-                          <div className="text-xs text-[#6B7280]">
+                          <div className="text-xs text-gray-500">
                             {partner.firstName || ''}
                             {partner.firstName && partner.lastName ? ' ' : ''}
                             {partner.lastName || ''}
                           </div>
                         </td>
-                        <td className="px-2 py-3 text-xs text-[#6B7280]">{formatDate(partner.createdAt)}</td>
+                        <td className="px-2 py-3 text-xs text-gray-500">{formatDate(partner.createdAt)}</td>
                         <td className="px-2 py-3">
                           <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${
                             partner.hasApiKey
@@ -408,7 +410,7 @@ const PartnerApiKeys = () => {
                         <td className="px-2 py-3">
                           <div className="flex items-center gap-2">
                             <button
-                              className="rounded-lg border border-[#356E6A] bg-white px-3 py-1.5 text-xs font-medium text-[#356E6A] hover:bg-[#ECF5F4] transition disabled:opacity-60"
+                              className="rounded-lg border border-abroad-dark bg-white px-3 py-1.5 text-xs font-medium text-abroad-dark hover:bg-abroad-dark/5 transition disabled:opacity-60"
                               disabled={!opsApiKey || Boolean(actionLoading)}
                               onClick={() => void handleRotate(partner)}
                               type="button"
@@ -416,7 +418,7 @@ const PartnerApiKeys = () => {
                               {actionLoading === `rotate:${partner.id}` ? 'Rotating...' : 'Rotate Key'}
                             </button>
                             <button
-                              className="rounded-lg border border-[#D1D5DB] bg-white px-3 py-1.5 text-xs font-medium text-[#374151] hover:bg-[#F5F5F5] transition disabled:opacity-60"
+                              className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-neutral-100 transition disabled:opacity-60"
                               disabled={!opsApiKey || Boolean(actionLoading) || !partner.hasApiKey}
                               onClick={() => void handleRevoke(partner)}
                               type="button"
@@ -432,18 +434,18 @@ const PartnerApiKeys = () => {
               </div>
 
               {!loading && opsApiKey && partners.length === 0 && (
-                <div className="mt-6 rounded-xl border border-dashed border-[#D6D6D6] px-4 py-10 text-center text-sm text-[#6B7280]">
+                <div className="mt-6 rounded-xl border border-dashed border-neutral-300 px-4 py-10 text-center text-sm text-gray-500">
                   No partners found.
                 </div>
               )}
 
               {loading && opsApiKey && (
-                <div className="mt-6 text-sm text-[#6B7280]">Loading partners...</div>
+                <div className="mt-6 text-sm text-gray-500">Loading partners...</div>
               )}
 
               <div className="mt-5 flex items-center justify-end gap-2">
                 <button
-                  className="h-9 w-9 rounded-xl border border-[#DADADA] bg-white text-lg disabled:opacity-40"
+                  className="h-9 w-9 rounded-xl border border-ops-border bg-white text-lg disabled:opacity-40"
                   disabled={page <= 1 || loading}
                   onClick={() => setPage(current => Math.max(1, current - 1))}
                   type="button"
@@ -451,7 +453,7 @@ const PartnerApiKeys = () => {
                   ‹
                 </button>
                 <button
-                  className="h-9 w-9 rounded-xl border border-[#DADADA] bg-white text-lg disabled:opacity-40"
+                  className="h-9 w-9 rounded-xl border border-ops-border bg-white text-lg disabled:opacity-40"
                   disabled={page >= totalPages || loading}
                   onClick={() => setPage(current => Math.min(totalPages, current + 1))}
                   type="button"

@@ -6,12 +6,15 @@ import {
 import React from 'react'
 
 import { TransactionListItem } from '../../../api'
+import { AB_STYLES } from '../../../shared/constants'
+import { cn } from '../../../shared/utils'
 import TransactionDetail from '../shared/TransactionDetail'
 
 export interface WalletDetailsProps {
   address: null | string
   copiedAddress: boolean
   formatDate: (dateString: string) => string
+  formatDateWithTime: (dateString: string) => string
   getStatusStyle: (status: string) => string
   getStatusText: (status: string) => string
   hasMoreTransactions: boolean
@@ -24,11 +27,13 @@ export interface WalletDetailsProps {
   onLoadMoreTransactions: () => void
   onRefreshBalance: () => void
   onRefreshTransactions: () => void
+  selectedAssetLabel?: string
   selectedTransaction: null | TransactionListItem
   setSelectedTransaction: (transaction: null | TransactionListItem) => void
   transactionError: null | string
   transactions: TransactionListItem[]
   usdcBalance: string
+  usdtBalance: string
 }
 
 // Stateless controlled component. All data & handlers provided via props.
@@ -36,6 +41,7 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({
   address,
   copiedAddress,
   formatDate,
+  formatDateWithTime,
   getStatusStyle,
   getStatusText,
   hasMoreTransactions,
@@ -48,13 +54,16 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({
   onLoadMoreTransactions,
   onRefreshBalance,
   onRefreshTransactions,
+  selectedAssetLabel,
   selectedTransaction,
   setSelectedTransaction,
   transactionError,
   transactions,
   usdcBalance,
+  usdtBalance,
 }) => {
   const { t } = useTranslate()
+  const sourceBalance = selectedAssetLabel === 'USDT' ? usdtBalance : usdcBalance
 
   const formatWalletAddress = (addr: null | string) => {
     if (!addr) return t('wallet_details.not_connected', 'No conectado')
@@ -86,66 +95,67 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({
         type: 'spring',
       }}
     >
-      <div className="bg-white rounded-t-4xl md:rounded-4xl shadow-lg border border-gray-200 p-4 relative w-full h-full md:h-full md:flex md:flex-col overflow-y-auto">
+      <div
+        className="rounded-t-4xl md:rounded-4xl p-4 relative w-full h-full md:h-full md:flex md:flex-col overflow-y-auto backdrop-blur-xl bg-ab-wallet-panel-bg border border-ab-wallet-panel-border shadow-panel"
+      >
         {/* Close Button */}
         {onClose && (
           <button
-            className="absolute top-4 right-4 p-1 rounded-full hover:bg-gray-100 transition-colors duration-200 cursor-pointer z-10"
+            className={cn('absolute top-4 right-4 p-1.5 rounded-full transition-colors duration-200 cursor-pointer z-10', AB_STYLES.hoverBg)}
             onClick={onClose}
+            type="button"
           >
-            <X className="w-5 h-5 text-gray-400 hover:text-gray-600" />
+            <X className={cn('w-5 h-5', AB_STYLES.textMuted)} />
           </button>
         )}
 
         {/* Header */}
         <div className="mb-6 pr-8 text-center mt-2 md:mt-4">
-          <h2 className="text-2xl font-semibold text-gray-900 mb-2">
+          <h2 className={cn('text-2xl font-semibold mb-2', AB_STYLES.text)}>
             {t('wallet_details.header.title', 'Tu Cuenta')}
           </h2>
-          <p className="text-md text-gray-600">
+          <p className={cn('text-md', AB_STYLES.textMuted)}>
             {t('wallet_details.header.subtitle', 'Gestiona tu billetera y consulta el historial de transacciones')}
           </p>
         </div>
 
-        {/* Wallet Address & Balance Card */}
-        <div
-          className="border border-gray-200 rounded-xl p-6 py-8 mb-6 bg-cover bg-center bg-no-repeat"
-          style={{ backgroundImage: 'url(https://static.vecteezy.com/system/resources/previews/026/493/927/non_2x/abstract-gradient-dark-green-liquid-wave-background-free-vector.jpg)' }}
-        >
-          {/* Wallet Address Section */}
+        {/* Wallet Address & Balance Card - glass */}
+        <div className={cn('rounded-2xl p-6 py-8 mb-6 backdrop-blur-md', AB_STYLES.badgeBg)}>
           <div className="flex items-center justify-between mb-4">
-            <span className="text-white font-mono text-sm break-all">{formatWalletAddress(address)}</span>
+            <span className={cn('font-mono text-sm break-all', AB_STYLES.text)}>{formatWalletAddress(address)}</span>
             <div className="flex space-x-2">
               <button
-                className="p-1 hover:bg-red-100 hover:bg-opacity-20 rounded transition-colors duration-200"
+                className={cn('p-1.5 rounded-lg transition-colors duration-200', AB_STYLES.hoverBg)}
                 onClick={onDisconnectWallet}
                 title={t('wallet_details.actions.disconnect', 'Desconectar billetera')}
+                type="button"
               >
-                <svg className="w-4 h-4 text-red-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className={cn('w-4 h-4', AB_STYLES.textMuted)} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} />
                 </svg>
               </button>
               <button
-                className="p-1 hover:bg-white hover:bg-opacity-20 rounded transition-colors duration-200"
+                className={cn('p-1.5 rounded-lg transition-colors duration-200', AB_STYLES.hoverBg)}
                 onClick={onCopyAddress}
                 title={t('wallet_details.actions.copy_address', 'Copiar dirección')}
+                type="button"
               >
-                <Copy className="w-4 h-4 text-white" />
+                <Copy className={cn('w-4 h-4', AB_STYLES.text)} />
               </button>
               <button
-                className="p-1 hover:bg-white hover:bg-opacity-20 rounded transition-colors duration-200"
+                className={cn('p-1.5 rounded-lg transition-colors duration-200', AB_STYLES.hoverBg)}
                 onClick={() => window.open(`https://stellar.expert/explorer/public/account/${address}`, '_blank')}
                 title={t('wallet_details.actions.view_explorer', 'Ver en explorador')}
+                type="button"
               >
-                <ExternalLink className="w-4 h-4 text-white" />
+                <ExternalLink className={cn('w-4 h-4', AB_STYLES.text)} />
               </button>
             </div>
           </div>
           {copiedAddress && (
-            <div className="text-green-300 text-xs mb-4">{t('wallet_details.toast.copied', '¡Dirección copiada!')}</div>
+            <div className={cn('text-xs mb-4', AB_STYLES.btnColor)}>{t('wallet_details.toast.copied', '¡Dirección copiada!')}</div>
           )}
 
-          {/* Balance Section */}
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
               <img
@@ -155,23 +165,23 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({
               />
               {isLoadingBalance
                 ? (
-                    <div className="w-32 h-9 bg-white/20 rounded animate-pulse"></div>
+                    <div className={cn('h-9 w-32 rounded-lg animate-pulse', AB_STYLES.separatorBg)} />
                   )
                 : (
-                    <span className="text-white font-bold text-4xl">
+                    <span className={cn('font-bold text-4xl', AB_STYLES.text)}>
                       $
-                      {usdcBalance}
+                      {sourceBalance}
                     </span>
                   )}
             </div>
-            {/* Refresh Balance Button */}
             <button
-              className="p-2 hover:bg-white hover:bg-opacity-20 rounded-full transition-colors duration-200 disabled:opacity-50"
+              className={cn('p-2 rounded-full transition-colors duration-200 disabled:opacity-50', AB_STYLES.hoverBg)}
               disabled={isLoadingBalance}
               onClick={onRefreshBalance}
               title={t('wallet_details.actions.refresh_balance', 'Actualizar balance')}
+              type="button"
             >
-              <RefreshCw className={`w-4 h-4 text-white ${isLoadingBalance ? 'animate-spin' : ''}`} />
+              <RefreshCw className={cn(`w-4 h-4 ${isLoadingBalance ? 'animate-spin' : ''}`, AB_STYLES.text)} />
             </button>
           </div>
         </div>
@@ -179,20 +189,21 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({
         {/* Transaction History */}
         <div className="flex-1">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-gray-800 font-medium text-lg">{t('wallet_details.transactions.title', 'Historial de Transacciones')}</h3>
+            <h3 className={cn('font-medium text-lg', AB_STYLES.text)}>{t('wallet_details.transactions.title', 'Historial de Transacciones')}</h3>
             <button
-              className="p-2 hover:bg-gray-100 rounded-full transition-colors duration-200 disabled:opacity-50"
+              className={cn('p-2 rounded-full transition-colors duration-200 disabled:opacity-50', AB_STYLES.hoverBg)}
               disabled={isLoadingTransactions}
               onClick={onRefreshTransactions}
               title={t('wallet_details.actions.refresh_transactions', 'Actualizar transacciones')}
+              type="button"
             >
-              <RefreshCw className={`w-4 h-4 text-gray-600 ${isLoadingTransactions ? 'animate-spin' : ''}`} />
+              <RefreshCw className={cn(`w-4 h-4 ${isLoadingTransactions ? 'animate-spin' : ''}`, AB_STYLES.text)} />
             </button>
           </div>
 
           {transactionError && (
-            <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-4">
-              <p className="text-red-700 text-sm">{transactionError}</p>
+            <div className={cn('rounded-xl p-4 mb-4', AB_STYLES.hoverBorder)}>
+              <p className={cn('text-sm', AB_STYLES.text)}>{transactionError}</p>
             </div>
           )}
 
@@ -200,16 +211,16 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({
             ? (
                 <div className="space-y-3">
                   {[...Array(3)].map((_, index) => (
-                    <div className="bg-gray-50 border border-gray-200 rounded-xl p-4" key={index}>
+                    <div className={cn('rounded-xl p-4', AB_STYLES.badgeBg)} key={index}>
                       <div className="animate-pulse">
                         <div className="flex justify-between items-center mb-2">
-                          <div className="h-4 bg-gray-200 rounded w-24"></div>
-                          <div className="h-6 bg-gray-200 rounded w-20"></div>
+                          <div className={cn('h-4 rounded w-24', AB_STYLES.separatorBg)} />
+                          <div className={cn('h-6 rounded w-20', AB_STYLES.separatorBg)} />
                         </div>
-                        <div className="h-4 bg-gray-200 rounded w-32 mb-3"></div>
+                        <div className={cn('h-4 rounded w-32 mb-3', AB_STYLES.separatorBg)} />
                         <div className="flex justify-between items-center">
-                          <div className="h-6 bg-gray-200 rounded w-20"></div>
-                          <div className="h-6 bg-gray-200 rounded w-24"></div>
+                          <div className={cn('h-6 rounded w-20', AB_STYLES.separatorBg)} />
+                          <div className={cn('h-6 rounded w-24', AB_STYLES.separatorBg)} />
                         </div>
                       </div>
                     </div>
@@ -222,6 +233,7 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({
                     ? (
                         <TransactionDetail
                           formatDate={formatDate}
+                          formatDateWithTime={formatDateWithTime}
                           getStatusStyle={getStatusStyle}
                           getStatusText={getStatusText}
                           onBack={() => setSelectedTransaction(null)}
@@ -233,7 +245,7 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({
                         <>
                           {transactions.map((transaction: TransactionListItem) => (
                             <div
-                              className="bg-gray-50 border border-gray-200 rounded-xl p-4 hover:bg-gray-100 transition-colors duration-200 cursor-pointer"
+                              className={cn('rounded-xl p-4 transition-colors duration-200 cursor-pointer', AB_STYLES.badgeBg)}
                               key={transaction.id}
                               onClick={() => setSelectedTransaction(transaction)}
                               onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setSelectedTransaction(transaction) }}
@@ -241,29 +253,22 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({
                               tabIndex={0}
                             >
                               <div className="flex items-center justify-between mb-2">
-                                <div className="flex items-center space-x-2">
-                                  <span className="text-gray-600 text-sm">{formatDate(transaction.createdAt)}</span>
-                                </div>
+                                <span className={cn('text-sm', AB_STYLES.textMuted)}>{formatDate(transaction.createdAt)}</span>
                                 <span className={`text-xs px-2 py-1 rounded-full ${getStatusStyle(transaction.status)}`}>
                                   {getStatusText(transaction.status)}
                                 </span>
                               </div>
-
                               <div className="mb-2">
-                                <span className="text-gray-500 text-xs">{t('wallet_details.transactions.to', 'Para:')}</span>
-                                <span className="text-gray-700 font-mono text-sm">
-                                  {transaction.accountNumber}
+                                <span className={cn('text-xs', AB_STYLES.textMuted)}>
+                                  {t('wallet_details.transactions.to', 'Para:')}
+                                  {' '}
                                 </span>
+                                <span className={cn('font-mono text-sm', AB_STYLES.text)}>{transaction.accountNumber}</span>
                               </div>
-
                               <div className="flex justify-between items-center">
                                 <div className="flex items-center space-x-1">
-                                  <img
-                                    alt="USDC"
-                                    className="w-4 h-4"
-                                    src="https://storage.googleapis.com/cdn-abroad/Icons/Tokens/USDC%20Token.svg"
-                                  />
-                                  <span className="text-gray-700 text-xl font-bold">
+                                  <img alt="USDC" className="w-4 h-4" src="https://storage.googleapis.com/cdn-abroad/Icons/Tokens/USDC%20Token.svg" />
+                                  <span className={cn('text-xl font-bold', AB_STYLES.text)}>
                                     $
                                     {transaction.quote.sourceAmount.toFixed(2)}
                                   </span>
@@ -278,14 +283,11 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({
                                         : 'https://hatscripts.github.io/circle-flags/flags/co.svg'
                                     }
                                   />
-                                  <span className="text-gray-700 text-xl font-bold">
+                                  <span className={cn('text-xl font-bold', AB_STYLES.text)}>
                                     {transaction.quote.targetCurrency === 'BRL' ? 'R$' : '$'}
                                     {transaction.quote.targetAmount.toLocaleString(
                                       transaction.quote.targetCurrency === 'BRL' ? 'pt-BR' : 'es-CO',
-                                      {
-                                        maximumFractionDigits: 2,
-                                        minimumFractionDigits: 2,
-                                      },
+                                      { maximumFractionDigits: 2, minimumFractionDigits: 2 },
                                     )}
                                   </span>
                                 </div>
@@ -295,13 +297,13 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({
 
                           {hasMoreTransactions && (
                             <button
-                              className="w-full flex items-center justify-center gap-2 border border-dashed border-gray-300 rounded-xl px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 transition-colors duration-200 disabled:opacity-50"
+                              className={cn('w-full flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition-colors duration-200 disabled:opacity-50 border border-dashed border-ab-separator', AB_STYLES.textMuted)}
                               disabled={isLoadingMoreTransactions}
                               onClick={onLoadMoreTransactions}
                               type="button"
                             >
                               {isLoadingMoreTransactions && (
-                                <RefreshCw className="w-4 h-4 text-gray-600 animate-spin" />
+                                <RefreshCw className={cn('w-4 h-4 animate-spin', AB_STYLES.textMuted)} />
                               )}
                               <span>
                                 {isLoadingMoreTransactions
@@ -317,27 +319,18 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({
 
           {!isLoadingTransactions && transactions.length === 0 && !transactionError && (
             <div className="text-center py-8">
-              {/* Skeleton card - 60% smaller than regular transaction cards */}
-              <div className="bg-gray-50 border border-gray-200 rounded-xl p-2.5 mb-4 mx-auto max-w-[60%] relative">
-                <div>
-                  <div className="flex justify-between items-center mb-1.5">
-                    <div className="h-3 bg-gray-200 rounded w-16"></div>
-                    <div className="h-4 bg-gray-200 rounded w-12"></div>
-                  </div>
-                  <div className="h-3 bg-gray-200 rounded w-20 mb-2"></div>
-                  <div className="flex justify-between items-center">
-                    <div className="h-4 bg-gray-200 rounded w-12"></div>
-                    <div className="h-4 bg-gray-200 rounded w-16"></div>
-                  </div>
+              <div className={cn('rounded-xl p-2.5 mb-4 mx-auto max-w-[60%]', AB_STYLES.badgeBg)}>
+                <div className="flex justify-between items-center mb-1.5">
+                  <div className={cn('h-3 rounded w-16', AB_STYLES.separatorBg)} />
+                  <div className={cn('h-4 rounded w-12', AB_STYLES.separatorBg)} />
                 </div>
-                {/* Alert sign overlay - top right corner */}
-                <div className="absolute -top-2 -right-2">
-                  <div className="bg-orange-200 text-white rounded-full w-5 h-5 flex items-center justify-center text-sm font-bold">
-                    !
-                  </div>
+                <div className={cn('h-3 rounded w-20 mb-2', AB_STYLES.separatorBg)} />
+                <div className="flex justify-between items-center">
+                  <div className={cn('h-4 rounded w-12', AB_STYLES.separatorBg)} />
+                  <div className={cn('h-4 rounded w-16', AB_STYLES.separatorBg)} />
                 </div>
               </div>
-              <div className="text-gray-400 text-sm">
+              <div className={cn('text-sm', AB_STYLES.textMuted)}>
                 <div className="font-medium mb-1">{t('wallet_details.empty.no_transactions', 'No hay transacciones aún')}</div>
                 <div className="text-xs">{t('wallet_details.empty.hint', 'Cuando hagas tu primera transacción, aparecerá aquí.')}</div>
               </div>
@@ -346,7 +339,7 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="text-xs text-gray-500 leading-relaxed text-center mt-6 pt-4 border-t border-gray-200">
+        <div className={cn('text-xs leading-relaxed text-center mt-6 pt-4', AB_STYLES.borderTopSeparator, AB_STYLES.textMuted)}>
           {t('wallet_details.footer.realtime_note', 'Los datos de transacciones se actualizan en tiempo real')}
         </div>
       </div>

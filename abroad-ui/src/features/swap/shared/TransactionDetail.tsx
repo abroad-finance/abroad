@@ -1,12 +1,16 @@
 import { useTranslate } from '@tolgee/react'
-import { ShieldQuestionMark } from 'lucide-react'
-import React, { useState } from 'react'
+import {
+  ArrowLeft, Calendar, ChevronDown, ChevronUp, Hash, HelpCircle, Send, Wallet,
+} from 'lucide-react'
+import React, { useMemo, useState } from 'react'
 
 import { TransactionListItem } from '../../../api'
-import { formatMoney } from '../../../shared/utils'
+import { AB_STYLES } from '../../../shared/constants'
+import { cn } from '../../../shared/utils'
 
 export interface TransactionDetailProps {
   formatDate: (dateString: string) => string
+  formatDateWithTime: (dateString: string) => string
   getStatusStyle: (status: string) => string
   getStatusText: (status: string) => string
   onBack: () => void
@@ -14,8 +18,68 @@ export interface TransactionDetailProps {
   transaction: TransactionListItem
 }
 
+type TableRow = { label: string, value: string }
+
+const LABEL_MAP: Record<string, string> = {
+  accountNumber: 'Account number',
+  createdAt: 'Date & time',
+  id: 'ID',
+  partnerUserId: 'Partner user ID',
+  sourceAmount: 'Source amount (USDC)',
+  status: 'Status',
+  targetAmount: 'Target amount',
+  targetCurrency: 'Target currency',
+  transactionReference: 'Transaction reference',
+}
+
+function labelFromKey(key: string): string {
+  return LABEL_MAP[key] ?? key.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase()).trim()
+}
+
+const TOP_LEVEL_ORDER = [
+  'id',
+  'partnerUserId',
+  'accountNumber',
+  'status',
+  'createdAt',
+  'transactionReference',
+  'quote',
+]
+
+function flattenToTableRows(
+  transaction: TransactionListItem,
+  formatDateWithTime: (dateString: string) => string,
+  getStatusText: (status: string) => string,
+): TableRow[] {
+  const rows: TableRow[] = []
+  const tx = transaction as unknown as Record<string, unknown>
+  const keys = Object.keys(tx)
+  const ordered = [...TOP_LEVEL_ORDER.filter(k => keys.includes(k)), ...keys.filter(k => !TOP_LEVEL_ORDER.includes(k))]
+  for (const key of ordered) {
+    if (key === 'quote' && tx.quote != null && typeof tx.quote === 'object') {
+      const q = tx.quote as Record<string, unknown>
+      for (const qk of Object.keys(q)) {
+        rows.push({ label: labelFromKey(qk), value: String(q[qk] ?? '') })
+      }
+      continue
+    }
+    if (key === 'createdAt' && typeof tx[key] === 'string') {
+      rows.push({ label: labelFromKey(key), value: formatDateWithTime(tx[key] as string) })
+      continue
+    }
+    if (key === 'status' && typeof tx[key] === 'string') {
+      rows.push({ label: labelFromKey(key), value: getStatusText(tx[key] as string) })
+      continue
+    }
+    if (tx[key] != null && typeof tx[key] !== 'object') {
+      rows.push({ label: labelFromKey(key), value: String(tx[key]) })
+    }
+  }
+  return rows
+}
+
 const TransactionDetail: React.FC<TransactionDetailProps> = ({
-  formatDate,
+  formatDateWithTime,
   getStatusStyle,
   getStatusText,
   onBack,
@@ -23,78 +87,144 @@ const TransactionDetail: React.FC<TransactionDetailProps> = ({
   transaction,
 }) => {
   const { t } = useTranslate()
-  const [showRawDetails, setShowRawDetails] = useState(false)
+  const [showFullDetails, setShowFullDetails] = useState(false)
+  const targetSymbol = transaction.quote.targetCurrency === 'BRL' ? 'R$' : '$'
+  const targetFormatted = transaction.quote.targetAmount.toLocaleString(
+    transaction.quote.targetCurrency === 'BRL' ? 'pt-BR' : 'es-CO',
+    { maximumFractionDigits: 2, minimumFractionDigits: 2 },
+  )
+
+  const tableRows = useMemo(
+    () => flattenToTableRows(transaction, formatDateWithTime, getStatusText),
+    [
+      transaction,
+      formatDateWithTime,
+      getStatusText,
+    ],
+  )
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4">
-      <div className="flex items-center justify-between mb-3">
-        <h4 className="text-lg font-medium text-gray-800">{t('wallet_details.transactions.detail_title', 'Detalle de transacción')}</h4>
-        <div className="flex items-center gap-3">
+    <div className={cn('rounded-xl p-4 backdrop-blur-md', AB_STYLES.badgeBg)}>
+      <div className="flex items-center justify-between mb-5">
+        <h4 className={cn('text-lg font-semibold', AB_STYLES.text)}>
+          {t('wallet_details.transactions.detail_title', 'Transaction details')}
+        </h4>
+        <div className="flex items-center gap-2">
           <button
             aria-label={t('wallet_details.actions.support', 'Support')}
-            className="text-sm hover:underline hover:cursor-pointer"
+            className={cn('p-2 rounded-lg transition-colors', AB_STYLES.hoverBg)}
             onClick={onSupport}
+            type="button"
           >
-            <ShieldQuestionMark className="w-5 h-5 text-abroad-dark" />
+            <HelpCircle className={cn('w-5 h-5', AB_STYLES.text)} />
           </button>
-
           <button
-            className="text-sm text-blue-600 hover:underline hover:cursor-pointer"
+            className={cn('flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors', AB_STYLES.hoverAndText)}
             onClick={onBack}
+            type="button"
           >
-            {t('wallet_details.actions.back_to_list', 'Volver')}
+            <ArrowLeft className="w-4 h-4" />
+            {t('wallet_details.actions.back_to_list', 'Back')}
           </button>
         </div>
       </div>
 
-      <div className="mb-2">
-        <div className="text-xs text-gray-500">{t('wallet_details.transactions.date', 'Fecha')}</div>
-        <div className="text-sm text-gray-700">{formatDate(transaction.createdAt)}</div>
-      </div>
-
-      <div className="mb-2">
-        <div className="text-xs text-gray-500">{t('wallet_details.transactions.status', 'Estado')}</div>
-        <div className={`inline-block mt-1 text-xs px-2 py-1 rounded-full ${getStatusStyle(transaction.status)}`}>
-          {getStatusText(transaction.status)}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Calendar className={cn('w-4 h-4', AB_STYLES.textMuted)} />
+            <span className={cn('text-xs', AB_STYLES.textMuted)}>{t('wallet_details.transactions.date', 'Date')}</span>
+          </div>
+          <span className={cn('text-sm font-medium', AB_STYLES.text)}>{formatDateWithTime(transaction.createdAt)}</span>
         </div>
-      </div>
 
-      <div className="mb-2">
-        <div className="text-xs text-gray-500">{t('wallet_details.transactions.to', 'Para')}</div>
-        <div className="text-sm font-mono text-gray-700">{transaction.accountNumber}</div>
-      </div>
+        <div className="flex items-center justify-between">
+          <span className={cn('text-xs', AB_STYLES.textMuted)}>{t('wallet_details.transactions.status', 'Status')}</span>
+          <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${getStatusStyle(transaction.status)}`}>
+            {getStatusText(transaction.status)}
+          </span>
+        </div>
 
-      <div className="mb-2 flex justify-between items-center">
-        <div>
-          <div className="text-xs text-gray-500">{t('wallet_details.transactions.from_amount', 'Monto USDC')}</div>
-          <div className="text-lg font-bold">
-            $
-            {transaction.quote.sourceAmount.toFixed(2)}
+        <div className={cn('rounded-lg p-3', AB_STYLES.hoverBg)}>
+          <div className="flex items-center gap-2 mb-1">
+            <Wallet className={cn('w-4 h-4', AB_STYLES.textMuted)} />
+            <span className={cn('text-xs', AB_STYLES.textMuted)}>{t('wallet_details.transactions.to', 'Destination account')}</span>
+          </div>
+          <span className={cn('font-mono text-sm break-all', AB_STYLES.text)}>{transaction.accountNumber}</span>
+        </div>
+
+        <div className="flex gap-4">
+          <div className={cn('flex-1 rounded-lg p-3', AB_STYLES.hoverBg)}>
+            <div className="flex items-center gap-2 mb-1">
+              <Send className={cn('w-4 h-4', AB_STYLES.textMuted)} />
+              <span className={cn('text-xs', AB_STYLES.textMuted)}>{t('wallet_details.transactions.from_amount', 'Sent')}</span>
+            </div>
+            <span className={cn('text-lg font-bold', AB_STYLES.text)}>
+              $
+              {' '}
+              {transaction.quote.sourceAmount.toFixed(2)}
+              {' '}
+              USDC
+            </span>
+          </div>
+          <div className={cn('flex-1 rounded-lg p-3', AB_STYLES.hoverBg)}>
+            <div className={cn('text-xs mb-1', AB_STYLES.textMuted)}>{t('wallet_details.transactions.to_amount', 'Received')}</div>
+            <span className={cn('text-lg font-bold', AB_STYLES.text)}>
+              {targetSymbol}
+              {' '}
+              {targetFormatted}
+              {' '}
+              {transaction.quote.targetCurrency}
+            </span>
           </div>
         </div>
-        <div>
-          <div className="text-xs text-gray-500">{t('wallet_details.transactions.to_amount', 'Monto destino')}</div>
-          <div className="text-lg font-bold">
-            {formatMoney(transaction.quote.targetCurrency, transaction.quote.targetAmount.toString())}
-          </div>
-        </div>
-      </div>
 
-      <div className="mt-3 text-xs text-gray-500">
-        <div className="flex items-center justify-between mb-1">
-          <div className="font-medium">{t('wallet_details.transactions.raw', 'Detalles')}</div>
-          <button
-            aria-controls="transaction-raw-details"
-            aria-expanded={showRawDetails}
-            className="text-sm text-blue-600 hover:underline hover:cursor-pointer"
-            onClick={() => setShowRawDetails(prev => !prev)}
-          >
-            {showRawDetails ? t('wallet_details.actions.hide_details', 'Ocultar detalles') : t('wallet_details.actions.show_details', 'Mostrar detalles')}
-          </button>
-        </div>
-        {showRawDetails && (
-          <pre className="text-xs text-gray-700 bg-gray-50 p-2 rounded overflow-auto max-h-40" id="transaction-raw-details">{JSON.stringify(transaction, null, 2)}</pre>
+        {(transaction as unknown as { transactionReference?: string }).transactionReference && (
+          <div className={cn('flex items-center gap-2 pt-2', AB_STYLES.borderTopSeparator)}>
+            <Hash className={cn('w-4 h-4 shrink-0', AB_STYLES.textMuted)} />
+            <div>
+              <span className={cn('text-xs', AB_STYLES.textMuted)}>{t('wallet_details.transactions.reference', 'Reference')}</span>
+              <span className={cn('block font-mono text-sm break-all', AB_STYLES.text)}>{(transaction as unknown as { transactionReference: string }).transactionReference}</span>
+            </div>
+          </div>
         )}
+
+        <div className={cn('pt-4', AB_STYLES.borderTopSeparator)}>
+          <button
+            className={cn('flex items-center justify-between w-full py-2 px-3 rounded-lg text-left text-sm font-medium transition-colors', AB_STYLES.hoverAndText)}
+            onClick={() => setShowFullDetails(v => !v)}
+            type="button"
+          >
+            <span>{t('wallet_details.transactions.full_details', 'Full details')}</span>
+            {showFullDetails ? <ChevronUp className="w-4 h-4 shrink-0" /> : <ChevronDown className="w-4 h-4 shrink-0" />}
+          </button>
+          {showFullDetails && (
+            <div className={cn('mt-3 rounded-lg overflow-hidden', AB_STYLES.hoverBorder)}>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm" style={{ borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr className={AB_STYLES.borderBottomSeparator}>
+                      <th className={cn('text-left py-3 px-4 font-medium', AB_STYLES.textMuted)}>
+                        {t('wallet_details.transactions.table.field', 'Field')}
+                      </th>
+                      <th className={cn('text-left py-3 px-4 font-medium', AB_STYLES.textMuted)}>
+                        {t('wallet_details.transactions.table.value', 'Value')}
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {tableRows.map(row => (
+                      <tr className={AB_STYLES.borderBottomSeparator} key={row.label}>
+                        <td className={cn('py-3 px-4 align-top whitespace-nowrap', AB_STYLES.textMuted)}>{row.label}</td>
+                        <td className={cn('py-3 px-4 font-mono break-all', AB_STYLES.text)}>{row.value}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )

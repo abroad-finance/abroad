@@ -37,7 +37,7 @@ export const useBankDetailsRoute = ({
   targetCurrency,
   taxId,
 }: UseBankDetailsRouteArgs): BankDetailsRouteProps => {
-  const textColor = isDesktop ? 'white' : '#356E6A'
+  const textColor = isDesktop ? 'white' : 'var(--color-abroad-dark)'
   const { walletAuthentication } = useWalletAuth()
 
   // ------------------------------ EFFECTS -----------------------------------

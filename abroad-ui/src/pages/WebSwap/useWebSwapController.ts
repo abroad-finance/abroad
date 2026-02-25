@@ -18,7 +18,7 @@ import {
   TransactionBuilder,
 } from '@stellar/stellar-sdk'
 import { useTranslate } from '@tolgee/react'
-import { ethers } from 'ethers'
+import { getAddress, Interface, parseUnits } from 'ethers'
 import {
   useCallback,
   useEffect,
@@ -45,10 +45,18 @@ import { useNotices } from '../../contexts/NoticeContext'
 import { BRL_BACKGROUND_IMAGE } from '../../features/swap/constants'
 import { SwapView } from '../../features/swap/types'
 import {
+  BRL_TRANSFER_FEE,
+  buildChainLabel,
+  chainKeyOf,
+  COP_TRANSFER_FEE,
+  corridorKeyOf,
+  sortStellarFirst,
+} from '../../features/swap/utils/corridorHelpers'
+import {
   acceptTransactionRequest, fetchPublicCorridors, notifyPayment, requestQuote, requestReverseQuote,
 } from '../../services/public/publicApi'
 import { ASSET_URLS, PENDING_TX_KEY } from '../../shared/constants'
-import { useWalletAuth } from '../../shared/hooks/useWalletAuth'
+import { useMenuCloseOnOutsideClick, useWalletAuth } from '../../shared/hooks'
 import { hasMessage } from '../../shared/utils'
 
 type DecodeQrApiResponse = ApiClientResponse<decodeQrCodeBRResponse, DecodeQrCodeBR400>
@@ -90,33 +98,6 @@ type SwapControllerState = {
   view: SwapView
 }
 
-const COP_TRANSFER_FEE = 0.0
-const BRL_TRANSFER_FEE = 0.0
-const corridorKeyOf = (corridor: PublicCorridor): string => (
-  `${corridor.cryptoCurrency}:${corridor.blockchain}:${corridor.targetCurrency}`
-)
-const chainKeyOf = (corridor: PublicCorridor): string => (
-  `${corridor.blockchain}:${corridor.chainId}`
-)
-
-const formatChainLabel = (value: string): string => {
-  const normalized = value.toLowerCase().replace(/_/g, ' ')
-  return normalized.replace(/\b\w/g, char => char.toUpperCase())
-}
-
-const formatChainIdLabel = (value: string): string => {
-  if (!value) return ''
-  const [, ...rest] = value.split(':')
-  return rest.length > 0 ? rest.join(':') : value
-}
-
-const buildChainLabel = (corridor: PublicCorridor, includeChainId: boolean): string => {
-  const base = formatChainLabel(corridor.blockchain)
-  if (!includeChainId) return base
-  const chainIdLabel = formatChainIdLabel(corridor.chainId)
-  return chainIdLabel ? `${base} (${chainIdLabel})` : base
-}
-
 const resolveStellarNetworkPassphrase = (chainId: null | string): string => {
   if (chainId && chainId.toLowerCase().includes('test')) return Networks.TESTNET
   return Networks.PUBLIC
@@ -143,7 +124,7 @@ const parseAmountUnits = (amount: string, decimals: number): bigint => {
   const normalized = amount.trim()
   const cleaned = normalized.endsWith('.') ? normalized.slice(0, -1) : normalized
   if (!cleaned) throw new Error('Amount is required')
-  return ethers.parseUnits(cleaned, decimals)
+  return parseUnits(cleaned, decimals)
 }
 
 const createInitialState = (isDesktop: boolean): SwapControllerState => ({
@@ -320,6 +301,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
   const directReqIdRef = useRef(0)
   const reverseReqIdRef = useRef(0)
   const decodeAbortRef = useRef<AbortController | null>(null)
+  const [quoteBelowMinimum, setQuoteBelowMinimum] = useState(false)
 
   useEffect(() => {
     let active = true
@@ -344,10 +326,10 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     [state.targetCurrency],
   )
   const targetSymbol = state.targetCurrency === TargetCurrency.BRL ? 'R$' : '$'
-  const availableCorridors = useMemo(
-    () => corridors.filter(corridor => corridor.targetCurrency === state.targetCurrency),
-    [corridors, state.targetCurrency],
-  )
+  const availableCorridors = useMemo(() => {
+    const filtered = corridors.filter(corridor => corridor.targetCurrency === state.targetCurrency)
+    return sortStellarFirst(filtered)
+  }, [corridors, state.targetCurrency])
   const selectedCorridor = useMemo(() => {
     const match = availableCorridors.find(corridor => corridorKeyOf(corridor) === state.corridorKey)
     if (match && (!chainKey || chainKeyOf(match) === chainKey)) return match
@@ -382,12 +364,18 @@ export const useWebSwapController = (): WebSwapControllerProps => {
       const key = chainKeyOf(corridor)
       if (!seen.has(key)) seen.set(key, corridor)
     })
-    return Array.from(seen.entries()).map(([key, corridor]) => {
+    const entries = Array.from(seen.entries()).map(([key, corridor]) => {
       const includeChainId = (chainVariants.get(corridor.blockchain)?.size ?? 0) > 1
-      return {
-        key,
-        label: buildChainLabel(corridor, includeChainId),
-      }
+      return { key, label: buildChainLabel(corridor, includeChainId) }
+    })
+    return entries.sort((a, b) => {
+      const corridorA = seen.get(a.key)
+      const corridorB = seen.get(b.key)
+      const aStellar = corridorA?.blockchain.toLowerCase() === 'stellar'
+      const bStellar = corridorB?.blockchain.toLowerCase() === 'stellar'
+      if (aStellar && !bStellar) return -1
+      if (!aStellar && bStellar) return 1
+      return 0
     })
   }, [chainVariants, corridors])
   const assetOptions = useMemo(() => chainFilteredCorridors.map(corridor => ({
@@ -444,7 +432,9 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     }
     if (state.corridorKey !== nextCorridorKey) {
       dispatch({ corridorKey: nextCorridorKey, type: 'SET_CORRIDOR' })
-      dispatch({ quoteId: '', sourceAmount: '', targetAmount: '', type: 'SET_AMOUNTS' })
+      dispatch({
+        quoteId: '', sourceAmount: '', targetAmount: '', type: 'SET_AMOUNTS',
+      })
     }
   }, [
     chainKey,
@@ -473,10 +463,13 @@ export const useWebSwapController = (): WebSwapControllerProps => {
   const targetPaymentMethod = selectedCorridor?.paymentMethod ?? 'BREB'
   const transferFee = state.targetCurrency === TargetCurrency.BRL ? BRL_TRANSFER_FEE : COP_TRANSFER_FEE
 
-  const formatTargetNumber = useCallback((value: number) => new Intl.NumberFormat(targetLocale, {
-    maximumFractionDigits: 2,
-    minimumFractionDigits: 2,
-  }).format(value), [targetLocale])
+  const formatTargetNumber = useCallback((value: number) => {
+    const isBRL = state.targetCurrency === TargetCurrency.BRL
+    return new Intl.NumberFormat(targetLocale, {
+      maximumFractionDigits: isBRL ? 2 : 0,
+      minimumFractionDigits: isBRL ? 2 : 0,
+    }).format(value)
+  }, [targetLocale, state.targetCurrency])
 
   const formatCryptoAmount = useCallback((value: number) => {
     if (!Number.isFinite(value)) return ''
@@ -543,8 +536,43 @@ export const useWebSwapController = (): WebSwapControllerProps => {
   useEffect(() => {
     if (!wallet?.address || !wallet?.chainId || !selectedCorridor) return
     if (wallet.chainId === selectedCorridor.chainId) return
-    wallet.disconnect().catch(() => undefined)
+    // Silently try to restore a saved session for the new chain.
+    // If no session exists, disconnect so the UI reflects the need to reconnect.
+    if (wallet.walletId === 'wallet-connect' && selectedCorridor.walletConnect) {
+      wallet.connect({
+        chainId: selectedCorridor.chainId,
+        walletConnect: selectedCorridor.walletConnect,
+      }).catch(() => {
+        void wallet.disconnect()
+      })
+    }
   }, [selectedCorridor, wallet])
+
+  const isBelowMinimum = useMemo(() => {
+    if (quoteBelowMinimum) return true
+    if (!selectedCorridor) return false
+    const min = selectedCorridor.minAmount
+      || (selectedCorridor.targetCurrency === 'BRL' ? 1 : 0)
+    if (!min) return false
+    const cleanedTarget = String(state.targetAmount).replace(/\./g, '').replace(/,/g, '.')
+    const numericTarget = parseFloat(cleanedTarget)
+    if (Number.isNaN(numericTarget) || numericTarget <= 0) return false
+    return numericTarget < min
+  }, [
+    quoteBelowMinimum,
+    selectedCorridor,
+    state.targetAmount,
+  ])
+
+  const isAboveMaximum = useMemo(() => {
+    if (!selectedCorridor) return false
+    const max = selectedCorridor.maxAmount || 0
+    if (!max) return false
+    const cleanedTarget = String(state.targetAmount).replace(/\./g, '').replace(/,/g, '.')
+    const numericTarget = parseFloat(cleanedTarget)
+    if (Number.isNaN(numericTarget) || numericTarget <= 0) return false
+    return numericTarget > max
+  }, [selectedCorridor, state.targetAmount])
 
   const isPrimaryDisabled = useCallback(() => {
     const numericSource = parseFloat(String(state.sourceAmount))
@@ -555,9 +583,11 @@ export const useWebSwapController = (): WebSwapControllerProps => {
 
   const continueDisabled = useMemo(() => {
     if (!isAuthenticated) return false
-    return isPrimaryDisabled() || !state.quoteId
+    return isPrimaryDisabled() || !state.quoteId || isBelowMinimum || isAboveMaximum
   }, [
+    isAboveMaximum,
     isAuthenticated,
+    isBelowMinimum,
     isPrimaryDisabled,
     state.quoteId,
   ])
@@ -623,6 +653,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
 
     const num = parseFloat(value)
     if (Number.isNaN(num)) {
+      setQuoteBelowMinimum(false)
       dispatch({
         quoteId: '', sourceAmount: value, targetAmount: '', type: 'SET_AMOUNTS',
       })
@@ -647,13 +678,27 @@ export const useWebSwapController = (): WebSwapControllerProps => {
 
     if (!response.ok) {
       if (!isAbortError(response)) {
-        const reason = extractReason(response.error?.body) || response.error?.message || t('swap.quote_error', 'Esta cotización superó el monto máximo permitido.')
-        notifyError(reason, response.error?.message)
+        // Suppress popup for 400 errors ��� the inline isBelowMinimum
+        // validation will handle the visual feedback instead.
+        const status = response.error?.status
+        if (status === 400) {
+          const reason = extractReason(response.error?.body) || ''
+          setQuoteBelowMinimum(reason.toLowerCase().includes('minimum'))
+          dispatch({
+            quoteId: '', sourceAmount: value, targetAmount: '', type: 'SET_AMOUNTS',
+          })
+        }
+        else {
+          setQuoteBelowMinimum(false)
+          const reason = extractReason(response.error?.body) || response.error?.message || t('swap.quote_error', 'Esta cotizaci?n super? el monto m?ximo permitido.')
+          notifyError(reason, response.error?.message)
+        }
       }
       dispatch({ loadingTarget: false, type: 'SET_LOADING' })
       return
     }
 
+    setQuoteBelowMinimum(false)
     const quote = response.data
     const formatted = formatTargetNumber(quote.value)
     dispatch({
@@ -688,6 +733,18 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     const normalized = raw.replace(/\./g, '').replace(/,/g, '.')
     const num = parseFloat(normalized)
     if (Number.isNaN(num)) {
+      setQuoteBelowMinimum(false)
+      dispatch({
+        quoteId: '', sourceAmount: '', targetAmount: value, type: 'SET_AMOUNTS',
+      })
+      dispatch({ loadingSource: false, type: 'SET_LOADING' })
+      return
+    }
+
+    // Skip API call if below minimum ��� inline validation handles the UI
+    const minAmount = selectedCorridor.minAmount
+      || (selectedCorridor.targetCurrency === 'BRL' ? 1 : 0)
+    if (minAmount && num < minAmount) {
       dispatch({
         quoteId: '', sourceAmount: '', targetAmount: value, type: 'SET_AMOUNTS',
       })
@@ -712,13 +769,25 @@ export const useWebSwapController = (): WebSwapControllerProps => {
 
     if (!response.ok) {
       if (!isAbortError(response)) {
-        const reason = extractReason(response.error?.body) || response.error?.message || t('swap.quote_error', 'Esta cotización superó el monto máximo permitido.')
-        notifyError(reason, response.error?.message)
+        const status = response.error?.status
+        if (status === 400) {
+          const reason = extractReason(response.error?.body) || ''
+          setQuoteBelowMinimum(reason.toLowerCase().includes('minimum'))
+          dispatch({
+            quoteId: '', sourceAmount: '', targetAmount: value, type: 'SET_AMOUNTS',
+          })
+        }
+        else {
+          setQuoteBelowMinimum(false)
+          const reason = extractReason(response.error?.body) || response.error?.message || t('swap.quote_error', 'Esta cotizaci?n super? el monto m?ximo permitido.')
+          notifyError(reason, response.error?.message)
+        }
       }
       dispatch({ loadingSource: false, type: 'SET_LOADING' })
       return
     }
 
+    setQuoteBelowMinimum(false)
     const quote = response.data
     dispatch({
       quoteId: quote.quote_id,
@@ -743,8 +812,21 @@ export const useWebSwapController = (): WebSwapControllerProps => {
 
   const onTargetChange = useCallback((val: string) => {
     const sanitized = val.replace(/[^0-9.,]/g, '')
-    dispatch({ targetAmount: sanitized, type: 'SET_AMOUNTS' })
-    void quoteFromTarget(sanitized)
+    // Strip existing thousand separators (dots), split on comma (decimal sep)
+    const stripped = sanitized.replace(/\./g, '')
+    const parts = stripped.split(',')
+    const intPart = parts[0] || ''
+    // Format integer part with dot thousand separators
+    const num = parseInt(intPart, 10)
+    const formattedInt = Number.isNaN(num) || intPart === ''
+      ? intPart
+      : num.toLocaleString('es-CO', { maximumFractionDigits: 0, useGrouping: true })
+    // Reassemble: keep decimal part exactly as user typed
+    const formatted = parts.length > 1
+      ? `${formattedInt},${parts[1]}`
+      : formattedInt
+    dispatch({ targetAmount: formatted, type: 'SET_AMOUNTS' })
+    void quoteFromTarget(formatted)
   }, [quoteFromTarget])
 
   const openQr = useCallback(() => {
@@ -768,7 +850,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
   const skipNextAssetClickRef = useRef(false)
   const [assetMenuOpen, setAssetMenuOpen] = useReducer((s: boolean) => !s, false)
 
-  const toggleAssetMenu = useCallback(() => {
+  const _toggleAssetMenu = useCallback(() => {
     if (assetOptions.length <= 1) return
     if (!assetMenuOpen) {
       if (currencyMenuOpen) setCurrencyMenuOpen()
@@ -787,6 +869,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
 
   const selectAssetOption = useCallback((key: string) => {
     setAssetMenuOpen()
+    setQuoteBelowMinimum(false)
     dispatch({ corridorKey: key, type: 'SET_CORRIDOR' })
     const selected = availableCorridors.find(corridor => corridorKeyOf(corridor) === key)
     if (selected) setChainKey(chainKeyOf(selected))
@@ -796,7 +879,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     reverseAbortRef.current?.abort()
   }, [availableCorridors])
 
-  const toggleCurrencyMenu = useCallback(() => {
+  const _toggleCurrencyMenu = useCallback(() => {
     if (!currencyMenuOpen) {
       if (assetMenuOpen) setAssetMenuOpen()
       if (chainMenuOpen) setChainMenuOpen()
@@ -811,7 +894,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     currencyMenuOpen,
   ])
 
-  const toggleChainMenu = useCallback(() => {
+  const _toggleChainMenu = useCallback(() => {
     if (chainOptions.length <= 1) return
     if (!chainMenuOpen) {
       if (assetMenuOpen) setAssetMenuOpen()
@@ -828,58 +911,24 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     currencyMenuOpen,
   ])
 
-  useEffect(() => {
-    if (!assetMenuOpen) return
-    const onDocumentClick = (event: MouseEvent) => {
-      if (skipNextAssetClickRef.current) {
-        skipNextAssetClickRef.current = false
-        return
-      }
-      const container = assetMenuRef.current
-      if (!container) return
-      const path = (event as unknown as { composedPath?: () => EventTarget[] }).composedPath?.()
-      const clickedInside = path ? path.includes(container) : container.contains(event.target as Node)
-      if (!clickedInside) setAssetMenuOpen()
-    }
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setAssetMenuOpen()
-    }
-    document.addEventListener('click', onDocumentClick)
-    document.addEventListener('keydown', onKeyDown)
-    return () => {
-      document.removeEventListener('click', onDocumentClick)
-      document.removeEventListener('keydown', onKeyDown)
-    }
-  }, [assetMenuOpen])
-
-  useEffect(() => {
-    if (!chainMenuOpen) return
-    const onDocumentClick = (event: MouseEvent) => {
-      if (skipNextChainClickRef.current) {
-        skipNextChainClickRef.current = false
-        return
-      }
-      const container = chainMenuRef.current
-      if (!container) return
-      const path = (event as unknown as { composedPath?: () => EventTarget[] }).composedPath?.()
-      const clickedInside = path ? path.includes(container) : container.contains(event.target as Node)
-      if (!clickedInside) setChainMenuOpen()
-    }
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setChainMenuOpen()
-    }
-    document.addEventListener('click', onDocumentClick)
-    document.addEventListener('keydown', onKeyDown)
-    return () => {
-      document.removeEventListener('click', onDocumentClick)
-      document.removeEventListener('keydown', onKeyDown)
-    }
-  }, [chainMenuOpen])
+  useMenuCloseOnOutsideClick({
+    isOpen: assetMenuOpen,
+    menuRef: assetMenuRef,
+    onClose: setAssetMenuOpen,
+    skipNextRef: skipNextAssetClickRef,
+  })
+  useMenuCloseOnOutsideClick({
+    isOpen: chainMenuOpen,
+    menuRef: chainMenuRef,
+    onClose: setChainMenuOpen,
+    skipNextRef: skipNextChainClickRef,
+  })
 
   const selectCurrency = useCallback((currency: TargetCurrency) => {
     setCurrencyMenuOpen()
     dispatch({ type: 'RESET' })
     dispatch({ targetCurrency: currency, type: 'SET_TARGET_CURRENCY' })
+    setQuoteBelowMinimum(false)
     dispatch({ corridorKey: '', type: 'SET_CORRIDOR' })
     setChainKey('')
     lastEditedRef.current = null
@@ -923,29 +972,12 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     state.targetCurrency,
   ])
 
-  useEffect(() => {
-    if (!currencyMenuOpen) return
-    const onDocumentClick = (event: MouseEvent) => {
-      if (skipNextDocumentClickRef.current) {
-        skipNextDocumentClickRef.current = false
-        return
-      }
-      const container = currencyMenuRef.current
-      if (!container) return
-      const path = (event as unknown as { composedPath?: () => EventTarget[] }).composedPath?.()
-      const clickedInside = path ? path.includes(container) : container.contains(event.target as Node)
-      if (!clickedInside) setCurrencyMenuOpen()
-    }
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setCurrencyMenuOpen()
-    }
-    document.addEventListener('click', onDocumentClick)
-    document.addEventListener('keydown', onKeyDown)
-    return () => {
-      document.removeEventListener('click', onDocumentClick)
-      document.removeEventListener('keydown', onKeyDown)
-    }
-  }, [currencyMenuOpen])
+  useMenuCloseOnOutsideClick({
+    isOpen: currencyMenuOpen,
+    menuRef: currencyMenuRef,
+    onClose: setCurrencyMenuOpen,
+    skipNextRef: skipNextDocumentClickRef,
+  })
 
   const handleBackToSwap = useCallback(() => {
     localStorage.removeItem(PENDING_TX_KEY)
@@ -968,7 +1000,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
       return
     }
     if (!state.quoteId) {
-      notifyError(t('swap.wait_for_quote', 'Espera la cotización antes de continuar'))
+      notifyError(t('swap.wait_for_quote', 'Espera la cotizaci?n antes de continuar'))
       return
     }
     dispatch({ type: 'SET_VIEW', view: 'bankDetails' })
@@ -1089,7 +1121,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
         throw new Error(t('swap.errors.missing_corridor', 'No hay un corredor disponible.'))
       }
       if (!state.quoteId) {
-        throw new Error(t('swap.errors.missing_quote', 'Falta la cotización o la dirección de la billetera.'))
+        throw new Error(t('swap.errors.missing_quote', 'Falta la cotizaci?n o la direcci?n de la billetera.'))
       }
       if (!wallet?.address || !walletUserId || !wallet.chainId) {
         throw new Error(t('swap.errors.missing_wallet', 'Conecta tu billetera antes de continuar.'))
@@ -1112,7 +1144,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
 
       if (!response.ok) {
         if (!isAbortError(response)) {
-          const reason = extractReason(response.error?.body) || response.error?.message || t('swap.accept_error', 'No pudimos iniciar la transacción.')
+          const reason = extractReason(response.error?.body) || response.error?.message || t('swap.accept_error', 'No pudimos iniciar la transacci?n.')
           notifyError(reason, response.error?.message)
         }
         return
@@ -1132,7 +1164,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
       }
 
       if (!acceptedTxId) {
-        notifyError(t('swap.accept_error', 'No pudimos iniciar la transacción.'))
+        notifyError(t('swap.accept_error', 'No pudimos iniciar la transacci?n.'))
         resetForNewTransaction()
         return
       }
@@ -1162,13 +1194,13 @@ export const useWebSwapController = (): WebSwapControllerProps => {
       }
 
       if (!paymentContext) {
-        throw new Error(t('swap.errors.payment_context', 'No se pudo preparar la transacción.'))
+        throw new Error(t('swap.errors.payment_context', 'No se pudo preparar la transacci?n.'))
       }
       if (wallet.chainId && wallet.chainId !== paymentContext.chainId) {
-        throw new Error(t('swap.errors.network_mismatch', 'La billetera está conectada a otra red.'))
+        throw new Error(t('swap.errors.network_mismatch', 'La billetera est? conectada a otra red.'))
       }
       if (!paymentContext.depositAddress) {
-        throw new Error(t('swap.errors.missing_deposit', 'Falta la dirección de depósito.'))
+        throw new Error(t('swap.errors.missing_deposit', 'Falta la direcci?n de dep?sito.'))
       }
 
       const amountString = state.sourceAmount.trim() || String(paymentContext.amount)
@@ -1179,7 +1211,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
       if (paymentContext.chainFamily === 'stellar') {
         const assetIssuer = paymentContext.mintAddress
         if (!assetIssuer) {
-          throw new Error(t('swap.errors.missing_asset', 'Falta la configuración del activo.'))
+          throw new Error(t('swap.errors.missing_asset', 'Falta la configuraci?n del activo.'))
         }
         const horizonUrl = paymentContext.rpcUrl || 'https://horizon.stellar.org'
         const networkPassphrase = resolveStellarNetworkPassphrase(paymentContext.chainId)
@@ -1205,10 +1237,10 @@ export const useWebSwapController = (): WebSwapControllerProps => {
           throw new Error(t('swap.errors.wallet_unsupported', 'La billetera no soporta esta red.'))
         }
         if (!paymentContext.rpcUrl) {
-          throw new Error(t('swap.errors.missing_rpc', 'No se configuró el RPC para esta red.'))
+          throw new Error(t('swap.errors.missing_rpc', 'No se configur? el RPC para esta red.'))
         }
         if (!paymentContext.mintAddress) {
-          throw new Error(t('swap.errors.missing_asset', 'Falta la configuración del activo.'))
+          throw new Error(t('swap.errors.missing_asset', 'Falta la configuraci?n del activo.'))
         }
         if (paymentContext.decimals == null) {
           throw new Error(t('swap.errors.missing_decimals', 'Faltan los decimales del activo.'))
@@ -1266,7 +1298,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
         })
         const signedBase64 = typeof signed === 'string' ? signed : signed.signedTransaction || signed.transaction
         if (!signedBase64) {
-          throw new Error(t('swap.errors.wallet_signature', 'No se pudo firmar la transacción.'))
+          throw new Error(t('swap.errors.wallet_signature', 'No se pudo firmar la transacci?n.'))
         }
         const signature = await connection.sendRawTransaction(fromBase64(signedBase64))
         onChainTx = signature
@@ -1276,15 +1308,15 @@ export const useWebSwapController = (): WebSwapControllerProps => {
           throw new Error(t('swap.errors.wallet_unsupported', 'La billetera no soporta esta red.'))
         }
         if (!paymentContext.mintAddress) {
-          throw new Error(t('swap.errors.missing_asset', 'Falta la configuración del activo.'))
+          throw new Error(t('swap.errors.missing_asset', 'Falta la configuraci?n del activo.'))
         }
         if (paymentContext.decimals == null) {
           throw new Error(t('swap.errors.missing_decimals', 'Faltan los decimales del activo.'))
         }
         const amountUnits = parseAmountUnits(amountString, paymentContext.decimals)
-        const toAddress = ethers.getAddress(paymentContext.depositAddress)
-        const tokenAddress = ethers.getAddress(paymentContext.mintAddress)
-        const iface = new ethers.Interface(['function transfer(address to, uint256 value)'])
+        const toAddress = getAddress(paymentContext.depositAddress)
+        const tokenAddress = getAddress(paymentContext.mintAddress)
+        const iface = new Interface(['function transfer(address to, uint256 value)'])
         const data = iface.encodeFunctionData('transfer', [toAddress, amountUnits])
         const txRequest = {
           data,
@@ -1298,7 +1330,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
           params: [txRequest],
         })
         if (typeof txHash !== 'string' || !txHash) {
-          throw new Error(t('swap.errors.wallet_signature', 'No se pudo firmar la transacción.'))
+          throw new Error(t('swap.errors.wallet_signature', 'No se pudo firmar la transacci?n.'))
         }
         onChainTx = txHash
       }
@@ -1327,7 +1359,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
         ? err.message
         : hasMessage(err)
           ? err.message
-          : t('swap.transaction_error', 'Error en la transacción')
+          : t('swap.transaction_error', 'Error en la transacci?n')
       notifyError(userMessage)
       resetForNewTransaction()
     }
@@ -1359,7 +1391,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
       return
     }
     if (state.targetCurrency === TargetCurrency.BRL && (!state.taxId || !state.pixKey)) {
-      notifyError(t('confirm_qr.missing_data', 'Faltan datos para completar la transacción.'))
+      notifyError(t('confirm_qr.missing_data', 'Faltan datos para completar la transacci?n.'))
       dispatch({ type: 'SET_VIEW', view: 'bankDetails' })
       return
     }
@@ -1405,30 +1437,22 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     targetAmount: state.targetAmount,
     targetCurrency: state.targetCurrency,
     taxId: state.taxId,
-    textColor: state.isDesktop ? 'white' : '#356E6A',
+    // Let BankDetailsRoute use theme (--ab-text / --ab-text-muted) for readable contrast on the card
   }
 
   const swapProps: SwapProps = {
-    assetMenuOpen,
-    assetMenuRef,
-    assetOptions,
-    chainMenuOpen,
-    chainMenuRef,
-    chainOptions,
     continueDisabled,
-    currencyMenuOpen,
-    currencyMenuRef,
     exchangeRateDisplay,
+    isAboveMaximum,
     isAuthenticated,
+    isBelowMinimum,
     loadingSource: state.loadingSource,
     loadingTarget: state.loadingTarget,
+    onOpenSourceModal: () => { /* handled in WebSwap */ },
+    onOpenTargetModal: () => { /* handled in WebSwap */ },
     onPrimaryAction,
     onSourceChange,
     onTargetChange,
-    openQr,
-    selectAssetOption,
-    selectChain,
-    selectCurrency,
     selectedAssetLabel,
     selectedChainLabel,
     sourceAmount: state.sourceAmount,
@@ -1436,10 +1460,9 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     targetAmount: state.targetAmount,
     targetCurrency: state.targetCurrency,
     targetSymbol,
-    textColor: state.isDesktop ? 'white' : '#356E6A',
-    toggleAssetMenu,
-    toggleChainMenu,
-    toggleCurrencyMenu,
+    toggleAssetMenu: _toggleAssetMenu,
+    toggleChainMenu: _toggleChainMenu,
+    toggleCurrencyMenu: _toggleCurrencyMenu,
     transferFeeDisplay,
   }
 
@@ -1461,7 +1484,9 @@ export const useWebSwapController = (): WebSwapControllerProps => {
   }, [])
 
   return {
+    assetOptions,
     bankDetailsProps,
+    chainOptions,
     closeQr: () => dispatch({ isQrOpen: false, type: 'SET_QR_OPEN' }),
     confirmQrProps,
     currentBgUrl,
@@ -1474,7 +1499,12 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     isQrOpen: state.isQrOpen,
     isWalletDetailsOpen: state.isWalletDetailsOpen,
     onWalletConnect: connectWallet,
+    openQr,
     resetForNewTransaction,
+    selectAssetOption,
+    selectChain,
+    selectCurrency,
+    selectedChainKey: activeChainKey,
     swapViewProps: swapProps,
     targetAmount: state.targetAmount,
     targetCurrency: state.targetCurrency,

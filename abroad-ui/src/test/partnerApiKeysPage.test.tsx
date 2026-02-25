@@ -9,8 +9,8 @@ import {
   vi,
 } from 'vitest'
 
-import { clearOpsApiKey, setOpsApiKey } from '../services/admin/opsAuthStore'
 import PartnerApiKeys from '../pages/Ops/PartnerApiKeys'
+import { clearOpsApiKey, setOpsApiKey } from '../services/admin/opsAuthStore'
 
 const mocked = vi.hoisted(() => ({
   createPartner: vi.fn(),

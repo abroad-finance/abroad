@@ -1,0 +1,6 @@
+{
+  "buildCommand": "npm run build:ui",
+  "outputDirectory": "abroad-ui/dist",
+  "framework": null,
+  "installCommand": "npm install"
+}

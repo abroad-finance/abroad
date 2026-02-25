@@ -4,6 +4,9 @@ import { X } from 'lucide-react'
 import React from 'react'
 import { createPortal } from 'react-dom'
 
+import { BRAND_TITLE_CLASS } from '../constants'
+import { cn } from '../utils'
+
 export interface LanguageSelectorProps {
   ariaLabel?: string
   className?: string
@@ -91,8 +94,8 @@ const LanguageSelector: React.FC<LanguageSelectorProps> = ({
 
   const triggerClasses
     = variant === 'mobile'
-      ? 'flex items-center gap-1 bg-[#356E6A]/5 border border-white/30 text-[#356E6A] text-xs font-medium px-2 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#356E6A]/40 hover:bg-[#356E6A]/10'
-      : 'flex items-center gap-2 bg-white/20 text-white text-sm font-medium px-3 py-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-white/40 hover:bg-white/30 cursor-pointer'
+      ? 'flex items-center gap-1 bg-abroad-dark/5 border border-white/30 text-abroad-dark text-xs font-medium px-2 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-abroad-dark/40 hover:bg-abroad-dark/10'
+      : 'flex items-center gap-2 bg-white/20 text-sm font-medium px-3 py-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-white/40 hover:bg-white/30 cursor-pointer'
 
   const handleConfirm = () => {
     if (draft !== value) onChange(draft)
@@ -114,7 +117,9 @@ const LanguageSelector: React.FC<LanguageSelectorProps> = ({
           loading="lazy"
           src={`https://hatscripts.github.io/circle-flags/flags/${currentMeta.flag}.svg`}
         />
-        <span className="hidden md:inline">{currentMeta.name}</span>
+        <span className={cn('hidden md:inline', variant === 'desktop' && BRAND_TITLE_CLASS)}>
+          {currentMeta.name}
+        </span>
       </button>
 
       {/* Side Modal - Portal to document body level */}
@@ -189,7 +194,7 @@ const LanguageSelector: React.FC<LanguageSelectorProps> = ({
                           <button
                             className={`w-full flex items-center justify-between p-4 rounded-xl border transition-all duration-200 hover:bg-gray-50 ${
                               selected
-                                ? 'border-[#356E6A] bg-[#356E6A]/10'
+                                ? 'border-abroad-dark bg-abroad-dark/10'
                                 : 'border-gray-200 bg-white'
                             }`}
                             key={code}
@@ -209,7 +214,7 @@ const LanguageSelector: React.FC<LanguageSelectorProps> = ({
                             </div>
                             <div
                               className={`w-5 h-5 rounded-full border-2 transition-all duration-200 ${
-                                selected ? 'border-[#356E6A] bg-[#356E6A]' : 'border-gray-300'
+                                selected ? 'border-abroad-dark bg-abroad-dark' : 'border-gray-300'
                               }`}
                             >
                               {selected && (
@@ -226,7 +231,7 @@ const LanguageSelector: React.FC<LanguageSelectorProps> = ({
                   {/* Confirmation Button */}
                   <div className="mt-6">
                     <button
-                      className="bg-gradient-to-r from-[#356E6A] to-[#73B9A3] hover:from-[#2a5956] hover:to-[#5fa88d] text-white cursor-pointer text-lg font-medium rounded-xl w-full p-4 transition"
+                      className="bg-gradient-to-r from-abroad-dark to-abroad-light hover:from-[#2a5956] hover:to-[#5fa88d] text-white cursor-pointer text-lg font-medium rounded-xl w-full p-4 transition"
                       onClick={handleConfirm}
                       type="button"
                     >
