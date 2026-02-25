@@ -1,4 +1,10 @@
+import { type ClassValue, clsx } from 'clsx'
+import { twMerge } from 'tailwind-merge'
+
 import { _36EnumsTargetCurrency as TargetCurrency } from '../../api'
+
+/** Merge Tailwind classes safely, resolving conflicts with tailwind-merge. */
+export const cn = (...inputs: ClassValue[]) => twMerge(clsx(inputs))
 import { WalletType } from '../../interfaces/IWalletFactory'
 
 // Minimal safe type-guard for objects that have a string `message` property.

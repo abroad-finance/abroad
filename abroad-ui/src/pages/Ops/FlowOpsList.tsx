@@ -95,45 +95,45 @@ const FlowOpsList = () => {
   const totalPages = data ? Math.max(1, Math.ceil(data.total / data.pageSize)) : 1
 
   return (
-    <div className="min-h-screen bg-[#F7F3EC] text-[#1A1A1A]">
+    <div className="ops-page">
       <div className="relative overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(27,94,89,0.18),_transparent_55%)]" />
         <div className="relative max-w-6xl mx-auto px-6 py-10">
           <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
             <div>
-              <div className="text-sm uppercase tracking-[0.3em] text-[#356E6A]">Operations</div>
+              <div className="text-sm uppercase tracking-[0.3em] text-abroad-dark">Operations</div>
               <h1 className="text-3xl md:text-4xl font-semibold">Flow Control Room</h1>
-              <p className="text-sm text-[#4B5563] max-w-xl mt-2">
+              <p className="text-sm text-gray-600 max-w-xl mt-2">
                 Monitor corridor executions, inspect step-level telemetry, and intervene when flows stall.
               </p>
             </div>
             <div className="flex items-center gap-3">
               <Link
-                className="px-4 py-2 rounded-xl border border-[#356E6A] text-[#356E6A] bg-white/70 hover:bg-white transition text-sm font-medium"
+                className="ops-nav-link"
                 to="/ops/flows/definitions"
               >
                 Edit Definitions
               </Link>
               <Link
-                className="px-4 py-2 rounded-xl border border-[#356E6A] text-[#356E6A] bg-white/70 hover:bg-white transition text-sm font-medium"
+                className="ops-nav-link"
                 to="/ops/crypto-assets"
               >
                 Crypto Assets
               </Link>
               <Link
-                className="px-4 py-2 rounded-xl border border-[#356E6A] text-[#356E6A] bg-white/70 hover:bg-white transition text-sm font-medium"
+                className="ops-nav-link"
                 to="/ops/partners"
               >
                 Partners
               </Link>
               <Link
-                className="px-4 py-2 rounded-xl border border-[#356E6A] text-[#356E6A] bg-white/70 hover:bg-white transition text-sm font-medium"
+                className="ops-nav-link"
                 to="/ops/transactions/reconcile"
               >
                 Reconcile Hash
               </Link>
               <button
-                className="px-4 py-2 rounded-xl border border-[#1B4D48] text-[#1B4D48] bg-white/70 hover:bg-white transition"
+                className="ops-btn-ghost"
                 disabled={!opsApiKey}
                 onClick={() => void fetchData()}
                 type="button"
@@ -147,18 +147,18 @@ const FlowOpsList = () => {
 
           <div className="mt-8 grid grid-cols-1 gap-4 lg:grid-cols-[2fr_1fr_1fr_1fr_auto] bg-white/70 backdrop-blur rounded-2xl border border-white/70 p-4 shadow-[0_20px_45px_-35px_rgba(15,23,42,0.45)]">
             <div className="flex flex-col">
-              <label className="text-xs uppercase tracking-wider text-[#5B6B6A]">Transaction ID</label>
+              <label className="ops-label">Transaction ID</label>
               <input
-                className="mt-2 rounded-xl border border-[#DADADA] bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#356E6A]/40"
+                className="mt-2 ops-input"
                 onChange={event => setTransactionId(event.target.value)}
                 placeholder="UUID"
                 value={transactionId}
               />
             </div>
             <div className="flex flex-col">
-              <label className="text-xs uppercase tracking-wider text-[#5B6B6A]">Status</label>
+              <label className="ops-label">Status</label>
               <select
-                className="mt-2 rounded-xl border border-[#DADADA] bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#356E6A]/40"
+                className="mt-2 ops-input"
                 onChange={event => setStatus(event.target.value as '' | FlowInstanceStatus)}
                 value={status}
               >
@@ -169,9 +169,9 @@ const FlowOpsList = () => {
               </select>
             </div>
             <div className="flex flex-col">
-              <label className="text-xs uppercase tracking-wider text-[#5B6B6A]">Stuck Minutes</label>
+              <label className="ops-label">Stuck Minutes</label>
               <input
-                className="mt-2 rounded-xl border border-[#DADADA] bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#356E6A]/40"
+                className="mt-2 ops-input"
                 onChange={event => setStuckMinutes(event.target.value)}
                 placeholder="ex: 30"
                 type="number"
@@ -179,10 +179,10 @@ const FlowOpsList = () => {
               />
             </div>
             <div className="flex flex-col">
-              <label className="text-xs uppercase tracking-wider text-[#5B6B6A]">Page</label>
+              <label className="ops-label">Page</label>
               <div className="mt-2 flex items-center gap-2">
                 <button
-                  className="h-9 w-9 rounded-xl border border-[#DADADA] bg-white text-lg disabled:opacity-40"
+                  className="h-9 w-9 rounded-xl border border-ops-border bg-white text-lg disabled:opacity-40"
                   disabled={page <= 1}
                   onClick={() => setPage(current => Math.max(1, current - 1))}
                   type="button"
@@ -197,7 +197,7 @@ const FlowOpsList = () => {
                   {totalPages}
                 </div>
                 <button
-                  className="h-9 w-9 rounded-xl border border-[#DADADA] bg-white text-lg disabled:opacity-40"
+                  className="h-9 w-9 rounded-xl border border-ops-border bg-white text-lg disabled:opacity-40"
                   disabled={page >= totalPages}
                   onClick={() => setPage(current => Math.min(totalPages, current + 1))}
                   type="button"
@@ -208,7 +208,7 @@ const FlowOpsList = () => {
             </div>
             <div className="flex items-end">
               <button
-                className="w-full rounded-xl border border-[#356E6A] bg-[#356E6A] px-4 py-2 text-white text-sm font-medium hover:bg-[#2B5B57] transition"
+                className="w-full rounded-xl border border-abroad-dark bg-abroad-dark px-4 py-2 text-white text-sm font-medium hover:bg-ops-brand-hover transition"
                 onClick={() => {
                   setPage(1)
                   void fetchData()
@@ -233,11 +233,11 @@ const FlowOpsList = () => {
 
           <div className="mt-8 space-y-4">
             {loading && opsApiKey && (
-              <div className="text-sm text-[#5B6B6A]">Loading flows...</div>
+              <div className="text-sm text-ops-label">Loading flows...</div>
             )}
 
             {!loading && opsApiKey && data?.items.length === 0 && (
-              <div className="rounded-2xl border border-dashed border-[#C6C6C6] bg-white/70 px-6 py-12 text-center text-sm text-[#6B7280]">
+              <div className="rounded-2xl border border-dashed border-neutral-300 bg-white/70 px-6 py-12 text-center text-sm text-gray-500">
                 No flow instances match the current filters.
               </div>
             )}
@@ -255,7 +255,7 @@ const FlowOpsList = () => {
                       <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold ${statusClasses[instance.status]}`}>
                         {instance.status}
                       </span>
-                      <span className="text-xs uppercase tracking-wider text-[#64748B]">{instance.definition?.name ?? 'Unlabeled flow'}</span>
+                      <span className="text-xs uppercase tracking-wider text-slate-500">{instance.definition?.name ?? 'Unlabeled flow'}</span>
                     </div>
                     <div className="mt-2 text-lg font-semibold">
                       {instance.definition?.cryptoCurrency ?? '—'}
@@ -266,7 +266,7 @@ const FlowOpsList = () => {
                       →
                       {instance.definition?.targetCurrency ?? '—'}
                     </div>
-                    <div className="mt-1 text-sm text-[#64748B]">
+                    <div className="mt-1 text-sm text-slate-500">
                       Updated
                       {' '}
                       {formatDate(instance.updatedAt)}
@@ -277,11 +277,11 @@ const FlowOpsList = () => {
                     </div>
                   </div>
 
-                  <div className="flex flex-col items-start gap-2 text-sm text-[#1F2937]">
+                  <div className="flex flex-col items-start gap-2 text-sm text-gray-800">
                     <div className="font-medium">Step Pulse</div>
-                    <div className="text-xs text-[#6B7280]">{buildStepSummary(instance.stepSummary)}</div>
+                    <div className="text-xs text-gray-500">{buildStepSummary(instance.stepSummary)}</div>
                     {instance.currentStep && (
-                      <div className="text-xs text-[#6B7280]">
+                      <div className="text-xs text-gray-500">
                         Current:
                         {instance.currentStep.stepType}
                         {' '}

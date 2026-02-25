@@ -26,6 +26,7 @@ import LanguageSelector from '../../shared/components/LanguageSelector'
 import { ModalOverlay } from '../../shared/components/ModalOverlay'
 import { AB_STYLES, ASSET_URLS } from '../../shared/constants'
 import { useLanguageSelector, useNavBarResponsive } from '../../shared/hooks'
+import { cn } from '../../shared/utils'
 import { useWebSwapController } from './useWebSwapController'
 
 const QrScannerFullScreen = lazy(() => import('../../features/swap/components/QrScannerFullScreen'))
@@ -230,29 +231,24 @@ const WebSwap: React.FC = () => {
       </main>
 
       {/* Desktop footer (Allbridge-style) */}
-      <footer
-        className="hidden md:flex items-center justify-center gap-6 h-[74px] px-6 border-t border-[var(--ab-separator)] flex-shrink-0 relative z-10"
-        style={AB_STYLES.cardBgOnly}
-      >
+      <footer className={cn('hidden md:flex items-center justify-center gap-6 h-[74px] px-6 border-t border-ab-separator flex-shrink-0 relative z-10', AB_STYLES.cardBgOnly)}>
         <a
-          className="text-sm font-medium hover:underline"
+          className={cn('text-sm font-medium hover:underline', AB_STYLES.textSecondary)}
           href="https://linktr.ee/Abroad.finance"
           rel="noopener noreferrer"
-          style={AB_STYLES.textSecondary}
           target="_blank"
         >
           {t('footer.guides', 'Guides')}
         </a>
         <a
-          className="text-sm font-medium hover:underline"
+          className={cn('text-sm font-medium hover:underline', AB_STYLES.textSecondary)}
           href="https://linktr.ee/Abroad.finance"
           rel="noopener noreferrer"
-          style={AB_STYLES.textSecondary}
           target="_blank"
         >
           {t('footer.need_help', 'Need help?')}
         </a>
-        <div className="flex items-center gap-2 ml-2" style={AB_STYLES.textMuted}>
+        <div className={cn('flex items-center gap-2 ml-2', AB_STYLES.textMuted)}>
           <span className="text-sm">powered by</span>
           <img
             alt="Stellar"

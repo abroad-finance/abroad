@@ -520,26 +520,26 @@ const FlowDefinitions = () => {
   )
 
   return (
-    <div className="min-h-screen bg-[#F7F3EC] text-[#1A1A1A]">
+    <div className="ops-page">
       <div className="relative overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(27,94,89,0.18),_transparent_55%)]" />
         <div className="relative max-w-7xl mx-auto px-6 py-10">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
               <div className="flex flex-wrap items-center gap-4 text-sm">
-                <Link className="text-[#1B4D48] hover:text-[#356E6A]" to="/ops/flows">← Back to runs</Link>
-                <Link className="text-[#1B4D48] hover:text-[#356E6A]" to="/ops/crypto-assets">Crypto asset coverage</Link>
-                <Link className="text-[#1B4D48] hover:text-[#356E6A]" to="/ops/partners">Partners & API keys</Link>
+                <Link className="text-ops-brand hover:text-abroad-dark" to="/ops/flows">← Back to runs</Link>
+                <Link className="text-ops-brand hover:text-abroad-dark" to="/ops/crypto-assets">Crypto asset coverage</Link>
+                <Link className="text-ops-brand hover:text-abroad-dark" to="/ops/partners">Partners & API keys</Link>
               </div>
-              <div className="mt-3 text-sm uppercase tracking-[0.3em] text-[#356E6A]">Flow Coverage</div>
+              <div className="mt-3 text-sm uppercase tracking-[0.3em] text-abroad-dark">Flow Coverage</div>
               <h1 className="text-3xl md:text-4xl font-semibold">Corridor Flow Builder</h1>
-              <p className="text-sm text-[#4B5563] max-w-xl mt-2">
+              <p className="text-sm text-gray-600 max-w-xl mt-2">
                 Define the business pipeline for each corridor. System logic handles payouts, waits, and refunds automatically.
               </p>
             </div>
             <div className="flex items-center gap-3">
               <button
-                className="px-4 py-2 rounded-xl border border-[#1B4D48] text-[#1B4D48] bg-white/70 hover:bg-white transition"
+                className="ops-btn-ghost"
                 disabled={!opsApiKey || loading}
                 onClick={() => void loadData()}
                 type="button"
@@ -565,19 +565,19 @@ const FlowDefinitions = () => {
 
           <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-4">
             <div className="rounded-2xl border border-white/70 bg-white/80 p-4 shadow-[0_16px_40px_-35px_rgba(15,23,42,0.45)]">
-              <div className="text-xs uppercase tracking-[0.3em] text-[#6B7280]">Total</div>
+              <div className="text-xs uppercase tracking-[0.3em] text-gray-500">Total</div>
               <div className="mt-2 text-2xl font-semibold">{corridorSummary?.total ?? '—'}</div>
             </div>
             <div className="rounded-2xl border border-white/70 bg-white/80 p-4 shadow-[0_16px_40px_-35px_rgba(15,23,42,0.45)]">
-              <div className="text-xs uppercase tracking-[0.3em] text-[#6B7280]">Defined</div>
+              <div className="text-xs uppercase tracking-[0.3em] text-gray-500">Defined</div>
               <div className="mt-2 text-2xl font-semibold text-emerald-700">{corridorSummary?.defined ?? '—'}</div>
             </div>
             <div className="rounded-2xl border border-white/70 bg-white/80 p-4 shadow-[0_16px_40px_-35px_rgba(15,23,42,0.45)]">
-              <div className="text-xs uppercase tracking-[0.3em] text-[#6B7280]">Missing</div>
+              <div className="text-xs uppercase tracking-[0.3em] text-gray-500">Missing</div>
               <div className="mt-2 text-2xl font-semibold text-rose-700">{corridorSummary?.missing ?? '—'}</div>
             </div>
             <div className="rounded-2xl border border-white/70 bg-white/80 p-4 shadow-[0_16px_40px_-35px_rgba(15,23,42,0.45)]">
-              <div className="text-xs uppercase tracking-[0.3em] text-[#6B7280]">Unsupported</div>
+              <div className="text-xs uppercase tracking-[0.3em] text-gray-500">Unsupported</div>
               <div className="mt-2 text-2xl font-semibold text-amber-700">{corridorSummary?.unsupported ?? '—'}</div>
             </div>
           </div>
@@ -587,7 +587,7 @@ const FlowDefinitions = () => {
               <div className="flex flex-col gap-3">
                 <div className="text-sm font-semibold">Corridors</div>
                 <input
-                  className="w-full rounded-xl border border-[#DADADA] bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#356E6A]/40"
+                  className="w-full ops-input"
                   onChange={event => setSearch(event.target.value)}
                   placeholder="Search corridor"
                   value={search}
@@ -600,7 +600,7 @@ const FlowDefinitions = () => {
                     'unsupported',
                   ].map(value => (
                     <button
-                      className={`rounded-full border px-3 py-1 ${filter === value ? 'border-[#356E6A] bg-[#356E6A]/10 text-[#1B4D48]' : 'border-[#DADADA] text-[#6B7280]'}`}
+                      className={`rounded-full border px-3 py-1 ${filter === value ? 'border-abroad-dark bg-abroad-dark/10 text-ops-brand' : 'border-ops-border text-gray-500'}`}
                       key={value}
                       onClick={() => setFilter(value as typeof filter)}
                       type="button"
@@ -612,10 +612,10 @@ const FlowDefinitions = () => {
               </div>
               <div className="mt-4 space-y-3">
                 {loading && (
-                  <div className="text-xs text-[#6B7280]">Loading corridors...</div>
+                  <div className="text-xs text-gray-500">Loading corridors...</div>
                 )}
                 {!loading && opsApiKey && filteredCorridors.length === 0 && (
-                  <div className="rounded-xl border border-dashed border-[#C6C6C6] bg-white/70 px-4 py-6 text-center text-xs text-[#6B7280]">
+                  <div className="rounded-xl border border-dashed border-neutral-300 bg-white/70 px-4 py-6 text-center text-xs text-gray-500">
                     No corridors found.
                   </div>
                 )}
@@ -623,7 +623,7 @@ const FlowDefinitions = () => {
                   <button
                     className={`w-full text-left rounded-xl border px-4 py-3 transition ${
                       selectedKey === buildCorridorKey(corridor)
-                        ? 'border-[#356E6A] bg-[#356E6A]/10'
+                        ? 'border-abroad-dark bg-abroad-dark/10'
                         : 'border-white/70 bg-white/60 hover:bg-white'
                     }`}
                     key={buildCorridorKey(corridor)}
@@ -631,7 +631,7 @@ const FlowDefinitions = () => {
                     type="button"
                   >
                     <div className="text-sm font-semibold">{corridorTitle(corridor)}</div>
-                    <div className="mt-1 flex items-center gap-2 text-[11px] text-[#6B7280]">
+                    <div className="mt-1 flex items-center gap-2 text-[11px] text-gray-500">
                       <span className={`rounded-full px-2 py-[2px] ${
                         corridor.status === 'DEFINED'
                           ? 'bg-emerald-100 text-emerald-700'
@@ -657,16 +657,16 @@ const FlowDefinitions = () => {
                     <>
                       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                         <div>
-                          <div className="text-xs uppercase tracking-wider text-[#6B7280]">Corridor</div>
+                          <div className="text-xs uppercase tracking-wider text-gray-500">Corridor</div>
                           <div className="text-lg font-semibold">{corridorTitle(selectedCorridor)}</div>
-                          <div className="text-xs text-[#6B7280]">
+                          <div className="text-xs text-gray-500">
                             Updated
                             {formatDate(selectedCorridor.updatedAt)}
                           </div>
                         </div>
                         <div className="flex flex-wrap items-center gap-2">
                           <button
-                            className="rounded-xl border border-[#DADADA] bg-white px-3 py-2 text-xs font-semibold text-[#1F2937] hover:bg-[#F5F5F5]"
+                            className="rounded-xl border border-ops-border bg-white px-3 py-2 text-xs font-semibold text-gray-800 hover:bg-neutral-100"
                             disabled={!isDirty}
                             onClick={() => {
                               if (!baseline) return
@@ -678,7 +678,7 @@ const FlowDefinitions = () => {
                             Discard changes
                           </button>
                           <button
-                            className="rounded-xl border border-[#356E6A] bg-[#356E6A] px-4 py-2 text-xs font-semibold text-white hover:bg-[#2B5B57]"
+                            className="rounded-xl border border-abroad-dark bg-abroad-dark px-4 py-2 text-xs font-semibold text-white hover:bg-ops-brand-hover"
                             disabled={saving || !opsApiKey}
                             onClick={() => void handleSave()}
                             type="button"
@@ -690,9 +690,9 @@ const FlowDefinitions = () => {
 
                       <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
                         <div>
-                          <label className="text-xs uppercase tracking-wider text-[#5B6B6A]">Name</label>
+                          <label className="ops-label">Name</label>
                           <input
-                            className="mt-2 w-full rounded-xl border border-[#DADADA] bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#356E6A]/40"
+                            className="mt-2 w-full ops-input"
                             onChange={event => updateDraftField('name', event.target.value)}
                             value={draft.name}
                           />
@@ -701,7 +701,7 @@ const FlowDefinitions = () => {
                           )}
                         </div>
                         <div className="flex items-center gap-3">
-                          <label className="text-xs uppercase tracking-wider text-[#5B6B6A]">Enabled</label>
+                          <label className="ops-label">Enabled</label>
                           <button
                             className={`rounded-full border px-4 py-2 text-xs font-semibold transition ${
                               draft.enabled ? 'border-emerald-300 bg-emerald-100 text-emerald-800' : 'border-rose-300 bg-rose-100 text-rose-800'
@@ -713,9 +713,9 @@ const FlowDefinitions = () => {
                           </button>
                         </div>
                         <div>
-                          <label className="text-xs uppercase tracking-wider text-[#5B6B6A]">Payout Provider</label>
+                          <label className="ops-label">Payout Provider</label>
                           <select
-                            className="mt-2 w-full rounded-xl border border-[#DADADA] bg-white px-3 py-2 text-sm"
+                            className="mt-2 w-full rounded-xl border border-ops-border bg-white px-3 py-2 text-sm"
                             onChange={event => updateDraftField('payoutProvider', event.target.value)}
                             value={draft.payoutProvider}
                           >
@@ -725,9 +725,9 @@ const FlowDefinitions = () => {
                           </select>
                         </div>
                         <div>
-                          <label className="text-xs uppercase tracking-wider text-[#5B6B6A]">Pricing Provider</label>
+                          <label className="ops-label">Pricing Provider</label>
                           <select
-                            className="mt-2 w-full rounded-xl border border-[#DADADA] bg-white px-3 py-2 text-sm"
+                            className="mt-2 w-full rounded-xl border border-ops-border bg-white px-3 py-2 text-sm"
                             onChange={event => updateDraftField('pricingProvider', event.target.value)}
                             value={draft.pricingProvider}
                           >
@@ -740,9 +740,9 @@ const FlowDefinitions = () => {
 
                       <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-4">
                         <div>
-                          <label className="text-xs uppercase tracking-wider text-[#5B6B6A]">Exchange Fee %</label>
+                          <label className="ops-label">Exchange Fee %</label>
                           <input
-                            className="mt-2 w-full rounded-xl border border-[#DADADA] bg-white px-3 py-2 text-sm"
+                            className="mt-2 w-full rounded-xl border border-ops-border bg-white px-3 py-2 text-sm"
                             onChange={event => updateDraftField('exchangeFeePct', event.target.value)}
                             type="number"
                             value={draft.exchangeFeePct}
@@ -752,9 +752,9 @@ const FlowDefinitions = () => {
                           )}
                         </div>
                         <div>
-                          <label className="text-xs uppercase tracking-wider text-[#5B6B6A]">Fixed Fee</label>
+                          <label className="ops-label">Fixed Fee</label>
                           <input
-                            className="mt-2 w-full rounded-xl border border-[#DADADA] bg-white px-3 py-2 text-sm"
+                            className="mt-2 w-full rounded-xl border border-ops-border bg-white px-3 py-2 text-sm"
                             onChange={event => updateDraftField('fixedFee', event.target.value)}
                             type="number"
                             value={draft.fixedFee}
@@ -764,7 +764,7 @@ const FlowDefinitions = () => {
                           )}
                         </div>
                         <div>
-                          <label className="text-xs uppercase tracking-wider text-[#5B6B6A]">
+                          <label className="ops-label">
                             Min Amount
                             <span className="ml-1">
                               (
@@ -773,7 +773,7 @@ const FlowDefinitions = () => {
                             </span>
                           </label>
                           <input
-                            className="mt-2 w-full rounded-xl border border-[#DADADA] bg-white px-3 py-2 text-sm"
+                            className="mt-2 w-full rounded-xl border border-ops-border bg-white px-3 py-2 text-sm"
                             onChange={event => updateDraftField('minAmount', event.target.value)}
                             type="number"
                             value={draft.minAmount}
@@ -783,7 +783,7 @@ const FlowDefinitions = () => {
                           )}
                         </div>
                         <div>
-                          <label className="text-xs uppercase tracking-wider text-[#5B6B6A]">
+                          <label className="ops-label">
                             Max Amount
                             <span className="ml-1">
                               (
@@ -792,7 +792,7 @@ const FlowDefinitions = () => {
                             </span>
                           </label>
                           <input
-                            className="mt-2 w-full rounded-xl border border-[#DADADA] bg-white px-3 py-2 text-sm"
+                            className="mt-2 w-full rounded-xl border border-ops-border bg-white px-3 py-2 text-sm"
                             onChange={event => updateDraftField('maxAmount', event.target.value)}
                             type="number"
                             value={draft.maxAmount}
@@ -803,9 +803,9 @@ const FlowDefinitions = () => {
                         </div>
                       </div>
 
-                      <div className="mt-6 rounded-2xl border border-dashed border-[#C6C6C6] bg-white/60 p-4">
+                      <div className="mt-6 rounded-2xl border border-dashed border-neutral-300 bg-white/60 p-4">
                         <div className="text-sm font-semibold">System enforced gates</div>
-                        <p className="mt-1 text-xs text-[#6B7280]">
+                        <p className="mt-1 text-xs text-gray-500">
                           Payout confirmation and refunds are handled automatically. Exchange balance waits are inserted when funds move between venues.
                         </p>
                       </div>
@@ -814,11 +814,11 @@ const FlowDefinitions = () => {
                         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                           <div>
                             <div className="text-sm font-semibold">Pipeline Steps</div>
-                            <div className="text-xs text-[#6B7280]">Business steps only — no technical configuration required.</div>
+                            <div className="text-xs text-gray-500">Business steps only — no technical configuration required.</div>
                           </div>
                           <div className="flex flex-wrap items-center gap-2">
                             <select
-                              className="rounded-xl border border-[#DADADA] bg-white px-3 py-2 text-xs"
+                              className="rounded-xl border border-ops-border bg-white px-3 py-2 text-xs"
                               onChange={event => setNewStepType(event.target.value as typeof newStepType)}
                               value={newStepType}
                             >
@@ -827,7 +827,7 @@ const FlowDefinitions = () => {
                               <option value="TRANSFER_VENUE">Transfer venue</option>
                             </select>
                             <button
-                              className="rounded-xl border border-[#356E6A] bg-[#356E6A] px-3 py-2 text-xs font-semibold text-white hover:bg-[#2B5B57]"
+                              className="rounded-xl border border-abroad-dark bg-abroad-dark px-3 py-2 text-xs font-semibold text-white hover:bg-ops-brand-hover"
                               onClick={addStep}
                               type="button"
                             >
@@ -848,7 +848,7 @@ const FlowDefinitions = () => {
                             >
                               <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                                 <div>
-                                  <div className="text-xs uppercase tracking-wider text-[#6B7280]">
+                                  <div className="text-xs uppercase tracking-wider text-gray-500">
                                     Step
                                     {' '}
                                     {index + 1}
@@ -868,7 +868,7 @@ const FlowDefinitions = () => {
                                 </div>
                                 <div className="flex items-center gap-2">
                                   <button
-                                    className="rounded-lg border border-[#DADADA] bg-white px-2 py-1 text-xs"
+                                    className="rounded-lg border border-ops-border bg-white px-2 py-1 text-xs"
                                     disabled={index <= 1}
                                     onClick={() => reorderStep(index, 'up')}
                                     type="button"
@@ -876,7 +876,7 @@ const FlowDefinitions = () => {
                                     ↑
                                   </button>
                                   <button
-                                    className="rounded-lg border border-[#DADADA] bg-white px-2 py-1 text-xs"
+                                    className="rounded-lg border border-ops-border bg-white px-2 py-1 text-xs"
                                     disabled={index === 0 || index >= draft.steps.length - 1}
                                     onClick={() => reorderStep(index, 'down')}
                                     type="button"
@@ -896,9 +896,9 @@ const FlowDefinitions = () => {
 
                               {step.type === 'MOVE_TO_EXCHANGE' && (
                                 <div className="mt-4">
-                                  <label className="text-xs uppercase tracking-wider text-[#5B6B6A]">Venue</label>
+                                  <label className="ops-label">Venue</label>
                                   <select
-                                    className="mt-2 w-full rounded-xl border border-[#DADADA] bg-white px-3 py-2 text-sm"
+                                    className="mt-2 w-full rounded-xl border border-ops-border bg-white px-3 py-2 text-sm"
                                     onChange={event => updateStep(index, prev => ({
                                       ...prev,
                                       venue: event.target.value as FlowVenue,
@@ -915,9 +915,9 @@ const FlowDefinitions = () => {
                               {step.type === 'CONVERT' && (
                                 <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
                                   <div>
-                                    <label className="text-xs uppercase tracking-wider text-[#5B6B6A]">Venue</label>
+                                    <label className="ops-label">Venue</label>
                                     <select
-                                      className="mt-2 w-full rounded-xl border border-[#DADADA] bg-white px-3 py-2 text-sm"
+                                      className="mt-2 w-full rounded-xl border border-ops-border bg-white px-3 py-2 text-sm"
                                       onChange={event => updateStep(index, prev => ({
                                         ...prev,
                                         venue: event.target.value as FlowVenue,
@@ -930,9 +930,9 @@ const FlowDefinitions = () => {
                                     </select>
                                   </div>
                                   <div>
-                                    <label className="text-xs uppercase tracking-wider text-[#5B6B6A]">From</label>
+                                    <label className="ops-label">From</label>
                                     <select
-                                      className="mt-2 w-full rounded-xl border border-[#DADADA] bg-white px-3 py-2 text-sm"
+                                      className="mt-2 w-full rounded-xl border border-ops-border bg-white px-3 py-2 text-sm"
                                       onChange={event => updateStep(index, prev => ({
                                         ...prev,
                                         fromAsset: event.target.value as SupportedCurrency,
@@ -945,9 +945,9 @@ const FlowDefinitions = () => {
                                     </select>
                                   </div>
                                   <div>
-                                    <label className="text-xs uppercase tracking-wider text-[#5B6B6A]">To</label>
+                                    <label className="ops-label">To</label>
                                     <select
-                                      className="mt-2 w-full rounded-xl border border-[#DADADA] bg-white px-3 py-2 text-sm"
+                                      className="mt-2 w-full rounded-xl border border-ops-border bg-white px-3 py-2 text-sm"
                                       onChange={event => updateStep(index, prev => ({
                                         ...prev,
                                         toAsset: event.target.value as SupportedCurrency,
@@ -965,9 +965,9 @@ const FlowDefinitions = () => {
                               {step.type === 'TRANSFER_VENUE' && (
                                 <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
                                   <div>
-                                    <label className="text-xs uppercase tracking-wider text-[#5B6B6A]">From Venue</label>
+                                    <label className="ops-label">From Venue</label>
                                     <select
-                                      className="mt-2 w-full rounded-xl border border-[#DADADA] bg-white px-3 py-2 text-sm"
+                                      className="mt-2 w-full rounded-xl border border-ops-border bg-white px-3 py-2 text-sm"
                                       onChange={event => updateStep(index, prev => ({
                                         ...prev,
                                         fromVenue: event.target.value as FlowVenue,
@@ -980,9 +980,9 @@ const FlowDefinitions = () => {
                                     </select>
                                   </div>
                                   <div>
-                                    <label className="text-xs uppercase tracking-wider text-[#5B6B6A]">To Venue</label>
+                                    <label className="ops-label">To Venue</label>
                                     <select
-                                      className="mt-2 w-full rounded-xl border border-[#DADADA] bg-white px-3 py-2 text-sm"
+                                      className="mt-2 w-full rounded-xl border border-ops-border bg-white px-3 py-2 text-sm"
                                       onChange={event => updateStep(index, prev => ({
                                         ...prev,
                                         toVenue: event.target.value as FlowVenue,
@@ -995,9 +995,9 @@ const FlowDefinitions = () => {
                                     </select>
                                   </div>
                                   <div>
-                                    <label className="text-xs uppercase tracking-wider text-[#5B6B6A]">Asset</label>
+                                    <label className="ops-label">Asset</label>
                                     <select
-                                      className="mt-2 w-full rounded-xl border border-[#DADADA] bg-white px-3 py-2 text-sm"
+                                      className="mt-2 w-full rounded-xl border border-ops-border bg-white px-3 py-2 text-sm"
                                       onChange={event => updateStep(index, prev => ({
                                         ...prev,
                                         asset: event.target.value as SupportedCurrency,
@@ -1018,12 +1018,12 @@ const FlowDefinitions = () => {
 
                       <div className="mt-8 rounded-2xl border border-white/70 bg-white/60 p-4">
                         <div className="text-sm font-semibold">Corridor Support</div>
-                        <p className="mt-1 text-xs text-[#6B7280]">
+                        <p className="mt-1 text-xs text-gray-500">
                           Mark corridors as unsupported to prevent new transactions from being processed.
                         </p>
                         <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-[2fr_auto]">
                           <input
-                            className="rounded-xl border border-[#DADADA] bg-white px-3 py-2 text-sm"
+                            className="rounded-xl border border-ops-border bg-white px-3 py-2 text-sm"
                             onChange={event => setUnsupportedReason(event.target.value)}
                             placeholder="Optional reason"
                             value={unsupportedReason}
@@ -1054,7 +1054,7 @@ const FlowDefinitions = () => {
                     </>
                   )
                 : (
-                    <div className="rounded-xl border border-dashed border-[#C6C6C6] bg-white/70 px-6 py-12 text-center text-sm text-[#6B7280]">
+                    <div className="rounded-xl border border-dashed border-neutral-300 bg-white/70 px-6 py-12 text-center text-sm text-gray-500">
                       Select a corridor to create or edit its flow.
                     </div>
                   )}

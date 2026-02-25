@@ -1437,7 +1437,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     targetAmount: state.targetAmount,
     targetCurrency: state.targetCurrency,
     taxId: state.taxId,
-    textColor: state.isDesktop ? 'white' : '#356E6A',
+    // Let BankDetailsRoute use theme (--ab-text / --ab-text-muted) for readable contrast on the card
   }
 
   const swapProps: SwapProps = {

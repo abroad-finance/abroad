@@ -4,6 +4,7 @@ import { Search, X } from 'lucide-react'
 import React, { useCallback, useMemo, useState } from 'react'
 
 import { AB_STYLES, ASSET_URLS } from '../../../shared/constants'
+import { cn } from '../../../shared/utils'
 
 /* ── Types ── */
 
@@ -106,27 +107,18 @@ const TokenSelectModal: React.FC<TokenSelectModalProps> = ({
           {/* Modal */}
           <motion.div
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            className="relative w-full max-w-sm rounded-3xl p-6 shadow-2xl"
+            className="relative w-full max-w-sm rounded-3xl p-6 shadow-2xl bg-ab-modal-bg border border-ab-modal-border"
             exit={{ opacity: 0, scale: 0.95, y: 10 }}
             initial={{ opacity: 0, scale: 0.95, y: 10 }}
             onClick={e => e.stopPropagation()}
-            style={{
-              background: 'var(--ab-modal-bg)',
-              borderColor: 'var(--ab-modal-border)',
-              borderStyle: 'solid',
-              borderWidth: '1px',
-            }}
             transition={{ duration: 0.2, ease: 'easeOut' }}
           >
             {/* Header */}
             <div className="flex items-center justify-between mb-5">
-              <h2 className="text-xl font-semibold" style={AB_STYLES.text}>
-                {title}
-              </h2>
+              <h2 className={cn('text-xl font-semibold', AB_STYLES.text)}>{title}</h2>
               <button
-                className="p-1.5 rounded-full transition-colors cursor-pointer"
+                className={cn('p-1.5 rounded-full transition-colors cursor-pointer', AB_STYLES.textMuted)}
                 onClick={handleClose}
-                style={AB_STYLES.textMuted}
                 type="button"
               >
                 <X className="w-5 h-5" />
@@ -134,19 +126,12 @@ const TokenSelectModal: React.FC<TokenSelectModalProps> = ({
             </div>
 
             {/* Search */}
-            <div
-              className="flex items-center gap-2 rounded-xl px-3 py-2.5 mb-5"
-              style={{
-                background: 'var(--ab-input)',
-                border: '1px solid var(--ab-input-border)',
-              }}
-            >
-              <Search className="w-4 h-4 shrink-0" style={AB_STYLES.textMuted} />
+            <div className="flex items-center gap-2 rounded-xl px-3 py-2.5 mb-5 bg-ab-input border border-ab-input-border">
+              <Search className={cn('w-4 h-4 shrink-0', AB_STYLES.textMuted)} />
               <input
-                className="w-full bg-transparent text-sm focus:outline-none"
+                className={cn('w-full bg-transparent text-sm focus:outline-none', AB_STYLES.text)}
                 onChange={e => setSearch(e.target.value)}
                 placeholder={t('token_select.search', 'Search')}
-                style={AB_STYLES.text}
                 type="text"
                 value={search}
               />
@@ -160,20 +145,19 @@ const TokenSelectModal: React.FC<TokenSelectModalProps> = ({
                   const icon = resolveIcon(chain.label, chain.icon)
                   return (
                     <button
-                      className="w-11 h-11 rounded-full flex items-center justify-center transition-all cursor-pointer"
+                      className={cn(
+                        'w-11 h-11 rounded-full flex items-center justify-center transition-all cursor-pointer border-2',
+                        isSelected ? 'bg-ab-selected border-ab-btn' : 'bg-ab-hover border-transparent',
+                      )}
                       key={chain.key}
                       onClick={() => handleChainSelect(chain.key)}
-                      style={{
-                        background: isSelected ? 'var(--ab-selected)' : 'var(--ab-hover)',
-                        border: isSelected ? '2px solid var(--ab-btn)' : '2px solid transparent',
-                      }}
                       title={chain.label}
                       type="button"
                     >
                       {icon
                         ? <img alt={chain.label} className="w-7 h-7 rounded-full" src={icon} />
                         : (
-                            <span className="text-xs font-bold" style={{ color: 'var(--ab-text)' }}>
+                            <span className={cn('text-xs font-bold', AB_STYLES.text)}>
                               {chain.label.slice(0, 2)}
                             </span>
                           )}
@@ -192,7 +176,7 @@ const TokenSelectModal: React.FC<TokenSelectModalProps> = ({
                   return (
                     <>
                       {icon && <img alt="" className="w-5 h-5 rounded-full" src={icon} />}
-                      <span className="text-sm font-medium" style={AB_STYLES.textSecondary}>
+                      <span className={cn('text-sm font-medium', AB_STYLES.textSecondary)}>
                         {t('token_select.chain_tokens', '{chain} tokens', { chain: chain?.label })}
                       </span>
                     </>
@@ -204,7 +188,7 @@ const TokenSelectModal: React.FC<TokenSelectModalProps> = ({
             {/* Token List */}
             <div className="space-y-1 max-h-60 overflow-y-auto">
               {filteredTokens.length === 0 && (
-                <p className="text-center py-4 text-sm" style={AB_STYLES.textMuted}>
+                <p className={cn('text-center py-4 text-sm', AB_STYLES.textMuted)}>
                   {t('token_select.no_results', 'No results')}
                 </p>
               )}
@@ -213,32 +197,25 @@ const TokenSelectModal: React.FC<TokenSelectModalProps> = ({
                 const icon = token.icon || CHAIN_ICONS[token.label] || CURRENCY_ICONS[token.label]
                 return (
                   <button
-                    className="w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-all cursor-pointer"
+                    className={cn(
+                      'w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-all cursor-pointer',
+                      isSelected ? 'bg-ab-selected' : 'bg-transparent',
+                    )}
                     key={token.key}
                     onClick={() => handleSelect(token.key)}
-                    style={{
-                      background: isSelected ? 'var(--ab-selected)' : 'transparent',
-                    }}
                     type="button"
                   >
                     {icon
                       ? <img alt={token.label} className="w-9 h-9 rounded-full" src={icon} />
                       : (
-                          <div
-                            className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold"
-                            style={AB_STYLES.hoverAndText}
-                          >
+                          <div className={cn('w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold', AB_STYLES.hoverAndText)}>
                             {token.label.slice(0, 2)}
                           </div>
                         )}
                     <div className="text-left">
-                      <div className="font-medium text-sm" style={AB_STYLES.text}>
-                        {token.label}
-                      </div>
+                      <div className={cn('font-medium text-sm', AB_STYLES.text)}>{token.label}</div>
                       {token.subtitle && (
-                        <div className="text-xs" style={AB_STYLES.textMuted}>
-                          {token.subtitle}
-                        </div>
+                        <div className={cn('text-xs', AB_STYLES.textMuted)}>{token.subtitle}</div>
                       )}
                     </div>
                   </button>

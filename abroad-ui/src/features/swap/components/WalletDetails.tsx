@@ -7,6 +7,7 @@ import React from 'react'
 
 import { TransactionListItem } from '../../../api'
 import { AB_STYLES } from '../../../shared/constants'
+import { cn } from '../../../shared/utils'
 import TransactionDetail from '../shared/TransactionDetail'
 
 export interface WalletDetailsProps {
@@ -95,72 +96,64 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({
       }}
     >
       <div
-        className="rounded-t-4xl md:rounded-4xl p-4 relative w-full h-full md:h-full md:flex md:flex-col overflow-y-auto backdrop-blur-xl"
-        style={{ background: 'var(--ab-wallet-panel-bg)', border: '1px solid var(--ab-wallet-panel-border)', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.08)' }}
+        className="rounded-t-4xl md:rounded-4xl p-4 relative w-full h-full md:h-full md:flex md:flex-col overflow-y-auto backdrop-blur-xl bg-ab-wallet-panel-bg border border-ab-wallet-panel-border shadow-panel"
       >
         {/* Close Button */}
         {onClose && (
           <button
-            className="absolute top-4 right-4 p-1.5 rounded-full transition-colors duration-200 cursor-pointer z-10"
+            className={cn('absolute top-4 right-4 p-1.5 rounded-full transition-colors duration-200 cursor-pointer z-10', AB_STYLES.hoverBg)}
             onClick={onClose}
-            style={AB_STYLES.hoverBg}
             type="button"
           >
-            <X className="w-5 h-5" style={AB_STYLES.textMuted} />
+            <X className={cn('w-5 h-5', AB_STYLES.textMuted)} />
           </button>
         )}
 
         {/* Header */}
         <div className="mb-6 pr-8 text-center mt-2 md:mt-4">
-          <h2 className="text-2xl font-semibold mb-2" style={AB_STYLES.text}>
+          <h2 className={cn('text-2xl font-semibold mb-2', AB_STYLES.text)}>
             {t('wallet_details.header.title', 'Tu Cuenta')}
           </h2>
-          <p className="text-md" style={AB_STYLES.textMuted}>
+          <p className={cn('text-md', AB_STYLES.textMuted)}>
             {t('wallet_details.header.subtitle', 'Gestiona tu billetera y consulta el historial de transacciones')}
           </p>
         </div>
 
         {/* Wallet Address & Balance Card - glass */}
-        <div
-          className="rounded-2xl p-6 py-8 mb-6 backdrop-blur-md"
-          style={AB_STYLES.badgeBg}
-        >
+        <div className={cn('rounded-2xl p-6 py-8 mb-6 backdrop-blur-md', AB_STYLES.badgeBg)}>
           <div className="flex items-center justify-between mb-4">
-            <span className="font-mono text-sm break-all" style={AB_STYLES.text}>{formatWalletAddress(address)}</span>
+            <span className={cn('font-mono text-sm break-all', AB_STYLES.text)}>{formatWalletAddress(address)}</span>
             <div className="flex space-x-2">
               <button
-                className="p-1.5 rounded-lg transition-colors duration-200"
+                className={cn('p-1.5 rounded-lg transition-colors duration-200', AB_STYLES.hoverBg)}
                 onClick={onDisconnectWallet}
-                style={AB_STYLES.hoverBg}
                 title={t('wallet_details.actions.disconnect', 'Desconectar billetera')}
                 type="button"
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" style={AB_STYLES.textMuted} viewBox="0 0 24 24">
+                <svg className={cn('w-4 h-4', AB_STYLES.textMuted)} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} />
                 </svg>
               </button>
               <button
-                className="p-1.5 rounded-lg transition-colors duration-200"
+                className={cn('p-1.5 rounded-lg transition-colors duration-200', AB_STYLES.hoverBg)}
                 onClick={onCopyAddress}
-                style={AB_STYLES.hoverBg}
                 title={t('wallet_details.actions.copy_address', 'Copiar dirección')}
                 type="button"
               >
-                <Copy className="w-4 h-4" style={AB_STYLES.text} />
+                <Copy className={cn('w-4 h-4', AB_STYLES.text)} />
               </button>
               <button
-                className="p-1.5 rounded-lg transition-colors duration-200"
+                className={cn('p-1.5 rounded-lg transition-colors duration-200', AB_STYLES.hoverBg)}
                 onClick={() => window.open(`https://stellar.expert/explorer/public/account/${address}`, '_blank')}
-                style={AB_STYLES.hoverBg}
                 title={t('wallet_details.actions.view_explorer', 'Ver en explorador')}
                 type="button"
               >
-                <ExternalLink className="w-4 h-4" style={AB_STYLES.text} />
+                <ExternalLink className={cn('w-4 h-4', AB_STYLES.text)} />
               </button>
             </div>
           </div>
           {copiedAddress && (
-            <div className="text-xs mb-4" style={AB_STYLES.btnColor}>{t('wallet_details.toast.copied', '¡Dirección copiada!')}</div>
+            <div className={cn('text-xs mb-4', AB_STYLES.btnColor)}>{t('wallet_details.toast.copied', '¡Dirección copiada!')}</div>
           )}
 
           <div className="flex items-center justify-between">
@@ -172,24 +165,23 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({
               />
               {isLoadingBalance
                 ? (
-                    <div className="h-9 w-32 rounded-lg animate-pulse" style={AB_STYLES.separatorBg} />
+                    <div className={cn('h-9 w-32 rounded-lg animate-pulse', AB_STYLES.separatorBg)} />
                   )
                 : (
-                    <span className="font-bold text-4xl" style={AB_STYLES.text}>
+                    <span className={cn('font-bold text-4xl', AB_STYLES.text)}>
                       $
                       {sourceBalance}
                     </span>
                   )}
             </div>
             <button
-              className="p-2 rounded-full transition-colors duration-200 disabled:opacity-50"
+              className={cn('p-2 rounded-full transition-colors duration-200 disabled:opacity-50', AB_STYLES.hoverBg)}
               disabled={isLoadingBalance}
               onClick={onRefreshBalance}
-              style={AB_STYLES.hoverBg}
               title={t('wallet_details.actions.refresh_balance', 'Actualizar balance')}
               type="button"
             >
-              <RefreshCw className={`w-4 h-4 ${isLoadingBalance ? 'animate-spin' : ''}`} style={AB_STYLES.text} />
+              <RefreshCw className={cn(`w-4 h-4 ${isLoadingBalance ? 'animate-spin' : ''}`, AB_STYLES.text)} />
             </button>
           </div>
         </div>
@@ -197,22 +189,21 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({
         {/* Transaction History */}
         <div className="flex-1">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-medium text-lg" style={AB_STYLES.text}>{t('wallet_details.transactions.title', 'Historial de Transacciones')}</h3>
+            <h3 className={cn('font-medium text-lg', AB_STYLES.text)}>{t('wallet_details.transactions.title', 'Historial de Transacciones')}</h3>
             <button
-              className="p-2 rounded-full transition-colors duration-200 disabled:opacity-50"
+              className={cn('p-2 rounded-full transition-colors duration-200 disabled:opacity-50', AB_STYLES.hoverBg)}
               disabled={isLoadingTransactions}
               onClick={onRefreshTransactions}
-              style={AB_STYLES.hoverBg}
               title={t('wallet_details.actions.refresh_transactions', 'Actualizar transacciones')}
               type="button"
             >
-              <RefreshCw className={`w-4 h-4 ${isLoadingTransactions ? 'animate-spin' : ''}`} style={AB_STYLES.text} />
+              <RefreshCw className={cn(`w-4 h-4 ${isLoadingTransactions ? 'animate-spin' : ''}`, AB_STYLES.text)} />
             </button>
           </div>
 
           {transactionError && (
-            <div className="rounded-xl p-4 mb-4" style={AB_STYLES.hoverBorder}>
-              <p className="text-sm" style={AB_STYLES.text}>{transactionError}</p>
+            <div className={cn('rounded-xl p-4 mb-4', AB_STYLES.hoverBorder)}>
+              <p className={cn('text-sm', AB_STYLES.text)}>{transactionError}</p>
             </div>
           )}
 
@@ -220,16 +211,16 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({
             ? (
                 <div className="space-y-3">
                   {[...Array(3)].map((_, index) => (
-                    <div className="rounded-xl p-4" key={index} style={AB_STYLES.badgeBg}>
+                    <div className={cn('rounded-xl p-4', AB_STYLES.badgeBg)} key={index}>
                       <div className="animate-pulse">
                         <div className="flex justify-between items-center mb-2">
-                          <div className="h-4 rounded w-24" style={AB_STYLES.separatorBg} />
-                          <div className="h-6 rounded w-20" style={AB_STYLES.separatorBg} />
+                          <div className={cn('h-4 rounded w-24', AB_STYLES.separatorBg)} />
+                          <div className={cn('h-6 rounded w-20', AB_STYLES.separatorBg)} />
                         </div>
-                        <div className="h-4 rounded w-32 mb-3" style={AB_STYLES.separatorBg} />
+                        <div className={cn('h-4 rounded w-32 mb-3', AB_STYLES.separatorBg)} />
                         <div className="flex justify-between items-center">
-                          <div className="h-6 rounded w-20" style={AB_STYLES.separatorBg} />
-                          <div className="h-6 rounded w-24" style={AB_STYLES.separatorBg} />
+                          <div className={cn('h-6 rounded w-20', AB_STYLES.separatorBg)} />
+                          <div className={cn('h-6 rounded w-24', AB_STYLES.separatorBg)} />
                         </div>
                       </div>
                     </div>
@@ -254,31 +245,30 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({
                         <>
                           {transactions.map((transaction: TransactionListItem) => (
                             <div
-                              className="rounded-xl p-4 transition-colors duration-200 cursor-pointer"
+                              className={cn('rounded-xl p-4 transition-colors duration-200 cursor-pointer', AB_STYLES.badgeBg)}
                               key={transaction.id}
                               onClick={() => setSelectedTransaction(transaction)}
                               onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setSelectedTransaction(transaction) }}
                               role="button"
-                              style={AB_STYLES.badgeBg}
                               tabIndex={0}
                             >
                               <div className="flex items-center justify-between mb-2">
-                                <span className="text-sm" style={AB_STYLES.textMuted}>{formatDate(transaction.createdAt)}</span>
+                                <span className={cn('text-sm', AB_STYLES.textMuted)}>{formatDate(transaction.createdAt)}</span>
                                 <span className={`text-xs px-2 py-1 rounded-full ${getStatusStyle(transaction.status)}`}>
                                   {getStatusText(transaction.status)}
                                 </span>
                               </div>
                               <div className="mb-2">
-                                <span className="text-xs" style={AB_STYLES.textMuted}>
+                                <span className={cn('text-xs', AB_STYLES.textMuted)}>
                                   {t('wallet_details.transactions.to', 'Para:')}
                                   {' '}
                                 </span>
-                                <span className="font-mono text-sm" style={AB_STYLES.text}>{transaction.accountNumber}</span>
+                                <span className={cn('font-mono text-sm', AB_STYLES.text)}>{transaction.accountNumber}</span>
                               </div>
                               <div className="flex justify-between items-center">
                                 <div className="flex items-center space-x-1">
                                   <img alt="USDC" className="w-4 h-4" src="https://storage.googleapis.com/cdn-abroad/Icons/Tokens/USDC%20Token.svg" />
-                                  <span className="text-xl font-bold" style={AB_STYLES.text}>
+                                  <span className={cn('text-xl font-bold', AB_STYLES.text)}>
                                     $
                                     {transaction.quote.sourceAmount.toFixed(2)}
                                   </span>
@@ -293,7 +283,7 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({
                                         : 'https://hatscripts.github.io/circle-flags/flags/co.svg'
                                     }
                                   />
-                                  <span className="text-xl font-bold" style={AB_STYLES.text}>
+                                  <span className={cn('text-xl font-bold', AB_STYLES.text)}>
                                     {transaction.quote.targetCurrency === 'BRL' ? 'R$' : '$'}
                                     {transaction.quote.targetAmount.toLocaleString(
                                       transaction.quote.targetCurrency === 'BRL' ? 'pt-BR' : 'es-CO',
@@ -307,14 +297,13 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({
 
                           {hasMoreTransactions && (
                             <button
-                              className="w-full flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition-colors duration-200 disabled:opacity-50"
+                              className={cn('w-full flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition-colors duration-200 disabled:opacity-50 border border-dashed border-ab-separator', AB_STYLES.textMuted)}
                               disabled={isLoadingMoreTransactions}
                               onClick={onLoadMoreTransactions}
-                              style={{ border: '1px dashed var(--ab-separator)', color: 'var(--ab-text-muted)' }}
                               type="button"
                             >
                               {isLoadingMoreTransactions && (
-                                <RefreshCw className="w-4 h-4 animate-spin" style={AB_STYLES.textMuted} />
+                                <RefreshCw className={cn('w-4 h-4 animate-spin', AB_STYLES.textMuted)} />
                               )}
                               <span>
                                 {isLoadingMoreTransactions
@@ -330,18 +319,18 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({
 
           {!isLoadingTransactions && transactions.length === 0 && !transactionError && (
             <div className="text-center py-8">
-              <div className="rounded-xl p-2.5 mb-4 mx-auto max-w-[60%]" style={AB_STYLES.badgeBg}>
+              <div className={cn('rounded-xl p-2.5 mb-4 mx-auto max-w-[60%]', AB_STYLES.badgeBg)}>
                 <div className="flex justify-between items-center mb-1.5">
-                  <div className="h-3 rounded w-16" style={AB_STYLES.separatorBg} />
-                  <div className="h-4 rounded w-12" style={AB_STYLES.separatorBg} />
+                  <div className={cn('h-3 rounded w-16', AB_STYLES.separatorBg)} />
+                  <div className={cn('h-4 rounded w-12', AB_STYLES.separatorBg)} />
                 </div>
-                <div className="h-3 rounded w-20 mb-2" style={AB_STYLES.separatorBg} />
+                <div className={cn('h-3 rounded w-20 mb-2', AB_STYLES.separatorBg)} />
                 <div className="flex justify-between items-center">
-                  <div className="h-4 rounded w-12" style={AB_STYLES.separatorBg} />
-                  <div className="h-4 rounded w-16" style={AB_STYLES.separatorBg} />
+                  <div className={cn('h-4 rounded w-12', AB_STYLES.separatorBg)} />
+                  <div className={cn('h-4 rounded w-16', AB_STYLES.separatorBg)} />
                 </div>
               </div>
-              <div className="text-sm" style={AB_STYLES.textMuted}>
+              <div className={cn('text-sm', AB_STYLES.textMuted)}>
                 <div className="font-medium mb-1">{t('wallet_details.empty.no_transactions', 'No hay transacciones aún')}</div>
                 <div className="text-xs">{t('wallet_details.empty.hint', 'Cuando hagas tu primera transacción, aparecerá aquí.')}</div>
               </div>
@@ -350,7 +339,7 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="text-xs leading-relaxed text-center mt-6 pt-4" style={{ ...AB_STYLES.borderTopSeparator, ...AB_STYLES.textMuted }}>
+        <div className={cn('text-xs leading-relaxed text-center mt-6 pt-4', AB_STYLES.borderTopSeparator, AB_STYLES.textMuted)}>
           {t('wallet_details.footer.realtime_note', 'Los datos de transacciones se actualizan en tiempo real')}
         </div>
       </div>

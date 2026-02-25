@@ -84,9 +84,9 @@ const ConfirmQr: React.FC<ConfirmQrProps> = ({
   }, [isRealBRL, t])
 
   return (
-    <div className="flex-1 flex items-center justify-center w-full flex-col text-abroad-dark md:text-white">
+    <div className="flex-1 flex items-center justify-center w-full flex-col text-abroad-dark md:text-[var(--ab-text)]">
       <div
-        className="w-[98%] max-w-md min-h-[60vh] h-auto bg-[#356E6A]/5 backdrop-blur-xl rounded-4xl p-4 md:p-6 flex flex-col items-center space-y-4"
+        className="w-full max-w-md min-h-[60vh] h-auto bg-abroad-dark/5 backdrop-blur-xl rounded-2xl p-4 md:p-6 flex flex-col items-center space-y-4"
         id="bg-container"
       >
         {/* Header */}
@@ -109,9 +109,9 @@ const ConfirmQr: React.FC<ConfirmQrProps> = ({
         </div>
 
         {/* Currency Exchange Display */}
-        <div className="flex-1 flex flex-col items-center justify-center w-full space-y-3 py-4">
+        <div className="flex-1 flex flex-col items-center justify-center w-full gap-0.5 py-0">
           {/* Destination Currency - Primary display (larger) */}
-          <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-2">
             <img
               alt="Brazil flag"
               className="w-6 h-6 rounded-full"
@@ -124,7 +124,7 @@ const ConfirmQr: React.FC<ConfirmQrProps> = ({
           </div>
 
           {/* Equal sign and Origin Currency on same line */}
-          <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-2">
             <span className="text-2xl font-bold">=</span>
             <img
               alt="USDC Token"
@@ -197,10 +197,10 @@ const ConfirmQr: React.FC<ConfirmQrProps> = ({
         {showMissingMessage()}
       </div>
 
-      {/* Action Buttons */}
-      <div className="mt-4 flex gap-3 w-[90%] max-w-md">
+      {/* Action Buttons: same width as card */}
+      <div className="mt-4 flex gap-3 w-full">
         <button
-          className="flex-1 py-4 bg-transparent border border-[#356E6A] rounded-xl font-semibold hover:bg-[#356E6A]/10 transition-colors"
+          className="flex-1 py-4 bg-transparent border border-abroad-dark rounded-xl font-semibold hover:bg-abroad-dark/10 transition-colors"
           onClick={onEdit}
           type="button"
         >

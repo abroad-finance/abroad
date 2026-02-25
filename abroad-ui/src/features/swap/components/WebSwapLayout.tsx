@@ -3,7 +3,8 @@ import { useTolgee, useTranslate } from '@tolgee/react'
 import React, { useMemo } from 'react'
 
 import { _36EnumsTargetCurrency as TargetCurrency } from '../../../api'
-import { BRAND_TITLE_STYLE } from '../../../shared/constants'
+import { BRAND_TITLE_CLASS } from '../../../shared/constants'
+import { cn } from '../../../shared/utils'
 import { getSwapPageTitleDefault } from '../constants/swapPageTitles'
 import { SwapView } from '../types'
 
@@ -60,18 +61,15 @@ const WebSwapLayout: React.FC<WebSwapLayoutProps & WebSwapLayoutSlots> = ({ slot
 
   return (
     <div
-      className="w-full overflow-x-hidden overflow-y-auto md:overflow-hidden min-h-0 flex-1 flex flex-col md:items-center md:justify-center md:px-4 md:py-8"
+      className="w-full overflow-x-hidden overflow-y-auto min-h-0 flex-1 flex flex-col md:items-center md:justify-center md:px-4 md:py-8"
     >
-      {/* ---------- Mobile (<= md) ---------- */}
+      {/* Mobile (<= md) */}
       <div className="md:hidden flex flex-col w-full">
         <div
           className="min-h-[600px] h-[calc(100vh-80px)] flex flex-col items-center justify-center px-4 py-6 gap-6"
           style={{ background: 'linear-gradient(135deg, var(--ab-bg), var(--ab-bg-end))' }}
         >
-          <h1
-            className="text-3xl font-black text-center w-full"
-            style={BRAND_TITLE_STYLE}
-          >
+          <h1 className={cn('text-3xl font-black text-center w-full', BRAND_TITLE_CLASS)}>
             {pageTitle}
           </h1>
           <div className="w-full max-w-md">
@@ -80,19 +78,10 @@ const WebSwapLayout: React.FC<WebSwapLayoutProps & WebSwapLayoutSlots> = ({ slot
         </div>
       </div>
 
-      {/* ---------- Desktop (>= md): single section, centered, 30% larger ---------- */}
-      <div className="hidden md:flex flex-1 min-h-0 w-full min-w-[552px] max-w-[552px] flex-col items-center justify-center">
-        <div
-          className="w-full max-w-[424px] flex flex-col items-center gap-6"
-          style={{
-            transform: 'scale(1.3)',
-            transformOrigin: 'center center',
-          }}
-        >
-          <h1
-            className="text-3xl font-black text-center w-full"
-            style={BRAND_TITLE_STYLE}
-          >
+      {/* Desktop (>= md): centered, fits viewport without forcing scroll */}
+      <div className="hidden md:flex flex-1 min-h-0 w-full flex-col items-center justify-center py-6">
+        <div className="w-full max-w-md flex flex-col items-center gap-6">
+          <h1 className={cn('text-3xl font-black text-center w-full', BRAND_TITLE_CLASS)}>
             {pageTitle}
           </h1>
           {renderSwap}

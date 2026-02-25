@@ -47,7 +47,7 @@ export const useSwap = ({
   targetAmount,
   targetCurrency,
 }: UseSwapArgs): SwapProps => {
-  const textColor = isDesktop ? 'white' : '#356E6A'
+  const textColor = isDesktop ? 'white' : 'var(--color-abroad-dark)'
   const { t } = useTranslate()
   const { addNotice } = useNotices()
   const { wallet, walletAuthentication } = useWalletAuth()

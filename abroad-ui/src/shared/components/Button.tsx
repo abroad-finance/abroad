@@ -1,6 +1,8 @@
 import { Loader } from 'lucide-react'
 import React from 'react'
 
+import { cn } from '../utils'
+
 type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
   loading?: boolean
 }
@@ -16,12 +18,12 @@ export function Button({
   return (
     <button
       aria-busy={loading || undefined}
-      className={`text-base font-semibold rounded-2xl px-6 py-4 transition-all inline-flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${className}`}
+      className={cn(
+        'text-base font-semibold rounded-2xl px-6 py-4 transition-all inline-flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed',
+        isDisabled ? 'bg-ab-separator text-ab-text-muted' : 'bg-ab-btn text-ab-btn-text',
+        className,
+      )}
       disabled={isDisabled}
-      style={{
-        background: isDisabled ? 'var(--ab-separator)' : 'var(--ab-btn)',
-        color: isDisabled ? 'var(--ab-text-muted)' : 'var(--ab-btn-text)',
-      }}
       {...props}
     >
       {loading && <Loader aria-hidden className="h-5 w-5 animate-spin" />}

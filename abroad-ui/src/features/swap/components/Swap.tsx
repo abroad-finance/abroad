@@ -14,6 +14,7 @@ import React, { useCallback } from 'react'
 
 import { _36EnumsTargetCurrency as TargetCurrency } from '../../../api'
 import { AB_STYLES, ASSET_URLS } from '../../../shared/constants'
+import { cn } from '../../../shared/utils'
 
 /* ── Icon maps ── */
 
@@ -124,10 +125,7 @@ export default function Swap({
   return (
     <div className="flex flex-col w-full max-w-md mx-auto gap-3">
       {/* ── Card ── */}
-      <div
-        className="rounded-2xl p-1"
-        style={AB_STYLES.cardBg}
-      >
+      <div className={cn('rounded-2xl p-1', AB_STYLES.cardBg)}>
         {/* Source Section */}
         <div className="p-4 pb-3">
           {/* QR button for BRL */}
@@ -135,12 +133,11 @@ export default function Swap({
             <div className="flex justify-end mb-2">
               <button
                 aria-label="Escanear QR"
-                className="p-2 rounded-full cursor-pointer transition-colors"
+                className={cn('p-2 rounded-full cursor-pointer transition-colors', AB_STYLES.badgeBg)}
                 onClick={openQr}
-                style={AB_STYLES.badgeBg}
                 type="button"
               >
-                <ScanLine className="w-5 h-5" style={AB_STYLES.text} />
+                <ScanLine className={cn('w-5 h-5', AB_STYLES.text)} />
               </button>
             </div>
           )}
@@ -149,16 +146,15 @@ export default function Swap({
           <div className="flex items-center justify-between gap-3">
             <div className="flex-1 min-w-0">
               {loadingSource
-                ? <Loader className="animate-spin w-6 h-6" style={AB_STYLES.textMuted} />
+                ? <Loader className={cn('animate-spin w-6 h-6', AB_STYLES.textMuted)} />
                 : (
                     <input
-                      className="w-full bg-transparent font-semibold focus:outline-none text-3xl"
+                      className={cn('w-full bg-transparent font-semibold focus:outline-none text-3xl', hasInsufficientFunds ? 'text-ab-error' : AB_STYLES.text)}
                       inputMode="decimal"
                       onChange={e => onSourceChange(e.target.value)}
                       onFocus={handleFocus}
                       pattern="[0-9.]*"
                       placeholder="0.0"
-                      style={{ color: hasInsufficientFunds ? '#ef4444' : 'var(--ab-text)' }}
                       type="text"
                       value={sourceAmount}
                     />
@@ -167,30 +163,27 @@ export default function Swap({
 
             {/* Token badge → opens source modal */}
             <button
-              className="shrink-0 flex items-center gap-2 rounded-full px-3 py-2 cursor-pointer transition-colors"
+              className={cn('shrink-0 flex items-center gap-2 rounded-full px-3 py-2 cursor-pointer transition-colors', AB_STYLES.badgeBg)}
               onClick={onOpenSourceModal}
-              style={AB_STYLES.badgeBg}
               type="button"
             >
               {assetIcon && <img alt={selectedAssetLabel} className="w-6 h-6 rounded-full" src={assetIcon} />}
               {chainIcon && (
                 <img
                   alt={selectedChainLabel}
-                  className="w-4 h-4 rounded-full -ml-[12px] -mb-[15px] ring-2 ring-[var(--ab-modal-bg)]"
+                  className="w-4 h-4 rounded-full -ml-[12px] -mb-[15px] ring-2 ring-ab-modal-bg"
                   src={chainIcon}
                 />
               )}
               <div className="text-left ml-1">
-                <span className="text-sm font-semibold" style={AB_STYLES.text}>
-                  {selectedAssetLabel}
-                </span>
-                <span className="text-[10px] block leading-tight" style={AB_STYLES.textMuted}>
+                <span className={cn('text-sm font-semibold', AB_STYLES.text)}>{selectedAssetLabel}</span>
+                <span className={cn('text-[10px] block leading-tight', AB_STYLES.textMuted)}>
                   from
                   {' '}
                   {selectedChainLabel}
                 </span>
               </div>
-              <ChevronRight className="w-4 h-4" style={AB_STYLES.textMuted} />
+              <ChevronRight className={cn('w-4 h-4', AB_STYLES.textMuted)} />
             </button>
           </div>
 
@@ -198,20 +191,14 @@ export default function Swap({
           <div className="flex items-center justify-between mt-2">
             {isAuthenticated && truncatedAddress
               ? (
-                  <div
-                    className="flex items-center gap-2 rounded-full px-3 py-1.5"
-                    style={AB_STYLES.badgeBg}
-                  >
+                  <div className={cn('flex items-center gap-2 rounded-full px-3 py-1.5', AB_STYLES.badgeBg)}>
                     {chainIcon && <img alt={selectedChainLabel} className="w-4 h-4 rounded-full" src={chainIcon} />}
-                    <span className="text-xs font-medium" style={AB_STYLES.text}>
-                      {truncatedAddress}
-                    </span>
+                    <span className={cn('text-xs font-medium', AB_STYLES.text)}>{truncatedAddress}</span>
                     {onDisconnect && (
                       <button
                         aria-label="Disconnect wallet"
-                        className="cursor-pointer p-0.5 rounded-full transition-colors"
+                        className={cn('cursor-pointer p-0.5 rounded-full transition-colors', AB_STYLES.textMuted)}
                         onClick={onDisconnect}
-                        style={AB_STYLES.textMuted}
                         type="button"
                       >
                         <X className="w-3.5 h-3.5" />
@@ -221,9 +208,8 @@ export default function Swap({
                 )
               : (
                   <button
-                    className="text-sm font-medium cursor-pointer transition-colors"
+                    className={cn('text-sm font-medium cursor-pointer transition-colors', AB_STYLES.btnColor)}
                     onClick={onPrimaryAction}
-                    style={AB_STYLES.btnColor}
                     type="button"
                   >
                     {t('swap.connect_wallet', 'Connect wallet')}
@@ -233,9 +219,8 @@ export default function Swap({
             {isAuthenticated && usdcBalance !== undefined && (
               <button
                 aria-label={t('swap.use_max_balance', 'Use max balance')}
-                className={`flex items-center gap-1.5 cursor-pointer transition-colors ${hasInsufficientFunds ? 'text-red-500' : ''}`}
+                className={cn('flex items-center gap-1.5 cursor-pointer transition-colors', hasInsufficientFunds ? 'text-ab-error' : AB_STYLES.textMuted)}
                 onClick={onBalanceClick}
-                style={hasInsufficientFunds ? undefined : AB_STYLES.textMuted}
                 type="button"
               >
                 <Wallet className="w-3.5 h-3.5" />
@@ -250,15 +235,9 @@ export default function Swap({
 
         {/* ── Separator with swap button ── */}
         <div className="relative flex items-center justify-center h-0">
-          <div className="absolute w-full" style={AB_STYLES.borderTopSeparator} />
-          <div
-            className="relative z-10 w-9 h-9 rounded-full flex items-center justify-center shadow-sm"
-            style={{
-              background: 'var(--ab-card)',
-              border: '1px solid var(--ab-separator)',
-            }}
-          >
-            <ArrowDownUp className="w-4 h-4" style={AB_STYLES.textMuted} />
+          <div className={cn('absolute w-full', AB_STYLES.borderTopSeparator)} />
+          <div className={cn('relative z-10 w-9 h-9 rounded-full flex items-center justify-center shadow-sm bg-ab-card border border-ab-separator')}>
+            <ArrowDownUp className={cn('w-4 h-4', AB_STYLES.textMuted)} />
           </div>
         </div>
 
@@ -267,16 +246,15 @@ export default function Swap({
           <div className="flex items-center justify-between gap-3">
             <div className="flex-1 min-w-0">
               {loadingTarget
-                ? <Loader className="animate-spin w-6 h-6" style={AB_STYLES.textMuted} />
+                ? <Loader className={cn('animate-spin w-6 h-6', AB_STYLES.textMuted)} />
                 : (
                     <input
-                      className="w-full bg-transparent font-semibold focus:outline-none text-3xl"
+                      className={cn('w-full bg-transparent font-semibold focus:outline-none text-3xl', (isBelowMinimum || isAboveMaximum) ? 'text-ab-error' : AB_STYLES.text)}
                       inputMode="decimal"
                       onChange={e => onTargetChange(e.target.value)}
                       onFocus={handleFocus}
                       pattern="[0-9.,]*"
                       placeholder="0.0"
-                      style={{ color: (isBelowMinimum || isAboveMaximum) ? '#ef4444' : 'var(--ab-text)' }}
                       type="text"
                       value={targetAmount}
                     />
@@ -285,9 +263,8 @@ export default function Swap({
 
             {/* Currency badge → opens target modal */}
             <button
-              className="shrink-0 flex items-center gap-2 rounded-full px-3 py-2 cursor-pointer transition-colors"
+              className={cn('shrink-0 flex items-center gap-2 rounded-full px-3 py-2 cursor-pointer transition-colors', AB_STYLES.badgeBg)}
               onClick={onOpenTargetModal}
-              style={AB_STYLES.badgeBg}
               type="button"
             >
               <img
@@ -299,24 +276,19 @@ export default function Swap({
                     : 'https://hatscripts.github.io/circle-flags/flags/co.svg'
                 }
               />
-              <span className="text-sm font-semibold" style={AB_STYLES.text}>
-                {targetCurrency}
-              </span>
-              <ChevronRight className="w-4 h-4" style={AB_STYLES.textMuted} />
+              <span className={cn('text-sm font-semibold', AB_STYLES.text)}>{targetCurrency}</span>
+              <ChevronRight className={cn('w-4 h-4', AB_STYLES.textMuted)} />
             </button>
           </div>
         </div>
       </div>
 
       {/* ── Info Section ── */}
-      <div
-        className="rounded-2xl px-4 py-3 space-y-2 text-xs"
-        style={{ ...AB_STYLES.cardBg, color: 'var(--ab-text-secondary)' }}
-      >
+      <div className={cn('rounded-2xl px-4 py-3 space-y-2 text-xs', AB_STYLES.cardBg, AB_STYLES.textSecondary)}>
         {/* Exchange rate */}
         <div className="flex items-center justify-between">
           <span>{t('swap.rate', 'Rate')}</span>
-          <span className="font-medium" style={AB_STYLES.text}>
+          <span className={cn('font-medium', AB_STYLES.text)}>
             1
             {' '}
             {sourceSymbol}
@@ -333,7 +305,7 @@ export default function Swap({
             <Landmark className="w-3.5 h-3.5" />
             <span>{t('swap.transfer_cost', 'Transfer fee')}</span>
           </div>
-          <span className="font-medium" style={AB_STYLES.text}>{transferFeeDisplay}</span>
+          <span className={cn('font-medium', AB_STYLES.text)}>{transferFeeDisplay}</span>
         </div>
 
         {/* Time */}
@@ -342,7 +314,7 @@ export default function Swap({
             <Timer className="w-3.5 h-3.5" />
             <span>{t('swap.time', 'Time')}</span>
           </div>
-          <span className="font-medium" style={AB_STYLES.text}>~30s</span>
+          <span className={cn('font-medium', AB_STYLES.text)}>~30s</span>
         </div>
 
         {/* Min/Max warnings */}
@@ -366,13 +338,12 @@ export default function Swap({
 
       {/* ── Primary Action Button ── */}
       <button
-        className="w-full py-4 rounded-2xl text-base font-semibold transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+        className={cn(
+          'w-full py-4 rounded-2xl text-base font-semibold transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed',
+          continueDisabled ? 'bg-ab-separator text-ab-text-muted' : 'bg-ab-btn text-ab-btn-text',
+        )}
         disabled={continueDisabled}
         onClick={onPrimaryAction}
-        style={{
-          background: continueDisabled ? 'var(--ab-separator)' : 'var(--ab-btn)',
-          color: continueDisabled ? 'var(--ab-text-muted)' : 'var(--ab-btn-text)',
-        }}
         type="button"
       >
         {!isAuthenticated

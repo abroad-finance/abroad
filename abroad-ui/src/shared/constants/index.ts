@@ -1,5 +1,3 @@
-import type { CSSProperties } from 'react'
-
 export const ATTRIBUTION_URL = 'https://www.flickr.com/photos/pedrosz/36132013403'
 
 export const ASSET_URLS = {
@@ -13,26 +11,23 @@ export const ASSET_URLS = {
 }
 
 /** Shared style for brand title text (navbar, page title, language selector). Reduces duplication for SonarCloud. */
-export const BRAND_TITLE_STYLE: CSSProperties = {
-  color: 'var(--color-emerald-700)',
-  fontFamily: '"Airbnb Cereal"',
-}
+export const BRAND_TITLE_CLASS = 'text-emerald-700 font-cereal'
 
-/** Shared theme styles to reduce duplicated lines (SonarCloud new_duplicated_lines_density). */
+/** Shared theme classes to reduce duplicated lines (SonarCloud new_duplicated_lines_density). */
 export const AB_STYLES = {
-  badgeBg: { background: 'var(--ab-badge-bg)', border: '1px solid var(--ab-badge-border)' } as CSSProperties,
-  borderBottomSeparator: { borderBottom: '1px solid var(--ab-separator)' } as CSSProperties,
-  borderTopSeparator: { borderTop: '1px solid var(--ab-separator)' } as CSSProperties,
-  btnColor: { color: 'var(--ab-btn)' } as CSSProperties,
-  cardBg: { background: 'var(--ab-card)', border: '1px solid var(--ab-card-border)' } as CSSProperties,
-  cardBgOnly: { background: 'var(--ab-card)' } as CSSProperties,
-  hoverAndText: { background: 'var(--ab-hover)', color: 'var(--ab-text)' } as CSSProperties,
-  hoverBg: { background: 'var(--ab-hover)' } as CSSProperties,
-  hoverBorder: { background: 'var(--ab-hover)', border: '1px solid var(--ab-separator)' } as CSSProperties,
-  separatorBg: { background: 'var(--ab-separator)' } as CSSProperties,
-  text: { color: 'var(--ab-text)' } as CSSProperties,
-  textMuted: { color: 'var(--ab-text-muted)' } as CSSProperties,
-  textSecondary: { color: 'var(--ab-text-secondary)' } as CSSProperties,
+  badgeBg: 'bg-ab-badge-bg border border-ab-badge-border',
+  borderBottomSeparator: 'border-b border-ab-separator',
+  borderTopSeparator: 'border-t border-ab-separator',
+  btnColor: 'text-ab-btn',
+  cardBg: 'bg-ab-card border border-ab-card-border',
+  cardBgOnly: 'bg-ab-card',
+  hoverAndText: 'bg-ab-hover text-ab-text',
+  hoverBg: 'bg-ab-hover',
+  hoverBorder: 'bg-ab-hover border border-ab-separator',
+  separatorBg: 'bg-ab-separator',
+  text: 'text-ab-text',
+  textMuted: 'text-ab-text-muted',
+  textSecondary: 'text-ab-text-secondary',
 } as const
 
 export const PENDING_TX_KEY = 'pendingTransaction'

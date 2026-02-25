@@ -118,28 +118,28 @@ const FlowOpsDetail = () => {
   ])
 
   return (
-    <div className="min-h-screen bg-[#F7F3EC] text-[#1A1A1A]">
+    <div className="ops-page">
       <div className="relative overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(27,94,89,0.18),_transparent_55%)]" />
         <div className="relative max-w-6xl mx-auto px-6 py-10">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
               <div className="flex items-center gap-3 text-sm">
-                <Link className="text-[#1B4D48] hover:text-[#356E6A]" to="/ops/flows">← Back to flows</Link>
-                <Link className="text-[#1B4D48] hover:text-[#356E6A]" to="/ops/flows/definitions">Edit definitions</Link>
-                <Link className="text-[#1B4D48] hover:text-[#356E6A]" to="/ops/partners">Partners & API keys</Link>
-                <Link className="text-[#1B4D48] hover:text-[#356E6A]" to="/ops/transactions/reconcile">Reconcile hash</Link>
+                <Link className="text-ops-brand hover:text-abroad-dark" to="/ops/flows">← Back to flows</Link>
+                <Link className="text-ops-brand hover:text-abroad-dark" to="/ops/flows/definitions">Edit definitions</Link>
+                <Link className="text-ops-brand hover:text-abroad-dark" to="/ops/partners">Partners & API keys</Link>
+                <Link className="text-ops-brand hover:text-abroad-dark" to="/ops/transactions/reconcile">Reconcile hash</Link>
               </div>
-              <div className="mt-3 text-sm uppercase tracking-[0.3em] text-[#356E6A]">Flow Instance</div>
+              <div className="mt-3 text-sm uppercase tracking-[0.3em] text-abroad-dark">Flow Instance</div>
               <h1 className="text-3xl md:text-4xl font-semibold">{headerDefinition}</h1>
-              <p className="text-xs text-[#6B7280] mt-2">{flowInstanceId}</p>
+              <p className="text-xs text-gray-500 mt-2">{flowInstanceId}</p>
             </div>
             {data && (
               <div className="flex items-center gap-3">
                 <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold ${flowStatusClasses[data.status]}`}>
                   {data.status}
                 </span>
-                <div className="text-xs text-[#6B7280]">
+                <div className="text-xs text-gray-500">
                   Updated
                   {formatDate(data.updatedAt)}
                 </div>
@@ -162,63 +162,63 @@ const FlowOpsDetail = () => {
           )}
 
           {loading && opsApiKey && (
-            <div className="mt-6 text-sm text-[#6B7280]">Loading flow instance...</div>
+            <div className="mt-6 text-sm text-gray-500">Loading flow instance...</div>
           )}
 
           {data && opsApiKey && (
             <>
               <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-3">
                 <div className="rounded-2xl border border-white/70 bg-white/80 p-5 shadow-[0_20px_45px_-35px_rgba(15,23,42,0.45)]">
-                  <div className="text-xs uppercase tracking-wider text-[#6B7280]">Transaction</div>
+                  <div className="text-xs uppercase tracking-wider text-gray-500">Transaction</div>
                   <div className="mt-2 text-sm font-medium">{data.transaction?.id ?? '—'}</div>
-                  <div className="mt-1 text-xs text-[#6B7280]">
+                  <div className="mt-1 text-xs text-gray-500">
                     Status:
                     {data.transaction?.status ?? '—'}
                   </div>
-                  <div className="mt-3 text-xs text-[#6B7280]">
+                  <div className="mt-3 text-xs text-gray-500">
                     External ID:
                     {data.transaction?.externalId ?? '—'}
                   </div>
-                  <div className="text-xs text-[#6B7280]">
+                  <div className="text-xs text-gray-500">
                     On-chain:
                     {data.transaction?.onChainId ?? '—'}
                   </div>
                 </div>
                 <div className="rounded-2xl border border-white/70 bg-white/80 p-5 shadow-[0_20px_45px_-35px_rgba(15,23,42,0.45)]">
-                  <div className="text-xs uppercase tracking-wider text-[#6B7280]">Amounts</div>
+                  <div className="text-xs uppercase tracking-wider text-gray-500">Amounts</div>
                   <div className="mt-2 text-sm font-medium">
                     Source:
                     {data.transaction?.quote.sourceAmount ?? '—'}
                   </div>
-                  <div className="text-xs text-[#6B7280]">
+                  <div className="text-xs text-gray-500">
                     Target:
                     {data.transaction?.quote.targetAmount ?? '—'}
                     {' '}
                     {data.transaction?.quote.targetCurrency ?? ''}
                   </div>
-                  <div className="mt-3 text-xs text-[#6B7280]">
+                  <div className="mt-3 text-xs text-gray-500">
                     Network:
                     {data.transaction?.quote.network ?? '—'}
                   </div>
-                  <div className="text-xs text-[#6B7280]">
+                  <div className="text-xs text-gray-500">
                     Payment:
                     {data.transaction?.paymentMethod ?? '—'}
                   </div>
                 </div>
                 <div className="rounded-2xl border border-white/70 bg-white/80 p-5 shadow-[0_20px_45px_-35px_rgba(15,23,42,0.45)]">
-                  <div className="text-xs uppercase tracking-wider text-[#6B7280]">Snapshot</div>
+                  <div className="text-xs uppercase tracking-wider text-gray-500">Snapshot</div>
                   <div className="mt-2 text-sm font-medium">{data.definition?.name ?? '—'}</div>
-                  <div className="text-xs text-[#6B7280]">
+                  <div className="text-xs text-gray-500">
                     Pricing:
                     {data.definition?.pricingProvider ?? '—'}
                   </div>
-                  <div className="mt-3 text-xs text-[#6B7280]">
+                  <div className="mt-3 text-xs text-gray-500">
                     Fee:
                     {data.definition?.exchangeFeePct ?? 0}
                     % +
                     {data.definition?.fixedFee ?? 0}
                   </div>
-                  <div className="text-xs text-[#6B7280]">
+                  <div className="text-xs text-gray-500">
                     Limits:
                     {data.definition?.minAmount ?? '—'}
                     {' '}
@@ -231,7 +231,7 @@ const FlowOpsDetail = () => {
               <div className="mt-10">
                 <div className="flex items-center justify-between">
                   <h2 className="text-xl font-semibold">Steps</h2>
-                  <div className="text-xs text-[#6B7280]">
+                  <div className="text-xs text-gray-500">
                     {data.steps.length}
                     {' '}
                     steps
@@ -252,20 +252,20 @@ const FlowOpsDetail = () => {
                               <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold ${stepStatusClasses[step.status]}`}>
                                 {step.status}
                               </span>
-                              <span className="text-xs uppercase tracking-wider text-[#64748B]">
+                              <span className="text-xs uppercase tracking-wider text-slate-500">
                                 Step
                                 {step.stepOrder}
                               </span>
                             </div>
                             <div className="mt-2 text-lg font-semibold">{step.stepType}</div>
-                            <div className="mt-1 text-xs text-[#6B7280]">
+                            <div className="mt-1 text-xs text-gray-500">
                               Attempts
                               {step.attempts}
                               {' '}
                               /
                               {step.maxAttempts}
                             </div>
-                            <div className="mt-2 text-xs text-[#6B7280]">
+                            <div className="mt-2 text-xs text-gray-500">
                               Started
                               {formatDate(step.startedAt)}
                               {' '}
@@ -302,17 +302,17 @@ const FlowOpsDetail = () => {
                         </div>
 
                         <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3 text-xs">
-                          <details className="rounded-xl border border-[#E5E7EB] bg-white/70 p-3">
+                          <details className="rounded-xl border border-gray-200 bg-white/70 p-3">
                             <summary className="cursor-pointer font-semibold">Input</summary>
-                            <pre className="mt-2 whitespace-pre-wrap text-[11px] text-[#4B5563]">{formatJson(step.input)}</pre>
+                            <pre className="mt-2 whitespace-pre-wrap text-[11px] text-gray-600">{formatJson(step.input)}</pre>
                           </details>
-                          <details className="rounded-xl border border-[#E5E7EB] bg-white/70 p-3">
+                          <details className="rounded-xl border border-gray-200 bg-white/70 p-3">
                             <summary className="cursor-pointer font-semibold">Output</summary>
-                            <pre className="mt-2 whitespace-pre-wrap text-[11px] text-[#4B5563]">{formatJson(step.output)}</pre>
+                            <pre className="mt-2 whitespace-pre-wrap text-[11px] text-gray-600">{formatJson(step.output)}</pre>
                           </details>
-                          <details className="rounded-xl border border-[#E5E7EB] bg-white/70 p-3">
+                          <details className="rounded-xl border border-gray-200 bg-white/70 p-3">
                             <summary className="cursor-pointer font-semibold">Correlation</summary>
-                            <pre className="mt-2 whitespace-pre-wrap text-[11px] text-[#4B5563]">{formatJson(step.correlation)}</pre>
+                            <pre className="mt-2 whitespace-pre-wrap text-[11px] text-gray-600">{formatJson(step.correlation)}</pre>
                           </details>
                         </div>
                       </div>
@@ -324,7 +324,7 @@ const FlowOpsDetail = () => {
               <div className="mt-10">
                 <div className="flex items-center justify-between">
                   <h2 className="text-xl font-semibold">Signals</h2>
-                  <div className="text-xs text-[#6B7280]">
+                  <div className="text-xs text-gray-500">
                     {data.signals.length}
                     {' '}
                     events
@@ -332,18 +332,18 @@ const FlowOpsDetail = () => {
                 </div>
                 <div className="mt-4 space-y-3">
                   {data.signals.length === 0 && (
-                    <div className="rounded-xl border border-dashed border-[#C6C6C6] bg-white/70 px-6 py-8 text-center text-sm text-[#6B7280]">
+                    <div className="rounded-xl border border-dashed border-neutral-300 bg-white/70 px-6 py-8 text-center text-sm text-gray-500">
                       No signals recorded for this instance.
                     </div>
                   )}
                   {data.signals.map(signal => (
                     <div
-                      className="rounded-xl border border-white/70 bg-white/80 p-4 text-xs text-[#4B5563]"
+                      className="rounded-xl border border-white/70 bg-white/80 p-4 text-xs text-gray-600"
                       key={signal.id}
                     >
                       <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
                         <div>
-                          <div className="font-semibold text-[#1F2937]">{signal.eventType}</div>
+                          <div className="font-semibold text-gray-800">{signal.eventType}</div>
                           <div className="text-[11px]">
                             Created
                             {formatDate(signal.createdAt)}
@@ -358,11 +358,11 @@ const FlowOpsDetail = () => {
                         </div>
                       </div>
                       <div className="mt-2 grid grid-cols-1 gap-2 md:grid-cols-2">
-                        <details className="rounded-lg border border-[#E5E7EB] bg-white/70 p-2">
+                        <details className="rounded-lg border border-gray-200 bg-white/70 p-2">
                           <summary className="cursor-pointer font-semibold">Correlation</summary>
                           <pre className="mt-2 whitespace-pre-wrap text-[11px]">{formatJson(signal.correlationKeys)}</pre>
                         </details>
-                        <details className="rounded-lg border border-[#E5E7EB] bg-white/70 p-2">
+                        <details className="rounded-lg border border-gray-200 bg-white/70 p-2">
                           <summary className="cursor-pointer font-semibold">Payload</summary>
                           <pre className="mt-2 whitespace-pre-wrap text-[11px]">{formatJson(signal.payload)}</pre>
                         </details>
