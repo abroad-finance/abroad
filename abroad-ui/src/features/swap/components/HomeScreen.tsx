@@ -1,5 +1,5 @@
 import { useTranslate } from '@tolgee/react'
-import { ChevronRight } from 'lucide-react'
+import { ChevronRight, ChevronDown } from 'lucide-react'
 import React from 'react'
 
 import { _36EnumsTargetCurrency as TargetCurrency } from '../../../api'
@@ -189,6 +189,7 @@ export default function HomeScreen({
             >
               <img alt={chainInfo.name} className="h-3.5 w-3.5" src={chainInfo.icon} />
               {selectedTokenLabel} on {chainInfo.name}
+              <ChevronDown className="h-3 w-3" />
             </button>
           )}
         </div>
