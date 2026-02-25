@@ -1,21 +1,57 @@
 @import "tailwindcss";
 @import "./fonts.css";
 
+/* Urbanist font */
+@font-face {
+  font-family: 'Urbanist';
+  src: url('https://fonts.gstatic.com/s/urbanist/v11/L0x5DF4xlVMF-BfR8bXMIjhFq3-OXg.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Urbanist';
+  src: url('https://fonts.gstatic.com/s/urbanist/v11/L0x5DF4xlVMF-BfR8bXMIjhLq3-OXg.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Urbanist';
+  src: url('https://fonts.gstatic.com/s/urbanist/v11/L0x5DF4xlVMF-BfR8bXMIjhFqf3-OXg.woff2') format('woff2');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Urbanist';
+  src: url('https://fonts.gstatic.com/s/urbanist/v11/L0x5DF4xlVMF-BfR8bXMIjhhqf3-OXg.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
 @theme {
   /* ── Brand palette ── */
   --color-abroad-dark: #356E6A;
   --color-abroad-mid: #26A17B;
   --color-abroad-light: #73B9A3;
 
-  /* ── Theme-aware tokens: reference --ab-* so dark mode works automatically ── */
+  /* ── UX redesign: green + semantic tokens ── */
+  --color-ab-green: var(--ab-green);
+  --color-ab-green-dark: var(--ab-green-dark);
   --color-ab-bg: var(--ab-bg);
+  --color-ab-text: var(--ab-text);
+  --color-ab-text-2: var(--ab-text-secondary);
+  --color-ab-text-3: var(--ab-text-muted);
+  --color-ab-border: var(--ab-border);
+  --color-ab-red: var(--ab-red);
+
+  /* ── Theme-aware tokens: reference --ab-* so dark mode works automatically ── */
   --color-ab-card: var(--ab-card);
   --color-ab-card-border: var(--ab-card-border);
   --color-ab-input: var(--ab-input);
   --color-ab-input-border: var(--ab-input-border);
-  --color-ab-text: var(--ab-text);
-  --color-ab-text-secondary: var(--ab-text-secondary);
-  --color-ab-text-muted: var(--ab-text-muted);
   --color-ab-btn: var(--ab-btn);
   --color-ab-btn-hover: var(--ab-btn-hover);
   --color-ab-btn-text: var(--ab-btn-text);
@@ -32,6 +68,7 @@
 
   /* ── Custom font ── */
   --font-cereal: "Airbnb Cereal";
+  --font-urbanist: "Urbanist";
 
   /* ── Custom shadow ── */
   --shadow-panel: 0 25px 50px -12px rgba(0, 0, 0, 0.08);
@@ -47,26 +84,47 @@
 
 /* ── Light mode (default) ── */
 :root {
-  --ab-bg: #e8f5f0;
+  /* UX redesign: brand green + semantic tokens */
+  --ab-green: #0FBE7B;
+  --ab-green-dark: #0AA66B;
+  --ab-green-soft: rgba(15, 190, 123, 0.06);
+  --ab-green-medium: rgba(15, 190, 123, 0.1);
+  --ab-green-border: rgba(15, 190, 123, 0.16);
+  --ab-bg: #FAFCFB;
   --ab-bg-end: #d4ede4;
+  --ab-bg-card: #FFFFFF;
+  --ab-bg-subtle: #F8FAF9;
+  --ab-bg-muted: #F5F7F9;
+  --ab-text: #111827;
+  --ab-text-secondary: #5F6B7A;
+  --ab-text-muted: #9CA3AF;
+  --ab-border: #E8ECF0;
+  --ab-border-hover: #D1D5DB;
+  --ab-red: #EF4444;
+  --ab-amber: #F59E0B;
+  --ab-chain-stellar: #000000;
+  --ab-chain-stellar-bg: #F0F0F0;
+  --ab-chain-celo: #35D07F;
+  --ab-chain-celo-bg: #E8FFF2;
+  --ab-chain-solana: #9945FF;
+  --ab-chain-solana-bg: #F3EDFF;
+  --ab-usdc: #2775CA;
+  --ab-usdt: #26A17B;
+  /* Legacy / layout */
   --ab-card: rgba(255, 255, 255, 0.6);
   --ab-card-border: rgba(53, 110, 106, 0.1);
   --ab-input: #f0f7f5;
   --ab-input-border: rgba(53, 110, 106, 0.08);
-  --ab-text: #1a3a37;
-  --ab-text-secondary: #4a7a75;
-  --ab-text-muted: #7a9e9a;
-  --ab-btn: #5a9a8f;
-  --ab-btn-hover: #4a8a7f;
+  --ab-btn: #0FBE7B;
+  --ab-btn-hover: #0AA66B;
   --ab-btn-text: #ffffff;
   --ab-separator: rgba(53, 110, 106, 0.1);
   --ab-modal-bg: #ffffff;
   --ab-modal-border: rgba(53, 110, 106, 0.08);
   --ab-badge-bg: rgba(255, 255, 255, 0.7);
   --ab-badge-border: rgba(53, 110, 106, 0.12);
-  --ab-hover: rgba(53, 110, 106, 0.06);
-  --ab-selected: rgba(53, 110, 106, 0.1);
-  /* Wallet details panel: clear with very subtle light green tint */
+  --ab-hover: rgba(15, 190, 123, 0.06);
+  --ab-selected: rgba(15, 190, 123, 0.1);
   --ab-wallet-panel-bg: rgba(232, 245, 240, 0.92);
   --ab-wallet-panel-border: rgba(53, 110, 106, 0.14);
 }
@@ -94,6 +152,28 @@
   --ab-selected: rgba(90, 154, 143, 0.2);
   --ab-wallet-panel-bg: rgba(26, 58, 52, 0.88);
   --ab-wallet-panel-border: rgba(42, 90, 80, 0.5);
+}
+
+/* ── UX redesign: shared animations ── */
+@keyframes ab-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+@keyframes ab-spin {
+  to { transform: rotate(360deg); }
+}
+@keyframes ab-pop-in {
+  from { transform: scale(0); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+@keyframes ab-scan-line {
+  0%, 100% { top: 24px; opacity: 0.3; }
+  50% { top: 216px; opacity: 1; }
+}
+@keyframes ab-fade-seq {
+  0%, 30% { opacity: 0.3; }
+  40%, 60% { opacity: 1; }
+  70%, 100% { opacity: 0.3; }
 }
 
 /* ── Ops admin panel component classes ── */
