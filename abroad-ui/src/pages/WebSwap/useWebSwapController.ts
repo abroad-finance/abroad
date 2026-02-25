@@ -146,7 +146,7 @@ const createInitialState = (isDesktop: boolean): SwapControllerState => ({
   targetCurrency: TargetCurrency.BRL,
   taxId: '',
   transactionId: null,
-  view: 'swap',
+  view: 'home',
 })
 
 const reducer = (state: SwapControllerState, action: SwapAction): SwapControllerState => {
@@ -288,6 +288,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
   const [corridors, setCorridors] = useState<PublicCorridor[]>([])
   const [corridorError, setCorridorError] = useState<null | string>(null)
   const [chainKey, setChainKey] = useState('')
+  const [pendingConnectAfterChainSelect, setPendingConnectAfterChainSelect] = useState(false)
 
   const sep24TokenPresent = useMemo(() => {
     if (typeof window === 'undefined') return false
@@ -449,12 +450,24 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     const nextWallet = selectedCorridor.chainFamily === 'stellar'
       ? defaultWallet
       : getWalletHandler('wallet-connect')
-    if (nextWallet && nextWallet !== wallet) {
-      setActiveWallet(nextWallet)
+    if (!nextWallet) return
+    if (nextWallet !== wallet) setActiveWallet(nextWallet)
+    // When user chose "connect" from the chain modal, connect with the wallet for this corridor
+    // (do it here so we use nextWallet, not the possibly stale wallet from context)
+    if (pendingConnectAfterChainSelect) {
+      setPendingConnectAfterChainSelect(false)
+      const options = nextWallet.walletId === 'wallet-connect'
+        ? {
+            chainId: selectedCorridor.chainId,
+            walletConnect: selectedCorridor.walletConnect,
+          }
+        : undefined
+      void nextWallet.connect(options)
     }
   }, [
     defaultWallet,
     getWalletHandler,
+    pendingConnectAfterChainSelect,
     selectedCorridor,
     setActiveWallet,
     wallet,
@@ -532,6 +545,10 @@ export const useWebSwapController = (): WebSwapControllerProps => {
       : undefined
     await wallet.connect(options)
   }, [selectedCorridor, wallet])
+
+  const requestConnectAfterChainSelect = useCallback(() => {
+    setPendingConnectAfterChainSelect(true)
+  }, [])
 
   useEffect(() => {
     if (!wallet?.address || !wallet?.chainId || !selectedCorridor) return
@@ -983,7 +1000,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     localStorage.removeItem(PENDING_TX_KEY)
     dispatch({ type: 'RESET' })
     dispatch({ isQrOpen: false, type: 'SET_QR_OPEN' })
-    dispatch({ type: 'SET_VIEW', view: 'swap' })
+    dispatch({ type: 'SET_VIEW', view: 'home' })
   }, [])
 
   const resetForNewTransaction = useCallback(() => {
@@ -991,6 +1008,10 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     dispatch({ type: 'RESET' })
     dispatch({ isQrOpen: false, type: 'SET_QR_OPEN' })
     dispatch({ transactionId: null, type: 'SET_TRANSACTION_ID' })
+    dispatch({ type: 'SET_VIEW', view: 'home' })
+  }, [])
+
+  const goToManual = useCallback(() => {
     dispatch({ type: 'SET_VIEW', view: 'swap' })
   }, [])
 
@@ -1490,6 +1511,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     closeQr: () => dispatch({ isQrOpen: false, type: 'SET_QR_OPEN' }),
     confirmQrProps,
     currentBgUrl,
+    goToManual,
     handleBackToSwap,
     handleKycApproved,
     handleQrResult,
@@ -1500,6 +1522,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     isWalletDetailsOpen: state.isWalletDetailsOpen,
     onWalletConnect: connectWallet,
     openQr,
+    requestConnectAfterChainSelect,
     resetForNewTransaction,
     selectAssetOption,
     selectChain,
