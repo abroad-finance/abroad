@@ -229,8 +229,10 @@ const WebSwap: React.FC = () => {
                 onConnectWallet={handleConnectWalletClick}
                 onGoToManual={goToManual}
                 onHistoryClick={() => setShowHistory(true)}
+                onOpenChainModal={openSourceModal}
                 onOpenQr={openQr}
                 recentTransactions={[]}
+                selectedChainKey={selectedChainKey}
                 selectedTokenLabel={swapViewProps.selectedAssetLabel}
                 targetCurrency={targetCurrency}
               />

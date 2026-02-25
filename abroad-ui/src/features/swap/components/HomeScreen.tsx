@@ -17,11 +17,18 @@ const COUNTRIES: Record<string, { flag: string, rate: number, decimals: number }
   COP: { flag: '🇨🇴', rate: 4198.5, decimals: 0 },
 }
 
+const CHAIN_MAP: Record<string, { icon: string, bg: string, color: string, name: string }> = {
+  stellar: { icon: ASSET_URLS.STELLAR_CHAIN_ICON, bg: 'var(--ab-chain-stellar-bg)', color: 'var(--ab-chain-stellar)', name: 'Stellar' },
+  celo: { icon: ASSET_URLS.CELO_CHAIN_ICON, bg: 'var(--ab-chain-celo-bg)', color: 'var(--ab-chain-celo)', name: 'Celo' },
+  solana: { icon: ASSET_URLS.SOLANA_CHAIN_ICON, bg: 'var(--ab-chain-solana-bg)', color: 'var(--ab-chain-solana)', name: 'Solana' },
+}
+
 export interface HomeScreenProps {
   balance: string
   isAuthenticated: boolean
   onConnectWallet: () => void
   onHistoryClick: () => void
+  onOpenChainModal?: () => void
   onOpenQr: () => void
   onGoToManual: () => void
   recentTransactions: Array<{
@@ -31,6 +38,7 @@ export interface HomeScreenProps {
     time: string
     usdcAmount: string
   }>
+  selectedChainKey?: string
   selectedTokenLabel: string
   targetCurrency: TargetCurrency
 }
@@ -40,9 +48,11 @@ export default function HomeScreen({
   isAuthenticated,
   onConnectWallet,
   onHistoryClick,
+  onOpenChainModal,
   onOpenQr,
   onGoToManual,
   recentTransactions,
+  selectedChainKey,
   selectedTokenLabel,
   targetCurrency,
 }: HomeScreenProps): React.JSX.Element {
@@ -134,6 +144,10 @@ export default function HomeScreen({
     ? Math.round(balanceNum * otherCurrency.rate).toLocaleString('es-CO')
     : (balanceNum * otherCurrency.rate).toFixed(otherCurrency.decimals)
 
+  // Get chain from selectedChainKey
+  const chainKey = selectedChainKey?.toLowerCase().split(':')[0] ?? 'stellar'
+  const chainInfo = CHAIN_MAP[chainKey] ?? CHAIN_MAP.stellar
+
   return (
     <div className="flex flex-1 flex-col items-center px-6 py-8 md:py-10">
       <div className="w-full max-w-[480px]">
@@ -164,6 +178,19 @@ export default function HomeScreen({
               {targetCurrency === TargetCurrency.BRL ? 'COP' : 'BRL'}
             </span>
           </div>
+
+          {/* Chain selector pill */}
+          {onOpenChainModal && (
+            <button
+              className="mt-3 inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors"
+              style={{ backgroundColor: chainInfo.bg, borderColor: `${chainInfo.color}25`, borderWidth: '1.5px', color: chainInfo.color }}
+              onClick={onOpenChainModal}
+              type="button"
+            >
+              <img alt={chainInfo.name} className="h-3.5 w-3.5" src={chainInfo.icon} />
+              {selectedTokenLabel} on {chainInfo.name}
+            </button>
+          )}
         </div>
 
         <button
