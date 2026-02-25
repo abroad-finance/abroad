@@ -8,6 +8,7 @@ import type {
   QuoteResponse,
   ReverseQuoteRequest,
 } from './types'
+import type { PaginatedTransactionList } from './transactionTypes'
 
 import { httpClient } from '../http/httpClient'
 
@@ -60,5 +61,19 @@ export const notifyPayment = async (
     body: JSON.stringify(payload),
     headers: jsonHeaders,
     method: 'POST',
+  })
+}
+
+export const getUserTransactions = async (
+  options?: { page?: number; pageSize?: number; confirmedOnly?: boolean; signal?: AbortSignal | null },
+): Promise<ApiResult<PaginatedTransactionList>> => {
+  const { page = 1, pageSize = 20, confirmedOnly = false, signal = null } = options ?? {}
+
+  const endpoint = confirmedOnly ? '/transactions/list/confirmed' : '/transactions/list'
+
+  return httpClient.request<PaginatedTransactionList>(endpoint, {
+    method: 'GET',
+    query: { page, pageSize },
+    signal,
   })
 }

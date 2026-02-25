@@ -1,7 +1,7 @@
 import { useTranslate } from '@tolgee/react'
 import { Loader } from 'lucide-react'
 import React, {
-  lazy, Suspense, useCallback, useMemo, useState,
+  lazy, Suspense, useCallback, useEffect, useMemo, useState,
 } from 'react'
 
 import type { BankDetailsRouteProps } from '../../features/swap/components/BankDetailsRoute'
@@ -34,6 +34,7 @@ import { AB_STYLES, ASSET_URLS } from '../../shared/constants'
 import { useLanguageSelector, useNavBarResponsive } from '../../shared/hooks'
 import { cn } from '../../shared/utils'
 import { useWebSwapController } from './useWebSwapController'
+import { useUserTransactions } from '../../services/useUserTransactions'
 
 const QrScannerFullScreen = lazy(() => import('../../features/swap/components/QrScannerFullScreen'))
 
@@ -143,7 +144,40 @@ const WebSwap: React.FC = () => {
   const [targetModalOpen, setTargetModalOpen] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
   const [selectedTx, setSelectedTx] = useState<TxDetailItem | null>(null)
-  const recentTransactions: TxDetailItem[] = []
+
+  // Fetch user transactions
+  const { recentTransactions: txSummaries, allTransactions, fetchTransactions, fetchAllTransactions, isLoading: isLoadingTransactions } = useUserTransactions(swapViewProps.isAuthenticated)
+
+  // Convert transaction summaries to TxDetailItem format for HomeScreen
+  const recentTransactions: TxDetailItem[] = txSummaries.map((tx) => ({
+    accountNumber: '',
+    chain: 'Stellar',
+    country: tx.country === 'BRL' ? 'br' : 'co',
+    date: tx.time,
+    fee: '0',
+    localAmount: tx.localAmount,
+    merchant: tx.merchant,
+    location: undefined,
+    partnerId: undefined,
+    settlementTime: '—',
+    status: 'completed' as const,
+    token: 'USDC',
+    transactionId: undefined,
+    usdcAmount: tx.usdcAmount,
+  }))
+
+  // Fetch transactions on mount and when authenticated changes
+  useEffect(() => {
+    if (swapViewProps.isAuthenticated) {
+      fetchTransactions({ confirmedOnly: true, pageSize: 10 })
+    }
+  }, [swapViewProps.isAuthenticated, fetchTransactions])
+
+  // Fetch all transactions when opening history
+  const handleHistoryOpen = useCallback(() => {
+    setShowHistory(true)
+    fetchAllTransactions()
+  }, [fetchAllTransactions])
 
   const openSourceModal = useCallback(() => setSourceModalOpen(true), [])
   const closeSourceModal = useCallback(() => setSourceModalOpen(false), [])
@@ -196,7 +230,7 @@ const WebSwap: React.FC = () => {
           languageSelectorMobile={
             <LanguageSelector {...languageSelector} variant="mobile" />
           }
-          onHistoryClick={() => setShowHistory(true)}
+          onHistoryClick={handleHistoryOpen}
           onOpenChainModal={openSourceModal}
           selectedChainKey={selectedChainKey}
           selectedTokenLabel={swapViewProps.selectedAssetLabel}
@@ -228,7 +262,7 @@ const WebSwap: React.FC = () => {
                 isAuthenticated={swapViewProps.isAuthenticated}
                 onConnectWallet={handleConnectWalletClick}
                 onGoToManual={goToManual}
-                onHistoryClick={() => setShowHistory(true)}
+                onHistoryClick={handleHistoryOpen}
                 onOpenChainModal={openSourceModal}
                 onOpenQr={openQr}
                 recentTransactions={[]}
@@ -347,7 +381,7 @@ const WebSwap: React.FC = () => {
             setSelectedTx(tx)
             setShowHistory(false)
           }}
-          transactions={recentTransactions}
+          transactions={allTransactions}
         />
       )}
 
