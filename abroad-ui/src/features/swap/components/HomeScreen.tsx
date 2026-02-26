@@ -1,5 +1,5 @@
 import { useTranslate } from '@tolgee/react'
-import { ChevronRight, ChevronDown } from 'lucide-react'
+import { ChevronDown, ChevronRight } from 'lucide-react'
 import React from 'react'
 
 import { _36EnumsTargetCurrency as TargetCurrency } from '../../../api'
@@ -58,84 +58,104 @@ export default function HomeScreen({
 }: HomeScreenProps): React.JSX.Element {
   const { t } = useTranslate()
   const balanceNum = parseFloat(balance.replace(/,/g, '')) || 0
-  const c = targetCurrency === TargetCurrency.BRL ? COUNTRIES.BRL : COUNTRIES.COP
 
+  // Unauthenticated view - Hero landing page
   if (!isAuthenticated) {
     return (
-      <div className="flex flex-1 flex-col items-center justify-center px-6 py-12 md:py-16">
-        <div className="w-full max-w-[500px] text-center">
-          <div
-            className={cn(
-              'mb-7 inline-flex items-center gap-2 rounded-full border px-4 py-2 text-[13px] font-semibold',
-              'border-[var(--ab-green-border)] bg-[var(--ab-green-soft)] text-[var(--ab-green-dark)]',
-            )}
-          >
-            <span
-              className="h-2 w-2 rounded-full bg-[var(--ab-green)]"
-              style={{ animation: 'ab-blink 2s infinite' }}
-            />
-            {t('home.live_badge', 'Live in Colombia & Brazil')}
+      <main className="flex min-h-[calc(100vh-64px)] flex-col items-center justify-center px-4 pt-8 relative overflow-hidden">
+        {/* Hero gradient background */}
+        <div className="absolute inset-0 hero-gradient" />
+
+        {/* Decorative blur orb */}
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-[var(--ab-green)]/20 rounded-full blur-3xl opacity-0 dark:opacity-30 pointer-events-none" />
+
+        <div className="relative z-10 w-full max-w-4xl mx-auto text-center pb-20">
+          {/* Live badge */}
+          <div className="inline-flex items-center gap-2 bg-emerald-100 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800/50 rounded-full px-4 py-1.5 mb-8 shadow-sm">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="text-sm font-semibold text-emerald-800 dark:text-emerald-300">
+              {t('home.live_badge', 'Live in Colombia & Brazil')}
+            </span>
           </div>
-          <h1 className="font-cereal mb-4 text-[44px] font-bold leading-tight tracking-[-1px] text-[var(--ab-text)]">
-            {t('home.headline_1', 'Spend your stablecoins at')}
+
+          {/* Headline */}
+          <h1 className="text-5xl md:text-6xl lg:text-7xl font-extrabold tracking-tight text-gray-900 dark:text-white mb-6 leading-tight">
+            {t('home.headline_1', 'Spend your')}
+            <br className="hidden md:block" />
+            {' '}stablecoins at
             <br />
-            <span className="text-[var(--ab-green)]">
+            <span className="text-[var(--ab-green)] bg-clip-text text-transparent bg-gradient-to-r from-emerald-500 to-teal-400">
               {t('home.headline_2', 'local merchants.')}
             </span>
           </h1>
-          <p className="mx-auto mb-5 max-w-[420px] text-[17px] leading-snug text-[var(--ab-text-secondary)]">
+
+          {/* Subline */}
+          <p className="text-lg md:text-xl text-gray-600 dark:text-gray-400 max-w-2xl mx-auto mb-10 leading-relaxed">
             {t('home.subline', 'Connect your wallet, scan a QR code, and pay — the merchant receives local currency instantly.')}
           </p>
-          <div className="mb-9 flex flex-wrap justify-center gap-3">
+
+          {/* Chain badges */}
+          <div className="flex flex-wrap justify-center gap-4 mb-12">
             {CHAIN_CONFIG.map(({ icon, key, label }) => (
-              <span
+              <div
                 key={key}
                 className={cn(
-                  'inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold',
-                  key === 'stellar' && 'bg-[var(--ab-chain-stellar-bg)] text-[var(--ab-chain-stellar)]',
-                  key === 'celo' && 'bg-[var(--ab-chain-celo-bg)] text-[var(--ab-chain-celo)]',
-                  key === 'solana' && 'bg-[var(--ab-chain-solana-bg)] text-[var(--ab-chain-solana)]',
+                  'flex items-center gap-2 px-4 py-2 rounded-full shadow-sm border transition-colors cursor-default',
+                  key === 'stellar' && 'bg-[var(--ab-chain-stellar-bg)] border-[var(--ab-chain-stellar)]/20',
+                  key === 'celo' && 'bg-yellow-100 dark:bg-yellow-900/30 border-yellow-200 dark:border-yellow-800/50',
+                  key === 'solana' && 'bg-purple-100 dark:bg-purple-900/30 border-purple-200 dark:border-purple-800/50',
                 )}
               >
                 <img
                   alt={label}
-                  className="h-4 w-4"
+                  className="w-5 h-5"
                   src={icon}
                 />
-                {label}
-              </span>
+                <span className={cn(
+                  'font-semibold text-sm',
+                  key === 'stellar' && 'text-[var(--ab-chain-stellar)]',
+                  key === 'celo' && 'text-yellow-700 dark:text-yellow-300',
+                  key === 'solana' && 'text-purple-700 dark:text-purple-300',
+                )}>
+                  {label}
+                </span>
+              </div>
             ))}
           </div>
+
+          {/* CTA Button */}
           <button
-            className={cn(
-              'font-cereal rounded-2xl bg-[var(--ab-green)] px-10 py-4 text-base font-semibold text-white',
-              'transition-[transform,opacity] duration-[0.4s] ease-[cubic-bezier(0.16,1,0.3,1)]',
-              'hover:opacity-95 active:scale-[0.98]',
-            )}
+            className="group bg-[var(--ab-green)] hover:opacity-90 text-white text-lg font-bold py-4 px-8 rounded-full shadow-lg hover:shadow-[var(--ab-green)]/30 dark:hover:shadow-[var(--ab-green)]/10 transition-all duration-300 transform hover:-translate-y-1 flex items-center justify-center gap-2 mx-auto"
             onClick={onConnectWallet}
             type="button"
           >
-            {t('home.cta_connect', 'Connect Wallet to Start')} →
+            {t('home.cta_connect', 'Connect Wallet to Start')}
+            <ChevronRight className="group-hover:translate-x-1 transition-transform" />
           </button>
-          <div className="mt-11 flex flex-wrap justify-center gap-5">
+
+          {/* Trust badges */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 max-w-3xl mx-auto mt-11">
             {[
-              { i: '⚡', l: t('home.trust_settlement', '< 3s settlement') },
-              { i: '💰', l: t('home.trust_fees', 'Low fees') },
-              { i: '🔒', l: t('home.trust_custodial', 'Non-custodial') },
-            ].map(({ i, l }) => (
-              <span
-                key={l}
-                className="flex items-center gap-1.5 text-[13px] font-semibold text-[var(--ab-text-secondary)]"
+              { icon: '⚡', label: t('home.trust_settlement', '< 3s settlement') },
+              { icon: '💰', label: t('home.trust_fees', 'Low fees') },
+              { icon: '🔒', label: t('home.trust_custodial', 'Non-custodial') },
+            ].map(({ icon, label }) => (
+              <div
+                key={label}
+                className="flex items-center justify-center gap-2 text-gray-600 dark:text-gray-400"
               >
-                {i} {l}
-              </span>
+                <span className="text-xl">{icon}</span>
+                <span className="font-medium text-sm">{label}</span>
+              </div>
             ))}
           </div>
         </div>
-      </div>
+      </main>
     )
   }
 
+  // Authenticated view - Dashboard
+  const c = targetCurrency === TargetCurrency.BRL ? COUNTRIES.BRL : COUNTRIES.COP
   const localBalance = c.decimals === 0
     ? Math.round(balanceNum * c.rate).toLocaleString('es-CO')
     : (balanceNum * c.rate).toFixed(c.decimals)

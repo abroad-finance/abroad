@@ -145,6 +145,14 @@
   70%, 100% { opacity: 0.3; }
 }
 
+/* Hero gradient background */
+.hero-gradient {
+  background: radial-gradient(circle at 50% 0%, rgba(209, 250, 229, 0.8) 0%, rgba(230, 246, 241, 1) 100%);
+}
+.dark .hero-gradient {
+  background: radial-gradient(circle at 50% 0%, rgba(16, 185, 129, 0.1) 0%, var(--ab-bg) 100%);
+}
+
 /* ── Ops admin panel component classes ── */
 @layer components {
   /* Page wrapper: warm beige bg, always light */
