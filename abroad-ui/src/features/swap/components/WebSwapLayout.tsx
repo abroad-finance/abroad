@@ -17,6 +17,7 @@ type WebSwapLayoutSlots = {
   slots: {
     bankDetails: React.JSX.Element
     confirmQr: React.JSX.Element
+    home: React.JSX.Element
     kycNeeded: React.JSX.Element
     swap: React.JSX.Element
     txStatus: React.JSX.Element
@@ -40,6 +41,8 @@ const WebSwapLayout: React.FC<WebSwapLayoutProps & WebSwapLayoutSlots> = ({ slot
         return slots.bankDetails
       case 'confirm-qr':
         return slots.confirmQr
+      case 'home':
+        return slots.home
       case 'kyc-needed':
         return slots.kycNeeded
       case 'swap':
@@ -52,12 +55,15 @@ const WebSwapLayout: React.FC<WebSwapLayoutProps & WebSwapLayoutSlots> = ({ slot
   }, [
     slots.bankDetails,
     slots.confirmQr,
+    slots.home,
     slots.kycNeeded,
     slots.swap,
     slots.txStatus,
     slots.waitSign,
     view,
   ])
+
+  const showPageTitle = view !== 'home'
 
   return (
     <div
@@ -69,9 +75,11 @@ const WebSwapLayout: React.FC<WebSwapLayoutProps & WebSwapLayoutSlots> = ({ slot
           className="min-h-[600px] h-[calc(100vh-80px)] flex flex-col items-center justify-center px-4 py-6 gap-6"
           style={{ background: 'linear-gradient(135deg, var(--ab-bg), var(--ab-bg-end))' }}
         >
-          <h1 className={cn('text-3xl font-black text-center w-full', BRAND_TITLE_CLASS)}>
-            {pageTitle}
-          </h1>
+          {showPageTitle && (
+            <h1 className={cn('text-3xl font-black text-center w-full', BRAND_TITLE_CLASS)}>
+              {pageTitle}
+            </h1>
+          )}
           <div className="w-full max-w-md">
             {renderSwap}
           </div>
@@ -79,11 +87,16 @@ const WebSwapLayout: React.FC<WebSwapLayoutProps & WebSwapLayoutSlots> = ({ slot
       </div>
 
       {/* Desktop (>= md): centered, fits viewport without forcing scroll */}
-      <div className="hidden md:flex flex-1 min-h-0 w-full flex-col items-center justify-center py-6">
+      <div className={cn(
+        'hidden md:flex flex-1 min-h-0 w-full flex-col items-center justify-center py-6',
+        view === 'home' && 'hero-gradient'
+      )}>
         <div className="w-full max-w-md flex flex-col items-center gap-6">
-          <h1 className={cn('text-3xl font-black text-center w-full', BRAND_TITLE_CLASS)}>
-            {pageTitle}
-          </h1>
+          {showPageTitle && (
+            <h1 className={cn('text-3xl font-black text-center w-full', BRAND_TITLE_CLASS)}>
+              {pageTitle}
+            </h1>
+          )}
           {renderSwap}
         </div>
       </div>

@@ -62,14 +62,11 @@ export default function HomeScreen({
   // Unauthenticated view - Hero landing page
   if (!isAuthenticated) {
     return (
-      <main className="flex min-h-[calc(100vh-64px)] flex-col items-center justify-center px-4 pt-8 relative overflow-hidden">
-        {/* Hero gradient background */}
-        <div className="absolute inset-0 hero-gradient" />
+      <main className="relative min-h-full flex-1 flex-col items-center justify-center px-4 pt-8 pb-20 overflow-hidden">
+        {/* Decorative blur orb - only in light mode */}
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-[var(--ab-green)]/10 rounded-full blur-3xl pointer-events-none" />
 
-        {/* Decorative blur orb */}
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-[var(--ab-green)]/20 rounded-full blur-3xl opacity-0 dark:opacity-30 pointer-events-none" />
-
-        <div className="relative z-10 w-full max-w-4xl mx-auto text-center pb-20">
+        <div className="relative z-10 w-full max-w-4xl mx-auto text-center">
           {/* Live badge */}
           <div className="inline-flex items-center gap-2 bg-emerald-100 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800/50 rounded-full px-4 py-1.5 mb-8 shadow-sm">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
@@ -79,7 +76,7 @@ export default function HomeScreen({
           </div>
 
           {/* Headline */}
-          <h1 className="text-5xl md:text-6xl lg:text-7xl font-extrabold tracking-tight text-gray-900 dark:text-white mb-6 leading-tight">
+          <h1 className="text-5xl md:text-6xl lg:text-7xl font-extrabold tracking-tight text-[var(--ab-text)] mb-6 leading-tight">
             {t('home.headline_1', 'Spend your')}
             <br className="hidden md:block" />
             {' '}stablecoins at
@@ -90,7 +87,7 @@ export default function HomeScreen({
           </h1>
 
           {/* Subline */}
-          <p className="text-lg md:text-xl text-gray-600 dark:text-gray-400 max-w-2xl mx-auto mb-10 leading-relaxed">
+          <p className="text-lg md:text-xl text-[var(--ab-text-secondary)] max-w-2xl mx-auto mb-10 leading-relaxed">
             {t('home.subline', 'Connect your wallet, scan a QR code, and pay — the merchant receives local currency instantly.')}
           </p>
 
@@ -142,7 +139,7 @@ export default function HomeScreen({
             ].map(({ icon, label }) => (
               <div
                 key={label}
-                className="flex items-center justify-center gap-2 text-gray-600 dark:text-gray-400"
+                className="flex items-center justify-center gap-2 text-[var(--ab-text-secondary)]"
               >
                 <span className="text-xl">{icon}</span>
                 <span className="font-medium text-sm">{label}</span>
