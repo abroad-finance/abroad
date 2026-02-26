@@ -38,6 +38,9 @@ describe('WalletAuthController', () => {
       fromSecretMock = jest.fn().mockReturnValue({ publicKey: jest.fn().mockReturnValue('GSECRET') })
       return {
         Keypair: { fromSecret: fromSecretMock },
+        StrKey: {
+          isValidEd25519PublicKey: jest.fn((address: string) => address.startsWith('G')),
+        },
         WebAuth: {
           buildChallengeTx: buildChallengeTxMock,
           verifyChallengeTxSigners: verifyChallengeTxSignersMock,
@@ -73,7 +76,12 @@ describe('WalletAuthController', () => {
   it('builds and returns a challenge transaction', async () => {
     const response = await controller.challenge({ address: 'GABC' })
 
-    expect(response).toEqual({ format: 'xdr', message: 'challenge-xdr', xdr: 'challenge-xdr' })
+    expect(response).toEqual(expect.objectContaining({
+      challengeToken: expect.any(String),
+      format: 'xdr',
+      message: 'challenge-xdr',
+      xdr: 'challenge-xdr',
+    }))
     expect(buildChallengeTxMock).toHaveBeenCalledWith(
       expect.anything(),
       'GABC',
@@ -100,28 +108,31 @@ describe('WalletAuthController', () => {
     verifyMock.mockImplementation(() => {
       throw new Error('expired')
     })
-    const setStatusSpy = jest.spyOn(controller, 'setStatus')
 
-    await expect(controller.refresh({ token: 'invalid' })).rejects.toThrow('Invalid token')
-    expect(setStatusSpy).toHaveBeenCalledWith(401)
+    await expect(controller.refresh({ token: 'invalid' })).rejects.toMatchObject({
+      message: 'Invalid token',
+      statusCode: 401,
+    })
   })
 
   it('rejects verification when no outstanding challenge exists', async () => {
-    const setStatusSpy = jest.spyOn(controller, 'setStatus')
     verifyChallengeTxSignersMock.mockReturnValue(['GABC'])
 
-    await expect(controller.verify({ address: 'GNOPE', signedXDR: 'xdr' })).rejects.toThrow('No outstanding challenge for this account')
-    expect(setStatusSpy).toHaveBeenCalledWith(400)
+    await expect(controller.verify({ address: 'GNOPE', signedXDR: 'xdr' })).rejects.toMatchObject({
+      message: 'No outstanding challenge for this account',
+      statusCode: 400,
+    })
     expect(stellarSdk.WebAuth.verifyChallengeTxSigners).not.toBeUndefined()
   })
 
   it('rejects verification when client signature is missing', async () => {
     await controller.challenge({ address: 'GABC' })
     verifyChallengeTxSignersMock.mockReturnValue([])
-    const setStatusSpy = jest.spyOn(controller, 'setStatus')
 
-    await expect(controller.verify({ address: 'GABC', signedXDR: 'bad-xdr' })).rejects.toThrow('Missing or invalid client signature')
-    expect(setStatusSpy).toHaveBeenCalledWith(401)
+    await expect(controller.verify({ address: 'GABC', signedXDR: 'bad-xdr' })).rejects.toMatchObject({
+      message: 'Missing or invalid client signature',
+      statusCode: 401,
+    })
   })
 
   it('issues a JWT when the challenge is signed correctly', async () => {

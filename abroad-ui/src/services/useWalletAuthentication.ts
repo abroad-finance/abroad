@@ -10,6 +10,12 @@ import { httpClient } from './http/httpClient'
 
 const REFRESH_GRACE_MS = 60_000
 
+type BaseVerifyPayload = {
+  address: string
+  chainId: string
+  challengeToken?: string
+}
+
 type ChallengeResponse = {
   challengeToken?: string
   format?: 'utf8' | 'xdr'
@@ -21,11 +27,15 @@ type JwtPayload = { exp?: number }
 
 type RefreshResponse = { token: string }
 
+type StellarVerifyPayload = BaseVerifyPayload & { signedXDR: string }
+
 type VerifyResponse = { token: string }
 
 type WalletAuthError = {
   reason?: string
 }
+
+type WalletVerifyPayload = BaseVerifyPayload & { signature: string }
 
 const extractReason = (body: unknown): null | string => {
   if (body && typeof body === 'object' && 'reason' in body) {
@@ -135,25 +145,34 @@ export const useWalletAuthentication = (): IWalletAuthentication => {
     }
   }, [])
 
-  const getAuthToken = useCallback(async ({ address, challengeToken, chainId, signedMessage }: {
+  const getAuthToken = useCallback(async ({
+    address,
+    chainId,
+    challengeToken,
+    signedMessage,
+  }: {
     address: string
-    challengeToken?: string
     chainId: string
+    challengeToken?: string
     signedMessage: string
   }): Promise<{ token: string }> => {
-    const payload = chainId.startsWith('stellar:')
-      ? {
+    let payload: StellarVerifyPayload | WalletVerifyPayload
+    if (chainId.startsWith('stellar:')) {
+      payload = {
         address,
         chainId,
         challengeToken,
         signedXDR: signedMessage,
       }
-      : {
+    }
+    else {
+      payload = {
         address,
         chainId,
         challengeToken,
         signature: signedMessage,
       }
+    }
     const res = await buildJsonRequest<VerifyResponse>('/walletAuth/verify', payload)
     const data = ensureOk(res, 'Failed to verify signature')
     return { token: data.token }
@@ -168,8 +187,8 @@ export const useWalletAuthentication = (): IWalletAuthentication => {
     const signed = await signMessage(message)
     const { token } = await getAuthToken({
       address,
-      challengeToken,
       chainId,
+      challengeToken,
       signedMessage: signed,
     })
     setJwtToken(token)
