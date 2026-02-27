@@ -3,10 +3,6 @@ import { useCallback, useState } from 'react'
 import type { TransactionData, UserTransactionSummary } from '../services/public/transactionTypes'
 import { getUserTransactions } from '../services/public/publicApi'
 
-const COUNTRY_CONFIG: Record<string, { flag: string, symbol: string, currency: string, rail: string }> = {
-  BR: { flag: '🇧🇷', symbol: 'R$', currency: 'BRL', rail: 'PIX' },
-  CO: { flag: '🇨🇴', symbol: '$', currency: 'COP', rail: 'Bre-B' },
-}
 
 const NETWORK_TO_CHAIN: Record<string, string> = {
   STELLAR: 'Stellar',
@@ -43,11 +39,10 @@ function formatFullDate(dateString: string): string {
 }
 
 function mapTransactionToSummary(tx: TransactionData): UserTransactionSummary {
-  const country = tx.quote.country
-  const countryConfig = COUNTRY_CONFIG[country] ?? COUNTRY_CONFIG.CO
+  const country = tx.quote.targetCurrency === 'BRL' ? 'BR' : 'CO'
 
   return {
-    country: countryConfig.currency,
+    country: tx.quote.targetCurrency,
     localAmount: tx.quote.targetAmount.toFixed(country === 'BR' ? 2 : 0),
     merchant: tx.accountNumber.slice(-4) ? `••••${tx.accountNumber.slice(-4)}` : 'Unknown',
     time: formatDate(tx.createdAt),
@@ -56,8 +51,7 @@ function mapTransactionToSummary(tx: TransactionData): UserTransactionSummary {
 }
 
 function mapTransactionToDetail(tx: TransactionData) {
-  const country = tx.quote.country
-  const countryConfig = COUNTRY_CONFIG[country] ?? COUNTRY_CONFIG.CO
+  const country = tx.quote.targetCurrency === 'BRL' ? 'BR' : 'CO'
   const chain = NETWORK_TO_CHAIN[tx.quote.network] ?? 'Stellar'
 
   const statusMap: Record<string, 'completed' | 'expired' | 'pending'> = {
@@ -72,7 +66,7 @@ function mapTransactionToDetail(tx: TransactionData) {
   return {
     accountNumber: tx.accountNumber,
     chain,
-    country: country === 'BR' ? 'br' : 'co',
+    country: (country === 'BR' ? 'br' : 'co') as 'br' | 'co',
     date: formatFullDate(tx.createdAt),
     fee: '0.01',
     localAmount: tx.quote.targetAmount.toFixed(country === 'BR' ? 2 : 0),

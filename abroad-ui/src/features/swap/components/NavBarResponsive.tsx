@@ -1,12 +1,12 @@
 import {
-  Clock, Info, Moon, Sun, User,
+  Clock, Info, LogOut, Moon, Sun, User,
 } from 'lucide-react'
 import React, { memo } from 'react'
 
 import AbroadLogoColored from '../../../assets/Logos/AbroadLogoColored.svg'
 import AbroadLogoWhite from '../../../assets/Logos/AbroadLogoWhite.svg'
 import type { ChainPillChain } from '../../../components/ui'
-import { ChainPill } from '../../../components/ui'
+import { ChainPill, CurrencyToggle } from '../../../components/ui'
 import { AB_STYLES, BRAND_TITLE_CLASS } from '../../../shared/constants'
 import { cn } from '../../../shared/utils'
 
@@ -25,6 +25,8 @@ export interface NavBarResponsiveProps {
   labels: {
     connectWallet: string
     connectWalletAria: string
+    disconnectAria?: string
+    disconnectTitle?: string
     history?: string
     infoAriaLabel: string
     notConnected: string
@@ -32,8 +34,11 @@ export interface NavBarResponsiveProps {
   }
   languageSelector?: React.ReactNode
   languageSelectorMobile?: React.ReactNode
+  onDisconnect?: () => Promise<void>
   onHistoryClick?: () => void
   onOpenChainModal?: () => void
+  onSelectCurrency?: (currency: 'COP' | 'BRL') => void
+  targetCurrency?: 'COP' | 'BRL'
   onToggleTheme?: () => void
   onWalletClick: () => void
   walletInfo: {
@@ -65,12 +70,15 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({
   labels,
   languageSelector,
   languageSelectorMobile,
+  onDisconnect,
   onHistoryClick,
   onOpenChainModal,
+  onSelectCurrency,
   onToggleTheme,
   onWalletClick,
   selectedChainKey,
   selectedTokenLabel,
+  targetCurrency,
 }) => {
   const openInfo = () => window.open(infoUrl, '_blank', 'noopener,noreferrer')
   const isConnected = Boolean(address)
@@ -89,6 +97,14 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({
           {isDark ? <Sun className="w-4.5 h-4.5" /> : <Moon className="w-4.5 h-4.5" />}
         </button>
       )}
+      {isConnected && onSelectCurrency && targetCurrency && (
+        <div className="hidden md:block">
+          <CurrencyToggle
+            value={targetCurrency}
+            onChange={onSelectCurrency}
+          />
+        </div>
+      )}
       {showChainPill && chainPillChain && (
         <ChainPill
           chain={chainPillChain}
@@ -100,26 +116,36 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({
       )}
       {isConnected && (
         <div
-          className={cn(
-            'flex items-center gap-2 rounded-xl border px-3.5 py-2',
-            'bg-[var(--ab-green-soft)] border-[var(--ab-green-border)]',
-          )}
+          className="flex items-center gap-2 rounded-full border border-[#d1fae5] bg-[#ecfdf5] px-[13px] py-[7px]"
         >
-          <div className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--ab-green)]" />
-          <span className="text-[13px] font-bold text-[var(--ab-text)]">
+          <div className="h-2 w-2 shrink-0 rounded-full bg-[#10b981]" />
+          <span className="text-sm font-bold leading-5 text-[#047857]">
             {balanceLoading ? '…' : `$${balance}`}
           </span>
         </div>
       )}
       {address && (
-        <button
-          aria-label={labels.walletDetailsAria}
-          className={cn(NAV_BUTTON_CLASS, AB_STYLES.badgeBg)}
-          onClick={onWalletClick}
-          type="button"
-        >
-          <User className={cn('w-4 h-4', AB_STYLES.text)} />
-        </button>
+        <>
+          <button
+            aria-label={labels.walletDetailsAria}
+            className={cn(NAV_BUTTON_CLASS, AB_STYLES.badgeBg)}
+            onClick={onWalletClick}
+            type="button"
+          >
+            <User className={cn('w-4 h-4', AB_STYLES.text)} />
+          </button>
+          {onDisconnect && (
+            <button
+              aria-label={labels.disconnectAria ?? 'Desconectar billetera'}
+              className={cn(NAV_BUTTON_CLASS, AB_STYLES.textSecondary)}
+              onClick={() => void onDisconnect()}
+              title={labels.disconnectTitle ?? 'Desconectar billetera'}
+              type="button"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+          )}
+        </>
       )}
       <button
         aria-label={labels.infoAriaLabel}
@@ -133,7 +159,14 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({
   )
 
   return (
-    <nav className={cn('sticky top-0 z-[100] w-full border-b', className)} style={{ backgroundColor: 'var(--ab-bg-card)', borderColor: 'var(--ab-border)' }} role="navigation">
+    <nav
+      className={cn(
+        'sticky top-0 z-[100] w-full border-b border-[#f3f4f6] py-4 px-6 backdrop-blur-[6px]',
+        className
+      )}
+      role="navigation"
+      style={{ backgroundColor: 'rgba(255,255,255,0.5)' }}
+    >
       {/* Mobile: full width bar - only logo and connect button */}
       <div className="md:hidden px-4 py-3">
         <div className="flex items-center justify-between">
@@ -183,7 +216,7 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({
             <span className={cn('text-sm font-semibold', BRAND_TITLE_CLASS)}>Swap</span>
           )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           <div>{languageSelector}</div>
           {!isConnected && (
             <button

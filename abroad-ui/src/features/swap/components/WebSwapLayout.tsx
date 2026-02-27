@@ -63,42 +63,24 @@ const WebSwapLayout: React.FC<WebSwapLayoutProps & WebSwapLayoutSlots> = ({ slot
     view,
   ])
 
-  const showPageTitle = view !== 'home'
+  const showPageTitle = view !== 'home' && view !== 'swap'
+
+  const isMainFlow = view === 'home' || view === 'swap' || view === 'bankDetails'
 
   return (
     <div
-      className="w-full overflow-x-hidden overflow-y-auto min-h-0 flex-1 flex flex-col md:items-center md:justify-center md:px-4 md:py-8"
+      className={cn(
+        'w-full min-h-0 flex-1 flex flex-col items-center overflow-x-hidden overflow-y-auto px-4 py-6 md:px-4 md:py-8',
+        isMainFlow ? 'hero-gradient justify-start' : 'justify-center'
+      )}
     >
-      {/* Mobile (<= md) */}
-      <div className="md:hidden flex flex-col w-full">
-        <div
-          className="min-h-[600px] h-[calc(100vh-80px)] flex flex-col items-center justify-center px-4 py-6 gap-6"
-          style={{ background: 'linear-gradient(135deg, var(--ab-bg), var(--ab-bg-end))' }}
-        >
-          {showPageTitle && (
-            <h1 className={cn('text-3xl font-black text-center w-full', BRAND_TITLE_CLASS)}>
-              {pageTitle}
-            </h1>
-          )}
-          <div className="w-full max-w-md">
-            {renderSwap}
-          </div>
-        </div>
-      </div>
-
-      {/* Desktop (>= md): centered, fits viewport without forcing scroll */}
-      <div className={cn(
-        'hidden md:flex flex-1 min-h-0 w-full flex-col items-center justify-center py-6',
-        view === 'home' && 'hero-gradient'
-      )}>
-        <div className="w-full max-w-md flex flex-col items-center gap-6">
-          {showPageTitle && (
-            <h1 className={cn('text-3xl font-black text-center w-full', BRAND_TITLE_CLASS)}>
-              {pageTitle}
-            </h1>
-          )}
-          {renderSwap}
-        </div>
+      {showPageTitle && (
+        <h1 className={cn('text-3xl font-black text-center w-full mb-6', BRAND_TITLE_CLASS)}>
+          {pageTitle}
+        </h1>
+      )}
+      <div className={cn('w-full', isMainFlow ? 'max-w-[576px]' : 'max-w-md')}>
+        {renderSwap}
       </div>
     </div>
   )

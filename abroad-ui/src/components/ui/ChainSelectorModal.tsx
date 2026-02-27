@@ -23,6 +23,13 @@ function tokenColor(tokenId: string): { bg: string, text: string } {
   return { bg: '#2775CA15', text: '#2775CA' }
 }
 
+function tokenIconUrl(tokenId: string): string | undefined {
+  const id = tokenId.toUpperCase()
+  if (id === 'USDC') return ASSET_URLS.USDC_TOKEN_ICON
+  if (id === 'USDT') return ASSET_URLS.USDT_TOKEN_ICON
+  return undefined
+}
+
 export interface ChainSelectorModalProps {
   balance: string
   chains: Array<{ key: string, label: string }>
@@ -125,6 +132,7 @@ export const ChainSelectorModal: React.FC<ChainSelectorModalProps> = ({
             {tokens.map((token) => {
               const isSelected = token.key === selectedTokenKey
               const tColor = tokenColor(token.key)
+              const iconUrl = tokenIconUrl(token.key)
               return (
                 <button
                   className={cn(
@@ -140,12 +148,20 @@ export const ChainSelectorModal: React.FC<ChainSelectorModalProps> = ({
                   type="button"
                 >
                   <div
-                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px]"
+                    className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-[14px]"
                     style={{ background: tColor.bg }}
                   >
-                    <span className="text-sm font-extrabold" style={{ color: tColor.text }}>
-                      {token.label}
-                    </span>
+                    {iconUrl ? (
+                      <img
+                        alt={token.label}
+                        className="h-7 w-7 object-contain"
+                        src={iconUrl}
+                      />
+                    ) : (
+                      <span className="text-sm font-extrabold" style={{ color: tColor.text }}>
+                        {token.label}
+                      </span>
+                    )}
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="text-[15px] font-bold text-[var(--ab-text)]">{token.label}</div>

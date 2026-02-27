@@ -285,6 +285,10 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     wallet,
     walletAuthentication,
   } = useWalletAuth()
+  // Capture the JWT value at mount time so HYDRATE only restores state on page reload
+  // (existing session), not when the user freshly connects during the same session.
+  const jwtOnMount = useRef(walletAuthentication?.jwtToken)
+
   const [corridors, setCorridors] = useState<PublicCorridor[]>([])
   const [corridorError, setCorridorError] = useState<null | string>(null)
   const [chainKey, setChainKey] = useState('')
@@ -620,8 +624,18 @@ export const useWebSwapController = (): WebSwapControllerProps => {
   }, [persistableView, state])
 
   useEffect(() => {
+    // Only restore persisted state when the user already had a JWT on mount (page reload
+    // with an existing session). Skip restoration when jwtToken transitions from null →
+    // non-null during the same session (fresh wallet connect) so the user lands on the
+    // authenticated HomeScreen instead of a previously-stored view like 'bankDetails'.
+    if (!jwtOnMount.current) return
+
     const stored = readPersisted()
     if (stored && walletAuthentication?.jwtToken) {
+      // Don't restore terminal views — those sessions are over
+      const restoredView = (stored.view === 'txStatus' || stored.view === 'wait-sign')
+        ? 'home'
+        : (stored.view ?? 'bankDetails')
       dispatch({
         payload: {
           accountNumber: stored.accountNumber ?? '',
@@ -633,12 +647,25 @@ export const useWebSwapController = (): WebSwapControllerProps => {
           targetAmount: stored.targetAmount ?? '',
           targetCurrency: stored.targetCurrency ?? TargetCurrency.BRL,
           taxId: stored.taxId ?? '',
-          view: stored.view ?? 'bankDetails',
+          view: restoredView,
         },
         type: 'HYDRATE',
       })
     }
   }, [walletAuthentication?.jwtToken])
+
+  // When the user first becomes authenticated, ensure they see the authenticated home screen
+  // (dashboard with balance, scan QR, enter amount) instead of swap view with pre-filled data.
+  const prevIsAuthRef = useRef(false)
+  useEffect(() => {
+    if (isAuthenticated && !prevIsAuthRef.current) {
+      // Clear any previous transaction data to show clean dashboard
+      dispatch({ accountNumber: '', pixKey: '', recipientName: '', taxId: '', type: 'SET_BANK_DETAILS' })
+      dispatch({ quoteId: '', sourceAmount: '', targetAmount: '', type: 'SET_AMOUNTS' })
+      dispatch({ type: 'SET_VIEW', view: 'home' })
+    }
+    prevIsAuthRef.current = isAuthenticated
+  }, [isAuthenticated])
 
   useEffect(() => {
     const handleResize = () => {
@@ -1472,8 +1499,12 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     onOpenSourceModal: () => { /* handled in WebSwap */ },
     onOpenTargetModal: () => { /* handled in WebSwap */ },
     onPrimaryAction,
+    onRecipientChange: state.targetCurrency === TargetCurrency.BRL
+      ? (v) => dispatch({ pixKey: v, type: 'SET_BANK_DETAILS' })
+      : (v) => dispatch({ accountNumber: v.trim(), type: 'SET_BANK_DETAILS' }),
     onSourceChange,
     onTargetChange,
+    recipientValue: state.targetCurrency === TargetCurrency.BRL ? state.pixKey : state.accountNumber,
     selectedAssetLabel,
     selectedChainLabel,
     sourceAmount: state.sourceAmount,

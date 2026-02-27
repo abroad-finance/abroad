@@ -10,8 +10,7 @@ import type { SwapProps } from '../../features/swap/components/Swap'
 import type { ChainOption, TokenOption } from '../../features/swap/components/TokenSelectModal'
 
 import { _36EnumsTargetCurrency as TargetCurrency } from '../../api/index'
-import { ChainPill, ChainSelectorModal, ConnectWalletChainModal } from '../../components/ui'
-import type { ChainPillChain } from '../../components/ui'
+import { ChainSelectorModal, ConnectWalletChainModal } from '../../components/ui'
 import BankDetailsRoute from '../../features/swap/components/BankDetailsRoute'
 import ConfirmQr from '../../features/swap/components/ConfirmQr'
 import HistorySheet from '../../features/swap/components/HistorySheet'
@@ -20,6 +19,7 @@ import NavBarResponsive from '../../features/swap/components/NavBarResponsive'
 import TxDetailSheet from '../../features/swap/components/TxDetailSheet'
 import type { TxDetailItem } from '../../features/swap/components/TxDetailSheet'
 import Swap from '../../features/swap/components/Swap'
+import type { SwapView } from '../../features/swap/types'
 import TokenSelectModal from '../../features/swap/components/TokenSelectModal'
 import TxStatus from '../../features/swap/components/TxStatus'
 import UserVerification from '../../features/swap/components/UserVerification'
@@ -27,7 +27,6 @@ import WaitSign from '../../features/swap/components/WaitSign'
 import WalletDetails from '../../features/swap/components/WalletDetails'
 import WebSwapLayout from '../../features/swap/components/WebSwapLayout'
 import { useWalletDetails } from '../../features/swap/hooks/useWalletDetails'
-import { SwapView } from '../../features/swap/types'
 import LanguageSelector from '../../shared/components/LanguageSelector'
 import { ModalOverlay } from '../../shared/components/ModalOverlay'
 import { AB_STYLES, ASSET_URLS } from '../../shared/constants'
@@ -77,15 +76,6 @@ const CHAIN_ICON_MAP: Record<string, string> = {
   Stellar: ASSET_URLS.STELLAR_CHAIN_ICON,
 }
 
-const CHAIN_PILL_FOR_CONFIRM: Record<string, ChainPillChain> = {
-  celo: { bgColor: 'var(--ab-chain-celo-bg)', color: 'var(--ab-chain-celo)', icon: '🟢', name: 'Celo' },
-  solana: { bgColor: 'var(--ab-chain-solana-bg)', color: 'var(--ab-chain-solana)', icon: '🟣', name: 'Solana' },
-  stellar: { bgColor: 'var(--ab-chain-stellar-bg)', color: 'var(--ab-chain-stellar)', icon: '⚫', name: 'Stellar' },
-}
-function getChainForPill(chainKey: string): ChainPillChain {
-  const prefix = chainKey.toLowerCase().split(':')[0]
-  return CHAIN_PILL_FOR_CONFIRM[prefix] ?? CHAIN_PILL_FOR_CONFIRM.stellar
-}
 
 const WebSwap: React.FC = () => {
   const controller = useWebSwapController()
@@ -146,32 +136,14 @@ const WebSwap: React.FC = () => {
   const [selectedTx, setSelectedTx] = useState<TxDetailItem | null>(null)
 
   // Fetch user transactions
-  const { recentTransactions: txSummaries, allTransactions, fetchTransactions, fetchAllTransactions, isLoading: isLoadingTransactions } = useUserTransactions(swapViewProps.isAuthenticated)
+  const { allTransactions, fetchAllTransactions, fetchTransactions, recentTransactions: txSummaries } = useUserTransactions(swapViewProps.isAuthenticated)
 
-  // Convert transaction summaries to TxDetailItem format for HomeScreen
-  const recentTransactions: TxDetailItem[] = txSummaries.map((tx) => ({
-    accountNumber: '',
-    chain: 'Stellar',
-    country: tx.country === 'BRL' ? 'br' : 'co',
-    date: tx.time,
-    fee: '0',
-    localAmount: tx.localAmount,
-    merchant: tx.merchant,
-    location: undefined,
-    partnerId: undefined,
-    settlementTime: '—',
-    status: 'completed' as const,
-    token: 'USDC',
-    transactionId: undefined,
-    usdcAmount: tx.usdcAmount,
-  }))
-
-  // Fetch transactions on mount and when authenticated changes
+  // Fetch transactions on mount, when authenticated changes, and when navigating to home
   useEffect(() => {
-    if (swapViewProps.isAuthenticated) {
+    if (swapViewProps.isAuthenticated && view === 'home') {
       fetchTransactions({ confirmedOnly: true, pageSize: 10 })
     }
-  }, [swapViewProps.isAuthenticated, fetchTransactions])
+  }, [swapViewProps.isAuthenticated, view, fetchTransactions])
 
   // Fetch all transactions when opening history
   const handleHistoryOpen = useCallback(() => {
@@ -230,10 +202,13 @@ const WebSwap: React.FC = () => {
           languageSelectorMobile={
             <LanguageSelector {...languageSelector} variant="mobile" />
           }
+          onDisconnect={walletDetails.onDisconnectWallet}
           onHistoryClick={handleHistoryOpen}
           onOpenChainModal={openSourceModal}
+          onSelectCurrency={selectCurrency}
           selectedChainKey={selectedChainKey}
           selectedTokenLabel={swapViewProps.selectedAssetLabel}
+          targetCurrency={targetCurrency}
         />
       </div>
 
@@ -242,30 +217,33 @@ const WebSwap: React.FC = () => {
         <WebSwapLayout
           slots={{
             bankDetails: <BankDetailsRoute {...bankDetailsProps} />,
-            confirmQr: (
-              <ConfirmQr
-                {...confirmQrProps}
-                chainPill={
-                  <ChainPill
-                    chain={getChainForPill(selectedChainKey)}
-                    compact
-                    onClick={openSourceModal}
-                    tokenLabel={swapViewProps.selectedAssetLabel}
-                  />
-                }
-                tokenLabel={swapViewProps.selectedAssetLabel}
-              />
-            ),
+            confirmQr: <ConfirmQr {...confirmQrProps} />,
             home: (
               <HomeScreen
                 balance={sourceAssetBalance ?? '0.00'}
-                isAuthenticated={swapViewProps.isAuthenticated}
+                formatDate={walletDetails.formatDate}
+                getStatusStyle={walletDetails.getStatusStyle}
+                getStatusText={walletDetails.getStatusText}
+                isAuthenticated={
+                  swapViewProps.isAuthenticated
+                  || Boolean(walletDetails.address && selectedChainKey)
+                }
                 onConnectWallet={handleConnectWalletClick}
                 onGoToManual={goToManual}
-                onHistoryClick={handleHistoryOpen}
+                onSelectCurrency={selectCurrency}
+                onHistoryClick={
+                  walletDetails.transactions.length > 0
+                    ? handleWalletDetailsOpen
+                    : handleHistoryOpen
+                }
                 onOpenChainModal={openSourceModal}
                 onOpenQr={openQr}
-                recentTransactions={[]}
+                onSelectTransaction={(tx) => {
+                  walletDetails.setSelectedTransaction(tx)
+                  handleWalletDetailsOpen()
+                }}
+                recentTransactions={walletDetails.transactions.slice(0, 2)}
+                recentTransactionsFallback={txSummaries}
                 selectedChainKey={selectedChainKey}
                 selectedTokenLabel={swapViewProps.selectedAssetLabel}
                 targetCurrency={targetCurrency}
@@ -285,6 +263,7 @@ const WebSwap: React.FC = () => {
                 }
                 loadingBalance={walletDetails.isLoadingBalance}
                 onBalanceClick={handleBalanceClick}
+                onBackClick={handleBackToSwap}
                 onDisconnect={walletDetails.onDisconnectWallet}
                 onOpenSourceModal={openSourceModal}
                 onOpenTargetModal={openTargetModal}
@@ -295,12 +274,10 @@ const WebSwap: React.FC = () => {
             ),
             txStatus: (
               <TxStatus
-                chainLabel={swapViewProps.selectedChainLabel}
                 onNewTransaction={resetForNewTransaction}
                 onRetry={handleBackToSwap}
                 targetAmount={targetAmount}
                 targetCurrency={targetCurrency}
-                tokenLabel={swapViewProps.selectedAssetLabel}
                 transactionId={transactionId}
               />
             ),
