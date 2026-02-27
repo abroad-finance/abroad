@@ -71,7 +71,7 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({
   languageSelector,
   languageSelectorMobile,
   onDisconnect,
-  onHistoryClick,
+  onHistoryClick: _onHistoryClick,
   onOpenChainModal,
   onSelectCurrency,
   onToggleTheme,
