@@ -1,5 +1,5 @@
 import {
-  Clock, Info, LogOut, Moon, Sun, User,
+  Info, LogOut, Moon, Sun, User,
 } from 'lucide-react'
 import React, { memo } from 'react'
 
@@ -7,7 +7,7 @@ import AbroadLogoColored from '../../../assets/Logos/AbroadLogoColored.svg'
 import AbroadLogoWhite from '../../../assets/Logos/AbroadLogoWhite.svg'
 import type { ChainPillChain } from '../../../components/ui'
 import { ChainPill, CurrencyToggle } from '../../../components/ui'
-import { AB_STYLES, BRAND_TITLE_CLASS } from '../../../shared/constants'
+import { AB_STYLES, ASSET_URLS, BRAND_TITLE_CLASS } from '../../../shared/constants'
 import { cn } from '../../../shared/utils'
 
 /* ── Props ── */
@@ -50,9 +50,9 @@ export interface NavBarResponsiveProps {
 const NAV_BUTTON_CLASS = 'p-2 rounded-full transition-colors cursor-pointer'
 
 const CHAIN_PILL_THEME: Record<string, ChainPillChain> = {
-  celo: { bgColor: 'var(--ab-chain-celo-bg)', color: 'var(--ab-chain-celo)', icon: '🟢', name: 'Celo' },
-  solana: { bgColor: 'var(--ab-chain-solana-bg)', color: 'var(--ab-chain-solana)', icon: '🟣', name: 'Solana' },
-  stellar: { bgColor: 'var(--ab-chain-stellar-bg)', color: 'var(--ab-chain-stellar)', icon: '⚫', name: 'Stellar' },
+  celo: { icon: '🟢', iconUrl: ASSET_URLS.CELO_CHAIN_ICON, name: 'Celo' },
+  solana: { icon: '🟣', iconUrl: ASSET_URLS.SOLANA_CHAIN_ICON, name: 'Solana' },
+  stellar: { icon: '⚫', iconUrl: ASSET_URLS.STELLAR_CHAIN_ICON, name: 'Stellar' },
 }
 
 function chainPillChainFromKey(chainKey: string): ChainPillChain {
@@ -116,10 +116,20 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({
       )}
       {isConnected && (
         <div
-          className="flex items-center gap-2 rounded-full border border-[#d1fae5] bg-[#ecfdf5] px-[13px] py-[7px]"
+          className="flex items-center gap-2 rounded-full border px-[13px] py-[7px]"
+          style={{
+            backgroundColor: 'var(--ab-nav-balance-bg)',
+            borderColor: 'var(--ab-nav-balance-border)',
+          }}
         >
-          <div className="h-2 w-2 shrink-0 rounded-full bg-[#10b981]" />
-          <span className="text-sm font-bold leading-5 text-[#047857]">
+          <div
+            className="h-2 w-2 shrink-0 rounded-full"
+            style={{ backgroundColor: 'var(--ab-nav-balance-dot)' }}
+          />
+          <span
+            className="text-sm font-bold leading-5"
+            style={{ color: 'var(--ab-nav-balance-text)' }}
+          >
             {balanceLoading ? '…' : `$${balance}`}
           </span>
         </div>
@@ -161,11 +171,14 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({
   return (
     <nav
       className={cn(
-        'sticky top-0 z-[100] w-full border-b border-[#f3f4f6] py-4 px-6 backdrop-blur-[6px]',
+        'sticky top-0 z-[100] w-full border-b py-4 px-6 backdrop-blur-[6px]',
         className
       )}
       role="navigation"
-      style={{ backgroundColor: 'rgba(255,255,255,0.5)' }}
+      style={{
+        backgroundColor: 'var(--ab-nav-bg)',
+        borderColor: 'var(--ab-nav-border)',
+      }}
     >
       {/* Mobile: full width bar - only logo and connect button */}
       <div className="md:hidden px-4 py-3">
@@ -181,8 +194,7 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({
             <div className="md:hidden">{languageSelectorMobile}</div>
             {!isConnected && (
               <button
-                className="rounded-xl px-4 py-2 text-sm font-semibold text-white"
-                style={{ backgroundColor: 'var(--ab-green)' }}
+                className="rounded-xl bg-abroad-dark px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-abroad-dark-hover"
                 onClick={onWalletClick}
                 type="button"
               >
@@ -202,16 +214,6 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({
             className="h-7 w-auto flex-shrink-0"
             src={isDark ? AbroadLogoWhite : AbroadLogoColored}
           />
-          {isConnected && onHistoryClick && (
-            <button
-              className={cn('flex items-center gap-1.5 rounded-[10px] border px-3.5 py-2 text-[13px] font-semibold', AB_STYLES.textSecondary, 'bg-[var(--ab-bg-muted)] border-[var(--ab-border)]')}
-              onClick={onHistoryClick}
-              type="button"
-            >
-              <Clock className="h-3.5 w-3.5" />
-              {labels.history ?? 'History'}
-            </button>
-          )}
           {!isConnected && (
             <span className={cn('text-sm font-semibold', BRAND_TITLE_CLASS)}>Swap</span>
           )}
@@ -220,7 +222,7 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({
           <div>{languageSelector}</div>
           {!isConnected && (
             <button
-              className={cn('rounded-xl bg-[var(--ab-green)] px-6 py-2.5 text-sm font-bold text-white')}
+              className="rounded-xl bg-abroad-dark px-6 py-2.5 text-sm font-bold text-white transition-colors hover:bg-abroad-dark-hover"
               onClick={onWalletClick}
               type="button"
             >

@@ -128,6 +128,35 @@ abroad-ui/src/shared/hooks/useNavBarResponsive.ts
 
 ---
 
+## Design system alignment (2025-02-27)
+
+### NavBar – Colores de marca y layout
+
+**Archivo:** `abroad-ui/src/features/swap/components/NavBarResponsive.tsx`
+
+- **Fondo y borde:** Variables `--ab-nav-bg`, `--ab-nav-border` (alineadas con hero: e8f5f1, teal)
+- **Botón Conectar:** `bg-abroad-dark` (#356E6A) + `hover:bg-abroad-dark-hover` (#2B5B57) — reemplaza `--ab-green`
+- **Balance pill:** Variables `--ab-nav-balance-*` para light/dark mode
+- **History:** Botón eliminado del NavBar
+- **ChainPill:** Usa `ASSET_URLS` para iconos (Stellar, Celo, Solana)
+
+### ChainPill – Figma 9:562
+
+**Archivo:** `abroad-ui/src/components/ui/ChainPill.tsx`
+
+- Estilos unificados con HomeScreen: `rounded-full`, `border-[#e5e7eb]`, `bg-[#f3f4f6]`, `px-[13px] py-[7px]`
+- Soporte `iconUrl` para imágenes de chains (ASSET_URLS)
+- Texto `text-xs font-semibold text-[#374151]`
+
+### Tokens CSS
+
+**Archivo:** `abroad-ui/src/index.css`
+
+- `--ab-nav-bg`, `--ab-nav-border`, `--ab-nav-balance-*` (light/dark)
+- `--color-abroad-dark-hover: #2B5B57`
+
+---
+
 ## Despliegue
 
 - **Vercel:** El push a `new-flow-ui` en GitHub activa el deploy automático si el proyecto está conectado

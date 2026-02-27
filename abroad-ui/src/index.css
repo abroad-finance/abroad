@@ -4,6 +4,7 @@
 @theme {
   /* ── Brand palette ── */
   --color-abroad-dark: #356E6A;
+  --color-abroad-dark-hover: #2B5B57;
   --color-abroad-mid: #26A17B;
   --color-abroad-light: #73B9A3;
 
@@ -96,6 +97,13 @@
   --ab-selected: rgba(15, 190, 123, 0.1);
   --ab-wallet-panel-bg: rgba(232, 245, 240, 0.92);
   --ab-wallet-panel-border: rgba(53, 110, 106, 0.14);
+  /* Navbar: align with hero (e8f5f1, abroad teal) */
+  --ab-nav-bg: rgba(232, 245, 241, 0.85);
+  --ab-nav-border: rgba(53, 110, 106, 0.1);
+  --ab-nav-balance-bg: #e8f5f1;
+  --ab-nav-balance-border: rgba(53, 110, 106, 0.12);
+  --ab-nav-balance-dot: #1ec677;
+  --ab-nav-balance-text: #0f513a;
 }
 
 /* ── Dark mode ── */
@@ -121,6 +129,12 @@
   --ab-selected: rgba(90, 154, 143, 0.2);
   --ab-wallet-panel-bg: rgba(26, 58, 52, 0.88);
   --ab-wallet-panel-border: rgba(42, 90, 80, 0.5);
+  --ab-nav-bg: rgba(13, 43, 38, 0.85);
+  --ab-nav-border: rgba(42, 90, 80, 0.5);
+  --ab-nav-balance-bg: rgba(42, 90, 80, 0.4);
+  --ab-nav-balance-border: rgba(42, 90, 80, 0.5);
+  --ab-nav-balance-dot: #5a9a8f;
+  --ab-nav-balance-text: #a0c8c0;
 }
 
 /* ── UX redesign: shared animations ── */

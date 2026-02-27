@@ -4,10 +4,15 @@ import React from 'react'
 import { cn } from '../../shared/utils'
 
 export interface ChainPillChain {
-  bgColor: string
-  color: string
+  /** Emoji fallback when iconUrl is not set */
   icon: string
+  /** Optional chain icon URL (Figma 9:562 – matches HomeScreen pill) */
+  iconUrl?: string
   name: string
+  /** @deprecated use neutral pill styles (Figma 9:562) */
+  bgColor?: string
+  /** @deprecated use neutral pill styles (Figma 9:562) */
+  color?: string
 }
 
 export interface ChainPillProps {
@@ -18,8 +23,12 @@ export interface ChainPillProps {
   className?: string
 }
 
+/** Figma 9:562 / HomeScreen – neutral pill styles for chain selector */
+const PILL_CLASS = 'flex items-center gap-2 rounded-full border border-[#e5e7eb] bg-[#f3f4f6] px-[13px] py-[7px] transition-colors hover:opacity-90 cursor-pointer'
+
 /**
- * Compact chain + token indicator (e.g. "USDC on Stellar"). Clickable to open chain selector.
+ * Chain + token indicator (e.g. "USDC on Stellar"). Clickable to open chain selector.
+ * Matches HomeScreen and Figma node 9:562.
  */
 export const ChainPill: React.FC<ChainPillProps> = ({
   chain,
@@ -29,32 +38,20 @@ export const ChainPill: React.FC<ChainPillProps> = ({
   className,
 }) => (
   <button
-    className={cn(
-      'inline-flex items-center gap-1.5 rounded-[10px] border cursor-pointer',
-      'transition-[background,border-color] duration-[0.4s] ease-[cubic-bezier(0.16,1,0.3,1)]',
-      compact ? 'px-2.5 py-1.5' : 'px-3.5 py-2',
-      className,
-    )}
+    className={cn(PILL_CLASS, className)}
     onClick={onClick}
-    style={{
-      background: chain.bgColor,
-      borderColor: `${chain.color}25`,
-      borderWidth: '1.5px',
-    }}
     type="button"
   >
-    <span className={compact ? 'text-xs' : 'text-sm'}>{chain.icon}</span>
-    <span
-      className={cn(
-        'font-bold',
-        compact ? 'text-[11px]' : 'text-xs',
-      )}
-      style={{ color: chain.color === '#FCFF52' ? '#35D07F' : chain.color }}
-    >
+    {chain.iconUrl ? (
+      <img alt={chain.name} className="h-5 w-5" src={chain.iconUrl} />
+    ) : (
+      <span className="text-sm">{chain.icon}</span>
+    )}
+    <span className="text-xs font-semibold text-[#374151]">
       {tokenLabel}
       {' on '}
       {chain.name}
     </span>
-    <ChevronDown className="h-3 w-3 text-[var(--ab-text-muted)]" />
+    <ChevronDown className="h-4 w-4 text-[#374151]" />
   </button>
 )
