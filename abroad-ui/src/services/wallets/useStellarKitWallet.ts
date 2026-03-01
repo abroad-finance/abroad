@@ -6,6 +6,7 @@ import {
   HanaModule,
   HotWalletModule,
   LobstrModule,
+  ModuleType,
   StellarWalletsKit,
   WalletNetwork,
   xBullModule,
@@ -25,19 +26,26 @@ import type { IWalletAuthentication } from '../../interfaces/IWalletAuthenticati
 
 import { WALLET_CONNECT_ID } from '../../shared/constants'
 
-// Build the WalletConnect module once (no browser globals required here)
-const walletConnectModule = new WalletConnectModule({
-  description:
-    'Abroad bridges USDC on Stellar with real-time payment networks around the world, enabling seamless crypto-fiat payments. You will be able to pay anywhere in Brazil and Colombia with your USDC.',
-  icons: ['https://storage.googleapis.com/cdn-abroad/Icons/Favicon/Abroad_Badge_transparent.png'],
-  method: WalletConnectAllowedMethods.SIGN,
-  name: 'Abroad',
-  network: WalletNetwork.PUBLIC,
-  projectId: WALLET_CONNECT_ID,
-  url: 'https://app.abroad.finance',
-})
+// Build a mock WalletConnect module to bypass the bug in StellarWalletsKit's walletconnect.module.js
+// Their module crashes if it encounters a WalletConnect session (e.g. Celo/Solana) that doesn't
+// have the `stellar` namespace defined, because it blindly maps `session.namespaces.stellar.accounts`.
+// Since we intercept WalletConnect in `isWalletConnect` and handle it manually, we only need this
+// mock to display "Wallet Connect" in the StellarWalletsKit UI modal without crashing.
+const mockWalletConnectModule: any = {
+  moduleType: ModuleType.BRIDGE_WALLET,
+  productId: 'wallet_connect', // WALLET_CONNECT_ID is 'wallet_connect'
+  productName: 'Wallet Connect',
+  productUrl: 'https://walletconnect.com/',
+  productIcon: 'https://stellar.creit.tech/wallet-icons/walletconnect.png',
+  isAvailable: async () => true,
+  getAddress: async () => { throw new Error('Handled externally') },
+  signTransaction: async () => { throw new Error('Handled externally') },
+  signAuthEntry: async () => { throw new Error('Handled externally') },
+  signMessage: async () => { throw new Error('Handled externally') },
+  getNetwork: async () => { throw new Error('Handled externally') },
+}
 
-// WalletConnect metadata for Stellar
+// Keep the WalletConnect metadata constants to pass them into our manual signClient instantiation
 const wcMetadata = {
   description:
     'Abroad bridges USDC on Stellar with real-time payment networks around the world, enabling seamless crypto-fiat payments. You will be able to pay anywhere in Brazil and Colombia with your USDC.',
@@ -131,6 +139,27 @@ export function useStellarKitWallet(
     async ({ message }: { message: string }) => {
       const kit = ensureKit()
       if (!address) throw new Error('Wallet not connected')
+
+      if (walletId === mockWalletConnectModule.productId) {
+        const client = await ensureWalletConnectClient()
+        if (!wcTopicRef.current) throw new Error('No WalletConnect session found')
+        
+        const stellarChainId = STELLAR_CHAIN_ID
+        const result = await client.request({
+          chainId: stellarChainId,
+          topic: wcTopicRef.current,
+          request: {
+            method: 'stellar_signXDR',
+            params: { network: 'PUBLIC', xdr: message },
+          },
+        })
+        
+        return {
+          signedTxXdr: (result as { signedXDR: string }).signedXDR,
+          signerAddress: address as string | undefined,
+        }
+      }
+
       const { signedTxXdr } = await kit.signTransaction(message, {
         address,
         networkPassphrase: network,
@@ -140,7 +169,7 @@ export function useStellarKitWallet(
         signerAddress: address as string | undefined,
       }
     },
-    [address, ensureKit],
+    [address, ensureKit, walletId, ensureWalletConnectClient],
   )
 
   const connect = useCallback(async () => {
@@ -309,13 +338,13 @@ export function useStellarKitWallet(
 
 function buildModules() {
   return isMobileUA()
-    ? [walletConnectModule]
+    ? [mockWalletConnectModule]
     : [
         new FreighterModule(),
         new LobstrModule(),
         new AlbedoModule(),
         new LedgerModule(),
-        walletConnectModule,
+        mockWalletConnectModule,
         new HotWalletModule(),
         new xBullModule(),
         new HanaModule(),
