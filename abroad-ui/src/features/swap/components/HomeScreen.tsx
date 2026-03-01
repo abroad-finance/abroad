@@ -3,6 +3,7 @@ import { ChevronDown, ChevronRight, Keyboard, Lock, PiggyBank, QrCode, Zap } fro
 import React from 'react'
 
 import { _36EnumsTargetCurrency as TargetCurrency, type TransactionListItem } from '../../../api'
+import BreBLogo from '../../../assets/Logos/networks/Bre-b.svg'
 import { CurrencyToggle } from '../../../components/ui'
 
 const RECENT_COUNTRY_CONFIG: Record<string, { flag: string, symbol: string, currency: string }> = {
@@ -29,9 +30,24 @@ const CHAIN_CONFIG = [
   { key: 'solana', label: 'Solana', icon: ASSET_URLS.SOLANA_CHAIN_ICON },
 ] as const
 
-const COUNTRIES: Record<string, { flag: string, rate: number, decimals: number }> = {
-  BRL: { flag: '🇧🇷', rate: 5.82, decimals: 2 },
-  COP: { flag: '🇨🇴', rate: 4198.5, decimals: 0 },
+const CURRENCY_FLAG_URL: Record<string, string> = {
+  BRL: 'https://hatscripts.github.io/circle-flags/flags/br.svg',
+  COP: 'https://hatscripts.github.io/circle-flags/flags/co.svg',
+}
+
+const COUNTRIES: Record<string, { rate: number, decimals: number }> = {
+  BRL: { rate: 5.82, decimals: 2 },
+  COP: { rate: 4198.5, decimals: 0 },
+}
+
+const RAIL_LOGO: Record<string, string> = {
+  BRL: '/pix-white.svg',
+  COP: BreBLogo,
+}
+
+const TOKEN_ICON_URL: Record<string, string> = {
+  USDC: ASSET_URLS.USDC_TOKEN_ICON,
+  USDT: ASSET_URLS.USDT_TOKEN_ICON,
 }
 
 const CHAIN_MAP: Record<string, { icon: string, bg: string, color: string, name: string }> = {
@@ -209,25 +225,39 @@ export default function HomeScreen({
   const chainInfo = CHAIN_MAP[chainKey] ?? CHAIN_MAP.stellar
 
   return (
-    <div className="flex flex-1 flex-col items-center px-4 py-6 md:px-6 md:py-[71.5px]">
+    <div className="flex flex-1 flex-col items-center px-4 md:px-6">
       <div className="w-full max-w-[576px]">
         {/* Balance – Figma 1:46 */}
-        <div className="flex flex-col items-center gap-2 py-2">
+        <div className="flex flex-col items-center gap-1 py-1">
           <p className="text-center text-xs font-bold uppercase leading-4 tracking-[1.2px] text-[#6b7280]">
             {t('home.your_balance', 'Your Balance')}
           </p>
           <div className="flex items-center justify-center gap-2">
-            <span className="text-center text-[40px] font-bold leading-[48px] text-[#111827] md:text-[60px] md:leading-[60px]">
+            <span className="text-center text-[40px] font-black leading-[48px] text-[#111827] md:text-[60px] md:leading-[60px]">
               $
               {balance}
             </span>
-            <span className="pt-3 text-[24px] font-medium leading-9 text-[#10b981] md:text-[30px] md:leading-9">
-              {selectedTokenLabel}
-            </span>
+            {TOKEN_ICON_URL[selectedTokenLabel] ? (
+              <img
+                alt={selectedTokenLabel}
+                className="h-6 w-6 shrink-0 pt-3 md:h-8 md:w-8"
+                src={TOKEN_ICON_URL[selectedTokenLabel]}
+              />
+            ) : (
+              <span className="pt-3 text-[24px] font-medium leading-9 text-[#10b981] md:text-[30px] md:leading-9">
+                {selectedTokenLabel}
+              </span>
+            )}
           </div>
-          <div className="flex h-[34px] items-center justify-center pt-2">
+          <div className="flex h-8 items-center justify-center pt-1">
             <div className="flex items-center gap-2 rounded-full border border-[#f3f4f6] bg-[rgba(255,255,255,0.6)] px-[13px] py-[4.5px] shadow-[0px_1px_2px_0px_rgba(0,0,0,0.05)]">
-              <span className="text-base">{c.flag}</span>
+              {CURRENCY_FLAG_URL[targetCurrency] && (
+                <img
+                  alt={targetCurrency}
+                  className="h-5 w-5 shrink-0 object-contain"
+                  src={CURRENCY_FLAG_URL[targetCurrency]}
+                />
+              )}
               <span className="text-xs font-medium leading-4 text-[#6b7280]">
                 ≈
                 {targetCurrency === TargetCurrency.BRL ? ' R$' : ' $'}
@@ -279,9 +309,11 @@ export default function HomeScreen({
             <span className="text-base font-bold leading-tight text-white md:text-xl md:leading-[25px]">
               {t('home.scan_to_pay', 'Scan to Pay')}
             </span>
-            <span className="text-xs font-medium leading-4 text-[#d1fae5] md:text-sm md:leading-5">
-              (PIX / Bre-B)
-            </span>
+            <img
+              alt={targetCurrency === TargetCurrency.BRL ? 'PIX' : 'Bre-B'}
+              className="h-5 w-auto md:h-6"
+              src={RAIL_LOGO[targetCurrency]}
+            />
           </button>
 
           <button
@@ -300,7 +332,7 @@ export default function HomeScreen({
 
         {/* Recent – walletDetails when available, fallback to useUserTransactions */}
         {(recentTransactions.length > 0 || recentTransactionsFallback.length > 0) && (
-          <div className="mt-6 pt-6 md:mt-10 md:pt-8">
+          <div className="mt-4">
             <div className="mb-4 flex items-center justify-between">
               <span className="text-xs font-bold uppercase leading-4 tracking-[1.2px] text-[#6b7280]">
                 {t('home.recent', 'Recent')}
