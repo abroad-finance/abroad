@@ -65,6 +65,14 @@ export interface WebSwapControllerProps {
   targetAmount: string
   targetCurrency: TargetCurrency
   transactionId: null | string
+  txStatusDetails: {
+    accountNumber: string
+    network: string
+    rail: string
+    sourceAmount: string
+    targetAmount: string
+    transferFeeDisplay: string
+  }
   view: SwapView
 }
 
@@ -105,6 +113,7 @@ const WebSwap: React.FC = () => {
     targetAmount,
     targetCurrency,
     transactionId,
+    txStatusDetails,
     view,
   } = controller
 
@@ -279,6 +288,7 @@ const WebSwap: React.FC = () => {
                 targetAmount={targetAmount}
                 targetCurrency={targetCurrency}
                 transactionId={transactionId}
+                txStatusDetails={txStatusDetails}
               />
             ),
             waitSign: <WaitSign />,

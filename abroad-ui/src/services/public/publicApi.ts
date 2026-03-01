@@ -1,3 +1,4 @@
+import type { TransactionStatus } from '../../api'
 import type { ApiResult } from '../http/types'
 import type {
   AcceptTransactionRequest,
@@ -11,6 +12,15 @@ import type {
 import type { PaginatedTransactionList } from './transactionTypes'
 
 import { httpClient } from '../http/httpClient'
+
+export type TransactionStatusResponse = {
+  id: string
+  status: TransactionStatus
+  transaction_reference: null | string
+  on_chain_tx_hash: null | string
+  kycLink: null | string
+  user_id: string
+}
 
 const jsonHeaders = { 'Content-Type': 'application/json' }
 
@@ -61,6 +71,16 @@ export const notifyPayment = async (
     body: JSON.stringify(payload),
     headers: jsonHeaders,
     method: 'POST',
+  })
+}
+
+export const getTransactionStatus = async (
+  transactionId: string,
+  options?: { signal?: AbortSignal | null },
+): Promise<ApiResult<TransactionStatusResponse>> => {
+  return httpClient.request<TransactionStatusResponse>(`/transaction/${encodeURIComponent(transactionId)}`, {
+    method: 'GET',
+    signal: options?.signal ?? null,
   })
 }
 

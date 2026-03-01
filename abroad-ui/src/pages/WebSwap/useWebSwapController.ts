@@ -50,6 +50,7 @@ import {
   chainKeyOf,
   COP_TRANSFER_FEE,
   corridorKeyOf,
+  formatChainLabel,
   sortStellarFirst,
 } from '../../features/swap/utils/corridorHelpers'
 import {
@@ -125,6 +126,28 @@ const parseAmountUnits = (amount: string, decimals: number): bigint => {
   const cleaned = normalized.endsWith('.') ? normalized.slice(0, -1) : normalized
   if (!cleaned) throw new Error('Amount is required')
   return parseUnits(cleaned, decimals)
+}
+
+/**
+ * Parse target amount (BRL/COP).
+ * - Comma present: locale format (1,00 = 1.00, 1.000,50 = 1000.50)
+ * - Dot only: "5.000" = 5000 (thousands) or "1.00" = 1 (decimal, e.g. from QR)
+ *   Use 3-digit segment after dot as thousands (es-CO); else decimal.
+ */
+const parseTargetAmount = (value: string): number => {
+  const raw = value.replace(/[^0-9.,]/g, '')
+  if (raw.includes(',')) {
+    return parseFloat(raw.replace(/\./g, '').replace(/,/g, '.'))
+  }
+  const dotCount = (raw.match(/\./g) || []).length
+  if (dotCount === 0) return parseFloat(raw) || 0
+  if (dotCount >= 2) return parseFloat(raw.replace(/\./g, ''))
+  const [intPart, fracPart] = raw.split('.')
+  const frac = fracPart ?? ''
+  if (frac.length === 3 && /^\d{3}$/.test(frac)) {
+    return parseFloat(raw.replace(/\./g, ''))
+  }
+  return parseFloat(raw)
 }
 
 const createInitialState = (isDesktop: boolean): SwapControllerState => ({
@@ -511,21 +534,26 @@ export const useWebSwapController = (): WebSwapControllerProps => {
   ])
 
   const exchangeRateDisplay = useMemo(() => {
-    if (state.loadingSource || state.loadingTarget) return '-'
+    const tc = state.targetCurrency === TargetCurrency.BRL ? 'BRL' : 'COP'
+    if (state.loadingSource || state.loadingTarget) {
+      return `1 ${selectedAssetLabel} = - ${tc}`
+    }
     const numericSource = parseFloat(state.sourceAmount)
     const cleanedTarget = state.targetAmount.replace(/\./g, '').replace(/,/g, '.')
     const numericTarget = parseFloat(cleanedTarget)
     if (numericSource > 0 && !Number.isNaN(numericTarget) && numericTarget >= 0) {
-      return `${targetSymbol}${formatTargetNumber((numericTarget + transferFee) / numericSource)}`
+      const rate = (numericTarget + transferFee) / numericSource
+      return `1 ${selectedAssetLabel} = ${formatTargetNumber(rate)} ${tc}`
     }
-    return '-'
+    return `1 ${selectedAssetLabel} = - ${tc}`
   }, [
     formatTargetNumber,
+    selectedAssetLabel,
     state.loadingSource,
     state.loadingTarget,
     state.sourceAmount,
     state.targetAmount,
-    targetSymbol,
+    state.targetCurrency,
     transferFee,
   ])
 
@@ -773,9 +801,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     reverseAbortRef.current = controller
     const reqId = ++reverseReqIdRef.current
 
-    const raw = value.replace(/[^0-9.,]/g, '')
-    const normalized = raw.replace(/\./g, '').replace(/,/g, '.')
-    const num = parseFloat(normalized)
+    const num = parseTargetAmount(value)
     if (Number.isNaN(num)) {
       setQuoteBelowMinimum(false)
       dispatch({
@@ -1051,7 +1077,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
       notifyError(t('swap.wait_for_quote', 'Espera la cotizaci?n antes de continuar'))
       return
     }
-    dispatch({ type: 'SET_VIEW', view: 'bankDetails' })
+    dispatch({ type: 'SET_VIEW', view: 'confirm-qr' })
   }, [
     connectWallet,
     isAuthenticated,
@@ -1499,6 +1525,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     onOpenSourceModal: () => { /* handled in WebSwap */ },
     onOpenTargetModal: () => { /* handled in WebSwap */ },
     onPrimaryAction,
+    selectCurrency,
     onRecipientChange: state.targetCurrency === TargetCurrency.BRL
       ? (v) => dispatch({ pixKey: v, type: 'SET_BANK_DETAILS' })
       : (v) => dispatch({ accountNumber: v.trim(), type: 'SET_BANK_DETAILS' }),
@@ -1516,6 +1543,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     toggleChainMenu: _toggleChainMenu,
     toggleCurrencyMenu: _toggleCurrencyMenu,
     transferFeeDisplay,
+    transferFeeIsZero: transferFee === 0,
   }
 
   const confirmQrProps: ConfirmQrProps = {
@@ -1526,6 +1554,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     onEdit: () => dispatch({ type: 'SET_VIEW', view: 'swap' }),
     pixKey: state.pixKey,
     recipentName: state.recipientName,
+    selectedAssetLabel,
     sourceAmount: state.sourceAmount,
     targetAmount: state.targetAmount,
     taxId: state.taxId,
@@ -1534,6 +1563,23 @@ export const useWebSwapController = (): WebSwapControllerProps => {
   const handleKycApproved = useCallback(() => {
     dispatch({ type: 'SET_VIEW', view: 'confirm-qr' })
   }, [])
+
+  const txStatusDetails = useMemo(() => ({
+    accountNumber: state.accountNumber,
+    network: selectedCorridor ? formatChainLabel(selectedCorridor.blockchain) : '',
+    rail: selectedCorridor
+      ? (selectedCorridor.paymentMethod === 'PIX' ? 'PIX' : 'Bre-B')
+      : '',
+    sourceAmount: state.sourceAmount,
+    targetAmount: state.targetAmount,
+    transferFeeDisplay,
+  }), [
+    state.accountNumber,
+    state.sourceAmount,
+    state.targetAmount,
+    selectedCorridor,
+    transferFeeDisplay,
+  ])
 
   return {
     assetOptions,
@@ -1563,6 +1609,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     targetAmount: state.targetAmount,
     targetCurrency: state.targetCurrency,
     transactionId: state.transactionId,
+    txStatusDetails,
     view: state.view,
   }
 }
