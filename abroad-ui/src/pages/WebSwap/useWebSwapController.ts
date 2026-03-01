@@ -142,7 +142,7 @@ const parseTargetAmount = (value: string): number => {
   const dotCount = (raw.match(/\./g) || []).length
   if (dotCount === 0) return parseFloat(raw) || 0
   if (dotCount >= 2) return parseFloat(raw.replace(/\./g, ''))
-  const [intPart, fracPart] = raw.split('.')
+  const [, fracPart] = raw.split('.')
   const frac = fracPart ?? ''
   if (frac.length === 3 && /^\d{3}$/.test(frac)) {
     return parseFloat(raw.replace(/\./g, ''))

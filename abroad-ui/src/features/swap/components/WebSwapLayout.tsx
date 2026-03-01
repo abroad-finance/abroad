@@ -22,7 +22,7 @@ type WebSwapLayoutSlots = {
   }
 }
 
-const WebSwapLayout: React.FC<WebSwapLayoutProps & WebSwapLayoutSlots> = ({ slots, targetCurrency, view }) => {
+const WebSwapLayout: React.FC<WebSwapLayoutProps & WebSwapLayoutSlots> = ({ slots, targetCurrency: _targetCurrency, view }) => {
   const renderSwap = useMemo(() => {
     switch (view) {
       case 'bankDetails':

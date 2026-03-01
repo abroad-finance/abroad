@@ -13,11 +13,6 @@ import {
 } from '@creit.tech/stellar-wallets-kit'
 import { LedgerModule } from '@creit.tech/stellar-wallets-kit/modules/ledger.module'
 import {
-  WalletConnectAllowedMethods,
-  WalletConnectModule,
-} from '@creit.tech/stellar-wallets-kit/modules/walletconnect.module'
-// useStellarKitWallet.ts
-import {
   useCallback, useMemo, useRef, useState,
 } from 'react'
 

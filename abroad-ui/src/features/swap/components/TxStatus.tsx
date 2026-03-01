@@ -1,7 +1,7 @@
 import { useTranslate } from '@tolgee/react'
 import { Check } from 'lucide-react'
 import React, {
-  memo, useCallback, useEffect, useRef, useState,
+  memo, useCallback, useEffect, useState,
 } from 'react'
 
 import { TransactionStatus as ApiStatus, _36EnumsTargetCurrency as TargetCurrency } from '../../../api'

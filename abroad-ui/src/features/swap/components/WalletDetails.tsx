@@ -36,29 +36,29 @@ export interface WalletDetailsProps {
 
 // Stateless controlled component. All data & handlers provided via props.
 const WalletDetails: React.FC<WalletDetailsProps> = ({
-  address,
-  copiedAddress,
+  address: _address,
+  copiedAddress: _copiedAddress,
   formatDate,
   formatDateWithTime,
   getStatusStyle,
   getStatusText,
   hasMoreTransactions,
-  isLoadingBalance,
+  isLoadingBalance: _isLoadingBalance,
   isLoadingMoreTransactions,
   isLoadingTransactions,
   onClose,
-  onCopyAddress,
-  onDisconnectWallet,
+  onCopyAddress: _onCopyAddress,
+  onDisconnectWallet: _onDisconnectWallet,
   onLoadMoreTransactions,
-  onRefreshBalance,
+  onRefreshBalance: _onRefreshBalance,
   onRefreshTransactions,
-  selectedAssetLabel,
+  selectedAssetLabel: _selectedAssetLabel,
   selectedTransaction,
   setSelectedTransaction,
   transactionError,
   transactions,
-  usdcBalance,
-  usdtBalance,
+  usdcBalance: _usdcBalance,
+  usdtBalance: _usdtBalance,
 }) => {
   const { t } = useTranslate()
 
