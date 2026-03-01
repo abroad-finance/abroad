@@ -13,13 +13,15 @@ import {
 } from '@creit.tech/stellar-wallets-kit'
 import { LedgerModule } from '@creit.tech/stellar-wallets-kit/modules/ledger.module'
 import {
-  useCallback, useMemo, useRef, useState,
+  useCallback, useEffect, useMemo, useRef, useState,
 } from 'react'
 
 import type { IWallet } from '../../interfaces/IWallet'
 import type { IWalletAuthentication } from '../../interfaces/IWalletAuthentication'
 
 import { WALLET_CONNECT_ID } from '../../shared/constants'
+import { authTokenStore } from '../auth/authTokenStore'
+import { sessionStore } from '../auth/sessionStore'
 
 // Build a mock WalletConnect module to bypass the bug in StellarWalletsKit's walletconnect.module.js
 // Their module crashes if it encounters a WalletConnect session (e.g. Celo/Solana) that doesn't
@@ -69,6 +71,23 @@ function getErrorMessage(err: unknown): string {
   return String(err)
 }
 
+/** Returns true if the stored JWT token exists and has not expired. */
+const isStoredTokenValid = (): boolean => {
+  const token = authTokenStore.getToken()
+  if (!token) return false
+  try {
+    const [, payload] = token.split('.')
+    if (!payload) return false
+    const decoded = JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/')))
+    return typeof decoded?.exp === 'number' && decoded.exp * 1000 > Date.now()
+  }
+  catch {
+    return false
+  }
+}
+
+const isWalletConnect = (id: string) => /walletconnect|wallet_connect/i.test(id)
+
 export function useStellarKitWallet(
   {
     onConnectError,
@@ -82,9 +101,22 @@ export function useStellarKitWallet(
   const wcClientRef = useRef<null | SignClient>(null)
   const wcModalRef = useRef<null | WalletConnectModal>(null)
   const wcTopicRef = useRef<string | undefined>(undefined)
+  const authenticatingRef = useRef(false)
 
-  const [address, setAddress] = useState<null | string>(null)
-  const [walletId, _setWalletId] = useState<null | string>(null)
+  // Restore address and walletId from session on page load if the JWT is still valid
+  const [address, setAddress] = useState<null | string>(() => {
+    if (!isStoredTokenValid()) return null
+    return sessionStore.get()?.address ?? null
+  })
+
+  const [walletId, _setWalletId] = useState<null | string>(() => {
+    if (!isStoredTokenValid()) return null
+    return sessionStore.get()?.walletId ?? null
+  })
+
+  // Keep a ref in sync so ensureKit can read it without being a dep
+  const walletIdRef = useRef(walletId)
+  useEffect(() => { walletIdRef.current = walletId }, [walletId])
 
   // Ensure WalletConnect client (for Stellar WalletConnect flow)
   const ensureWalletConnectClient = useCallback(async () => {
@@ -118,6 +150,10 @@ export function useStellarKitWallet(
         modules: buildModules(),
         network,
       })
+      // Restore the previously selected wallet module into the newly-created kit
+      if (walletIdRef.current) {
+        kitRef.current.setWallet(walletIdRef.current)
+      }
     }
     return kitRef.current
   }, [])
@@ -130,6 +166,63 @@ export function useStellarKitWallet(
     _setWalletId(id)
   }, [ensureKit])
 
+  // On mount, restore the WalletConnect topic if the session was persisted as a WC wallet
+  useEffect(() => {
+    if (!walletId || !isWalletConnect(walletId)) return
+    const restoreWcTopic = async () => {
+      try {
+        const client = await ensureWalletConnectClient()
+        const storeKey = `wc:session:${STELLAR_CHAIN_ID}`
+        const stored = localStorage.getItem(storeKey)
+        if (!stored) return
+        const { topic } = JSON.parse(stored)
+        const session = client.session.get(topic)
+        if (session) wcTopicRef.current = topic
+      }
+      catch { /* ignore */ }
+    }
+    void restoreWcTopic()
+  }, []) // intentionally runs only on mount
+
+  // When the JWT is cleared externally (e.g. refresh failure), wipe the local session too
+  useEffect(() => {
+    const unsubscribe = authTokenStore.subscribe((token) => {
+      if (!token) {
+        sessionStore.clear()
+        setAddress(null)
+        _setWalletId(null)
+      }
+    })
+    return unsubscribe
+  }, [])
+
+  // Detect account changes in the wallet extension while the tab is in the background
+  useEffect(() => {
+    if (!address) return
+    const handleVisibilityChange = async () => {
+      if (document.visibilityState !== 'visible') return
+      const session = sessionStore.get()
+      if (!session || !address) return
+      // Only check non-WalletConnect wallets (Freighter, etc.) — WC sessions are self-contained
+      if (isWalletConnect(session.walletId)) return
+      try {
+        const kit = ensureKit()
+        const result = await kit.getAddress()
+        const current = result?.address ?? null
+        if (current && current !== session.address) {
+          // User switched accounts in the wallet extension without logging out
+          sessionStore.clear()
+          walletAuth.setJwtToken(null)
+          setAddress(null)
+          _setWalletId(null)
+        }
+      }
+      catch { /* Can't verify — keep the session */ }
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
+  }, [address, ensureKit, walletAuth])
+
   const signTransaction = useCallback(
     async ({ message }: { message: string }) => {
       const kit = ensureKit()
@@ -138,7 +231,7 @@ export function useStellarKitWallet(
       if (walletId === mockWalletConnectModule.productId) {
         const client = await ensureWalletConnectClient()
         if (!wcTopicRef.current) throw new Error('No WalletConnect session found')
-        
+
         const stellarChainId = STELLAR_CHAIN_ID
         const result = await client.request({
           chainId: stellarChainId,
@@ -148,7 +241,7 @@ export function useStellarKitWallet(
             params: { network: 'PUBLIC', xdr: message },
           },
         })
-        
+
         return {
           signedTxXdr: (result as { signedXDR: string }).signedXDR,
           signerAddress: address as string | undefined,
@@ -172,12 +265,13 @@ export function useStellarKitWallet(
 
     kit.openModal({
       onWalletSelected: async (options: { id: string }) => {
+        // Prevent multiple simultaneous auth flows (avoids "Request expired" from overwritten challenges)
+        if (authenticatingRef.current) return
+        authenticatingRef.current = true
         try {
           setWalletId(options.id)
 
           let address: string | null = null
-          const isWalletConnect = (id: string) =>
-            /walletconnect|wallet_connect/i.test(id)
 
           if (isWalletConnect(options.id)) {
             // For WalletConnect in Stellar Kit, the kit.getAddress() doesn't work because
@@ -258,6 +352,7 @@ export function useStellarKitWallet(
                 return (result as { signedXDR: string }).signedXDR
               },
             })
+            sessionStore.set({ address, chainId: STELLAR_CHAIN_ID, walletId: options.id })
             return
           }
 
@@ -276,12 +371,14 @@ export function useStellarKitWallet(
               return signedTxXdr
             },
           })
+          sessionStore.set({ address, chainId: STELLAR_CHAIN_ID, walletId: options.id })
         }
         catch (err) {
           const message = getErrorMessage(err)
           console.error('Failed to connect wallet', err)
           setAddress(null)
           walletAuth.setJwtToken(null)
+          sessionStore.clear()
           if (onConnectError) {
             const isWalletConnectAccounts = /accounts/i.test(message)
             onConnectError(
@@ -290,6 +387,9 @@ export function useStellarKitWallet(
                 : message || 'Failed to connect wallet. Please try again.',
             )
           }
+        }
+        finally {
+          authenticatingRef.current = false
         }
       },
     })
@@ -308,6 +408,7 @@ export function useStellarKitWallet(
     setWalletId(null)
     setAddress(null)
     walletAuth.setJwtToken(null)
+    sessionStore.clear()
   }, [
     ensureKit,
     setWalletId,
