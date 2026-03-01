@@ -1,11 +1,8 @@
 // WebSwapLayout.tsx
-import { useTolgee, useTranslate } from '@tolgee/react'
 import React, { useMemo } from 'react'
 
 import { _36EnumsTargetCurrency as TargetCurrency } from '../../../api'
-import { BRAND_TITLE_CLASS } from '../../../shared/constants'
 import { cn } from '../../../shared/utils'
-import { getSwapPageTitleDefault } from '../constants/swapPageTitles'
 import { SwapView } from '../types'
 
 export interface WebSwapLayoutProps {
@@ -26,15 +23,6 @@ type WebSwapLayoutSlots = {
 }
 
 const WebSwapLayout: React.FC<WebSwapLayoutProps & WebSwapLayoutSlots> = ({ slots, targetCurrency, view }) => {
-  const { t } = useTranslate()
-  const tolgee = useTolgee()
-  const lang = tolgee.getLanguage()
-
-  const pageTitle
-    = targetCurrency === TargetCurrency.BRL
-      ? t('swap.page_title_brl', getSwapPageTitleDefault(lang, 'brl'))
-      : t('swap.page_title_cop', getSwapPageTitleDefault(lang, 'cop'))
-
   const renderSwap = useMemo(() => {
     switch (view) {
       case 'bankDetails':
@@ -63,8 +51,6 @@ const WebSwapLayout: React.FC<WebSwapLayoutProps & WebSwapLayoutSlots> = ({ slot
     view,
   ])
 
-  const showPageTitle = view !== 'home' && view !== 'swap'
-
   const isMainFlow = view === 'home' || view === 'swap' || view === 'bankDetails'
 
   return (
@@ -74,11 +60,6 @@ const WebSwapLayout: React.FC<WebSwapLayoutProps & WebSwapLayoutSlots> = ({ slot
         isMainFlow ? 'hero-gradient justify-start' : 'justify-center'
       )}
     >
-      {showPageTitle && (
-        <h1 className={cn('text-3xl font-black text-center w-full mb-6', BRAND_TITLE_CLASS)}>
-          {pageTitle}
-        </h1>
-      )}
       <div className={cn('w-full', isMainFlow ? 'max-w-[576px]' : 'max-w-md')}>
         {renderSwap}
       </div>
