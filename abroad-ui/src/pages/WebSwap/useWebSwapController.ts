@@ -323,6 +323,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
   }, [])
 
   const lastEditedRef = useRef<'source' | 'target' | null>(null)
+  const lastQuoteRateRef = useRef<number | null>(null)
   const sep24AutoSelectedRef = useRef(false)
   const directAbortRef = useRef<AbortController | null>(null)
   const reverseAbortRef = useRef<AbortController | null>(null)
@@ -641,6 +642,15 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     state.quoteId,
   ])
 
+  const sourceAmountForBalanceCheck = useMemo(() => {
+    if (state.sourceAmount) return state.sourceAmount
+    if (!state.loadingSource || !state.targetAmount || lastQuoteRateRef.current == null) return ''
+    const numericTarget = parseTargetAmount(state.targetAmount)
+    if (numericTarget <= 0) return ''
+    const estimated = numericTarget / lastQuoteRateRef.current
+    return String(estimated)
+  }, [state.loadingSource, state.sourceAmount, state.targetAmount])
+
   const persistableView = state.view !== 'swap'
 
   useEffect(() => {
@@ -773,6 +783,8 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     setQuoteBelowMinimum(false)
     const quote = response.data
     const formatted = formatTargetNumber(quote.value)
+    const numericTarget = parseTargetAmount(formatted) || 0
+    if (numericTarget > 0) lastQuoteRateRef.current = numericTarget / num
     dispatch({
       quoteId: quote.quote_id,
       sourceAmount: value,
@@ -859,6 +871,8 @@ export const useWebSwapController = (): WebSwapControllerProps => {
 
     setQuoteBelowMinimum(false)
     const quote = response.data
+    const numericSource = Number(quote.value) || 0
+    if (numericSource > 0) lastQuoteRateRef.current = num / numericSource
     dispatch({
       quoteId: quote.quote_id,
       sourceAmount: formatCryptoAmount(quote.value),
@@ -1535,6 +1549,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     selectedAssetLabel,
     selectedChainLabel,
     sourceAmount: state.sourceAmount,
+    sourceAmountForBalanceCheck,
     sourceSymbol,
     targetAmount: state.targetAmount,
     targetCurrency: state.targetCurrency,

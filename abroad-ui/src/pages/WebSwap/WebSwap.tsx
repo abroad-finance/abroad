@@ -267,8 +267,8 @@ const WebSwap: React.FC = () => {
                 hasInsufficientFunds={
                   swapViewProps.isAuthenticated
                   && !!sourceAssetBalance
-                  && !!swapViewProps.sourceAmount
-                  && parseFloat(swapViewProps.sourceAmount) > parseFloat(sourceAssetBalance.replace(/,/g, ''))
+                  && !!(swapViewProps.sourceAmountForBalanceCheck ?? swapViewProps.sourceAmount)
+                  && parseFloat(swapViewProps.sourceAmountForBalanceCheck ?? swapViewProps.sourceAmount) > parseFloat(sourceAssetBalance.replace(/,/g, ''))
                 }
                 loadingBalance={walletDetails.isLoadingBalance}
                 onBalanceClick={handleBalanceClick}

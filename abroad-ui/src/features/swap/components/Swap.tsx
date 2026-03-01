@@ -48,6 +48,7 @@ export interface SwapProps {
   selectedAssetLabel: string
   selectedChainLabel: string
   sourceAmount: string
+  sourceAmountForBalanceCheck?: string
   sourceSymbol: string
   targetAmount: string
   targetCurrency: (typeof TargetCurrency)[keyof typeof TargetCurrency]
@@ -65,6 +66,7 @@ export interface SwapProps {
 export default function Swap({
   continueDisabled,
   exchangeRateDisplay,
+  hasInsufficientFunds = false,
   isAboveMaximum,
   isAuthenticated,
   isBelowMinimum,
@@ -98,7 +100,9 @@ export default function Swap({
     ? t('swap.send_to_placeholder_pix', 'Chave Pix ou número de telefone')
     : t('swap.send_to_placeholder_breb', 'Bre-B ID ou número de telefone')
 
-  const ctaLabelDisabled = t('swap.enter_amount', 'Enter amount')
+  const ctaLabelDisabled = hasInsufficientFunds
+    ? t('swap.insufficient_balance', 'Saldo insuficiente')
+    : t('swap.enter_amount', 'Enter amount')
   const formattedAmount = targetCurrency === TargetCurrency.BRL
     ? `R$${targetAmount}`
     : `$${targetAmount}`
@@ -136,12 +140,29 @@ export default function Swap({
         )}
       </div>
 
-      {/* ── Live rate banner ── */}
-      <div className="flex w-full items-center gap-2 bg-[#f0fdf4] px-6 py-2.5">
-        <div className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#10b981]" />
-        <span className="text-xs font-medium leading-4 text-[#15803d]">
-          Live: {exchangeRateDisplay}
-        </span>
+      {/* ── Live rate banner + balance ── */}
+      <div className="flex w-full items-center justify-between gap-4 bg-[#f0fdf4] px-6 py-2.5">
+        <div className="flex items-center gap-2">
+          <div className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#10b981]" />
+          <span className="text-xs font-medium leading-4 text-[#15803d]">
+            Live: {exchangeRateDisplay}
+          </span>
+        </div>
+        {isAuthenticated && usdcBalance !== undefined && onBalanceClick && (
+          <button
+            className={cn(
+              'text-xs font-medium transition-colors hover:text-[#10b981]',
+              hasInsufficientFunds ? 'text-ab-error' : 'text-[#15803d]'
+            )}
+            onClick={onBalanceClick}
+            type="button"
+          >
+            {t('swap.available_balance', 'Balance disponible:')}{' '}
+            <span className="font-bold">
+              {loadingBalance ? '...' : `${usdcBalance} ${selectedAssetLabel}`}
+            </span>
+          </button>
+        )}
       </div>
 
       {/* ── Amount section ── */}
@@ -152,7 +173,7 @@ export default function Swap({
               autoFocus
               className={cn(
                 'bg-transparent text-center text-[48px] font-black leading-[48px] tracking-[-2.4px] outline-none caret-[#10b981] placeholder:text-[#e5e7eb]',
-                (isBelowMinimum || isAboveMaximum) ? 'text-ab-error' : 'text-[#111827]'
+                (isBelowMinimum || isAboveMaximum || hasInsufficientFunds) ? 'text-ab-error' : 'text-[#111827]'
               )}
               inputMode="decimal"
               onChange={e => onTargetChange(e.target.value)}
@@ -253,11 +274,11 @@ export default function Swap({
         <button
           className={cn(
             'flex w-full items-center justify-center rounded-2xl py-4 text-lg font-bold transition-all active:scale-[0.98]',
-            continueDisabled
+            continueDisabled || hasInsufficientFunds
               ? 'cursor-not-allowed bg-[#e5e7eb] text-[#9ca3af]'
               : 'bg-[#059669] text-[#f0fdf4] hover:bg-[#047857]'
           )}
-          disabled={continueDisabled}
+          disabled={continueDisabled || hasInsufficientFunds}
           onClick={onPrimaryAction}
           type="button"
         >
@@ -267,24 +288,9 @@ export default function Swap({
               {t('swap.connect_wallet', 'Conectar Billetera')}
             </span>
           ) : (
-            continueDisabled ? ctaLabelDisabled : ctaLabelEnabled
+            (continueDisabled || hasInsufficientFunds) ? ctaLabelDisabled : ctaLabelEnabled
           )}
         </button>
-
-        {/* Balance helper */}
-        {isAuthenticated && usdcBalance !== undefined && onBalanceClick && (
-          <button
-            className="flex items-center justify-center gap-2 text-sm font-medium text-[#6b7280] transition-colors hover:text-[#10b981]"
-            onClick={onBalanceClick}
-            type="button"
-          >
-            <Wallet className="h-4 w-4" />
-            <span>{t('swap.available_balance', 'Balance disponible:')}</span>
-            <span className="font-bold text-[#111827]">
-              {loadingBalance ? '...' : `${usdcBalance} ${selectedAssetLabel}`}
-            </span>
-          </button>
-        )}
       </div>
     </div>
   )
