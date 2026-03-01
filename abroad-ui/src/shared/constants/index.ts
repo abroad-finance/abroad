@@ -1,10 +1,14 @@
+import celoCeloLogo from '@/assets/Logos/Blockchains/celo-celo-logo.svg'
+import solanaSolLogo from '@/assets/Logos/Blockchains/solana-sol-logo.svg'
+import stellarXlmLogo from '@/assets/Logos/Blockchains/stellar-xlm-logo.svg'
+
 export const ATTRIBUTION_URL = 'https://www.flickr.com/photos/pedrosz/36132013403'
 
 export const ASSET_URLS = {
   BACKGROUND_IMAGE: 'https://storage.googleapis.com/cdn-abroad/bg/36132013403_56c8daad31_3k.jpg',
-  CELO_CHAIN_ICON: 'https://cryptologos.cc/logos/celo-celo-logo.svg',
-  SOLANA_CHAIN_ICON: 'https://cryptologos.cc/logos/solana-sol-logo.svg',
-  STELLAR_CHAIN_ICON: 'https://cryptologos.cc/logos/stellar-xlm-logo.svg',
+  CELO_CHAIN_ICON: celoCeloLogo,
+  SOLANA_CHAIN_ICON: solanaSolLogo,
+  STELLAR_CHAIN_ICON: stellarXlmLogo,
   STELLAR_LOGO: 'https://storage.googleapis.com/cdn-abroad/Icons/Stellar/SCF_white.svg',
   USDC_TOKEN_ICON: 'https://storage.googleapis.com/cdn-abroad/Icons/Tokens/USDC%20Token.svg',
   USDT_TOKEN_ICON: 'https://storage.googleapis.com/cdn-abroad/Icons/Tokens/USDT-token.svg',
