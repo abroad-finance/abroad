@@ -1,6 +1,6 @@
 import { useTranslate } from '@tolgee/react'
 import {
-  ArrowLeft,
+  ChevronLeft,
   CircleDollarSign,
   Wallet,
   Zap,
@@ -57,6 +57,7 @@ export interface SwapProps {
   toggleChainMenu?: () => void
   toggleCurrencyMenu?: () => void
   transferFeeDisplay: string
+  transferFeeIsZero?: boolean
   usdcBalance?: string
   walletAddress?: null | string
 }
@@ -83,6 +84,7 @@ export default function Swap({
   targetAmount,
   targetCurrency,
   transferFeeDisplay,
+  transferFeeIsZero = false,
   usdcBalance,
 }: SwapProps): React.JSX.Element {
   const { t } = useTranslate()
@@ -119,7 +121,7 @@ export default function Swap({
               onClick={onBackClick}
               type="button"
             >
-              <ArrowLeft className="h-[16px] w-[9px] text-[#111827]" />
+              <ChevronLeft className="h-6 w-6 text-ab-text" strokeWidth={2.5} />
             </button>
           )}
           <h1 className="text-xl font-bold leading-7 text-[#111827]">
@@ -175,6 +177,22 @@ export default function Swap({
         </div>
       </div>
 
+      {/* Min/Max warnings – right below amount */}
+      {(isBelowMinimum || isAboveMaximum) && (
+        <div className="flex items-center justify-center gap-2 px-6 pb-2 text-xs font-bold text-ab-error">
+          <CircleDollarSign className="h-4 w-4" />
+          <span>
+            {isBelowMinimum
+              ? (targetCurrency === TargetCurrency.COP
+                ? t('swap.min_cop', 'Mínimo: $5.000 COP')
+                : t('swap.min_brl', 'Mínimo: R$1,00 BRL'))
+              : (targetCurrency === TargetCurrency.COP
+                ? t('swap.max_cop', 'Máximo: $5.000.000 COP')
+                : t('swap.max_brl', 'Máximo: R$50.000,00 BRL'))}
+          </span>
+        </div>
+      )}
+
       {/* ── Separator ── */}
       <div className="h-px w-full shrink-0 border-t border-[#f3f4f6]" />
 
@@ -196,16 +214,28 @@ export default function Swap({
             type="text"
             value={recipientValue}
           />
+          <span className="mt-2 block pl-1 font-medium text-xs text-ab-text-3">
+            {targetCurrency === TargetCurrency.BRL
+              ? t('bank_details.pix_disclaimer', 'Tu transacción será procesada de inmediato. Asegúrate de que la llave PIX y el CPF del destinatario sean correctos. Esta transacción no se puede reversar.')
+              : t('bank_details.breb_disclaimer', 'Tu transacción será procesada de inmediato a través de BRE-B. Ingresa la llave correcta del destinatario y asegurate que la tenga inscrita. No es necesario seleccionar banco.')}
+          </span>
         </div>
 
         {/* Fee + Speed */}
         <div className="flex flex-col gap-2 rounded-2xl border border-[#f3f4f6] bg-[#f9fafb] p-4">
           <div className="flex items-center justify-between">
             <span className="text-sm font-normal text-[#6b7280]">
-              {t('swap.fee_percent', 'Fee (1.5%)')}
+              {transferFeeIsZero
+                ? t('swap.fee', 'Fee')
+                : t('swap.fee_percent', 'Fee (1.5%)')}
             </span>
-            <span className="text-sm font-medium text-[#111827]">
-              {transferFeeDisplay}
+            <span
+              className={cn(
+                'text-sm font-medium',
+                transferFeeIsZero ? 'text-[#10b981]' : 'text-[#111827]',
+              )}
+            >
+              {transferFeeIsZero ? t('swap.free', 'Gratis') : transferFeeDisplay}
             </span>
           </div>
           <div className="flex items-center justify-between">
@@ -218,22 +248,6 @@ export default function Swap({
             </div>
           </div>
         </div>
-
-        {/* Min/Max warnings */}
-        {(isBelowMinimum || isAboveMaximum) && (
-          <div className="flex items-center gap-2 text-xs font-bold text-ab-error">
-            <CircleDollarSign className="h-4 w-4" />
-            <span>
-              {isBelowMinimum
-                ? (targetCurrency === TargetCurrency.COP
-                  ? t('swap.min_cop', 'Mínimo: $5.000 COP')
-                  : t('swap.min_brl', 'Mínimo: R$1,00 BRL'))
-                : (targetCurrency === TargetCurrency.COP
-                  ? t('swap.max_cop', 'Máximo: $5.000.000 COP')
-                  : t('swap.max_brl', 'Máximo: R$50.000,00 BRL'))}
-            </span>
-          </div>
-        )}
 
         {/* Primary CTA ── Figma: disabled = gray, enabled = green #059669 */}
         <button
