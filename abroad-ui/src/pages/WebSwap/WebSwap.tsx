@@ -62,6 +62,7 @@ export interface WebSwapControllerProps {
   selectChain: (key: string) => void
   selectCurrency: (currency: TargetCurrency) => void
   selectedChainKey: string
+  sourceAmountForBalanceCheck: string | undefined
   swapViewProps: SwapProps
   targetAmount: string
   targetCurrency: TargetCurrency
@@ -110,6 +111,7 @@ const WebSwap: React.FC = () => {
     selectChain,
     selectCurrency,
     selectedChainKey,
+    sourceAmountForBalanceCheck,
     swapViewProps,
     targetAmount,
     targetCurrency,
@@ -134,7 +136,7 @@ const WebSwap: React.FC = () => {
 
   const handleBalanceClick = useCallback(() => {
     if (sourceAssetBalance) {
-      const raw = sourceAssetBalance.replace(/,/g, '')
+      const raw = sourceAssetBalance.replaceAll(',', '')
       swapViewProps.onSourceChange(raw)
     }
   }, [sourceAssetBalance, swapViewProps])
@@ -264,18 +266,15 @@ const WebSwap: React.FC = () => {
                 hasInsufficientFunds={
                   swapViewProps.isAuthenticated
                   && !!sourceAssetBalance
-                  && !!(swapViewProps.sourceAmountForBalanceCheck ?? swapViewProps.sourceAmount)
-                  && Number.parseFloat(swapViewProps.sourceAmountForBalanceCheck ?? swapViewProps.sourceAmount) > Number.parseFloat(sourceAssetBalance.replace(/,/g, ''))
+                  && !!(sourceAmountForBalanceCheck ?? swapViewProps.sourceAmount)
+                  && Number.parseFloat(sourceAmountForBalanceCheck ?? swapViewProps.sourceAmount) > Number.parseFloat(sourceAssetBalance.replaceAll(',', ''))
                 }
                 loadingBalance={walletDetails.isLoadingBalance}
                 onBalanceClick={handleBalanceClick}
                 onBackClick={handleBackToSwap}
-                onDisconnect={walletDetails.onDisconnectWallet}
                 onOpenSourceModal={openSourceModal}
                 onOpenTargetModal={openTargetModal}
-                openQr={openQr}
                 usdcBalance={sourceAssetBalance}
-                walletAddress={walletDetails.address}
               />
             ),
             txStatus: (

@@ -27,7 +27,7 @@ export default function HistorySheet({
   onClose,
   onSelectTx,
   transactions,
-}: HistorySheetProps): React.JSX.Element {
+}: Readonly<HistorySheetProps>): React.JSX.Element {
   return (
     <BottomSheet onClose={onClose}>
       <div className="px-6 pb-9 pt-1">

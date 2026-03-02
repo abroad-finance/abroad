@@ -58,7 +58,7 @@ export function ConnectWalletChainModal({
   onConnectRequest,
   onSelectChain,
   open,
-}: ConnectWalletChainModalProps): React.JSX.Element | null {
+}: Readonly<ConnectWalletChainModalProps>): React.JSX.Element | null {
   if (!open) return null
 
   const handleSelect = (key: string) => {

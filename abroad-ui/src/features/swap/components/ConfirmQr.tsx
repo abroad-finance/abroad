@@ -17,12 +17,9 @@ export interface ConfirmQrProps {
   onBack: () => void
   onConfirm: () => void
   onEdit: () => void
-  pixKey?: string
   selectedAssetLabel?: string
-  recipentName?: string
   sourceAmount?: string
   targetAmount?: string
-  taxId?: string
 }
 
 const FLAG_URL: Record<string, string> = {

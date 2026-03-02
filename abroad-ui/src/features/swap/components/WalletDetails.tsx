@@ -150,9 +150,7 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({
                   {selectedTransaction
                     ? (
                         <TransactionDetail
-                          formatDate={formatDate}
                           formatDateWithTime={formatDateWithTime}
-                          getStatusStyle={getStatusStyle}
                           getStatusText={getStatusText}
                           onBack={() => setSelectedTransaction(null)}
                           onSupport={() => window.open('https://linktr.ee/Abroad.finance', '_blank', 'noopener,noreferrer')}

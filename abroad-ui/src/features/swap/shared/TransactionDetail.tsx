@@ -10,9 +10,7 @@ import { cn } from '../../../shared/utils'
 import { formatChainLabel } from '../utils/corridorHelpers'
 
 export interface TransactionDetailProps {
-  formatDate?: (dateString: string) => string
   formatDateWithTime: (dateString: string) => string
-  getStatusStyle?: (status: string) => string
   getStatusText: (status: string) => string
   onBack: () => void
   onSupport: () => void
@@ -38,7 +36,7 @@ const TOKEN_ICON_MAP: Record<string, string> = {
   USDT: ASSET_URLS.USDT_TOKEN_ICON,
 }
 
-const TransactionDetail: React.FC<TransactionDetailProps> = ({
+const TransactionDetail: React.FC<Readonly<TransactionDetailProps>> = ({
   formatDateWithTime,
   getStatusText,
   onBack,

@@ -51,7 +51,7 @@ export function AmountInput({
   loading = false,
   id = 'amount-input',
   className,
-}: AmountInputProps): React.JSX.Element {
+}: Readonly<AmountInputProps>): React.JSX.Element {
   const inputRef = useRef<HTMLInputElement>(null)
 
   const handleFocus = useCallback((e: React.FocusEvent<HTMLInputElement>) => {
@@ -61,9 +61,9 @@ export function AmountInput({
 
   const isLocal = inputMode === 'local'
 
-  const sanitizeLocal = (raw: string) => raw.replace(/[^0-9.,]/g, '')
+  const sanitizeLocal = (raw: string) => raw.replaceAll(/[^0-9.,]/g, '')
   const sanitizeUsdc = (raw: string) => {
-    const v = raw.replace(/[^0-9.]/g, '')
+    const v = raw.replaceAll(/[^0-9.]/g, '')
     const parts = v.split('.')
     if (parts.length > 2) return parts[0] + '.' + parts.slice(1).join('')
     return v

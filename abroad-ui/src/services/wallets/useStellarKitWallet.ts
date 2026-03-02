@@ -78,7 +78,7 @@ const isStoredTokenValid = (): boolean => {
   try {
     const [, payload] = token.split('.')
     if (!payload) return false
-    const decoded = JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/')))
+    const decoded = JSON.parse(atob(payload.replaceAll('-', '+').replaceAll('_', '/')))
     return typeof decoded?.exp === 'number' && decoded.exp * 1000 > Date.now()
   }
   catch {
@@ -109,7 +109,7 @@ export function useStellarKitWallet(
     return sessionStore.get()?.address ?? null
   })
 
-  const [walletId, _setWalletId] = useState<null | string>(() => {
+  const [walletId, setWalletIdRaw] = useState<null | string>(() => {
     if (!isStoredTokenValid()) return null
     return sessionStore.get()?.walletId ?? null
   })
@@ -121,8 +121,8 @@ export function useStellarKitWallet(
   // Ensure WalletConnect client (for Stellar WalletConnect flow)
   const ensureWalletConnectClient = useCallback(async () => {
     if (!wcClientRef.current) {
-      if (typeof window === 'undefined') {
-        throw new Error('WalletConnect client is only available in the browser')
+      if (typeof globalThis.window === 'undefined') {
+        throw new TypeError('WalletConnect client is only available in the browser')
       }
       const client = await SignClient.init({
         metadata: wcMetadata,
@@ -135,8 +135,8 @@ export function useStellarKitWallet(
 
   // Ensure WalletConnect modal
   const ensureWalletConnectModal = useCallback(() => {
-    if (typeof window === 'undefined') {
-      throw new Error('WalletConnect modal is only available in the browser')
+    if (typeof globalThis.window === 'undefined') {
+      throw new TypeError('WalletConnect modal is only available in the browser')
     }
     if (!wcModalRef.current) {
       wcModalRef.current = new WalletConnectModal({ projectId: WALLET_CONNECT_ID })
@@ -163,7 +163,7 @@ export function useStellarKitWallet(
     if (id) {
       kit.setWallet(id)
     }
-    _setWalletId(id)
+    setWalletIdRaw(id)
   }, [ensureKit])
 
   // On mount, restore the WalletConnect topic if the session was persisted as a WC wallet
@@ -190,7 +190,7 @@ export function useStellarKitWallet(
       if (!token) {
         sessionStore.clear()
         setAddress(null)
-        _setWalletId(null)
+        setWalletIdRaw(null)
       }
     })
     return unsubscribe
@@ -214,7 +214,7 @@ export function useStellarKitWallet(
           sessionStore.clear()
           walletAuth.setJwtToken(null)
           setAddress(null)
-          _setWalletId(null)
+          setWalletIdRaw(null)
         }
       }
       catch { /* Can't verify — keep the session */ }

@@ -137,15 +137,15 @@ const parseAmountUnits = (amount: string, decimals: number): bigint => {
 const parseTargetAmount = (value: string): number => {
   const raw = value.replace(/[^0-9.,]/g, '')
   if (raw.includes(',')) {
-    return Number.parseFloat(raw.replace(/\./g, '').replace(/,/g, '.'))
+    return Number.parseFloat(raw.replaceAll('.', '').replaceAll(',', '.'))
   }
   const dotCount = (raw.match(/\./g) || []).length
   if (dotCount === 0) return Number.parseFloat(raw) || 0
-  if (dotCount >= 2) return Number.parseFloat(raw.replace(/\./g, ''))
+  if (dotCount >= 2) return Number.parseFloat(raw.replaceAll('.', ''))
   const [, fracPart] = raw.split('.')
   const frac = fracPart ?? ''
   if (frac.length === 3 && /^\d{3}$/.test(frac)) {
-    return Number.parseFloat(raw.replace(/\./g, ''))
+    return Number.parseFloat(raw.replaceAll('.', ''))
   }
   return Number.parseFloat(raw)
 }
@@ -415,17 +415,6 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     if (!selectedCorridor) return t('swap.asset_placeholder', 'Selecciona activo')
     return selectedCorridor.cryptoCurrency
   }, [selectedCorridor, t])
-  const selectedChainLabel = useMemo(() => {
-    if (!selectedCorridor) return t('swap.chain_placeholder', 'Selecciona red')
-    const includeChainId = (chainVariants.get(selectedCorridor.blockchain)?.size ?? 0) > 1
-    return buildChainLabel(selectedCorridor, includeChainId)
-  }, [
-    chainVariants,
-    selectedCorridor,
-    t,
-  ])
-  const sourceSymbol = selectedCorridor?.cryptoCurrency ?? ''
-
   useEffect(() => {
     if (!selectedCorridor) return
     const key = corridorKeyOf(selectedCorridor)
@@ -934,23 +923,6 @@ export const useWebSwapController = (): WebSwapControllerProps => {
   const skipNextAssetClickRef = useRef(false)
   const [assetMenuOpen, setAssetMenuOpen] = useReducer((s: boolean) => !s, false)
 
-  const _toggleAssetMenu = useCallback(() => {
-    if (assetOptions.length <= 1) return
-    if (!assetMenuOpen) {
-      if (currencyMenuOpen) setCurrencyMenuOpen()
-      if (chainMenuOpen) setChainMenuOpen()
-    }
-    setAssetMenuOpen()
-    if (!assetMenuOpen) {
-      skipNextAssetClickRef.current = true
-    }
-  }, [
-    assetMenuOpen,
-    assetOptions.length,
-    chainMenuOpen,
-    currencyMenuOpen,
-  ])
-
   const selectAssetOption = useCallback((key: string) => {
     setAssetMenuOpen()
     setQuoteBelowMinimum(false)
@@ -962,38 +934,6 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     directAbortRef.current?.abort()
     reverseAbortRef.current?.abort()
   }, [availableCorridors])
-
-  const _toggleCurrencyMenu = useCallback(() => {
-    if (!currencyMenuOpen) {
-      if (assetMenuOpen) setAssetMenuOpen()
-      if (chainMenuOpen) setChainMenuOpen()
-    }
-    setCurrencyMenuOpen()
-    if (!currencyMenuOpen) {
-      skipNextDocumentClickRef.current = true
-    }
-  }, [
-    assetMenuOpen,
-    chainMenuOpen,
-    currencyMenuOpen,
-  ])
-
-  const _toggleChainMenu = useCallback(() => {
-    if (chainOptions.length <= 1) return
-    if (!chainMenuOpen) {
-      if (assetMenuOpen) setAssetMenuOpen()
-      if (currencyMenuOpen) setCurrencyMenuOpen()
-    }
-    setChainMenuOpen()
-    if (!chainMenuOpen) {
-      skipNextChainClickRef.current = true
-    }
-  }, [
-    assetMenuOpen,
-    chainMenuOpen,
-    chainOptions.length,
-    currencyMenuOpen,
-  ])
 
   useMenuCloseOnOutsideClick({
     isOpen: assetMenuOpen,
@@ -1534,8 +1474,6 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     isAboveMaximum,
     isAuthenticated,
     isBelowMinimum,
-    loadingSource: state.loadingSource,
-    loadingTarget: state.loadingTarget,
     onOpenSourceModal: () => { /* handled in WebSwap */ },
     onOpenTargetModal: () => { /* handled in WebSwap */ },
     onPrimaryAction,
@@ -1547,16 +1485,9 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     onTargetChange,
     recipientValue: state.targetCurrency === TargetCurrency.BRL ? state.pixKey : state.accountNumber,
     selectedAssetLabel,
-    selectedChainLabel,
     sourceAmount: state.sourceAmount,
-    sourceAmountForBalanceCheck,
-    sourceSymbol,
     targetAmount: state.targetAmount,
     targetCurrency: state.targetCurrency,
-    targetSymbol,
-    toggleAssetMenu: _toggleAssetMenu,
-    toggleChainMenu: _toggleChainMenu,
-    toggleCurrencyMenu: _toggleCurrencyMenu,
     transferFeeDisplay,
     transferFeeIsZero: transferFee === 0,
   }
@@ -1567,12 +1498,9 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     onBack: handleBackToSwap,
     onConfirm: handleConfirmQr,
     onEdit: () => dispatch({ type: 'SET_VIEW', view: 'swap' }),
-    pixKey: state.pixKey,
-    recipentName: state.recipientName,
     selectedAssetLabel,
     sourceAmount: state.sourceAmount,
     targetAmount: state.targetAmount,
-    taxId: state.taxId,
   }
 
   const handleKycApproved = useCallback(() => {
@@ -1580,9 +1508,10 @@ export const useWebSwapController = (): WebSwapControllerProps => {
   }, [])
 
   const txStatusDetails = useMemo(() => {
-    const rail = selectedCorridor
-      ? (selectedCorridor.paymentMethod === 'PIX' ? 'PIX' : 'Bre-B')
-      : ''
+    let rail = ''
+    if (selectedCorridor) {
+      rail = selectedCorridor.paymentMethod === 'PIX' ? 'PIX' : 'Bre-B'
+    }
     return {
       accountNumber: state.accountNumber,
       network: selectedCorridor ? formatChainLabel(selectedCorridor.blockchain) : '',
@@ -1623,6 +1552,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     selectChain,
     selectCurrency,
     selectedChainKey: activeChainKey,
+    sourceAmountForBalanceCheck,
     swapViewProps: swapProps,
     targetAmount: state.targetAmount,
     targetCurrency: state.targetCurrency,

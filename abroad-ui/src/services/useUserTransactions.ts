@@ -78,7 +78,7 @@ function mapTransactionToDetail(tx: TransactionData) {
   return {
     accountNumber: tx.accountNumber,
     chain,
-    country: (country === 'BR' ? 'br' : 'co') as 'br' | 'co',
+    country: country === 'BR' ? ('br' as const) : ('co' as const),
     date: formatFullDate(tx.createdAt),
     fee: '0.01',
     localAmount: tx.quote.targetAmount.toFixed(country === 'BR' ? 2 : 0),

@@ -210,7 +210,7 @@ const TxStatus = ({
   if (status === 'accepted' && txStatusDetails) {
     const merchant = txStatusDetails.accountNumber || '—'
     const amountStr = getAmount(targetCurrency, targetAmount)
-    const amountDisplay = amountStr != null ? `${amountStr} ${targetCurrency}` : `$${targetAmount} ${targetCurrency}`
+    const amountDisplay = amountStr === null ? `$${targetAmount} ${targetCurrency}` : `${amountStr} ${targetCurrency}`
 
     return (
       <div className="flex flex-1 flex-col items-center justify-center w-full max-w-[448px]">

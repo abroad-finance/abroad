@@ -38,7 +38,7 @@ export interface TxDetailSheetProps {
   tx: TxDetailItem | null
 }
 
-export default function TxDetailSheet({ onClose, tx }: TxDetailSheetProps): React.JSX.Element | null {
+export default function TxDetailSheet({ onClose, tx }: Readonly<TxDetailSheetProps>): React.JSX.Element | null {
   const [showTechnical, setShowTechnical] = useState(false)
 
   if (!tx) return null

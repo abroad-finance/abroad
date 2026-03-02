@@ -20,7 +20,7 @@ export function QuickAmounts({
   selectedValue,
   symbol,
   className,
-}: QuickAmountsProps): React.JSX.Element {
+}: Readonly<QuickAmountsProps>): React.JSX.Element {
   return (
     <div className={cn('mt-3.5 flex flex-wrap justify-center gap-1.5', className)}>
       {amounts.map((value) => {

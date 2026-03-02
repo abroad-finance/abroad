@@ -6,12 +6,12 @@ interface SessionData {
   walletId: string
 }
 
-const isBrowser = typeof window !== 'undefined'
+const isBrowser = typeof globalThis.window !== 'undefined'
 
 const readSession = (): SessionData | null => {
   if (!isBrowser) return null
   try {
-    const stored = window.localStorage.getItem(SESSION_KEY)
+    const stored = globalThis.localStorage.getItem(SESSION_KEY)
     if (!stored) return null
     return JSON.parse(stored) as SessionData
   }
@@ -24,10 +24,10 @@ const writeSession = (data: SessionData | null) => {
   if (!isBrowser) return
   try {
     if (data) {
-      window.localStorage.setItem(SESSION_KEY, JSON.stringify(data))
+      globalThis.localStorage.setItem(SESSION_KEY, JSON.stringify(data))
     }
     else {
-      window.localStorage.removeItem(SESSION_KEY)
+      globalThis.localStorage.removeItem(SESSION_KEY)
     }
   }
   catch {

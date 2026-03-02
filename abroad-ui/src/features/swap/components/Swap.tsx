@@ -14,53 +14,30 @@ import { cn } from '../../../shared/utils'
 /* ── Props ── */
 
 export interface SwapProps {
-  assetMenuOpen?: boolean
-  assetMenuRef?: React.RefObject<HTMLDivElement | null>
-  assetOptions?: Array<{ key: string, label: string }>
-  chainMenuOpen?: boolean
-  chainMenuRef?: React.RefObject<HTMLDivElement | null>
-  chainOptions?: Array<{ key: string, label: string }>
   continueDisabled: boolean
-  currencyMenuOpen?: boolean
-  currencyMenuRef?: React.RefObject<HTMLDivElement | null>
   exchangeRateDisplay: string
   hasInsufficientFunds?: boolean
   isAboveMaximum: boolean
   isAuthenticated: boolean
   isBelowMinimum: boolean
   loadingBalance?: boolean
-  loadingSource: boolean
-  loadingTarget: boolean
   onBalanceClick?: () => void
   onBackClick?: () => void
-  onDisconnect?: () => void
   onOpenSourceModal: () => void
   onOpenTargetModal: () => void
   onPrimaryAction: () => void
   onRecipientChange?: (value: string) => void
   onSourceChange: (value: string) => void
   onTargetChange: (value: string) => void
-  openQr?: () => void
   recipientValue?: string
-  selectAssetOption?: (key: string) => void
-  selectChain?: (key: string) => void
   selectCurrency?: (currency: (typeof TargetCurrency)[keyof typeof TargetCurrency]) => void
   selectedAssetLabel: string
-  selectedChainLabel: string
   sourceAmount: string
-  sourceAmountForBalanceCheck?: string
-  sourceSymbol: string
   targetAmount: string
   targetCurrency: (typeof TargetCurrency)[keyof typeof TargetCurrency]
-  targetSymbol: string
-  textColor?: string
-  toggleAssetMenu?: () => void
-  toggleChainMenu?: () => void
-  toggleCurrencyMenu?: () => void
   transferFeeDisplay: string
   transferFeeIsZero?: boolean
   usdcBalance?: string
-  walletAddress?: null | string
 }
 
 export default function Swap({
@@ -284,12 +261,12 @@ export default function Swap({
           onClick={onPrimaryAction}
           type="button"
         >
-          {!isAuthenticated ? (
+          {isAuthenticated ? ctaLabel : (
             <span className="flex items-center gap-2">
               <Wallet className="h-6 w-6" />
               {t('swap.connect_wallet', 'Conectar Billetera')}
             </span>
-          ) : ctaLabel}
+          )}
         </button>
       </div>
     </div>

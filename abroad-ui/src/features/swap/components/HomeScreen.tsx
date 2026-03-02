@@ -103,9 +103,9 @@ export default function HomeScreen({
   selectedChainKey,
   selectedTokenLabel,
   targetCurrency,
-}: HomeScreenProps): React.JSX.Element {
+}: Readonly<HomeScreenProps>): React.JSX.Element {
   const { t } = useTranslate()
-  const balanceNum = Number.parseFloat(balance.replace(/,/g, '')) || 0
+  const balanceNum = Number.parseFloat(balance.replaceAll(',', '')) || 0
 
   // Unauthenticated view – Figma node 5:2 pixel-perfect
   if (!isAuthenticated) {
