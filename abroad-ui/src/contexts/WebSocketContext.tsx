@@ -143,7 +143,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       reconnectionAttempts: 10,
       reconnectionDelay: 500,
       reconnectionDelayMax: 30_000,
-      transports: ['websocket'],
+      transports: ['websocket', 'polling'],
     })
     socketRef.current = socket
 
