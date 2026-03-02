@@ -11,12 +11,19 @@ describe('PayoutSendStepExecutor', () => {
     warn: jest.fn(),
   }
 
-  afterEach(() => {
-    jest.restoreAllMocks()
-    jest.clearAllMocks()
-  })
+  type SetupOptions = {
+    applyTransitionResult?: null | object
+    initialStatus?: TransactionStatus
+    network?: string
+    paymentFailureReason: string
+  }
 
-  it('applies payment_failed transition for async payout send failures', async () => {
+  const setup = ({
+    applyTransitionResult,
+    initialStatus,
+    network = 'stellar',
+    paymentFailureReason,
+  }: SetupOptions) => {
     const prismaClient = {
       transaction: {
         findUnique: jest.fn(async () => ({
@@ -27,23 +34,25 @@ describe('PayoutSendStepExecutor', () => {
           qrCode: null,
           quote: {
             cryptoCurrency: 'USDC',
-            network: 'stellar',
+            network,
             paymentMethod: PaymentMethod.BREB,
             sourceAmount: 20,
             targetAmount: 100,
             targetCurrency: 'COP',
           },
+          status: initialStatus,
         })),
       },
     }
 
-    const applyTransition = jest.fn(async () => ({
+    const defaultTransition = {
       id: 'tx-1',
       onChainId: 'on-chain-1',
       partnerUser: { partner: { webhookUrl: 'https://example.com/webhook' }, userId: 'user-1' },
-      quote: { cryptoCurrency: 'USDC', network: 'stellar', sourceAmount: 20 },
+      quote: { cryptoCurrency: 'USDC', network, sourceAmount: 20 },
       status: TransactionStatus.PAYMENT_FAILED,
-    }))
+    }
+    const applyTransition = jest.fn(async () => (applyTransitionResult === undefined ? defaultTransition : applyTransitionResult))
 
     jest.spyOn(TransactionRepository.prototype, 'getClient').mockResolvedValue(prismaClient as never)
     jest.spyOn(TransactionRepository.prototype, 'recordExternalIdIfMissing').mockResolvedValue(false)
@@ -60,7 +69,7 @@ describe('PayoutSendStepExecutor', () => {
         provider: 'transfero',
         sendPayment: jest.fn(async () => ({
           code: 'validation',
-          reason: 'tax_id_missing',
+          reason: paymentFailureReason,
           success: false,
           transactionId: 'provider-tx-1',
         })),
@@ -79,6 +88,19 @@ describe('PayoutSendStepExecutor', () => {
       {} as never,
       refundCoordinator as never,
     )
+
+    return { applyTransition, executor, notifyPartnerAndUser, notifySlack, prismaClient, refundCoordinator }
+  }
+
+  afterEach(() => {
+    jest.restoreAllMocks()
+    jest.clearAllMocks()
+  })
+
+  it('applies payment_failed transition for async payout send failures', async () => {
+    const { applyTransition, executor, notifyPartnerAndUser, notifySlack, prismaClient, refundCoordinator } = setup({
+      paymentFailureReason: 'tax_id_missing',
+    })
 
     expect(executor.stepType).toBe(FlowStepType.PAYOUT_SEND)
 
@@ -104,63 +126,12 @@ describe('PayoutSendStepExecutor', () => {
   })
 
   it('continues refund flow when retrying PAYMENT_FAILED payout and transition is rejected', async () => {
-    const prismaClient = {
-      transaction: {
-        findUnique: jest.fn(async () => ({
-          accountNumber: 'acct-1',
-          id: 'tx-1',
-          onChainId: 'on-chain-1',
-          partnerUser: { partner: { webhookUrl: 'https://example.com/webhook' }, userId: 'user-1' },
-          qrCode: null,
-          quote: {
-            cryptoCurrency: 'USDC',
-            network: 'SOLANA',
-            paymentMethod: PaymentMethod.BREB,
-            sourceAmount: 20,
-            targetAmount: 100,
-            targetCurrency: 'COP',
-          },
-          status: TransactionStatus.PAYMENT_FAILED,
-        })),
-      },
-    }
-
-    const applyTransition = jest.fn(async () => null)
-
-    jest.spyOn(TransactionRepository.prototype, 'getClient').mockResolvedValue(prismaClient as never)
-    jest.spyOn(TransactionRepository.prototype, 'recordExternalIdIfMissing').mockResolvedValue(false)
-    jest.spyOn(TransactionRepository.prototype, 'persistExternalId').mockResolvedValue(undefined)
-    jest.spyOn(TransactionRepository.prototype, 'applyTransition').mockImplementation(applyTransition as never)
-
-    const notifyPartnerAndUser = jest.spyOn(TransactionEventDispatcher.prototype, 'notifyPartnerAndUser').mockResolvedValue(undefined)
-    const notifySlack = jest.spyOn(TransactionEventDispatcher.prototype, 'notifySlack').mockResolvedValue(undefined)
-
-    const paymentServiceFactory = {
-      getPaymentService: jest.fn(() => ({
-        isAsync: true,
-        isEnabled: true,
-        provider: 'transfero',
-        sendPayment: jest.fn(async () => ({
-          code: 'validation',
-          reason: 'provider_failed',
-          success: false,
-          transactionId: 'provider-tx-1',
-        })),
-      })),
-      getPaymentServiceForCapability: jest.fn(),
-    }
-
-    const refundCoordinator = {
-      refundByOnChainId: jest.fn(async () => ({ success: true, transactionId: 'refund-1' })),
-    }
-
-    const executor = new PayoutSendStepExecutor(
-      { getClient: jest.fn(async () => prismaClient) } as never,
-      paymentServiceFactory as never,
-      baseLogger,
-      {} as never,
-      refundCoordinator as never,
-    )
+    const { applyTransition, executor, notifyPartnerAndUser, notifySlack, prismaClient, refundCoordinator } = setup({
+      applyTransitionResult: null,
+      initialStatus: TransactionStatus.PAYMENT_FAILED,
+      network: 'SOLANA',
+      paymentFailureReason: 'provider_failed',
+    })
 
     const result = await executor.execute({
       config: {},
