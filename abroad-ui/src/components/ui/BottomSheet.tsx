@@ -24,6 +24,7 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
       'transition-[visibility,opacity] duration-[0.4s] ease-[cubic-bezier(0.16,1,0.3,1)]',
     )}
     onClick={onClose}
+    onKeyDown={(e) => { if (e.key === 'Escape') onClose() }}
   >
     <dialog
       open
@@ -35,6 +36,7 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
         className,
       )}
       onClick={e => e.stopPropagation()}
+      onKeyDown={e => e.stopPropagation()}
     >
       <div
         className="mx-auto mt-3 h-1 w-10 shrink-0 rounded-full bg-[var(--ab-border)]"

@@ -25,8 +25,9 @@ export const Overlay: React.FC<OverlayProps> = ({
       className,
     )}
     onClick={onClose}
+    onKeyDown={(e) => { if (e.key === 'Escape') onClose() }}
   >
-    <dialog open className="border-0 p-0 m-0 bg-transparent" onClick={e => e.stopPropagation()}>
+    <dialog open className="border-0 p-0 m-0 bg-transparent" onClick={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()}>
       {children}
     </dialog>
   </div>
