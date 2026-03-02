@@ -49,6 +49,7 @@ export class ReceivedCryptoTransactionUseCase implements IReceivedCryptoTransact
     try {
       const prismaClient = await this.repository.getClient()
       const depositResult = await this.repository.applyDepositReceived(prismaClient, {
+        addressFrom: parsedMessage.addressFrom,
         idempotencyKey: `flow:deposit:${parsedMessage.onChainId}`,
         onChainId: parsedMessage.onChainId,
         transactionId: parsedMessage.transactionId,
