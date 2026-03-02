@@ -23,6 +23,8 @@
   --color-ab-card-border: var(--ab-card-border);
   --color-ab-input: var(--ab-input);
   --color-ab-input-border: var(--ab-input-border);
+  --color-ab-text-secondary: var(--ab-text-secondary);
+  --color-ab-text-muted: var(--ab-text-muted);
   --color-ab-btn: var(--ab-btn);
   --color-ab-btn-hover: var(--ab-btn-hover);
   --color-ab-btn-text: var(--ab-btn-text);
