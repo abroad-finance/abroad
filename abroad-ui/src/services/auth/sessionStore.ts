@@ -6,7 +6,7 @@ interface SessionData {
   walletId: string
 }
 
-const isBrowser = typeof globalThis.window !== 'undefined'
+const isBrowser = globalThis.window !== undefined
 
 const readSession = (): SessionData | null => {
   if (!isBrowser) return null

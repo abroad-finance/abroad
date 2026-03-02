@@ -109,7 +109,7 @@ export function useStellarKitWallet(
     return sessionStore.get()?.address ?? null
   })
 
-  const [walletId, setWalletIdRaw] = useState<null | string>(() => {
+  const [walletId, setWalletId] = useState<null | string>(() => {
     if (!isStoredTokenValid()) return null
     return sessionStore.get()?.walletId ?? null
   })
@@ -121,7 +121,7 @@ export function useStellarKitWallet(
   // Ensure WalletConnect client (for Stellar WalletConnect flow)
   const ensureWalletConnectClient = useCallback(async () => {
     if (!wcClientRef.current) {
-      if (typeof globalThis.window === 'undefined') {
+      if (globalThis.window === undefined) {
         throw new TypeError('WalletConnect client is only available in the browser')
       }
       const client = await SignClient.init({
@@ -135,7 +135,7 @@ export function useStellarKitWallet(
 
   // Ensure WalletConnect modal
   const ensureWalletConnectModal = useCallback(() => {
-    if (typeof globalThis.window === 'undefined') {
+    if (globalThis.window === undefined) {
       throw new TypeError('WalletConnect modal is only available in the browser')
     }
     if (!wcModalRef.current) {
@@ -158,12 +158,12 @@ export function useStellarKitWallet(
     return kitRef.current
   }, [])
 
-  const setWalletId = useCallback((id: null | string) => {
+  const applyWalletId = useCallback((id: null | string) => {
     const kit = ensureKit()
     if (id) {
       kit.setWallet(id)
     }
-    setWalletIdRaw(id)
+    setWalletId(id)
   }, [ensureKit])
 
   // On mount, restore the WalletConnect topic if the session was persisted as a WC wallet
@@ -190,7 +190,7 @@ export function useStellarKitWallet(
       if (!token) {
         sessionStore.clear()
         setAddress(null)
-        setWalletIdRaw(null)
+        setWalletId(null)
       }
     })
     return unsubscribe
@@ -214,7 +214,7 @@ export function useStellarKitWallet(
           sessionStore.clear()
           walletAuth.setJwtToken(null)
           setAddress(null)
-          setWalletIdRaw(null)
+          setWalletId(null)
         }
       }
       catch { /* Can't verify — keep the session */ }
@@ -309,7 +309,7 @@ export function useStellarKitWallet(
         if (authenticatingRef.current) return
         authenticatingRef.current = true
         try {
-          setWalletId(options.id)
+          applyWalletId(options.id)
 
           if (isWalletConnect(options.id)) {
             const address = await resolveWcAddress()
@@ -373,20 +373,20 @@ export function useStellarKitWallet(
     ensureWalletConnectModal,
     onConnectError,
     resolveWcAddress,
-    setWalletId,
+    applyWalletId,
     walletAuth,
   ])
 
   const disconnect = useCallback(async () => {
     const kit = ensureKit()
     await kit.disconnect()
-    setWalletId(null)
+    applyWalletId(null)
     setAddress(null)
     walletAuth.setJwtToken(null)
     sessionStore.clear()
   }, [
     ensureKit,
-    setWalletId,
+    applyWalletId,
     walletAuth,
   ])
 

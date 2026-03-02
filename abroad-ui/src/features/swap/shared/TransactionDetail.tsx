@@ -262,7 +262,7 @@ const TransactionDetail: React.FC<Readonly<TransactionDetailProps>> = ({
   )
 }
 
-function SummaryRow({ label, children }: { label: string, children: React.ReactNode }) {
+function SummaryRow({ label, children }: Readonly<{ label: string, children: React.ReactNode }>) {
   return (
     <div className="flex items-center justify-between py-1">
       <span className="text-sm text-[#64748b]">{label}</span>

@@ -24,10 +24,12 @@ export const Overlay: React.FC<OverlayProps> = ({
       'transition-[visibility,opacity] duration-[0.4s] ease-[cubic-bezier(0.16,1,0.3,1)]',
       className,
     )}
+    role="button"
+    tabIndex={0}
     onClick={onClose}
     onKeyDown={(e) => { if (e.key === 'Escape') onClose() }}
   >
-    <dialog open className="border-0 p-0 m-0 bg-transparent" onClick={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()}>
+    <dialog open role="dialog" className="border-0 p-0 m-0 bg-transparent" onClick={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()}>
       {children}
     </dialog>
   </div>

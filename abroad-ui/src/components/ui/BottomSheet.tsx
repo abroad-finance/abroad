@@ -23,11 +23,14 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
       'bg-black/35 backdrop-blur-[8px]',
       'transition-[visibility,opacity] duration-[0.4s] ease-[cubic-bezier(0.16,1,0.3,1)]',
     )}
+    role="button"
+    tabIndex={0}
     onClick={onClose}
     onKeyDown={(e) => { if (e.key === 'Escape') onClose() }}
   >
     <dialog
       open
+      role="dialog"
       className={cn(
         'w-full max-w-[520px] max-h-[85vh] overflow-y-auto rounded-t-[24px]',
         'bg-[var(--ab-bg-card)] shadow-[0_-12px_40px_rgba(0,0,0,0.08)]',
