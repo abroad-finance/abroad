@@ -3,7 +3,6 @@ import { Loader } from 'lucide-react'
 import React, {
   lazy, Suspense, useCallback, useEffect, useMemo, useState,
 } from 'react'
-import { flushSync } from 'react-dom'
 
 import type { BankDetailsRouteProps } from '../../features/swap/components/BankDetailsRoute'
 import type { ConfirmQrProps } from '../../features/swap/components/ConfirmQr'
@@ -240,7 +239,7 @@ const WebSwap: React.FC = () => {
                 onOpenChainModal={openSourceModal}
                 onOpenQr={openQr}
                 onSelectTransaction={(tx) => {
-                  flushSync(() => walletDetails.setSelectedTransaction(tx))
+                  walletDetails.setSelectedTransaction(tx)
                   handleWalletDetailsOpen()
                 }}
                 recentTransactions={
