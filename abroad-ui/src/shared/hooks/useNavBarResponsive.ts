@@ -191,6 +191,8 @@ export function useNavBarResponsive({
   const labels = useMemo(() => ({
     connectWallet: t('navbar.connect_wallet', 'Conectar Billetera'),
     connectWalletAria: t('navbar.connect_wallet_aria', 'Conectar billetera'),
+    disconnectAria: t('navbar.disconnect_aria', 'Desconectar billetera'),
+    disconnectTitle: t('navbar.disconnect_title', 'Desconectar billetera'),
     infoAriaLabel: t('navbar.info_aria_label', 'Información de Abroad'),
     notConnected: t('navbar.not_connected', 'No conectado'),
     walletDetailsAria: t('navbar.wallet_details_aria', 'Ver detalles de la billetera'),

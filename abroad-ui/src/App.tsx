@@ -6,6 +6,7 @@ import { tolgee } from './contexts/LanguageContext'
 import { NoticeProvider } from './contexts/NoticeContext'
 import { WalletAuthProvider } from './contexts/WalletAuthProvider'
 import { WebSocketProvider } from './contexts/WebSocketContext'
+import { ConnectionStatusBanner } from './shared/components/ConnectionStatusBanner'
 import HiddenLogViewer from './shared/components/HiddenLogViewer'
 
 // Route-level code splitting
@@ -24,6 +25,7 @@ function App() {
       <NoticeProvider>
         <WalletAuthProvider>
           <WebSocketProvider>
+            <ConnectionStatusBanner />
             <Router>
               <Suspense fallback={<div />}>
                 {' '}

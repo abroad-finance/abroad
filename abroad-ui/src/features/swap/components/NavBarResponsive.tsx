@@ -1,11 +1,13 @@
 import {
-  Info, Moon, Sun, User,
+  Info, LogOut, Moon, Sun, User,
 } from 'lucide-react'
 import React, { memo } from 'react'
 
 import AbroadLogoColored from '../../../assets/Logos/AbroadLogoColored.svg'
 import AbroadLogoWhite from '../../../assets/Logos/AbroadLogoWhite.svg'
-import { AB_STYLES, BRAND_TITLE_CLASS } from '../../../shared/constants'
+import type { ChainPillChain } from '../../../components/ui'
+import { ChainPill, CurrencyToggle } from '../../../components/ui'
+import { AB_STYLES, ASSET_URLS, BRAND_TITLE_CLASS } from '../../../shared/constants'
 import { cn } from '../../../shared/utils'
 
 /* ── Props ── */
@@ -15,17 +17,28 @@ export interface NavBarResponsiveProps {
   balance: string
   balanceLoading: boolean
   className?: string
+  /** When set with onOpenChainModal, shows the chain/token pill (e.g. "USDC on Stellar") */
+  selectedChainKey?: string
+  selectedTokenLabel?: string
   infoUrl: string
   isDark?: boolean
   labels: {
     connectWallet: string
     connectWalletAria: string
+    disconnectAria?: string
+    disconnectTitle?: string
+    history?: string
     infoAriaLabel: string
     notConnected: string
     walletDetailsAria: string
   }
   languageSelector?: React.ReactNode
   languageSelectorMobile?: React.ReactNode
+  onDisconnect?: () => Promise<void>
+  onHistoryClick?: () => void
+  onOpenChainModal?: () => void
+  onSelectCurrency?: (currency: 'COP' | 'BRL') => void
+  targetCurrency?: 'COP' | 'BRL'
   onToggleTheme?: () => void
   onWalletClick: () => void
   walletInfo: {
@@ -36,18 +49,41 @@ export interface NavBarResponsiveProps {
 
 const NAV_BUTTON_CLASS = 'p-2 rounded-full transition-colors cursor-pointer'
 
+const CHAIN_PILL_THEME: Record<string, ChainPillChain> = {
+  celo: { icon: '🟢', iconUrl: ASSET_URLS.CELO_CHAIN_ICON, name: 'Celo' },
+  solana: { icon: '🟣', iconUrl: ASSET_URLS.SOLANA_CHAIN_ICON, name: 'Solana' },
+  stellar: { icon: '⚫', iconUrl: ASSET_URLS.STELLAR_CHAIN_ICON, name: 'Stellar' },
+}
+
+function chainPillChainFromKey(chainKey: string): ChainPillChain {
+  const prefix = chainKey.toLowerCase().split(':')[0]
+  return CHAIN_PILL_THEME[prefix] ?? CHAIN_PILL_THEME.stellar
+}
+
 const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({
   address,
+  balance,
+  balanceLoading,
   className = '',
   infoUrl,
   isDark = false,
   labels,
   languageSelector,
   languageSelectorMobile,
+  onDisconnect,
+  onHistoryClick: _onHistoryClick,
+  onOpenChainModal,
+  onSelectCurrency,
   onToggleTheme,
   onWalletClick,
+  selectedChainKey,
+  selectedTokenLabel,
+  targetCurrency,
 }) => {
   const openInfo = () => window.open(infoUrl, '_blank', 'noopener,noreferrer')
+  const isConnected = Boolean(address)
+  const chainPillChain = selectedChainKey ? chainPillChainFromKey(selectedChainKey) : null
+  const showChainPill = isConnected && chainPillChain && selectedTokenLabel && onOpenChainModal
 
   const actionButtons = (
     <>
@@ -61,15 +97,65 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({
           {isDark ? <Sun className="w-4.5 h-4.5" /> : <Moon className="w-4.5 h-4.5" />}
         </button>
       )}
-      {address && (
-        <button
-          aria-label={labels.walletDetailsAria}
-          className={cn(NAV_BUTTON_CLASS, AB_STYLES.badgeBg)}
-          onClick={onWalletClick}
-          type="button"
+      {isConnected && onSelectCurrency && targetCurrency && (
+        <div className="hidden md:block">
+          <CurrencyToggle
+            value={targetCurrency}
+            onChange={onSelectCurrency}
+          />
+        </div>
+      )}
+      {showChainPill && chainPillChain && (
+        <ChainPill
+          chain={chainPillChain}
+          compact
+          onClick={onOpenChainModal}
+          tokenLabel={selectedTokenLabel}
+          className="hidden md:flex"
+        />
+      )}
+      {isConnected && (
+        <div
+          className="flex items-center gap-2 rounded-full border px-[13px] py-[7px]"
+          style={{
+            backgroundColor: 'var(--ab-nav-balance-bg)',
+            borderColor: 'var(--ab-nav-balance-border)',
+          }}
         >
-          <User className={cn('w-4 h-4', AB_STYLES.text)} />
-        </button>
+          <div
+            className="h-2 w-2 shrink-0 rounded-full"
+            style={{ backgroundColor: 'var(--ab-nav-balance-dot)' }}
+          />
+          <span
+            className="text-sm font-bold leading-5"
+            style={{ color: 'var(--ab-nav-balance-text)' }}
+          >
+            {balanceLoading ? '…' : `$${balance}`}
+          </span>
+        </div>
+      )}
+      {address && (
+        <>
+          <button
+            aria-label={labels.walletDetailsAria}
+            className={cn(NAV_BUTTON_CLASS, AB_STYLES.badgeBg)}
+            onClick={onWalletClick}
+            type="button"
+          >
+            <User className={cn('w-4 h-4', AB_STYLES.text)} />
+          </button>
+          {onDisconnect && (
+            <button
+              aria-label={labels.disconnectAria ?? 'Desconectar billetera'}
+              className={cn(NAV_BUTTON_CLASS, AB_STYLES.textSecondary)}
+              onClick={() => { onDisconnect().catch(console.error) }}
+              title={labels.disconnectTitle ?? 'Desconectar billetera'}
+              type="button"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+          )}
+        </>
       )}
       <button
         aria-label={labels.infoAriaLabel}
@@ -83,42 +169,66 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({
   )
 
   return (
-    <nav className={`w-full ${className}`} role="navigation">
-      {/* Mobile: rounded card with padding */}
-      <div className="md:hidden px-4 pt-4">
-        <div className={cn('max-w-8xl mx-auto rounded-2xl backdrop-blur-md', AB_STYLES.hoverBg)}>
-          <div className="px-3 sm:px-6">
-            <div className="flex items-center justify-between h-14">
-              <div className="flex-shrink-0">
-                <img
-                  alt="Abroad"
-                  className="h-7 w-auto"
-                  src={isDark ? AbroadLogoWhite : AbroadLogoColored}
-                />
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="md:hidden">{languageSelectorMobile}</div>
-                {actionButtons}
-              </div>
-            </div>
+    <nav
+      className={cn(
+        'sticky top-0 z-[100] w-full border-b py-4 px-6 backdrop-blur-[6px]',
+        className
+      )}
+      role="navigation"
+      style={{
+        backgroundColor: 'var(--ab-nav-bg)',
+        borderColor: 'var(--ab-nav-border)',
+      }}
+    >
+      {/* Mobile: full width bar - only logo and connect button */}
+      <div className="md:hidden px-4 py-3">
+        <div className="flex items-center justify-between">
+          <div className="flex flex-shrink-0 items-center">
+            <img
+              alt="Abroad"
+              className="h-6 w-auto"
+              src={isDark ? AbroadLogoWhite : AbroadLogoColored}
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="md:hidden">{languageSelectorMobile}</div>
+            {!isConnected && (
+              <button
+                className="rounded-xl bg-abroad-dark px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-abroad-dark-hover"
+                onClick={onWalletClick}
+                type="button"
+              >
+                {labels.connectWallet}
+              </button>
+            )}
+            {actionButtons}
           </div>
         </div>
       </div>
 
-      {/* Desktop: Allbridge-style flat toolbar (64px) */}
-      <div className={cn('hidden md:flex items-center justify-between h-16 px-6 w-full border-b border-ab-separator', AB_STYLES.cardBgOnly)}>
-        <div className="flex items-center gap-8">
+      {/* Desktop: flat toolbar */}
+      <div className={cn('hidden md:flex items-center justify-between h-16 px-6 w-full')}>
+        <div className="flex items-center gap-4">
           <img
             alt="Abroad"
             className="h-7 w-auto flex-shrink-0"
             src={isDark ? AbroadLogoWhite : AbroadLogoColored}
           />
-          <span className={cn('text-sm font-semibold', BRAND_TITLE_CLASS)}>
-            Swap
-          </span>
+          {!isConnected && (
+            <span className={cn('text-sm font-semibold', BRAND_TITLE_CLASS)}>Swap</span>
+          )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           <div>{languageSelector}</div>
+          {!isConnected && (
+            <button
+              className="rounded-xl bg-abroad-dark px-6 py-2.5 text-sm font-bold text-white transition-colors hover:bg-abroad-dark-hover"
+              onClick={onWalletClick}
+              type="button"
+            >
+              {labels.connectWallet}
+            </button>
+          )}
           {actionButtons}
         </div>
       </div>

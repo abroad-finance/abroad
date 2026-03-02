@@ -4,7 +4,6 @@ import {
 } from 'react'
 
 import type { PublicCorridor } from '../../../services/public/types'
-import type { SwapProps } from '../components/Swap'
 import type { SwapView } from '../types'
 
 import { _36EnumsTargetCurrency as TargetCurrency } from '../../../api'
@@ -46,7 +45,7 @@ export const useSwap = ({
   sourceAmount,
   targetAmount,
   targetCurrency,
-}: UseSwapArgs): SwapProps => {
+}: UseSwapArgs) => {
   const textColor = isDesktop ? 'white' : 'var(--color-abroad-dark)'
   const { t } = useTranslate()
   const { addNotice } = useNotices()

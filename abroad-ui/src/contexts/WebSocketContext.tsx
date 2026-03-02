@@ -27,6 +27,9 @@ type TransactionEventPayload = { id?: string, status?: TransactionStatus }
 interface WebSocketApi {
   connected: boolean
   error: null | string
+  manualReconnect: () => void
+  reconnectFailed: boolean
+  reconnecting: boolean
   subscribe: <E extends EventName>(event: E, handler: Listener<E>) => () => void
 }
 
@@ -42,6 +45,9 @@ interface WebSocketEventMap {
 const WebSocketContext = createContext<WebSocketApi>({
   connected: false,
   error: null,
+  manualReconnect: () => { },
+  reconnectFailed: false,
+  reconnecting: false,
   subscribe: () => () => { },
 })
 
@@ -77,6 +83,8 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const listenersRef = useRef<Map<EventName, Set<ListenerEntry<EventName>>>>(new Map())
   const [connected, setConnected] = useState(false)
   const [error, setError] = useState<null | string>(null)
+  const [reconnecting, setReconnecting] = useState(false)
+  const [reconnectFailed, setReconnectFailed] = useState(false)
 
   const attachStoredListeners = useCallback((socket: Socket) => {
     listenersRef.current.forEach((entries, event) => {
@@ -114,76 +122,82 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
   }, [])
 
-  const connectSocket = useCallback(() => {
-    const userId = wallet?.address && wallet?.chainId ? `${wallet.chainId}:${wallet.address}` : null
-    if (!userId) return
+  // Inline socket lifecycle — no intermediate callback in deps to avoid re-creation races
+  useEffect(() => {
+    if (!wallet?.address || !wallet?.chainId) {
+      setConnected(false)
+      setError(null)
+      setReconnecting(false)
+      setReconnectFailed(false)
+      socketRef.current?.disconnect()
+      socketRef.current = null
+      return
+    }
+
+    const userId = `${wallet.chainId}:${wallet.address}`
     const url = resolveWsUrl()
     const socket = io(url, {
       auth: { userId },
       autoConnect: true,
       reconnection: true,
-      reconnectionAttempts: Infinity,
+      reconnectionAttempts: 10,
       reconnectionDelay: 500,
-      reconnectionDelayMax: 5000,
-      transports: ['websocket'],
+      reconnectionDelayMax: 30_000,
+      transports: ['websocket', 'polling'],
     })
     socketRef.current = socket
 
     const handleConnect = () => {
       setConnected(true)
       setError(null)
+      setReconnecting(false)
+      setReconnectFailed(false)
       attachStoredListeners(socket)
     }
-    const handleDisconnect = () => {
-      setConnected(false)
-    }
-    const handleConnectError = (err: Error) => {
-      setError(err.message || 'WS connection error')
-    }
+    const handleDisconnect = () => setConnected(false)
+    const handleConnectError = (err: Error) => setError(err.message || 'WS connection error')
+    const handleReconnectAttempt = () => setReconnecting(true)
+    const handleReconnectFailed = () => { setReconnecting(false); setReconnectFailed(true) }
 
     socket.on('connect', handleConnect)
     socket.on('disconnect', handleDisconnect)
     socket.on('connect_error', handleConnectError)
+    socket.io.on('reconnect_attempt', handleReconnectAttempt)
+    socket.io.on('reconnect_failed', handleReconnectFailed)
+
+    // Attach any listeners registered before the socket was ready
     attachStoredListeners(socket)
 
     return () => {
       socket.off('connect', handleConnect)
       socket.off('disconnect', handleDisconnect)
       socket.off('connect_error', handleConnectError)
+      socket.io.off('reconnect_attempt', handleReconnectAttempt)
+      socket.io.off('reconnect_failed', handleReconnectFailed)
       socket.disconnect()
       socketRef.current = null
     }
-  }, [
-    attachStoredListeners,
-    wallet?.address,
-    wallet?.chainId,
-  ])
+  }, [wallet?.address, wallet?.chainId, attachStoredListeners])
 
-  useEffect(() => {
-    if (!wallet?.address || !wallet?.chainId) {
-      setConnected(false)
-      setError(null)
-      socketRef.current?.disconnect()
-      socketRef.current = null
-      return
-    }
-    const teardown = connectSocket()
-    return () => {
-      teardown?.()
-    }
-  }, [
-    connectSocket,
-    wallet?.address,
-    wallet?.chainId,
-  ])
+  const manualReconnect = useCallback(() => {
+    setReconnectFailed(false)
+    setError(null)
+    socketRef.current?.connect()
+  }, [])
 
   const value = useMemo<WebSocketApi>(() => ({
     connected,
     error,
+    manualReconnect,
+    reconnectFailed,
+    reconnecting,
     subscribe,
   }), [
     connected,
     error,
+    manualReconnect,
+    reconnectFailed,
+    reconnecting,
     subscribe,
   ])
 

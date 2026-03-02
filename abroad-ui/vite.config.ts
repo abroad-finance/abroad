@@ -112,6 +112,8 @@ const config: VitestEnabledConfig = {
   },
   plugins,
   server: {
+    port: 5174,
+    open: true,
     allowedHosts: process.env.VITE_ALLOW_ALL_HOSTS === 'true' ? true : [],
     watch: {
       usePolling: true,

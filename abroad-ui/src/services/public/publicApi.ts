@@ -1,3 +1,4 @@
+import type { TransactionStatus } from '../../api'
 import type { ApiResult } from '../http/types'
 import type {
   AcceptTransactionRequest,
@@ -8,8 +9,18 @@ import type {
   QuoteResponse,
   ReverseQuoteRequest,
 } from './types'
+import type { PaginatedTransactionList } from './transactionTypes'
 
 import { httpClient } from '../http/httpClient'
+
+export type TransactionStatusResponse = {
+  id: string
+  status: TransactionStatus
+  transaction_reference: null | string
+  on_chain_tx_hash: null | string
+  kycLink: null | string
+  user_id: string
+}
 
 const jsonHeaders = { 'Content-Type': 'application/json' }
 
@@ -60,5 +71,29 @@ export const notifyPayment = async (
     body: JSON.stringify(payload),
     headers: jsonHeaders,
     method: 'POST',
+  })
+}
+
+export const getTransactionStatus = async (
+  transactionId: string,
+  options?: { signal?: AbortSignal | null },
+): Promise<ApiResult<TransactionStatusResponse>> => {
+  return httpClient.request<TransactionStatusResponse>(`/transaction/${encodeURIComponent(transactionId)}`, {
+    method: 'GET',
+    signal: options?.signal ?? null,
+  })
+}
+
+export const getUserTransactions = async (
+  options?: { page?: number; pageSize?: number; confirmedOnly?: boolean; signal?: AbortSignal | null },
+): Promise<ApiResult<PaginatedTransactionList>> => {
+  const { page = 1, pageSize = 20, confirmedOnly = false, signal = null } = options ?? {}
+
+  const endpoint = confirmedOnly ? '/transactions/list/confirmed' : '/transactions/list'
+
+  return httpClient.request<PaginatedTransactionList>(endpoint, {
+    method: 'GET',
+    query: { page, pageSize },
+    signal,
   })
 }

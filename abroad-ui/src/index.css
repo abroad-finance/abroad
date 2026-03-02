@@ -4,16 +4,25 @@
 @theme {
   /* ── Brand palette ── */
   --color-abroad-dark: #356E6A;
+  --color-abroad-dark-hover: #2B5B57;
   --color-abroad-mid: #26A17B;
   --color-abroad-light: #73B9A3;
 
-  /* ── Theme-aware tokens: reference --ab-* so dark mode works automatically ── */
+  /* ── UX redesign: green + semantic tokens ── */
+  --color-ab-green: var(--ab-green);
+  --color-ab-green-dark: var(--ab-green-dark);
   --color-ab-bg: var(--ab-bg);
+  --color-ab-text: var(--ab-text);
+  --color-ab-text-2: var(--ab-text-secondary);
+  --color-ab-text-3: var(--ab-text-muted);
+  --color-ab-border: var(--ab-border);
+  --color-ab-red: var(--ab-red);
+
+  /* ── Theme-aware tokens: reference --ab-* so dark mode works automatically ── */
   --color-ab-card: var(--ab-card);
   --color-ab-card-border: var(--ab-card-border);
   --color-ab-input: var(--ab-input);
   --color-ab-input-border: var(--ab-input-border);
-  --color-ab-text: var(--ab-text);
   --color-ab-text-secondary: var(--ab-text-secondary);
   --color-ab-text-muted: var(--ab-text-muted);
   --color-ab-btn: var(--ab-btn);
@@ -47,28 +56,56 @@
 
 /* ── Light mode (default) ── */
 :root {
-  --ab-bg: #e8f5f0;
+  /* UX redesign: brand green + semantic tokens */
+  --ab-green: #0FBE7B;
+  --ab-green-dark: #0AA66B;
+  --ab-green-soft: rgba(15, 190, 123, 0.06);
+  --ab-green-medium: rgba(15, 190, 123, 0.1);
+  --ab-green-border: rgba(15, 190, 123, 0.16);
+  --ab-bg: #FAFCFB;
   --ab-bg-end: #d4ede4;
+  --ab-bg-card: #FFFFFF;
+  --ab-bg-subtle: #F8FAF9;
+  --ab-bg-muted: #F5F7F9;
+  --ab-text: #111827;
+  --ab-text-secondary: #5F6B7A;
+  --ab-text-muted: #9CA3AF;
+  --ab-border: #E8ECF0;
+  --ab-border-hover: #D1D5DB;
+  --ab-red: #EF4444;
+  --ab-amber: #F59E0B;
+  --ab-chain-stellar: #000000;
+  --ab-chain-stellar-bg: #F0F0F0;
+  --ab-chain-celo: #35D07F;
+  --ab-chain-celo-bg: #E8FFF2;
+  --ab-chain-solana: #9945FF;
+  --ab-chain-solana-bg: #F3EDFF;
+  --ab-usdc: #2775CA;
+  --ab-usdt: #26A17B;
+  /* Legacy / layout */
   --ab-card: rgba(255, 255, 255, 0.6);
   --ab-card-border: rgba(53, 110, 106, 0.1);
   --ab-input: #f0f7f5;
   --ab-input-border: rgba(53, 110, 106, 0.08);
-  --ab-text: #1a3a37;
-  --ab-text-secondary: #4a7a75;
-  --ab-text-muted: #7a9e9a;
-  --ab-btn: #5a9a8f;
-  --ab-btn-hover: #4a8a7f;
+  --ab-btn: #0FBE7B;
+  --ab-btn-hover: #0AA66B;
   --ab-btn-text: #ffffff;
   --ab-separator: rgba(53, 110, 106, 0.1);
   --ab-modal-bg: #ffffff;
   --ab-modal-border: rgba(53, 110, 106, 0.08);
   --ab-badge-bg: rgba(255, 255, 255, 0.7);
   --ab-badge-border: rgba(53, 110, 106, 0.12);
-  --ab-hover: rgba(53, 110, 106, 0.06);
-  --ab-selected: rgba(53, 110, 106, 0.1);
-  /* Wallet details panel: clear with very subtle light green tint */
+  --ab-hover: rgba(15, 190, 123, 0.06);
+  --ab-selected: rgba(15, 190, 123, 0.1);
   --ab-wallet-panel-bg: rgba(232, 245, 240, 0.92);
   --ab-wallet-panel-border: rgba(53, 110, 106, 0.14);
+  /* Navbar: align with hero (e8f5f1, abroad teal) */
+  --ab-nav-bg: rgba(232, 245, 241, 0.85);
+  --ab-nav-border: rgba(53, 110, 106, 0.1);
+  --ab-nav-balance-bg: #e8f5f1;
+  --ab-nav-balance-border: rgba(53, 110, 106, 0.12);
+  --ab-nav-balance-dot: #1ec677;
+  --ab-nav-balance-text: #0f513a;
 }
 
 /* ── Dark mode ── */
@@ -94,6 +131,42 @@
   --ab-selected: rgba(90, 154, 143, 0.2);
   --ab-wallet-panel-bg: rgba(26, 58, 52, 0.88);
   --ab-wallet-panel-border: rgba(42, 90, 80, 0.5);
+  --ab-nav-bg: rgba(13, 43, 38, 0.85);
+  --ab-nav-border: rgba(42, 90, 80, 0.5);
+  --ab-nav-balance-bg: rgba(42, 90, 80, 0.4);
+  --ab-nav-balance-border: rgba(42, 90, 80, 0.5);
+  --ab-nav-balance-dot: #5a9a8f;
+  --ab-nav-balance-text: #a0c8c0;
+}
+
+/* ── UX redesign: shared animations ── */
+@keyframes ab-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+@keyframes ab-spin {
+  to { transform: rotate(360deg); }
+}
+@keyframes ab-pop-in {
+  from { transform: scale(0); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+@keyframes ab-scan-line {
+  0%, 100% { top: 24px; opacity: 0.3; }
+  50% { top: 216px; opacity: 1; }
+}
+@keyframes ab-fade-seq {
+  0%, 30% { opacity: 0.3; }
+  40%, 60% { opacity: 1; }
+  70%, 100% { opacity: 0.3; }
+}
+
+/* Hero gradient background */
+.hero-gradient {
+  background: radial-gradient(circle at 50% 0%, rgba(209, 250, 229, 0.8) 0%, rgba(230, 246, 241, 1) 100%);
+}
+.dark .hero-gradient {
+  background: radial-gradient(circle at 50% 0%, rgba(16, 185, 129, 0.1) 0%, var(--ab-bg) 100%);
 }
 
 /* ── Ops admin panel component classes ── */

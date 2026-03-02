@@ -29,6 +29,21 @@ export const buildChainLabel = (corridor: PublicCorridor, includeChainId: boolea
   return chainIdLabel ? `${base} (${chainIdLabel})` : base
 }
 
+/** Derive STELLAR | SOLANA | CELO from chainKey (e.g. stellar:pubkey, solana:xxx, celo:42220, eip155:42220). */
+export const networkFromChainKey = (chainKey: string): string => {
+  const prefix = chainKey.split(':')[0]?.toLowerCase() ?? ''
+  if (prefix === 'stellar') return 'STELLAR'
+  if (prefix === 'solana') return 'SOLANA'
+  if (prefix === 'celo' || prefix === 'eip155') return 'CELO'
+  return 'STELLAR'
+}
+
+/** Check if a transaction's quote.network matches the given chainKey. */
+export const transactionMatchesChain = <T extends { quote: { network: string } }>(
+  tx: T,
+  chainKey: string,
+): boolean => (tx.quote.network?.toUpperCase() ?? '') === networkFromChainKey(chainKey)
+
 /** Sort corridors with Stellar first (used by useSwap and useWebSwapController). */
 export const sortStellarFirst = <T extends { blockchain: string }>(arr: T[]): T[] => (
   [...arr].sort((a, b) => {

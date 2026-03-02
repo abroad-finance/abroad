@@ -227,7 +227,7 @@ describe('useWebSwapController', () => {
       await mocked.fetchPublicCorridorsMock.mock.results[0]?.value
     })
 
-    expect(result.current.swapViewProps.selectedChainLabel).toBe('Stellar')
+    expect(result.current.selectedChainKey).toContain('stellar')
   })
 
   it('does not advance confirm flow without amounts', () => {

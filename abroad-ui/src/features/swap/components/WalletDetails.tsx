@@ -1,8 +1,6 @@
 import { useTranslate } from '@tolgee/react'
 import { motion } from 'framer-motion'
-import {
-  Copy, ExternalLink, RefreshCw, X,
-} from 'lucide-react'
+import { RefreshCw, X } from 'lucide-react'
 import React from 'react'
 
 import { TransactionListItem } from '../../../api'
@@ -38,37 +36,31 @@ export interface WalletDetailsProps {
 
 // Stateless controlled component. All data & handlers provided via props.
 const WalletDetails: React.FC<WalletDetailsProps> = ({
-  address,
-  copiedAddress,
+  address: _address,
+  copiedAddress: _copiedAddress,
   formatDate,
   formatDateWithTime,
   getStatusStyle,
   getStatusText,
   hasMoreTransactions,
-  isLoadingBalance,
+  isLoadingBalance: _isLoadingBalance,
   isLoadingMoreTransactions,
   isLoadingTransactions,
   onClose,
-  onCopyAddress,
-  onDisconnectWallet,
+  onCopyAddress: _onCopyAddress,
+  onDisconnectWallet: _onDisconnectWallet,
   onLoadMoreTransactions,
-  onRefreshBalance,
+  onRefreshBalance: _onRefreshBalance,
   onRefreshTransactions,
-  selectedAssetLabel,
+  selectedAssetLabel: _selectedAssetLabel,
   selectedTransaction,
   setSelectedTransaction,
   transactionError,
   transactions,
-  usdcBalance,
-  usdtBalance,
+  usdcBalance: _usdcBalance,
+  usdtBalance: _usdtBalance,
 }) => {
   const { t } = useTranslate()
-  const sourceBalance = selectedAssetLabel === 'USDT' ? usdtBalance : usdcBalance
-
-  const formatWalletAddress = (addr: null | string) => {
-    if (!addr) return t('wallet_details.not_connected', 'No conectado')
-    return `${addr.slice(0, 6)}...${addr.slice(-4)}`
-  }
 
   return (
     <motion.div
@@ -109,102 +101,28 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({
           </button>
         )}
 
-        {/* Header */}
-        <div className="mb-6 pr-8 text-center mt-2 md:mt-4">
-          <h2 className={cn('text-2xl font-semibold mb-2', AB_STYLES.text)}>
-            {t('wallet_details.header.title', 'Tu Cuenta')}
-          </h2>
-          <p className={cn('text-md', AB_STYLES.textMuted)}>
-            {t('wallet_details.header.subtitle', 'Gestiona tu billetera y consulta el historial de transacciones')}
-          </p>
-        </div>
-
-        {/* Wallet Address & Balance Card - glass */}
-        <div className={cn('rounded-2xl p-6 py-8 mb-6 backdrop-blur-md', AB_STYLES.badgeBg)}>
-          <div className="flex items-center justify-between mb-4">
-            <span className={cn('font-mono text-sm break-all', AB_STYLES.text)}>{formatWalletAddress(address)}</span>
-            <div className="flex space-x-2">
-              <button
-                className={cn('p-1.5 rounded-lg transition-colors duration-200', AB_STYLES.hoverBg)}
-                onClick={onDisconnectWallet}
-                title={t('wallet_details.actions.disconnect', 'Desconectar billetera')}
-                type="button"
-              >
-                <svg className={cn('w-4 h-4', AB_STYLES.textMuted)} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} />
-                </svg>
-              </button>
-              <button
-                className={cn('p-1.5 rounded-lg transition-colors duration-200', AB_STYLES.hoverBg)}
-                onClick={onCopyAddress}
-                title={t('wallet_details.actions.copy_address', 'Copiar dirección')}
-                type="button"
-              >
-                <Copy className={cn('w-4 h-4', AB_STYLES.text)} />
-              </button>
-              <button
-                className={cn('p-1.5 rounded-lg transition-colors duration-200', AB_STYLES.hoverBg)}
-                onClick={() => window.open(`https://stellar.expert/explorer/public/account/${address}`, '_blank')}
-                title={t('wallet_details.actions.view_explorer', 'Ver en explorador')}
-                type="button"
-              >
-                <ExternalLink className={cn('w-4 h-4', AB_STYLES.text)} />
-              </button>
-            </div>
-          </div>
-          {copiedAddress && (
-            <div className={cn('text-xs mb-4', AB_STYLES.btnColor)}>{t('wallet_details.toast.copied', '¡Dirección copiada!')}</div>
-          )}
-
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <img
-                alt="USDC"
-                className="w-5 h-5"
-                src="https://storage.googleapis.com/cdn-abroad/Icons/Tokens/USDC%20Token.svg"
-              />
-              {isLoadingBalance
-                ? (
-                    <div className={cn('h-9 w-32 rounded-lg animate-pulse', AB_STYLES.separatorBg)} />
-                  )
-                : (
-                    <span className={cn('font-bold text-4xl', AB_STYLES.text)}>
-                      $
-                      {sourceBalance}
-                    </span>
-                  )}
-            </div>
-            <button
-              className={cn('p-2 rounded-full transition-colors duration-200 disabled:opacity-50', AB_STYLES.hoverBg)}
-              disabled={isLoadingBalance}
-              onClick={onRefreshBalance}
-              title={t('wallet_details.actions.refresh_balance', 'Actualizar balance')}
-              type="button"
-            >
-              <RefreshCw className={cn(`w-4 h-4 ${isLoadingBalance ? 'animate-spin' : ''}`, AB_STYLES.text)} />
-            </button>
-          </div>
-        </div>
-
         {/* Transaction History */}
-        <div className="flex-1">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className={cn('font-medium text-lg', AB_STYLES.text)}>{t('wallet_details.transactions.title', 'Historial de Transacciones')}</h3>
-            <button
-              className={cn('p-2 rounded-full transition-colors duration-200 disabled:opacity-50', AB_STYLES.hoverBg)}
-              disabled={isLoadingTransactions}
-              onClick={onRefreshTransactions}
-              title={t('wallet_details.actions.refresh_transactions', 'Actualizar transacciones')}
-              type="button"
-            >
-              <RefreshCw className={cn(`w-4 h-4 ${isLoadingTransactions ? 'animate-spin' : ''}`, AB_STYLES.text)} />
-            </button>
-          </div>
-
-          {transactionError && (
-            <div className={cn('rounded-xl p-4 mb-4', AB_STYLES.hoverBorder)}>
-              <p className={cn('text-sm', AB_STYLES.text)}>{transactionError}</p>
-            </div>
+        <div className="flex-1 pt-4 md:pt-6">
+          {!selectedTransaction && (
+            <>
+              <div className="flex items-center justify-between mb-4 pr-8">
+                <h3 className={cn('font-medium text-lg', AB_STYLES.text)}>{t('wallet_details.transactions.title', 'Historial de Transacciones')}</h3>
+                <button
+                  className={cn('p-2 rounded-full transition-colors duration-200 disabled:opacity-50', AB_STYLES.hoverBg)}
+                  disabled={isLoadingTransactions}
+                  onClick={onRefreshTransactions}
+                  title={t('wallet_details.actions.refresh_transactions', 'Actualizar transacciones')}
+                  type="button"
+                >
+                  <RefreshCw className={cn(`w-4 h-4 ${isLoadingTransactions ? 'animate-spin' : ''}`, AB_STYLES.text)} />
+                </button>
+              </div>
+              {transactionError && (
+                <div className={cn('rounded-xl p-4 mb-4', AB_STYLES.hoverBorder)}>
+                  <p className={cn('text-sm', AB_STYLES.text)}>{transactionError}</p>
+                </div>
+              )}
+            </>
           )}
 
           {isLoadingTransactions
@@ -232,9 +150,7 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({
                   {selectedTransaction
                     ? (
                         <TransactionDetail
-                          formatDate={formatDate}
                           formatDateWithTime={formatDateWithTime}
-                          getStatusStyle={getStatusStyle}
                           getStatusText={getStatusText}
                           onBack={() => setSelectedTransaction(null)}
                           onSupport={() => window.open('https://linktr.ee/Abroad.finance', '_blank', 'noopener,noreferrer')}
