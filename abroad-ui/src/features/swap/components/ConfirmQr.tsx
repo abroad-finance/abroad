@@ -12,14 +12,22 @@ const TOKEN_ICON: Record<string, string> = {
 }
 
 export interface ConfirmQrProps {
+  /** Recipient account / Bre-B ID (COP) */
+  accountNumber?: string
   currency: TargetCurrency
   loadingSubmit?: boolean
   onBack: () => void
   onConfirm: () => void
   onEdit: () => void
+  /** PIX key (BRL) */
+  pixKey?: string
+  /** Recipient name from QR, if available */
+  recipientName?: string
   selectedAssetLabel?: string
   sourceAmount?: string
   targetAmount?: string
+  /** CPF/CNPJ (BRL) */
+  taxId?: string
 }
 
 const FLAG_URL: Record<string, string> = {
@@ -28,14 +36,18 @@ const FLAG_URL: Record<string, string> = {
 }
 
 const ConfirmQr: React.FC<ConfirmQrProps> = ({
+  accountNumber,
   currency,
   loadingSubmit,
   onBack,
   onConfirm,
   onEdit,
+  pixKey,
+  recipientName,
   selectedAssetLabel = 'USDC',
   sourceAmount,
   targetAmount,
+  taxId,
 }) => {
   const { t } = useTranslate()
   const isBRL = currency === TargetCurrency.BRL
@@ -104,6 +116,44 @@ const ConfirmQr: React.FC<ConfirmQrProps> = ({
               {sourceAmount || '—'}
             </span>
           </div>
+        </div>
+
+        {/* Transaction details — recipient info for verification */}
+        <div className="flex flex-col gap-3 rounded-2xl border border-ab-border bg-ab-bg-muted/50 px-4 py-4">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-ab-text-3">
+            {t('confirm_qr.details_title', 'Detalles del destinatario')}
+          </h3>
+          {isBRL ? (
+            <div className="flex flex-col gap-2 text-sm">
+              {recipientName && (
+                <div className="flex justify-between gap-3">
+                  <span className="text-ab-text-3">{t('confirm_qr.recipient_name', 'Nombre')}</span>
+                  <span className="font-medium text-ab-text break-all text-right">{recipientName}</span>
+                </div>
+              )}
+              <div className="flex justify-between gap-3">
+                <span className="text-ab-text-3 shrink-0">{t('confirm_qr.pix_key', 'Llave PIX')}</span>
+                <span className="font-medium text-ab-text break-all font-mono text-right">{pixKey || '—'}</span>
+              </div>
+              <div className="flex justify-between gap-3">
+                <span className="text-ab-text-3 shrink-0">{t('confirm_qr.cpf_cnpj', 'CPF/CNPJ')}</span>
+                <span className="font-medium text-ab-text break-all font-mono text-right">{taxId || '—'}</span>
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-2 text-sm">
+              {recipientName && (
+                <div className="flex justify-between gap-3">
+                  <span className="text-ab-text-3">{t('confirm_qr.recipient_name', 'Nombre')}</span>
+                  <span className="font-medium text-ab-text break-all text-right">{recipientName}</span>
+                </div>
+              )}
+              <div className="flex justify-between gap-3">
+                <span className="text-ab-text-3 shrink-0">{t('confirm_qr.account_breb', 'Cuenta / Bre-B')}</span>
+                <span className="font-medium text-ab-text break-all font-mono text-right">{accountNumber || '—'}</span>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Disclaimer */}

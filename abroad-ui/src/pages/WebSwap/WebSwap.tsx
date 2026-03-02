@@ -124,10 +124,16 @@ const WebSwap: React.FC = () => {
   const [showConnectChainModal, setShowConnectChainModal] = useState(false)
   const handleConnectWalletClick = useCallback(() => setShowConnectChainModal(true), [])
 
-  // Components controllers
-  const navBar = useNavBarResponsive({ onWalletConnect: handleConnectWalletClick, onWalletDetails: handleWalletDetailsOpen })
-  const languageSelector = useLanguageSelector()
   const walletDetails = useWalletDetails({ onClose: handleWalletDetailsClose })
+
+  // Opens wallet panel and resets to list view (not TransactionDetail)
+  const handleOpenWalletList = useCallback(() => {
+    walletDetails.setSelectedTransaction(null)
+    handleWalletDetailsOpen()
+  }, [handleWalletDetailsOpen, walletDetails.setSelectedTransaction])
+
+  const navBar = useNavBarResponsive({ onWalletConnect: handleConnectWalletClick, onWalletDetails: handleOpenWalletList })
+  const languageSelector = useLanguageSelector()
   const { t } = useTranslate()
 
   const sourceAssetBalance = swapViewProps.selectedAssetLabel === 'USDT'
@@ -209,7 +215,7 @@ const WebSwap: React.FC = () => {
             <LanguageSelector {...languageSelector} variant="mobile" />
           }
           onDisconnect={walletDetails.onDisconnectWallet}
-          onHistoryClick={handleWalletDetailsOpen}
+          onHistoryClick={handleOpenWalletList}
           onOpenChainModal={openSourceModal}
           onSelectCurrency={selectCurrency}
           selectedChainKey={selectedChainKey}
@@ -237,7 +243,7 @@ const WebSwap: React.FC = () => {
                 onConnectWallet={handleConnectWalletClick}
                 onGoToManual={goToManual}
                 onSelectCurrency={selectCurrency}
-                onHistoryClick={handleWalletDetailsOpen}
+                onHistoryClick={handleOpenWalletList}
                 onOpenChainModal={openSourceModal}
                 onOpenQr={openQr}
                 onSelectTransaction={(tx) => {

@@ -28,6 +28,7 @@ export interface SwapProps {
   onPrimaryAction: () => void
   onRecipientChange?: (value: string) => void
   onSourceChange: (value: string) => void
+  onTaxIdChange?: (value: string) => void
   onTargetChange: (value: string) => void
   recipientValue?: string
   selectCurrency?: (currency: (typeof TargetCurrency)[keyof typeof TargetCurrency]) => void
@@ -35,6 +36,7 @@ export interface SwapProps {
   sourceAmount: string
   targetAmount: string
   targetCurrency: (typeof TargetCurrency)[keyof typeof TargetCurrency]
+  taxId?: string
   transferFeeDisplay: string
   transferFeeIsZero?: boolean
   usdcBalance?: string
@@ -55,6 +57,7 @@ export default function Swap({
   onPrimaryAction,
   onRecipientChange,
   onSourceChange: _onSourceChange,
+  onTaxIdChange,
   onTargetChange,
   recipientValue = '',
   selectCurrency,
@@ -62,6 +65,7 @@ export default function Swap({
   sourceAmount,
   targetAmount,
   targetCurrency,
+  taxId = '',
   transferFeeDisplay,
   transferFeeIsZero = false,
   usdcBalance,
@@ -214,6 +218,26 @@ export default function Swap({
             type="text"
             value={recipientValue}
           />
+          {targetCurrency === TargetCurrency.BRL && onTaxIdChange && (
+            <div className="relative mt-3">
+              <label
+                className="absolute left-1 top-0 -translate-y-1/2 text-xs font-bold uppercase tracking-[0.6px] text-[#6b7280]"
+                htmlFor="swap-cpf"
+              >
+                {t('bank_details.cpf_placeholder', 'CPF')}
+              </label>
+              <input
+                className="w-full rounded-2xl border border-[#e5e7eb] bg-[#f9fafb] px-4 py-[19px] text-base text-[#111827] placeholder:text-[#9ca3af] focus:border-[#10b981] focus:outline-none focus:ring-1 focus:ring-[#10b981]"
+                id="swap-cpf"
+                inputMode="numeric"
+                onChange={e => onTaxIdChange(e.target.value.replace(/[^\d]/g, ''))}
+                pattern="[0-9]*"
+                placeholder={t('bank_details.cpf_placeholder', 'CPF')}
+                type="text"
+                value={taxId}
+              />
+            </div>
+          )}
           <span className="mt-2 block pl-1 font-medium text-xs text-ab-text-3">
             {targetCurrency === TargetCurrency.BRL
               ? t('bank_details.pix_disclaimer', 'Tu transacción será procesada de inmediato. Asegúrate de que la llave PIX y el CPF del destinatario sean correctos. Esta transacción no se puede reversar.')

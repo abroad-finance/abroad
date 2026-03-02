@@ -622,13 +622,24 @@ export const useWebSwapController = (): WebSwapControllerProps => {
 
   const continueDisabled = useMemo(() => {
     if (!isAuthenticated) return false
-    return isPrimaryDisabled() || !state.quoteId || isBelowMinimum || isAboveMaximum
+    const baseDisabled = isPrimaryDisabled() || !state.quoteId || isBelowMinimum || isAboveMaximum
+    if (state.targetCurrency === TargetCurrency.BRL) {
+      return baseDisabled || !state.pixKey?.trim() || !state.taxId?.trim()
+    }
+    if (state.targetCurrency === TargetCurrency.COP) {
+      return baseDisabled || state.accountNumber.trim().length < 6
+    }
+    return baseDisabled
   }, [
     isAboveMaximum,
     isAuthenticated,
     isBelowMinimum,
     isPrimaryDisabled,
+    state.accountNumber,
+    state.pixKey,
     state.quoteId,
+    state.targetCurrency,
+    state.taxId,
   ])
 
   const sourceAmountForBalanceCheck = useMemo(() => {
@@ -1419,8 +1430,8 @@ export const useWebSwapController = (): WebSwapControllerProps => {
       return
     }
     if (state.targetCurrency === TargetCurrency.BRL && (!state.taxId || !state.pixKey)) {
-      notifyError(t('confirm_qr.missing_data', 'Faltan datos para completar la transacci?n.'))
-      dispatch({ type: 'SET_VIEW', view: 'bankDetails' })
+      notifyError(t('confirm_qr.missing_data', 'Faltan datos para completar la transacción.'))
+      dispatch({ type: 'SET_VIEW', view: 'swap' })
       return
     }
     void handleTransactionFlow()
@@ -1477,6 +1488,9 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     onOpenSourceModal: () => { /* handled in WebSwap */ },
     onOpenTargetModal: () => { /* handled in WebSwap */ },
     onPrimaryAction,
+    onTaxIdChange: state.targetCurrency === TargetCurrency.BRL
+      ? (v) => dispatch({ taxId: v.replace(/[^\d]/g, ''), type: 'SET_BANK_DETAILS' })
+      : undefined,
     selectCurrency,
     onRecipientChange: state.targetCurrency === TargetCurrency.BRL
       ? (v) => dispatch({ pixKey: v, type: 'SET_BANK_DETAILS' })
@@ -1488,19 +1502,24 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     sourceAmount: state.sourceAmount,
     targetAmount: state.targetAmount,
     targetCurrency: state.targetCurrency,
+    taxId: state.taxId,
     transferFeeDisplay,
     transferFeeIsZero: transferFee === 0,
   }
 
   const confirmQrProps: ConfirmQrProps = {
+    accountNumber: state.accountNumber,
     currency: state.targetCurrency,
     loadingSubmit: state.loadingSubmit,
     onBack: handleBackToSwap,
     onConfirm: handleConfirmQr,
     onEdit: () => dispatch({ type: 'SET_VIEW', view: 'swap' }),
+    pixKey: state.pixKey,
+    recipientName: state.recipientName,
     selectedAssetLabel,
     sourceAmount: state.sourceAmount,
     targetAmount: state.targetAmount,
+    taxId: state.taxId,
   }
 
   const handleKycApproved = useCallback(() => {
