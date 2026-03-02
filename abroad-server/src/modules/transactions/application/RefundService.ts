@@ -27,10 +27,19 @@ export class RefundService {
     cryptoCurrency: Parameters<RefundService['refundToSender']>[0]['cryptoCurrency']
     network: Parameters<IWalletHandlerFactory['getWalletHandler']>[0]
     onChainId: string
+    sourceAddress?: string
   }): Promise<RefundResult> {
-    const { amount, cryptoCurrency, network, onChainId } = params
+    const { amount, cryptoCurrency, network, onChainId, sourceAddress } = params
     const walletHandler = this.walletHandlerFactory.getWalletHandlerForCapability?.({ blockchain: network })
       ?? this.walletHandlerFactory.getWalletHandler(network)
+
+    if (network === BlockchainNetwork.SOLANA) {
+      if (!sourceAddress) {
+        throw new Error('Unable to refund Solana transaction: missing source address (addressFrom) in transaction context')
+      }
+      return walletHandler.send({ address: sourceAddress, amount, cryptoCurrency })
+    }
+
     const address = await walletHandler.getAddressFromTransaction({ onChainId })
     return walletHandler.send({ address, amount, cryptoCurrency })
   }
