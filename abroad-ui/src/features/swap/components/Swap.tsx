@@ -30,6 +30,8 @@ export interface SwapProps {
   onSourceChange: (value: string) => void
   onTaxIdChange?: (value: string) => void
   onTargetChange: (value: string) => void
+  fromQr?: boolean
+  recipientName?: string
   recipientValue?: string
   selectCurrency?: (currency: (typeof TargetCurrency)[keyof typeof TargetCurrency]) => void
   selectedAssetLabel: string
@@ -59,6 +61,8 @@ export default function Swap({
   onSourceChange: _onSourceChange,
   onTaxIdChange,
   onTargetChange,
+  fromQr = false,
+  recipientName,
   recipientValue = '',
   selectCurrency,
   selectedAssetLabel,
@@ -203,47 +207,76 @@ export default function Swap({
       {/* ── Send to + Fee + Speed + CTA ── */}
       <div className="flex flex-col gap-4 p-6">
         {/* Send to */}
-        <div className="relative">
-          <label
-            className="absolute left-1 top-0 -translate-y-1/2 text-xs font-bold uppercase tracking-[0.6px] text-[#6b7280]"
-            htmlFor="swap-send-to"
-          >
-            {t('swap.send_to', 'Send to')}
-          </label>
-          <input
-            className="w-full rounded-2xl border border-[#e5e7eb] bg-[#f9fafb] px-4 py-[19px] text-base text-[#111827] placeholder:text-[#9ca3af] focus:border-[#10b981] focus:outline-none focus:ring-1 focus:ring-[#10b981]"
-            id="swap-send-to"
-            onChange={e => onRecipientChange?.(e.target.value)}
-            placeholder={sendToPlaceholder}
-            type="text"
-            value={recipientValue}
-          />
-          {targetCurrency === TargetCurrency.BRL && onTaxIdChange && (
-            <div className="relative mt-3">
-              <label
-                className="absolute left-1 top-0 -translate-y-1/2 text-xs font-bold uppercase tracking-[0.6px] text-[#6b7280]"
-                htmlFor="swap-cpf"
-              >
-                {t('bank_details.cpf_placeholder', 'CPF')}
-              </label>
-              <input
-                className="w-full rounded-2xl border border-[#e5e7eb] bg-[#f9fafb] px-4 py-[19px] text-base text-[#111827] placeholder:text-[#9ca3af] focus:border-[#10b981] focus:outline-none focus:ring-1 focus:ring-[#10b981]"
-                id="swap-cpf"
-                inputMode="numeric"
-                onChange={e => onTaxIdChange(e.target.value.replace(/[^\d]/g, ''))}
-                pattern="[0-9]*"
-                placeholder={t('bank_details.cpf_placeholder', 'CPF')}
-                type="text"
-                value={taxId}
-              />
+        {fromQr ? (
+          <div className="relative">
+            <label className="absolute left-1 top-0 -translate-y-1/2 text-xs font-bold uppercase tracking-[0.6px] text-[#6b7280]">
+              {t('swap.send_to', 'Send to')}
+            </label>
+            <div className="flex flex-col gap-2 rounded-2xl border border-[#e5e7eb] bg-[#f9fafb] px-4 py-[19px]">
+              {recipientName && (
+                <div className="flex items-center justify-between gap-3">
+                  <span className="shrink-0 text-sm text-ab-text-3">{t('swap.recipient_name_label', 'Nombre')}</span>
+                  <span className="break-all text-right text-sm font-semibold text-ab-text">{recipientName}</span>
+                </div>
+              )}
+              <div className="flex items-center justify-between gap-3">
+                <span className="shrink-0 text-sm text-ab-text-3">
+                  {targetCurrency === TargetCurrency.BRL
+                    ? t('swap.pix_key_label', 'Clave PIX')
+                    : t('swap.breb_key_label', 'Clave Bre-B')}
+                </span>
+                <span className="break-all text-right font-mono text-sm font-medium text-ab-text">{recipientValue}</span>
+              </div>
             </div>
-          )}
-          <span className="mt-2 block pl-1 font-medium text-xs text-ab-text-3">
-            {targetCurrency === TargetCurrency.BRL
-              ? t('bank_details.pix_disclaimer', 'Tu transacción será procesada de inmediato. Asegúrate de que la llave PIX y el CPF del destinatario sean correctos. Esta transacción no se puede reversar.')
-              : t('bank_details.breb_disclaimer', 'Tu transacción será procesada de inmediato a través de BRE-B. Ingresa la llave correcta del destinatario y asegurate que la tenga inscrita. No es necesario seleccionar banco.')}
-          </span>
-        </div>
+            <span className="mt-2 block pl-1 font-medium text-xs text-ab-text-3">
+              {targetCurrency === TargetCurrency.BRL
+                ? t('bank_details.pix_disclaimer', 'Tu transacción será procesada de inmediato. Asegúrate de que la llave PIX y el CPF del destinatario sean correctos. Esta transacción no se puede reversar.')
+                : t('bank_details.breb_disclaimer', 'Tu transacción será procesada de inmediato a través de BRE-B. Ingresa la llave correcta del destinatario y asegurate que la tenga inscrita. No es necesario seleccionar banco.')}
+            </span>
+          </div>
+        ) : (
+          <div className="relative">
+            <label
+              className="absolute left-1 top-0 -translate-y-1/2 text-xs font-bold uppercase tracking-[0.6px] text-[#6b7280]"
+              htmlFor="swap-send-to"
+            >
+              {t('swap.send_to', 'Send to')}
+            </label>
+            <input
+              className="w-full rounded-2xl border border-[#e5e7eb] bg-[#f9fafb] px-4 py-[19px] text-base text-[#111827] placeholder:text-[#9ca3af] focus:border-[#10b981] focus:outline-none focus:ring-1 focus:ring-[#10b981]"
+              id="swap-send-to"
+              onChange={e => onRecipientChange?.(e.target.value)}
+              placeholder={sendToPlaceholder}
+              type="text"
+              value={recipientValue}
+            />
+            {targetCurrency === TargetCurrency.BRL && onTaxIdChange && (
+              <div className="relative mt-3">
+                <label
+                  className="absolute left-1 top-0 -translate-y-1/2 text-xs font-bold uppercase tracking-[0.6px] text-[#6b7280]"
+                  htmlFor="swap-cpf"
+                >
+                  {t('bank_details.cpf_placeholder', 'CPF')}
+                </label>
+                <input
+                  className="w-full rounded-2xl border border-[#e5e7eb] bg-[#f9fafb] px-4 py-[19px] text-base text-[#111827] placeholder:text-[#9ca3af] focus:border-[#10b981] focus:outline-none focus:ring-1 focus:ring-[#10b981]"
+                  id="swap-cpf"
+                  inputMode="numeric"
+                  onChange={e => onTaxIdChange(e.target.value.replace(/[^\d]/g, ''))}
+                  pattern="[0-9]*"
+                  placeholder={t('bank_details.cpf_placeholder', 'CPF')}
+                  type="text"
+                  value={taxId}
+                />
+              </div>
+            )}
+            <span className="mt-2 block pl-1 font-medium text-xs text-ab-text-3">
+              {targetCurrency === TargetCurrency.BRL
+                ? t('bank_details.pix_disclaimer', 'Tu transacción será procesada de inmediato. Asegúrate de que la llave PIX y el CPF del destinatario sean correctos. Esta transacción no se puede reversar.')
+                : t('bank_details.breb_disclaimer', 'Tu transacción será procesada de inmediato a través de BRE-B. Ingresa la llave correcta del destinatario y asegurate que la tenga inscrita. No es necesario seleccionar banco.')}
+            </span>
+          </div>
+        )}
 
         {/* Fee + Speed */}
         <div className="flex flex-col gap-2 rounded-2xl border border-[#f3f4f6] bg-[#f9fafb] p-4">

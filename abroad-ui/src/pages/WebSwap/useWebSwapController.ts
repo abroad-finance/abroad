@@ -41,6 +41,7 @@ import {
   type decodeQrCodeBRResponse,
   _36EnumsTargetCurrency as TargetCurrency,
 } from '../../api'
+import { parseEMVQR } from '../../lib/qr/emv-parser'
 import { useNotices } from '../../contexts/NoticeContext'
 import { BRL_BACKGROUND_IMAGE } from '../../features/swap/constants'
 import { SwapView } from '../../features/swap/types'
@@ -800,10 +801,10 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     t,
   ])
 
-  const quoteFromTarget = useCallback(async (value: string) => {
+  const quoteFromTarget = useCallback(async (value: string): Promise<boolean> => {
     if (!selectedCorridor) {
       notifyError(t('swap.corridor_error', 'No corridor available for this currency.'))
-      return
+      return false
     }
     lastEditedRef.current = 'target'
     reverseAbortRef.current?.abort()
@@ -820,7 +821,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
         quoteId: '', sourceAmount: '', targetAmount: value, type: 'SET_AMOUNTS',
       })
       dispatch({ loadingSource: false, type: 'SET_LOADING' })
-      return
+      return false
     }
 
     // Skip API call if below minimum ��� inline validation handles the UI
@@ -831,7 +832,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
         quoteId: '', sourceAmount: '', targetAmount: value, type: 'SET_AMOUNTS',
       })
       dispatch({ loadingSource: false, type: 'SET_LOADING' })
-      return
+      return false
     }
 
     dispatch({ loadingSource: true, type: 'SET_LOADING' })
@@ -847,7 +848,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
       { signal: controller.signal },
     )
 
-    if (controller.signal.aborted || reqId !== reverseReqIdRef.current || lastEditedRef.current !== 'target') return
+    if (controller.signal.aborted || reqId !== reverseReqIdRef.current || lastEditedRef.current !== 'target') return false
 
     if (!response.ok) {
       if (!isAbortError(response)) {
@@ -866,7 +867,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
         }
       }
       dispatch({ loadingSource: false, type: 'SET_LOADING' })
-      return
+      return false
     }
 
     setQuoteBelowMinimum(false)
@@ -880,6 +881,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
       type: 'SET_AMOUNTS',
     })
     dispatch({ loadingSource: false, type: 'SET_LOADING' })
+    return true
   }, [
     formatCryptoAmount,
     notifyError,
@@ -919,7 +921,6 @@ export const useWebSwapController = (): WebSwapControllerProps => {
       return
     }
     dispatch({ isQrOpen: true, type: 'SET_QR_OPEN' })
-    dispatch({ targetCurrency: TargetCurrency.BRL, type: 'SET_TARGET_CURRENCY' })
   }, [connectWallet, isAuthenticated])
 
   const currencyMenuRef = useRef<HTMLDivElement | null>(null)
@@ -1060,51 +1061,97 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     dispatch({ isQrOpen: false, type: 'SET_QR_OPEN' })
     dispatch({ isDecodingQr: true, type: 'SET_DECODING' })
     dispatch({ qrCode: text, type: 'SET_QR_CODE' })
-    decodeAbortRef.current?.abort()
-    const controller = new AbortController()
-    decodeAbortRef.current = controller
+
     try {
-      const response = await decodeQrCodeBR({ qrCode: text }, { signal: controller.signal }) as DecodeQrApiResponse
-      if (controller.signal.aborted) return
-      if (!response.ok) {
-        if (!isAbortError(response)) {
-          const reason = extractReason(response.data) || response.error?.message || t('swap.qr_decode_error', 'No pudimos decodificar este QR.')
-          notifyError(reason, response.error?.message)
+      if (state.targetCurrency === TargetCurrency.COP) {
+        // ── BRE-B: parseo client-side ──────────────────────────────────────
+        const parsed = parseEMVQR(text)
+
+        if (!parsed.keyInfo?.value) {
+          notifyError(t('swap.qr_decode_error', 'No pudimos decodificar este QR.'))
+          return
         }
-        return
+
+        if (parsed.currency && parsed.currency !== '170') {
+          notifyError(t('swap.qr_wrong_currency', 'Este QR es para otra moneda.'))
+          return
+        }
+
+        dispatch({ accountNumber: parsed.keyInfo.value, type: 'SET_BANK_DETAILS' })
+        if (parsed.merchantName) {
+          dispatch({ recipientName: parsed.merchantName, type: 'SET_BANK_DETAILS' })
+        }
+
+        if (parsed.amount && Number.isFinite(parsed.amount) && parsed.amount > 0) {
+          const amountStr = String(parsed.amount)
+          const minAmount = selectedCorridor?.minAmount ?? 0
+          if (minAmount && parsed.amount < minAmount) {
+            notifyError(
+              t('swap.qr_below_minimum', `El monto del QR (${parsed.amount} COP) es inferior al mínimo requerido (${minAmount} COP).`)
+            )
+            return
+          }
+          const quoted = await quoteFromTarget(amountStr)
+          if (!quoted) return
+          dispatch({ type: 'SET_VIEW', view: 'confirm-qr' })
+          return
+        }
+
+        notifyError(t('swap.qr_missing_amount', 'Este QR no incluye un monto. Ingresa el monto para continuar.'))
+        dispatch({ type: 'SET_VIEW', view: 'swap' })
       }
-      const decoded = response.data && 'decoded' in response.data ? response.data.decoded : null
-      if (!decoded) {
-        notifyError(t('swap.qr_decode_error', 'No pudimos decodificar este QR.'))
-        return
+      else {
+        // ── PIX/BRL: lógica existente ──────────────────────────────────────
+        decodeAbortRef.current?.abort()
+        const controller = new AbortController()
+        decodeAbortRef.current = controller
+        try {
+          const response = await decodeQrCodeBR({ qrCode: text }, { signal: controller.signal }) as DecodeQrApiResponse
+          if (controller.signal.aborted) return
+          if (!response.ok) {
+            if (!isAbortError(response)) {
+              const reason = extractReason(response.data) || response.error?.message || t('swap.qr_decode_error', 'No pudimos decodificar este QR.')
+              notifyError(reason, response.error?.message)
+            }
+            return
+          }
+          const decoded = response.data && 'decoded' in response.data ? response.data.decoded : null
+          if (!decoded) {
+            notifyError(t('swap.qr_decode_error', 'No pudimos decodificar este QR.'))
+            return
+          }
+
+          const amountRaw = decoded.amount
+          const amountText = typeof amountRaw === 'string' ? amountRaw : null
+          const normalizedAmount = amountText?.replace(',', '.').trim() ?? ''
+          const parsedAmount = normalizedAmount ? Number.parseFloat(normalizedAmount) : Number.NaN
+          const pixKey = decoded?.account
+          const taxIdDecoded = decoded?.taxId
+          const name = decoded?.name
+
+          if (name) dispatch({ recipientName: name, type: 'SET_BANK_DETAILS' })
+          if (pixKey) dispatch({ pixKey, type: 'SET_BANK_DETAILS' })
+          if (taxIdDecoded && !taxIdDecoded.includes('*')) dispatch({ taxId: taxIdDecoded, type: 'SET_BANK_DETAILS' })
+
+          if (Number.isFinite(parsedAmount) && parsedAmount > 0) {
+            const quoted = await quoteFromTarget(normalizedAmount)
+            if (!quoted) return
+            dispatch({ type: 'SET_VIEW', view: 'confirm-qr' })
+            return
+          }
+
+          notifyError(t('swap.qr_missing_amount', 'Este QR no incluye un monto. Ingresa el monto para continuar.'))
+          dispatch({ type: 'SET_VIEW', view: 'swap' })
+        }
+        catch (e) {
+          if (!decodeAbortRef.current?.signal.aborted) {
+            notifyError(t('swap.qr_decode_error', 'No pudimos decodificar este QR.'), e instanceof Error ? e.message : undefined)
+          }
+        }
       }
-
-      const amountRaw = decoded.amount
-      const amountText = typeof amountRaw === 'string' ? amountRaw : null
-      const normalizedAmount = amountText?.replace(',', '.').trim() ?? ''
-      const parsedAmount = normalizedAmount ? Number.parseFloat(normalizedAmount) : Number.NaN
-      const pixKey = decoded?.account
-      const taxIdDecoded = decoded?.taxId
-      const name = decoded?.name
-
-      if (name) dispatch({ recipientName: name, type: 'SET_BANK_DETAILS' })
-      if (pixKey) dispatch({ pixKey, type: 'SET_BANK_DETAILS' })
-      if (taxIdDecoded && !taxIdDecoded.includes('*')) dispatch({ taxId: taxIdDecoded, type: 'SET_BANK_DETAILS' })
-
-      if (Number.isFinite(parsedAmount) && parsedAmount > 0) {
-        dispatch({ targetAmount: normalizedAmount, type: 'SET_AMOUNTS' })
-        await quoteFromTarget(normalizedAmount)
-        dispatch({ type: 'SET_VIEW', view: 'confirm-qr' })
-        return
-      }
-
-      notifyError(t('swap.qr_missing_amount', 'Este QR no incluye un monto. Ingresa el monto para continuar.'))
-      dispatch({ type: 'SET_VIEW', view: 'swap' })
     }
     catch (e) {
-      if (!controller.signal.aborted) {
-        notifyError(t('swap.qr_decode_error', 'No pudimos decodificar este QR.'), e instanceof Error ? e.message : undefined)
-      }
+      notifyError(t('swap.qr_decode_error', 'No pudimos decodificar este QR.'), e instanceof Error ? e.message : undefined)
     }
     finally {
       dispatch({ isDecodingQr: false, type: 'SET_DECODING' })
@@ -1112,6 +1159,8 @@ export const useWebSwapController = (): WebSwapControllerProps => {
   }, [
     notifyError,
     quoteFromTarget,
+    selectedCorridor,
+    state.targetCurrency,
     t,
   ])
 
@@ -1504,6 +1553,8 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     targetCurrency: state.targetCurrency,
     taxId: state.taxId,
     transferFeeDisplay,
+    fromQr: !!state.qrCode,
+    recipientName: state.recipientName,
     transferFeeIsZero: transferFee === 0,
   }
 
