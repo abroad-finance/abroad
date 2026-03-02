@@ -148,7 +148,7 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({
             <button
               aria-label={labels.disconnectAria ?? 'Desconectar billetera'}
               className={cn(NAV_BUTTON_CLASS, AB_STYLES.textSecondary)}
-              onClick={() => void onDisconnect()}
+              onClick={() => { onDisconnect().catch(console.error) }}
               title={labels.disconnectTitle ?? 'Desconectar billetera'}
               type="button"
             >

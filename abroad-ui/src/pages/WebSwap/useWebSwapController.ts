@@ -490,7 +490,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
             walletConnect: selectedCorridor.walletConnect,
           }
         : undefined
-      void nextWallet.connect(options)
+      nextWallet.connect(options).catch(err => console.error('[wallet] connect failed:', err))
     }
   }, [
     defaultWallet,

@@ -260,6 +260,46 @@ export function useStellarKitWallet(
     [address, ensureKit, walletId, ensureWalletConnectClient],
   )
 
+  // Resolves the Stellar address for a WalletConnect session.
+  // Restores an existing session from localStorage, or runs the full connect flow (QR modal).
+  const resolveWcAddress = useCallback(async (): Promise<string> => {
+    const client = await ensureWalletConnectClient()
+    const storeKey = `wc:session:${STELLAR_CHAIN_ID}`
+
+    // Attempt to restore an existing session from localStorage
+    const stored = localStorage.getItem(storeKey)
+    if (stored) {
+      try {
+        const { topic } = JSON.parse(stored)
+        const session = client.session.get(topic)
+        if (session) wcTopicRef.current = topic
+      }
+      catch { /* ignore invalid stored session */ }
+    }
+
+    // Start a new connection flow only when no valid session was restored
+    if (!wcTopicRef.current) {
+      const { approval, uri } = await client.connect({
+        requiredNamespaces: {
+          stellar: { chains: [STELLAR_CHAIN_ID], events: [], methods: ['stellar_signXDR'] },
+        },
+      })
+      if (!uri) throw new Error('No WalletConnect URI')
+      const modal = ensureWalletConnectModal()
+      await modal.openModal({ chains: [STELLAR_CHAIN_ID], uri })
+      const session = await approval()
+      wcTopicRef.current = session.topic
+      await modal.closeModal()
+      localStorage.setItem(storeKey, JSON.stringify({ topic: session.topic }))
+    }
+
+    const session = client.session.get(wcTopicRef.current as string)
+    const caip10 = session?.namespaces?.stellar?.accounts?.[0]
+    const address = caip10 ? caip10ToAddress(caip10) : null
+    if (!address) throw new Error('Failed to get wallet address from WalletConnect')
+    return address
+  }, [ensureWalletConnectClient, ensureWalletConnectModal])
+
   const connect = useCallback(async () => {
     const kit = ensureKit()
 
@@ -271,83 +311,18 @@ export function useStellarKitWallet(
         try {
           setWalletId(options.id)
 
-          let address: string | null = null
-
           if (isWalletConnect(options.id)) {
-            // For WalletConnect in Stellar Kit, the kit.getAddress() doesn't work because
-            // the session isn't established when onWalletSelected fires. We use the full
-            // WalletConnect flow (like useWalletConnectWallet) to connect properly.
-            const client = await ensureWalletConnectClient()
-            const stellarChainId = STELLAR_CHAIN_ID
-
-            // Try to restore existing session
-            const storeKey = `wc:session:${stellarChainId}`
-            let restored = false
-            if (typeof window !== 'undefined') {
-              const stored = localStorage.getItem(storeKey)
-              if (stored) {
-                try {
-                  const { topic } = JSON.parse(stored)
-                  const session = client.session.get(topic)
-                  if (session) {
-                    wcTopicRef.current = topic
-                    restored = true
-                  }
-                }
-                catch {
-                  // Invalid stored session
-                }
-              }
-            }
-
-            if (!restored) {
-              // Start new connection flow
-              const { approval, uri } = await client.connect({
-                requiredNamespaces: {
-                  stellar: {
-                    chains: [stellarChainId],
-                    events: [],
-                    methods: ['stellar_signXDR'],
-                  },
-                },
-              })
-
-              if (!uri) throw new Error('No WalletConnect URI')
-
-              const modal = ensureWalletConnectModal()
-              await modal.openModal({ chains: [stellarChainId], uri })
-
-              const session = await approval()
-              wcTopicRef.current = session.topic
-              await modal.closeModal()
-
-              // Store session for future use
-              if (typeof window !== 'undefined') {
-                localStorage.setItem(storeKey, JSON.stringify({ topic: session.topic }))
-              }
-            }
-
-            // Get address from session
-            const session = client.session.get(wcTopicRef.current as string)
-            const ns = session?.namespaces?.stellar
-            const caip10 = ns?.accounts?.[0]
-            address = caip10 ? caip10ToAddress(caip10) : null
-
-            if (!address) throw new Error('Failed to get wallet address from WalletConnect')
-
+            const address = await resolveWcAddress()
             setAddress(address)
             await walletAuth.authenticate({
               address,
               chainId: STELLAR_CHAIN_ID,
               signMessage: async (challenge: string) => {
-                // For Stellar via WalletConnect, we need to use the signClient directly
+                const client = await ensureWalletConnectClient()
                 const result = await client.request({
-                  chainId: stellarChainId,
+                  chainId: STELLAR_CHAIN_ID,
                   topic: wcTopicRef.current as string,
-                  request: {
-                    method: 'stellar_signXDR',
-                    params: { network: 'PUBLIC', xdr: challenge },
-                  },
+                  request: { method: 'stellar_signXDR', params: { network: 'PUBLIC', xdr: challenge } },
                 })
                 return (result as { signedXDR: string }).signedXDR
               },
@@ -357,9 +332,9 @@ export function useStellarKitWallet(
           }
 
           const result = await kit.getAddress()
-          address = result?.address ?? null
-          setAddress(address)
+          const address = result?.address ?? null
           if (!address) throw new Error('Failed to get wallet address')
+          setAddress(address)
           await walletAuth.authenticate({
             address,
             chainId: STELLAR_CHAIN_ID,
@@ -380,9 +355,8 @@ export function useStellarKitWallet(
           walletAuth.setJwtToken(null)
           sessionStore.clear()
           if (onConnectError) {
-            const isWalletConnectAccounts = /accounts/i.test(message)
             onConnectError(
-              isWalletConnectAccounts
+              /accounts/i.test(message)
                 ? WALLETCONNECT_ACCOUNTS_ERROR
                 : message || 'Failed to connect wallet. Please try again.',
             )
@@ -398,6 +372,7 @@ export function useStellarKitWallet(
     ensureWalletConnectClient,
     ensureWalletConnectModal,
     onConnectError,
+    resolveWcAddress,
     setWalletId,
     walletAuth,
   ])
