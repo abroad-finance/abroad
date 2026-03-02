@@ -57,7 +57,7 @@ const WebSwapLayout: React.FC<WebSwapLayoutProps & WebSwapLayoutSlots> = ({ slot
     <div
       className={cn(
         'w-full min-h-0 flex-1 flex flex-col items-center overflow-x-hidden overflow-y-auto px-4 py-6 md:px-4 md:py-8',
-        isMainFlow ? 'hero-gradient justify-start' : 'justify-center'
+        isMainFlow ? 'hero-gradient justify-start' : 'justify-center',
       )}
     >
       <div className={cn('w-full', isMainFlow ? 'max-w-[576px]' : 'max-w-md')}>

@@ -5,7 +5,12 @@ import { useWalletAuth } from '../hooks/useWalletAuth'
 import { cn } from '../utils'
 
 export function ConnectionStatusBanner() {
-  const { connected, reconnecting, reconnectFailed, manualReconnect } = useWebSocket()
+  const {
+    connected,
+    manualReconnect,
+    reconnectFailed,
+    reconnecting,
+  } = useWebSocket()
   const { wallet, walletAuthentication } = useWalletAuth()
   const isAuthenticated = Boolean(walletAuthentication?.jwtToken && wallet?.address && wallet?.chainId)
 
@@ -32,8 +37,8 @@ export function ConnectionStatusBanner() {
               {reconnectFailed && (
                 <button
                   className="text-sm text-ab-green hover:underline ml-1 whitespace-nowrap"
-                  type="button"
                   onClick={manualReconnect}
+                  type="button"
                 >
                   Reintentar
                 </button>

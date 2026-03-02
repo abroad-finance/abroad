@@ -16,21 +16,21 @@ import { cn } from '../../../shared/utils'
 export interface SwapProps {
   continueDisabled: boolean
   exchangeRateDisplay: string
+  fromQr?: boolean
   hasInsufficientFunds?: boolean
   isAboveMaximum: boolean
   isAuthenticated: boolean
   isBelowMinimum: boolean
   loadingBalance?: boolean
-  onBalanceClick?: () => void
   onBackClick?: () => void
+  onBalanceClick?: () => void
   onOpenSourceModal: () => void
   onOpenTargetModal: () => void
   onPrimaryAction: () => void
   onRecipientChange?: (value: string) => void
   onSourceChange: (value: string) => void
-  onTaxIdChange?: (value: string) => void
   onTargetChange: (value: string) => void
-  fromQr?: boolean
+  onTaxIdChange?: (value: string) => void
   recipientName?: string
   recipientValue?: string
   selectCurrency?: (currency: (typeof TargetCurrency)[keyof typeof TargetCurrency]) => void
@@ -47,21 +47,21 @@ export interface SwapProps {
 export default function Swap({
   continueDisabled,
   exchangeRateDisplay,
+  fromQr = false,
   hasInsufficientFunds = false,
   isAboveMaximum,
   isAuthenticated,
   isBelowMinimum,
   loadingBalance,
-  onBalanceClick,
   onBackClick,
+  onBalanceClick,
   onOpenSourceModal: _onOpenSourceModal,
   onOpenTargetModal: _onOpenTargetModal,
   onPrimaryAction,
   onRecipientChange,
   onSourceChange: _onSourceChange,
-  onTaxIdChange,
   onTargetChange,
-  fromQr = false,
+  onTaxIdChange,
   recipientName,
   recipientValue = '',
   selectCurrency,
@@ -129,8 +129,8 @@ export default function Swap({
         </div>
         {selectCurrency && (
           <CurrencyToggle
+            onChange={c => selectCurrency(c)}
             value={targetCurrency}
-            onChange={(c) => selectCurrency(c)}
           />
         )}
       </div>
@@ -140,19 +140,22 @@ export default function Swap({
         <div className="flex items-center gap-2">
           <div className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#10b981]" />
           <span className="text-xs font-medium leading-4 text-[#15803d]">
-            Live: {exchangeRateDisplay}
+            Live:
+            {' '}
+            {exchangeRateDisplay}
           </span>
         </div>
         {isAuthenticated && usdcBalance !== undefined && onBalanceClick && (
           <button
             className={cn(
               'text-xs font-medium transition-colors hover:text-[#10b981]',
-              hasInsufficientFunds ? 'text-ab-error' : 'text-[#15803d]'
+              hasInsufficientFunds ? 'text-ab-error' : 'text-[#15803d]',
             )}
             onClick={onBalanceClick}
             type="button"
           >
-            {t('swap.available_balance', 'Balance disponible:')}{' '}
+            {t('swap.available_balance', 'Balance disponible:')}
+            {' '}
             <span className="font-bold">
               {loadingBalance ? '...' : `${usdcBalance} ${selectedAssetLabel}`}
             </span>
@@ -168,15 +171,15 @@ export default function Swap({
               autoFocus
               className={cn(
                 'bg-transparent text-center text-[48px] font-black leading-[48px] tracking-[-2.4px] outline-none caret-[#10b981] placeholder:text-[#e5e7eb]',
-                (isBelowMinimum || isAboveMaximum || hasInsufficientFunds) ? 'text-ab-error' : 'text-[#111827]'
+                (isBelowMinimum || isAboveMaximum || hasInsufficientFunds) ? 'text-ab-error' : 'text-[#111827]',
               )}
               inputMode="decimal"
               onChange={e => onTargetChange(e.target.value)}
               onFocus={handleFocus}
               placeholder="0"
               style={{
-                width: `${Math.max(4, (targetAmount || '0').length + 2)}ch`,
                 minWidth: '80px',
+                width: `${Math.max(4, (targetAmount || '0').length + 2)}ch`,
               }}
               type="text"
               value={targetAmount}
@@ -187,7 +190,11 @@ export default function Swap({
           </div>
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium text-[#6b7280]">
-              $ {sourceAmount || '0.00'} {selectedAssetLabel}
+              $
+              {' '}
+              {sourceAmount || '0.00'}
+              {' '}
+              {selectedAssetLabel}
             </span>
           </div>
         </div>
@@ -207,76 +214,78 @@ export default function Swap({
       {/* ── Send to + Fee + Speed + CTA ── */}
       <div className="flex flex-col gap-4 p-6">
         {/* Send to */}
-        {fromQr ? (
-          <div className="relative">
-            <label className="absolute left-1 top-0 -translate-y-1/2 text-xs font-bold uppercase tracking-[0.6px] text-[#6b7280]">
-              {t('swap.send_to', 'Send to')}
-            </label>
-            <div className="flex flex-col gap-2 rounded-2xl border border-[#e5e7eb] bg-[#f9fafb] px-4 py-[19px]">
-              {recipientName && (
-                <div className="flex items-center justify-between gap-3">
-                  <span className="shrink-0 text-sm text-ab-text-3">{t('swap.recipient_name_label', 'Nombre')}</span>
-                  <span className="break-all text-right text-sm font-semibold text-ab-text">{recipientName}</span>
+        {fromQr
+          ? (
+              <div className="relative">
+                <label className="absolute left-1 top-0 -translate-y-1/2 text-xs font-bold uppercase tracking-[0.6px] text-[#6b7280]">
+                  {t('swap.send_to', 'Send to')}
+                </label>
+                <div className="flex flex-col gap-2 rounded-2xl border border-[#e5e7eb] bg-[#f9fafb] px-4 py-[19px]">
+                  {recipientName && (
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="shrink-0 text-sm text-ab-text-3">{t('swap.recipient_name_label', 'Nombre')}</span>
+                      <span className="break-all text-right text-sm font-semibold text-ab-text">{recipientName}</span>
+                    </div>
+                  )}
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="shrink-0 text-sm text-ab-text-3">
+                      {targetCurrency === TargetCurrency.BRL
+                        ? t('swap.pix_key_label', 'Clave PIX')
+                        : t('swap.breb_key_label', 'Clave Bre-B')}
+                    </span>
+                    <span className="break-all text-right font-mono text-sm font-medium text-ab-text">{recipientValue}</span>
+                  </div>
                 </div>
-              )}
-              <div className="flex items-center justify-between gap-3">
-                <span className="shrink-0 text-sm text-ab-text-3">
+                <span className="mt-2 block pl-1 font-medium text-xs text-ab-text-3">
                   {targetCurrency === TargetCurrency.BRL
-                    ? t('swap.pix_key_label', 'Clave PIX')
-                    : t('swap.breb_key_label', 'Clave Bre-B')}
+                    ? t('bank_details.pix_disclaimer', 'Tu transacción será procesada de inmediato. Asegúrate de que la llave PIX y el CPF del destinatario sean correctos. Esta transacción no se puede reversar.')
+                    : t('bank_details.breb_disclaimer', 'Tu transacción será procesada de inmediato a través de BRE-B. Ingresa la llave correcta del destinatario y asegurate que la tenga inscrita. No es necesario seleccionar banco.')}
                 </span>
-                <span className="break-all text-right font-mono text-sm font-medium text-ab-text">{recipientValue}</span>
               </div>
-            </div>
-            <span className="mt-2 block pl-1 font-medium text-xs text-ab-text-3">
-              {targetCurrency === TargetCurrency.BRL
-                ? t('bank_details.pix_disclaimer', 'Tu transacción será procesada de inmediato. Asegúrate de que la llave PIX y el CPF del destinatario sean correctos. Esta transacción no se puede reversar.')
-                : t('bank_details.breb_disclaimer', 'Tu transacción será procesada de inmediato a través de BRE-B. Ingresa la llave correcta del destinatario y asegurate que la tenga inscrita. No es necesario seleccionar banco.')}
-            </span>
-          </div>
-        ) : (
-          <div className="relative">
-            <label
-              className="absolute left-1 top-0 -translate-y-1/2 text-xs font-bold uppercase tracking-[0.6px] text-[#6b7280]"
-              htmlFor="swap-send-to"
-            >
-              {t('swap.send_to', 'Send to')}
-            </label>
-            <input
-              className="w-full rounded-2xl border border-[#e5e7eb] bg-[#f9fafb] px-4 py-[19px] text-base text-[#111827] placeholder:text-[#9ca3af] focus:border-[#10b981] focus:outline-none focus:ring-1 focus:ring-[#10b981]"
-              id="swap-send-to"
-              onChange={e => onRecipientChange?.(e.target.value)}
-              placeholder={sendToPlaceholder}
-              type="text"
-              value={recipientValue}
-            />
-            {targetCurrency === TargetCurrency.BRL && onTaxIdChange && (
-              <div className="relative mt-3">
+            )
+          : (
+              <div className="relative">
                 <label
                   className="absolute left-1 top-0 -translate-y-1/2 text-xs font-bold uppercase tracking-[0.6px] text-[#6b7280]"
-                  htmlFor="swap-cpf"
+                  htmlFor="swap-send-to"
                 >
-                  {t('bank_details.cpf_placeholder', 'CPF')}
+                  {t('swap.send_to', 'Send to')}
                 </label>
                 <input
                   className="w-full rounded-2xl border border-[#e5e7eb] bg-[#f9fafb] px-4 py-[19px] text-base text-[#111827] placeholder:text-[#9ca3af] focus:border-[#10b981] focus:outline-none focus:ring-1 focus:ring-[#10b981]"
-                  id="swap-cpf"
-                  inputMode="numeric"
-                  onChange={e => onTaxIdChange(e.target.value.replace(/[^\d]/g, ''))}
-                  pattern="[0-9]*"
-                  placeholder={t('bank_details.cpf_placeholder', 'CPF')}
+                  id="swap-send-to"
+                  onChange={e => onRecipientChange?.(e.target.value)}
+                  placeholder={sendToPlaceholder}
                   type="text"
-                  value={taxId}
+                  value={recipientValue}
                 />
+                {targetCurrency === TargetCurrency.BRL && onTaxIdChange && (
+                  <div className="relative mt-3">
+                    <label
+                      className="absolute left-1 top-0 -translate-y-1/2 text-xs font-bold uppercase tracking-[0.6px] text-[#6b7280]"
+                      htmlFor="swap-cpf"
+                    >
+                      {t('bank_details.cpf_placeholder', 'CPF')}
+                    </label>
+                    <input
+                      className="w-full rounded-2xl border border-[#e5e7eb] bg-[#f9fafb] px-4 py-[19px] text-base text-[#111827] placeholder:text-[#9ca3af] focus:border-[#10b981] focus:outline-none focus:ring-1 focus:ring-[#10b981]"
+                      id="swap-cpf"
+                      inputMode="numeric"
+                      onChange={e => onTaxIdChange(e.target.value.replace(/[^\d]/g, ''))}
+                      pattern="[0-9]*"
+                      placeholder={t('bank_details.cpf_placeholder', 'CPF')}
+                      type="text"
+                      value={taxId}
+                    />
+                  </div>
+                )}
+                <span className="mt-2 block pl-1 font-medium text-xs text-ab-text-3">
+                  {targetCurrency === TargetCurrency.BRL
+                    ? t('bank_details.pix_disclaimer', 'Tu transacción será procesada de inmediato. Asegúrate de que la llave PIX y el CPF del destinatario sean correctos. Esta transacción no se puede reversar.')
+                    : t('bank_details.breb_disclaimer', 'Tu transacción será procesada de inmediato a través de BRE-B. Ingresa la llave correcta del destinatario y asegurate que la tenga inscrita. No es necesario seleccionar banco.')}
+                </span>
               </div>
             )}
-            <span className="mt-2 block pl-1 font-medium text-xs text-ab-text-3">
-              {targetCurrency === TargetCurrency.BRL
-                ? t('bank_details.pix_disclaimer', 'Tu transacción será procesada de inmediato. Asegúrate de que la llave PIX y el CPF del destinatario sean correctos. Esta transacción no se puede reversar.')
-                : t('bank_details.breb_disclaimer', 'Tu transacción será procesada de inmediato a través de BRE-B. Ingresa la llave correcta del destinatario y asegurate que la tenga inscrita. No es necesario seleccionar banco.')}
-            </span>
-          </div>
-        )}
 
         {/* Fee + Speed */}
         <div className="flex flex-col gap-2 rounded-2xl border border-[#f3f4f6] bg-[#f9fafb] p-4">
@@ -312,18 +321,20 @@ export default function Swap({
             'flex w-full items-center justify-center rounded-2xl py-4 text-lg font-bold transition-all active:scale-[0.98]',
             continueDisabled || hasInsufficientFunds
               ? 'cursor-not-allowed bg-[#e5e7eb] text-[#9ca3af]'
-              : 'bg-[#059669] text-[#f0fdf4] hover:bg-[#047857]'
+              : 'bg-[#059669] text-[#f0fdf4] hover:bg-[#047857]',
           )}
           disabled={continueDisabled || hasInsufficientFunds}
           onClick={onPrimaryAction}
           type="button"
         >
-          {isAuthenticated ? ctaLabel : (
-            <span className="flex items-center gap-2">
-              <Wallet className="h-6 w-6" />
-              {t('swap.connect_wallet', 'Conectar Billetera')}
-            </span>
-          )}
+          {isAuthenticated
+            ? ctaLabel
+            : (
+                <span className="flex items-center gap-2">
+                  <Wallet className="h-6 w-6" />
+                  {t('swap.connect_wallet', 'Conectar Billetera')}
+                </span>
+              )}
         </button>
       </div>
     </div>

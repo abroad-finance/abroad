@@ -1,53 +1,56 @@
-import type { KeyInfo, MerchantAccount, NetworkInfo, ParsedQR, TLVEntry } from './emv-types'
+import type {
+  KeyInfo, MerchantAccount, NetworkInfo, ParsedQR, TLVEntry,
+} from './emv-types'
 
 // ─── Network patterns ─────────────────────────────────────────────────────────
 
 const NETWORK_PATTERNS: Record<string, NetworkInfo> = {
-  // Bre-B Colombia (identificadores oficiales Superfinanciera / ACH Colombia)
-  'co.gov.superfinanciera': { color: '#10b981', name: 'Bre-B' },
-  'co.bre-b': { color: '#10b981', name: 'Bre-B' },
+  'ach': { color: '#3b82f6', name: 'ACH Colombia' },
+  'bancolombia': { color: '#fdda24', name: 'Bancolombia' },
+  'br.gov': { color: '#32bcad', name: 'PIX Brasil' },
   'bre-b': { color: '#10b981', name: 'Bre-B' },
-  breb: { color: '#10b981', name: 'Bre-B' },
-  'co.gov': { color: '#10b981', name: 'Bre-B (Gov CO)' },
+  'breb': { color: '#10b981', name: 'Bre-B' },
+  'co.bre-b': { color: '#10b981', name: 'Bre-B' },
   // Redes colombianas
   'co.com.rbm': { color: '#10b981', name: 'Bre-B' },
-  rbm: { color: '#10b981', name: 'Bre-B' },
-  redeban: { color: '#ef4444', name: 'Redeban' },
-  ach: { color: '#3b82f6', name: 'ACH Colombia' },
-  entrecuentas: { color: '#8b5cf6', name: 'EntreCuentas' },
-  bancolombia: { color: '#fdda24', name: 'Bancolombia' },
-  daviplata: { color: '#e60000', name: 'Daviplata' },
-  nequi: { color: '#7c0cfa', name: 'Nequi' },
-  movii: { color: '#00b4e0', name: 'MOVii' },
+  'co.gov': { color: '#10b981', name: 'Bre-B (Gov CO)' },
+  // Bre-B Colombia (identificadores oficiales Superfinanciera / ACH Colombia)
+  'co.gov.superfinanciera': { color: '#10b981', name: 'Bre-B' },
+  'daviplata': { color: '#e60000', name: 'Daviplata' },
+  'entrecuentas': { color: '#8b5cf6', name: 'EntreCuentas' },
+  'mastercard': { color: '#eb001b', name: 'Mastercard' },
+  'movii': { color: '#00b4e0', name: 'MOVii' },
+  'nequi': { color: '#7c0cfa', name: 'Nequi' },
+  'pix': { color: '#32bcad', name: 'PIX' },
+  'rbm': { color: '#10b981', name: 'Bre-B' },
+  'redeban': { color: '#ef4444', name: 'Redeban' },
   // Internacionales
-  visa: { color: '#1a1f71', name: 'Visa' },
-  mastercard: { color: '#eb001b', name: 'Mastercard' },
-  pix: { color: '#32bcad', name: 'PIX' },
-  'br.gov': { color: '#32bcad', name: 'PIX Brasil' },
+  'visa': { color: '#1a1f71', name: 'Visa' },
 }
 
 // ─── TLV Core ─────────────────────────────────────────────────────────────────
 
-export function parseTLV(data: string): TLVEntry[] {
-  const entries: TLVEntry[] = []
-  let i = 0
-
-  while (i + 4 <= data.length) {
-    const id = data.substring(i, i + 2)
-    const lenStr = data.substring(i + 2, i + 4)
-    const len = Number.parseInt(lenStr, 10)
-
-    if (Number.isNaN(len) || len < 0 || i + 4 + len > data.length) break
-
-    const value = data.substring(i + 4, i + 4 + len)
-    entries.push({ id, len, value })
-    i += 4 + len
-  }
-
-  return entries
+export function detectKeyType(value: string): KeyInfo['type'] {
+  if (value.startsWith('@')) return 'alias'
+  if (/^[\da-f]{8}-[\da-f]{4}-4[\da-f]{3}-[89ab][\da-f]{3}-[\da-f]{12}$/i.test(value)) return 'uuid'
+  if (value.includes('@') && value.includes('.')) return 'email'
+  if (/^\+?\d{10,13}$/.test(value)) return 'phone'
+  if (/^\d{9,12}$/.test(value)) return 'nit'
+  return 'alias'
 }
 
 // ─── Pre-processing ───────────────────────────────────────────────────────────
+
+export function detectNetwork(globalId: string): NetworkInfo | null {
+  if (!globalId) return null
+  const id = globalId.toLowerCase()
+  for (const [pattern, info] of Object.entries(NETWORK_PATTERNS)) {
+    if (id.includes(pattern)) return info
+  }
+  return null
+}
+
+// ─── Network / Key detection ──────────────────────────────────────────────────
 
 /**
  * Extrae el payload EMVCo puro de un string que puede ser:
@@ -69,9 +72,21 @@ export function extractEMVPayload(raw: string): string {
 
     const url = new URL(urlStr.startsWith('http') ? urlStr : `https://x.co?${urlStr}`)
     const candidateParams = [
-      'payload', 'Payload', 'qr', 'QR', 'data', 'Data',
-      'emv', 'EMV', 'p', 'q', 'code', 'qrcode', 'content',
-      'br_code', 'brcode',
+      'payload',
+      'Payload',
+      'qr',
+      'QR',
+      'data',
+      'Data',
+      'emv',
+      'EMV',
+      'p',
+      'q',
+      'code',
+      'qrcode',
+      'content',
+      'br_code',
+      'brcode',
     ]
 
     for (const name of candidateParams) {
@@ -95,28 +110,6 @@ export function extractEMVPayload(raw: string): string {
 
   return trimmed
 }
-
-// ─── Network / Key detection ──────────────────────────────────────────────────
-
-export function detectNetwork(globalId: string): NetworkInfo | null {
-  if (!globalId) return null
-  const id = globalId.toLowerCase()
-  for (const [pattern, info] of Object.entries(NETWORK_PATTERNS)) {
-    if (id.includes(pattern)) return info
-  }
-  return null
-}
-
-export function detectKeyType(value: string): KeyInfo['type'] {
-  if (value.startsWith('@')) return 'alias'
-  if (/^[\da-f]{8}-[\da-f]{4}-4[\da-f]{3}-[89ab][\da-f]{3}-[\da-f]{12}$/i.test(value)) return 'uuid'
-  if (value.includes('@') && value.includes('.')) return 'email'
-  if (/^\+?\d{10,13}$/.test(value)) return 'phone'
-  if (/^\d{9,12}$/.test(value)) return 'nit'
-  return 'alias'
-}
-
-// ─── Main parser ──────────────────────────────────────────────────────────────
 
 export function parseEMVQR(rawData: string): ParsedQR {
   const emvPayload = extractEMVPayload(rawData.trim())
@@ -174,9 +167,9 @@ export function parseEMVQR(rawData: string): ParsedQR {
 
       if (!result.keyInfo) {
         // Skip short all-caps codes (network identifiers like "RBM", "APP") — prefer real keys (≥ 6 chars)
-        const candidate =
-          subEntries.find(s => s.id !== '00' && s.value.length >= 6) ??
-          subEntries.find(s => s.id !== '00' && s.value.length > 0 && !/^[A-Z]{1,5}$/.test(s.value))
+        const candidate
+          = subEntries.find(s => s.id !== '00' && s.value.length >= 6)
+            ?? subEntries.find(s => s.id !== '00' && s.value.length > 0 && !/^[A-Z]{1,5}$/.test(s.value))
         if (candidate) {
           result.keyInfo = {
             source: network?.name ?? `Cuenta ${entry.id}`,
@@ -190,16 +183,51 @@ export function parseEMVQR(rawData: string): ParsedQR {
     }
     else {
       switch (entry.id) {
-        case '01': result.isDynamic = entry.value === '12'; break
-        case '53': result.currency = entry.value; break
-        case '54': result.amount = Number.parseFloat(entry.value) || null; break
-        case '58': result.country = entry.value; break
-        case '59': result.merchantName = entry.value; break
-        case '60': result.merchantCity = entry.value; break
-        case '63': result.crc = entry.value; break
+        case '01':
+          result.isDynamic = entry.value === '12'
+          break
+        case '53':
+          result.currency = entry.value
+          break
+        case '54':
+          result.amount = Number.parseFloat(entry.value) || null
+          break
+        case '58':
+          result.country = entry.value
+          break
+        case '59':
+          result.merchantName = entry.value
+          break
+        case '60':
+          result.merchantCity = entry.value
+          break
+        case '63':
+          result.crc = entry.value
+          break
       }
     }
   }
 
   return result
+}
+
+// ─── Main parser ──────────────────────────────────────────────────────────────
+
+export function parseTLV(data: string): TLVEntry[] {
+  const entries: TLVEntry[] = []
+  let i = 0
+
+  while (i + 4 <= data.length) {
+    const id = data.substring(i, i + 2)
+    const lenStr = data.substring(i + 2, i + 4)
+    const len = Number.parseInt(lenStr, 10)
+
+    if (Number.isNaN(len) || len < 0 || i + 4 + len > data.length) break
+
+    const value = data.substring(i + 4, i + 4 + len)
+    entries.push({ id, len, value })
+    i += 4 + len
+  }
+
+  return entries
 }

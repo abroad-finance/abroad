@@ -3,9 +3,10 @@ import {
 } from 'lucide-react'
 import React, { memo } from 'react'
 
+import type { ChainPillChain } from '../../../components/ui'
+
 import AbroadLogoColored from '../../../assets/Logos/AbroadLogoColored.svg'
 import AbroadLogoWhite from '../../../assets/Logos/AbroadLogoWhite.svg'
-import type { ChainPillChain } from '../../../components/ui'
 import { ChainPill, CurrencyToggle } from '../../../components/ui'
 import { AB_STYLES, ASSET_URLS, BRAND_TITLE_CLASS } from '../../../shared/constants'
 import { cn } from '../../../shared/utils'
@@ -17,9 +18,6 @@ export interface NavBarResponsiveProps {
   balance: string
   balanceLoading: boolean
   className?: string
-  /** When set with onOpenChainModal, shows the chain/token pill (e.g. "USDC on Stellar") */
-  selectedChainKey?: string
-  selectedTokenLabel?: string
   infoUrl: string
   isDark?: boolean
   labels: {
@@ -37,10 +35,13 @@ export interface NavBarResponsiveProps {
   onDisconnect?: () => Promise<void>
   onHistoryClick?: () => void
   onOpenChainModal?: () => void
-  onSelectCurrency?: (currency: 'COP' | 'BRL') => void
-  targetCurrency?: 'COP' | 'BRL'
+  onSelectCurrency?: (currency: 'BRL' | 'COP') => void
   onToggleTheme?: () => void
   onWalletClick: () => void
+  /** When set with onOpenChainModal, shows the chain/token pill (e.g. "USDC on Stellar") */
+  selectedChainKey?: string
+  selectedTokenLabel?: string
+  targetCurrency?: 'BRL' | 'COP'
   walletInfo: {
     icon?: string
     name: string
@@ -100,18 +101,18 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({
       {isConnected && onSelectCurrency && targetCurrency && (
         <div className="hidden md:block">
           <CurrencyToggle
-            value={targetCurrency}
             onChange={onSelectCurrency}
+            value={targetCurrency}
           />
         </div>
       )}
       {showChainPill && chainPillChain && (
         <ChainPill
           chain={chainPillChain}
+          className="hidden md:flex"
           compact
           onClick={onOpenChainModal}
           tokenLabel={selectedTokenLabel}
-          className="hidden md:flex"
         />
       )}
       {isConnected && (
@@ -172,7 +173,7 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({
     <nav
       className={cn(
         'sticky top-0 z-[100] w-full border-b py-4 px-6 backdrop-blur-[6px]',
-        className
+        className,
       )}
       role="navigation"
       style={{

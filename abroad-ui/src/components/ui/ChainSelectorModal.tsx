@@ -12,15 +12,27 @@ const CHAIN_THEME: Record<string, { bg: string, color: string, icon: string }> =
   Stellar: { bg: 'var(--ab-chain-stellar-bg)', color: 'var(--ab-chain-stellar)', icon: ASSET_URLS.STELLAR_CHAIN_ICON },
 }
 
-function getChainShortLabel(label: string): string {
-  if (label.startsWith('Celo')) return 'Celo'
-  if (label.startsWith('Solana')) return 'Solana'
-  return label
+export interface ChainSelectorModalProps {
+  balance: string
+  chains: Array<{ key: string, label: string }>
+  onClose: () => void
+  onSelectChain: (key: string) => void
+  onSelectToken: (key: string) => void
+  open: boolean
+  selectedChainKey: string
+  selectedTokenKey: string
+  tokens: Array<{ key: string, label: string }>
 }
 
 function chainTheme(label: string): { bg: string, color: string, icon: string } {
   const prefix = Object.keys(CHAIN_THEME).find(p => label.startsWith(p))
   return prefix ? CHAIN_THEME[prefix] : CHAIN_THEME.Stellar
+}
+
+function getChainShortLabel(label: string): string {
+  if (label.startsWith('Celo')) return 'Celo'
+  if (label.startsWith('Solana')) return 'Solana'
+  return label
 }
 
 function tokenColor(tokenId: string): { bg: string, text: string } {
@@ -40,18 +52,6 @@ function tokenSubtitle(tokenLabel: string): string {
   if (t === 'USDC') return 'USD Coin'
   if (t === 'USDT') return 'Tether USD'
   return tokenLabel
-}
-
-export interface ChainSelectorModalProps {
-  balance: string
-  chains: Array<{ key: string, label: string }>
-  onClose: () => void
-  onSelectChain: (key: string) => void
-  onSelectToken: (key: string) => void
-  open: boolean
-  selectedChainKey: string
-  selectedTokenKey: string
-  tokens: Array<{ key: string, label: string }>
 }
 
 /**
@@ -139,7 +139,9 @@ export const ChainSelectorModal: React.FC<ChainSelectorModalProps> = ({
 
           {/* Token list – Figma tsTokenList: gap 4, row padding 10,12 */}
           <p className="text-[11px] font-bold uppercase tracking-[2px] text-[#7a9e9a]">
-            Available tokens on {chainLabel}
+            Available tokens on
+            {' '}
+            {chainLabel}
           </p>
           <div className="flex flex-col gap-1">
             {tokens.map((token) => {
@@ -160,24 +162,29 @@ export const ChainSelectorModal: React.FC<ChainSelectorModalProps> = ({
                     className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full"
                     style={{ background: tColor.bg }}
                   >
-                    {iconUrl ? (
-                      <img
-                        alt={token.label}
-                        className="h-5 w-5 object-contain"
-                        src={iconUrl}
-                      />
-                    ) : (
-                      <span className="text-xs font-bold" style={{ color: tColor.text }}>
-                        {token.label}
-                      </span>
-                    )}
+                    {iconUrl
+                      ? (
+                          <img
+                            alt={token.label}
+                            className="h-5 w-5 object-contain"
+                            src={iconUrl}
+                          />
+                        )
+                      : (
+                          <span className="text-xs font-bold" style={{ color: tColor.text }}>
+                            {token.label}
+                          </span>
+                        )}
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="text-sm font-semibold text-[#1a3a37]">{token.label}</div>
                     <div className="text-xs text-[#7a9e9a]">{tokenSubtitle(token.label)}</div>
                   </div>
                   <div className="text-right">
-                    <div className="text-sm font-semibold text-[#1a3a37]">${balance}</div>
+                    <div className="text-sm font-semibold text-[#1a3a37]">
+                      $
+                      {balance}
+                    </div>
                     <div className="text-[11px] text-[#7a9e9a]">available</div>
                   </div>
                   {isSelected && (

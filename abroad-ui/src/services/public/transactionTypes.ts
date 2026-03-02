@@ -1,17 +1,16 @@
 import type { TargetCurrency } from '../../api'
 
-export type TransactionStatus =
-  | 'AWAITING_PAYMENT'
-  | 'PROCESSING_PAYMENT'
-  | 'PAYMENT_FAILED'
-  | 'PAYMENT_EXPIRED'
-  | 'PAYMENT_COMPLETED'
-  | 'WRONG_AMOUNT'
+export type BlockchainNetwork = 'CELO' | 'ETHEREUM' | 'SOLANA' | 'STELLAR'
 
-export type PaymentMethod = 'PIX' | 'BRE_B' | 'BOTON'
 export type Country = 'BR' | 'CO'
-export type CryptoCurrency = 'USDC' | 'USDT' | 'ETH' | 'SOL'
-export type BlockchainNetwork = 'STELLAR' | 'SOLANA' | 'CELO' | 'ETHEREUM'
+export type CryptoCurrency = 'ETH' | 'SOL' | 'USDC' | 'USDT'
+export interface PaginatedTransactionList {
+  page: number
+  pageSize: number
+  total: number
+  transactions: TransactionData[]
+}
+export type PaymentMethod = 'BOTON' | 'BRE_B' | 'PIX'
 
 export interface QuoteData {
   cryptoCurrency: CryptoCurrency
@@ -24,27 +23,28 @@ export interface QuoteData {
 }
 
 export interface TransactionData {
-  id: string
-  partnerUserId: string
   accountNumber: string
-  status: TransactionStatus
   createdAt: string
-  quoteId: string
-  onChainId: string | null
-  refundOnChainId: string | null
-  taxId: string | null
-  externalId: string | null
-  qrCode: string | null
-  exchangeHandoffAt: string | null
+  exchangeHandoffAt: null | string
+  externalId: null | string
+  id: string
+  onChainId: null | string
+  partnerUserId: string
+  qrCode: null | string
   quote: QuoteData
+  quoteId: string
+  refundOnChainId: null | string
+  status: TransactionStatus
+  taxId: null | string
 }
 
-export interface PaginatedTransactionList {
-  page: number
-  pageSize: number
-  total: number
-  transactions: TransactionData[]
-}
+export type TransactionStatus
+  = | 'AWAITING_PAYMENT'
+    | 'PAYMENT_COMPLETED'
+    | 'PAYMENT_EXPIRED'
+    | 'PAYMENT_FAILED'
+    | 'PROCESSING_PAYMENT'
+    | 'WRONG_AMOUNT'
 
 export type UserTransactionSummary = {
   country: string

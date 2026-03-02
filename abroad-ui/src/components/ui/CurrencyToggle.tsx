@@ -3,34 +3,30 @@ import React from 'react'
 import { cn } from '../../shared/utils'
 
 const FLAG_URLS = {
-  COP: 'https://hatscripts.github.io/circle-flags/flags/co.svg',
   BRL: 'https://hatscripts.github.io/circle-flags/flags/br.svg',
+  COP: 'https://hatscripts.github.io/circle-flags/flags/co.svg',
 } as const
 
-export type CurrencyOption = 'COP' | 'BRL'
+export type CurrencyOption = 'BRL' | 'COP'
 
 export interface CurrencyToggleProps {
-  /** Currently selected currency */
-  value: CurrencyOption
+  className?: string
   /** Called when user selects a currency */
   onChange: (currency: CurrencyOption) => void
-  className?: string
+  /** Currently selected currency */
+  value: CurrencyOption
 }
 
 /**
  * Toggle between COP and BRL – Figma 9:368
  * Segmented control with flags; selected option has white background.
  */
-export const CurrencyToggle: React.FC<CurrencyToggleProps> = ({
-  value,
-  onChange,
-  className,
-}) => (
+export const CurrencyToggle: React.FC<CurrencyToggleProps> = ({ className, onChange, value }) => (
   <fieldset
     className={cn(
       'inline-flex items-stretch gap-0.5 rounded-[11px] bg-[#f3f4f6] p-1 shadow-[1px_1px_3.6px_0px_rgba(0,0,0,0.25)]',
       'border-0 m-0',
-      className
+      className,
     )}
   >
     <legend className="sr-only">Select currency</legend>
@@ -40,7 +36,7 @@ export const CurrencyToggle: React.FC<CurrencyToggleProps> = ({
         'flex h-[26px] items-center justify-center rounded-lg px-3 py-1.5 transition-colors',
         value === 'COP'
           ? 'border border-[#e5e7eb] bg-white shadow-[0px_1px_2px_0px_rgba(0,0,0,0.05)]'
-          : 'hover:bg-white/50'
+          : 'hover:bg-white/50',
       )}
       onClick={(e) => {
         e.stopPropagation()
@@ -60,7 +56,7 @@ export const CurrencyToggle: React.FC<CurrencyToggleProps> = ({
         'flex h-[26px] items-center justify-center rounded-lg px-3 py-1.5 transition-colors',
         value === 'BRL'
           ? 'border border-[#e5e7eb] bg-white shadow-[0px_1px_2px_0px_rgba(0,0,0,0.05)]'
-          : 'hover:bg-white/50'
+          : 'hover:bg-white/50',
       )}
       onClick={(e) => {
         e.stopPropagation()

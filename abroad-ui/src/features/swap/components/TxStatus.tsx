@@ -9,12 +9,12 @@ import { useWebSocketSubscription } from '../../../contexts/WebSocketContext'
 import { getTransactionStatus } from '../../../services/public/publicApi'
 import { Button } from '../../../shared/components/Button'
 import { IconAnimated } from '../../../shared/components/IconAnimated'
+import { ASSET_URLS } from '../../../shared/constants'
 import { useWalletAuth } from '../../../shared/hooks/useWalletAuth'
 import { cn } from '../../../shared/utils'
-import { ASSET_URLS } from '../../../shared/constants'
 
 // S6478: component defined at module scope (not inside parent)
-const DetailRow = ({ label, value, className }: { label: string; value: React.ReactNode; className?: string }) => (
+const DetailRow = ({ className, label, value }: { className?: string, label: string, value: React.ReactNode }) => (
   <div className={cn('flex items-center justify-between border-b border-ab-border pb-[17px]', className)}>
     <span className="text-base font-normal text-ab-text-3">{label}</span>
     <span className="text-base font-medium text-ab-text">{value}</span>
@@ -22,7 +22,12 @@ const DetailRow = ({ label, value, className }: { label: string; value: React.Re
 )
 
 // S7776: Set.has() is O(1) vs Array.includes() O(n); defined at module scope to avoid re-creation per render
-const TERMINAL_STATUSES = new Set<ApiStatus>(['PAYMENT_COMPLETED', 'PAYMENT_EXPIRED', 'PAYMENT_FAILED', 'WRONG_AMOUNT'])
+const TERMINAL_STATUSES = new Set<ApiStatus>([
+  'PAYMENT_COMPLETED',
+  'PAYMENT_EXPIRED',
+  'PAYMENT_FAILED',
+  'WRONG_AMOUNT',
+])
 
 const CHAIN_ICON_URL: Record<string, string> = {
   Celo: ASSET_URLS.CELO_CHAIN_ICON,
@@ -164,7 +169,11 @@ const TxStatus = ({
       cancelled = true
       if (timeoutId != null) clearTimeout(timeoutId)
     }
-  }, [transactionId, status, mapStatus])
+  }, [
+    transactionId,
+    status,
+    mapStatus,
+  ])
 
   const renderIcon = () => {
     switch (status) {
@@ -243,7 +252,14 @@ const TxStatus = ({
               />
               <DetailRow
                 label={t('tx_status.deducted', 'Deducted')}
-                value={<span className="font-bold">$ {txStatusDetails.sourceAmount} USDC</span>}
+                value={(
+                  <span className="font-bold">
+                    $
+                    {txStatusDetails.sourceAmount}
+                    {' '}
+                    USDC
+                  </span>
+                )}
               />
               <DetailRow
                 label={t('tx_status.fee', 'Fee')}
@@ -251,20 +267,22 @@ const TxStatus = ({
               />
               <DetailRow
                 label={t('tx_status.network', 'Network')}
-                value={
+                value={(
                   <span className="flex items-center gap-2">
-                    {CHAIN_ICON_URL[txStatusDetails.network] ? (
-                      <img
-                        alt={txStatusDetails.network}
-                        className="h-4 w-4 shrink-0 object-contain"
-                        src={CHAIN_ICON_URL[txStatusDetails.network]}
-                      />
-                    ) : (
-                      <span className="h-4 w-4 shrink-0 rounded-full bg-ab-text" />
-                    )}
+                    {CHAIN_ICON_URL[txStatusDetails.network]
+                      ? (
+                          <img
+                            alt={txStatusDetails.network}
+                            className="h-4 w-4 shrink-0 object-contain"
+                            src={CHAIN_ICON_URL[txStatusDetails.network]}
+                          />
+                        )
+                      : (
+                          <span className="h-4 w-4 shrink-0 rounded-full bg-ab-text" />
+                        )}
                     <span>{txStatusDetails.network || 'Stellar'}</span>
                   </span>
-                }
+                )}
               />
               <div className="flex items-center justify-between">
                 <span className="text-base font-normal text-ab-text-3">{t('tx_status.rail', 'Rail')}</span>

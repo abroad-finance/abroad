@@ -12,25 +12,19 @@ export interface BottomSheetProps {
  * Full-screen backdrop; panel slides up from bottom (max 85vh). Drag handle at top.
  * Clicking backdrop calls onClose.
  */
-export const BottomSheet: React.FC<BottomSheetProps> = ({
-  children,
-  className,
-  onClose,
-}) => (
+export const BottomSheet: React.FC<BottomSheetProps> = ({ children, className, onClose }) => (
   <div
     className={cn(
       'fixed inset-0 z-[300] flex items-end justify-center',
       'bg-black/35 backdrop-blur-[8px]',
       'transition-[visibility,opacity] duration-[0.4s] ease-[cubic-bezier(0.16,1,0.3,1)]',
     )}
-    role="button"
-    tabIndex={0}
     onClick={onClose}
     onKeyDown={(e) => { if (e.key === 'Escape') onClose() }}
+    role="button"
+    tabIndex={0}
   >
     <dialog
-      open
-      role="dialog"
       className={cn(
         'w-full max-w-[520px] max-h-[85vh] overflow-y-auto rounded-t-[24px]',
         'bg-[var(--ab-bg-card)] shadow-[0_-12px_40px_rgba(0,0,0,0.08)]',
@@ -40,10 +34,12 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
       )}
       onClick={e => e.stopPropagation()}
       onKeyDown={e => e.stopPropagation()}
+      open
+      role="dialog"
     >
       <div
-        className="mx-auto mt-3 h-1 w-10 shrink-0 rounded-full bg-[var(--ab-border)]"
         aria-hidden
+        className="mx-auto mt-3 h-1 w-10 shrink-0 rounded-full bg-[var(--ab-border)]"
       />
       {children}
     </dialog>

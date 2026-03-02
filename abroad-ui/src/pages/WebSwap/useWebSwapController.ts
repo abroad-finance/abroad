@@ -41,7 +41,6 @@ import {
   type decodeQrCodeBRResponse,
   _36EnumsTargetCurrency as TargetCurrency,
 } from '../../api'
-import { parseEMVQR } from '../../lib/qr/emv-parser'
 import { useNotices } from '../../contexts/NoticeContext'
 import { BRL_BACKGROUND_IMAGE } from '../../features/swap/constants'
 import { SwapView } from '../../features/swap/types'
@@ -54,6 +53,7 @@ import {
   formatChainLabel,
   sortStellarFirst,
 } from '../../features/swap/utils/corridorHelpers'
+import { parseEMVQR } from '../../lib/qr/emv-parser'
 import {
   acceptTransactionRequest, fetchPublicCorridors, notifyPayment, requestQuote, requestReverseQuote,
 } from '../../services/public/publicApi'
@@ -324,7 +324,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
   }, [])
 
   const lastEditedRef = useRef<'source' | 'target' | null>(null)
-  const lastQuoteRateRef = useRef<number | null>(null)
+  const lastQuoteRateRef = useRef<null | number>(null)
   const sep24AutoSelectedRef = useRef(false)
   const directAbortRef = useRef<AbortController | null>(null)
   const reverseAbortRef = useRef<AbortController | null>(null)
@@ -650,7 +650,11 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     if (numericTarget <= 0) return ''
     const estimated = numericTarget / lastQuoteRateRef.current
     return String(estimated)
-  }, [state.loadingSource, state.sourceAmount, state.targetAmount])
+  }, [
+    state.loadingSource,
+    state.sourceAmount,
+    state.targetAmount,
+  ])
 
   const persistableView = state.view !== 'swap'
 
@@ -699,8 +703,12 @@ export const useWebSwapController = (): WebSwapControllerProps => {
   useEffect(() => {
     if (isAuthenticated && !prevIsAuthRef.current) {
       // Clear any previous transaction data to show clean dashboard
-      dispatch({ accountNumber: '', pixKey: '', recipientName: '', taxId: '', type: 'SET_BANK_DETAILS' })
-      dispatch({ quoteId: '', sourceAmount: '', targetAmount: '', type: 'SET_AMOUNTS' })
+      dispatch({
+        accountNumber: '', pixKey: '', recipientName: '', taxId: '', type: 'SET_BANK_DETAILS',
+      })
+      dispatch({
+        quoteId: '', sourceAmount: '', targetAmount: '', type: 'SET_AMOUNTS',
+      })
       dispatch({ type: 'SET_VIEW', view: 'home' })
     }
     prevIsAuthRef.current = isAuthenticated
@@ -1087,7 +1095,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
           const minAmount = selectedCorridor?.minAmount ?? 0
           if (minAmount && parsed.amount < minAmount) {
             notifyError(
-              t('swap.qr_below_minimum', `El monto del QR (${parsed.amount} COP) es inferior al mínimo requerido (${minAmount} COP).`)
+              t('swap.qr_below_minimum', `El monto del QR (${parsed.amount} COP) es inferior al mínimo requerido (${minAmount} COP).`),
             )
             return
           }
@@ -1531,30 +1539,30 @@ export const useWebSwapController = (): WebSwapControllerProps => {
   const swapProps: SwapProps = {
     continueDisabled,
     exchangeRateDisplay,
+    fromQr: !!state.qrCode,
     isAboveMaximum,
     isAuthenticated,
     isBelowMinimum,
     onOpenSourceModal: () => { /* handled in WebSwap */ },
     onOpenTargetModal: () => { /* handled in WebSwap */ },
     onPrimaryAction,
-    onTaxIdChange: state.targetCurrency === TargetCurrency.BRL
-      ? (v) => dispatch({ taxId: v.replace(/[^\d]/g, ''), type: 'SET_BANK_DETAILS' })
-      : undefined,
-    selectCurrency,
     onRecipientChange: state.targetCurrency === TargetCurrency.BRL
-      ? (v) => dispatch({ pixKey: v, type: 'SET_BANK_DETAILS' })
-      : (v) => dispatch({ accountNumber: v.trim(), type: 'SET_BANK_DETAILS' }),
+      ? v => dispatch({ pixKey: v, type: 'SET_BANK_DETAILS' })
+      : v => dispatch({ accountNumber: v.trim(), type: 'SET_BANK_DETAILS' }),
     onSourceChange,
     onTargetChange,
+    onTaxIdChange: state.targetCurrency === TargetCurrency.BRL
+      ? v => dispatch({ taxId: v.replace(/[^\d]/g, ''), type: 'SET_BANK_DETAILS' })
+      : undefined,
+    recipientName: state.recipientName,
     recipientValue: state.targetCurrency === TargetCurrency.BRL ? state.pixKey : state.accountNumber,
+    selectCurrency,
     selectedAssetLabel,
     sourceAmount: state.sourceAmount,
     targetAmount: state.targetAmount,
     targetCurrency: state.targetCurrency,
     taxId: state.taxId,
     transferFeeDisplay,
-    fromQr: !!state.qrCode,
-    recipientName: state.recipientName,
     transferFeeIsZero: transferFee === 0,
   }
 

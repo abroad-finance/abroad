@@ -4,10 +4,10 @@ import { cn } from '../../shared/utils'
 
 export interface QuickAmountsProps {
   amounts: string[]
+  className?: string
   onSelect: (value: string) => void
   selectedValue: string
   symbol: string
-  className?: string
 }
 
 /**
@@ -16,10 +16,10 @@ export interface QuickAmountsProps {
  */
 export function QuickAmounts({
   amounts,
+  className,
   onSelect,
   selectedValue,
   symbol,
-  className,
 }: Readonly<QuickAmountsProps>): React.JSX.Element {
   return (
     <div className={cn('mt-3.5 flex flex-wrap justify-center gap-1.5', className)}>

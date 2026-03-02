@@ -157,7 +157,10 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     const handleDisconnect = () => setConnected(false)
     const handleConnectError = (err: Error) => setError(err.message || 'WS connection error')
     const handleReconnectAttempt = () => setReconnecting(true)
-    const handleReconnectFailed = () => { setReconnecting(false); setReconnectFailed(true) }
+    const handleReconnectFailed = () => {
+      setReconnecting(false)
+      setReconnectFailed(true)
+    }
 
     socket.on('connect', handleConnect)
     socket.on('disconnect', handleDisconnect)
@@ -177,7 +180,11 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       socket.disconnect()
       socketRef.current = null
     }
-  }, [wallet?.address, wallet?.chainId, attachStoredListeners])
+  }, [
+    wallet?.address,
+    wallet?.chainId,
+    attachStoredListeners,
+  ])
 
   const manualReconnect = useCallback(() => {
     setReconnectFailed(false)

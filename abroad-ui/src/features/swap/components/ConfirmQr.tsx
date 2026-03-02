@@ -123,37 +123,39 @@ const ConfirmQr: React.FC<ConfirmQrProps> = ({
           <h3 className="text-xs font-bold uppercase tracking-wider text-ab-text-3">
             {t('confirm_qr.details_title', 'Detalles del destinatario')}
           </h3>
-          {isBRL ? (
-            <div className="flex flex-col gap-2 text-sm">
-              {recipientName && (
-                <div className="flex justify-between gap-3">
-                  <span className="text-ab-text-3">{t('confirm_qr.recipient_name', 'Nombre')}</span>
-                  <span className="font-medium text-ab-text break-all text-right">{recipientName}</span>
+          {isBRL
+            ? (
+                <div className="flex flex-col gap-2 text-sm">
+                  {recipientName && (
+                    <div className="flex justify-between gap-3">
+                      <span className="text-ab-text-3">{t('confirm_qr.recipient_name', 'Nombre')}</span>
+                      <span className="font-medium text-ab-text break-all text-right">{recipientName}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between gap-3">
+                    <span className="text-ab-text-3 shrink-0">{t('confirm_qr.pix_key', 'Llave PIX')}</span>
+                    <span className="font-medium text-ab-text break-all font-mono text-right">{pixKey || '—'}</span>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <span className="text-ab-text-3 shrink-0">{t('confirm_qr.cpf_cnpj', 'CPF/CNPJ')}</span>
+                    <span className="font-medium text-ab-text break-all font-mono text-right">{taxId || '—'}</span>
+                  </div>
+                </div>
+              )
+            : (
+                <div className="flex flex-col gap-2 text-sm">
+                  {recipientName && (
+                    <div className="flex justify-between gap-3">
+                      <span className="text-ab-text-3">{t('confirm_qr.recipient_name', 'Nombre')}</span>
+                      <span className="font-medium text-ab-text break-all text-right">{recipientName}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between gap-3">
+                    <span className="text-ab-text-3 shrink-0">{t('confirm_qr.account_breb', 'Cuenta / Bre-B')}</span>
+                    <span className="font-medium text-ab-text break-all font-mono text-right">{accountNumber || '—'}</span>
+                  </div>
                 </div>
               )}
-              <div className="flex justify-between gap-3">
-                <span className="text-ab-text-3 shrink-0">{t('confirm_qr.pix_key', 'Llave PIX')}</span>
-                <span className="font-medium text-ab-text break-all font-mono text-right">{pixKey || '—'}</span>
-              </div>
-              <div className="flex justify-between gap-3">
-                <span className="text-ab-text-3 shrink-0">{t('confirm_qr.cpf_cnpj', 'CPF/CNPJ')}</span>
-                <span className="font-medium text-ab-text break-all font-mono text-right">{taxId || '—'}</span>
-              </div>
-            </div>
-          ) : (
-            <div className="flex flex-col gap-2 text-sm">
-              {recipientName && (
-                <div className="flex justify-between gap-3">
-                  <span className="text-ab-text-3">{t('confirm_qr.recipient_name', 'Nombre')}</span>
-                  <span className="font-medium text-ab-text break-all text-right">{recipientName}</span>
-                </div>
-              )}
-              <div className="flex justify-between gap-3">
-                <span className="text-ab-text-3 shrink-0">{t('confirm_qr.account_breb', 'Cuenta / Bre-B')}</span>
-                <span className="font-medium text-ab-text break-all font-mono text-right">{accountNumber || '—'}</span>
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Disclaimer */}
@@ -188,11 +190,13 @@ const ConfirmQr: React.FC<ConfirmQrProps> = ({
           onClick={onConfirm}
           type="button"
         >
-          {loadingSubmit ? (
-            <Loader className="h-5 w-5 animate-spin" />
-          ) : (
-            t('confirm_qr.confirm', 'Continuar')
-          )}
+          {loadingSubmit
+            ? (
+                <Loader className="h-5 w-5 animate-spin" />
+              )
+            : (
+                t('confirm_qr.confirm', 'Continuar')
+              )}
         </button>
       </div>
     </div>

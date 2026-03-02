@@ -2,13 +2,13 @@ import React from 'react'
 
 import { cn } from '../../shared/utils'
 
-export type StatusBadgeVariant = 'completed' | 'expired' | 'pending'
-
 export interface StatusBadgeProps {
+  children: React.ReactNode
   className?: string
   variant: StatusBadgeVariant
-  children: React.ReactNode
 }
+
+export type StatusBadgeVariant = 'completed' | 'expired' | 'pending'
 
 const variantStyles: Record<StatusBadgeVariant, { bg: string, border: string, text: string }> = {
   completed: {
@@ -31,11 +31,7 @@ const variantStyles: Record<StatusBadgeVariant, { bg: string, border: string, te
 /**
  * Pill badge for transaction status: completed (green), expired (red), pending (muted).
  */
-export const StatusBadge: React.FC<StatusBadgeProps> = ({
-  children,
-  className,
-  variant,
-}) => {
+export const StatusBadge: React.FC<StatusBadgeProps> = ({ children, className, variant }) => {
   const styles = variantStyles[variant]
   return (
     <span

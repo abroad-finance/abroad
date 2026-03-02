@@ -1,33 +1,35 @@
 import { useTranslate } from '@tolgee/react'
-import { ChevronDown, ChevronRight, Keyboard, Lock, PiggyBank, QrCode, Store, Zap } from 'lucide-react'
+import {
+  ChevronDown, ChevronRight, Keyboard, Lock, PiggyBank, QrCode, Store, Zap,
+} from 'lucide-react'
 import React from 'react'
 
 import { _36EnumsTargetCurrency as TargetCurrency, type TransactionListItem } from '../../../api'
 import BreBLogo from '../../../assets/Logos/networks/Bre-b.svg'
 import { CurrencyToggle } from '../../../components/ui'
 
-const RECENT_COUNTRY_CONFIG: Record<string, { flagUrl: string, symbol: string, currency: string }> = {
-  COP: { flagUrl: 'https://hatscripts.github.io/circle-flags/flags/co.svg', symbol: '$', currency: 'COP' },
-  BRL: { flagUrl: 'https://hatscripts.github.io/circle-flags/flags/br.svg', symbol: 'R$', currency: 'BRL' },
+const RECENT_COUNTRY_CONFIG: Record<string, { currency: string, flagUrl: string, symbol: string }> = {
+  BRL: { currency: 'BRL', flagUrl: 'https://hatscripts.github.io/circle-flags/flags/br.svg', symbol: 'R$' },
+  COP: { currency: 'COP', flagUrl: 'https://hatscripts.github.io/circle-flags/flags/co.svg', symbol: '$' },
 }
 import { ASSET_URLS } from '../../../shared/constants'
 import { cn } from '../../../shared/utils'
 
 /* Figma node 5:2 – pixel-perfect spec from ABROAD NEW UI */
 const HERO_LIVE_BADGE = { bg: '#e8f5f1', dot: '#1ec677', text: '#0f513a' }
-const HERO_HEADING = { dark: '#101828', accent: '#73b9a3' }
+const HERO_HEADING = { accent: '#73b9a3', dark: '#101828' }
 const HERO_SUBLINE = '#6b7280'
 const HERO_CHAINS = {
-  stellar: { bg: '#f3f4f6', text: '#000000' },
   celo: { bg: 'rgba(255,241,162,0.94)', text: '#000000' },
   solana: { bg: '#f3ebfd', text: '#6b21a8' },
+  stellar: { bg: '#f3f4f6', text: '#000000' },
 }
 const HERO_CTA_BG = '#54ae92'
 
 const CHAIN_CONFIG = [
-  { key: 'stellar', label: 'Stellar', icon: ASSET_URLS.STELLAR_CHAIN_ICON },
-  { key: 'celo', label: 'Celo', icon: ASSET_URLS.CELO_CHAIN_ICON },
-  { key: 'solana', label: 'Solana', icon: ASSET_URLS.SOLANA_CHAIN_ICON },
+  { icon: ASSET_URLS.STELLAR_CHAIN_ICON, key: 'stellar', label: 'Stellar' },
+  { icon: ASSET_URLS.CELO_CHAIN_ICON, key: 'celo', label: 'Celo' },
+  { icon: ASSET_URLS.SOLANA_CHAIN_ICON, key: 'solana', label: 'Solana' },
 ] as const
 
 const CURRENCY_FLAG_URL: Record<string, string> = {
@@ -35,9 +37,9 @@ const CURRENCY_FLAG_URL: Record<string, string> = {
   COP: 'https://hatscripts.github.io/circle-flags/flags/co.svg',
 }
 
-const COUNTRIES: Record<string, { rate: number, decimals: number }> = {
-  BRL: { rate: 5.82, decimals: 2 },
-  COP: { rate: 4198.5, decimals: 0 },
+const COUNTRIES: Record<string, { decimals: number, rate: number }> = {
+  BRL: { decimals: 2, rate: 5.82 },
+  COP: { decimals: 0, rate: 4198.5 },
 }
 
 const RAIL_LOGO: Record<string, string> = {
@@ -50,10 +52,37 @@ const TOKEN_ICON_URL: Record<string, string> = {
   USDT: ASSET_URLS.USDT_TOKEN_ICON,
 }
 
-const CHAIN_MAP: Record<string, { icon: string, bg: string, color: string, name: string }> = {
-  stellar: { icon: ASSET_URLS.STELLAR_CHAIN_ICON, bg: 'var(--ab-chain-stellar-bg)', color: 'var(--ab-chain-stellar)', name: 'Stellar' },
-  celo: { icon: ASSET_URLS.CELO_CHAIN_ICON, bg: 'var(--ab-chain-celo-bg)', color: 'var(--ab-chain-celo)', name: 'Celo' },
-  solana: { icon: ASSET_URLS.SOLANA_CHAIN_ICON, bg: 'var(--ab-chain-solana-bg)', color: 'var(--ab-chain-solana)', name: 'Solana' },
+const CHAIN_MAP: Record<string, { bg: string, color: string, icon: string, name: string }> = {
+  celo: {
+    bg: 'var(--ab-chain-celo-bg)', color: 'var(--ab-chain-celo)', icon: ASSET_URLS.CELO_CHAIN_ICON, name: 'Celo',
+  },
+  solana: {
+    bg: 'var(--ab-chain-solana-bg)', color: 'var(--ab-chain-solana)', icon: ASSET_URLS.SOLANA_CHAIN_ICON, name: 'Solana',
+  },
+  stellar: {
+    bg: 'var(--ab-chain-stellar-bg)', color: 'var(--ab-chain-stellar)', icon: ASSET_URLS.STELLAR_CHAIN_ICON, name: 'Stellar',
+  },
+}
+
+export interface HomeScreenProps {
+  balance: string
+  formatDate?: (dateString: string) => string
+  getStatusStyle?: (status: string) => string
+  getStatusText?: (status: string) => string
+  isAuthenticated: boolean
+  onConnectWallet: () => void
+  onGoToManual: () => void
+  onHistoryClick: () => void
+  onOpenChainModal?: () => void
+  onOpenQr: () => void
+  onSelectCurrency?: (currency: TargetCurrency) => void
+  onSelectTransaction?: (tx: TransactionListItem) => void
+  recentTransactions: TransactionListItem[]
+  /** Fallback when recentTransactions is empty (from useUserTransactions) */
+  recentTransactionsFallback?: RecentTxSummary[]
+  selectedChainKey?: string
+  selectedTokenLabel: string
+  targetCurrency: TargetCurrency
 }
 
 export type RecentTxSummary = {
@@ -64,27 +93,6 @@ export type RecentTxSummary = {
   usdcAmount: string
 }
 
-export interface HomeScreenProps {
-  balance: string
-  formatDate?: (dateString: string) => string
-  getStatusStyle?: (status: string) => string
-  getStatusText?: (status: string) => string
-  isAuthenticated: boolean
-  onConnectWallet: () => void
-  onHistoryClick: () => void
-  onOpenChainModal?: () => void
-  onOpenQr: () => void
-  onSelectCurrency?: (currency: TargetCurrency) => void
-  onSelectTransaction?: (tx: TransactionListItem) => void
-  onGoToManual: () => void
-  recentTransactions: TransactionListItem[]
-  /** Fallback when recentTransactions is empty (from useUserTransactions) */
-  recentTransactionsFallback?: RecentTxSummary[]
-  selectedChainKey?: string
-  selectedTokenLabel: string
-  targetCurrency: TargetCurrency
-}
-
 export default function HomeScreen({
   balance,
   formatDate,
@@ -92,10 +100,10 @@ export default function HomeScreen({
   getStatusText,
   isAuthenticated,
   onConnectWallet,
+  onGoToManual,
   onHistoryClick,
   onOpenChainModal,
   onOpenQr,
-  onGoToManual,
   onSelectCurrency,
   onSelectTransaction,
   recentTransactions,
@@ -162,8 +170,8 @@ export default function HomeScreen({
               const theme = HERO_CHAINS[key]
               return (
                 <div
-                  key={key}
                   className="flex items-center gap-2 self-stretch rounded-full px-4 py-[5.5px]"
+                  key={key}
                   style={{ backgroundColor: theme.bg }}
                 >
                   <img
@@ -237,17 +245,19 @@ export default function HomeScreen({
               $
               {balance}
             </span>
-            {TOKEN_ICON_URL[selectedTokenLabel] ? (
-              <img
-                alt={selectedTokenLabel}
-                className="h-6 w-6 shrink-0 pt-3 md:h-8 md:w-8"
-                src={TOKEN_ICON_URL[selectedTokenLabel]}
-              />
-            ) : (
-              <span className="pt-3 text-[24px] font-medium leading-9 text-[#10b981] md:text-[30px] md:leading-9">
-                {selectedTokenLabel}
-              </span>
-            )}
+            {TOKEN_ICON_URL[selectedTokenLabel]
+              ? (
+                  <img
+                    alt={selectedTokenLabel}
+                    className="h-6 w-6 shrink-0 pt-3 md:h-8 md:w-8"
+                    src={TOKEN_ICON_URL[selectedTokenLabel]}
+                  />
+                )
+              : (
+                  <span className="pt-3 text-[24px] font-medium leading-9 text-[#10b981] md:text-[30px] md:leading-9">
+                    {selectedTokenLabel}
+                  </span>
+                )}
           </div>
           <div className="flex h-8 items-center justify-center pt-1">
             <div className="flex items-center gap-2 rounded-full border border-[#f3f4f6] bg-[rgba(255,255,255,0.6)] px-[13px] py-[4.5px] shadow-[0px_1px_2px_0px_rgba(0,0,0,0.05)]">
@@ -290,8 +300,8 @@ export default function HomeScreen({
           )}
           {onSelectCurrency && (
             <CurrencyToggle
+              onChange={c => onSelectCurrency(c)}
               value={targetCurrency}
-              onChange={(c) => onSelectCurrency(c)}
             />
           )}
         </div>
@@ -348,114 +358,114 @@ export default function HomeScreen({
             <div className="divide-y divide-[#e5e7eb] overflow-hidden rounded-2xl border border-[#e5e7eb] bg-white">
               {recentTransactions.length > 0
                 ? recentTransactions.slice(0, 2).map((tx) => {
-                  const countryConfig = RECENT_COUNTRY_CONFIG[tx.quote.targetCurrency] ?? RECENT_COUNTRY_CONFIG.COP
-                  const isExpired = tx.status === 'PAYMENT_EXPIRED' || tx.status === 'PAYMENT_FAILED' || tx.status === 'WRONG_AMOUNT'
-                  const localAmount = tx.quote.targetAmount.toLocaleString(
-                    tx.quote.targetCurrency === 'BRL' ? 'pt-BR' : 'es-CO',
-                    tx.quote.targetCurrency === 'COP'
-                      ? { maximumFractionDigits: 0, minimumFractionDigits: 0 }
-                      : { maximumFractionDigits: 2, minimumFractionDigits: 2 },
-                  )
-                  return (
-                    <button
-                      className="flex w-full items-center gap-3.5 px-4 py-3.5 text-left transition-colors hover:bg-[#f9fafb]"
-                      key={tx.id}
-                      onClick={() => (onSelectTransaction ? onSelectTransaction(tx) : onHistoryClick())}
-                      type="button"
-                    >
-                      <div className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-[15px] border border-[#e5e7eb] bg-[#f9fafb]">
-                        <Store className="h-6 w-6 text-[#6b7280]" strokeWidth={1.5} />
-                        <img
-                          alt={countryConfig.currency}
-                          className="absolute bottom-0 right-0 h-5 w-5 rounded-full border-2 border-white object-cover shadow-sm"
-                          src={countryConfig.flagUrl}
-                        />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div
-                          className={cn(
-                            'text-sm font-semibold',
-                            isExpired ? 'text-[#6b7280] line-through' : 'text-[#111827]',
-                          )}
-                        >
-                          {tx.accountNumber}
+                    const countryConfig = RECENT_COUNTRY_CONFIG[tx.quote.targetCurrency] ?? RECENT_COUNTRY_CONFIG.COP
+                    const isExpired = tx.status === 'PAYMENT_EXPIRED' || tx.status === 'PAYMENT_FAILED' || tx.status === 'WRONG_AMOUNT'
+                    const localAmount = tx.quote.targetAmount.toLocaleString(
+                      tx.quote.targetCurrency === 'BRL' ? 'pt-BR' : 'es-CO',
+                      tx.quote.targetCurrency === 'COP'
+                        ? { maximumFractionDigits: 0, minimumFractionDigits: 0 }
+                        : { maximumFractionDigits: 2, minimumFractionDigits: 2 },
+                    )
+                    return (
+                      <button
+                        className="flex w-full items-center gap-3.5 px-4 py-3.5 text-left transition-colors hover:bg-[#f9fafb]"
+                        key={tx.id}
+                        onClick={() => (onSelectTransaction ? onSelectTransaction(tx) : onHistoryClick())}
+                        type="button"
+                      >
+                        <div className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-[15px] border border-[#e5e7eb] bg-[#f9fafb]">
+                          <Store className="h-6 w-6 text-[#6b7280]" strokeWidth={1.5} />
+                          <img
+                            alt={countryConfig.currency}
+                            className="absolute bottom-0 right-0 h-5 w-5 rounded-full border-2 border-white object-cover shadow-sm"
+                            src={countryConfig.flagUrl}
+                          />
                         </div>
-                        {formatDate && getStatusStyle && getStatusText && (
-                          <div className="mt-0.5 flex items-center gap-1.5 text-xs text-[#6b7280]">
-                            <span>{formatDate(tx.createdAt)}</span>
-                            <span>·</span>
-                            <span className={cn('rounded-full px-2 py-0.5 text-[10px] font-medium', getStatusStyle(tx.status))}>
-                              {getStatusText(tx.status)}
-                            </span>
+                        <div className="min-w-0 flex-1">
+                          <div
+                            className={cn(
+                              'text-sm font-semibold',
+                              isExpired ? 'text-[#6b7280] line-through' : 'text-[#111827]',
+                            )}
+                          >
+                            {tx.accountNumber}
                           </div>
-                        )}
-                      </div>
-                      <div className="text-right">
-                        <div
-                          className={cn(
-                            'text-sm font-semibold',
-                            isExpired ? 'text-[#6b7280] line-through' : 'text-[#111827]',
+                          {formatDate && getStatusStyle && getStatusText && (
+                            <div className="mt-0.5 flex items-center gap-1.5 text-xs text-[#6b7280]">
+                              <span>{formatDate(tx.createdAt)}</span>
+                              <span>·</span>
+                              <span className={cn('rounded-full px-2 py-0.5 text-[10px] font-medium', getStatusStyle(tx.status))}>
+                                {getStatusText(tx.status)}
+                              </span>
+                            </div>
                           )}
-                        >
-                          {countryConfig.symbol}
-                          {localAmount}
-                          {' '}
-                          {countryConfig.currency}
                         </div>
-                        <div className="text-[11px] text-[#6b7280]">
-                          $
-                          {tx.quote.sourceAmount.toFixed(2)}
-                          {' '}
-                          {selectedTokenLabel}
+                        <div className="text-right">
+                          <div
+                            className={cn(
+                              'text-sm font-semibold',
+                              isExpired ? 'text-[#6b7280] line-through' : 'text-[#111827]',
+                            )}
+                          >
+                            {countryConfig.symbol}
+                            {localAmount}
+                            {' '}
+                            {countryConfig.currency}
+                          </div>
+                          <div className="text-[11px] text-[#6b7280]">
+                            $
+                            {tx.quote.sourceAmount.toFixed(2)}
+                            {' '}
+                            {selectedTokenLabel}
+                          </div>
                         </div>
-                      </div>
-                      <ChevronRight className="h-4 w-4 shrink-0 text-[#9ca3af]" />
-                    </button>
-                  )
-                })
+                        <ChevronRight className="h-4 w-4 shrink-0 text-[#9ca3af]" />
+                      </button>
+                    )
+                  })
                 : recentTransactionsFallback.slice(0, 2).map((tx, i) => {
-                  const countryConfig = RECENT_COUNTRY_CONFIG[tx.country] ?? RECENT_COUNTRY_CONFIG.COP
-                  return (
-                    <button
-                      className="flex w-full items-center gap-3.5 px-4 py-3.5 text-left transition-colors hover:bg-[#f9fafb]"
-                      key={`${tx.merchant}-${tx.time}-${i}`}
-                      onClick={onHistoryClick}
-                      type="button"
-                    >
-                      <div className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-[15px] border border-[#e5e7eb] bg-[#f9fafb]">
-                        <Store className="h-6 w-6 text-[#6b7280]" strokeWidth={1.5} />
-                        <img
-                          alt={countryConfig.currency}
-                          className="absolute bottom-0 right-0 h-5 w-5 rounded-full border-2 border-white object-cover shadow-sm"
-                          src={countryConfig.flagUrl}
-                        />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="text-sm font-semibold text-[#111827]">{tx.merchant}</div>
-                        <div className="mt-0.5 text-xs text-[#6b7280]">
-                          {tx.country === 'COP' ? 'Colombia' : 'Brazil'}
-                          {' · '}
-                          {tx.time}
+                    const countryConfig = RECENT_COUNTRY_CONFIG[tx.country] ?? RECENT_COUNTRY_CONFIG.COP
+                    return (
+                      <button
+                        className="flex w-full items-center gap-3.5 px-4 py-3.5 text-left transition-colors hover:bg-[#f9fafb]"
+                        key={`${tx.merchant}-${tx.time}-${i}`}
+                        onClick={onHistoryClick}
+                        type="button"
+                      >
+                        <div className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-[15px] border border-[#e5e7eb] bg-[#f9fafb]">
+                          <Store className="h-6 w-6 text-[#6b7280]" strokeWidth={1.5} />
+                          <img
+                            alt={countryConfig.currency}
+                            className="absolute bottom-0 right-0 h-5 w-5 rounded-full border-2 border-white object-cover shadow-sm"
+                            src={countryConfig.flagUrl}
+                          />
                         </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-sm font-semibold text-[#111827]">
-                          {countryConfig.symbol}
-                          {tx.localAmount}
-                          {' '}
-                          {countryConfig.currency}
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm font-semibold text-[#111827]">{tx.merchant}</div>
+                          <div className="mt-0.5 text-xs text-[#6b7280]">
+                            {tx.country === 'COP' ? 'Colombia' : 'Brazil'}
+                            {' · '}
+                            {tx.time}
+                          </div>
                         </div>
-                        <div className="text-[11px] text-[#6b7280]">
-                          $
-                          {tx.usdcAmount}
-                          {' '}
-                          {selectedTokenLabel}
+                        <div className="text-right">
+                          <div className="text-sm font-semibold text-[#111827]">
+                            {countryConfig.symbol}
+                            {tx.localAmount}
+                            {' '}
+                            {countryConfig.currency}
+                          </div>
+                          <div className="text-[11px] text-[#6b7280]">
+                            $
+                            {tx.usdcAmount}
+                            {' '}
+                            {selectedTokenLabel}
+                          </div>
                         </div>
-                      </div>
-                      <ChevronRight className="h-4 w-4 shrink-0 text-[#9ca3af]" />
-                    </button>
-                  )
-                })}
+                        <ChevronRight className="h-4 w-4 shrink-0 text-[#9ca3af]" />
+                      </button>
+                    )
+                  })}
             </div>
           </div>
         )}

@@ -56,6 +56,15 @@ export default tseslint.config(
       'react/forbid-dom-props': ['warn', { forbid: ['style'] }],
       'react/forbid-component-props': ['warn', { forbid: ['style'] }],
 
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        {
+          argsIgnorePattern: '^_',
+          caughtErrorsIgnorePattern: '^_',
+          destructuredArrayIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+        },
+      ],
       'import/no-restricted-paths': [
         'error',
         {
@@ -65,12 +74,16 @@ export default tseslint.config(
               target: './src/features/**/components/**/*',
               from: './src/**/*',
               except: [
+                srcGlob('components', '**', '*'),
+                srcGlob('features', '**', 'components', '**', '*'),
                 srcGlob('features', '**', 'constants', '**', '*'),
                 srcGlob('**', 'shared', '**', '*'),
                 srcGlob('**', 'assets', '**', '*'),
                 srcGlob('**', 'api', '**', '*'),
                 srcGlob('**', 'types', '**', '*'),
                 srcGlob('**', 'contexts', '**', '*'),
+                srcGlob('lib', '**', '*'),
+                srcGlob('services', '**', '*'),
               ],
             },
           ],

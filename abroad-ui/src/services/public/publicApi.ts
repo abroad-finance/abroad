@@ -1,5 +1,6 @@
 import type { TransactionStatus } from '../../api'
 import type { ApiResult } from '../http/types'
+import type { PaginatedTransactionList } from './transactionTypes'
 import type {
   AcceptTransactionRequest,
   AcceptTransactionResponse,
@@ -9,16 +10,15 @@ import type {
   QuoteResponse,
   ReverseQuoteRequest,
 } from './types'
-import type { PaginatedTransactionList } from './transactionTypes'
 
 import { httpClient } from '../http/httpClient'
 
 export type TransactionStatusResponse = {
   id: string
+  kycLink: null | string
+  on_chain_tx_hash: null | string
   status: TransactionStatus
   transaction_reference: null | string
-  on_chain_tx_hash: null | string
-  kycLink: null | string
   user_id: string
 }
 
@@ -85,9 +85,14 @@ export const getTransactionStatus = async (
 }
 
 export const getUserTransactions = async (
-  options?: { page?: number; pageSize?: number; confirmedOnly?: boolean; signal?: AbortSignal | null },
+  options?: { confirmedOnly?: boolean, page?: number, pageSize?: number, signal?: AbortSignal | null },
 ): Promise<ApiResult<PaginatedTransactionList>> => {
-  const { page = 1, pageSize = 20, confirmedOnly = false, signal = null } = options ?? {}
+  const {
+    confirmedOnly = false,
+    page = 1,
+    pageSize = 20,
+    signal = null,
+  } = options ?? {}
 
   const endpoint = confirmedOnly ? '/transactions/list/confirmed' : '/transactions/list'
 

@@ -8,6 +8,8 @@ import type { BankDetailsRouteProps } from '../../features/swap/components/BankD
 import type { ConfirmQrProps } from '../../features/swap/components/ConfirmQr'
 import type { SwapProps } from '../../features/swap/components/Swap'
 import type { ChainOption, TokenOption } from '../../features/swap/components/TokenSelectModal'
+import type { TxDetailItem } from '../../features/swap/components/TxDetailSheet'
+import type { SwapView } from '../../features/swap/types'
 
 import { _36EnumsTargetCurrency as TargetCurrency } from '../../api/index'
 import { ChainSelectorModal, ConnectWalletChainModal } from '../../components/ui'
@@ -16,25 +18,23 @@ import ConfirmQr from '../../features/swap/components/ConfirmQr'
 import HistorySheet from '../../features/swap/components/HistorySheet'
 import HomeScreen from '../../features/swap/components/HomeScreen'
 import NavBarResponsive from '../../features/swap/components/NavBarResponsive'
-import TxDetailSheet from '../../features/swap/components/TxDetailSheet'
-import type { TxDetailItem } from '../../features/swap/components/TxDetailSheet'
 import Swap from '../../features/swap/components/Swap'
-import type { SwapView } from '../../features/swap/types'
 import TokenSelectModal from '../../features/swap/components/TokenSelectModal'
+import TxDetailSheet from '../../features/swap/components/TxDetailSheet'
 import TxStatus from '../../features/swap/components/TxStatus'
 import UserVerification from '../../features/swap/components/UserVerification'
 import WaitSign from '../../features/swap/components/WaitSign'
 import WalletDetails from '../../features/swap/components/WalletDetails'
 import WebSwapLayout from '../../features/swap/components/WebSwapLayout'
 import { useWalletDetails } from '../../features/swap/hooks/useWalletDetails'
+import { transactionMatchesChain } from '../../features/swap/utils/corridorHelpers'
+import { useUserTransactions } from '../../services/useUserTransactions'
 import LanguageSelector from '../../shared/components/LanguageSelector'
 import { ModalOverlay } from '../../shared/components/ModalOverlay'
 import { AB_STYLES, ASSET_URLS } from '../../shared/constants'
 import { useLanguageSelector, useNavBarResponsive } from '../../shared/hooks'
 import { cn } from '../../shared/utils'
-import { transactionMatchesChain } from '../../features/swap/utils/corridorHelpers'
 import { useWebSwapController } from './useWebSwapController'
-import { useUserTransactions } from '../../services/useUserTransactions'
 
 const QrScannerFullScreen = lazy(() => import('../../features/swap/components/QrScannerFullScreen'))
 
@@ -86,7 +86,6 @@ const CHAIN_ICON_MAP: Record<string, string> = {
   Stellar: ASSET_URLS.STELLAR_CHAIN_ICON,
 }
 
-
 const WebSwap: React.FC = () => {
   const controller = useWebSwapController()
   const {
@@ -130,7 +129,7 @@ const WebSwap: React.FC = () => {
   const handleOpenWalletList = useCallback(() => {
     walletDetails.setSelectedTransaction(null)
     handleWalletDetailsOpen()
-  }, [handleWalletDetailsOpen, walletDetails.setSelectedTransaction])
+  }, [handleWalletDetailsOpen, walletDetails])
 
   const navBar = useNavBarResponsive({ onWalletConnect: handleConnectWalletClick, onWalletDetails: handleOpenWalletList })
   const languageSelector = useLanguageSelector()
@@ -151,7 +150,7 @@ const WebSwap: React.FC = () => {
   const [sourceModalOpen, setSourceModalOpen] = useState(false)
   const [targetModalOpen, setTargetModalOpen] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
-  const [selectedTx, setSelectedTx] = useState<TxDetailItem | null>(null)
+  const [selectedTx, setSelectedTx] = useState<null | TxDetailItem>(null)
 
   // Fetch user transactions
   const { allTransactions, fetchTransactions, recentTransactions: txSummaries } = useUserTransactions(swapViewProps.isAuthenticated, selectedChainKey)
@@ -161,7 +160,11 @@ const WebSwap: React.FC = () => {
     if (swapViewProps.isAuthenticated && view === 'home') {
       fetchTransactions({ confirmedOnly: true, pageSize: 10 })
     }
-  }, [swapViewProps.isAuthenticated, view, fetchTransactions])
+  }, [
+    swapViewProps.isAuthenticated,
+    view,
+    fetchTransactions,
+  ])
 
   const openSourceModal = useCallback(() => setSourceModalOpen(true), [])
   const closeSourceModal = useCallback(() => setSourceModalOpen(false), [])
@@ -242,10 +245,10 @@ const WebSwap: React.FC = () => {
                 }
                 onConnectWallet={handleConnectWalletClick}
                 onGoToManual={goToManual}
-                onSelectCurrency={selectCurrency}
                 onHistoryClick={handleOpenWalletList}
                 onOpenChainModal={openSourceModal}
                 onOpenQr={openQr}
+                onSelectCurrency={selectCurrency}
                 onSelectTransaction={(tx) => {
                   walletDetails.setSelectedTransaction(tx)
                   handleWalletDetailsOpen()
@@ -276,8 +279,8 @@ const WebSwap: React.FC = () => {
                   && Number.parseFloat(sourceAmountForBalanceCheck ?? swapViewProps.sourceAmount) > Number.parseFloat(sourceAssetBalance.replaceAll(',', ''))
                 }
                 loadingBalance={walletDetails.isLoadingBalance}
-                onBalanceClick={handleBalanceClick}
                 onBackClick={handleBackToSwap}
+                onBalanceClick={handleBalanceClick}
                 onOpenSourceModal={openSourceModal}
                 onOpenTargetModal={openTargetModal}
                 usdcBalance={sourceAssetBalance}

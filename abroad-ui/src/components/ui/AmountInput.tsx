@@ -2,13 +2,16 @@ import React, { useCallback, useRef } from 'react'
 
 import { cn } from '../../shared/utils'
 
-export type InputMode = 'local' | 'usdc'
-
 export interface AmountInputProps {
+  className?: string
   /** Currency code (COP, BRL) */
   currency: string
+  /** Input id for a11y */
+  id?: string
   /** Current input mode: which amount is shown in the big input */
   inputMode: InputMode
+  /** Loading state for the main input (e.g. fetching quote) */
+  loading?: boolean
   /** Local (target) amount string, e.g. "14,350" or "23.80" */
   localValue: string
   /** Called when user changes the main input (local or USDC depending on mode) */
@@ -17,40 +20,37 @@ export interface AmountInputProps {
   onUsdcChange: (value: string) => void
   /** Placeholder for local input (e.g. "14,350" for COP) */
   placeholderLocal: string
+  /** Converted value to show in the secondary pill (opposite of main input) */
+  secondaryDisplay: string
+  /** Symbol for local currency ($ or R$) */
+  symbol: string
   /** Token label (e.g. USDC) */
   tokenLabel: string
   /** USDC (source) amount string */
   usdcValue: string
-  /** Symbol for local currency ($ or R$) */
-  symbol: string
-  /** Converted value to show in the secondary pill (opposite of main input) */
-  secondaryDisplay: string
-  /** Loading state for the main input (e.g. fetching quote) */
-  loading?: boolean
-  /** Input id for a11y */
-  id?: string
-  className?: string
 }
+
+export type InputMode = 'local' | 'usdc'
 
 /**
  * Dual-mode amount input: big primary (local or USDC) and small secondary pill with "switch".
  * Used for manual payment screen with local-currency-first UX.
  */
 export function AmountInput({
+  className,
   currency,
+  id = 'amount-input',
   inputMode,
+  loading = false,
   localValue,
   onLocalChange,
   onModeSwitch,
   onUsdcChange,
   placeholderLocal,
   secondaryDisplay,
+  symbol,
   tokenLabel,
   usdcValue,
-  symbol,
-  loading = false,
-  id = 'amount-input',
-  className,
 }: Readonly<AmountInputProps>): React.JSX.Element {
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -85,7 +85,6 @@ export function AmountInput({
               {symbol}
             </span>
             <input
-              ref={inputRef}
               aria-label={`Amount in ${currency}`}
               className="min-w-[4ch] max-w-[24ch] bg-transparent text-[42px] font-extrabold tracking-[-1.5px] text-[var(--ab-text)] outline-none caret-[var(--ab-green)]"
               id={id}
@@ -93,6 +92,7 @@ export function AmountInput({
               onChange={e => onLocalChange(sanitizeLocal(e.target.value))}
               onFocus={handleFocus}
               placeholder={placeholderLocal}
+              ref={inputRef}
               style={{ width: `${Math.max(5, (localValue || placeholderLocal).length + 1)}ch` }}
               type="text"
               value={localValue}
@@ -102,7 +102,10 @@ export function AmountInput({
           <div className="inline-flex items-center gap-1.5 rounded-full bg-[var(--ab-bg-muted)] px-4 py-1.5">
             <span className="text-[13px] text-[var(--ab-text-secondary)]">≈</span>
             <span className="text-[13px] font-bold text-[var(--ab-text)]">
-              ${usdcValue} {tokenLabel}
+              $
+              {usdcValue}
+              {' '}
+              {tokenLabel}
             </span>
             <button
               className="text-[11px] font-semibold text-[var(--ab-green)] underline"
@@ -122,7 +125,6 @@ export function AmountInput({
             $
           </span>
           <input
-            ref={inputRef}
             aria-label={`Amount in ${tokenLabel}`}
             className="min-w-[4ch] max-w-[20ch] bg-transparent text-[42px] font-extrabold tracking-[-1.5px] text-[var(--ab-text)] outline-none caret-[var(--ab-green)]"
             id={id}
@@ -130,6 +132,7 @@ export function AmountInput({
             onChange={e => onUsdcChange(sanitizeUsdc(e.target.value))}
             onFocus={handleFocus}
             placeholder="0.00"
+            ref={inputRef}
             style={{ width: `${Math.max(4, (usdcValue || '0.00').length + 1)}ch` }}
             type="text"
             value={usdcValue}

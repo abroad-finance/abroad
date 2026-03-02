@@ -19,16 +19,20 @@ export interface TransactionDetailProps {
 
 const CHAIN_ICON_MAP: Record<string, string> = {
   CELO: ASSET_URLS.CELO_CHAIN_ICON,
-  SOLANA: ASSET_URLS.SOLANA_CHAIN_ICON,
-  STELLAR: ASSET_URLS.STELLAR_CHAIN_ICON,
   celo: ASSET_URLS.CELO_CHAIN_ICON,
+  SOLANA: ASSET_URLS.SOLANA_CHAIN_ICON,
   solana: ASSET_URLS.SOLANA_CHAIN_ICON,
+  STELLAR: ASSET_URLS.STELLAR_CHAIN_ICON,
   stellar: ASSET_URLS.STELLAR_CHAIN_ICON,
 }
 
 const COUNTRY_CONFIG: Record<string, { flagUrl: string, location: string, name: string, rail: string, symbol: string }> = {
-  BRL: { flagUrl: 'https://hatscripts.github.io/circle-flags/flags/br.svg', location: 'Brazil', name: 'BRL', rail: 'PIX', symbol: 'R$' },
-  COP: { flagUrl: 'https://hatscripts.github.io/circle-flags/flags/co.svg', location: 'Colombia', name: 'COP', rail: 'Bre-B', symbol: '$' },
+  BRL: {
+    flagUrl: 'https://hatscripts.github.io/circle-flags/flags/br.svg', location: 'Brazil', name: 'BRL', rail: 'PIX', symbol: 'R$',
+  },
+  COP: {
+    flagUrl: 'https://hatscripts.github.io/circle-flags/flags/co.svg', location: 'Colombia', name: 'COP', rail: 'Bre-B', symbol: '$',
+  },
 }
 
 const TOKEN_ICON_MAP: Record<string, string> = {
@@ -110,12 +114,12 @@ const TransactionDetail: React.FC<Readonly<TransactionDetailProps>> = ({
           {isExpired
             ? (
                 <svg className="h-8 w-8 text-ab-error" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  <path d="M6 18L18 6M6 6l12 12" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               )
             : (
                 <svg className="h-8 w-8 text-[#059669]" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M20 6L9 17l-5-5" />
+                  <path d="M20 6L9 17l-5-5" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               )}
         </div>
@@ -184,7 +188,15 @@ const TransactionDetail: React.FC<Readonly<TransactionDetailProps>> = ({
             {t('wallet_details.transactions.exchange_rate', 'Exchange Rate')}
           </span>
           <span className="text-xs font-medium text-[#0f172a]">
-            1 {transaction.quote.cryptoCurrency ?? 'USDC'} ≈ {rate} {country.name}
+            1
+            {' '}
+            {transaction.quote.cryptoCurrency ?? 'USDC'}
+            {' '}
+            ≈
+            {' '}
+            {rate}
+            {' '}
+            {country.name}
           </span>
         </div>
       </div>
@@ -216,7 +228,9 @@ const TransactionDetail: React.FC<Readonly<TransactionDetailProps>> = ({
           <SummaryRow label={t('wallet_details.transactions.token', 'Token')}>
             <span className="flex items-center gap-1.5 font-semibold text-[#0f172a]">
               <img alt={cryptoCurrency} className="h-4 w-4" src={tokenIcon} />
-              {transaction.quote.cryptoCurrency ?? 'USDC'} (Circle)
+              {transaction.quote.cryptoCurrency ?? 'USDC'}
+              {' '}
+              (Circle)
             </span>
           </SummaryRow>
           <SummaryRow label={t('wallet_details.transactions.recipient_id', 'Recipient ID')}>
@@ -262,7 +276,7 @@ const TransactionDetail: React.FC<Readonly<TransactionDetailProps>> = ({
   )
 }
 
-function SummaryRow({ label, children }: Readonly<{ label: string, children: React.ReactNode }>) {
+function SummaryRow({ children, label }: Readonly<{ children: React.ReactNode, label: string }>) {
   return (
     <div className="flex items-center justify-between py-1">
       <span className="text-sm text-[#64748b]">{label}</span>

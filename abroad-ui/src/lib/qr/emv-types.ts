@@ -1,45 +1,45 @@
-export interface TLVEntry {
-  id: string
-  len: number
+export interface KeyInfo {
+  source: string
+  type: 'alias' | 'email' | 'nit' | 'phone' | 'uuid'
   value: string
-}
-
-export interface SubField {
-  id: string
-  value: string
-  label: string
-}
-
-export interface NetworkInfo {
-  name: string
-  color: string
 }
 
 export interface MerchantAccount {
-  id: string
-  rawValue: string
   globalId: string
+  id: string
   network: NetworkInfo | null
+  rawValue: string
   subFields: SubField[]
 }
 
-export interface KeyInfo {
-  value: string
-  source: string
-  type: 'alias' | 'email' | 'nit' | 'phone' | 'uuid'
+export interface NetworkInfo {
+  color: string
+  name: string
 }
 
 export interface ParsedQR {
-  amount: number | null
-  country: string | null
-  crc: string | null
-  currency: string | null // "170" = COP, "986" = BRL
+  amount: null | number
+  country: null | string
+  crc: null | string
+  currency: null | string // "170" = COP, "986" = BRL
   isBreB: boolean
   isDynamic: boolean
   keyInfo: KeyInfo | null
   merchantAccounts: MerchantAccount[]
-  merchantCity: string | null
-  merchantName: string | null
+  merchantCity: null | string
+  merchantName: null | string
   raw: string
   timestamp: Date
+}
+
+export interface SubField {
+  id: string
+  label: string
+  value: string
+}
+
+export interface TLVEntry {
+  id: string
+  len: number
+  value: string
 }

@@ -8,7 +8,7 @@ interface SessionData {
 
 const isBrowser = globalThis.window !== undefined
 
-const readSession = (): SessionData | null => {
+const readSession = (): null | SessionData => {
   if (!isBrowser) return null
   try {
     const stored = globalThis.localStorage.getItem(SESSION_KEY)
@@ -20,7 +20,7 @@ const readSession = (): SessionData | null => {
   }
 }
 
-const writeSession = (data: SessionData | null) => {
+const writeSession = (data: null | SessionData) => {
   if (!isBrowser) return
   try {
     if (data) {

@@ -1,5 +1,3 @@
-import { WalletConnectModal } from '@walletconnect/modal'
-import SignClient from '@walletconnect/sign-client'
 import {
   AlbedoModule,
   FreighterModule,
@@ -12,6 +10,8 @@ import {
   xBullModule,
 } from '@creit.tech/stellar-wallets-kit'
 import { LedgerModule } from '@creit.tech/stellar-wallets-kit/modules/ledger.module'
+import { WalletConnectModal } from '@walletconnect/modal'
+import SignClient from '@walletconnect/sign-client'
 import {
   useCallback, useEffect, useMemo, useRef, useState,
 } from 'react'
@@ -28,18 +28,19 @@ import { sessionStore } from '../auth/sessionStore'
 // have the `stellar` namespace defined, because it blindly maps `session.namespaces.stellar.accounts`.
 // Since we intercept WalletConnect in `isWalletConnect` and handle it manually, we only need this
 // mock to display "Wallet Connect" in the StellarWalletsKit UI modal without crashing.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const mockWalletConnectModule: any = {
+  getAddress: async () => { throw new Error('Handled externally') },
+  getNetwork: async () => { throw new Error('Handled externally') },
+  isAvailable: async () => true,
   moduleType: ModuleType.BRIDGE_WALLET,
+  productIcon: 'https://stellar.creit.tech/wallet-icons/walletconnect.png',
   productId: 'wallet_connect', // WALLET_CONNECT_ID is 'wallet_connect'
   productName: 'Wallet Connect',
   productUrl: 'https://walletconnect.com/',
-  productIcon: 'https://stellar.creit.tech/wallet-icons/walletconnect.png',
-  isAvailable: async () => true,
-  getAddress: async () => { throw new Error('Handled externally') },
-  signTransaction: async () => { throw new Error('Handled externally') },
   signAuthEntry: async () => { throw new Error('Handled externally') },
   signMessage: async () => { throw new Error('Handled externally') },
-  getNetwork: async () => { throw new Error('Handled externally') },
+  signTransaction: async () => { throw new Error('Handled externally') },
 }
 
 // Keep the WalletConnect metadata constants to pass them into our manual signClient instantiation
@@ -59,8 +60,8 @@ const caip10ToAddress = (caip10: string) => {
 const network = WalletNetwork.PUBLIC
 const STELLAR_CHAIN_ID = import.meta.env.VITE_STELLAR_CHAIN_ID || 'stellar:pubnet'
 
-const WALLETCONNECT_ACCOUNTS_ERROR =
-  'WalletConnect session is not ready yet. Please scan the QR code with your wallet app and approve the connection, then try again.'
+const WALLETCONNECT_ACCOUNTS_ERROR
+  = 'WalletConnect session is not ready yet. Please scan the QR code with your wallet app and approve the connection, then try again.'
 
 function getErrorMessage(err: unknown): string {
   if (err instanceof Error) return err.message
@@ -89,10 +90,7 @@ const isStoredTokenValid = (): boolean => {
 const isWalletConnect = (id: string) => /walletconnect|wallet_connect/i.test(id)
 
 export function useStellarKitWallet(
-  {
-    onConnectError,
-    walletAuth,
-  }: {
+  { onConnectError, walletAuth }: {
     onConnectError?: (message: string) => void
     walletAuth: IWalletAuthentication
   },
@@ -116,7 +114,9 @@ export function useStellarKitWallet(
 
   // Keep a ref in sync so ensureKit can read it without being a dep
   const walletIdRef = useRef(walletId)
-  useEffect(() => { walletIdRef.current = walletId }, [walletId])
+  useEffect(() => {
+    walletIdRef.current = walletId
+  }, [walletId])
 
   // Ensure WalletConnect client (for Stellar WalletConnect flow)
   const ensureWalletConnectClient = useCallback(async () => {
@@ -182,6 +182,7 @@ export function useStellarKitWallet(
       catch { /* ignore */ }
     }
     void restoreWcTopic()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []) // intentionally runs only on mount
 
   // When the JWT is cleared externally (e.g. refresh failure), wipe the local session too
@@ -221,7 +222,11 @@ export function useStellarKitWallet(
     }
     document.addEventListener('visibilitychange', handleVisibilityChange)
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
-  }, [address, ensureKit, walletAuth])
+  }, [
+    address,
+    ensureKit,
+    walletAuth,
+  ])
 
   const signTransaction = useCallback(
     async ({ message }: { message: string }) => {
@@ -235,11 +240,11 @@ export function useStellarKitWallet(
         const stellarChainId = STELLAR_CHAIN_ID
         const result = await client.request({
           chainId: stellarChainId,
-          topic: wcTopicRef.current,
           request: {
             method: 'stellar_signXDR',
             params: { network: 'PUBLIC', xdr: message },
           },
+          topic: wcTopicRef.current,
         })
 
         return {
@@ -257,7 +262,12 @@ export function useStellarKitWallet(
         signerAddress: address as string | undefined,
       }
     },
-    [address, ensureKit, walletId, ensureWalletConnectClient],
+    [
+      address,
+      ensureKit,
+      walletId,
+      ensureWalletConnectClient,
+    ],
   )
 
   // Resolves the Stellar address for a WalletConnect session.
@@ -321,8 +331,8 @@ export function useStellarKitWallet(
                 const client = await ensureWalletConnectClient()
                 const result = await client.request({
                   chainId: STELLAR_CHAIN_ID,
-                  topic: wcTopicRef.current as string,
                   request: { method: 'stellar_signXDR', params: { network: 'PUBLIC', xdr: challenge } },
+                  topic: wcTopicRef.current as string,
                 })
                 return (result as { signedXDR: string }).signedXDR
               },
@@ -370,7 +380,6 @@ export function useStellarKitWallet(
   }, [
     ensureKit,
     ensureWalletConnectClient,
-    ensureWalletConnectModal,
     onConnectError,
     resolveWcAddress,
     applyWalletId,
