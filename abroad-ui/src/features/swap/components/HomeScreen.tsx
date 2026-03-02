@@ -352,7 +352,9 @@ export default function HomeScreen({
                   const isExpired = tx.status === 'PAYMENT_EXPIRED' || tx.status === 'PAYMENT_FAILED' || tx.status === 'WRONG_AMOUNT'
                   const localAmount = tx.quote.targetAmount.toLocaleString(
                     tx.quote.targetCurrency === 'BRL' ? 'pt-BR' : 'es-CO',
-                    { maximumFractionDigits: 2, minimumFractionDigits: 2 },
+                    tx.quote.targetCurrency === 'COP'
+                      ? { maximumFractionDigits: 0, minimumFractionDigits: 0 }
+                      : { maximumFractionDigits: 2, minimumFractionDigits: 2 },
                   )
                   return (
                     <button
@@ -390,14 +392,16 @@ export default function HomeScreen({
                             isExpired ? 'text-[#6b7280] line-through' : 'text-[#111827]',
                           )}
                         >
-                          $
-                          {tx.quote.sourceAmount.toFixed(2)}
-                        </div>
-                        <div className="text-[11px] text-[#6b7280]">
                           {countryConfig.symbol}
                           {localAmount}
                           {' '}
                           {countryConfig.currency}
+                        </div>
+                        <div className="text-[11px] text-[#6b7280]">
+                          $
+                          {tx.quote.sourceAmount.toFixed(2)}
+                          {' '}
+                          {selectedTokenLabel}
                         </div>
                       </div>
                       <ChevronRight className="h-4 w-4 shrink-0 text-[#9ca3af]" />
