@@ -32,6 +32,7 @@ import { ModalOverlay } from '../../shared/components/ModalOverlay'
 import { AB_STYLES, ASSET_URLS } from '../../shared/constants'
 import { useLanguageSelector, useNavBarResponsive } from '../../shared/hooks'
 import { cn } from '../../shared/utils'
+import { transactionMatchesChain } from '../../features/swap/utils/corridorHelpers'
 import { useWebSwapController } from './useWebSwapController'
 import { useUserTransactions } from '../../services/useUserTransactions'
 
@@ -145,7 +146,7 @@ const WebSwap: React.FC = () => {
   const [selectedTx, setSelectedTx] = useState<TxDetailItem | null>(null)
 
   // Fetch user transactions
-  const { allTransactions, fetchAllTransactions, fetchTransactions, recentTransactions: txSummaries } = useUserTransactions(swapViewProps.isAuthenticated)
+  const { allTransactions, fetchTransactions, recentTransactions: txSummaries } = useUserTransactions(swapViewProps.isAuthenticated, selectedChainKey)
 
   // Fetch transactions on mount, when authenticated changes, and when navigating to home
   useEffect(() => {
@@ -153,12 +154,6 @@ const WebSwap: React.FC = () => {
       fetchTransactions({ confirmedOnly: true, pageSize: 10 })
     }
   }, [swapViewProps.isAuthenticated, view, fetchTransactions])
-
-  // Fetch all transactions when opening history
-  const handleHistoryOpen = useCallback(() => {
-    setShowHistory(true)
-    fetchAllTransactions()
-  }, [fetchAllTransactions])
 
   const openSourceModal = useCallback(() => setSourceModalOpen(true), [])
   const closeSourceModal = useCallback(() => setSourceModalOpen(false), [])
@@ -212,7 +207,7 @@ const WebSwap: React.FC = () => {
             <LanguageSelector {...languageSelector} variant="mobile" />
           }
           onDisconnect={walletDetails.onDisconnectWallet}
-          onHistoryClick={handleHistoryOpen}
+          onHistoryClick={handleWalletDetailsOpen}
           onOpenChainModal={openSourceModal}
           onSelectCurrency={selectCurrency}
           selectedChainKey={selectedChainKey}
@@ -240,18 +235,20 @@ const WebSwap: React.FC = () => {
                 onConnectWallet={handleConnectWalletClick}
                 onGoToManual={goToManual}
                 onSelectCurrency={selectCurrency}
-                onHistoryClick={
-                  walletDetails.transactions.length > 0
-                    ? handleWalletDetailsOpen
-                    : handleHistoryOpen
-                }
+                onHistoryClick={handleWalletDetailsOpen}
                 onOpenChainModal={openSourceModal}
                 onOpenQr={openQr}
                 onSelectTransaction={(tx) => {
                   walletDetails.setSelectedTransaction(tx)
                   handleWalletDetailsOpen()
                 }}
-                recentTransactions={walletDetails.transactions.slice(0, 2)}
+                recentTransactions={
+                  selectedChainKey
+                    ? walletDetails.transactions
+                        .filter(tx => transactionMatchesChain(tx, selectedChainKey))
+                        .slice(0, 2)
+                    : walletDetails.transactions.slice(0, 2)
+                }
                 recentTransactionsFallback={txSummaries}
                 selectedChainKey={selectedChainKey}
                 selectedTokenLabel={swapViewProps.selectedAssetLabel}
@@ -388,6 +385,11 @@ const WebSwap: React.FC = () => {
         <WalletDetails
           {...walletDetails}
           selectedAssetLabel={swapViewProps.selectedAssetLabel}
+          transactions={
+            selectedChainKey
+              ? walletDetails.transactions.filter(tx => transactionMatchesChain(tx, selectedChainKey))
+              : walletDetails.transactions
+          }
         />
       </ModalOverlay>
 

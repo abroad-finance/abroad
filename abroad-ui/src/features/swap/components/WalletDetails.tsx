@@ -101,35 +101,40 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({
           </button>
         )}
 
-        {/* Header */}
-        <div className="mb-6 pr-8 text-center mt-2 md:mt-4">
-          <h2 className={cn('text-2xl font-semibold mb-2', AB_STYLES.text)}>
-            {t('wallet_details.header.title', 'Tu Cuenta')}
-          </h2>
-          <p className={cn('text-md', AB_STYLES.textMuted)}>
-            {t('wallet_details.header.subtitle', 'Gestiona tu billetera y consulta el historial de transacciones')}
-          </p>
-        </div>
+        {/* Header — hidden when showing transaction detail */}
+        {!selectedTransaction && (
+          <div className="mb-6 pr-8 text-center mt-2 md:mt-4">
+            <h2 className={cn('text-2xl font-semibold mb-2', AB_STYLES.text)}>
+              {t('wallet_details.header.title', 'Tu Cuenta')}
+            </h2>
+            <p className={cn('text-md', AB_STYLES.textMuted)}>
+              {t('wallet_details.header.subtitle', 'Gestiona tu billetera y consulta el historial de transacciones')}
+            </p>
+          </div>
+        )}
 
         {/* Transaction History */}
         <div className="flex-1">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className={cn('font-medium text-lg', AB_STYLES.text)}>{t('wallet_details.transactions.title', 'Historial de Transacciones')}</h3>
-            <button
-              className={cn('p-2 rounded-full transition-colors duration-200 disabled:opacity-50', AB_STYLES.hoverBg)}
-              disabled={isLoadingTransactions}
-              onClick={onRefreshTransactions}
-              title={t('wallet_details.actions.refresh_transactions', 'Actualizar transacciones')}
-              type="button"
-            >
-              <RefreshCw className={cn(`w-4 h-4 ${isLoadingTransactions ? 'animate-spin' : ''}`, AB_STYLES.text)} />
-            </button>
-          </div>
-
-          {transactionError && (
-            <div className={cn('rounded-xl p-4 mb-4', AB_STYLES.hoverBorder)}>
-              <p className={cn('text-sm', AB_STYLES.text)}>{transactionError}</p>
-            </div>
+          {!selectedTransaction && (
+            <>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className={cn('font-medium text-lg', AB_STYLES.text)}>{t('wallet_details.transactions.title', 'Historial de Transacciones')}</h3>
+                <button
+                  className={cn('p-2 rounded-full transition-colors duration-200 disabled:opacity-50', AB_STYLES.hoverBg)}
+                  disabled={isLoadingTransactions}
+                  onClick={onRefreshTransactions}
+                  title={t('wallet_details.actions.refresh_transactions', 'Actualizar transacciones')}
+                  type="button"
+                >
+                  <RefreshCw className={cn(`w-4 h-4 ${isLoadingTransactions ? 'animate-spin' : ''}`, AB_STYLES.text)} />
+                </button>
+              </div>
+              {transactionError && (
+                <div className={cn('rounded-xl p-4 mb-4', AB_STYLES.hoverBorder)}>
+                  <p className={cn('text-sm', AB_STYLES.text)}>{transactionError}</p>
+                </div>
+              )}
+            </>
           )}
 
           {isLoadingTransactions

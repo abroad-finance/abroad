@@ -11,6 +11,18 @@ const NETWORK_TO_CHAIN: Record<string, string> = {
   ETHEREUM: 'Ethereum',
 }
 
+function networkFromChainKey(chainKey: string): string {
+  const prefix = chainKey.split(':')[0]?.toLowerCase() ?? ''
+  if (prefix === 'stellar') return 'STELLAR'
+  if (prefix === 'solana') return 'SOLANA'
+  if (prefix === 'celo' || prefix === 'eip155') return 'CELO'
+  return 'STELLAR'
+}
+
+function transactionMatchesChain(tx: TransactionData, chainKey: string): boolean {
+  return (tx.quote.network?.toUpperCase() ?? '') === networkFromChainKey(chainKey)
+}
+
 function formatDate(dateString: string): string {
   const date = new Date(dateString)
   const now = new Date()
@@ -81,7 +93,7 @@ function mapTransactionToDetail(tx: TransactionData) {
   }
 }
 
-export function useUserTransactions(isAuthenticated: boolean) {
+export function useUserTransactions(isAuthenticated: boolean, selectedChainKey?: string) {
   const [transactions, setTransactions] = useState<TransactionData[]>([])
   const [allTransactions, setAllTransactions] = useState<TransactionData[]>([])
   const [isLoading, setIsLoading] = useState(false)
@@ -137,7 +149,10 @@ export function useUserTransactions(isAuthenticated: boolean) {
     setIsLoadingAll(false)
   }, [isAuthenticated])
 
-  const recentTransactions: UserTransactionSummary[] = transactions.slice(0, 2).map(mapTransactionToSummary)
+  const filteredTransactions = selectedChainKey
+    ? transactions.filter(tx => transactionMatchesChain(tx, selectedChainKey))
+    : transactions
+  const recentTransactions: UserTransactionSummary[] = filteredTransactions.slice(0, 2).map(mapTransactionToSummary)
 
   const allTransactionsDetail = allTransactions.map(mapTransactionToDetail)
 
