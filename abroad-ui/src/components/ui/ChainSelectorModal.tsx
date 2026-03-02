@@ -12,6 +12,12 @@ const CHAIN_THEME: Record<string, { bg: string, color: string, icon: string }> =
   Stellar: { bg: 'var(--ab-chain-stellar-bg)', color: 'var(--ab-chain-stellar)', icon: ASSET_URLS.STELLAR_CHAIN_ICON },
 }
 
+function getChainShortLabel(label: string): string {
+  if (label.startsWith('Celo')) return 'Celo'
+  if (label.startsWith('Solana')) return 'Solana'
+  return label
+}
+
 function chainTheme(label: string): { bg: string, color: string, icon: string } {
   const prefix = Object.keys(CHAIN_THEME).find(p => label.startsWith(p))
   return prefix ? CHAIN_THEME[prefix] : CHAIN_THEME.Stellar
@@ -72,9 +78,7 @@ export const ChainSelectorModal: React.FC<ChainSelectorModalProps> = ({
 
   if (!open) return null
 
-  const chainLabel = selectedChain
-    ? (selectedChain.label.startsWith('Celo') ? 'Celo' : selectedChain.label.startsWith('Solana') ? 'Solana' : selectedChain.label)
-    : 'Stellar'
+  const chainLabel = selectedChain ? getChainShortLabel(selectedChain.label) : 'Stellar'
 
   return (
     <AnimatePresence>
@@ -104,7 +108,7 @@ export const ChainSelectorModal: React.FC<ChainSelectorModalProps> = ({
             {chains.map((chain) => {
               const theme = chainTheme(chain.label)
               const isSelected = chain.key === selectedChainKey
-              const label = chain.label.startsWith('Celo') ? 'Celo' : chain.label.startsWith('Solana') ? 'Solana' : chain.label
+              const label = getChainShortLabel(chain.label)
               return (
                 <button
                   aria-pressed={isSelected}

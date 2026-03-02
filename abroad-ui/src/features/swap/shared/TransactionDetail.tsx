@@ -52,13 +52,14 @@ const TransactionDetail: React.FC<TransactionDetailProps> = ({
   const country = COUNTRY_CONFIG[tc] ?? COUNTRY_CONFIG.COP
   const isExpired = transaction.status === 'PAYMENT_EXPIRED' || transaction.status === 'PAYMENT_FAILED' || transaction.status === 'WRONG_AMOUNT'
 
+  const locale = tc === 'BRL' ? 'pt-BR' : 'es-CO'
   const targetFormatted = transaction.quote.targetAmount.toLocaleString(
-    tc === 'BRL' ? 'pt-BR' : 'es-CO',
+    locale,
     tc === 'COP' ? { maximumFractionDigits: 0, minimumFractionDigits: 0 } : { maximumFractionDigits: 2, minimumFractionDigits: 2 },
   )
 
   const rate = transaction.quote.sourceAmount > 0
-    ? (transaction.quote.targetAmount / transaction.quote.sourceAmount).toLocaleString(tc === 'BRL' ? 'pt-BR' : 'es-CO', { maximumFractionDigits: 2 })
+    ? (transaction.quote.targetAmount / transaction.quote.sourceAmount).toLocaleString(locale, { maximumFractionDigits: 2 })
     : '—'
 
   const networkKey = (transaction.quote.network ?? 'STELLAR').toUpperCase()

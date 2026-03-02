@@ -24,23 +24,23 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
       'transition-[visibility,opacity] duration-[0.4s] ease-[cubic-bezier(0.16,1,0.3,1)]',
     )}
     onClick={onClose}
-    role="presentation"
   >
-    <div
+    <dialog
+      open
       className={cn(
         'w-full max-w-[520px] max-h-[85vh] overflow-y-auto rounded-t-[24px]',
         'bg-[var(--ab-bg-card)] shadow-[0_-12px_40px_rgba(0,0,0,0.08)]',
         'transition-transform duration-[0.4s] ease-[cubic-bezier(0.16,1,0.3,1)]',
+        'border-0 p-0 m-0',
         className,
       )}
       onClick={e => e.stopPropagation()}
-      role="dialog"
     >
       <div
         className="mx-auto mt-3 h-1 w-10 shrink-0 rounded-full bg-[var(--ab-border)]"
         aria-hidden
       />
       {children}
-    </div>
+    </dialog>
   </div>
 )

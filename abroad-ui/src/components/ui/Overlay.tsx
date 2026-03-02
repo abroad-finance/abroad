@@ -25,10 +25,9 @@ export const Overlay: React.FC<OverlayProps> = ({
       className,
     )}
     onClick={onClose}
-    role="presentation"
   >
-    <div onClick={e => e.stopPropagation()} role="dialog">
+    <dialog open className="border-0 p-0 m-0 bg-transparent" onClick={e => e.stopPropagation()}>
       {children}
-    </div>
+    </dialog>
   </div>
 )

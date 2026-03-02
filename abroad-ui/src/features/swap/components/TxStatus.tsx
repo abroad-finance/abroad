@@ -13,6 +13,17 @@ import { useWalletAuth } from '../../../shared/hooks/useWalletAuth'
 import { cn } from '../../../shared/utils'
 import { ASSET_URLS } from '../../../shared/constants'
 
+// S6478: component defined at module scope (not inside parent)
+const DetailRow = ({ label, value, className }: { label: string; value: React.ReactNode; className?: string }) => (
+  <div className={cn('flex items-center justify-between border-b border-ab-border pb-[17px]', className)}>
+    <span className="text-base font-normal text-ab-text-3">{label}</span>
+    <span className="text-base font-medium text-ab-text">{value}</span>
+  </div>
+)
+
+// S7776: Set.has() is O(1) vs Array.includes() O(n); defined at module scope to avoid re-creation per render
+const TERMINAL_STATUSES = new Set<ApiStatus>(['PAYMENT_COMPLETED', 'PAYMENT_EXPIRED', 'PAYMENT_FAILED', 'WRONG_AMOUNT'])
+
 const CHAIN_ICON_URL: Record<string, string> = {
   Celo: ASSET_URLS.CELO_CHAIN_ICON,
   Solana: ASSET_URLS.SOLANA_CHAIN_ICON,
@@ -109,14 +120,13 @@ const TxStatus = ({
   }, [transactionId])
 
   // REST polling fallback when WebSocket doesn't deliver (e.g. timeout, disconnect)
-  const TERMINAL_STATUSES: ApiStatus[] = ['PAYMENT_COMPLETED', 'PAYMENT_EXPIRED', 'PAYMENT_FAILED', 'WRONG_AMOUNT']
   const pollIntervalMs = 3000
   const maxPollAttempts = 60 // 3 minutes
 
   useEffect(() => {
     if (!transactionId || status !== 'inProgress') return
 
-    const isTerminal = (s?: ApiStatus) => s != null && TERMINAL_STATUSES.includes(s)
+    const isTerminal = (s?: ApiStatus) => s != null && TERMINAL_STATUSES.has(s)
     let cancelled = false
     let attempts = 0
 
@@ -196,13 +206,6 @@ const TxStatus = ({
         )
     }
   }
-
-  const DetailRow = ({ label, value, className }: { label: string; value: React.ReactNode; className?: string }) => (
-    <div className={cn('flex items-center justify-between border-b border-ab-border pb-[17px]', className)}>
-      <span className="text-base font-normal text-ab-text-3">{label}</span>
-      <span className="text-base font-medium text-ab-text">{value}</span>
-    </div>
-  )
 
   if (status === 'accepted' && txStatusDetails) {
     const merchant = txStatusDetails.accountNumber || '—'

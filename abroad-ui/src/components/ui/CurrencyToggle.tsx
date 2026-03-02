@@ -26,14 +26,14 @@ export const CurrencyToggle: React.FC<CurrencyToggleProps> = ({
   onChange,
   className,
 }) => (
-  <div
+  <fieldset
     className={cn(
       'inline-flex items-stretch gap-0.5 rounded-[11px] bg-[#f3f4f6] p-1 shadow-[1px_1px_3.6px_0px_rgba(0,0,0,0.25)]',
+      'border-0 m-0',
       className
     )}
-    role="group"
-    aria-label="Select currency"
   >
+    <legend className="sr-only">Select currency</legend>
     <button
       aria-pressed={value === 'COP'}
       className={cn(
@@ -74,5 +74,5 @@ export const CurrencyToggle: React.FC<CurrencyToggleProps> = ({
         src={FLAG_URLS.BRL}
       />
     </button>
-  </div>
+  </fieldset>
 )

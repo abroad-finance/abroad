@@ -137,17 +137,17 @@ const parseAmountUnits = (amount: string, decimals: number): bigint => {
 const parseTargetAmount = (value: string): number => {
   const raw = value.replace(/[^0-9.,]/g, '')
   if (raw.includes(',')) {
-    return parseFloat(raw.replace(/\./g, '').replace(/,/g, '.'))
+    return Number.parseFloat(raw.replace(/\./g, '').replace(/,/g, '.'))
   }
   const dotCount = (raw.match(/\./g) || []).length
-  if (dotCount === 0) return parseFloat(raw) || 0
-  if (dotCount >= 2) return parseFloat(raw.replace(/\./g, ''))
+  if (dotCount === 0) return Number.parseFloat(raw) || 0
+  if (dotCount >= 2) return Number.parseFloat(raw.replace(/\./g, ''))
   const [, fracPart] = raw.split('.')
   const frac = fracPart ?? ''
   if (frac.length === 3 && /^\d{3}$/.test(frac)) {
-    return parseFloat(raw.replace(/\./g, ''))
+    return Number.parseFloat(raw.replace(/\./g, ''))
   }
-  return parseFloat(raw)
+  return Number.parseFloat(raw)
 }
 
 const createInitialState = (isDesktop: boolean): SwapControllerState => ({
@@ -1579,16 +1579,19 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     dispatch({ type: 'SET_VIEW', view: 'confirm-qr' })
   }, [])
 
-  const txStatusDetails = useMemo(() => ({
-    accountNumber: state.accountNumber,
-    network: selectedCorridor ? formatChainLabel(selectedCorridor.blockchain) : '',
-    rail: selectedCorridor
+  const txStatusDetails = useMemo(() => {
+    const rail = selectedCorridor
       ? (selectedCorridor.paymentMethod === 'PIX' ? 'PIX' : 'Bre-B')
-      : '',
-    sourceAmount: state.sourceAmount,
-    targetAmount: state.targetAmount,
-    transferFeeDisplay,
-  }), [
+      : ''
+    return {
+      accountNumber: state.accountNumber,
+      network: selectedCorridor ? formatChainLabel(selectedCorridor.blockchain) : '',
+      rail,
+      sourceAmount: state.sourceAmount,
+      targetAmount: state.targetAmount,
+      transferFeeDisplay,
+    }
+  }, [
     state.accountNumber,
     state.sourceAmount,
     state.targetAmount,

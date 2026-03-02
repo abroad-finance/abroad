@@ -110,6 +110,16 @@ export default function Swap({
     ? t('swap.send_amount', 'Send {amount}', { amount: formattedAmount })
     : t('swap.continue', 'Continuar')
 
+  const ctaLabel = (continueDisabled || hasInsufficientFunds) ? ctaLabelDisabled : ctaLabelEnabled
+
+  const minMessage = targetCurrency === TargetCurrency.COP
+    ? t('swap.min_cop', 'Mínimo: $5.000 COP')
+    : t('swap.min_brl', 'Mínimo: R$1,00 BRL')
+  const maxMessage = targetCurrency === TargetCurrency.COP
+    ? t('swap.max_cop', 'Máximo: $5.000.000 COP')
+    : t('swap.max_brl', 'Máximo: R$50.000,00 BRL')
+  const limitMessage = isBelowMinimum ? minMessage : maxMessage
+
   return (
     <div
       className="mx-auto flex w-full max-w-[512px] flex-col overflow-hidden rounded-[32px] border border-[#f3f4f6] bg-white shadow-[0px_10px_40px_-10px_rgba(0,0,0,0.08)]"
@@ -202,15 +212,7 @@ export default function Swap({
       {(isBelowMinimum || isAboveMaximum) && (
         <div className="flex items-center justify-center gap-2 px-6 pb-2 text-xs font-bold text-ab-error">
           <CircleDollarSign className="h-4 w-4" />
-          <span>
-            {isBelowMinimum
-              ? (targetCurrency === TargetCurrency.COP
-                ? t('swap.min_cop', 'Mínimo: $5.000 COP')
-                : t('swap.min_brl', 'Mínimo: R$1,00 BRL'))
-              : (targetCurrency === TargetCurrency.COP
-                ? t('swap.max_cop', 'Máximo: $5.000.000 COP')
-                : t('swap.max_brl', 'Máximo: R$50.000,00 BRL'))}
-          </span>
+          <span>{limitMessage}</span>
         </div>
       )}
 
@@ -287,9 +289,7 @@ export default function Swap({
               <Wallet className="h-6 w-6" />
               {t('swap.connect_wallet', 'Conectar Billetera')}
             </span>
-          ) : (
-            (continueDisabled || hasInsufficientFunds) ? ctaLabelDisabled : ctaLabelEnabled
-          )}
+          ) : ctaLabel}
         </button>
       </div>
     </div>

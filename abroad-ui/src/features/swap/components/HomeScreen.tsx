@@ -105,7 +105,7 @@ export default function HomeScreen({
   targetCurrency,
 }: HomeScreenProps): React.JSX.Element {
   const { t } = useTranslate()
-  const balanceNum = parseFloat(balance.replace(/,/g, '')) || 0
+  const balanceNum = Number.parseFloat(balance.replace(/,/g, '')) || 0
 
   // Unauthenticated view – Figma node 5:2 pixel-perfect
   if (!isAuthenticated) {

@@ -3,6 +3,7 @@ import { Loader } from 'lucide-react'
 import React, {
   lazy, Suspense, useCallback, useEffect, useMemo, useState,
 } from 'react'
+import { flushSync } from 'react-dom'
 
 import type { BankDetailsRouteProps } from '../../features/swap/components/BankDetailsRoute'
 import type { ConfirmQrProps } from '../../features/swap/components/ConfirmQr'
@@ -239,7 +240,7 @@ const WebSwap: React.FC = () => {
                 onOpenChainModal={openSourceModal}
                 onOpenQr={openQr}
                 onSelectTransaction={(tx) => {
-                  walletDetails.setSelectedTransaction(tx)
+                  flushSync(() => walletDetails.setSelectedTransaction(tx))
                   handleWalletDetailsOpen()
                 }}
                 recentTransactions={
@@ -265,7 +266,7 @@ const WebSwap: React.FC = () => {
                   swapViewProps.isAuthenticated
                   && !!sourceAssetBalance
                   && !!(swapViewProps.sourceAmountForBalanceCheck ?? swapViewProps.sourceAmount)
-                  && parseFloat(swapViewProps.sourceAmountForBalanceCheck ?? swapViewProps.sourceAmount) > parseFloat(sourceAssetBalance.replace(/,/g, ''))
+                  && Number.parseFloat(swapViewProps.sourceAmountForBalanceCheck ?? swapViewProps.sourceAmount) > Number.parseFloat(sourceAssetBalance.replace(/,/g, ''))
                 }
                 loadingBalance={walletDetails.isLoadingBalance}
                 onBalanceClick={handleBalanceClick}
