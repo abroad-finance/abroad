@@ -113,21 +113,26 @@ export class PayoutSendStepExecutor implements FlowStepExecutor {
         transactionId: transaction.id,
       })
 
-      if (!updated) {
+      const retryingFailedPayout = transitionName === 'payment_failed' && transaction.status === TransactionStatus.PAYMENT_FAILED
+      if (!updated && !retryingFailedPayout) {
         this.logger.warn('Payout transition rejected', { transactionId: transaction.id, transitionName })
         return { error: 'Payout transition rejected', outcome: 'failed' }
       }
 
-      await this.dispatcher.notifyPartnerAndUser(
-        updated,
-        WebhookEvent.TRANSACTION_UPDATED,
-        'transaction.updated',
-        'flow_payout',
-        { deliverNow: false, prismaClient },
-      )
+      const transactionForNotifications = updated ?? transaction
+
+      if (updated) {
+        await this.dispatcher.notifyPartnerAndUser(
+          updated,
+          WebhookEvent.TRANSACTION_UPDATED,
+          'transaction.updated',
+          'flow_payout',
+          { deliverNow: false, prismaClient },
+        )
+      }
 
       if (paymentResponse.success) {
-        await this.dispatcher.notifySlack(updated, TransactionStatus.PAYMENT_COMPLETED, {
+        await this.dispatcher.notifySlack(transactionForNotifications, TransactionStatus.PAYMENT_COMPLETED, {
           deliverNow: false,
           notes: { provider: paymentService.provider ?? paymentMethod },
           prismaClient,
@@ -136,7 +141,7 @@ export class PayoutSendStepExecutor implements FlowStepExecutor {
         return { outcome: 'succeeded', output: { provider: paymentService.provider ?? transaction.quote.paymentMethod } }
       }
 
-      await this.dispatcher.notifySlack(updated, TransactionStatus.PAYMENT_FAILED, {
+      await this.dispatcher.notifySlack(transactionForNotifications, TransactionStatus.PAYMENT_FAILED, {
         deliverNow: false,
         notes: {
           provider: paymentService.provider ?? paymentMethod,
@@ -152,25 +157,25 @@ export class PayoutSendStepExecutor implements FlowStepExecutor {
         this.logger.info('Skipping refund for payout failure', {
           code: paymentResponse.code ?? null,
           reason: paymentResponse.reason ?? null,
-          transactionId: updated.id,
+          transactionId: transactionForNotifications.id,
         })
         return { error: paymentResponse.reason ?? 'payout_failed', outcome: 'failed' }
       }
 
-      if (!updated.onChainId) {
+      if (!transactionForNotifications.onChainId) {
         this.logger.warn('Skipping refund for payout failure; missing onChainId', {
-          transactionId: updated.id,
+          transactionId: transactionForNotifications.id,
         })
         return { error: paymentResponse.reason ?? 'payout_failed', outcome: 'failed' }
       }
 
       await this.refundCoordinator.refundByOnChainId({
-        amount: updated.quote.sourceAmount,
-        cryptoCurrency: updated.quote.cryptoCurrency,
-        network: updated.quote.network,
-        onChainId: updated.onChainId,
+        amount: transactionForNotifications.quote.sourceAmount,
+        cryptoCurrency: transactionForNotifications.quote.cryptoCurrency,
+        network: transactionForNotifications.quote.network,
+        onChainId: transactionForNotifications.onChainId,
         reason: 'provider_failed',
-        transactionId: updated.id,
+        transactionId: transactionForNotifications.id,
         trigger: 'flow_payout_send',
       })
 
