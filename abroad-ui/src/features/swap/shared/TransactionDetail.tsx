@@ -1,6 +1,6 @@
 import { useTranslate } from '@tolgee/react'
 import {
-  ArrowLeft, ArrowRight, ChevronDown, ChevronUp, HelpCircle, MapPin,
+  ArrowLeft, ArrowRight, ChevronDown, ChevronUp, HelpCircle, MapPin, Store,
 } from 'lucide-react'
 import React, { useState } from 'react'
 
@@ -130,8 +130,13 @@ const TransactionDetail: React.FC<TransactionDetailProps> = ({
 
       {/* Merchant/Recipient — Figma 1:277 */}
       <div className="flex flex-col items-center pb-6">
-        <div className="mb-3 flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl border-4 border-white bg-ab-bg-muted shadow-sm">
-          <img alt={country.location} className="h-full w-full object-cover" src={country.flagUrl} />
+        <div className="relative mb-3 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border-2 border-white bg-ab-bg-muted shadow-sm">
+          <Store className="h-5 w-5 text-ab-text-muted" strokeWidth={1.5} />
+          <img
+            alt={country.location}
+            className="absolute bottom-0 right-0 h-4 w-4 rounded-full border-2 border-white object-cover shadow-sm"
+            src={country.flagUrl}
+          />
         </div>
         <h5 className="font-cereal text-2xl font-bold text-[#0f172a]">
           {transaction.accountNumber}

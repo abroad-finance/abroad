@@ -1,5 +1,5 @@
 import { useTranslate } from '@tolgee/react'
-import { ChevronDown, ChevronRight, Keyboard, Lock, PiggyBank, QrCode, Zap } from 'lucide-react'
+import { ChevronDown, ChevronRight, Keyboard, Lock, PiggyBank, QrCode, Store, Zap } from 'lucide-react'
 import React from 'react'
 
 import { _36EnumsTargetCurrency as TargetCurrency, type TransactionListItem } from '../../../api'
@@ -363,8 +363,13 @@ export default function HomeScreen({
                       onClick={() => (onSelectTransaction ? onSelectTransaction(tx) : onHistoryClick())}
                       type="button"
                     >
-                      <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-[15px] border border-[#e5e7eb] bg-[#f9fafb]">
-                        <img alt={countryConfig.currency} className="h-full w-full object-cover" src={countryConfig.flagUrl} />
+                      <div className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-[15px] border border-[#e5e7eb] bg-[#f9fafb]">
+                        <Store className="h-6 w-6 text-[#6b7280]" strokeWidth={1.5} />
+                        <img
+                          alt={countryConfig.currency}
+                          className="absolute bottom-0 right-0 h-5 w-5 rounded-full border-2 border-white object-cover shadow-sm"
+                          src={countryConfig.flagUrl}
+                        />
                       </div>
                       <div className="min-w-0 flex-1">
                         <div
@@ -417,8 +422,13 @@ export default function HomeScreen({
                       onClick={onHistoryClick}
                       type="button"
                     >
-                      <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-[15px] border border-[#e5e7eb] bg-[#f9fafb]">
-                        <img alt={countryConfig.currency} className="h-full w-full object-cover" src={countryConfig.flagUrl} />
+                      <div className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-[15px] border border-[#e5e7eb] bg-[#f9fafb]">
+                        <Store className="h-6 w-6 text-[#6b7280]" strokeWidth={1.5} />
+                        <img
+                          alt={countryConfig.currency}
+                          className="absolute bottom-0 right-0 h-5 w-5 rounded-full border-2 border-white object-cover shadow-sm"
+                          src={countryConfig.flagUrl}
+                        />
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="text-sm font-semibold text-[#111827]">{tx.merchant}</div>
