@@ -101,23 +101,11 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({
           </button>
         )}
 
-        {/* Header — hidden when showing transaction detail */}
-        {!selectedTransaction && (
-          <div className="mb-6 pr-8 text-center mt-2 md:mt-4">
-            <h2 className={cn('text-2xl font-semibold mb-2', AB_STYLES.text)}>
-              {t('wallet_details.header.title', 'Tu Cuenta')}
-            </h2>
-            <p className={cn('text-md', AB_STYLES.textMuted)}>
-              {t('wallet_details.header.subtitle', 'Gestiona tu billetera y consulta el historial de transacciones')}
-            </p>
-          </div>
-        )}
-
         {/* Transaction History */}
-        <div className="flex-1">
+        <div className="flex-1 pt-4 md:pt-6">
           {!selectedTransaction && (
             <>
-              <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center justify-between mb-4 pr-8">
                 <h3 className={cn('font-medium text-lg', AB_STYLES.text)}>{t('wallet_details.transactions.title', 'Historial de Transacciones')}</h3>
                 <button
                   className={cn('p-2 rounded-full transition-colors duration-200 disabled:opacity-50', AB_STYLES.hoverBg)}
