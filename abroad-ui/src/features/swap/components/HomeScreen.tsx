@@ -6,9 +6,9 @@ import { _36EnumsTargetCurrency as TargetCurrency, type TransactionListItem } fr
 import BreBLogo from '../../../assets/Logos/networks/Bre-b.svg'
 import { CurrencyToggle } from '../../../components/ui'
 
-const RECENT_COUNTRY_CONFIG: Record<string, { flag: string, symbol: string, currency: string }> = {
-  COP: { flag: '🇨🇴', symbol: '$', currency: 'COP' },
-  BRL: { flag: '🇧🇷', symbol: 'R$', currency: 'BRL' },
+const RECENT_COUNTRY_CONFIG: Record<string, { flagUrl: string, symbol: string, currency: string }> = {
+  COP: { flagUrl: 'https://hatscripts.github.io/circle-flags/flags/co.svg', symbol: '$', currency: 'COP' },
+  BRL: { flagUrl: 'https://hatscripts.github.io/circle-flags/flags/br.svg', symbol: 'R$', currency: 'BRL' },
 }
 import { ASSET_URLS } from '../../../shared/constants'
 import { cn } from '../../../shared/utils'
@@ -363,8 +363,8 @@ export default function HomeScreen({
                       onClick={() => (onSelectTransaction ? onSelectTransaction(tx) : onHistoryClick())}
                       type="button"
                     >
-                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[15px] border border-[#e5e7eb] bg-[#f9fafb] text-xl">
-                        {countryConfig.flag}
+                      <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-[15px] border border-[#e5e7eb] bg-[#f9fafb]">
+                        <img alt={countryConfig.currency} className="h-full w-full object-cover" src={countryConfig.flagUrl} />
                       </div>
                       <div className="min-w-0 flex-1">
                         <div
@@ -417,8 +417,8 @@ export default function HomeScreen({
                       onClick={onHistoryClick}
                       type="button"
                     >
-                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[15px] border border-[#e5e7eb] bg-[#f9fafb] text-xl">
-                        {countryConfig.flag}
+                      <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-[15px] border border-[#e5e7eb] bg-[#f9fafb]">
+                        <img alt={countryConfig.currency} className="h-full w-full object-cover" src={countryConfig.flagUrl} />
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="text-sm font-semibold text-[#111827]">{tx.merchant}</div>
