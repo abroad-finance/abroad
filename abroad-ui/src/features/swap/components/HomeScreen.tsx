@@ -306,35 +306,35 @@ export default function HomeScreen({
           )}
         </div>
 
-        {/* Payment cards – Figma 1:71, 2 cols on mobile, square buttons */}
-        <div className="mt-6 grid grid-cols-2 gap-4 md:mt-10">
+        {/* Payment cards – Figma 1:71, 2 cols equal height, responsive */}
+        <div className="mt-6 grid grid-cols-2 gap-3 items-stretch md:mt-10 md:gap-4">
           <button
-            className="flex aspect-square flex-col items-center justify-center gap-2 rounded-[24px] bg-[#3ca383] p-4 text-center shadow-[0px_0px_15px_0px_rgba(16,185,129,0.3)] transition-opacity hover:opacity-95 md:rounded-[32px] md:gap-4 md:p-6"
+            className="flex h-full min-h-[140px] w-full flex-col items-center justify-center gap-1.5 rounded-[24px] bg-[#3ca383] p-4 text-center shadow-[0px_0px_15px_0px_rgba(16,185,129,0.3)] transition-opacity hover:opacity-95 md:min-h-[180px] md:gap-4 md:rounded-[32px] md:p-6"
             onClick={onOpenQr}
             type="button"
           >
-            <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-[18px] bg-white/20 backdrop-blur-[2px] md:h-32 md:w-32 md:rounded-[24px]">
+            <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[14px] bg-white/20 backdrop-blur-[2px] md:h-24 md:w-24 md:rounded-[20px]">
               <QrCode className="h-full w-full p-2 text-white" strokeWidth={1.5} />
             </div>
-            <span className="text-base font-bold leading-tight text-white md:text-xl md:leading-[25px]">
+            <span className="text-sm font-bold leading-tight text-white md:text-xl md:leading-[25px]">
               {t('home.scan_to_pay', 'Scan to Pay')}
             </span>
             <img
               alt={targetCurrency === TargetCurrency.BRL ? 'PIX' : 'Bre-B'}
-              className="h-5 w-auto md:h-6"
+              className="h-4 w-auto shrink-0 md:h-6"
               src={RAIL_LOGO[targetCurrency]}
             />
           </button>
 
           <button
-            className="flex aspect-square flex-col items-center justify-center gap-2 rounded-[24px] bg-white p-4 text-center shadow-[0px_4px_6px_-1px_rgba(0,0,0,0.02),0px_2px_4px_-1px_rgba(0,0,0,0.02)] transition-shadow hover:shadow-md md:rounded-[32px] md:gap-4 md:p-6"
+            className="flex h-full min-h-[140px] w-full flex-col items-center justify-center gap-1.5 rounded-[24px] bg-white p-4 text-center shadow-[0px_4px_6px_-1px_rgba(0,0,0,0.02),0px_2px_4px_-1px_rgba(0,0,0,0.02)] transition-shadow hover:shadow-md md:min-h-[180px] md:gap-4 md:rounded-[32px] md:p-6"
             onClick={onGoToManual}
             type="button"
           >
-            <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-[18px] bg-[#f3f4f6] md:h-32 md:w-32 md:rounded-[24px]">
+            <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[14px] bg-[#f3f4f6] md:h-24 md:w-24 md:rounded-[20px]">
               <Keyboard className="h-full w-full p-2 text-[#374151]" strokeWidth={1.5} />
             </div>
-            <span className="text-base font-bold leading-tight text-[#111827] md:text-xl md:leading-[25px]">
+            <span className="text-sm font-bold leading-tight text-[#111827] md:text-xl md:leading-[25px]">
               {t('home.manual_payment', 'Manual Payment')}
             </span>
           </button>
