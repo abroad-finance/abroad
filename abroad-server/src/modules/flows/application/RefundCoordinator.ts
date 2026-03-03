@@ -53,11 +53,16 @@ export class RefundCoordinator {
 
     let refundResult
     try {
+      const sourceAddress = params.network === BlockchainNetwork.SOLANA
+        ? await this.repository.findDepositAddressFrom(params.transactionId)
+        : undefined
+
       refundResult = await this.refundService.refundByOnChainId({
         amount: params.amount,
         cryptoCurrency: params.cryptoCurrency,
         network: params.network,
         onChainId: params.onChainId,
+        sourceAddress: sourceAddress ?? undefined,
       })
     }
     catch (error) {
