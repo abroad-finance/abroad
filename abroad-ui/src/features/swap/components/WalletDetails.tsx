@@ -43,7 +43,6 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({
   getStatusStyle,
   getStatusText,
   hasMoreTransactions,
-  isLoadingBalance: _isLoadingBalance,
   isLoadingMoreTransactions,
   isLoadingTransactions,
   onClose,

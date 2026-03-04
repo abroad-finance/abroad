@@ -13,12 +13,12 @@ const CHAIN_CONFIG: Record<string, { bg: string, icon: string }> = {
   Stellar: { bg: 'var(--ab-chain-stellar-bg)', icon: ASSET_URLS.STELLAR_CHAIN_ICON },
 }
 
-const COUNTRY_CONFIG: Record<string, { currency: string, flag: string, rail: string, symbol: string }> = {
+const COUNTRY_CONFIG: Record<string, { currency: string, flagUrl: string, rail: string, symbol: string }> = {
   br: {
-    currency: 'BRL', flag: '🇧🇷', rail: 'PIX', symbol: 'R$',
+    currency: 'BRL', flagUrl: 'https://hatscripts.github.io/circle-flags/flags/br.svg', rail: 'PIX', symbol: 'R$',
   },
   co: {
-    currency: 'COP', flag: '🇨🇴', rail: 'Bre-B', symbol: '$',
+    currency: 'COP', flagUrl: 'https://hatscripts.github.io/circle-flags/flags/co.svg', rail: 'Bre-B', symbol: '$',
   },
 }
 
@@ -55,11 +55,11 @@ export default function HistorySheet({ onClose, onSelectTx, transactions }: Read
                     >
                       <div
                         className={cn(
-                          'relative flex h-12 w-12 shrink-0 items-center justify-center rounded-[15px] border text-xl',
+                          'relative flex h-12 w-12 shrink-0 items-center justify-center rounded-[15px] border',
                           isExpired ? 'border-[#FECACA] bg-[#FEF2F2]' : 'border-[var(--ab-border)] bg-[var(--ab-bg-muted)]',
                         )}
                       >
-                        {country.flag}
+                        <img alt={country.currency} className="h-7 w-7 rounded-full" src={country.flagUrl} />
                         {isExpired && (
                           <div className="absolute -bottom-0.5 -right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full border-2 border-white bg-[var(--ab-red)]">
                             <svg className="h-1.5 w-1.5 text-white" fill="none" stroke="currentColor" strokeWidth={3} viewBox="0 0 24 24">

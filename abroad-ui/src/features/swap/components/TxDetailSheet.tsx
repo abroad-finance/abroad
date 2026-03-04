@@ -28,12 +28,12 @@ const CHAIN_CONFIG: Record<string, { bg: string, icon: string }> = {
   Stellar: { bg: 'var(--ab-chain-stellar-bg)', icon: ASSET_URLS.STELLAR_CHAIN_ICON },
 }
 
-const COUNTRY_CONFIG: Record<string, { currency: string, flag: string, name: string, rail: string, symbol: string }> = {
+const COUNTRY_CONFIG: Record<string, { currency: string, flagUrl: string, name: string, rail: string, symbol: string }> = {
   br: {
-    currency: 'BRL', flag: '🇧🇷', name: 'Brazil', rail: 'PIX', symbol: 'R$',
+    currency: 'BRL', flagUrl: 'https://hatscripts.github.io/circle-flags/flags/br.svg', name: 'Brazil', rail: 'PIX', symbol: 'R$',
   },
   co: {
-    currency: 'COP', flag: '🇨🇴', name: 'Colombia', rail: 'Bre-B', symbol: '$',
+    currency: 'COP', flagUrl: 'https://hatscripts.github.io/circle-flags/flags/co.svg', name: 'Colombia', rail: 'Bre-B', symbol: '$',
   },
 }
 
@@ -82,8 +82,8 @@ export default function TxDetailSheet({ onClose, tx }: Readonly<TxDetailSheetPro
         </div>
 
         <div className="mb-6 text-center">
-          <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-[18px] border border-[var(--ab-border)] bg-[var(--ab-bg-muted)] text-2xl">
-            {country.flag}
+          <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-[18px] border border-[var(--ab-border)] bg-[var(--ab-bg-muted)]">
+            <img alt={country.currency} className="h-10 w-10 rounded-full" src={country.flagUrl} />
           </div>
           <div className="font-cereal text-lg font-bold text-[var(--ab-text)]">{tx.merchant}</div>
           <div className="text-[13px] text-[var(--ab-text-muted)]">
@@ -118,7 +118,7 @@ export default function TxDetailSheet({ onClose, tx }: Readonly<TxDetailSheetPro
         <div className="mb-4 overflow-hidden rounded-2xl border border-[var(--ab-border)]">
           {[
             { badge: true, label: 'Status', value: isExpired ? 'Expired' : 'Completed' },
-            { label: 'Payment rail', value: `${country.flag} ${country.rail}` },
+            { icon: country.flagUrl, label: 'Payment rail', value: country.rail },
             { label: 'Fee', value: `$${tx.fee} ${tx.token}` },
             { label: 'Settlement time', value: tx.settlementTime === '—' ? '—' : `⚡ ${tx.settlementTime}` },
             { icon: chain.icon, label: 'Network', value: tx.chain },

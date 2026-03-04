@@ -80,6 +80,21 @@ export interface WebSwapControllerProps {
 
 /* ── Chain icon helpers for source modal ── */
 
+const NETWORK_TO_CHAIN_NAME: Record<string, string> = {
+  CELO: 'Celo',
+  SOLANA: 'Solana',
+  STELLAR: 'Stellar',
+}
+
+const TX_STATUS_MAP: Record<string, 'completed' | 'expired' | 'pending'> = {
+  AWAITING_PAYMENT: 'pending',
+  PAYMENT_COMPLETED: 'completed',
+  PAYMENT_EXPIRED: 'expired',
+  PAYMENT_FAILED: 'expired',
+  PROCESSING_PAYMENT: 'pending',
+  WRONG_AMOUNT: 'expired',
+}
+
 const CHAIN_ICON_MAP: Record<string, string> = {
   Celo: ASSET_URLS.CELO_CHAIN_ICON,
   Solana: ASSET_URLS.SOLANA_CHAIN_ICON,
@@ -153,7 +168,7 @@ const WebSwap: React.FC = () => {
   const [selectedTx, setSelectedTx] = useState<null | TxDetailItem>(null)
 
   // Fetch user transactions
-  const { allTransactions, fetchTransactions, recentTransactions: txSummaries } = useUserTransactions(swapViewProps.isAuthenticated, selectedChainKey)
+  const { allTransactions, fetchAllTransactions, fetchTransactions, recentTransactions: txSummaries } = useUserTransactions(swapViewProps.isAuthenticated, selectedChainKey)
 
   // Fetch transactions on mount, when authenticated changes, and when navigating to home
   useEffect(() => {
@@ -245,13 +260,30 @@ const WebSwap: React.FC = () => {
                 }
                 onConnectWallet={handleConnectWalletClick}
                 onGoToManual={goToManual}
-                onHistoryClick={handleOpenWalletList}
+                onHistoryClick={() => {
+                  fetchAllTransactions()
+                  setShowHistory(true)
+                }}
                 onOpenChainModal={openSourceModal}
                 onOpenQr={openQr}
                 onSelectCurrency={selectCurrency}
                 onSelectTransaction={(tx) => {
-                  walletDetails.setSelectedTransaction(tx)
-                  handleWalletDetailsOpen()
+                  const country = tx.quote.targetCurrency === 'BRL' ? 'br' : 'co'
+                  setSelectedTx({
+                    accountNumber: tx.accountNumber,
+                    chain: NETWORK_TO_CHAIN_NAME[tx.quote.network?.toUpperCase() ?? ''] ?? 'Stellar',
+                    country,
+                    date: new Date(tx.createdAt).toLocaleString('en-US', { day: 'numeric', hour: 'numeric', minute: '2-digit', month: 'short', year: 'numeric' }),
+                    fee: '0.01',
+                    localAmount: tx.quote.targetAmount.toFixed(country === 'br' ? 2 : 0),
+                    location: tx.externalId || undefined,
+                    merchant: tx.externalId || `••••${tx.accountNumber.slice(-4)}`,
+                    settlementTime: tx.status === 'PAYMENT_COMPLETED' ? 'Instant' : '—',
+                    status: TX_STATUS_MAP[tx.status] ?? 'pending',
+                    token: tx.quote.cryptoCurrency,
+                    transactionId: tx.onChainId ?? tx.id,
+                    usdcAmount: tx.quote.sourceAmount.toFixed(2),
+                  })
                 }}
                 recentTransactions={
                   selectedChainKey
