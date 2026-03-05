@@ -201,6 +201,22 @@ export function parseEMVQR(rawData: string): ParsedQR {
         case '60':
           result.merchantCity = entry.value
           break
+        case '62': {
+          // Additional Data Field Template — extract Mobile Number (sub-tag 02) as keyInfo fallback.
+          // Nequi (Colombia) stores the recipient phone in field 62.02 instead of a merchant account sub-field.
+          if (!result.keyInfo) {
+            const additional = parseTLV(entry.value)
+            const mobile = additional.find(s => s.id === '02')
+            if (mobile?.value) {
+              result.keyInfo = {
+                source: 'Nequi',
+                type: 'phone',
+                value: mobile.value,
+              }
+            }
+          }
+          break
+        }
         case '63':
           result.crc = entry.value
           break
