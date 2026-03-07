@@ -1,4 +1,9 @@
-import React, { useCallback, useMemo, useState } from 'react'
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react'
 
 import { useWalletAuthentication } from '../services/useWalletAuthentication'
 import { useWalletFactory } from '../services/useWalletFactory'
@@ -11,6 +16,10 @@ export const WalletAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const walletAuthentication = useWalletAuthentication()
   const walletFactory = useWalletFactory({ walletAuth: walletAuthentication })
   const defaultWallet = useMemo(() => {
+    if (walletFactory.miniPay.isActive) {
+      return walletFactory.getWalletHandler('mini-pay')
+    }
+
     const searchParams = new URLSearchParams(window.location.search)
     if (searchParams.get('token')) {
       // If there's a token in the URL, force using sep24 wallet to handle it.
@@ -21,6 +30,21 @@ export const WalletAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     return walletFactory.getWalletHandler(walletType)
   }, [walletFactory])
   const [wallet, setWallet] = useState(defaultWallet)
+
+  useEffect(() => {
+    setWallet(defaultWallet)
+  }, [defaultWallet])
+
+  useEffect(() => {
+    if (!walletFactory.miniPay.isActive || !walletAuthentication.jwtToken) {
+      return
+    }
+    walletAuthentication.setJwtToken(null)
+  }, [
+    walletAuthentication,
+    walletAuthentication.jwtToken,
+    walletFactory.miniPay.isActive,
+  ])
 
   const setKycUrl = useCallback((url: null | string) => {
     _setKycUrl(url)
@@ -37,6 +61,7 @@ export const WalletAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       defaultWallet,
       getWalletHandler: walletFactory.getWalletHandler,
       kycUrl,
+      miniPay: walletFactory.miniPay,
       setActiveWallet: setWallet,
       setKycUrl,
       wallet,

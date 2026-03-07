@@ -12,9 +12,13 @@ export async function fetchNonStellarBalances(
   address: string,
   chainId: string,
   family: 'evm' | 'solana',
-): Promise<{ usdc: string, usdt: string }> {
+): Promise<{ cUsd: string, usdc: string, usdt: string }> {
   const config = getChainBalanceConfig(chainId)
-  if (!config) return { usdc: '0.00', usdt: '0.00' }
+  if (!config) return {
+    cUsd: '0.00',
+    usdc: '0.00',
+    usdt: '0.00',
+  }
 
   const format = (n: number): string => (
     Number.isFinite(n)
@@ -37,29 +41,55 @@ export async function fetchNonStellarBalances(
         return Number(raw) / (10 ** config.decimals)
       }
       return {
+        cUsd: '0.00',
         usdc: format(parseTokenAccount(usdcAccount)),
         usdt: format(parseTokenAccount(usdtAccount)),
       }
     }
     catch {
-      return { usdc: '0.00', usdt: '0.00' }
+      return {
+        cUsd: '0.00',
+        usdc: '0.00',
+        usdt: '0.00',
+      }
     }
   }
 
   if (family === 'evm') {
     try {
       const provider = new JsonRpcProvider(config.rpcUrl)
+      const ownerAddress = getAddress(address)
       const usdc = new Contract(getAddress(config.usdcAddress), ERC20_ABI, provider)
       const usdt = new Contract(getAddress(config.usdtAddress), ERC20_ABI, provider)
-      const [usdcRaw, usdtRaw] = await Promise.all([usdc.balanceOf(getAddress(address)), usdt.balanceOf(getAddress(address))])
+      const cUsd = config.cUsdAddress
+        ? new Contract(getAddress(config.cUsdAddress), ERC20_ABI, provider)
+        : null
+      const [usdcRaw, usdtRaw, cUsdRaw] = await Promise.all([
+        usdc.balanceOf(ownerAddress),
+        usdt.balanceOf(ownerAddress),
+        cUsd ? cUsd.balanceOf(ownerAddress) : Promise.resolve(0n),
+      ])
       const usdcNum = parseFloat(formatUnits(usdcRaw, config.decimals))
       const usdtNum = parseFloat(formatUnits(usdtRaw, config.decimals))
-      return { usdc: format(usdcNum), usdt: format(usdtNum) }
+      const cUsdNum = parseFloat(formatUnits(cUsdRaw, config.decimals))
+      return {
+        cUsd: format(cUsdNum),
+        usdc: format(usdcNum),
+        usdt: format(usdtNum),
+      }
     }
     catch {
-      return { usdc: '0.00', usdt: '0.00' }
+      return {
+        cUsd: '0.00',
+        usdc: '0.00',
+        usdt: '0.00',
+      }
     }
   }
 
-  return { usdc: '0.00', usdt: '0.00' }
+  return {
+    cUsd: '0.00',
+    usdc: '0.00',
+    usdt: '0.00',
+  }
 }

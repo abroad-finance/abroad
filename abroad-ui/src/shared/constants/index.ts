@@ -1,4 +1,7 @@
 export const ATTRIBUTION_URL = 'https://www.flickr.com/photos/pedrosz/36132013403'
+export const ABROAD_PRIVACY_URL = 'https://www.abroad.finance/privacy-policy'
+export const ABROAD_SUPPORT_URL = 'https://www.abroad.finance/contact-us'
+export const ABROAD_TERMS_URL = 'https://www.abroad.finance/terms-of-service'
 
 export const ASSET_URLS = {
   BACKGROUND_IMAGE: 'https://storage.googleapis.com/cdn-abroad/bg/36132013403_56c8daad31_3k.jpg',

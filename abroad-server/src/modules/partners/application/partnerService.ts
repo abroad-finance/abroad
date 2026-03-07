@@ -55,6 +55,15 @@ export class PartnerService implements IPartnerService {
     return partner
   }
 
+  public async getPartnerFromClientDomain(clientDomain: string): Promise<Partner> {
+    const prismaClient = await this.databaseClientProvider.getClient()
+    const partner = await this.findPartnerByClientDomain(prismaClient, clientDomain)
+    if (!partner) {
+      throw new Error('Partner not found')
+    }
+    return partner
+  }
+
   public async getPartnerFromSepJwt(token: string): Promise<Partner> {
     try {
       const [sepJwtSecret, sepPartnerId] = await Promise.all([

@@ -9,6 +9,8 @@ import { getSwapPageTitleDefault } from '../constants/swapPageTitles'
 import { SwapView } from '../types'
 
 export interface WebSwapLayoutProps {
+  disclosure?: null | React.JSX.Element
+  isMiniPay?: boolean
   targetCurrency: (typeof TargetCurrency)[keyof typeof TargetCurrency]
   view: SwapView
 }
@@ -24,7 +26,13 @@ type WebSwapLayoutSlots = {
   }
 }
 
-const WebSwapLayout: React.FC<WebSwapLayoutProps & WebSwapLayoutSlots> = ({ slots, targetCurrency, view }) => {
+const WebSwapLayout: React.FC<WebSwapLayoutProps & WebSwapLayoutSlots> = ({
+  disclosure = null,
+  isMiniPay = false,
+  slots,
+  targetCurrency,
+  view,
+}) => {
   const { t } = useTranslate()
   const tolgee = useTolgee()
   const lang = tolgee.getLanguage()
@@ -66,8 +74,15 @@ const WebSwapLayout: React.FC<WebSwapLayoutProps & WebSwapLayoutSlots> = ({ slot
       {/* Mobile (<= md) */}
       <div className="md:hidden flex flex-col w-full">
         <div
-          className="min-h-[600px] h-[calc(100vh-80px)] flex flex-col items-center justify-center px-4 py-6 gap-6"
-          style={{ background: 'linear-gradient(135deg, var(--ab-bg), var(--ab-bg-end))' }}
+          className={cn(
+            'min-h-[600px] h-[calc(100vh-80px)] flex flex-col items-center justify-center gap-5',
+            isMiniPay ? 'px-3 py-4' : 'px-4 py-6',
+          )}
+          style={{
+            background: isMiniPay
+              ? 'linear-gradient(180deg, #f3faf7 0%, #e6f4ee 100%)'
+              : 'linear-gradient(135deg, var(--ab-bg), var(--ab-bg-end))',
+          }}
         >
           <h1 className={cn('text-3xl font-black text-center w-full', BRAND_TITLE_CLASS)}>
             {pageTitle}
@@ -75,6 +90,7 @@ const WebSwapLayout: React.FC<WebSwapLayoutProps & WebSwapLayoutSlots> = ({ slot
           <div className="w-full max-w-md">
             {renderSwap}
           </div>
+          {disclosure}
         </div>
       </div>
 
@@ -85,6 +101,7 @@ const WebSwapLayout: React.FC<WebSwapLayoutProps & WebSwapLayoutSlots> = ({ slot
             {pageTitle}
           </h1>
           {renderSwap}
+          {disclosure}
         </div>
       </div>
     </div>

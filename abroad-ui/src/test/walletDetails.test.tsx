@@ -82,6 +82,11 @@ const mockAuth: IWalletAuthentication = {
 const Wrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   <WalletAuthContext.Provider value={{
     kycUrl: null,
+    miniPay: {
+      isActive: false,
+      isReady: false,
+      isResolving: false,
+    },
     setKycUrl: vi.fn(),
     wallet: mockKit,
     walletAuthentication: mockAuth,

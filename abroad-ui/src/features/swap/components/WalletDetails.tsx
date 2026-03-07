@@ -12,6 +12,7 @@ import TransactionDetail from '../shared/TransactionDetail'
 
 export interface WalletDetailsProps {
   address: null | string
+  cUsdBalance?: string
   copiedAddress: boolean
   formatDate: (dateString: string) => string
   formatDateWithTime: (dateString: string) => string
@@ -21,6 +22,7 @@ export interface WalletDetailsProps {
   isLoadingBalance: boolean
   isLoadingMoreTransactions: boolean
   isLoadingTransactions: boolean
+  isUnsupportedPreferredStablecoin?: boolean
   onClose?: () => void
   onCopyAddress: () => Promise<void>
   onDisconnectWallet: () => Promise<void>
@@ -30,6 +32,8 @@ export interface WalletDetailsProps {
   selectedAssetLabel?: string
   selectedTransaction: null | TransactionListItem
   setSelectedTransaction: (transaction: null | TransactionListItem) => void
+  supportedTokenPreference?: 'USDC' | 'USDT' | null
+  topStablecoin?: 'USDC' | 'USDT' | 'cUSD'
   transactionError: null | string
   transactions: TransactionListItem[]
   usdcBalance: string

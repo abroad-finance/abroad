@@ -15,6 +15,7 @@ export interface NavBarResponsiveProps {
   balance: string
   balanceLoading: boolean
   className?: string
+  hideWalletButton?: boolean
   infoUrl: string
   isDark?: boolean
   labels: {
@@ -39,6 +40,7 @@ const NAV_BUTTON_CLASS = 'p-2 rounded-full transition-colors cursor-pointer'
 const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({
   address,
   className = '',
+  hideWalletButton = false,
   infoUrl,
   isDark = false,
   labels,
@@ -61,7 +63,7 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({
           {isDark ? <Sun className="w-4.5 h-4.5" /> : <Moon className="w-4.5 h-4.5" />}
         </button>
       )}
-      {address && (
+      {address && !hideWalletButton && (
         <button
           aria-label={labels.walletDetailsAria}
           className={cn(NAV_BUTTON_CLASS, AB_STYLES.badgeBg)}

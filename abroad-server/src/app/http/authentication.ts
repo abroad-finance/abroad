@@ -10,6 +10,33 @@ import { OpsAuthService } from './OpsAuthService'
 
 type AuthContext = Partner | { kind: 'ops' }
 
+const CLIENT_DOMAIN_HEADER_CANDIDATES = ['Origin', 'Referer'] as const
+
+const resolveClientDomain = (request: Request): undefined | string => {
+  for (const headerName of CLIENT_DOMAIN_HEADER_CANDIDATES) {
+    const rawHeader = request.header(headerName)
+    if (!rawHeader) {
+      continue
+    }
+
+    try {
+      const url = new URL(rawHeader)
+      const hostname = url.hostname.trim().toLowerCase()
+      if (hostname.length > 0) {
+        return hostname
+      }
+    }
+    catch {
+      const normalized = rawHeader.trim().toLowerCase()
+      if (normalized.length > 0) {
+        return normalized
+      }
+    }
+  }
+
+  return undefined
+}
+
 export async function expressAuthentication(
   request: Request,
   securityName: string,
@@ -20,10 +47,16 @@ export async function expressAuthentication(
 
   if (securityName === 'ApiKeyAuth') {
     const apiKey = request.header('X-API-Key')
-    if (!apiKey) {
-      throw new Error('API key not provided')
+    if (apiKey) {
+      return partnerService.getPartnerFromApiKey(apiKey)
     }
-    return partnerService.getPartnerFromApiKey(apiKey)
+
+    const clientDomain = resolveClientDomain(request)
+    if (clientDomain) {
+      return partnerService.getPartnerFromClientDomain(clientDomain)
+    }
+
+    throw new Error('API key not provided')
   }
 
   if (securityName === 'BearerAuth') {

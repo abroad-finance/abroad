@@ -50,9 +50,18 @@ export interface SwapProps {
   isAboveMaximum: boolean
   isAuthenticated: boolean
   isBelowMinimum: boolean
+  isMiniPay?: boolean
+  isMiniPayReady?: boolean
   loadingBalance?: boolean
   loadingSource: boolean
   loadingTarget: boolean
+  loadingWallet?: boolean
+  miniPayNotice?: null | {
+    ctaHref: string
+    ctaLabel: string
+    description: string
+    title: string
+  }
   onBalanceClick?: () => void
   onDisconnect?: () => void
   onOpenSourceModal: () => void
@@ -78,6 +87,8 @@ export interface SwapProps {
   transferFeeDisplay: string
   usdcBalance?: string
   walletAddress?: null | string
+  walletStatusLabel?: string
+  walletStatusTone?: 'info' | 'warning'
 }
 
 export default function Swap({
@@ -87,9 +98,13 @@ export default function Swap({
   isAboveMaximum,
   isAuthenticated,
   isBelowMinimum,
+  isMiniPay = false,
+  isMiniPayReady = false,
   loadingBalance,
   loadingSource,
   loadingTarget,
+  loadingWallet,
+  miniPayNotice,
   onBalanceClick,
   onDisconnect,
   onOpenSourceModal,
@@ -107,6 +122,8 @@ export default function Swap({
   transferFeeDisplay,
   usdcBalance,
   walletAddress,
+  walletStatusLabel,
+  walletStatusTone = 'info',
 }: SwapProps): React.JSX.Element {
   const { t } = useTranslate()
 
@@ -118,6 +135,10 @@ export default function Swap({
   const truncatedAddress = walletAddress
     ? `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`
     : null
+  const primaryButtonDisabled = continueDisabled || (isMiniPay && !isMiniPayReady)
+  const walletStatusClass = walletStatusTone === 'warning'
+    ? 'text-amber-700 bg-amber-50 border-amber-200'
+    : 'text-emerald-700 bg-emerald-50 border-emerald-200'
 
   const chainIcon = getChainIcon(selectedChainLabel)
   const assetIcon = CRYPTO_ICONS[selectedAssetLabel]
@@ -189,7 +210,14 @@ export default function Swap({
 
           {/* Wallet address + Balance row (Allbridge-style) */}
           <div className="flex items-center justify-between mt-2">
-            {isAuthenticated && truncatedAddress
+            {isMiniPay
+              ? (
+                  <div className={cn('flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium', walletStatusClass)}>
+                    <Wallet className="w-3.5 h-3.5" />
+                    <span>{walletStatusLabel ?? (loadingWallet ? t('swap.minipay.opening', 'Opening MiniPay') : t('swap.minipay.ready', 'MiniPay ready'))}</span>
+                  </div>
+                )
+              : isAuthenticated && truncatedAddress
               ? (
                   <div className={cn('flex items-center gap-2 rounded-full px-3 py-1.5', AB_STYLES.badgeBg)}>
                     {chainIcon && <img alt={selectedChainLabel} className="w-4 h-4 rounded-full" src={chainIcon} />}
@@ -336,17 +364,34 @@ export default function Swap({
         )}
       </div>
 
+      {miniPayNotice && (
+        <div className={cn('rounded-2xl border px-4 py-3 text-sm', AB_STYLES.cardBg)}>
+          <div className={cn('font-semibold', AB_STYLES.text)}>{miniPayNotice.title}</div>
+          <p className={cn('mt-1 leading-relaxed', AB_STYLES.textSecondary)}>{miniPayNotice.description}</p>
+          <a
+            className={cn('mt-3 inline-flex items-center rounded-full px-3 py-2 text-sm font-semibold', 'bg-ab-btn text-ab-btn-text')}
+            href={miniPayNotice.ctaHref}
+            rel="noopener noreferrer"
+            target="_blank"
+          >
+            {miniPayNotice.ctaLabel}
+          </a>
+        </div>
+      )}
+
       {/* ── Primary Action Button ── */}
       <button
         className={cn(
           'w-full py-4 rounded-2xl text-base font-semibold transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed',
-          continueDisabled ? 'bg-ab-separator text-ab-text-muted' : 'bg-ab-btn text-ab-btn-text',
+          primaryButtonDisabled ? 'bg-ab-separator text-ab-text-muted' : 'bg-ab-btn text-ab-btn-text',
         )}
-        disabled={continueDisabled}
+        disabled={primaryButtonDisabled}
         onClick={onPrimaryAction}
         type="button"
       >
-        {!isAuthenticated
+        {isMiniPay && !isMiniPayReady
+          ? t('swap.minipay.opening', 'Opening MiniPay')
+          : !isAuthenticated
           ? (
               <div className="flex items-center justify-center gap-2">
                 <Wallet className="w-5 h-5" />

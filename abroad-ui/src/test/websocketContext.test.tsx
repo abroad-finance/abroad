@@ -75,6 +75,11 @@ describe('WebSocketProvider', () => {
     render(
       <WalletAuthContext.Provider value={{
         kycUrl: null,
+        miniPay: {
+          isActive: false,
+          isReady: false,
+          isResolving: false,
+        },
         setKycUrl: vi.fn(),
         wallet: mockKit,
         walletAuthentication: {

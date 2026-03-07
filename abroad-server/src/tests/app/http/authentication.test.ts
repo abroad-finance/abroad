@@ -7,6 +7,7 @@ import { expressAuthentication } from '../../../app/http/authentication'
 
 const partnerService: jest.Mocked<IPartnerService> = {
   getPartnerFromApiKey: jest.fn(),
+  getPartnerFromClientDomain: jest.fn(),
   getPartnerFromSepJwt: jest.fn(),
 } as jest.Mocked<IPartnerService>
 
@@ -22,6 +23,7 @@ describe('expressAuthentication', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     partnerService.getPartnerFromApiKey.mockResolvedValue(partner)
+    partnerService.getPartnerFromClientDomain.mockResolvedValue(partner)
     partnerService.getPartnerFromSepJwt.mockResolvedValue(partner)
     ;(iocContainer.get as jest.Mock).mockReturnValue(partnerService)
   })
@@ -54,6 +56,39 @@ describe('expressAuthentication', () => {
 
     await expect(expressAuthentication(req, 'ApiKeyAuth')).rejects.toThrow('API key not provided')
     expect(partnerService.getPartnerFromApiKey).not.toHaveBeenCalled()
+  })
+
+  it('falls back to the client origin domain for partner auth', async () => {
+    const req = buildRequest({
+      header: jest.fn((name: string) => {
+        if (name === 'Origin') {
+          return 'https://app.abroad.finance'
+        }
+        return undefined
+      }) as unknown as Request['header'],
+    })
+
+    const result = await expressAuthentication(req, 'ApiKeyAuth')
+
+    expect(result).toBe(partner)
+    expect(partnerService.getPartnerFromClientDomain).toHaveBeenCalledWith('app.abroad.finance')
+    expect(partnerService.getPartnerFromApiKey).not.toHaveBeenCalled()
+  })
+
+  it('falls back to the referer host when origin is unavailable', async () => {
+    const req = buildRequest({
+      header: jest.fn((name: string) => {
+        if (name === 'Referer') {
+          return 'https://app.abroad.finance/swap?utm_source=minipay'
+        }
+        return undefined
+      }) as unknown as Request['header'],
+    })
+
+    const result = await expressAuthentication(req, 'ApiKeyAuth')
+
+    expect(result).toBe(partner)
+    expect(partnerService.getPartnerFromClientDomain).toHaveBeenCalledWith('app.abroad.finance')
   })
 
   it('authenticates with a bearer token', async () => {

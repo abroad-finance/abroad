@@ -88,6 +88,13 @@ describe('PartnerService', () => {
     await expect(service.getPartnerFromApiKey('api-key')).rejects.toThrow('Partner not found')
   })
 
+  it('retrieves a partner by normalized client domain', async () => {
+    const result = await service.getPartnerFromClientDomain('Client.Example.com')
+
+    expect(findFirst).toHaveBeenCalledWith({ where: { clientDomainHash: hashedClientDomain } })
+    expect(result).toBe(partnerFromDomain)
+  })
+
   it('uses client_domain to resolve partner from SEP JWT', async () => {
     const result = await service.getPartnerFromSepJwt('token-123')
 

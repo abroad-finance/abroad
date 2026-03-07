@@ -12,6 +12,7 @@ import type { ChainOption, TokenOption } from '../../features/swap/components/To
 import { _36EnumsTargetCurrency as TargetCurrency } from '../../api/index'
 import BankDetailsRoute from '../../features/swap/components/BankDetailsRoute'
 import ConfirmQr from '../../features/swap/components/ConfirmQr'
+import MiniPayDisclosure from '../../features/swap/components/MiniPayDisclosure'
 import NavBarResponsive from '../../features/swap/components/NavBarResponsive'
 import Swap from '../../features/swap/components/Swap'
 import TokenSelectModal from '../../features/swap/components/TokenSelectModal'
@@ -44,6 +45,7 @@ export interface WebSwapControllerProps {
   handleWalletDetailsClose: () => void
   handleWalletDetailsOpen: () => void
   isDecodingQr: boolean
+  isMiniPay: boolean
   isQrOpen: boolean
   isWalletDetailsOpen: boolean
   onWalletConnect: () => Promise<void>
@@ -87,6 +89,7 @@ const WebSwap: React.FC = () => {
     handleWalletDetailsClose,
     handleWalletDetailsOpen,
     isDecodingQr,
+    isMiniPay,
     isQrOpen,
     isWalletDetailsOpen,
     onWalletConnect,
@@ -130,7 +133,7 @@ const WebSwap: React.FC = () => {
   const closeTargetModal = useCallback(() => setTargetModalOpen(false), [])
 
   // Build chain options for modal
-  const sourceChains: ChainOption[] = chainOptions.map(c => ({
+  const sourceChains: ChainOption[] = (isMiniPay ? [] : chainOptions).map(c => ({
     icon: Object.entries(CHAIN_ICON_MAP).find(([prefix]) => c.label.startsWith(prefix))?.[1],
     key: c.key,
     label: c.label,
@@ -173,7 +176,12 @@ const WebSwap: React.FC = () => {
 
   return (
     <div
-      className="w-full h-[100dvh] md:h-screen overflow-hidden flex flex-col bg-gradient-to-br from-[var(--ab-bg)] to-[var(--ab-bg-end)]"
+      className="w-full h-[100dvh] md:h-screen overflow-hidden flex flex-col"
+      style={{
+        background: isMiniPay
+          ? 'linear-gradient(180deg, #f5fbf8 0%, #e8f4ee 100%)'
+          : 'linear-gradient(135deg, var(--ab-bg), var(--ab-bg-end))',
+      }}
     >
       {/* Shared Navigation */}
       <div className="relative z-10">
@@ -189,6 +197,8 @@ const WebSwap: React.FC = () => {
       {/* Main Content Area */}
       <main className="flex-1 min-h-0 relative z-10 flex">
         <WebSwapLayout
+          disclosure={isMiniPay ? <MiniPayDisclosure /> : null}
+          isMiniPay={isMiniPay}
           slots={{
             bankDetails: <BankDetailsRoute {...bankDetailsProps} />,
             confirmQr: <ConfirmQr {...confirmQrProps} />,
@@ -198,12 +208,6 @@ const WebSwap: React.FC = () => {
             swap: (
               <Swap
                 {...swapViewProps}
-                hasInsufficientFunds={
-                  swapViewProps.isAuthenticated
-                  && !!sourceAssetBalance
-                  && !!swapViewProps.sourceAmount
-                  && parseFloat(swapViewProps.sourceAmount) > parseFloat(sourceAssetBalance.replace(/,/g, ''))
-                }
                 loadingBalance={walletDetails.isLoadingBalance}
                 onBalanceClick={handleBalanceClick}
                 onDisconnect={walletDetails.onDisconnectWallet}
@@ -211,7 +215,7 @@ const WebSwap: React.FC = () => {
                 onOpenTargetModal={openTargetModal}
                 openQr={openQr}
                 usdcBalance={sourceAssetBalance}
-                walletAddress={walletDetails.address}
+                walletAddress={isMiniPay ? null : walletDetails.address}
               />
             ),
             txStatus: (
@@ -231,33 +235,35 @@ const WebSwap: React.FC = () => {
       </main>
 
       {/* Desktop footer (Allbridge-style) */}
-      <footer className={cn('hidden md:flex items-center justify-center gap-6 h-[74px] px-6 border-t border-ab-separator flex-shrink-0 relative z-10', AB_STYLES.cardBgOnly)}>
-        <a
-          className={cn('text-sm font-medium hover:underline', AB_STYLES.textSecondary)}
-          href="https://linktr.ee/Abroad.finance"
-          rel="noopener noreferrer"
-          target="_blank"
-        >
-          {t('footer.guides', 'Guides')}
-        </a>
-        <a
-          className={cn('text-sm font-medium hover:underline', AB_STYLES.textSecondary)}
-          href="https://linktr.ee/Abroad.finance"
-          rel="noopener noreferrer"
-          target="_blank"
-        >
-          {t('footer.need_help', 'Need help?')}
-        </a>
-        <div className={cn('flex items-center gap-2 ml-2', AB_STYLES.textMuted)}>
-          <span className="text-sm">powered by</span>
-          <img
-            alt="Stellar"
-            className="h-6 w-auto"
-            src={ASSET_URLS.STELLAR_LOGO}
-            style={{ filter: 'invert(1)' }}
-          />
-        </div>
-      </footer>
+      {!isMiniPay && (
+        <footer className={cn('hidden md:flex items-center justify-center gap-6 h-[74px] px-6 border-t border-ab-separator flex-shrink-0 relative z-10', AB_STYLES.cardBgOnly)}>
+          <a
+            className={cn('text-sm font-medium hover:underline', AB_STYLES.textSecondary)}
+            href="https://linktr.ee/Abroad.finance"
+            rel="noopener noreferrer"
+            target="_blank"
+          >
+            {t('footer.guides', 'Guides')}
+          </a>
+          <a
+            className={cn('text-sm font-medium hover:underline', AB_STYLES.textSecondary)}
+            href="https://linktr.ee/Abroad.finance"
+            rel="noopener noreferrer"
+            target="_blank"
+          >
+            {t('footer.need_help', 'Need help?')}
+          </a>
+          <div className={cn('flex items-center gap-2 ml-2', AB_STYLES.textMuted)}>
+            <span className="text-sm">powered by</span>
+            <img
+              alt="Stellar"
+              className="h-6 w-auto"
+              src={ASSET_URLS.STELLAR_LOGO}
+              style={{ filter: 'invert(1)' }}
+            />
+          </div>
+        </footer>
+      )}
 
       {/* Source Modal (chain + token selection) */}
       <TokenSelectModal
@@ -284,15 +290,17 @@ const WebSwap: React.FC = () => {
       />
 
       {/* Wallet Details Modal */}
-      <ModalOverlay
-        onClose={handleWalletDetailsClose}
-        open={!!isWalletDetailsOpen}
-      >
-        <WalletDetails
-          {...walletDetails}
-          selectedAssetLabel={swapViewProps.selectedAssetLabel}
-        />
-      </ModalOverlay>
+      {!isMiniPay && (
+        <ModalOverlay
+          onClose={handleWalletDetailsClose}
+          open={!!isWalletDetailsOpen}
+        >
+          <WalletDetails
+            {...walletDetails}
+            selectedAssetLabel={swapViewProps.selectedAssetLabel}
+          />
+        </ModalOverlay>
+      )}
 
       {/* Full-screen QR Scanner */}
       {isQrOpen && (
