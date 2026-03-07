@@ -43,8 +43,13 @@ describe('ReceivedCryptoTransactionUseCase', () => {
   })
 
   it('starts flow for valid deposit', async () => {
-    const { orchestrator, useCase } = buildHarness()
+    const { orchestrator, repository, useCase } = buildHarness()
     await useCase.process(baseMessage)
+    expect(repository.applyDepositReceived).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      addressFrom: 'sender-wallet',
+      onChainId: 'on-chain-hash',
+      transactionId: '11111111-1111-4111-8111-111111111111',
+    }))
     expect(orchestrator.startFlow).toHaveBeenCalledWith('tx-1')
   })
 })

@@ -43,6 +43,7 @@ export class TransactionRepository {
   public async applyDepositReceived(
     prismaClient: TransactionClient,
     params: {
+      addressFrom?: string
       idempotencyKey: string
       onChainId: string
       transactionId: string
@@ -64,6 +65,7 @@ export class TransactionRepository {
     }
 
     const updated = await this.applyTransition(prismaClient, {
+      context: params.addressFrom ? { addressFrom: params.addressFrom } : undefined,
       data: {
         onChainId: params.onChainId,
       },
@@ -163,6 +165,31 @@ export class TransactionRepository {
       include: transactionNotificationInclude,
       where: { externalId },
     })
+  }
+
+  public async findDepositAddressFrom(transactionId: string): Promise<null | string> {
+    const client = await this.dbProvider.getClient()
+    const transitions = await client.transactionTransition.findMany({
+      orderBy: { createdAt: 'desc' },
+      select: { context: true },
+      where: {
+        event: 'deposit_received',
+        transactionId,
+      },
+    })
+
+    for (const transition of transitions) {
+      const context = transition.context
+      if (!context || typeof context !== 'object') {
+        continue
+      }
+      const addressFrom = (context as Record<string, unknown>).addressFrom
+      if (typeof addressFrom === 'string' && addressFrom.length > 0) {
+        return addressFrom
+      }
+    }
+
+    return null
   }
 
   public async findRefundState(transactionId: string): Promise<null | {

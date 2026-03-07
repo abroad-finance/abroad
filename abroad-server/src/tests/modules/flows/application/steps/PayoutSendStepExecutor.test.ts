@@ -11,12 +11,19 @@ describe('PayoutSendStepExecutor', () => {
     warn: jest.fn(),
   }
 
-  afterEach(() => {
-    jest.restoreAllMocks()
-    jest.clearAllMocks()
-  })
+  type SetupOptions = {
+    applyTransitionResult?: null | object
+    initialStatus?: TransactionStatus
+    network?: string
+    paymentFailureReason: string
+  }
 
-  it('applies payment_failed transition for async payout send failures', async () => {
+  const setup = ({
+    applyTransitionResult,
+    initialStatus,
+    network = 'stellar',
+    paymentFailureReason,
+  }: SetupOptions) => {
     const prismaClient = {
       transaction: {
         findUnique: jest.fn(async () => ({
@@ -27,23 +34,25 @@ describe('PayoutSendStepExecutor', () => {
           qrCode: null,
           quote: {
             cryptoCurrency: 'USDC',
-            network: 'stellar',
+            network,
             paymentMethod: PaymentMethod.BREB,
             sourceAmount: 20,
             targetAmount: 100,
             targetCurrency: 'COP',
           },
+          status: initialStatus,
         })),
       },
     }
 
-    const applyTransition = jest.fn(async () => ({
+    const defaultTransition = {
       id: 'tx-1',
       onChainId: 'on-chain-1',
       partnerUser: { partner: { webhookUrl: 'https://example.com/webhook' }, userId: 'user-1' },
-      quote: { cryptoCurrency: 'USDC', network: 'stellar', sourceAmount: 20 },
+      quote: { cryptoCurrency: 'USDC', network, sourceAmount: 20 },
       status: TransactionStatus.PAYMENT_FAILED,
-    }))
+    }
+    const applyTransition = jest.fn(async () => (applyTransitionResult === undefined ? defaultTransition : applyTransitionResult))
 
     jest.spyOn(TransactionRepository.prototype, 'getClient').mockResolvedValue(prismaClient as never)
     jest.spyOn(TransactionRepository.prototype, 'recordExternalIdIfMissing').mockResolvedValue(false)
@@ -60,7 +69,7 @@ describe('PayoutSendStepExecutor', () => {
         provider: 'transfero',
         sendPayment: jest.fn(async () => ({
           code: 'validation',
-          reason: 'tax_id_missing',
+          reason: paymentFailureReason,
           success: false,
           transactionId: 'provider-tx-1',
         })),
@@ -79,6 +88,19 @@ describe('PayoutSendStepExecutor', () => {
       {} as never,
       refundCoordinator as never,
     )
+
+    return { applyTransition, executor, notifyPartnerAndUser, notifySlack, prismaClient, refundCoordinator }
+  }
+
+  afterEach(() => {
+    jest.restoreAllMocks()
+    jest.clearAllMocks()
+  })
+
+  it('applies payment_failed transition for async payout send failures', async () => {
+    const { applyTransition, executor, notifyPartnerAndUser, notifySlack, prismaClient, refundCoordinator } = setup({
+      paymentFailureReason: 'tax_id_missing',
+    })
 
     expect(executor.stepType).toBe(FlowStepType.PAYOUT_SEND)
 
@@ -101,5 +123,34 @@ describe('PayoutSendStepExecutor', () => {
     expect(notifySlack).toHaveBeenCalledWith(expect.anything(), TransactionStatus.PAYMENT_FAILED, expect.anything())
     expect(refundCoordinator.refundByOnChainId).toHaveBeenCalledTimes(1)
     expect(result).toEqual({ error: 'tax_id_missing', outcome: 'failed' })
+  })
+
+  it('continues refund flow when retrying PAYMENT_FAILED payout and transition is rejected', async () => {
+    const { applyTransition, executor, notifyPartnerAndUser, notifySlack, prismaClient, refundCoordinator } = setup({
+      applyTransitionResult: null,
+      initialStatus: TransactionStatus.PAYMENT_FAILED,
+      network: 'SOLANA',
+      paymentFailureReason: 'provider_failed',
+    })
+
+    const result = await executor.execute({
+      config: {},
+      runtime: { context: { transactionId: 'tx-1' }, flowRunId: 'flow-1', stepExecutionId: 'step-1' } as never,
+      stepOrder: 1,
+    })
+
+    expect(applyTransition).toHaveBeenCalledWith(prismaClient, expect.objectContaining({
+      name: 'payment_failed',
+      transactionId: 'tx-1',
+    }))
+    expect(notifyPartnerAndUser).not.toHaveBeenCalled()
+    expect(notifySlack).toHaveBeenCalledWith(expect.objectContaining({ id: 'tx-1' }), TransactionStatus.PAYMENT_FAILED, expect.anything())
+    expect(refundCoordinator.refundByOnChainId).toHaveBeenCalledWith(expect.objectContaining({
+      network: 'SOLANA',
+      onChainId: 'on-chain-1',
+      reason: 'provider_failed',
+      transactionId: 'tx-1',
+    }))
+    expect(result).toEqual({ error: 'provider_failed', outcome: 'failed' })
   })
 })
