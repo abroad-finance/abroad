@@ -1,30 +1,85 @@
 import { getAddress } from 'ethers'
 
-export const MINIPAY_CHAIN_ID = 'eip155:42220'
+import type { WalletConnectRequest } from '../../interfaces/IWallet'
+
+export const MINIPAY_CHAIN_ID = 'eip155:42220' as const
 export const MINIPAY_ADD_CASH_URL = 'https://minipay.opera.com/add_cash'
-export const MINIPAY_SESSION_ADDRESS_KEY = 'abroad:minipay:address'
 
-export const MINIPAY_STABLECOIN_ADDRESSES = {
-  cUSD: '0x765DE816845861e75A25fCA122bb6898B8B1282a',
-  USDC: '0x37f750B7Cc259a2f741Af45294f6a16572CF5cAd',
-  USDT: '0x48065fbBE25f71C9282ddf5e1cD6D6A887483D5e',
-} as const
+const MINIPAY_SESSION_ADDRESS_KEY = 'abroad:minipay:address'
+const MINI_PAY_FEE_FIELDS = new Set(['gasPrice', 'maxFeePerGas', 'maxPriorityFeePerGas'])
 
-export const isMiniPayEnvironment = (): boolean => window.ethereum?.isMiniPay === true
+export interface MiniPaySessionStore {
+  getItem(key: string): null | string
+  removeItem(key: string): void
+  setItem(key: string, value: string): void
+}
 
-export const getMiniPayProvider = (): MiniPayEthereumProvider => {
-  const provider = window.ethereum
+export interface MiniPayBrowserRuntime {
+  provider: MiniPayEthereumProvider
+  sessionStore: MiniPaySessionStore | null
+}
+
+export type MiniPayAddressResolution = {
+  address: null | string
+  source: 'missing' | 'provider' | 'session'
+}
+
+const hasWindow = (): boolean => typeof window !== 'undefined'
+
+const getMiniPaySessionStore = (): MiniPaySessionStore | null => {
+  if (!hasWindow()) {
+    return null
+  }
+
+  try {
+    return window.sessionStorage
+  }
+  catch {
+    return null
+  }
+}
+
+export const isMiniPayEnvironment = (): boolean => {
+  if (!hasWindow()) {
+    return false
+  }
+  return window.ethereum?.isMiniPay === true
+}
+
+export const getMiniPayProvider = (
+  provider: MiniPayEthereumProvider | undefined = hasWindow() ? window.ethereum : undefined,
+): MiniPayEthereumProvider => {
   if (!provider || provider.isMiniPay !== true) {
     throw new Error('MiniPay provider is not available')
   }
   return provider
 }
 
+export const getMiniPayBrowserRuntime = (): MiniPayBrowserRuntime | null => {
+  if (!hasWindow()) {
+    return null
+  }
+
+  const provider = window.ethereum
+  if (!provider || provider.isMiniPay !== true) {
+    return null
+  }
+
+  return {
+    provider,
+    sessionStore: getMiniPaySessionStore(),
+  }
+}
+
 export const normalizeWalletAddress = (value: string): string => getAddress(value)
 
-export const readMiniPaySessionAddress = (): null | string => {
+export const readMiniPaySessionAddress = (sessionStore: MiniPaySessionStore | null): null | string => {
+  if (!sessionStore) {
+    return null
+  }
+
   try {
-    const value = sessionStorage.getItem(MINIPAY_SESSION_ADDRESS_KEY)
+    const value = sessionStore.getItem(MINIPAY_SESSION_ADDRESS_KEY)
     return value ? normalizeWalletAddress(value) : null
   }
   catch {
@@ -32,51 +87,81 @@ export const readMiniPaySessionAddress = (): null | string => {
   }
 }
 
-export const writeMiniPaySessionAddress = (address: null | string): void => {
+export const writeMiniPaySessionAddress = (
+  sessionStore: MiniPaySessionStore | null,
+  address: null | string,
+): void => {
+  if (!sessionStore) {
+    return
+  }
+
   try {
     if (!address) {
-      sessionStorage.removeItem(MINIPAY_SESSION_ADDRESS_KEY)
+      sessionStore.removeItem(MINIPAY_SESSION_ADDRESS_KEY)
       return
     }
-    sessionStorage.setItem(MINIPAY_SESSION_ADDRESS_KEY, normalizeWalletAddress(address))
+    sessionStore.setItem(MINIPAY_SESSION_ADDRESS_KEY, normalizeWalletAddress(address))
   }
   catch {
-    // Ignore session storage failures in embedded browsers.
+    // Embedded browsers can deny session storage access.
   }
 }
 
-export const resolveMiniPayAddress = async (): Promise<null | string> => {
-  const provider = getMiniPayProvider()
-  const accounts = await provider.request<string[]>({ method: 'eth_requestAccounts' })
+export const resolveMiniPayAddress = async (
+  runtime: MiniPayBrowserRuntime,
+): Promise<MiniPayAddressResolution> => {
+  const accounts = await runtime.provider.request<string[]>({ method: 'eth_requestAccounts' })
   const [address] = Array.isArray(accounts) ? accounts : []
+
   if (!address) {
-    return readMiniPaySessionAddress()
+    const cachedAddress = readMiniPaySessionAddress(runtime.sessionStore)
+    return {
+      address: cachedAddress,
+      source: cachedAddress ? 'session' : 'missing',
+    }
   }
+
   const normalizedAddress = normalizeWalletAddress(address)
-  writeMiniPaySessionAddress(normalizedAddress)
-  return normalizedAddress
+  writeMiniPaySessionAddress(runtime.sessionStore, normalizedAddress)
+
+  return {
+    address: normalizedAddress,
+    source: 'provider',
+  }
 }
 
-export const sanitizeMiniPayTransactionParams = (
-  params: Array<unknown> | Record<string, unknown>,
-): Array<unknown> | Record<string, unknown> => {
+const isRequestParameterObject = (
+  value: Array<unknown> | Record<string, unknown> | unknown,
+): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value)
+
+const sanitizeMiniPayTransactionParams = (
+  params: WalletConnectRequest['params'],
+): WalletConnectRequest['params'] => {
   if (!Array.isArray(params)) {
     return params
   }
 
-  const [firstParam, ...rest] = params
-  if (typeof firstParam !== 'object' || firstParam === null) {
+  const [transactionCandidate, ...remainingParams] = params
+  if (!isRequestParameterObject(transactionCandidate)) {
     return params
   }
 
-  const tx = firstParam as Record<string, unknown>
-  const sanitizedTx: Record<string, unknown> = {}
-  Object.entries(tx).forEach(([key, value]) => {
-    if (key === 'gasPrice' || key === 'maxFeePerGas' || key === 'maxPriorityFeePerGas') {
-      return
-    }
-    sanitizedTx[key] = value
-  })
+  const sanitizedTransaction = Object.fromEntries(
+    Object.entries(transactionCandidate).filter(([key]) => !MINI_PAY_FEE_FIELDS.has(key)),
+  )
 
-  return [sanitizedTx, ...rest]
+  return [sanitizedTransaction, ...remainingParams]
+}
+
+export const sanitizeMiniPayRequest = (
+  request: WalletConnectRequest,
+): WalletConnectRequest => {
+  if (request.method !== 'eth_sendTransaction') {
+    return request
+  }
+
+  return {
+    ...request,
+    params: sanitizeMiniPayTransactionParams(request.params),
+  }
 }

@@ -5,6 +5,11 @@ import {
 } from 'ethers'
 
 import { getChainBalanceConfig } from './chainBalanceConfig'
+import {
+  EMPTY_STABLECOIN_BALANCES,
+  formatStablecoinBalance,
+  type StablecoinBalances,
+} from './stablecoinPortfolio'
 
 const ERC20_ABI = ['function balanceOf(address account) view returns (uint256)'] as const
 
@@ -12,19 +17,11 @@ export async function fetchNonStellarBalances(
   address: string,
   chainId: string,
   family: 'evm' | 'solana',
-): Promise<{ cUsd: string, usdc: string, usdt: string }> {
+): Promise<StablecoinBalances> {
   const config = getChainBalanceConfig(chainId)
-  if (!config) return {
-    cUsd: '0.00',
-    usdc: '0.00',
-    usdt: '0.00',
+  if (!config) {
+    return EMPTY_STABLECOIN_BALANCES
   }
-
-  const format = (n: number): string => (
-    Number.isFinite(n)
-      ? n.toLocaleString('en-US', { maximumFractionDigits: 2, minimumFractionDigits: 2 })
-      : '0.00'
-  )
 
   if (family === 'solana') {
     try {
@@ -41,17 +38,13 @@ export async function fetchNonStellarBalances(
         return Number(raw) / (10 ** config.decimals)
       }
       return {
-        cUsd: '0.00',
-        usdc: format(parseTokenAccount(usdcAccount)),
-        usdt: format(parseTokenAccount(usdtAccount)),
+        cUSD: '0.00',
+        USDC: formatStablecoinBalance(parseTokenAccount(usdcAccount)),
+        USDT: formatStablecoinBalance(parseTokenAccount(usdtAccount)),
       }
     }
     catch {
-      return {
-        cUsd: '0.00',
-        usdc: '0.00',
-        usdt: '0.00',
-      }
+      return EMPTY_STABLECOIN_BALANCES
     }
   }
 
@@ -73,23 +66,15 @@ export async function fetchNonStellarBalances(
       const usdtNum = parseFloat(formatUnits(usdtRaw, config.decimals))
       const cUsdNum = parseFloat(formatUnits(cUsdRaw, config.decimals))
       return {
-        cUsd: format(cUsdNum),
-        usdc: format(usdcNum),
-        usdt: format(usdtNum),
+        cUSD: formatStablecoinBalance(cUsdNum),
+        USDC: formatStablecoinBalance(usdcNum),
+        USDT: formatStablecoinBalance(usdtNum),
       }
     }
     catch {
-      return {
-        cUsd: '0.00',
-        usdc: '0.00',
-        usdt: '0.00',
-      }
+      return EMPTY_STABLECOIN_BALANCES
     }
   }
 
-  return {
-    cUsd: '0.00',
-    usdc: '0.00',
-    usdt: '0.00',
-  }
+  return EMPTY_STABLECOIN_BALANCES
 }

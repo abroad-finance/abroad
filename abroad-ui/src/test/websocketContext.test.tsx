@@ -79,6 +79,7 @@ describe('WebSocketProvider', () => {
           isActive: false,
           isReady: false,
           isResolving: false,
+          status: 'inactive',
         },
         setKycUrl: vi.fn(),
         wallet: mockKit,

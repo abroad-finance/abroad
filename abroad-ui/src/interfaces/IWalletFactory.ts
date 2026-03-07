@@ -5,10 +5,30 @@ export interface IWalletFactory {
   miniPay: MiniPayRuntime
 }
 
-export interface MiniPayRuntime {
-  isActive: boolean
-  isReady: boolean
-  isResolving: boolean
-}
+export type MiniPayRuntime
+  = | {
+      isActive: false
+      isReady: false
+      isResolving: false
+      status: 'inactive'
+    }
+    | {
+      isActive: true
+      isReady: false
+      isResolving: false
+      status: 'available'
+    }
+    | {
+      isActive: true
+      isReady: false
+      isResolving: true
+      status: 'resolving'
+    }
+    | {
+      isActive: true
+      isReady: true
+      isResolving: false
+      status: 'ready'
+    }
 
 export type WalletType = 'mini-pay' | 'sep24' | 'stellar-kit' | 'wallet-connect'

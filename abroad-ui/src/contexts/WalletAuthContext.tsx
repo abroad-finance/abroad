@@ -21,6 +21,7 @@ export const WalletAuthContext = createContext<WalletAuthState>({
     isActive: false,
     isReady: false,
     isResolving: false,
+    status: 'inactive',
   },
   setKycUrl: () => { },
 })

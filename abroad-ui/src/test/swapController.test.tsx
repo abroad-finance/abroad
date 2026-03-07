@@ -19,17 +19,44 @@ vi.mock('@tolgee/react', () => ({
   useTranslate: () => ({ t: (_key: string, fallback: string) => fallback }),
 }))
 
-const stablecoinBalancesMock = vi.hoisted(() => vi.fn(() => ({
-  cUsd: '0.00',
-  error: null,
-  isLoading: false,
-  refresh: vi.fn(async () => undefined),
-  supportedBalanceFor: (symbol: 'USDC' | 'USDT') => (symbol === 'USDT' ? '5.00' : '25.00'),
-  supportedTokenPreference: 'USDC' as const,
-  topBalanceToken: 'USDC' as const,
-  usdc: '25.00',
-  usdt: '5.00',
-})))
+const createStablecoinBalanceState = (overrides?: Partial<{
+  cUsd: string
+  highestBalanceToken: 'USDC' | 'USDT' | 'cUSD'
+  isLoading: boolean
+  preferredSupportedToken: 'USDC' | 'USDT' | null
+  preferenceKind: 'empty' | 'supported' | 'unsupported-preferred'
+  usdc: string
+  usdt: string
+}>) => {
+  const cUsd = overrides?.cUsd ?? '0.00'
+  const usdc = overrides?.usdc ?? '25.00'
+  const usdt = overrides?.usdt ?? '5.00'
+  const preferredSupportedToken = overrides?.preferredSupportedToken ?? 'USDC'
+  const highestBalanceToken = overrides?.highestBalanceToken ?? 'USDC'
+  const preferenceKind = overrides?.preferenceKind ?? 'supported'
+
+  return {
+    balances: {
+      cUSD: cUsd,
+      USDC: usdc,
+      USDT: usdt,
+    },
+    cUsd,
+    error: null,
+    isLoading: overrides?.isLoading ?? false,
+    preference: {
+      highestBalanceToken,
+      kind: preferenceKind,
+      preferredSupportedToken,
+    },
+    refresh: vi.fn(async () => undefined),
+    supportedBalanceFor: (symbol: 'USDC' | 'USDT') => (symbol === 'USDT' ? usdt : usdc),
+    usdc,
+    usdt,
+  }
+}
+
+const stablecoinBalancesMock = vi.hoisted(() => vi.fn(() => createStablecoinBalanceState()))
 
 const mocked = vi.hoisted(() => {
   const abortResult = {
@@ -157,6 +184,7 @@ const Wrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
         isActive: false,
         isReady: false,
         isResolving: false,
+        status: 'inactive' as const,
       },
       setActiveWallet: vi.fn(),
       setKycUrl: vi.fn(),
@@ -178,17 +206,7 @@ afterEach(() => {
   vi.useRealTimers()
   vi.clearAllMocks()
   stablecoinBalancesMock.mockReset()
-  stablecoinBalancesMock.mockImplementation(() => ({
-    cUsd: '0.00',
-    error: null,
-    isLoading: false,
-    refresh: vi.fn(async () => undefined),
-    supportedBalanceFor: (symbol: 'USDC' | 'USDT') => (symbol === 'USDT' ? '5.00' : '25.00'),
-    supportedTokenPreference: 'USDC' as const,
-    topBalanceToken: 'USDC' as const,
-    usdc: '25.00',
-    usdt: '5.00',
-  }))
+  stablecoinBalancesMock.mockImplementation(() => createStablecoinBalanceState())
 })
 
 describe('useWebSwapController', () => {
@@ -305,14 +323,11 @@ describe('useWebSwapController', () => {
       walletId: 'mini-pay',
     }
 
-    stablecoinBalancesMock.mockImplementation(() => ({
+    stablecoinBalancesMock.mockImplementation(() => createStablecoinBalanceState({
       cUsd: '40.00',
-      error: null,
-      isLoading: false,
-      refresh: vi.fn(async () => undefined),
-      supportedBalanceFor: (symbol: 'USDC' | 'USDT') => (symbol === 'USDT' ? '22.00' : '5.00'),
-      supportedTokenPreference: 'USDT' as const,
-      topBalanceToken: 'cUSD' as const,
+      highestBalanceToken: 'cUSD',
+      preferredSupportedToken: 'USDT',
+      preferenceKind: 'unsupported-preferred',
       usdc: '5.00',
       usdt: '22.00',
     }))
@@ -379,6 +394,7 @@ describe('useWebSwapController', () => {
             isActive: true,
             isReady: true,
             isResolving: false,
+            status: 'ready',
           },
           setActiveWallet: vi.fn(),
           setKycUrl: vi.fn(),

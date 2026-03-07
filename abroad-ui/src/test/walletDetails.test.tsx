@@ -86,6 +86,7 @@ const Wrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
       isActive: false,
       isReady: false,
       isResolving: false,
+      status: 'inactive',
     },
     setKycUrl: vi.fn(),
     wallet: mockKit,

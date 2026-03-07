@@ -5,6 +5,7 @@ import type { IDatabaseClientProvider } from '../../../../platform/persistence/I
 import type { ISecretManager } from '../../../../platform/secrets/ISecretManager'
 
 import { PartnerService } from '../../../../modules/partners/application/partnerService'
+import { parseClientDomain } from '../../../../modules/partners/domain/clientDomain'
 
 type PartnerModel = import('@prisma/client').Partner
 
@@ -89,7 +90,14 @@ describe('PartnerService', () => {
   })
 
   it('retrieves a partner by normalized client domain', async () => {
-    const result = await service.getPartnerFromClientDomain('Client.Example.com')
+    const clientDomain = parseClientDomain('Client.Example.com')
+
+    expect(clientDomain).not.toBeNull()
+    if (!clientDomain) {
+      throw new Error('Expected valid client domain')
+    }
+
+    const result = await service.getPartnerFromClientDomain(clientDomain)
 
     expect(findFirst).toHaveBeenCalledWith({ where: { clientDomainHash: hashedClientDomain } })
     expect(result).toBe(partnerFromDomain)

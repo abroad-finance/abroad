@@ -8,70 +8,32 @@ import {
 } from 'react'
 
 import { fetchNonStellarBalances } from '../lib/chainBalanceFetchers'
+import {
+  balanceForStablecoin,
+  EMPTY_STABLECOIN_BALANCES,
+  formatStablecoinBalance,
+  resolveStablecoinPreference,
+  type StablecoinBalances,
+  type StablecoinPreference,
+  type SupportedStablecoinSymbol,
+} from '../lib/stablecoinPortfolio'
 
 const STELLAR_HORIZON_URL = 'https://horizon.stellar.org'
 const STELLAR_USDC_ISSUER = 'GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN'
 
-export type HighestBalanceToken = 'cUSD' | 'USDC' | 'USDT'
-export type SupportedStableToken = Exclude<HighestBalanceToken, 'cUSD'>
-
 type StablecoinBalanceState = {
+  balances: StablecoinBalances
   cUsd: string
   error: null | string
   isLoading: boolean
+  preference: StablecoinPreference
   refresh: () => Promise<void>
-  supportedBalanceFor: (symbol: SupportedStableToken) => string
-  supportedTokenPreference: null | SupportedStableToken
-  topBalanceToken: HighestBalanceToken
+  supportedBalanceFor: (symbol: SupportedStablecoinSymbol) => string
   usdc: string
   usdt: string
 }
 
-type BalanceSnapshot = {
-  cUsd: string
-  usdc: string
-  usdt: string
-}
-
-const EMPTY_BALANCE_SNAPSHOT: BalanceSnapshot = {
-  cUsd: '0.00',
-  usdc: '0.00',
-  usdt: '0.00',
-}
-
-const formatBalance = (value: number): string => (
-  Number.isFinite(value)
-    ? value.toLocaleString('en-US', { maximumFractionDigits: 2, minimumFractionDigits: 2 })
-    : '0.00'
-)
-
-const parseBalance = (value: string): number => {
-  const normalized = value.replace(/,/g, '')
-  const parsed = Number.parseFloat(normalized)
-  return Number.isFinite(parsed) ? parsed : 0
-}
-
-const resolveTopBalanceToken = (balances: BalanceSnapshot): HighestBalanceToken => {
-  const rankedBalances: Array<{ amount: number, token: HighestBalanceToken }> = [
-    { amount: parseBalance(balances.usdc), token: 'USDC' },
-    { amount: parseBalance(balances.usdt), token: 'USDT' },
-    { amount: parseBalance(balances.cUsd), token: 'cUSD' },
-  ]
-
-  rankedBalances.sort((left, right) => right.amount - left.amount)
-  return rankedBalances[0]?.token ?? 'USDC'
-}
-
-const resolveSupportedPreference = (balances: BalanceSnapshot): null | SupportedStableToken => {
-  const usdcBalance = parseBalance(balances.usdc)
-  const usdtBalance = parseBalance(balances.usdt)
-  if (usdcBalance <= 0 && usdtBalance <= 0) {
-    return null
-  }
-  return usdcBalance >= usdtBalance ? 'USDC' : 'USDT'
-}
-
-const fetchStellarBalances = async (address: string): Promise<BalanceSnapshot> => {
+const fetchStellarBalances = async (address: string): Promise<StablecoinBalances> => {
   try {
     const server = new Horizon.Server(STELLAR_HORIZON_URL)
     const account = await server.loadAccount(address)
@@ -84,17 +46,17 @@ const fetchStellarBalances = async (address: string): Promise<BalanceSnapshot> =
     ))
     const usdcBalance = line && 'balance' in line ? parseFloat(line.balance) : 0
     return {
-      cUsd: '0.00',
-      usdc: formatBalance(usdcBalance),
-      usdt: '0.00',
+      cUSD: '0.00',
+      USDC: formatStablecoinBalance(usdcBalance),
+      USDT: '0.00',
     }
   }
   catch {
-    return EMPTY_BALANCE_SNAPSHOT
+    return EMPTY_STABLECOIN_BALANCES
   }
 }
 
-const fetchBalancesForChain = async (address: string, chainId: string): Promise<BalanceSnapshot> => {
+const fetchBalancesForChain = async (address: string, chainId: string): Promise<StablecoinBalances> => {
   if (chainId.startsWith('stellar:')) {
     return fetchStellarBalances(address)
   }
@@ -104,7 +66,7 @@ const fetchBalancesForChain = async (address: string, chainId: string): Promise<
   if (chainId.startsWith('eip155:')) {
     return fetchNonStellarBalances(address, chainId, 'evm')
   }
-  return EMPTY_BALANCE_SNAPSHOT
+  return EMPTY_STABLECOIN_BALANCES
 }
 
 export const useStablecoinBalances = ({
@@ -114,14 +76,14 @@ export const useStablecoinBalances = ({
   address: null | string | undefined
   chainId: null | string | undefined
 }): StablecoinBalanceState => {
-  const [balances, setBalances] = useState<BalanceSnapshot>(EMPTY_BALANCE_SNAPSHOT)
+  const [balances, setBalances] = useState<StablecoinBalances>(EMPTY_STABLECOIN_BALANCES)
   const [error, setError] = useState<null | string>(null)
   const [isLoading, setIsLoading] = useState(false)
   const requestIdRef = useRef(0)
 
   const refresh = useCallback(async () => {
     if (!address || !chainId) {
-      setBalances(EMPTY_BALANCE_SNAPSHOT)
+      setBalances(EMPTY_STABLECOIN_BALANCES)
       setError(null)
       return
     }
@@ -142,7 +104,7 @@ export const useStablecoinBalances = ({
       if (requestIdRef.current !== requestId) {
         return
       }
-      setBalances(EMPTY_BALANCE_SNAPSHOT)
+      setBalances(EMPTY_STABLECOIN_BALANCES)
       setError(balanceError instanceof Error ? balanceError.message : 'Failed to load stablecoin balances')
     }
     finally {
@@ -156,21 +118,20 @@ export const useStablecoinBalances = ({
     void refresh()
   }, [refresh])
 
-  const topBalanceToken = useMemo(() => resolveTopBalanceToken(balances), [balances])
-  const supportedTokenPreference = useMemo(() => resolveSupportedPreference(balances), [balances])
-  const supportedBalanceFor = useCallback((symbol: SupportedStableToken): string => (
-    symbol === 'USDT' ? balances.usdt : balances.usdc
-  ), [balances.usdc, balances.usdt])
+  const preference = useMemo(() => resolveStablecoinPreference(balances), [balances])
+  const supportedBalanceFor = useCallback((symbol: SupportedStablecoinSymbol): string => (
+    balanceForStablecoin(balances, symbol)
+  ), [balances])
 
   return {
-    cUsd: balances.cUsd,
+    balances,
+    cUsd: balances.cUSD,
     error,
     isLoading,
+    preference,
     refresh,
     supportedBalanceFor,
-    supportedTokenPreference,
-    topBalanceToken,
-    usdc: balances.usdc,
-    usdt: balances.usdt,
+    usdc: balances.USDC,
+    usdt: balances.USDT,
   }
 }
