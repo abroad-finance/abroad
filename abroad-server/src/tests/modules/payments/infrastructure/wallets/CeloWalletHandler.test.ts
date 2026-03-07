@@ -67,8 +67,8 @@ describe('CeloWalletHandler', () => {
       ...overrides,
     })
     const assetConfigService = {
+      getActiveMint: jest.fn(async ({ cryptoCurrency }: { cryptoCurrency: CryptoCurrency }) => cryptoCurrency === CryptoCurrency.USDC ? ({ decimals: 6, mintAddress: usdcAddress }) : null),
       listEnabledAssets: jest.fn(async () => [{ mintAddress: usdcAddress }]),
-      getActiveMint: jest.fn(async ({ cryptoCurrency }: { cryptoCurrency: CryptoCurrency }) => cryptoCurrency === CryptoCurrency.USDC ? ({ mintAddress: usdcAddress, decimals: 6 }) : null),
     }
     return new CeloWalletHandler(secretManager, assetConfigService as never, new LoggerStub())
   }

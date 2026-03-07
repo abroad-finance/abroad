@@ -16,9 +16,23 @@ jest.mock('jsonwebtoken', () => ({
 describe('PartnerService', () => {
   const hashedApiKey = sha512_224('api-key')
   const hashedClientDomain = sha512_224('client.example.com')
-  const partnerFromApiKey = { apiKey: hashedApiKey, clientDomainHash: null, id: 'partner-1' } as unknown as PartnerModel
-  const partnerFromDomain = { apiKey: null, clientDomainHash: hashedClientDomain, id: 'partner-2' } as unknown as PartnerModel
-  const defaultPartner = { clientDomainHash: null, id: 'secret-STELLAR_SEP_PARTNER_ID' } as unknown as PartnerModel
+  const partnerFromApiKey = {
+    apiKey: hashedApiKey,
+    clientDomain: null,
+    clientDomainHash: null,
+    id: 'partner-1',
+  } as unknown as PartnerModel
+  const partnerFromDomain = {
+    apiKey: null,
+    clientDomain: 'client.example.com',
+    clientDomainHash: hashedClientDomain,
+    id: 'partner-2',
+  } as unknown as PartnerModel
+  const defaultPartner = {
+    clientDomain: null,
+    clientDomainHash: null,
+    id: 'secret-STELLAR_SEP_PARTNER_ID',
+  } as unknown as PartnerModel
 
   let partnersByApiKey: Record<string, PartnerModel>
   let partnersByClientDomainHash: Record<string, PartnerModel>

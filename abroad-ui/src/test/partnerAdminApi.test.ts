@@ -15,6 +15,7 @@ import {
   listPartners,
   revokePartnerApiKey,
   rotatePartnerApiKey,
+  updatePartnerClientDomain,
 } from '../services/admin/partnerAdminApi'
 
 const baseUrl = 'https://api.abroad.finance'
@@ -46,12 +47,13 @@ describe('partnerAdminApi', () => {
     expect(response.total).toBe(0)
   })
 
-  test('create, rotate, and revoke partner API keys', async () => {
+  test('create, update client domain, rotate, and revoke partner access', async () => {
     setOpsApiKey('ops_test_key')
 
     server.use(
       http.post(`${baseUrl}/ops/partners`, async ({ request }) => {
         const body = await request.json() as {
+          clientDomain?: string
           company: string
           country: string
           email: string
@@ -59,10 +61,12 @@ describe('partnerAdminApi', () => {
           lastName: string
           phone?: string
         }
+        expect(body.clientDomain).toBe('https://App.Abroad.Finance/swap')
         expect(body.company).toBe('Acme')
         return HttpResponse.json({
           apiKey: 'partner_created_key',
           partner: {
+            clientDomain: 'app.abroad.finance',
             createdAt: new Date('2024-01-01T00:00:00.000Z').toISOString(),
             hasApiKey: true,
             id: 'partner-1',
@@ -72,9 +76,23 @@ describe('partnerAdminApi', () => {
           },
         }, { status: 201 })
       }),
+      http.patch(`${baseUrl}/ops/partners/partner-1/client-domain`, async ({ request }) => {
+        const body = await request.json() as { clientDomain: null | string }
+        expect(body).toEqual({ clientDomain: null })
+        return HttpResponse.json({
+          clientDomain: undefined,
+          createdAt: new Date('2024-01-01T00:00:00.000Z').toISOString(),
+          hasApiKey: true,
+          id: 'partner-1',
+          isKybApproved: false,
+          name: 'Acme',
+          needsKyc: true,
+        })
+      }),
       http.post(`${baseUrl}/ops/partners/partner-1/api-key`, () => HttpResponse.json({
         apiKey: 'partner_rotated_key',
         partner: {
+          clientDomain: 'app.abroad.finance',
           createdAt: new Date('2024-01-01T00:00:00.000Z').toISOString(),
           hasApiKey: true,
           id: 'partner-1',
@@ -87,16 +105,20 @@ describe('partnerAdminApi', () => {
     )
 
     const created = await createPartner({
+      clientDomain: 'https://App.Abroad.Finance/swap',
       company: 'Acme',
       country: 'CO',
       email: 'acme@example.com',
       firstName: 'Ada',
       lastName: 'Lovelace',
     })
+    const updated = await updatePartnerClientDomain('partner-1', { clientDomain: null })
     const rotated = await rotatePartnerApiKey('partner-1')
     await revokePartnerApiKey('partner-1')
 
     expect(created.apiKey).toBe('partner_created_key')
+    expect(created.partner.clientDomain).toBe('app.abroad.finance')
+    expect(updated.clientDomain).toBeUndefined()
     expect(rotated.apiKey).toBe('partner_rotated_key')
   })
 

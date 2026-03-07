@@ -3,11 +3,17 @@ import { inject, injectable } from 'inversify'
 
 import { TYPES } from '../../../app/container/types'
 import { IDatabaseClientProvider } from '../../../platform/persistence/IDatabaseClientProvider'
+import { normalizeClientDomainInput } from '../domain/clientDomain'
 import { buildPartnerApiKeyCandidate } from './partnerApiKey'
 
 const API_KEY_RETRY_ATTEMPTS = 5
 
+export type OpsPartnerClientDomainInput = {
+  clientDomain: null | string
+}
+
 export type OpsPartnerCreateInput = {
+  clientDomain?: string
   company: string
   country: string
   email: string
@@ -16,12 +22,30 @@ export type OpsPartnerCreateInput = {
   phone?: string
 }
 
+export type OpsPartnerCreateResult = {
+  apiKey: string
+  partner: OpsPartnerSummary
+}
+
 export type OpsPartnerListParams = {
   page: number
   pageSize: number
 }
 
+export type OpsPartnerListResult = {
+  items: OpsPartnerSummary[]
+  page: number
+  pageSize: number
+  total: number
+}
+
+export type OpsPartnerRotateApiKeyResult = {
+  apiKey: string
+  partner: OpsPartnerSummary
+}
+
 export type OpsPartnerSummary = {
+  clientDomain?: string
   country?: string
   createdAt: Date
   email?: string
@@ -33,23 +57,6 @@ export type OpsPartnerSummary = {
   name: string
   needsKyc: boolean
   phone?: string
-}
-
-export type OpsPartnerListResult = {
-  items: OpsPartnerSummary[]
-  page: number
-  pageSize: number
-  total: number
-}
-
-export type OpsPartnerCreateResult = {
-  apiKey: string
-  partner: OpsPartnerSummary
-}
-
-export type OpsPartnerRotateApiKeyResult = {
-  apiKey: string
-  partner: OpsPartnerSummary
 }
 
 export class OpsPartnerNotFoundError extends Error {
@@ -75,6 +82,7 @@ export class OpsPartnerService {
 
   public async createPartner(input: OpsPartnerCreateInput): Promise<OpsPartnerCreateResult> {
     const prisma = await this.dbProvider.getClient()
+    const clientDomainRecord = this.normalizeClientDomain(input.clientDomain)
 
     try {
       for (let attempt = 1; attempt <= API_KEY_RETRY_ATTEMPTS; attempt += 1) {
@@ -83,6 +91,8 @@ export class OpsPartnerService {
           const created = await prisma.partner.create({
             data: {
               apiKey: candidate.hashed,
+              clientDomain: clientDomainRecord.clientDomain,
+              clientDomainHash: clientDomainRecord.clientDomainHash,
               country: input.country,
               email: input.email,
               firstName: input.firstName,
@@ -109,6 +119,12 @@ export class OpsPartnerService {
     catch (error) {
       if (this.isUniqueConstraintFor(error, 'email')) {
         throw new OpsPartnerValidationError('Partner email already exists')
+      }
+      if (
+        this.isUniqueConstraintFor(error, 'clientDomain')
+        || this.isUniqueConstraintFor(error, 'clientDomainHash')
+      ) {
+        throw new OpsPartnerValidationError('Client domain already exists')
       }
       if (error instanceof OpsPartnerValidationError) {
         throw error
@@ -183,6 +199,41 @@ export class OpsPartnerService {
     throw new OpsPartnerValidationError('Failed to generate a unique partner API key')
   }
 
+  public async updateClientDomain(
+    partnerId: string,
+    input: OpsPartnerClientDomainInput,
+  ): Promise<OpsPartnerSummary> {
+    const prisma = await this.dbProvider.getClient()
+    const clientDomainRecord = this.normalizeClientDomain(input.clientDomain)
+
+    try {
+      const updatedPartner = await prisma.partner.update({
+        data: {
+          clientDomain: clientDomainRecord.clientDomain,
+          clientDomainHash: clientDomainRecord.clientDomainHash,
+        },
+        where: { id: partnerId },
+      })
+
+      return this.toSummary(updatedPartner)
+    }
+    catch (error) {
+      if (this.isNotFoundError(error)) {
+        throw new OpsPartnerNotFoundError('Partner not found')
+      }
+      if (
+        this.isUniqueConstraintFor(error, 'clientDomain')
+        || this.isUniqueConstraintFor(error, 'clientDomainHash')
+      ) {
+        throw new OpsPartnerValidationError('Client domain already exists')
+      }
+      if (error instanceof OpsPartnerValidationError) {
+        throw error
+      }
+      throw new OpsPartnerValidationError('Failed to update partner client domain')
+    }
+  }
+
   private isNotFoundError(error: unknown): boolean {
     return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025'
   }
@@ -202,8 +253,21 @@ export class OpsPartnerService {
     return false
   }
 
+  private normalizeClientDomain(
+    value: null | string | undefined,
+  ): { clientDomain: null | string, clientDomainHash: null | string } {
+    try {
+      return normalizeClientDomainInput(value)
+    }
+    catch (error) {
+      const message = error instanceof Error ? error.message : 'Client domain is invalid'
+      throw new OpsPartnerValidationError(message)
+    }
+  }
+
   private toSummary(partner: Partner): OpsPartnerSummary {
     return {
+      clientDomain: partner.clientDomain ?? undefined,
       country: partner.country ?? undefined,
       createdAt: partner.createdAt,
       email: partner.email ?? undefined,

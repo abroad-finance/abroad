@@ -1,4 +1,5 @@
 export type OpsCreatePartnerInput = {
+  clientDomain?: string
   company: string
   country: string
   email: string
@@ -13,6 +14,7 @@ export type OpsCreatePartnerResponse = {
 }
 
 export type OpsPartner = {
+  clientDomain?: string
   country?: string
   createdAt: string
   email?: string
@@ -37,3 +39,9 @@ export type OpsRotatePartnerApiKeyResponse = {
   apiKey: string
   partner: OpsPartner
 }
+
+export type OpsUpdatePartnerClientDomainInput = {
+  clientDomain: null | string
+}
+
+export type OpsUpdatePartnerClientDomainResponse = OpsPartner

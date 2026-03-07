@@ -5,4 +5,3 @@ export const ExchangeBalanceUpdatedMessageSchema = z.object({
 }).strict()
 
 export type ExchangeBalanceUpdatedMessage = z.infer<typeof ExchangeBalanceUpdatedMessageSchema>
-

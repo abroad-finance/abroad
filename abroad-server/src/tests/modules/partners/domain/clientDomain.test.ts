@@ -1,7 +1,4 @@
-import {
-  clientDomainToString,
-  parseClientDomain,
-} from '../../../../modules/partners/domain/clientDomain'
+import { clientDomainToString, normalizeClientDomainInput, parseClientDomain } from '../../../../modules/partners/domain/clientDomain'
 
 describe('clientDomain', () => {
   it('normalizes origins and bare hosts into a canonical client domain', () => {
@@ -22,5 +19,16 @@ describe('clientDomain', () => {
   it('rejects malformed client domain values', () => {
     expect(parseClientDomain('not a domain value')).toBeNull()
     expect(parseClientDomain('')).toBeNull()
+  })
+
+  it('builds storage fields for canonical client domains and clears blanks', () => {
+    expect(normalizeClientDomainInput('https://App.Abroad.Finance/path')).toEqual({
+      clientDomain: 'app.abroad.finance',
+      clientDomainHash: expect.any(String),
+    })
+    expect(normalizeClientDomainInput('')).toEqual({
+      clientDomain: null,
+      clientDomainHash: null,
+    })
   })
 })

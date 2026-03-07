@@ -64,50 +64,6 @@ export class WebhookController extends Controller {
   }
 
   /**
-   * Handle payment status webhook notifications from Transfero
-   * Accepts the provider payload and forwards a normalized message to a queue.
-   */
-  @Hidden()
-  @Post('transfero')
-  @Response('400', 'Bad Request - Invalid payload')
-  @Response('500', 'Internal Server Error')
-  @SuccessResponse('200', 'Webhook processed successfully')
-  public async handleTransferoWebhook(
-    @Body() body: Record<string, unknown>,
-    @Request() request: RequestExpress,
-    @Res() badRequest: TsoaResponse<400, { message: string, success: false }>,
-    @Res() serverError: TsoaResponse<500, { message: string, success: false }>,
-  ): Promise<WebhookResponse> {
-    try {
-      this.logger.info('Received Transfero webhook', {
-        headers: request.headers,
-        payload: body,
-      })
-
-      const validation = parseTransferoWebhook(body)
-      if (!validation.success) {
-        this.logger.warn('Invalid Transfero webhook payload', { errors: validation.errors })
-        return badRequest(400, { message: 'Invalid webhook payload', success: false })
-      }
-
-      await this.queueHandler.postMessage(QueueName.PAYMENT_STATUS_UPDATED, validation.message)
-      this.setStatus(200)
-      return { message: 'Webhook processed successfully', success: true }
-    }
-    catch (error) {
-      this.logger.error('Error processing Transfero webhook', {
-        error: error instanceof Error ? error.message : 'Unknown error',
-        payload: body,
-        stack: error instanceof Error ? error.stack : undefined,
-      })
-      return serverError(500, {
-        message: 'Internal server error',
-        success: false,
-      })
-    }
-  }
-
-  /**
    * Handle Transfero balance/deposit webhook notifications.
    *
    * Today, this drives the `AWAIT_EXCHANGE_BALANCE` flow step using a coarse correlation:
@@ -153,6 +109,50 @@ export class WebhookController extends Controller {
     catch (error) {
       this.logger.error('Error processing Transfero balance webhook', {
         error: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+      })
+      return serverError(500, {
+        message: 'Internal server error',
+        success: false,
+      })
+    }
+  }
+
+  /**
+   * Handle payment status webhook notifications from Transfero
+   * Accepts the provider payload and forwards a normalized message to a queue.
+   */
+  @Hidden()
+  @Post('transfero')
+  @Response('400', 'Bad Request - Invalid payload')
+  @Response('500', 'Internal Server Error')
+  @SuccessResponse('200', 'Webhook processed successfully')
+  public async handleTransferoWebhook(
+    @Body() body: Record<string, unknown>,
+    @Request() request: RequestExpress,
+    @Res() badRequest: TsoaResponse<400, { message: string, success: false }>,
+    @Res() serverError: TsoaResponse<500, { message: string, success: false }>,
+  ): Promise<WebhookResponse> {
+    try {
+      this.logger.info('Received Transfero webhook', {
+        headers: request.headers,
+        payload: body,
+      })
+
+      const validation = parseTransferoWebhook(body)
+      if (!validation.success) {
+        this.logger.warn('Invalid Transfero webhook payload', { errors: validation.errors })
+        return badRequest(400, { message: 'Invalid webhook payload', success: false })
+      }
+
+      await this.queueHandler.postMessage(QueueName.PAYMENT_STATUS_UPDATED, validation.message)
+      this.setStatus(200)
+      return { message: 'Webhook processed successfully', success: true }
+    }
+    catch (error) {
+      this.logger.error('Error processing Transfero webhook', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        payload: body,
         stack: error instanceof Error ? error.stack : undefined,
       })
       return serverError(500, {

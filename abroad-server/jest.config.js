@@ -15,11 +15,11 @@ module.exports = {
       statements: 85,
     },
   },
+  forceExit: true,
   moduleFileExtensions: ['ts', 'js', 'json', 'node'],
   preset: 'ts-jest',
   setupFilesAfterEnv: ['<rootDir>/src/tests/setup/jest.setup.ts'],
   testEnvironment: 'node',
-  forceExit: true,
   testMatch: ['<rootDir>/src/tests/**/*.ts?(x)'],
   transform: {
     '^.+\\.ts?$': ['ts-jest', { tsconfig: 'tsconfig.json' }],

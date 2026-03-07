@@ -2,8 +2,8 @@ import { Partner } from '@prisma/client'
 import { Request } from 'express'
 
 import type { ClientDomain } from '../../modules/partners/domain/clientDomain'
-import { IPartnerService } from '../../modules/partners/application/contracts/IPartnerService'
 
+import { IPartnerService } from '../../modules/partners/application/contracts/IPartnerService'
 import { parseClientDomain } from '../../modules/partners/domain/clientDomain'
 import { iocContainer } from '../container'
 import { TYPES } from '../container/types'

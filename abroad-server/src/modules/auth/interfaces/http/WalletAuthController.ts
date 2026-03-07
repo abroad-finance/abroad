@@ -7,8 +7,8 @@ import jwt from 'jsonwebtoken'
 import { Body, Controller, Post, Route } from 'tsoa'
 import nacl from 'tweetnacl'
 
-import { UserError, ValidationError } from '../../../../core/errors'
 import { TYPES } from '../../../../app/container/types'
+import { UserError, ValidationError } from '../../../../core/errors'
 import { ISecretManager } from '../../../../platform/secrets/ISecretManager'
 
 const CHALLENGE_TTL_MS = 5 * 60 * 1000
@@ -37,8 +37,8 @@ interface RefreshResponse { token: string }
 
 interface VerifyRequest {
   address: string
-  challengeToken?: string
   chainId?: string
+  challengeToken?: string
   signature?: string
   signedXDR?: string
 }
@@ -188,45 +188,6 @@ export class WalletAuthController extends Controller {
     return { token }
   }
 
-  private createChallengeToken(secret: string, subject: string, message: string): string {
-    return jwt.sign(
-      {
-        msg: message,
-        typ: 'wallet_challenge',
-      },
-      secret,
-      {
-        expiresIn: Math.floor(CHALLENGE_TTL_MS / 1000),
-        subject,
-      },
-    )
-  }
-
-  private resolveOutstandingChallenge(secret: string, key: string, challengeToken?: string): null | string {
-    if (challengeToken && challengeToken.trim().length > 0) {
-      try {
-        const payload = jwt.verify(challengeToken, secret) as jwt.JwtPayload & {
-          msg?: string
-          typ?: string
-        }
-        if (payload.typ === 'wallet_challenge' && payload.sub === key && typeof payload.msg === 'string' && payload.msg.length > 0) {
-          return payload.msg
-        }
-      }
-      catch {
-        // Fall back to in-memory challenge for backward compatibility.
-      }
-    }
-
-    const outstanding = challenges.get(key)
-    if (!outstanding || outstanding.expiresAt < Date.now()) {
-      challenges.delete(key)
-      return null
-    }
-
-    return outstanding.message
-  }
-
   private buildChallengeMessage(chainId: string, address: string): string {
     const issuedAt = new Date().toISOString()
     const nonce = ethers.utils.hexlify(ethers.utils.randomBytes(12))
@@ -241,6 +202,20 @@ export class WalletAuthController extends Controller {
 
   private challengeKey(chainId: string, address: string): string {
     return `${chainId}:${address}`
+  }
+
+  private createChallengeToken(secret: string, subject: string, message: string): string {
+    return jwt.sign(
+      {
+        msg: message,
+        typ: 'wallet_challenge',
+      },
+      secret,
+      {
+        expiresIn: Math.floor(CHALLENGE_TTL_MS / 1000),
+        subject,
+      },
+    )
   }
 
   private decodeSignature(signature: string): null | Uint8Array {
@@ -293,6 +268,16 @@ export class WalletAuthController extends Controller {
     return chainId.startsWith('stellar:')
   }
 
+  private isValidSolanaAddress(address: string): boolean {
+    try {
+      void new PublicKey(address)
+      return true
+    }
+    catch {
+      return false
+    }
+  }
+
   private resolveChainId(chainId: string | undefined, address: string, passphrase: string): string {
     if (chainId && chainId.trim().length > 0) return chainId.trim()
 
@@ -311,21 +296,36 @@ export class WalletAuthController extends Controller {
     throw new ValidationError('chainId is required for this wallet address')
   }
 
+  private resolveOutstandingChallenge(secret: string, key: string, challengeToken?: string): null | string {
+    if (challengeToken && challengeToken.trim().length > 0) {
+      try {
+        const payload = jwt.verify(challengeToken, secret) as jwt.JwtPayload & {
+          msg?: string
+          typ?: string
+        }
+        if (payload.typ === 'wallet_challenge' && payload.sub === key && typeof payload.msg === 'string' && payload.msg.length > 0) {
+          return payload.msg
+        }
+      }
+      catch {
+        // Fall back to in-memory challenge for backward compatibility.
+      }
+    }
+
+    const outstanding = challenges.get(key)
+    if (!outstanding || outstanding.expiresAt < Date.now()) {
+      challenges.delete(key)
+      return null
+    }
+
+    return outstanding.message
+  }
+
   private resolveStellarChainId(passphrase: string): string {
     if (passphrase.toLowerCase().includes('test')) {
       return 'stellar:testnet'
     }
     return 'stellar:pubnet'
-  }
-
-  private isValidSolanaAddress(address: string): boolean {
-    try {
-      void new PublicKey(address)
-      return true
-    }
-    catch {
-      return false
-    }
   }
 
   private verifyEvmSignature(address: string, message: string, signature: string): boolean {

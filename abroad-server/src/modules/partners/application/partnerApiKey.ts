@@ -1,5 +1,4 @@
 import { randomBytes } from 'crypto'
-
 import { sha512_224 } from 'js-sha512'
 
 const PARTNER_API_KEY_PREFIX = 'partner_'

@@ -3,6 +3,7 @@ import type { Partner } from '@prisma/client'
 import { z } from 'zod'
 
 export interface CreatePartnerRequest {
+  clientDomain?: string
   company: string
   country: string
   email: string
@@ -12,6 +13,7 @@ export interface CreatePartnerRequest {
 }
 
 export const createPartnerRequestSchema = z.object({
+  clientDomain: z.string().optional(),
   company: z.string().min(1),
   country: z.string().min(1),
   email: z.string().email(),

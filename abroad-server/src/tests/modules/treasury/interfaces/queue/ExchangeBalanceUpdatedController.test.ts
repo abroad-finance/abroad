@@ -1,9 +1,10 @@
 import 'reflect-metadata'
 
+import type { IDatabaseClientProvider } from '../../../../../platform/persistence/IDatabaseClientProvider'
+
 import { FlowOrchestrator } from '../../../../../modules/flows/application/FlowOrchestrator'
 import { ExchangeBalanceUpdatedController } from '../../../../../modules/treasury/interfaces/queue/ExchangeBalanceUpdatedController'
 import { QueueName } from '../../../../../platform/messaging/queues'
-import type { IDatabaseClientProvider } from '../../../../../platform/persistence/IDatabaseClientProvider'
 import { createMockLogger, createMockQueueHandler, MockLogger, MockQueueHandler } from '../../../../setup/mockFactories'
 
 type WaitingStep = { flowInstance: { transactionId: string } }

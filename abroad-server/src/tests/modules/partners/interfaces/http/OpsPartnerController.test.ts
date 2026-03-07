@@ -1,48 +1,56 @@
 import 'reflect-metadata'
 import type { TsoaResponse } from '@tsoa/runtime'
 
-import {
-  OpsPartnerNotFoundError,
-  OpsPartnerService,
-  OpsPartnerValidationError,
-} from '../../../../../modules/partners/application/OpsPartnerService'
+import { OpsPartnerNotFoundError, OpsPartnerService, OpsPartnerValidationError } from '../../../../../modules/partners/application/OpsPartnerService'
 import { OpsPartnerController } from '../../../../../modules/partners/interfaces/http/OpsPartnerController'
 
 type OpsPartnerServiceMock = Pick<
-OpsPartnerService,
-'createPartner' | 'listPartners' | 'revokeApiKey' | 'rotateApiKey'
+  OpsPartnerService,
+'createPartner' | 'listPartners' | 'revokeApiKey' | 'rotateApiKey' | 'updateClientDomain'
 >
+
+const buildPartnerSummary = (overrides?: Partial<{
+  clientDomain?: string
+  createdAt: Date
+  hasApiKey: boolean
+  id: string
+  isKybApproved: boolean
+  name: string
+  needsKyc: boolean
+}>): {
+  clientDomain?: string
+  createdAt: Date
+  hasApiKey: boolean
+  id: string
+  isKybApproved: boolean
+  name: string
+  needsKyc: boolean
+} => ({
+  createdAt: new Date('2024-01-01T00:00:00.000Z'),
+  hasApiKey: true,
+  id: 'partner-1',
+  isKybApproved: false,
+  name: 'Partner One',
+  needsKyc: true,
+  ...(overrides ?? {}),
+})
 
 const buildService = (): jest.Mocked<OpsPartnerServiceMock> => ({
   createPartner: jest.fn(async (_input) => {
     void _input
     return {
-    apiKey: 'partner_test_key',
-    partner: {
-      createdAt: new Date('2024-01-01T00:00:00.000Z'),
-      hasApiKey: true,
-      id: 'partner-1',
-      isKybApproved: false,
-      name: 'Partner One',
-      needsKyc: true,
-    },
-  }
+      apiKey: 'partner_test_key',
+      partner: buildPartnerSummary(),
+    }
   }),
   listPartners: jest.fn(async (_params) => {
     void _params
     return {
-    items: [{
-      createdAt: new Date('2024-01-01T00:00:00.000Z'),
-      hasApiKey: true,
-      id: 'partner-1',
-      isKybApproved: false,
-      name: 'Partner One',
-      needsKyc: true,
-    }],
-    page: 1,
-    pageSize: 20,
-    total: 1,
-  }
+      items: [buildPartnerSummary()],
+      page: 1,
+      pageSize: 20,
+      total: 1,
+    }
   }),
   revokeApiKey: jest.fn(async (_partnerId: string) => {
     void _partnerId
@@ -51,16 +59,14 @@ const buildService = (): jest.Mocked<OpsPartnerServiceMock> => ({
   rotateApiKey: jest.fn(async (_partnerId: string) => {
     void _partnerId
     return {
-    apiKey: 'partner_rotated_key',
-    partner: {
-      createdAt: new Date('2024-01-01T00:00:00.000Z'),
-      hasApiKey: true,
-      id: 'partner-1',
-      isKybApproved: false,
-      name: 'Partner One',
-      needsKyc: true,
-    },
-  }
+      apiKey: 'partner_rotated_key',
+      partner: buildPartnerSummary(),
+    }
+  }),
+  updateClientDomain: jest.fn(async (_partnerId: string, _body: { clientDomain: null | string }) => {
+    void _partnerId
+    void _body
+    return buildPartnerSummary({ clientDomain: 'app.abroad.finance' })
   }),
 })
 
@@ -75,6 +81,7 @@ const notFoundResponder = (): TsoaResponse<404, { reason: string }> => (
 const createdResponder = (): TsoaResponse<201, {
   apiKey: string
   partner: {
+    clientDomain?: string
     createdAt: Date
     hasApiKey: boolean
     id: string
@@ -141,6 +148,7 @@ describe('OpsPartnerController', () => {
 
     const response = await controller.createPartner(
       {
+        clientDomain: 'app.abroad.finance',
         company: 'Acme',
         country: 'CO',
         email: 'acme@example.com',
@@ -153,6 +161,7 @@ describe('OpsPartnerController', () => {
     )
 
     expect(service.createPartner).toHaveBeenCalledWith(expect.objectContaining({
+      clientDomain: 'app.abroad.finance',
       company: 'Acme',
       email: 'acme@example.com',
     }))
@@ -205,6 +214,95 @@ describe('OpsPartnerController', () => {
 
     expect(response).toEqual({ reason: 'Partner not found' })
     expect(notFound).toHaveBeenCalledWith(404, { reason: 'Partner not found' })
+  })
+
+  it('returns 400 for invalid partner id on client-domain update', async () => {
+    const service = buildService()
+    const controller = new OpsPartnerController(service as unknown as OpsPartnerService)
+    const badRequest = badRequestResponder()
+    const notFound = notFoundResponder()
+
+    const response = await controller.updateClientDomain(
+      'not-a-uuid',
+      { clientDomain: 'app.abroad.finance' },
+      badRequest,
+      notFound,
+    )
+
+    expect(response).toEqual({ reason: 'Invalid UUID' })
+    expect(service.updateClientDomain).not.toHaveBeenCalled()
+  })
+
+  it('returns 400 for invalid client-domain payloads', async () => {
+    const service = buildService()
+    const controller = new OpsPartnerController(service as unknown as OpsPartnerService)
+    const badRequest = badRequestResponder()
+    const notFound = notFoundResponder()
+
+    const response = await controller.updateClientDomain(
+      '3ee06787-8a54-4af2-8f74-ec26d43167aa',
+      {} as { clientDomain: null | string },
+      badRequest,
+      notFound,
+    )
+
+    expect(response).toEqual(expect.objectContaining({ reason: expect.any(String) }))
+    expect(service.updateClientDomain).not.toHaveBeenCalled()
+  })
+
+  it('updates partner client domain and returns the updated summary', async () => {
+    const service = buildService()
+    const controller = new OpsPartnerController(service as unknown as OpsPartnerService)
+    const badRequest = badRequestResponder()
+    const notFound = notFoundResponder()
+
+    const response = await controller.updateClientDomain(
+      '3ee06787-8a54-4af2-8f74-ec26d43167aa',
+      { clientDomain: 'https://App.Abroad.Finance/path' },
+      badRequest,
+      notFound,
+    )
+
+    expect(service.updateClientDomain).toHaveBeenCalledWith(
+      '3ee06787-8a54-4af2-8f74-ec26d43167aa',
+      { clientDomain: 'https://App.Abroad.Finance/path' },
+    )
+    expect(response.clientDomain).toBe('app.abroad.finance')
+  })
+
+  it('maps missing partner client-domain updates to 404', async () => {
+    const service = buildService()
+    service.updateClientDomain.mockRejectedValueOnce(new OpsPartnerNotFoundError('Partner not found'))
+    const controller = new OpsPartnerController(service as unknown as OpsPartnerService)
+    const badRequest = badRequestResponder()
+    const notFound = notFoundResponder()
+
+    const response = await controller.updateClientDomain(
+      '3ee06787-8a54-4af2-8f74-ec26d43167aa',
+      { clientDomain: null },
+      badRequest,
+      notFound,
+    )
+
+    expect(response).toEqual({ reason: 'Partner not found' })
+    expect(notFound).toHaveBeenCalledWith(404, { reason: 'Partner not found' })
+  })
+
+  it('maps client-domain validation errors to 400', async () => {
+    const service = buildService()
+    service.updateClientDomain.mockRejectedValueOnce(new OpsPartnerValidationError('Client domain already exists'))
+    const controller = new OpsPartnerController(service as unknown as OpsPartnerService)
+    const badRequest = badRequestResponder()
+    const notFound = notFoundResponder()
+
+    const response = await controller.updateClientDomain(
+      '3ee06787-8a54-4af2-8f74-ec26d43167aa',
+      { clientDomain: 'app.abroad.finance' },
+      badRequest,
+      notFound,
+    )
+
+    expect(response).toEqual({ reason: 'Client domain already exists' })
   })
 
   it('revokes API key and responds with 204', async () => {

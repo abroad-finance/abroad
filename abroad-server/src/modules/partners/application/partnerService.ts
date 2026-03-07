@@ -3,17 +3,12 @@
 import type { Partner, PrismaClient } from '@prisma/client'
 
 import { inject, injectable } from 'inversify'
-import { sha512_224 } from 'js-sha512'
 import jwt from 'jsonwebtoken'
 
 import { TYPES } from '../../../app/container/types'
 import { IDatabaseClientProvider } from '../../../platform/persistence/IDatabaseClientProvider'
 import { ISecretManager } from '../../../platform/secrets/ISecretManager'
-import {
-  clientDomainToString,
-  parseClientDomain as parseClientDomainValue,
-  type ClientDomain,
-} from '../domain/clientDomain'
+import { type ClientDomain, hashClientDomain, parseClientDomain as parseClientDomainValue } from '../domain/clientDomain'
 import { IPartnerService } from './contracts/IPartnerService'
 import { hashPartnerApiKey } from './partnerApiKey'
 
@@ -140,7 +135,7 @@ export class PartnerService implements IPartnerService {
   }
 
   private hashClientDomain(clientDomain: ClientDomain): string {
-    return sha512_224(clientDomainToString(clientDomain))
+    return hashClientDomain(clientDomain)
   }
 
   private isJwtPayload(payload: unknown): payload is SepTokenPayload {

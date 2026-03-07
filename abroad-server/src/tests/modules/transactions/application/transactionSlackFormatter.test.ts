@@ -24,6 +24,7 @@ const buildTransaction = (overrides: Partial<TransactionWithRelations> = {}): Tr
     kycExternalToken: null,
     partner: {
       apiKey: null,
+      clientDomain: null,
       clientDomainHash: null,
       country: Country.CO,
       createdAt: new Date(),
