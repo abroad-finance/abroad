@@ -2,6 +2,14 @@ export type StablecoinSymbol = 'cUSD' | 'USDC' | 'USDT'
 export type SupportedStablecoinSymbol = Exclude<StablecoinSymbol, 'cUSD'>
 
 export type StablecoinBalances = Readonly<Record<StablecoinSymbol, string>>
+type RankedStablecoinBalance = Readonly<{
+  amount: number
+  token: StablecoinSymbol
+}>
+type RankedSupportedStablecoinBalance = Readonly<{
+  amount: number
+  token: SupportedStablecoinSymbol
+}>
 
 export type StablecoinPreference =
   | {
@@ -49,8 +57,8 @@ export const balanceForStablecoin = (
 
 const rankStablecoinBalances = (
   balances: StablecoinBalances,
-): Array<{ amount: number, token: StablecoinSymbol }> => {
-  const rankedBalances: Array<{ amount: number, token: StablecoinSymbol }> = [
+): RankedStablecoinBalance[] => {
+  const rankedBalances: RankedStablecoinBalance[] = [
     { amount: parseStablecoinBalance(balances.USDC), token: 'USDC' },
     { amount: parseStablecoinBalance(balances.USDT), token: 'USDT' },
     { amount: parseStablecoinBalance(balances.cUSD), token: 'cUSD' },
@@ -60,13 +68,19 @@ const rankStablecoinBalances = (
   return rankedBalances
 }
 
+const isSupportedRankedStablecoinBalance = (
+  candidate: RankedStablecoinBalance,
+): candidate is RankedSupportedStablecoinBalance => (
+  candidate.amount > 0 && isSupportedStablecoinSymbol(candidate.token)
+)
+
 export const resolveStablecoinPreference = (
   balances: StablecoinBalances,
 ): StablecoinPreference => {
   const rankedBalances = rankStablecoinBalances(balances)
   const highestBalanceToken = rankedBalances[0]?.token ?? 'USDC'
   const preferredSupportedToken = rankedBalances.find(
-    candidate => candidate.amount > 0 && isSupportedStablecoinSymbol(candidate.token),
+    isSupportedRankedStablecoinBalance,
   )?.token ?? null
 
   if (!preferredSupportedToken) {

@@ -9,7 +9,9 @@ import {
 } from 'vitest'
 
 import type { IWallet } from '../interfaces/IWallet'
+import type { PublicCorridorResponse } from '../services/public/types'
 import type { IWalletAuthentication } from '../interfaces/IWalletAuthentication'
+import type { WalletConnectRequest } from '../interfaces/IWallet'
 
 import { NoticeProvider } from '../contexts/NoticeContext'
 import { WalletAuthContext } from '../contexts/WalletAuthContext'
@@ -57,6 +59,16 @@ const createStablecoinBalanceState = (overrides?: Partial<{
 }
 
 const stablecoinBalancesMock = vi.hoisted(() => vi.fn(() => createStablecoinBalanceState()))
+
+const createWalletRequestMock = (
+  response: string = '0x-minipay-transaction',
+): NonNullable<IWallet['request']> => {
+  const requestMock = vi.fn(async (_request: WalletConnectRequest): Promise<string> => response)
+
+  return async <TResult,>(request: WalletConnectRequest): Promise<TResult> => (
+    await requestMock(request)
+  ) as TResult
+}
 
 const mocked = vi.hoisted(() => {
   const abortResult = {
@@ -109,7 +121,7 @@ const mocked = vi.hoisted(() => {
     status: 200,
   }))
 
-  const fetchPublicCorridorsMock = vi.fn(async () => ({
+  const fetchPublicCorridorsMock = vi.fn<[], Promise<PublicCorridorResponse>>(async () => ({
     corridors: [{
       blockchain: 'STELLAR',
       chainFamily: 'stellar',
@@ -318,7 +330,7 @@ describe('useWebSwapController', () => {
       chainId: 'eip155:42220',
       connect: vi.fn(),
       disconnect: vi.fn(),
-      request: vi.fn(),
+      request: createWalletRequestMock(),
       signTransaction: vi.fn(async () => ({ signedTxXdr: 'unused', signerAddress: undefined })),
       walletId: 'mini-pay',
     }
