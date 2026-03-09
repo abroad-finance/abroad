@@ -1,5 +1,5 @@
 import {
-  Info, LogOut, Moon, Sun, User,
+  Info, LogOut, Moon, Sun,
 } from 'lucide-react'
 import React, { memo } from 'react'
 
@@ -63,8 +63,8 @@ function chainPillChainFromKey(chainKey: string): ChainPillChain {
 
 const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({
   address,
-  balance,
-  balanceLoading,
+  balance: _balance,
+  balanceLoading: _balanceLoading,
   className = '',
   infoUrl,
   isDark = false,
@@ -117,7 +117,8 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({
       )}
       {isConnected && (
         <div
-          className="flex items-center gap-2 rounded-full border px-[13px] py-[7px]"
+          aria-label={labels.walletDetailsAria}
+          className="flex shrink-0 items-center justify-center rounded-full border p-1.5"
           style={{
             backgroundColor: 'var(--ab-nav-balance-bg)',
             borderColor: 'var(--ab-nav-balance-border)',
@@ -127,24 +128,10 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({
             className="h-2 w-2 shrink-0 rounded-full"
             style={{ backgroundColor: 'var(--ab-nav-balance-dot)' }}
           />
-          <span
-            className="text-sm font-bold leading-5"
-            style={{ color: 'var(--ab-nav-balance-text)' }}
-          >
-            {balanceLoading ? '…' : `$${balance}`}
-          </span>
         </div>
       )}
       {address && (
         <>
-          <button
-            aria-label={labels.walletDetailsAria}
-            className={cn(NAV_BUTTON_CLASS, AB_STYLES.badgeBg)}
-            onClick={onWalletClick}
-            type="button"
-          >
-            <User className={cn('w-4 h-4', AB_STYLES.text)} />
-          </button>
           {onDisconnect && (
             <button
               aria-label={labels.disconnectAria ?? 'Desconectar billetera'}
@@ -172,7 +159,7 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({
   return (
     <nav
       className={cn(
-        'sticky top-0 z-[100] w-full border-b py-4 px-6 backdrop-blur-[6px]',
+        'sticky top-0 z-[100] w-full border-b p-0 backdrop-blur-[6px]',
         className,
       )}
       role="navigation"
@@ -182,7 +169,7 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({
       }}
     >
       {/* Mobile: full width bar - only logo and connect button */}
-      <div className="md:hidden px-4 py-3">
+      <div className="md:hidden px-4 py-1.5">
         <div className="flex items-center justify-between">
           <div className="flex flex-shrink-0 items-center">
             <img

@@ -11,7 +11,7 @@ import type { ChainOption, TokenOption } from '../../features/swap/components/To
 import type { TxDetailItem } from '../../features/swap/components/TxDetailSheet'
 import type { SwapView } from '../../features/swap/types'
 
-import { _36EnumsTargetCurrency as TargetCurrency } from '../../api/index'
+import { _36EnumsTargetCurrency as TargetCurrency, type TransactionListItem } from '../../api/index'
 import { ChainSelectorModal, ConnectWalletChainModal } from '../../components/ui'
 import BankDetailsRoute from '../../features/swap/components/BankDetailsRoute'
 import ConfirmQr from '../../features/swap/components/ConfirmQr'
@@ -95,6 +95,25 @@ const TX_STATUS_MAP: Record<string, 'completed' | 'expired' | 'pending'> = {
   WRONG_AMOUNT: 'expired',
 }
 
+function transactionToTxDetailItem(tx: TransactionListItem): TxDetailItem {
+  const country = tx.quote.targetCurrency === 'BRL' ? 'br' : 'co'
+  return {
+    accountNumber: tx.accountNumber,
+    chain: NETWORK_TO_CHAIN_NAME[tx.quote.network?.toUpperCase() ?? ''] ?? 'Stellar',
+    country,
+    date: new Date(tx.createdAt).toLocaleString('en-US', { day: 'numeric', hour: 'numeric', minute: '2-digit', month: 'short', year: 'numeric' }),
+    fee: '0.01',
+    localAmount: tx.quote.targetAmount.toFixed(country === 'br' ? 2 : 0),
+    location: undefined,
+    merchant: `••••${tx.accountNumber.slice(-4)}`,
+    settlementTime: tx.status === 'PAYMENT_COMPLETED' ? 'Instant' : '—',
+    status: TX_STATUS_MAP[tx.status] ?? 'pending',
+    token: tx.quote.cryptoCurrency,
+    transactionId: tx.onChainId ?? tx.id,
+    usdcAmount: tx.quote.sourceAmount.toFixed(2),
+  }
+}
+
 const CHAIN_ICON_MAP: Record<string, string> = {
   Celo: ASSET_URLS.CELO_CHAIN_ICON,
   Solana: ASSET_URLS.SOLANA_CHAIN_ICON,
@@ -167,8 +186,15 @@ const WebSwap: React.FC = () => {
   const [showHistory, setShowHistory] = useState(false)
   const [selectedTx, setSelectedTx] = useState<null | TxDetailItem>(null)
 
-  // Fetch user transactions
-  const { allTransactions, fetchAllTransactions, fetchTransactions, recentTransactions: txSummaries } = useUserTransactions(swapViewProps.isAuthenticated, selectedChainKey)
+  // Fetch user transactions (for fallback summaries only; HistorySheet uses walletDetails.transactions)
+  const { fetchTransactions, recentTransactions: txSummaries } = useUserTransactions(swapViewProps.isAuthenticated, selectedChainKey)
+
+  const historySheetTransactions: TxDetailItem[] = useMemo(() => {
+    const list = selectedChainKey
+      ? walletDetails.transactions.filter(tx => transactionMatchesChain(tx, selectedChainKey))
+      : walletDetails.transactions
+    return list.map(transactionToTxDetailItem)
+  }, [walletDetails.transactions, selectedChainKey])
 
   // Fetch transactions on mount, when authenticated changes, and when navigating to home
   useEffect(() => {
@@ -260,10 +286,7 @@ const WebSwap: React.FC = () => {
                 }
                 onConnectWallet={handleConnectWalletClick}
                 onGoToManual={goToManual}
-                onHistoryClick={() => {
-                  fetchAllTransactions()
-                  setShowHistory(true)
-                }}
+                onHistoryClick={() => setShowHistory(true)}
                 onOpenChainModal={openSourceModal}
                 onOpenQr={openQr}
                 onSelectCurrency={selectCurrency}
@@ -276,8 +299,8 @@ const WebSwap: React.FC = () => {
                     date: new Date(tx.createdAt).toLocaleString('en-US', { day: 'numeric', hour: 'numeric', minute: '2-digit', month: 'short', year: 'numeric' }),
                     fee: '0.01',
                     localAmount: tx.quote.targetAmount.toFixed(country === 'br' ? 2 : 0),
-                    location: tx.externalId || undefined,
-                    merchant: tx.externalId || `••••${tx.accountNumber.slice(-4)}`,
+                    location: undefined,
+                    merchant: `••••${tx.accountNumber.slice(-4)}`,
                     settlementTime: tx.status === 'PAYMENT_COMPLETED' ? 'Instant' : '—',
                     status: TX_STATUS_MAP[tx.status] ?? 'pending',
                     token: tx.quote.cryptoCurrency,
@@ -405,7 +428,7 @@ const WebSwap: React.FC = () => {
             setSelectedTx(tx)
             setShowHistory(false)
           }}
-          transactions={allTransactions}
+          transactions={historySheetTransactions}
         />
       )}
 

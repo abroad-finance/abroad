@@ -233,31 +233,31 @@ export default function HomeScreen({
   const chainInfo = CHAIN_MAP[chainKey] ?? CHAIN_MAP.stellar
 
   return (
-    <div className="flex flex-1 flex-col items-center px-4 md:px-6">
+    <div className="flex w-full flex-1 flex-col items-center px-0">
       <div className="w-full max-w-[576px]">
         {/* Balance – Figma 1:46 */}
         <div className="flex flex-col items-center gap-1 py-1">
           <p className="text-center text-xs font-bold uppercase leading-4 tracking-[1.2px] text-[#6b7280]">
             {t('home.your_balance', 'Your Balance')}
           </p>
-          <div className="flex items-center justify-center gap-2">
-            <span className="text-center text-[40px] font-black leading-[48px] text-[#111827] md:text-[60px] md:leading-[60px]">
-              $
-              {balance}
-            </span>
+          <div className="flex items-center justify-center gap-3">
             {TOKEN_ICON_URL[selectedTokenLabel]
               ? (
                   <img
                     alt={selectedTokenLabel}
-                    className="h-6 w-6 shrink-0 pt-3 md:h-8 md:w-8"
+                    className="h-8 w-8 shrink-0 self-center object-contain md:h-9 md:w-9"
                     src={TOKEN_ICON_URL[selectedTokenLabel]}
                   />
                 )
               : (
-                  <span className="pt-3 text-[24px] font-medium leading-9 text-[#10b981] md:text-[30px] md:leading-9">
+                  <span className="text-2xl font-medium text-[#10b981] md:text-[30px] md:leading-9">
                     {selectedTokenLabel}
                   </span>
                 )}
+            <span className="text-center text-[40px] font-black leading-[48px] text-[#111827] md:text-[60px] md:leading-[60px]">
+              $
+              {balance}
+            </span>
           </div>
           <div className="flex h-8 items-center justify-center pt-1">
             <div className="flex items-center gap-2 rounded-full border border-[#f3f4f6] bg-[rgba(255,255,255,0.6)] px-[13px] py-[4.5px] shadow-[0px_1px_2px_0px_rgba(0,0,0,0.05)]">
@@ -373,11 +373,11 @@ export default function HomeScreen({
                         onClick={() => (onSelectTransaction ? onSelectTransaction(tx) : onHistoryClick())}
                         type="button"
                       >
-                        <div className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-[15px] border border-[#e5e7eb] bg-[#f9fafb]">
-                          <Store className="h-6 w-6 text-[#6b7280]" strokeWidth={1.5} />
+                        <div className="relative flex h-7 w-7 shrink-0 items-center justify-center rounded-[9px] border border-[#e5e7eb] bg-[#f9fafb]">
+                          <Store className="h-3.5 w-3.5 text-[#6b7280]" strokeWidth={1.5} />
                           <img
                             alt={countryConfig.currency}
-                            className="absolute bottom-0 right-0 h-5 w-5 rounded-full border-2 border-white object-cover shadow-sm"
+                            className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border border-white object-cover shadow-sm"
                             src={countryConfig.flagUrl}
                           />
                         </div>
@@ -390,17 +390,13 @@ export default function HomeScreen({
                           >
                             {tx.accountNumber}
                           </div>
-                          {formatDate && getStatusStyle && getStatusText && (
-                            <div className="mt-0.5 flex items-center gap-1.5 text-xs text-[#6b7280]">
-                              <span>{formatDate(tx.createdAt)}</span>
-                              <span>·</span>
-                              <span className={cn('rounded-full px-2 py-0.5 text-[10px] font-medium', getStatusStyle(tx.status))}>
-                                {getStatusText(tx.status)}
-                              </span>
+                          {formatDate && (
+                            <div className="mt-0.5 text-xs text-[#6b7280]">
+                              {formatDate(tx.createdAt)}
                             </div>
                           )}
                         </div>
-                        <div className="text-right">
+                        <div className="flex flex-col items-end gap-0.5">
                           <div
                             className={cn(
                               'text-sm font-semibold',
@@ -418,6 +414,11 @@ export default function HomeScreen({
                             {' '}
                             {selectedTokenLabel}
                           </div>
+                          {getStatusStyle && getStatusText && (
+                            <span className={cn('rounded-full px-2 py-0.5 text-[10px] font-medium', getStatusStyle(tx.status))}>
+                              {getStatusText(tx.status)}
+                            </span>
+                          )}
                         </div>
                         <ChevronRight className="h-4 w-4 shrink-0 text-[#9ca3af]" />
                       </button>
@@ -432,11 +433,11 @@ export default function HomeScreen({
                         onClick={onHistoryClick}
                         type="button"
                       >
-                        <div className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-[15px] border border-[#e5e7eb] bg-[#f9fafb]">
-                          <Store className="h-6 w-6 text-[#6b7280]" strokeWidth={1.5} />
+                        <div className="relative flex h-7 w-7 shrink-0 items-center justify-center rounded-[9px] border border-[#e5e7eb] bg-[#f9fafb]">
+                          <Store className="h-3.5 w-3.5 text-[#6b7280]" strokeWidth={1.5} />
                           <img
                             alt={countryConfig.currency}
-                            className="absolute bottom-0 right-0 h-5 w-5 rounded-full border-2 border-white object-cover shadow-sm"
+                            className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border border-white object-cover shadow-sm"
                             src={countryConfig.flagUrl}
                           />
                         </div>
