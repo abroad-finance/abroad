@@ -43,6 +43,11 @@ import {
 } from '../../api'
 import { useNotices } from '../../contexts/NoticeContext'
 import { BRL_BACKGROUND_IMAGE } from '../../features/swap/constants'
+import { useStablecoinBalances } from '../../features/swap/hooks/useStablecoinBalances'
+import {
+  isSupportedStablecoinSymbol,
+  parseStablecoinBalance,
+} from '../../features/swap/lib/stablecoinPortfolio'
 import { SwapView } from '../../features/swap/types'
 import {
   BRL_TRANSFER_FEE,
@@ -60,6 +65,12 @@ import {
 import { ASSET_URLS, PENDING_TX_KEY } from '../../shared/constants'
 import { useMenuCloseOnOutsideClick, useWalletAuth } from '../../shared/hooks'
 import { hasMessage } from '../../shared/utils'
+import {
+  buildWalletUserId,
+  resolveMiniPayNotice,
+  resolvePreferredMiniPayCorridor,
+  scopeCorridorsForWalletSurface,
+} from './minipayPolicy'
 
 type DecodeQrApiResponse = ApiClientResponse<decodeQrCodeBRResponse, DecodeQrCodeBR400>
 type SwapAction
@@ -304,6 +315,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
   const {
     defaultWallet,
     getWalletHandler,
+    miniPay,
     setActiveWallet,
     setKycUrl,
     wallet,
@@ -331,7 +343,13 @@ export const useWebSwapController = (): WebSwapControllerProps => {
   const directReqIdRef = useRef(0)
   const reverseReqIdRef = useRef(0)
   const decodeAbortRef = useRef<AbortController | null>(null)
+  const miniPayManualAssetSelectionRef = useRef(false)
   const [quoteBelowMinimum, setQuoteBelowMinimum] = useState(false)
+  const stablecoinBalances = useStablecoinBalances({
+    address: wallet?.address,
+    chainId: wallet?.chainId,
+  })
+  const isMiniPay = miniPay.isActive
 
   useEffect(() => {
     let active = true
@@ -356,10 +374,21 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     [state.targetCurrency],
   )
   const targetSymbol = state.targetCurrency === TargetCurrency.BRL ? 'R$' : '$'
+  const scopedCorridors = useMemo(() => scopeCorridorsForWalletSurface({
+    corridors,
+    isMiniPay,
+  }), [
+    corridors,
+    isMiniPay,
+  ])
   const availableCorridors = useMemo(() => {
-    const filtered = corridors.filter(corridor => corridor.targetCurrency === state.targetCurrency)
-    return sortStellarFirst(filtered)
-  }, [corridors, state.targetCurrency])
+    const filtered = scopedCorridors.filter(corridor => corridor.targetCurrency === state.targetCurrency)
+    return isMiniPay ? filtered : sortStellarFirst(filtered)
+  }, [
+    isMiniPay,
+    scopedCorridors,
+    state.targetCurrency,
+  ])
   const selectedCorridor = useMemo(() => {
     const match = availableCorridors.find(corridor => corridorKeyOf(corridor) === state.corridorKey)
     if (match && (!chainKey || chainKeyOf(match) === chainKey)) return match
@@ -381,16 +410,16 @@ export const useWebSwapController = (): WebSwapControllerProps => {
   }, [activeChainKey, availableCorridors])
   const chainVariants = useMemo(() => {
     const map = new Map<string, Set<string>>()
-    corridors.forEach((corridor) => {
+    scopedCorridors.forEach((corridor) => {
       const current = map.get(corridor.blockchain) ?? new Set<string>()
       current.add(corridor.chainId)
       map.set(corridor.blockchain, current)
     })
     return map
-  }, [corridors])
+  }, [scopedCorridors])
   const chainOptions = useMemo(() => {
     const seen = new Map<string, PublicCorridor>()
-    corridors.forEach((corridor) => {
+    scopedCorridors.forEach((corridor) => {
       const key = chainKeyOf(corridor)
       if (!seen.has(key)) seen.set(key, corridor)
     })
@@ -407,7 +436,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
       if (!aStellar && bStellar) return 1
       return 0
     })
-  }, [chainVariants, corridors])
+  }, [chainVariants, isMiniPay, scopedCorridors])
   const assetOptions = useMemo(() => chainFilteredCorridors.map(corridor => ({
     key: corridorKeyOf(corridor),
     label: corridor.cryptoCurrency,
@@ -416,6 +445,50 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     if (!selectedCorridor) return t('swap.asset_placeholder', 'Selecciona activo')
     return selectedCorridor.cryptoCurrency
   }, [selectedCorridor, t])
+  const selectedSourceBalance = useMemo(() => {
+    if (!selectedCorridor || !isSupportedStablecoinSymbol(selectedCorridor.cryptoCurrency)) {
+      return '0.00'
+    }
+
+    return stablecoinBalances.supportedBalanceFor(selectedCorridor.cryptoCurrency)
+  }, [
+    selectedCorridor,
+    stablecoinBalances,
+  ])
+  const hasInsufficientFunds = useMemo(() => {
+    const requestedAmount = parseStablecoinBalance(state.sourceAmount)
+    if (requestedAmount <= 0) {
+      return false
+    }
+    return requestedAmount > parseStablecoinBalance(selectedSourceBalance)
+  }, [
+    selectedSourceBalance,
+    state.sourceAmount,
+  ])
+  const miniPayNotice = useMemo(() => resolveMiniPayNotice({
+    copy: {
+      addCashLabel: t('swap.minipay.add_cash', 'Add Cash'),
+      cUsdDescription: t(
+        'swap.minipay.cusd_notice',
+        'MiniPay is ready, but Abroad currently works with USDC and USDT. If your main balance is cUSD, switch to a supported stablecoin or add cash in MiniPay.',
+      ),
+      cUsdTitle: t('swap.minipay.cusd_title', 'Use USDC or USDT'),
+      lowBalanceDescription: t(
+        'swap.minipay.low_balance_notice',
+        'This payment needs more supported stablecoin than you have available in MiniPay.',
+      ),
+      lowBalanceTitle: t('swap.minipay.low_balance_title', 'Low balance'),
+    },
+    hasInsufficientFunds,
+    isMiniPay,
+    preference: stablecoinBalances.preference,
+  }), [
+    hasInsufficientFunds,
+    isMiniPay,
+    stablecoinBalances.preference,
+    t,
+  ])
+
   useEffect(() => {
     if (!selectedCorridor) return
     const key = corridorKeyOf(selectedCorridor)
@@ -464,8 +537,35 @@ export const useWebSwapController = (): WebSwapControllerProps => {
   ])
 
   useEffect(() => {
+    if (!isMiniPay) return
+    if (miniPayManualAssetSelectionRef.current) return
+    const preferredCorridor = resolvePreferredMiniPayCorridor({
+      availableCorridors,
+      preference: stablecoinBalances.preference,
+    })
+    if (!preferredCorridor) return
+
+    const preferredCorridorKey = corridorKeyOf(preferredCorridor)
+    const preferredChainKey = chainKeyOf(preferredCorridor)
+    if (state.corridorKey !== preferredCorridorKey) {
+      dispatch({ corridorKey: preferredCorridorKey, type: 'SET_CORRIDOR' })
+    }
+    if (chainKey !== preferredChainKey) {
+      setChainKey(preferredChainKey)
+    }
+  }, [
+    availableCorridors,
+    chainKey,
+    isMiniPay,
+    stablecoinBalances.preference,
+    state.corridorKey,
+  ])
+
+  useEffect(() => {
     if (!selectedCorridor || !getWalletHandler || !setActiveWallet) return
-    const nextWallet = selectedCorridor.chainFamily === 'stellar'
+    const nextWallet = isMiniPay
+      ? defaultWallet
+      : selectedCorridor.chainFamily === 'stellar'
       ? defaultWallet
       : getWalletHandler('wallet-connect')
     if (!nextWallet) return
@@ -485,6 +585,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
   }, [
     defaultWallet,
     getWalletHandler,
+    isMiniPay,
     pendingConnectAfterChainSelect,
     selectedCorridor,
     setActiveWallet,
@@ -554,12 +655,16 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     transferFee,
   ])
 
-  const isAuthenticated = Boolean(walletAuthentication?.jwtToken && wallet?.address && wallet?.chainId)
+  const isAuthenticated = Boolean(wallet?.address && wallet?.chainId && (isMiniPay || walletAuthentication?.jwtToken))
   const resolvedChainId = wallet?.chainId ?? selectedCorridor?.chainId ?? null
-  const walletUserId = wallet?.address && resolvedChainId ? `${resolvedChainId}:${wallet.address}` : null
+  const walletUserId = buildWalletUserId(resolvedChainId, wallet?.address ?? null)
 
   const connectWallet = useCallback(async () => {
     if (!wallet || !selectedCorridor) return
+    if (isMiniPay) {
+      await wallet.connect()
+      return
+    }
     const options = wallet.walletId === 'wallet-connect'
       ? {
           chainId: selectedCorridor.chainId,
@@ -567,7 +672,11 @@ export const useWebSwapController = (): WebSwapControllerProps => {
         }
       : undefined
     await wallet.connect(options)
-  }, [selectedCorridor, wallet])
+  }, [
+    isMiniPay,
+    selectedCorridor,
+    wallet,
+  ])
 
   const requestConnectAfterChainSelect = useCallback(() => {
     setPendingConnectAfterChainSelect(true)
@@ -576,6 +685,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
   useEffect(() => {
     if (!wallet?.address || !wallet?.chainId || !selectedCorridor) return
     if (wallet.chainId === selectedCorridor.chainId) return
+    if (isMiniPay) return
     // Silently try to restore a saved session for the new chain.
     // If no session exists, disconnect so the UI reflects the need to reconnect.
     if (wallet.walletId === 'wallet-connect' && selectedCorridor.walletConnect) {
@@ -586,7 +696,11 @@ export const useWebSwapController = (): WebSwapControllerProps => {
         void wallet.disconnect()
       })
     }
-  }, [selectedCorridor, wallet])
+  }, [
+    isMiniPay,
+    selectedCorridor,
+    wallet,
+  ])
 
   const isBelowMinimum = useMemo(() => {
     if (quoteBelowMinimum) return true
@@ -622,6 +736,9 @@ export const useWebSwapController = (): WebSwapControllerProps => {
   }, [state.sourceAmount, state.targetAmount])
 
   const continueDisabled = useMemo(() => {
+    if (isMiniPay && !miniPay.isReady) {
+      return true
+    }
     if (!isAuthenticated) return false
     const baseDisabled = isPrimaryDisabled() || !state.quoteId || isBelowMinimum || isAboveMaximum
     if (state.targetCurrency === TargetCurrency.BRL) {
@@ -636,6 +753,8 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     isAuthenticated,
     isBelowMinimum,
     isPrimaryDisabled,
+    isMiniPay,
+    miniPay.isReady,
     state.accountNumber,
     state.pixKey,
     state.quoteId,
@@ -674,7 +793,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     if (!jwtOnMount.current) return
 
     const stored = readPersisted()
-    if (stored && walletAuthentication?.jwtToken) {
+    if (stored && (isMiniPay || walletAuthentication?.jwtToken)) {
       // Don't restore terminal views — those sessions are over
       const restoredView = (stored.view === 'txStatus' || stored.view === 'wait-sign')
         ? 'home'
@@ -695,7 +814,10 @@ export const useWebSwapController = (): WebSwapControllerProps => {
         type: 'HYDRATE',
       })
     }
-  }, [walletAuthentication?.jwtToken])
+  }, [
+    isMiniPay,
+    walletAuthentication?.jwtToken,
+  ])
 
   // When the user first becomes authenticated, ensure they see the authenticated home screen
   // (dashboard with balance, scan QR, enter amount) instead of swap view with pre-filled data.
@@ -925,11 +1047,19 @@ export const useWebSwapController = (): WebSwapControllerProps => {
 
   const openQr = useCallback(() => {
     if (!isAuthenticated) {
+      if (isMiniPay) {
+        return
+      }
       void connectWallet()
       return
     }
     dispatch({ isQrOpen: true, type: 'SET_QR_OPEN' })
-  }, [connectWallet, isAuthenticated])
+    dispatch({ targetCurrency: TargetCurrency.BRL, type: 'SET_TARGET_CURRENCY' })
+  }, [
+    connectWallet,
+    isAuthenticated,
+    isMiniPay,
+  ])
 
   const currencyMenuRef = useRef<HTMLDivElement | null>(null)
   const skipNextDocumentClickRef = useRef(false)
@@ -944,6 +1074,9 @@ export const useWebSwapController = (): WebSwapControllerProps => {
   const [assetMenuOpen, setAssetMenuOpen] = useReducer((s: boolean) => !s, false)
 
   const selectAssetOption = useCallback((key: string) => {
+    if (isMiniPay) {
+      miniPayManualAssetSelectionRef.current = true
+    }
     setAssetMenuOpen()
     setQuoteBelowMinimum(false)
     dispatch({ corridorKey: key, type: 'SET_CORRIDOR' })
@@ -953,7 +1086,10 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     lastEditedRef.current = null
     directAbortRef.current?.abort()
     reverseAbortRef.current?.abort()
-  }, [availableCorridors])
+  }, [
+    availableCorridors,
+    isMiniPay,
+  ])
 
   useMenuCloseOnOutsideClick({
     isOpen: assetMenuOpen,
@@ -970,6 +1106,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
 
   const selectCurrency = useCallback((currency: TargetCurrency) => {
     setCurrencyMenuOpen()
+    miniPayManualAssetSelectionRef.current = false
     dispatch({ type: 'RESET' })
     dispatch({ targetCurrency: currency, type: 'SET_TARGET_CURRENCY' })
     setQuoteBelowMinimum(false)
@@ -1044,6 +1181,9 @@ export const useWebSwapController = (): WebSwapControllerProps => {
 
   const onPrimaryAction = useCallback(async () => {
     if (!isAuthenticated) {
+      if (isMiniPay) {
+        return
+      }
       await connectWallet()
       return
     }
@@ -1055,6 +1195,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
   }, [
     connectWallet,
     isAuthenticated,
+    isMiniPay,
     notifyError,
     state.quoteId,
     t,
@@ -1062,7 +1203,12 @@ export const useWebSwapController = (): WebSwapControllerProps => {
 
   const currentBgUrl = state.targetCurrency === TargetCurrency.BRL ? BRL_BACKGROUND_IMAGE : ASSET_URLS.BACKGROUND_IMAGE
 
-  const handleWalletDetailsOpen = useCallback(() => dispatch({ isWalletDetailsOpen: true, type: 'SET_WALLET_DETAILS_OPEN' }), [])
+  const handleWalletDetailsOpen = useCallback(() => {
+    if (isMiniPay) {
+      return
+    }
+    dispatch({ isWalletDetailsOpen: true, type: 'SET_WALLET_DETAILS_OPEN' })
+  }, [isMiniPay])
   const handleWalletDetailsClose = useCallback(() => dispatch({ isWalletDetailsOpen: false, type: 'SET_WALLET_DETAILS_OPEN' }), [])
 
   const handleQrResult = useCallback(async (text: string) => {
@@ -1540,9 +1686,16 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     continueDisabled,
     exchangeRateDisplay,
     fromQr: !!state.qrCode,
+    hasInsufficientFunds,
     isAboveMaximum,
     isAuthenticated,
     isBelowMinimum,
+    isMiniPay,
+    isMiniPayReady: miniPay.isReady,
+    loadingSource: state.loadingSource,
+    loadingTarget: state.loadingTarget,
+    loadingWallet: isMiniPay && miniPay.isResolving,
+    miniPayNotice,
     onOpenSourceModal: () => { /* handled in WebSwap */ },
     onOpenTargetModal: () => { /* handled in WebSwap */ },
     onPrimaryAction,
@@ -1564,6 +1717,12 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     taxId: state.taxId,
     transferFeeDisplay,
     transferFeeIsZero: transferFee === 0,
+    walletStatusLabel: isMiniPay
+      ? miniPay.isReady
+        ? t('swap.minipay.ready', 'MiniPay ready')
+        : t('swap.minipay.opening', 'Opening MiniPay')
+      : undefined,
+    walletStatusTone: isMiniPay ? 'info' : undefined,
   }
 
   const confirmQrProps: ConfirmQrProps = {
@@ -1620,6 +1779,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     handleWalletDetailsClose,
     handleWalletDetailsOpen,
     isDecodingQr: state.isDecodingQr,
+    isMiniPay,
     isQrOpen: state.isQrOpen,
     isWalletDetailsOpen: state.isWalletDetailsOpen,
     onWalletConnect: connectWallet,

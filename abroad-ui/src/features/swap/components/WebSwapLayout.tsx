@@ -6,6 +6,8 @@ import { cn } from '../../../shared/utils'
 import { SwapView } from '../types'
 
 export interface WebSwapLayoutProps {
+  disclosure?: null | React.JSX.Element
+  isMiniPay?: boolean
   targetCurrency: (typeof TargetCurrency)[keyof typeof TargetCurrency]
   view: SwapView
 }
@@ -22,7 +24,13 @@ type WebSwapLayoutSlots = {
   }
 }
 
-const WebSwapLayout: React.FC<WebSwapLayoutProps & WebSwapLayoutSlots> = ({ slots, targetCurrency: _targetCurrency, view }) => {
+const WebSwapLayout: React.FC<WebSwapLayoutProps & WebSwapLayoutSlots> = ({
+  disclosure = null,
+  isMiniPay: _isMiniPay = false,
+  slots,
+  targetCurrency: _targetCurrency,
+  view,
+}) => {
   const renderSwap = useMemo(() => {
     switch (view) {
       case 'bankDetails':
@@ -62,6 +70,7 @@ const WebSwapLayout: React.FC<WebSwapLayoutProps & WebSwapLayoutSlots> = ({ slot
     >
       <div className={cn('w-full', isMainFlow ? 'max-w-[576px]' : 'max-w-md')}>
         {renderSwap}
+        {disclosure}
       </div>
     </div>
   )

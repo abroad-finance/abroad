@@ -4,6 +4,7 @@
  * Solana and EVM (e.g. Celo) show USDC + USDT.
  */
 export interface ChainBalanceConfig {
+  cUsdAddress?: null | string
   decimals: number
   rpcUrl: string
   usdcAddress: string
@@ -11,6 +12,7 @@ export interface ChainBalanceConfig {
 }
 
 const SOLANA_MAINNET: ChainBalanceConfig = {
+  cUsdAddress: null,
   decimals: 6,
   rpcUrl: 'https://api.mainnet-beta.solana.com',
   usdcAddress: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
@@ -18,9 +20,11 @@ const SOLANA_MAINNET: ChainBalanceConfig = {
 }
 
 const CELO_MAINNET: ChainBalanceConfig = {
+  // MiniPay docs currently point developers to these Celo stablecoin contracts.
+  cUsdAddress: '0x765DE816845861e75A25fCA122bb6898B8B1282a',
   decimals: 6,
   rpcUrl: 'https://forno.celo.org',
-  usdcAddress: '0xcebA9300f2b948710d2653dD7B07f33A8B32118C',
+  usdcAddress: '0x37f750B7Cc259a2f741Af45294f6a16572CF5cAd',
   usdtAddress: '0x48065fbBE25f71C9282ddf5e1cD6D6A887483D5e',
 }
 

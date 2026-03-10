@@ -21,7 +21,18 @@ export interface SwapProps {
   isAboveMaximum: boolean
   isAuthenticated: boolean
   isBelowMinimum: boolean
+  isMiniPay?: boolean
+  isMiniPayReady?: boolean
   loadingBalance?: boolean
+  loadingSource?: boolean
+  loadingTarget?: boolean
+  loadingWallet?: boolean
+  miniPayNotice?: null | {
+    ctaHref: string
+    ctaLabel: string
+    description: string
+    title: string
+  }
   onBackClick?: () => void
   onBalanceClick?: () => void
   onOpenSourceModal: () => void
@@ -42,6 +53,9 @@ export interface SwapProps {
   transferFeeDisplay: string
   transferFeeIsZero?: boolean
   usdcBalance?: string
+  walletAddress?: null | string
+  walletStatusLabel?: string
+  walletStatusTone?: 'info' | 'warning'
 }
 
 export default function Swap({
@@ -52,7 +66,13 @@ export default function Swap({
   isAboveMaximum,
   isAuthenticated,
   isBelowMinimum,
+  isMiniPay: _isMiniPay = false,
+  isMiniPayReady: _isMiniPayReady = false,
   loadingBalance,
+  loadingSource: _loadingSource,
+  loadingTarget: _loadingTarget,
+  loadingWallet: _loadingWallet,
+  miniPayNotice: _miniPayNotice,
   onBackClick,
   onBalanceClick,
   onOpenSourceModal: _onOpenSourceModal,
@@ -73,6 +93,9 @@ export default function Swap({
   transferFeeDisplay,
   transferFeeIsZero = false,
   usdcBalance,
+  walletAddress: _walletAddress,
+  walletStatusLabel: _walletStatusLabel,
+  walletStatusTone: _walletStatusTone,
 }: SwapProps): React.JSX.Element {
   const { t } = useTranslate()
 

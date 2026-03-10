@@ -15,10 +15,10 @@ const WaitSign = (): React.JSX.Element => {
           <IconAnimated colors="primary:#ffffff,secondary:#ffffff" icon="DocumentSign" loop={true} play={true} size={150} />
         </div>
         <h2 className="text-xl font-semibold text-center mb-4">
-          {t('wait_sign.wait_sign', 'Esperando firma en wallet...')}
+          {t('wait_sign.wait_sign', 'Confirm your payment in your wallet')}
         </h2>
         <p className="text-center mb-6">
-          {t('wait_sign.wait_message', 'Por favor espera mientras se firma la transacción en tu billetera.')}
+          {t('wait_sign.wait_message', 'MiniPay will ask you to confirm the transaction.')}
         </p>
       </div>
     </div>

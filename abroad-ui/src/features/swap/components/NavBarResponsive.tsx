@@ -18,6 +18,7 @@ export interface NavBarResponsiveProps {
   balance: string
   balanceLoading: boolean
   className?: string
+  hideWalletButton?: boolean
   infoUrl: string
   isDark?: boolean
   labels: {
@@ -66,6 +67,7 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({
   balance: _balance,
   balanceLoading: _balanceLoading,
   className = '',
+  hideWalletButton = false,
   infoUrl,
   isDark = false,
   labels,
@@ -115,7 +117,7 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({
           tokenLabel={selectedTokenLabel}
         />
       )}
-      {isConnected && (
+      {isConnected && !hideWalletButton && (
         <div
           aria-label={labels.walletDetailsAria}
           className="flex shrink-0 items-center justify-center rounded-full border p-1.5"
@@ -130,7 +132,7 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({
           />
         </div>
       )}
-      {address && (
+      {address && !hideWalletButton && (
         <>
           {onDisconnect && (
             <button

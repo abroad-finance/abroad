@@ -7,12 +7,13 @@ import {
 import type { NavBarResponsiveProps } from '../../features/swap/components/NavBarResponsive'
 
 import { useWebSocketSubscription } from '../../contexts/WebSocketContext'
+import { ABROAD_SUPPORT_URL } from '../constants'
 import { useTheme } from './useTheme'
 import { useWalletAuth } from './useWalletAuth'
 
 const DEFAULT_HORIZON_URL = 'https://horizon.stellar.org'
 const DEFAULT_USDC_ISSUER = 'GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN'
-const DEFAULT_INFO_URL = 'https://linktr.ee/Abroad.finance'
+const DEFAULT_INFO_URL = ABROAD_SUPPORT_URL
 
 type BalanceLine
   = | { asset_code: string
@@ -126,7 +127,7 @@ interface UseNavBarResponsiveArgs {
 }
 
 type UseNavBarResponsiveResult = Pick<NavBarResponsiveProps,
-  'address' | 'balance' | 'balanceLoading' | 'infoUrl' | 'isDark' | 'labels' | 'onToggleTheme' | 'onWalletClick' | 'walletInfo'
+  'address' | 'balance' | 'balanceLoading' | 'hideWalletButton' | 'infoUrl' | 'isDark' | 'labels' | 'onToggleTheme' | 'onWalletClick' | 'walletInfo'
 >
 
 export function useNavBarResponsive({
@@ -136,7 +137,7 @@ export function useNavBarResponsive({
   onWalletDetails,
   usdcIssuer = DEFAULT_USDC_ISSUER,
 }: UseNavBarResponsiveArgs = {}): UseNavBarResponsiveResult {
-  const { wallet } = useWalletAuth()
+  const { miniPay, wallet } = useWalletAuth()
   const { t } = useTranslate()
   const { isDark, toggleTheme } = useTheme()
   const isStellar = wallet?.chainId?.startsWith('stellar:') ?? false
@@ -202,6 +203,7 @@ export function useNavBarResponsive({
     address: wallet?.address || null,
     balance,
     balanceLoading,
+    hideWalletButton: miniPay.isActive,
     infoUrl,
     isDark,
     labels,

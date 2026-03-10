@@ -1,4 +1,3 @@
-import { Horizon } from '@stellar/stellar-sdk'
 import { useTranslate } from '@tolgee/react'
 import {
   useCallback,
@@ -18,11 +17,8 @@ import {
 import { useWebSocketSubscription } from '../../../contexts/WebSocketContext'
 import { useWalletAuth } from '../../../shared/hooks/useWalletAuth'
 import { WalletDetailsProps } from '../components/WalletDetails'
-import { fetchNonStellarBalances } from '../lib/chainBalanceFetchers'
+import { useStablecoinBalances } from './useStablecoinBalances'
 
-// Stellar: only USDC. Other chains (Solana, EVM/Celo) use USDC + USDT.
-const STELLAR_HORIZON_URL = 'https://horizon.stellar.org'
-const STELLAR_USDC_ISSUER = 'GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN'
 const DEFAULT_TRANSACTIONS_PAGE_SIZE = 10
 
 type ListTransactionsResult = ApiClientResponse<listPartnerTransactionsResponse, ListPartnerTransactions400>
@@ -44,15 +40,12 @@ export function useWalletDetails(params: Params = {}): WalletDetailsProps {
   const { wallet, walletAuthentication } = useWalletAuth()
 
   const [copiedAddress, setCopiedAddress] = useState(false)
-  const [usdcBalance, setUsdcBalance] = useState<string>('0.00')
-  const [usdtBalance, setUsdtBalance] = useState<string>('0.00')
-  const [isLoadingBalance, setIsLoadingBalance] = useState(false)
   const [transactions, setTransactions] = useState<Transaction[]>([])
-  const transactionsRef = useRef<Transaction[]>([])
   const [isLoadingTransactions, setIsLoadingTransactions] = useState(false)
   const [isLoadingMoreTransactions, setIsLoadingMoreTransactions] = useState(false)
   const [transactionError, setTransactionError] = useState<null | string>(null)
   const [selectedTransaction, setSelectedTransaction] = useState<null | TransactionListItem>(null)
+  const transactionsRef = useRef<Transaction[]>([])
   const pageSizeRef = useRef<number>(DEFAULT_TRANSACTIONS_PAGE_SIZE)
   const transactionsAbortRef = useRef<AbortController | null>(null)
   const [pagination, setPagination] = useState<PaginationState>({
@@ -60,6 +53,11 @@ export function useWalletDetails(params: Params = {}): WalletDetailsProps {
     hasMore: false,
     total: 0,
   })
+  const stablecoinBalances = useStablecoinBalances({
+    address: wallet?.address,
+    chainId: wallet?.chainId,
+  })
+
   useEffect(() => {
     transactionsRef.current = transactions
   }, [transactions])
@@ -69,53 +67,6 @@ export function useWalletDetails(params: Params = {}): WalletDetailsProps {
       transactionsAbortRef.current?.abort()
     }
   }, [])
-
-  const formatBalance = useCallback((n: number): string => (
-    Number.isFinite(n)
-      ? n.toLocaleString('en-US', { maximumFractionDigits: 2, minimumFractionDigits: 2 })
-      : '0.00'
-  ), [])
-
-  const fetchStellarUSDCOnly = useCallback(async (address: string): Promise<{ usdc: string, usdt: string }> => {
-    try {
-      const server = new Horizon.Server(STELLAR_HORIZON_URL)
-      const account = await server.loadAccount(address)
-      const line = account.balances.find(balance => (
-        balance.asset_type !== 'native'
-        && 'asset_code' in balance
-        && 'asset_issuer' in balance
-        && balance.asset_code === 'USDC'
-        && balance.asset_issuer === STELLAR_USDC_ISSUER
-      ))
-      const n = line && 'balance' in line ? parseFloat(line.balance) : 0
-      return { usdc: formatBalance(n), usdt: '0.00' }
-    }
-    catch {
-      return { usdc: '0.00', usdt: '0.00' }
-    }
-  }, [formatBalance])
-
-  const fetchBalancesForChain = useCallback(async (address: string, chainId: null | string): Promise<{ usdc: string, usdt: string }> => {
-    if (!chainId || !address) return { usdc: '0.00', usdt: '0.00' }
-    if (chainId.startsWith('stellar:')) return fetchStellarUSDCOnly(address)
-    if (chainId.startsWith('solana:')) return fetchNonStellarBalances(address, chainId, 'solana')
-    if (chainId.startsWith('eip155:')) return fetchNonStellarBalances(address, chainId, 'evm')
-    return { usdc: '0.00', usdt: '0.00' }
-  }, [fetchStellarUSDCOnly])
-
-  const fetchBalancesWithLoading = useCallback(async (address: string, chainId: null | string) => {
-    try {
-      setIsLoadingBalance(true)
-      const { usdc, usdt } = await fetchBalancesForChain(address, chainId)
-      setUsdcBalance(usdc)
-      setUsdtBalance(usdt)
-    }
-    catch {
-      setUsdcBalance('0.00')
-      setUsdtBalance('0.00')
-    }
-    finally { setIsLoadingBalance(false) }
-  }, [fetchBalancesForChain])
 
   const loadTransactions = useCallback(async ({ append, page }: { append: boolean, page: number }) => {
     if (!walletAuthentication?.jwtToken) {
@@ -202,9 +153,6 @@ export function useWalletDetails(params: Params = {}): WalletDetailsProps {
 
   // Effects
   useEffect(() => {
-    if (wallet?.address && wallet?.chainId) {
-      fetchBalancesWithLoading(wallet.address, wallet.chainId)
-    }
     if (wallet?.address && wallet?.chainId && walletAuthentication?.jwtToken) {
       loadTransactions({ append: false, page: 1 })
     }
@@ -212,20 +160,21 @@ export function useWalletDetails(params: Params = {}): WalletDetailsProps {
     wallet?.address,
     wallet?.chainId,
     walletAuthentication?.jwtToken,
-    fetchBalancesWithLoading,
     loadTransactions,
   ])
 
   // Subscribe to websocket notifications to refresh transactions and balance
   const refreshFromEvent = useCallback(() => {
-    if (!wallet?.address || !wallet?.chainId || !walletAuthentication?.jwtToken) return
-    void loadTransactions({ append: false, page: 1 })
-    fetchBalancesWithLoading(wallet.address, wallet.chainId)
+    if (!wallet?.address || !wallet?.chainId) return
+    if (walletAuthentication?.jwtToken) {
+      void loadTransactions({ append: false, page: 1 })
+    }
+    void stablecoinBalances.refresh()
   }, [
-    fetchBalancesWithLoading,
     wallet?.address,
     wallet?.chainId,
     loadTransactions,
+    stablecoinBalances.refresh,
     walletAuthentication?.jwtToken,
   ])
 
@@ -237,13 +186,13 @@ export function useWalletDetails(params: Params = {}): WalletDetailsProps {
 
   // Handlers exposed to component
   const onRefreshBalance = useCallback(() => {
-    if (!wallet?.address || !wallet?.chainId || isLoadingBalance) return
-    fetchBalancesWithLoading(wallet.address, wallet.chainId)
+    if (!wallet?.address || !wallet?.chainId || stablecoinBalances.isLoading) return
+    void stablecoinBalances.refresh()
   }, [
     wallet?.address,
     wallet?.chainId,
-    isLoadingBalance,
-    fetchBalancesWithLoading,
+    stablecoinBalances.isLoading,
+    stablecoinBalances.refresh,
   ])
 
   const onRefreshTransactions = useCallback(() => {
@@ -336,13 +285,15 @@ export function useWalletDetails(params: Params = {}): WalletDetailsProps {
 
   return {
     address: wallet?.address || null,
+    cUsdBalance: stablecoinBalances.cUsd,
     copiedAddress,
     formatDate,
     formatDateWithTime,
     getStatusStyle,
     getStatusText,
     hasMoreTransactions: pagination.hasMore,
-    isLoadingBalance,
+    isLoadingBalance: stablecoinBalances.isLoading,
+    isUnsupportedPreferredStablecoin: stablecoinBalances.preference.kind === 'unsupported-preferred',
     isLoadingMoreTransactions,
     isLoadingTransactions,
     onClose,
@@ -353,9 +304,11 @@ export function useWalletDetails(params: Params = {}): WalletDetailsProps {
     onRefreshTransactions,
     selectedTransaction,
     setSelectedTransaction,
+    supportedTokenPreference: stablecoinBalances.preference.preferredSupportedToken,
+    topStablecoin: stablecoinBalances.preference.highestBalanceToken,
     transactionError,
     transactions,
-    usdcBalance,
-    usdtBalance,
+    usdcBalance: stablecoinBalances.usdc,
+    usdtBalance: stablecoinBalances.usdt,
   }
 }
