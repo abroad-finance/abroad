@@ -9,6 +9,7 @@ import {
   listPartners,
   revokePartnerApiKey,
   rotatePartnerApiKey,
+  updatePartnerClientDomain,
 } from '../../services/admin/partnerAdminApi'
 import { OpsCreatePartnerInput, OpsPartner } from '../../services/admin/partnerTypes'
 import OpsApiKeyPanel from './OpsApiKeyPanel'
@@ -16,6 +17,7 @@ import OpsApiKeyPanel from './OpsApiKeyPanel'
 const pageSize = 20
 
 type CreatePartnerDraft = {
+  clientDomain: string
   company: string
   country: string
   email: string
@@ -32,6 +34,7 @@ type RevealedKey = {
 }
 
 const emptyDraft: CreatePartnerDraft = {
+  clientDomain: '',
   company: '',
   country: 'CO',
   email: '',
@@ -52,6 +55,11 @@ const validateDraft = (draft: CreatePartnerDraft): null | string => {
   return null
 }
 
+const buildActionKey = (
+  action: 'clear-domain' | 'revoke' | 'rotate' | 'save-domain',
+  partnerId: string,
+): string => `${action}:${partnerId}`
+
 const PartnerApiKeys = () => {
   const opsApiKey = useOpsApiKey()
   const [partners, setPartners] = useState<OpsPartner[]>([])
@@ -60,6 +68,8 @@ const PartnerApiKeys = () => {
   const [loading, setLoading] = useState(false)
   const [creating, setCreating] = useState(false)
   const [actionLoading, setActionLoading] = useState<null | string>(null)
+  const [editingPartnerId, setEditingPartnerId] = useState<null | string>(null)
+  const [editingClientDomain, setEditingClientDomain] = useState('')
   const [error, setError] = useState<null | string>(null)
   const [draft, setDraft] = useState<CreatePartnerDraft>(emptyDraft)
   const [revealedKey, setRevealedKey] = useState<null | RevealedKey>(null)
@@ -101,6 +111,7 @@ const PartnerApiKeys = () => {
   }, [copied])
 
   const createPayload = (): OpsCreatePartnerInput => ({
+    clientDomain: draft.clientDomain.trim() || undefined,
     company: draft.company.trim(),
     country: draft.country.trim(),
     email: draft.email.trim(),
@@ -108,6 +119,16 @@ const PartnerApiKeys = () => {
     lastName: draft.lastName.trim(),
     phone: draft.phone.trim() || undefined,
   })
+
+  const updatePartnerRecord = useCallback((nextPartner: OpsPartner) => {
+    setPartners(current => current.map(item => (
+      item.id === nextPartner.id ? nextPartner : item
+    )))
+  }, [])
+
+  const isPartnerBusy = useCallback((partnerId: string): boolean => (
+    actionLoading?.endsWith(`:${partnerId}`) ?? false
+  ), [actionLoading])
 
   const handleCreatePartner = async () => {
     const validationError = validateDraft(draft)
@@ -139,13 +160,13 @@ const PartnerApiKeys = () => {
   }
 
   const handleRotate = async (partner: OpsPartner) => {
-    const key = `rotate:${partner.id}`
+    const key = buildActionKey('rotate', partner.id)
     setActionLoading(key)
     setError(null)
 
     try {
       const response = await rotatePartnerApiKey(partner.id)
-      setPartners(current => current.map(item => (item.id === response.partner.id ? response.partner : item)))
+      updatePartnerRecord(response.partner)
       setRevealedKey({
         action: 'rotated',
         apiKey: response.apiKey,
@@ -165,7 +186,7 @@ const PartnerApiKeys = () => {
     const confirmed = window.confirm(`Revoke API key for ${partner.name}?`)
     if (!confirmed) return
 
-    const key = `revoke:${partner.id}`
+    const key = buildActionKey('revoke', partner.id)
     setActionLoading(key)
     setError(null)
 
@@ -182,6 +203,60 @@ const PartnerApiKeys = () => {
     }
     catch (revokeError) {
       setError(revokeError instanceof Error ? revokeError.message : 'Failed to revoke API key')
+    }
+    finally {
+      setActionLoading(null)
+    }
+  }
+
+  const startEditingClientDomain = useCallback((partner: OpsPartner) => {
+    setEditingPartnerId(partner.id)
+    setEditingClientDomain(partner.clientDomain ?? '')
+    setError(null)
+  }, [])
+
+  const stopEditingClientDomain = useCallback(() => {
+    setEditingPartnerId(null)
+    setEditingClientDomain('')
+  }, [])
+
+  const handleSaveClientDomain = async (partner: OpsPartner) => {
+    const key = buildActionKey('save-domain', partner.id)
+    setActionLoading(key)
+    setError(null)
+
+    try {
+      const updatedPartner = await updatePartnerClientDomain(partner.id, {
+        clientDomain: editingClientDomain.trim() || null,
+      })
+      updatePartnerRecord(updatedPartner)
+      stopEditingClientDomain()
+    }
+    catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : 'Failed to save client domain')
+    }
+    finally {
+      setActionLoading(null)
+    }
+  }
+
+  const handleClearClientDomain = async (partner: OpsPartner) => {
+    const confirmed = window.confirm(`Clear client domain for ${partner.name}?`)
+    if (!confirmed) return
+
+    const key = buildActionKey('clear-domain', partner.id)
+    setActionLoading(key)
+    setError(null)
+
+    try {
+      const updatedPartner = await updatePartnerClientDomain(partner.id, { clientDomain: null })
+      updatePartnerRecord(updatedPartner)
+      if (editingPartnerId === partner.id) {
+        stopEditingClientDomain()
+      }
+    }
+    catch (clearError) {
+      setError(clearError instanceof Error ? clearError.message : 'Failed to clear client domain')
     }
     finally {
       setActionLoading(null)
@@ -209,7 +284,7 @@ const PartnerApiKeys = () => {
               <div className="text-sm uppercase tracking-[0.3em] text-abroad-dark">Operations</div>
               <h1 className="text-3xl md:text-4xl font-semibold">Partners & API Keys</h1>
               <p className="text-sm text-gray-600 max-w-2xl mt-2">
-                Create partner accounts, issue one-time API keys, rotate compromised keys, and revoke access.
+                Create partner accounts, issue one-time API keys, rotate compromised keys, revoke access, and manage trusted browser domains.
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-3">
@@ -342,6 +417,20 @@ const PartnerApiKeys = () => {
                   type="email"
                   value={draft.email}
                 />
+                <input
+                  className="ops-input"
+                  onChange={event => setDraft(current => ({ ...current, clientDomain: event.target.value }))}
+                  placeholder="Client domain (optional)"
+                  type="text"
+                  value={draft.clientDomain}
+                />
+                <div className="text-xs text-gray-500">
+                  Enter a hostname like
+                  {' '}
+                  <span className="font-medium">app.example.com</span>
+                  {' '}
+                  or a full URL. Abroad will store the canonical host only.
+                </div>
                 <button
                   className="mt-1 ops-btn-primary disabled:opacity-60"
                   disabled={!opsApiKey || creating}
@@ -371,64 +460,146 @@ const PartnerApiKeys = () => {
               </div>
 
               <div className="mt-4 overflow-x-auto">
-                <table className="w-full min-w-[760px] text-sm">
+                <table className="w-full min-w-[980px] text-sm">
                   <thead>
                     <tr className="text-left text-xs uppercase tracking-wider text-gray-500">
                       <th className="px-2 py-2">Partner</th>
                       <th className="px-2 py-2">Contact</th>
+                      <th className="px-2 py-2">Client Domain</th>
                       <th className="px-2 py-2">Created</th>
                       <th className="px-2 py-2">API Key</th>
                       <th className="px-2 py-2">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {partners.map(partner => (
-                      <tr className="border-t border-neutral-200" key={partner.id}>
-                        <td className="px-2 py-3">
-                          <div className="font-medium">{partner.name}</div>
-                          <div className="text-xs text-gray-500">{partner.id}</div>
-                        </td>
-                        <td className="px-2 py-3">
-                          <div>{partner.email || '—'}</div>
-                          <div className="text-xs text-gray-500">
-                            {partner.firstName || ''}
-                            {partner.firstName && partner.lastName ? ' ' : ''}
-                            {partner.lastName || ''}
-                          </div>
-                        </td>
-                        <td className="px-2 py-3 text-xs text-gray-500">{formatDate(partner.createdAt)}</td>
-                        <td className="px-2 py-3">
-                          <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${
-                            partner.hasApiKey
-                              ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
-                              : 'bg-rose-100 text-rose-800 border-rose-200'
-                          }`}
-                          >
-                            {partner.hasApiKey ? 'Active' : 'Revoked'}
-                          </span>
-                        </td>
-                        <td className="px-2 py-3">
-                          <div className="flex items-center gap-2">
-                            <button
-                              className="rounded-lg border border-abroad-dark bg-white px-3 py-1.5 text-xs font-medium text-abroad-dark hover:bg-abroad-dark/5 transition disabled:opacity-60"
-                              disabled={!opsApiKey || Boolean(actionLoading)}
-                              onClick={() => void handleRotate(partner)}
-                              type="button"
+                    {partners.map((partner) => {
+                      const isEditing = editingPartnerId === partner.id
+                      const partnerBusy = isPartnerBusy(partner.id)
+                      const saveDomainKey = buildActionKey('save-domain', partner.id)
+                      const clearDomainKey = buildActionKey('clear-domain', partner.id)
+                      const rotateKey = buildActionKey('rotate', partner.id)
+                      const revokeKey = buildActionKey('revoke', partner.id)
+                      const editingAnotherPartner = editingPartnerId !== null && editingPartnerId !== partner.id
+
+                      return (
+                        <tr className="border-t border-neutral-200" key={partner.id}>
+                          <td className="px-2 py-3 align-top">
+                            <div className="font-medium">{partner.name}</div>
+                            <div className="text-xs text-gray-500">{partner.id}</div>
+                          </td>
+                          <td className="px-2 py-3 align-top">
+                            <div>{partner.email || '—'}</div>
+                            <div className="text-xs text-gray-500">
+                              {partner.firstName || ''}
+                              {partner.firstName && partner.lastName ? ' ' : ''}
+                              {partner.lastName || ''}
+                            </div>
+                          </td>
+                          <td className="px-2 py-3 align-top">
+                            {isEditing
+                              ? (
+                                  <div className="flex flex-col gap-2">
+                                    <input
+                                      aria-label={`Client domain for ${partner.name}`}
+                                      className="ops-input h-10"
+                                      onChange={event => setEditingClientDomain(event.target.value)}
+                                      placeholder="app.example.com"
+                                      type="text"
+                                      value={editingClientDomain}
+                                    />
+                                    <div className="text-xs text-gray-500">
+                                      Save a hostname or full URL. The backend stores the canonical host only.
+                                    </div>
+                                  </div>
+                                )
+                              : (
+                                  <div>
+                                    <div className="break-all font-medium">
+                                      {partner.clientDomain || '—'}
+                                    </div>
+                                    <div className="text-xs text-gray-500">
+                                      {partner.clientDomain ? 'Origin-based auth enabled' : 'No browser origin configured'}
+                                    </div>
+                                  </div>
+                                )}
+                          </td>
+                          <td className="px-2 py-3 align-top text-xs text-gray-500">{formatDate(partner.createdAt)}</td>
+                          <td className="px-2 py-3 align-top">
+                            <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${
+                              partner.hasApiKey
+                                ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
+                                : 'bg-rose-100 text-rose-800 border-rose-200'
+                            }`}
                             >
-                              {actionLoading === `rotate:${partner.id}` ? 'Rotating...' : 'Rotate Key'}
-                            </button>
-                            <button
-                              className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-neutral-100 transition disabled:opacity-60"
-                              disabled={!opsApiKey || Boolean(actionLoading) || !partner.hasApiKey}
-                              onClick={() => void handleRevoke(partner)}
-                              type="button"
-                            >
-                              {actionLoading === `revoke:${partner.id}` ? 'Revoking...' : 'Revoke'}
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                              {partner.hasApiKey ? 'Active' : 'Revoked'}
+                            </span>
+                          </td>
+                          <td className="px-2 py-3 align-top">
+                            <div className="flex flex-wrap items-center gap-2">
+                              {isEditing
+                                ? (
+                                    <>
+                                      <button
+                                        className="rounded-lg border border-abroad-dark bg-abroad-dark px-3 py-1.5 text-xs font-medium text-white hover:bg-abroad-dark/90 transition disabled:opacity-60"
+                                        disabled={!opsApiKey || partnerBusy}
+                                        onClick={() => void handleSaveClientDomain(partner)}
+                                        type="button"
+                                      >
+                                        {actionLoading === saveDomainKey ? 'Saving...' : 'Save'}
+                                      </button>
+                                      <button
+                                        className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-neutral-100 transition disabled:opacity-60"
+                                        disabled={partnerBusy}
+                                        onClick={stopEditingClientDomain}
+                                        type="button"
+                                      >
+                                        Cancel
+                                      </button>
+                                    </>
+                                  )
+                                : (
+                                    <>
+                                      <button
+                                        className="rounded-lg border border-abroad-dark bg-white px-3 py-1.5 text-xs font-medium text-abroad-dark hover:bg-abroad-dark/5 transition disabled:opacity-60"
+                                        disabled={!opsApiKey || partnerBusy || editingAnotherPartner}
+                                        onClick={() => startEditingClientDomain(partner)}
+                                        type="button"
+                                      >
+                                        {partner.clientDomain ? 'Edit Domain' : 'Set Domain'}
+                                      </button>
+                                      {partner.clientDomain && (
+                                        <button
+                                          className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-neutral-100 transition disabled:opacity-60"
+                                          disabled={!opsApiKey || partnerBusy || editingAnotherPartner}
+                                          onClick={() => void handleClearClientDomain(partner)}
+                                          type="button"
+                                        >
+                                          {actionLoading === clearDomainKey ? 'Clearing...' : 'Clear Domain'}
+                                        </button>
+                                      )}
+                                    </>
+                                  )}
+                              <button
+                                className="rounded-lg border border-abroad-dark bg-white px-3 py-1.5 text-xs font-medium text-abroad-dark hover:bg-abroad-dark/5 transition disabled:opacity-60"
+                                disabled={!opsApiKey || partnerBusy || isEditing}
+                                onClick={() => void handleRotate(partner)}
+                                type="button"
+                              >
+                                {actionLoading === rotateKey ? 'Rotating...' : 'Rotate Key'}
+                              </button>
+                              <button
+                                className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-neutral-100 transition disabled:opacity-60"
+                                disabled={!opsApiKey || partnerBusy || isEditing || !partner.hasApiKey}
+                                onClick={() => void handleRevoke(partner)}
+                                type="button"
+                              >
+                                {actionLoading === revokeKey ? 'Revoking...' : 'Revoke'}
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>

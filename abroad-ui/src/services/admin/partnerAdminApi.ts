@@ -3,6 +3,8 @@ import type {
   OpsCreatePartnerResponse,
   OpsPartnerListResponse,
   OpsRotatePartnerApiKeyResponse,
+  OpsUpdatePartnerClientDomainInput,
+  OpsUpdatePartnerClientDomainResponse,
 } from './partnerTypes'
 
 import { adminRequest, unwrapAdminResult } from './adminRequest'
@@ -46,4 +48,20 @@ export const revokePartnerApiKey = async (partnerId: string): Promise<void> => {
   })
 
   unwrapAdminResult(result)
+}
+
+export const updatePartnerClientDomain = async (
+  partnerId: string,
+  payload: OpsUpdatePartnerClientDomainInput,
+): Promise<OpsUpdatePartnerClientDomainResponse> => {
+  const result = await adminRequest<OpsUpdatePartnerClientDomainResponse>(
+    `/ops/partners/${partnerId}/client-domain`,
+    {
+      body: JSON.stringify(payload),
+      headers: { 'Content-Type': 'application/json' },
+      method: 'PATCH',
+    },
+  )
+
+  return unwrapAdminResult(result)
 }
