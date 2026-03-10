@@ -103,7 +103,9 @@ function transactionToTxDetailItem(tx: TransactionListItem): TxDetailItem {
     accountNumber: tx.accountNumber,
     chain: NETWORK_TO_CHAIN_NAME[tx.quote.network?.toUpperCase() ?? ''] ?? 'Stellar',
     country,
-    date: new Date(tx.createdAt).toLocaleString('en-US', { day: 'numeric', hour: 'numeric', minute: '2-digit', month: 'short', year: 'numeric' }),
+    date: new Date(tx.createdAt).toLocaleString('en-US', {
+      day: 'numeric', hour: 'numeric', minute: '2-digit', month: 'short', year: 'numeric',
+    }),
     fee: '0.01',
     localAmount: tx.quote.targetAmount.toFixed(country === 'br' ? 2 : 0),
     location: undefined,
@@ -306,7 +308,9 @@ const WebSwap: React.FC = () => {
                     accountNumber: tx.accountNumber,
                     chain: NETWORK_TO_CHAIN_NAME[tx.quote.network?.toUpperCase() ?? ''] ?? 'Stellar',
                     country,
-                    date: new Date(tx.createdAt).toLocaleString('en-US', { day: 'numeric', hour: 'numeric', minute: '2-digit', month: 'short', year: 'numeric' }),
+                    date: new Date(tx.createdAt).toLocaleString('en-US', {
+                      day: 'numeric', hour: 'numeric', minute: '2-digit', month: 'short', year: 'numeric',
+                    }),
                     fee: '0.01',
                     localAmount: tx.quote.targetAmount.toFixed(country === 'br' ? 2 : 0),
                     location: undefined,

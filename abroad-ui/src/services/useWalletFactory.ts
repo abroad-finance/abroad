@@ -45,8 +45,5 @@ export function useWalletFactory({ walletAuth }: {
   return useMemo(() => ({
     getWalletHandler,
     miniPay: miniPayWallet.runtime,
-  }), [
-    getWalletHandler,
-    miniPayWallet.runtime,
-  ])
+  }), [getWalletHandler, miniPayWallet.runtime])
 }
