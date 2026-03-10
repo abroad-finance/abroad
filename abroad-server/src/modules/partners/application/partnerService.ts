@@ -3,12 +3,12 @@
 import type { Partner, PrismaClient } from '@prisma/client'
 
 import { inject, injectable } from 'inversify'
-import { sha512_224 } from 'js-sha512'
 import jwt from 'jsonwebtoken'
 
 import { TYPES } from '../../../app/container/types'
 import { IDatabaseClientProvider } from '../../../platform/persistence/IDatabaseClientProvider'
 import { ISecretManager } from '../../../platform/secrets/ISecretManager'
+import { type ClientDomain, hashClientDomain, parseClientDomain as parseClientDomainValue } from '../domain/clientDomain'
 import { IPartnerService } from './contracts/IPartnerService'
 import { hashPartnerApiKey } from './partnerApiKey'
 
@@ -55,6 +55,15 @@ export class PartnerService implements IPartnerService {
     return partner
   }
 
+  public async getPartnerFromClientDomain(clientDomain: ClientDomain): Promise<Partner> {
+    const prismaClient = await this.databaseClientProvider.getClient()
+    const partner = await this.findPartnerByClientDomain(prismaClient, clientDomain)
+    if (!partner) {
+      throw new Error('Partner not found')
+    }
+    return partner
+  }
+
   public async getPartnerFromSepJwt(token: string): Promise<Partner> {
     try {
       const [sepJwtSecret, sepPartnerId] = await Promise.all([
@@ -92,13 +101,13 @@ export class PartnerService implements IPartnerService {
     }
   }
 
-  private extractClientDomain(payload: SepTokenPayload): string | undefined {
-    const rootDomain = this.normalizeClientDomain(payload.client_domain)
+  private extractClientDomain(payload: SepTokenPayload): ClientDomain | undefined {
+    const rootDomain = this.parseClientDomain(payload.client_domain)
     if (rootDomain) {
       return rootDomain
     }
 
-    const nestedDomain = this.normalizeClientDomain(payload.data?.client_domain)
+    const nestedDomain = this.parseClientDomain(payload.data?.client_domain)
     if (nestedDomain) {
       return nestedDomain
     }
@@ -117,35 +126,27 @@ export class PartnerService implements IPartnerService {
 
   private async findPartnerByClientDomain(
     prismaClient: PrismaClient,
-    clientDomain: string,
+    clientDomain: ClientDomain,
   ): Promise<null | Partner> {
-    const normalizedClientDomain = this.normalizeClientDomain(clientDomain)
-
-    if (!normalizedClientDomain) {
-      return null
-    }
-
-    const clientDomainHash = this.hashClientDomain(normalizedClientDomain)
+    const clientDomainHash = this.hashClientDomain(clientDomain)
     return prismaClient.partner.findFirst({
       where: { clientDomainHash },
     })
   }
 
-  private hashClientDomain(clientDomain: string): string {
-    return sha512_224(clientDomain)
+  private hashClientDomain(clientDomain: ClientDomain): string {
+    return hashClientDomain(clientDomain)
   }
 
   private isJwtPayload(payload: unknown): payload is SepTokenPayload {
     return typeof payload === 'object' && payload !== null
   }
 
-  private normalizeClientDomain(clientDomain?: string): string | undefined {
+  private parseClientDomain(clientDomain?: string): ClientDomain | undefined {
     if (typeof clientDomain !== 'string') {
       return undefined
     }
 
-    const normalizedDomain = clientDomain.trim().toLowerCase()
-
-    return normalizedDomain.length > 0 ? normalizedDomain : undefined
+    return parseClientDomainValue(clientDomain) ?? undefined
   }
 }

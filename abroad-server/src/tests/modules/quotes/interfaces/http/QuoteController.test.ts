@@ -37,6 +37,7 @@ describe('QuoteController', () => {
 
     mockPartnerService = {
       getPartnerFromApiKey: jest.fn(),
+      getPartnerFromClientDomain: jest.fn(),
       getPartnerFromSepJwt: jest.fn(),
     } as unknown as jest.Mocked<IPartnerService>
 

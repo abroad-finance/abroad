@@ -64,6 +64,10 @@ type TransactionDecision
 
 @injectable()
 export class TransactionAcceptanceService {
+  private static readonly UNBOUNDED_AMOUNT_CAP = Number.MAX_SAFE_INTEGER
+
+  private static readonly UNBOUNDED_COUNT_CAP = 2_147_483_647
+
   private readonly logger: ScopedLogger
 
   constructor(
@@ -255,6 +259,14 @@ export class TransactionAcceptanceService {
     return aggregate.sourceAmount
   }
 
+  private dailyAmountCap(paymentService: PaymentServiceInstance): number {
+    return this.normalizeAmountCap(paymentService.MAX_TOTAL_AMOUNT_PER_DAY)
+  }
+
+  private dailyCountCap(paymentService: PaymentServiceInstance): number {
+    return this.normalizeCountCap(paymentService.MAX_USER_TRANSACTIONS_PER_DAY)
+  }
+
   private async enforceLiquidity(
     paymentService: PaymentServiceInstance,
     targetAmount: number,
@@ -395,6 +407,14 @@ export class TransactionAcceptanceService {
     return quote
   }
 
+  private interactiveTransactionMaxWaitMs(): number {
+    return this.readBoundedIntEnv('TRANSACTION_ACCEPTANCE_TX_MAX_WAIT_MS', 5_000, 1_000, 30_000)
+  }
+
+  private interactiveTransactionTimeoutMs(): number {
+    return this.readBoundedIntEnv('TRANSACTION_ACCEPTANCE_TX_TIMEOUT_MS', 15_000, 5_000, 60_000)
+  }
+
   private async lockPartner(
     prismaClient: SerializableTx,
     partnerId: string,
@@ -419,26 +439,6 @@ export class TransactionAcceptanceService {
     await prismaClient.$executeRaw`SELECT 1 FROM "PaymentProvider" WHERE id = ${paymentMethod} FOR UPDATE`
   }
 
-  private static readonly UNBOUNDED_AMOUNT_CAP = Number.MAX_SAFE_INTEGER
-  private static readonly UNBOUNDED_COUNT_CAP = 2_147_483_647
-
-  // Prisma serializes non-finite numbers as NULL in SQL. Use finite sentinels for cap checks.
-  private normalizeAmountCap(value: number): number {
-    return Number.isFinite(value) ? value : TransactionAcceptanceService.UNBOUNDED_AMOUNT_CAP
-  }
-
-  private normalizeCountCap(value: number): number {
-    return Number.isFinite(value) ? value : TransactionAcceptanceService.UNBOUNDED_COUNT_CAP
-  }
-
-  private dailyAmountCap(paymentService: PaymentServiceInstance): number {
-    return this.normalizeAmountCap(paymentService.MAX_TOTAL_AMOUNT_PER_DAY)
-  }
-
-  private dailyCountCap(paymentService: PaymentServiceInstance): number {
-    return this.normalizeCountCap(paymentService.MAX_USER_TRANSACTIONS_PER_DAY)
-  }
-
   private monthlyAmountCap(paymentService: PaymentServiceInstance): number {
     return this.normalizeAmountCap(paymentService.MAX_TOTAL_AMOUNT_PER_DAY * this.monthlyMultiplier())
   }
@@ -458,24 +458,13 @@ export class TransactionAcceptanceService {
     return Math.min(parsed, 62)
   }
 
-  private interactiveTransactionMaxWaitMs(): number {
-    return this.readBoundedIntEnv('TRANSACTION_ACCEPTANCE_TX_MAX_WAIT_MS', 5_000, 1_000, 30_000)
+  // Prisma serializes non-finite numbers as NULL in SQL. Use finite sentinels for cap checks.
+  private normalizeAmountCap(value: number): number {
+    return Number.isFinite(value) ? value : TransactionAcceptanceService.UNBOUNDED_AMOUNT_CAP
   }
 
-  private interactiveTransactionTimeoutMs(): number {
-    return this.readBoundedIntEnv('TRANSACTION_ACCEPTANCE_TX_TIMEOUT_MS', 15_000, 5_000, 60_000)
-  }
-
-  private readBoundedIntEnv(key: string, fallback: number, min: number, max: number): number {
-    const raw = process.env[key]
-    if (!raw) return fallback
-
-    const parsed = Number.parseInt(raw, 10)
-    if (Number.isNaN(parsed)) {
-      return fallback
-    }
-
-    return Math.min(Math.max(parsed, min), max)
+  private normalizeCountCap(value: number): number {
+    return Number.isFinite(value) ? value : TransactionAcceptanceService.UNBOUNDED_COUNT_CAP
   }
 
   private normalizeCountry(country: string): KycCountry {
@@ -509,6 +498,18 @@ export class TransactionAcceptanceService {
     catch (notifyErr) {
       this.logger.warn('Failed to publish transaction.created notification', notifyErr)
     }
+  }
+
+  private readBoundedIntEnv(key: string, fallback: number, min: number, max: number): number {
+    const raw = process.env[key]
+    if (!raw) return fallback
+
+    const parsed = Number.parseInt(raw, 10)
+    if (Number.isNaN(parsed)) {
+      return fallback
+    }
+
+    return Math.min(Math.max(parsed, min), max)
   }
 
   private async reservePartnerDailyLimits(

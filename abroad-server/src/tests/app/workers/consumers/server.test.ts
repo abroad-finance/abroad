@@ -27,10 +27,10 @@ describe('consumers lifecycle', () => {
     getMock.mockReset()
     getMock.mockImplementation((token: unknown) => {
       switch (token) {
-        case TYPES.ExchangeBalanceUpdatedController:
-          return exchangeBalanceUpdatedController
         case TYPES.DeadLetterController:
           return deadLetterController
+        case TYPES.ExchangeBalanceUpdatedController:
+          return exchangeBalanceUpdatedController
         case TYPES.IQueueHandler:
           return queueHandler
         case TYPES.PaymentStatusUpdatedController:
@@ -83,10 +83,10 @@ describe('consumers entrypoint health server', () => {
     queueHandler = createMockQueueHandler()
     getMock.mockImplementation((token: unknown) => {
       switch (token) {
-        case TYPES.ExchangeBalanceUpdatedController:
-          return exchangeBalanceUpdatedController
         case TYPES.DeadLetterController:
           return deadLetterController
+        case TYPES.ExchangeBalanceUpdatedController:
+          return exchangeBalanceUpdatedController
         case TYPES.IQueueHandler:
           return queueHandler
         case TYPES.PaymentStatusUpdatedController:

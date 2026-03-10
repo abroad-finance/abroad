@@ -6,8 +6,8 @@ import { ValidationError } from '../../../../core/errors'
 import { createScopedLogger } from '../../../../core/logging/scopedLogger'
 import { ILogger } from '../../../../core/logging/types'
 import { getCorrelationId } from '../../../../core/requestContext'
-import { ExchangeBalanceUpdatedMessageSchema } from '../../../../platform/messaging/queueSchema'
 import { IQueueHandler, QueueName } from '../../../../platform/messaging/queues'
+import { ExchangeBalanceUpdatedMessageSchema } from '../../../../platform/messaging/queueSchema'
 import { IDatabaseClientProvider } from '../../../../platform/persistence/IDatabaseClientProvider'
 import { FlowOrchestrator } from '../../../flows/application/FlowOrchestrator'
 
@@ -60,7 +60,7 @@ export class ExchangeBalanceUpdatedController {
         distinct: ['flowInstanceId'],
         select: { flowInstance: { select: { transactionId: true } } },
         where: {
-          correlation: { path: ['provider'], equals: provider },
+          correlation: { equals: provider, path: ['provider'] },
           status: FlowStepStatus.WAITING,
           stepType: FlowStepType.AWAIT_EXCHANGE_BALANCE,
         },
@@ -107,4 +107,3 @@ export class ExchangeBalanceUpdatedController {
     }
   }
 }
-

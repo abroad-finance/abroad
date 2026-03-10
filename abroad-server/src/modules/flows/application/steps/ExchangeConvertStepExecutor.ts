@@ -12,6 +12,21 @@ import { IExchangeProviderFactory } from '../../../treasury/application/contract
 import { AmountSource, amountSourceSchema, resolveAmount } from '../flowAmountResolver'
 import { FlowStepExecutionResult, FlowStepExecutor, FlowStepRuntimeContext } from '../flowTypes'
 
+type BinanceBookTickerResponse = {
+  askPrice: string
+  bidPrice: string
+  symbol: string
+}
+
+type BinanceExchangeInfoResponse = {
+  symbols: BinanceSymbolInfo[]
+}
+
+type BinanceFilter = BinanceLotSizeFilter | BinanceNotionalFilter | {
+  [key: string]: boolean | number | string | undefined
+  filterType: string
+}
+
 type BinanceLotSizeFilter = {
   filterType: 'LOT_SIZE' | 'MARKET_LOT_SIZE'
   maxQty: string
@@ -26,9 +41,12 @@ type BinanceNotionalFilter = {
   notional?: string
 }
 
-type BinanceFilter = BinanceLotSizeFilter | BinanceNotionalFilter | {
-  filterType: string
-  [key: string]: boolean | number | string | undefined
+type BinanceOrderPayload = {
+  quantity?: number
+  quoteOrderQty?: number
+  side: 'BUY' | 'SELL'
+  symbol: string
+  type: 'MARKET'
 }
 
 type BinanceSymbolInfo = {
@@ -38,24 +56,6 @@ type BinanceSymbolInfo = {
   quoteAsset: string
   quoteAssetPrecision?: number
   symbol: string
-}
-
-type BinanceExchangeInfoResponse = {
-  symbols: BinanceSymbolInfo[]
-}
-
-type BinanceBookTickerResponse = {
-  askPrice: string
-  bidPrice: string
-  symbol: string
-}
-
-type BinanceOrderPayload = {
-  quoteOrderQty?: number
-  quantity?: number
-  side: 'BUY' | 'SELL'
-  symbol: string
-  type: 'MARKET'
 }
 
 class BinanceOrderConstraintError extends Error {
@@ -235,7 +235,7 @@ export class ExchangeConvertStepExecutor implements FlowStepExecutor {
     }
 
     if (!symbolInfo) {
-      const orderPayload: BinanceOrderPayload = { side, symbol, type: 'MARKET', quantity: amount }
+      const orderPayload: BinanceOrderPayload = { quantity: amount, side, symbol, type: 'MARKET' }
       return { adjustedAmount: amount, orderPayload }
     }
 
@@ -315,48 +315,6 @@ export class ExchangeConvertStepExecutor implements FlowStepExecutor {
     return { adjustedAmount: adjusted, orderPayload }
   }
 
-  private async getSymbolInfo(symbol: string, apiUrl: string): Promise<BinanceSymbolInfo> {
-    const cached = this.exchangeInfoCache.get(symbol)
-    if (cached && cached.expiresAt > Date.now()) {
-      return cached.info
-    }
-
-    const response = await axios.get<BinanceExchangeInfoResponse>(
-      this.buildBinanceUrl(apiUrl, '/api/v3/exchangeInfo'),
-      { params: { symbol }, timeout: 10_000 },
-    )
-    const info = response.data.symbols?.[0]
-    if (!info) {
-      throw new Error(`ExchangeInfo missing for symbol ${symbol}`)
-    }
-    this.exchangeInfoCache.set(symbol, { expiresAt: Date.now() + this.exchangeInfoCacheTtlMs, info })
-    return info
-  }
-
-  private async getReferencePrice(symbol: string, apiUrl: string, side: 'BUY' | 'SELL'): Promise<number> {
-    const response = await axios.get<BinanceBookTickerResponse>(
-      this.buildBinanceUrl(apiUrl, '/api/v3/ticker/bookTicker'),
-      { params: { symbol }, timeout: 10_000 },
-    )
-    const priceString = side === 'BUY' ? response.data.askPrice : response.data.bidPrice
-    const price = Number(priceString)
-    if (!Number.isFinite(price) || price <= 0) {
-      throw new Error(`Invalid book price for ${symbol}`)
-    }
-    return price
-  }
-
-  private getLotSizeFilter(filters: BinanceFilter[]): BinanceLotSizeFilter | undefined {
-    const market = filters.find(filter => filter.filterType === 'MARKET_LOT_SIZE') as BinanceLotSizeFilter | undefined
-    if (market) return market
-    return filters.find(filter => filter.filterType === 'LOT_SIZE') as BinanceLotSizeFilter | undefined
-  }
-
-  private getNotionalFilter(filters: BinanceFilter[]): BinanceNotionalFilter | undefined {
-    const found = filters.find(filter => filter.filterType === 'NOTIONAL' || filter.filterType === 'MIN_NOTIONAL')
-    return found as BinanceNotionalFilter | undefined
-  }
-
   private buildBinanceUrl(baseUrl: string, path: string): string {
     const trimmed = baseUrl.replace(/\/$/, '')
     return `${trimmed}${path}`
@@ -378,16 +336,58 @@ export class ExchangeConvertStepExecutor implements FlowStepExecutor {
     return Math.floor(amount * scale + 1e-8) / scale
   }
 
-  private roundToPrecision(amount: number, decimals: number): number {
-    const normalizedDecimals = Math.max(0, Math.min(decimals, 12))
-    if (normalizedDecimals === 0) return Math.trunc(amount)
-    // Convert through string to clamp floating point tails (e.g., 1.1000000003).
-    return Number(amount.toFixed(normalizedDecimals))
+  private getLotSizeFilter(filters: BinanceFilter[]): BinanceLotSizeFilter | undefined {
+    const market = filters.find(filter => filter.filterType === 'MARKET_LOT_SIZE') as BinanceLotSizeFilter | undefined
+    if (market) return market
+    return filters.find(filter => filter.filterType === 'LOT_SIZE') as BinanceLotSizeFilter | undefined
+  }
+
+  private getNotionalFilter(filters: BinanceFilter[]): BinanceNotionalFilter | undefined {
+    const found = filters.find(filter => filter.filterType === 'NOTIONAL' || filter.filterType === 'MIN_NOTIONAL')
+    return found as BinanceNotionalFilter | undefined
+  }
+
+  private async getReferencePrice(symbol: string, apiUrl: string, side: 'BUY' | 'SELL'): Promise<number> {
+    const response = await axios.get<BinanceBookTickerResponse>(
+      this.buildBinanceUrl(apiUrl, '/api/v3/ticker/bookTicker'),
+      { params: { symbol }, timeout: 10_000 },
+    )
+    const priceString = side === 'BUY' ? response.data.askPrice : response.data.bidPrice
+    const price = Number(priceString)
+    if (!Number.isFinite(price) || price <= 0) {
+      throw new Error(`Invalid book price for ${symbol}`)
+    }
+    return price
+  }
+
+  private async getSymbolInfo(symbol: string, apiUrl: string): Promise<BinanceSymbolInfo> {
+    const cached = this.exchangeInfoCache.get(symbol)
+    if (cached && cached.expiresAt > Date.now()) {
+      return cached.info
+    }
+
+    const response = await axios.get<BinanceExchangeInfoResponse>(
+      this.buildBinanceUrl(apiUrl, '/api/v3/exchangeInfo'),
+      { params: { symbol }, timeout: 10_000 },
+    )
+    const info = response.data.symbols?.[0]
+    if (!info) {
+      throw new Error(`ExchangeInfo missing for symbol ${symbol}`)
+    }
+    this.exchangeInfoCache.set(symbol, { expiresAt: Date.now() + this.exchangeInfoCacheTtlMs, info })
+    return info
   }
 
   private parseNumber(value: string | undefined): number | undefined {
     if (!value) return undefined
     const parsed = Number(value)
     return Number.isFinite(parsed) ? parsed : undefined
+  }
+
+  private roundToPrecision(amount: number, decimals: number): number {
+    const normalizedDecimals = Math.max(0, Math.min(decimals, 12))
+    if (normalizedDecimals === 0) return Math.trunc(amount)
+    // Convert through string to clamp floating point tails (e.g., 1.1000000003).
+    return Number(amount.toFixed(normalizedDecimals))
   }
 }

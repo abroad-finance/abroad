@@ -21,15 +21,15 @@ jest.mock('@solana/web3.js', () => ({
 const getMintMock = jest.fn()
 jest.mock('@solana/spl-token', () => ({
   createTransferInstruction: jest.fn(() => ({ instruction: true })),
-  getOrCreateAssociatedTokenAccount: jest.fn(async () => ({ address: 'associated-account' })),
   getMint: (...args: unknown[]) => getMintMock(...args),
+  getOrCreateAssociatedTokenAccount: jest.fn(async () => ({ address: 'associated-account' })),
   TOKEN_2022_PROGRAM_ID: { toBase58: () => 'tp22' },
   TOKEN_PROGRAM_ID: { toBase58: () => 'tp' },
 }))
 
 const buildHandler = () => {
   const secretManager = { getSecret: jest.fn(async (key: string) => key === Secrets.SOLANA_PRIVATE_KEY ? '3Lw5wZbLv' : 'http://localhost:8899') }
-  const assetConfigService = { getActiveMint: jest.fn(async ({ cryptoCurrency }: { cryptoCurrency: CryptoCurrency }) => cryptoCurrency === CryptoCurrency.USDC ? ({ mintAddress: 'mint-address', decimals: 6 }) : null) }
+  const assetConfigService = { getActiveMint: jest.fn(async ({ cryptoCurrency }: { cryptoCurrency: CryptoCurrency }) => cryptoCurrency === CryptoCurrency.USDC ? ({ decimals: 6, mintAddress: 'mint-address' }) : null) }
   const logger = { error: jest.fn(), info: jest.fn(), warn: jest.fn() }
   const handler = new SolanaWalletHandler(secretManager as never, assetConfigService as never, logger as never)
   return { assetConfigService, handler, logger }

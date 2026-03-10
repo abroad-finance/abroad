@@ -20,6 +20,7 @@ import {
 
 import { TYPES } from '../../../../app/container/types'
 import { IDatabaseClientProvider } from '../../../../platform/persistence/IDatabaseClientProvider'
+import { normalizeClientDomainInput } from '../../domain/clientDomain'
 import { type CreatePartnerRequest, createPartnerRequestSchema, type CreatePartnerResponse, type PartnerInfoResponse } from './contracts'
 
 @Route('partner')
@@ -34,9 +35,9 @@ export class PartnerController extends Controller {
    * Create a new partner
    */
   @Hidden()
-  @Security('OpsApiKeyAuth')
   @Post()
   @Response<400, { reason: string }>(400, 'Bad Request')
+  @Security('OpsApiKeyAuth')
   @SuccessResponse('201', 'Partner created')
   public async createPartner(
     @Body() body: CreatePartnerRequest,
@@ -48,6 +49,14 @@ export class PartnerController extends Controller {
       return badRequest(400, { reason: parsedBody.error.message })
     }
     const partnerData = parsedBody.data
+    let clientDomainRecord: { clientDomain: null | string, clientDomainHash: null | string }
+    try {
+      clientDomainRecord = normalizeClientDomainInput(partnerData.clientDomain)
+    }
+    catch (error) {
+      const reason = error instanceof Error ? error.message : 'Client domain is invalid'
+      return badRequest(400, { reason })
+    }
 
     const dbClient = await this.dbProvider.getClient()
 
@@ -55,6 +64,8 @@ export class PartnerController extends Controller {
     try {
       partner = await dbClient.partner.create({
         data: {
+          clientDomain: clientDomainRecord.clientDomain,
+          clientDomainHash: clientDomainRecord.clientDomainHash,
           country: partnerData.country,
           email: partnerData.email,
           firstName: partnerData.firstName,

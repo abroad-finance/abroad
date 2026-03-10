@@ -5,6 +5,7 @@ import type { IDatabaseClientProvider } from '../../../../platform/persistence/I
 import type { ISecretManager } from '../../../../platform/secrets/ISecretManager'
 
 import { PartnerService } from '../../../../modules/partners/application/partnerService'
+import { parseClientDomain } from '../../../../modules/partners/domain/clientDomain'
 
 type PartnerModel = import('@prisma/client').Partner
 
@@ -15,9 +16,23 @@ jest.mock('jsonwebtoken', () => ({
 describe('PartnerService', () => {
   const hashedApiKey = sha512_224('api-key')
   const hashedClientDomain = sha512_224('client.example.com')
-  const partnerFromApiKey = { apiKey: hashedApiKey, clientDomainHash: null, id: 'partner-1' } as unknown as PartnerModel
-  const partnerFromDomain = { apiKey: null, clientDomainHash: hashedClientDomain, id: 'partner-2' } as unknown as PartnerModel
-  const defaultPartner = { clientDomainHash: null, id: 'secret-STELLAR_SEP_PARTNER_ID' } as unknown as PartnerModel
+  const partnerFromApiKey = {
+    apiKey: hashedApiKey,
+    clientDomain: null,
+    clientDomainHash: null,
+    id: 'partner-1',
+  } as unknown as PartnerModel
+  const partnerFromDomain = {
+    apiKey: null,
+    clientDomain: 'client.example.com',
+    clientDomainHash: hashedClientDomain,
+    id: 'partner-2',
+  } as unknown as PartnerModel
+  const defaultPartner = {
+    clientDomain: null,
+    clientDomainHash: null,
+    id: 'secret-STELLAR_SEP_PARTNER_ID',
+  } as unknown as PartnerModel
 
   let partnersByApiKey: Record<string, PartnerModel>
   let partnersByClientDomainHash: Record<string, PartnerModel>
@@ -86,6 +101,20 @@ describe('PartnerService', () => {
 
     delete partnersByApiKey[hashedApiKey]
     await expect(service.getPartnerFromApiKey('api-key')).rejects.toThrow('Partner not found')
+  })
+
+  it('retrieves a partner by normalized client domain', async () => {
+    const clientDomain = parseClientDomain('Client.Example.com')
+
+    expect(clientDomain).not.toBeNull()
+    if (!clientDomain) {
+      throw new Error('Expected valid client domain')
+    }
+
+    const result = await service.getPartnerFromClientDomain(clientDomain)
+
+    expect(findFirst).toHaveBeenCalledWith({ where: { clientDomainHash: hashedClientDomain } })
+    expect(result).toBe(partnerFromDomain)
   })
 
   it('uses client_domain to resolve partner from SEP JWT', async () => {

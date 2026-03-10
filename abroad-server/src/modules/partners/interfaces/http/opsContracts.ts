@@ -1,12 +1,14 @@
 import { z } from 'zod'
 
 import type {
+  OpsPartnerClientDomainInput,
   OpsPartnerCreateInput,
   OpsPartnerCreateResult,
   OpsPartnerListResult,
   OpsPartnerRotateApiKeyResult,
   OpsPartnerSummary,
 } from '../../application/OpsPartnerService'
+
 import { createPartnerRequestSchema } from './contracts'
 
 export const DEFAULT_PARTNER_PAGE_SIZE = 20
@@ -17,12 +19,17 @@ export type OpsCreatePartnerResponse = OpsPartnerCreateResult
 export type OpsPartnerDto = OpsPartnerSummary
 export type OpsPartnerListResponse = OpsPartnerListResult
 export type OpsRotatePartnerApiKeyResponse = OpsPartnerRotateApiKeyResult
+export type OpsUpdatePartnerClientDomainRequest = OpsPartnerClientDomainInput
+export type OpsUpdatePartnerClientDomainResponse = OpsPartnerSummary
 
 const partnerIdSchema = z.string().uuid()
 const paginationSchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(MAX_PARTNER_PAGE_SIZE).default(DEFAULT_PARTNER_PAGE_SIZE),
 })
+const updatePartnerClientDomainSchema = z.object({
+  clientDomain: z.string().nullable(),
+}).strict() satisfies z.ZodType<OpsUpdatePartnerClientDomainRequest>
 
 type PaginationInput = {
   page?: number
@@ -30,6 +37,7 @@ type PaginationInput = {
 }
 
 export const opsCreatePartnerRequestSchema = createPartnerRequestSchema
+export const opsUpdatePartnerClientDomainRequestSchema = updatePartnerClientDomainSchema
 
 export const parsePartnerId = (value: string): { data: string } | { error: string } => {
   const parsed = partnerIdSchema.safeParse(value)

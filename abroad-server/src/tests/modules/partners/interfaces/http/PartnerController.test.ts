@@ -7,6 +7,8 @@ import type { IDatabaseClientProvider } from '../../../../../platform/persistenc
 import { PartnerController } from '../../../../../modules/partners/interfaces/http/PartnerController'
 
 type PartnerCreateInput = {
+  clientDomain?: null | string
+  clientDomainHash?: null | string
   country: string
   email: string
   firstName: string
@@ -122,6 +124,8 @@ describe('PartnerController', () => {
     expect(created).toHaveBeenCalledWith(201, { id: 'partner-123' })
     expect(partnerCreate).toHaveBeenCalledWith({
       data: expect.objectContaining({
+        clientDomain: null,
+        clientDomainHash: null,
         country: 'CO',
         email: 'acme@example.com',
         firstName: 'Ada',
@@ -168,6 +172,7 @@ describe('PartnerController', () => {
     const controller = new PartnerController(buildDbProvider().dbProvider)
     const partner: Partner = {
       apiKey: null,
+      clientDomain: null,
       clientDomainHash: null,
       country: null,
       createdAt: new Date('2024-02-02T00:00:00.000Z'),
@@ -195,6 +200,32 @@ describe('PartnerController', () => {
       name: partner.name,
       needsKyc: false,
       phone: undefined,
+    })
+  })
+
+  it('normalizes client domains when creating partners', async () => {
+    const { badRequest, created } = setupTsoaResponses()
+    const { dbProvider, partnerCreate } = buildDbProvider({ id: 'partner-domain' })
+    const controller = new PartnerController(dbProvider)
+
+    await controller.createPartner(
+      {
+        clientDomain: 'https://App.Abroad.Finance/swap',
+        company: 'Acme',
+        country: 'CO',
+        email: 'acme@example.com',
+        firstName: 'Ada',
+        lastName: 'Lovelace',
+      },
+      badRequest,
+      created,
+    )
+
+    expect(partnerCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        clientDomain: 'app.abroad.finance',
+        clientDomainHash: expect.any(String),
+      }),
     })
   })
 })

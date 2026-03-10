@@ -6,8 +6,8 @@ import { createScopedLogger } from '../../../../core/logging/scopedLogger'
 import { ILogger } from '../../../../core/logging/types'
 import { getCorrelationId } from '../../../../core/requestContext'
 import { IQueueHandler, QueueName } from '../../../../platform/messaging/queues'
-import { IDatabaseClientProvider } from '../../../../platform/persistence/IDatabaseClientProvider'
 import { PaymentStatusUpdatedMessage, PaymentStatusUpdatedMessageSchema } from '../../../../platform/messaging/queueSchema'
+import { IDatabaseClientProvider } from '../../../../platform/persistence/IDatabaseClientProvider'
 import { FlowOrchestrator } from '../../../flows/application/FlowOrchestrator'
 
 /**

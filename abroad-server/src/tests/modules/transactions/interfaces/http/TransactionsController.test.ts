@@ -69,6 +69,7 @@ const buildController = () => {
   }
   const partnerService: IPartnerService = {
     getPartnerFromApiKey: jest.fn(),
+    getPartnerFromClientDomain: jest.fn(),
     getPartnerFromSepJwt: jest.fn(),
   }
   return { controller: new TransactionsController(dbProvider, partnerService), prisma }

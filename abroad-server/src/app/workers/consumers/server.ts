@@ -44,8 +44,8 @@ export const createHealthHandler = (state: { live: boolean, ready: boolean }) =>
 
 // Keep module-level strong references to prevent GC
 const running: {
-  exchangeBalanceUpdated?: ExchangeBalanceUpdatedController
   deadLetter?: DeadLetterController
+  exchangeBalanceUpdated?: ExchangeBalanceUpdatedController
   paymentStatus?: PaymentStatusUpdatedController
   received?: ReceivedCryptoTransactionController
 } = {}

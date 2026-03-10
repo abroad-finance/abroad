@@ -31,4 +31,3 @@ export function parseTransferoBalanceWebhook(
 
   return { payload: parsed.data, success: true }
 }
-
