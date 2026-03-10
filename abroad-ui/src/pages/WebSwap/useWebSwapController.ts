@@ -377,10 +377,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
   const scopedCorridors = useMemo(() => scopeCorridorsForWalletSurface({
     corridors,
     isMiniPay,
-  }), [
-    corridors,
-    isMiniPay,
-  ])
+  }), [corridors, isMiniPay])
   const availableCorridors = useMemo(() => {
     const filtered = scopedCorridors.filter(corridor => corridor.targetCurrency === state.targetCurrency)
     return isMiniPay ? filtered : sortStellarFirst(filtered)
@@ -436,7 +433,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
       if (!aStellar && bStellar) return 1
       return 0
     })
-  }, [chainVariants, isMiniPay, scopedCorridors])
+  }, [chainVariants, scopedCorridors])
   const assetOptions = useMemo(() => chainFilteredCorridors.map(corridor => ({
     key: corridorKeyOf(corridor),
     label: corridor.cryptoCurrency,
@@ -451,20 +448,14 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     }
 
     return stablecoinBalances.supportedBalanceFor(selectedCorridor.cryptoCurrency)
-  }, [
-    selectedCorridor,
-    stablecoinBalances,
-  ])
+  }, [selectedCorridor, stablecoinBalances])
   const hasInsufficientFunds = useMemo(() => {
     const requestedAmount = parseStablecoinBalance(state.sourceAmount)
     if (requestedAmount <= 0) {
       return false
     }
     return requestedAmount > parseStablecoinBalance(selectedSourceBalance)
-  }, [
-    selectedSourceBalance,
-    state.sourceAmount,
-  ])
+  }, [selectedSourceBalance, state.sourceAmount])
   const miniPayNotice = useMemo(() => resolveMiniPayNotice({
     copy: {
       addCashLabel: t('swap.minipay.add_cash', 'Add Cash'),
@@ -566,8 +557,8 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     const nextWallet = isMiniPay
       ? defaultWallet
       : selectedCorridor.chainFamily === 'stellar'
-      ? defaultWallet
-      : getWalletHandler('wallet-connect')
+        ? defaultWallet
+        : getWalletHandler('wallet-connect')
     if (!nextWallet) return
     if (nextWallet !== wallet) setActiveWallet(nextWallet)
     // When user chose "connect" from the chain modal, connect with the wallet for this corridor
@@ -814,10 +805,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
         type: 'HYDRATE',
       })
     }
-  }, [
-    isMiniPay,
-    walletAuthentication?.jwtToken,
-  ])
+  }, [isMiniPay, walletAuthentication?.jwtToken])
 
   // When the user first becomes authenticated, ensure they see the authenticated home screen
   // (dashboard with balance, scan QR, enter amount) instead of swap view with pre-filled data.
@@ -1086,10 +1074,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     lastEditedRef.current = null
     directAbortRef.current?.abort()
     reverseAbortRef.current?.abort()
-  }, [
-    availableCorridors,
-    isMiniPay,
-  ])
+  }, [availableCorridors, isMiniPay])
 
   useMenuCloseOnOutsideClick({
     isOpen: assetMenuOpen,

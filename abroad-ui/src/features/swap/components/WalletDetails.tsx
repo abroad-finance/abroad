@@ -10,8 +10,8 @@ import TransactionDetail from '../shared/TransactionDetail'
 
 export interface WalletDetailsProps {
   address: null | string
-  cUsdBalance?: string
   copiedAddress: boolean
+  cUsdBalance?: string
   formatDate: (dateString: string) => string
   formatDateWithTime: (dateString: string) => string
   getStatusStyle: (status: string) => string
@@ -31,7 +31,7 @@ export interface WalletDetailsProps {
   selectedTransaction: null | TransactionListItem
   setSelectedTransaction: (transaction: null | TransactionListItem) => void
   supportedTokenPreference?: 'USDC' | 'USDT' | null
-  topStablecoin?: 'USDC' | 'USDT' | 'cUSD'
+  topStablecoin?: 'cUSD' | 'USDC' | 'USDT'
   transactionError: null | string
   transactions: TransactionListItem[]
   usdcBalance: string

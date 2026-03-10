@@ -57,7 +57,11 @@ export async function fetchNonStellarBalances(
       const cUsd = config.cUsdAddress
         ? new Contract(getAddress(config.cUsdAddress), ERC20_ABI, provider)
         : null
-      const [usdcRaw, usdtRaw, cUsdRaw] = await Promise.all([
+      const [
+        usdcRaw,
+        usdtRaw,
+        cUsdRaw,
+      ] = await Promise.all([
         usdc.balanceOf(ownerAddress),
         usdt.balanceOf(ownerAddress),
         cUsd ? cUsd.balanceOf(ownerAddress) : Promise.resolve(0n),

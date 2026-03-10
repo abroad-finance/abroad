@@ -174,7 +174,7 @@ export function useWalletDetails(params: Params = {}): WalletDetailsProps {
     wallet?.address,
     wallet?.chainId,
     loadTransactions,
-    stablecoinBalances.refresh,
+    stablecoinBalances,
     walletAuthentication?.jwtToken,
   ])
 
@@ -191,8 +191,7 @@ export function useWalletDetails(params: Params = {}): WalletDetailsProps {
   }, [
     wallet?.address,
     wallet?.chainId,
-    stablecoinBalances.isLoading,
-    stablecoinBalances.refresh,
+    stablecoinBalances,
   ])
 
   const onRefreshTransactions = useCallback(() => {
@@ -285,17 +284,17 @@ export function useWalletDetails(params: Params = {}): WalletDetailsProps {
 
   return {
     address: wallet?.address || null,
-    cUsdBalance: stablecoinBalances.cUsd,
     copiedAddress,
+    cUsdBalance: stablecoinBalances.cUsd,
     formatDate,
     formatDateWithTime,
     getStatusStyle,
     getStatusText,
     hasMoreTransactions: pagination.hasMore,
     isLoadingBalance: stablecoinBalances.isLoading,
-    isUnsupportedPreferredStablecoin: stablecoinBalances.preference.kind === 'unsupported-preferred',
     isLoadingMoreTransactions,
     isLoadingTransactions,
+    isUnsupportedPreferredStablecoin: stablecoinBalances.preference.kind === 'unsupported-preferred',
     onClose,
     onCopyAddress,
     onDisconnectWallet,
