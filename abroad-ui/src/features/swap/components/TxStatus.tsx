@@ -98,6 +98,7 @@ const TxStatus = ({
     else if (currency === TargetCurrency.COP) {
       return `$${amount}`
     }
+    return null
   }
 
   const handleTxEvent = useCallback((payload: { id?: string, status?: ApiStatus }) => {
@@ -219,7 +220,7 @@ const TxStatus = ({
   if (status === 'accepted' && txStatusDetails) {
     const merchant = txStatusDetails.accountNumber || '—'
     const amountStr = getAmount(targetCurrency, targetAmount)
-    const amountDisplay = amountStr === null ? `$${targetAmount} ${targetCurrency}` : `${amountStr} ${targetCurrency}`
+    const amountDisplay = amountStr ?? `$${targetAmount} ${targetCurrency}`
 
     return (
       <div className="flex flex-1 flex-col items-center justify-center w-full max-w-[448px]">

@@ -1,8 +1,8 @@
 import { useCallback, useState } from 'react'
 
-import type { TransactionData, UserTransactionSummary } from '../services/public/transactionTypes'
+import type { TransactionData, UserTransactionSummary } from './public/transactionTypes'
 
-import { getUserTransactions } from '../services/public/publicApi'
+import { getUserTransactions } from './public/publicApi'
 
 const NETWORK_TO_CHAIN: Record<string, string> = {
   CELO: 'Celo',
@@ -46,6 +46,7 @@ export function useUserTransactions(isAuthenticated: boolean, selectedChainKey?:
   const fetchAllTransactions = useCallback(async () => {
     if (!isAuthenticated) {
       setAllTransactions([])
+      setIsLoadingAll(false)
       return
     }
 

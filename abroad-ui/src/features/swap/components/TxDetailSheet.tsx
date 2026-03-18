@@ -1,3 +1,4 @@
+import { useTranslate } from '@tolgee/react'
 import { ChevronDown } from 'lucide-react'
 import React, { useState } from 'react'
 
@@ -43,6 +44,7 @@ export interface TxDetailSheetProps {
 }
 
 export default function TxDetailSheet({ onClose, tx }: Readonly<TxDetailSheetProps>): null | React.JSX.Element {
+  const { t } = useTranslate()
   const [showTechnical, setShowTechnical] = useState(false)
 
   if (!tx) return null
@@ -75,7 +77,7 @@ export default function TxDetailSheet({ onClose, tx }: Readonly<TxDetailSheetPro
           </div>
           <div>
             <div className="font-cereal text-base font-bold text-[var(--ab-text)]">
-              {isExpired ? 'Payment Expired' : 'Payment Completed'}
+              {isExpired ? t('tx_detail.expired', 'Payment Expired') : t('tx_detail.completed', 'Payment Completed')}
             </div>
             <div className="text-xs text-[var(--ab-text-muted)]">{tx.date}</div>
           </div>
@@ -93,7 +95,7 @@ export default function TxDetailSheet({ onClose, tx }: Readonly<TxDetailSheetPro
 
         <div className="mb-6 flex gap-2.5">
           <div className="flex flex-1 flex-col items-center justify-center rounded-2xl border border-[var(--ab-border)] bg-[var(--ab-bg-subtle)] px-4 py-4">
-            <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--ab-text-muted)]">You paid</div>
+            <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--ab-text-muted)]">{t('tx_detail.you_paid', 'You paid')}</div>
             <div className="font-cereal text-[22px] font-bold text-[var(--ab-text)]">
               $
               {tx.usdcAmount}
@@ -106,7 +108,7 @@ export default function TxDetailSheet({ onClose, tx }: Readonly<TxDetailSheetPro
             </svg>
           </div>
           <div className="flex flex-1 flex-col items-center justify-center rounded-2xl border border-[var(--ab-border)] bg-[var(--ab-bg-subtle)] px-4 py-4">
-            <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--ab-text-muted)]">Merchant got</div>
+            <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--ab-text-muted)]">{t('tx_detail.merchant_got', 'Merchant got')}</div>
             <div className="font-cereal text-[22px] font-bold text-[var(--ab-text)]">
               {country.symbol}
               {tx.localAmount}
@@ -117,13 +119,13 @@ export default function TxDetailSheet({ onClose, tx }: Readonly<TxDetailSheetPro
 
         <div className="mb-4 overflow-hidden rounded-2xl border border-[var(--ab-border)]">
           {[
-            { badge: true, label: 'Status', value: isExpired ? 'Expired' : 'Completed' },
-            { icon: country.flagUrl, label: 'Payment rail', value: country.rail },
-            { label: 'Fee', value: `$${tx.fee} ${tx.token}` },
-            { label: 'Settlement time', value: tx.settlementTime === '—' ? '—' : `⚡ ${tx.settlementTime}` },
-            { icon: chain.icon, label: 'Network', value: tx.chain },
-            { label: 'Token', value: tx.token },
-            { label: 'Recipient', value: tx.accountNumber },
+            { badge: true, label: t('tx_detail.status', 'Status'), value: isExpired ? t('tx_detail.status_expired', 'Expired') : t('tx_detail.status_completed', 'Completed') },
+            { icon: country.flagUrl, label: t('tx_detail.payment_rail', 'Payment rail'), value: country.rail },
+            { label: t('tx_detail.fee', 'Fee'), value: `$${tx.fee} ${tx.token}` },
+            { label: t('tx_detail.settlement_time', 'Settlement time'), value: tx.settlementTime === '—' ? '—' : `⚡ ${tx.settlementTime}` },
+            { icon: chain.icon, label: t('tx_detail.network', 'Network'), value: tx.chain },
+            { label: t('tx_detail.token', 'Token'), value: tx.token },
+            { label: t('tx_detail.recipient', 'Recipient'), value: tx.accountNumber },
           ].map((row, i) => (
             <div
               className={cn(
@@ -152,7 +154,7 @@ export default function TxDetailSheet({ onClose, tx }: Readonly<TxDetailSheetPro
           onClick={() => setShowTechnical(s => !s)}
           type="button"
         >
-          <span className="font-cereal text-[13px] font-bold text-[var(--ab-text-secondary)]">Technical Details</span>
+          <span className="font-cereal text-[13px] font-bold text-[var(--ab-text-secondary)]">{t('tx_detail.technical_details', 'Technical Details')}</span>
           <ChevronDown className={cn('h-4 w-4 text-[var(--ab-text-muted)] transition-transform', showTechnical && 'rotate-180')} />
         </button>
 

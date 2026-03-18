@@ -1,3 +1,4 @@
+import { useTranslate } from '@tolgee/react'
 import { ChevronRight } from 'lucide-react'
 import React from 'react'
 
@@ -29,13 +30,15 @@ export interface HistorySheetProps {
 }
 
 export default function HistorySheet({ onClose, onSelectTx, transactions }: Readonly<HistorySheetProps>): React.JSX.Element {
+  const { t } = useTranslate()
+
   return (
     <BottomSheet onClose={onClose}>
       <div className="px-6 pb-9 pt-1">
-        <h3 className="font-cereal mb-5 text-lg font-bold text-[var(--ab-text)]">Payment History</h3>
+        <h3 className="font-cereal mb-5 text-lg font-bold text-[var(--ab-text)]">{t('history.title', 'Payment History')}</h3>
         {transactions.length === 0
           ? (
-              <p className="py-8 text-center text-sm text-[var(--ab-text-muted)]">No transactions yet.</p>
+              <p className="py-8 text-center text-sm text-[var(--ab-text-muted)]">{t('history.empty', 'No transactions yet.')}</p>
             )
           : (
               <div className="divide-y divide-[var(--ab-border)]">
@@ -78,7 +81,7 @@ export default function HistorySheet({ onClose, onSelectTx, transactions }: Read
                           {tx.merchant}
                         </div>
                         <div className="mt-0.5 flex items-center gap-1 text-xs text-[var(--ab-text-muted)]">
-                          {tx.location ?? (tx.country === 'br' ? 'Brazil' : 'Colombia')}
+                          {tx.location ?? (tx.country === 'br' ? t('country.brazil', 'Brazil') : t('country.colombia', 'Colombia'))}
                           {' · '}
                           {country.rail}
                           {' · '}

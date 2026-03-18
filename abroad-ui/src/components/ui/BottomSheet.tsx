@@ -14,13 +14,19 @@ export interface BottomSheetProps {
  */
 export const BottomSheet: React.FC<BottomSheetProps> = ({ children, className, onClose }) => (
   <div
+    aria-label="Close sheet"
     className={cn(
       'fixed inset-0 z-[300] flex items-end justify-center',
       'bg-black/35 backdrop-blur-[8px]',
       'transition-[visibility,opacity] duration-[0.4s] ease-[cubic-bezier(0.16,1,0.3,1)]',
     )}
     onClick={onClose}
-    onKeyDown={(e) => { if (e.key === 'Escape') onClose() }}
+    onKeyDown={(e) => {
+      if (e.key === 'Escape' || e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault()
+        onClose()
+      }
+    }}
     role="button"
     tabIndex={0}
   >

@@ -14,6 +14,7 @@ export interface OverlayProps {
  */
 export const Overlay: React.FC<OverlayProps> = ({ children, className, onClose }) => (
   <div
+    aria-label="Close overlay"
     className={cn(
       'fixed inset-0 z-[300] flex items-center justify-center p-5',
       'bg-black/35 backdrop-blur-[12px]',
@@ -21,7 +22,12 @@ export const Overlay: React.FC<OverlayProps> = ({ children, className, onClose }
       className,
     )}
     onClick={onClose}
-    onKeyDown={(e) => { if (e.key === 'Escape') onClose() }}
+    onKeyDown={(e) => {
+      if (e.key === 'Escape' || e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault()
+        onClose()
+      }
+    }}
     role="button"
     tabIndex={0}
   >

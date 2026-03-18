@@ -79,7 +79,8 @@ const isStoredTokenValid = (): boolean => {
   try {
     const [, payload] = token.split('.')
     if (!payload) return false
-    const decoded = JSON.parse(atob(payload.replaceAll('-', '+').replaceAll('_', '/')))
+    const padded = payload.replaceAll('-', '+').replaceAll('_', '/') + '=='.slice(0, (4 - payload.length % 4) % 4)
+    const decoded = JSON.parse(atob(padded))
     return typeof decoded?.exp === 'number' && decoded.exp * 1000 > Date.now()
   }
   catch {
@@ -233,7 +234,7 @@ export function useStellarKitWallet(
       const kit = ensureKit()
       if (!address) throw new Error('Wallet not connected')
 
-      if (walletId === mockWalletConnectModule.productId) {
+      if (isWalletConnect(walletId ?? '')) {
         const client = await ensureWalletConnectClient()
         if (!wcTopicRef.current) throw new Error('No WalletConnect session found')
 
