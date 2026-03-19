@@ -1,6 +1,6 @@
 import { useTranslate } from '@tolgee/react'
 import {
-  ChevronDown, ChevronRight, Keyboard, Lock, PiggyBank, QrCode, Store, Zap,
+  ChevronDown, ChevronRight, Keyboard, Lock, PiggyBank, QrCode, Store, Zap, Wallet,
 } from 'lucide-react'
 import React from 'react'
 
@@ -64,17 +64,31 @@ const CHAIN_MAP: Record<string, { bg: string, color: string, icon: string, name:
   },
 }
 
+type OnboardingRates = {
+  brl: {
+    USDC: null | number
+    USDT: null | number
+  }
+  cop: {
+    USDC: null | number
+    USDT: null | number
+  }
+}
+
 export interface HomeScreenProps {
   balance: string
   formatDate?: (dateString: string) => string
   getStatusStyle?: (status: string) => string
   getStatusText?: (status: string) => string
+  hasEnteredApp?: boolean
   isAuthenticated: boolean
-  onConnectWallet: () => void
+  onboardingRates?: OnboardingRates
+  onEnterApp?: () => void
   onGoToManual: () => void
   onHistoryClick: () => void
   onOpenChainModal?: () => void
   onOpenQr: () => void
+  onRequestConnect: () => void
   onSelectCurrency?: (currency: TargetCurrency) => void
   onSelectTransaction?: (tx: TransactionListItem) => void
   recentTransactions: TransactionListItem[]
@@ -98,12 +112,15 @@ export default function HomeScreen({
   formatDate,
   getStatusStyle,
   getStatusText,
+  hasEnteredApp = false,
   isAuthenticated,
-  onConnectWallet,
+  onboardingRates,
+  onEnterApp,
   onGoToManual,
   onHistoryClick,
   onOpenChainModal,
   onOpenQr,
+  onRequestConnect,
   onSelectCurrency,
   onSelectTransaction,
   recentTransactions,
@@ -115,8 +132,20 @@ export default function HomeScreen({
   const { t } = useTranslate()
   const balanceNum = Number.parseFloat(balance.replaceAll(',', '')) || 0
 
-  // Unauthenticated view – Figma node 5:2 pixel-perfect
-  if (!isAuthenticated) {
+  // Show onboarding view for non-authenticated users who haven't entered the app
+  const showOnboarding = !isAuthenticated && !hasEnteredApp
+  
+  // Format rate for display
+  const formatRate = (rate: null | number, decimals: number): string => {
+    if (rate === null) return '--'
+    return rate.toLocaleString(decimals === 0 ? 'es-CO' : 'pt-BR', {
+      maximumFractionDigits: decimals,
+      minimumFractionDigits: decimals,
+    })
+  }
+
+  // Onboarding view - Figma node 5:2 pixel-perfect
+  if (showOnboarding) {
     const trustBadges = [
       { Icon: Zap, label: t('home.trust_settlement', '< 3s settlement') },
       { Icon: PiggyBank, label: t('home.trust_fees', 'Low fees') },
@@ -124,19 +153,19 @@ export default function HomeScreen({
     ] as const
 
     return (
-      <main className="flex w-full min-h-full flex-1 flex-col items-center justify-center px-4 pt-[10px] pb-8 md:px-8 md:py-[151px] overflow-hidden">
-        <div className="flex w-full max-w-[667px] flex-col items-center">
+      <main className="flex w-full h-full flex-col items-center justify-center px-4 overflow-hidden">
+        <div className="flex w-full max-w-[min(90vw,667px)] flex-col items-center justify-center">
           {/* Live badge – Figma 5:13 */}
           <div
-            className="mb-8 flex shrink-0 items-center gap-2 rounded-full px-4 py-1.5 dark:bg-emerald-900/30 dark:border dark:border-emerald-800/50"
+            className="mb-[clamp(0.5rem,2vh,1rem)] flex shrink-0 items-center gap-2 rounded-full px-[clamp(0.75rem,2vw,1rem)] py-[clamp(0.25rem,1vh,0.375rem)] dark:bg-emerald-900/30 dark:border dark:border-emerald-800/50"
             style={{ backgroundColor: HERO_LIVE_BADGE.bg }}
           >
             <span
-              className="h-2 w-2 shrink-0 rounded-full animate-pulse"
+              className="h-[clamp(0.375rem,1.5vh,0.5rem)] w-[clamp(0.375rem,1.5vh,0.5rem)] shrink-0 rounded-full animate-pulse"
               style={{ backgroundColor: HERO_LIVE_BADGE.dot }}
             />
             <span
-              className="text-sm font-medium leading-5"
+              className="text-[clamp(0.75rem,1.5vw+0.5vh,0.875rem)] font-medium leading-tight"
               style={{ color: HERO_LIVE_BADGE.text }}
             >
               {t('home.live_badge', 'Live in Colombia & Brazil')}
@@ -144,7 +173,7 @@ export default function HomeScreen({
           </div>
 
           {/* Headline – Figma 5:20 */}
-          <h1 className="mb-6 text-center text-[40px] font-extrabold leading-[48px] tracking-[-1.5px] md:text-[60px] md:leading-[60px]">
+          <h1 className="mb-[clamp(0.5rem,2vh,1rem)] text-center text-[clamp(1.75rem,4vw+2vh,3.75rem)] font-extrabold leading-[1.1] tracking-[-0.02em]">
             <span style={{ color: HERO_HEADING.dark }}>
               {t('home.headline_1', 'Spend your')}
               <br />
@@ -158,29 +187,29 @@ export default function HomeScreen({
 
           {/* Subline – Figma 5:22 */}
           <p
-            className="mb-8 max-w-[461px] text-center text-xl font-normal leading-7"
+            className="mb-[clamp(0.75rem,2.5vh,1.5rem)] max-w-[min(85vw,461px)] text-center text-[clamp(0.875rem,2vw+0.5vh,1.25rem)] font-normal leading-[1.4]"
             style={{ color: HERO_SUBLINE }}
           >
             {t('home.subline', 'Connect your wallet, scan a QR code, and pay — the merchant receives local currency instantly.')}
           </p>
 
           {/* Chain badges – Figma 5:24 */}
-          <div className="mb-10 flex shrink-0 flex-wrap items-center justify-center gap-3">
+          <div className="mb-[clamp(0.75rem,2.5vh,1.5rem)] flex shrink-0 flex-wrap items-center justify-center gap-[clamp(0.5rem,1.5vh,0.75rem)]">
             {CHAIN_CONFIG.map(({ icon, key, label }) => {
               const theme = HERO_CHAINS[key]
               return (
                 <div
-                  className="flex items-center gap-2 self-stretch rounded-full px-4 py-[5.5px]"
+                  className="flex items-center gap-[clamp(0.25rem,1vw,0.5rem)] self-stretch rounded-full px-[clamp(0.5rem,2vw,1rem)] py-[clamp(0.25rem,1vh,0.35rem)]"
                   key={key}
                   style={{ backgroundColor: theme.bg }}
                 >
                   <img
                     alt={label}
-                    className="h-5 w-5 shrink-0 object-contain"
+                    className="h-[clamp(1rem,2.5vh,1.25rem)] w-[clamp(1rem,2.5vh,1.25rem)] shrink-0 object-contain"
                     src={icon}
                   />
                   <span
-                    className="text-center text-sm font-medium leading-5"
+                    className="text-center text-[clamp(0.75rem,1.5vw+0.5vh,0.875rem)] font-medium leading-tight"
                     style={{ color: theme.text }}
                   >
                     {label}
@@ -190,31 +219,97 @@ export default function HomeScreen({
             })}
           </div>
 
+          {/* Exchange Rates Section */}
+          {onboardingRates && (
+            <div className="mb-[clamp(0.5rem,2vh,1rem)] w-full max-w-[min(85vw,400px)]">
+              <p className="text-center text-[clamp(0.75rem,1.5vw+0.5vh,0.875rem)] font-medium mb-[clamp(0.25rem,1vh,0.75rem)]" style={{ color: HERO_SUBLINE }}>
+                {t('home.exchange_rates', 'Live Exchange Rates')}
+              </p>
+              <div className="grid grid-cols-2 gap-[clamp(0.5rem,1.5vw,0.75rem)]">
+                {/* COP Rates */}
+                <div className="rounded-[clamp(0.75rem,2vh,1rem)] border border-[#e5e7eb] bg-white/50 p-[clamp(0.5rem,1.5vh,0.75rem)]">
+                  <div className="flex items-center gap-[clamp(0.25rem,1vw,0.5rem)] mb-[clamp(0.25rem,1vh,0.5rem)]">
+                    <img
+                      alt="Colombia"
+                      className="h-[clamp(1rem,2.5vh,1.25rem)] w-[clamp(1rem,2.5vh,1.25rem)] rounded-full object-cover"
+                      src="https://hatscripts.github.io/circle-flags/flags/co.svg"
+                    />
+                    <span className="text-[clamp(0.7rem,1.5vw,0.75rem)] font-semibold text-[#374151]">COP</span>
+                  </div>
+                  <div className="space-y-[clamp(0.125rem,0.75vh,0.375rem)]">
+                    <div className="flex items-center gap-[clamp(0.25rem,1vw,0.375rem)]">
+                      <img alt="USDC" className="h-[clamp(0.875rem,2vh,1rem)] w-[clamp(0.875rem,2vh,1rem)]" src={TOKEN_ICON_URL.USDC} />
+                      <span className="text-[clamp(0.65rem,1.5vw,0.75rem)] text-[#6b7280]">1 USDC =</span>
+                      <span className="text-[clamp(0.65rem,1.5vw,0.75rem)] font-semibold text-[#111827]">
+                        ${formatRate(onboardingRates.cop.USDC, 0)}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-[clamp(0.25rem,1vw,0.375rem)]">
+                      <img alt="USDT" className="h-[clamp(0.875rem,2vh,1rem)] w-[clamp(0.875rem,2vh,1rem)]" src={TOKEN_ICON_URL.USDT} />
+                      <span className="text-[clamp(0.65rem,1.5vw,0.75rem)] text-[#6b7280]">1 USDT =</span>
+                      <span className="text-[clamp(0.65rem,1.5vw,0.75rem)] font-semibold text-[#111827]">
+                        ${formatRate(onboardingRates.cop.USDT, 0)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* BRL Rates */}
+                <div className="rounded-[clamp(0.75rem,2vh,1rem)] border border-[#e5e7eb] bg-white/50 p-[clamp(0.5rem,1.5vh,0.75rem)]">
+                  <div className="flex items-center gap-[clamp(0.25rem,1vw,0.5rem)] mb-[clamp(0.25rem,1vh,0.5rem)]">
+                    <img
+                      alt="Brazil"
+                      className="h-[clamp(1rem,2.5vh,1.25rem)] w-[clamp(1rem,2.5vh,1.25rem)] rounded-full object-cover"
+                      src="https://hatscripts.github.io/circle-flags/flags/br.svg"
+                    />
+                    <span className="text-[clamp(0.7rem,1.5vw,0.75rem)] font-semibold text-[#374151]">BRL</span>
+                  </div>
+                  <div className="space-y-[clamp(0.125rem,0.75vh,0.375rem)]">
+                    <div className="flex items-center gap-[clamp(0.25rem,1vw,0.375rem)]">
+                      <img alt="USDC" className="h-[clamp(0.875rem,2vh,1rem)] w-[clamp(0.875rem,2vh,1rem)]" src={TOKEN_ICON_URL.USDC} />
+                      <span className="text-[clamp(0.65rem,1.5vw,0.75rem)] text-[#6b7280]">1 USDC =</span>
+                      <span className="text-[clamp(0.65rem,1.5vw,0.75rem)] font-semibold text-[#111827]">
+                        R${formatRate(onboardingRates.brl.USDC, 2)}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-[clamp(0.25rem,1vw,0.375rem)]">
+                      <img alt="USDT" className="h-[clamp(0.875rem,2vh,1rem)] w-[clamp(0.875rem,2vh,1rem)]" src={TOKEN_ICON_URL.USDT} />
+                      <span className="text-[clamp(0.65rem,1.5vw,0.75rem)] text-[#6b7280]">1 USDT =</span>
+                      <span className="text-[clamp(0.65rem,1.5vw,0.75rem)] font-semibold text-[#111827]">
+                        R${formatRate(onboardingRates.brl.USDT, 2)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* CTA Button – Figma 5:36 */}
           <button
-            className="mb-6 flex shrink-0 items-center justify-center gap-2 rounded-2xl px-8 py-4 font-bold text-white shadow-[0px_10px_15px_-3px_rgba(0,0,0,0.1),0px_4px_6px_-4px_rgba(0,0,0,0.1)] transition-opacity hover:opacity-90 md:mb-12"
-            onClick={onConnectWallet}
+            className="mb-[clamp(0.5rem,1.5vh,1rem)] flex shrink-0 items-center justify-center gap-[clamp(0.25rem,1vw,0.5rem)] rounded-[clamp(0.75rem,2vh,1rem)] px-[clamp(1.5rem,4vw,2rem)] py-[clamp(0.5rem,1.5vh,1rem)] font-bold text-white shadow-[0px_10px_15px_-3px_rgba(0,0,0,0.1),0px_4px_6px_-4px_rgba(0,0,0,0.1)] transition-opacity hover:opacity-90"
+            onClick={onEnterApp}
             style={{ backgroundColor: HERO_CTA_BG }}
             type="button"
           >
-            <span className="text-lg leading-7">
-              {t('home.cta_connect', 'Connect Wallet to Start')}
+            <span className="text-[clamp(1rem,2.5vw+1vh,1.125rem)] leading-tight">
+              {t('home.cta_continue', 'Continuar')}
             </span>
-            <ChevronRight className="h-4 w-4 shrink-0" />
+            <ChevronRight className="h-[clamp(1rem,2.5vh,1.25rem)] w-[clamp(1rem,2.5vh,1.25rem)] shrink-0" />
           </button>
 
           {/* Trust badges – Figma 5:41 */}
           <div
-            className="flex w-full flex-nowrap items-center justify-between gap-2 sm:flex-wrap sm:justify-center sm:gap-8"
+            className="flex w-full flex-nowrap items-center justify-center gap-[clamp(0.5rem,2vw,2rem)]"
             style={{ color: HERO_SUBLINE }}
           >
             {trustBadges.map(({ Icon, label }) => (
               <div
-                className="flex shrink-0 items-center gap-1.5 sm:gap-2"
+                className="flex shrink-0 items-center gap-[clamp(0.25rem,1vw,0.5rem)]"
                 key={label}
               >
-                <Icon className="h-3 w-3 shrink-0 sm:h-[13px] sm:w-[13px]" strokeWidth={2} />
-                <span className="whitespace-nowrap text-center text-xs font-medium leading-5 sm:text-sm">{label}</span>
+                <Icon className="h-[clamp(0.75rem,2vh,0.875rem)] w-[clamp(0.75rem,2vh,0.875rem)] shrink-0" strokeWidth={2} />
+                <span className="whitespace-nowrap text-center text-[clamp(0.7rem,1.5vw+0.5vh,0.875rem)] font-medium leading-tight">{label}</span>
               </div>
             ))}
           </div>
@@ -223,7 +318,7 @@ export default function HomeScreen({
     )
   }
 
-  // Authenticated view – Figma 1:3 / 1:42 pixel-perfect
+  // Dashboard view - Guest mode or Authenticated – Figma 1:3 / 1:42 pixel-perfect
   const c = targetCurrency === TargetCurrency.BRL ? COUNTRIES.BRL : COUNTRIES.COP
   const localBalance = c.decimals === 0
     ? Math.round(balanceNum * c.rate).toLocaleString('es-CO')
@@ -232,46 +327,88 @@ export default function HomeScreen({
   const chainKey = selectedChainKey?.toLowerCase().split(':')[0] ?? 'stellar'
   const chainInfo = CHAIN_MAP[chainKey] ?? CHAIN_MAP.stellar
 
+  // Helper to check if we should show transactions section
+  const hasTransactions = isAuthenticated && (recentTransactions.length > 0 || recentTransactionsFallback.length > 0)
+
   return (
-    <div className="flex w-full flex-1 flex-col items-center px-0">
-      <div className="w-full max-w-[576px]">
-        {/* Balance – Figma 1:46 */}
-        <div className="flex flex-col items-center gap-1 py-1">
-          <p className="text-center text-xs font-bold uppercase leading-4 tracking-[1.2px] text-[#6b7280]">
+    <div className="flex w-full h-full flex-col items-center px-0 overflow-y-auto">
+      <div className="w-full max-w-[min(90vw,576px)]">
+        {/* Live badge - shown for all users */}
+        <div className="flex justify-center mb-[clamp(0.25rem,1.5vh,1rem)]">
+          <div
+            className="flex shrink-0 items-center gap-[clamp(0.25rem,1vw,0.5rem)] rounded-full px-[clamp(0.75rem,2vw,1rem)] py-[clamp(0.25rem,1vh,0.375rem)] dark:bg-emerald-900/30 dark:border dark:border-emerald-800/50"
+            style={{ backgroundColor: HERO_LIVE_BADGE.bg }}
+          >
+            <span
+              className="h-[clamp(0.375rem,1.5vh,0.5rem)] w-[clamp(0.375rem,1.5vh,0.5rem)] shrink-0 rounded-full animate-pulse"
+              style={{ backgroundColor: HERO_LIVE_BADGE.dot }}
+            />
+            <span
+              className="text-[clamp(0.75rem,1.5vw+0.5vh,0.875rem)] font-medium leading-tight"
+              style={{ color: HERO_LIVE_BADGE.text }}
+            >
+              {t('home.live_badge', 'Live in Colombia & Brazil')}
+            </span>
+          </div>
+        </div>
+
+        {/* Balance - Figma 1:46 */}
+        <div className="flex flex-col items-center gap-[clamp(0.25rem,1vh,0.5rem)] py-[clamp(0.25rem,1vh,0.5rem)]">
+          <p className={cn(
+            'text-center text-[clamp(0.65rem,1.5vw,0.75rem)] font-bold uppercase leading-tight tracking-[1.2px]',
+            isAuthenticated ? 'text-[#6b7280]' : 'text-[#9ca3af]'
+          )}>
             {t('home.your_balance', 'Your Balance')}
           </p>
-          <div className="flex items-center justify-center gap-3">
-            {TOKEN_ICON_URL[selectedTokenLabel]
+          <div className="flex items-center justify-center gap-[clamp(0.5rem,2vw,0.75rem)]">
+            {TOKEN_ICON_URL[selectedTokenLabel] && isAuthenticated
               ? (
                   <img
                     alt={selectedTokenLabel}
-                    className="h-8 w-8 shrink-0 self-center object-contain md:h-9 md:w-9"
+                    className="h-[clamp(1.5rem,4vh,2rem)] w-[clamp(1.5rem,4vh,2rem)] shrink-0 self-center object-contain"
                     src={TOKEN_ICON_URL[selectedTokenLabel]}
                   />
                 )
               : (
-                  <span className="text-2xl font-medium text-[#10b981] md:text-[30px] md:leading-9">
+                  <span className={cn(
+                    'text-[clamp(1.25rem,3vh,1.875rem)] font-medium leading-tight',
+                    isAuthenticated ? 'text-[#10b981]' : 'text-[#9ca3af]'
+                  )}>
                     {selectedTokenLabel}
                   </span>
                 )}
-            <span className="text-center text-[40px] font-black leading-[48px] text-[#111827] md:text-[60px] md:leading-[60px]">
+            <span className={cn(
+              'text-center text-[clamp(2rem,6vh,3.75rem)] font-black leading-[1.1]',
+              isAuthenticated ? 'text-[#111827]' : 'text-[#9ca3af]'
+            )}>
               $
-              {balance}
+              {isAuthenticated ? balance : '--'}
             </span>
           </div>
-          <div className="flex h-8 items-center justify-center pt-1">
-            <div className="flex items-center gap-2 rounded-full border border-[#f3f4f6] bg-[rgba(255,255,255,0.6)] px-[13px] py-[4.5px] shadow-[0px_1px_2px_0px_rgba(0,0,0,0.05)]">
+          <div className="flex items-center justify-center pt-[clamp(0.125rem,0.5vh,0.25rem)]">
+            <div className={cn(
+              'flex items-center gap-[clamp(0.25rem,1vw,0.5rem)] rounded-full border px-[clamp(0.5rem,1.5vw,0.75rem)] py-[clamp(0.25rem,0.75vh,0.25rem)] shadow-[0px_1px_2px_0px_rgba(0,0,0,0.05)]',
+              isAuthenticated
+                ? 'border-[#f3f4f6] bg-[rgba(255,255,255,0.6)]'
+                : 'border-[#e5e7eb] bg-[#f9fafb]'
+            )}>
               {CURRENCY_FLAG_URL[targetCurrency] && (
                 <img
                   alt={targetCurrency}
-                  className="h-5 w-5 shrink-0 object-contain"
+                  className={cn(
+                    'h-[clamp(1rem,2.5vh,1.25rem)] w-[clamp(1rem,2.5vh,1.25rem)] shrink-0 object-contain',
+                    !isAuthenticated && 'opacity-50 grayscale'
+                  )}
                   src={CURRENCY_FLAG_URL[targetCurrency]}
                 />
               )}
-              <span className="text-xs font-medium leading-4 text-[#6b7280]">
+              <span className={cn(
+                'text-[clamp(0.75rem,1.5vw+0.5vh,0.875rem)] font-medium leading-tight',
+                isAuthenticated ? 'text-[#6b7280]' : 'text-[#9ca3af]'
+              )}>
                 ≈
                 {targetCurrency === TargetCurrency.BRL ? ' R$' : ' $'}
-                {localBalance}
+                {isAuthenticated ? localBalance : '--'}
                 {' '}
                 {targetCurrency}
               </span>
@@ -279,23 +416,35 @@ export default function HomeScreen({
           </div>
         </div>
 
-        {/* Chain + currency toggle – Figma 9:332 / 9:368 */}
-        <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+        {/* Chain + currency toggle - Figma 9:332 / 9:368 */}
+        <div className="mt-[clamp(0.5rem,2vh,1rem)] flex flex-wrap items-center justify-center gap-[clamp(0.25rem,1vw,0.5rem)]">
           {onOpenChainModal && (
             <button
-              className="flex items-center gap-2 rounded-full border border-[#e5e7eb] bg-[#f3f4f6] px-[13px] py-[7px] transition-colors hover:opacity-90"
-              onClick={onOpenChainModal}
+              className={cn(
+                'flex items-center gap-2 rounded-full border px-[13px] py-[7px] transition-colors',
+                isAuthenticated
+                  ? 'border-[#e5e7eb] bg-[#f3f4f6] hover:opacity-90'
+                  : 'border-[#e5e7eb] bg-[#f9fafb] cursor-not-allowed opacity-70'
+              )}
+              onClick={isAuthenticated ? onOpenChainModal : onRequestConnect}
               type="button"
             >
-              <img alt={chainInfo.name} className="h-5 w-5" src={chainInfo.icon} />
-              <span className="text-xs font-semibold text-[#374151]">
+              <img
+                alt={chainInfo.name}
+                className={cn('h-5 w-5', !isAuthenticated && 'opacity-50 grayscale')}
+                src={chainInfo.icon}
+              />
+              <span className={cn(
+                'text-xs font-semibold',
+                isAuthenticated ? 'text-[#374151]' : 'text-[#9ca3af]'
+              )}>
                 {selectedTokenLabel}
                 {' '}
                 on
                 {' '}
                 {chainInfo.name}
               </span>
-              <ChevronDown className="h-4 w-4 text-[#374151]" />
+              <ChevronDown className={cn('h-4 w-4', isAuthenticated ? 'text-[#374151]' : 'text-[#9ca3af]')} />
             </button>
           )}
           {onSelectCurrency && (
@@ -306,43 +455,100 @@ export default function HomeScreen({
           )}
         </div>
 
-        {/* Payment cards – Figma 1:71, 2 cols equal height, responsive */}
-        <div className="mt-6 grid grid-cols-2 gap-3 items-stretch md:mt-10 md:gap-4">
+        {/* Trust badges - shown when not authenticated */}
+        {!isAuthenticated && (
+          <div className="mt-[clamp(0.75rem,2.5vh,1.5rem)] flex flex-wrap items-center justify-center gap-[clamp(0.5rem,2vw,1rem)]">
+            {[
+              { Icon: Zap, label: t('home.trust_settlement', '< 3s settlement') },
+              { Icon: PiggyBank, label: t('home.trust_fees', 'Low fees') },
+              { Icon: Lock, label: t('home.trust_custodial', 'Non-custodial') },
+            ].map(({ Icon, label }) => (
+              <div
+                className="flex shrink-0 items-center gap-1.5"
+                key={label}
+                style={{ color: HERO_SUBLINE }}
+              >
+                <Icon className="h-3.5 w-3.5 shrink-0" strokeWidth={2} />
+                <span className="whitespace-nowrap text-center text-xs font-medium leading-5">{label}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Payment cards - Figma 1:71, 2 cols equal height, responsive */}
+        <div className="mt-[clamp(0.75rem,2.5vh,1.5rem)] grid grid-cols-2 gap-[clamp(0.5rem,1.5vw,0.75rem)] items-stretch">
           <button
-            className="flex h-full min-h-[140px] w-full flex-col items-center justify-center gap-1.5 rounded-[24px] bg-[#3ca383] p-4 text-center shadow-[0px_0px_15px_0px_rgba(16,185,129,0.3)] transition-opacity hover:opacity-95 md:min-h-[180px] md:gap-4 md:rounded-[32px] md:p-6"
+            className={cn(
+              'flex h-full min-h-[clamp(100px,18vh,140px)] w-full flex-col items-center justify-center gap-[clamp(0.25rem,1vh,0.5rem)] rounded-[clamp(1rem,3vh,1.5rem)] p-[clamp(0.75rem,2vh,1rem)] text-center transition-all',
+              isAuthenticated
+                ? 'bg-[#3ca383] shadow-[0px_0px_15px_0px_rgba(16,185,129,0.3)] hover:opacity-95'
+                : 'bg-[#3ca383]/80 hover:bg-[#3ca383]'
+            )}
             onClick={onOpenQr}
             type="button"
           >
-            <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[14px] bg-white/20 backdrop-blur-[2px] md:h-24 md:w-24 md:rounded-[20px]">
-              <QrCode className="h-full w-full p-2 text-white" strokeWidth={1.5} />
+            <div className="flex h-[clamp(2.5rem,8vh,4rem)] w-[clamp(2.5rem,8vh,4rem)] shrink-0 items-center justify-center rounded-[clamp(0.5rem,1.5vh,0.875rem)] bg-white/20 backdrop-blur-[2px]">
+              <QrCode className="h-full w-full p-[clamp(0.375rem,1.5vh,0.5rem)] text-white" strokeWidth={1.5} />
             </div>
-            <span className="text-sm font-bold leading-tight text-white md:text-xl md:leading-[25px]">
+            <span className="text-[clamp(0.8rem,2vw+0.5vh,1.125rem)] font-bold leading-tight text-white">
               {t('home.scan_to_pay', 'Scan to Pay')}
             </span>
             <img
               alt={targetCurrency === TargetCurrency.BRL ? 'PIX' : 'Bre-B'}
-              className="h-4 w-auto shrink-0 md:h-6"
+              className="h-[clamp(0.875rem,2.5vh,1rem)] w-auto shrink-0"
               src={RAIL_LOGO[targetCurrency]}
             />
           </button>
 
           <button
-            className="flex h-full min-h-[140px] w-full flex-col items-center justify-center gap-1.5 rounded-[24px] bg-white p-4 text-center shadow-[0px_4px_6px_-1px_rgba(0,0,0,0.02),0px_2px_4px_-1px_rgba(0,0,0,0.02)] transition-shadow hover:shadow-md md:min-h-[180px] md:gap-4 md:rounded-[32px] md:p-6"
+            className={cn(
+              'flex h-full min-h-[clamp(100px,18vh,140px)] w-full flex-col items-center justify-center gap-[clamp(0.25rem,1vh,0.5rem)] rounded-[clamp(1rem,3vh,1.5rem)] p-[clamp(0.75rem,2vh,1rem)] text-center transition-all',
+              isAuthenticated
+                ? 'bg-white shadow-[0px_4px_6px_-1px_rgba(0,0,0,0.02),0px_2px_4px_-1px_rgba(0,0,0,0.02)] hover:shadow-md'
+                : 'bg-[#f9fafb] border border-[#e5e7eb]'
+            )}
             onClick={onGoToManual}
             type="button"
           >
-            <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[14px] bg-[#f3f4f6] md:h-24 md:w-24 md:rounded-[20px]">
-              <Keyboard className="h-full w-full p-2 text-[#374151]" strokeWidth={1.5} />
+            <div className={cn(
+              'flex h-[clamp(2.5rem,8vh,4rem)] w-[clamp(2.5rem,8vh,4rem)] shrink-0 items-center justify-center rounded-[clamp(0.5rem,1.5vh,0.875rem)]',
+              isAuthenticated ? 'bg-[#f3f4f6]' : 'bg-[#e5e7eb]'
+            )}>
+              <Keyboard className={cn(
+                'h-full w-full p-[clamp(0.375rem,1.5vh,0.5rem)]',
+                isAuthenticated ? 'text-[#374151]' : 'text-[#6b7280]'
+              )} strokeWidth={1.5} />
             </div>
-            <span className="text-sm font-bold leading-tight text-[#111827] md:text-xl md:leading-[25px]">
+            <span className={cn(
+              'text-[clamp(0.8rem,2vw+0.5vh,1.125rem)] font-bold leading-tight',
+              isAuthenticated ? 'text-[#111827]' : 'text-[#6b7280]'
+            )}>
               {t('home.manual_payment', 'Manual Payment')}
             </span>
           </button>
         </div>
 
-        {/* Recent – walletDetails when available, fallback to useUserTransactions */}
-        {(recentTransactions.length > 0 || recentTransactionsFallback.length > 0) && (
-          <div className="mt-4">
+        {/* Connect wallet hint - shown when not authenticated */}
+        {!isAuthenticated && (
+          <div className="mt-[clamp(0.75rem,2.5vh,1.5rem)] flex justify-center">
+            <button
+              className="flex items-center gap-[clamp(0.25rem,1vw,0.5rem)] rounded-[clamp(0.75rem,2vh,1rem)] px-[clamp(1rem,3vw,1.5rem)] py-[clamp(0.5rem,1.5vh,0.75rem)] font-bold text-white shadow-[0px_10px_15px_-3px_rgba(0,0,0,0.1),0px_4px_6px_-4px_rgba(0,0,0,0.1)] transition-opacity hover:opacity-90"
+              onClick={onRequestConnect}
+              style={{ backgroundColor: HERO_CTA_BG }}
+              type="button"
+            >
+              <Wallet className="h-[clamp(1rem,2.5vh,1.25rem)] w-[clamp(1rem,2.5vh,1.25rem)]" />
+              <span className="text-[clamp(0.875rem,2vw+0.5vh,1rem)] leading-tight">
+                {t('home.cta_connect', 'Connect Wallet')}
+              </span>
+              <ChevronRight className="h-[clamp(1rem,2.5vh,1.25rem)] w-[clamp(1rem,2.5vh,1.25rem)] shrink-0" />
+            </button>
+          </div>
+        )}
+
+        {/* Recent transactions - only when authenticated */}
+        {hasTransactions && (
+          <div className="mt-[clamp(0.5rem,2vh,1rem)] flex-1 min-h-0 overflow-y-auto">
             <div className="mb-4 flex items-center justify-between">
               <span className="text-xs font-bold uppercase leading-4 tracking-[1.2px] text-[#6b7280]">
                 {t('home.recent', 'Recent')}
@@ -468,6 +674,15 @@ export default function HomeScreen({
                     )
                   })}
             </div>
+          </div>
+        )}
+
+        {/* Empty state for transactions when authenticated but no history */}
+        {isAuthenticated && !hasTransactions && (
+          <div className="mt-8 text-center">
+            <p className="text-sm text-[#9ca3af]">
+              {t('home.no_transactions', 'No transactions yet. Start by scanning a QR code or making a manual payment.')}
+            </p>
           </div>
         )}
       </div>
