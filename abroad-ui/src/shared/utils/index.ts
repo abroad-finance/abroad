@@ -24,9 +24,9 @@ export const getWalletTypeByDevice = (): WalletType => {
     return session.walletId as WalletType
   }
 
-  // 3. Fallback por dispositivo
-  const isMobile = typeof window !== 'undefined' && /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
-  return isMobile ? 'wallet-connect' : 'stellar-kit'
+  // 3. No fallback por dispositivo - requerir selección explícita de wallet
+  // Retornar stellar-kit como default seguro, pero la UI debe pedir al usuario seleccionar
+  return 'stellar-kit'
 }
 
 export const formatMoney = (currency: TargetCurrency, amount: string): string => {

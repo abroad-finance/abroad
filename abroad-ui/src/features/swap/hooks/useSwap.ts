@@ -268,8 +268,11 @@ export const useSwap = ({
   useEffect(() => {
     if (!wallet?.address || !wallet?.chainId || !selectedCorridor) return
     if (wallet.chainId === selectedCorridor.chainId) return
+    // Disconnect wallet and clean JWT when chain mismatch occurs
     wallet.disconnect().catch(() => undefined)
-  }, [selectedCorridor, wallet])
+    // Clean JWT to ensure proper re-authentication for new chain
+    walletAuthentication.setJwtToken(null)
+  }, [selectedCorridor, wallet, walletAuthentication])
 
   const formatCryptoAmount = useCallback((value: number) => {
     if (!Number.isFinite(value)) return ''

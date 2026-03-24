@@ -175,7 +175,13 @@ export function useStellarKitWallet(
         const session = client.session.get(wcSession.topic)
         if (session) wcTopicRef.current = wcSession.topic
       }
-      catch { /* ignore */ }
+      catch (err) {
+        // Log WC topic restoration errors in dev mode
+        if (import.meta.env.DEV) {
+          console.error('Failed to restore WalletConnect topic', err)
+        }
+        // Don't clear session here - let the user try to reconnect
+      }
     }
     void restoreWcTopic()
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -214,7 +220,12 @@ export function useStellarKitWallet(
           setInternalWalletId(null)
         }
       }
-      catch { /* Can't verify — keep the session */ }
+      catch (err) {
+        // Can't verify — keep the session, but log in dev mode
+        if (import.meta.env.DEV) {
+          console.error('Failed to verify wallet address after visibility change', err)
+        }
+      }
     }
     document.addEventListener('visibilitychange', handleVisibilityChange)
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
@@ -392,6 +403,33 @@ export function useStellarKitWallet(
   const disconnect = useCallback(async () => {
     const kit = ensureKit()
     await kit.disconnect()
+
+    // Clean up WalletConnect topic if exists
+    if (wcTopicRef.current && wcClientRef.current) {
+      try {
+        await wcClientRef.current.disconnect({
+          reason: { code: 6000, message: 'User disconnected' },
+          topic: wcTopicRef.current,
+        })
+      }
+      catch (err) {
+        if (import.meta.env.DEV) {
+          console.error('Failed to disconnect WalletConnect session', err)
+        }
+      }
+      wcTopicRef.current = undefined
+    }
+
+    // Close WalletConnect modal if open
+    if (wcModalRef.current) {
+      try {
+        await wcModalRef.current.closeModal()
+      }
+      catch {
+        // Ignore modal close errors
+      }
+    }
+
     applyWalletId(null)
     setAddress(null)
     walletAuth.setJwtToken(null)
@@ -420,18 +458,18 @@ export function useStellarKitWallet(
 }
 
 function buildModules() {
-  return isMobileUA()
-    ? [mockWalletConnectModule]
-    : [
-        new FreighterModule(),
-        new LobstrModule(),
-        new AlbedoModule(),
-        new LedgerModule(),
-        mockWalletConnectModule,
-        new HotWalletModule(),
-        new xBullModule(),
-        new HanaModule(),
-      ]
+  // Allow native Stellar wallets on both mobile and desktop
+  // Mobile users may have Stellar wallets installed (e.g., Lobstr, Albedo mobile apps)
+  return [
+    new FreighterModule(),
+    new LobstrModule(),
+    new AlbedoModule(),
+    new LedgerModule(),
+    mockWalletConnectModule,
+    new HotWalletModule(),
+    new xBullModule(),
+    new HanaModule(),
+  ]
 }
 
 function isMobileUA(): boolean {

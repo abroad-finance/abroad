@@ -6,6 +6,7 @@ import type { IWalletAuthentication } from '../interfaces/IWalletAuthentication'
 import type { ApiResult } from './http/types'
 
 import { authTokenStore } from './auth/authTokenStore'
+import { sessionStore } from './auth/sessionStore'
 import { httpClient } from './http/httpClient'
 
 const REFRESH_GRACE_MS = 60_000
@@ -111,7 +112,9 @@ export const useWalletAuthentication = (): IWalletAuthentication => {
         if (import.meta.env.DEV) {
           console.error('Failed to refresh wallet token', err)
         }
+        // Clean both JWT and wallet session when refresh fails
         setJwtToken(null)
+        sessionStore.clear()
       }
     }, timeoutMs)
   }, [

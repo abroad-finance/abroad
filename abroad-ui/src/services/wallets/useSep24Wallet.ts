@@ -32,6 +32,28 @@ export const useSep24Wallet = ({ walletAuthentication }: {
     const urlToken = urlParams.get('token')
     const address = urlParams.get('address')
     if (urlToken && address) {
+      // Validate JWT before setting it
+      try {
+        const [, payload] = urlToken.split('.')
+        if (payload) {
+          const padded = payload.replaceAll('-', '+').replaceAll('_', '/') + '=='.slice(0, (4 - payload.length % 4) % 4)
+          const decoded = JSON.parse(atob(padded))
+          const isTokenValid = typeof decoded?.exp === 'number' && decoded.exp * 1000 > Date.now()
+          if (!isTokenValid) {
+            // Token is expired or invalid, don't set it
+            if (import.meta.env.DEV) {
+              console.warn('SEP-24 URL token is expired or invalid')
+            }
+            return
+          }
+        }
+      }
+      catch (err) {
+        if (import.meta.env.DEV) {
+          console.error('Failed to validate SEP-24 URL token', err)
+        }
+        return
+      }
       walletAuthentication.setJwtToken(urlToken)
       setAddress(address)
       window.history.replaceState({}, '', `${window.location.pathname}?${urlParams.toString()}`)
