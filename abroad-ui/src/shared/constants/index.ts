@@ -40,3 +40,8 @@ export const AB_STYLES = {
 export const PENDING_TX_KEY = 'pendingTransaction'
 
 export const WALLET_CONNECT_ID = '5686074a7981cd147a5f0d7434a6d4b7'
+
+// Re-export consolidated configs
+export * from './chains'
+export * from './countries'
+export * from './tokens'

@@ -363,7 +363,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
   const reverseReqIdRef = useRef(0)
   const decodeAbortRef = useRef<AbortController | null>(null)
   const miniPayManualAssetSelectionRef = useRef(false)
-  const pendingActionAfterConnectRef = useRef<null | 'continue-to-confirm' | 'process-qr'>(null)
+  const pendingActionAfterConnectRef = useRef<null | 'continue-to-confirm' | 'continue-to-confirm-from-swap' | 'process-qr'>(null)
   const [quoteBelowMinimum, setQuoteBelowMinimum] = useState(false)
   const stablecoinBalances = useStablecoinBalances({
     address: wallet?.address,
@@ -653,7 +653,11 @@ export const useWebSwapController = (): WebSwapControllerProps => {
             walletConnect: selectedCorridor.walletConnect,
           }
         : undefined
-      nextWallet.connect(options).catch(err => console.error('[wallet] connect failed:', err))
+      nextWallet.connect(options).catch(err => {
+        if (import.meta.env.DEV) {
+          console.error('[wallet] connect failed:', err)
+        }
+      })
     }
   }, [
     defaultWallet,
@@ -891,9 +895,15 @@ export const useWebSwapController = (): WebSwapControllerProps => {
 
   // When the user first becomes authenticated, ensure they see the authenticated home screen
   // (dashboard with balance, scan QR, enter amount) instead of swap view with pre-filled data.
+  // BUT: Skip this if there's a pending action (user is connecting to complete a payment)
   const prevIsAuthRef = useRef(false)
   useEffect(() => {
     if (isAuthenticated && !prevIsAuthRef.current) {
+      // If there's a pending action, let the other useEffect handle navigation
+      if (pendingActionAfterConnectRef.current) {
+        prevIsAuthRef.current = isAuthenticated
+        return
+      }
       // Clear any previous transaction data to show clean dashboard
       dispatch({
         accountNumber: '', pixKey: '', recipientName: '', taxId: '', type: 'SET_BANK_DETAILS',
@@ -909,19 +919,52 @@ export const useWebSwapController = (): WebSwapControllerProps => {
   // Handle pending actions after wallet connection
   useEffect(() => {
     if (!isAuthenticated) return
-    
+
     const pendingAction = pendingActionAfterConnectRef.current
     if (!pendingAction) return
-    
-    // Clear the pending action
+
+    // Clear the pending action immediately to prevent re-triggering
     pendingActionAfterConnectRef.current = null
-    
+
     // Execute the pending action
     if (pendingAction === 'continue-to-confirm') {
-      // User clicked continue in swap and got connected - proceed to confirm
+      // User clicked continue from home (QR flow) and got connected - proceed to confirm
       if (state.quoteId) {
         dispatch({ type: 'SET_VIEW', view: 'confirm-qr' })
       }
+    }
+    else if (pendingAction === 'continue-to-confirm-from-swap') {
+      // User clicked "Connect Wallet to Continue" from swap view (manual payment)
+      // Need to get a fresh quote now that wallet is connected, then proceed to confirm
+      const processSwapAfterConnect = async () => {
+        // Wait a bit for balances to load
+        await new Promise(resolve => setTimeout(resolve, 500))
+
+        // Re-trigger quote calculation with the existing target amount
+        if (state.targetAmount) {
+          const quoted = await quoteFromTarget(state.targetAmount)
+          if (quoted) {
+            // Wait for React state to update after quote dispatches the new sourceAmount
+            await new Promise(resolve => setTimeout(resolve, 100))
+
+            // After quote succeeds, check if user has sufficient balance
+            const requestedAmount = parseStablecoinBalance(state.sourceAmount || '')
+            const availableBalance = parseStablecoinBalance(selectedSourceBalance)
+
+            if (requestedAmount > 0 && requestedAmount > availableBalance) {
+              // User has insufficient funds - stay on swap view to show the error
+              notifyError(
+                t('swap.insufficient_funds', 'Insufficient balance for this payment. Please reduce the amount or add funds to your wallet.'),
+              )
+              dispatch({ type: 'SET_VIEW', view: 'swap' })
+              return
+            }
+
+            dispatch({ type: 'SET_VIEW', view: 'confirm-qr' })
+          }
+        }
+      }
+      void processSwapAfterConnect()
     }
     else if (pendingAction === 'process-qr') {
       // User scanned QR and got connected - process the QR now
@@ -933,7 +976,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
         dispatch({ type: 'SET_VIEW', view: 'swap' })
       }
     }
-  }, [isAuthenticated, state.quoteId, state.qrCode])
+  }, [isAuthenticated, state.quoteId, state.qrCode, state.targetAmount])
 
   useEffect(() => {
     const handleResize = () => {
@@ -1271,13 +1314,13 @@ export const useWebSwapController = (): WebSwapControllerProps => {
       if (isMiniPay) {
         return
       }
-      // Store intent to continue after connection
-      pendingActionAfterConnectRef.current = 'continue-to-confirm'
+      // Store intent to continue to confirm-qr after connection (user is ready to complete payment)
+      pendingActionAfterConnectRef.current = 'continue-to-confirm-from-swap'
       await connectWallet()
       return
     }
     if (!state.quoteId) {
-      notifyError(t('swap.wait_for_quote', 'Espera la cotizaci?n antes de continuar'))
+      notifyError(t('swap.wait_for_quote', 'Espera la cotización antes de continuar'))
       return
     }
     dispatch({ type: 'SET_VIEW', view: 'confirm-qr' })

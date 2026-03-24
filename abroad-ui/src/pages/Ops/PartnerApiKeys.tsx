@@ -1,6 +1,7 @@
 import {
   useCallback, useEffect, useMemo, useState,
 } from 'react'
+import { useTranslate } from '@tolgee/react'
 import { Link } from 'react-router-dom'
 
 import { useOpsApiKey } from '../../services/admin/opsAuthStore'

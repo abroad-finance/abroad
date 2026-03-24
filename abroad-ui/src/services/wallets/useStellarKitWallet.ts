@@ -23,6 +23,14 @@ import { WALLET_CONNECT_ID } from '../../shared/constants'
 import { authTokenStore } from '../auth/authTokenStore'
 import { sessionStore } from '../auth/sessionStore'
 
+// Import shared utilities
+import {
+  WC_METADATA,
+  saveWCSession,
+  getWCSession,
+} from './shared/wallet-connect-base'
+import { caip10ToAddress } from './shared/wallet-utils'
+
 // Build a mock WalletConnect module to bypass the bug in StellarWalletsKit's walletconnect.module.js
 // Their module crashes if it encounters a WalletConnect session (e.g. Celo/Solana) that doesn't
 // have the `stellar` namespace defined, because it blindly maps `session.namespaces.stellar.accounts`.
@@ -41,20 +49,6 @@ const mockWalletConnectModule: any = {
   signAuthEntry: async () => { throw new Error('Handled externally') },
   signMessage: async () => { throw new Error('Handled externally') },
   signTransaction: async () => { throw new Error('Handled externally') },
-}
-
-// Keep the WalletConnect metadata constants to pass them into our manual signClient instantiation
-const wcMetadata = {
-  description:
-    'Abroad bridges USDC on Stellar with real-time payment networks around the world, enabling seamless crypto-fiat payments. You will be able to pay anywhere in Brazil and Colombia with your USDC.',
-  icons: ['https://storage.googleapis.com/cdn-abroad/Icons/Favicon/Abroad_Badge_transparent.png'],
-  name: 'Abroad',
-  url: 'https://app.abroad.finance',
-}
-
-const caip10ToAddress = (caip10: string) => {
-  const parts = caip10.split(':')
-  return parts[2] ?? ''
 }
 
 const network = WalletNetwork.PUBLIC
@@ -88,7 +82,7 @@ const isStoredTokenValid = (): boolean => {
   }
 }
 
-const isWalletConnect = (id: string) => /walletconnect|wallet_connect/i.test(id)
+const isWalletConnect = (id: string) => /walletconnect|wallet_connect|wallet-connect/i.test(id)
 
 export function useStellarKitWallet(
   { onConnectError, walletAuth }: {
@@ -108,16 +102,19 @@ export function useStellarKitWallet(
     return sessionStore.get()?.address ?? null
   })
 
-  const [walletId, setWalletId] = useState<null | string>(() => {
+  // Internal walletId for StellarKit (uses original IDs like 'wallet_connect')
+  const [internalWalletId, setInternalWalletId] = useState<null | string>(() => {
     if (!isStoredTokenValid()) return null
-    return sessionStore.get()?.walletId ?? null
+    const sessionWalletId = sessionStore.get()?.walletId ?? null
+    // Convert normalized 'wallet-connect' back to 'wallet_connect' for StellarKit
+    return sessionWalletId === 'wallet-connect' ? 'wallet_connect' : sessionWalletId
   })
 
   // Keep a ref in sync so ensureKit can read it without being a dep
-  const walletIdRef = useRef(walletId)
+  const walletIdRef = useRef(internalWalletId)
   useEffect(() => {
-    walletIdRef.current = walletId
-  }, [walletId])
+    walletIdRef.current = internalWalletId
+  }, [internalWalletId])
 
   // Ensure WalletConnect client (for Stellar WalletConnect flow)
   const ensureWalletConnectClient = useCallback(async () => {
@@ -126,7 +123,7 @@ export function useStellarKitWallet(
         throw new TypeError('WalletConnect client is only available in the browser')
       }
       const client = await SignClient.init({
-        metadata: wcMetadata,
+        metadata: WC_METADATA,
         projectId: WALLET_CONNECT_ID,
       })
       wcClientRef.current = client
@@ -164,21 +161,19 @@ export function useStellarKitWallet(
     if (id) {
       kit.setWallet(id)
     }
-    setWalletId(id)
+    setInternalWalletId(id)
   }, [ensureKit])
 
   // On mount, restore the WalletConnect topic if the session was persisted as a WC wallet
   useEffect(() => {
-    if (!walletId || !isWalletConnect(walletId)) return
+    if (!internalWalletId || !isWalletConnect(internalWalletId)) return
     const restoreWcTopic = async () => {
       try {
         const client = await ensureWalletConnectClient()
-        const storeKey = `wc:session:${STELLAR_CHAIN_ID}`
-        const stored = localStorage.getItem(storeKey)
-        if (!stored) return
-        const { topic } = JSON.parse(stored)
-        const session = client.session.get(topic)
-        if (session) wcTopicRef.current = topic
+        const wcSession = getWCSession(STELLAR_CHAIN_ID)
+        if (!wcSession?.topic) return
+        const session = client.session.get(wcSession.topic)
+        if (session) wcTopicRef.current = wcSession.topic
       }
       catch { /* ignore */ }
     }
@@ -192,7 +187,7 @@ export function useStellarKitWallet(
       if (!token) {
         sessionStore.clear()
         setAddress(null)
-        setWalletId(null)
+        setInternalWalletId(null)
       }
     })
     return unsubscribe
@@ -216,7 +211,7 @@ export function useStellarKitWallet(
           sessionStore.clear()
           walletAuth.setJwtToken(null)
           setAddress(null)
-          setWalletId(null)
+          setInternalWalletId(null)
         }
       }
       catch { /* Can't verify — keep the session */ }
@@ -234,7 +229,7 @@ export function useStellarKitWallet(
       const kit = ensureKit()
       if (!address) throw new Error('Wallet not connected')
 
-      if (isWalletConnect(walletId ?? '')) {
+      if (isWalletConnect(internalWalletId ?? '')) {
         const client = await ensureWalletConnectClient()
         if (!wcTopicRef.current) throw new Error('No WalletConnect session found')
 
@@ -266,7 +261,7 @@ export function useStellarKitWallet(
     [
       address,
       ensureKit,
-      walletId,
+      internalWalletId,
       ensureWalletConnectClient,
     ],
   )
@@ -275,15 +270,13 @@ export function useStellarKitWallet(
   // Restores an existing session from localStorage, or runs the full connect flow (QR modal).
   const resolveWcAddress = useCallback(async (): Promise<string> => {
     const client = await ensureWalletConnectClient()
-    const storeKey = `wc:session:${STELLAR_CHAIN_ID}`
 
     // Attempt to restore an existing session from localStorage
-    const stored = localStorage.getItem(storeKey)
-    if (stored) {
+    const wcSession = getWCSession(STELLAR_CHAIN_ID)
+    if (wcSession?.topic) {
       try {
-        const { topic } = JSON.parse(stored)
-        const session = client.session.get(topic)
-        if (session) wcTopicRef.current = topic
+        const session = client.session.get(wcSession.topic)
+        if (session) wcTopicRef.current = wcSession.topic
       }
       catch { /* ignore invalid stored session */ }
     }
@@ -301,7 +294,11 @@ export function useStellarKitWallet(
       const session = await approval()
       wcTopicRef.current = session.topic
       await modal.closeModal()
-      localStorage.setItem(storeKey, JSON.stringify({ topic: session.topic }))
+      saveWCSession(STELLAR_CHAIN_ID, {
+        address: '', // Will be populated after resolution
+        chains: [STELLAR_CHAIN_ID],
+        topic: session.topic,
+      })
     }
 
     const session = client.session.get(wcTopicRef.current as string)
@@ -320,6 +317,9 @@ export function useStellarKitWallet(
         if (authenticatingRef.current) return
         authenticatingRef.current = true
         try {
+          // Normalize wallet_connect to wallet-connect for consistency in session storage
+          const normalizedWalletId = isWalletConnect(options.id) ? 'wallet-connect' : options.id
+          // Apply the original ID to kit (it handles the conversion internally)
           applyWalletId(options.id)
 
           if (isWalletConnect(options.id)) {
@@ -338,7 +338,7 @@ export function useStellarKitWallet(
                 return (result as { signedXDR: string }).signedXDR
               },
             })
-            sessionStore.set({ address, chainId: STELLAR_CHAIN_ID, walletId: options.id })
+            sessionStore.set({ address, chainId: STELLAR_CHAIN_ID, walletId: normalizedWalletId })
             return
           }
 
@@ -357,11 +357,13 @@ export function useStellarKitWallet(
               return signedTxXdr
             },
           })
-          sessionStore.set({ address, chainId: STELLAR_CHAIN_ID, walletId: options.id })
+          sessionStore.set({ address, chainId: STELLAR_CHAIN_ID, walletId: normalizedWalletId })
         }
         catch (err) {
           const message = getErrorMessage(err)
-          console.error('Failed to connect wallet', err)
+          if (import.meta.env.DEV) {
+            console.error('Failed to connect wallet', err)
+          }
           setAddress(null)
           walletAuth.setJwtToken(null)
           sessionStore.clear()
@@ -407,13 +409,13 @@ export function useStellarKitWallet(
     connect,
     disconnect,
     signTransaction,
-    walletId,
+    walletId: internalWalletId,
   }), [
     address,
     connect,
     disconnect,
     signTransaction,
-    walletId,
+    internalWalletId,
   ])
 }
 

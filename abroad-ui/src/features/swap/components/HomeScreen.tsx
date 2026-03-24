@@ -7,12 +7,9 @@ import React from 'react'
 import { _36EnumsTargetCurrency as TargetCurrency, type TransactionListItem } from '../../../api'
 import BreBLogo from '../../../assets/Logos/networks/Bre-b.svg'
 import { CurrencyToggle } from '../../../components/ui'
-
-const RECENT_COUNTRY_CONFIG: Record<string, { currency: string, flagUrl: string, symbol: string }> = {
-  BRL: { currency: 'BRL', flagUrl: 'https://hatscripts.github.io/circle-flags/flags/br.svg', symbol: 'R$' },
-  COP: { currency: 'COP', flagUrl: 'https://hatscripts.github.io/circle-flags/flags/co.svg', symbol: '$' },
-}
-import { ASSET_URLS } from '../../../shared/constants'
+import {
+  CHAIN_CONFIG_ARRAY, CHAIN_MAP, COUNTRIES, CURRENCY_FLAG_URL, RECENT_COUNTRY_CONFIG, TOKEN_ICON_URLS,
+} from '../../../shared/constants'
 import { cn } from '../../../shared/utils'
 
 /* Figma node 5:2 – pixel-perfect spec from ABROAD NEW UI */
@@ -26,42 +23,13 @@ const HERO_CHAINS = {
 }
 const HERO_CTA_BG = '#54ae92'
 
-const CHAIN_CONFIG = [
-  { icon: ASSET_URLS.STELLAR_CHAIN_ICON, key: 'stellar', label: 'Stellar' },
-  { icon: ASSET_URLS.CELO_CHAIN_ICON, key: 'celo', label: 'Celo' },
-  { icon: ASSET_URLS.SOLANA_CHAIN_ICON, key: 'solana', label: 'Solana' },
-] as const
-
-const CURRENCY_FLAG_URL: Record<string, string> = {
-  BRL: 'https://hatscripts.github.io/circle-flags/flags/br.svg',
-  COP: 'https://hatscripts.github.io/circle-flags/flags/co.svg',
-}
-
-const COUNTRIES: Record<string, { decimals: number, rate: number }> = {
-  BRL: { decimals: 2, rate: 5.82 },
-  COP: { decimals: 0, rate: 4198.5 },
-}
+// Alias for backwards compatibility
+const CHAIN_CONFIG = CHAIN_CONFIG_ARRAY
+const TOKEN_ICON_URL = TOKEN_ICON_URLS
 
 const RAIL_LOGO: Record<string, string> = {
   BRL: '/pix-white.svg',
   COP: BreBLogo,
-}
-
-const TOKEN_ICON_URL: Record<string, string> = {
-  USDC: ASSET_URLS.USDC_TOKEN_ICON,
-  USDT: ASSET_URLS.USDT_TOKEN_ICON,
-}
-
-const CHAIN_MAP: Record<string, { bg: string, color: string, icon: string, name: string }> = {
-  celo: {
-    bg: 'var(--ab-chain-celo-bg)', color: 'var(--ab-chain-celo)', icon: ASSET_URLS.CELO_CHAIN_ICON, name: 'Celo',
-  },
-  solana: {
-    bg: 'var(--ab-chain-solana-bg)', color: 'var(--ab-chain-solana)', icon: ASSET_URLS.SOLANA_CHAIN_ICON, name: 'Solana',
-  },
-  stellar: {
-    bg: 'var(--ab-chain-stellar-bg)', color: 'var(--ab-chain-stellar)', icon: ASSET_URLS.STELLAR_CHAIN_ICON, name: 'Stellar',
-  },
 }
 
 type OnboardingRates = {
@@ -333,8 +301,9 @@ export default function HomeScreen({
   return (
     <div className="flex w-full h-full flex-col items-center px-0 overflow-y-auto">
       <div className="w-full max-w-[min(90vw,576px)]">
-        {/* Live badge - shown for all users */}
-        <div className="flex justify-center mb-[clamp(0.25rem,1.5vh,1rem)]">
+        {/* Live badge - only shown during onboarding */}
+        {showOnboarding && (
+          <div className="flex justify-center mb-[clamp(0.25rem,1.5vh,1rem)]">
           <div
             className="flex shrink-0 items-center gap-[clamp(0.25rem,1vw,0.5rem)] rounded-full px-[clamp(0.75rem,2vw,1rem)] py-[clamp(0.25rem,1vh,0.375rem)] dark:bg-emerald-900/30 dark:border dark:border-emerald-800/50"
             style={{ backgroundColor: HERO_LIVE_BADGE.bg }}
@@ -351,6 +320,7 @@ export default function HomeScreen({
             </span>
           </div>
         </div>
+        )}
 
         {/* Balance - Figma 1:46 */}
         <div className="flex flex-col items-center gap-[clamp(0.25rem,1vh,0.5rem)] py-[clamp(0.25rem,1vh,0.5rem)]">
@@ -361,11 +331,14 @@ export default function HomeScreen({
             {t('home.your_balance', 'Your Balance')}
           </p>
           <div className="flex items-center justify-center gap-[clamp(0.5rem,2vw,0.75rem)]">
-            {TOKEN_ICON_URL[selectedTokenLabel] && isAuthenticated
+            {TOKEN_ICON_URL[selectedTokenLabel]
               ? (
                   <img
                     alt={selectedTokenLabel}
-                    className="h-[clamp(1.5rem,4vh,2rem)] w-[clamp(1.5rem,4vh,2rem)] shrink-0 self-center object-contain"
+                    className={cn(
+                      'h-[clamp(1.5rem,4vh,2rem)] w-[clamp(1.5rem,4vh,2rem)] shrink-0 self-center object-contain',
+                      !isAuthenticated && 'opacity-50 grayscale'
+                    )}
                     src={TOKEN_ICON_URL[selectedTokenLabel]}
                   />
                 )
@@ -455,8 +428,8 @@ export default function HomeScreen({
           )}
         </div>
 
-        {/* Trust badges - shown when not authenticated */}
-        {!isAuthenticated && (
+        {/* Trust badges - shown only during onboarding */}
+        {showOnboarding && (
           <div className="mt-[clamp(0.75rem,2.5vh,1.5rem)] flex flex-wrap items-center justify-center gap-[clamp(0.5rem,2vw,1rem)]">
             {[
               { Icon: Zap, label: t('home.trust_settlement', '< 3s settlement') },

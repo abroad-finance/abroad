@@ -136,7 +136,7 @@ export default function Swap({
         <div className="flex items-center gap-4">
           {onBackClick && (
             <button
-              aria-label="Back"
+              aria-label={t('swap.back', 'Back')}
               className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#f9fafb] transition-colors hover:bg-[#f3f4f6]"
               onClick={onBackClick}
               type="button"
@@ -203,7 +203,7 @@ export default function Swap({
               inputMode="decimal"
               onChange={e => onTargetChange(e.target.value)}
               onFocus={handleFocus}
-              placeholder="0"
+              placeholder={t('input.placeholder_zero', '0')}
               style={{
                 minWidth: '80px',
                 width: `${Math.max(4, (targetAmount || '0').length + 2)}ch`,
@@ -271,9 +271,9 @@ export default function Swap({
               </div>
             )
           : (
-              <div className="relative">
+              <div className="relative mt-3">
                 <label
-                  className="absolute left-1 top-0 -translate-y-1/2 text-xs font-bold uppercase tracking-[0.6px] text-[#6b7280]"
+                  className="absolute left-4 -top-2.5 bg-white px-1 text-xs font-bold uppercase tracking-[0.6px] text-[#6b7280]"
                   htmlFor="swap-send-to"
                 >
                   {t('swap.send_to', 'Send to')}
@@ -289,7 +289,7 @@ export default function Swap({
                 {targetCurrency === TargetCurrency.BRL && onTaxIdChange && (
                   <div className="relative mt-3">
                     <label
-                      className="absolute left-1 top-0 -translate-y-1/2 text-xs font-bold uppercase tracking-[0.6px] text-[#6b7280]"
+                      className="absolute left-4 -top-2.5 bg-white px-1 text-xs font-bold uppercase tracking-[0.6px] text-[#6b7280]"
                       htmlFor="swap-cpf"
                     >
                       {t('bank_details.cpf_placeholder', 'CPF')}

@@ -1,3 +1,4 @@
+import { useTranslate } from '@tolgee/react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Check, X } from 'lucide-react'
 import React, { useCallback } from 'react'
@@ -69,6 +70,7 @@ export const ChainSelectorModal: React.FC<ChainSelectorModalProps> = ({
   selectedTokenKey,
   tokens,
 }) => {
+  const { t } = useTranslate()
   const selectedChain = chains.find(c => c.key === selectedChainKey)
 
   const handleTokenClick = useCallback((key: string) => {
@@ -78,7 +80,7 @@ export const ChainSelectorModal: React.FC<ChainSelectorModalProps> = ({
 
   if (!open) return null
 
-  const chainLabel = selectedChain ? getChainShortLabel(selectedChain.label) : 'Stellar'
+  const chainLabel = selectedChain ? getChainShortLabel(selectedChain.label) : t('chain.stellar', 'Stellar')
 
   return (
     <AnimatePresence>
@@ -93,7 +95,7 @@ export const ChainSelectorModal: React.FC<ChainSelectorModalProps> = ({
         >
           {/* Header – Figma 36-2 tsHeader */}
           <div className="flex w-full items-center justify-between">
-            <h3 className="text-lg font-semibold text-[#1a3a37]">Pay from</h3>
+            <h3 className="text-lg font-semibold text-[#1a3a37]">{t('modal.pay_from', 'Pay from')}</h3>
             <button
               className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#F3F4F6] text-[#6B7280] transition-colors hover:bg-[#E5E7EB]"
               onClick={onClose}
@@ -139,9 +141,7 @@ export const ChainSelectorModal: React.FC<ChainSelectorModalProps> = ({
 
           {/* Token list – Figma tsTokenList: gap 4, row padding 10,12 */}
           <p className="text-[11px] font-bold uppercase tracking-[2px] text-[#7a9e9a]">
-            Available tokens on
-            {' '}
-            {chainLabel}
+            {t('modal.available_tokens', 'Available tokens on {{chain}}', { chain: chainLabel })}
           </p>
           <div className="flex flex-col gap-1">
             {tokens.map((token) => {
@@ -178,14 +178,14 @@ export const ChainSelectorModal: React.FC<ChainSelectorModalProps> = ({
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="text-sm font-semibold text-[#1a3a37]">{token.label}</div>
-                    <div className="text-xs text-[#7a9e9a]">{tokenSubtitle(token.label)}</div>
+                    <div className="text-xs text-[#7a9e9a]">{t(`token.${token.label.toLowerCase()}_subtitle`, tokenSubtitle(token.label))}</div>
                   </div>
                   <div className="text-right">
                     <div className="text-sm font-semibold text-[#1a3a37]">
                       $
                       {balance}
                     </div>
-                    <div className="text-[11px] text-[#7a9e9a]">available</div>
+                    <div className="text-[11px] text-[#7a9e9a]">{t('token.available', 'available')}</div>
                   </div>
                   {isSelected && (
                     <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-abroad-dark">

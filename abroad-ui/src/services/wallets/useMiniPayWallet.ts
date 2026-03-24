@@ -154,7 +154,9 @@ export const useMiniPayWallet = (): MiniPayWalletState => {
         return null
       }
       catch (error) {
-        console.error('Failed to resolve MiniPay address', error)
+        if (import.meta.env.DEV) {
+          console.error('Failed to resolve MiniPay address', error)
+        }
         const cachedAddress = readMiniPaySessionAddress(browserRuntime.sessionStore)
         setConnectionState(cachedAddress
           ? {

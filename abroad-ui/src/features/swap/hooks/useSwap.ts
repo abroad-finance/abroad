@@ -340,7 +340,9 @@ export const useSwap = ({
         ) {
           return
         }
-        console.error('Reverse quote error', error)
+        if (import.meta.env.DEV) {
+          console.error('Reverse quote error', error)
+        }
       }
       finally {
         if (reqId === directReqIdRef.current && lastEditedRef.current === 'source') {
@@ -417,7 +419,9 @@ export const useSwap = ({
         ) {
           return
         }
-        console.error('Quote error', error)
+        if (import.meta.env.DEV) {
+          console.error('Quote error', error)
+        }
       }
       finally {
         if (reqId === reverseReqIdRef.current && lastEditedRef.current === 'target') {

@@ -108,7 +108,9 @@ export const useWalletAuthentication = (): IWalletAuthentication => {
         setJwtToken(newToken)
       }
       catch (err) {
-        console.error('Failed to refresh wallet token', err)
+        if (import.meta.env.DEV) {
+          console.error('Failed to refresh wallet token', err)
+        }
         setJwtToken(null)
       }
     }, timeoutMs)

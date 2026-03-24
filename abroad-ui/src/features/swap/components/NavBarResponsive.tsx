@@ -138,7 +138,7 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({
             <button
               aria-label={labels.disconnectAria ?? 'Desconectar billetera'}
               className={cn(NAV_BUTTON_CLASS, AB_STYLES.textSecondary)}
-              onClick={() => { onDisconnect().catch(console.error) }}
+              onClick={() => { onDisconnect().catch(err => { if (import.meta.env.DEV) console.error(err) }) }}
               title={labels.disconnectTitle ?? 'Desconectar billetera'}
               type="button"
             >
@@ -204,9 +204,6 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({
             className="h-7 w-auto flex-shrink-0"
             src={isDark ? AbroadLogoWhite : AbroadLogoColored}
           />
-          {!isConnected && (
-            <span className={cn('text-sm font-semibold', BRAND_TITLE_CLASS)}>Swap</span>
-          )}
         </div>
         <div className="flex items-center gap-3">
           <div>{languageSelector}</div>

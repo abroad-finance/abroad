@@ -1,30 +1,10 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { ChevronRight, X } from 'lucide-react'
 import React from 'react'
+import { useTranslate } from '@tolgee/react'
 
-import { ASSET_URLS } from '../../shared/constants'
+import { CHAIN_CONFIG } from '../../shared/constants'
 import { Overlay } from './Overlay'
-
-const CHAIN_CONFIG: Record<string, { bg: string, color: string, icon: string, wallets: string }> = {
-  Celo: {
-    bg: 'var(--ab-chain-celo-bg)',
-    color: 'var(--ab-chain-celo)',
-    icon: ASSET_URLS.CELO_CHAIN_ICON,
-    wallets: 'WalletConnect (QR or app)',
-  },
-  Solana: {
-    bg: 'var(--ab-chain-solana-bg)',
-    color: 'var(--ab-chain-solana)',
-    icon: ASSET_URLS.SOLANA_CHAIN_ICON,
-    wallets: 'WalletConnect (QR or app)',
-  },
-  Stellar: {
-    bg: 'var(--ab-chain-stellar-bg)',
-    color: 'var(--ab-chain-stellar)',
-    icon: ASSET_URLS.STELLAR_CHAIN_ICON,
-    wallets: 'Freighter, LOBSTR, WalletConnect',
-  },
-}
 
 export interface ConnectWalletChainModalProps {
   chains: Array<{ key: string, label: string }>
@@ -40,13 +20,15 @@ export interface ConnectWalletChainModalProps {
  * On select we call onSelectChain, onConnectRequest, and onClose so the app can
  * set the corridor, switch wallet (Stellar Kit vs WalletConnect), then open the right connect flow.
  */
-export function ConnectWalletChainModal({
+export const ConnectWalletChainModal: React.FC<ConnectWalletChainModalProps> = ({
   chains,
   onClose,
   onConnectRequest,
   onSelectChain,
   open,
-}: Readonly<ConnectWalletChainModalProps>): null | React.JSX.Element {
+}) => {
+  const { t } = useTranslate()
+
   if (!open) return null
 
   const handleSelect = (key: string) => {
@@ -68,7 +50,7 @@ export function ConnectWalletChainModal({
         >
           <div className="mb-6 flex items-center justify-between">
             <h3 className="font-cereal text-xl font-bold" style={{ color: 'var(--ab-text, #111827)' }}>
-              Connect wallet
+              {t('modal.connect_wallet', 'Connect wallet')}
             </h3>
             <button
               className="flex h-9 w-9 items-center justify-center rounded-xl transition-colors"
@@ -80,7 +62,7 @@ export function ConnectWalletChainModal({
             </button>
           </div>
           <p className="mb-6 text-sm" style={{ color: 'var(--ab-text-secondary, #5f6b7a)' }}>
-            Choose the blockchain you want to use. Then we&apos;ll show the right wallet options.
+            {t('modal.connect_wallet_desc', "Choose the blockchain you want to use. Then we'll show the right wallet options.")}
           </p>
 
           <div className="flex flex-col gap-3">

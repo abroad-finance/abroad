@@ -19,6 +19,10 @@ vi.mock('@tolgee/react', () => ({
 type Listener = (payload?: unknown) => void
 
 class FakeSocket {
+  io = {
+    off: vi.fn(),
+    on: vi.fn(),
+  }
   listeners = new Map<string, Set<Listener>>()
 
   disconnect() {

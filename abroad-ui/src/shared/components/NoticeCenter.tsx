@@ -1,3 +1,4 @@
+import { useTranslate } from '@tolgee/react'
 import { X } from 'lucide-react'
 import React from 'react'
 
@@ -16,10 +17,11 @@ const KIND_STYLES: Record<Notice['kind'], { bg: string, border: string, text: st
 }
 
 export const NoticeCenter: React.FC<NoticeCenterProps> = ({ notices, onDismiss }) => {
+  const { t } = useTranslate()
   if (!notices.length) return null
 
   return (
-    <div aria-label="Notifications" className="fixed top-4 right-4 z-[1200] flex flex-col gap-2 w-[min(360px,90vw)]" role="region">
+    <div aria-label={t('notice.notifications', 'Notifications')} className="fixed top-4 right-4 z-[1200] flex flex-col gap-2 w-[min(360px,90vw)]" role="region">
       {notices.map((notice) => {
         const styles = KIND_STYLES[notice.kind]
         return (
@@ -37,7 +39,7 @@ export const NoticeCenter: React.FC<NoticeCenterProps> = ({ notices, onDismiss }
                 )}
               </div>
               <button
-                aria-label="Dismiss notification"
+                aria-label={t('notice.dismiss', 'Dismiss notification')}
                 className="p-1 rounded-full hover:bg-black/5"
                 onClick={() => onDismiss(notice.id)}
                 type="button"
