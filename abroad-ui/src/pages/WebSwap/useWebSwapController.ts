@@ -280,6 +280,14 @@ const isInsufficientBalanceError = (error: unknown): boolean => {
     && (msg.includes('balance') || msg.includes('funds'))
 }
 
+const parseLocalizedNumber = (value: string): number => {
+  const raw = value.replace(/[^0-9.,]/g, '')
+  const normalized = raw.includes(',')
+    ? raw.replace(/\./g, '').replace(/,/g, '.')
+    : raw
+  return parseFloat(normalized)
+}
+
 const extractReason = (body: unknown): null | string => {
   if (body && typeof body === 'object' && 'reason' in body) {
     const reason = (body as { reason?: unknown }).reason
@@ -603,8 +611,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
   const exchangeRateDisplay = useMemo(() => {
     if (state.loadingSource || state.loadingTarget) return '-'
     const numericSource = parseFloat(state.sourceAmount)
-    const cleanedTarget = state.targetAmount.replace(/\./g, '').replace(/,/g, '.')
-    const numericTarget = parseFloat(cleanedTarget)
+    const numericTarget = parseLocalizedNumber(state.targetAmount)
     if (numericSource > 0 && !Number.isNaN(numericTarget) && numericTarget >= 0) {
       return `${targetSymbol}${formatTargetNumber((numericTarget + transferFee) / numericSource)}`
     }
@@ -674,8 +681,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     const min = selectedCorridor.minAmount
       || (selectedCorridor.targetCurrency === 'BRL' ? 1 : 0)
     if (!min) return false
-    const cleanedTarget = String(state.targetAmount).replace(/\./g, '').replace(/,/g, '.')
-    const numericTarget = parseFloat(cleanedTarget)
+    const numericTarget = parseLocalizedNumber(String(state.targetAmount))
     if (Number.isNaN(numericTarget) || numericTarget <= 0) return false
     return numericTarget < min
   }, [
@@ -688,16 +694,14 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     if (!selectedCorridor) return false
     const max = selectedCorridor.maxAmount || 0
     if (!max) return false
-    const cleanedTarget = String(state.targetAmount).replace(/\./g, '').replace(/,/g, '.')
-    const numericTarget = parseFloat(cleanedTarget)
+    const numericTarget = parseLocalizedNumber(String(state.targetAmount))
     if (Number.isNaN(numericTarget) || numericTarget <= 0) return false
     return numericTarget > max
   }, [selectedCorridor, state.targetAmount])
 
   const isPrimaryDisabled = useCallback(() => {
     const numericSource = parseFloat(String(state.sourceAmount))
-    const cleanedTarget = String(state.targetAmount).replace(/\./g, '').replace(/,/g, '.')
-    const numericTarget = parseFloat(cleanedTarget)
+    const numericTarget = parseLocalizedNumber(String(state.targetAmount))
     return !(numericSource > 0 && numericTarget > 0)
   }, [state.sourceAmount, state.targetAmount])
 
@@ -857,9 +861,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     reverseAbortRef.current = controller
     const reqId = ++reverseReqIdRef.current
 
-    const raw = value.replace(/[^0-9.,]/g, '')
-    const normalized = raw.replace(/\./g, '').replace(/,/g, '.')
-    const num = parseFloat(normalized)
+    const num = parseLocalizedNumber(value)
     if (Number.isNaN(num)) {
       setQuoteBelowMinimum(false)
       dispatch({
