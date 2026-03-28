@@ -273,6 +273,13 @@ const formatError = (message: string, description?: string) => ({
   message,
 })
 
+const isInsufficientBalanceError = (error: unknown): boolean => {
+  if (!(error instanceof Error)) return false
+  const msg = error.message.toLowerCase()
+  return (msg.includes('eth_estimategas') || msg.includes('insufficient'))
+    && (msg.includes('balance') || msg.includes('funds'))
+}
+
 const extractReason = (body: unknown): null | string => {
   if (body && typeof body === 'object' && 'reason' in body) {
     const reason = (body as { reason?: unknown }).reason
@@ -1499,11 +1506,13 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     }
     catch (err) {
       if (err instanceof Error && err.name === 'AbortError') return
-      const userMessage = err instanceof Error
-        ? err.message
-        : hasMessage(err)
+      const userMessage = isInsufficientBalanceError(err)
+        ? t('swap.errors.insufficient_balance', 'Saldo insuficiente para completar la transacci?n.')
+        : err instanceof Error
           ? err.message
-          : t('swap.transaction_error', 'Error en la transacci?n')
+          : hasMessage(err)
+            ? err.message
+            : t('swap.transaction_error', 'Error en la transacci?n')
       notifyError(userMessage)
       resetForNewTransaction()
     }
