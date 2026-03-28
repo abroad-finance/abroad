@@ -1,4 +1,4 @@
-import { WebsocketClient, WsUserDataEvents } from 'binance'
+import { MainClient, WebsocketClient, WsUserDataEvents } from 'binance'
 import { inject } from 'inversify'
 
 import { TYPES } from '../../../../app/container/types'
@@ -144,7 +144,17 @@ export class BinanceListener {
       this.handleSpotUserDataStream(data)
     })
 
-    const connected = await this.wsClient.subscribeSpotUserDataStream()
+    // Binance deprecated POST /api/v3/userDataStream on 2026-02-20.
+    // Use the new listenToken flow: POST /sapi/v1/userListenToken → subscribeSpotUserDataStreamWithListenKey
+    const restClient = new MainClient({
+      api_key: BINANCE_API_KEY,
+      api_secret: BINANCE_API_SECRET,
+      baseUrl: BINANCE_API_URL,
+    })
+    const { token: listenToken } = await restClient.getMarginListenToken()
+    this.logger.info('Obtained listen token for spot user data stream')
+
+    const connected = await this.wsClient.subscribeSpotUserDataStreamWithListenKey('main', listenToken)
     if (connected) {
       this.logger.info('Subscribed to spot user data stream', { wsKey: connected.wsKey })
     }
