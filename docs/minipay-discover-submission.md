@@ -28,7 +28,7 @@ They only submit standard ERC-20 transfers on Celo:
 
 Contract references used for MiniPay support:
 
-- USDC on Celo: [0x37f750B7Cc259a2f741Af45294f6a16572CF5cAd](https://celoscan.io/token/0x37f750B7Cc259a2f741Af45294f6a16572CF5cAd)
+- USDC on Celo: [0xcebA9300f2b948710d2653dD7B07f33A8B32118C](https://celoscan.io/token/0xcebA9300f2b948710d2653dD7B07f33A8B32118C)
 - USDT on Celo: [0x48065fbBE25f71C9282ddf5e1cD6D6A887483D5e](https://celoscan.io/token/0x48065fbBE25f71C9282ddf5e1cD6D6A887483D5e)
 - cUSD balance detection only: [0x765DE816845861e75A25fCA122bb6898B8B1282a](https://celoscan.io/token/0x765DE816845861e75A25fCA122bb6898B8B1282a)
 
