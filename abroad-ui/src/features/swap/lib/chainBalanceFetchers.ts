@@ -64,7 +64,7 @@ export async function fetchNonStellarBalances(
       ])
       const usdcNum = parseFloat(formatUnits(usdcRaw, config.decimals))
       const usdtNum = parseFloat(formatUnits(usdtRaw, config.decimals))
-      const cUsdNum = parseFloat(formatUnits(cUsdRaw, config.decimals))
+      const cUsdNum = parseFloat(formatUnits(cUsdRaw, config.cUsdDecimals ?? config.decimals))
       return {
         cUSD: formatStablecoinBalance(cUsdNum),
         USDC: formatStablecoinBalance(usdcNum),
