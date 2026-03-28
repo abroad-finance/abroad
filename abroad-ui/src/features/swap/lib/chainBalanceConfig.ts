@@ -5,6 +5,7 @@
  */
 export interface ChainBalanceConfig {
   cUsdAddress?: null | string
+  cUsdDecimals?: number
   decimals: number
   rpcUrl: string
   usdcAddress: string
@@ -20,11 +21,12 @@ const SOLANA_MAINNET: ChainBalanceConfig = {
 }
 
 const CELO_MAINNET: ChainBalanceConfig = {
-  // MiniPay docs currently point developers to these Celo stablecoin contracts.
+  // MiniPay docs: https://docs.minipay.xyz/technical-references/retrieve-balance.html
   cUsdAddress: '0x765DE816845861e75A25fCA122bb6898B8B1282a',
+  cUsdDecimals: 18,
   decimals: 6,
   rpcUrl: 'https://forno.celo.org',
-  usdcAddress: '0x37f750B7Cc259a2f741Af45294f6a16572CF5cAd',
+  usdcAddress: '0xcebA9300f2b948710d2653dD7B07f33A8B32118C',
   usdtAddress: '0x48065fbBE25f71C9282ddf5e1cD6D6A887483D5e',
 }
 
