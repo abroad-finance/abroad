@@ -1,4 +1,4 @@
-import { MainClient, WebsocketClient, WsUserDataEvents } from 'binance'
+import { WebsocketAPIClient, WsUserDataEvents } from 'binance'
 import { inject } from 'inversify'
 
 import { TYPES } from '../../../../app/container/types'
@@ -10,7 +10,7 @@ import { ISecretManager } from '../../../../platform/secrets/ISecretManager'
 
 export class BinanceListener {
   private readonly logger: ScopedLogger
-  private wsClient?: WebsocketClient
+  private wsApiClient?: WebsocketAPIClient
   public constructor(
     @inject(TYPES.ISecretManager) private secretManager: ISecretManager,
     @inject(TYPES.IQueueHandler) private queueHandler: IQueueHandler,
@@ -33,10 +33,10 @@ export class BinanceListener {
 
   public stop = async () => {
     try {
-      if (this.wsClient) {
+      if (this.wsApiClient) {
         this.logger.info('Stopping listener')
-        this.wsClient.closeAll(true)
-        this.wsClient = undefined
+        await this.wsApiClient.disconnectAll()
+        this.wsApiClient = undefined
       }
     }
     catch (err: unknown) {
@@ -82,17 +82,21 @@ export class BinanceListener {
 
     const websocketBinanceUrl = this.toWsUrl(BINANCE_API_URL)
 
-    this.wsClient = new WebsocketClient({
+    // Binance deprecated POST /api/v3/userDataStream on 2026-02-20.
+    // Use WebsocketAPIClient which subscribes via userDataStream.subscribe.signature (WS API).
+    this.wsApiClient = new WebsocketAPIClient({
       api_key: BINANCE_API_KEY,
       api_secret: BINANCE_API_SECRET,
       restOptions: { baseUrl: BINANCE_API_URL },
       wsUrl: websocketBinanceUrl,
     })
 
-    this.logger.info('Websocket client initialized', { baseUrl: BINANCE_API_URL, wsUrl: websocketBinanceUrl })
+    const wsClient = this.wsApiClient.getWSClient()
+
+    this.logger.info('WebSocket API client initialized', { baseUrl: BINANCE_API_URL, wsUrl: websocketBinanceUrl })
 
     // raw messages: keep lightweight logging only
-    this.wsClient.on('message', (data) => {
+    wsClient.on('message', (data) => {
       const correlationSeed = typeof data === 'object'
         && data !== null
         && 'eventTime' in data
@@ -112,31 +116,31 @@ export class BinanceListener {
     })
 
     // connection lifecycle notifications
-    this.wsClient.on('open', (data) => {
+    wsClient.on('open', (data) => {
       this.logger.info('connection opened', { wsKey: data.wsKey })
       // Trigger an initial balance sync on connect
       void this.queueHandler.postMessage(QueueName.EXCHANGE_BALANCE_UPDATED, { provider: 'binance' })
     })
-    this.wsClient.on('reconnecting', (data) => {
+    wsClient.on('reconnecting', (data) => {
       this.logger.warn('reconnecting', { wsKey: data.wsKey })
     })
-    this.wsClient.on('reconnected', (data) => {
+    wsClient.on('reconnected', (data) => {
       this.logger.info('reconnected', { wsKey: data.wsKey })
       // Trigger a balance sync after reconnection
       void this.queueHandler.postMessage(QueueName.EXCHANGE_BALANCE_UPDATED, { provider: 'binance' })
     })
-    this.wsClient.on('close', (data) => {
+    wsClient.on('close', (data) => {
       this.logger.warn('connection closed', { wsKey: data.wsKey })
     })
-    this.wsClient.on('response', ({ isWSAPIResponse, wsKey }) => {
+    wsClient.on('response', ({ isWSAPIResponse, wsKey }) => {
       this.logger.info('ws api response', { isWSAPIResponse, wsKey })
     })
-    this.wsClient.on('exception', (data) => {
+    wsClient.on('exception', (data) => {
       this.logger.error('websocket exception', data)
     })
 
     // formatted user data events
-    this.wsClient.on('formattedUserDataMessage', (data: WsUserDataEvents) => {
+    wsClient.on('formattedUserDataMessage', (data: WsUserDataEvents) => {
       this.logger.info('formatted user data', {
         eventTime: data.eventTime,
         eventType: data.eventType,
@@ -144,23 +148,8 @@ export class BinanceListener {
       this.handleSpotUserDataStream(data)
     })
 
-    // Binance deprecated POST /api/v3/userDataStream on 2026-02-20.
-    // Use the new listenToken flow: POST /sapi/v1/userListenToken → subscribeSpotUserDataStreamWithListenKey
-    const restClient = new MainClient({
-      api_key: BINANCE_API_KEY,
-      api_secret: BINANCE_API_SECRET,
-      baseUrl: BINANCE_API_URL,
-    })
-    const { token: listenToken } = await restClient.getMarginListenToken()
-    this.logger.info('Obtained listen token for spot user data stream')
-
-    const connected = await this.wsClient.subscribeSpotUserDataStreamWithListenKey('main', listenToken)
-    if (connected) {
-      this.logger.info('Subscribed to spot user data stream', { wsKey: connected.wsKey })
-    }
-    else {
-      this.logger.info('Subscribed to spot user data stream')
-    }
+    await this.wsApiClient.subscribeUserDataStream('mainWSAPI')
+    this.logger.info('Subscribed to spot user data stream via WebSocket API')
   }
 
   private toWsUrl = (httpUrl: string, pathSuffix?: string) => {
