@@ -5,6 +5,7 @@ import { sentryVitePlugin } from '@sentry/vite-plugin'
 import type { PluginOption, UserConfig } from 'vite'
 import { defineConfig } from 'vite'
 import crypto from 'node:crypto'
+import fs from 'node:fs'
 import path from 'node:path'
 
 // https://vite.dev/config/
@@ -22,7 +23,21 @@ type VitestEnabledConfig = UserConfig & { test?: import('vitest/config').UserCon
 const plugins: PluginOption[] = [
   react({ include: '**/*.tsx' }),
   tailwindcss(),
+  versionFilePlugin(),
 ]
+
+const buildVersion = randomHash('__build_version__')
+
+function versionFilePlugin(): PluginOption {
+  return {
+    apply: 'build',
+    closeBundle() {
+      const outPath = path.resolve(__dirname, 'dist', 'version.json')
+      fs.writeFileSync(outPath, JSON.stringify({ version: buildVersion }))
+    },
+    name: 'version-file',
+  }
+}
 
 const readEnv = (key: string): string | undefined => {
   const raw = process.env[key]
