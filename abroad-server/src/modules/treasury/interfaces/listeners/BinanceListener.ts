@@ -80,20 +80,19 @@ export class BinanceListener {
       throw new Error('[Binance WS]: Missing API configuration')
     }
 
-    const websocketBinanceUrl = this.toWsUrl(BINANCE_API_URL)
-
     // Binance deprecated POST /api/v3/userDataStream on 2026-02-20.
     // Use WebsocketAPIClient which subscribes via userDataStream.subscribe.signature (WS API).
+    // REST calls go through the proxy (BINANCE_API_URL), but WebSocket connects directly to Binance
+    // (wss://ws-api.binance.com:443) since the proxy doesn't support the WS API path.
     this.wsApiClient = new WebsocketAPIClient({
       api_key: BINANCE_API_KEY,
       api_secret: BINANCE_API_SECRET,
       restOptions: { baseUrl: BINANCE_API_URL },
-      wsUrl: websocketBinanceUrl,
     })
 
     const wsClient = this.wsApiClient.getWSClient()
 
-    this.logger.info('WebSocket API client initialized', { baseUrl: BINANCE_API_URL, wsUrl: websocketBinanceUrl })
+    this.logger.info('WebSocket API client initialized', { baseUrl: BINANCE_API_URL })
 
     // raw messages: keep lightweight logging only
     wsClient.on('message', (data) => {
@@ -152,19 +151,4 @@ export class BinanceListener {
     this.logger.info('Subscribed to spot user data stream via WebSocket API')
   }
 
-  private toWsUrl = (httpUrl: string, pathSuffix?: string) => {
-    try {
-      const u = new URL(httpUrl)
-      const protocol = u.protocol === 'https:' ? 'wss:' : u.protocol === 'http:' ? 'ws:' : u.protocol
-      const base = `${protocol}//${u.host}${u.pathname.replace(/\/$/, '')}`
-      if (!pathSuffix) return base
-      const suffix = pathSuffix.startsWith('/') ? pathSuffix : `/${pathSuffix}`
-      return `${base}${suffix}`
-    }
-    catch {
-      // Fallback: naive replace
-      if (!pathSuffix) return httpUrl
-      return httpUrl.replace(/^https:\/\//, 'wss://').replace(/^http:\/\//, 'ws://') + (pathSuffix.startsWith('/') ? pathSuffix : `/${pathSuffix}`)
-    }
-  }
 }
