@@ -282,7 +282,9 @@ const isInsufficientBalanceError = (error: unknown): boolean => {
 
 const parseLocalizedNumber = (value: string): number => {
   const raw = value.replace(/[^0-9.,]/g, '')
-  const normalized = raw.includes(',')
+  // Dots as thousand separators: has comma (e.g. "1.000,50") or dot-separated groups of 3 (e.g. "7.280", "1.234.567")
+  const dotsAreThousands = raw.includes(',') || /^\d{1,3}(\.\d{3})+$/.test(raw)
+  const normalized = dotsAreThousands
     ? raw.replace(/\./g, '').replace(/,/g, '.')
     : raw
   return parseFloat(normalized)
