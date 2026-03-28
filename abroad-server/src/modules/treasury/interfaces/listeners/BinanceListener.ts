@@ -82,17 +82,19 @@ export class BinanceListener {
 
     // Binance deprecated POST /api/v3/userDataStream on 2026-02-20.
     // Use WebsocketAPIClient which subscribes via userDataStream.subscribe.signature (WS API).
-    // REST calls go through the proxy (BINANCE_API_URL), but WebSocket connects directly to Binance
-    // (wss://ws-api.binance.com:443) since the proxy doesn't support the WS API path.
+    // Both REST and WS connections go through the proxy to avoid Binance geo-blocking (451 from US IPs).
+    // The proxy routes /ws-api/ to wss://ws-api.binance.com:443.
+    const wsProxyUrl = BINANCE_API_URL.replace(/^https:/, 'wss:').replace(/^http:/, 'ws:').replace(/\/$/, '') + '/ws-api/'
     this.wsApiClient = new WebsocketAPIClient({
       api_key: BINANCE_API_KEY,
       api_secret: BINANCE_API_SECRET,
       restOptions: { baseUrl: BINANCE_API_URL },
+      wsUrl: wsProxyUrl,
     })
 
     const wsClient = this.wsApiClient.getWSClient()
 
-    this.logger.info('WebSocket API client initialized', { baseUrl: BINANCE_API_URL })
+    this.logger.info('WebSocket API client initialized', { baseUrl: BINANCE_API_URL, wsUrl: wsProxyUrl })
 
     // raw messages: keep lightweight logging only
     wsClient.on('message', (data) => {
