@@ -35,6 +35,15 @@ export const NoticeCenter: React.FC<NoticeCenterProps> = ({ notices, onDismiss }
                 {notice.description && (
                   <p className="text-sm opacity-80 mt-0.5">{notice.description}</p>
                 )}
+                {notice.onAction && (
+                  <button
+                    className="text-sm font-medium underline mt-1"
+                    onClick={notice.onAction}
+                    type="button"
+                  >
+                    {notice.actionLabel ?? 'Reload'}
+                  </button>
+                )}
               </div>
               <button
                 aria-label="Dismiss notification"

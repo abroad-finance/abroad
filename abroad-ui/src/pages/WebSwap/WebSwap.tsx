@@ -33,7 +33,7 @@ import { useUserTransactions } from '../../services/useUserTransactions'
 import LanguageSelector from '../../shared/components/LanguageSelector'
 import { ModalOverlay } from '../../shared/components/ModalOverlay'
 import { AB_STYLES, ASSET_URLS } from '../../shared/constants'
-import { useLanguageSelector, useNavBarResponsive } from '../../shared/hooks'
+import { useLanguageSelector, useNavBarResponsive, useVersionCheck } from '../../shared/hooks'
 import { cn } from '../../shared/utils'
 import { useWebSwapController } from './useWebSwapController'
 
@@ -126,6 +126,10 @@ const CHAIN_ICON_MAP: Record<string, string> = {
 
 const WebSwap: React.FC = () => {
   const controller = useWebSwapController()
+  useVersionCheck({
+    currentView: controller.view,
+    suppressWhileViews: ['txStatus', 'wait-sign'],
+  })
   const {
     assetOptions,
     bankDetailsProps,

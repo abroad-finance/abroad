@@ -26,6 +26,7 @@ type CeloReceiptContext = {
 export class CeloPaymentVerifier implements IDepositVerifier {
   public readonly supportedNetwork = BlockchainNetwork.CELO
   private cachedProvider?: { provider: ethers.providers.JsonRpcProvider, rpcUrl: string }
+  private readonly receiptPollConfig = { delayMs: 2_000, maxAttempts: 10 }
   private readonly tokenDecimalsCache = new Map<string, number>()
 
   public constructor(
@@ -71,7 +72,7 @@ export class CeloPaymentVerifier implements IDepositVerifier {
     let context: CeloReceiptContext
     try {
       context = await this.buildReceiptContext(assetConfig.mintAddress)
-      receipt = await context.provider.getTransactionReceipt(onChainSignature)
+      receipt = await this.waitForReceipt(context.provider, onChainSignature)
     }
     catch (error) {
       this.logger.error('[CeloPaymentVerifier] Failed to fetch receipt', error)
@@ -212,6 +213,29 @@ export class CeloPaymentVerifier implements IDepositVerifier {
     const decimals = await fetchErc20Decimals(provider, tokenAddress)
     this.tokenDecimalsCache.set(tokenAddress, decimals)
     return decimals
+  }
+
+  private async waitForReceipt(
+    provider: ethers.providers.JsonRpcProvider,
+    txHash: string,
+  ): Promise<ethers.providers.TransactionReceipt | null> {
+    for (let attempt = 0; attempt < this.receiptPollConfig.maxAttempts; attempt++) {
+      const receipt = await provider.getTransactionReceipt(txHash)
+      if (receipt) {
+        if (attempt > 0) {
+          this.logger.info('[CeloPaymentVerifier] Receipt found after polling', { attempt, txHash })
+        }
+        return receipt
+      }
+      if (attempt < this.receiptPollConfig.maxAttempts - 1) {
+        await new Promise(resolve => setTimeout(resolve, this.receiptPollConfig.delayMs))
+      }
+    }
+    this.logger.warn('[CeloPaymentVerifier] Receipt not found after polling', {
+      attempts: this.receiptPollConfig.maxAttempts,
+      txHash,
+    })
+    return null
   }
 
   private validateTransaction(transaction: {

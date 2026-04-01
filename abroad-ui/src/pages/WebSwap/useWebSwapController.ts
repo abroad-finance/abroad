@@ -297,6 +297,23 @@ const formatError = (message: string, description?: string) => ({
   message,
 })
 
+const isInsufficientBalanceError = (error: unknown): boolean => {
+  if (!(error instanceof Error)) return false
+  const msg = error.message.toLowerCase()
+  return (msg.includes('eth_estimategas') || msg.includes('insufficient'))
+    && (msg.includes('balance') || msg.includes('funds'))
+}
+
+const parseLocalizedNumber = (value: string): number => {
+  const raw = value.replace(/[^0-9.,]/g, '')
+  // Dots as thousand separators: has comma (e.g. "1.000,50") or dot-separated groups of 3 (e.g. "7.280", "1.234.567")
+  const dotsAreThousands = raw.includes(',') || /^\d{1,3}(\.\d{3})+$/.test(raw)
+  const normalized = dotsAreThousands
+    ? raw.replace(/\./g, '').replace(/,/g, '.')
+    : raw
+  return parseFloat(normalized)
+}
+
 const extractReason = (body: unknown): null | string => {
   if (body && typeof body === 'object' && 'reason' in body) {
     const reason = (body as { reason?: unknown }).reason
@@ -622,8 +639,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
       return `1 ${selectedAssetLabel} = - ${tc}`
     }
     const numericSource = parseFloat(state.sourceAmount)
-    const cleanedTarget = state.targetAmount.replace(/\./g, '').replace(/,/g, '.')
-    const numericTarget = parseFloat(cleanedTarget)
+    const numericTarget = parseLocalizedNumber(state.targetAmount)
     if (numericSource > 0 && !Number.isNaN(numericTarget) && numericTarget >= 0) {
       const rate = (numericTarget + transferFee) / numericSource
       return `1 ${selectedAssetLabel} = ${formatTargetNumber(rate)} ${tc}`
@@ -699,8 +715,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     const min = selectedCorridor.minAmount
       || (selectedCorridor.targetCurrency === 'BRL' ? 1 : 0)
     if (!min) return false
-    const cleanedTarget = String(state.targetAmount).replace(/\./g, '').replace(/,/g, '.')
-    const numericTarget = parseFloat(cleanedTarget)
+    const numericTarget = parseLocalizedNumber(String(state.targetAmount))
     if (Number.isNaN(numericTarget) || numericTarget <= 0) return false
     return numericTarget < min
   }, [
@@ -713,16 +728,14 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     if (!selectedCorridor) return false
     const max = selectedCorridor.maxAmount || 0
     if (!max) return false
-    const cleanedTarget = String(state.targetAmount).replace(/\./g, '').replace(/,/g, '.')
-    const numericTarget = parseFloat(cleanedTarget)
+    const numericTarget = parseLocalizedNumber(String(state.targetAmount))
     if (Number.isNaN(numericTarget) || numericTarget <= 0) return false
     return numericTarget > max
   }, [selectedCorridor, state.targetAmount])
 
   const isPrimaryDisabled = useCallback(() => {
     const numericSource = parseFloat(String(state.sourceAmount))
-    const cleanedTarget = String(state.targetAmount).replace(/\./g, '').replace(/,/g, '.')
-    const numericTarget = parseFloat(cleanedTarget)
+    const numericTarget = parseLocalizedNumber(String(state.targetAmount))
     return !(numericSource > 0 && numericTarget > 0)
   }, [state.sourceAmount, state.targetAmount])
 
@@ -932,7 +945,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     reverseAbortRef.current = controller
     const reqId = ++reverseReqIdRef.current
 
-    const num = parseTargetAmount(value)
+    const num = parseLocalizedNumber(value)
     if (Number.isNaN(num)) {
       setQuoteBelowMinimum(false)
       dispatch({
@@ -1582,11 +1595,13 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     }
     catch (err) {
       if (err instanceof Error && err.name === 'AbortError') return
-      const userMessage = err instanceof Error
-        ? err.message
-        : hasMessage(err)
+      const userMessage = isInsufficientBalanceError(err)
+        ? t('swap.errors.insufficient_balance', 'Saldo insuficiente para completar la transacci?n.')
+        : err instanceof Error
           ? err.message
-          : t('swap.transaction_error', 'Error en la transacci?n')
+          : hasMessage(err)
+            ? err.message
+            : t('swap.transaction_error', 'Error en la transacci?n')
       notifyError(userMessage)
       resetForNewTransaction()
     }

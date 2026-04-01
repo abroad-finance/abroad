@@ -291,6 +291,7 @@ describe('CeloPaymentVerifier', () => {
       } as unknown as ethers.providers.JsonRpcProvider,
       rpcUrl,
     }
+    ;(verifier as unknown as { receiptPollConfig: { delayMs: number, maxAttempts: number } }).receiptPollConfig = { delayMs: 0, maxAttempts: 1 }
 
     const result = await verifier.verifyNotification('0xhash', 'tx-3')
 
