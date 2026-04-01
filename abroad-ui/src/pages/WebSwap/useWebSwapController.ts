@@ -55,8 +55,10 @@ import {
   chainKeyOf,
   COP_TRANSFER_FEE,
   corridorKeyOf,
+  formatChainLabel,
   sortStellarFirst,
 } from '../../features/swap/utils/corridorHelpers'
+import { parseEMVQR } from '../../lib/qr/emv-parser'
 import {
   acceptTransactionRequest, fetchPublicCorridors, notifyPayment, requestQuote, requestReverseQuote,
 } from '../../services/public/publicApi'
@@ -138,6 +140,28 @@ const parseAmountUnits = (amount: string, decimals: number): bigint => {
   return parseUnits(cleaned, decimals)
 }
 
+/**
+ * Parse target amount (BRL/COP).
+ * - Comma present: locale format (1,00 = 1.00, 1.000,50 = 1000.50)
+ * - Dot only: "5.000" = 5000 (thousands) or "1.00" = 1 (decimal, e.g. from QR)
+ *   Use 3-digit segment after dot as thousands (es-CO); else decimal.
+ */
+const parseTargetAmount = (value: string): number => {
+  const raw = value.replace(/[^0-9.,]/g, '')
+  if (raw.includes(',')) {
+    return Number.parseFloat(raw.replaceAll('.', '').replaceAll(',', '.'))
+  }
+  const dotCount = (raw.match(/\./g) || []).length
+  if (dotCount === 0) return Number.parseFloat(raw) || 0
+  if (dotCount >= 2) return Number.parseFloat(raw.replaceAll('.', ''))
+  const [, fracPart] = raw.split('.')
+  const frac = fracPart ?? ''
+  if (frac.length === 3 && /^\d{3}$/.test(frac)) {
+    return Number.parseFloat(raw.replaceAll('.', ''))
+  }
+  return Number.parseFloat(raw)
+}
+
 const createInitialState = (isDesktop: boolean): SwapControllerState => ({
   accountNumber: '',
   corridorKey: '',
@@ -157,7 +181,7 @@ const createInitialState = (isDesktop: boolean): SwapControllerState => ({
   targetCurrency: TargetCurrency.BRL,
   taxId: '',
   transactionId: null,
-  view: 'swap',
+  view: 'home',
 })
 
 const reducer = (state: SwapControllerState, action: SwapAction): SwapControllerState => {
@@ -314,9 +338,14 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     wallet,
     walletAuthentication,
   } = useWalletAuth()
+  // Capture the JWT value at mount time so HYDRATE only restores state on page reload
+  // (existing session), not when the user freshly connects during the same session.
+  const jwtOnMount = useRef(walletAuthentication?.jwtToken)
+
   const [corridors, setCorridors] = useState<PublicCorridor[]>([])
   const [corridorError, setCorridorError] = useState<null | string>(null)
   const [chainKey, setChainKey] = useState('')
+  const [pendingConnectAfterChainSelect, setPendingConnectAfterChainSelect] = useState(false)
 
   const sep24TokenPresent = useMemo(() => {
     if (typeof window === 'undefined') return false
@@ -324,6 +353,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
   }, [])
 
   const lastEditedRef = useRef<'source' | 'target' | null>(null)
+  const lastQuoteRateRef = useRef<null | number>(null)
   const sep24AutoSelectedRef = useRef(false)
   const directAbortRef = useRef<AbortController | null>(null)
   const reverseAbortRef = useRef<AbortController | null>(null)
@@ -364,10 +394,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
   const scopedCorridors = useMemo(() => scopeCorridorsForWalletSurface({
     corridors,
     isMiniPay,
-  }), [
-    corridors,
-    isMiniPay,
-  ])
+  }), [corridors, isMiniPay])
   const availableCorridors = useMemo(() => {
     const filtered = scopedCorridors.filter(corridor => corridor.targetCurrency === state.targetCurrency)
     return isMiniPay ? filtered : sortStellarFirst(filtered)
@@ -423,7 +450,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
       if (!aStellar && bStellar) return 1
       return 0
     })
-  }, [chainVariants, isMiniPay, scopedCorridors])
+  }, [chainVariants, scopedCorridors])
   const assetOptions = useMemo(() => chainFilteredCorridors.map(corridor => ({
     key: corridorKeyOf(corridor),
     label: corridor.cryptoCurrency,
@@ -432,36 +459,20 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     if (!selectedCorridor) return t('swap.asset_placeholder', 'Selecciona activo')
     return selectedCorridor.cryptoCurrency
   }, [selectedCorridor, t])
-  const selectedChainLabel = useMemo(() => {
-    if (!selectedCorridor) return t('swap.chain_placeholder', 'Selecciona red')
-    const includeChainId = (chainVariants.get(selectedCorridor.blockchain)?.size ?? 0) > 1
-    return buildChainLabel(selectedCorridor, includeChainId)
-  }, [
-    chainVariants,
-    selectedCorridor,
-    t,
-  ])
-  const sourceSymbol = selectedCorridor?.cryptoCurrency ?? ''
   const selectedSourceBalance = useMemo(() => {
     if (!selectedCorridor || !isSupportedStablecoinSymbol(selectedCorridor.cryptoCurrency)) {
       return '0.00'
     }
 
     return stablecoinBalances.supportedBalanceFor(selectedCorridor.cryptoCurrency)
-  }, [
-    selectedCorridor,
-    stablecoinBalances,
-  ])
+  }, [selectedCorridor, stablecoinBalances])
   const hasInsufficientFunds = useMemo(() => {
     const requestedAmount = parseStablecoinBalance(state.sourceAmount)
     if (requestedAmount <= 0) {
       return false
     }
     return requestedAmount > parseStablecoinBalance(selectedSourceBalance)
-  }, [
-    selectedSourceBalance,
-    state.sourceAmount,
-  ])
+  }, [selectedSourceBalance, state.sourceAmount])
   const miniPayNotice = useMemo(() => resolveMiniPayNotice({
     copy: {
       addCashLabel: t('swap.minipay.add_cash', 'Add Cash'),
@@ -563,15 +574,27 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     const nextWallet = isMiniPay
       ? defaultWallet
       : selectedCorridor.chainFamily === 'stellar'
-      ? defaultWallet
-      : getWalletHandler('wallet-connect')
-    if (nextWallet && nextWallet !== wallet) {
-      setActiveWallet(nextWallet)
+        ? defaultWallet
+        : getWalletHandler('wallet-connect')
+    if (!nextWallet) return
+    if (nextWallet !== wallet) setActiveWallet(nextWallet)
+    // When user chose "connect" from the chain modal, connect with the wallet for this corridor
+    // (do it here so we use nextWallet, not the possibly stale wallet from context)
+    if (pendingConnectAfterChainSelect) {
+      setPendingConnectAfterChainSelect(false)
+      const options = nextWallet.walletId === 'wallet-connect'
+        ? {
+            chainId: selectedCorridor.chainId,
+            walletConnect: selectedCorridor.walletConnect,
+          }
+        : undefined
+      nextWallet.connect(options).catch(err => console.error('[wallet] connect failed:', err))
     }
   }, [
     defaultWallet,
     getWalletHandler,
     isMiniPay,
+    pendingConnectAfterChainSelect,
     selectedCorridor,
     setActiveWallet,
     wallet,
@@ -611,20 +634,25 @@ export const useWebSwapController = (): WebSwapControllerProps => {
   ])
 
   const exchangeRateDisplay = useMemo(() => {
-    if (state.loadingSource || state.loadingTarget) return '-'
+    const tc = state.targetCurrency === TargetCurrency.BRL ? 'BRL' : 'COP'
+    if (state.loadingSource || state.loadingTarget) {
+      return `1 ${selectedAssetLabel} = - ${tc}`
+    }
     const numericSource = parseFloat(state.sourceAmount)
     const numericTarget = parseLocalizedNumber(state.targetAmount)
     if (numericSource > 0 && !Number.isNaN(numericTarget) && numericTarget >= 0) {
-      return `${targetSymbol}${formatTargetNumber((numericTarget + transferFee) / numericSource)}`
+      const rate = (numericTarget + transferFee) / numericSource
+      return `1 ${selectedAssetLabel} = ${formatTargetNumber(rate)} ${tc}`
     }
-    return '-'
+    return `1 ${selectedAssetLabel} = - ${tc}`
   }, [
     formatTargetNumber,
+    selectedAssetLabel,
     state.loadingSource,
     state.loadingTarget,
     state.sourceAmount,
     state.targetAmount,
-    targetSymbol,
+    state.targetCurrency,
     transferFee,
   ])
 
@@ -656,6 +684,10 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     selectedCorridor,
     wallet,
   ])
+
+  const requestConnectAfterChainSelect = useCallback(() => {
+    setPendingConnectAfterChainSelect(true)
+  }, [])
 
   useEffect(() => {
     if (!wallet?.address || !wallet?.chainId || !selectedCorridor) return
@@ -712,7 +744,14 @@ export const useWebSwapController = (): WebSwapControllerProps => {
       return true
     }
     if (!isAuthenticated) return false
-    return isPrimaryDisabled() || !state.quoteId || isBelowMinimum || isAboveMaximum
+    const baseDisabled = isPrimaryDisabled() || !state.quoteId || isBelowMinimum || isAboveMaximum
+    if (state.targetCurrency === TargetCurrency.BRL) {
+      return baseDisabled || !state.pixKey?.trim() || !state.taxId?.trim()
+    }
+    if (state.targetCurrency === TargetCurrency.COP) {
+      return baseDisabled || state.accountNumber.trim().length < 6
+    }
+    return baseDisabled
   }, [
     isAboveMaximum,
     isAuthenticated,
@@ -720,7 +759,24 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     isPrimaryDisabled,
     isMiniPay,
     miniPay.isReady,
+    state.accountNumber,
+    state.pixKey,
     state.quoteId,
+    state.targetCurrency,
+    state.taxId,
+  ])
+
+  const sourceAmountForBalanceCheck = useMemo(() => {
+    if (state.sourceAmount) return state.sourceAmount
+    if (!state.loadingSource || !state.targetAmount || lastQuoteRateRef.current == null) return ''
+    const numericTarget = parseTargetAmount(state.targetAmount)
+    if (numericTarget <= 0) return ''
+    const estimated = numericTarget / lastQuoteRateRef.current
+    return String(estimated)
+  }, [
+    state.loadingSource,
+    state.sourceAmount,
+    state.targetAmount,
   ])
 
   const persistableView = state.view !== 'swap'
@@ -734,8 +790,18 @@ export const useWebSwapController = (): WebSwapControllerProps => {
   }, [persistableView, state])
 
   useEffect(() => {
+    // Only restore persisted state when the user already had a JWT on mount (page reload
+    // with an existing session). Skip restoration when jwtToken transitions from null →
+    // non-null during the same session (fresh wallet connect) so the user lands on the
+    // authenticated HomeScreen instead of a previously-stored view like 'bankDetails'.
+    if (!jwtOnMount.current) return
+
     const stored = readPersisted()
     if (stored && (isMiniPay || walletAuthentication?.jwtToken)) {
+      // Don't restore terminal views — those sessions are over
+      const restoredView = (stored.view === 'txStatus' || stored.view === 'wait-sign')
+        ? 'home'
+        : (stored.view ?? 'bankDetails')
       dispatch({
         payload: {
           accountNumber: stored.accountNumber ?? '',
@@ -747,15 +813,29 @@ export const useWebSwapController = (): WebSwapControllerProps => {
           targetAmount: stored.targetAmount ?? '',
           targetCurrency: stored.targetCurrency ?? TargetCurrency.BRL,
           taxId: stored.taxId ?? '',
-          view: stored.view ?? 'bankDetails',
+          view: restoredView,
         },
         type: 'HYDRATE',
       })
     }
-  }, [
-    isMiniPay,
-    walletAuthentication?.jwtToken,
-  ])
+  }, [isMiniPay, walletAuthentication?.jwtToken])
+
+  // When the user first becomes authenticated, ensure they see the authenticated home screen
+  // (dashboard with balance, scan QR, enter amount) instead of swap view with pre-filled data.
+  const prevIsAuthRef = useRef(false)
+  useEffect(() => {
+    if (isAuthenticated && !prevIsAuthRef.current) {
+      // Clear any previous transaction data to show clean dashboard
+      dispatch({
+        accountNumber: '', pixKey: '', recipientName: '', taxId: '', type: 'SET_BANK_DETAILS',
+      })
+      dispatch({
+        quoteId: '', sourceAmount: '', targetAmount: '', type: 'SET_AMOUNTS',
+      })
+      dispatch({ type: 'SET_VIEW', view: 'home' })
+    }
+    prevIsAuthRef.current = isAuthenticated
+  }, [isAuthenticated])
 
   useEffect(() => {
     const handleResize = () => {
@@ -835,6 +915,8 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     setQuoteBelowMinimum(false)
     const quote = response.data
     const formatted = formatTargetNumber(quote.value)
+    const numericTarget = parseTargetAmount(formatted) || 0
+    if (numericTarget > 0) lastQuoteRateRef.current = numericTarget / num
     dispatch({
       quoteId: quote.quote_id,
       sourceAmount: value,
@@ -850,10 +932,10 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     t,
   ])
 
-  const quoteFromTarget = useCallback(async (value: string) => {
+  const quoteFromTarget = useCallback(async (value: string): Promise<boolean> => {
     if (!selectedCorridor) {
       notifyError(t('swap.corridor_error', 'No corridor available for this currency.'))
-      return
+      return false
     }
     lastEditedRef.current = 'target'
     reverseAbortRef.current?.abort()
@@ -870,7 +952,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
         quoteId: '', sourceAmount: '', targetAmount: value, type: 'SET_AMOUNTS',
       })
       dispatch({ loadingSource: false, type: 'SET_LOADING' })
-      return
+      return false
     }
 
     // Skip API call if below minimum ��� inline validation handles the UI
@@ -881,7 +963,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
         quoteId: '', sourceAmount: '', targetAmount: value, type: 'SET_AMOUNTS',
       })
       dispatch({ loadingSource: false, type: 'SET_LOADING' })
-      return
+      return false
     }
 
     dispatch({ loadingSource: true, type: 'SET_LOADING' })
@@ -897,7 +979,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
       { signal: controller.signal },
     )
 
-    if (controller.signal.aborted || reqId !== reverseReqIdRef.current || lastEditedRef.current !== 'target') return
+    if (controller.signal.aborted || reqId !== reverseReqIdRef.current || lastEditedRef.current !== 'target') return false
 
     if (!response.ok) {
       if (!isAbortError(response)) {
@@ -916,11 +998,13 @@ export const useWebSwapController = (): WebSwapControllerProps => {
         }
       }
       dispatch({ loadingSource: false, type: 'SET_LOADING' })
-      return
+      return false
     }
 
     setQuoteBelowMinimum(false)
     const quote = response.data
+    const numericSource = Number(quote.value) || 0
+    if (numericSource > 0) lastQuoteRateRef.current = num / numericSource
     dispatch({
       quoteId: quote.quote_id,
       sourceAmount: formatCryptoAmount(quote.value),
@@ -928,6 +1012,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
       type: 'SET_AMOUNTS',
     })
     dispatch({ loadingSource: false, type: 'SET_LOADING' })
+    return true
   }, [
     formatCryptoAmount,
     notifyError,
@@ -989,23 +1074,6 @@ export const useWebSwapController = (): WebSwapControllerProps => {
   const skipNextAssetClickRef = useRef(false)
   const [assetMenuOpen, setAssetMenuOpen] = useReducer((s: boolean) => !s, false)
 
-  const _toggleAssetMenu = useCallback(() => {
-    if (assetOptions.length <= 1) return
-    if (!assetMenuOpen) {
-      if (currencyMenuOpen) setCurrencyMenuOpen()
-      if (chainMenuOpen) setChainMenuOpen()
-    }
-    setAssetMenuOpen()
-    if (!assetMenuOpen) {
-      skipNextAssetClickRef.current = true
-    }
-  }, [
-    assetMenuOpen,
-    assetOptions.length,
-    chainMenuOpen,
-    currencyMenuOpen,
-  ])
-
   const selectAssetOption = useCallback((key: string) => {
     if (isMiniPay) {
       miniPayManualAssetSelectionRef.current = true
@@ -1019,42 +1087,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     lastEditedRef.current = null
     directAbortRef.current?.abort()
     reverseAbortRef.current?.abort()
-  }, [
-    availableCorridors,
-    isMiniPay,
-  ])
-
-  const _toggleCurrencyMenu = useCallback(() => {
-    if (!currencyMenuOpen) {
-      if (assetMenuOpen) setAssetMenuOpen()
-      if (chainMenuOpen) setChainMenuOpen()
-    }
-    setCurrencyMenuOpen()
-    if (!currencyMenuOpen) {
-      skipNextDocumentClickRef.current = true
-    }
-  }, [
-    assetMenuOpen,
-    chainMenuOpen,
-    currencyMenuOpen,
-  ])
-
-  const _toggleChainMenu = useCallback(() => {
-    if (chainOptions.length <= 1) return
-    if (!chainMenuOpen) {
-      if (assetMenuOpen) setAssetMenuOpen()
-      if (currencyMenuOpen) setCurrencyMenuOpen()
-    }
-    setChainMenuOpen()
-    if (!chainMenuOpen) {
-      skipNextChainClickRef.current = true
-    }
-  }, [
-    assetMenuOpen,
-    chainMenuOpen,
-    chainOptions.length,
-    currencyMenuOpen,
-  ])
+  }, [availableCorridors, isMiniPay])
 
   useMenuCloseOnOutsideClick({
     isOpen: assetMenuOpen,
@@ -1129,7 +1162,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     localStorage.removeItem(PENDING_TX_KEY)
     dispatch({ type: 'RESET' })
     dispatch({ isQrOpen: false, type: 'SET_QR_OPEN' })
-    dispatch({ type: 'SET_VIEW', view: 'swap' })
+    dispatch({ type: 'SET_VIEW', view: 'home' })
   }, [])
 
   const resetForNewTransaction = useCallback(() => {
@@ -1137,6 +1170,10 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     dispatch({ type: 'RESET' })
     dispatch({ isQrOpen: false, type: 'SET_QR_OPEN' })
     dispatch({ transactionId: null, type: 'SET_TRANSACTION_ID' })
+    dispatch({ type: 'SET_VIEW', view: 'home' })
+  }, [])
+
+  const goToManual = useCallback(() => {
     dispatch({ type: 'SET_VIEW', view: 'swap' })
   }, [])
 
@@ -1152,7 +1189,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
       notifyError(t('swap.wait_for_quote', 'Espera la cotizaci?n antes de continuar'))
       return
     }
-    dispatch({ type: 'SET_VIEW', view: 'bankDetails' })
+    dispatch({ type: 'SET_VIEW', view: 'confirm-qr' })
   }, [
     connectWallet,
     isAuthenticated,
@@ -1176,51 +1213,97 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     dispatch({ isQrOpen: false, type: 'SET_QR_OPEN' })
     dispatch({ isDecodingQr: true, type: 'SET_DECODING' })
     dispatch({ qrCode: text, type: 'SET_QR_CODE' })
-    decodeAbortRef.current?.abort()
-    const controller = new AbortController()
-    decodeAbortRef.current = controller
+
     try {
-      const response = await decodeQrCodeBR({ qrCode: text }, { signal: controller.signal }) as DecodeQrApiResponse
-      if (controller.signal.aborted) return
-      if (!response.ok) {
-        if (!isAbortError(response)) {
-          const reason = extractReason(response.data) || response.error?.message || t('swap.qr_decode_error', 'No pudimos decodificar este QR.')
-          notifyError(reason, response.error?.message)
+      if (state.targetCurrency === TargetCurrency.COP) {
+        // ── BRE-B: parseo client-side ──────────────────────────────────────
+        const parsed = parseEMVQR(text)
+
+        if (!parsed.keyInfo?.value) {
+          notifyError(t('swap.qr_decode_error', 'No pudimos decodificar este QR.'))
+          return
         }
-        return
+
+        if (parsed.currency && parsed.currency !== '170') {
+          notifyError(t('swap.qr_wrong_currency', 'Este QR es para otra moneda.'))
+          return
+        }
+
+        dispatch({ accountNumber: parsed.keyInfo.value, type: 'SET_BANK_DETAILS' })
+        if (parsed.merchantName) {
+          dispatch({ recipientName: parsed.merchantName, type: 'SET_BANK_DETAILS' })
+        }
+
+        if (parsed.amount && Number.isFinite(parsed.amount) && parsed.amount > 0) {
+          const amountStr = String(parsed.amount)
+          const minAmount = selectedCorridor?.minAmount ?? 0
+          if (minAmount && parsed.amount < minAmount) {
+            notifyError(
+              t('swap.qr_below_minimum', `El monto del QR (${parsed.amount} COP) es inferior al mínimo requerido (${minAmount} COP).`),
+            )
+            return
+          }
+          const quoted = await quoteFromTarget(amountStr)
+          if (!quoted) return
+          dispatch({ type: 'SET_VIEW', view: 'confirm-qr' })
+          return
+        }
+
+        notifyError(t('swap.qr_missing_amount', 'Este QR no incluye un monto. Ingresa el monto para continuar.'))
+        dispatch({ type: 'SET_VIEW', view: 'swap' })
       }
-      const decoded = response.data && 'decoded' in response.data ? response.data.decoded : null
-      if (!decoded) {
-        notifyError(t('swap.qr_decode_error', 'No pudimos decodificar este QR.'))
-        return
+      else {
+        // ── PIX/BRL: lógica existente ──────────────────────────────────────
+        decodeAbortRef.current?.abort()
+        const controller = new AbortController()
+        decodeAbortRef.current = controller
+        try {
+          const response = await decodeQrCodeBR({ qrCode: text }, { signal: controller.signal }) as DecodeQrApiResponse
+          if (controller.signal.aborted) return
+          if (!response.ok) {
+            if (!isAbortError(response)) {
+              const reason = extractReason(response.data) || response.error?.message || t('swap.qr_decode_error', 'No pudimos decodificar este QR.')
+              notifyError(reason, response.error?.message)
+            }
+            return
+          }
+          const decoded = response.data && 'decoded' in response.data ? response.data.decoded : null
+          if (!decoded) {
+            notifyError(t('swap.qr_decode_error', 'No pudimos decodificar este QR.'))
+            return
+          }
+
+          const amountRaw = decoded.amount
+          const amountText = typeof amountRaw === 'string' ? amountRaw : null
+          const normalizedAmount = amountText?.replace(',', '.').trim() ?? ''
+          const parsedAmount = normalizedAmount ? Number.parseFloat(normalizedAmount) : Number.NaN
+          const pixKey = decoded?.account
+          const taxIdDecoded = decoded?.taxId
+          const name = decoded?.name
+
+          if (name) dispatch({ recipientName: name, type: 'SET_BANK_DETAILS' })
+          if (pixKey) dispatch({ pixKey, type: 'SET_BANK_DETAILS' })
+          if (taxIdDecoded && !taxIdDecoded.includes('*')) dispatch({ taxId: taxIdDecoded, type: 'SET_BANK_DETAILS' })
+
+          if (Number.isFinite(parsedAmount) && parsedAmount > 0) {
+            const quoted = await quoteFromTarget(normalizedAmount)
+            if (!quoted) return
+            dispatch({ type: 'SET_VIEW', view: 'confirm-qr' })
+            return
+          }
+
+          notifyError(t('swap.qr_missing_amount', 'Este QR no incluye un monto. Ingresa el monto para continuar.'))
+          dispatch({ type: 'SET_VIEW', view: 'swap' })
+        }
+        catch (e) {
+          if (!decodeAbortRef.current?.signal.aborted) {
+            notifyError(t('swap.qr_decode_error', 'No pudimos decodificar este QR.'), e instanceof Error ? e.message : undefined)
+          }
+        }
       }
-
-      const amountRaw = decoded.amount
-      const amountText = typeof amountRaw === 'string' ? amountRaw : null
-      const normalizedAmount = amountText?.replace(',', '.').trim() ?? ''
-      const parsedAmount = normalizedAmount ? Number.parseFloat(normalizedAmount) : Number.NaN
-      const pixKey = decoded?.account
-      const taxIdDecoded = decoded?.taxId
-      const name = decoded?.name
-
-      if (name) dispatch({ recipientName: name, type: 'SET_BANK_DETAILS' })
-      if (pixKey) dispatch({ pixKey, type: 'SET_BANK_DETAILS' })
-      if (taxIdDecoded && !taxIdDecoded.includes('*')) dispatch({ taxId: taxIdDecoded, type: 'SET_BANK_DETAILS' })
-
-      if (Number.isFinite(parsedAmount) && parsedAmount > 0) {
-        dispatch({ targetAmount: normalizedAmount, type: 'SET_AMOUNTS' })
-        await quoteFromTarget(normalizedAmount)
-        dispatch({ type: 'SET_VIEW', view: 'confirm-qr' })
-        return
-      }
-
-      notifyError(t('swap.qr_missing_amount', 'Este QR no incluye un monto. Ingresa el monto para continuar.'))
-      dispatch({ type: 'SET_VIEW', view: 'swap' })
     }
     catch (e) {
-      if (!controller.signal.aborted) {
-        notifyError(t('swap.qr_decode_error', 'No pudimos decodificar este QR.'), e instanceof Error ? e.message : undefined)
-      }
+      notifyError(t('swap.qr_decode_error', 'No pudimos decodificar este QR.'), e instanceof Error ? e.message : undefined)
     }
     finally {
       dispatch({ isDecodingQr: false, type: 'SET_DECODING' })
@@ -1228,6 +1311,8 @@ export const useWebSwapController = (): WebSwapControllerProps => {
   }, [
     notifyError,
     quoteFromTarget,
+    selectedCorridor,
+    state.targetCurrency,
     t,
   ])
 
@@ -1548,8 +1633,8 @@ export const useWebSwapController = (): WebSwapControllerProps => {
       return
     }
     if (state.targetCurrency === TargetCurrency.BRL && (!state.taxId || !state.pixKey)) {
-      notifyError(t('confirm_qr.missing_data', 'Faltan datos para completar la transacci?n.'))
-      dispatch({ type: 'SET_VIEW', view: 'bankDetails' })
+      notifyError(t('confirm_qr.missing_data', 'Faltan datos para completar la transacción.'))
+      dispatch({ type: 'SET_VIEW', view: 'swap' })
       return
     }
     void handleTransactionFlow()
@@ -1600,6 +1685,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
   const swapProps: SwapProps = {
     continueDisabled,
     exchangeRateDisplay,
+    fromQr: !!state.qrCode,
     hasInsufficientFunds,
     isAboveMaximum,
     isAuthenticated,
@@ -1613,19 +1699,24 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     onOpenSourceModal: () => { /* handled in WebSwap */ },
     onOpenTargetModal: () => { /* handled in WebSwap */ },
     onPrimaryAction,
+    onRecipientChange: state.targetCurrency === TargetCurrency.BRL
+      ? v => dispatch({ pixKey: v, type: 'SET_BANK_DETAILS' })
+      : v => dispatch({ accountNumber: v.trim(), type: 'SET_BANK_DETAILS' }),
     onSourceChange,
     onTargetChange,
+    onTaxIdChange: state.targetCurrency === TargetCurrency.BRL
+      ? v => dispatch({ taxId: v.replace(/[^\d]/g, ''), type: 'SET_BANK_DETAILS' })
+      : undefined,
+    recipientName: state.recipientName,
+    recipientValue: state.targetCurrency === TargetCurrency.BRL ? state.pixKey : state.accountNumber,
+    selectCurrency,
     selectedAssetLabel,
-    selectedChainLabel,
     sourceAmount: state.sourceAmount,
-    sourceSymbol,
     targetAmount: state.targetAmount,
     targetCurrency: state.targetCurrency,
-    targetSymbol,
-    toggleAssetMenu: _toggleAssetMenu,
-    toggleChainMenu: _toggleChainMenu,
-    toggleCurrencyMenu: _toggleCurrencyMenu,
+    taxId: state.taxId,
     transferFeeDisplay,
+    transferFeeIsZero: transferFee === 0,
     walletStatusLabel: isMiniPay
       ? miniPay.isReady
         ? t('swap.minipay.ready', 'MiniPay ready')
@@ -1635,13 +1726,15 @@ export const useWebSwapController = (): WebSwapControllerProps => {
   }
 
   const confirmQrProps: ConfirmQrProps = {
+    accountNumber: state.accountNumber,
     currency: state.targetCurrency,
     loadingSubmit: state.loadingSubmit,
     onBack: handleBackToSwap,
     onConfirm: handleConfirmQr,
     onEdit: () => dispatch({ type: 'SET_VIEW', view: 'swap' }),
     pixKey: state.pixKey,
-    recipentName: state.recipientName,
+    recipientName: state.recipientName,
+    selectedAssetLabel,
     sourceAmount: state.sourceAmount,
     targetAmount: state.targetAmount,
     taxId: state.taxId,
@@ -1651,6 +1744,27 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     dispatch({ type: 'SET_VIEW', view: 'confirm-qr' })
   }, [])
 
+  const txStatusDetails = useMemo(() => {
+    let rail = ''
+    if (selectedCorridor) {
+      rail = selectedCorridor.paymentMethod === 'PIX' ? 'PIX' : 'Bre-B'
+    }
+    return {
+      accountNumber: state.accountNumber,
+      network: selectedCorridor ? formatChainLabel(selectedCorridor.blockchain) : '',
+      rail,
+      sourceAmount: state.sourceAmount,
+      targetAmount: state.targetAmount,
+      transferFeeDisplay,
+    }
+  }, [
+    state.accountNumber,
+    state.sourceAmount,
+    state.targetAmount,
+    selectedCorridor,
+    transferFeeDisplay,
+  ])
+
   return {
     assetOptions,
     bankDetailsProps,
@@ -1658,6 +1772,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     closeQr: () => dispatch({ isQrOpen: false, type: 'SET_QR_OPEN' }),
     confirmQrProps,
     currentBgUrl,
+    goToManual,
     handleBackToSwap,
     handleKycApproved,
     handleQrResult,
@@ -1669,15 +1784,18 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     isWalletDetailsOpen: state.isWalletDetailsOpen,
     onWalletConnect: connectWallet,
     openQr,
+    requestConnectAfterChainSelect,
     resetForNewTransaction,
     selectAssetOption,
     selectChain,
     selectCurrency,
     selectedChainKey: activeChainKey,
+    sourceAmountForBalanceCheck,
     swapViewProps: swapProps,
     targetAmount: state.targetAmount,
     targetCurrency: state.targetCurrency,
     transactionId: state.transactionId,
+    txStatusDetails,
     view: state.view,
   }
 }

@@ -21,21 +21,21 @@ import {
 
 type MiniPayConnectionState
   = | {
-      address: null
-      kind: 'available'
-    }
-    | {
-      address: null
-      kind: 'inactive'
-    }
-    | {
-      address: null | string
-      kind: 'resolving'
-    }
-    | {
-      address: string
-      kind: 'ready'
-    }
+    address: null
+    kind: 'available'
+  }
+  | {
+    address: null
+    kind: 'inactive'
+  }
+  | {
+    address: null | string
+    kind: 'resolving'
+  }
+  | {
+    address: string
+    kind: 'ready'
+  }
 
 type MiniPayWalletState = {
   runtime: MiniPayRuntime
@@ -78,13 +78,6 @@ const toResolvingState = (state: MiniPayConnectionState): MiniPayConnectionState
 
 const deriveMiniPayRuntime = (state: MiniPayConnectionState): MiniPayRuntime => {
   switch (state.kind) {
-    case 'inactive':
-      return {
-        isActive: false,
-        isReady: false,
-        isResolving: false,
-        status: 'inactive',
-      }
     case 'available':
       return {
         isActive: true,
@@ -92,12 +85,12 @@ const deriveMiniPayRuntime = (state: MiniPayConnectionState): MiniPayRuntime => 
         isResolving: false,
         status: 'available',
       }
-    case 'resolving':
+    case 'inactive':
       return {
-        isActive: true,
+        isActive: false,
         isReady: false,
-        isResolving: true,
-        status: 'resolving',
+        isResolving: false,
+        status: 'inactive',
       }
     case 'ready':
       return {
@@ -105,6 +98,13 @@ const deriveMiniPayRuntime = (state: MiniPayConnectionState): MiniPayRuntime => 
         isReady: true,
         isResolving: false,
         status: 'ready',
+      }
+    case 'resolving':
+      return {
+        isActive: true,
+        isReady: false,
+        isResolving: true,
+        status: 'resolving',
       }
     default: {
       const exhaustiveCheck: never = state
@@ -207,7 +207,7 @@ export const useMiniPayWallet = (): MiniPayWalletState => {
         })
   }, [])
 
-  const request = useCallback(async <TResult,>(requestShape: WalletConnectRequest): Promise<TResult> => {
+  const request = useCallback(async <TResult>(requestShape: WalletConnectRequest): Promise<TResult> => {
     const browserRuntime = getMiniPayBrowserRuntime()
     const provider = getMiniPayProvider(browserRuntime?.provider)
     const sanitizedRequest = sanitizeMiniPayRequest(requestShape)

@@ -6,12 +6,15 @@ export const MINIPAY_CHAIN_ID = 'eip155:42220' as const
 export const MINIPAY_ADD_CASH_URL = 'https://minipay.opera.com/add_cash'
 
 const MINIPAY_SESSION_ADDRESS_KEY = 'abroad:minipay:address'
-const MINI_PAY_FEE_FIELDS = new Set(['gasPrice', 'maxFeePerGas', 'maxPriorityFeePerGas'])
+const MINI_PAY_FEE_FIELDS = new Set([
+  'gasPrice',
+  'maxFeePerGas',
+  'maxPriorityFeePerGas',
+])
 
-export interface MiniPaySessionStore {
-  getItem(key: string): null | string
-  removeItem(key: string): void
-  setItem(key: string, value: string): void
+export type MiniPayAddressResolution = {
+  address: null | string
+  source: 'missing' | 'provider' | 'session'
 }
 
 export interface MiniPayBrowserRuntime {
@@ -19,9 +22,10 @@ export interface MiniPayBrowserRuntime {
   sessionStore: MiniPaySessionStore | null
 }
 
-export type MiniPayAddressResolution = {
-  address: null | string
-  source: 'missing' | 'provider' | 'session'
+export interface MiniPaySessionStore {
+  getItem(key: string): null | string
+  removeItem(key: string): void
+  setItem(key: string, value: string): void
 }
 
 const hasWindow = (): boolean => typeof window !== 'undefined'

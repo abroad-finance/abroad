@@ -9,9 +9,9 @@ import {
 } from 'vitest'
 
 import type { IWallet } from '../interfaces/IWallet'
-import type { PublicCorridorResponse } from '../services/public/types'
-import type { IWalletAuthentication } from '../interfaces/IWalletAuthentication'
 import type { WalletConnectRequest } from '../interfaces/IWallet'
+import type { IWalletAuthentication } from '../interfaces/IWalletAuthentication'
+import type { PublicCorridorResponse } from '../services/public/types'
 
 import { NoticeProvider } from '../contexts/NoticeContext'
 import { WalletAuthContext } from '../contexts/WalletAuthContext'
@@ -23,10 +23,10 @@ vi.mock('@tolgee/react', () => ({
 
 const createStablecoinBalanceState = (overrides?: Partial<{
   cUsd: string
-  highestBalanceToken: 'USDC' | 'USDT' | 'cUSD'
+  highestBalanceToken: 'cUSD' | 'USDC' | 'USDT'
   isLoading: boolean
-  preferredSupportedToken: 'USDC' | 'USDT' | null
   preferenceKind: 'empty' | 'supported' | 'unsupported-preferred'
+  preferredSupportedToken: 'USDC' | 'USDT' | null
   usdc: string
   usdt: string
 }>) => {
@@ -65,6 +65,7 @@ const createWalletRequestMock = (
 ): NonNullable<IWallet['request']> => {
   const requestMock = vi.fn(async (_request: WalletConnectRequest): Promise<string> => response)
 
+  // eslint-disable-next-line @stylistic/comma-dangle
   return async <TResult,>(request: WalletConnectRequest): Promise<TResult> => (
     await requestMock(request)
   ) as TResult
@@ -290,7 +291,7 @@ describe('useWebSwapController', () => {
       await mocked.fetchPublicCorridorsMock.mock.results[0]?.value
     })
 
-    expect(result.current.swapViewProps.selectedChainLabel).toBe('Stellar')
+    expect(result.current.selectedChainKey).toContain('stellar')
   })
 
   it('does not advance confirm flow without amounts', async () => {
@@ -338,62 +339,66 @@ describe('useWebSwapController', () => {
     stablecoinBalancesMock.mockImplementation(() => createStablecoinBalanceState({
       cUsd: '40.00',
       highestBalanceToken: 'cUSD',
-      preferredSupportedToken: 'USDT',
       preferenceKind: 'unsupported-preferred',
+      preferredSupportedToken: 'USDT',
       usdc: '5.00',
       usdt: '22.00',
     }))
 
     mocked.fetchPublicCorridorsMock.mockResolvedValueOnce({
-      corridors: [{
-        blockchain: 'CELO',
-        chainFamily: 'evm',
-        chainId: 'eip155:42220',
-        cryptoCurrency: 'USDC',
-        maxAmount: null,
-        minAmount: null,
-        notify: { endpoint: '/payments/notify', required: true },
-        paymentMethod: 'BREB',
-        targetCurrency: 'BRL',
-        walletConnect: {
+      corridors: [
+        {
+          blockchain: 'CELO',
+          chainFamily: 'evm',
           chainId: 'eip155:42220',
-          events: [],
-          methods: ['eth_sendTransaction'],
-          namespace: 'eip155',
+          cryptoCurrency: 'USDC',
+          maxAmount: null,
+          minAmount: null,
+          notify: { endpoint: '/payments/notify', required: true },
+          paymentMethod: 'BREB',
+          targetCurrency: 'BRL',
+          walletConnect: {
+            chainId: 'eip155:42220',
+            events: [],
+            methods: ['eth_sendTransaction'],
+            namespace: 'eip155',
+          },
         },
-      }, {
-        blockchain: 'CELO',
-        chainFamily: 'evm',
-        chainId: 'eip155:42220',
-        cryptoCurrency: 'USDT',
-        maxAmount: null,
-        minAmount: null,
-        notify: { endpoint: '/payments/notify', required: true },
-        paymentMethod: 'BREB',
-        targetCurrency: 'BRL',
-        walletConnect: {
+        {
+          blockchain: 'CELO',
+          chainFamily: 'evm',
           chainId: 'eip155:42220',
-          events: [],
-          methods: ['eth_sendTransaction'],
-          namespace: 'eip155',
+          cryptoCurrency: 'USDT',
+          maxAmount: null,
+          minAmount: null,
+          notify: { endpoint: '/payments/notify', required: true },
+          paymentMethod: 'BREB',
+          targetCurrency: 'BRL',
+          walletConnect: {
+            chainId: 'eip155:42220',
+            events: [],
+            methods: ['eth_sendTransaction'],
+            namespace: 'eip155',
+          },
         },
-      }, {
-        blockchain: 'STELLAR',
-        chainFamily: 'stellar',
-        chainId: 'stellar:pubnet',
-        cryptoCurrency: 'USDC',
-        maxAmount: null,
-        minAmount: null,
-        notify: { endpoint: null, required: false },
-        paymentMethod: 'BREB',
-        targetCurrency: 'BRL',
-        walletConnect: {
+        {
+          blockchain: 'STELLAR',
+          chainFamily: 'stellar',
           chainId: 'stellar:pubnet',
-          events: [],
-          methods: ['stellar_signXDR'],
-          namespace: 'stellar',
+          cryptoCurrency: 'USDC',
+          maxAmount: null,
+          minAmount: null,
+          notify: { endpoint: null, required: false },
+          paymentMethod: 'BREB',
+          targetCurrency: 'BRL',
+          walletConnect: {
+            chainId: 'stellar:pubnet',
+            events: [],
+            methods: ['stellar_signXDR'],
+            namespace: 'stellar',
+          },
         },
-      }],
+      ],
     })
 
     const MiniPayWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
@@ -432,7 +437,6 @@ describe('useWebSwapController', () => {
 
     expect(result.current.isMiniPay).toBe(true)
     expect(result.current.chainOptions).toHaveLength(1)
-    expect(result.current.swapViewProps.selectedChainLabel).toBe('Celo')
     expect(result.current.swapViewProps.selectedAssetLabel).toBe('USDT')
     expect(result.current.swapViewProps.miniPayNotice?.title).toBe('Use USDC or USDT')
   })
