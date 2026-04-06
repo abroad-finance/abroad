@@ -7,9 +7,10 @@ import {
 } from 'lucide-react'
 import React, { useCallback } from 'react'
 
+import { CurrencyToggle } from '@/components/ui'
+import { cn } from '@/shared/utils'
+
 import { _36EnumsTargetCurrency as TargetCurrency } from '../../../api'
-import { CurrencyToggle } from '../../../components/ui'
-import { cn } from '../../../shared/utils'
 
 /* ── Props ── */
 
@@ -21,25 +22,11 @@ export interface SwapProps {
   isAboveMaximum: boolean
   isAuthenticated: boolean
   isBelowMinimum: boolean
-  isMiniPay?: boolean
-  isMiniPayReady?: boolean
   loadingBalance?: boolean
-  loadingSource?: boolean
-  loadingTarget?: boolean
-  loadingWallet?: boolean
-  miniPayNotice?: null | {
-    ctaHref: string
-    ctaLabel: string
-    description: string
-    title: string
-  }
   onBackClick?: () => void
   onBalanceClick?: () => void
-  onOpenSourceModal: () => void
-  onOpenTargetModal: () => void
   onPrimaryAction: () => void
   onRecipientChange?: (value: string) => void
-  onSourceChange: (value: string) => void
   onTargetChange: (value: string) => void
   onTaxIdChange?: (value: string) => void
   recipientName?: string
@@ -53,9 +40,6 @@ export interface SwapProps {
   transferFeeDisplay: string
   transferFeeIsZero?: boolean
   usdcBalance?: string
-  walletAddress?: null | string
-  walletStatusLabel?: string
-  walletStatusTone?: 'info' | 'warning'
 }
 
 export default function Swap({
@@ -66,20 +50,11 @@ export default function Swap({
   isAboveMaximum,
   isAuthenticated,
   isBelowMinimum,
-  isMiniPay: _isMiniPay = false,
-  isMiniPayReady: _isMiniPayReady = false,
   loadingBalance,
-  loadingSource: _loadingSource,
-  loadingTarget: _loadingTarget,
-  loadingWallet: _loadingWallet,
-  miniPayNotice: _miniPayNotice,
   onBackClick,
   onBalanceClick,
-  onOpenSourceModal: _onOpenSourceModal,
-  onOpenTargetModal: _onOpenTargetModal,
   onPrimaryAction,
   onRecipientChange,
-  onSourceChange: _onSourceChange,
   onTargetChange,
   onTaxIdChange,
   recipientName,
@@ -93,9 +68,6 @@ export default function Swap({
   transferFeeDisplay,
   transferFeeIsZero = false,
   usdcBalance,
-  walletAddress: _walletAddress,
-  walletStatusLabel: _walletStatusLabel,
-  walletStatusTone: _walletStatusTone,
 }: SwapProps): React.JSX.Element {
   const { t } = useTranslate()
 
@@ -193,17 +165,13 @@ export default function Swap({
             <input
               autoFocus
               className={cn(
-                'bg-transparent text-center text-[48px] font-black leading-[48px] tracking-[-2.4px] outline-none caret-[#10b981] placeholder:text-[#e5e7eb]',
+                'bg-transparent text-center text-[48px] font-black leading-[48px] tracking-[-2.4px] outline-none min-w-[80px] caret-[#10b981] placeholder:text-[#e5e7eb]',
                 (isBelowMinimum || isAboveMaximum || hasInsufficientFunds) ? 'text-ab-error' : 'text-[#111827]',
               )}
               inputMode="decimal"
               onChange={e => onTargetChange(e.target.value)}
               onFocus={handleFocus}
               placeholder="0"
-              style={{
-                minWidth: '80px',
-                width: `${Math.max(4, (targetAmount || '0').length + 2)}ch`,
-              }}
               type="text"
               value={targetAmount}
             />

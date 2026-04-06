@@ -3,12 +3,13 @@ import {
 } from 'lucide-react'
 import React, { memo } from 'react'
 
-import type { ChainPillChain } from '../../../components/ui'
+import type { ChainPillChain } from '@/components/ui'
 
-import AbroadLogoColored from '../../../assets/Logos/AbroadLogoColored.svg'
-import AbroadLogoWhite from '../../../assets/Logos/AbroadLogoWhite.svg'
-import { ChainPill, CurrencyToggle } from '../../../components/ui'
-import { AB_STYLES, ASSET_URLS, BRAND_TITLE_CLASS } from '../../../shared/constants'
+import AbroadLogoColored from '@/assets/Logos/AbroadLogoColored.svg'
+import AbroadLogoWhite from '@/assets/Logos/AbroadLogoWhite.svg'
+import { ChainPill, CurrencyToggle } from '@/components/ui'
+import { AB_STYLES, ASSET_URLS, BRAND_TITLE_CLASS } from '@/shared/constants'
+
 import { cn } from '../../../shared/utils'
 
 /* ── Props ── */
@@ -64,8 +65,6 @@ function chainPillChainFromKey(chainKey: string): ChainPillChain {
 
 const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({
   address,
-  balance: _balance,
-  balanceLoading: _balanceLoading,
   className = '',
   hideWalletButton = false,
   infoUrl,
@@ -74,7 +73,6 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({
   languageSelector,
   languageSelectorMobile,
   onDisconnect,
-  onHistoryClick: _onHistoryClick,
   onOpenChainModal,
   onSelectCurrency,
   onToggleTheme,
@@ -120,15 +118,10 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({
       {isConnected && !hideWalletButton && (
         <div
           aria-label={labels.walletDetailsAria}
-          className="flex shrink-0 items-center justify-center rounded-full border p-1.5"
-          style={{
-            backgroundColor: 'var(--ab-nav-balance-bg)',
-            borderColor: 'var(--ab-nav-balance-border)',
-          }}
+          className="ab-nav-balance-pill flex shrink-0 items-center justify-center rounded-full border p-1.5"
         >
           <div
-            className="h-2 w-2 shrink-0 rounded-full"
-            style={{ backgroundColor: 'var(--ab-nav-balance-dot)' }}
+            className="ab-nav-balance-dot h-2 w-2 shrink-0 rounded-full"
           />
         </div>
       )}
@@ -161,14 +154,10 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({
   return (
     <nav
       className={cn(
-        'sticky top-0 z-[100] w-full border-b p-0 backdrop-blur-[6px]',
+        'ab-nav sticky top-0 z-[100] w-full border-b p-0 backdrop-blur-[6px]',
         className,
       )}
       role="navigation"
-      style={{
-        backgroundColor: 'var(--ab-nav-bg)',
-        borderColor: 'var(--ab-nav-border)',
-      }}
     >
       {/* Mobile: full width bar - only logo and connect button */}
       <div className="md:hidden px-4 py-1.5">

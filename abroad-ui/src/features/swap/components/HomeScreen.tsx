@@ -4,27 +4,17 @@ import {
 } from 'lucide-react'
 import React from 'react'
 
+import { CurrencyToggle } from '@/components/ui'
+import { ASSET_URLS } from '@/shared/constants'
+import { cn } from '@/shared/utils'
+
 import { _36EnumsTargetCurrency as TargetCurrency, type TransactionListItem } from '../../../api'
 import BreBLogo from '../../../assets/Logos/networks/Bre-b.svg'
-import { CurrencyToggle } from '../../../components/ui'
 
 const RECENT_COUNTRY_CONFIG: Record<string, { currency: string, flagUrl: string, symbol: string }> = {
   BRL: { currency: 'BRL', flagUrl: 'https://hatscripts.github.io/circle-flags/flags/br.svg', symbol: 'R$' },
   COP: { currency: 'COP', flagUrl: 'https://hatscripts.github.io/circle-flags/flags/co.svg', symbol: '$' },
 }
-import { ASSET_URLS } from '../../../shared/constants'
-import { cn } from '../../../shared/utils'
-
-/* Figma node 5:2 – pixel-perfect spec from ABROAD NEW UI */
-const HERO_LIVE_BADGE = { bg: '#e8f5f1', dot: '#1ec677', text: '#0f513a' }
-const HERO_HEADING = { accent: '#73b9a3', dark: '#101828' }
-const HERO_SUBLINE = '#6b7280'
-const HERO_CHAINS = {
-  celo: { bg: 'rgba(255,241,162,0.94)', text: '#000000' },
-  solana: { bg: '#f3ebfd', text: '#6b21a8' },
-  stellar: { bg: '#f3f4f6', text: '#000000' },
-}
-const HERO_CTA_BG = '#54ae92'
 
 const CHAIN_CONFIG = [
   { icon: ASSET_URLS.STELLAR_CHAIN_ICON, key: 'stellar', label: 'Stellar' },
@@ -128,16 +118,13 @@ export default function HomeScreen({
         <div className="flex w-full max-w-[667px] flex-col items-center">
           {/* Live badge – Figma 5:13 */}
           <div
-            className="mb-8 flex shrink-0 items-center gap-2 rounded-full px-4 py-1.5 dark:bg-emerald-900/30 dark:border dark:border-emerald-800/50"
-            style={{ backgroundColor: HERO_LIVE_BADGE.bg }}
+            className="ab-hero-live-badge mb-8 flex shrink-0 items-center gap-2 rounded-full px-4 py-1.5 dark:bg-emerald-900/30 dark:border dark:border-emerald-800/50"
           >
             <span
-              className="h-2 w-2 shrink-0 rounded-full animate-pulse"
-              style={{ backgroundColor: HERO_LIVE_BADGE.dot }}
+              className="ab-hero-live-dot h-2 w-2 shrink-0 rounded-full animate-pulse"
             />
             <span
-              className="text-sm font-medium leading-5"
-              style={{ color: HERO_LIVE_BADGE.text }}
+              className="ab-hero-live-text text-sm font-medium leading-5"
             >
               {t('home.live_badge', 'Live in Colombia & Brazil')}
             </span>
@@ -145,21 +132,20 @@ export default function HomeScreen({
 
           {/* Headline – Figma 5:20 */}
           <h1 className="mb-6 text-center text-[40px] font-extrabold leading-[48px] tracking-[-1.5px] md:text-[60px] md:leading-[60px]">
-            <span style={{ color: HERO_HEADING.dark }}>
+            <span className="ab-hero-heading-dark">
               {t('home.headline_1', 'Spend your')}
               <br />
               stablecoins at
             </span>
             <br />
-            <span style={{ color: HERO_HEADING.accent }}>
+            <span className="ab-hero-heading-accent">
               {t('home.headline_2', 'local merchants.')}
             </span>
           </h1>
 
           {/* Subline – Figma 5:22 */}
           <p
-            className="mb-8 max-w-[461px] text-center text-xl font-normal leading-7"
-            style={{ color: HERO_SUBLINE }}
+            className="ab-hero-subline mb-8 max-w-[461px] text-center text-xl font-normal leading-7"
           >
             {t('home.subline', 'Connect your wallet, scan a QR code, and pay — the merchant receives local currency instantly.')}
           </p>
@@ -167,12 +153,12 @@ export default function HomeScreen({
           {/* Chain badges – Figma 5:24 */}
           <div className="mb-10 flex shrink-0 flex-wrap items-center justify-center gap-3">
             {CHAIN_CONFIG.map(({ icon, key, label }) => {
-              const theme = HERO_CHAINS[key]
+              const bgClass = key === 'celo' ? 'ab-hero-chain-celo' : key === 'solana' ? 'ab-hero-chain-solana' : 'ab-hero-chain-stellar'
+              const textClass = key === 'celo' ? 'ab-hero-chain-celo-text' : key === 'solana' ? 'ab-hero-chain-solana-text' : 'ab-hero-chain-stellar-text'
               return (
                 <div
-                  className="flex items-center gap-2 self-stretch rounded-full px-4 py-[5.5px]"
+                  className={`${bgClass} flex items-center gap-2 self-stretch rounded-full px-4 py-[5.5px]`}
                   key={key}
-                  style={{ backgroundColor: theme.bg }}
                 >
                   <img
                     alt={label}
@@ -180,8 +166,7 @@ export default function HomeScreen({
                     src={icon}
                   />
                   <span
-                    className="text-center text-sm font-medium leading-5"
-                    style={{ color: theme.text }}
+                    className={`${textClass} text-center text-sm font-medium leading-5`}
                   >
                     {label}
                   </span>
@@ -192,9 +177,8 @@ export default function HomeScreen({
 
           {/* CTA Button – Figma 5:36 */}
           <button
-            className="mb-6 flex shrink-0 items-center justify-center gap-2 rounded-2xl px-8 py-4 font-bold text-white shadow-[0px_10px_15px_-3px_rgba(0,0,0,0.1),0px_4px_6px_-4px_rgba(0,0,0,0.1)] transition-opacity hover:opacity-90 md:mb-12"
+            className="ab-hero-cta mb-6 flex shrink-0 items-center justify-center gap-2 rounded-2xl px-8 py-4 font-bold text-white shadow-[0px_10px_15px_-3px_rgba(0,0,0,0.1),0px_4px_6px_-4px_rgba(0,0,0,0.1)] transition-opacity hover:opacity-90 md:mb-12"
             onClick={onConnectWallet}
-            style={{ backgroundColor: HERO_CTA_BG }}
             type="button"
           >
             <span className="text-lg leading-7">
@@ -205,8 +189,7 @@ export default function HomeScreen({
 
           {/* Trust badges – Figma 5:41 */}
           <div
-            className="flex w-full flex-nowrap items-center justify-between gap-2 sm:flex-wrap sm:justify-center sm:gap-8"
-            style={{ color: HERO_SUBLINE }}
+            className="ab-hero-subline flex w-full flex-nowrap items-center justify-between gap-2 sm:flex-wrap sm:justify-center sm:gap-8"
           >
             {trustBadges.map(({ Icon, label }) => (
               <div
