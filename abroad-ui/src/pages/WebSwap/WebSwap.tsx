@@ -185,7 +185,7 @@ const WebSwap: React.FC = () => {
   const handleBalanceClick = useCallback(() => {
     if (sourceAssetBalance) {
       const raw = sourceAssetBalance.replaceAll(',', '')
-      swapViewProps.onSourceChange(raw)
+      swapViewProps.onSourceChange?.(raw)
     }
   }, [sourceAssetBalance, swapViewProps])
 
