@@ -2,26 +2,11 @@ import { useTranslate } from '@tolgee/react'
 import { ChevronDown } from 'lucide-react'
 import React, { useState } from 'react'
 
-import { BottomSheet, StatusBadge } from '../../../components/ui'
-import { ASSET_URLS } from '../../../shared/constants'
-import { cn } from '../../../shared/utils'
+import { BottomSheet, StatusBadge } from '@/shared/components'
+import { ASSET_URLS } from '@/shared/constants'
+import { cn } from '@/shared/utils'
 
-export interface TxDetailItem {
-  accountNumber: string
-  chain: string
-  country: 'br' | 'co'
-  date: string
-  fee: string
-  localAmount: string
-  location?: string
-  merchant: string
-  partnerId?: string
-  settlementTime: string
-  status: 'completed' | 'expired' | 'pending'
-  token: string
-  transactionId?: string
-  usdcAmount: string
-}
+import type { TxDetailItem } from '../constants'
 
 const CHAIN_CONFIG: Record<string, { bg: string, icon: string }> = {
   Celo: { bg: 'var(--ab-chain-celo-bg)', icon: ASSET_URLS.CELO_CHAIN_ICON },

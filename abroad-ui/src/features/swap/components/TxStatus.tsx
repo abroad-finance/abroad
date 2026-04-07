@@ -4,14 +4,13 @@ import React, {
   memo, useCallback, useEffect, useState,
 } from 'react'
 
-import { TransactionStatus as ApiStatus, _36EnumsTargetCurrency as TargetCurrency } from '../../../api'
-import { useWebSocketSubscription } from '../../../contexts/WebSocketContext'
-import { getTransactionStatus } from '../../../services/public/publicApi'
-import { Button } from '../../../shared/components/Button'
-import { IconAnimated } from '../../../shared/components/IconAnimated'
-import { ASSET_URLS } from '../../../shared/constants'
-import { useWalletAuth } from '../../../shared/hooks/useWalletAuth'
-import { cn } from '../../../shared/utils'
+import { TransactionStatus as ApiStatus, getTransactionStatus, _36EnumsTargetCurrency as TargetCurrency } from '@/api'
+import { useWebSocketSubscription } from '@/contexts/WebSocketContext'
+import { Button } from '@/shared/components/Button'
+import { IconAnimated } from '@/shared/components/IconAnimated'
+import { ASSET_URLS } from '@/shared/constants'
+import { useWalletAuth } from '@/shared/hooks/useWalletAuth'
+import { cn } from '@/shared/utils'
 
 // S6478: component defined at module scope (not inside parent)
 const DetailRow = ({ className, label, value }: { className?: string, label: string, value: React.ReactNode }) => (
@@ -142,7 +141,7 @@ const TxStatus = ({
       attempts += 1
       const result = await getTransactionStatus(transactionId)
       if (cancelled) return
-      if (!result.ok || !result.data) {
+      if (!result.data || result.status !== 200) {
         scheduleNext()
         return
       }

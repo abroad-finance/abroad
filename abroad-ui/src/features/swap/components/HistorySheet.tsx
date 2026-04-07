@@ -2,11 +2,11 @@ import { useTranslate } from '@tolgee/react'
 import { ChevronRight } from 'lucide-react'
 import React from 'react'
 
-import type { TxDetailItem } from './TxDetailSheet'
+import { BottomSheet } from '@/shared/components'
+import { ASSET_URLS } from '@/shared/constants'
+import { cn } from '@/shared/utils'
 
-import { BottomSheet } from '../../../components/ui'
-import { ASSET_URLS } from '../../../shared/constants'
-import { cn } from '../../../shared/utils'
+import type { TxDetailItem } from '../constants'
 
 const CHAIN_CONFIG: Record<string, { bg: string, icon: string }> = {
   Celo: { bg: 'var(--ab-chain-celo-bg)', icon: ASSET_URLS.CELO_CHAIN_ICON },
