@@ -1,5 +1,5 @@
-export { BottomSheet, StatusBadge } from '../shared/components'
-export type { BottomSheetProps, StatusBadgeProps, StatusBadgeVariant } from '../shared/components'
+export { BottomSheet, StatusBadge } from '../../shared/components'
+export type { BottomSheetProps, StatusBadgeProps, StatusBadgeVariant } from '../../shared/components'
 export { AmountInput } from './AmountInput'
 export type { AmountInputProps, InputMode } from './AmountInput'
 export { ChainPill } from './ChainPill'

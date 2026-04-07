@@ -8,7 +8,7 @@ import type { BankDetailsRouteProps } from '../../features/swap/components/BankD
 import type { ConfirmQrProps } from '../../features/swap/components/ConfirmQr'
 import type { SwapProps } from '../../features/swap/components/Swap'
 import type { ChainOption, TokenOption } from '../../features/swap/components/TokenSelectModal'
-import type { TxDetailItem } from '../../features/swap/components/TxDetailSheet'
+import type { TxDetailItem } from '../../features/swap/constants'
 import type { SwapView } from '../../features/swap/types'
 
 import { _36EnumsTargetCurrency as TargetCurrency, type TransactionListItem } from '../../api/index'
