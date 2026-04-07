@@ -22,11 +22,20 @@ export interface SwapProps {
   isAboveMaximum: boolean
   isAuthenticated: boolean
   isBelowMinimum: boolean
+  isMiniPay?: boolean
+  isMiniPayReady?: boolean
   loadingBalance?: boolean
+  loadingSource?: boolean
+  loadingTarget?: boolean
+  loadingWallet?: boolean
+  miniPayNotice?: null | { [key: string]: unknown, title?: string }
   onBackClick?: () => void
   onBalanceClick?: () => void
+  onOpenSourceModal?: () => void
+  onOpenTargetModal?: () => void
   onPrimaryAction: () => void
   onRecipientChange?: (value: string) => void
+  onSourceChange?: (value: string) => void
   onTargetChange: (value: string) => void
   onTaxIdChange?: (value: string) => void
   recipientName?: string
@@ -40,6 +49,9 @@ export interface SwapProps {
   transferFeeDisplay: string
   transferFeeIsZero?: boolean
   usdcBalance?: string
+  walletAddress?: null | string
+  walletStatusLabel?: string
+  walletStatusTone?: 'info'
 }
 
 export default function Swap({
