@@ -1,4 +1,4 @@
-import { BlockchainNetwork, CryptoCurrency, PrismaClient, TransactionStatus } from '@prisma/client'
+import { BlockchainNetwork } from '@prisma/client'
 import { ethers } from 'ethers'
 import { inject, injectable } from 'inversify'
 
@@ -15,6 +15,7 @@ import {
   sumTransfers,
   toDecimalAmount,
 } from './celoErc20'
+import { ensureUniqueOnChainId, validateDepositTransaction } from './depositVerification'
 
 type CeloReceiptContext = {
   depositAddress: string
@@ -50,7 +51,7 @@ export class CeloPaymentVerifier implements IDepositVerifier {
       return { outcome: 'error', reason: 'Transaction not found', status: 404 }
     }
 
-    const validationError = this.validateTransaction(transaction)
+    const validationError = validateDepositTransaction(transaction, BlockchainNetwork.CELO)
     if (validationError) {
       return { outcome: 'error', reason: validationError, status: 400 }
     }
@@ -63,7 +64,7 @@ export class CeloPaymentVerifier implements IDepositVerifier {
       return { outcome: 'error', reason: 'Unsupported currency for Celo payments', status: 400 }
     }
 
-    const duplicateReason = await this.ensureUniqueOnChainId(prismaClient, onChainSignature, transaction.id)
+    const duplicateReason = await ensureUniqueOnChainId(prismaClient, onChainSignature, transaction.id)
     if (duplicateReason) {
       return { outcome: 'error', reason: duplicateReason, status: 400 }
     }
@@ -133,23 +134,6 @@ export class CeloPaymentVerifier implements IDepositVerifier {
       provider,
       tokenAddress,
     }
-  }
-
-  private async ensureUniqueOnChainId(
-    prismaClient: PrismaClient,
-    onChainSignature: string,
-    transactionId: string,
-  ): Promise<string | undefined> {
-    const duplicateOnChain = await prismaClient.transaction.findFirst({
-      select: { id: true },
-      where: { onChainId: onChainSignature },
-    })
-
-    if (duplicateOnChain && duplicateOnChain.id !== transactionId) {
-      return 'On-chain transaction already linked to another transaction'
-    }
-
-    return undefined
   }
 
   private extractDepositTransfer(
@@ -238,20 +222,4 @@ export class CeloPaymentVerifier implements IDepositVerifier {
     return null
   }
 
-  private validateTransaction(transaction: {
-    quote: { cryptoCurrency: CryptoCurrency, network: BlockchainNetwork }
-    status: TransactionStatus
-  }): string | undefined {
-    const isAwaitingPayment = transaction.status === TransactionStatus.AWAITING_PAYMENT
-    const isExpiredPayment = transaction.status === TransactionStatus.PAYMENT_EXPIRED
-    if (!isAwaitingPayment && !isExpiredPayment) {
-      return 'Transaction is not awaiting payment'
-    }
-
-    if (transaction.quote.network !== BlockchainNetwork.CELO) {
-      return 'Transaction is not set for Celo'
-    }
-
-    return undefined
-  }
 }

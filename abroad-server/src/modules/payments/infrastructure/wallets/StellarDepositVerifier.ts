@@ -1,4 +1,4 @@
-import { BlockchainNetwork, CryptoCurrency, TransactionStatus } from '@prisma/client'
+import { BlockchainNetwork, CryptoCurrency } from '@prisma/client'
 import { Horizon } from '@stellar/stellar-sdk'
 import { inject, injectable } from 'inversify'
 
@@ -10,6 +10,7 @@ import { IDatabaseClientProvider } from '../../../../platform/persistence/IDatab
 import { ISecretManager, Secrets } from '../../../../platform/secrets/ISecretManager'
 import { DepositVerificationError, DepositVerificationSuccess, IDepositVerifier } from '../../application/contracts/IDepositVerifier'
 import { CryptoAssetConfigService } from '../../application/CryptoAssetConfigService'
+import { validateDepositTransaction } from './depositVerification'
 
 @injectable()
 export class StellarDepositVerifier implements IDepositVerifier {
@@ -39,14 +40,9 @@ export class StellarDepositVerifier implements IDepositVerifier {
       return { outcome: 'error', reason: 'Transaction not found', status: 404 }
     }
 
-    const isAwaitingPayment = transaction.status === TransactionStatus.AWAITING_PAYMENT
-    const isExpiredPayment = transaction.status === TransactionStatus.PAYMENT_EXPIRED
-    if (!isAwaitingPayment && !isExpiredPayment) {
-      return { outcome: 'error', reason: 'Transaction is not awaiting payment', status: 400 }
-    }
-
-    if (transaction.quote.network !== BlockchainNetwork.STELLAR) {
-      return { outcome: 'error', reason: 'Transaction is not set for Stellar', status: 400 }
+    const validationError = validateDepositTransaction(transaction, BlockchainNetwork.STELLAR)
+    if (validationError) {
+      return { outcome: 'error', reason: validationError, status: 400 }
     }
 
     const assetConfig = await this.assetConfigService.getActiveMint({
