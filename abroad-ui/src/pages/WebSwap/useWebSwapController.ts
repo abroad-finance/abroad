@@ -423,7 +423,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
       if (!aStellar && bStellar) return 1
       return 0
     })
-  }, [chainVariants, isMiniPay, scopedCorridors])
+  }, [chainVariants, scopedCorridors])
   const assetOptions = useMemo(() => chainFilteredCorridors.map(corridor => ({
     key: corridorKeyOf(corridor),
     label: corridor.cryptoCurrency,

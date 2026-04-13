@@ -57,8 +57,12 @@ export class StellarDepositVerifier implements IDepositVerifier {
     const server = new Horizon.Server(horizonUrl)
 
     let transactionRecord: Horizon.ServerApi.TransactionRecord
+    let operations: Horizon.ServerApi.CollectionPage<Horizon.ServerApi.OperationRecord>
     try {
-      transactionRecord = await server.transactions().transaction(onChainSignature).call()
+      [transactionRecord, operations] = await Promise.all([
+        server.transactions().transaction(onChainSignature).call(),
+        server.operations().forTransaction(onChainSignature).call(),
+      ])
     }
     catch (error) {
       const status = this.extractErrorStatus(error) ?? 400
@@ -66,26 +70,17 @@ export class StellarDepositVerifier implements IDepositVerifier {
       return { outcome: 'error', reason, status: status === 404 ? 404 : 400 }
     }
 
-    let payment: Horizon.ServerApi.PaymentOperationRecord | undefined
-    try {
-      const operations = await server.operations().forTransaction(onChainSignature).call()
-      const paymentOps = operations.records.filter(
-        (op): op is Horizon.ServerApi.PaymentOperationRecord => this.isPayment(op),
-      )
-      if (paymentOps.length === 0) {
-        return { outcome: 'error', reason: 'Transaction does not include a payment operation', status: 400 }
-      }
-      payment = paymentOps.find(op => (
-        this.isPaymentToWallet(op, accountId, transaction.quote.cryptoCurrency, assetConfig.mintAddress)
-      ))
-      if (!payment) {
-        return { outcome: 'error', reason: 'Payment does not target the configured wallet', status: 400 }
-      }
+    const paymentOps = operations.records.filter(
+      (op): op is Horizon.ServerApi.PaymentOperationRecord => this.isPayment(op),
+    )
+    if (paymentOps.length === 0) {
+      return { outcome: 'error', reason: 'Transaction does not include a payment operation', status: 400 }
     }
-    catch (error) {
-      const status = this.extractErrorStatus(error) ?? 400
-      const reason = error instanceof Error ? error.message : 'Failed to fetch transaction operations'
-      return { outcome: 'error', reason, status: status === 404 ? 404 : 400 }
+    const payment = paymentOps.find(op => (
+      this.isPaymentToWallet(op, accountId, transaction.quote.cryptoCurrency, assetConfig.mintAddress)
+    ))
+    if (!payment) {
+      return { outcome: 'error', reason: 'Payment does not target the configured wallet', status: 400 }
     }
 
     const memo = transactionRecord.memo?.trim() ?? null

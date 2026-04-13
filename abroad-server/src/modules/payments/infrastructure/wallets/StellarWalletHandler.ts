@@ -15,7 +15,7 @@ import { TYPES } from '../../../../app/container/types'
 import { createScopedLogger, ScopedLogger } from '../../../../core/logging/scopedLogger'
 import { ILogger } from '../../../../core/logging/types'
 import { ILockManager } from '../../../../platform/cacheLock/ILockManager'
-import { ISecretManager } from '../../../../platform/secrets/ISecretManager'
+import { ISecretManager, Secrets } from '../../../../platform/secrets/ISecretManager'
 import { IWalletHandler, WalletSendParams, WalletSendResult } from '../../application/contracts/IWalletHandler'
 import { CryptoAssetConfigService } from '../../application/CryptoAssetConfigService'
 
@@ -52,7 +52,7 @@ export class StellarWalletHandler implements IWalletHandler {
       throw new Error('onChainId is required to get address from transaction')
     }
 
-    const horizonUrl = await this.secretManager.getSecret('STELLAR_HORIZON_URL')
+    const horizonUrl = await this.secretManager.getSecret(Secrets.STELLAR_HORIZON_URL)
     const server = new Horizon.Server(horizonUrl)
     try {
       const tx = await server.transactions().transaction(onChainId).call()
@@ -74,10 +74,6 @@ export class StellarWalletHandler implements IWalletHandler {
     }
   }
 
-  /**
-   * Send cryptocurrency to the specified address on the Stellar network.
-   * Uses a Redis-backed distributed lock to serialize submissions per source account.
-   */
   async send({
     address,
     amount,
@@ -93,15 +89,15 @@ export class StellarWalletHandler implements IWalletHandler {
         throw new Error(`Unsupported cryptocurrency for Stellar: ${cryptoCurrency}`)
       }
 
-      const horizonUrl = await this.secretManager.getSecret('STELLAR_HORIZON_URL')
-      const privateKey = await this.secretManager.getSecret('STELLAR_PRIVATE_KEY')
+      const horizonUrl = await this.secretManager.getSecret(Secrets.STELLAR_HORIZON_URL)
+      const privateKey = await this.secretManager.getSecret(Secrets.STELLAR_PRIVATE_KEY)
 
       const server = new Horizon.Server(horizonUrl)
       const sourceKeypair = Keypair.fromSecret(privateKey)
       const sourcePublicKey = sourceKeypair.publicKey()
 
       // 🔒 Serialize all txs per source account across ALL nodes
-      const LOCK_TTL_MS = 20_000 // long enough for load+build+submit; auto-extends if needed
+      const LOCK_TTL_MS = 20_000 // long enough for load+build+submit
       const result = await this.lockManager.withLock(sourcePublicKey, LOCK_TTL_MS, async () => {
         const sourceAccount = await server.loadAccount(sourcePublicKey)
         const fee = await server.fetchBaseFee()

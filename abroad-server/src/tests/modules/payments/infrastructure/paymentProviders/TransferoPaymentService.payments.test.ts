@@ -66,7 +66,7 @@ describe('TransferoPaymentService getLiquidity', () => {
     const liquidity = await harness.service.getLiquidity()
 
     expect(liquidity).toBe(0)
-    expect(harness.logger.error).toHaveBeenCalledWith('Transfero getLiquidity error:', JSON.stringify('boom'))
+    expect(harness.logger.error).toHaveBeenCalledWith('Transfero getLiquidity error:', 'boom')
   })
 })
 
@@ -224,8 +224,8 @@ describe('TransferoPaymentService sendPayment', () => {
       value: 5,
     })
 
-    expect(result).toEqual({ code: 'retriable', reason: JSON.stringify('plain axios'), success: false })
-    expect(harness.logger.error).toHaveBeenCalledWith('Transfero sendPayment error:', JSON.stringify('plain axios'))
+    expect(result).toEqual({ code: 'retriable', reason: 'plain axios', success: false })
+    expect(harness.logger.error).toHaveBeenCalledWith('Transfero sendPayment error:', 'plain axios')
     expect(mockedAxios.post).toHaveBeenCalledTimes(1)
   })
 
@@ -244,7 +244,7 @@ describe('TransferoPaymentService sendPayment', () => {
       value: 5,
     })
 
-    expect(result).toEqual({ code: 'retriable', reason: JSON.stringify('transient'), success: false })
+    expect(result).toEqual({ code: 'retriable', reason: 'transient', success: false })
     expect(mockedAxios.post).toHaveBeenCalledTimes(3)
   })
 })
