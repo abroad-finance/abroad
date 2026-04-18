@@ -52,6 +52,7 @@ export interface WebSwapControllerProps {
   handleQrResult: (text: string) => Promise<void>
   handleWalletDetailsClose: () => void
   handleWalletDetailsOpen: () => void
+  hasPassedOnboarding: boolean
   isDecodingQr: boolean
   isMiniPay: boolean
   isQrOpen: boolean
