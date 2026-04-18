@@ -116,14 +116,16 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({
         />
       )}
       {isConnected && !hideWalletButton && (
-        <div
+        <button
           aria-label={labels.walletDetailsAria}
-          className="ab-nav-balance-pill flex shrink-0 items-center justify-center rounded-full border p-1.5"
+          className="ab-nav-balance-pill flex shrink-0 items-center justify-center rounded-full border p-1.5 cursor-pointer"
+          onClick={onWalletClick}
+          type="button"
         >
           <div
             className="ab-nav-balance-dot h-2 w-2 shrink-0 rounded-full"
           />
-        </div>
+        </button>
       )}
       {address && !hideWalletButton && (
         <>

@@ -45,7 +45,7 @@ export default function TxDetailSheet({ onClose, tx }: Readonly<TxDetailSheetPro
           <div
             className={cn(
               'flex h-10 w-10 items-center justify-center rounded-full border-[1.5px]',
-              isExpired ? 'border-[#FECACA] bg-[#FEF2F2]' : 'border-[var(--ab-green-border)] bg-[var(--ab-green-soft)]',
+              isExpired ? 'border-[var(--ab-red-border)] bg-[var(--ab-red-soft)]' : 'border-[var(--ab-green-border)] bg-[var(--ab-green-soft)]',
             )}
           >
             {isExpired
@@ -115,7 +115,7 @@ export default function TxDetailSheet({ onClose, tx }: Readonly<TxDetailSheetPro
             <div
               className={cn(
                 'flex items-center justify-between px-4 py-3',
-                i % 2 === 0 ? 'bg-[#FAFBFC]' : 'bg-white',
+                i % 2 === 0 ? 'bg-ab-separator/30' : 'bg-ab-card',
               )}
               key={row.label}
             >
@@ -146,19 +146,19 @@ export default function TxDetailSheet({ onClose, tx }: Readonly<TxDetailSheetPro
         {showTechnical && (
           <div className="mt-0 overflow-hidden rounded-b-[14px] border border-t-0 border-[var(--ab-border)]">
             {[
-              { l: 'Transaction ID', v: tx.transactionId ?? '—' },
-              { l: 'Partner ID', v: tx.partnerId ?? '—' },
-              { l: 'Account number', v: tx.accountNumber },
-              { l: 'Country code', v: tx.country.toUpperCase() },
-              { l: 'Source amount', v: `${tx.usdcAmount} ${tx.token}` },
-              { l: 'Target amount', v: `${tx.localAmount} ${country.currency}` },
-              { l: 'Crypto currency', v: tx.token },
-              { l: 'Network', v: tx.chain.toUpperCase() },
+              { l: t('tx_detail.transaction_id', 'Transaction ID'), v: tx.transactionId ?? '—' },
+              { l: t('tx_detail.partner_id', 'Partner ID'), v: tx.partnerId ?? '—' },
+              { l: t('tx_detail.account_number', 'Account number'), v: tx.accountNumber },
+              { l: t('tx_detail.country_code', 'Country code'), v: tx.country.toUpperCase() },
+              { l: t('tx_detail.source_amount', 'Source amount'), v: `${tx.usdcAmount} ${tx.token}` },
+              { l: t('tx_detail.target_amount', 'Target amount'), v: `${tx.localAmount} ${country.currency}` },
+              { l: t('tx_detail.crypto_currency', 'Crypto currency'), v: tx.token },
+              { l: t('tx_detail.network', 'Network'), v: tx.chain.toUpperCase() },
             ].map((row, i) => (
               <div
                 className={cn(
                   'flex justify-between gap-2 px-4 py-2.5',
-                  i % 2 === 0 ? 'bg-[#FAFBFC]' : 'bg-white',
+                  i % 2 === 0 ? 'bg-ab-separator/30' : 'bg-ab-card',
                 )}
                 key={row.l}
               >

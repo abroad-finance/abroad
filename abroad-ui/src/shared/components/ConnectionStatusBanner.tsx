@@ -29,20 +29,20 @@ export function ConnectionStatusBanner() {
         ? (
             <>
               <Loader2 className="h-4 w-4 animate-spin text-ab-text-2 shrink-0" />
-              <span className="text-sm text-ab-text-2 whitespace-nowrap">{t('connection.reconnecting', 'Reconectando...')}</span>
+              <span className="text-sm text-ab-text-2 whitespace-nowrap">{t('connection.reconnecting', 'Reconnecting...')}</span>
             </>
           )
         : (
             <>
               <WifiOff className="h-4 w-4 text-ab-error shrink-0" />
-              <span className="text-sm text-ab-text-2 whitespace-nowrap">{t('connection.disconnected', 'Sin conexión al servidor')}</span>
+              <span className="text-sm text-ab-text-2 whitespace-nowrap">{t('connection.disconnected', 'No connection to server')}</span>
               {reconnectFailed && (
                 <button
                   className="text-sm text-ab-green hover:underline ml-1 whitespace-nowrap"
                   onClick={manualReconnect}
                   type="button"
                 >
-                  {t('connection.retry', 'Reintentar')}
+                  {t('connection.retry', 'Retry')}
                 </button>
               )}
             </>

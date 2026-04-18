@@ -17,8 +17,8 @@ const variantStyles: Record<StatusBadgeVariant, { bg: string, border: string, te
     text: 'var(--ab-green-dark)',
   },
   expired: {
-    bg: '#FEF2F2',
-    border: '#FECACA',
+    bg: 'var(--ab-red-soft)',
+    border: 'var(--ab-red-border)',
     text: 'var(--ab-red)',
   },
   pending: {

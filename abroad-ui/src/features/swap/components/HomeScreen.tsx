@@ -59,12 +59,15 @@ export interface HomeScreenProps {
   formatDate?: (dateString: string) => string
   getStatusStyle?: (status: string) => string
   getStatusText?: (status: string) => string
+  /** True when onboarding was bypassed (click "Continuar" or already has wallet) */
+  hasPassedOnboarding?: boolean
   isAuthenticated: boolean
   onConnectWallet: () => void
   onGoToManual: () => void
   onHistoryClick: () => void
   onOpenChainModal?: () => void
   onOpenQr: () => void
+  onPassOnboarding?: () => void
   onSelectCurrency?: (currency: TargetCurrency) => void
   onSelectTransaction?: (tx: TransactionListItem) => void
   recentTransactions: TransactionListItem[]
@@ -88,12 +91,14 @@ export default function HomeScreen({
   formatDate,
   getStatusStyle,
   getStatusText,
+  hasPassedOnboarding: _hasPassedOnboarding,
   isAuthenticated,
   onConnectWallet,
   onGoToManual,
   onHistoryClick,
   onOpenChainModal,
   onOpenQr,
+  onPassOnboarding,
   onSelectCurrency,
   onSelectTransaction,
   recentTransactions,
@@ -118,7 +123,7 @@ export default function HomeScreen({
         <div className="flex w-full max-w-[667px] flex-col items-center">
           {/* Live badge – Figma 5:13 */}
           <div
-            className="ab-hero-live-badge mb-8 flex shrink-0 items-center gap-2 rounded-full px-4 py-1.5 dark:bg-emerald-900/30 dark:border dark:border-emerald-800/50"
+            className="ab-hero-live-badge mb-8 flex shrink-0 items-center gap-2 rounded-full px-4 py-1.5"
           >
             <span
               className="ab-hero-live-dot h-2 w-2 shrink-0 rounded-full animate-pulse"
@@ -135,7 +140,7 @@ export default function HomeScreen({
             <span className="ab-hero-heading-dark">
               {t('home.headline_1', 'Spend your')}
               <br />
-              stablecoins at
+              {t('home.headline_1b', 'stablecoins at')}
             </span>
             <br />
             <span className="ab-hero-heading-accent">
@@ -175,14 +180,14 @@ export default function HomeScreen({
             })}
           </div>
 
-          {/* CTA Button – Figma 5:36 */}
+          {/* CTA Button – Figma 5:36 (onboarding "Continuar" → passes through, wallet connect otherwise) */}
           <button
             className="ab-hero-cta mb-6 flex shrink-0 items-center justify-center gap-2 rounded-2xl px-8 py-4 font-bold text-white shadow-[0px_10px_15px_-3px_rgba(0,0,0,0.1),0px_4px_6px_-4px_rgba(0,0,0,0.1)] transition-opacity hover:opacity-90 md:mb-12"
-            onClick={onConnectWallet}
+            onClick={onPassOnboarding ?? onConnectWallet}
             type="button"
           >
             <span className="text-lg leading-7">
-              {t('home.cta_connect', 'Connect Wallet to Start')}
+              {t('home.cta_continue', 'Continuar')}
             </span>
             <ChevronRight className="h-4 w-4 shrink-0" />
           </button>
@@ -220,7 +225,7 @@ export default function HomeScreen({
       <div className="w-full max-w-[576px]">
         {/* Balance – Figma 1:46 */}
         <div className="flex flex-col items-center gap-1 py-1">
-          <p className="text-center text-xs font-bold uppercase leading-4 tracking-[1.2px] text-[#6b7280]">
+          <p className="text-center text-xs font-bold uppercase leading-4 tracking-[1.2px] text-ab-text-2">
             {t('home.your_balance', 'Your Balance')}
           </p>
           <div className="flex items-center justify-center gap-3">
@@ -233,17 +238,17 @@ export default function HomeScreen({
                   />
                 )
               : (
-                  <span className="text-2xl font-medium text-[#10b981] md:text-[30px] md:leading-9">
+                  <span className="text-2xl font-medium text-ab-green md:text-[30px] md:leading-9">
                     {selectedTokenLabel}
                   </span>
                 )}
-            <span className="text-center text-[40px] font-black leading-[48px] text-[#111827] md:text-[60px] md:leading-[60px]">
+            <span className="text-center text-[40px] font-black leading-[48px] text-ab-text md:text-[60px] md:leading-[60px]">
               $
               {balance}
             </span>
           </div>
           <div className="flex h-8 items-center justify-center pt-1">
-            <div className="flex items-center gap-2 rounded-full border border-[#f3f4f6] bg-[rgba(255,255,255,0.6)] px-[13px] py-[4.5px] shadow-[0px_1px_2px_0px_rgba(0,0,0,0.05)]">
+            <div className="flex items-center gap-2 rounded-full border border-ab-border bg-ab-card/60 px-[13px] py-[4.5px] shadow-[0px_1px_2px_0px_rgba(0,0,0,0.05)]">
               {CURRENCY_FLAG_URL[targetCurrency] && (
                 <img
                   alt={targetCurrency}
@@ -251,7 +256,7 @@ export default function HomeScreen({
                   src={CURRENCY_FLAG_URL[targetCurrency]}
                 />
               )}
-              <span className="text-xs font-medium leading-4 text-[#6b7280]">
+              <span className="text-xs font-medium leading-4 text-ab-text-2">
                 ≈
                 {targetCurrency === TargetCurrency.BRL ? ' R$' : ' $'}
                 {localBalance}
@@ -266,19 +271,19 @@ export default function HomeScreen({
         <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
           {onOpenChainModal && (
             <button
-              className="flex items-center gap-2 rounded-full border border-[#e5e7eb] bg-[#f3f4f6] px-[13px] py-[7px] transition-colors hover:opacity-90"
+              className="flex items-center gap-2 rounded-full border border-ab-border bg-ab-hover px-[13px] py-[7px] transition-colors hover:opacity-90"
               onClick={onOpenChainModal}
               type="button"
             >
               <img alt={chainInfo.name} className="h-5 w-5" src={chainInfo.icon} />
-              <span className="text-xs font-semibold text-[#374151]">
+              <span className="text-xs font-semibold text-ab-text">
                 {selectedTokenLabel}
                 {' '}
                 on
                 {' '}
                 {chainInfo.name}
               </span>
-              <ChevronDown className="h-4 w-4 text-[#374151]" />
+              <ChevronDown className="h-4 w-4 text-ab-text" />
             </button>
           )}
           {onSelectCurrency && (
@@ -292,7 +297,7 @@ export default function HomeScreen({
         {/* Payment cards – Figma 1:71, 2 cols equal height, responsive */}
         <div className="mt-6 grid grid-cols-2 gap-3 items-stretch md:mt-10 md:gap-4">
           <button
-            className="flex h-full min-h-[140px] w-full flex-col items-center justify-center gap-1.5 rounded-[24px] bg-[#3ca383] p-4 text-center shadow-[0px_0px_15px_0px_rgba(16,185,129,0.3)] transition-opacity hover:opacity-95 md:min-h-[180px] md:gap-4 md:rounded-[32px] md:p-6"
+            className="flex h-full min-h-[140px] w-full flex-col items-center justify-center gap-1.5 rounded-[24px] bg-ab-green p-4 text-center shadow-[0px_0px_15px_0px_rgba(16,185,129,0.3)] transition-opacity hover:opacity-95 md:min-h-[180px] md:gap-4 md:rounded-[32px] md:p-6"
             onClick={onOpenQr}
             type="button"
           >
@@ -310,14 +315,14 @@ export default function HomeScreen({
           </button>
 
           <button
-            className="flex h-full min-h-[140px] w-full flex-col items-center justify-center gap-1.5 rounded-[24px] bg-white p-4 text-center shadow-[0px_4px_6px_-1px_rgba(0,0,0,0.02),0px_2px_4px_-1px_rgba(0,0,0,0.02)] transition-shadow hover:shadow-md md:min-h-[180px] md:gap-4 md:rounded-[32px] md:p-6"
+            className="flex h-full min-h-[140px] w-full flex-col items-center justify-center gap-1.5 rounded-[24px] bg-ab-card p-4 text-center shadow-[0px_4px_6px_-1px_rgba(0,0,0,0.02),0px_2px_4px_-1px_rgba(0,0,0,0.02)] transition-shadow hover:shadow-md md:min-h-[180px] md:gap-4 md:rounded-[32px] md:p-6"
             onClick={onGoToManual}
             type="button"
           >
-            <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[14px] bg-[#f3f4f6] md:h-24 md:w-24 md:rounded-[20px]">
-              <Keyboard className="h-full w-full p-2 text-[#374151]" strokeWidth={1.5} />
+            <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[14px] bg-ab-hover md:h-24 md:w-24 md:rounded-[20px]">
+              <Keyboard className="h-full w-full p-2 text-ab-text" strokeWidth={1.5} />
             </div>
-            <span className="text-sm font-bold leading-tight text-[#111827] md:text-xl md:leading-[25px]">
+            <span className="text-sm font-bold leading-tight text-ab-text md:text-xl md:leading-[25px]">
               {t('home.manual_payment', 'Manual Payment')}
             </span>
           </button>
@@ -327,18 +332,18 @@ export default function HomeScreen({
         {(recentTransactions.length > 0 || recentTransactionsFallback.length > 0) && (
           <div className="mt-4">
             <div className="mb-4 flex items-center justify-between">
-              <span className="text-xs font-bold uppercase leading-4 tracking-[1.2px] text-[#6b7280]">
+              <span className="text-xs font-bold uppercase leading-4 tracking-[1.2px] text-ab-text-2">
                 {t('home.recent', 'Recent')}
               </span>
               <button
-                className="text-sm font-medium leading-5 text-[#10b981]"
+                className="text-sm font-medium leading-5 text-ab-green"
                 onClick={onHistoryClick}
                 type="button"
               >
                 {t('home.see_all', 'See all')}
               </button>
             </div>
-            <div className="divide-y divide-[#e5e7eb] overflow-hidden rounded-2xl border border-[#e5e7eb] bg-white">
+            <div className="divide-y divide-ab-border overflow-hidden rounded-2xl border border-ab-border bg-ab-card">
               {recentTransactions.length > 0
                 ? recentTransactions.slice(0, 2).map((tx) => {
                     const countryConfig = RECENT_COUNTRY_CONFIG[tx.quote.targetCurrency] ?? RECENT_COUNTRY_CONFIG.COP
@@ -351,16 +356,16 @@ export default function HomeScreen({
                     )
                     return (
                       <button
-                        className="flex w-full items-center gap-3.5 px-4 py-3.5 text-left transition-colors hover:bg-[#f9fafb]"
+                        className="flex w-full items-center gap-3.5 px-4 py-3.5 text-left transition-colors hover:bg-ab-hover"
                         key={tx.id}
                         onClick={() => (onSelectTransaction ? onSelectTransaction(tx) : onHistoryClick())}
                         type="button"
                       >
-                        <div className="relative flex h-7 w-7 shrink-0 items-center justify-center rounded-[9px] border border-[#e5e7eb] bg-[#f9fafb]">
-                          <Store className="h-3.5 w-3.5 text-[#6b7280]" strokeWidth={1.5} />
+                        <div className="relative flex h-7 w-7 shrink-0 items-center justify-center rounded-[9px] border border-ab-border bg-ab-hover">
+                          <Store className="h-3.5 w-3.5 text-ab-text-2" strokeWidth={1.5} />
                           <img
                             alt={countryConfig.currency}
-                            className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border border-white object-cover shadow-sm"
+                            className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border border-ab-card object-cover shadow-sm"
                             src={countryConfig.flagUrl}
                           />
                         </div>
@@ -368,13 +373,13 @@ export default function HomeScreen({
                           <div
                             className={cn(
                               'text-sm font-semibold',
-                              isExpired ? 'text-[#6b7280] line-through' : 'text-[#111827]',
+                              isExpired ? 'text-ab-text-2 line-through' : 'text-ab-text',
                             )}
                           >
                             {tx.accountNumber}
                           </div>
                           {formatDate && (
-                            <div className="mt-0.5 text-xs text-[#6b7280]">
+                            <div className="mt-0.5 text-xs text-ab-text-2">
                               {formatDate(tx.createdAt)}
                             </div>
                           )}
@@ -383,7 +388,7 @@ export default function HomeScreen({
                           <div
                             className={cn(
                               'text-sm font-semibold',
-                              isExpired ? 'text-[#6b7280] line-through' : 'text-[#111827]',
+                              isExpired ? 'text-ab-text-2 line-through' : 'text-ab-text',
                             )}
                           >
                             {countryConfig.symbol}
@@ -391,7 +396,7 @@ export default function HomeScreen({
                             {' '}
                             {countryConfig.currency}
                           </div>
-                          <div className="text-[11px] text-[#6b7280]">
+                          <div className="text-[11px] text-ab-text-2">
                             $
                             {tx.quote.sourceAmount.toFixed(2)}
                             {' '}
@@ -403,7 +408,7 @@ export default function HomeScreen({
                             </span>
                           )}
                         </div>
-                        <ChevronRight className="h-4 w-4 shrink-0 text-[#9ca3af]" />
+                        <ChevronRight className="h-4 w-4 shrink-0 text-ab-text-3" />
                       </button>
                     )
                   })
@@ -411,42 +416,42 @@ export default function HomeScreen({
                     const countryConfig = RECENT_COUNTRY_CONFIG[tx.country] ?? RECENT_COUNTRY_CONFIG.COP
                     return (
                       <button
-                        className="flex w-full items-center gap-3.5 px-4 py-3.5 text-left transition-colors hover:bg-[#f9fafb]"
+                        className="flex w-full items-center gap-3.5 px-4 py-3.5 text-left transition-colors hover:bg-ab-hover"
                         key={`${tx.merchant}-${tx.time}-${i}`}
                         onClick={onHistoryClick}
                         type="button"
                       >
-                        <div className="relative flex h-7 w-7 shrink-0 items-center justify-center rounded-[9px] border border-[#e5e7eb] bg-[#f9fafb]">
-                          <Store className="h-3.5 w-3.5 text-[#6b7280]" strokeWidth={1.5} />
+                        <div className="relative flex h-7 w-7 shrink-0 items-center justify-center rounded-[9px] border border-ab-border bg-ab-hover">
+                          <Store className="h-3.5 w-3.5 text-ab-text-2" strokeWidth={1.5} />
                           <img
                             alt={countryConfig.currency}
-                            className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border border-white object-cover shadow-sm"
+                            className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border border-ab-card object-cover shadow-sm"
                             src={countryConfig.flagUrl}
                           />
                         </div>
                         <div className="min-w-0 flex-1">
-                          <div className="text-sm font-semibold text-[#111827]">{tx.merchant}</div>
-                          <div className="mt-0.5 text-xs text-[#6b7280]">
-                            {tx.country === 'COP' ? 'Colombia' : 'Brazil'}
+                          <div className="text-sm font-semibold text-ab-text">{tx.merchant}</div>
+                          <div className="mt-0.5 text-xs text-ab-text-2">
+                            {tx.country === 'COP' ? t('country.colombia', 'Colombia') : t('country.brazil', 'Brazil')}
                             {' · '}
                             {tx.time}
                           </div>
                         </div>
                         <div className="text-right">
-                          <div className="text-sm font-semibold text-[#111827]">
+                          <div className="text-sm font-semibold text-ab-text">
                             {countryConfig.symbol}
                             {tx.localAmount}
                             {' '}
                             {countryConfig.currency}
                           </div>
-                          <div className="text-[11px] text-[#6b7280]">
+                          <div className="text-[11px] text-ab-text-2">
                             $
                             {tx.usdcAmount}
                             {' '}
                             {selectedTokenLabel}
                           </div>
                         </div>
-                        <ChevronRight className="h-4 w-4 shrink-0 text-[#9ca3af]" />
+                        <ChevronRight className="h-4 w-4 shrink-0 text-ab-text-3" />
                       </button>
                     )
                   })}

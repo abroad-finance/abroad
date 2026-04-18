@@ -223,8 +223,6 @@ const TxStatus = ({
 
     return (
       <div className="flex flex-1 flex-col items-center justify-center w-full max-w-[448px]">
-        {error && status !== 'accepted' ? <div className="text-ab-error text-sm">{error}</div> : null}
-
         <div className="flex w-full flex-col items-center">
           {/* Success icon – Figma 17:93 */}
           <div className="mb-8">{renderIcon()}</div>

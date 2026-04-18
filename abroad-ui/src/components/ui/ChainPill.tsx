@@ -33,7 +33,6 @@ const PILL_CLASS = 'flex items-center gap-2 rounded-full border border-[#e5e7eb]
 export const ChainPill: React.FC<ChainPillProps> = ({
   chain,
   className,
-  compact: _compact = false,
   onClick,
   tokenLabel,
 }) => (

@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react'
 
 import type { TransactionData, UserTransactionSummary } from './public/transactionTypes'
 
+import { transactionMatchesChain } from '../features/swap/utils/corridorHelpers'
 import { getUserTransactions } from './public/publicApi'
 
 const NETWORK_TO_CHAIN: Record<string, string> = {
@@ -21,6 +22,7 @@ export function useUserTransactions(isAuthenticated: boolean, selectedChainKey?:
   const fetchTransactions = useCallback(async (options?: { confirmedOnly?: boolean, page?: number, pageSize?: number }) => {
     if (!isAuthenticated) {
       setTransactions([])
+      setIsLoading(false)
       return
     }
 
@@ -97,12 +99,14 @@ function formatDate(dateString: string): string {
   const diffHours = Math.floor(diffMs / 3600000)
   const diffDays = Math.floor(diffMs / 86400000)
 
-  if (diffMins < 1) return 'Just now'
-  if (diffMins < 60) return `${diffMins}m ago`
-  if (diffHours < 24) return `${diffHours}h ago`
-  if (diffDays < 7) return `${diffDays}d ago`
+  const rtf = new Intl.RelativeTimeFormat(navigator.language, { numeric: 'auto' })
 
-  return date.toLocaleDateString('en-US', { day: 'numeric', month: 'short' })
+  if (diffMins < 1) return rtf.format(0, 'minute')
+  if (diffMins < 60) return rtf.format(-diffMins, 'minute')
+  if (diffHours < 24) return rtf.format(-diffHours, 'hour')
+  if (diffDays < 7) return rtf.format(-diffDays, 'day')
+
+  return date.toLocaleDateString(navigator.language, { day: 'numeric', month: 'short' })
 }
 
 function formatFullDate(dateString: string): string {
@@ -157,16 +161,4 @@ function mapTransactionToSummary(tx: TransactionData): UserTransactionSummary {
     time: formatDate(tx.createdAt),
     usdcAmount: tx.quote.sourceAmount.toFixed(2),
   }
-}
-
-function networkFromChainKey(chainKey: string): string {
-  const prefix = chainKey.split(':')[0]?.toLowerCase() ?? ''
-  if (prefix === 'stellar') return 'STELLAR'
-  if (prefix === 'solana') return 'SOLANA'
-  if (prefix === 'celo' || prefix === 'eip155') return 'CELO'
-  return 'STELLAR'
-}
-
-function transactionMatchesChain(tx: TransactionData, chainKey: string): boolean {
-  return (tx.quote.network?.toUpperCase() ?? '') === networkFromChainKey(chainKey)
 }

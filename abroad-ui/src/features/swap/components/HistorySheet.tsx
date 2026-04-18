@@ -59,7 +59,7 @@ export default function HistorySheet({ onClose, onSelectTx, transactions }: Read
                       <div
                         className={cn(
                           'relative flex h-12 w-12 shrink-0 items-center justify-center rounded-[15px] border',
-                          isExpired ? 'border-[#FECACA] bg-[#FEF2F2]' : 'border-[var(--ab-border)] bg-[var(--ab-bg-muted)]',
+                          isExpired ? 'border-[var(--ab-red-border)] bg-[var(--ab-red-soft)]' : 'border-[var(--ab-border)] bg-[var(--ab-bg-muted)]',
                         )}
                       >
                         <img alt={country.currency} className="h-7 w-7 rounded-full" src={country.flagUrl} />

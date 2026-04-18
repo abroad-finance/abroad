@@ -1,3 +1,4 @@
+import { useTranslate } from '@tolgee/react'
 import React, { useCallback, useRef } from 'react'
 
 import { cn } from '../../shared/utils'
@@ -52,6 +53,7 @@ export function AmountInput({
   tokenLabel,
   usdcValue,
 }: Readonly<AmountInputProps>): React.JSX.Element {
+  const { t } = useTranslate()
   const inputRef = useRef<HTMLInputElement>(null)
 
   const handleFocus = useCallback((e: React.FocusEvent<HTMLInputElement>) => {
@@ -112,7 +114,7 @@ export function AmountInput({
               onClick={onModeSwitch}
               type="button"
             >
-              switch
+              {t('amount_input.switch', 'switch')}
             </button>
           </div>
         </>
@@ -146,7 +148,7 @@ export function AmountInput({
             onClick={onModeSwitch}
             type="button"
           >
-            switch
+            {t('amount_input.switch', 'switch')}
           </button>
         </div>
       </>

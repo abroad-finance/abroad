@@ -79,7 +79,7 @@ const TransactionDetail: React.FC<Readonly<TransactionDetailProps>> = ({
   return (
     <div className="flex flex-col">
       {/* Header — Figma 1:254 */}
-      <div className="flex items-center justify-between border-b border-[#e2e8f0] pb-4 pt-1">
+      <div className="flex items-center justify-between border-b border-ab-border pb-4 pt-1">
         <button
           aria-label={t('wallet_details.actions.back', 'Back')}
           className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-ab-hover"
@@ -88,7 +88,7 @@ const TransactionDetail: React.FC<Readonly<TransactionDetailProps>> = ({
         >
           <ArrowLeft className="h-5 w-5 text-ab-text" strokeWidth={2} />
         </button>
-        <h3 className="font-cereal text-lg font-bold text-[#0f172a]">
+        <h3 className="font-cereal text-lg font-bold text-ab-text">
           {t('wallet_details.transactions.detail_title', 'Transaction Details')}
         </h3>
         <div className="flex gap-2">
@@ -108,7 +108,7 @@ const TransactionDetail: React.FC<Readonly<TransactionDetailProps>> = ({
         <div
           className={cn(
             'mb-4 flex h-16 w-16 shrink-0 items-center justify-center rounded-full',
-            isExpired ? 'bg-red-100' : 'bg-[#d1fae5]',
+            isExpired ? 'bg-red-100' : 'bg-ab-green-soft',
           )}
         >
           {isExpired
@@ -118,15 +118,15 @@ const TransactionDetail: React.FC<Readonly<TransactionDetailProps>> = ({
                 </svg>
               )
             : (
-                <svg className="h-8 w-8 text-[#059669]" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                <svg className="h-8 w-8 text-ab-green" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
                   <path d="M20 6L9 17l-5-5" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               )}
         </div>
-        <h4 className={cn('font-cereal text-xl font-bold', isExpired ? 'text-ab-error' : 'text-[#059669]')}>
+        <h4 className={cn('font-cereal text-xl font-bold', isExpired ? 'text-ab-error' : 'text-ab-green')}>
           {isExpired ? t('wallet_details.status.expired', 'Payment Expired') : t('wallet_details.status.completed', 'Payment Completed')}
         </h4>
-        <p className="mt-1 text-sm text-[#64748b]">
+        <p className="mt-1 text-sm text-ab-text-2">
           {formatDateWithTime(transaction.createdAt)}
         </p>
       </div>
@@ -141,53 +141,53 @@ const TransactionDetail: React.FC<Readonly<TransactionDetailProps>> = ({
             src={country.flagUrl}
           />
         </div>
-        <h5 className="font-cereal text-2xl font-bold text-[#0f172a]">
+        <h5 className="font-cereal text-2xl font-bold text-ab-text">
           {transaction.accountNumber}
         </h5>
-        <div className="flex items-center gap-1 text-sm text-[#64748b]">
+        <div className="flex items-center gap-1 text-sm text-ab-text-2">
           <MapPin className="h-3.5 w-3.5 shrink-0" />
           <span>{country.location}</span>
         </div>
       </div>
 
       {/* Currency comparison card — Figma 1:287 */}
-      <div className="mb-6 rounded-2xl border border-[#f1f5f9] bg-white p-6 shadow-sm">
+      <div className="mb-6 rounded-2xl border border-ab-border bg-ab-card p-6 shadow-sm">
         <div className="flex items-center justify-between">
           <div>
-            <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-[#94a3b8]">
+            <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-ab-text-3">
               {t('wallet_details.transactions.you_paid', 'You Paid')}
             </p>
             <div className="flex items-center gap-2">
-              <span className="font-cereal text-xl font-bold text-[#0f172a]">
+              <span className="font-cereal text-xl font-bold text-ab-text">
                 {transaction.quote.sourceAmount.toFixed(2)}
               </span>
-              <span className="flex items-center gap-1.5 rounded bg-[#f1f5f9] px-2 py-0.5 text-xs font-semibold text-[#475569]">
+              <span className="flex items-center gap-1.5 rounded bg-ab-hover px-2 py-0.5 text-xs font-semibold text-ab-text-secondary">
                 <img alt={cryptoCurrency} className="h-4 w-4" src={tokenIcon} />
                 {transaction.quote.cryptoCurrency ?? 'USDC'}
               </span>
             </div>
           </div>
-          <ArrowRight className="h-8 w-8 shrink-0 text-[#94a3b8]" strokeWidth={2} />
+          <ArrowRight className="h-8 w-8 shrink-0 text-ab-text-2" strokeWidth={2} />
           <div className="text-right">
-            <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-[#94a3b8]">
+            <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-ab-text-3">
               {t('wallet_details.transactions.merchant_got', 'Merchant Got')}
             </p>
             <div className="flex items-center justify-end gap-2">
-              <span className="font-cereal text-xl font-bold text-[#0f172a]">
+              <span className="font-cereal text-xl font-bold text-ab-text">
                 {targetFormatted}
               </span>
-              <span className="flex items-center gap-1.5 rounded bg-[#f1f5f9] px-2 py-0.5 text-xs font-semibold text-[#475569]">
+              <span className="flex items-center gap-1.5 rounded bg-ab-hover px-2 py-0.5 text-xs font-semibold text-ab-text-secondary">
                 <img alt={country.name} className="h-4 w-4" src={country.flagUrl} />
                 {country.name}
               </span>
             </div>
           </div>
         </div>
-        <div className="mt-4 flex items-center justify-between border-t border-[#f8fafc] pt-4">
-          <span className="text-xs text-[#94a3b8]">
+        <div className="mt-4 flex items-center justify-between border-t border-ab-separator pt-4">
+          <span className="text-xs text-ab-text-3">
             {t('wallet_details.transactions.exchange_rate', 'Exchange Rate')}
           </span>
-          <span className="text-xs font-medium text-[#0f172a]">
+          <span className="text-xs font-medium text-ab-text">
             1
             {' '}
             {transaction.quote.cryptoCurrency ?? 'USDC'}
@@ -203,30 +203,30 @@ const TransactionDetail: React.FC<Readonly<TransactionDetailProps>> = ({
 
       {/* Transaction summary — Figma 1:313 */}
       <div className="mb-4">
-        <h6 className="mb-4 px-1 text-xs font-bold uppercase tracking-wider text-[#94a3b8]">
+        <h6 className="mb-4 px-1 text-xs font-bold uppercase tracking-wider text-ab-text-3">
           {t('wallet_details.transactions.summary', 'Transaction Summary')}
         </h6>
         <div className="space-y-1">
           <SummaryRow label={t('wallet_details.transactions.status', 'Status')}>
-            <span className={cn('flex items-center gap-1 font-semibold', isExpired ? 'text-ab-error' : 'text-[#0f172a]')}>
-              {!isExpired && <span className="h-2 w-2 shrink-0 rounded-full bg-[#10b981]" />}
+            <span className={cn('flex items-center gap-1 font-semibold', isExpired ? 'text-ab-error' : 'text-ab-text')}>
+              {!isExpired && <span className="h-2 w-2 shrink-0 rounded-full bg-ab-green" />}
               {getStatusText(transaction.status)}
             </span>
           </SummaryRow>
           <SummaryRow label={t('wallet_details.transactions.payment_rail', 'Payment Rail')}>
-            <span className="flex items-center gap-1.5 font-semibold text-[#0f172a]">
+            <span className="flex items-center gap-1.5 font-semibold text-ab-text">
               <img alt={country.location} className="h-4 w-4" src={country.flagUrl} />
               {country.rail}
             </span>
           </SummaryRow>
           <SummaryRow label={t('wallet_details.transactions.network', 'Network')}>
-            <span className="flex items-center gap-1.5 font-semibold text-[#0f172a]">
+            <span className="flex items-center gap-1.5 font-semibold text-ab-text">
               <img alt={chainLabel} className="h-5 w-5" src={chainIcon} />
               {chainLabel}
             </span>
           </SummaryRow>
           <SummaryRow label={t('wallet_details.transactions.token', 'Token')}>
-            <span className="flex items-center gap-1.5 font-semibold text-[#0f172a]">
+            <span className="flex items-center gap-1.5 font-semibold text-ab-text">
               <img alt={cryptoCurrency} className="h-4 w-4" src={tokenIcon} />
               {transaction.quote.cryptoCurrency ?? 'USDC'}
               {' '}
@@ -234,7 +234,7 @@ const TransactionDetail: React.FC<Readonly<TransactionDetailProps>> = ({
             </span>
           </SummaryRow>
           <SummaryRow label={t('wallet_details.transactions.recipient_id', 'Recipient ID')}>
-            <span className="rounded bg-[#f1f5f9] px-2 py-1 font-mono text-sm text-[#0f172a]">
+            <span className="rounded bg-ab-hover px-2 py-1 font-mono text-sm text-ab-text">
               {shortRecipient}
             </span>
           </SummaryRow>
@@ -242,32 +242,32 @@ const TransactionDetail: React.FC<Readonly<TransactionDetailProps>> = ({
       </div>
 
       {/* Technical details collapsible — Figma 1:356 */}
-      <div className="mb-6 overflow-hidden rounded-xl border border-[#e2e8f0]">
+      <div className="mb-6 overflow-hidden rounded-xl border border-ab-border">
         <button
-          className="flex w-full items-center justify-between bg-[#f8fafc] px-4 py-4 transition-colors hover:bg-ab-hover"
+          className="flex w-full items-center justify-between bg-ab-hover px-4 py-4 transition-colors hover:bg-ab-selected"
           onClick={() => setShowTechnical(s => !s)}
           type="button"
         >
-          <span className="font-cereal text-sm font-bold text-[#0f172a]">
+          <span className="font-cereal text-sm font-bold text-ab-text">
             {t('wallet_details.transactions.technical_details', 'Technical Details')}
           </span>
           {showTechnical ? <ChevronUp className="h-4 w-4 text-ab-text-muted" /> : <ChevronDown className="h-4 w-4 text-ab-text-muted" />}
         </button>
         {showTechnical && (
-          <div className="border-t border-[#e2e8f0] bg-white px-4 py-4">
+          <div className="border-t border-ab-border bg-ab-card px-4 py-4">
             {txRef.onChainId && (
               <div className="mb-4">
-                <p className="mb-1 text-[10px] font-bold uppercase text-[#94a3b8]">
+                <p className="mb-1 text-[10px] font-bold uppercase text-ab-text-3">
                   {t('wallet_details.transactions.tx_hash', 'Transaction Hash')}
                 </p>
-                <p className="break-all font-mono text-xs text-[#475569]">{txRef.onChainId}</p>
+                <p className="break-all font-mono text-xs text-ab-text-secondary">{txRef.onChainId}</p>
               </div>
             )}
             <div>
-              <p className="mb-1 text-[10px] font-bold uppercase text-[#94a3b8]">
+              <p className="mb-1 text-[10px] font-bold uppercase text-ab-text-3">
                 {t('wallet_details.transactions.transaction_id', 'Transaction ID')}
               </p>
-              <p className="break-all font-mono text-xs text-[#475569]">{transaction.id}</p>
+              <p className="break-all font-mono text-xs text-ab-text-secondary">{transaction.id}</p>
             </div>
           </div>
         )}
@@ -279,7 +279,7 @@ const TransactionDetail: React.FC<Readonly<TransactionDetailProps>> = ({
 function SummaryRow({ children, label }: Readonly<{ children: React.ReactNode, label: string }>) {
   return (
     <div className="flex items-center justify-between py-1">
-      <span className="text-sm text-[#64748b]">{label}</span>
+      <span className="text-sm text-ab-text-2">{label}</span>
       {children}
     </div>
   )

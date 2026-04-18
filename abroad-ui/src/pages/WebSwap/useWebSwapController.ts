@@ -346,6 +346,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
   const [corridorError, setCorridorError] = useState<null | string>(null)
   const [chainKey, setChainKey] = useState('')
   const [pendingConnectAfterChainSelect, setPendingConnectAfterChainSelect] = useState(false)
+  const [hasPassedOnboarding, setHasPassedOnboarding] = useState(false)
 
   const sep24TokenPresent = useMemo(() => {
     if (typeof window === 'undefined') return false
@@ -662,12 +663,14 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     transferFee,
   ])
 
-  const isAuthenticated = Boolean(wallet?.address && wallet?.chainId && (isMiniPay || walletAuthentication?.jwtToken))
+  const isWalletConnected = Boolean(wallet?.address && wallet?.chainId && (isMiniPay || walletAuthentication?.jwtToken))
+  const isAuthenticated = isWalletConnected || hasPassedOnboarding
   const resolvedChainId = wallet?.chainId ?? selectedCorridor?.chainId ?? null
   const walletUserId = buildWalletUserId(resolvedChainId, wallet?.address ?? null)
 
   const connectWallet = useCallback(async () => {
     if (!wallet || !selectedCorridor) return
+    if (isWalletConnected && !isMiniPay) return
     if (isMiniPay) {
       await wallet.connect()
       return
@@ -681,6 +684,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     await wallet.connect(options)
   }, [
     isMiniPay,
+    isWalletConnected,
     selectedCorridor,
     wallet,
   ])
@@ -824,8 +828,8 @@ export const useWebSwapController = (): WebSwapControllerProps => {
   // (dashboard with balance, scan QR, enter amount) instead of swap view with pre-filled data.
   const prevIsAuthRef = useRef(false)
   useEffect(() => {
-    if (isAuthenticated && !prevIsAuthRef.current) {
-      // Clear any previous transaction data to show clean dashboard
+    if (isWalletConnected && !prevIsAuthRef.current) {
+      // Clear any previous transaction data to show clean dashboad
       dispatch({
         accountNumber: '', pixKey: '', recipientName: '', taxId: '', type: 'SET_BANK_DETAILS',
       })
@@ -834,8 +838,8 @@ export const useWebSwapController = (): WebSwapControllerProps => {
       })
       dispatch({ type: 'SET_VIEW', view: 'home' })
     }
-    prevIsAuthRef.current = isAuthenticated
-  }, [isAuthenticated])
+    prevIsAuthRef.current = isWalletConnected
+  }, [isWalletConnected])
 
   useEffect(() => {
     const handleResize = () => {
@@ -1047,10 +1051,8 @@ export const useWebSwapController = (): WebSwapControllerProps => {
   }, [quoteFromTarget])
 
   const openQr = useCallback(() => {
-    if (!isAuthenticated) {
-      if (isMiniPay) {
-        return
-      }
+    if (!isWalletConnected) {
+      if (isMiniPay) return
       void connectWallet()
       return
     }
@@ -1058,7 +1060,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     dispatch({ targetCurrency: TargetCurrency.BRL, type: 'SET_TARGET_CURRENCY' })
   }, [
     connectWallet,
-    isAuthenticated,
+    isWalletConnected,
     isMiniPay,
   ])
 
@@ -1178,21 +1180,19 @@ export const useWebSwapController = (): WebSwapControllerProps => {
   }, [])
 
   const onPrimaryAction = useCallback(async () => {
-    if (!isAuthenticated) {
-      if (isMiniPay) {
-        return
-      }
-      await connectWallet()
+    if (!isWalletConnected) {
+      if (isMiniPay) return
+      void connectWallet()
       return
     }
     if (!state.quoteId) {
-      notifyError(t('swap.wait_for_quote', 'Espera la cotizaci?n antes de continuar'))
+      notifyError(t('swap.wait_for_quote', 'Espera la cotización antes de continuar'))
       return
     }
     dispatch({ type: 'SET_VIEW', view: 'confirm-qr' })
   }, [
     connectWallet,
-    isAuthenticated,
+    isWalletConnected,
     isMiniPay,
     notifyError,
     state.quoteId,
@@ -1778,6 +1778,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     handleQrResult,
     handleWalletDetailsClose,
     handleWalletDetailsOpen,
+    hasPassedOnboarding,
     isDecodingQr: state.isDecodingQr,
     isMiniPay,
     isQrOpen: state.isQrOpen,
@@ -1790,6 +1791,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     selectChain,
     selectCurrency,
     selectedChainKey: activeChainKey,
+    setHasPassedOnboarding,
     sourceAmountForBalanceCheck,
     swapViewProps: swapProps,
     targetAmount: state.targetAmount,

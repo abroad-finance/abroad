@@ -1,3 +1,4 @@
+import { useTranslate } from '@tolgee/react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Check, X } from 'lucide-react'
 import React, { useCallback } from 'react'
@@ -36,8 +37,8 @@ function getChainShortLabel(label: string): string {
 }
 
 function tokenColor(tokenId: string): { bg: string, text: string } {
-  if (tokenId.toLowerCase() === 'usdt') return { bg: '#26A17B15', text: '#26A17B' }
-  return { bg: '#2775CA15', text: '#2775CA' }
+  if (tokenId.toLowerCase() === 'usdt') return { bg: 'rgba(38, 161, 123, 0.08)', text: 'var(--ab-green)' }
+  return { bg: 'rgba(39, 117, 202, 0.08)', text: 'var(--ab-text)' }
 }
 
 function tokenIconUrl(tokenIdOrLabel: string): string | undefined {
@@ -69,6 +70,7 @@ export const ChainSelectorModal: React.FC<ChainSelectorModalProps> = ({
   selectedTokenKey,
   tokens,
 }) => {
+  const { t } = useTranslate()
   const selectedChain = chains.find(c => c.key === selectedChainKey)
 
   const handleTokenClick = useCallback((key: string) => {
@@ -85,17 +87,16 @@ export const ChainSelectorModal: React.FC<ChainSelectorModalProps> = ({
       <Overlay onClose={onClose}>
         <motion.div
           animate={{ opacity: 1, scale: 1, y: 0 }}
-          className="flex w-full max-w-[360px] flex-col gap-4 rounded-[24px] border border-[#356E6A14] p-6 shadow-[0_24px_80px_rgba(0,0,0,0.12)]"
+          className="flex w-full max-w-[360px] flex-col gap-4 rounded-[24px] border border-ab-card-border bg-ab-modal-bg p-6 shadow-[0_24px_80px_rgba(0,0,0,0.12)]"
           exit={{ opacity: 0, scale: 0.98, y: 8 }}
           initial={{ opacity: 0, scale: 0.98, y: 8 }}
-          style={{ background: '#FFFFFF' }}
           transition={{ duration: 0.2, ease: 'easeOut' }}
         >
           {/* Header – Figma 36-2 tsHeader */}
           <div className="flex w-full items-center justify-between">
-            <h3 className="text-lg font-semibold text-[#1a3a37]">Pay from</h3>
+            <h3 className="text-lg font-semibold text-ab-text">{t('chain_selector.pay_from', 'Pay from')}</h3>
             <button
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#F3F4F6] text-[#6B7280] transition-colors hover:bg-[#E5E7EB]"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-ab-hover text-ab-text-2 transition-colors hover:bg-ab-selected"
               onClick={onClose}
               type="button"
             >
@@ -117,7 +118,7 @@ export const ChainSelectorModal: React.FC<ChainSelectorModalProps> = ({
                   onClick={() => onSelectChain(chain.key)}
                   style={{
                     background: isSelected ? 'rgba(53, 110, 106, 0.1)' : 'rgba(53, 110, 106, 0.05)',
-                    border: isSelected ? '2px solid #5a9a8f' : '2px solid transparent',
+                    border: isSelected ? '2px solid var(--ab-green)' : '2px solid transparent',
                   }}
                   type="button"
                 >
@@ -128,7 +129,7 @@ export const ChainSelectorModal: React.FC<ChainSelectorModalProps> = ({
                   />
                   <span
                     className="text-xs font-semibold"
-                    style={{ color: isSelected ? '#1a3a37' : '#7a9e9a' }}
+                    style={{ color: isSelected ? 'var(--ab-text)' : 'var(--ab-text-2)' }}
                   >
                     {label}
                   </span>
@@ -138,8 +139,8 @@ export const ChainSelectorModal: React.FC<ChainSelectorModalProps> = ({
           </div>
 
           {/* Token list – Figma tsTokenList: gap 4, row padding 10,12 */}
-          <p className="text-[11px] font-bold uppercase tracking-[2px] text-[#7a9e9a]">
-            Available tokens on
+          <p className="text-[11px] font-bold uppercase tracking-[2px] text-ab-text-2">
+            {t('chain_selector.available_tokens_on', 'Available tokens on')}
             {' '}
             {chainLabel}
           </p>
@@ -177,15 +178,15 @@ export const ChainSelectorModal: React.FC<ChainSelectorModalProps> = ({
                         )}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <div className="text-sm font-semibold text-[#1a3a37]">{token.label}</div>
-                    <div className="text-xs text-[#7a9e9a]">{tokenSubtitle(token.label)}</div>
+                    <div className="text-sm font-semibold text-ab-text">{token.label}</div>
+                    <div className="text-xs text-ab-text-2">{t(`chain_selector.token.${token.label.toLowerCase()}`, tokenSubtitle(token.label))}</div>
                   </div>
                   <div className="text-right">
-                    <div className="text-sm font-semibold text-[#1a3a37]">
+                    <div className="text-sm font-semibold text-ab-text">
                       $
                       {balance}
                     </div>
-                    <div className="text-[11px] text-[#7a9e9a]">available</div>
+                    <div className="text-[11px] text-ab-text-2">{t('chain_selector.available', 'available')}</div>
                   </div>
                   {isSelected && (
                     <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-abroad-dark">

@@ -39,7 +39,7 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({ children, className, o
         className,
       )}
       onClick={e => e.stopPropagation()}
-      onKeyDown={e => e.stopPropagation()}
+      onKeyDown={(e) => { if (e.key !== 'Escape') e.stopPropagation() }}
       open
       role="dialog"
     >

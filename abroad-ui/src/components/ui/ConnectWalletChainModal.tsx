@@ -1,3 +1,4 @@
+import { useTranslate } from '@tolgee/react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ChevronRight, X } from 'lucide-react'
 import React from 'react'
@@ -47,6 +48,7 @@ export function ConnectWalletChainModal({
   onSelectChain,
   open,
 }: Readonly<ConnectWalletChainModalProps>): null | React.JSX.Element {
+  const { t } = useTranslate()
   if (!open) return null
 
   const handleSelect = (key: string) => {
@@ -68,7 +70,7 @@ export function ConnectWalletChainModal({
         >
           <div className="mb-6 flex items-center justify-between">
             <h3 className="font-cereal text-xl font-bold" style={{ color: 'var(--ab-text, #111827)' }}>
-              Connect wallet
+              {t('connect_wallet.title', 'Connect wallet')}
             </h3>
             <button
               className="flex h-9 w-9 items-center justify-center rounded-xl transition-colors"
@@ -80,7 +82,7 @@ export function ConnectWalletChainModal({
             </button>
           </div>
           <p className="mb-6 text-sm" style={{ color: 'var(--ab-text-secondary, #5f6b7a)' }}>
-            Choose the blockchain you want to use. Then we&apos;ll show the right wallet options.
+            {t('connect_wallet.description', 'Choose the blockchain you want to use. Then we\'ll show the right wallet options.')}
           </p>
 
           <div className="flex flex-col gap-3">

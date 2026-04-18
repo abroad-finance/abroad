@@ -35,7 +35,7 @@ const mockWalletConnectModule: any = {
   isAvailable: async () => true,
   moduleType: ModuleType.BRIDGE_WALLET,
   productIcon: 'https://stellar.creit.tech/wallet-icons/walletconnect.png',
-  productId: 'wallet_connect', // WALLET_CONNECT_ID is 'wallet_connect'
+  productId: 'wallet_connect',
   productName: 'Wallet Connect',
   productUrl: 'https://walletconnect.com/',
   signAuthEntry: async () => { throw new Error('Handled externally') },
@@ -298,10 +298,17 @@ export function useStellarKitWallet(
       if (!uri) throw new Error('No WalletConnect URI')
       const modal = ensureWalletConnectModal()
       await modal.openModal({ chains: [STELLAR_CHAIN_ID], uri })
-      const session = await approval()
-      wcTopicRef.current = session.topic
-      await modal.closeModal()
-      localStorage.setItem(storeKey, JSON.stringify({ topic: session.topic }))
+      try {
+        const session = await approval()
+        wcTopicRef.current = session.topic
+        try {
+          localStorage.setItem(storeKey, JSON.stringify({ topic: session.topic }))
+        }
+        catch { /* ignore storage failures */ }
+      }
+      finally {
+        await modal.closeModal()
+      }
     }
 
     const session = client.session.get(wcTopicRef.current as string)

@@ -57,11 +57,11 @@
 /* ── Light mode (default) ── */
 :root {
   /* UX redesign: brand green + semantic tokens */
-  --ab-green: #0FBE7B;
-  --ab-green-dark: #0AA66B;
-  --ab-green-soft: rgba(15, 190, 123, 0.06);
-  --ab-green-medium: rgba(15, 190, 123, 0.1);
-  --ab-green-border: rgba(15, 190, 123, 0.16);
+  --ab-green: #73B9A3;
+  --ab-green-dark: #5FA993;
+  --ab-green-soft: rgba(115, 185, 163, 0.06);
+  --ab-green-medium: rgba(115, 185, 163, 0.1);
+  --ab-green-border: rgba(115, 185, 163, 0.16);
   --ab-bg: #FAFCFB;
   --ab-bg-end: #d4ede4;
   --ab-bg-card: #FFFFFF;
@@ -73,6 +73,8 @@
   --ab-border: #E8ECF0;
   --ab-border-hover: #D1D5DB;
   --ab-red: #EF4444;
+  --ab-red-soft: #FEF2F2;
+  --ab-red-border: #FECACA;
   --ab-amber: #F59E0B;
   --ab-chain-stellar: #000000;
   --ab-chain-stellar-bg: #F0F0F0;
@@ -87,8 +89,8 @@
   --ab-card-border: rgba(53, 110, 106, 0.1);
   --ab-input: #f0f7f5;
   --ab-input-border: rgba(53, 110, 106, 0.08);
-  --ab-btn: #0FBE7B;
-  --ab-btn-hover: #0AA66B;
+  --ab-btn: #73B9A3;
+  --ab-btn-hover: #5FA993;
   --ab-btn-text: #ffffff;
   --ab-separator: rgba(53, 110, 106, 0.1);
   --ab-modal-bg: #ffffff;
@@ -106,6 +108,19 @@
   --ab-nav-balance-border: rgba(53, 110, 106, 0.12);
   --ab-nav-balance-dot: #1ec677;
   --ab-nav-balance-text: #0f513a;
+}
+
+/* Navbar utility classes */
+.ab-nav {
+  background-color: var(--ab-nav-bg);
+  border-color: var(--ab-nav-border);
+}
+.ab-nav-balance-pill {
+  background-color: var(--ab-nav-balance-bg);
+  border-color: var(--ab-nav-balance-border);
+}
+.ab-nav-balance-dot {
+  background-color: var(--ab-nav-balance-dot);
 }
 
 /* ── Dark mode ── */
@@ -137,6 +152,81 @@
   --ab-nav-balance-border: rgba(42, 90, 80, 0.5);
   --ab-nav-balance-dot: #5a9a8f;
   --ab-nav-balance-text: #a0c8c0;
+  --ab-red-soft: rgba(239, 68, 68, 0.1);
+  --ab-red-border: rgba(239, 68, 68, 0.25);
+}
+
+/* Dark mode navbar utility classes */
+.dark .ab-nav {
+  background-color: var(--ab-nav-bg);
+  border-color: var(--ab-nav-border);
+}
+.dark .ab-nav-balance-pill {
+  background-color: var(--ab-nav-balance-bg);
+  border-color: var(--ab-nav-balance-border);
+}
+.dark .ab-nav-balance-dot {
+  background-color: var(--ab-nav-balance-dot);
+}
+
+/* HomeScreen utility classes */
+.ab-hero-live-badge {
+  background-color: #e8f5f1;
+}
+.dark .ab-hero-live-badge {
+  background-color: rgba(13, 43, 38, 0.3);
+  border: 1px solid rgba(13, 43, 38, 0.5);
+}
+.ab-hero-live-dot {
+  background-color: #1ec677;
+}
+.dark .ab-hero-live-dot {
+  background-color: #5a9a8f;
+}
+.ab-hero-live-text {
+  color: #0f513a;
+}
+.dark .ab-hero-live-text {
+  color: #a0c8c0;
+}
+.ab-hero-heading-dark {
+  color: #101828;
+}
+.dark .ab-hero-heading-dark {
+  color: #e0f0ec;
+}
+.ab-hero-heading-accent {
+  color: #73b9a3;
+}
+.ab-hero-subline {
+  color: #6b7280;
+}
+.dark .ab-hero-subline {
+  color: #6a9a92;
+}
+.ab-hero-chain-celo {
+  background-color: rgba(255, 241, 162, 0.94);
+}
+.ab-hero-chain-celo-text {
+  color: #000000;
+}
+.ab-hero-chain-solana {
+  background-color: #f3ebfd;
+}
+.ab-hero-chain-solana-text {
+  color: #6b21a8;
+}
+.ab-hero-chain-stellar {
+  background-color: #f3f4f6;
+}
+.ab-hero-chain-stellar-text {
+  color: #000000;
+}
+.ab-hero-cta {
+  background-color: #54ae92;
+}
+.dark .ab-hero-cta {
+  background-color: #5a9a8f;
 }
 
 /* ── UX redesign: shared animations ── */

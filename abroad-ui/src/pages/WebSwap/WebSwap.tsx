@@ -64,6 +64,7 @@ export interface WebSwapControllerProps {
   selectChain: (key: string) => void
   selectCurrency: (currency: TargetCurrency) => void
   selectedChainKey: string
+  setHasPassedOnboarding: (value: boolean) => void
   sourceAmountForBalanceCheck: string | undefined
   swapViewProps: SwapProps
   targetAmount: string
@@ -142,6 +143,7 @@ const WebSwap: React.FC = () => {
     handleQrResult,
     handleWalletDetailsClose,
     handleWalletDetailsOpen,
+    hasPassedOnboarding,
     isDecodingQr,
     isMiniPay,
     isQrOpen,
@@ -153,6 +155,7 @@ const WebSwap: React.FC = () => {
     selectChain,
     selectCurrency,
     selectedChainKey,
+    setHasPassedOnboarding,
     sourceAmountForBalanceCheck,
     swapViewProps,
     targetAmount,
@@ -296,8 +299,9 @@ const WebSwap: React.FC = () => {
                 formatDate={walletDetails.formatDate}
                 getStatusStyle={walletDetails.getStatusStyle}
                 getStatusText={walletDetails.getStatusText}
+                hasPassedOnboarding={hasPassedOnboarding}
                 isAuthenticated={
-                  swapViewProps.isAuthenticated
+                  hasPassedOnboarding
                   || Boolean(walletDetails.address && selectedChainKey)
                 }
                 onConnectWallet={handleConnectWalletClick}
@@ -305,27 +309,9 @@ const WebSwap: React.FC = () => {
                 onHistoryClick={() => setShowHistory(true)}
                 onOpenChainModal={openSourceModal}
                 onOpenQr={openQr}
+                onPassOnboarding={() => setHasPassedOnboarding(true)}
                 onSelectCurrency={selectCurrency}
-                onSelectTransaction={(tx) => {
-                  const country = tx.quote.targetCurrency === 'BRL' ? 'br' : 'co'
-                  setSelectedTx({
-                    accountNumber: tx.accountNumber,
-                    chain: NETWORK_TO_CHAIN_NAME[tx.quote.network?.toUpperCase() ?? ''] ?? 'Stellar',
-                    country,
-                    date: new Date(tx.createdAt).toLocaleString('en-US', {
-                      day: 'numeric', hour: 'numeric', minute: '2-digit', month: 'short', year: 'numeric',
-                    }),
-                    fee: '0.01',
-                    localAmount: tx.quote.targetAmount.toFixed(country === 'br' ? 2 : 0),
-                    location: undefined,
-                    merchant: `••••${tx.accountNumber.slice(-4)}`,
-                    settlementTime: tx.status === 'PAYMENT_COMPLETED' ? 'Instant' : '—',
-                    status: TX_STATUS_MAP[tx.status] ?? 'pending',
-                    token: tx.quote.cryptoCurrency,
-                    transactionId: tx.onChainId ?? tx.id,
-                    usdcAmount: tx.quote.sourceAmount.toFixed(2),
-                  })
-                }}
+                onSelectTransaction={tx => setSelectedTx(transactionToTxDetailItem(tx))}
                 recentTransactions={
                   selectedChainKey
                     ? walletDetails.transactions

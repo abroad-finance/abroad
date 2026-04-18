@@ -31,7 +31,7 @@ export const Overlay: React.FC<OverlayProps> = ({ children, className, onClose }
     role="button"
     tabIndex={0}
   >
-    <dialog className="border-0 p-0 m-0 bg-transparent" onClick={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()} open role="dialog">
+    <dialog className="border-0 p-0 m-0 bg-transparent" onClick={e => e.stopPropagation()} onKeyDown={(e) => { if (e.key !== 'Escape') e.stopPropagation() }} open role="dialog">
       {children}
     </dialog>
   </div>

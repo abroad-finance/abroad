@@ -28,7 +28,6 @@ const WebSwapLayout: React.FC<WebSwapLayoutProps & WebSwapLayoutSlots> = ({
   disclosure = null,
   isMiniPay: _isMiniPay = false,
   slots,
-  targetCurrency: _targetCurrency,
   view,
 }) => {
   const renderSwap = useMemo(() => {
