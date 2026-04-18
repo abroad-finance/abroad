@@ -1,5 +1,5 @@
 import { BlockchainNetwork, CryptoCurrency, PrismaClient, TransactionStatus } from '@prisma/client'
-import { getAssociatedTokenAddress, TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID } from '@solana/spl-token'
+import { getAccount, getAssociatedTokenAddress, TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID } from '@solana/spl-token'
 import {
   Connection,
   ParsedInstruction,
@@ -15,6 +15,7 @@ import { IDatabaseClientProvider } from '../../../../platform/persistence/IDatab
 import { ISecretManager, Secrets } from '../../../../platform/secrets/ISecretManager'
 import { DepositVerificationError, DepositVerificationSuccess, IDepositVerifier } from '../../application/contracts/IDepositVerifier'
 import { CryptoAssetConfigService } from '../../application/CryptoAssetConfigService'
+import { ensureUniqueOnChainId, validateDepositTransaction } from './depositVerification'
 
 type ParsedInstructionType = ParsedInstruction | PartiallyDecodedInstruction
 
@@ -32,6 +33,7 @@ type TokenAmountInfo = {
 }
 
 type TransferCheckedInfo = {
+  authority?: string
   destination: string
   mint: string
   source: string
@@ -82,23 +84,6 @@ export class SolanaPaymentVerifier implements IDepositVerifier {
     }
   }
 
-  public async ensureUniqueOnChainId(
-    prismaClient: PrismaClient,
-    onChainSignature: string,
-    transactionId: string,
-  ): Promise<string | undefined> {
-    const duplicateOnChain = await prismaClient.transaction.findFirst({
-      select: { id: true },
-      where: { onChainId: onChainSignature },
-    })
-
-    if (duplicateOnChain && duplicateOnChain.id !== transactionId) {
-      return 'On-chain transaction already linked to another transaction'
-    }
-
-    return undefined
-  }
-
   public async fetchOnChainTransaction(
     connection: Connection,
     onChainSignature: string,
@@ -122,7 +107,7 @@ export class SolanaPaymentVerifier implements IDepositVerifier {
     txDetails: ParsedTransactionWithMeta,
     walletTokenAccounts: PublicKey[],
     allowedMints: PublicKey[],
-  ): null | { amount: number, source: string } {
+  ): null | { amount: number, transferInfo: TransferCheckedInfo } {
     const outerInstructions = txDetails.transaction?.message.instructions ?? []
     const innerInstructions = (txDetails.meta?.innerInstructions ?? []).reduce<ParsedInstructionType[]>(
       (all, ix) => all.concat(ix.instructions as ParsedInstructionType[]),
@@ -162,7 +147,7 @@ export class SolanaPaymentVerifier implements IDepositVerifier {
         continue
       }
 
-      return { amount, source: transferInfo.source }
+      return { amount, transferInfo }
     }
 
     return null
@@ -187,15 +172,8 @@ export class SolanaPaymentVerifier implements IDepositVerifier {
     quote: { cryptoCurrency: CryptoCurrency, network: BlockchainNetwork }
     status: TransactionStatus
   }): Promise<string | undefined> {
-    const isAwaitingPayment = transaction.status === TransactionStatus.AWAITING_PAYMENT
-    const isExpiredPayment = transaction.status === TransactionStatus.PAYMENT_EXPIRED
-    if (!isAwaitingPayment && !isExpiredPayment) {
-      return 'Transaction is not awaiting payment'
-    }
-
-    if (transaction.quote.network !== BlockchainNetwork.SOLANA) {
-      return 'Transaction is not set for Solana'
-    }
+    const baseError = validateDepositTransaction(transaction, BlockchainNetwork.SOLANA)
+    if (baseError) return baseError
 
     const assetConfig = await this.assetConfigService.getActiveMint({
       blockchain: BlockchainNetwork.SOLANA,
@@ -227,7 +205,7 @@ export class SolanaPaymentVerifier implements IDepositVerifier {
       return { outcome: 'error', reason: validationError, status: 400 }
     }
 
-    const duplicateReason = await this.ensureUniqueOnChainId(prismaClient, onChainSignature, transaction.id)
+    const duplicateReason = await ensureUniqueOnChainId(prismaClient, onChainSignature, transaction.id)
     if (duplicateReason) {
       return { outcome: 'error', reason: duplicateReason, status: 400 }
     }
@@ -246,10 +224,12 @@ export class SolanaPaymentVerifier implements IDepositVerifier {
         }
       }
 
+      const walletAddress = await this.resolveWalletAddress(connection, transfer.transferInfo)
+
       return {
         outcome: 'ok',
         queueMessage: {
-          addressFrom: transfer.source,
+          addressFrom: walletAddress,
           amount: transfer.amount,
           blockchain: BlockchainNetwork.SOLANA,
           cryptoCurrency: transaction.quote.cryptoCurrency,
@@ -282,6 +262,7 @@ export class SolanaPaymentVerifier implements IDepositVerifier {
     const info = (parsed as { info?: unknown }).info
     if (!info || typeof info !== 'object') return null
 
+    const authority = (info as { authority?: unknown }).authority
     const destination = (info as { destination?: unknown }).destination
     const mint = (info as { mint?: unknown }).mint
     const source = (info as { source?: unknown }).source
@@ -307,6 +288,7 @@ export class SolanaPaymentVerifier implements IDepositVerifier {
     }
 
     return {
+      authority: typeof authority === 'string' ? authority : undefined,
       destination,
       mint,
       source,
@@ -352,6 +334,29 @@ export class SolanaPaymentVerifier implements IDepositVerifier {
     }
 
     return tokenAccounts
+  }
+
+  private async resolveWalletAddress(
+    connection: Connection,
+    transferInfo: TransferCheckedInfo,
+  ): Promise<string> {
+    if (transferInfo.authority) {
+      return transferInfo.authority
+    }
+
+    const sourceKey = this.safePublicKey(transferInfo.source)
+    if (!sourceKey) {
+      return transferInfo.source
+    }
+
+    try {
+      const tokenAccountInfo = await getAccount(connection, sourceKey)
+      return tokenAccountInfo.owner.toBase58()
+    }
+    catch (error) {
+      this.logger.warn('[SolanaPaymentVerifier] Could not resolve wallet for token account', { error, source: transferInfo.source })
+      return transferInfo.source
+    }
   }
 
   private parseTokenAmount(tokenAmount: TokenAmountInfo): number {

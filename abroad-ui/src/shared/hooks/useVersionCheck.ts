@@ -10,9 +10,25 @@ interface UseVersionCheckOptions {
   suppressWhileViews?: string[]
 }
 
-export function useVersionCheck({ currentView, pollingIntervalMs = DEFAULT_INTERVAL_MS, suppressWhileViews = [] }: UseVersionCheckOptions = {}): void {
+async function fetchRemoteVersion(): Promise<string | null> {
+  try {
+    const response = await fetch(`/version.json?t=${Date.now()}`)
+    if (!response.ok) return null
+    const data = await response.json()
+    return typeof data?.version === 'string' ? data.version : null
+  }
+  catch {
+    return null
+  }
+}
+
+export function useVersionCheck({
+  currentView,
+  pollingIntervalMs = DEFAULT_INTERVAL_MS,
+  suppressWhileViews = [],
+}: UseVersionCheckOptions = {}): void {
   const { addNotice } = useNotices()
-  const knownVersionRef = useRef<null | string>(null)
+  const knownVersionRef = useRef<string | null>(null)
   const updateDetectedRef = useRef(false)
   const noticeShownRef = useRef(false)
 
@@ -56,21 +72,5 @@ export function useVersionCheck({ currentView, pollingIntervalMs = DEFAULT_INTER
     if (!isSuppressed) {
       showReloadNotice()
     }
-  }, [
-    currentView,
-    showReloadNotice,
-    suppressWhileViews,
-  ])
-}
-
-async function fetchRemoteVersion(): Promise<null | string> {
-  try {
-    const response = await fetch(`/version.json?t=${Date.now()}`)
-    if (!response.ok) return null
-    const data = await response.json()
-    return typeof data?.version === 'string' ? data.version : null
-  }
-  catch {
-    return null
-  }
+  }, [currentView, showReloadNotice, suppressWhileViews])
 }

@@ -74,6 +74,9 @@ jest.mock('@solana/spl-token', () => {
   }
 
   return {
+    getAccount: jest.fn(async () => {
+      throw new Error('getAccount not configured for this test')
+    }),
     getAssociatedTokenAddress: async (
       mint: unknown,
       owner: InstanceType<typeof PublicKey>,
@@ -142,9 +145,10 @@ export const resetSolanaTestState = (): void => {
 export const buildTransferInstruction = (overrides?: Partial<ParsedInstruction>) => ({
   parsed: {
     info: {
+      authority: 'sender-wallet',
       destination: secrets.SOLANA_ADDRESS,
       mint: 'usdc-mint',
-      source: 'sender-wallet',
+      source: 'sender-token-account',
       tokenAmount: {
         amount: '2500000',
         decimals: 6,

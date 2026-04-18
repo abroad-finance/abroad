@@ -1,7 +1,5 @@
-import { act, renderHook } from '@testing-library/react'
-import {
-  afterEach, beforeEach, describe, expect, it, vi,
-} from 'vitest'
+import { renderHook, act } from '@testing-library/react'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 import { useVersionCheck } from '../useVersionCheck'
 
