@@ -24,10 +24,6 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true,
-
-
-    "experimentalDecorators": true,
-    "emitDecoratorMetadata": true,
   },
   "include": ["src"]
 }
