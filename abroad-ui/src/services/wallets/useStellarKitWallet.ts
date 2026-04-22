@@ -79,7 +79,7 @@ const isStoredTokenValid = (): boolean => {
   try {
     const [, payload] = token.split('.')
     if (!payload) return false
-    const padded = payload.replaceAll('-', '+').replaceAll('_', '/') + '=='.slice(0, (4 - payload.length % 4) % 4)
+    const padded = payload.replace(/-/g, '+').replace(/_/g, '/') + '=='.slice(0, (4 - payload.length % 4) % 4)
     const decoded = JSON.parse(atob(padded))
     return typeof decoded?.exp === 'number' && decoded.exp * 1000 > Date.now()
   }

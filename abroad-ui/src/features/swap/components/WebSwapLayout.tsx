@@ -24,12 +24,7 @@ type WebSwapLayoutSlots = {
   }
 }
 
-const WebSwapLayout: React.FC<WebSwapLayoutProps & WebSwapLayoutSlots> = ({
-  disclosure = null,
-  isMiniPay: _isMiniPay = false,
-  slots,
-  view,
-}) => {
+const WebSwapLayout: React.FC<WebSwapLayoutProps & WebSwapLayoutSlots> = ({ disclosure = null, slots, view }) => {
   const renderSwap = useMemo(() => {
     switch (view) {
       case 'bankDetails':

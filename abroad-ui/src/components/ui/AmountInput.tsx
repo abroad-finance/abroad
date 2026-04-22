@@ -63,9 +63,9 @@ export function AmountInput({
 
   const isLocal = inputMode === 'local'
 
-  const sanitizeLocal = (raw: string) => raw.replaceAll(/[^0-9.,]/g, '')
+  const sanitizeLocal = (raw: string) => raw.replace(/[^0-9.,]/g, '')
   const sanitizeUsdc = (raw: string) => {
-    const v = raw.replaceAll(/[^0-9.]/g, '')
+    const v = raw.replace(/[^0-9.]/g, '')
     const parts = v.split('.')
     if (parts.length > 2) return parts[0] + '.' + parts.slice(1).join('')
     return v

@@ -149,15 +149,15 @@ const parseAmountUnits = (amount: string, decimals: number): bigint => {
 const parseTargetAmount = (value: string): number => {
   const raw = value.replace(/[^0-9.,]/g, '')
   if (raw.includes(',')) {
-    return Number.parseFloat(raw.replaceAll('.', '').replaceAll(',', '.'))
+    return Number.parseFloat(raw.replace(/\./g, '').replace(/,/g, '.'))
   }
   const dotCount = (raw.match(/\./g) || []).length
   if (dotCount === 0) return Number.parseFloat(raw) || 0
-  if (dotCount >= 2) return Number.parseFloat(raw.replaceAll('.', ''))
+  if (dotCount >= 2) return Number.parseFloat(raw.replace(/\./g, ''))
   const [, fracPart] = raw.split('.')
   const frac = fracPart ?? ''
   if (frac.length === 3 && /^\d{3}$/.test(frac)) {
-    return Number.parseFloat(raw.replaceAll('.', ''))
+    return Number.parseFloat(raw.replace(/\./g, ''))
   }
   return Number.parseFloat(raw)
 }

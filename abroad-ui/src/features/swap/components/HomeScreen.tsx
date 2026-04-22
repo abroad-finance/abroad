@@ -91,7 +91,6 @@ export default function HomeScreen({
   formatDate,
   getStatusStyle,
   getStatusText,
-  hasPassedOnboarding: _hasPassedOnboarding,
   isAuthenticated,
   onConnectWallet,
   onGoToManual,
@@ -108,7 +107,7 @@ export default function HomeScreen({
   targetCurrency,
 }: Readonly<HomeScreenProps>): React.JSX.Element {
   const { t } = useTranslate()
-  const balanceNum = Number.parseFloat(balance.replaceAll(',', '')) || 0
+  const balanceNum = Number.parseFloat(balance.replace(/,/g, '')) || 0
 
   // Unauthenticated view – Figma node 5:2 pixel-perfect
   if (!isAuthenticated) {

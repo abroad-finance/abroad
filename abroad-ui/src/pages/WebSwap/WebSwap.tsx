@@ -188,7 +188,7 @@ const WebSwap: React.FC = () => {
 
   const handleBalanceClick = useCallback(() => {
     if (sourceAssetBalance) {
-      const raw = sourceAssetBalance.replaceAll(',', '')
+      const raw = sourceAssetBalance.replace(/,/g, '')
       swapViewProps.onSourceChange?.(raw)
     }
   }, [sourceAssetBalance, swapViewProps])
@@ -336,7 +336,7 @@ const WebSwap: React.FC = () => {
                   swapViewProps.isAuthenticated
                   && !!sourceAssetBalance
                   && !!(sourceAmountForBalanceCheck ?? swapViewProps.sourceAmount)
-                  && Number.parseFloat(sourceAmountForBalanceCheck ?? swapViewProps.sourceAmount) > Number.parseFloat(sourceAssetBalance.replaceAll(',', ''))
+                  && Number.parseFloat(sourceAmountForBalanceCheck ?? swapViewProps.sourceAmount) > Number.parseFloat(sourceAssetBalance.replace(/,/g, ''))
                 }
                 loadingBalance={walletDetails.isLoadingBalance}
                 onBackClick={handleBackToSwap}

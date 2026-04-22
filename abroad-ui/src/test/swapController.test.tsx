@@ -63,7 +63,10 @@ const stablecoinBalancesMock = vi.hoisted(() => vi.fn(() => createStablecoinBala
 const createWalletRequestMock = (
   response: string = '0x-minipay-transaction',
 ): NonNullable<IWallet['request']> => {
-  const requestMock = vi.fn(async (_request: WalletConnectRequest): Promise<string> => response)
+  const requestMock = vi.fn(async (request: WalletConnectRequest): Promise<string> => {
+    void request
+    return response
+  })
 
   // eslint-disable-next-line @stylistic/comma-dangle
   return async <TResult,>(request: WalletConnectRequest): Promise<TResult> => (
