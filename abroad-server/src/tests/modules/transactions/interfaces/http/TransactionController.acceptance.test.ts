@@ -125,13 +125,35 @@ describe('TransactionController acceptance flows', () => {
     expect(response).toEqual({ reason: 'You reached the maximum number of transactions allowed today. Please try again tomorrow.' })
   })
 
-  it('rejects when liquidity retrieval fails or amount exceeds availability', async () => {
+  it('returns a retryable error when liquidity retrieval fails', async () => {
     const liquidityError = jest.fn(async () => {
       throw new Error('liquidity unavailable')
     })
     const { controller } = buildAcceptController({
       paymentService: {
         getLiquidity: liquidityError,
+        MAX_TOTAL_AMOUNT_PER_DAY: 500,
+        MAX_USER_TRANSACTIONS_PER_DAY: 3,
+        verifyAccount: jest.fn().mockResolvedValue(true),
+      },
+      transactionFindMany: [[], [], [], []],
+    })
+
+    const response = await controller.acceptTransaction(
+      { ...requestBody, account_number: '123' },
+      { user: partner } as unknown as import('express').Request,
+      badRequest,
+    )
+
+    expect(response).toEqual({
+      reason: 'We could not verify available liquidity for this payment method right now. Please try again in a few moments.',
+    })
+  })
+
+  it('rejects when reported liquidity is below the requested amount', async () => {
+    const { controller } = buildAcceptController({
+      paymentService: {
+        getLiquidity: jest.fn().mockResolvedValue(10),
         MAX_TOTAL_AMOUNT_PER_DAY: 500,
         MAX_USER_TRANSACTIONS_PER_DAY: 3,
         verifyAccount: jest.fn().mockResolvedValue(true),
