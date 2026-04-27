@@ -21,7 +21,6 @@ export interface BankDetailsRouteProps {
   targetAmount: string
   targetCurrency: (typeof TargetCurrency)[keyof typeof TargetCurrency]
   taxId: string
-  textColor?: string
 }
 
 export default function BankDetailsRoute({
@@ -36,11 +35,8 @@ export default function BankDetailsRoute({
   targetAmount,
   targetCurrency,
   taxId,
-  textColor,
 }: BankDetailsRouteProps): React.JSX.Element {
   const { t } = useTranslate()
-  const colorStyle = textColor ? { color: textColor } : { color: 'var(--ab-text)' }
-  const mutedStyle = textColor ? { color: textColor } : { color: 'var(--ab-text-muted)' }
 
   return (
     <div className="flex-1 flex items-center justify-center w-full flex-col">
@@ -52,16 +48,15 @@ export default function BankDetailsRoute({
         <div className="w-full flex items-center space-x-3 mb-2 flex-shrink-0">
           <button
             aria-label={t('bank_details.back_aria', 'Go back')}
-            className="hover:text-opacity-80 transition-colors cursor-pointer"
+            className="text-ab-text hover:text-opacity-80 transition-colors cursor-pointer"
             onClick={onBackClick}
-            style={colorStyle}
+            type="button"
           >
             <ArrowLeft className="w-6 h-6" />
           </button>
           <div
-            className="text-xl sm:text-2xl font-bold flex-grow text-center"
+            className="text-ab-text text-xl sm:text-2xl font-bold flex-grow text-center"
             id="Title"
-            style={colorStyle}
           >
             {t('bank_details.title', 'Datos del destinatario')}
           </div>
@@ -74,27 +69,25 @@ export default function BankDetailsRoute({
                 <>
                   {/* PIX Key */}
                   <div className="w-full bg-white/60 backdrop-blur-xl rounded-2xl p-4 md:p-6 flex items-center space-x-3" id="pix-key-input">
-                    <Hash className="w-5 h-5 sm:w-6 sm:h-6" style={colorStyle} />
+                    <Hash className="w-5 h-5 sm:w-6 sm:h-6 text-ab-text" />
                     <input
-                      className="w-full bg-transparent font-semibold focus:outline-none text-base sm:text-lg"
+                      className="w-full bg-transparent font-semibold focus:outline-none text-base sm:text-lg text-ab-text"
                       inputMode="text"
                       onChange={e => onPixKeyChange(e.target.value)}
                       placeholder={t('bank_details.pix_key_placeholder', 'PIX Key')}
-                      style={colorStyle}
                       type="text"
                       value={pixKey}
                     />
                   </div>
                   {/* CPF */}
                   <div className="w-full bg-white/60 backdrop-blur-xl rounded-2xl p-4 md:p-6 flex items-center space-x-3" id="cpf-input">
-                    <Hash className="w-5 h-5 sm:w-6 sm:h-6" style={colorStyle} />
+                    <Hash className="w-5 h-5 sm:w-6 sm:h-6 text-ab-text" />
                     <input
-                      className="w-full bg-transparent font-semibold focus:outline-none text-base sm:text-lg"
+                      className="w-full bg-transparent font-semibold focus:outline-none text-base sm:text-lg text-ab-text"
                       inputMode="numeric"
                       onChange={e => onTaxIdChange(e.target.value)}
                       pattern="[0-9]*"
                       placeholder={t('bank_details.cpf_placeholder', 'CPF')}
-                      style={colorStyle}
                       type="text"
                       value={taxId}
                     />
@@ -108,13 +101,12 @@ export default function BankDetailsRoute({
                     className="w-full bg-white/60 backdrop-blur-xl rounded-2xl p-4 md:p-6 flex items-center space-x-3"
                     id="recipient-key-input"
                   >
-                    <Hash className="w-5 h-5 sm:w-6 sm:h-6" style={colorStyle} />
+                    <Hash className="w-5 h-5 sm:w-6 sm:h-6 text-ab-text" />
                     <input
-                      className="w-full bg-transparent font-semibold focus:outline-none text-base sm:text-lg"
+                      className="w-full bg-transparent font-semibold focus:outline-none text-base sm:text-lg text-ab-text"
                       inputMode="text"
                       onChange={e => onAccountNumberChange(e.target.value)}
                       placeholder={t('bank_details.breb_key_placeholder', 'Clave BRE-B')}
-                      style={colorStyle}
                       type="text"
                       value={accountNumber}
                     />
@@ -124,9 +116,8 @@ export default function BankDetailsRoute({
 
           {/* Amount info */}
           <div
-            className="relative font-medium w-full flex items-center space-x-1"
+            className="relative font-medium w-full flex items-center space-x-1 text-ab-text"
             id="tx-info"
-            style={colorStyle}
           >
             <span className="text-sm sm:text-base">{t('bank_details.amount_to_receive', 'Monto a recibir:')}</span>
             <img
@@ -148,9 +139,8 @@ export default function BankDetailsRoute({
 
         {/* Disclaimer */}
         <div
-          className="relative w-full bg-white/10 backdrop-blur-xl rounded-2xl p-3 sm:p-4 flex flex-col space-y-2"
+          className="relative w-full bg-white/10 backdrop-blur-xl rounded-2xl p-3 sm:p-4 flex flex-col space-y-2 text-ab-text-muted"
           id="transfer-disclaimer"
-          style={mutedStyle}
         >
           {targetCurrency === TargetCurrency.BRL
             ? (
@@ -162,7 +152,7 @@ export default function BankDetailsRoute({
                       <img alt="PIX Logo" className="h-3 sm:h-4 w-auto" src={PixFull} />
                     </div>
                   </div>
-                  <span className="font-medium text-xs pl-1" style={mutedStyle}>
+                  <span className="font-medium text-xs pl-1 text-ab-text-muted">
                     {t(
                       'bank_details.pix_disclaimer',
                       'Tu transacción será procesada de inmediato. Asegúrate de que la llave PIX y el CPF del destinatario sean correctos. Esta transacción no se puede reversar.',
@@ -179,7 +169,7 @@ export default function BankDetailsRoute({
                       <img alt="BRE-B Logo" className="h-3 sm:h-4 w-auto" src={BreBLogo} />
                     </div>
                   </div>
-                  <span className="font-medium text-xs pl-1" style={mutedStyle}>
+                  <span className="font-medium text-xs pl-1 text-ab-text-muted">
                     {t(
                       'bank_details.breb_disclaimer',
                       'Tu transacción será procesada de inmediato con BRE-B. Ingresa la clave correcta del destinatario; esta transacción no se puede reversar.',

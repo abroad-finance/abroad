@@ -1,5 +1,5 @@
-import type { PublicCorridor } from '../../services/public/types'
 import type { StablecoinPreference } from '../../features/swap/lib/stablecoinPortfolio'
+import type { PublicCorridor } from '../../services/public/types'
 
 import { MINIPAY_ADD_CASH_URL } from '../../services/wallets/minipay'
 
@@ -20,10 +20,7 @@ export type MiniPayNoticeCopy = {
 
 export type WalletUserId = `${string}:${string}`
 
-export const scopeCorridorsForWalletSurface = ({
-  corridors,
-  isMiniPay,
-}: {
+export const scopeCorridorsForWalletSurface = ({ corridors, isMiniPay }: {
   corridors: PublicCorridor[]
   isMiniPay: boolean
 }): PublicCorridor[] => (
@@ -32,10 +29,7 @@ export const scopeCorridorsForWalletSurface = ({
     : corridors
 )
 
-export const resolvePreferredMiniPayCorridor = ({
-  availableCorridors,
-  preference,
-}: {
+export const resolvePreferredMiniPayCorridor = ({ availableCorridors, preference }: {
   availableCorridors: PublicCorridor[]
   preference: StablecoinPreference
 }): null | PublicCorridor => {

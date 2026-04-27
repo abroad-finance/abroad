@@ -2,10 +2,10 @@ import React from 'react'
 
 import AbroadLogoColored from '../../../assets/Logos/AbroadLogoColored.svg'
 import {
+  AB_STYLES,
   ABROAD_PRIVACY_URL,
   ABROAD_SUPPORT_URL,
   ABROAD_TERMS_URL,
-  AB_STYLES,
 } from '../../../shared/constants'
 import { cn } from '../../../shared/utils'
 

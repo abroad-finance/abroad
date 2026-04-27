@@ -26,7 +26,6 @@ const PENDING_TX_KEY = 'pendingTransaction'
 
 export const useBankDetailsRoute = ({
   accountNumber,
-  isDesktop,
   onBackClick,
   pixKey,
   setAccountNumber,
@@ -37,7 +36,6 @@ export const useBankDetailsRoute = ({
   targetCurrency,
   taxId,
 }: UseBankDetailsRouteArgs): BankDetailsRouteProps => {
-  const textColor = isDesktop ? 'white' : 'var(--color-abroad-dark)'
   const { walletAuthentication } = useWalletAuth()
 
   // ------------------------------ EFFECTS -----------------------------------
@@ -118,6 +116,5 @@ export const useBankDetailsRoute = ({
     targetAmount,
     targetCurrency,
     taxId,
-    textColor,
   }
 }
