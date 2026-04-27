@@ -69,10 +69,7 @@ const fetchBalancesForChain = async (address: string, chainId: string): Promise<
   return EMPTY_STABLECOIN_BALANCES
 }
 
-export const useStablecoinBalances = ({
-  address,
-  chainId,
-}: {
+export const useStablecoinBalances = ({ address, chainId }: {
   address: null | string | undefined
   chainId: null | string | undefined
 }): StablecoinBalanceState => {

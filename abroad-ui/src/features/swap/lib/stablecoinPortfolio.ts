@@ -1,32 +1,32 @@
+export type StablecoinBalances = Readonly<Record<StablecoinSymbol, string>>
+export type StablecoinPreference
+  = | {
+    highestBalanceToken: 'cUSD'
+    kind: 'unsupported-preferred'
+    preferredSupportedToken: null | SupportedStablecoinSymbol
+  }
+  | {
+    highestBalanceToken: StablecoinSymbol
+    kind: 'empty'
+    preferredSupportedToken: null
+  }
+  | {
+    highestBalanceToken: SupportedStablecoinSymbol
+    kind: 'supported'
+    preferredSupportedToken: SupportedStablecoinSymbol
+  }
+
 export type StablecoinSymbol = 'cUSD' | 'USDC' | 'USDT'
 export type SupportedStablecoinSymbol = Exclude<StablecoinSymbol, 'cUSD'>
-
-export type StablecoinBalances = Readonly<Record<StablecoinSymbol, string>>
 type RankedStablecoinBalance = Readonly<{
   amount: number
   token: StablecoinSymbol
 }>
+
 type RankedSupportedStablecoinBalance = Readonly<{
   amount: number
   token: SupportedStablecoinSymbol
 }>
-
-export type StablecoinPreference =
-  | {
-      highestBalanceToken: StablecoinSymbol
-      kind: 'empty'
-      preferredSupportedToken: null
-    }
-  | {
-      highestBalanceToken: SupportedStablecoinSymbol
-      kind: 'supported'
-      preferredSupportedToken: SupportedStablecoinSymbol
-    }
-  | {
-      highestBalanceToken: 'cUSD'
-      kind: 'unsupported-preferred'
-      preferredSupportedToken: null | SupportedStablecoinSymbol
-    }
 
 export const EMPTY_STABLECOIN_BALANCES: StablecoinBalances = Object.freeze({
   cUSD: '0.00',
