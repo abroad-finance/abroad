@@ -141,6 +141,12 @@ const config: VitestEnabledConfig = {
     globals: true,
     restoreMocks: true,
     setupFiles: ['./src/test/setupTests.ts'],
+    exclude: [
+      '**/node_modules/**',
+      '**/dist/**',
+      '**/e2e/**',
+      '**/*.spec.{ts,tsx}',
+    ],
   },
 }
 

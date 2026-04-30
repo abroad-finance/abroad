@@ -73,6 +73,16 @@ import {
 } from './minipayPolicy'
 
 type DecodeQrApiResponse = ApiClientResponse<decodeQrCodeBRResponse, DecodeQrCodeBR400>
+type OnboardingRates = {
+  brl: {
+    USDC: null | number
+    USDT: null | number
+  }
+  cop: {
+    USDC: null | number
+    USDT: null | number
+  }
+}
 type SwapAction
   = | { accountNumber?: string, pixKey?: string, recipientName?: string, taxId?: string, type: 'SET_BANK_DETAILS' }
     | { corridorKey: string, type: 'SET_CORRIDOR' }
@@ -85,10 +95,12 @@ type SwapAction
     | { payload: Partial<SwapControllerState>, type: 'HYDRATE' }
     | { qrCode: null | string, type: 'SET_QR_CODE' }
     | { quoteId?: string, sourceAmount?: string, targetAmount?: string, type: 'SET_AMOUNTS' }
+    | { rates: OnboardingRates, type: 'SET_ONBOARDING_RATES' }
     | { targetCurrency: TargetCurrency, type: 'SET_TARGET_CURRENCY' }
     | { transactionId: null | string, type: 'SET_TRANSACTION_ID' }
     | { type: 'RESET' }
     | { type: 'SET_VIEW', view: SwapView }
+
 type SwapControllerState = {
   accountNumber: string
   corridorKey: string
@@ -99,6 +111,7 @@ type SwapControllerState = {
   loadingSource: boolean
   loadingSubmit: boolean
   loadingTarget: boolean
+  onboardingRates: OnboardingRates
   pixKey: string
   qrCode: null | string
   quoteId: string
@@ -172,6 +185,10 @@ const createInitialState = (isDesktop: boolean): SwapControllerState => ({
   loadingSource: false,
   loadingSubmit: false,
   loadingTarget: false,
+  onboardingRates: {
+    brl: { USDC: null, USDT: null },
+    cop: { USDC: null, USDT: null },
+  },
   pixKey: '',
   qrCode: null,
   quoteId: '',
@@ -220,6 +237,8 @@ const reducer = (state: SwapControllerState, action: SwapAction): SwapController
         loadingSource: action.loadingSource ?? state.loadingSource,
         loadingTarget: action.loadingTarget ?? state.loadingTarget,
       }
+    case 'SET_ONBOARDING_RATES':
+      return { ...state, onboardingRates: action.rates }
     case 'SET_QR_CODE':
       return { ...state, qrCode: action.qrCode }
     case 'SET_QR_OPEN':
@@ -362,12 +381,78 @@ export const useWebSwapController = (): WebSwapControllerProps => {
   const reverseReqIdRef = useRef(0)
   const decodeAbortRef = useRef<AbortController | null>(null)
   const miniPayManualAssetSelectionRef = useRef(false)
+  const pendingActionAfterConnectRef = useRef<'continue-to-confirm' | 'continue-to-confirm-from-swap' | 'process-qr' | null>(null)
   const [quoteBelowMinimum, setQuoteBelowMinimum] = useState(false)
   const stablecoinBalances = useStablecoinBalances({
     address: wallet?.address,
     chainId: wallet?.chainId,
   })
   const isMiniPay = miniPay.isActive
+
+  // Fetch onboarding rates when corridors are loaded
+  const fetchOnboardingRates = useCallback(async (availableCorridors: PublicCorridor[]) => {
+    const rates: OnboardingRates = {
+      brl: { USDC: null, USDT: null },
+      cop: { USDC: null, USDT: null },
+    }
+
+    const fetchRate = async (corridor: PublicCorridor): Promise<null | number> => {
+      try {
+        // Use a larger amount to avoid minimum amount errors
+        // 10 USDC/USDT should be above minimum for all corridors
+        const testAmount = 10
+        const response = await requestReverseQuote({
+          crypto_currency: corridor.cryptoCurrency,
+          network: corridor.blockchain,
+          payment_method: corridor.paymentMethod,
+          source_amount: testAmount,
+          target_currency: corridor.targetCurrency,
+        })
+        if (response.ok && response.data) {
+          // Calculate rate per 1 unit
+          return response.data.value / testAmount
+        }
+        return null
+      }
+      catch {
+        return null
+      }
+    }
+
+    // Find corridors for each token/currency combination
+    const usdcCopCorridor = availableCorridors.find(
+      c => c.cryptoCurrency === 'USDC' && c.targetCurrency === TargetCurrency.COP,
+    )
+    const usdtCopCorridor = availableCorridors.find(
+      c => c.cryptoCurrency === 'USDT' && c.targetCurrency === TargetCurrency.COP,
+    )
+    const usdcBrlCorridor = availableCorridors.find(
+      c => c.cryptoCurrency === 'USDC' && c.targetCurrency === TargetCurrency.BRL,
+    )
+    const usdtBrlCorridor = availableCorridors.find(
+      c => c.cryptoCurrency === 'USDT' && c.targetCurrency === TargetCurrency.BRL,
+    )
+
+    // Fetch rates in parallel
+    const [
+      copUsdc,
+      copUsdt,
+      brlUsdc,
+      brlUsdt,
+    ] = await Promise.all([
+      usdcCopCorridor ? fetchRate(usdcCopCorridor) : Promise.resolve(null),
+      usdtCopCorridor ? fetchRate(usdtCopCorridor) : Promise.resolve(null),
+      usdcBrlCorridor ? fetchRate(usdcBrlCorridor) : Promise.resolve(null),
+      usdtBrlCorridor ? fetchRate(usdtBrlCorridor) : Promise.resolve(null),
+    ])
+
+    rates.cop.USDC = copUsdc
+    rates.cop.USDT = copUsdt
+    rates.brl.USDC = brlUsdc
+    rates.brl.USDT = brlUsdt
+
+    dispatch({ rates, type: 'SET_ONBOARDING_RATES' })
+  }, [])
 
   useEffect(() => {
     let active = true
@@ -376,6 +461,8 @@ export const useWebSwapController = (): WebSwapControllerProps => {
         if (!active) return
         setCorridors(data.corridors)
         setCorridorError(null)
+        // Fetch onboarding rates after corridors are loaded
+        void fetchOnboardingRates(data.corridors)
       })
       .catch((err) => {
         if (!active) return
@@ -385,7 +472,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     return () => {
       active = false
     }
-  }, [])
+  }, [fetchOnboardingRates])
 
   const targetLocale = useMemo(
     () => (state.targetCurrency === TargetCurrency.BRL ? 'pt-BR' : 'es-CO'),
@@ -589,7 +676,11 @@ export const useWebSwapController = (): WebSwapControllerProps => {
             walletConnect: selectedCorridor.walletConnect,
           }
         : undefined
-      nextWallet.connect(options).catch(err => console.error('[wallet] connect failed:', err))
+      nextWallet.connect(options).catch((err) => {
+        if (import.meta.env.DEV) {
+          console.error('[wallet] connect failed:', err)
+        }
+      })
     }
   }, [
     defaultWallet,
@@ -826,10 +917,16 @@ export const useWebSwapController = (): WebSwapControllerProps => {
 
   // When the user first becomes authenticated, ensure they see the authenticated home screen
   // (dashboard with balance, scan QR, enter amount) instead of swap view with pre-filled data.
+  // BUT: Skip this if there's a pending action (user is connecting to complete a payment)
   const prevIsAuthRef = useRef(false)
   useEffect(() => {
-    if (isWalletConnected && !prevIsAuthRef.current) {
-      // Clear any previous transaction data to show clean dashboad
+    if (isAuthenticated && !prevIsAuthRef.current) {
+      // If there's a pending action, let the other useEffect handle navigation
+      if (pendingActionAfterConnectRef.current) {
+        prevIsAuthRef.current = isAuthenticated
+        return
+      }
+      // Clear any previous transaction data to show clean dashboard
       dispatch({
         accountNumber: '', pixKey: '', recipientName: '', taxId: '', type: 'SET_BANK_DETAILS',
       })
@@ -838,8 +935,76 @@ export const useWebSwapController = (): WebSwapControllerProps => {
       })
       dispatch({ type: 'SET_VIEW', view: 'home' })
     }
-    prevIsAuthRef.current = isWalletConnected
-  }, [isWalletConnected])
+    prevIsAuthRef.current = isAuthenticated
+  }, [isAuthenticated])
+
+  // Handle pending actions after wallet connection
+  useEffect(() => {
+    if (!isAuthenticated) return
+
+    const pendingAction = pendingActionAfterConnectRef.current
+    if (!pendingAction) return
+
+    // Clear the pending action immediately to prevent re-triggering
+    pendingActionAfterConnectRef.current = null
+
+    // Execute the pending action
+    if (pendingAction === 'continue-to-confirm') {
+      // User clicked continue from home (QR flow) and got connected - proceed to confirm
+      if (state.quoteId) {
+        dispatch({ type: 'SET_VIEW', view: 'confirm-qr' })
+      }
+    }
+    else if (pendingAction === 'continue-to-confirm-from-swap') {
+      // User clicked "Connect Wallet to Continue" from swap view (manual payment)
+      // Need to get a fresh quote now that wallet is connected, then proceed to confirm
+      const processSwapAfterConnect = async () => {
+        // Wait a bit for balances to load
+        await new Promise(resolve => setTimeout(resolve, 500))
+
+        // Re-trigger quote calculation with the existing target amount
+        if (state.targetAmount) {
+          const quoted = await quoteFromTarget(state.targetAmount)
+          if (quoted) {
+            // Wait for React state to update after quote dispatches the new sourceAmount
+            await new Promise(resolve => setTimeout(resolve, 100))
+
+            // After quote succeeds, check if user has sufficient balance
+            const requestedAmount = parseStablecoinBalance(state.sourceAmount || '')
+            const availableBalance = parseStablecoinBalance(selectedSourceBalance)
+
+            if (requestedAmount > 0 && requestedAmount > availableBalance) {
+              // User has insufficient funds - stay on swap view to show the error
+              notifyError(
+                t('swap.insufficient_funds', 'Insufficient balance for this payment. Please reduce the amount or add funds to your wallet.'),
+              )
+              dispatch({ type: 'SET_VIEW', view: 'swap' })
+              return
+            }
+
+            dispatch({ type: 'SET_VIEW', view: 'confirm-qr' })
+          }
+        }
+      }
+      void processSwapAfterConnect()
+    }
+    else if (pendingAction === 'process-qr') {
+      // User scanned QR and got connected - process the QR now
+      if (state.qrCode) {
+        // Re-trigger QR processing with the stored code
+        // We need to call handleQrResult again, but we can't call the callback directly
+        // Instead, we'll dispatch to the appropriate view based on the QR content
+        // For now, go to swap view where the user can see the extracted data
+        dispatch({ type: 'SET_VIEW', view: 'swap' })
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    isAuthenticated,
+    state.quoteId,
+    state.qrCode,
+    state.targetAmount,
+  ])
 
   useEffect(() => {
     const handleResize = () => {
@@ -1051,18 +1216,10 @@ export const useWebSwapController = (): WebSwapControllerProps => {
   }, [quoteFromTarget])
 
   const openQr = useCallback(() => {
-    if (!isWalletConnected) {
-      if (isMiniPay) return
-      void connectWallet()
-      return
-    }
+    // Always allow opening QR scanner - auth check happens on scan result
     dispatch({ isQrOpen: true, type: 'SET_QR_OPEN' })
     dispatch({ targetCurrency: TargetCurrency.BRL, type: 'SET_TARGET_CURRENCY' })
-  }, [
-    connectWallet,
-    isWalletConnected,
-    isMiniPay,
-  ])
+  }, [])
 
   const currencyMenuRef = useRef<HTMLDivElement | null>(null)
   const skipNextDocumentClickRef = useRef(false)
@@ -1180,9 +1337,14 @@ export const useWebSwapController = (): WebSwapControllerProps => {
   }, [])
 
   const onPrimaryAction = useCallback(async () => {
-    if (!isWalletConnected) {
-      if (isMiniPay) return
-      void connectWallet()
+    // If not authenticated, request wallet connection first
+    if (!isAuthenticated) {
+      if (isMiniPay) {
+        return
+      }
+      // Store intent to continue to confirm-qr after connection (user is ready to complete payment)
+      pendingActionAfterConnectRef.current = 'continue-to-confirm-from-swap'
+      await connectWallet()
       return
     }
     if (!state.quoteId) {
@@ -1192,7 +1354,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     dispatch({ type: 'SET_VIEW', view: 'confirm-qr' })
   }, [
     connectWallet,
-    isWalletConnected,
+    isAuthenticated,
     isMiniPay,
     notifyError,
     state.quoteId,
@@ -1211,8 +1373,21 @@ export const useWebSwapController = (): WebSwapControllerProps => {
 
   const handleQrResult = useCallback(async (text: string) => {
     dispatch({ isQrOpen: false, type: 'SET_QR_OPEN' })
-    dispatch({ isDecodingQr: true, type: 'SET_DECODING' })
     dispatch({ qrCode: text, type: 'SET_QR_CODE' })
+
+    // Check authentication before processing QR
+    if (!isAuthenticated) {
+      if (isMiniPay) {
+        dispatch({ isDecodingQr: false, type: 'SET_DECODING' })
+        return
+      }
+      // Store QR and request connection - will process after connect
+      pendingActionAfterConnectRef.current = 'process-qr'
+      await connectWallet()
+      return
+    }
+
+    dispatch({ isDecodingQr: true, type: 'SET_DECODING' })
 
     try {
       if (state.targetCurrency === TargetCurrency.COP) {
@@ -1309,6 +1484,9 @@ export const useWebSwapController = (): WebSwapControllerProps => {
       dispatch({ isDecodingQr: false, type: 'SET_DECODING' })
     }
   }, [
+    connectWallet,
+    isAuthenticated,
+    isMiniPay,
     notifyError,
     quoteFromTarget,
     selectedCorridor,
@@ -1783,6 +1961,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     isMiniPay,
     isQrOpen: state.isQrOpen,
     isWalletDetailsOpen: state.isWalletDetailsOpen,
+    onboardingRates: state.onboardingRates,
     onWalletConnect: connectWallet,
     openQr,
     requestConnectAfterChainSelect,

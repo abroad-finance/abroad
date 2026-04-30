@@ -283,8 +283,15 @@ export const useSwap = ({
   useEffect(() => {
     if (!wallet?.address || !wallet?.chainId || !selectedCorridor) return
     if (wallet.chainId === selectedCorridor.chainId) return
+    // Disconnect wallet and clean JWT when chain mismatch occurs
     wallet.disconnect().catch(() => undefined)
-  }, [selectedCorridor, wallet])
+    // Clean JWT to ensure proper re-authentication for new chain
+    walletAuthentication?.setJwtToken(null)
+  }, [
+    selectedCorridor,
+    wallet,
+    walletAuthentication,
+  ])
 
   const formatCryptoAmount = useCallback((value: number) => {
     if (!Number.isFinite(value)) return ''
@@ -354,7 +361,9 @@ export const useSwap = ({
         ) {
           return
         }
-        console.error('Reverse quote error', error)
+        if (import.meta.env.DEV) {
+          console.error('Reverse quote error', error)
+        }
       }
       finally {
         if (reqId === directReqIdRef.current && lastEditedRef.current === 'source') {
@@ -431,7 +440,9 @@ export const useSwap = ({
         ) {
           return
         }
-        console.error('Quote error', error)
+        if (import.meta.env.DEV) {
+          console.error('Quote error', error)
+        }
       }
       finally {
         if (reqId === reverseReqIdRef.current && lastEditedRef.current === 'target') {

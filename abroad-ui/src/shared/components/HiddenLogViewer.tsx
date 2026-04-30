@@ -1,3 +1,4 @@
+import { useTranslate } from '@tolgee/react'
 import React, {
   useCallback, useEffect, useMemo, useRef, useState,
 } from 'react'
@@ -41,6 +42,7 @@ function formatArg(arg: unknown): string {
 }
 
 export const HiddenLogViewer: React.FC = () => {
+  const { t } = useTranslate()
   const [open, setOpen] = useState(false)
   const [filter, setFilter] = useState<Record<LogLevel, boolean>>({
     debug: true,
@@ -159,7 +161,7 @@ export const HiddenLogViewer: React.FC = () => {
     <>
       {/* Hidden hotspot in bottom-right corner to open modal */}
       <button
-        aria-label="Open in-app logs"
+        aria-label={t('logs.open', 'Open in-app logs')}
         className="fixed bottom-0 right-0 w-8 h-8 opacity-0 z-[1000]"
         onClick={() => setOpen(true)}
         title=""
@@ -168,29 +170,29 @@ export const HiddenLogViewer: React.FC = () => {
       <Overlay backdropClassName="bg-black/50 backdrop-blur-sm" onClose={() => setOpen(false)} open={open} zIndexClassName="z-[1000]">
         <div className="w-full max-w-4xl max-h-[80vh] bg-white text-black rounded-lg shadow-xl overflow-hidden flex flex-col">
           <div className="flex items-center justify-between px-4 py-2 border-b border-gray-200 bg-gray-50">
-            <div className="font-semibold text-sm">In-App Logs</div>
+            <div className="font-semibold text-sm">{t('logs.title', 'In-App Logs')}</div>
             <div className="flex items-center gap-2">
               <button
                 className="text-xs px-2 py-1 rounded bg-gray-200 hover:bg-gray-300"
                 onClick={copyAll}
                 type="button"
               >
-                Copy
+                {t('logs.copy', 'Copy')}
               </button>
               <button
                 className="text-xs px-2 py-1 rounded bg-gray-200 hover:bg-gray-300"
                 onClick={clear}
                 type="button"
               >
-                Clear
+                {t('logs.clear', 'Clear')}
               </button>
               <button
-                aria-label="Close logs"
+                aria-label={t('logs.close_aria', 'Close logs')}
                 className="text-xs px-2 py-1 rounded bg-gray-200 hover:bg-gray-300"
                 onClick={() => setOpen(false)}
                 type="button"
               >
-                Close
+                {t('logs.close', 'Close')}
               </button>
             </div>
           </div>
@@ -219,7 +221,7 @@ export const HiddenLogViewer: React.FC = () => {
             <div className="ml-auto text-gray-500">
               {filtered.length}
               {' '}
-              shown
+              {t('logs.shown', 'shown')}
             </div>
           </div>
 

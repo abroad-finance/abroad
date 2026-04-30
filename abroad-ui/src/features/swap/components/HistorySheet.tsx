@@ -3,25 +3,13 @@ import { ChevronRight } from 'lucide-react'
 import React from 'react'
 
 import { BottomSheet } from '@/shared/components'
-import { ASSET_URLS } from '@/shared/constants'
+import { CHAIN_SIMPLE_CONFIG, COUNTRY_CONFIG } from '@/shared/constants'
 import { cn } from '@/shared/utils'
 
 import type { TxDetailItem } from '../constants'
 
-const CHAIN_CONFIG: Record<string, { bg: string, icon: string }> = {
-  Celo: { bg: 'var(--ab-chain-celo-bg)', icon: ASSET_URLS.CELO_CHAIN_ICON },
-  Solana: { bg: 'var(--ab-chain-solana-bg)', icon: ASSET_URLS.SOLANA_CHAIN_ICON },
-  Stellar: { bg: 'var(--ab-chain-stellar-bg)', icon: ASSET_URLS.STELLAR_CHAIN_ICON },
-}
-
-const COUNTRY_CONFIG: Record<string, { currency: string, flagUrl: string, rail: string, symbol: string }> = {
-  br: {
-    currency: 'BRL', flagUrl: 'https://hatscripts.github.io/circle-flags/flags/br.svg', rail: 'PIX', symbol: 'R$',
-  },
-  co: {
-    currency: 'COP', flagUrl: 'https://hatscripts.github.io/circle-flags/flags/co.svg', rail: 'Bre-B', symbol: '$',
-  },
-}
+// Alias for backwards compatibility with existing code structure
+const CHAIN_CONFIG = CHAIN_SIMPLE_CONFIG
 
 export interface HistorySheetProps {
   onClose: () => void

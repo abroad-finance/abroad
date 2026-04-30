@@ -31,4 +31,4 @@ export type MiniPayRuntime
     status: 'ready'
   }
 
-export type WalletType = 'mini-pay' | 'sep24' | 'stellar-kit' | 'wallet-connect'
+export type WalletType = 'mini-pay' | 'sep24' | 'solana' | 'stellar-kit' | 'wallet-connect'

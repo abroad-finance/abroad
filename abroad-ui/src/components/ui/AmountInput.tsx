@@ -87,13 +87,13 @@ export function AmountInput({
               {symbol}
             </span>
             <input
-              aria-label={`Amount in ${currency}`}
+              aria-label={t('input.amount_aria', 'Amount in {{currency}}', { currency })}
               className="min-w-[4ch] max-w-[24ch] bg-transparent text-[42px] font-extrabold tracking-[-1.5px] text-[var(--ab-text)] outline-none caret-[var(--ab-green)]"
               id={id}
               inputMode="decimal"
               onChange={e => onLocalChange(sanitizeLocal(e.target.value))}
               onFocus={handleFocus}
-              placeholder={placeholderLocal}
+              placeholder={t('input.placeholder', placeholderLocal)}
               ref={inputRef}
               style={{ width: `${Math.max(5, (localValue || placeholderLocal).length + 1)}ch` }}
               type="text"
@@ -114,7 +114,7 @@ export function AmountInput({
               onClick={onModeSwitch}
               type="button"
             >
-              {t('amount_input.switch', 'switch')}
+              {t('input.switch', 'switch')}
             </button>
           </div>
         </>
@@ -127,13 +127,13 @@ export function AmountInput({
             $
           </span>
           <input
-            aria-label={`Amount in ${tokenLabel}`}
+            aria-label={t('input.token_amount_aria', 'Amount in {{token}}', { token: tokenLabel })}
             className="min-w-[4ch] max-w-[20ch] bg-transparent text-[42px] font-extrabold tracking-[-1.5px] text-[var(--ab-text)] outline-none caret-[var(--ab-green)]"
             id={id}
             inputMode="decimal"
             onChange={e => onUsdcChange(sanitizeUsdc(e.target.value))}
             onFocus={handleFocus}
-            placeholder="0.00"
+            placeholder={t('input.placeholder', '0.00')}
             ref={inputRef}
             style={{ width: `${Math.max(4, (usdcValue || '0.00').length + 1)}ch` }}
             type="text"
@@ -148,7 +148,7 @@ export function AmountInput({
             onClick={onModeSwitch}
             type="button"
           >
-            {t('amount_input.switch', 'switch')}
+            {t('input.switch', 'switch')}
           </button>
         </div>
       </>

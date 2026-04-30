@@ -1,3 +1,5 @@
+import type { WalletConnectMetadata } from '../api'
+
 export interface IWallet {
   readonly address: null | string
 
@@ -15,13 +17,6 @@ export interface IWallet {
     signerAddress?: string }>
 
   readonly walletId: null | string
-}
-
-export type WalletConnectMetadata = {
-  chainId: string
-  events: string[]
-  methods: string[]
-  namespace: string
 }
 
 export type WalletConnectOptions = {

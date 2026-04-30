@@ -1,23 +1,15 @@
-import type { TargetCurrency } from '../../api'
+import type {
+  AcceptTransactionRequest, AcceptTransactionResponse, ChainFamily, TargetCurrency, WalletConnectMetadata,
+} from '../../api'
 
-export type AcceptTransactionRequest = {
-  account_number: string
-  qr_code?: null | string
-  quote_id: string
-  redirectUrl?: string
-  tax_id?: string
-  user_id: string
-}
+// Re-export AcceptTransactionRequest and AcceptTransactionResponse for use in publicApi.ts
+export type { AcceptTransactionRequest, AcceptTransactionResponse }
 
-export type AcceptTransactionResponse = {
-  id: null | string
-  kycLink: null | string
-  payment_context?: null | PaymentContext
-  transaction_reference: null | string
-}
-
-export type ChainFamily = 'evm' | 'solana' | 'stellar'
-
+/**
+ * @deprecated Use PaymentContext from ../../api instead
+ * This local type is kept for backwards compatibility but should be removed
+ * once all usages are migrated to the API type.
+ */
 export type NotifyMetadata = {
   endpoint: null | string
   required: boolean
@@ -29,21 +21,9 @@ export type NotifyPaymentRequest = {
   transaction_id: string
 }
 
-export type PaymentContext = {
-  amount: number
-  blockchain: string
-  chainFamily: ChainFamily
-  chainId: string
-  cryptoCurrency: string
-  decimals: null | number
-  depositAddress: string
-  memo: null | string
-  memoType: 'text' | null
-  mintAddress: null | string
-  notify: NotifyMetadata
-  rpcUrl: null | string
-}
-
+/**
+ * Public corridor configuration type.
+ */
 export type PublicCorridor = {
   blockchain: string
   chainFamily: ChainFamily
@@ -81,11 +61,4 @@ export type ReverseQuoteRequest = {
   payment_method: string
   source_amount: number
   target_currency: string
-}
-
-export type WalletConnectMetadata = {
-  chainId: string
-  events: string[]
-  methods: string[]
-  namespace: string
 }

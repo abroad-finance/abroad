@@ -80,7 +80,7 @@ export const ChainSelectorModal: React.FC<ChainSelectorModalProps> = ({
 
   if (!open) return null
 
-  const chainLabel = selectedChain ? getChainShortLabel(selectedChain.label) : 'Stellar'
+  const chainLabel = selectedChain ? getChainShortLabel(selectedChain.label) : t('chain.stellar', 'Stellar')
 
   return (
     <AnimatePresence>

@@ -5,7 +5,9 @@ import {
 import React, { useState } from 'react'
 
 import { TransactionListItem } from '../../../api'
-import { ASSET_URLS } from '../../../shared/constants'
+import {
+  ASSET_URLS, CHAIN_ICON_MAP, COUNTRY_CONFIG_BY_CURRENCY, TOKEN_ICON_MAP,
+} from '../../../shared/constants'
 import { cn } from '../../../shared/utils'
 import { formatChainLabel } from '../utils/corridorHelpers'
 
@@ -17,28 +19,8 @@ export interface TransactionDetailProps {
   transaction: TransactionListItem
 }
 
-const CHAIN_ICON_MAP: Record<string, string> = {
-  CELO: ASSET_URLS.CELO_CHAIN_ICON,
-  celo: ASSET_URLS.CELO_CHAIN_ICON,
-  SOLANA: ASSET_URLS.SOLANA_CHAIN_ICON,
-  solana: ASSET_URLS.SOLANA_CHAIN_ICON,
-  STELLAR: ASSET_URLS.STELLAR_CHAIN_ICON,
-  stellar: ASSET_URLS.STELLAR_CHAIN_ICON,
-}
-
-const COUNTRY_CONFIG: Record<string, { flagUrl: string, location: string, name: string, rail: string, symbol: string }> = {
-  BRL: {
-    flagUrl: 'https://hatscripts.github.io/circle-flags/flags/br.svg', location: 'Brazil', name: 'BRL', rail: 'PIX', symbol: 'R$',
-  },
-  COP: {
-    flagUrl: 'https://hatscripts.github.io/circle-flags/flags/co.svg', location: 'Colombia', name: 'COP', rail: 'Bre-B', symbol: '$',
-  },
-}
-
-const TOKEN_ICON_MAP: Record<string, string> = {
-  USDC: ASSET_URLS.USDC_TOKEN_ICON,
-  USDT: ASSET_URLS.USDT_TOKEN_ICON,
-}
+// Alias for backwards compatibility with existing code structure
+const COUNTRY_CONFIG = COUNTRY_CONFIG_BY_CURRENCY
 
 const TransactionDetail: React.FC<Readonly<TransactionDetailProps>> = ({
   formatDateWithTime,

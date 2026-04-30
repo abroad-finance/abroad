@@ -1,3 +1,4 @@
+import { useTranslate } from '@tolgee/react'
 import React, { useEffect, useRef } from 'react'
 
 // Define Option interface
@@ -32,6 +33,7 @@ export function DropSelector({
   setIsOpen,
   textColor,
 }: DropSelectorProps) {
+  const { t } = useTranslate()
   const rootRef = useRef<HTMLDivElement>(null)
   const listboxIdRef = useRef(`drop-selector-${Math.random().toString(36).slice(2)}`)
   const listboxId = listboxIdRef.current
@@ -177,7 +179,7 @@ export function DropSelector({
                 })
               )
             : (
-                <div className="px-3 py-2 text-gray-500 text-lg">No options available</div>
+                <div className="px-3 py-2 text-gray-500 text-lg">{t('selector.no_options', 'No options available')}</div>
               )}
         </div>
       )}

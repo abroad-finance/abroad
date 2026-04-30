@@ -57,6 +57,7 @@ export interface WebSwapControllerProps {
   isMiniPay: boolean
   isQrOpen: boolean
   isWalletDetailsOpen: boolean
+  onboardingRates: OnboardingRates
   onWalletConnect: () => Promise<void>
   openQr: () => void
   requestConnectAfterChainSelect: () => void
@@ -80,6 +81,17 @@ export interface WebSwapControllerProps {
     transferFeeDisplay: string
   }
   view: SwapView
+}
+
+type OnboardingRates = {
+  brl: {
+    USDC: null | number
+    USDT: null | number
+  }
+  cop: {
+    USDC: null | number
+    USDT: null | number
+  }
 }
 
 /* ── Chain icon helpers for source modal ── */
@@ -149,6 +161,7 @@ const WebSwap: React.FC = () => {
     isMiniPay,
     isQrOpen,
     isWalletDetailsOpen,
+    onboardingRates,
     openQr,
     requestConnectAfterChainSelect,
     resetForNewTransaction,
@@ -156,7 +169,6 @@ const WebSwap: React.FC = () => {
     selectChain,
     selectCurrency,
     selectedChainKey,
-    setHasPassedOnboarding,
     sourceAmountForBalanceCheck,
     swapViewProps,
     targetAmount,
@@ -198,6 +210,10 @@ const WebSwap: React.FC = () => {
   const [targetModalOpen, setTargetModalOpen] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
   const [selectedTx, setSelectedTx] = useState<null | TxDetailItem>(null)
+
+  // Track if user has entered the app from onboarding
+  const [hasEnteredApp, setHasEnteredApp] = useState(false)
+  const handleEnterApp = useCallback(() => setHasEnteredApp(true), [])
 
   // Fetch user transactions (for fallback summaries only; HistorySheet uses walletDetails.transactions)
   const { fetchTransactions, recentTransactions: txSummaries } = useUserTransactions(swapViewProps.isAuthenticated, selectedChainKey)
@@ -261,7 +277,7 @@ const WebSwap: React.FC = () => {
 
   return (
     <div
-      className="w-full h-[100dvh] md:h-screen overflow-hidden flex flex-col"
+      className="w-full h-dvh overflow-hidden flex flex-col"
       style={{
         background: isMiniPay
           ? 'linear-gradient(180deg, #f5fbf8 0%, #e8f4ee 100%)'
@@ -300,17 +316,18 @@ const WebSwap: React.FC = () => {
                 formatDate={walletDetails.formatDate}
                 getStatusStyle={walletDetails.getStatusStyle}
                 getStatusText={walletDetails.getStatusText}
-                hasPassedOnboarding={hasPassedOnboarding}
+                hasEnteredApp={hasEnteredApp || swapViewProps.isAuthenticated}
                 isAuthenticated={
                   hasPassedOnboarding
                   || Boolean(walletDetails.address && selectedChainKey)
                 }
-                onConnectWallet={handleConnectWalletClick}
+                onboardingRates={onboardingRates}
+                onEnterApp={handleEnterApp}
                 onGoToManual={goToManual}
                 onHistoryClick={() => setShowHistory(true)}
                 onOpenChainModal={openSourceModal}
                 onOpenQr={openQr}
-                onPassOnboarding={() => setHasPassedOnboarding(true)}
+                onRequestConnect={handleConnectWalletClick}
                 onSelectCurrency={selectCurrency}
                 onSelectTransaction={tx => setSelectedTx(transactionToTxDetailItem(tx))}
                 recentTransactions={
