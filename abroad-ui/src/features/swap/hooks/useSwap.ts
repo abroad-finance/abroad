@@ -135,7 +135,16 @@ export const useSwap = ({
   // Local UI state
   const [loadingSource, setLoadingSource] = useState(false) // typing in target field -> fetching source
   const [loadingTarget, setLoadingTarget] = useState(false) // typing in source field -> fetching target
-  const [displayedTRM, setDisplayedTRM] = useState(0.0)
+  const displayedTRM = useMemo(() => {
+    if (loadingSource || loadingTarget) return 0.0
+    const numericSource = parseFloat(sourceAmount)
+    const cleanedTarget = targetAmount.replace(/\./g, '').replace(/,/g, '.')
+    const numericTarget = parseFloat(cleanedTarget)
+    if (numericSource > 0 && !isNaN(numericTarget) && numericTarget >= 0) {
+      return (numericTarget + transferFee) / numericSource
+    }
+    return 0.0
+  }, [sourceAmount, targetAmount, loadingSource, loadingTarget, transferFee])
 
   const [currencyMenuOpen, setCurrencyMenuOpen] = useState(false)
   const currencyMenuRef = useRef<HTMLDivElement | null>(null)
@@ -306,7 +315,6 @@ export const useSwap = ({
       setLoadingTarget(true)
       setQuoteId('') // invalidate previous quote
       try {
-        // NOTE: We pass an AbortSignal as a 2nd arg; ensure your API helper forwards it to fetch/axios.
         const response = await requestReverseQuote(
           {
             crypto_currency: corridor.cryptoCurrency,
@@ -507,7 +515,6 @@ export const useSwap = ({
     setQuoteId('')
     setSourceAmount('')
     setTargetAmount('')
-    setDisplayedTRM(0)
   }, [
     availableCorridors,
     setCorridorKey,
@@ -586,7 +593,6 @@ export const useSwap = ({
     setQuoteId('')
     setSourceAmount('')
     setTargetAmount('')
-    setDisplayedTRM(0)
   }, [
     availableCorridors,
     corridors,
@@ -615,7 +621,6 @@ export const useSwap = ({
       setQuoteId('')
       setSourceAmount('')
       setTargetAmount('')
-      setDisplayedTRM(0)
     },
     [
       setCorridorKey,
@@ -647,33 +652,6 @@ export const useSwap = ({
     t,
   ])
 
-  // Effects -------------------------------------------------------------------
-
-  // Exchange rate (TRM) display
-  useEffect(() => {
-    if (!loadingSource && !loadingTarget) {
-      const numericSource = parseFloat(sourceAmount)
-      const cleanedTarget = targetAmount.replace(/\./g, '').replace(/,/g, '.')
-      const numericTarget = parseFloat(cleanedTarget)
-      if (numericSource > 0 && !isNaN(numericTarget) && numericTarget >= 0) {
-        setDisplayedTRM((numericTarget + transferFee) / numericSource)
-      }
-      else {
-        setDisplayedTRM(0.0)
-      }
-    }
-  }, [
-    sourceAmount,
-    targetAmount,
-    loadingSource,
-    loadingTarget,
-    transferFee,
-  ])
-
-  // ⛔️ Removed debounced fetchers:
-  // useEffect(() => { ... }, [sourceDebouncedAmount])
-  // useEffect(() => { ... }, [targetDebounceAmount])
-
   useMenuCloseOnOutsideClick({
     isOpen: currencyMenuOpen,
     menuRef: currencyMenuRef,
@@ -693,7 +671,6 @@ export const useSwap = ({
     skipNextRef: skipNextChainClickRef,
   })
 
-  // Cleanup on unmount: abort any in-flight requests
   useEffect(() => {
     return () => {
       directAbortRef.current?.abort()

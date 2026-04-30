@@ -5,6 +5,7 @@ import type { IPaymentService } from '../../../../../modules/payments/applicatio
 import type { IPaymentServiceFactory } from '../../../../../modules/payments/application/contracts/IPaymentServiceFactory'
 import type { IDatabaseClientProvider } from '../../../../../platform/persistence/IDatabaseClientProvider'
 
+import { LiquidityCacheService } from '../../../../../modules/payments/application/LiquidityCacheService'
 import { TransactionAcceptanceService } from '../../../../../modules/transactions/application/TransactionAcceptanceService'
 import { TransactionStatusService } from '../../../../../modules/transactions/application/TransactionStatusService'
 import { TransactionController } from '../../../../../modules/transactions/interfaces/http/TransactionController'
@@ -63,11 +64,25 @@ export const buildMinimalController = () => {
   }
   const logger = createMockLogger()
 
+  const liquidityCacheService = {
+    getLiquidity: jest.fn(async ({ fetchLiquidity }: { fetchLiquidity: () => Promise<number> }) => {
+      try {
+        const liquidity = await fetchLiquidity()
+        return { fromCache: false, liquidity, success: true }
+      }
+      catch (error) {
+        const reason = error instanceof Error ? error.message : 'Unknown error'
+        return { fromCache: false, liquidity: 0, message: reason, success: false }
+      }
+    }),
+  } as unknown as LiquidityCacheService
+
   const acceptanceService = new TransactionAcceptanceService(
     dbProvider,
     paymentServiceFactory,
     kycService,
     outboxDispatcher as never,
+    liquidityCacheService,
     logger,
   )
   const statusService = new TransactionStatusService(dbProvider)

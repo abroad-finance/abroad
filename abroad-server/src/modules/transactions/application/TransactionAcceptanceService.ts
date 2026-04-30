@@ -19,6 +19,7 @@ import { IDatabaseClientProvider } from '../../../platform/persistence/IDatabase
 import { IKycService } from '../../kyc/application/contracts/IKycService'
 import { getNextTier, type KycCountry } from '../../kyc/application/kycTierRules'
 import { IPaymentServiceFactory } from '../../payments/application/contracts/IPaymentServiceFactory'
+import { LiquidityCacheService } from '../../payments/application/LiquidityCacheService'
 import { uuidToBase64 } from '../infrastructure/transactionEncoding'
 import { toWebhookTransactionPayload } from './transactionPayload'
 
@@ -77,6 +78,7 @@ export class TransactionAcceptanceService {
     private readonly paymentServiceFactory: IPaymentServiceFactory,
     @inject(TYPES.IKycService) private readonly kycService: IKycService,
     @inject(TYPES.IOutboxDispatcher) private readonly outboxDispatcher: OutboxDispatcher,
+    @inject(LiquidityCacheService) private readonly liquidityCacheService: LiquidityCacheService,
     @inject(TYPES.ILogger) logger: ILogger,
   ) {
     this.logger = createScopedLogger(logger, { scope: 'TransactionAcceptance' })
@@ -138,7 +140,7 @@ export class TransactionAcceptanceService {
 
         await this.enforceUserTransactionLimits(tx, partnerUser.id, quote, paymentService)
         await this.enforcePaymentMethodLimits(tx, quote, paymentService)
-        await this.enforceLiquidity(paymentService, quote.targetAmount)
+        await this.enforceLiquidity(paymentService, quote.paymentMethod, quote.targetAmount)
         await this.enforcePartnerKybThreshold(tx, partner.id, quote.sourceAmount, partner.isKybApproved)
         await this.reserveUserMonthlyLimits(tx, partnerUser.id, quote.paymentMethod, quote.targetAmount, paymentService)
         await this.reservePartnerMonthlyLimits(tx, partner.id, quote.paymentMethod, quote.targetAmount, paymentService)
@@ -269,20 +271,29 @@ export class TransactionAcceptanceService {
 
   private async enforceLiquidity(
     paymentService: PaymentServiceInstance,
+    paymentMethod: PaymentMethod,
     targetAmount: number,
   ) {
-    let availableLiquidity = 0
-    try {
-      availableLiquidity = await paymentService.getLiquidity()
-    }
-    catch (err) {
-      this.logger.warn('Failed to fetch payment service liquidity', err)
-      availableLiquidity = 0
+    const result = await this.liquidityCacheService.getLiquidity({
+      fetchLiquidity: () => paymentService.getLiquidity(),
+      method: paymentMethod,
+    })
+
+    if (result.liquidity >= targetAmount) {
+      return
     }
 
-    if (targetAmount > availableLiquidity) {
-      throw new TransactionValidationError('We cannot process this payout because liquidity for this method is below the requested amount. Try a smaller amount or choose another payment method.')
+    if (!result.success) {
+      this.logger.error('Unable to verify liquidity for transaction acceptance', {
+        cachedLiquidity: result.liquidity,
+        paymentMethod,
+        reason: result.message,
+        targetAmount,
+      })
+      throw new TransactionValidationError('We could not verify available liquidity for this payment method right now. Please try again in a few moments.')
     }
+
+    throw new TransactionValidationError('We cannot process this payout because liquidity for this method is below the requested amount. Try a smaller amount or choose another payment method.')
   }
 
   private async enforcePartnerKybThreshold(

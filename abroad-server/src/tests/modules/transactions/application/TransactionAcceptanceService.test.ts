@@ -1,6 +1,8 @@
 import 'reflect-metadata'
 import { PaymentMethod, TargetCurrency, TransactionStatus } from '@prisma/client'
 
+import type { LiquidityCacheService } from '../../../../modules/payments/application/LiquidityCacheService'
+
 import { TransactionAcceptanceService, TransactionValidationError } from '../../../../modules/transactions/application/TransactionAcceptanceService'
 import { createMockLogger } from '../../../setup/mockFactories'
 
@@ -38,12 +40,25 @@ describe('TransactionAcceptanceService helpers', () => {
   const prismaProvider = {
     getClient: jest.fn(),
   }
+  const liquidityCacheService = {
+    getLiquidity: jest.fn(async ({ fetchLiquidity }: { fetchLiquidity: () => Promise<number> }) => {
+      try {
+        const liquidity = await fetchLiquidity()
+        return { fromCache: false, liquidity, success: true }
+      }
+      catch (error) {
+        const reason = error instanceof Error ? error.message : 'Unknown error'
+        return { fromCache: false, liquidity: 0, message: reason, success: false }
+      }
+    }),
+  } as unknown as LiquidityCacheService
 
   const service = new TransactionAcceptanceService(
     prismaProvider as unknown as import('../../../../platform/persistence/IDatabaseClientProvider').IDatabaseClientProvider,
     paymentServiceFactory as unknown as import('../../../../modules/payments/application/contracts/IPaymentServiceFactory').IPaymentServiceFactory,
     kycService as unknown as import('../../../../modules/kyc/application/contracts/IKycService').IKycService,
     outboxDispatcher as unknown as import('../../../../platform/outbox/OutboxDispatcher').OutboxDispatcher,
+    liquidityCacheService,
     logger,
   )
 
@@ -67,13 +82,43 @@ describe('TransactionAcceptanceService helpers', () => {
     expect(normalizeCountry('co')).toBe('CO')
   })
 
-  it('enforces liquidity thresholds and invokes the provider', async () => {
+  it('enforces liquidity thresholds and invokes the provider through the cache', async () => {
     const enforceLiquidity = (service as unknown as {
-      enforceLiquidity: (svc: ReturnType<typeof buildPaymentService>, amount: number) => Promise<void>
+      enforceLiquidity: (svc: ReturnType<typeof buildPaymentService>, method: PaymentMethod, amount: number) => Promise<void>
     }).enforceLiquidity
 
-    await expect(enforceLiquidity(paymentService, 50)).rejects.toThrow('liquidity for this method is below the requested amount')
+    await expect(enforceLiquidity.call(service, paymentService, PaymentMethod.BREB, 50))
+      .rejects.toThrow('liquidity for this method is below the requested amount')
+    expect(liquidityCacheService.getLiquidity).toHaveBeenCalledWith(
+      expect.objectContaining({ method: PaymentMethod.BREB }),
+    )
     expect(paymentService.getLiquidity).toHaveBeenCalled()
+  })
+
+  it('surfaces a retryable error when liquidity cannot be verified', async () => {
+    const enforceLiquidity = (service as unknown as {
+      enforceLiquidity: (svc: ReturnType<typeof buildPaymentService>, method: PaymentMethod, amount: number) => Promise<void>
+    }).enforceLiquidity
+    const failingProvider = {
+      ...paymentService,
+      getLiquidity: jest.fn(async () => { throw new Error('Movii API unavailable') }),
+    }
+
+    await expect(enforceLiquidity.call(service, failingProvider, PaymentMethod.BREB, 50))
+      .rejects.toThrow('We could not verify available liquidity for this payment method right now. Please try again in a few moments.')
+  })
+
+  it('accepts the transaction when cached liquidity covers the requested amount', async () => {
+    const enforceLiquidity = (service as unknown as {
+      enforceLiquidity: (svc: ReturnType<typeof buildPaymentService>, method: PaymentMethod, amount: number) => Promise<void>
+    }).enforceLiquidity
+    const sufficientProvider = {
+      ...paymentService,
+      getLiquidity: jest.fn(async () => 1_000),
+    }
+
+    await expect(enforceLiquidity.call(service, sufficientProvider, PaymentMethod.BREB, 50))
+      .resolves.toBeUndefined()
   })
 
   it('enforces per-transaction amount bounds', () => {

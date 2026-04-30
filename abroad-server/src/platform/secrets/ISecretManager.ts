@@ -1,4 +1,3 @@
-// src/platform/secrets/ISecretManager.ts
 const secretEntries = [
   ['BREB_API_BASE_URL', 'BREB_API_BASE_URL'],
   ['BREB_AUTH_URL', 'BREB_AUTH_URL'],

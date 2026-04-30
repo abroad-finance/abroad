@@ -308,7 +308,7 @@ export class TransferoPaymentService implements IPaymentService {
         : error
 
     if (isAxiosError) {
-      return typeof payload === 'string' ? JSON.stringify(payload) : JSON.stringify(payload)
+      return typeof payload === 'string' ? payload : JSON.stringify(payload)
     }
 
     return typeof payload === 'string' ? payload : JSON.stringify(payload)

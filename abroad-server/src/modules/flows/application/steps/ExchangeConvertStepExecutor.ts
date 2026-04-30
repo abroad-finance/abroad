@@ -7,7 +7,7 @@ import { z } from 'zod'
 import { TYPES } from '../../../../app/container/types'
 import { createScopedLogger, ScopedLogger } from '../../../../core/logging/scopedLogger'
 import { ILogger } from '../../../../core/logging/types'
-import { ISecretManager } from '../../../../platform/secrets/ISecretManager'
+import { ISecretManager, Secrets } from '../../../../platform/secrets/ISecretManager'
 import { IExchangeProviderFactory } from '../../../treasury/application/contracts/IExchangeProviderFactory'
 import { AmountSource, amountSourceSchema, resolveAmount } from '../flowAmountResolver'
 import { FlowStepExecutionResult, FlowStepExecutor, FlowStepRuntimeContext } from '../flowTypes'
@@ -157,9 +157,9 @@ export class ExchangeConvertStepExecutor implements FlowStepExecutor {
 
     try {
       const [apiKey, apiSecret, apiUrl] = await Promise.all([
-        this.secretManager.getSecret('BINANCE_API_KEY'),
-        this.secretManager.getSecret('BINANCE_API_SECRET'),
-        this.secretManager.getSecret('BINANCE_API_URL'),
+        this.secretManager.getSecret(Secrets.BINANCE_API_KEY),
+        this.secretManager.getSecret(Secrets.BINANCE_API_SECRET),
+        this.secretManager.getSecret(Secrets.BINANCE_API_URL),
       ])
 
       const client = new MainClient({
