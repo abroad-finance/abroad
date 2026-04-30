@@ -144,7 +144,13 @@ export const useSwap = ({
       return (numericTarget + transferFee) / numericSource
     }
     return 0.0
-  }, [sourceAmount, targetAmount, loadingSource, loadingTarget, transferFee])
+  }, [
+    sourceAmount,
+    targetAmount,
+    loadingSource,
+    loadingTarget,
+    transferFee,
+  ])
 
   const [currencyMenuOpen, setCurrencyMenuOpen] = useState(false)
   const currencyMenuRef = useRef<HTMLDivElement | null>(null)
