@@ -229,6 +229,79 @@
   background-color: #5a9a8f;
 }
 
+/* Dark mode navbar utility classes */
+.dark .ab-nav {
+  background-color: var(--ab-nav-bg);
+  border-color: var(--ab-nav-border);
+}
+.dark .ab-nav-balance-pill {
+  background-color: var(--ab-nav-balance-bg);
+  border-color: var(--ab-nav-balance-border);
+}
+.dark .ab-nav-balance-dot {
+  background-color: var(--ab-nav-balance-dot);
+}
+
+/* HomeScreen utility classes */
+.ab-hero-live-badge {
+  background-color: #e8f5f1;
+}
+.dark .ab-hero-live-badge {
+  background-color: rgba(13, 43, 38, 0.3);
+  border: 1px solid rgba(13, 43, 38, 0.5);
+}
+.ab-hero-live-dot {
+  background-color: #1ec677;
+}
+.dark .ab-hero-live-dot {
+  background-color: #5a9a8f;
+}
+.ab-hero-live-text {
+  color: #0f513a;
+}
+.dark .ab-hero-live-text {
+  color: #a0c8c0;
+}
+.ab-hero-heading-dark {
+  color: #101828;
+}
+.dark .ab-hero-heading-dark {
+  color: #e0f0ec;
+}
+.ab-hero-heading-accent {
+  color: #73b9a3;
+}
+.ab-hero-subline {
+  color: #6b7280;
+}
+.dark .ab-hero-subline {
+  color: #6a9a92;
+}
+.ab-hero-chain-celo {
+  background-color: rgba(255, 241, 162, 0.94);
+}
+.ab-hero-chain-celo-text {
+  color: #000000;
+}
+.ab-hero-chain-solana {
+  background-color: #f3ebfd;
+}
+.ab-hero-chain-solana-text {
+  color: #6b21a8;
+}
+.ab-hero-chain-stellar {
+  background-color: #f3f4f6;
+}
+.ab-hero-chain-stellar-text {
+  color: #000000;
+}
+.ab-hero-cta {
+  background-color: #54ae92;
+}
+.dark .ab-hero-cta {
+  background-color: #5a9a8f;
+}
+
 /* ── UX redesign: shared animations ── */
 @keyframes ab-blink {
   0%, 100% { opacity: 1; }
