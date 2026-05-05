@@ -119,11 +119,11 @@ export const useSwap = ({
     label: corridor.cryptoCurrency,
   })), [chainFilteredCorridors])
   const selectedAssetLabel = useMemo(() => {
-    if (!selectedCorridor) return t('swap.asset_placeholder', 'Selecciona activo')
+    if (!selectedCorridor) return t('swap.asset_placeholder', 'Select asset')
     return selectedCorridor.cryptoCurrency
   }, [selectedCorridor, t])
   const selectedChainLabel = useMemo(() => {
-    if (!selectedCorridor) return t('swap.chain_placeholder', 'Selecciona red')
+    if (!selectedCorridor) return t('swap.chain_placeholder', 'Select network')
     const includeChainId = (chainVariants.get(selectedCorridor.blockchain)?.size ?? 0) > 1
     return buildChainLabel(selectedCorridor, includeChainId)
   }, [
@@ -261,7 +261,7 @@ export const useSwap = ({
     addNotice({
       description: corridorError,
       kind: 'error',
-      message: t('swap.corridor_load_error', 'No pudimos cargar los activos disponibles.'),
+      message: t('swap.corridor_load_error', 'We could not load the available assets.'),
     })
   }, [
     addNotice,

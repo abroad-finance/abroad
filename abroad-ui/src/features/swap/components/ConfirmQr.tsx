@@ -58,12 +58,12 @@ const ConfirmQr: React.FC<ConfirmQrProps> = ({
     if (isBRL) {
       return t(
         'confirm_qr.disclaimer',
-        'Tu transacción será procesada de inmediato. Asegúrate de que la llave PIX y el CPF sean correctos. Esta transacción no se puede reversar.',
+        'Your transaction will be processed immediately. Make sure the PIX key and CPF are correct. This transaction cannot be reversed.',
       )
     }
     return t(
       'confirm_qr.disclaimer_cop',
-      'Tu transacción será procesada de inmediato. Asegúrate de que el número de cuenta y datos sean los correctos. Esta transacción no se puede reversar.',
+      'Your transaction will be processed immediately. Make sure the account number and details are correct. This transaction cannot be reversed.',
     )
   }, [isBRL, t])
 
@@ -87,7 +87,7 @@ const ConfirmQr: React.FC<ConfirmQrProps> = ({
             <ArrowLeft className="h-5 w-5 text-ab-text" />
           </button>
           <h2 className="text-lg font-bold leading-7 text-ab-text">
-            {t('confirm_qr.title', 'Verifica los detalles del pago')}
+            {t('confirm_qr.title', 'Verify payment details')}
           </h2>
         </div>
 
@@ -122,19 +122,19 @@ const ConfirmQr: React.FC<ConfirmQrProps> = ({
         {/* Transaction details — recipient info for verification */}
         <div className="flex flex-col gap-2.5 rounded-2xl border border-ab-border bg-ab-bg-muted/50 px-3 py-3 md:px-4 md:py-4">
           <h3 className="text-xs font-bold uppercase tracking-wider text-ab-text-3">
-            {t('confirm_qr.details_title', 'Detalles del destinatario')}
+            {t('confirm_qr.details_title', 'Recipient Details')}
           </h3>
           {isBRL
             ? (
                 <div className="flex flex-col gap-2 text-sm">
                   {recipientName && (
                     <div className="flex justify-between gap-3">
-                      <span className="text-ab-text-3">{t('confirm_qr.recipient_name', 'Nombre')}</span>
+                      <span className="text-ab-text-3">{t('confirm_qr.recipient_name', 'Name')}</span>
                       <span className="font-medium text-ab-text break-all text-right">{recipientName}</span>
                     </div>
                   )}
                   <div className="flex justify-between gap-3">
-                    <span className="text-ab-text-3 shrink-0">{t('confirm_qr.pix_key', 'Llave PIX')}</span>
+                    <span className="text-ab-text-3 shrink-0">{t('confirm_qr.pix_key', 'PIX Key')}</span>
                     <span className="font-medium text-ab-text break-all font-mono text-right">{pixKey || '—'}</span>
                   </div>
                   <div className="flex justify-between gap-3">
@@ -147,12 +147,12 @@ const ConfirmQr: React.FC<ConfirmQrProps> = ({
                 <div className="flex flex-col gap-2 text-sm">
                   {recipientName && (
                     <div className="flex justify-between gap-3">
-                      <span className="text-ab-text-3">{t('confirm_qr.recipient_name', 'Nombre')}</span>
+                      <span className="text-ab-text-3">{t('confirm_qr.recipient_name', 'Name')}</span>
                       <span className="font-medium text-ab-text break-all text-right">{recipientName}</span>
                     </div>
                   )}
                   <div className="flex justify-between gap-3">
-                    <span className="text-ab-text-3 shrink-0">{t('confirm_qr.account_breb', 'Cuenta / Bre-B')}</span>
+                    <span className="text-ab-text-3 shrink-0">{t('confirm_qr.account_breb', 'Account / Bre-B')}</span>
                     <span className="font-medium text-ab-text break-all font-mono text-right">{accountNumber || '—'}</span>
                   </div>
                 </div>
@@ -178,7 +178,7 @@ const ConfirmQr: React.FC<ConfirmQrProps> = ({
           onClick={onEdit}
           type="button"
         >
-          {t('confirm_qr.edit', 'Editar')}
+          {t('confirm_qr.edit', 'Edit')}
         </button>
         <button
           className={cn(
@@ -196,7 +196,7 @@ const ConfirmQr: React.FC<ConfirmQrProps> = ({
                 <Loader className="h-5 w-5 animate-spin" />
               )
             : (
-                t('confirm_qr.confirm', 'Continuar')
+                t('confirm_qr.confirm', 'Continue')
               )}
         </button>
       </div>

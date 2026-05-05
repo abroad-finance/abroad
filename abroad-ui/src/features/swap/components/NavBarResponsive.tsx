@@ -131,14 +131,14 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({
         <>
           {onDisconnect && (
             <button
-              aria-label={labels.disconnectAria ?? 'Desconectar billetera'}
+              aria-label={labels.disconnectAria ?? 'Disconnect wallet'}
               className={cn(NAV_BUTTON_CLASS, AB_STYLES.textSecondary)}
               onClick={() => {
                 onDisconnect().catch((err) => {
                   if (import.meta.env.DEV) console.error(err)
                 })
               }}
-              title={labels.disconnectTitle ?? 'Desconectar billetera'}
+              title={labels.disconnectTitle ?? 'Disconnect wallet'}
               type="button"
             >
               <LogOut className="w-4 h-4" />

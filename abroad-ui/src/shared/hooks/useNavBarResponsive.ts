@@ -190,13 +190,13 @@ export function useNavBarResponsive({
   }, [wallet?.walletId])
 
   const labels = useMemo(() => ({
-    connectWallet: t('navbar.connect_wallet', 'Conectar Billetera'),
-    connectWalletAria: t('navbar.connect_wallet_aria', 'Conectar billetera'),
-    disconnectAria: t('navbar.disconnect_aria', 'Desconectar billetera'),
-    disconnectTitle: t('navbar.disconnect_title', 'Desconectar billetera'),
-    infoAriaLabel: t('navbar.info_aria_label', 'Información de Abroad'),
-    notConnected: t('navbar.not_connected', 'No conectado'),
-    walletDetailsAria: t('navbar.wallet_details_aria', 'Ver detalles de la billetera'),
+    connectWallet: t('navbar.connect_wallet', 'Connect Wallet'),
+    connectWalletAria: t('navbar.connect_wallet_aria', 'Connect wallet'),
+    disconnectAria: t('navbar.disconnect_aria', 'Disconnect wallet'),
+    disconnectTitle: t('navbar.disconnect_title', 'Disconnect wallet'),
+    infoAriaLabel: t('navbar.info_aria_label', 'Abroad information'),
+    notConnected: t('navbar.not_connected', 'Not connected'),
+    walletDetailsAria: t('navbar.wallet_details_aria', 'View wallet details'),
   }), [t])
 
   return {

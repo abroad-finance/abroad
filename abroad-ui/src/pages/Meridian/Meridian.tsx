@@ -36,7 +36,7 @@ const Meridian = () => {
     <div className="bg-black h-full min-h-screen p-8 flex flex-col items-center justify-around">
       <div className="flex flex-row space-x-1 items-center text-white mb-8 self-start">
         <h1 className="text-center text-3xl font-extralight">
-          {t('merian_landing.welcome_to', 'Bienvenido a')}
+          {t('merian_landing.welcome_to', 'Welcome to')}
           {' '}
           <span className="text-[#F2CD00] font-semibold">{t('merian_landing.brazil', 'Brazil')}</span>
         </h1>
@@ -59,7 +59,7 @@ const Meridian = () => {
 
         {/* foreground content (kept sharp) */}
         <div className="absolute top-3 left-3 text-white text-3xl drop-shadow z-10">
-          <span className="font-extralight">{t('merian_landing.pay_with', 'Paga con')}</span>
+          <span className="font-extralight">{t('merian_landing.pay_with', 'Pay with')}</span>
           <br />
           <div className="flex items-center space-x-2 font-semibold">
             <span>USDC</span>
@@ -73,17 +73,17 @@ const Meridian = () => {
           </div>
         </div>
         <div className="absolute bottom-3 right-3 text-3xl text-white font-extralight drop-shadow text-right whitespace-pre-line z-10">
-          {t('merian_landing.or_any_pix', 'En cualquier Pix')}
+          {t('merian_landing.or_any_pix', 'On any Pix')}
           <br />
-          {t('merian_landing.qr_code', 'Código QR')}
+          {t('merian_landing.qr_code', 'QR Code')}
         </div>
       </div>
 
       <div className="max-w-[400px] mr-auto mt-6 text-white text-xs font-extralight">
         <h2 className="text-left text-2xl font-extralight mb-3">
-          {t('merian_landing.please_follow', 'Por favor siga estos')}
+          {t('merian_landing.please_follow', 'Please follow these')}
           {' '}
-          <span className="text-[#F2CD00] font-semibold">{t('merian_landing.steps', 'pasos')}</span>
+          <span className="text-[#F2CD00] font-semibold">{t('merian_landing.steps', 'steps')}</span>
         </h2>
         <ul className="space-y-2 text-left">
           <li className="flex items-center justify-start gap-3">
@@ -108,9 +108,9 @@ const Meridian = () => {
       {/* new subtitle before wallet buttons - same styles as the main h1, last word in yellow */}
       <div className="w-full my-4">
         <h1 className="text-center text-2xl font-extralight text-white">
-          {t('merian_landing.select_your_favourite_wallet', 'Selecciona tu billetera favorita')}
+          {t('merian_landing.select_your_favourite_wallet', 'Select your favorite wallet')}
           {' '}
-          <span className="text-[#F2CD00] font-semibold">{t('merian_landing.to_continue', 'para continuar')}</span>
+          <span className="text-[#F2CD00] font-semibold">{t('merian_landing.to_continue', 'to continue')}</span>
         </h1>
       </div>
 

@@ -116,7 +116,7 @@ const TxStatus = ({
   useWebSocketSubscription('transaction.created', handleTxEvent)
   useWebSocketSubscription('transaction.updated', handleTxEvent)
   useWebSocketSubscription('connect_error', (err) => {
-    setError(err.message || 'WS connection error')
+    setError(err.message || t('errors.ws_connection', 'WS connection error'))
   })
 
   useEffect(() => {
@@ -318,14 +318,14 @@ const TxStatus = ({
   const renderStatusText = () => {
     switch (status) {
       case 'accepted':
-        return t('tx_status.accepted', 'Retiro Realizado')
+        return t('tx_status.accepted', 'Withdrawal Completed')
       case 'denied':
         if (apiStatus === 'PAYMENT_EXPIRED') {
-          return t('tx_status.expired', 'Transacción Expirada')
+          return t('tx_status.expired', 'Transaction Expired')
         }
-        return t('tx_status.denied', 'Transacción Rechazada')
+        return t('tx_status.denied', 'Transaction Denied')
       case 'inProgress':
-        return t('tx_status.in_progress', 'Procesando Transacción')
+        return t('tx_status.in_progress', 'Processing Transaction')
     }
   }
 
@@ -334,22 +334,22 @@ const TxStatus = ({
       case 'accepted':
         return (
           <>
-            {t('tx_status.accepted.super', '¡Super!')}
+            {t('tx_status.accepted.super', 'Great!')}
             <br />
-            {t('tx_status.accepted.message', 'Todo salió bien y tu retiro ha sido exitoso.')}
+            {t('tx_status.accepted.message', 'Everything went well and your withdrawal was successful.')}
           </>
         )
       case 'denied':
         if (apiStatus === 'PAYMENT_EXPIRED') {
-          return <>{t('tx_status.expired.message', 'El tiempo para completar el pago se agotó y la solicitud fue cancelada. Puedes generar una nueva transacción cuando estés listo.')}</>
+          return <>{t('tx_status.expired.message', 'The time to complete the payment has expired and the request was cancelled. You can create a new transaction when ready.')}</>
         }
-        return <>{t('tx_status.denied.message', 'La solicitud ha sido rechazada y tus fondos han sido devueltos. Puedes intentar nuevamente más tarde.')}</>
+        return <>{t('tx_status.denied.message', 'The request has been denied and your funds have been returned. You can try again later.')}</>
       case 'inProgress':
         return (
           <>
-            {t('tx_status.in_progress.processing', 'Tu solicitud está siendo procesada.')}
+            {t('tx_status.in_progress.processing', 'Your request is being processed.')}
             <br />
-            {t('tx_status.in_progress.wait', 'Esto tomará algunos segundos.')}
+            {t('tx_status.in_progress.wait', 'This will take a few seconds.')}
           </>
         )
     }
@@ -374,13 +374,13 @@ const TxStatus = ({
 
       {status === 'accepted' && !txStatusDetails && (
         <Button className="mt-4 w-full py-4" onClick={onNewTransaction}>
-          {t('tx_status.action.new_transaction', 'Realizar otra transacción')}
+          {t('tx_status.action.new_transaction', 'Make another transaction')}
         </Button>
       )}
 
       {status === 'denied' && (
         <Button className="mt-4 w-full py-4" onClick={onRetry}>
-          {t('tx_status.action.retry', 'Intentar Nuevamente')}
+          {t('tx_status.action.retry', 'Try Again')}
         </Button>
       )}
     </div>

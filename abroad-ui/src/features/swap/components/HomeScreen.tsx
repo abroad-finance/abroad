@@ -144,9 +144,8 @@ export default function HomeScreen({
           {/* Headline – Figma 5:20 */}
           <h1 className="mb-[clamp(0.5rem,2vh,1rem)] text-center text-[clamp(1.75rem,4vw+2vh,3.75rem)] font-extrabold leading-[1.1] tracking-[-0.02em]">
             <span style={{ color: HERO_HEADING.dark }}>
-              {t('home.headline_1', 'Spend your')}
+              {t('home.headline_1', 'Spend your stablecoins at')}
               <br />
-              stablecoins at
             </span>
             <br />
             <span style={{ color: HERO_HEADING.accent }}>
@@ -208,7 +207,7 @@ export default function HomeScreen({
                   <div className="space-y-[clamp(0.125rem,0.75vh,0.375rem)]">
                     <div className="flex items-center gap-[clamp(0.25rem,1vw,0.375rem)]">
                       <img alt="USDC" className="h-[clamp(0.875rem,2vh,1rem)] w-[clamp(0.875rem,2vh,1rem)]" src={TOKEN_ICON_URL.USDC} />
-                      <span className="text-[clamp(0.65rem,1.5vw,0.75rem)] text-[#6b7280]">1 USDC =</span>
+                      <span className="text-[clamp(0.65rem,1.5vw,0.75rem)] text-[#6b7280]">{t('home.rate_usdc', '1 USDC =')}</span>
                       <span className="text-[clamp(0.65rem,1.5vw,0.75rem)] font-semibold text-[#111827]">
                         $
                         {formatRate(onboardingRates.cop.USDC, 0)}
@@ -216,7 +215,7 @@ export default function HomeScreen({
                     </div>
                     <div className="flex items-center gap-[clamp(0.25rem,1vw,0.375rem)]">
                       <img alt="USDT" className="h-[clamp(0.875rem,2vh,1rem)] w-[clamp(0.875rem,2vh,1rem)]" src={TOKEN_ICON_URL.USDT} />
-                      <span className="text-[clamp(0.65rem,1.5vw,0.75rem)] text-[#6b7280]">1 USDT =</span>
+                      <span className="text-[clamp(0.65rem,1.5vw,0.75rem)] text-[#6b7280]">{t('home.rate_usdt', '1 USDT =')}</span>
                       <span className="text-[clamp(0.65rem,1.5vw,0.75rem)] font-semibold text-[#111827]">
                         $
                         {formatRate(onboardingRates.cop.USDT, 0)}
@@ -238,7 +237,7 @@ export default function HomeScreen({
                   <div className="space-y-[clamp(0.125rem,0.75vh,0.375rem)]">
                     <div className="flex items-center gap-[clamp(0.25rem,1vw,0.375rem)]">
                       <img alt="USDC" className="h-[clamp(0.875rem,2vh,1rem)] w-[clamp(0.875rem,2vh,1rem)]" src={TOKEN_ICON_URL.USDC} />
-                      <span className="text-[clamp(0.65rem,1.5vw,0.75rem)] text-[#6b7280]">1 USDC =</span>
+                      <span className="text-[clamp(0.65rem,1.5vw,0.75rem)] text-[#6b7280]">{t('home.rate_usdc', '1 USDC =')}</span>
                       <span className="text-[clamp(0.65rem,1.5vw,0.75rem)] font-semibold text-[#111827]">
                         R$
                         {formatRate(onboardingRates.brl.USDC, 2)}
@@ -246,7 +245,7 @@ export default function HomeScreen({
                     </div>
                     <div className="flex items-center gap-[clamp(0.25rem,1vw,0.375rem)]">
                       <img alt="USDT" className="h-[clamp(0.875rem,2vh,1rem)] w-[clamp(0.875rem,2vh,1rem)]" src={TOKEN_ICON_URL.USDT} />
-                      <span className="text-[clamp(0.65rem,1.5vw,0.75rem)] text-[#6b7280]">1 USDT =</span>
+                      <span className="text-[clamp(0.65rem,1.5vw,0.75rem)] text-[#6b7280]">{t('home.rate_usdt', '1 USDT =')}</span>
                       <span className="text-[clamp(0.65rem,1.5vw,0.75rem)] font-semibold text-[#111827]">
                         R$
                         {formatRate(onboardingRates.brl.USDT, 2)}
@@ -266,7 +265,7 @@ export default function HomeScreen({
             type="button"
           >
             <span className="text-[clamp(1rem,2.5vw+1vh,1.125rem)] leading-tight">
-              {t('home.cta_continue', 'Continuar')}
+              {t('home.cta_continue', 'Continue')}
             </span>
             <ChevronRight className="h-[clamp(1rem,2.5vh,1.25rem)] w-[clamp(1rem,2.5vh,1.25rem)] shrink-0" />
           </button>
@@ -639,7 +638,7 @@ export default function HomeScreen({
                         <div className="min-w-0 flex-1">
                           <div className="text-sm font-semibold text-[#111827]">{tx.merchant}</div>
                           <div className="mt-0.5 text-xs text-[#6b7280]">
-                            {tx.country === 'COP' ? 'Colombia' : 'Brazil'}
+                            {tx.country === 'COP' ? t('country.colombia', 'Colombia') : t('country.brazil', 'Brazil')}
                             {' · '}
                             {tx.time}
                           </div>

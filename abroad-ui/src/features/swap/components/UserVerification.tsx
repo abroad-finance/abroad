@@ -50,9 +50,9 @@ const UserVerification = ({ onApproved, onClose }: UserVerificationProps): React
     }
     else {
       addNotice({
-        description: t('user_verification.missing_url', 'No encontramos el enlace de verificación.'),
+        description: t('user_verification.missing_url', 'We could not find the verification link.'),
         kind: 'error',
-        message: t('user_verification.missing_url_title', 'No se encontró el enlace de KYC'),
+        message: t('user_verification.missing_url_title', 'KYC link not found'),
       })
     }
   }, [
@@ -69,7 +69,7 @@ const UserVerification = ({ onApproved, onClose }: UserVerificationProps): React
     <div className="flex-1 flex items-center justify-center w-full flex-col">
       <div className="w-full max-w-md min-h-[60vh] bg-abroad-dark/5 backdrop-blur-xl rounded-2xl p-4 md:p-6 flex flex-col items-center justify-center space-y-1 lg:space-y-4 text-abroad-dark md:text-[var(--ab-text)]">
         <button
-          aria-label="Close"
+          aria-label={t('user_verification.close', 'Close')}
           className="fixed top-4 right-4 z-20 rounded-full bg-white/90 p-2 shadow-md md:top-6 md:right-6"
           onClick={onClose}
         >
@@ -82,10 +82,10 @@ const UserVerification = ({ onApproved, onClose }: UserVerificationProps): React
           <IconAnimated colors="primary:#ffffff,secondary:#ffffff" icon="MagnifyingGlass" loop={true} play={true} size={150} />
         </div>
         <h2 className="text-xl font-semibold text-center mb-4 ">
-          {t('user_verification.title', 'Se requiere verificación de usuario')}
+          {t('user_verification.title', 'User verification required')}
         </h2>
         <p className="text-center mb-6">
-          {t('user_verification.subtitle', 'Verifique su cuenta para acceder a todas las funciones.')}
+          {t('user_verification.subtitle', 'Verify your account to access all features.')}
         </p>
       </div>
       <Button
@@ -93,7 +93,7 @@ const UserVerification = ({ onApproved, onClose }: UserVerificationProps): React
         loading={loading}
         onClick={handleKycRedirect}
       >
-        {t('user_verification.cta', 'Verificar Ahora')}
+        {t('user_verification.cta', 'Verify Now')}
       </Button>
     </div>
   )

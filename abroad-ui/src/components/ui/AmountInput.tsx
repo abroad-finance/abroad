@@ -87,7 +87,7 @@ export function AmountInput({
               {symbol}
             </span>
             <input
-              aria-label={t('input.amount_aria', 'Amount in {{currency}}', { currency })}
+              aria-label={t('input.amount_aria', 'Amount in {currency}', { currency })}
               className="min-w-[4ch] max-w-[24ch] bg-transparent text-[42px] font-extrabold tracking-[-1.5px] text-[var(--ab-text)] outline-none caret-[var(--ab-green)]"
               id={id}
               inputMode="decimal"
@@ -127,7 +127,7 @@ export function AmountInput({
             $
           </span>
           <input
-            aria-label={t('input.token_amount_aria', 'Amount in {{token}}', { token: tokenLabel })}
+            aria-label={t('input.token_amount_aria', 'Amount in {token}', { token: tokenLabel })}
             className="min-w-[4ch] max-w-[20ch] bg-transparent text-[42px] font-extrabold tracking-[-1.5px] text-[var(--ab-text)] outline-none caret-[var(--ab-green)]"
             id={id}
             inputMode="decimal"

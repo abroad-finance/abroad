@@ -212,7 +212,7 @@ const TransactionDetail: React.FC<Readonly<TransactionDetailProps>> = ({
               <img alt={cryptoCurrency} className="h-4 w-4" src={tokenIcon} />
               {transaction.quote.cryptoCurrency ?? 'USDC'}
               {' '}
-              (Circle)
+              {t('wallet_details.token_issuer_circle', '(Circle)')}
             </span>
           </SummaryRow>
           <SummaryRow label={t('wallet_details.transactions.recipient_id', 'Recipient ID')}>

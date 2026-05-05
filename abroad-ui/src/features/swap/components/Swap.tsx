@@ -89,25 +89,25 @@ export default function Swap({
   }, [])
 
   const sendToPlaceholder = targetCurrency === TargetCurrency.BRL
-    ? t('swap.send_to_placeholder_pix', 'Chave Pix ou número de telefone')
-    : t('swap.send_to_placeholder_breb', 'Bre-B ID ou número de telefone')
+    ? t('swap.send_to_placeholder_pix', 'PIX key or phone number')
+    : t('swap.send_to_placeholder_breb', 'Bre-B ID or phone number')
 
   const ctaLabelDisabled = hasInsufficientFunds
-    ? t('swap.insufficient_balance', 'Saldo insuficiente')
+    ? t('swap.insufficient_balance', 'Insufficient balance')
     : t('swap.enter_amount', 'Enter amount')
   const formattedAmount = targetCurrency === TargetCurrency.BRL
     ? `R$${targetAmount}`
     : `$${targetAmount}`
   const ctaLabelEnabled = targetAmount
     ? t('swap.send_amount', 'Send {amount}', { amount: formattedAmount })
-    : t('swap.continue', 'Continuar')
+    : t('swap.continue', 'Continue')
 
   const minMessage = targetCurrency === TargetCurrency.COP
-    ? t('swap.min_cop', 'Mínimo: $5.000 COP')
-    : t('swap.min_brl', 'Mínimo: R$1,00 BRL')
+    ? t('swap.min_cop', 'Minimum: $5,000 COP')
+    : t('swap.min_brl', 'Minimum: R$1.00 BRL')
   const maxMessage = targetCurrency === TargetCurrency.COP
-    ? t('swap.max_cop', 'Máximo: $5.000.000 COP')
-    : t('swap.max_brl', 'Máximo: R$50.000,00 BRL')
+    ? t('swap.max_cop', 'Maximum: $5,000,000 COP')
+    : t('swap.max_brl', 'Maximum: R$50,000.00 BRL')
   const limitMessage = isBelowMinimum ? minMessage : maxMessage
 
   return (
@@ -145,7 +145,8 @@ export default function Swap({
         <div className="flex items-center gap-2">
           <div className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#10b981]" />
           <span className="text-xs font-medium leading-4 text-[#15803d]">
-            Live:
+            {t('swap.live', 'Live')}
+            :
             {' '}
             {exchangeRateDisplay}
           </span>
@@ -160,7 +161,7 @@ export default function Swap({
                 onClick={onBalanceClick}
                 type="button"
               >
-                {t('swap.available_balance', 'Balance disponible:')}
+                {t('swap.available_balance', 'Available balance:')}
                 {' '}
                 <span className="font-bold">
                   {loadingBalance ? '...' : `${usdcBalance} ${selectedAssetLabel}`}
@@ -234,23 +235,23 @@ export default function Swap({
                 <div className="flex flex-col gap-2 rounded-2xl border border-[#e5e7eb] bg-[#f9fafb] px-4 py-[19px]">
                   {recipientName && (
                     <div className="flex items-center justify-between gap-3">
-                      <span className="shrink-0 text-sm text-ab-text-3">{t('swap.recipient_name_label', 'Nombre')}</span>
+                      <span className="shrink-0 text-sm text-ab-text-3">{t('swap.recipient_name_label', 'Name')}</span>
                       <span className="break-all text-right text-sm font-semibold text-ab-text">{recipientName}</span>
                     </div>
                   )}
                   <div className="flex items-center justify-between gap-3">
                     <span className="shrink-0 text-sm text-ab-text-3">
                       {targetCurrency === TargetCurrency.BRL
-                        ? t('swap.pix_key_label', 'Clave PIX')
-                        : t('swap.breb_key_label', 'Clave Bre-B')}
+                        ? t('swap.pix_key_label', 'PIX Key')
+                        : t('swap.breb_key_label', 'Bre-B Key')}
                     </span>
                     <span className="break-all text-right font-mono text-sm font-medium text-ab-text">{recipientValue}</span>
                   </div>
                 </div>
                 <span className="mt-2 block pl-1 font-medium text-xs text-ab-text-3">
                   {targetCurrency === TargetCurrency.BRL
-                    ? t('bank_details.pix_disclaimer', 'Tu transacción será procesada de inmediato. Asegúrate de que la llave PIX y el CPF del destinatario sean correctos. Esta transacción no se puede reversar.')
-                    : t('bank_details.breb_disclaimer', 'Tu transacción será procesada de inmediato a través de BRE-B. Ingresa la llave correcta del destinatario y asegurate que la tenga inscrita. No es necesario seleccionar banco.')}
+                    ? t('bank_details.pix_disclaimer', 'Your transaction will be processed immediately. Make sure the PIX key and recipient CPF are correct. This transaction cannot be reversed.')
+                    : t('bank_details.breb_disclaimer', 'Your transaction will be processed immediately via BRE-B. Enter the correct recipient key. This transaction cannot be reversed.')}
                 </span>
               </div>
             )
@@ -292,8 +293,8 @@ export default function Swap({
                 )}
                 <span className="mt-2 block pl-1 font-medium text-xs text-ab-text-3">
                   {targetCurrency === TargetCurrency.BRL
-                    ? t('bank_details.pix_disclaimer', 'Tu transacción será procesada de inmediato. Asegúrate de que la llave PIX y el CPF del destinatario sean correctos. Esta transacción no se puede reversar.')
-                    : t('bank_details.breb_disclaimer', 'Tu transacción será procesada de inmediato a través de BRE-B. Ingresa la llave correcta del destinatario y asegurate que la tenga inscrita. No es necesario seleccionar banco.')}
+                    ? t('bank_details.pix_disclaimer', 'Your transaction will be processed immediately. Make sure the PIX key and recipient CPF are correct. This transaction cannot be reversed.')
+                    : t('bank_details.breb_disclaimer', 'Your transaction will be processed immediately via BRE-B. Enter the correct recipient key. This transaction cannot be reversed.')}
                 </span>
               </div>
             )}
@@ -312,7 +313,7 @@ export default function Swap({
                 transferFeeIsZero ? 'text-[#10b981]' : 'text-[#111827]',
               )}
             >
-              {transferFeeIsZero ? t('swap.free', 'Gratis') : transferFeeDisplay}
+              {transferFeeIsZero ? t('swap.free', 'Free') : transferFeeDisplay}
             </span>
           </div>
           <div className="flex items-center justify-between">
@@ -321,7 +322,7 @@ export default function Swap({
             </span>
             <div className="flex items-center gap-1 text-sm font-medium text-[#10b981]">
               <Zap className="h-3.5 w-3.5" />
-              ~30s
+              {t('swap.speed_approx', '~30s')}
             </div>
           </div>
         </div>
@@ -344,7 +345,7 @@ export default function Swap({
             ? (
                 <span className="flex items-center gap-2">
                   <Wallet className="h-6 w-6" />
-                  {t('swap.connect_wallet_to_continue', 'Connect Wallet to Continue')}
+                  {t('swap.connect_wallet_to_continue', 'Connect your wallet to continue')}
                 </span>
               )
             : (hasInsufficientFunds

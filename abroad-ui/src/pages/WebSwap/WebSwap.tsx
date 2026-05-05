@@ -401,7 +401,7 @@ const WebSwap: React.FC = () => {
             {t('footer.need_help', 'Need help?')}
           </a>
           <div className={cn('flex items-center gap-2 ml-2', AB_STYLES.textMuted)}>
-            <span className="text-sm">powered by</span>
+            <span className="text-sm">{t('footer.powered_by', 'powered by')}</span>
             <img
               alt="Stellar"
               className="h-6 w-auto"
@@ -499,7 +499,7 @@ const WebSwap: React.FC = () => {
         <div className="fixed inset-0 z-[1100] bg-black/60 backdrop-blur-sm flex items-center justify-center">
           <div className="flex flex-col items-center gap-3 text-white">
             <Loader className="w-8 h-8 animate-spin" />
-            <p className="text-sm">Decodificando QR...</p>
+            <p className="text-sm">{t('swap.decoding_qr', 'Decoding QR...')}</p>
           </div>
         </div>
       )}

@@ -255,12 +255,12 @@ export function useWalletDetails(params: Params = {}): WalletDetailsProps {
 
   const getStatusText = useCallback((status: string) => {
     switch (status) {
-      case 'AWAITING_PAYMENT': return t('wallet_details.status.awaiting_payment', 'Esperando Pago')
-      case 'PAYMENT_COMPLETED': return t('wallet_details.status.completed', 'Completado')
-      case 'PAYMENT_EXPIRED': return t('wallet_details.status.expired', 'Pago Expirado')
-      case 'PAYMENT_FAILED': return t('wallet_details.status.failed', 'Pago Fallido')
-      case 'PROCESSING_PAYMENT': return t('wallet_details.status.processing', 'Procesando Pago')
-      case 'WRONG_AMOUNT': return t('wallet_details.status.wrong_amount', 'Monto Incorrecto')
+      case 'AWAITING_PAYMENT': return t('wallet_details.status.awaiting_payment', 'Awaiting Payment')
+      case 'PAYMENT_COMPLETED': return t('wallet_details.status.completed', 'Completed')
+      case 'PAYMENT_EXPIRED': return t('wallet_details.status.expired', 'Payment Expired')
+      case 'PAYMENT_FAILED': return t('wallet_details.status.failed', 'Payment Failed')
+      case 'PROCESSING_PAYMENT': return t('wallet_details.status.processing', 'Processing Payment')
+      case 'WRONG_AMOUNT': return t('wallet_details.status.wrong_amount', 'Wrong Amount')
       default: return status
     }
   }, [t])

@@ -65,22 +65,22 @@ export const useLanguageSelector = (): LanguageSelectorProps => {
 
   // Labels & aria (resolved via i18n here so the component stays dumb)
   const labels = {
-    closeAria: t('language_selector.actions.close', 'Cerrar'),
-    confirm: t('language_selector.actions.confirm', 'Confirmar Selección'),
+    closeAria: t('language_selector.actions.close', 'Close'),
+    confirm: t('language_selector.actions.confirm', 'Confirm Selection'),
     hint: t(
       'language_selector.footer.hint',
-      'Los cambios de idioma se aplicarán inmediatamente',
+      'Language changes will be applied immediately',
     ),
     subtitle: t(
       'language_selector.header.subtitle',
-      'Selecciona tu idioma preferido para la interfaz',
+      'Select your preferred interface language',
     ),
-    title: t('language_selector.header.title', 'Configuración de Idioma'),
+    title: t('language_selector.header.title', 'Language Settings'),
   }
 
-  const _aria = t('language_selector.trigger.aria_label', 'Seleccionar idioma')
+  const _aria = t('language_selector.trigger.aria_label', 'Select language')
   const ariaLabel
-    = typeof _aria === 'string' && _aria.length > 0 ? _aria : 'Seleccionar idioma'
+    = typeof _aria === 'string' && _aria.length > 0 ? _aria : 'Select language'
 
   return {
     ariaLabel,

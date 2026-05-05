@@ -1,3 +1,4 @@
+import { useTranslate } from '@tolgee/react'
 import React from 'react'
 
 import { cn } from '../../shared/utils'
@@ -12,42 +13,46 @@ export interface BottomSheetProps {
  * Full-screen backdrop; panel slides up from bottom (max 85vh). Drag handle at top.
  * Clicking backdrop calls onClose.
  */
-export const BottomSheet: React.FC<BottomSheetProps> = ({ children, className, onClose }) => (
-  <div
-    aria-label="Close sheet"
-    className={cn(
-      'fixed inset-0 z-[300] flex items-end justify-center',
-      'bg-black/35 backdrop-blur-[8px]',
-      'transition-[visibility,opacity] duration-[0.4s] ease-[cubic-bezier(0.16,1,0.3,1)]',
-    )}
-    onClick={onClose}
-    onKeyDown={(e) => {
-      if (e.key === 'Escape' || e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault()
-        onClose()
-      }
-    }}
-    role="button"
-    tabIndex={0}
-  >
-    <dialog
+export const BottomSheet: React.FC<BottomSheetProps> = ({ children, className, onClose }) => {
+  const { t } = useTranslate()
+
+  return (
+    <div
+      aria-label={t('bottom_sheet.close', 'Close sheet')}
       className={cn(
-        'w-full max-w-[520px] max-h-[85vh] overflow-y-auto rounded-t-[24px]',
-        'bg-[var(--ab-bg-card)] shadow-[0_-12px_40px_rgba(0,0,0,0.08)]',
-        'transition-transform duration-[0.4s] ease-[cubic-bezier(0.16,1,0.3,1)]',
-        'border-0 p-0 m-0',
-        className,
+        'fixed inset-0 z-[300] flex items-end justify-center',
+        'bg-black/35 backdrop-blur-[8px]',
+        'transition-[visibility,opacity] duration-[0.4s] ease-[cubic-bezier(0.16,1,0.3,1)]',
       )}
-      onClick={e => e.stopPropagation()}
-      onKeyDown={(e) => { if (e.key !== 'Escape') e.stopPropagation() }}
-      open
-      role="dialog"
+      onClick={onClose}
+      onKeyDown={(e) => {
+        if (e.key === 'Escape' || e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          onClose()
+        }
+      }}
+      role="button"
+      tabIndex={0}
     >
-      <div
-        aria-hidden
-        className="mx-auto mt-3 h-1 w-10 shrink-0 rounded-full bg-[var(--ab-border)]"
-      />
-      {children}
-    </dialog>
-  </div>
-)
+      <dialog
+        className={cn(
+          'w-full max-w-[520px] max-h-[85vh] overflow-y-auto rounded-t-[24px]',
+          'bg-[var(--ab-bg-card)] shadow-[0_-12px_40px_rgba(0,0,0,0.08)]',
+          'transition-transform duration-[0.4s] ease-[cubic-bezier(0.16,1,0.3,1)]',
+          'border-0 p-0 m-0',
+          className,
+        )}
+        onClick={e => e.stopPropagation()}
+        onKeyDown={(e) => { if (e.key !== 'Escape') e.stopPropagation() }}
+        open
+        role="dialog"
+      >
+        <div
+          aria-hidden
+          className="mx-auto mt-3 h-1 w-10 shrink-0 rounded-full bg-[var(--ab-border)]"
+        />
+        {children}
+      </dialog>
+    </div>
+  )
+}
