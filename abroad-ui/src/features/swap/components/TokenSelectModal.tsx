@@ -183,7 +183,7 @@ const TokenSelectModal: React.FC<TokenSelectModalProps> = ({
               )}
               {filteredTokens.map((token) => {
                 const isSelected = token.key === selectedTokenKey
-                const icon = token.icon || CHAIN_ICONS[token.label] || CURRENCY_ICONS[token.label]
+                const icon = token.icon || CHAIN_ICON_MAP[token.label] || CURRENCY_FLAG_URL[token.label]
                 return (
                   <button
                     className={cn(
