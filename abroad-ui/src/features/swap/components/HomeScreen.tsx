@@ -4,9 +4,11 @@ import {
 } from 'lucide-react'
 import React from 'react'
 
+import type { OnboardingRates } from '@/features/swap/types'
+
 import { CurrencyToggle } from '@/components/ui'
 import {
-  CHAIN_CONFIG_ARRAY, CHAIN_MAP, COUNTRIES, CURRENCY_FLAG_URL, RECENT_COUNTRY_CONFIG, TOKEN_ICON_URLS,
+  CHAIN_CONFIG_ARRAY, CHAIN_MAP, COUNTRIES, CURRENCY_FLAG_URL, RECENT_COUNTRY_CONFIG, TOKEN_ICONS,
 } from '@/shared/constants'
 import { cn } from '@/shared/utils'
 
@@ -26,12 +28,18 @@ const HERO_CTA_BG = '#54ae92'
 
 // Alias for backwards compatibility
 const CHAIN_CONFIG = CHAIN_CONFIG_ARRAY
-const TOKEN_ICON_URL = TOKEN_ICON_URLS
+const TOKEN_ICON_URL = TOKEN_ICONS
 
 const RAIL_LOGO: Record<string, string> = {
   BRL: '/pix-white.svg',
   COP: BreBLogo,
 }
+
+const TRUST_BADGE_DATA = [
+  { defaultLabel: '< 3s settlement', i18nKey: 'home.trust_settlement' as const, Icon: Zap },
+  { defaultLabel: 'Low fees', i18nKey: 'home.trust_fees' as const, Icon: PiggyBank },
+  { defaultLabel: 'Non-custodial', i18nKey: 'home.trust_custodial' as const, Icon: Lock },
+]
 
 export interface HomeScreenProps {
   balance: string
@@ -63,17 +71,6 @@ export type RecentTxSummary = {
   merchant: string
   time: string
   usdcAmount: string
-}
-
-type OnboardingRates = {
-  brl: {
-    USDC: null | number
-    USDT: null | number
-  }
-  cop: {
-    USDC: null | number
-    USDT: null | number
-  }
 }
 
 export default function HomeScreen({
@@ -115,11 +112,10 @@ export default function HomeScreen({
 
   // Onboarding view - Figma node 5:2 pixel-perfect
   if (showOnboarding) {
-    const trustBadges = [
-      { Icon: Zap, label: t('home.trust_settlement', '< 3s settlement') },
-      { Icon: PiggyBank, label: t('home.trust_fees', 'Low fees') },
-      { Icon: Lock, label: t('home.trust_custodial', 'Non-custodial') },
-    ] as const
+    const trustBadges = TRUST_BADGE_DATA.map(({ defaultLabel, i18nKey, Icon }) => ({
+      Icon,
+      label: t(i18nKey, defaultLabel),
+    }))
 
     return (
       <main className="flex w-full h-full flex-col items-center justify-center px-4 overflow-hidden">
@@ -441,18 +437,14 @@ export default function HomeScreen({
         {/* Trust badges - shown only during onboarding */}
         {showOnboarding && (
           <div className="mt-[clamp(0.75rem,2.5vh,1.5rem)] flex flex-wrap items-center justify-center gap-[clamp(0.5rem,2vw,1rem)]">
-            {[
-              { Icon: Zap, label: t('home.trust_settlement', '< 3s settlement') },
-              { Icon: PiggyBank, label: t('home.trust_fees', 'Low fees') },
-              { Icon: Lock, label: t('home.trust_custodial', 'Non-custodial') },
-            ].map(({ Icon, label }) => (
+            {TRUST_BADGE_DATA.map(({ defaultLabel, i18nKey, Icon }) => (
               <div
                 className="flex shrink-0 items-center gap-1.5"
-                key={label}
+                key={i18nKey}
                 style={{ color: HERO_SUBLINE }}
               >
                 <Icon className="h-3.5 w-3.5 shrink-0" strokeWidth={2} />
-                <span className="whitespace-nowrap text-center text-xs font-medium leading-5">{label}</span>
+                <span className="whitespace-nowrap text-center text-xs font-medium leading-5">{t(i18nKey, defaultLabel)}</span>
               </div>
             ))}
           </div>

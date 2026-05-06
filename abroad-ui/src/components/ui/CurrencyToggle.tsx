@@ -1,12 +1,8 @@
 import { useTranslate } from '@tolgee/react'
 import React from 'react'
 
+import { CURRENCY_FLAG_URL } from '../../shared/constants'
 import { cn } from '../../shared/utils'
-
-const FLAG_URLS = {
-  BRL: 'https://hatscripts.github.io/circle-flags/flags/br.svg',
-  COP: 'https://hatscripts.github.io/circle-flags/flags/co.svg',
-} as const
 
 export type CurrencyOption = 'BRL' | 'COP'
 
@@ -50,7 +46,7 @@ export const CurrencyToggle: React.FC<CurrencyToggleProps> = ({ className, onCha
         <img
           alt={t('country.colombia', 'Colombia')}
           className="h-[13px] w-5 object-contain"
-          src={FLAG_URLS.COP}
+          src={CURRENCY_FLAG_URL.COP}
         />
       </button>
       <button
@@ -70,7 +66,7 @@ export const CurrencyToggle: React.FC<CurrencyToggleProps> = ({ className, onCha
         <img
           alt={t('country.brazil', 'Brazil')}
           className="h-[13px] w-5 object-contain"
-          src={FLAG_URLS.BRL}
+          src={CURRENCY_FLAG_URL.BRL}
         />
       </button>
     </fieldset>

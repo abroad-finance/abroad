@@ -48,7 +48,7 @@ import {
   isSupportedStablecoinSymbol,
   parseStablecoinBalance,
 } from '../../features/swap/lib/stablecoinPortfolio'
-import { SwapView } from '../../features/swap/types'
+import { type OnboardingRates, SwapView } from '../../features/swap/types'
 import {
   BRL_TRANSFER_FEE,
   buildChainLabel,
@@ -62,6 +62,7 @@ import { parseEMVQR } from '../../lib/qr/emv-parser'
 import {
   acceptTransactionRequest, fetchPublicCorridors, notifyPayment, requestQuote, requestReverseQuote,
 } from '../../services/public/publicApi'
+import { fromBase64, toBase64 } from '../../services/wallets/shared/wallet-connect-base'
 import { ASSET_URLS, PENDING_TX_KEY } from '../../shared/constants'
 import { useMenuCloseOnOutsideClick, useWalletAuth } from '../../shared/hooks'
 import { hasMessage } from '../../shared/utils'
@@ -73,16 +74,6 @@ import {
 } from './minipayPolicy'
 
 type DecodeQrApiResponse = ApiClientResponse<decodeQrCodeBRResponse, DecodeQrCodeBR400>
-type OnboardingRates = {
-  brl: {
-    USDC: null | number
-    USDT: null | number
-  }
-  cop: {
-    USDC: null | number
-    USDT: null | number
-  }
-}
 type SwapAction
   = | { accountNumber?: string, pixKey?: string, recipientName?: string, taxId?: string, type: 'SET_BANK_DETAILS' }
     | { corridorKey: string, type: 'SET_CORRIDOR' }
@@ -127,23 +118,6 @@ type SwapControllerState = {
 const resolveStellarNetworkPassphrase = (chainId: null | string): string => {
   if (chainId && chainId.toLowerCase().includes('test')) return Networks.TESTNET
   return Networks.PUBLIC
-}
-
-const toBase64 = (bytes: Uint8Array): string => {
-  let binary = ''
-  bytes.forEach((byte) => {
-    binary += String.fromCharCode(byte)
-  })
-  return btoa(binary)
-}
-
-const fromBase64 = (value: string): Uint8Array => {
-  const binary = atob(value)
-  const bytes = new Uint8Array(binary.length)
-  for (let i = 0; i < binary.length; i += 1) {
-    bytes[i] = binary.charCodeAt(i)
-  }
-  return bytes
 }
 
 const parseAmountUnits = (amount: string, decimals: number): bigint => {

@@ -6,7 +6,7 @@ import React, { useState } from 'react'
 
 import { TransactionListItem } from '../../../api'
 import {
-  ASSET_URLS, CHAIN_ICON_MAP, COUNTRY_CONFIG_BY_CURRENCY, TOKEN_ICON_MAP,
+  CHAIN_ICON_MAP, COUNTRY_CONFIG_BY_CURRENCY, TOKEN_ICONS,
 } from '../../../shared/constants'
 import { cn } from '../../../shared/utils'
 import { formatChainLabel } from '../utils/corridorHelpers'
@@ -56,7 +56,7 @@ const TransactionDetail: React.FC<Readonly<TransactionDetailProps>> = ({
     : transaction.accountNumber
 
   const cryptoCurrency = (transaction.quote.cryptoCurrency ?? 'USDC').toUpperCase()
-  const tokenIcon = TOKEN_ICON_MAP[cryptoCurrency] ?? ASSET_URLS.USDC_TOKEN_ICON
+  const tokenIcon = TOKEN_ICONS[cryptoCurrency] ?? TOKEN_ICONS.USDC
 
   return (
     <div className="flex flex-col">

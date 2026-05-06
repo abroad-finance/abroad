@@ -6,7 +6,6 @@ import { describe, expect, it } from 'vitest'
 
 import {
   fromBase64,
-  resolveNamespaceFromChainId,
   resolveStellarNetwork,
   toBase64,
   WC_STORAGE_PREFIX,
@@ -62,11 +61,11 @@ describe('wallet-utils', () => {
     })
   })
 
-  describe('resolveNamespaceFromChainId', () => {
+  describe('resolveNamespaceFromChainId (now getNamespaceFromChainId)', () => {
     it('should resolve namespace from chainId', () => {
-      expect(resolveNamespaceFromChainId('eip155:1')).toBe('eip155')
-      expect(resolveNamespaceFromChainId('solana:mainnet')).toBe('solana')
-      expect(resolveNamespaceFromChainId('stellar:pubnet')).toBe('stellar')
+      expect(getNamespaceFromChainId('eip155:1')).toBe('eip155')
+      expect(getNamespaceFromChainId('solana:mainnet')).toBe('solana')
+      expect(getNamespaceFromChainId('stellar:pubnet')).toBe('stellar')
     })
   })
 

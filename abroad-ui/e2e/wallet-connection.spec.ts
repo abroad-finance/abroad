@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { watchPage, formatIssues } from './helpers'
+import { generateMockJwt, setupSession } from './mocks/wallet-auth'
 
 /**
  * Wallet connection E2E tests.
@@ -10,17 +11,6 @@ import { watchPage, formatIssues } from './helpers'
  * - Show blockchain selection
  * - Session persistence
  */
-
-// Helper to generate a simple mock JWT (using plain text for browser context)
-const createMockJwt = (address: string, chainId: string, expOffset = 3600) => {
-  const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }))
-  const payload = btoa(JSON.stringify({
-    address,
-    chainId,
-    exp: Math.floor(Date.now() / 1000) + expOffset,
-  }))
-  return `${header}.${payload}.mock-sig`
-}
 
 test.describe('Wallet Connection', () => {
   test.beforeEach(async ({ page }) => {
@@ -71,7 +61,7 @@ test.describe('Wallet Connection', () => {
 
     await page.route('**/api/walletAuth/verify', async (route) => {
       const body = JSON.parse(route.request().postData() ?? '{}')
-      const token = createMockJwt(body.address ?? 'test-address', body.chainId ?? 'stellar:pubnet')
+      const token = generateMockJwt({ address: body.address ?? 'test-address', chainId: body.chainId ?? 'stellar:pubnet' })
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -167,18 +157,7 @@ test.describe('Session Persistence', () => {
     const { errors } = watchPage(page)
 
     // Set up a mock session before page load
-    await page.addInitScript(() => {
-      const jwt = createMockJwt('test-address-123', 'stellar:pubnet')
-      localStorage.setItem(
-        'wallet_session',
-        JSON.stringify({
-          address: 'test-address-123',
-          chainId: 'stellar:pubnet',
-          walletId: 'stellar-kit',
-        })
-      )
-      localStorage.setItem('auth_token', jwt)
-    })
+    setupSession(page, { address: 'test-address-123', chainId: 'stellar:pubnet', walletId: 'stellar-kit' })
 
     await page.goto('/')
     await page.waitForLoadState('domcontentloaded')

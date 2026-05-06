@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { watchPage, formatIssues } from './helpers'
+import { generateMockJwt, setupSession } from './mocks/wallet-auth'
 
 /**
  * Chain switching E2E tests.
@@ -9,17 +10,6 @@ import { watchPage, formatIssues } from './helpers'
  * - Switching between Solana and Stellar
  * - Corridor changes during active connections
  */
-
-// Helper to generate a simple mock JWT (using plain text for browser context)
-const createMockJwt = (address: string, chainId: string, expOffset = 3600) => {
-  const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }))
-  const payload = btoa(JSON.stringify({
-    address,
-    chainId,
-    exp: Math.floor(Date.now() / 1000) + expOffset,
-  }))
-  return `${header}.${payload}.mock-sig`
-}
 
 test.describe('Chain Switching', () => {
   test.beforeEach(async ({ page }) => {
@@ -32,18 +22,7 @@ test.describe('Chain Switching', () => {
     const { errors } = watchPage(page)
 
     // Start with Stellar session
-    await page.addInitScript(() => {
-      const jwt = createMockJwt('GTEST123456789', 'stellar:pubnet')
-      localStorage.setItem(
-        'wallet_session',
-        JSON.stringify({
-          address: 'GTEST123456789',
-          chainId: 'stellar:pubnet',
-          walletId: 'stellar-kit',
-        })
-      )
-      localStorage.setItem('auth_token', jwt)
-    })
+    setupSession(page, { address: 'GTEST123456789', chainId: 'stellar:pubnet', walletId: 'stellar-kit' })
 
     // Mock corridors with both Stellar and Celo
     await page.route('**/api/public/corridors', async (route) => {
@@ -96,18 +75,7 @@ test.describe('Chain Switching', () => {
     const { errors } = watchPage(page)
 
     // Start with Solana session
-    await page.addInitScript(() => {
-      const jwt = createMockJwt('7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU', 'solana:mainnet')
-      localStorage.setItem(
-        'wallet_session',
-        JSON.stringify({
-          address: '7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU',
-          chainId: 'solana:mainnet',
-          walletId: 'solana',
-        })
-      )
-      localStorage.setItem('auth_token', jwt)
-    })
+    setupSession(page, { address: '7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU', chainId: 'solana:mainnet', walletId: 'solana' })
 
     // Mock corridors with Solana and Stellar
     await page.route('**/api/public/corridors', async (route) => {

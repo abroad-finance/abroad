@@ -3,13 +3,8 @@ import { ArrowLeft, Loader } from 'lucide-react'
 import React, { memo, useMemo } from 'react'
 
 import { _36EnumsTargetCurrency as TargetCurrency } from '../../../api'
-import { ASSET_URLS } from '../../../shared/constants'
+import { TOKEN_ICONS } from '../../../shared/constants'
 import { cn } from '../../../shared/utils'
-
-const TOKEN_ICON: Record<string, string> = {
-  USDC: ASSET_URLS.USDC_TOKEN_ICON,
-  USDT: ASSET_URLS.USDT_TOKEN_ICON,
-}
 
 export interface ConfirmQrProps {
   /** Recipient account / Bre-B ID (COP) */
@@ -110,7 +105,7 @@ const ConfirmQr: React.FC<ConfirmQrProps> = ({
             <img
               alt={selectedAssetLabel}
               className="h-5 w-5 shrink-0 object-contain"
-              src={TOKEN_ICON[selectedAssetLabel] ?? TOKEN_ICON.USDC}
+              src={TOKEN_ICONS[selectedAssetLabel] ?? TOKEN_ICONS.USDC}
             />
             <span className="text-lg font-medium text-ab-text-3">
               $

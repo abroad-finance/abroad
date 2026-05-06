@@ -8,7 +8,7 @@ import type { ChainPillChain } from '@/components/ui'
 import AbroadLogoColored from '@/assets/Logos/AbroadLogoColored.svg'
 import AbroadLogoWhite from '@/assets/Logos/AbroadLogoWhite.svg'
 import { ChainPill, CurrencyToggle } from '@/components/ui'
-import { AB_STYLES, ASSET_URLS } from '@/shared/constants'
+import { AB_STYLES, CHAIN_MAP } from '@/shared/constants'
 
 import { cn } from '../../../shared/utils'
 
@@ -52,11 +52,12 @@ export interface NavBarResponsiveProps {
 
 const NAV_BUTTON_CLASS = 'p-2 rounded-full transition-colors cursor-pointer'
 
-const CHAIN_PILL_THEME: Record<string, ChainPillChain> = {
-  celo: { icon: '🟢', iconUrl: ASSET_URLS.CELO_CHAIN_ICON, name: 'Celo' },
-  solana: { icon: '🟣', iconUrl: ASSET_URLS.SOLANA_CHAIN_ICON, name: 'Solana' },
-  stellar: { icon: '⚫', iconUrl: ASSET_URLS.STELLAR_CHAIN_ICON, name: 'Stellar' },
-}
+const CHAIN_PILL_THEME: Record<string, ChainPillChain> = Object.fromEntries(
+  Object.entries(CHAIN_MAP).map(([key, { icon, name }]) => {
+    const emoji = key === 'celo' ? '🟢' : key === 'solana' ? '🟣' : '⚫'
+    return [key, { icon: emoji, iconUrl: icon, name }]
+  }),
+)
 
 function chainPillChainFromKey(chainKey: string): ChainPillChain {
   const prefix = chainKey.toLowerCase().split(':')[0]

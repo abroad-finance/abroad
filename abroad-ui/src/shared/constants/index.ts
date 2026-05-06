@@ -13,8 +13,6 @@ export const ASSET_URLS = {
   SOLANA_CHAIN_ICON: solanaSolLogo,
   STELLAR_CHAIN_ICON: stellarXlmLogo,
   STELLAR_LOGO: 'https://storage.googleapis.com/cdn-abroad/Icons/Stellar/SCF_white.svg',
-  USDC_TOKEN_ICON: 'https://storage.googleapis.com/cdn-abroad/Icons/Tokens/USDC%20Token.svg',
-  USDT_TOKEN_ICON: 'https://storage.googleapis.com/cdn-abroad/Icons/Tokens/USDT-token.svg',
 }
 
 /** Shared style for brand title text (navbar, page title, language selector). Reduces duplication for SonarCloud. */

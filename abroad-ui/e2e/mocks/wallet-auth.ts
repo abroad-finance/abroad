@@ -4,6 +4,8 @@
  * Provides mock responses for wallet auth API endpoints.
  */
 
+import type { Page } from '@playwright/test'
+
 /**
  * Mock JWT token generator for testing.
  * Creates a valid JWT with configurable expiration.
@@ -28,6 +30,33 @@ export function generateMockJwt(payload: {
     Buffer.from(JSON.stringify(obj)).toString('base64url')
 
   return `${encode(header)}.${encode(body)}.mock-signature`
+}
+
+/**
+ * Sets up a mock wallet session in page localStorage via addInitScript.
+ * Must be called BEFORE page.goto().
+ */
+export function setupSession(
+  page: Page,
+  options: {
+    address?: string
+    chainId?: string
+    walletId?: string
+    expOffset?: number // seconds from now; negative = expired
+  } = {},
+): void {
+  const {
+    address = 'GTEST123456789',
+    chainId = 'stellar:pubnet',
+    walletId = 'stellar-kit',
+    expOffset = 3600,
+  } = options
+  const jwt = generateMockJwt({ address, chainId, exp: Math.floor(Date.now() / 1000) + expOffset })
+  page.addInitScript(({ address, chainId, walletId, jwt }) => {
+    localStorage.clear()
+    localStorage.setItem('wallet_session', JSON.stringify({ address, chainId, walletId }))
+    localStorage.setItem('auth_token', jwt)
+  }, { address, chainId, walletId, jwt })
 }
 
 /**

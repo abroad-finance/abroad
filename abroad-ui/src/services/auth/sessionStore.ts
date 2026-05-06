@@ -1,3 +1,5 @@
+import { isValidAddressForChain } from '../wallets/shared/wallet-utils'
+
 const SESSION_KEY = 'ab_session'
 
 interface SessionData {
@@ -36,30 +38,6 @@ const writeSession = (data: null | SessionData) => {
   catch {
     // Swallow storage failures
   }
-}
-
-/**
- * Valida que un address tenga el formato correcto para un chainId dado
- */
-function isValidAddressForChain(address: string, chainId: string): boolean {
-  if (!address) return false
-
-  if (chainId.startsWith('eip155')) {
-    // Ethereum/Celo: debe empezar con 0x y tener 42 caracteres
-    return /^0x[a-fA-F0-9]{40}$/.test(address)
-  }
-
-  if (chainId.startsWith('solana')) {
-    // Solana: base58, longitud típica 32-44 caracteres
-    return /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(address)
-  }
-
-  if (chainId.startsWith('stellar')) {
-    // Stellar: empieza con G (pública) o S (privada), 56 caracteres
-    return /^[GS][a-zA-Z0-9]{55}$/.test(address)
-  }
-
-  return false
 }
 
 /**

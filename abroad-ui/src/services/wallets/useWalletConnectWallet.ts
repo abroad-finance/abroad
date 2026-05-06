@@ -14,14 +14,13 @@ import {
   clearWCSession,
   fromBase64,
   getWCSession,
-  resolveNamespaceFromChainId,
   resolveStellarNetwork,
   saveWCSession,
   toBase64,
   WC_METADATA,
   WC_STORAGE_PREFIX,
 } from './shared/wallet-connect-base'
-import { caip10ToAddress } from './shared/wallet-utils'
+import { caip10ToAddress, getNamespaceFromChainId } from './shared/wallet-utils'
 
 const buildStoreKey = (chainId: string) => `${WC_STORAGE_PREFIX}:${chainId}`
 
@@ -111,7 +110,7 @@ export function useWalletConnectWallet({ walletAuth }: {
     message: string
   }): Promise<string> => {
     const { address, chainId, message } = params
-    const namespace = resolveNamespaceFromChainId(chainId)
+    const namespace = getNamespaceFromChainId(chainId)
 
     if (namespace === 'solana') {
       const encoded = toBase64(new TextEncoder().encode(message))
@@ -150,7 +149,7 @@ export function useWalletConnectWallet({ walletAuth }: {
     const wcMeta = options?.walletConnect
     if (!targetChainId) throw new Error('WalletConnect chainId is required')
 
-    const namespace = wcMeta?.namespace || resolveNamespaceFromChainId(targetChainId)
+    const namespace = wcMeta?.namespace || getNamespaceFromChainId(targetChainId)
     const methods = wcMeta?.methods || (namespace === 'solana'
       ? ['solana_signMessage', 'solana_signTransaction']
       : namespace === 'stellar'
@@ -244,7 +243,7 @@ export function useWalletConnectWallet({ walletAuth }: {
 
   const signTransaction: IWallet['signTransaction'] = useCallback(async ({ message }) => {
     if (!chainId) throw new Error('WalletConnect chainId is not set')
-    const namespace = resolveNamespaceFromChainId(chainId)
+    const namespace = getNamespaceFromChainId(chainId)
 
     if (namespace !== 'stellar') {
       throw new Error('signTransaction is only supported for Stellar via WalletConnect')

@@ -70,16 +70,6 @@ export function getWCSession(chainId: string): null | WalletConnectSession {
 }
 
 /**
- * Resuelve el namespace desde un chainId
- */
-export function resolveNamespaceFromChainId(chainId: string): string {
-  if (chainId.startsWith('eip155:')) return 'eip155'
-  if (chainId.startsWith('solana:')) return 'solana'
-  if (chainId.startsWith('stellar:')) return 'stellar'
-  return 'eip155'
-}
-
-/**
  * Resuelve la red Stellar (PUBLIC o TESTNET) desde chainId
  */
 export function resolveStellarNetwork(chainId: string): 'PUBLIC' | 'TESTNET' {

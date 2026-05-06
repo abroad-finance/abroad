@@ -8,7 +8,7 @@ import { TransactionStatus as ApiStatus, getTransactionStatus, _36EnumsTargetCur
 import { useWebSocketSubscription } from '@/contexts/WebSocketContext'
 import { Button } from '@/shared/components/Button'
 import { IconAnimated } from '@/shared/components/IconAnimated'
-import { ASSET_URLS } from '@/shared/constants'
+import { CHAIN_ICON_MAP, CURRENCY_FLAG_URL } from '@/shared/constants'
 import { useWalletAuth } from '@/shared/hooks/useWalletAuth'
 import { cn } from '@/shared/utils'
 
@@ -27,17 +27,6 @@ const TERMINAL_STATUSES = new Set<ApiStatus>([
   'PAYMENT_FAILED',
   'WRONG_AMOUNT',
 ])
-
-const CHAIN_ICON_URL: Record<string, string> = {
-  Celo: ASSET_URLS.CELO_CHAIN_ICON,
-  Solana: ASSET_URLS.SOLANA_CHAIN_ICON,
-  Stellar: ASSET_URLS.STELLAR_CHAIN_ICON,
-}
-
-const CURRENCY_FLAG_URL: Record<string, string> = {
-  BRL: 'https://hatscripts.github.io/circle-flags/flags/br.svg',
-  COP: 'https://hatscripts.github.io/circle-flags/flags/co.svg',
-}
 
 export type TxStatusDetails = {
   accountNumber: string
@@ -267,12 +256,12 @@ const TxStatus = ({
                 label={t('tx_status.network', 'Network')}
                 value={(
                   <span className="flex items-center gap-2">
-                    {CHAIN_ICON_URL[txStatusDetails.network]
+                    {CHAIN_ICON_MAP[txStatusDetails.network]
                       ? (
                           <img
                             alt={txStatusDetails.network}
                             className="h-4 w-4 shrink-0 object-contain"
-                            src={CHAIN_ICON_URL[txStatusDetails.network]}
+                            src={CHAIN_ICON_MAP[txStatusDetails.network]}
                           />
                         )
                       : (

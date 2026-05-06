@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { Search, X } from 'lucide-react'
 import React, { useCallback, useMemo, useState } from 'react'
 
-import { AB_STYLES, ASSET_URLS } from '../../../shared/constants'
+import { AB_STYLES, CHAIN_ICON_MAP, CURRENCY_FLAG_URL } from '../../../shared/constants'
 import { cn } from '../../../shared/utils'
 
 /* ── Types ── */
@@ -33,22 +33,11 @@ interface TokenSelectModalProps {
   tokens: TokenOption[]
 }
 
-/* ── Chain icon mapping ── */
-
-const CHAIN_ICONS: Record<string, string> = {
-  Celo: ASSET_URLS.CELO_CHAIN_ICON,
-  Solana: ASSET_URLS.SOLANA_CHAIN_ICON,
-  Stellar: ASSET_URLS.STELLAR_CHAIN_ICON,
-}
-
-const CURRENCY_ICONS: Record<string, string> = {
-  BRL: 'https://hatscripts.github.io/circle-flags/flags/br.svg',
-  COP: 'https://hatscripts.github.io/circle-flags/flags/co.svg',
-}
+/* ── Icon resolution ── */
 
 function resolveIcon(label: string, icon?: string): string | undefined {
   if (icon) return icon
-  return CHAIN_ICONS[label] || CURRENCY_ICONS[label]
+  return CHAIN_ICON_MAP[label] || CURRENCY_FLAG_URL[label]
 }
 
 /* ── Component ── */

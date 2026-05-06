@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { watchPage, formatIssues } from './helpers'
+import { setupSession } from './mocks/wallet-auth'
 
 /**
  * Session restoration E2E tests.
@@ -10,17 +11,6 @@ import { watchPage, formatIssues } from './helpers'
  * - Invalid session (walletId type) is cleared
  * - Solana wallet session is supported
  */
-
-// Helper to generate a simple mock JWT (using plain text for browser context)
-const createMockJwt = (address: string, chainId: string, expOffset = 3600) => {
-  const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }))
-  const payload = btoa(JSON.stringify({
-    address,
-    chainId,
-    exp: Math.floor(Date.now() / 1000) + expOffset,
-  }))
-  return `${header}.${payload}.mock-sig`
-}
 
 test.describe('Session Restore', () => {
   test.beforeEach(async ({ page }) => {
@@ -33,18 +23,7 @@ test.describe('Session Restore', () => {
     const { errors } = watchPage(page)
 
     // Set up valid session before first load
-    await page.addInitScript(() => {
-      const jwt = createMockJwt('GTEST123456789', 'stellar:pubnet')
-      localStorage.setItem(
-        'wallet_session',
-        JSON.stringify({
-          address: 'GTEST123456789',
-          chainId: 'stellar:pubnet',
-          walletId: 'stellar-kit',
-        })
-      )
-      localStorage.setItem('auth_token', jwt)
-    })
+    setupSession(page, { address: 'GTEST123456789', chainId: 'stellar:pubnet', walletId: 'stellar-kit' })
 
     // First page load
     await page.goto('/')
@@ -87,18 +66,7 @@ test.describe('Session Restore', () => {
     const { errors } = watchPage(page)
 
     // Set up EXPIRED session (exp in the past)
-    await page.addInitScript(() => {
-      const jwt = createMockJwt('GTEST123456789', 'stellar:pubnet', -3600) // 1 hour ago
-      localStorage.setItem(
-        'wallet_session',
-        JSON.stringify({
-          address: 'GTEST123456789',
-          chainId: 'stellar:pubnet',
-          walletId: 'stellar-kit',
-        })
-      )
-      localStorage.setItem('auth_token', jwt)
-    })
+    setupSession(page, { address: 'GTEST123456789', chainId: 'stellar:pubnet', walletId: 'stellar-kit', expOffset: -3600 })
 
     await page.goto('/')
     await page.waitForLoadState('domcontentloaded')
@@ -125,18 +93,7 @@ test.describe('Session Restore', () => {
     const { errors } = watchPage(page)
 
     // Set up session with invalid walletId
-    await page.addInitScript(() => {
-      const jwt = createMockJwt('GTEST123456789', 'stellar:pubnet')
-      localStorage.setItem(
-        'wallet_session',
-        JSON.stringify({
-          address: 'GTEST123456789',
-          chainId: 'stellar:pubnet',
-          walletId: 'invalid-wallet-type', // Not in validWalletTypes
-        })
-      )
-      localStorage.setItem('auth_token', jwt)
-    })
+    setupSession(page, { address: 'GTEST123456789', chainId: 'stellar:pubnet', walletId: 'invalid-wallet-type' })
 
     await page.goto('/')
     await page.waitForLoadState('domcontentloaded')
@@ -161,18 +118,7 @@ test.describe('Session Restore', () => {
   test('should handle solana wallet session', async ({ page }) => {
     const { errors } = watchPage(page)
 
-    await page.addInitScript(() => {
-      const jwt = createMockJwt('7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU', 'solana:mainnet')
-      localStorage.setItem(
-        'wallet_session',
-        JSON.stringify({
-          address: '7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU',
-          chainId: 'solana:mainnet',
-          walletId: 'solana',
-        })
-      )
-      localStorage.setItem('auth_token', jwt)
-    })
+    setupSession(page, { address: '7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU', chainId: 'solana:mainnet', walletId: 'solana' })
 
     await page.goto('/')
     await page.waitForLoadState('domcontentloaded')
@@ -200,18 +146,7 @@ test.describe('Session Restore', () => {
     const { errors } = watchPage(page)
 
     // Set up Stellar session
-    await page.addInitScript(() => {
-      const jwt = createMockJwt('GTEST123456789', 'stellar:pubnet')
-      localStorage.setItem(
-        'wallet_session',
-        JSON.stringify({
-          address: 'GTEST123456789',
-          chainId: 'stellar:pubnet',
-          walletId: 'stellar-kit',
-        })
-      )
-      localStorage.setItem('auth_token', jwt)
-    })
+    setupSession(page, { address: 'GTEST123456789', chainId: 'stellar:pubnet', walletId: 'stellar-kit' })
 
     await page.goto('/')
     await page.waitForLoadState('domcontentloaded')
@@ -245,18 +180,7 @@ test.describe('JWT and Session Cleanup', () => {
   test('should clear both JWT and session on chain mismatch', async ({ page }) => {
     const { errors } = watchPage(page)
 
-    await page.addInitScript(() => {
-      const jwt = createMockJwt('GTEST123456789', 'stellar:pubnet')
-      localStorage.setItem(
-        'wallet_session',
-        JSON.stringify({
-          address: 'GTEST123456789',
-          chainId: 'stellar:pubnet',
-          walletId: 'stellar-kit',
-        })
-      )
-      localStorage.setItem('auth_token', jwt)
-    })
+    setupSession(page, { address: 'GTEST123456789', chainId: 'stellar:pubnet', walletId: 'stellar-kit' })
 
     await page.goto('/')
     await page.waitForLoadState('domcontentloaded')

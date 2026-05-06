@@ -9,7 +9,7 @@ import type { ConfirmQrProps } from '../../features/swap/components/ConfirmQr'
 import type { SwapProps } from '../../features/swap/components/Swap'
 import type { ChainOption, TokenOption } from '../../features/swap/components/TokenSelectModal'
 import type { TxDetailItem } from '../../features/swap/constants'
-import type { SwapView } from '../../features/swap/types'
+import type { OnboardingRates, SwapView } from '../../features/swap/types'
 
 import { _36EnumsTargetCurrency as TargetCurrency, type TransactionListItem } from '../../api/index'
 import { ChainSelectorModal, ConnectWalletChainModal } from '../../components/ui'
@@ -32,7 +32,7 @@ import { transactionMatchesChain } from '../../features/swap/utils/corridorHelpe
 import { useUserTransactions } from '../../services/useUserTransactions'
 import LanguageSelector from '../../shared/components/LanguageSelector'
 import { ModalOverlay } from '../../shared/components/ModalOverlay'
-import { AB_STYLES, ASSET_URLS } from '../../shared/constants'
+import { AB_STYLES, ASSET_URLS, CHAIN_ICON_MAP } from '../../shared/constants'
 import { useLanguageSelector, useNavBarResponsive, useVersionCheck } from '../../shared/hooks'
 import { cn } from '../../shared/utils'
 import { useWebSwapController } from './useWebSwapController'
@@ -83,17 +83,6 @@ export interface WebSwapControllerProps {
   view: SwapView
 }
 
-type OnboardingRates = {
-  brl: {
-    USDC: null | number
-    USDT: null | number
-  }
-  cop: {
-    USDC: null | number
-    USDT: null | number
-  }
-}
-
 /* ── Chain icon helpers for source modal ── */
 
 const NETWORK_TO_CHAIN_NAME: Record<string, string> = {
@@ -130,12 +119,6 @@ function transactionToTxDetailItem(tx: TransactionListItem): TxDetailItem {
     transactionId: tx.onChainId ?? tx.id,
     usdcAmount: tx.quote.sourceAmount.toFixed(2),
   }
-}
-
-const CHAIN_ICON_MAP: Record<string, string> = {
-  Celo: ASSET_URLS.CELO_CHAIN_ICON,
-  Solana: ASSET_URLS.SOLANA_CHAIN_ICON,
-  Stellar: ASSET_URLS.STELLAR_CHAIN_ICON,
 }
 
 const WebSwap: React.FC = () => {
