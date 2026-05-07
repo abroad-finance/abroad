@@ -44,7 +44,7 @@ export const transactionMatchesChain = <T extends { quote: { network: string } }
   chainKey: string,
 ): boolean => (tx.quote.network?.toUpperCase() ?? '') === networkFromChainKey(chainKey)
 
-/** Sort corridors with Stellar first (used by useSwap and useWebSwapController). */
+/** Sort corridors with Stellar first (used by useWebSwapController). */
 export const sortStellarFirst = <T extends { blockchain: string }>(arr: T[]): T[] => (
   [...arr].sort((a, b) => {
     const aStellar = a.blockchain.toLowerCase() === 'stellar'
