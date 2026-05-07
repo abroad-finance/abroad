@@ -1,6 +1,14 @@
 import { expect, test } from '@playwright/test'
-import { watchPage, formatIssues } from './helpers'
-import { generateMockJwt, setupSession } from './mocks/wallet-auth'
+
+import { attachConsoleAndNetwork, readSession, watchPage } from './helpers'
+import {
+  CELO_BRL,
+  CELO_COP,
+  mockCorridors,
+  SOLANA_COP,
+  STELLAR_COP,
+} from './mocks/corridors'
+import { setupSession } from './mocks/wallet-auth'
 
 /**
  * Chain switching E2E tests.
@@ -21,107 +29,35 @@ test.describe('Chain Switching', () => {
   test('should handle switching from Stellar to Celo', async ({ page }) => {
     const { errors } = watchPage(page)
 
-    // Start with Stellar session
     setupSession(page, { address: 'GTEST123456789', chainId: 'stellar:pubnet', walletId: 'stellar-kit' })
-
-    // Mock corridors with both Stellar and Celo
-    await page.route('**/api/public/corridors', async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          corridors: [
-            {
-              blockchain: 'Stellar',
-              chainId: 'stellar:pubnet',
-              cryptoCurrency: 'XLM',
-              targetCurrency: 'COP',
-              paymentMethod: 'BREB',
-            },
-            {
-              blockchain: 'Celo',
-              chainId: 'celo:mainnet',
-              cryptoCurrency: 'CELO',
-              targetCurrency: 'COP',
-              paymentMethod: 'PIX',
-            },
-          ],
-        }),
-      })
-    })
+    await mockCorridors(page, [STELLAR_COP, CELO_COP])
 
     await page.goto('/')
     await page.waitForLoadState('domcontentloaded')
     await page.waitForTimeout(2000)
 
-    // Verify initial Stellar session
-    let session = await page.evaluate(() => {
-      const s = localStorage.getItem('wallet_session')
-      return s ? JSON.parse(s) : null
-    })
-
+    const session = await readSession(page)
     expect(session?.chainId).toBe('stellar:pubnet')
 
-    await test.info().attach('console-and-network', {
-      contentType: 'text/plain',
-      body: Buffer.from(formatIssues(errors, [], [], [])),
-    })
-
-    // No JS crashes
+    await attachConsoleAndNetwork(errors)
     expect(errors).toHaveLength(0)
   })
 
   test('should handle Solana to Stellar chain switch', async ({ page }) => {
     const { errors } = watchPage(page)
 
-    // Start with Solana session
     setupSession(page, { address: '7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU', chainId: 'solana:mainnet', walletId: 'solana' })
-
-    // Mock corridors with Solana and Stellar
-    await page.route('**/api/public/corridors', async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          corridors: [
-            {
-              blockchain: 'Solana',
-              chainId: 'solana:mainnet',
-              cryptoCurrency: 'SOL',
-              targetCurrency: 'COP',
-              paymentMethod: 'PIX',
-            },
-            {
-              blockchain: 'Stellar',
-              chainId: 'stellar:pubnet',
-              cryptoCurrency: 'XLM',
-              targetCurrency: 'COP',
-              paymentMethod: 'BREB',
-            },
-          ],
-        }),
-      })
-    })
+    await mockCorridors(page, [SOLANA_COP, STELLAR_COP])
 
     await page.goto('/')
     await page.waitForLoadState('domcontentloaded')
     await page.waitForTimeout(2000)
 
-    // Verify initial Solana session
-    let session = await page.evaluate(() => {
-      const s = localStorage.getItem('wallet_session')
-      return s ? JSON.parse(s) : null
-    })
-
+    const session = await readSession(page)
     expect(session?.chainId).toBe('solana:mainnet')
     expect(session?.walletId).toBe('solana')
 
-    await test.info().attach('console-and-network', {
-      contentType: 'text/plain',
-      body: Buffer.from(formatIssues(errors, [], [], [])),
-    })
-
-    // No JS crashes
+    await attachConsoleAndNetwork(errors)
     expect(errors).toHaveLength(0)
   })
 
@@ -130,72 +66,24 @@ test.describe('Chain Switching', () => {
 
     await page.goto('/')
     await page.waitForLoadState('domcontentloaded')
-
-    // Mock corridors
-    await page.route('**/api/public/corridors', async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          corridors: [
-            {
-              blockchain: 'Stellar',
-              chainId: 'stellar:pubnet',
-              cryptoCurrency: 'XLM',
-              targetCurrency: 'COP',
-              paymentMethod: 'BREB',
-            },
-          ],
-        }),
-      })
-    })
+    await mockCorridors(page, [STELLAR_COP])
 
     await page.waitForTimeout(2000)
 
-    await test.info().attach('console-and-network', {
-      contentType: 'text/plain',
-      body: Buffer.from(formatIssues(errors, [], [], [])),
-    })
-
-    // No JS crashes
+    await attachConsoleAndNetwork(errors)
     expect(errors).toHaveLength(0)
   })
 
   test('should handle pending connection with slow corridors response', async ({ page }) => {
     const { errors } = watchPage(page)
 
-    // Mock slow corridors response
-    await page.route('**/api/public/corridors', async (route) => {
-      await new Promise(resolve => setTimeout(resolve, 2000))
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          corridors: [
-            {
-              blockchain: 'Stellar',
-              chainId: 'stellar:pubnet',
-              cryptoCurrency: 'XLM',
-              targetCurrency: 'COP',
-              paymentMethod: 'BREB',
-            },
-          ],
-        }),
-      })
-    })
+    await mockCorridors(page, [STELLAR_COP], { delayMs: 2000 })
 
     await page.goto('/')
     await page.waitForLoadState('domcontentloaded')
-
-    // Wait for initial load
     await page.waitForTimeout(3000)
 
-    await test.info().attach('console-and-network', {
-      contentType: 'text/plain',
-      body: Buffer.from(formatIssues(errors, [], [], [])),
-    })
-
-    // No JS crashes during race condition
+    await attachConsoleAndNetwork(errors)
     expect(errors).toHaveLength(0)
   })
 })
@@ -210,50 +98,13 @@ test.describe('Multi-Chain Connection Flow', () => {
   test('should support multiple chains in corridor list', async ({ page }) => {
     const { errors } = watchPage(page)
 
-    // Mock all supported chains
-    await page.route('**/api/public/corridors', async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          corridors: [
-            {
-              blockchain: 'Stellar',
-              chainId: 'stellar:pubnet',
-              cryptoCurrency: 'XLM',
-              targetCurrency: 'COP',
-              paymentMethod: 'BREB',
-            },
-            {
-              blockchain: 'Celo',
-              chainId: 'celo:mainnet',
-              cryptoCurrency: 'CELO',
-              targetCurrency: 'BRL',
-              paymentMethod: 'PIX',
-            },
-            {
-              blockchain: 'Solana',
-              chainId: 'solana:mainnet',
-              cryptoCurrency: 'SOL',
-              targetCurrency: 'COP',
-              paymentMethod: 'PIX',
-            },
-          ],
-        }),
-      })
-    })
+    await mockCorridors(page, [STELLAR_COP, CELO_BRL, SOLANA_COP])
 
     await page.goto('/')
     await page.waitForLoadState('domcontentloaded')
     await page.waitForTimeout(2000)
 
-    // Verify all chains are available in the UI
-    await test.info().attach('console-and-network', {
-      contentType: 'text/plain',
-      body: Buffer.from(formatIssues(errors, [], [], [])),
-    })
-
-    // No JS crashes
+    await attachConsoleAndNetwork(errors)
     expect(errors).toHaveLength(0)
   })
 })

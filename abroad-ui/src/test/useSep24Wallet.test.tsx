@@ -15,6 +15,23 @@ import type { IWalletAuthentication } from '../interfaces/IWalletAuthentication'
 
 import { useSep24Wallet } from '../services/wallets/useSep24Wallet'
 
+const withMockUrlParams = (
+  getter: (key: string) => null | string,
+  callback: () => Promise<void> | void,
+) => {
+  const original = global.URLSearchParams
+  global.URLSearchParams = vi.fn(() => ({ get: getter })) as unknown as typeof URLSearchParams
+  try {
+    return Promise.resolve(callback()).finally(() => {
+      global.URLSearchParams = original
+    })
+  }
+  catch (err) {
+    global.URLSearchParams = original
+    throw err
+  }
+}
+
 describe('useSep24Wallet', () => {
   const mockSetJwtToken = vi.fn()
   const mockWalletAuth: IWalletAuthentication = {
@@ -26,13 +43,16 @@ describe('useSep24Wallet', () => {
     setJwtToken: mockSetJwtToken,
   }
 
+  const renderSep24 = () =>
+    renderHook(() => useSep24Wallet({ walletAuthentication: mockWalletAuth }))
+
   beforeEach(() => {
     vi.clearAllMocks()
   })
 
   describe('wallet interface', () => {
     it('should have correct initial state', () => {
-      const { result } = renderHook(() => useSep24Wallet({ walletAuthentication: mockWalletAuth }))
+      const { result } = renderSep24()
 
       expect(result.current.address).toBe(null)
       expect(result.current.chainId).toBe('stellar:pubnet')
@@ -40,31 +60,29 @@ describe('useSep24Wallet', () => {
     })
 
     it('should have connect method that is a no-op', async () => {
-      const { result } = renderHook(() => useSep24Wallet({ walletAuthentication: mockWalletAuth }))
+      const { result } = renderSep24()
 
       await act(async () => {
         await result.current.connect()
       })
 
-      // Connect is a no-op for SEP-24 (URL-based connection)
       expect(mockSetJwtToken).not.toHaveBeenCalled()
     })
 
     it('should have disconnect method that is a no-op', async () => {
-      const { result } = renderHook(() => useSep24Wallet({ walletAuthentication: mockWalletAuth }))
+      const { result } = renderSep24()
 
       await act(async () => {
         await result.current.disconnect()
       })
 
-      // Disconnect is a no-op for SEP-24 (URL-based connection)
       expect(mockSetJwtToken).not.toHaveBeenCalled()
     })
 
     it('should have signTransaction that closes window', async () => {
       const closeSpy = vi.spyOn(window, 'close').mockImplementation(() => {})
 
-      const { result } = renderHook(() => useSep24Wallet({ walletAuthentication: mockWalletAuth }))
+      const { result } = renderSep24()
 
       let signedResult: undefined | { signedTxXdr?: string, signerAddress?: string }
       await act(async () => {
@@ -81,13 +99,13 @@ describe('useSep24Wallet', () => {
 
   describe('wallet properties', () => {
     it('should use Stellar pubnet as chainId', () => {
-      const { result } = renderHook(() => useSep24Wallet({ walletAuthentication: mockWalletAuth }))
+      const { result } = renderSep24()
 
       expect(result.current.chainId).toBe('stellar:pubnet')
     })
 
     it('should always return sep24 as walletId', () => {
-      const { result } = renderHook(() => useSep24Wallet({ walletAuthentication: mockWalletAuth }))
+      const { result } = renderSep24()
 
       expect(result.current.walletId).toBe('sep24')
     })
@@ -95,81 +113,53 @@ describe('useSep24Wallet', () => {
 
   describe('URL parameter parsing', () => {
     it('should set JWT token and address when both token and address are present in URL', async () => {
-      // Mock URLSearchParams to simulate URL with token and address
-      const MockURLSearchParams = vi.fn(() => ({
-        get: (key: string) => {
+      await withMockUrlParams(
+        (key) => {
           if (key === 'token') return 'test-jwt-token'
           if (key === 'address') return '0xTestAddress'
           return null
         },
-      }))
+        async () => {
+          const { result } = renderSep24()
+          await new Promise(resolve => setTimeout(resolve, 50))
 
-      const originalURLSearchParams = global.URLSearchParams
-      global.URLSearchParams = MockURLSearchParams as unknown as typeof URLSearchParams
-
-      const { result } = renderHook(() => useSep24Wallet({ walletAuthentication: mockWalletAuth }))
-
-      // Wait for useEffect to run
-      await new Promise(resolve => setTimeout(resolve, 50))
-
-      expect(result.current.address).toBe('0xTestAddress')
-      expect(mockSetJwtToken).toHaveBeenCalledWith('test-jwt-token')
-
-      global.URLSearchParams = originalURLSearchParams
-    })
-
-    it('should not set token or address when URL params are missing', () => {
-      const MockURLSearchParams = vi.fn(() => ({
-        get: () => null,
-      }))
-
-      const originalURLSearchParams = global.URLSearchParams
-      global.URLSearchParams = MockURLSearchParams as unknown as typeof URLSearchParams
-
-      const { result } = renderHook(() => useSep24Wallet({ walletAuthentication: mockWalletAuth }))
-
-      expect(result.current.address).toBe(null)
-      expect(mockSetJwtToken).not.toHaveBeenCalled()
-
-      global.URLSearchParams = originalURLSearchParams
-    })
-
-    it('should not set address when only token is present (no address)', () => {
-      const MockURLSearchParams = vi.fn(() => ({
-        get: (key: string) => {
-          if (key === 'token') return 'test-token'
-          return null
+          expect(result.current.address).toBe('0xTestAddress')
+          expect(mockSetJwtToken).toHaveBeenCalledWith('test-jwt-token')
         },
-      }))
-
-      const originalURLSearchParams = global.URLSearchParams
-      global.URLSearchParams = MockURLSearchParams as unknown as typeof URLSearchParams
-
-      const { result } = renderHook(() => useSep24Wallet({ walletAuthentication: mockWalletAuth }))
-
-      expect(result.current.address).toBe(null)
-      expect(mockSetJwtToken).not.toHaveBeenCalled()
-
-      global.URLSearchParams = originalURLSearchParams
+      )
     })
 
-    it('should not set token or address when only address is present (no token)', () => {
-      const MockURLSearchParams = vi.fn(() => ({
-        get: (key: string) => {
-          if (key === 'address') return '0xTestAddress'
-          return null
+    it('should not set token or address when URL params are missing', async () => {
+      await withMockUrlParams(
+        () => null,
+        () => {
+          const { result } = renderSep24()
+          expect(result.current.address).toBe(null)
+          expect(mockSetJwtToken).not.toHaveBeenCalled()
         },
-      }))
+      )
+    })
 
-      const originalURLSearchParams = global.URLSearchParams
-      global.URLSearchParams = MockURLSearchParams as unknown as typeof URLSearchParams
+    it('should not set address when only token is present (no address)', async () => {
+      await withMockUrlParams(
+        key => (key === 'token' ? 'test-token' : null),
+        () => {
+          const { result } = renderSep24()
+          expect(result.current.address).toBe(null)
+          expect(mockSetJwtToken).not.toHaveBeenCalled()
+        },
+      )
+    })
 
-      const { result } = renderHook(() => useSep24Wallet({ walletAuthentication: mockWalletAuth }))
-
-      expect(result.current.address).toBe(null)
-      expect(mockSetJwtToken).not.toHaveBeenCalled()
-
-      global.URLSearchParams = originalURLSearchParams
+    it('should not set token or address when only address is present (no token)', async () => {
+      await withMockUrlParams(
+        key => (key === 'address' ? '0xTestAddress' : null),
+        () => {
+          const { result } = renderSep24()
+          expect(result.current.address).toBe(null)
+          expect(mockSetJwtToken).not.toHaveBeenCalled()
+        },
+      )
     })
   })
 })

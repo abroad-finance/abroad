@@ -20,13 +20,30 @@ vi.mock('../features/swap/lib/chainBalanceFetchers', () => ({
 
 import { fetchNonStellarBalances } from '../features/swap/lib/chainBalanceFetchers'
 
-// Note: We can't easily mock @stellar/stellar-sdk here because it's imported
-// and used directly in the hook. The hook has its own internal handling for
-// Stellar balance fetching. These tests focus on Solana and EVM chains.
+type Balances = { cUSD: string, USDC: string, USDT: string }
+
+const ZERO_BALANCES: Balances = { cUSD: '0.00', USDC: '0.00', USDT: '0.00' }
+
+const renderBalances = (address: null | string | undefined, chainId: null | string) =>
+  renderHook(() => useStablecoinBalances({ address, chainId }))
+
+const setupBalances = async (
+  balances: Balances,
+  { address, chainId }: { address: null | string, chainId: null | string },
+) => {
+  vi.mocked(fetchNonStellarBalances).mockResolvedValue(balances)
+  const { result } = renderBalances(address, chainId)
+  await waitFor(() => {
+    expect(result.current.isLoading).toBe(false)
+  })
+  return result
+}
 
 describe('useStablecoinBalances', () => {
   const mockSolanaAddress = 'HN7cABqLq46Es1jh92dQQisAq662SmxELLLsHHe4YWrH'
   const mockEvmAddress = '0x1234567890123456789012345678901234567890'
+  const SOLANA = { address: mockSolanaAddress, chainId: 'solana:mainnet' }
+  const EVM = { address: mockEvmAddress, chainId: 'eip155:42220' }
 
   beforeEach(() => {
     vi.clearAllMocks()
@@ -34,45 +51,23 @@ describe('useStablecoinBalances', () => {
 
   describe('initial state', () => {
     it('should return empty balances when no address provided', () => {
-      const { result } = renderHook(() => useStablecoinBalances({ address: null, chainId: null }))
+      const { result } = renderBalances(null, null)
 
-      expect(result.current.balances).toEqual({
-        cUSD: '0.00',
-        USDC: '0.00',
-        USDT: '0.00',
-      })
+      expect(result.current.balances).toEqual(ZERO_BALANCES)
       expect(result.current.isLoading).toBe(false)
       expect(result.current.error).toBe(null)
     })
 
     it('should return empty balances when address is undefined', () => {
-      const { result } = renderHook(() =>
-        useStablecoinBalances({ address: undefined, chainId: 'stellar:pubnet' }),
-      )
+      const { result } = renderBalances(undefined, 'stellar:pubnet')
 
-      expect(result.current.balances).toEqual({
-        cUSD: '0.00',
-        USDC: '0.00',
-        USDT: '0.00',
-      })
+      expect(result.current.balances).toEqual(ZERO_BALANCES)
     })
   })
 
   describe('Solana balance fetching', () => {
     it('should fetch Solana balances successfully', async () => {
-      vi.mocked(fetchNonStellarBalances).mockResolvedValue({
-        cUSD: '0.00',
-        USDC: '200.00',
-        USDT: '50.00',
-      })
-
-      const { result } = renderHook(() =>
-        useStablecoinBalances({ address: mockSolanaAddress, chainId: 'solana:mainnet' }),
-      )
-
-      await waitFor(() => {
-        expect(result.current.isLoading).toBe(false)
-      })
+      const result = await setupBalances({ cUSD: '0.00', USDC: '200.00', USDT: '50.00' }, SOLANA)
 
       expect(fetchNonStellarBalances).toHaveBeenCalledWith(
         mockSolanaAddress,
@@ -86,37 +81,19 @@ describe('useStablecoinBalances', () => {
     it('should handle Solana fetch error', async () => {
       vi.mocked(fetchNonStellarBalances).mockRejectedValue(new Error('RPC error'))
 
-      const { result } = renderHook(() =>
-        useStablecoinBalances({ address: mockSolanaAddress, chainId: 'solana:mainnet' }),
-      )
+      const { result } = renderBalances(mockSolanaAddress, 'solana:mainnet')
 
       await waitFor(() => {
         expect(result.current.isLoading).toBe(false)
       })
 
-      expect(result.current.balances).toEqual({
-        cUSD: '0.00',
-        USDC: '0.00',
-        USDT: '0.00',
-      })
+      expect(result.current.balances).toEqual(ZERO_BALANCES)
     })
   })
 
   describe('EVM balance fetching', () => {
     it('should fetch EVM balances successfully', async () => {
-      vi.mocked(fetchNonStellarBalances).mockResolvedValue({
-        cUSD: '100.00',
-        USDC: '300.00',
-        USDT: '75.00',
-      })
-
-      const { result } = renderHook(() =>
-        useStablecoinBalances({ address: mockEvmAddress, chainId: 'eip155:42220' }),
-      )
-
-      await waitFor(() => {
-        expect(result.current.isLoading).toBe(false)
-      })
+      const result = await setupBalances({ cUSD: '100.00', USDC: '300.00', USDT: '75.00' }, EVM)
 
       expect(fetchNonStellarBalances).toHaveBeenCalledWith(
         mockEvmAddress,
@@ -130,57 +107,21 @@ describe('useStablecoinBalances', () => {
 
   describe('preference resolution', () => {
     it('should prefer USDC when it has the highest balance', async () => {
-      vi.mocked(fetchNonStellarBalances).mockResolvedValue({
-        cUSD: '10.00',
-        USDC: '500.00',
-        USDT: '100.00',
-      })
-
-      const { result } = renderHook(() =>
-        useStablecoinBalances({ address: mockEvmAddress, chainId: 'eip155:42220' }),
-      )
-
-      await waitFor(() => {
-        expect(result.current.isLoading).toBe(false)
-      })
+      const result = await setupBalances({ cUSD: '10.00', USDC: '500.00', USDT: '100.00' }, EVM)
 
       expect(result.current.preference.highestBalanceToken).toBe('USDC')
       expect(result.current.preference.kind).toBe('supported')
     })
 
     it('should prefer USDT when it has the highest balance', async () => {
-      vi.mocked(fetchNonStellarBalances).mockResolvedValue({
-        cUSD: '10.00',
-        USDC: '50.00',
-        USDT: '500.00',
-      })
-
-      const { result } = renderHook(() =>
-        useStablecoinBalances({ address: mockEvmAddress, chainId: 'eip155:42220' }),
-      )
-
-      await waitFor(() => {
-        expect(result.current.isLoading).toBe(false)
-      })
+      const result = await setupBalances({ cUSD: '10.00', USDC: '50.00', USDT: '500.00' }, EVM)
 
       expect(result.current.preference.highestBalanceToken).toBe('USDT')
       expect(result.current.preference.kind).toBe('supported')
     })
 
     it('should default to USDC when all balances are zero', async () => {
-      vi.mocked(fetchNonStellarBalances).mockResolvedValue({
-        cUSD: '0.00',
-        USDC: '0.00',
-        USDT: '0.00',
-      })
-
-      const { result } = renderHook(() =>
-        useStablecoinBalances({ address: mockEvmAddress, chainId: 'eip155:42220' }),
-      )
-
-      await waitFor(() => {
-        expect(result.current.isLoading).toBe(false)
-      })
+      const result = await setupBalances(ZERO_BALANCES, EVM)
 
       expect(result.current.preference.highestBalanceToken).toBe('USDC')
       expect(result.current.preference.kind).toBe('empty')
@@ -189,19 +130,7 @@ describe('useStablecoinBalances', () => {
 
   describe('supportedBalanceFor', () => {
     it('should return balance for requested symbol', async () => {
-      vi.mocked(fetchNonStellarBalances).mockResolvedValue({
-        cUSD: '25.00',
-        USDC: '100.00',
-        USDT: '50.00',
-      })
-
-      const { result } = renderHook(() =>
-        useStablecoinBalances({ address: mockEvmAddress, chainId: 'eip155:42220' }),
-      )
-
-      await waitFor(() => {
-        expect(result.current.isLoading).toBe(false)
-      })
+      const result = await setupBalances({ cUSD: '25.00', USDC: '100.00', USDT: '50.00' }, EVM)
 
       expect(result.current.supportedBalanceFor('USDC')).toBe('100.00')
       expect(result.current.supportedBalanceFor('USDT')).toBe('50.00')
@@ -220,9 +149,7 @@ describe('useStablecoinBalances', () => {
         }
       })
 
-      const { result } = renderHook(() =>
-        useStablecoinBalances({ address: mockEvmAddress, chainId: 'eip155:42220' }),
-      )
+      const { result } = renderBalances(mockEvmAddress, 'eip155:42220')
 
       await waitFor(() => {
         expect(result.current.isLoading).toBe(false)
@@ -230,7 +157,6 @@ describe('useStablecoinBalances', () => {
 
       const initialBalance = result.current.balances.USDC
 
-      // Refresh
       await act(async () => {
         await result.current.refresh()
       })
@@ -239,11 +165,7 @@ describe('useStablecoinBalances', () => {
     })
 
     it('should clear balances when address becomes null', async () => {
-      vi.mocked(fetchNonStellarBalances).mockResolvedValue({
-        cUSD: '0.00',
-        USDC: '100.00',
-        USDT: '0.00',
-      })
+      vi.mocked(fetchNonStellarBalances).mockResolvedValue({ cUSD: '0.00', USDC: '100.00', USDT: '0.00' })
 
       const { rerender, result } = renderHook(
         ({ address, chainId }: { address: null | string, chainId: null | string }) => useStablecoinBalances({ address, chainId }),
@@ -258,15 +180,10 @@ describe('useStablecoinBalances', () => {
 
       expect(result.current.balances.USDC).toBe('100.00')
 
-      // Change address to null
       rerender({ address: null, chainId: null })
 
       await waitFor(() => {
-        expect(result.current.balances).toEqual({
-          cUSD: '0.00',
-          USDC: '0.00',
-          USDT: '0.00',
-        })
+        expect(result.current.balances).toEqual(ZERO_BALANCES)
       })
     })
   })
@@ -297,21 +214,16 @@ describe('useStablecoinBalances', () => {
         },
       )
 
-      // First request starts (callCount = 1, requestId = 1)
-      // Wait for the mock to be called
       await waitFor(() => {
         expect(callCount).toBe(1)
       })
 
-      // Change address before first request completes - this triggers second request (callCount = 2, requestId = 2)
       rerender({ address: mockSolanaAddress })
 
-      // Wait for second request to start
       await waitFor(() => {
         expect(callCount).toBe(2)
       })
 
-      // Resolve both requests - SECOND first (should win), then FIRST (should be ignored)
       if (resolveSecond) resolveSecond()
       if (resolveFirst) resolveFirst()
 
@@ -319,7 +231,6 @@ describe('useStablecoinBalances', () => {
         expect(result.current.isLoading).toBe(false)
       })
 
-      // Should use the second (most recent) response due to requestIdRef race condition prevention
       expect(result.current.balances.USDC).toBe('200.00')
     })
   })

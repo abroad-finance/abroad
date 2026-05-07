@@ -17,76 +17,59 @@ import {
   normalizeAddress,
 } from '../services/wallets/shared/wallet-utils'
 
+const roundTripBase64 = (input: string): string =>
+  new TextDecoder().decode(fromBase64(toBase64(new TextEncoder().encode(input))))
+
 describe('wallet-utils', () => {
   describe('caip10ToAddress', () => {
     it('should extract address from CAIP-10 format (eip155)', () => {
-      const result = caip10ToAddress('eip155:42220:0x1234567890abcdef1234567890abcdef12345678')
-      expect(result).toBe('0x1234567890abcdef1234567890abcdef12345678')
+      expect(caip10ToAddress('eip155:42220:0x1234567890abcdef1234567890abcdef12345678'))
+        .toBe('0x1234567890abcdef1234567890abcdef12345678')
     })
 
     it('should extract address from CAIP-10 format (solana)', () => {
-      const result = caip10ToAddress('solana:mainnet:HN7cABqLq46Es1jh92dQQisAq662SmxELLLsHHe4YWrH')
-      expect(result).toBe('HN7cABqLq46Es1jh92dQQisAq662SmxELLLsHHe4YWrH')
+      expect(caip10ToAddress('solana:mainnet:HN7cABqLq46Es1jh92dQQisAq662SmxELLLsHHe4YWrH'))
+        .toBe('HN7cABqLq46Es1jh92dQQisAq662SmxELLLsHHe4YWrH')
     })
 
     it('should extract address from CAIP-10 format (stellar)', () => {
-      const result = caip10ToAddress('stellar:pubnet:GABCD1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890ABC')
-      expect(result).toBe('GABCD1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890ABC')
+      expect(caip10ToAddress('stellar:pubnet:GABCD1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890ABC'))
+        .toBe('GABCD1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890ABC')
     })
 
     it('should return the last part for invalid format (no colon separator)', () => {
-      const result = caip10ToAddress('invalid-format')
-      expect(result).toBe('invalid-format')
+      expect(caip10ToAddress('invalid-format')).toBe('invalid-format')
     })
   })
 
   describe('getNamespaceFromChainId', () => {
-    it('should return eip155 for Ethereum chain', () => {
-      expect(getNamespaceFromChainId('eip155:1')).toBe('eip155')
-      expect(getNamespaceFromChainId('eip155:42220')).toBe('eip155')
-    })
-
-    it('should return solana for Solana chain', () => {
-      expect(getNamespaceFromChainId('solana:mainnet')).toBe('solana')
-      expect(getNamespaceFromChainId('solana:testnet')).toBe('solana')
-    })
-
-    it('should return stellar for Stellar chain', () => {
-      expect(getNamespaceFromChainId('stellar:pubnet')).toBe('stellar')
-      expect(getNamespaceFromChainId('stellar:testnet')).toBe('stellar')
-    })
-
-    it('should return the first part for unknown chains', () => {
-      expect(getNamespaceFromChainId('unknown:chain')).toBe('unknown')
-    })
-  })
-
-  describe('resolveNamespaceFromChainId (now getNamespaceFromChainId)', () => {
-    it('should resolve namespace from chainId', () => {
-      expect(getNamespaceFromChainId('eip155:1')).toBe('eip155')
-      expect(getNamespaceFromChainId('solana:mainnet')).toBe('solana')
-      expect(getNamespaceFromChainId('stellar:pubnet')).toBe('stellar')
+    it.each([
+      ['eip155:1', 'eip155'],
+      ['eip155:42220', 'eip155'],
+      ['solana:mainnet', 'solana'],
+      ['solana:testnet', 'solana'],
+      ['stellar:pubnet', 'stellar'],
+      ['stellar:testnet', 'stellar'],
+      ['unknown:chain', 'unknown'],
+    ])('returns %s -> %s', (chainId, expected) => {
+      expect(getNamespaceFromChainId(chainId)).toBe(expected)
     })
   })
 
   describe('normalizeAddress', () => {
     it('should checksum Ethereum addresses', () => {
-      // Note: ethers.getAddress() does the actual checksum
-      // This test verifies the function delegates correctly
       const result = normalizeAddress('0x1234567890123456789012345678901234567890', 'eip155:1')
       expect(result).toMatch(/^0x[0-9A-Fa-f]{40}$/)
     })
 
     it('should lowercase Solana addresses', () => {
       const result = normalizeAddress('HN7cABqLq46Es1jh92dQQisAq662SmxELLLsHHe4YWrH', 'solana:mainnet')
-      // Note: toLowerCase() is used, actual result depends on the input
       expect(result).toBe(result.toLowerCase())
     })
 
     it('should not modify Stellar addresses', () => {
       const input = 'GABCD1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890ABC'
-      const result = normalizeAddress(input, 'stellar:pubnet')
-      expect(result).toBe(input)
+      expect(normalizeAddress(input, 'stellar:pubnet')).toBe(input)
     })
   })
 
@@ -106,7 +89,6 @@ describe('wallet-utils', () => {
 
     describe('Solana', () => {
       it('should validate Solana address format', () => {
-        // Valid base58 Solana addresses (32-44 chars)
         expect(isValidAddressForChain('HN7cABqLq46Es1jh92dQQisAq662SmxELLLsHHe4YWrH', 'solana:mainnet')).toBe(true)
         expect(isValidAddressForChain('9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM', 'solana:mainnet')).toBe(true)
       })
@@ -120,12 +102,10 @@ describe('wallet-utils', () => {
 
     describe('Stellar', () => {
       it('should validate Stellar public address format', () => {
-        // Valid Stellar address: G prefix, 56 chars total
         expect(isValidAddressForChain('GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ', 'stellar:pubnet')).toBe(true)
       })
 
       it('should validate Stellar private address format', () => {
-        // Valid Stellar seed: S prefix, 56 chars total
         expect(isValidAddressForChain('SA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVAAA', 'stellar:pubnet')).toBe(true)
       })
 
@@ -159,25 +139,12 @@ describe('wallet-connect-base', () => {
   })
 
   describe('toBase64 / fromBase64', () => {
-    it('should encode and decode string correctly', () => {
-      const original = 'Hello, World!'
-      const encoded = toBase64(new TextEncoder().encode(original))
-      const decoded = new TextDecoder().decode(fromBase64(encoded))
-      expect(decoded).toBe(original)
-    })
-
-    it('should handle empty string', () => {
-      const original = ''
-      const encoded = toBase64(new TextEncoder().encode(original))
-      const decoded = new TextDecoder().decode(fromBase64(encoded))
-      expect(decoded).toBe('')
-    })
-
-    it('should handle special characters', () => {
-      const original = '🎉 Special chars: ñ, ü, 中文'
-      const encoded = toBase64(new TextEncoder().encode(original))
-      const decoded = new TextDecoder().decode(fromBase64(encoded))
-      expect(decoded).toBe(original)
+    it.each([
+      ['Hello, World!'],
+      [''],
+      ['🎉 Special chars: ñ, ü, 中文'],
+    ])('round-trips %j', (input) => {
+      expect(roundTripBase64(input)).toBe(input)
     })
   })
 })

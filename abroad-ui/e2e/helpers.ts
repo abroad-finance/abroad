@@ -1,4 +1,4 @@
-import { type Page, type TestInfo } from '@playwright/test'
+import { test, type Page, type TestInfo } from '@playwright/test'
 
 export type ConsoleMessage = {
   type: string
@@ -120,6 +120,30 @@ export function formatIssues(
     warnings.forEach(w => lines.push(`  ${w.text}`))
   }
   return lines.length ? lines.join('\n') : '(none)'
+}
+
+/**
+ * Reads the wallet_session entry from page localStorage and parses it.
+ */
+export function readSession(page: Page): Promise<null | Record<string, unknown>> {
+  return page.evaluate(() => {
+    const s = localStorage.getItem('wallet_session')
+    return s ? JSON.parse(s) as Record<string, unknown> : null
+  })
+}
+
+/**
+ * Attaches the standard "console-and-network" report blob used by every spec.
+ */
+export async function attachConsoleAndNetwork(
+  errors: ConsoleMessage[],
+  warnings: ConsoleMessage[] = [],
+  networkErrors: NetworkError[] = [],
+): Promise<void> {
+  await test.info().attach('console-and-network', {
+    body: Buffer.from(formatIssues(errors, warnings, networkErrors)),
+    contentType: 'text/plain',
+  })
 }
 
 /**
