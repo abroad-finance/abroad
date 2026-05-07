@@ -19,7 +19,7 @@ import {
 } from '@stellar/stellar-sdk'
 import { useTranslate } from '@tolgee/react'
 import { getAddress, Interface, parseUnits } from 'ethers'
-import {
+import React, {
   useCallback,
   useEffect,
   useMemo,
@@ -58,6 +58,7 @@ import {
   formatChainLabel,
   sortStellarFirst,
 } from '../../features/swap/utils/corridorHelpers'
+import { IWallet } from '../../interfaces/IWallet'
 import { parseEMVQR } from '../../lib/qr/emv-parser'
 import {
   acceptTransactionRequest, fetchPublicCorridors, notifyPayment, requestQuote, requestReverseQuote,
@@ -316,6 +317,50 @@ const extractReason = (body: unknown): null | string => {
 }
 
 const isAbortError = (result: { error?: { type?: string } }) => result.error?.type === 'aborted'
+
+const handleQuoteError = (
+  response: ApiClientResponse<unknown, unknown>,
+  value: string,
+  loadingKey: 'loadingSource' | 'loadingTarget',
+  amountFields: { sourceAmount: string, targetAmount: string },
+  dispatchFn: React.Dispatch<SwapAction>,
+  setMinFlag: (v: boolean) => void,
+  notify: (msg: string, detail?: string) => void,
+  translate: (key: string, fallback: string) => string,
+): void => {
+  if (!isAbortError(response)) {
+    const status = response.error?.status
+    if (status === 400) {
+      const reason = extractReason(response.error?.body) || ''
+      setMinFlag(reason.toLowerCase().includes('minimum'))
+      dispatchFn({ quoteId: '', ...amountFields, type: 'SET_AMOUNTS' })
+    }
+    else {
+      setMinFlag(false)
+      const reason = extractReason(response.error?.body) || response.error?.message || translate('swap.quote_error', 'This quote exceeded the maximum allowed amount.')
+      notify(reason, response.error?.message)
+    }
+  }
+  dispatchFn({ [loadingKey]: false, type: 'SET_LOADING' })
+}
+
+const validateNonStellarPaymentContext = (
+  wallet: IWallet,
+  paymentContext: { decimals: null | number, mintAddress: null | string },
+  amountString: string,
+  t: (key: string, fallback: string) => string,
+): bigint => {
+  if (!wallet.request) {
+    throw new Error(t('swap.errors.wallet_unsupported', 'The wallet does not support this network.'))
+  }
+  if (!paymentContext.mintAddress) {
+    throw new Error(t('swap.errors.missing_asset', 'Missing asset configuration.'))
+  }
+  if (paymentContext.decimals == null) {
+    throw new Error(t('swap.errors.missing_decimals', 'Missing asset decimals.'))
+  }
+  return parseAmountUnits(amountString, paymentContext.decimals)
+}
 
 export const useWebSwapController = (): WebSwapControllerProps => {
   const initialDesktop = typeof window !== 'undefined' ? window.innerWidth >= 768 : true
@@ -1034,24 +1079,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     if (controller.signal.aborted || reqId !== directReqIdRef.current || lastEditedRef.current !== 'source') return
 
     if (!response.ok) {
-      if (!isAbortError(response)) {
-        // Suppress popup for 400 errors ��� the inline isBelowMinimum
-        // validation will handle the visual feedback instead.
-        const status = response.error?.status
-        if (status === 400) {
-          const reason = extractReason(response.error?.body) || ''
-          setQuoteBelowMinimum(reason.toLowerCase().includes('minimum'))
-          dispatch({
-            quoteId: '', sourceAmount: value, targetAmount: '', type: 'SET_AMOUNTS',
-          })
-        }
-        else {
-          setQuoteBelowMinimum(false)
-          const reason = extractReason(response.error?.body) || response.error?.message || t('swap.quote_error', 'This quote exceeded the maximum allowed amount.')
-          notifyError(reason, response.error?.message)
-        }
-      }
-      dispatch({ loadingTarget: false, type: 'SET_LOADING' })
+      handleQuoteError(response, value, 'loadingTarget', { sourceAmount: value, targetAmount: '' }, dispatch, setQuoteBelowMinimum, notifyError, t)
       return
     }
 
@@ -1098,7 +1126,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
       return false
     }
 
-    // Skip API call if below minimum ��� inline validation handles the UI
+    // Skip API call if below minimum - inline validation handles the UI
     const minAmount = selectedCorridor.minAmount
       || (selectedCorridor.targetCurrency === 'BRL' ? 1 : 0)
     if (minAmount && num < minAmount) {
@@ -1125,22 +1153,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     if (controller.signal.aborted || reqId !== reverseReqIdRef.current || lastEditedRef.current !== 'target') return false
 
     if (!response.ok) {
-      if (!isAbortError(response)) {
-        const status = response.error?.status
-        if (status === 400) {
-          const reason = extractReason(response.error?.body) || ''
-          setQuoteBelowMinimum(reason.toLowerCase().includes('minimum'))
-          dispatch({
-            quoteId: '', sourceAmount: '', targetAmount: value, type: 'SET_AMOUNTS',
-          })
-        }
-        else {
-          setQuoteBelowMinimum(false)
-          const reason = extractReason(response.error?.body) || response.error?.message || t('swap.quote_error', 'This quote exceeded the maximum allowed amount.')
-          notifyError(reason, response.error?.message)
-        }
-      }
-      dispatch({ loadingSource: false, type: 'SET_LOADING' })
+      handleQuoteError(response, value, 'loadingSource', { sourceAmount: '', targetAmount: value }, dispatch, setQuoteBelowMinimum, notifyError, t)
       return false
     }
 
@@ -1625,19 +1638,10 @@ export const useWebSwapController = (): WebSwapControllerProps => {
         onChainTx = result.hash
       }
       else if (paymentContext.chainFamily === 'solana') {
-        if (!wallet.request) {
-          throw new Error(t('swap.errors.wallet_unsupported', 'The wallet does not support this network.'))
-        }
         if (!paymentContext.rpcUrl) {
           throw new Error(t('swap.errors.missing_rpc', 'No RPC configured for this network.'))
         }
-        if (!paymentContext.mintAddress) {
-          throw new Error(t('swap.errors.missing_asset', 'Missing asset configuration.'))
-        }
-        if (paymentContext.decimals == null) {
-          throw new Error(t('swap.errors.missing_decimals', 'Missing asset decimals.'))
-        }
-        const amountUnits = parseAmountUnits(amountString, paymentContext.decimals)
+        const amountUnits = validateNonStellarPaymentContext(wallet, paymentContext, amountString, t)
         const connection = new Connection(paymentContext.rpcUrl, 'confirmed')
         const mint = new PublicKey(paymentContext.mintAddress)
         const owner = new PublicKey(wallet.address)
@@ -1696,16 +1700,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
         onChainTx = signature
       }
       else if (paymentContext.chainFamily === 'evm') {
-        if (!wallet.request) {
-          throw new Error(t('swap.errors.wallet_unsupported', 'The wallet does not support this network.'))
-        }
-        if (!paymentContext.mintAddress) {
-          throw new Error(t('swap.errors.missing_asset', 'Missing asset configuration.'))
-        }
-        if (paymentContext.decimals == null) {
-          throw new Error(t('swap.errors.missing_decimals', 'Missing asset decimals.'))
-        }
-        const amountUnits = parseAmountUnits(amountString, paymentContext.decimals)
+        const amountUnits = validateNonStellarPaymentContext(wallet, paymentContext, amountString, t)
         const toAddress = getAddress(paymentContext.depositAddress)
         const tokenAddress = getAddress(paymentContext.mintAddress)
         const iface = new Interface(['function transfer(address to, uint256 value)'])
