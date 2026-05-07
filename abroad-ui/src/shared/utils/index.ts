@@ -29,6 +29,32 @@ export const getWalletTypeByDevice = (): WalletType => {
   return 'stellar-kit'
 }
 
+/** Extract a string `reason` from an error body, if present. */
+export const extractReason = (body: unknown): null | string => {
+  if (body && typeof body === 'object' && 'reason' in body) {
+    const reason = (body as { reason?: unknown }).reason
+    if (typeof reason === 'string') return reason
+  }
+  return null
+}
+
+/** Whether an API transaction status represents a failed/expired outcome. */
+export const isApiTxExpired = (status: string): boolean =>
+  status === 'PAYMENT_EXPIRED' || status === 'PAYMENT_FAILED' || status === 'WRONG_AMOUNT'
+
+/** Whether a TxDetailItem status represents an expired outcome. */
+export const isLocalTxExpired = (status: string): boolean => status === 'expired'
+
+/** Resolve the locale for a target currency code. */
+export const localeForCurrency = (currency: string): string =>
+  currency === 'BRL' ? 'pt-BR' : 'es-CO'
+
+/** Resolve Intl.NumberFormat options for a target currency. */
+export const numberFormatOptions = (currency: string): Intl.NumberFormatOptions => {
+  const decimals = currency === 'COP' ? 0 : 2
+  return { maximumFractionDigits: decimals, minimumFractionDigits: decimals }
+}
+
 export const formatMoney = (currency: TargetCurrency, amount: string): string => {
   // Parse a safe number from the amount string
   const n = Number(String(amount).replace(/,/g, ''))

@@ -10,7 +10,9 @@ import { CurrencyToggle } from '@/components/ui'
 import {
   CHAIN_CONFIG_ARRAY, CHAIN_MAP, COUNTRIES, CURRENCY_FLAG_URL, RECENT_COUNTRY_CONFIG, TOKEN_ICONS,
 } from '@/shared/constants'
-import { cn } from '@/shared/utils'
+import {
+  cn, isApiTxExpired, localeForCurrency, numberFormatOptions,
+} from '@/shared/utils'
 
 import { _36EnumsTargetCurrency as TargetCurrency, type TransactionListItem } from '../../../api'
 import BreBLogo from '../../../assets/Logos/networks/Bre-b.svg'
@@ -196,7 +198,7 @@ export default function HomeScreen({
                     <img
                       alt="Colombia"
                       className="h-[clamp(1rem,2.5vh,1.25rem)] w-[clamp(1rem,2.5vh,1.25rem)] rounded-full object-cover"
-                      src="https://hatscripts.github.io/circle-flags/flags/co.svg"
+                      src={CURRENCY_FLAG_URL.COP}
                     />
                     <span className="text-[clamp(0.7rem,1.5vw,0.75rem)] font-semibold text-[#374151]">COP</span>
                   </div>
@@ -226,7 +228,7 @@ export default function HomeScreen({
                     <img
                       alt="Brazil"
                       className="h-[clamp(1rem,2.5vh,1.25rem)] w-[clamp(1rem,2.5vh,1.25rem)] rounded-full object-cover"
-                      src="https://hatscripts.github.io/circle-flags/flags/br.svg"
+                      src={CURRENCY_FLAG_URL.BRL}
                     />
                     <span className="text-[clamp(0.7rem,1.5vw,0.75rem)] font-semibold text-[#374151]">BRL</span>
                   </div>
@@ -545,12 +547,10 @@ export default function HomeScreen({
               {recentTransactions.length > 0
                 ? recentTransactions.slice(0, 2).map((tx) => {
                     const countryConfig = RECENT_COUNTRY_CONFIG[tx.quote.targetCurrency] ?? RECENT_COUNTRY_CONFIG.COP
-                    const isExpired = tx.status === 'PAYMENT_EXPIRED' || tx.status === 'PAYMENT_FAILED' || tx.status === 'WRONG_AMOUNT'
+                    const isExpired = isApiTxExpired(tx.status)
                     const localAmount = tx.quote.targetAmount.toLocaleString(
-                      tx.quote.targetCurrency === 'BRL' ? 'pt-BR' : 'es-CO',
-                      tx.quote.targetCurrency === 'COP'
-                        ? { maximumFractionDigits: 0, minimumFractionDigits: 0 }
-                        : { maximumFractionDigits: 2, minimumFractionDigits: 2 },
+                      localeForCurrency(tx.quote.targetCurrency),
+                      numberFormatOptions(tx.quote.targetCurrency),
                     )
                     return (
                       <button

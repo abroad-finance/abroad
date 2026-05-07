@@ -3,7 +3,7 @@ import { ArrowLeft, Loader } from 'lucide-react'
 import React, { memo, useMemo } from 'react'
 
 import { _36EnumsTargetCurrency as TargetCurrency } from '../../../api'
-import { TOKEN_ICONS } from '../../../shared/constants'
+import { CURRENCY_FLAG_URL, TOKEN_ICONS } from '../../../shared/constants'
 import { cn } from '../../../shared/utils'
 
 export interface ConfirmQrProps {
@@ -23,11 +23,6 @@ export interface ConfirmQrProps {
   targetAmount?: string
   /** CPF/CNPJ (BRL) */
   taxId?: string
-}
-
-const FLAG_URL: Record<string, string> = {
-  BRL: 'https://hatscripts.github.io/circle-flags/flags/br.svg',
-  COP: 'https://hatscripts.github.io/circle-flags/flags/co.svg',
 }
 
 const ConfirmQr: React.FC<ConfirmQrProps> = ({
@@ -92,7 +87,7 @@ const ConfirmQr: React.FC<ConfirmQrProps> = ({
             <img
               alt={isBRL ? 'Brazil flag' : 'Colombia flag'}
               className="h-8 w-8 shrink-0 rounded-full shadow-[0px_1px_2px_0px_rgba(0,0,0,0.05)]"
-              src={FLAG_URL[currency] ?? FLAG_URL.COP}
+              src={CURRENCY_FLAG_URL[currency] ?? CURRENCY_FLAG_URL.COP}
             />
             <span className="text-[36px] leading-[40px] md:text-[48px] md:leading-[48px] font-extrabold tracking-[-1.2px] text-ab-text">
               {targetSymbol}

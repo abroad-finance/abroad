@@ -1,15 +1,12 @@
 import { useTranslate } from '@tolgee/react'
-import { ChevronRight } from 'lucide-react'
+import { ChevronRight, X } from 'lucide-react'
 import React from 'react'
 
 import { BottomSheet } from '@/shared/components'
-import { CHAIN_SIMPLE_CONFIG, COUNTRY_CONFIG } from '@/shared/constants'
-import { cn } from '@/shared/utils'
+import { resolveChainConfig, resolveCountryConfig } from '@/shared/constants'
+import { cn, isLocalTxExpired } from '@/shared/utils'
 
 import type { TxDetailItem } from '../constants'
-
-// Alias for backwards compatibility with existing code structure
-const CHAIN_CONFIG = CHAIN_SIMPLE_CONFIG
 
 export interface HistorySheetProps {
   onClose: () => void
@@ -31,9 +28,9 @@ export default function HistorySheet({ onClose, onSelectTx, transactions }: Read
           : (
               <div className="divide-y divide-[var(--ab-border)]">
                 {transactions.map((tx, i) => {
-                  const isExpired = tx.status === 'expired'
-                  const country = COUNTRY_CONFIG[tx.country] ?? COUNTRY_CONFIG.co
-                  const chain = CHAIN_CONFIG[tx.chain] ?? CHAIN_CONFIG.Stellar
+                  const isExpired = isLocalTxExpired(tx.status)
+                  const country = resolveCountryConfig(tx.country)
+                  const chain = resolveChainConfig(tx.chain)
                   return (
                     <button
                       className="flex w-full items-center gap-3.5 py-3.5 text-left"
@@ -53,9 +50,7 @@ export default function HistorySheet({ onClose, onSelectTx, transactions }: Read
                         <img alt={country.currency} className="h-7 w-7 rounded-full" src={country.flagUrl} />
                         {isExpired && (
                           <div className="absolute -bottom-0.5 -right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full border-2 border-white bg-[var(--ab-red)]">
-                            <svg className="h-1.5 w-1.5 text-white" fill="none" stroke="currentColor" strokeWidth={3} viewBox="0 0 24 24">
-                              <path d="M6 18L18 6M6 6l12 12" strokeLinecap="round" strokeLinejoin="round" />
-                            </svg>
+                            <X className="h-1.5 w-1.5 text-white" strokeWidth={3} />
                           </div>
                         )}
                       </div>

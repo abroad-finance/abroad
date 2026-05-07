@@ -57,3 +57,7 @@ export const COUNTRIES: Record<string, { decimals: number, rate: number }>
   = Object.fromEntries(
     Object.entries(COUNTRIES_DATA).map(([, data]) => [data.currency, { decimals: data.decimals, rate: data.rate }]),
   )
+
+/** Lookup country config with Colombia fallback. */
+export const resolveCountryConfig = (code: string): { currency: string, flagUrl: string, name?: string, rail: string, symbol: string } =>
+  COUNTRY_CONFIG[code] ?? COUNTRY_CONFIG.co

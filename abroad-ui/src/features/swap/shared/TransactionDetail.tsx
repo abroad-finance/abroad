@@ -1,6 +1,6 @@
 import { useTranslate } from '@tolgee/react'
 import {
-  ArrowLeft, ArrowRight, ChevronDown, ChevronUp, HelpCircle, MapPin, Store,
+  ArrowLeft, ArrowRight, Check, ChevronDown, ChevronUp, HelpCircle, MapPin, Store, X,
 } from 'lucide-react'
 import React, { useState } from 'react'
 
@@ -8,7 +8,9 @@ import { TransactionListItem } from '../../../api'
 import {
   CHAIN_ICON_MAP, COUNTRY_CONFIG_BY_CURRENCY, TOKEN_ICONS,
 } from '../../../shared/constants'
-import { cn } from '../../../shared/utils'
+import {
+  cn, isApiTxExpired, localeForCurrency, numberFormatOptions,
+} from '../../../shared/utils'
 import { formatChainLabel } from '../utils/corridorHelpers'
 
 export interface TransactionDetailProps {
@@ -34,13 +36,10 @@ const TransactionDetail: React.FC<Readonly<TransactionDetailProps>> = ({
 
   const tc = transaction.quote.targetCurrency
   const country = COUNTRY_CONFIG[tc] ?? COUNTRY_CONFIG.COP
-  const isExpired = transaction.status === 'PAYMENT_EXPIRED' || transaction.status === 'PAYMENT_FAILED' || transaction.status === 'WRONG_AMOUNT'
+  const isExpired = isApiTxExpired(transaction.status)
 
-  const locale = tc === 'BRL' ? 'pt-BR' : 'es-CO'
-  const targetFormatted = transaction.quote.targetAmount.toLocaleString(
-    locale,
-    tc === 'COP' ? { maximumFractionDigits: 0, minimumFractionDigits: 0 } : { maximumFractionDigits: 2, minimumFractionDigits: 2 },
-  )
+  const locale = localeForCurrency(tc)
+  const targetFormatted = transaction.quote.targetAmount.toLocaleString(locale, numberFormatOptions(tc))
 
   const rate = transaction.quote.sourceAmount > 0
     ? (transaction.quote.targetAmount / transaction.quote.sourceAmount).toLocaleString(locale, { maximumFractionDigits: 2 })
@@ -95,14 +94,10 @@ const TransactionDetail: React.FC<Readonly<TransactionDetailProps>> = ({
         >
           {isExpired
             ? (
-                <svg className="h-8 w-8 text-ab-error" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                  <path d="M6 18L18 6M6 6l12 12" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
+                <X className="h-8 w-8 text-ab-error" strokeWidth={2} />
               )
             : (
-                <svg className="h-8 w-8 text-ab-green" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
-                  <path d="M20 6L9 17l-5-5" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
+                <Check className="h-8 w-8 text-ab-green" strokeWidth={2.5} />
               )}
         </div>
         <h4 className={cn('font-cereal text-xl font-bold', isExpired ? 'text-ab-error' : 'text-ab-green')}>

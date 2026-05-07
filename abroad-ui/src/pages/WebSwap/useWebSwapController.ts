@@ -32,6 +32,7 @@ import type { ApiClientResponse } from '../../api/customClient'
 import type { BankDetailsRouteProps } from '../../features/swap/components/BankDetailsRoute'
 import type { ConfirmQrProps } from '../../features/swap/components/ConfirmQr'
 import type { SwapProps } from '../../features/swap/components/Swap'
+import type { ApiFailure } from '../../services/http/types'
 import type { PublicCorridor } from '../../services/public/types'
 import type { WebSwapControllerProps } from './WebSwap'
 
@@ -40,6 +41,7 @@ import {
   type DecodeQrCodeBR400,
   type decodeQrCodeBRResponse,
   _36EnumsTargetCurrency as TargetCurrency,
+  type WalletConnectMetadata,
 } from '../../api'
 import { useNotices } from '../../contexts/NoticeContext'
 import { BRL_BACKGROUND_IMAGE } from '../../features/swap/constants'
@@ -58,7 +60,7 @@ import {
   formatChainLabel,
   sortStellarFirst,
 } from '../../features/swap/utils/corridorHelpers'
-import { IWallet } from '../../interfaces/IWallet'
+import { IWallet, type WalletConnectOptions } from '../../interfaces/IWallet'
 import { parseEMVQR } from '../../lib/qr/emv-parser'
 import {
   acceptTransactionRequest, fetchPublicCorridors, notifyPayment, requestQuote, requestReverseQuote,
@@ -66,7 +68,7 @@ import {
 import { fromBase64, toBase64 } from '../../services/wallets/shared/wallet-connect-base'
 import { ASSET_URLS, PENDING_TX_KEY } from '../../shared/constants'
 import { useMenuCloseOnOutsideClick, useWalletAuth } from '../../shared/hooks'
-import { hasMessage } from '../../shared/utils'
+import { extractReason, hasMessage } from '../../shared/utils'
 import {
   buildWalletUserId,
   resolveMiniPayNotice,
@@ -308,19 +310,18 @@ const parseLocalizedNumber = (value: string): number => {
   return parseFloat(normalized)
 }
 
-const extractReason = (body: unknown): null | string => {
-  if (body && typeof body === 'object' && 'reason' in body) {
-    const reason = (body as { reason?: unknown }).reason
-    if (typeof reason === 'string') return reason
-  }
-  return null
-}
-
 const isAbortError = (result: { error?: { type?: string } }) => result.error?.type === 'aborted'
 
+const walletConnectOptions = (
+  wallet: { walletId: null | string },
+  corridor: { chainId: string, walletConnect: WalletConnectMetadata },
+): undefined | WalletConnectOptions =>
+  wallet.walletId === 'wallet-connect'
+    ? { chainId: corridor.chainId, walletConnect: corridor.walletConnect }
+    : undefined
+
 const handleQuoteError = (
-  response: ApiClientResponse<unknown, unknown>,
-  value: string,
+  response: ApiFailure<unknown>,
   loadingKey: 'loadingSource' | 'loadingTarget',
   amountFields: { sourceAmount: string, targetAmount: string },
   dispatchFn: React.Dispatch<SwapAction>,
@@ -349,7 +350,7 @@ const validateNonStellarPaymentContext = (
   paymentContext: { decimals: null | number, mintAddress: null | string },
   amountString: string,
   t: (key: string, fallback: string) => string,
-): bigint => {
+): { amountUnits: bigint, mintAddress: string, walletRequest: NonNullable<IWallet['request']> } => {
   if (!wallet.request) {
     throw new Error(t('swap.errors.wallet_unsupported', 'The wallet does not support this network.'))
   }
@@ -359,7 +360,11 @@ const validateNonStellarPaymentContext = (
   if (paymentContext.decimals == null) {
     throw new Error(t('swap.errors.missing_decimals', 'Missing asset decimals.'))
   }
-  return parseAmountUnits(amountString, paymentContext.decimals)
+  return {
+    amountUnits: parseAmountUnits(amountString, paymentContext.decimals),
+    mintAddress: paymentContext.mintAddress,
+    walletRequest: wallet.request,
+  }
 }
 
 export const useWebSwapController = (): WebSwapControllerProps => {
@@ -689,13 +694,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     // (do it here so we use nextWallet, not the possibly stale wallet from context)
     if (pendingConnectAfterChainSelect) {
       setPendingConnectAfterChainSelect(false)
-      const options = nextWallet.walletId === 'wallet-connect'
-        ? {
-            chainId: selectedCorridor.chainId,
-            walletConnect: selectedCorridor.walletConnect,
-          }
-        : undefined
-      nextWallet.connect(options).catch((err) => {
+      nextWallet.connect(walletConnectOptions(nextWallet, selectedCorridor)).catch((err) => {
         if (import.meta.env.DEV) {
           console.error('[wallet] connect failed:', err)
         }
@@ -785,13 +784,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
       await wallet.connect()
       return
     }
-    const options = wallet.walletId === 'wallet-connect'
-      ? {
-          chainId: selectedCorridor.chainId,
-          walletConnect: selectedCorridor.walletConnect,
-        }
-      : undefined
-    await wallet.connect(options)
+    await wallet.connect(walletConnectOptions(wallet, selectedCorridor))
   }, [
     isMiniPay,
     isWalletConnected,
@@ -810,10 +803,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     // Silently try to restore a saved session for the new chain.
     // If no session exists, disconnect so the UI reflects the need to reconnect.
     if (wallet.walletId === 'wallet-connect' && selectedCorridor.walletConnect) {
-      wallet.connect({
-        chainId: selectedCorridor.chainId,
-        walletConnect: selectedCorridor.walletConnect,
-      }).catch(() => {
+      wallet.connect(walletConnectOptions(wallet, selectedCorridor)).catch(() => {
         void wallet.disconnect()
       })
     }
@@ -1079,7 +1069,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     if (controller.signal.aborted || reqId !== directReqIdRef.current || lastEditedRef.current !== 'source') return
 
     if (!response.ok) {
-      handleQuoteError(response, value, 'loadingTarget', { sourceAmount: value, targetAmount: '' }, dispatch, setQuoteBelowMinimum, notifyError, t)
+      handleQuoteError(response, 'loadingTarget', { sourceAmount: value, targetAmount: '' }, dispatch, setQuoteBelowMinimum, notifyError, t)
       return
     }
 
@@ -1153,7 +1143,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     if (controller.signal.aborted || reqId !== reverseReqIdRef.current || lastEditedRef.current !== 'target') return false
 
     if (!response.ok) {
-      handleQuoteError(response, value, 'loadingSource', { sourceAmount: '', targetAmount: value }, dispatch, setQuoteBelowMinimum, notifyError, t)
+      handleQuoteError(response, 'loadingSource', { sourceAmount: '', targetAmount: value }, dispatch, setQuoteBelowMinimum, notifyError, t)
       return false
     }
 
@@ -1304,20 +1294,17 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     skipNextRef: skipNextDocumentClickRef,
   })
 
-  const handleBackToSwap = useCallback(() => {
+  const resetToHome = useCallback((...extra: SwapAction[]) => {
     localStorage.removeItem(PENDING_TX_KEY)
     dispatch({ type: 'RESET' })
     dispatch({ isQrOpen: false, type: 'SET_QR_OPEN' })
+    for (const action of extra) dispatch(action)
     dispatch({ type: 'SET_VIEW', view: 'home' })
   }, [])
 
-  const resetForNewTransaction = useCallback(() => {
-    localStorage.removeItem(PENDING_TX_KEY)
-    dispatch({ type: 'RESET' })
-    dispatch({ isQrOpen: false, type: 'SET_QR_OPEN' })
-    dispatch({ transactionId: null, type: 'SET_TRANSACTION_ID' })
-    dispatch({ type: 'SET_VIEW', view: 'home' })
-  }, [])
+  const handleBackToSwap = useCallback(() => resetToHome(), [resetToHome])
+
+  const resetForNewTransaction = useCallback(() => resetToHome({ transactionId: null, type: 'SET_TRANSACTION_ID' }), [resetToHome])
 
   const goToManual = useCallback(() => {
     dispatch({ type: 'SET_VIEW', view: 'swap' })
@@ -1641,9 +1628,9 @@ export const useWebSwapController = (): WebSwapControllerProps => {
         if (!paymentContext.rpcUrl) {
           throw new Error(t('swap.errors.missing_rpc', 'No RPC configured for this network.'))
         }
-        const amountUnits = validateNonStellarPaymentContext(wallet, paymentContext, amountString, t)
+        const { amountUnits, mintAddress, walletRequest } = validateNonStellarPaymentContext(wallet, paymentContext, amountString, t)
         const connection = new Connection(paymentContext.rpcUrl, 'confirmed')
-        const mint = new PublicKey(paymentContext.mintAddress)
+        const mint = new PublicKey(mintAddress)
         const owner = new PublicKey(wallet.address)
         const destinationOwner = new PublicKey(paymentContext.depositAddress)
         const sourceAta = await getAssociatedTokenAddress(mint, owner)
@@ -1684,7 +1671,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
         const unsignedTx = new VersionedTransaction(message)
         const unsignedBase64 = toBase64(unsignedTx.serialize())
 
-        const signed = await wallet.request<string | { signedTransaction?: string, transaction?: string }>({
+        const signed = await walletRequest<string | { signedTransaction?: string, transaction?: string }>({
           chainId: paymentContext.chainId,
           method: 'solana_signTransaction',
           params: {
@@ -1700,9 +1687,9 @@ export const useWebSwapController = (): WebSwapControllerProps => {
         onChainTx = signature
       }
       else if (paymentContext.chainFamily === 'evm') {
-        const amountUnits = validateNonStellarPaymentContext(wallet, paymentContext, amountString, t)
+        const { amountUnits, mintAddress, walletRequest } = validateNonStellarPaymentContext(wallet, paymentContext, amountString, t)
         const toAddress = getAddress(paymentContext.depositAddress)
-        const tokenAddress = getAddress(paymentContext.mintAddress)
+        const tokenAddress = getAddress(mintAddress)
         const iface = new Interface(['function transfer(address to, uint256 value)'])
         const data = iface.encodeFunctionData('transfer', [toAddress, amountUnits])
         const txRequest = {
@@ -1711,7 +1698,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
           to: tokenAddress,
           value: '0x0',
         }
-        const txHash = await wallet.request<string>({
+        const txHash = await walletRequest<string>({
           chainId: paymentContext.chainId,
           method: 'eth_sendTransaction',
           params: [txRequest],

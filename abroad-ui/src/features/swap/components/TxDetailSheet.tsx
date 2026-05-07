@@ -1,15 +1,14 @@
 import { useTranslate } from '@tolgee/react'
-import { ChevronDown } from 'lucide-react'
+import {
+  ArrowRight, Check, ChevronDown, X,
+} from 'lucide-react'
 import React, { useState } from 'react'
 
 import { BottomSheet, StatusBadge } from '@/shared/components'
-import { CHAIN_SIMPLE_CONFIG, COUNTRY_CONFIG } from '@/shared/constants'
-import { cn } from '@/shared/utils'
+import { resolveChainConfig, resolveCountryConfig } from '@/shared/constants'
+import { cn, isLocalTxExpired } from '@/shared/utils'
 
 import type { TxDetailItem } from '../constants'
-
-// Alias for backwards compatibility with existing code structure
-const CHAIN_CONFIG = CHAIN_SIMPLE_CONFIG
 
 export interface TxDetailSheetProps {
   onClose: () => void
@@ -22,9 +21,9 @@ export default function TxDetailSheet({ onClose, tx }: Readonly<TxDetailSheetPro
 
   if (!tx) return null
 
-  const isExpired = tx.status === 'expired'
-  const country = COUNTRY_CONFIG[tx.country] ?? COUNTRY_CONFIG.co
-  const chain = CHAIN_CONFIG[tx.chain] ?? CHAIN_CONFIG.Stellar
+  const isExpired = isLocalTxExpired(tx.status)
+  const country = resolveCountryConfig(tx.country)
+  const chain = resolveChainConfig(tx.chain)
 
   return (
     <BottomSheet onClose={onClose}>
@@ -38,14 +37,10 @@ export default function TxDetailSheet({ onClose, tx }: Readonly<TxDetailSheetPro
           >
             {isExpired
               ? (
-                  <svg className="h-5 w-5 text-[var(--ab-red)]" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                    <path d="M6 18L18 6M6 6l12 12" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
+                  <X className="h-5 w-5 text-[var(--ab-red)]" strokeWidth={2} />
                 )
               : (
-                  <svg className="h-5 w-5 text-[var(--ab-green)]" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
-                    <path d="M20 6L9 17l-5-5" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
+                  <Check className="h-5 w-5 text-[var(--ab-green)]" strokeWidth={2.5} />
                 )}
           </div>
           <div>
@@ -76,9 +71,7 @@ export default function TxDetailSheet({ onClose, tx }: Readonly<TxDetailSheetPro
             <div className="text-xs font-semibold text-[var(--ab-green)]">{tx.token}</div>
           </div>
           <div className="flex items-center">
-            <svg className="h-5 w-5 text-[var(--ab-text-muted)]" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-              <path d="M5 12h14m-7-7l7 7-7 7" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
+            <ArrowRight className="h-5 w-5 text-[var(--ab-text-muted)]" strokeWidth={2} />
           </div>
           <div className="flex flex-1 flex-col items-center justify-center rounded-2xl border border-[var(--ab-border)] bg-[var(--ab-bg-subtle)] px-4 py-4">
             <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--ab-text-muted)]">{t('tx_detail.merchant_got', 'Merchant got')}</div>

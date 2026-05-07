@@ -61,3 +61,7 @@ export const CHAIN_MAP: Record<string, { bg: string, color: string, icon: string
   }]))
 
 export const CHAIN_CONFIG_ARRAY = CHAINS.map(c => ({ icon: c.icon, key: c.key, label: c.label }))
+
+/** Lookup chain config with Stellar fallback. */
+export const resolveChainConfig = (key: string): { bg: string, icon: string } =>
+  CHAIN_SIMPLE_CONFIG[key] ?? CHAIN_SIMPLE_CONFIG.Stellar
