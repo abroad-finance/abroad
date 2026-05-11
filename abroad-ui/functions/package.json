@@ -1,0 +1,17 @@
+{
+  "name": "abroad-ui-functions",
+  "private": true,
+  "description": "Firebase Functions for abroad-ui (geo-blocks US visitors at the Hosting edge).",
+  "engines": {
+    "node": "20"
+  },
+  "main": "index.js",
+  "scripts": {
+    "serve": "firebase emulators:start --only functions",
+    "logs": "firebase functions:log"
+  },
+  "dependencies": {
+    "firebase-functions": "^4.9.0",
+    "geoip-lite": "^1.4.10"
+  }
+}

@@ -9,8 +9,18 @@
     "rewrites": [
       {
         "source": "**",
-        "destination": "/index.html"
+        "function": "geoBlock"
       }
+    ],
+    "predeploy": [
+      "cp \"$RESOURCE_DIR/dist/index.html\" \"$RESOURCE_DIR/functions/index.html\""
+    ]
+  },
+  "functions": {
+    "source": "functions",
+    "runtime": "nodejs20",
+    "predeploy": [
+      "npm --prefix \"$RESOURCE_DIR\" install"
     ]
   }
 }
