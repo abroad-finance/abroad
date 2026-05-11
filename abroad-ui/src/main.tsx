@@ -6,12 +6,16 @@ import { createRoot } from 'react-dom/client'
 
 import './index.css'
 import App from './App.tsx'
+import UnavailableInRegion from './UnavailableInRegion.tsx'
 
 const rootEl = document.getElementById('root')
 if (!rootEl) {
   throw new Error('Root element with id "root" not found')
 }
-createRoot(rootEl).render(
+
+const root = createRoot(rootEl)
+
+const AppShell = (
   <StrictMode>
     <Sentry.ErrorBoundary
       fallback={(
@@ -27,5 +31,33 @@ createRoot(rootEl).render(
     >
       <App />
     </Sentry.ErrorBoundary>
-  </StrictMode>,
+  </StrictMode>
 )
+
+async function isGeoBlocked(): Promise<boolean> {
+  const apiUrl = import.meta.env.VITE_API_URL || 'https://api.abroad.finance'
+  try {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 3000)
+    const res = await fetch(`${apiUrl}/geo/country`, {
+      cache: 'no-store',
+      signal: controller.signal,
+    })
+    clearTimeout(timeout)
+    if (!res.ok) return false
+    const data = (await res.json()) as { blocked?: boolean }
+    return data.blocked === true
+  }
+  catch {
+    return false
+  }
+}
+
+void (async () => {
+  if (await isGeoBlocked()) {
+    document.title = 'Service unavailable in your region'
+    root.render(<UnavailableInRegion />)
+    return
+  }
+  root.render(AppShell)
+})()

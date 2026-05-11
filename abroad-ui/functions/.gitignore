@@ -1,4 +1,0 @@
-node_modules/
-# Copied from ../dist by the hosting predeploy step.
-index.html
-*.log
