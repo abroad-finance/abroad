@@ -11,16 +11,14 @@
         "source": "**",
         "function": "geoBlock"
       }
-    ],
-    "predeploy": [
-      "cp \"$RESOURCE_DIR/dist/index.html\" \"$RESOURCE_DIR/functions/index.html\""
     ]
   },
   "functions": {
     "source": "functions",
     "runtime": "nodejs20",
     "predeploy": [
-      "npm --prefix \"$RESOURCE_DIR\" install"
+      "npm --prefix \"$RESOURCE_DIR\" install --no-audit --no-fund",
+      "cp \"$RESOURCE_DIR/../dist/index.html\" \"$RESOURCE_DIR/index.html\""
     ]
   }
 }

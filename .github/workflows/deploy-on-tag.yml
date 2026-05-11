@@ -80,6 +80,22 @@ jobs:
         if: steps.check.outputs.on_main == 'true'
         run: npm -w abroad-ui run build --if-present
 
+      - name: Deploy Firebase Functions (geoBlock)
+        if: steps.check.outputs.on_main == 'true'
+        working-directory: abroad-ui
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/firebase-sa.json
+          FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$GOOGLE_APPLICATION_CREDENTIALS"
+          npx --yes firebase-tools@latest deploy \
+            --only functions \
+            --project "$FIREBASE_PROJECT_ID" \
+            --non-interactive \
+            --force
+
       - name: Deploy to Firebase Hosting
         if: steps.check.outputs.on_main == 'true'
         uses: FirebaseExtended/action-hosting-deploy@v0
