@@ -1,6 +1,6 @@
 import { useTranslate } from '@tolgee/react'
 import {
-  ArrowRight, Check, ChevronDown, X,
+  ArrowRight, Check, ChevronDown, ChevronLeft, X,
 } from 'lucide-react'
 import React, { useState } from 'react'
 
@@ -13,11 +13,12 @@ import { cn, isLocalTxExpired } from '@/shared/utils'
 import type { TxDetailItem } from '../constants'
 
 export interface TxDetailSheetProps {
+  onBack?: () => void
   onClose: () => void
   tx: null | TxDetailItem
 }
 
-export default function TxDetailSheet({ onClose, tx }: Readonly<TxDetailSheetProps>): null | React.JSX.Element {
+export default function TxDetailSheet({ onBack, onClose, tx }: Readonly<TxDetailSheetProps>): null | React.JSX.Element {
   const { t } = useTranslate()
   const [showTechnical, setShowTechnical] = useState(false)
 
@@ -30,7 +31,17 @@ export default function TxDetailSheet({ onClose, tx }: Readonly<TxDetailSheetPro
   return (
     <BottomSheet onClose={onClose}>
       <div className="px-6 pb-9 pt-1">
-        <div className="mb-5 flex items-center justify-center gap-2.5 py-3.5">
+        <div className="relative mb-5 flex items-center justify-center gap-2.5 py-3.5">
+          {onBack && (
+            <button
+              aria-label={t('swap.back', 'Back')}
+              className="absolute left-0 top-1/2 -translate-y-1/2 flex items-center justify-center rounded-full p-1.5 text-[var(--ab-text-muted)] transition-colors hover:bg-[var(--ab-bg-subtle)] hover:text-[var(--ab-text)]"
+              onClick={onBack}
+              type="button"
+            >
+              <ChevronLeft className="h-5 w-5" strokeWidth={2} />
+            </button>
+          )}
           <div
             className={cn(
               'flex h-10 w-10 items-center justify-center rounded-full border-[1.5px]',

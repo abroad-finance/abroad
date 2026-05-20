@@ -437,6 +437,10 @@ const WebSwap: React.FC = () => {
       {/* Transaction detail bottom sheet */}
       {selectedTx && (
         <TxDetailSheet
+          onBack={() => {
+            setSelectedTx(null)
+            setShowHistory(true)
+          }}
           onClose={() => setSelectedTx(null)}
           tx={selectedTx}
         />

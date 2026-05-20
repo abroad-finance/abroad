@@ -20,7 +20,7 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({ children, className, o
     <div
       aria-label={t('bottom_sheet.close', 'Close sheet')}
       className={cn(
-        'fixed inset-0 z-[300] flex items-end justify-center',
+        'fixed inset-0 z-[300] flex items-end md:items-center justify-center',
         'bg-black/35 backdrop-blur-[8px]',
         'transition-[visibility,opacity] duration-[0.4s] ease-[cubic-bezier(0.16,1,0.3,1)]',
       )}
@@ -36,7 +36,7 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({ children, className, o
     >
       <dialog
         className={cn(
-          'w-full max-w-[520px] max-h-[85vh] overflow-y-auto rounded-t-[24px]',
+          'relative w-full max-w-[520px] max-h-[85vh] overflow-y-auto rounded-t-[24px] md:rounded-[24px]',
           'bg-[var(--ab-bg-card)] shadow-[0_-12px_40px_rgba(0,0,0,0.08)]',
           'transition-transform duration-[0.4s] ease-[cubic-bezier(0.16,1,0.3,1)]',
           'border-0 p-0 m-0',
@@ -49,7 +49,7 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({ children, className, o
       >
         <div
           aria-hidden
-          className="mx-auto mt-3 h-1 w-10 shrink-0 rounded-full bg-[var(--ab-border)]"
+          className="mx-auto mt-3 h-1 w-10 shrink-0 rounded-full bg-[var(--ab-border)] md:hidden"
         />
         {children}
       </dialog>
