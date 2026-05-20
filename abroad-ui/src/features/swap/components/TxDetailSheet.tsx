@@ -5,7 +5,9 @@ import {
 import React, { useState } from 'react'
 
 import { BottomSheet, StatusBadge } from '@/shared/components'
-import { resolveChainConfig, resolveCountryConfig } from '@/shared/constants'
+import {
+  CURRENCY_FLAG_URL, RAIL_LOGO_MAP, resolveChainConfig, resolveCountryConfig, TOKEN_ICONS,
+} from '@/shared/constants'
 import { cn, isLocalTxExpired } from '@/shared/utils'
 
 import type { TxDetailItem } from '../constants'
@@ -68,7 +70,7 @@ export default function TxDetailSheet({ onClose, tx }: Readonly<TxDetailSheetPro
               $
               {tx.usdcAmount}
             </div>
-            <div className="text-xs font-semibold text-[var(--ab-green)]">{tx.token}</div>
+            <img alt={tx.token} className="h-5 w-5" src={TOKEN_ICONS[tx.token] ?? TOKEN_ICONS.USDC} />
           </div>
           <div className="flex items-center">
             <ArrowRight className="h-5 w-5 text-[var(--ab-text-muted)]" strokeWidth={2} />
@@ -79,20 +81,38 @@ export default function TxDetailSheet({ onClose, tx }: Readonly<TxDetailSheetPro
               {country.symbol}
               {tx.localAmount}
             </div>
-            <div className="text-xs font-semibold text-[var(--ab-text-secondary)]">{country.currency}</div>
+            <img alt={country.currency} className="h-5 w-5 rounded-full" src={CURRENCY_FLAG_URL[country.currency] ?? country.flagUrl} />
           </div>
         </div>
 
         <div className="mb-4 overflow-hidden rounded-2xl border border-[var(--ab-border)]">
-          {[
+          {([
             { badge: true, label: t('tx_detail.status', 'Status'), value: isExpired ? t('tx_detail.status_expired', 'Expired') : t('tx_detail.status_completed', 'Completed') },
-            { icon: country.flagUrl, label: t('tx_detail.payment_rail', 'Payment rail'), value: country.rail },
-            { label: t('tx_detail.fee', 'Fee'), value: `$${tx.fee} ${tx.token}` },
+            {
+              icon: RAIL_LOGO_MAP[country.currency], iconClassName: 'h-4 w-auto max-w-[48px]', label: t('tx_detail.payment_rail', 'Payment rail'), value: '',
+            },
+            {
+              label: t('tx_detail.fee', 'Fee'), value: (
+                <span className="flex items-center gap-1">
+                  $
+                  {tx.fee}
+                  {' '}
+                  <img alt={tx.token} className="h-3.5 w-3.5" src={TOKEN_ICONS[tx.token] ?? TOKEN_ICONS.USDC} />
+                </span>
+              ),
+            },
             { label: t('tx_detail.settlement_time', 'Settlement time'), value: tx.settlementTime === '—' ? '—' : `⚡ ${tx.settlementTime}` },
             { icon: chain.icon, label: t('tx_detail.network', 'Network'), value: tx.chain },
-            { label: t('tx_detail.token', 'Token'), value: tx.token },
+            {
+              label: t('tx_detail.token', 'Token'), value: (
+                <span className="flex items-center gap-1.5">
+                  <img alt={tx.token} className="h-4 w-4" src={TOKEN_ICONS[tx.token] ?? TOKEN_ICONS.USDC} />
+                  {tx.token}
+                </span>
+              ),
+            },
             { label: t('tx_detail.recipient', 'Recipient'), value: tx.accountNumber },
-          ].map((row, i) => (
+          ] as Array<{ badge?: boolean, icon?: string, iconClassName?: string, label: string, value: React.ReactNode }>).map((row, i) => (
             <div
               className={cn(
                 'flex items-center justify-between px-4 py-3',
@@ -103,11 +123,11 @@ export default function TxDetailSheet({ onClose, tx }: Readonly<TxDetailSheetPro
               <span className="text-[13px] text-[var(--ab-text-muted)]">{row.label}</span>
               {row.badge
                 ? (
-                    <StatusBadge variant={isExpired ? 'expired' : 'completed'}>{row.value}</StatusBadge>
+                    <StatusBadge variant={isExpired ? 'expired' : 'completed'}>{row.value as string}</StatusBadge>
                   )
                 : (
-                    <span className="flex items-center gap-1.5 text-[13px] font-semibold text-[var(--ab-text)]">
-                      {row.icon && <img alt="" className="h-4 w-4" src={row.icon} />}
+                    <span className="flex max-w-[55%] items-center gap-1.5 break-all text-right text-[13px] font-semibold text-[var(--ab-text)]">
+                      {row.icon && <img alt="" className={row.iconClassName ?? 'h-4 w-4'} src={row.icon} />}
                       {row.value}
                     </span>
                   )}

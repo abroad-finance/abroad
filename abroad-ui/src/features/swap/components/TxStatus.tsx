@@ -8,7 +8,9 @@ import { TransactionStatus as ApiStatus, getTransactionStatus, _36EnumsTargetCur
 import { useWebSocketSubscription } from '@/contexts/WebSocketContext'
 import { Button } from '@/shared/components/Button'
 import { IconAnimated } from '@/shared/components/IconAnimated'
-import { CHAIN_ICON_MAP, CURRENCY_FLAG_URL } from '@/shared/constants'
+import {
+  CHAIN_ICON_MAP, CURRENCY_FLAG_URL, RAIL_LOGO_MAP, TOKEN_ICONS,
+} from '@/shared/constants'
 import { useWalletAuth } from '@/shared/hooks/useWalletAuth'
 import { cn } from '@/shared/utils'
 
@@ -240,11 +242,10 @@ const TxStatus = ({
               <DetailRow
                 label={t('tx_status.deducted', 'Deducted')}
                 value={(
-                  <span className="font-bold">
+                  <span className="flex items-center gap-1.5 font-bold">
                     $
                     {txStatusDetails.sourceAmount}
-                    {' '}
-                    USDC
+                    <img alt="USDC" className="h-3.5 w-3.5" src={TOKEN_ICONS.USDC} />
                   </span>
                 )}
               />
@@ -281,10 +282,13 @@ const TxStatus = ({
                       src={CURRENCY_FLAG_URL[targetCurrency]}
                     />
                   )}
-                  <span>
-                    {targetCurrency === TargetCurrency.BRL ? 'BR ' : 'CO '}
-                    {txStatusDetails.rail}
-                  </span>
+                  {RAIL_LOGO_MAP[targetCurrency] && (
+                    <img
+                      alt={txStatusDetails.rail}
+                      className="h-4 w-auto max-w-[48px] shrink-0 object-contain"
+                      src={RAIL_LOGO_MAP[targetCurrency]}
+                    />
+                  )}
                 </span>
               </div>
             </div>

@@ -63,7 +63,7 @@ const ConfirmQr: React.FC<ConfirmQrProps> = ({
         className={cn(
           'w-full max-w-[448px] flex flex-col gap-6 rounded-[24px] p-5',
           'md:gap-8 md:p-8',
-          'bg-white/90 backdrop-blur-sm shadow-[0px_4px_20px_-2px_rgba(0,0,0,0.05)]',
+          'bg-[var(--ab-bg-card)] backdrop-blur-sm shadow-[0px_4px_20px_-2px_rgba(0,0,0,0.05)]',
         )}
       >
         {/* Header */}
@@ -110,7 +110,7 @@ const ConfirmQr: React.FC<ConfirmQrProps> = ({
         </div>
 
         {/* Transaction details — recipient info for verification */}
-        <div className="flex flex-col gap-2.5 rounded-2xl border border-ab-border bg-ab-bg-muted/50 px-3 py-3 md:px-4 md:py-4">
+        <div className="flex flex-col gap-2.5 rounded-2xl border border-ab-border bg-[var(--ab-bg-muted)] px-3 py-3 md:px-4 md:py-4">
           <h3 className="text-xs font-bold uppercase tracking-wider text-ab-text-3">
             {t('confirm_qr.details_title', 'Recipient Details')}
           </h3>

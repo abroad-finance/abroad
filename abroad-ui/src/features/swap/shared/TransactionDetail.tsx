@@ -6,7 +6,7 @@ import React, { useState } from 'react'
 
 import { TransactionListItem } from '../../../api'
 import {
-  CHAIN_ICON_MAP, COUNTRY_CONFIG_BY_CURRENCY, TOKEN_ICONS,
+  CHAIN_ICON_MAP, COUNTRY_CONFIG_BY_CURRENCY, RAIL_LOGO_MAP, TOKEN_ICONS,
 } from '../../../shared/constants'
 import {
   cn, isApiTxExpired, localeForCurrency, numberFormatOptions,
@@ -192,8 +192,9 @@ const TransactionDetail: React.FC<Readonly<TransactionDetailProps>> = ({
           </SummaryRow>
           <SummaryRow label={t('wallet_details.transactions.payment_rail', 'Payment Rail')}>
             <span className="flex items-center gap-1.5 font-semibold text-ab-text">
-              <img alt={country.location} className="h-4 w-4" src={country.flagUrl} />
-              {country.rail}
+              {RAIL_LOGO_MAP[country.currency] && (
+                <img alt={country.rail} className="h-4 w-auto max-w-[48px]" src={RAIL_LOGO_MAP[country.currency]} />
+              )}
             </span>
           </SummaryRow>
           <SummaryRow label={t('wallet_details.transactions.network', 'Network')}>

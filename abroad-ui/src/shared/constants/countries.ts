@@ -3,6 +3,15 @@
  * Consolidated from multiple duplicated definitions across the codebase
  */
 
+import BrebLogo from '@/assets/Logos/networks/Bre-b.svg'
+import PixLogo from '@/assets/Logos/networks/PixFull.svg'
+
+/** Rail payment logos keyed by target currency code (BRL / COP). */
+export const RAIL_LOGO_MAP: Record<string, string> = {
+  BRL: PixLogo,
+  COP: BrebLogo,
+}
+
 const BRAZIL_FLAG = 'https://hatscripts.github.io/circle-flags/flags/br.svg'
 const COLOMBIA_FLAG = 'https://hatscripts.github.io/circle-flags/flags/co.svg'
 

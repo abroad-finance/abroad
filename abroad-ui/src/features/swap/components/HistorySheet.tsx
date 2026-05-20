@@ -1,9 +1,13 @@
 import { useTranslate } from '@tolgee/react'
-import { ChevronRight, X } from 'lucide-react'
+import { Check, ChevronRight, X } from 'lucide-react'
 import React from 'react'
 
+import BrebLogo from '@/assets/Logos/networks/Bre-b.svg'
+import PixLogo from '@/assets/Logos/networks/PixFull.svg'
 import { BottomSheet } from '@/shared/components'
-import { resolveChainConfig, resolveCountryConfig } from '@/shared/constants'
+import {
+  CURRENCY_FLAG_URL, resolveChainConfig, resolveCountryConfig, TOKEN_ICONS,
+} from '@/shared/constants'
 import { cn, isLocalTxExpired } from '@/shared/utils'
 
 import type { TxDetailItem } from '../constants'
@@ -29,8 +33,10 @@ export default function HistorySheet({ onClose, onSelectTx, transactions }: Read
               <div className="divide-y divide-[var(--ab-border)]">
                 {transactions.map((tx, i) => {
                   const isExpired = isLocalTxExpired(tx.status)
+                  const isCompleted = tx.status === 'completed'
                   const country = resolveCountryConfig(tx.country)
                   const chain = resolveChainConfig(tx.chain)
+                  const railLogo = tx.country === 'br' ? PixLogo : BrebLogo
                   return (
                     <button
                       className="flex w-full items-center gap-3.5 py-3.5 text-left"
@@ -44,13 +50,22 @@ export default function HistorySheet({ onClose, onSelectTx, transactions }: Read
                       <div
                         className={cn(
                           'relative flex h-12 w-12 shrink-0 items-center justify-center rounded-[15px] border',
-                          isExpired ? 'border-[var(--ab-red-border)] bg-[var(--ab-red-soft)]' : 'border-[var(--ab-border)] bg-[var(--ab-bg-muted)]',
+                          isExpired
+                            ? 'border-[var(--ab-red-border)] bg-[var(--ab-red-soft)]'
+                            : isCompleted
+                              ? 'border-[var(--ab-green-border)] bg-[var(--ab-green-soft)]'
+                              : 'border-[var(--ab-border)] bg-[var(--ab-bg-muted)]',
                         )}
                       >
                         <img alt={country.currency} className="h-7 w-7 rounded-full" src={country.flagUrl} />
                         {isExpired && (
                           <div className="absolute -bottom-0.5 -right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full border-2 border-white bg-[var(--ab-red)]">
                             <X className="h-1.5 w-1.5 text-white" strokeWidth={3} />
+                          </div>
+                        )}
+                        {isCompleted && (
+                          <div className="absolute -bottom-0.5 -right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full border-2 border-white bg-[var(--ab-green)]">
+                            <Check className="h-1.5 w-1.5 text-white" strokeWidth={3} />
                           </div>
                         )}
                       </div>
@@ -66,7 +81,7 @@ export default function HistorySheet({ onClose, onSelectTx, transactions }: Read
                         <div className="mt-0.5 flex items-center gap-1 text-xs text-[var(--ab-text-muted)]">
                           {tx.location ?? (tx.country === 'br' ? t('country.brazil', 'Brazil') : t('country.colombia', 'Colombia'))}
                           {' · '}
-                          {country.rail}
+                          <img alt={country.rail} className="h-3.5 w-auto max-w-[36px]" src={railLogo} />
                           {' · '}
                           <img
                             alt={tx.chain}
@@ -86,13 +101,13 @@ export default function HistorySheet({ onClose, onSelectTx, transactions }: Read
                           {country.symbol}
                           {tx.localAmount}
                           {' '}
-                          {country.currency}
+                          <img alt={country.currency} className="ml-0.5 inline-block h-3 w-3 rounded-full" src={CURRENCY_FLAG_URL[country.currency] ?? country.flagUrl} />
                         </div>
                         <div className="text-[11px] text-[var(--ab-text-muted)]">
                           $
                           {tx.usdcAmount}
                           {' '}
-                          {tx.token}
+                          <img alt={tx.token} className="ml-0.5 inline-block h-3 w-3" src={TOKEN_ICONS[tx.token] ?? TOKEN_ICONS.USDC} />
                         </div>
                       </div>
                       <ChevronRight className="h-4 w-4 shrink-0 text-[var(--ab-text-muted)]" />
