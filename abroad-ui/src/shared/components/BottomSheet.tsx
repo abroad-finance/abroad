@@ -25,8 +25,9 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({ children, className, o
   }, [onClose])
 
   useEffect(() => {
-    const el = panelRef.current
-    if (!el) return
+    const elMaybe = panelRef.current
+    if (!elMaybe) return
+    const el: HTMLDivElement = elMaybe
 
     const s = {
       dragging: false, lastT: 0, lastY: 0, scrollTopAtStart: 0, startY: 0,
