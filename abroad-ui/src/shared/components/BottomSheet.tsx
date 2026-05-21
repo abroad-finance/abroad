@@ -20,13 +20,17 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({ children, className, o
   const panelRef = useRef<HTMLDivElement>(null)
   const y = useMotionValue(0)
   const onCloseRef = useRef(onClose)
-  useEffect(() => { onCloseRef.current = onClose }, [onClose])
+  useEffect(() => {
+    onCloseRef.current = onClose
+  }, [onClose])
 
   useEffect(() => {
     const el = panelRef.current
     if (!el) return
 
-    const s = { startY: 0, scrollTopAtStart: 0, dragging: false, lastY: 0, lastT: 0 }
+    const s = {
+      dragging: false, lastT: 0, lastY: 0, scrollTopAtStart: 0, startY: 0,
+    }
 
     function onTouchStart(e: TouchEvent) {
       s.startY = e.touches[0].clientY
@@ -68,8 +72,9 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({ children, className, o
 
       if (offset > 80 || velocity > 0.5) {
         onCloseRef.current()
-      } else {
-        animate(y, 0, { type: 'spring', stiffness: 400, damping: 40 })
+      }
+      else {
+        animate(y, 0, { damping: 40, stiffness: 400, type: 'spring' })
       }
     }
 
@@ -102,7 +107,6 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({ children, className, o
       tabIndex={0}
     >
       <motion.div
-        ref={panelRef}
         className={cn(
           'w-full max-w-[520px] max-h-[85vh] overflow-y-auto rounded-t-[24px] md:rounded-[24px]',
           'bg-[var(--ab-bg-card)] shadow-[0_-12px_40px_rgba(0,0,0,0.08)]',
@@ -111,6 +115,7 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({ children, className, o
         )}
         onClick={e => e.stopPropagation()}
         onKeyDown={(e) => { if (e.key !== 'Escape') e.stopPropagation() }}
+        ref={panelRef}
         role="dialog"
         style={{ y }}
       >
