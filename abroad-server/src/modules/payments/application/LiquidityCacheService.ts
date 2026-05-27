@@ -5,12 +5,6 @@ import { TYPES } from '../../../app/container/types'
 import { ILogger } from '../../../core/logging/types'
 import { IDatabaseClientProvider } from '../../../platform/persistence/IDatabaseClientProvider'
 
-type GetLiquidityParams = {
-  fetchLiquidity: () => Promise<number>
-  method: PaymentMethod
-  now?: number
-}
-
 export type LiquidityCacheResult = {
   fromCache: boolean
   liquidity: number
@@ -22,6 +16,12 @@ export type LiquidityCacheResult = {
 type CachedLiquidity = {
   liquidity: number
   updatedAt: Date
+}
+
+type GetLiquidityParams = {
+  fetchLiquidity: () => Promise<number>
+  method: PaymentMethod
+  now?: number
 }
 
 type PrismaClientLike = Awaited<ReturnType<IDatabaseClientProvider['getClient']>>
@@ -164,8 +164,14 @@ export class LiquidityCacheService {
         reject(new Error(`Liquidity fetch timed out after ${timeoutMs}ms`))
       }, timeoutMs)
       promise.then(
-        (value) => { clearTimeout(timer); resolve(value) },
-        (error) => { clearTimeout(timer); reject(error) },
+        (value) => {
+          clearTimeout(timer)
+          resolve(value)
+        },
+        (error) => {
+          clearTimeout(timer)
+          reject(error)
+        },
       )
     })
   }

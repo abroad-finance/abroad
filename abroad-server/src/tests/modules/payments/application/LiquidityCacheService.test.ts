@@ -41,7 +41,7 @@ describe('LiquidityCacheService', () => {
   }
 
   // Wait for any background refresh microtasks/macrotasks the service started.
-  const flushPromises = () => new Promise<void>((resolve) => setImmediate(resolve))
+  const flushPromises = () => new Promise<void>(resolve => setImmediate(resolve))
 
   it('returns cached liquidity when fresh and does not call the provider', async () => {
     const liquidity = 125
@@ -81,7 +81,9 @@ describe('LiquidityCacheService', () => {
   })
 
   it('does not surface background refresh failures to the caller', async () => {
-    const fetchLiquidity = jest.fn(async () => { throw new Error('Movii API unavailable') })
+    const fetchLiquidity = jest.fn(async () => {
+      throw new Error('Movii API unavailable')
+    })
     const { logger, service } = buildService({
       paymentProvider: {
         findUnique: jest.fn(async () => ({ id: PaymentMethod.PIX, liquidity: 15, updatedAt: stale })),
@@ -135,7 +137,9 @@ describe('LiquidityCacheService', () => {
   })
 
   it('returns success:false with cached value on sync-path fetch failure', async () => {
-    const fetchLiquidity = jest.fn(async () => { throw new Error('boom') })
+    const fetchLiquidity = jest.fn(async () => {
+      throw new Error('boom')
+    })
     const { logger, service } = buildService({
       paymentProvider: {
         findUnique: jest.fn(async () => ({ id: PaymentMethod.PIX, liquidity: 7, updatedAt: ancient })),
@@ -150,7 +154,9 @@ describe('LiquidityCacheService', () => {
 
   it('deduplicates concurrent stale refreshes (single-flight)', async () => {
     let resolveFetch: ((value: number) => void) | undefined
-    const fetchLiquidity = jest.fn(() => new Promise<number>((resolve) => { resolveFetch = resolve }))
+    const fetchLiquidity = jest.fn(() => new Promise<number>((resolve) => {
+      resolveFetch = resolve
+    }))
     const { prisma, service } = buildService({
       paymentProvider: {
         findUnique: jest.fn(async () => ({ id: PaymentMethod.PIX, liquidity: 10, updatedAt: stale })),
