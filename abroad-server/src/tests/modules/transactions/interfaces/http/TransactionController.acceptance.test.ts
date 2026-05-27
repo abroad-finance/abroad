@@ -225,4 +225,26 @@ describe('TransactionController acceptance flows', () => {
 
     expect(response).toEqual({ reason: 'We could not create your transaction right now. Please try again in a few moments.' })
   })
+
+  it('rejects when liquidity is below target before any Serializable transaction opens', async () => {
+    const { controller, prisma } = buildAcceptController({
+      paymentService: {
+        getLiquidity: jest.fn().mockResolvedValue(1), // below the 50-target of baseQuote
+        MAX_TOTAL_AMOUNT_PER_DAY: 500,
+        MAX_USER_TRANSACTIONS_PER_DAY: 3,
+        verifyAccount: jest.fn().mockResolvedValue(true),
+      },
+    })
+
+    const response = await controller.acceptTransaction(
+      requestBody,
+      { user: partner } as unknown as import('express').Request,
+      badRequest,
+    )
+
+    expect(response).toEqual({
+      reason: 'We cannot process this payout because liquidity for this method is below the requested amount. Try a smaller amount or choose another payment method.',
+    })
+    expect(prisma.$transaction).not.toHaveBeenCalled()
+  })
 })

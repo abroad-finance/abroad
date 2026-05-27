@@ -89,15 +89,21 @@ export class TransactionAcceptanceService {
     partner: PartnerUserContext,
   ): Promise<AcceptTransactionResponse> {
     const prismaClient = await this.prismaClientProvider.getClient()
+
+    // Preflight runs OUTSIDE the Serializable transaction. It is the only
+    // place that may hit external services for liquidity, so a slow or
+    // failing provider can never trip the interactive transaction timeout
+    // nor contend with the FOR UPDATE lock on PaymentProvider.
+    const preflightQuote = await this.fetchQuote(prismaClient, request.quoteId, partner.id)
+    const preflightPaymentService = this.resolvePaymentService(preflightQuote)
+    this.assertPaymentServiceIsEnabled(preflightPaymentService, preflightQuote.paymentMethod)
+    await this.enforceLiquidity(preflightPaymentService, preflightQuote.paymentMethod, preflightQuote.targetAmount)
+
     let decision: TransactionDecision
     try {
       decision = await prismaClient.$transaction<TransactionDecision>(async (tx) => {
         const quote = await this.fetchQuote(tx, request.quoteId, partner.id)
-        const basePaymentService = this.paymentServiceFactory.getPaymentService(quote.paymentMethod)
-        const paymentService = this.paymentServiceFactory.getPaymentServiceForCapability?.({
-          paymentMethod: quote.paymentMethod,
-          targetCurrency: quote.targetCurrency,
-        }) ?? basePaymentService
+        const paymentService = this.resolvePaymentService(quote)
         this.assertPaymentServiceIsEnabled(paymentService, quote.paymentMethod)
         await this.lockPaymentMethod(tx, quote.paymentMethod)
 
@@ -140,7 +146,6 @@ export class TransactionAcceptanceService {
 
         await this.enforceUserTransactionLimits(tx, partnerUser.id, quote, paymentService)
         await this.enforcePaymentMethodLimits(tx, quote, paymentService)
-        await this.enforceLiquidity(paymentService, quote.paymentMethod, quote.targetAmount)
         await this.enforcePartnerKybThreshold(tx, partner.id, quote.sourceAmount, partner.isKybApproved)
         await this.reserveUserMonthlyLimits(tx, partnerUser.id, quote.paymentMethod, quote.targetAmount, paymentService)
         await this.reservePartnerMonthlyLimits(tx, partner.id, quote.paymentMethod, quote.targetAmount, paymentService)
@@ -406,7 +411,7 @@ export class TransactionAcceptanceService {
     return approvedKyc?.tier ?? KYCTier.NONE
   }
 
-  private async fetchQuote(prismaClient: SerializableTx, quoteId: string, partnerId: string) {
+  private async fetchQuote(prismaClient: PrismaClientLike, quoteId: string, partnerId: string) {
     const quote = await prismaClient.quote.findUnique({
       where: { id: quoteId, partnerId },
     })
@@ -642,6 +647,17 @@ export class TransactionAcceptanceService {
     }
 
     return kycLink
+  }
+
+  private resolvePaymentService(quote: {
+    paymentMethod: PaymentMethod
+    targetCurrency: TargetCurrency
+  }): PaymentServiceInstance {
+    const basePaymentService = this.paymentServiceFactory.getPaymentService(quote.paymentMethod)
+    return this.paymentServiceFactory.getPaymentServiceForCapability?.({
+      paymentMethod: quote.paymentMethod,
+      targetCurrency: quote.targetCurrency,
+    }) ?? basePaymentService
   }
 
   private async shouldRequestKyc(

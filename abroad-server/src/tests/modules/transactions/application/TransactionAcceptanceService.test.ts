@@ -121,6 +121,78 @@ describe('TransactionAcceptanceService helpers', () => {
       .resolves.toBeUndefined()
   })
 
+  it('runs enforceLiquidity strictly before opening the Serializable transaction', async () => {
+    const order: string[] = []
+
+    const fetchLiquidity = jest.fn(async () => {
+      order.push('enforceLiquidity')
+      return 100
+    })
+    const orderingPaymentService = {
+      ...buildPaymentService(),
+      getLiquidity: fetchLiquidity,
+      isEnabled: true,
+      MAX_TOTAL_AMOUNT_PER_DAY: 1_000,
+      MAX_USER_AMOUNT_PER_TRANSACTION: 1_000,
+      MAX_USER_TRANSACTIONS_PER_DAY: 10,
+      verifyAccount: jest.fn(async () => true),
+    }
+    const orderingFactory = {
+      getPaymentService: jest.fn(() => orderingPaymentService),
+      getPaymentServiceForCapability: jest.fn(() => orderingPaymentService),
+    }
+
+    const orderingPrisma = {} as {
+      $executeRaw: jest.Mock
+      $transaction: jest.Mock
+      partnerUser: { upsert: jest.Mock }
+      partnerUserKyc: { findFirst: jest.Mock }
+      quote: { aggregate: jest.Mock, findUnique: jest.Mock }
+      transaction: { create: jest.Mock, findMany: jest.Mock }
+    }
+    Object.assign(orderingPrisma, {
+      $executeRaw: jest.fn(async () => 1),
+      $transaction: jest.fn(async (cb: (tx: unknown) => Promise<unknown>) => {
+        order.push('$transaction')
+        return cb(orderingPrisma)
+      }),
+      partnerUser: { upsert: jest.fn().mockResolvedValue({ id: 'pu-1', partnerId: 'partner-1', userId: 'user-1' }) },
+      partnerUserKyc: { findFirst: jest.fn().mockResolvedValue(null) },
+      quote: {
+        aggregate: jest.fn(async () => ({ _count: { _all: 0 }, _sum: { sourceAmount: 0, targetAmount: 0 } })),
+        findUnique: jest.fn().mockResolvedValue({
+          country: 'CO',
+          id: 'quote-1',
+          partnerId: 'partner-1',
+          paymentMethod: PaymentMethod.BREB,
+          sourceAmount: 10,
+          targetAmount: 20,
+          targetCurrency: TargetCurrency.COP,
+        }),
+      },
+      transaction: {
+        create: jest.fn(async () => ({ bankCode: null, id: 't-1' })),
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+    })
+
+    const orderingService = new TransactionAcceptanceService(
+      { getClient: jest.fn(async () => orderingPrisma) } as unknown as import('../../../../platform/persistence/IDatabaseClientProvider').IDatabaseClientProvider,
+      orderingFactory as unknown as import('../../../../modules/payments/application/contracts/IPaymentServiceFactory').IPaymentServiceFactory,
+      { getKycLink: jest.fn() } as unknown as import('../../../../modules/kyc/application/contracts/IKycService').IKycService,
+      { enqueueQueue: jest.fn(), enqueueWebhook: jest.fn() } as never,
+      liquidityCacheService,
+      logger,
+    )
+
+    await orderingService.acceptTransaction(
+      { accountNumber: '123', quoteId: 'quote-1', userId: 'user-1' },
+      { id: 'partner-1', isKybApproved: true, needsKyc: false, webhookUrl: 'https://webhook.test' },
+    )
+
+    expect(order).toEqual(['enforceLiquidity', '$transaction'])
+  })
+
   it('enforces per-transaction amount bounds', () => {
     const enforceAmountBounds = (service as unknown as {
       enforceTransactionAmountBounds: (
