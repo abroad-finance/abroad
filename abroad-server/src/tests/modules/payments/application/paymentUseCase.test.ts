@@ -107,13 +107,23 @@ describe('PaymentUseCase', () => {
     const prismaClient: PrismaLike = {
       paymentProvider: {
         create: jest.fn(),
-        findUnique: jest.fn().mockResolvedValue({
-          country: Country.CO,
-          id: PaymentMethod.BREB,
-          liquidity: 0,
-          name: PaymentMethod.BREB,
-          updatedAt: new Date(0),
-        }),
+        // First call: liquidity=0 treated as no usable cache → sync fetch path.
+        // Second call (after update): returns refreshed value so the result is populated.
+        findUnique: jest.fn()
+          .mockResolvedValueOnce({
+            country: Country.CO,
+            id: PaymentMethod.BREB,
+            liquidity: 0,
+            name: PaymentMethod.BREB,
+            updatedAt: new Date(0),
+          })
+          .mockResolvedValueOnce({
+            country: Country.CO,
+            id: PaymentMethod.BREB,
+            liquidity: 510,
+            name: PaymentMethod.BREB,
+            updatedAt: new Date(),
+          }),
         update: jest.fn(),
       },
     }
@@ -134,7 +144,7 @@ describe('PaymentUseCase', () => {
     })
   })
 
-  it('refreshes stale cached liquidity even when non-zero', async () => {
+  it('returns stale cached liquidity immediately and triggers a background refresh', async () => {
     const prismaClient: PrismaLike = {
       paymentProvider: {
         create: jest.fn(),
@@ -151,14 +161,19 @@ describe('PaymentUseCase', () => {
     const paymentService = buildPaymentService({ getLiquidity: jest.fn(async () => 450) })
     const { useCase } = buildUseCase({ paymentService, prismaClient })
 
+    // SWR: stale value is returned immediately; background refresh fires asynchronously.
     const response = await useCase.getLiquidity(PaymentMethod.BREB)
+
+    expect(response).toMatchObject({ liquidity: 120, success: true })
+
+    // Allow the background refresh microtask to complete.
+    await new Promise<void>((resolve) => setImmediate(resolve))
 
     expect(paymentService.getLiquidity).toHaveBeenCalled()
     expect(prismaClient.paymentProvider.update).toHaveBeenCalledWith({
       data: { liquidity: 450 },
       where: { id: PaymentMethod.BREB },
     })
-    expect(response.liquidity).toBe(450)
   })
 
   it('returns failure response when liquidity retrieval fails', async () => {
