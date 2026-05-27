@@ -77,6 +77,8 @@ export class TransferoPaymentService implements IPaymentService {
 
   private cachedToken?: { exp: number, value: string }
 
+  private readonly liquidityRequestTimeoutMs: number
+
   private readonly maxSendAttempts: number
 
   private readonly retryDelayMs: number
@@ -90,6 +92,7 @@ export class TransferoPaymentService implements IPaymentService {
   ) {
     this.maxSendAttempts = this.readNumberFromEnv('TRANSFERO_MAX_SEND_ATTEMPTS', 3)
     this.retryDelayMs = this.readNumberFromEnv('TRANSFERO_RETRY_DELAY_MS', 250)
+    this.liquidityRequestTimeoutMs = this.readNumberFromEnv('TRANSFERO_LIQUIDITY_TIMEOUT_MS', 5_000)
   }
 
   private static parseAmount(raw: number | string | undefined): null | number {
@@ -128,6 +131,7 @@ export class TransferoPaymentService implements IPaymentService {
             Accept: 'application/json',
             Authorization: `Bearer ${token}`,
           },
+          timeout: this.liquidityRequestTimeoutMs,
         },
       )
 
@@ -340,6 +344,7 @@ export class TransferoPaymentService implements IPaymentService {
       scope: clientScope,
     }, {
       headers: { 'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
+      timeout: this.liquidityRequestTimeoutMs,
     })
 
     const value = data.access_token ?? data

@@ -131,6 +131,9 @@ export class BrebPaymentService implements IPaymentService {
 
   public readonly provider = 'breb'
   private accessTokenCache?: { expiresAt: number, value: string }
+
+  private readonly liquidityRequestTimeoutMs: number
+
   private readonly mandatoryKeyFields: ReadonlyArray<keyof BrebKeyDetails> = [
     'accountNumber',
     'documentNumber',
@@ -162,6 +165,7 @@ export class BrebPaymentService implements IPaymentService {
   ) {
     this.maxSendAttempts = this.readNumberFromEnv('BREB_MAX_SEND_ATTEMPTS', 3)
     this.retryDelayMs = this.readNumberFromEnv('BREB_RETRY_DELAY_MS', 500)
+    this.liquidityRequestTimeoutMs = this.readNumberFromEnv('BREB_LIQUIDITY_TIMEOUT_MS', 5_000)
   }
 
   public async getLiquidity(): Promise<number> {
@@ -177,7 +181,10 @@ export class BrebPaymentService implements IPaymentService {
         'x-api-key': apiKey,
       }
 
-      const { data } = await axios.get<MoviiLiquidityResponse>(url, { headers })
+      const { data } = await axios.get<MoviiLiquidityResponse>(url, {
+        headers,
+        timeout: this.liquidityRequestTimeoutMs,
+      })
       const saldoStr = data?.body?.[0]?.saldo
       const saldo = typeof saldoStr === 'string' ? Number.parseFloat(saldoStr) : Number.NaN
       if (!Number.isFinite(saldo)) {
