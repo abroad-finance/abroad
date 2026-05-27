@@ -151,7 +151,7 @@ describe('LiquidityCacheService', () => {
   it('deduplicates concurrent stale refreshes (single-flight)', async () => {
     let resolveFetch: ((value: number) => void) | undefined
     const fetchLiquidity = jest.fn(() => new Promise<number>((resolve) => { resolveFetch = resolve }))
-    const { service } = buildService({
+    const { prisma, service } = buildService({
       paymentProvider: {
         findUnique: jest.fn(async () => ({ id: PaymentMethod.PIX, liquidity: 10, updatedAt: stale })),
       },
@@ -168,5 +168,7 @@ describe('LiquidityCacheService', () => {
 
     resolveFetch?.(99)
     await flushPromises()
+
+    expect(prisma.paymentProvider.update).toHaveBeenCalledTimes(1)
   })
 })

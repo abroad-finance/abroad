@@ -67,11 +67,15 @@ export class LiquidityCacheService {
       await existing
       return
     }
-    const promise = this.refreshCache(prisma, params).finally(() => {
+    // The map entry is always a no-op-on-error promise so any concurrent
+    // observer can safely await it without triggering an unhandled rejection.
+    // This caller awaits the raw refresh below so the error still propagates.
+    const refreshPromise = this.refreshCache(prisma, params)
+    const guardedEntry = refreshPromise.catch(() => undefined).finally(() => {
       this.inFlightRefreshes.delete(params.method)
     })
-    this.inFlightRefreshes.set(params.method, promise)
-    await promise
+    this.inFlightRefreshes.set(params.method, guardedEntry)
+    await refreshPromise
   }
 
   private async readCachedLiquidity(prisma: PrismaClientLike, method: PaymentMethod): Promise<CachedLiquidity | null> {
