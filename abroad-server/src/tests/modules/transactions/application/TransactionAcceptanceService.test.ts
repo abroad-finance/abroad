@@ -148,7 +148,7 @@ describe('TransactionAcceptanceService helpers', () => {
       partnerUser: { upsert: jest.Mock }
       partnerUserKyc: { findFirst: jest.Mock }
       quote: { aggregate: jest.Mock, findUnique: jest.Mock }
-      transaction: { create: jest.Mock, findMany: jest.Mock }
+      transaction: { create: jest.Mock, findMany: jest.Mock, findUnique: jest.Mock }
     }
     Object.assign(orderingPrisma, {
       $executeRaw: jest.fn(async () => 1),
@@ -173,6 +173,15 @@ describe('TransactionAcceptanceService helpers', () => {
       transaction: {
         create: jest.fn(async () => ({ bankCode: null, id: 't-1' })),
         findMany: jest.fn().mockResolvedValue([]),
+        findUnique: jest.fn().mockResolvedValue({
+          id: 't-1',
+          partnerUser: { partnerId: 'partner-1', userId: 'user-1' },
+          quote: {
+            id: 'quote-1',
+            paymentMethod: PaymentMethod.BREB,
+            targetCurrency: TargetCurrency.COP,
+          },
+        }),
       },
     })
 

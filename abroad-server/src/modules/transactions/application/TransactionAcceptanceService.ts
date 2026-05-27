@@ -94,6 +94,12 @@ export class TransactionAcceptanceService {
     // place that may hit external services for liquidity, so a slow or
     // failing provider can never trip the interactive transaction timeout
     // nor contend with the FOR UPDATE lock on PaymentProvider.
+    //
+    // The cached liquidity result is intentionally NOT re-fetched inside the
+    // tx: liquidity has no transactional reservation mechanism on our side
+    // (the provider's balance changes independently), so an in-tx re-check
+    // would gain no real consistency and would re-introduce the deadlock
+    // this fix removed.
     const preflightQuote = await this.fetchQuote(prismaClient, request.quoteId, partner.id)
     const preflightPaymentService = this.resolvePaymentService(preflightQuote)
     this.assertPaymentServiceIsEnabled(preflightPaymentService, preflightQuote.paymentMethod)

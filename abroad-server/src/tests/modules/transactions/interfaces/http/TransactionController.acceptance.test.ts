@@ -246,5 +246,6 @@ describe('TransactionController acceptance flows', () => {
       reason: 'We cannot process this payout because liquidity for this method is below the requested amount. Try a smaller amount or choose another payment method.',
     })
     expect(prisma.$transaction).not.toHaveBeenCalled()
+    expect(prisma.quote.findUnique).toHaveBeenCalledTimes(1)
   })
 })
