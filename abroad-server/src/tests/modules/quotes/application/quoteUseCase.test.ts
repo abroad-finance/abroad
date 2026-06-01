@@ -9,11 +9,10 @@ import {
 
 import type { IPaymentService } from '../../../../modules/payments/application/contracts/IPaymentService'
 import type { IPaymentServiceFactory } from '../../../../modules/payments/application/contracts/IPaymentServiceFactory'
+import type { CorridorPricing, ICorridorPricingProvider } from '../../../../modules/quotes/application/contracts/ICorridorPricingProvider'
 import type { IExchangeProviderFactory } from '../../../../modules/treasury/application/contracts/IExchangeProviderFactory'
 import type { IDatabaseClientProvider } from '../../../../platform/persistence/IDatabaseClientProvider'
 import type { ISecretManager } from '../../../../platform/secrets/ISecretManager'
-
-import type { CorridorPricing, ICorridorPricingProvider } from '../../../../modules/quotes/application/contracts/ICorridorPricingProvider'
 
 import { CorridorNotConfiguredError } from '../../../../modules/quotes/application/errors/CorridorNotConfiguredError'
 import { QuoteUseCase } from '../../../../modules/quotes/application/quoteUseCase'

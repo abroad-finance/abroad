@@ -1,11 +1,7 @@
 import { inject, injectable } from 'inversify'
 
 import { FlowDefinitionService } from '../../flows/application/FlowDefinitionService'
-import {
-  CorridorIdentifier,
-  CorridorPricing,
-  ICorridorPricingProvider,
-} from '../application/contracts/ICorridorPricingProvider'
+import { CorridorIdentifier, CorridorPricing, ICorridorPricingProvider } from '../application/contracts/ICorridorPricingProvider'
 import { CorridorNotConfiguredError } from '../application/errors/CorridorNotConfiguredError'
 
 @injectable()

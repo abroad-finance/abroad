@@ -1,11 +1,5 @@
 import { BlockchainNetwork, CryptoCurrency, TargetCurrency } from '@prisma/client'
 
-interface CorridorRow {
-  blockchain: BlockchainNetwork
-  cryptoCurrency: CryptoCurrency
-  targetCurrency: TargetCurrency
-}
-
 export interface CorridorAuditClient {
   flowCorridor: {
     findMany(args: { where: { status: 'SUPPORTED' } }): Promise<CorridorRow[]>
@@ -20,6 +14,12 @@ export interface CorridorAuditClient {
       }
     }): Promise<unknown>
   }
+}
+
+interface CorridorRow {
+  blockchain: BlockchainNetwork
+  cryptoCurrency: CryptoCurrency
+  targetCurrency: TargetCurrency
 }
 
 export async function findCorridorsMissingPricing(client: CorridorAuditClient): Promise<string[]> {
