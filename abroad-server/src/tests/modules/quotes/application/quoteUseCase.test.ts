@@ -376,6 +376,37 @@ describe('QuoteUseCase', () => {
     expect(result.value).toBe(231)
   })
 
+  it('prices reverse quotes using corridor exchangeFeePct and fixedFee, not provider constants', async () => {
+    ;(corridorPricingProvider.getPricing as jest.Mock).mockResolvedValue(
+      buildCorridorPricing({ exchangeFeePct: 0.1, fixedFee: 5 }),
+    )
+    ;(exchangeProviderFactory.getExchangeProvider as jest.Mock).mockReturnValue({
+      createMarketOrder: jest.fn(),
+      exchangePercentageFee: 0.01, // must be ignored in favor of the corridor's 0.1
+      getExchangeAddress: jest.fn(),
+      getExchangeRate: jest.fn(async () => 2),
+    })
+    prisma.quote.create.mockImplementationOnce(async ({ data }) => ({ id: 'reverse-priced', ...data }))
+
+    const result = await quoteUseCase.createReverseQuote({
+      cryptoCurrency: CryptoCurrency.USDC,
+      network: BlockchainNetwork.STELLAR,
+      partner,
+      paymentMethod: PaymentMethod.BREB,
+      sourceAmountInput: 220,
+      targetCurrency: TargetCurrency.COP,
+    })
+
+    expect(corridorPricingProvider.getPricing).toHaveBeenCalledWith({
+      blockchain: BlockchainNetwork.STELLAR,
+      cryptoCurrency: CryptoCurrency.USDC,
+      targetCurrency: TargetCurrency.COP,
+    })
+    // rate 2 * (1 + 0.1) = 2.2 ; 220 / 2.2 - 5 (fixedFee) = 95 exactly.
+    // If the provider's 0.01 fee were used instead, the value would be ~104.
+    expect(result.value).toBe(95)
+  })
+
   it('rejects quotes for corridors without an active flow definition (fail-fast)', async () => {
     ;(corridorPricingProvider.getPricing as jest.Mock).mockRejectedValue(
       new CorridorNotConfiguredError({
