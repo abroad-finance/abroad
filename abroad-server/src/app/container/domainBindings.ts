@@ -34,6 +34,7 @@ import { SolanaPaymentVerifier } from '../../modules/payments/infrastructure/wal
 import { SolanaWalletHandler } from '../../modules/payments/infrastructure/wallets/SolanaWalletHandler'
 import { StellarDepositVerifier } from '../../modules/payments/infrastructure/wallets/StellarDepositVerifier'
 import { StellarWalletHandler } from '../../modules/payments/infrastructure/wallets/StellarWalletHandler'
+import { FlowCorridorPricingProvider } from '../../modules/quotes/infrastructure/FlowCorridorPricingProvider'
 import { QuoteUseCase } from '../../modules/quotes/application/quoteUseCase'
 import { OpsTransactionReconciliationService } from '../../modules/transactions/application/OpsTransactionReconciliationService'
 import { ReceivedCryptoTransactionUseCase } from '../../modules/transactions/application/receivedCryptoTransactionUseCase'
@@ -60,6 +61,7 @@ const domainBindings: ReadonlyArray<BindingRegistration<unknown>> = [
   { identifier: TYPES.IWalletHandlerFactory, implementation: WalletHandlerFactory },
   { identifier: TYPES.IPixQrDecoder, implementation: PixQrDecoder },
   { identifier: TYPES.QuoteUseCase, implementation: QuoteUseCase },
+  { identifier: TYPES.ICorridorPricingProvider, implementation: FlowCorridorPricingProvider },
   { identifier: TYPES.CeloWalletHandler, implementation: CeloWalletHandler },
   { identifier: TYPES.SolanaPaymentVerifier, implementation: SolanaPaymentVerifier },
   { identifier: TYPES.SolanaWalletHandler, implementation: SolanaWalletHandler },
