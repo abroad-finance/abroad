@@ -13,6 +13,7 @@ const typeKeys = [
   'IDepositVerifierRegistry',
   'IExchangeProvider',
   'IExchangeProviderFactory',
+  'ICorridorPricingProvider',
   'IKycService',
   'ILockManager',
   'IOutboxDispatcher',
