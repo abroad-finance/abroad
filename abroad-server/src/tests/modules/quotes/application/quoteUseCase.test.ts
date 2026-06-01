@@ -13,6 +13,9 @@ import type { IExchangeProviderFactory } from '../../../../modules/treasury/appl
 import type { IDatabaseClientProvider } from '../../../../platform/persistence/IDatabaseClientProvider'
 import type { ISecretManager } from '../../../../platform/secrets/ISecretManager'
 
+import type { CorridorPricing, ICorridorPricingProvider } from '../../../../modules/quotes/application/contracts/ICorridorPricingProvider'
+
+import { CorridorNotConfiguredError } from '../../../../modules/quotes/application/errors/CorridorNotConfiguredError'
 import { QuoteUseCase } from '../../../../modules/quotes/application/quoteUseCase'
 
 const buildPaymentService = (overrides?: Partial<IPaymentService>): IPaymentService => ({
@@ -33,12 +36,21 @@ const buildPaymentService = (overrides?: Partial<IPaymentService>): IPaymentServ
   ...(overrides ?? {}),
 })
 
+const buildCorridorPricing = (overrides?: Partial<CorridorPricing>): CorridorPricing => ({
+  exchangeFeePct: 0.01,
+  fixedFee: 1,
+  maxAmount: null,
+  minAmount: null,
+  ...(overrides ?? {}),
+})
+
 describe('QuoteUseCase', () => {
   let dbProvider: IDatabaseClientProvider
   let paymentServiceFactory: IPaymentServiceFactory
   let exchangeProviderFactory: IExchangeProviderFactory
   let secretManager: ISecretManager
   let quoteUseCase: QuoteUseCase
+  let corridorPricingProvider: ICorridorPricingProvider
   const partner: Partner = { id: 'partner-1' } as Partner
   const sepPartner: Partner = { id: 'sep-partner' } as Partner
   const prisma = {
@@ -71,7 +83,10 @@ describe('QuoteUseCase', () => {
       getSecret: jest.fn(async () => 'sep-partner'),
       getSecrets: jest.fn(),
     }
-    quoteUseCase = new QuoteUseCase(dbProvider, paymentServiceFactory, exchangeProviderFactory, secretManager)
+    corridorPricingProvider = {
+      getPricing: jest.fn(async () => buildCorridorPricing()),
+    }
+    quoteUseCase = new QuoteUseCase(dbProvider, paymentServiceFactory, exchangeProviderFactory, secretManager, corridorPricingProvider)
   })
 
   it('creates a quote using provided partner and applies fees', async () => {
@@ -115,8 +130,7 @@ describe('QuoteUseCase', () => {
   })
 
   it('enforces max amount per transaction', async () => {
-    const limitedService = buildPaymentService({ MAX_USER_AMOUNT_PER_TRANSACTION: 50 })
-    ;(paymentServiceFactory.getPaymentService as jest.Mock).mockReturnValue(limitedService)
+    ;(corridorPricingProvider.getPricing as jest.Mock).mockResolvedValue(buildCorridorPricing({ maxAmount: 50 }))
 
     await expect(quoteUseCase.createQuote({
       amount: 100,
@@ -128,8 +142,7 @@ describe('QuoteUseCase', () => {
   })
 
   it('enforces minimum amount per transaction', async () => {
-    const brebService = buildPaymentService({ MAX_USER_AMOUNT_PER_TRANSACTION: 10_000, MIN_USER_AMOUNT_PER_TRANSACTION: 5_000 })
-    ;(paymentServiceFactory.getPaymentService as jest.Mock).mockReturnValue(brebService)
+    ;(corridorPricingProvider.getPricing as jest.Mock).mockResolvedValue(buildCorridorPricing({ minAmount: 5_000 }))
 
     await expect(quoteUseCase.createQuote({
       amount: 4_999,
@@ -169,8 +182,7 @@ describe('QuoteUseCase', () => {
     expect(result.quote_id).toBe('reverse-1')
     expect(result.value).toBe(48)
 
-    const restrictiveService = buildPaymentService({ MAX_USER_AMOUNT_PER_TRANSACTION: 1 })
-    ;(paymentServiceFactory.getPaymentService as jest.Mock).mockReturnValue(restrictiveService)
+    ;(corridorPricingProvider.getPricing as jest.Mock).mockResolvedValue(buildCorridorPricing({ maxAmount: 1 }))
 
     await expect(quoteUseCase.createReverseQuote({
       cryptoCurrency: CryptoCurrency.USDC,
@@ -225,8 +237,9 @@ describe('QuoteUseCase', () => {
   })
 
   it('drops fractional digits from COP reverse quotes', async () => {
-    const paymentService = buildPaymentService({ fixedFee: 0 })
-    ;(paymentServiceFactory.getPaymentService as jest.Mock).mockReturnValue(paymentService)
+    ;(corridorPricingProvider.getPricing as jest.Mock).mockResolvedValue(
+      buildCorridorPricing({ exchangeFeePct: 0, fixedFee: 0 }),
+    )
     ;(exchangeProviderFactory.getExchangeProvider as jest.Mock).mockReturnValue({
       createMarketOrder: jest.fn(),
       exchangePercentageFee: 0,
@@ -330,5 +343,93 @@ describe('QuoteUseCase', () => {
     )
 
     expect(normalized).toBe(42.99)
+  })
+
+  it('prices using corridor exchangeFeePct and fixedFee, not provider constants', async () => {
+    ;(corridorPricingProvider.getPricing as jest.Mock).mockResolvedValue(
+      buildCorridorPricing({ exchangeFeePct: 0.1, fixedFee: 5 }),
+    )
+    // Clean rate so the expected value is exact (no float-rounding boundary).
+    ;(exchangeProviderFactory.getExchangeProvider as jest.Mock).mockReturnValue({
+      createMarketOrder: jest.fn(),
+      exchangePercentageFee: 0.01, // must be ignored in favor of the corridor's 0.1
+      getExchangeAddress: jest.fn(),
+      getExchangeRate: jest.fn(async () => 2),
+    })
+    prisma.quote.create.mockImplementationOnce(async ({ data }) => ({ id: 'priced', ...data }))
+
+    const result = await quoteUseCase.createQuote({
+      amount: 100,
+      cryptoCurrency: CryptoCurrency.USDC,
+      network: BlockchainNetwork.STELLAR,
+      partner,
+      paymentMethod: PaymentMethod.BREB,
+      targetCurrency: TargetCurrency.COP,
+    })
+
+    expect(corridorPricingProvider.getPricing).toHaveBeenCalledWith({
+      blockchain: BlockchainNetwork.STELLAR,
+      cryptoCurrency: CryptoCurrency.USDC,
+      targetCurrency: TargetCurrency.COP,
+    })
+    // rate 2 * (1 + 0.1) = 2.2 ; (100 + 5) * 2.2 = 231 exactly.
+    // If the provider's 0.01 fee were used instead, the value would be 212.1.
+    expect(result.value).toBe(231)
+  })
+
+  it('rejects quotes for corridors without an active flow definition (fail-fast)', async () => {
+    ;(corridorPricingProvider.getPricing as jest.Mock).mockRejectedValue(
+      new CorridorNotConfiguredError({
+        blockchain: BlockchainNetwork.STELLAR,
+        cryptoCurrency: CryptoCurrency.USDC,
+        targetCurrency: TargetCurrency.COP,
+      }),
+    )
+
+    await expect(quoteUseCase.createQuote({
+      amount: 100,
+      cryptoCurrency: CryptoCurrency.USDC,
+      network: BlockchainNetwork.STELLAR,
+      paymentMethod: PaymentMethod.BREB,
+      targetCurrency: TargetCurrency.COP,
+    })).rejects.toThrow('No active flow definition for corridor USDC/STELLAR → COP')
+
+    expect(exchangeProviderFactory.getExchangeProvider).not.toHaveBeenCalled()
+  })
+
+  it('rejects reverse quotes for corridors without an active flow definition', async () => {
+    ;(corridorPricingProvider.getPricing as jest.Mock).mockRejectedValue(
+      new CorridorNotConfiguredError({
+        blockchain: BlockchainNetwork.STELLAR,
+        cryptoCurrency: CryptoCurrency.USDC,
+        targetCurrency: TargetCurrency.COP,
+      }),
+    )
+
+    await expect(quoteUseCase.createReverseQuote({
+      cryptoCurrency: CryptoCurrency.USDC,
+      network: BlockchainNetwork.STELLAR,
+      paymentMethod: PaymentMethod.PIX,
+      sourceAmountInput: 50,
+      targetCurrency: TargetCurrency.COP,
+    })).rejects.toThrow(CorridorNotConfiguredError)
+  })
+
+  it('applies no limit when corridor min/max are null', async () => {
+    ;(corridorPricingProvider.getPricing as jest.Mock).mockResolvedValue(
+      buildCorridorPricing({ maxAmount: null, minAmount: null }),
+    )
+    prisma.quote.create.mockImplementationOnce(async ({ data }) => ({ id: 'no-limit', ...data }))
+
+    const result = await quoteUseCase.createQuote({
+      amount: 999_999_999,
+      cryptoCurrency: CryptoCurrency.USDC,
+      network: BlockchainNetwork.STELLAR,
+      partner,
+      paymentMethod: PaymentMethod.BREB,
+      targetCurrency: TargetCurrency.COP,
+    })
+
+    expect(result.quote_id).toBe('no-limit')
   })
 })

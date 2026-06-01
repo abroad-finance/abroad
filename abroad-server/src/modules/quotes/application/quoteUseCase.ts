@@ -15,6 +15,7 @@ import { IPaymentService } from '../../payments/application/contracts/IPaymentSe
 import { IPaymentServiceFactory } from '../../payments/application/contracts/IPaymentServiceFactory'
 import { SupportedPaymentMethod } from '../../payments/application/supportedPaymentMethods'
 import { IExchangeProviderFactory } from '../../treasury/application/contracts/IExchangeProviderFactory'
+import { ICorridorPricingProvider } from './contracts/ICorridorPricingProvider'
 
 // Interface for QuoteUseCase
 export interface IQuoteUseCase {
@@ -61,6 +62,8 @@ export class QuoteUseCase implements IQuoteUseCase {
     @inject(TYPES.IExchangeProviderFactory)
     private exchangeProviderFactory: IExchangeProviderFactory,
     @inject(TYPES.ISecretManager) private secretManager: ISecretManager,
+    @inject(TYPES.ICorridorPricingProvider)
+    private corridorPricingProvider: ICorridorPricingProvider,
   ) { }
 
   public async createQuote(params: CreateQuoteParams): Promise<QuoteResponse> {
@@ -68,6 +71,13 @@ export class QuoteUseCase implements IQuoteUseCase {
 
     const targetAmount = this.normalizeTargetAmount(amount, targetCurrency)
     const expirationDate = this.getExpirationDate()
+
+    const pricing = await this.corridorPricingProvider.getPricing({
+      blockchain: network,
+      cryptoCurrency,
+      targetCurrency,
+    })
+
     const exchangeRateProvider = this.exchangeProviderFactory.getExchangeProviderForCapability?.({
       targetCurrency,
     }) ?? this.exchangeProviderFactory.getExchangeProvider(targetCurrency)
@@ -77,14 +87,14 @@ export class QuoteUseCase implements IQuoteUseCase {
     if (!exchangeRate || isNaN(exchangeRate)) {
       throw new Error('Invalid exchange rate received')
     }
-    const exchangeRateWithFee = this.applyExchangeFee(exchangeRate, exchangeRateProvider.exchangePercentageFee)
+    const exchangeRateWithFee = this.applyExchangeFee(exchangeRate, pricing.exchangeFeePct)
 
     const paymentService = this.paymentServiceFactory.getPaymentService(paymentMethod)
     this.ensurePaymentServiceIsEnabled(paymentService, paymentMethod)
 
-    this.ensureAmountWithinLimits(targetAmount, paymentService, targetCurrency)
+    this.ensureAmountWithinLimits(targetAmount, pricing, targetCurrency)
 
-    const sourceAmount = this.calculateSourceAmount(targetAmount, exchangeRateWithFee, paymentService.fixedFee)
+    const sourceAmount = this.calculateSourceAmount(targetAmount, exchangeRateWithFee, pricing.fixedFee)
 
     const prismaClient = await this.dbClientProvider.getClient()
 
@@ -129,6 +139,13 @@ export class QuoteUseCase implements IQuoteUseCase {
     const { cryptoCurrency, network, partner, paymentMethod, sourceAmountInput, targetCurrency } = params
 
     const expirationDate = this.getExpirationDate()
+
+    const pricing = await this.corridorPricingProvider.getPricing({
+      blockchain: network,
+      cryptoCurrency,
+      targetCurrency,
+    })
+
     const exchangeRateProvider = this.exchangeProviderFactory.getExchangeProviderForCapability?.({
       targetCurrency,
     }) ?? this.exchangeProviderFactory.getExchangeProvider(targetCurrency)
@@ -136,18 +153,18 @@ export class QuoteUseCase implements IQuoteUseCase {
     if (!exchangeRate || isNaN(exchangeRate)) {
       throw new Error('Invalid exchange rate received')
     }
-    const exchangeRateWithFee = this.applyExchangeFee(exchangeRate, exchangeRateProvider.exchangePercentageFee)
+    const exchangeRateWithFee = this.applyExchangeFee(exchangeRate, pricing.exchangeFeePct)
 
     const paymentService = this.paymentServiceFactory.getPaymentService(paymentMethod)
     this.ensurePaymentServiceIsEnabled(paymentService, paymentMethod)
     const targetAmount = this.calculateTargetAmount(
       sourceAmountInput,
       exchangeRateWithFee,
-      paymentService.fixedFee,
+      pricing.fixedFee,
       targetCurrency,
     )
 
-    this.ensureAmountWithinLimits(targetAmount, paymentService, targetCurrency)
+    this.ensureAmountWithinLimits(targetAmount, pricing, targetCurrency)
 
     const prismaClient = await this.dbClientProvider.getClient()
     const sepPartnerId = await this.secretManager.getSecret('STELLAR_SEP_PARTNER_ID')
@@ -191,7 +208,6 @@ export class QuoteUseCase implements IQuoteUseCase {
     return rate * (1 + exchangePercentageFee)
   }
 
-  // TODO: Add percentage fee calculation when available
   private calculateSourceAmount(amount: number, exchangeRate: number, fixedFee: number): number {
     const amountWithFee = amount + fixedFee
     const result = exchangeRate * amountWithFee
@@ -208,13 +224,17 @@ export class QuoteUseCase implements IQuoteUseCase {
     return this.normalizeTargetAmount(result, targetCurrency)
   }
 
-  private ensureAmountWithinLimits(amount: number, paymentService: IPaymentService, targetCurrency: TargetCurrency): void {
-    if (amount < paymentService.MIN_USER_AMOUNT_PER_TRANSACTION) {
-      throw new Error(`The minimum allowed amount for ${targetCurrency} is ${paymentService.MIN_USER_AMOUNT_PER_TRANSACTION} ${targetCurrency}`)
+  private ensureAmountWithinLimits(
+    amount: number,
+    limits: { maxAmount: null | number, minAmount: null | number },
+    targetCurrency: TargetCurrency,
+  ): void {
+    if (limits.minAmount !== null && amount < limits.minAmount) {
+      throw new Error(`The minimum allowed amount for ${targetCurrency} is ${limits.minAmount} ${targetCurrency}`)
     }
 
-    if (amount > paymentService.MAX_USER_AMOUNT_PER_TRANSACTION) {
-      throw new Error(`The maximum allowed amount for ${targetCurrency} is ${paymentService.MAX_USER_AMOUNT_PER_TRANSACTION} ${targetCurrency}`)
+    if (limits.maxAmount !== null && amount > limits.maxAmount) {
+      throw new Error(`The maximum allowed amount for ${targetCurrency} is ${limits.maxAmount} ${targetCurrency}`)
     }
   }
 
