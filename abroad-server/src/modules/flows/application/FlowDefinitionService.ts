@@ -118,6 +118,24 @@ export class FlowDefinitionService {
     }
   }
 
+  public async findActiveByCorridor(corridor: {
+    blockchain: FlowDefinitionDto['blockchain']
+    cryptoCurrency: FlowDefinitionDto['cryptoCurrency']
+    targetCurrency: FlowDefinitionDto['targetCurrency']
+  }): Promise<FlowDefinitionDto | null> {
+    const client = await this.dbProvider.getClient()
+    const definition = await client.flowDefinition.findFirst({
+      where: {
+        blockchain: corridor.blockchain,
+        cryptoCurrency: corridor.cryptoCurrency,
+        enabled: true,
+        targetCurrency: corridor.targetCurrency,
+      },
+    })
+
+    return definition ? this.toDto(definition) : null
+  }
+
   private buildSystemSteps(payload: FlowDefinitionInput): ReturnType<FlowDefinitionBuilder['build']> {
     return this.builder.build(payload)
   }
