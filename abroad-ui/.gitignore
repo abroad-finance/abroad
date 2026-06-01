@@ -26,3 +26,7 @@ dist-ssr
 
 # Firebase
 .firebase
+
+# Local Claude notes — never commit
+CLAUDE.md
+.claude/

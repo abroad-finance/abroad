@@ -1,47 +1,47 @@
 import { useTranslate } from '@tolgee/react'
-import { ChevronDown } from 'lucide-react'
+import {
+  ArrowRight, Check, ChevronDown, ChevronLeft, X,
+} from 'lucide-react'
 import React, { useState } from 'react'
 
 import { BottomSheet, StatusBadge } from '@/shared/components'
-import { ASSET_URLS } from '@/shared/constants'
-import { cn } from '@/shared/utils'
+import {
+  CURRENCY_FLAG_URL, RAIL_LOGO_MAP, resolveChainConfig, resolveCountryConfig, TOKEN_ICONS,
+} from '@/shared/constants'
+import { cn, isLocalTxExpired } from '@/shared/utils'
 
 import type { TxDetailItem } from '../constants'
 
-const CHAIN_CONFIG: Record<string, { bg: string, icon: string }> = {
-  Celo: { bg: 'var(--ab-chain-celo-bg)', icon: ASSET_URLS.CELO_CHAIN_ICON },
-  Solana: { bg: 'var(--ab-chain-solana-bg)', icon: ASSET_URLS.SOLANA_CHAIN_ICON },
-  Stellar: { bg: 'var(--ab-chain-stellar-bg)', icon: ASSET_URLS.STELLAR_CHAIN_ICON },
-}
-
-const COUNTRY_CONFIG: Record<string, { currency: string, flagUrl: string, name: string, rail: string, symbol: string }> = {
-  br: {
-    currency: 'BRL', flagUrl: 'https://hatscripts.github.io/circle-flags/flags/br.svg', name: 'Brazil', rail: 'PIX', symbol: 'R$',
-  },
-  co: {
-    currency: 'COP', flagUrl: 'https://hatscripts.github.io/circle-flags/flags/co.svg', name: 'Colombia', rail: 'Bre-B', symbol: '$',
-  },
-}
-
 export interface TxDetailSheetProps {
+  onBack?: () => void
   onClose: () => void
   tx: null | TxDetailItem
 }
 
-export default function TxDetailSheet({ onClose, tx }: Readonly<TxDetailSheetProps>): null | React.JSX.Element {
+export default function TxDetailSheet({ onBack, onClose, tx }: Readonly<TxDetailSheetProps>): null | React.JSX.Element {
   const { t } = useTranslate()
   const [showTechnical, setShowTechnical] = useState(false)
 
   if (!tx) return null
 
-  const isExpired = tx.status === 'expired'
-  const country = COUNTRY_CONFIG[tx.country] ?? COUNTRY_CONFIG.co
-  const chain = CHAIN_CONFIG[tx.chain] ?? CHAIN_CONFIG.Stellar
+  const isExpired = isLocalTxExpired(tx.status)
+  const country = resolveCountryConfig(tx.country)
+  const chain = resolveChainConfig(tx.chain)
 
   return (
     <BottomSheet onClose={onClose}>
       <div className="px-6 pb-9 pt-1">
-        <div className="mb-5 flex items-center justify-center gap-2.5 py-3.5">
+        <div className="relative mb-5 flex items-center justify-center gap-2.5 py-3.5">
+          {onBack && (
+            <button
+              aria-label={t('swap.back', 'Back')}
+              className="absolute left-0 top-1/2 -translate-y-1/2 flex items-center justify-center rounded-full p-1.5 text-[var(--ab-text-muted)] transition-colors hover:bg-[var(--ab-bg-subtle)] hover:text-[var(--ab-text)]"
+              onClick={onBack}
+              type="button"
+            >
+              <ChevronLeft className="h-5 w-5" strokeWidth={2} />
+            </button>
+          )}
           <div
             className={cn(
               'flex h-10 w-10 items-center justify-center rounded-full border-[1.5px]',
@@ -50,14 +50,10 @@ export default function TxDetailSheet({ onClose, tx }: Readonly<TxDetailSheetPro
           >
             {isExpired
               ? (
-                  <svg className="h-5 w-5 text-[var(--ab-red)]" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                    <path d="M6 18L18 6M6 6l12 12" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
+                  <X className="h-5 w-5 text-[var(--ab-red)]" strokeWidth={2} />
                 )
               : (
-                  <svg className="h-5 w-5 text-[var(--ab-green)]" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
-                    <path d="M20 6L9 17l-5-5" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
+                  <Check className="h-5 w-5 text-[var(--ab-green)]" strokeWidth={2.5} />
                 )}
           </div>
           <div>
@@ -85,12 +81,10 @@ export default function TxDetailSheet({ onClose, tx }: Readonly<TxDetailSheetPro
               $
               {tx.usdcAmount}
             </div>
-            <div className="text-xs font-semibold text-[var(--ab-green)]">{tx.token}</div>
+            <img alt={tx.token} className="h-5 w-5" src={TOKEN_ICONS[tx.token] ?? TOKEN_ICONS.USDC} />
           </div>
           <div className="flex items-center">
-            <svg className="h-5 w-5 text-[var(--ab-text-muted)]" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-              <path d="M5 12h14m-7-7l7 7-7 7" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
+            <ArrowRight className="h-5 w-5 text-[var(--ab-text-muted)]" strokeWidth={2} />
           </div>
           <div className="flex flex-1 flex-col items-center justify-center rounded-2xl border border-[var(--ab-border)] bg-[var(--ab-bg-subtle)] px-4 py-4">
             <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--ab-text-muted)]">{t('tx_detail.merchant_got', 'Merchant got')}</div>
@@ -98,20 +92,38 @@ export default function TxDetailSheet({ onClose, tx }: Readonly<TxDetailSheetPro
               {country.symbol}
               {tx.localAmount}
             </div>
-            <div className="text-xs font-semibold text-[var(--ab-text-secondary)]">{country.currency}</div>
+            <img alt={country.currency} className="h-5 w-5 rounded-full" src={CURRENCY_FLAG_URL[country.currency] ?? country.flagUrl} />
           </div>
         </div>
 
         <div className="mb-4 overflow-hidden rounded-2xl border border-[var(--ab-border)]">
-          {[
+          {([
             { badge: true, label: t('tx_detail.status', 'Status'), value: isExpired ? t('tx_detail.status_expired', 'Expired') : t('tx_detail.status_completed', 'Completed') },
-            { icon: country.flagUrl, label: t('tx_detail.payment_rail', 'Payment rail'), value: country.rail },
-            { label: t('tx_detail.fee', 'Fee'), value: `$${tx.fee} ${tx.token}` },
+            {
+              icon: RAIL_LOGO_MAP[country.currency], iconClassName: 'h-4 w-auto max-w-[48px]', label: t('tx_detail.payment_rail', 'Payment rail'), value: '',
+            },
+            {
+              label: t('tx_detail.fee', 'Fee'), value: (
+                <span className="flex items-center gap-1">
+                  $
+                  {tx.fee}
+                  {' '}
+                  <img alt={tx.token} className="h-3.5 w-3.5" src={TOKEN_ICONS[tx.token] ?? TOKEN_ICONS.USDC} />
+                </span>
+              ),
+            },
             { label: t('tx_detail.settlement_time', 'Settlement time'), value: tx.settlementTime === '—' ? '—' : `⚡ ${tx.settlementTime}` },
             { icon: chain.icon, label: t('tx_detail.network', 'Network'), value: tx.chain },
-            { label: t('tx_detail.token', 'Token'), value: tx.token },
+            {
+              label: t('tx_detail.token', 'Token'), value: (
+                <span className="flex items-center gap-1.5">
+                  <img alt={tx.token} className="h-4 w-4" src={TOKEN_ICONS[tx.token] ?? TOKEN_ICONS.USDC} />
+                  {tx.token}
+                </span>
+              ),
+            },
             { label: t('tx_detail.recipient', 'Recipient'), value: tx.accountNumber },
-          ].map((row, i) => (
+          ] as Array<{ badge?: boolean, icon?: string, iconClassName?: string, label: string, value: React.ReactNode }>).map((row, i) => (
             <div
               className={cn(
                 'flex items-center justify-between px-4 py-3',
@@ -122,11 +134,11 @@ export default function TxDetailSheet({ onClose, tx }: Readonly<TxDetailSheetPro
               <span className="text-[13px] text-[var(--ab-text-muted)]">{row.label}</span>
               {row.badge
                 ? (
-                    <StatusBadge variant={isExpired ? 'expired' : 'completed'}>{row.value}</StatusBadge>
+                    <StatusBadge variant={isExpired ? 'expired' : 'completed'}>{row.value as string}</StatusBadge>
                   )
                 : (
-                    <span className="flex items-center gap-1.5 text-[13px] font-semibold text-[var(--ab-text)]">
-                      {row.icon && <img alt="" className="h-4 w-4" src={row.icon} />}
+                    <span className="flex max-w-[55%] items-center gap-1.5 break-all text-right text-[13px] font-semibold text-[var(--ab-text)]">
+                      {row.icon && <img alt="" className={row.iconClassName ?? 'h-4 w-4'} src={row.icon} />}
                       {row.value}
                     </span>
                   )}

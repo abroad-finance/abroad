@@ -127,6 +127,9 @@
 .dark {
   --ab-bg: #0d2b26;
   --ab-bg-end: #0d2b26;
+  --ab-bg-card: #1a3f38;
+  --ab-bg-subtle: #112b26;
+  --ab-bg-muted: #0f2520;
   --ab-card: rgba(26, 63, 56, 0.8);
   --ab-card-border: rgba(42, 90, 80, 0.5);
   --ab-input: #0d2b26;
@@ -134,6 +137,8 @@
   --ab-text: #e0f0ec;
   --ab-text-secondary: #a0c8c0;
   --ab-text-muted: #6a9a92;
+  --ab-border: rgba(42, 90, 80, 0.5);
+  --ab-border-hover: rgba(42, 90, 80, 0.8);
   --ab-btn: #5a9a8f;
   --ab-btn-hover: #6aaa9f;
   --ab-btn-text: #ffffff;
@@ -181,19 +186,19 @@
   background-color: #1ec677;
 }
 .dark .ab-hero-live-dot {
-  background-color: #5a9a8f;
+  background-color: var(--ab-btn);
 }
 .ab-hero-live-text {
   color: #0f513a;
 }
 .dark .ab-hero-live-text {
-  color: #a0c8c0;
+  color: var(--ab-text-secondary);
 }
 .ab-hero-heading-dark {
   color: #101828;
 }
 .dark .ab-hero-heading-dark {
-  color: #e0f0ec;
+  color: var(--ab-text);
 }
 .ab-hero-heading-accent {
   color: #73b9a3;
@@ -202,7 +207,7 @@
   color: #6b7280;
 }
 .dark .ab-hero-subline {
-  color: #6a9a92;
+  color: var(--ab-text-muted);
 }
 .ab-hero-chain-celo {
   background-color: rgba(255, 241, 162, 0.94);
@@ -226,8 +231,14 @@
   background-color: #54ae92;
 }
 .dark .ab-hero-cta {
-  background-color: #5a9a8f;
+  background-color: var(--ab-btn);
 }
+.dark .ab-hero-chain-celo         { background-color: rgba(53, 208, 127, 0.12); }
+.dark .ab-hero-chain-celo-text    { color: #86efac; }
+.dark .ab-hero-chain-solana       { background-color: rgba(153, 69, 255, 0.12); }
+.dark .ab-hero-chain-solana-text  { color: #c4b5fd; }
+.dark .ab-hero-chain-stellar      { background-color: rgba(200, 200, 200, 0.08); }
+.dark .ab-hero-chain-stellar-text { color: var(--ab-text-muted); }
 
 /* ── UX redesign: shared animations ── */
 @keyframes ab-blink {

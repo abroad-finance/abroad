@@ -5,7 +5,9 @@ import {
 import type { IWalletAuthentication } from '../interfaces/IWalletAuthentication'
 import type { ApiResult } from './http/types'
 
+import { extractReason } from '../shared/utils'
 import { authTokenStore } from './auth/authTokenStore'
+import { sessionStore } from './auth/sessionStore'
 import { httpClient } from './http/httpClient'
 
 const REFRESH_GRACE_MS = 60_000
@@ -36,14 +38,6 @@ type WalletAuthError = {
 }
 
 type WalletVerifyPayload = BaseVerifyPayload & { signature: string }
-
-const extractReason = (body: unknown): null | string => {
-  if (body && typeof body === 'object' && 'reason' in body) {
-    const reason = (body as { reason?: unknown }).reason
-    if (typeof reason === 'string') return reason
-  }
-  return null
-}
 
 const ensureOk = <TData, TError>(result: { data?: TData, error?: { body?: null | TError, message?: string }, ok: boolean }, fallbackMessage: string): TData => {
   if (result.ok && result.data !== undefined) return result.data
@@ -108,8 +102,12 @@ export const useWalletAuthentication = (): IWalletAuthentication => {
         setJwtToken(newToken)
       }
       catch (err) {
-        console.error('Failed to refresh wallet token', err)
+        if (import.meta.env.DEV) {
+          console.error('Failed to refresh wallet token', err)
+        }
+        // Clean both JWT and wallet session when refresh fails
         setJwtToken(null)
+        sessionStore.clear()
       }
     }, timeoutMs)
   }, [

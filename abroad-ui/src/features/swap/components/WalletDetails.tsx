@@ -101,12 +101,12 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({
           {!selectedTransaction && (
             <>
               <div className="flex items-center justify-between mb-4 pr-8">
-                <h3 className={cn('font-medium text-lg', AB_STYLES.text)}>{t('wallet_details.transactions.title', 'Historial de Transacciones')}</h3>
+                <h3 className={cn('font-medium text-lg', AB_STYLES.text)}>{t('wallet_details.transactions.title', 'Transaction History')}</h3>
                 <button
                   className={cn('p-2 rounded-full transition-colors duration-200 disabled:opacity-50', AB_STYLES.hoverBg)}
                   disabled={isLoadingTransactions}
                   onClick={onRefreshTransactions}
-                  title={t('wallet_details.actions.refresh_transactions', 'Actualizar transacciones')}
+                  title={t('wallet_details.actions.refresh_transactions', 'Refresh transactions')}
                   type="button"
                 >
                   <RefreshCw className={cn(`w-4 h-4 ${isLoadingTransactions ? 'animate-spin' : ''}`, AB_STYLES.text)} />
@@ -171,7 +171,7 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({
                               </div>
                               <div className="mb-2">
                                 <span className={cn('text-xs', AB_STYLES.textMuted)}>
-                                  {t('wallet_details.transactions.to', 'Para:')}
+                                  {t('wallet_details.transactions.to', 'To:')}
                                   {' '}
                                 </span>
                                 <span className={cn('font-mono text-sm', AB_STYLES.text)}>{transaction.accountNumber}</span>
@@ -218,8 +218,8 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({
                               )}
                               <span>
                                 {isLoadingMoreTransactions
-                                  ? t('wallet_details.transactions.loading_more', 'Cargando más transacciones…')
-                                  : t('wallet_details.transactions.load_more', 'Ver más transacciones')}
+                                  ? t('wallet_details.transactions.loading_more', 'Loading more transactions...')
+                                  : t('wallet_details.transactions.load_more', 'Load more transactions')}
                               </span>
                             </button>
                           )}
@@ -242,8 +242,8 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({
                 </div>
               </div>
               <div className={cn('text-sm', AB_STYLES.textMuted)}>
-                <div className="font-medium mb-1">{t('wallet_details.empty.no_transactions', 'No hay transacciones aún')}</div>
-                <div className="text-xs">{t('wallet_details.empty.hint', 'Cuando hagas tu primera transacción, aparecerá aquí.')}</div>
+                <div className="font-medium mb-1">{t('wallet_details.empty.no_transactions', 'No transactions yet')}</div>
+                <div className="text-xs">{t('wallet_details.empty.hint', 'When you make your first transaction, it will appear here.')}</div>
               </div>
             </div>
           )}
@@ -251,7 +251,7 @@ const WalletDetails: React.FC<WalletDetailsProps> = ({
 
         {/* Footer */}
         <div className={cn('text-xs leading-relaxed text-center mt-6 pt-4', AB_STYLES.borderTopSeparator, AB_STYLES.textMuted)}>
-          {t('wallet_details.footer.realtime_note', 'Los datos de transacciones se actualizan en tiempo real')}
+          {t('wallet_details.footer.realtime_note', 'Transaction data updates in real time')}
         </div>
       </div>
     </motion.div>

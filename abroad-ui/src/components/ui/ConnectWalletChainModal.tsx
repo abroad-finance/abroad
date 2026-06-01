@@ -3,29 +3,8 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { ChevronRight, X } from 'lucide-react'
 import React from 'react'
 
-import { ASSET_URLS } from '../../shared/constants'
+import { CHAIN_CONFIG } from '../../shared/constants'
 import { Overlay } from './Overlay'
-
-const CHAIN_CONFIG: Record<string, { bg: string, color: string, icon: string, wallets: string }> = {
-  Celo: {
-    bg: 'var(--ab-chain-celo-bg)',
-    color: 'var(--ab-chain-celo)',
-    icon: ASSET_URLS.CELO_CHAIN_ICON,
-    wallets: 'WalletConnect (QR or app)',
-  },
-  Solana: {
-    bg: 'var(--ab-chain-solana-bg)',
-    color: 'var(--ab-chain-solana)',
-    icon: ASSET_URLS.SOLANA_CHAIN_ICON,
-    wallets: 'WalletConnect (QR or app)',
-  },
-  Stellar: {
-    bg: 'var(--ab-chain-stellar-bg)',
-    color: 'var(--ab-chain-stellar)',
-    icon: ASSET_URLS.STELLAR_CHAIN_ICON,
-    wallets: 'Freighter, LOBSTR, WalletConnect',
-  },
-}
 
 export interface ConnectWalletChainModalProps {
   chains: Array<{ key: string, label: string }>
@@ -41,13 +20,13 @@ export interface ConnectWalletChainModalProps {
  * On select we call onSelectChain, onConnectRequest, and onClose so the app can
  * set the corridor, switch wallet (Stellar Kit vs WalletConnect), then open the right connect flow.
  */
-export function ConnectWalletChainModal({
+export const ConnectWalletChainModal: React.FC<ConnectWalletChainModalProps> = ({
   chains,
   onClose,
   onConnectRequest,
   onSelectChain,
   open,
-}: Readonly<ConnectWalletChainModalProps>): null | React.JSX.Element {
+}: Readonly<ConnectWalletChainModalProps>): null | React.JSX.Element => {
   const { t } = useTranslate()
   if (!open) return null
 

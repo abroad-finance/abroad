@@ -7,6 +7,7 @@ import type { IWalletFactory, WalletType } from '../interfaces/IWalletFactory'
 
 import { useMiniPayWallet } from './wallets/useMiniPayWallet'
 import { useSep24Wallet } from './wallets/useSep24Wallet'
+import { useSolanaWallet } from './wallets/useSolanaWallet'
 import { useStellarKitWallet } from './wallets/useStellarKitWallet'
 import { useWalletConnectWallet } from './wallets/useWalletConnectWallet'
 
@@ -18,6 +19,7 @@ export function useWalletFactory({ walletAuth }: {
   const stellarKitWallet = useStellarKitWallet({ walletAuth })
   const walletConnectWallet = useWalletConnectWallet({ walletAuth })
   const sep24Wallet = useSep24Wallet({ walletAuthentication: walletAuth })
+  const solanaWallet = useSolanaWallet(walletAuth)
 
   const getWalletHandler = useCallback(
     (walletType: WalletType): IWallet => {
@@ -26,6 +28,11 @@ export function useWalletFactory({ walletAuth }: {
           return miniPayWallet.wallet
         case 'sep24':
           return sep24Wallet
+        case 'solana':
+          if (!solanaWallet.wallet) {
+            throw new Error('Solana wallet hook returned no wallet — should be impossible when this case is selected')
+          }
+          return solanaWallet.wallet
         case 'stellar-kit':
           return stellarKitWallet
         case 'wallet-connect':
@@ -37,6 +44,7 @@ export function useWalletFactory({ walletAuth }: {
     [
       miniPayWallet.wallet,
       sep24Wallet,
+      solanaWallet.wallet,
       stellarKitWallet,
       walletConnectWallet,
     ],

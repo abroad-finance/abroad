@@ -10,7 +10,7 @@ type MenuCloseOptions = {
   skipNextRef: React.MutableRefObject<boolean>
 }
 
-/** Listens for outside clicks and Escape to close a menu. Shared by useSwap and useWebSwapController. */
+/** Listens for outside clicks and Escape to close a menu. Used by useWebSwapController. */
 export function useMenuCloseOnOutsideClick({
   isOpen,
   menuRef,

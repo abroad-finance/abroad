@@ -9,58 +9,20 @@ import type { IWallet, WalletConnectRequest } from '../../interfaces/IWallet'
 import type { IWalletAuthentication } from '../../interfaces/IWalletAuthentication'
 
 import { WALLET_CONNECT_ID } from '../../shared/constants'
+// Import shared utilities
+import {
+  clearWCSession,
+  fromBase64,
+  getWCSession,
+  resolveStellarNetwork,
+  saveWCSession,
+  toBase64,
+  WC_METADATA,
+  WC_STORAGE_PREFIX,
+} from './shared/wallet-connect-base'
+import { caip10ToAddress, getNamespaceFromChainId } from './shared/wallet-utils'
 
-const SESSION_STORE_PREFIX = 'wc:session:'
-
-type WCMetadata = {
-  description: string
-  icons: string[]
-  name: string
-  url: string
-}
-
-const metadata: WCMetadata = {
-  description:
-    'Abroad bridges USDC on Stellar with real-time payment networks around the world, enabling seamless crypto-fiat payments. You will be able to pay anywhere in Brazil and Colombia with your USDC.',
-  icons: ['https://storage.googleapis.com/cdn-abroad/Icons/Favicon/Abroad_Badge_transparent.png'],
-  name: 'Abroad',
-  url: 'https://app.abroad.finance',
-}
-
-const buildStoreKey = (chainId: string) => `${SESSION_STORE_PREFIX}${chainId}`
-
-const caip10ToAddress = (caip10: string) => {
-  const parts = caip10.split(':')
-  return parts[2] ?? ''
-}
-
-const toBase64 = (bytes: Uint8Array): string => {
-  let binary = ''
-  bytes.forEach((byte) => {
-    binary += String.fromCharCode(byte)
-  })
-  return btoa(binary)
-}
-
-const fromBase64 = (value: string): Uint8Array => {
-  const binary = atob(value)
-  const bytes = new Uint8Array(binary.length)
-  for (let i = 0; i < binary.length; i += 1) {
-    bytes[i] = binary.charCodeAt(i)
-  }
-  return bytes
-}
-
-const resolveNamespaceFromChainId = (chainId: string): string => {
-  if (chainId.startsWith('eip155:')) return 'eip155'
-  if (chainId.startsWith('solana:')) return 'solana'
-  if (chainId.startsWith('stellar:')) return 'stellar'
-  return 'eip155'
-}
-
-const resolveStellarNetwork = (chainId: string): 'PUBLIC' | 'TESTNET' => {
-  return chainId.toLowerCase().includes('test') ? 'TESTNET' : 'PUBLIC'
-}
+const buildStoreKey = (chainId: string) => `${WC_STORAGE_PREFIX}:${chainId}`
 
 export function useWalletConnectWallet({ walletAuth }: {
   walletAuth: IWalletAuthentication
@@ -89,7 +51,7 @@ export function useWalletConnectWallet({ walletAuth }: {
         throw new Error('WalletConnect client is only available in the browser')
       }
       const client = await SignClient.init({
-        metadata,
+        metadata: WC_METADATA,
         projectId: WALLET_CONNECT_ID,
       })
       clientRef.current = client
@@ -106,17 +68,15 @@ export function useWalletConnectWallet({ walletAuth }: {
 
   const tryRestoreSession = useCallback(async (client: SignClient, targetChainId: string, namespace: string) => {
     if (typeof window === 'undefined') return false
-    const raw = localStorage.getItem(buildStoreKey(targetChainId))
-    if (!raw) return false
+    const wcSession = getWCSession(targetChainId)
+    if (!wcSession?.topic) return false
     try {
-      const { topic } = JSON.parse(raw) as { topic?: string }
-      if (!topic) return false
-      const session = client.session.get(topic)
+      const session = client.session.get(wcSession.topic)
       if (!session) {
-        localStorage.removeItem(buildStoreKey(targetChainId))
+        clearWCSession(targetChainId)
         return false
       }
-      topicRef.current = topic
+      topicRef.current = wcSession.topic
       setChainId(targetChainId)
       const ns = session.namespaces?.[namespace]
       const caip10 = ns?.accounts?.[0]
@@ -126,7 +86,7 @@ export function useWalletConnectWallet({ walletAuth }: {
       return true
     }
     catch {
-      localStorage.removeItem(buildStoreKey(targetChainId))
+      clearWCSession(targetChainId)
       return false
     }
   }, [])
@@ -150,7 +110,7 @@ export function useWalletConnectWallet({ walletAuth }: {
     message: string
   }): Promise<string> => {
     const { address, chainId, message } = params
-    const namespace = resolveNamespaceFromChainId(chainId)
+    const namespace = getNamespaceFromChainId(chainId)
 
     if (namespace === 'solana') {
       const encoded = toBase64(new TextEncoder().encode(message))
@@ -189,7 +149,7 @@ export function useWalletConnectWallet({ walletAuth }: {
     const wcMeta = options?.walletConnect
     if (!targetChainId) throw new Error('WalletConnect chainId is required')
 
-    const namespace = wcMeta?.namespace || resolveNamespaceFromChainId(targetChainId)
+    const namespace = wcMeta?.namespace || getNamespaceFromChainId(targetChainId)
     const methods = wcMeta?.methods || (namespace === 'solana'
       ? ['solana_signMessage', 'solana_signTransaction']
       : namespace === 'stellar'
@@ -218,9 +178,17 @@ export function useWalletConnectWallet({ walletAuth }: {
       topicRef.current = session.topic
       await modal.closeModal()
 
-      if (typeof window !== 'undefined') {
-        localStorage.setItem(buildStoreKey(targetChainId), JSON.stringify({ topic: session.topic }))
-      }
+      // Get address from session to save it
+      const savedSession = client.session.get(topicRef.current)
+      const savedNs = savedSession?.namespaces?.[namespace]
+      const savedCaip10 = savedNs?.accounts?.[0]
+      const savedAddress = savedCaip10 ? caip10ToAddress(savedCaip10) : ''
+
+      saveWCSession(targetChainId, {
+        address: savedAddress,
+        chains: [targetChainId],
+        topic: session.topic,
+      })
     }
 
     const session = client.session.get(topicRef.current as string)
@@ -260,8 +228,8 @@ export function useWalletConnectWallet({ walletAuth }: {
         topic: topicRef.current,
       })
       topicRef.current = undefined
-      if (typeof window !== 'undefined' && chainId) {
-        localStorage.removeItem(buildStoreKey(chainId))
+      if (chainId) {
+        clearWCSession(chainId)
       }
     }
     setAddress(null)
@@ -275,7 +243,7 @@ export function useWalletConnectWallet({ walletAuth }: {
 
   const signTransaction: IWallet['signTransaction'] = useCallback(async ({ message }) => {
     if (!chainId) throw new Error('WalletConnect chainId is not set')
-    const namespace = resolveNamespaceFromChainId(chainId)
+    const namespace = getNamespaceFromChainId(chainId)
 
     if (namespace !== 'stellar') {
       throw new Error('signTransaction is only supported for Stellar via WalletConnect')

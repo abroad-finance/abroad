@@ -9,7 +9,7 @@ import type { ConfirmQrProps } from '../../features/swap/components/ConfirmQr'
 import type { SwapProps } from '../../features/swap/components/Swap'
 import type { ChainOption, TokenOption } from '../../features/swap/components/TokenSelectModal'
 import type { TxDetailItem } from '../../features/swap/constants'
-import type { SwapView } from '../../features/swap/types'
+import type { OnboardingRates, SwapView } from '../../features/swap/types'
 
 import { _36EnumsTargetCurrency as TargetCurrency, type TransactionListItem } from '../../api/index'
 import { ChainSelectorModal, ConnectWalletChainModal } from '../../components/ui'
@@ -25,14 +25,12 @@ import TxDetailSheet from '../../features/swap/components/TxDetailSheet'
 import TxStatus from '../../features/swap/components/TxStatus'
 import UserVerification from '../../features/swap/components/UserVerification'
 import WaitSign from '../../features/swap/components/WaitSign'
-import WalletDetails from '../../features/swap/components/WalletDetails'
 import WebSwapLayout from '../../features/swap/components/WebSwapLayout'
 import { useWalletDetails } from '../../features/swap/hooks/useWalletDetails'
 import { transactionMatchesChain } from '../../features/swap/utils/corridorHelpers'
 import { useUserTransactions } from '../../services/useUserTransactions'
 import LanguageSelector from '../../shared/components/LanguageSelector'
-import { ModalOverlay } from '../../shared/components/ModalOverlay'
-import { AB_STYLES, ASSET_URLS } from '../../shared/constants'
+import { AB_STYLES, ASSET_URLS, CHAIN_ICON_MAP } from '../../shared/constants'
 import { useLanguageSelector, useNavBarResponsive, useVersionCheck } from '../../shared/hooks'
 import { cn } from '../../shared/utils'
 import { useWebSwapController } from './useWebSwapController'
@@ -57,6 +55,7 @@ export interface WebSwapControllerProps {
   isMiniPay: boolean
   isQrOpen: boolean
   isWalletDetailsOpen: boolean
+  onboardingRates: OnboardingRates
   onWalletConnect: () => Promise<void>
   openQr: () => void
   requestConnectAfterChainSelect: () => void
@@ -111,19 +110,13 @@ function transactionToTxDetailItem(tx: TransactionListItem): TxDetailItem {
     fee: '0.01',
     localAmount: tx.quote.targetAmount.toFixed(country === 'br' ? 2 : 0),
     location: undefined,
-    merchant: `••••${tx.accountNumber.slice(-4)}`,
+    merchant: tx.accountNumber,
     settlementTime: tx.status === 'PAYMENT_COMPLETED' ? 'Instant' : '—',
     status: TX_STATUS_MAP[tx.status] ?? 'pending',
     token: tx.quote.cryptoCurrency,
     transactionId: tx.onChainId ?? tx.id,
     usdcAmount: tx.quote.sourceAmount.toFixed(2),
   }
-}
-
-const CHAIN_ICON_MAP: Record<string, string> = {
-  Celo: ASSET_URLS.CELO_CHAIN_ICON,
-  Solana: ASSET_URLS.SOLANA_CHAIN_ICON,
-  Stellar: ASSET_URLS.STELLAR_CHAIN_ICON,
 }
 
 const WebSwap: React.FC = () => {
@@ -143,12 +136,11 @@ const WebSwap: React.FC = () => {
     handleKycApproved,
     handleQrResult,
     handleWalletDetailsClose,
-    handleWalletDetailsOpen,
     hasPassedOnboarding,
     isDecodingQr,
     isMiniPay,
     isQrOpen,
-    isWalletDetailsOpen,
+    onboardingRates,
     openQr,
     requestConnectAfterChainSelect,
     resetForNewTransaction,
@@ -156,7 +148,6 @@ const WebSwap: React.FC = () => {
     selectChain,
     selectCurrency,
     selectedChainKey,
-    setHasPassedOnboarding,
     sourceAmountForBalanceCheck,
     swapViewProps,
     targetAmount,
@@ -171,14 +162,9 @@ const WebSwap: React.FC = () => {
   const handleConnectWalletClick = useCallback(() => setShowConnectChainModal(true), [])
 
   const walletDetails = useWalletDetails({ onClose: handleWalletDetailsClose })
+  const [showHistory, setShowHistory] = useState(false)
 
-  // Opens wallet panel and resets to list view (not TransactionDetail)
-  const handleOpenWalletList = useCallback(() => {
-    walletDetails.setSelectedTransaction(null)
-    handleWalletDetailsOpen()
-  }, [handleWalletDetailsOpen, walletDetails])
-
-  const navBar = useNavBarResponsive({ onWalletConnect: handleConnectWalletClick, onWalletDetails: handleOpenWalletList })
+  const navBar = useNavBarResponsive({ onWalletConnect: handleConnectWalletClick, onWalletDetails: () => setShowHistory(true) })
   const languageSelector = useLanguageSelector()
   const { t } = useTranslate()
 
@@ -196,8 +182,11 @@ const WebSwap: React.FC = () => {
   // Modal state for source (chain + token) and target (currency)
   const [sourceModalOpen, setSourceModalOpen] = useState(false)
   const [targetModalOpen, setTargetModalOpen] = useState(false)
-  const [showHistory, setShowHistory] = useState(false)
   const [selectedTx, setSelectedTx] = useState<null | TxDetailItem>(null)
+
+  // Track if user has entered the app from onboarding
+  const [hasEnteredApp, setHasEnteredApp] = useState(false)
+  const handleEnterApp = useCallback(() => setHasEnteredApp(true), [])
 
   // Fetch user transactions (for fallback summaries only; HistorySheet uses walletDetails.transactions)
   const { fetchTransactions, recentTransactions: txSummaries } = useUserTransactions(swapViewProps.isAuthenticated, selectedChainKey)
@@ -261,7 +250,7 @@ const WebSwap: React.FC = () => {
 
   return (
     <div
-      className="w-full h-[100dvh] md:h-screen overflow-hidden flex flex-col"
+      className="w-full h-dvh overflow-hidden flex flex-col"
       style={{
         background: isMiniPay
           ? 'linear-gradient(180deg, #f5fbf8 0%, #e8f4ee 100%)'
@@ -277,7 +266,7 @@ const WebSwap: React.FC = () => {
             <LanguageSelector {...languageSelector} variant="mobile" />
           }
           onDisconnect={walletDetails.onDisconnectWallet}
-          onHistoryClick={handleOpenWalletList}
+          onHistoryClick={() => setShowHistory(true)}
           onOpenChainModal={openSourceModal}
           onSelectCurrency={selectCurrency}
           selectedChainKey={selectedChainKey}
@@ -300,17 +289,18 @@ const WebSwap: React.FC = () => {
                 formatDate={walletDetails.formatDate}
                 getStatusStyle={walletDetails.getStatusStyle}
                 getStatusText={walletDetails.getStatusText}
-                hasPassedOnboarding={hasPassedOnboarding}
+                hasEnteredApp={hasEnteredApp || swapViewProps.isAuthenticated}
                 isAuthenticated={
                   hasPassedOnboarding
                   || Boolean(walletDetails.address && selectedChainKey)
                 }
-                onConnectWallet={handleConnectWalletClick}
+                onboardingRates={onboardingRates}
+                onEnterApp={handleEnterApp}
                 onGoToManual={goToManual}
                 onHistoryClick={() => setShowHistory(true)}
                 onOpenChainModal={openSourceModal}
                 onOpenQr={openQr}
-                onPassOnboarding={() => setHasPassedOnboarding(true)}
+                onRequestConnect={handleConnectWalletClick}
                 onSelectCurrency={selectCurrency}
                 onSelectTransaction={tx => setSelectedTx(transactionToTxDetailItem(tx))}
                 recentTransactions={
@@ -384,7 +374,7 @@ const WebSwap: React.FC = () => {
             {t('footer.need_help', 'Need help?')}
           </a>
           <div className={cn('flex items-center gap-2 ml-2', AB_STYLES.textMuted)}>
-            <span className="text-sm">powered by</span>
+            <span className="text-sm">{t('footer.powered_by', 'powered by')}</span>
             <img
               alt="Stellar"
               className="h-6 w-auto"
@@ -447,27 +437,13 @@ const WebSwap: React.FC = () => {
       {/* Transaction detail bottom sheet */}
       {selectedTx && (
         <TxDetailSheet
+          onBack={() => {
+            setSelectedTx(null)
+            setShowHistory(true)
+          }}
           onClose={() => setSelectedTx(null)}
           tx={selectedTx}
         />
-      )}
-
-      {/* Wallet Details Modal */}
-      {!isMiniPay && (
-        <ModalOverlay
-          onClose={handleWalletDetailsClose}
-          open={!!isWalletDetailsOpen}
-        >
-          <WalletDetails
-            {...walletDetails}
-            selectedAssetLabel={swapViewProps.selectedAssetLabel}
-            transactions={
-              selectedChainKey
-                ? walletDetails.transactions.filter(tx => transactionMatchesChain(tx, selectedChainKey))
-                : walletDetails.transactions
-            }
-          />
-        </ModalOverlay>
       )}
 
       {/* Full-screen QR Scanner */}
@@ -482,7 +458,7 @@ const WebSwap: React.FC = () => {
         <div className="fixed inset-0 z-[1100] bg-black/60 backdrop-blur-sm flex items-center justify-center">
           <div className="flex flex-col items-center gap-3 text-white">
             <Loader className="w-8 h-8 animate-spin" />
-            <p className="text-sm">Decodificando QR...</p>
+            <p className="text-sm">{t('swap.decoding_qr', 'Decoding QR...')}</p>
           </div>
         </div>
       )}

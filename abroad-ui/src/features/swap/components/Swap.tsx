@@ -89,48 +89,47 @@ export default function Swap({
   }, [])
 
   const sendToPlaceholder = targetCurrency === TargetCurrency.BRL
-    ? t('swap.send_to_placeholder_pix', 'Chave Pix ou número de telefone')
-    : t('swap.send_to_placeholder_breb', 'Bre-B ID ou número de telefone')
+    ? t('swap.send_to_placeholder_pix', 'PIX key or phone number')
+    : t('swap.send_to_placeholder_breb', 'Bre-B ID or phone number')
 
+  const ctaDisabled = isAuthenticated && (continueDisabled || hasInsufficientFunds)
   const ctaLabelDisabled = hasInsufficientFunds
-    ? t('swap.insufficient_balance', 'Saldo insuficiente')
+    ? t('swap.insufficient_balance', 'Insufficient balance')
     : t('swap.enter_amount', 'Enter amount')
   const formattedAmount = targetCurrency === TargetCurrency.BRL
     ? `R$${targetAmount}`
     : `$${targetAmount}`
   const ctaLabelEnabled = targetAmount
     ? t('swap.send_amount', 'Send {amount}', { amount: formattedAmount })
-    : t('swap.continue', 'Continuar')
-
-  const ctaLabel = (continueDisabled || hasInsufficientFunds) ? ctaLabelDisabled : ctaLabelEnabled
+    : t('swap.continue', 'Continue')
 
   const minMessage = targetCurrency === TargetCurrency.COP
-    ? t('swap.min_cop', 'Mínimo: $5.000 COP')
-    : t('swap.min_brl', 'Mínimo: R$1,00 BRL')
+    ? t('swap.min_cop', 'Minimum: $5,000 COP')
+    : t('swap.min_brl', 'Minimum: R$1.00 BRL')
   const maxMessage = targetCurrency === TargetCurrency.COP
-    ? t('swap.max_cop', 'Máximo: $5.000.000 COP')
-    : t('swap.max_brl', 'Máximo: R$50.000,00 BRL')
+    ? t('swap.max_cop', 'Maximum: $5,000,000 COP')
+    : t('swap.max_brl', 'Maximum: R$50,000.00 BRL')
   const limitMessage = isBelowMinimum ? minMessage : maxMessage
 
   return (
     <div
-      className="mx-auto flex w-full max-w-[512px] flex-col overflow-hidden rounded-[32px] border border-[#f3f4f6] bg-white shadow-[0px_10px_40px_-10px_rgba(0,0,0,0.08)]"
+      className="mx-auto flex w-full max-w-[min(95vw,512px)] max-h-[90dvh] flex-col overflow-hidden rounded-[clamp(1.5rem,4vh,2rem)] border border-[var(--ab-border)] bg-[var(--ab-bg-card)] shadow-[0px_10px_40px_-10px_rgba(0,0,0,0.08)]"
       data-name="SwapCard"
     >
       {/* ── Header ── */}
-      <div className="flex items-center justify-between px-6 pb-2 pt-6">
+      <div className="flex items-center justify-between px-[clamp(1rem,4vw,1.5rem)] pb-[clamp(0.25rem,1vh,0.5rem)] pt-[clamp(0.75rem,3vh,1.5rem)]">
         <div className="flex items-center gap-4">
           {onBackClick && (
             <button
-              aria-label="Back"
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#f9fafb] transition-colors hover:bg-[#f3f4f6]"
+              aria-label={t('swap.back', 'Back')}
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[var(--ab-bg-subtle)] transition-colors hover:bg-[var(--ab-bg-muted)]"
               onClick={onBackClick}
               type="button"
             >
-              <ChevronLeft className="h-6 w-6 text-ab-text" strokeWidth={2.5} />
+              <ChevronLeft className="h-[clamp(1.25rem,3.5vh,1.5rem)] w-[clamp(1.25rem,3.5vh,1.5rem)] text-ab-text" strokeWidth={2.5} />
             </button>
           )}
-          <h1 className="text-xl font-bold leading-7 text-[#111827]">
+          <h1 className="text-[clamp(1rem,2.5vh+1vw,1.25rem)] font-bold leading-tight text-[var(--ab-text)]">
             {t('swap.send_payment', 'Send Payment')}
           </h1>
         </div>
@@ -143,56 +142,67 @@ export default function Swap({
       </div>
 
       {/* ── Live rate banner + balance ── */}
-      <div className="flex w-full items-center justify-between gap-4 bg-[#f0fdf4] px-6 py-2.5">
+      <div className="flex w-full items-center justify-between gap-[clamp(0.5rem,2vw,1rem)] bg-[var(--ab-bg-subtle)] px-[clamp(1rem,4vw,1.5rem)] py-[clamp(0.375rem,1.5vh,0.625rem)]">
         <div className="flex items-center gap-2">
-          <div className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#10b981]" />
-          <span className="text-xs font-medium leading-4 text-[#15803d]">
-            Live:
+          <div className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--ab-green)]" />
+          <span className="text-xs font-medium leading-4 text-[var(--ab-green)]">
+            {t('swap.live', 'Live')}
+            :
             {' '}
             {exchangeRateDisplay}
           </span>
         </div>
-        {isAuthenticated && usdcBalance !== undefined && onBalanceClick && (
-          <button
-            className={cn(
-              'text-xs font-medium transition-colors hover:text-[#10b981]',
-              hasInsufficientFunds ? 'text-ab-error' : 'text-[#15803d]',
+        {isAuthenticated
+          ? (usdcBalance !== undefined && onBalanceClick && (
+              <button
+                className={cn(
+                  'text-xs font-medium transition-colors hover:text-[var(--ab-green)]',
+                  hasInsufficientFunds ? 'text-ab-error' : 'text-[var(--ab-green)]',
+                )}
+                onClick={onBalanceClick}
+                type="button"
+              >
+                {t('swap.available_balance', 'Available balance:')}
+                {' '}
+                <span className="font-bold">
+                  {loadingBalance ? '...' : `${usdcBalance} ${selectedAssetLabel}`}
+                </span>
+              </button>
+            ))
+          : (
+              <span className="text-xs font-medium text-[var(--ab-text-muted)]">
+                {t('swap.connect_to_see_balance', 'Connect wallet to see balance')}
+              </span>
             )}
-            onClick={onBalanceClick}
-            type="button"
-          >
-            {t('swap.available_balance', 'Balance disponible:')}
-            {' '}
-            <span className="font-bold">
-              {loadingBalance ? '...' : `${usdcBalance} ${selectedAssetLabel}`}
-            </span>
-          </button>
-        )}
       </div>
 
       {/* ── Amount section ── */}
-      <div className="relative flex h-[135px] w-full shrink-0 flex-col items-center justify-center px-6">
-        <div className="flex flex-col items-center gap-2">
-          <div className="flex items-baseline justify-center gap-1">
+      <div className="relative flex h-[clamp(100px,20vh,135px)] w-full shrink-0 flex-col items-center justify-center px-[clamp(1rem,4vw,1.5rem)]">
+        <div className="flex flex-col items-center gap-[clamp(0.25rem,1vh,0.5rem)]">
+          <div className="flex items-baseline justify-center gap-[clamp(0.25rem,1vw,0.5rem)]">
             <input
               autoFocus
               className={cn(
-                'bg-transparent text-center text-[48px] font-black leading-[48px] tracking-[-2.4px] outline-none min-w-[80px] caret-[#10b981] placeholder:text-[#e5e7eb]',
-                (isBelowMinimum || isAboveMaximum || hasInsufficientFunds) ? 'text-ab-error' : 'text-[#111827]',
+                'bg-transparent text-center text-[clamp(2rem,5vh+2vw,3rem)] font-black leading-[1.1] tracking-[-0.02em] outline-none caret-[var(--ab-green)] placeholder:text-[var(--ab-border)]',
+                (isBelowMinimum || isAboveMaximum || hasInsufficientFunds) ? 'text-ab-error' : 'text-[var(--ab-text)]',
               )}
               inputMode="decimal"
               onChange={e => onTargetChange(e.target.value)}
               onFocus={handleFocus}
-              placeholder="0"
+              placeholder={t('input.placeholder_zero', '0')}
+              style={{
+                minWidth: '80px',
+                width: `${Math.max(4, (targetAmount || '0').length + 2)}ch`,
+              }}
               type="text"
               value={targetAmount}
             />
-            <span className="text-xl font-bold text-[#6b7280]">
+            <span className="text-[clamp(1rem,2.5vh,1.25rem)] font-bold text-[var(--ab-text-muted)]">
               {targetCurrency === TargetCurrency.BRL ? 'BRL' : 'COP'}
             </span>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-[#6b7280]">
+          <div className="flex items-center gap-[clamp(0.25rem,1vw,0.5rem)]">
+            <span className="text-[clamp(0.875rem,2vh,1rem)] font-medium text-[var(--ab-text-muted)]">
               $
               {' '}
               {sourceAmount || '0.00'}
@@ -205,57 +215,57 @@ export default function Swap({
 
       {/* Min/Max warnings – right below amount */}
       {(isBelowMinimum || isAboveMaximum) && (
-        <div className="flex items-center justify-center gap-2 px-6 pb-2 text-xs font-bold text-ab-error">
-          <CircleDollarSign className="h-4 w-4" />
+        <div className="flex items-center justify-center gap-[clamp(0.25rem,1vw,0.5rem)] px-[clamp(1rem,4vw,1.5rem)] pb-[clamp(0.25rem,1vh,0.5rem)] text-[clamp(0.75rem,1.5vh,0.875rem)] font-bold text-ab-error">
+          <CircleDollarSign className="h-[clamp(1rem,2.5vh,1.25rem)] w-[clamp(1rem,2.5vh,1.25rem)]" />
           <span>{limitMessage}</span>
         </div>
       )}
 
       {/* ── Separator ── */}
-      <div className="h-px w-full shrink-0 border-t border-[#f3f4f6]" />
+      <div className="h-px w-full shrink-0 border-t border-[var(--ab-border)]" />
 
       {/* ── Send to + Fee + Speed + CTA ── */}
-      <div className="flex flex-col gap-4 p-6">
+      <div className="flex flex-col gap-[clamp(0.5rem,2vh,1rem)] p-[clamp(1rem,4vw,1.5rem)] overflow-y-auto">
         {/* Send to */}
         {fromQr
           ? (
               <div className="relative">
-                <label className="absolute left-1 top-0 -translate-y-1/2 text-xs font-bold uppercase tracking-[0.6px] text-[#6b7280]">
+                <label className="absolute left-1 top-0 -translate-y-1/2 text-xs font-bold uppercase tracking-[0.6px] text-[var(--ab-text-muted)]">
                   {t('swap.send_to', 'Send to')}
                 </label>
-                <div className="flex flex-col gap-2 rounded-2xl border border-[#e5e7eb] bg-[#f9fafb] px-4 py-[19px]">
+                <div className="flex flex-col gap-2 rounded-2xl border border-[var(--ab-border)] bg-[var(--ab-bg-subtle)] px-4 py-[19px]">
                   {recipientName && (
                     <div className="flex items-center justify-between gap-3">
-                      <span className="shrink-0 text-sm text-ab-text-3">{t('swap.recipient_name_label', 'Nombre')}</span>
+                      <span className="shrink-0 text-sm text-ab-text-3">{t('swap.recipient_name_label', 'Name')}</span>
                       <span className="break-all text-right text-sm font-semibold text-ab-text">{recipientName}</span>
                     </div>
                   )}
                   <div className="flex items-center justify-between gap-3">
                     <span className="shrink-0 text-sm text-ab-text-3">
                       {targetCurrency === TargetCurrency.BRL
-                        ? t('swap.pix_key_label', 'Clave PIX')
-                        : t('swap.breb_key_label', 'Clave Bre-B')}
+                        ? t('swap.pix_key_label', 'PIX Key')
+                        : t('swap.breb_key_label', 'Bre-B Key')}
                     </span>
                     <span className="break-all text-right font-mono text-sm font-medium text-ab-text">{recipientValue}</span>
                   </div>
                 </div>
                 <span className="mt-2 block pl-1 font-medium text-xs text-ab-text-3">
                   {targetCurrency === TargetCurrency.BRL
-                    ? t('bank_details.pix_disclaimer', 'Tu transacción será procesada de inmediato. Asegúrate de que la llave PIX y el CPF del destinatario sean correctos. Esta transacción no se puede reversar.')
-                    : t('bank_details.breb_disclaimer', 'Tu transacción será procesada de inmediato a través de BRE-B. Ingresa la llave correcta del destinatario y asegurate que la tenga inscrita. No es necesario seleccionar banco.')}
+                    ? t('bank_details.pix_disclaimer', 'Your transaction will be processed immediately. Make sure the PIX key and recipient CPF are correct. This transaction cannot be reversed.')
+                    : t('bank_details.breb_disclaimer', 'Your transaction will be processed immediately via BRE-B. Enter the correct recipient key. This transaction cannot be reversed.')}
                 </span>
               </div>
             )
           : (
-              <div className="relative">
+              <div className="relative mt-3">
                 <label
-                  className="absolute left-1 top-0 -translate-y-1/2 text-xs font-bold uppercase tracking-[0.6px] text-[#6b7280]"
+                  className="absolute left-4 -top-2.5 bg-[var(--ab-bg-card)] px-1 text-xs font-bold uppercase tracking-[0.6px] text-[var(--ab-text-muted)]"
                   htmlFor="swap-send-to"
                 >
                   {t('swap.send_to', 'Send to')}
                 </label>
                 <input
-                  className="w-full rounded-2xl border border-[#e5e7eb] bg-[#f9fafb] px-4 py-[19px] text-base text-[#111827] placeholder:text-[#9ca3af] focus:border-[#10b981] focus:outline-none focus:ring-1 focus:ring-[#10b981]"
+                  className="w-full rounded-2xl border border-[var(--ab-border)] bg-[var(--ab-bg-subtle)] px-4 py-[19px] text-base text-[var(--ab-text)] placeholder:text-[var(--ab-text-muted)] focus:border-[var(--ab-green)] focus:outline-none focus:ring-1 focus:ring-[var(--ab-green)]"
                   id="swap-send-to"
                   onChange={e => onRecipientChange?.(e.target.value)}
                   placeholder={sendToPlaceholder}
@@ -265,13 +275,13 @@ export default function Swap({
                 {targetCurrency === TargetCurrency.BRL && onTaxIdChange && (
                   <div className="relative mt-3">
                     <label
-                      className="absolute left-1 top-0 -translate-y-1/2 text-xs font-bold uppercase tracking-[0.6px] text-[#6b7280]"
+                      className="absolute left-4 -top-2.5 bg-[var(--ab-bg-card)] px-1 text-xs font-bold uppercase tracking-[0.6px] text-[var(--ab-text-muted)]"
                       htmlFor="swap-cpf"
                     >
                       {t('bank_details.cpf_placeholder', 'CPF')}
                     </label>
                     <input
-                      className="w-full rounded-2xl border border-[#e5e7eb] bg-[#f9fafb] px-4 py-[19px] text-base text-[#111827] placeholder:text-[#9ca3af] focus:border-[#10b981] focus:outline-none focus:ring-1 focus:ring-[#10b981]"
+                      className="w-full rounded-2xl border border-[var(--ab-border)] bg-[var(--ab-bg-subtle)] px-4 py-[19px] text-base text-[var(--ab-text)] placeholder:text-[var(--ab-text-muted)] focus:border-[var(--ab-green)] focus:outline-none focus:ring-1 focus:ring-[var(--ab-green)]"
                       id="swap-cpf"
                       inputMode="numeric"
                       onChange={e => onTaxIdChange(e.target.value.replace(/[^\d]/g, ''))}
@@ -284,16 +294,16 @@ export default function Swap({
                 )}
                 <span className="mt-2 block pl-1 font-medium text-xs text-ab-text-3">
                   {targetCurrency === TargetCurrency.BRL
-                    ? t('bank_details.pix_disclaimer', 'Tu transacción será procesada de inmediato. Asegúrate de que la llave PIX y el CPF del destinatario sean correctos. Esta transacción no se puede reversar.')
-                    : t('bank_details.breb_disclaimer', 'Tu transacción será procesada de inmediato a través de BRE-B. Ingresa la llave correcta del destinatario y asegurate que la tenga inscrita. No es necesario seleccionar banco.')}
+                    ? t('bank_details.pix_disclaimer', 'Your transaction will be processed immediately. Make sure the PIX key and recipient CPF are correct. This transaction cannot be reversed.')
+                    : t('bank_details.breb_disclaimer', 'Your transaction will be processed immediately via BRE-B. Enter the correct recipient key. This transaction cannot be reversed.')}
                 </span>
               </div>
             )}
 
         {/* Fee + Speed */}
-        <div className="flex flex-col gap-2 rounded-2xl border border-[#f3f4f6] bg-[#f9fafb] p-4">
+        <div className="flex flex-col gap-[clamp(0.25rem,1vh,0.5rem)] rounded-[clamp(1rem,3vh,1.25rem)] border border-[var(--ab-border)] bg-[var(--ab-bg-subtle)] p-[clamp(0.75rem,2.5vh,1rem)]">
           <div className="flex items-center justify-between">
-            <span className="text-sm font-normal text-[#6b7280]">
+            <span className="text-sm font-normal text-[var(--ab-text-muted)]">
               {transferFeeIsZero
                 ? t('swap.fee', 'Fee')
                 : t('swap.fee_percent', 'Fee (1.5%)')}
@@ -301,43 +311,45 @@ export default function Swap({
             <span
               className={cn(
                 'text-sm font-medium',
-                transferFeeIsZero ? 'text-[#10b981]' : 'text-[#111827]',
+                transferFeeIsZero ? 'text-[var(--ab-green)]' : 'text-[var(--ab-text)]',
               )}
             >
-              {transferFeeIsZero ? t('swap.free', 'Gratis') : transferFeeDisplay}
+              {transferFeeIsZero ? t('swap.free', 'Free') : transferFeeDisplay}
             </span>
           </div>
           <div className="flex items-center justify-between">
-            <span className="text-sm font-normal text-[#6b7280]">
+            <span className="text-sm font-normal text-[var(--ab-text-muted)]">
               {t('swap.speed', 'Speed')}
             </span>
-            <div className="flex items-center gap-1 text-sm font-medium text-[#10b981]">
+            <div className="flex items-center gap-1 text-sm font-medium text-[var(--ab-green)]">
               <Zap className="h-3.5 w-3.5" />
-              ~30s
+              {t('swap.speed_approx', '~30s')}
             </div>
           </div>
         </div>
 
-        {/* Primary CTA ── Figma: disabled = gray, enabled = green #059669 */}
+        {/* Primary CTA ── Figma: disabled = gray, enabled = green */}
         <button
           className={cn(
             'flex w-full items-center justify-center rounded-2xl py-4 text-lg font-bold transition-all active:scale-[0.98]',
-            continueDisabled || hasInsufficientFunds
-              ? 'cursor-not-allowed bg-[#e5e7eb] text-[#9ca3af]'
-              : 'bg-[#059669] text-[#f0fdf4] hover:bg-[#047857]',
+            ctaDisabled
+              ? 'cursor-not-allowed bg-[var(--ab-border)] text-[var(--ab-text-muted)]'
+              : 'bg-ab-btn text-ab-btn-text hover:bg-ab-btn-hover',
           )}
-          disabled={continueDisabled || hasInsufficientFunds}
+          disabled={ctaDisabled}
           onClick={onPrimaryAction}
           type="button"
         >
-          {isAuthenticated
-            ? ctaLabel
-            : (
+          {!isAuthenticated
+            ? (
                 <span className="flex items-center gap-2">
                   <Wallet className="h-6 w-6" />
-                  {t('swap.connect_wallet', 'Conectar Billetera')}
+                  {t('swap.connect_wallet_to_continue', 'Connect your wallet to continue')}
                 </span>
-              )}
+              )
+            : (hasInsufficientFunds
+                ? ctaLabelDisabled
+                : ctaLabelEnabled)}
         </button>
       </div>
     </div>

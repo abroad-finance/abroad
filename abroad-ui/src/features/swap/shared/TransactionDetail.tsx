@@ -1,12 +1,16 @@
 import { useTranslate } from '@tolgee/react'
 import {
-  ArrowLeft, ArrowRight, ChevronDown, ChevronUp, HelpCircle, MapPin, Store,
+  ArrowLeft, ArrowRight, Check, ChevronDown, ChevronUp, HelpCircle, MapPin, Store, X,
 } from 'lucide-react'
 import React, { useState } from 'react'
 
 import { TransactionListItem } from '../../../api'
-import { ASSET_URLS } from '../../../shared/constants'
-import { cn } from '../../../shared/utils'
+import {
+  CHAIN_ICON_MAP, COUNTRY_CONFIG_BY_CURRENCY, RAIL_LOGO_MAP, TOKEN_ICONS,
+} from '../../../shared/constants'
+import {
+  cn, isApiTxExpired, localeForCurrency, numberFormatOptions,
+} from '../../../shared/utils'
 import { formatChainLabel } from '../utils/corridorHelpers'
 
 export interface TransactionDetailProps {
@@ -17,28 +21,8 @@ export interface TransactionDetailProps {
   transaction: TransactionListItem
 }
 
-const CHAIN_ICON_MAP: Record<string, string> = {
-  CELO: ASSET_URLS.CELO_CHAIN_ICON,
-  celo: ASSET_URLS.CELO_CHAIN_ICON,
-  SOLANA: ASSET_URLS.SOLANA_CHAIN_ICON,
-  solana: ASSET_URLS.SOLANA_CHAIN_ICON,
-  STELLAR: ASSET_URLS.STELLAR_CHAIN_ICON,
-  stellar: ASSET_URLS.STELLAR_CHAIN_ICON,
-}
-
-const COUNTRY_CONFIG: Record<string, { flagUrl: string, location: string, name: string, rail: string, symbol: string }> = {
-  BRL: {
-    flagUrl: 'https://hatscripts.github.io/circle-flags/flags/br.svg', location: 'Brazil', name: 'BRL', rail: 'PIX', symbol: 'R$',
-  },
-  COP: {
-    flagUrl: 'https://hatscripts.github.io/circle-flags/flags/co.svg', location: 'Colombia', name: 'COP', rail: 'Bre-B', symbol: '$',
-  },
-}
-
-const TOKEN_ICON_MAP: Record<string, string> = {
-  USDC: ASSET_URLS.USDC_TOKEN_ICON,
-  USDT: ASSET_URLS.USDT_TOKEN_ICON,
-}
+// Alias for backwards compatibility with existing code structure
+const COUNTRY_CONFIG = COUNTRY_CONFIG_BY_CURRENCY
 
 const TransactionDetail: React.FC<Readonly<TransactionDetailProps>> = ({
   formatDateWithTime,
@@ -52,13 +36,10 @@ const TransactionDetail: React.FC<Readonly<TransactionDetailProps>> = ({
 
   const tc = transaction.quote.targetCurrency
   const country = COUNTRY_CONFIG[tc] ?? COUNTRY_CONFIG.COP
-  const isExpired = transaction.status === 'PAYMENT_EXPIRED' || transaction.status === 'PAYMENT_FAILED' || transaction.status === 'WRONG_AMOUNT'
+  const isExpired = isApiTxExpired(transaction.status)
 
-  const locale = tc === 'BRL' ? 'pt-BR' : 'es-CO'
-  const targetFormatted = transaction.quote.targetAmount.toLocaleString(
-    locale,
-    tc === 'COP' ? { maximumFractionDigits: 0, minimumFractionDigits: 0 } : { maximumFractionDigits: 2, minimumFractionDigits: 2 },
-  )
+  const locale = localeForCurrency(tc)
+  const targetFormatted = transaction.quote.targetAmount.toLocaleString(locale, numberFormatOptions(tc))
 
   const rate = transaction.quote.sourceAmount > 0
     ? (transaction.quote.targetAmount / transaction.quote.sourceAmount).toLocaleString(locale, { maximumFractionDigits: 2 })
@@ -74,7 +55,7 @@ const TransactionDetail: React.FC<Readonly<TransactionDetailProps>> = ({
     : transaction.accountNumber
 
   const cryptoCurrency = (transaction.quote.cryptoCurrency ?? 'USDC').toUpperCase()
-  const tokenIcon = TOKEN_ICON_MAP[cryptoCurrency] ?? ASSET_URLS.USDC_TOKEN_ICON
+  const tokenIcon = TOKEN_ICONS[cryptoCurrency] ?? TOKEN_ICONS.USDC
 
   return (
     <div className="flex flex-col">
@@ -113,14 +94,10 @@ const TransactionDetail: React.FC<Readonly<TransactionDetailProps>> = ({
         >
           {isExpired
             ? (
-                <svg className="h-8 w-8 text-ab-error" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                  <path d="M6 18L18 6M6 6l12 12" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
+                <X className="h-8 w-8 text-ab-error" strokeWidth={2} />
               )
             : (
-                <svg className="h-8 w-8 text-ab-green" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
-                  <path d="M20 6L9 17l-5-5" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
+                <Check className="h-8 w-8 text-ab-green" strokeWidth={2.5} />
               )}
         </div>
         <h4 className={cn('font-cereal text-xl font-bold', isExpired ? 'text-ab-error' : 'text-ab-green')}>
@@ -215,8 +192,9 @@ const TransactionDetail: React.FC<Readonly<TransactionDetailProps>> = ({
           </SummaryRow>
           <SummaryRow label={t('wallet_details.transactions.payment_rail', 'Payment Rail')}>
             <span className="flex items-center gap-1.5 font-semibold text-ab-text">
-              <img alt={country.location} className="h-4 w-4" src={country.flagUrl} />
-              {country.rail}
+              {RAIL_LOGO_MAP[country.currency] && (
+                <img alt={country.rail} className="h-4 w-auto max-w-[48px]" src={RAIL_LOGO_MAP[country.currency]} />
+              )}
             </span>
           </SummaryRow>
           <SummaryRow label={t('wallet_details.transactions.network', 'Network')}>
@@ -230,7 +208,7 @@ const TransactionDetail: React.FC<Readonly<TransactionDetailProps>> = ({
               <img alt={cryptoCurrency} className="h-4 w-4" src={tokenIcon} />
               {transaction.quote.cryptoCurrency ?? 'USDC'}
               {' '}
-              (Circle)
+              {t('wallet_details.token_issuer_circle', '(Circle)')}
             </span>
           </SummaryRow>
           <SummaryRow label={t('wallet_details.transactions.recipient_id', 'Recipient ID')}>

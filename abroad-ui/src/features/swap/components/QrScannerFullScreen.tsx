@@ -42,7 +42,7 @@ const QrScannerFullScreen: React.FC<QrScannerFullScreenProps> = ({ onClose, onRe
   useEffect(() => {
     if (typeof navigator === 'undefined') return
     if (!navigator.mediaDevices?.getUserMedia) {
-      setCameraError(t('qr_scanner.unsupported', 'Tu navegador no admite acceso a la cámara.'))
+      setCameraError(t('qr_scanner.unsupported', 'Your browser does not support camera access.'))
     }
   }, [t])
 
@@ -53,7 +53,7 @@ const QrScannerFullScreen: React.FC<QrScannerFullScreenProps> = ({ onClose, onRe
     hasResultRef.current = true
     Promise.resolve(onResult(text)).catch(() => {
       hasResultRef.current = false
-      setCameraError(t('qr_scanner.unexpected_error', 'No pudimos procesar este QR. Intenta nuevamente.'))
+      setCameraError(t('qr_scanner.unexpected_error', 'We could not process this QR. Please try again.'))
     })
   }, [onResult, t])
 
@@ -65,7 +65,7 @@ const QrScannerFullScreen: React.FC<QrScannerFullScreenProps> = ({ onClose, onRe
         ? error
         : ''
     setCameraError(
-      message || t('qr_scanner.camera_error', 'No pudimos acceder a tu cámara. Verifica los permisos.'),
+      message || t('qr_scanner.camera_error', 'We could not access your camera. Please check permissions.'),
     )
   }, [cameraError, t])
 
@@ -74,7 +74,7 @@ const QrScannerFullScreen: React.FC<QrScannerFullScreenProps> = ({ onClose, onRe
       <div className="flex items-center justify-between p-4 max-h-[85vh]">
         <div className="flex items-center gap-2">
           <ScanLine className="h-6 w-6" />
-          <h2 className="text-lg font-semibold">{t('qr_scanner.title', 'Escane un código QR')}</h2>
+          <h2 className="text-lg font-semibold">{t('qr_scanner.title', 'Scan a QR code')}</h2>
         </div>
         <button aria-label={t('qr_scanner.close_aria', 'Close scanner')} className="p-2 rounded hover:bg-white/10" onClick={onClose}>
           <X className="h-6 w-6" />
@@ -87,9 +87,9 @@ const QrScannerFullScreen: React.FC<QrScannerFullScreenProps> = ({ onClose, onRe
           ? (
               <div className="flex h-full items-center justify-center px-6 text-center">
                 <div className="max-w-sm">
-                  <p className="text-lg font-semibold">{t('qr_scanner.error_title', 'No pudimos abrir la cámara')}</p>
+                  <p className="text-lg font-semibold">{t('qr_scanner.error_title', 'We could not open the camera')}</p>
                   <p className="text-sm text-white/80 mt-2">{cameraError}</p>
-                  <p className="text-xs text-white/60 mt-4">{t('qr_scanner.error_hint', 'Puedes cerrar este modal y pegar el código manualmente.')}</p>
+                  <p className="text-xs text-white/60 mt-4">{t('qr_scanner.error_hint', 'You can close this modal and paste the code manually.')}</p>
                 </div>
               </div>
             )
@@ -117,7 +117,7 @@ const QrScannerFullScreen: React.FC<QrScannerFullScreenProps> = ({ onClose, onRe
         {/* Bottom help text */}
         {!cameraError && (
           <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/70 to-transparent text-center">
-            <p className="text-sm">{t('qr_scanner.hint', 'Asegurate de que sea un código QR de Pix')}</p>
+            <p className="text-sm">{t('qr_scanner.hint', 'Make sure it is a PIX QR code')}</p>
           </div>
         )}
       </div>

@@ -1,11 +1,8 @@
+import { useTranslate } from '@tolgee/react'
 import React from 'react'
 
+import { CURRENCY_FLAG_URL } from '../../shared/constants'
 import { cn } from '../../shared/utils'
-
-const FLAG_URLS = {
-  BRL: 'https://hatscripts.github.io/circle-flags/flags/br.svg',
-  COP: 'https://hatscripts.github.io/circle-flags/flags/co.svg',
-} as const
 
 export type CurrencyOption = 'BRL' | 'COP'
 
@@ -21,54 +18,57 @@ export interface CurrencyToggleProps {
  * Toggle between COP and BRL – Figma 9:368
  * Segmented control with flags; selected option has white background.
  */
-export const CurrencyToggle: React.FC<CurrencyToggleProps> = ({ className, onChange, value }) => (
-  <fieldset
-    className={cn(
-      'inline-flex items-stretch gap-0.5 rounded-[11px] bg-[#f3f4f6] p-1 shadow-[1px_1px_3.6px_0px_rgba(0,0,0,0.25)]',
-      'border-0 m-0',
-      className,
-    )}
-  >
-    <legend className="sr-only">Select currency</legend>
-    <button
-      aria-pressed={value === 'COP'}
+export const CurrencyToggle: React.FC<CurrencyToggleProps> = ({ className, onChange, value }) => {
+  const { t } = useTranslate()
+  return (
+    <fieldset
       className={cn(
-        'flex h-[26px] items-center justify-center rounded-lg px-3 py-1.5 transition-colors',
-        value === 'COP'
-          ? 'border border-[#e5e7eb] bg-white shadow-[0px_1px_2px_0px_rgba(0,0,0,0.05)]'
-          : 'hover:bg-white/50',
+        'inline-flex items-stretch gap-0.5 rounded-[11px] bg-[#f3f4f6] p-1 shadow-[1px_1px_3.6px_0px_rgba(0,0,0,0.25)]',
+        'border-0 m-0',
+        className,
       )}
-      onClick={(e) => {
-        e.stopPropagation()
-        onChange('COP')
-      }}
-      type="button"
     >
-      <img
-        alt="Colombia"
-        className="h-[13px] w-5 object-contain"
-        src={FLAG_URLS.COP}
-      />
-    </button>
-    <button
-      aria-pressed={value === 'BRL'}
-      className={cn(
-        'flex h-[26px] items-center justify-center rounded-lg px-3 py-1.5 transition-colors',
-        value === 'BRL'
-          ? 'border border-[#e5e7eb] bg-white shadow-[0px_1px_2px_0px_rgba(0,0,0,0.05)]'
-          : 'hover:bg-white/50',
-      )}
-      onClick={(e) => {
-        e.stopPropagation()
-        onChange('BRL')
-      }}
-      type="button"
-    >
-      <img
-        alt="Brazil"
-        className="h-[13px] w-5 object-contain"
-        src={FLAG_URLS.BRL}
-      />
-    </button>
-  </fieldset>
-)
+      <legend className="sr-only">{t('toggle.select_currency', 'Select currency')}</legend>
+      <button
+        aria-pressed={value === 'COP'}
+        className={cn(
+          'flex h-[26px] items-center justify-center rounded-lg px-3 py-1.5 transition-colors',
+          value === 'COP'
+            ? 'border border-[#e5e7eb] bg-white shadow-[0px_1px_2px_0px_rgba(0,0,0,0.05)]'
+            : 'hover:bg-white/50',
+        )}
+        onClick={(e) => {
+          e.stopPropagation()
+          onChange('COP')
+        }}
+        type="button"
+      >
+        <img
+          alt={t('country.colombia', 'Colombia')}
+          className="h-[13px] w-5 object-contain"
+          src={CURRENCY_FLAG_URL.COP}
+        />
+      </button>
+      <button
+        aria-pressed={value === 'BRL'}
+        className={cn(
+          'flex h-[26px] items-center justify-center rounded-lg px-3 py-1.5 transition-colors',
+          value === 'BRL'
+            ? 'border border-[#e5e7eb] bg-white shadow-[0px_1px_2px_0px_rgba(0,0,0,0.05)]'
+            : 'hover:bg-white/50',
+        )}
+        onClick={(e) => {
+          e.stopPropagation()
+          onChange('BRL')
+        }}
+        type="button"
+      >
+        <img
+          alt={t('country.brazil', 'Brazil')}
+          className="h-[13px] w-5 object-contain"
+          src={CURRENCY_FLAG_URL.BRL}
+        />
+      </button>
+    </fieldset>
+  )
+}

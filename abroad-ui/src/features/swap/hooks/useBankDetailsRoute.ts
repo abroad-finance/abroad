@@ -59,7 +59,9 @@ export const useBankDetailsRoute = ({
       if (parsed.taxId) setTaxId(parsed.taxId)
     }
     catch (e) {
-      console.error('Failed to restore pending transaction', e)
+      if (import.meta.env.DEV) {
+        console.error('Failed to restore pending transaction', e)
+      }
     }
   }, [
     setAccountNumber,

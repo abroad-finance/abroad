@@ -1,3 +1,4 @@
+import { useTranslate } from '@tolgee/react'
 import { FormEvent, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 
@@ -22,6 +23,7 @@ const resultClasses: Record<OpsReconcileTransactionHashResponse['result'], strin
 }
 
 const TransactionReconcile = () => {
+  const { t } = useTranslate()
   const opsApiKey = useOpsApiKey()
   const [blockchain, setBlockchain] = useState<ReconciliationBlockchain>('STELLAR')
   const [onChainTx, setOnChainTx] = useState('')
@@ -69,10 +71,10 @@ const TransactionReconcile = () => {
         <div className="relative max-w-4xl mx-auto px-6 py-10">
           <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
             <div>
-              <div className="text-sm uppercase tracking-[0.3em] text-abroad-dark">Operations</div>
-              <h1 className="text-3xl md:text-4xl font-semibold">Transaction Hash Reconcile</h1>
+              <div className="text-sm uppercase tracking-[0.3em] text-abroad-dark">{t('ops.operations', 'Operations')}</div>
+              <h1 className="text-3xl md:text-4xl font-semibold">{t('ops.tx_reconcile_title', 'Transaction Hash Reconcile')}</h1>
               <p className="text-sm text-gray-600 max-w-xl mt-2">
-                Trigger blockchain hash reconciliation through OPS-only controls.
+                {t('ops.tx_reconcile_desc', 'Trigger blockchain hash reconciliation through OPS-only controls.')}
               </p>
             </div>
             <div className="flex items-center gap-3">

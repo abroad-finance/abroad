@@ -1,6 +1,10 @@
 import { act, renderHook } from '@testing-library/react'
+import { http, HttpResponse } from 'msw'
+import { setupServer } from 'msw/node'
 import {
+  afterAll,
   afterEach,
+  beforeAll,
   describe,
   expect,
   vi,
@@ -17,40 +21,40 @@ vi.mock('@tolgee/react', () => ({
   useTranslate: () => ({ t: (_key: string, fallback: string) => fallback }),
 }))
 
-const mocked = vi.hoisted(() => ({
-  challengeMock: vi.fn(async () => ({
-    data: { xdr: 'challenge-xdr' },
-    headers: new Headers(),
-    ok: true,
-    status: 200,
-  })),
-  refreshMock: vi.fn(async () => ({
-    data: { token: `${token}-refreshed` },
-    headers: new Headers(),
-    ok: true,
-    status: 200,
-  })),
-  verifyMock: vi.fn(async () => ({
-    data: { token },
-    headers: new Headers(),
-    ok: true,
-    status: 200,
-  })),
-}))
+// Set up MSW server for HTTP-level mocking
+const server = setupServer()
 
-vi.mock('../api', () => ({
-  challenge: mocked.challengeMock,
-  refresh: mocked.refreshMock,
-  verify: mocked.verifyMock,
-}))
-
+beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }))
 afterEach(() => {
+  server.resetHandlers()
   authTokenStore.setToken(null)
-  vi.clearAllMocks()
 })
+afterAll(() => server.close())
+
+// Helper to create MSW handlers with full URL
+const createHandler = (path: string, handler: Parameters<typeof http.post>[1]) => {
+  return http.post(`https://api.abroad.finance${path}`, handler)
+}
 
 describe('useWalletAuthentication', () => {
   it('authenticates using challenge + verify and stores token', async () => {
+    let challengeCalled = false
+    let verifyCalledWith: unknown = null
+
+    server.use(
+      createHandler('/walletAuth/challenge', async () => {
+        challengeCalled = true
+        return HttpResponse.json({
+          message: 'challenge-xdr',
+          xdr: 'challenge-xdr',
+        })
+      }),
+      createHandler('/walletAuth/verify', async ({ request }) => {
+        verifyCalledWith = await request.json()
+        return HttpResponse.json({ token })
+      }),
+    )
+
     const { result } = renderHook(() => useWalletAuthentication())
 
     await act(async () => {
@@ -64,8 +68,8 @@ describe('useWalletAuthentication', () => {
       })
     })
 
-    expect(mocked.challengeMock).toHaveBeenCalled()
-    expect(mocked.verifyMock).toHaveBeenCalledWith(expect.objectContaining({
+    expect(challengeCalled).toBe(true)
+    expect(verifyCalledWith).toEqual(expect.objectContaining({
       address: 'GADDR',
       chainId: 'stellar:public',
       signedXDR: 'signed-xdr',
@@ -74,11 +78,20 @@ describe('useWalletAuthentication', () => {
   })
 
   it('refreshes tokens when requested directly', async () => {
+    let refreshCalled = false
+
+    server.use(
+      createHandler('/walletAuth/refresh', async () => {
+        refreshCalled = true
+        return HttpResponse.json({ token: `${token}-refreshed` })
+      }),
+    )
+
     const { result } = renderHook(() => useWalletAuthentication())
 
     const refreshed = await act(async () => result.current.refreshAuthToken({ token }))
 
-    expect(mocked.refreshMock).toHaveBeenCalled()
+    expect(refreshCalled).toBe(true)
     expect(refreshed.token).toContain('refreshed')
   })
 })

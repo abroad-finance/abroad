@@ -3,13 +3,8 @@ import { ArrowLeft, Loader } from 'lucide-react'
 import React, { memo, useMemo } from 'react'
 
 import { _36EnumsTargetCurrency as TargetCurrency } from '../../../api'
-import { ASSET_URLS } from '../../../shared/constants'
+import { CURRENCY_FLAG_URL, TOKEN_ICONS } from '../../../shared/constants'
 import { cn } from '../../../shared/utils'
-
-const TOKEN_ICON: Record<string, string> = {
-  USDC: ASSET_URLS.USDC_TOKEN_ICON,
-  USDT: ASSET_URLS.USDT_TOKEN_ICON,
-}
 
 export interface ConfirmQrProps {
   /** Recipient account / Bre-B ID (COP) */
@@ -28,11 +23,6 @@ export interface ConfirmQrProps {
   targetAmount?: string
   /** CPF/CNPJ (BRL) */
   taxId?: string
-}
-
-const FLAG_URL: Record<string, string> = {
-  BRL: 'https://hatscripts.github.io/circle-flags/flags/br.svg',
-  COP: 'https://hatscripts.github.io/circle-flags/flags/co.svg',
 }
 
 const ConfirmQr: React.FC<ConfirmQrProps> = ({
@@ -58,12 +48,12 @@ const ConfirmQr: React.FC<ConfirmQrProps> = ({
     if (isBRL) {
       return t(
         'confirm_qr.disclaimer',
-        'Tu transacción será procesada de inmediato. Asegúrate de que la llave PIX y el CPF sean correctos. Esta transacción no se puede reversar.',
+        'Your transaction will be processed immediately. Make sure the PIX key and CPF are correct. This transaction cannot be reversed.',
       )
     }
     return t(
       'confirm_qr.disclaimer_cop',
-      'Tu transacción será procesada de inmediato. Asegúrate de que el número de cuenta y datos sean los correctos. Esta transacción no se puede reversar.',
+      'Your transaction will be processed immediately. Make sure the account number and details are correct. This transaction cannot be reversed.',
     )
   }, [isBRL, t])
 
@@ -73,7 +63,7 @@ const ConfirmQr: React.FC<ConfirmQrProps> = ({
         className={cn(
           'w-full max-w-[448px] flex flex-col gap-6 rounded-[24px] p-5',
           'md:gap-8 md:p-8',
-          'bg-white/90 backdrop-blur-sm shadow-[0px_4px_20px_-2px_rgba(0,0,0,0.05)]',
+          'bg-[var(--ab-bg-card)] backdrop-blur-sm shadow-[0px_4px_20px_-2px_rgba(0,0,0,0.05)]',
         )}
       >
         {/* Header */}
@@ -87,7 +77,7 @@ const ConfirmQr: React.FC<ConfirmQrProps> = ({
             <ArrowLeft className="h-5 w-5 text-ab-text" />
           </button>
           <h2 className="text-lg font-bold leading-7 text-ab-text">
-            {t('confirm_qr.title', 'Verifica los detalles del pago')}
+            {t('confirm_qr.title', 'Verify payment details')}
           </h2>
         </div>
 
@@ -97,7 +87,7 @@ const ConfirmQr: React.FC<ConfirmQrProps> = ({
             <img
               alt={isBRL ? 'Brazil flag' : 'Colombia flag'}
               className="h-8 w-8 shrink-0 rounded-full shadow-[0px_1px_2px_0px_rgba(0,0,0,0.05)]"
-              src={FLAG_URL[currency] ?? FLAG_URL.COP}
+              src={CURRENCY_FLAG_URL[currency] ?? CURRENCY_FLAG_URL.COP}
             />
             <span className="text-[36px] leading-[40px] md:text-[48px] md:leading-[48px] font-extrabold tracking-[-1.2px] text-ab-text">
               {targetSymbol}
@@ -110,7 +100,7 @@ const ConfirmQr: React.FC<ConfirmQrProps> = ({
             <img
               alt={selectedAssetLabel}
               className="h-5 w-5 shrink-0 object-contain"
-              src={TOKEN_ICON[selectedAssetLabel] ?? TOKEN_ICON.USDC}
+              src={TOKEN_ICONS[selectedAssetLabel] ?? TOKEN_ICONS.USDC}
             />
             <span className="text-lg font-medium text-ab-text-3">
               $
@@ -120,21 +110,21 @@ const ConfirmQr: React.FC<ConfirmQrProps> = ({
         </div>
 
         {/* Transaction details — recipient info for verification */}
-        <div className="flex flex-col gap-2.5 rounded-2xl border border-ab-border bg-ab-bg-muted/50 px-3 py-3 md:px-4 md:py-4">
+        <div className="flex flex-col gap-2.5 rounded-2xl border border-ab-border bg-[var(--ab-bg-muted)] px-3 py-3 md:px-4 md:py-4">
           <h3 className="text-xs font-bold uppercase tracking-wider text-ab-text-3">
-            {t('confirm_qr.details_title', 'Detalles del destinatario')}
+            {t('confirm_qr.details_title', 'Recipient Details')}
           </h3>
           {isBRL
             ? (
                 <div className="flex flex-col gap-2 text-sm">
                   {recipientName && (
                     <div className="flex justify-between gap-3">
-                      <span className="text-ab-text-3">{t('confirm_qr.recipient_name', 'Nombre')}</span>
+                      <span className="text-ab-text-3">{t('confirm_qr.recipient_name', 'Name')}</span>
                       <span className="font-medium text-ab-text break-all text-right">{recipientName}</span>
                     </div>
                   )}
                   <div className="flex justify-between gap-3">
-                    <span className="text-ab-text-3 shrink-0">{t('confirm_qr.pix_key', 'Llave PIX')}</span>
+                    <span className="text-ab-text-3 shrink-0">{t('confirm_qr.pix_key', 'PIX Key')}</span>
                     <span className="font-medium text-ab-text break-all font-mono text-right">{pixKey || '—'}</span>
                   </div>
                   <div className="flex justify-between gap-3">
@@ -147,12 +137,12 @@ const ConfirmQr: React.FC<ConfirmQrProps> = ({
                 <div className="flex flex-col gap-2 text-sm">
                   {recipientName && (
                     <div className="flex justify-between gap-3">
-                      <span className="text-ab-text-3">{t('confirm_qr.recipient_name', 'Nombre')}</span>
+                      <span className="text-ab-text-3">{t('confirm_qr.recipient_name', 'Name')}</span>
                       <span className="font-medium text-ab-text break-all text-right">{recipientName}</span>
                     </div>
                   )}
                   <div className="flex justify-between gap-3">
-                    <span className="text-ab-text-3 shrink-0">{t('confirm_qr.account_breb', 'Cuenta / Bre-B')}</span>
+                    <span className="text-ab-text-3 shrink-0">{t('confirm_qr.account_breb', 'Account / Bre-B')}</span>
                     <span className="font-medium text-ab-text break-all font-mono text-right">{accountNumber || '—'}</span>
                   </div>
                 </div>
@@ -178,7 +168,7 @@ const ConfirmQr: React.FC<ConfirmQrProps> = ({
           onClick={onEdit}
           type="button"
         >
-          {t('confirm_qr.edit', 'Editar')}
+          {t('confirm_qr.edit', 'Edit')}
         </button>
         <button
           className={cn(
@@ -196,7 +186,7 @@ const ConfirmQr: React.FC<ConfirmQrProps> = ({
                 <Loader className="h-5 w-5 animate-spin" />
               )
             : (
-                t('confirm_qr.confirm', 'Continuar')
+                t('confirm_qr.confirm', 'Continue')
               )}
         </button>
       </div>

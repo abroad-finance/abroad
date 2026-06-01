@@ -8,7 +8,9 @@ import { TransactionStatus as ApiStatus, getTransactionStatus, _36EnumsTargetCur
 import { useWebSocketSubscription } from '@/contexts/WebSocketContext'
 import { Button } from '@/shared/components/Button'
 import { IconAnimated } from '@/shared/components/IconAnimated'
-import { ASSET_URLS } from '@/shared/constants'
+import {
+  CHAIN_ICON_MAP, CURRENCY_FLAG_URL, RAIL_LOGO_MAP, TOKEN_ICONS,
+} from '@/shared/constants'
 import { useWalletAuth } from '@/shared/hooks/useWalletAuth'
 import { cn } from '@/shared/utils'
 
@@ -27,17 +29,6 @@ const TERMINAL_STATUSES = new Set<ApiStatus>([
   'PAYMENT_FAILED',
   'WRONG_AMOUNT',
 ])
-
-const CHAIN_ICON_URL: Record<string, string> = {
-  Celo: ASSET_URLS.CELO_CHAIN_ICON,
-  Solana: ASSET_URLS.SOLANA_CHAIN_ICON,
-  Stellar: ASSET_URLS.STELLAR_CHAIN_ICON,
-}
-
-const CURRENCY_FLAG_URL: Record<string, string> = {
-  BRL: 'https://hatscripts.github.io/circle-flags/flags/br.svg',
-  COP: 'https://hatscripts.github.io/circle-flags/flags/co.svg',
-}
 
 export type TxStatusDetails = {
   accountNumber: string
@@ -116,7 +107,7 @@ const TxStatus = ({
   useWebSocketSubscription('transaction.created', handleTxEvent)
   useWebSocketSubscription('transaction.updated', handleTxEvent)
   useWebSocketSubscription('connect_error', (err) => {
-    setError(err.message || 'WS connection error')
+    setError(err.message || t('errors.ws_connection', 'WS connection error'))
   })
 
   useEffect(() => {
@@ -251,11 +242,10 @@ const TxStatus = ({
               <DetailRow
                 label={t('tx_status.deducted', 'Deducted')}
                 value={(
-                  <span className="font-bold">
+                  <span className="flex items-center gap-1.5 font-bold">
                     $
                     {txStatusDetails.sourceAmount}
-                    {' '}
-                    USDC
+                    <img alt="USDC" className="h-3.5 w-3.5" src={TOKEN_ICONS.USDC} />
                   </span>
                 )}
               />
@@ -267,12 +257,12 @@ const TxStatus = ({
                 label={t('tx_status.network', 'Network')}
                 value={(
                   <span className="flex items-center gap-2">
-                    {CHAIN_ICON_URL[txStatusDetails.network]
+                    {CHAIN_ICON_MAP[txStatusDetails.network]
                       ? (
                           <img
                             alt={txStatusDetails.network}
                             className="h-4 w-4 shrink-0 object-contain"
-                            src={CHAIN_ICON_URL[txStatusDetails.network]}
+                            src={CHAIN_ICON_MAP[txStatusDetails.network]}
                           />
                         )
                       : (
@@ -292,10 +282,13 @@ const TxStatus = ({
                       src={CURRENCY_FLAG_URL[targetCurrency]}
                     />
                   )}
-                  <span>
-                    {targetCurrency === TargetCurrency.BRL ? 'BR ' : 'CO '}
-                    {txStatusDetails.rail}
-                  </span>
+                  {RAIL_LOGO_MAP[targetCurrency] && (
+                    <img
+                      alt={txStatusDetails.rail}
+                      className="h-4 w-auto max-w-[48px] shrink-0 object-contain"
+                      src={RAIL_LOGO_MAP[targetCurrency]}
+                    />
+                  )}
                 </span>
               </div>
             </div>
@@ -318,14 +311,14 @@ const TxStatus = ({
   const renderStatusText = () => {
     switch (status) {
       case 'accepted':
-        return t('tx_status.accepted', 'Retiro Realizado')
+        return t('tx_status.accepted', 'Withdrawal Completed')
       case 'denied':
         if (apiStatus === 'PAYMENT_EXPIRED') {
-          return t('tx_status.expired', 'Transacción Expirada')
+          return t('tx_status.expired', 'Transaction Expired')
         }
-        return t('tx_status.denied', 'Transacción Rechazada')
+        return t('tx_status.denied', 'Transaction Denied')
       case 'inProgress':
-        return t('tx_status.in_progress', 'Procesando Transacción')
+        return t('tx_status.in_progress', 'Processing Transaction')
     }
   }
 
@@ -334,22 +327,22 @@ const TxStatus = ({
       case 'accepted':
         return (
           <>
-            {t('tx_status.accepted.super', '¡Super!')}
+            {t('tx_status.accepted.super', 'Great!')}
             <br />
-            {t('tx_status.accepted.message', 'Todo salió bien y tu retiro ha sido exitoso.')}
+            {t('tx_status.accepted.message', 'Everything went well and your withdrawal was successful.')}
           </>
         )
       case 'denied':
         if (apiStatus === 'PAYMENT_EXPIRED') {
-          return <>{t('tx_status.expired.message', 'El tiempo para completar el pago se agotó y la solicitud fue cancelada. Puedes generar una nueva transacción cuando estés listo.')}</>
+          return <>{t('tx_status.expired.message', 'The time to complete the payment has expired and the request was cancelled. You can create a new transaction when ready.')}</>
         }
-        return <>{t('tx_status.denied.message', 'La solicitud ha sido rechazada y tus fondos han sido devueltos. Puedes intentar nuevamente más tarde.')}</>
+        return <>{t('tx_status.denied.message', 'The request has been denied and your funds have been returned. You can try again later.')}</>
       case 'inProgress':
         return (
           <>
-            {t('tx_status.in_progress.processing', 'Tu solicitud está siendo procesada.')}
+            {t('tx_status.in_progress.processing', 'Your request is being processed.')}
             <br />
-            {t('tx_status.in_progress.wait', 'Esto tomará algunos segundos.')}
+            {t('tx_status.in_progress.wait', 'This will take a few seconds.')}
           </>
         )
     }
@@ -374,13 +367,13 @@ const TxStatus = ({
 
       {status === 'accepted' && !txStatusDetails && (
         <Button className="mt-4 w-full py-4" onClick={onNewTransaction}>
-          {t('tx_status.action.new_transaction', 'Realizar otra transacción')}
+          {t('tx_status.action.new_transaction', 'Make another transaction')}
         </Button>
       )}
 
       {status === 'denied' && (
         <Button className="mt-4 w-full py-4" onClick={onRetry}>
-          {t('tx_status.action.retry', 'Intentar Nuevamente')}
+          {t('tx_status.action.retry', 'Try Again')}
         </Button>
       )}
     </div>

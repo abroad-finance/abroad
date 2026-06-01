@@ -3,15 +3,13 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { Check, X } from 'lucide-react'
 import React, { useCallback } from 'react'
 
-import { ASSET_URLS } from '../../shared/constants'
+import { CHAIN_CONFIG, TOKEN_ICONS } from '../../shared/constants'
 import { Overlay } from './Overlay'
 
 /** Map chain label prefix to spec colors and logos (Stellar, Celo, Solana). */
-const CHAIN_THEME: Record<string, { bg: string, color: string, icon: string }> = {
-  Celo: { bg: 'var(--ab-chain-celo-bg)', color: 'var(--ab-chain-celo)', icon: ASSET_URLS.CELO_CHAIN_ICON },
-  Solana: { bg: 'var(--ab-chain-solana-bg)', color: 'var(--ab-chain-solana)', icon: ASSET_URLS.SOLANA_CHAIN_ICON },
-  Stellar: { bg: 'var(--ab-chain-stellar-bg)', color: 'var(--ab-chain-stellar)', icon: ASSET_URLS.STELLAR_CHAIN_ICON },
-}
+const CHAIN_THEME: Record<string, { bg: string, color: string, icon: string }> = Object.fromEntries(
+  Object.entries(CHAIN_CONFIG).map(([label, { bg, color, icon }]) => [label, { bg, color, icon }]),
+)
 
 export interface ChainSelectorModalProps {
   balance: string
@@ -43,9 +41,7 @@ function tokenColor(tokenId: string): { bg: string, text: string } {
 
 function tokenIconUrl(tokenIdOrLabel: string): string | undefined {
   const token = tokenIdOrLabel.split(':')[0]?.toUpperCase() ?? tokenIdOrLabel.toUpperCase()
-  if (token === 'USDC') return ASSET_URLS.USDC_TOKEN_ICON
-  if (token === 'USDT') return ASSET_URLS.USDT_TOKEN_ICON
-  return undefined
+  return TOKEN_ICONS[token]
 }
 
 function tokenSubtitle(tokenLabel: string): string {
@@ -80,7 +76,7 @@ export const ChainSelectorModal: React.FC<ChainSelectorModalProps> = ({
 
   if (!open) return null
 
-  const chainLabel = selectedChain ? getChainShortLabel(selectedChain.label) : 'Stellar'
+  const chainLabel = selectedChain ? getChainShortLabel(selectedChain.label) : t('chain.stellar', 'Stellar')
 
   return (
     <AnimatePresence>

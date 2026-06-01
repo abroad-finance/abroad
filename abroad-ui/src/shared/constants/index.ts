@@ -13,8 +13,6 @@ export const ASSET_URLS = {
   SOLANA_CHAIN_ICON: solanaSolLogo,
   STELLAR_CHAIN_ICON: stellarXlmLogo,
   STELLAR_LOGO: 'https://storage.googleapis.com/cdn-abroad/Icons/Stellar/SCF_white.svg',
-  USDC_TOKEN_ICON: 'https://storage.googleapis.com/cdn-abroad/Icons/Tokens/USDC%20Token.svg',
-  USDT_TOKEN_ICON: 'https://storage.googleapis.com/cdn-abroad/Icons/Tokens/USDT-token.svg',
 }
 
 /** Shared style for brand title text (navbar, page title, language selector). Reduces duplication for SonarCloud. */
@@ -40,3 +38,8 @@ export const AB_STYLES = {
 export const PENDING_TX_KEY = 'pendingTransaction'
 
 export const WALLET_CONNECT_ID = '5686074a7981cd147a5f0d7434a6d4b7'
+
+// Re-export consolidated configs
+export * from './chains'
+export * from './countries'
+export * from './tokens'

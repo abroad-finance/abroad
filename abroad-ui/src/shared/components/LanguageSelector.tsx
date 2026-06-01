@@ -83,14 +83,14 @@ const LanguageSelector: React.FC<LanguageSelectorProps> = ({
   }
 
   // Fallbacks (hook can override via `labels`)
-  const title = labels?.title ?? 'Configuración de Idioma'
+  const title = labels?.title ?? 'Language Settings'
   const subtitle
-    = labels?.subtitle ?? 'Selecciona tu idioma preferido para la interfaz'
-  const confirmLabel = labels?.confirm ?? 'Confirmar Selección'
+    = labels?.subtitle ?? 'Select your preferred interface language'
+  const confirmLabel = labels?.confirm ?? 'Confirm Selection'
   const hint
-    = labels?.hint ?? 'Los cambios de idioma se aplicarán inmediatamente'
-  const closeAria = labels?.closeAria ?? 'Cerrar'
-  const selectLanguageAria = ariaLabel ?? 'Seleccionar idioma'
+    = labels?.hint ?? 'Language changes will be applied immediately'
+  const closeAria = labels?.closeAria ?? 'Close'
+  const selectLanguageAria = ariaLabel ?? 'Select language'
 
   const triggerClasses
     = variant === 'mobile'

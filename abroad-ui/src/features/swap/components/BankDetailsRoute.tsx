@@ -58,7 +58,7 @@ export default function BankDetailsRoute({
             className="text-ab-text text-xl sm:text-2xl font-bold flex-grow text-center"
             id="Title"
           >
-            {t('bank_details.title', 'Datos del destinatario')}
+            {t('bank_details.title', 'Recipient Details')}
           </div>
         </div>
 
@@ -106,7 +106,7 @@ export default function BankDetailsRoute({
                       className="w-full bg-transparent font-semibold focus:outline-none text-base sm:text-lg text-ab-text"
                       inputMode="text"
                       onChange={e => onAccountNumberChange(e.target.value)}
-                      placeholder={t('bank_details.breb_key_placeholder', 'Clave BRE-B')}
+                      placeholder={t('bank_details.breb_key_placeholder', 'BRE-B Key')}
                       type="text"
                       value={accountNumber}
                     />
@@ -119,7 +119,7 @@ export default function BankDetailsRoute({
             className="relative font-medium w-full flex items-center space-x-1 text-ab-text"
             id="tx-info"
           >
-            <span className="text-sm sm:text-base">{t('bank_details.amount_to_receive', 'Monto a recibir:')}</span>
+            <span className="text-sm sm:text-base">{t('bank_details.amount_to_receive', 'Amount to receive:')}</span>
             <img
               alt={targetCurrency === TargetCurrency.BRL ? 'Brazil flag' : 'Colombia flag'}
               className="w-4 h-4 sm:w-5 sm:h-5 rounded-full"
@@ -147,7 +147,7 @@ export default function BankDetailsRoute({
                 <>
                   <div className="flex items-center space-x-2">
                     <Rotate3d className="w-4 h-4 sm:w-5 sm:h-5" />
-                    <span className="font-medium text-xs sm:text-sm">{t('bank_details.network', 'Red:')}</span>
+                    <span className="font-medium text-xs sm:text-sm">{t('bank_details.network', 'Network:')}</span>
                     <div className="bg-white/70 backdrop-blur-md rounded-lg px-2 py-1 flex items-center">
                       <img alt="PIX Logo" className="h-3 sm:h-4 w-auto" src={PixFull} />
                     </div>
@@ -155,7 +155,7 @@ export default function BankDetailsRoute({
                   <span className="font-medium text-xs pl-1 text-ab-text-muted">
                     {t(
                       'bank_details.pix_disclaimer',
-                      'Tu transacción será procesada de inmediato. Asegúrate de que la llave PIX y el CPF del destinatario sean correctos. Esta transacción no se puede reversar.',
+                      'Your transaction will be processed immediately. Make sure the recipient\'s PIX key and CPF are correct. This transaction cannot be reversed.',
                     )}
                   </span>
                 </>
@@ -164,7 +164,7 @@ export default function BankDetailsRoute({
                 <>
                   <div className="flex items-center space-x-2">
                     <Rotate3d className="w-4 h-4 sm:w-5 sm:h-5" />
-                    <span className="font-medium text-xs sm:text-sm">{t('bank_details.network', 'Red:')}</span>
+                    <span className="font-medium text-xs sm:text-sm">{t('bank_details.network', 'Network:')}</span>
                     <div className="bg-white/70 backdrop-blur-md rounded-lg px-2 py-1 flex items-center">
                       <img alt="BRE-B Logo" className="h-3 sm:h-4 w-auto" src={BreBLogo} />
                     </div>
@@ -172,7 +172,7 @@ export default function BankDetailsRoute({
                   <span className="font-medium text-xs pl-1 text-ab-text-muted">
                     {t(
                       'bank_details.breb_disclaimer',
-                      'Tu transacción será procesada de inmediato con BRE-B. Ingresa la clave correcta del destinatario; esta transacción no se puede reversar.',
+                      'Your transaction will be processed immediately with BRE-B. Enter the correct recipient key; this transaction cannot be reversed.',
                     )}
                   </span>
                 </>
@@ -186,7 +186,7 @@ export default function BankDetailsRoute({
         disabled={continueDisabled}
         onClick={onContinue}
       >
-        {t('bank_details.continue', 'Continuar')}
+        {t('bank_details.continue', 'Continue')}
       </Button>
     </div>
   )
