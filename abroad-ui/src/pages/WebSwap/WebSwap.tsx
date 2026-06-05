@@ -1,7 +1,7 @@
 import { useTranslate } from '@tolgee/react'
 import { Loader } from 'lucide-react'
 import React, {
-  lazy, Suspense, useCallback, useEffect, useMemo, useState,
+  lazy, Suspense, useCallback, useMemo, useState,
 } from 'react'
 
 import type { BankDetailsRouteProps } from '../../features/swap/components/BankDetailsRoute'
@@ -28,7 +28,6 @@ import WaitSign from '../../features/swap/components/WaitSign'
 import WebSwapLayout from '../../features/swap/components/WebSwapLayout'
 import { useWalletDetails } from '../../features/swap/hooks/useWalletDetails'
 import { transactionMatchesChain } from '../../features/swap/utils/corridorHelpers'
-import { useUserTransactions } from '../../services/useUserTransactions'
 import LanguageSelector from '../../shared/components/LanguageSelector'
 import { AB_STYLES, ASSET_URLS, CHAIN_ICON_MAP } from '../../shared/constants'
 import { useLanguageSelector, useNavBarResponsive, useVersionCheck } from '../../shared/hooks'
@@ -72,6 +71,7 @@ export interface WebSwapControllerProps {
   transactionId: null | string
   txStatusDetails: {
     accountNumber: string
+    cryptoCurrency: string
     network: string
     rail: string
     sourceAmount: string
@@ -188,26 +188,14 @@ const WebSwap: React.FC = () => {
   const [hasEnteredApp, setHasEnteredApp] = useState(false)
   const handleEnterApp = useCallback(() => setHasEnteredApp(true), [])
 
-  // Fetch user transactions (for fallback summaries only; HistorySheet uses walletDetails.transactions)
-  const { fetchTransactions, recentTransactions: txSummaries } = useUserTransactions(swapViewProps.isAuthenticated, selectedChainKey)
-
+  // User-scoped transactions (same source as HistorySheet) feed both the home
+  // "Recent" list and the full history sheet, keeping them consistent.
   const historySheetTransactions: TxDetailItem[] = useMemo(() => {
     const list = selectedChainKey
       ? walletDetails.transactions.filter(tx => transactionMatchesChain(tx, selectedChainKey))
       : walletDetails.transactions
     return list.map(transactionToTxDetailItem)
   }, [walletDetails.transactions, selectedChainKey])
-
-  // Fetch transactions on mount, when authenticated changes, and when navigating to home
-  useEffect(() => {
-    if (swapViewProps.isAuthenticated && view === 'home') {
-      fetchTransactions({ confirmedOnly: true, pageSize: 10 })
-    }
-  }, [
-    swapViewProps.isAuthenticated,
-    view,
-    fetchTransactions,
-  ])
 
   const openSourceModal = useCallback(() => setSourceModalOpen(true), [])
   const closeSourceModal = useCallback(() => setSourceModalOpen(false), [])
@@ -310,7 +298,6 @@ const WebSwap: React.FC = () => {
                         .slice(0, 2)
                     : walletDetails.transactions.slice(0, 2)
                 }
-                recentTransactionsFallback={txSummaries}
                 selectedChainKey={selectedChainKey}
                 selectedTokenLabel={swapViewProps.selectedAssetLabel}
                 targetCurrency={targetCurrency}
