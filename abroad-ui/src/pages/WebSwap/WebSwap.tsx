@@ -251,11 +251,7 @@ const WebSwap: React.FC = () => {
   return (
     <div
       className="w-full h-dvh overflow-hidden flex flex-col"
-      style={{
-        background: isMiniPay
-          ? 'linear-gradient(180deg, #f5fbf8 0%, #e8f4ee 100%)'
-          : 'linear-gradient(135deg, var(--ab-bg), var(--ab-bg-end))',
-      }}
+      style={{ background: 'linear-gradient(135deg, var(--ab-bg), var(--ab-bg-end))' }}
     >
       {/* Shared Navigation */}
       <div className="relative z-10">
@@ -278,7 +274,7 @@ const WebSwap: React.FC = () => {
       {/* Main Content Area */}
       <main className="flex-1 min-h-0 relative z-10 flex">
         <WebSwapLayout
-          disclosure={isMiniPay ? <MiniPayDisclosure /> : null}
+          disclosure={isMiniPay ? <MiniPayDisclosure isDark={navBar.isDark} /> : null}
           isMiniPay={isMiniPay}
           slots={{
             bankDetails: <BankDetailsRoute {...bankDetailsProps} />,
@@ -317,7 +313,7 @@ const WebSwap: React.FC = () => {
               />
             ),
             kycNeeded: (
-              <UserVerification onApproved={handleKycApproved} onClose={handleBackToSwap} />
+              <UserVerification isDark={navBar.isDark} onApproved={handleKycApproved} onClose={handleBackToSwap} />
             ),
             swap: (
               <Swap
@@ -347,7 +343,7 @@ const WebSwap: React.FC = () => {
                 txStatusDetails={txStatusDetails}
               />
             ),
-            waitSign: <WaitSign />,
+            waitSign: <WaitSign isDark={navBar.isDark} />,
           }}
           targetCurrency={targetCurrency}
           view={view}

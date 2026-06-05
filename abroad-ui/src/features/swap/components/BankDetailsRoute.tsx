@@ -41,7 +41,7 @@ export default function BankDetailsRoute({
   return (
     <div className="flex-1 flex items-center justify-center w-full flex-col">
       <div
-        className="w-full rounded-2xl p-4 md:p-6 flex flex-col items-center space-y-4 bg-abroad-dark/5 backdrop-blur-xl min-h-0"
+        className="w-full rounded-2xl p-4 md:p-6 flex flex-col items-center space-y-4 bg-[var(--ab-card)] border border-[var(--ab-border)] backdrop-blur-xl min-h-0"
         id="bg-container"
       >
         {/* Header */}
@@ -68,7 +68,7 @@ export default function BankDetailsRoute({
             ? (
                 <>
                   {/* PIX Key */}
-                  <div className="w-full bg-white/60 backdrop-blur-xl rounded-2xl p-4 md:p-6 flex items-center space-x-3" id="pix-key-input">
+                  <div className="w-full bg-[var(--ab-bg-subtle)] border border-[var(--ab-border)] backdrop-blur-xl rounded-2xl p-4 md:p-6 flex items-center space-x-3" id="pix-key-input">
                     <Hash className="w-5 h-5 sm:w-6 sm:h-6 text-ab-text" />
                     <input
                       className="w-full bg-transparent font-semibold focus:outline-none text-base sm:text-lg text-ab-text"
@@ -80,7 +80,7 @@ export default function BankDetailsRoute({
                     />
                   </div>
                   {/* CPF */}
-                  <div className="w-full bg-white/60 backdrop-blur-xl rounded-2xl p-4 md:p-6 flex items-center space-x-3" id="cpf-input">
+                  <div className="w-full bg-[var(--ab-bg-subtle)] border border-[var(--ab-border)] backdrop-blur-xl rounded-2xl p-4 md:p-6 flex items-center space-x-3" id="cpf-input">
                     <Hash className="w-5 h-5 sm:w-6 sm:h-6 text-ab-text" />
                     <input
                       className="w-full bg-transparent font-semibold focus:outline-none text-base sm:text-lg text-ab-text"
@@ -98,7 +98,7 @@ export default function BankDetailsRoute({
                 <>
                   {/* BreB key */}
                   <div
-                    className="w-full bg-white/60 backdrop-blur-xl rounded-2xl p-4 md:p-6 flex items-center space-x-3"
+                    className="w-full bg-[var(--ab-bg-subtle)] border border-[var(--ab-border)] backdrop-blur-xl rounded-2xl p-4 md:p-6 flex items-center space-x-3"
                     id="recipient-key-input"
                   >
                     <Hash className="w-5 h-5 sm:w-6 sm:h-6 text-ab-text" />
@@ -139,7 +139,7 @@ export default function BankDetailsRoute({
 
         {/* Disclaimer */}
         <div
-          className="relative w-full bg-white/10 backdrop-blur-xl rounded-2xl p-3 sm:p-4 flex flex-col space-y-2 text-ab-text-muted"
+          className="relative w-full bg-[var(--ab-bg-muted)] border border-[var(--ab-border)] backdrop-blur-xl rounded-2xl p-3 sm:p-4 flex flex-col space-y-2 text-ab-text-muted"
           id="transfer-disclaimer"
         >
           {targetCurrency === TargetCurrency.BRL

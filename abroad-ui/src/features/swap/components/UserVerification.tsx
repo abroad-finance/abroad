@@ -10,11 +10,12 @@ import { IconAnimated } from '../../../shared/components/IconAnimated'
 import { useWalletAuth } from '../../../shared/hooks/useWalletAuth'
 
 interface UserVerificationProps {
+  isDark?: boolean
   onApproved?: () => void
   onClose: () => void
 }
 
-const UserVerification = ({ onApproved, onClose }: UserVerificationProps): React.JSX.Element => {
+const UserVerification = ({ isDark = false, onApproved, onClose }: UserVerificationProps): React.JSX.Element => {
   const { t } = useTranslate()
   const { addNotice } = useNotices()
   const { kycUrl, setKycUrl } = useWalletAuth()
@@ -67,24 +68,25 @@ const UserVerification = ({ onApproved, onClose }: UserVerificationProps): React
   useWebSocketSubscription('kyc.updated', handleKycUpdate)
   return (
     <div className="flex-1 flex items-center justify-center w-full flex-col">
-      <div className="w-full max-w-md min-h-[60vh] bg-abroad-dark/5 backdrop-blur-xl rounded-2xl p-4 md:p-6 flex flex-col items-center justify-center space-y-1 lg:space-y-4 text-abroad-dark md:text-[var(--ab-text)]">
+      <div className="w-full max-w-md min-h-[60vh] bg-[var(--ab-card)] border border-[var(--ab-border)] backdrop-blur-xl rounded-2xl p-4 md:p-6 flex flex-col items-center justify-center space-y-1 lg:space-y-4 text-[var(--ab-text)]">
         <button
           aria-label={t('user_verification.close', 'Close')}
-          className="fixed top-4 right-4 z-20 rounded-full bg-white/90 p-2 shadow-md md:top-6 md:right-6"
+          className="fixed top-4 right-4 z-20 rounded-full bg-[var(--ab-bg-card)] border border-[var(--ab-border)] p-2 shadow-md md:top-6 md:right-6"
           onClick={onClose}
         >
-          <X className="w-5 h-5 text-abroad-dark" />
+          <X className="w-5 h-5 text-[var(--ab-text)]" />
         </button>
-        <div className="block md:hidden">
-          <IconAnimated colors="primary:#26A17B,secondary:#73B9A3" icon="MagnifyingGlass" loop={true} play={true} size={150} />
-        </div>
-        <div className="hidden md:block">
-          <IconAnimated colors="primary:#ffffff,secondary:#ffffff" icon="MagnifyingGlass" loop={true} play={true} size={150} />
-        </div>
+        <IconAnimated
+          colors={isDark ? 'primary:#e0f0ec,secondary:#73B9A3' : 'primary:#26A17B,secondary:#73B9A3'}
+          icon="MagnifyingGlass"
+          loop={true}
+          play={true}
+          size={150}
+        />
         <h2 className="text-xl font-semibold text-center mb-4 ">
           {t('user_verification.title', 'User verification required')}
         </h2>
-        <p className="text-center mb-6">
+        <p className="text-center mb-6 text-[var(--ab-text-secondary)]">
           {t('user_verification.subtitle', 'Verify your account to access all features.')}
         </p>
       </div>
