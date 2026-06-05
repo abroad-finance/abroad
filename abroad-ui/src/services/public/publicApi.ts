@@ -1,6 +1,5 @@
 import type { TransactionStatus } from '../../api'
 import type { ApiResult } from '../http/types'
-import type { PaginatedTransactionList } from './transactionTypes'
 import type {
   AcceptTransactionRequest,
   AcceptTransactionResponse,
@@ -81,24 +80,5 @@ export const getTransactionStatus = async (
   return httpClient.request<TransactionStatusResponse>(`/transaction/${encodeURIComponent(transactionId)}`, {
     method: 'GET',
     signal: options?.signal ?? null,
-  })
-}
-
-export const getUserTransactions = async (
-  options?: { confirmedOnly?: boolean, page?: number, pageSize?: number, signal?: AbortSignal | null },
-): Promise<ApiResult<PaginatedTransactionList>> => {
-  const {
-    confirmedOnly = false,
-    page = 1,
-    pageSize = 20,
-    signal = null,
-  } = options ?? {}
-
-  const endpoint = confirmedOnly ? '/transactions/list/confirmed' : '/transactions/list'
-
-  return httpClient.request<PaginatedTransactionList>(endpoint, {
-    method: 'GET',
-    query: { page, pageSize },
-    signal,
   })
 }

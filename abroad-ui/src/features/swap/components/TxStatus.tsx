@@ -32,6 +32,7 @@ const TERMINAL_STATUSES = new Set<ApiStatus>([
 
 export type TxStatusDetails = {
   accountNumber: string
+  cryptoCurrency: string
   network: string
   rail: string
   sourceAmount: string
@@ -245,7 +246,7 @@ const TxStatus = ({
                   <span className="flex items-center gap-1.5 font-bold">
                     $
                     {txStatusDetails.sourceAmount}
-                    <img alt="USDC" className="h-3.5 w-3.5" src={TOKEN_ICONS.USDC} />
+                    <img alt={txStatusDetails.cryptoCurrency} className="h-3.5 w-3.5" src={TOKEN_ICONS[txStatusDetails.cryptoCurrency] ?? TOKEN_ICONS.USDC} />
                   </span>
                 )}
               />
