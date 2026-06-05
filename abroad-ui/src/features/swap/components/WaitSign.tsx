@@ -23,7 +23,7 @@ const WaitSign = ({ isDark = false }: WaitSignProps): React.JSX.Element => {
           {t('wait_sign.wait_sign', 'Confirm your payment in your wallet')}
         </h2>
         <p className="text-center mb-6 text-[var(--ab-text-secondary)]">
-          {t('wait_sign.wait_message', 'MiniPay will ask you to confirm the transaction.')}
+          {t('wait_sign.wait_message', 'Your wallet will ask you to confirm the transaction.')}
         </p>
       </div>
     </div>
