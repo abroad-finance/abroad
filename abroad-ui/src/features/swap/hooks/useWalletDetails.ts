@@ -68,6 +68,19 @@ export function useWalletDetails(params: Params = {}): WalletDetailsProps {
     }
   }, [])
 
+  // Reset transaction state whenever the active user (wallet) changes, so a
+  // previous user's transactions never bleed into a different user's view.
+  const transactionUserId = wallet?.address && wallet?.chainId
+    ? `${wallet.chainId}:${wallet.address}`
+    : null
+  useEffect(() => {
+    transactionsRef.current = []
+    setTransactions([])
+    setSelectedTransaction(null)
+    setTransactionError(null)
+    setPagination({ currentPage: 0, hasMore: false, total: 0 })
+  }, [transactionUserId])
+
   const loadTransactions = useCallback(async ({ append, page }: { append: boolean, page: number }) => {
     if (!walletAuthentication?.jwtToken) {
       setTransactionError(t('wallet_details.error.no_token', 'No authentication token available'))

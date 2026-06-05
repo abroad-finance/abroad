@@ -1,7 +1,7 @@
 import { useTranslate } from '@tolgee/react'
 import { Loader } from 'lucide-react'
 import React, {
-  lazy, Suspense, useCallback, useEffect, useMemo, useState,
+  lazy, Suspense, useCallback, useMemo, useState,
 } from 'react'
 
 import type { BankDetailsRouteProps } from '../../features/swap/components/BankDetailsRoute'
@@ -28,7 +28,6 @@ import WaitSign from '../../features/swap/components/WaitSign'
 import WebSwapLayout from '../../features/swap/components/WebSwapLayout'
 import { useWalletDetails } from '../../features/swap/hooks/useWalletDetails'
 import { transactionMatchesChain } from '../../features/swap/utils/corridorHelpers'
-import { useUserTransactions } from '../../services/useUserTransactions'
 import LanguageSelector from '../../shared/components/LanguageSelector'
 import { AB_STYLES, ASSET_URLS, CHAIN_ICON_MAP } from '../../shared/constants'
 import { useLanguageSelector, useNavBarResponsive, useVersionCheck } from '../../shared/hooks'
@@ -72,6 +71,7 @@ export interface WebSwapControllerProps {
   transactionId: null | string
   txStatusDetails: {
     accountNumber: string
+    cryptoCurrency: string
     network: string
     rail: string
     sourceAmount: string
@@ -188,26 +188,14 @@ const WebSwap: React.FC = () => {
   const [hasEnteredApp, setHasEnteredApp] = useState(false)
   const handleEnterApp = useCallback(() => setHasEnteredApp(true), [])
 
-  // Fetch user transactions (for fallback summaries only; HistorySheet uses walletDetails.transactions)
-  const { fetchTransactions, recentTransactions: txSummaries } = useUserTransactions(swapViewProps.isAuthenticated, selectedChainKey)
-
+  // User-scoped transactions (same source as HistorySheet) feed both the home
+  // "Recent" list and the full history sheet, keeping them consistent.
   const historySheetTransactions: TxDetailItem[] = useMemo(() => {
     const list = selectedChainKey
       ? walletDetails.transactions.filter(tx => transactionMatchesChain(tx, selectedChainKey))
       : walletDetails.transactions
     return list.map(transactionToTxDetailItem)
   }, [walletDetails.transactions, selectedChainKey])
-
-  // Fetch transactions on mount, when authenticated changes, and when navigating to home
-  useEffect(() => {
-    if (swapViewProps.isAuthenticated && view === 'home') {
-      fetchTransactions({ confirmedOnly: true, pageSize: 10 })
-    }
-  }, [
-    swapViewProps.isAuthenticated,
-    view,
-    fetchTransactions,
-  ])
 
   const openSourceModal = useCallback(() => setSourceModalOpen(true), [])
   const closeSourceModal = useCallback(() => setSourceModalOpen(false), [])
@@ -251,11 +239,7 @@ const WebSwap: React.FC = () => {
   return (
     <div
       className="w-full h-dvh overflow-hidden flex flex-col"
-      style={{
-        background: isMiniPay
-          ? 'linear-gradient(180deg, #f5fbf8 0%, #e8f4ee 100%)'
-          : 'linear-gradient(135deg, var(--ab-bg), var(--ab-bg-end))',
-      }}
+      style={{ background: 'linear-gradient(135deg, var(--ab-bg), var(--ab-bg-end))' }}
     >
       {/* Shared Navigation */}
       <div className="relative z-10">
@@ -278,7 +262,7 @@ const WebSwap: React.FC = () => {
       {/* Main Content Area */}
       <main className="flex-1 min-h-0 relative z-10 flex">
         <WebSwapLayout
-          disclosure={isMiniPay ? <MiniPayDisclosure /> : null}
+          disclosure={isMiniPay ? <MiniPayDisclosure isDark={navBar.isDark} /> : null}
           isMiniPay={isMiniPay}
           slots={{
             bankDetails: <BankDetailsRoute {...bankDetailsProps} />,
@@ -310,14 +294,13 @@ const WebSwap: React.FC = () => {
                         .slice(0, 2)
                     : walletDetails.transactions.slice(0, 2)
                 }
-                recentTransactionsFallback={txSummaries}
                 selectedChainKey={selectedChainKey}
                 selectedTokenLabel={swapViewProps.selectedAssetLabel}
                 targetCurrency={targetCurrency}
               />
             ),
             kycNeeded: (
-              <UserVerification onApproved={handleKycApproved} onClose={handleBackToSwap} />
+              <UserVerification isDark={navBar.isDark} onApproved={handleKycApproved} onClose={handleBackToSwap} />
             ),
             swap: (
               <Swap
@@ -347,7 +330,7 @@ const WebSwap: React.FC = () => {
                 txStatusDetails={txStatusDetails}
               />
             ),
-            waitSign: <WaitSign />,
+            waitSign: <WaitSign isDark={navBar.isDark} />,
           }}
           targetCurrency={targetCurrency}
           view={view}

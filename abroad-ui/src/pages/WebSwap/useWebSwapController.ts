@@ -1241,15 +1241,36 @@ export const useWebSwapController = (): WebSwapControllerProps => {
   const selectCurrency = useCallback((currency: TargetCurrency) => {
     setCurrencyMenuOpen()
     miniPayManualAssetSelectionRef.current = false
+    // Preserve the current network/wallet when the new currency supports it, so
+    // switching currency does not change the active wallet or force a reconnect.
+    // Fall back to the default (stellar-first → supported network) only when the
+    // currency has no corridor on the current chain.
+    const currentChainKey = activeChainKey
+    const currentCrypto = selectedCorridor?.cryptoCurrency
+    const currencyCorridors = scopedCorridors.filter(corridor => corridor.targetCurrency === currency)
+    const preservedCorridor = currentChainKey
+      ? (currencyCorridors.find(corridor => chainKeyOf(corridor) === currentChainKey && corridor.cryptoCurrency === currentCrypto)
+        ?? currencyCorridors.find(corridor => chainKeyOf(corridor) === currentChainKey))
+      : undefined
     dispatch({ type: 'RESET' })
     dispatch({ targetCurrency: currency, type: 'SET_TARGET_CURRENCY' })
     setQuoteBelowMinimum(false)
-    dispatch({ corridorKey: '', type: 'SET_CORRIDOR' })
-    setChainKey('')
+    if (preservedCorridor) {
+      dispatch({ corridorKey: corridorKeyOf(preservedCorridor), type: 'SET_CORRIDOR' })
+      setChainKey(chainKeyOf(preservedCorridor))
+    }
+    else {
+      dispatch({ corridorKey: '', type: 'SET_CORRIDOR' })
+      setChainKey('')
+    }
     lastEditedRef.current = null
     directAbortRef.current?.abort()
     reverseAbortRef.current?.abort()
-  }, [])
+  }, [
+    activeChainKey,
+    scopedCorridors,
+    selectedCorridor,
+  ])
 
   const selectChain = useCallback((key: string) => {
     setChainMenuOpen()
@@ -1885,6 +1906,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     }
     return {
       accountNumber: state.accountNumber,
+      cryptoCurrency: selectedCorridor?.cryptoCurrency ?? 'USDC',
       network: selectedCorridor ? formatChainLabel(selectedCorridor.blockchain) : '',
       rail,
       sourceAmount: state.sourceAmount,
