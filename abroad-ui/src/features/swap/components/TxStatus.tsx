@@ -220,7 +220,7 @@ const TxStatus = ({
           <div className="mb-8">{renderIcon()}</div>
 
           {/* Title – Figma 17:50 */}
-          <h1 className="mb-2 text-center text-[30px] font-bold leading-9 text-ab-text">
+          <h1 className="mb-2 text-center text-[clamp(1.1rem,5vw,1.6rem)] font-bold leading-tight text-ab-text">
             {t('tx_status.payment_confirmed', 'Payment Confirmed!')}
           </h1>
 
