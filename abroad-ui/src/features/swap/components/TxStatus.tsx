@@ -354,7 +354,7 @@ const TxStatus = ({
       {error && <div className="text-ab-error text-sm">{error}</div>}
 
       <div
-        className="relative w-full max-w-md min-h-[60vh] rounded-2xl bg-ab-card/5 p-6 backdrop-blur-xl flex flex-col items-center justify-center space-y-4"
+        className="relative w-full max-w-md py-[clamp(2.5rem,8vh,5rem)] rounded-2xl bg-ab-card/5 p-6 backdrop-blur-xl flex flex-col items-center justify-center space-y-4"
         id="bg-container"
       >
         <div>{renderIcon()}</div>
