@@ -2,6 +2,7 @@ import { TransactionStatus } from '@prisma/client'
 import { NotFound } from 'http-errors'
 import { inject, injectable } from 'inversify'
 
+import { isKycTemporarilyDisabled } from '../../../app/config/kyc'
 import { TYPES } from '../../../app/container/types'
 import { IDatabaseClientProvider } from '../../../platform/persistence/IDatabaseClientProvider'
 import { uuidToBase64 } from '../infrastructure/transactionEncoding'
@@ -37,10 +38,12 @@ export class TransactionStatusService {
     }
 
     const transactionReference = uuidToBase64(transaction.id)
-    const kyc = await prismaClient.partnerUserKyc.findFirst({
-      orderBy: { createdAt: 'desc' },
-      where: { partnerUserId: transaction.partnerUserId },
-    })
+    const kyc = isKycTemporarilyDisabled()
+      ? null
+      : await prismaClient.partnerUserKyc.findFirst({
+          orderBy: { createdAt: 'desc' },
+          where: { partnerUserId: transaction.partnerUserId },
+        })
 
     return {
       id: transaction.id,

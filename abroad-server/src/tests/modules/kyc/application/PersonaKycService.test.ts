@@ -147,4 +147,21 @@ describe('PersonaKycService.getNextTier', () => {
   it('requires BASIC once above the CO exemption threshold', () => {
     expect(getNextTier('CO', KYC_EXEMPTION_USD_THRESHOLD + 1, KYCTier.NONE)).toBe(KYCTier.BASIC)
   })
+
+  it('never requires a tier while KYC is temporarily disabled', () => {
+    const originalEnforceKyc = process.env.ENFORCE_KYC
+    delete process.env.ENFORCE_KYC
+    try {
+      expect(getNextTier('BR', 2_000, KYCTier.NONE)).toBeNull()
+      expect(getNextTier('CO', 1_000_000, KYCTier.NONE)).toBeNull()
+    }
+    finally {
+      if (originalEnforceKyc === undefined) {
+        delete process.env.ENFORCE_KYC
+      }
+      else {
+        process.env.ENFORCE_KYC = originalEnforceKyc
+      }
+    }
+  })
 })

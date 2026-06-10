@@ -1,3 +1,7 @@
+// KYC enforcement is temporarily disabled by default (see src/app/config/kyc.ts).
+// Tests run with enforcement on so tier/exemption logic stays covered.
+process.env.ENFORCE_KYC = 'true'
+
 const shouldSilenceConsole = process.env.SHOW_TEST_LOGS !== 'true'
 
 type ConsoleMethod = 'error' | 'log' | 'warn'
