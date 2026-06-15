@@ -12,7 +12,9 @@ import packageJson from '../../../package.json'
 import { mapErrorToHttpResponse } from '../../core/errors'
 import { ILogger } from '../../core/logging/types'
 import { requestContextMiddleware } from '../../core/requestContext'
+import { TransferoCallbackRegistrar } from '../../modules/treasury/infrastructure/exchangeProviders/TransferoCallbackRegistrar'
 import { initSentry, setupSentryExpressErrorHandler } from '../../platform/observability/sentry'
+import { ISecretManager } from '../../platform/secrets/ISecretManager'
 import { initAdmin } from '../admin/admin'
 import { RuntimeConfig } from '../config/runtime'
 import { iocContainer } from '../container'
@@ -166,6 +168,20 @@ async function start() {
     logger.warn('AdminJS failed to initialize', error)
     // Preserve legacy console warning for operational visibility and tests
     console.warn('AdminJS failed to initialize:', error)
+  }
+
+  // Ensure Transfero is subscribed to deposit/credit callbacks so incoming
+  // deposits notify our webhook and AWAIT_EXCHANGE_BALANCE steps resume.
+  // Idempotent and best-effort: it must never block service startup.
+  try {
+    const callbackRegistrar = new TransferoCallbackRegistrar(
+      iocContainer.get<ISecretManager>(TYPES.ISecretManager),
+      logger,
+    )
+    void callbackRegistrar.ensureSubscriptions()
+  }
+  catch (e) {
+    logger.warn('Failed to start Transfero callback registration', e instanceof Error ? e : new Error(String(e)))
   }
 
   const port = RuntimeConfig.server.port
