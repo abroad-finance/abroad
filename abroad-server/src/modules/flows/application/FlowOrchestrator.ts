@@ -120,25 +120,43 @@ export class FlowOrchestrator {
 
   public async run(flowInstanceId: string): Promise<void> {
     const prisma = await this.dbProvider.getClient()
-    await prisma.flowInstance.updateMany({
-      data: { status: FlowInstanceStatus.IN_PROGRESS },
-      where: { id: flowInstanceId, status: FlowInstanceStatus.WAITING },
+
+    // Acquire lock and claim first step in a short transaction
+    let claimed = await prisma.$transaction(async (tx) => {
+      const locked: Array<{ id: string }> = await tx.$queryRawUnsafe(
+        'SELECT id FROM "FlowInstance" WHERE id = $1 FOR UPDATE SKIP LOCKED',
+        flowInstanceId,
+      )
+
+      if (locked.length === 0) {
+        this.logger.info('Flow instance locked by another caller; skipping', { flowInstanceId })
+        return null
+      }
+
+      await tx.flowInstance.updateMany({
+        data: { status: FlowInstanceStatus.IN_PROGRESS },
+        where: { id: flowInstanceId, status: FlowInstanceStatus.WAITING },
+      })
+
+      return this.claimNextStep(tx, flowInstanceId)
     })
-    let claimed = await this.claimNextStep(prisma, flowInstanceId)
 
     while (claimed) {
       const current = claimed
       const runtime = await this.buildRuntimeContext(flowInstanceId)
       const snapshot = this.readSnapshot(runtime.flowSnapshot)
       const stepDefinition = snapshot.steps.find(step => step.stepOrder === current.stepOrder)
+
       if (!stepDefinition) {
-        await prisma.flowStepInstance.update({
-          data: { endedAt: new Date(), error: { message: 'Step definition missing' }, status: FlowStepStatus.FAILED },
-          where: { id: current.id },
-        })
-        await prisma.flowInstance.update({
-          data: { status: FlowInstanceStatus.FAILED },
-          where: { id: flowInstanceId },
+        await prisma.$transaction(async (tx) => {
+          await tx.flowStepInstance.update({
+            data: { endedAt: new Date(), error: { message: 'Step definition missing' }, status: FlowStepStatus.FAILED },
+            where: { id: current.id },
+          })
+          await tx.flowInstance.update({
+            data: { status: FlowInstanceStatus.FAILED },
+            where: { id: flowInstanceId },
+          })
         })
         return
       }
@@ -153,36 +171,65 @@ export class FlowOrchestrator {
         },
         where: { id: current.id },
       })
+
+      // Execute OUTSIDE the transaction — this is where HTTP calls happen
       const result = await executor.execute({
         config: stepDefinition.config,
         runtime,
         stepOrder: current.stepOrder,
       })
 
-      await this.persistStepOutcome(current.id, result)
+      // Persist outcome, promote next step, and claim — all in a short transaction with lock
+      claimed = await prisma.$transaction(async (tx) => {
+        const locked: Array<{ id: string }> = await tx.$queryRawUnsafe(
+          'SELECT id FROM "FlowInstance" WHERE id = $1 FOR UPDATE SKIP LOCKED',
+          flowInstanceId,
+        )
 
-      if (result.outcome === 'waiting' || result.outcome === 'failed') {
-        await prisma.flowInstance.update({
-          data: {
-            status: result.outcome === 'waiting' ? FlowInstanceStatus.WAITING : FlowInstanceStatus.FAILED,
-          },
+        if (locked.length === 0) {
+          this.logger.warn('Flow instance lock lost after execution; skipping outcome persistence', {
+            flowInstanceId,
+            stepOrder: current.stepOrder,
+          })
+          return null
+        }
+
+        await this.persistStepOutcome(current.id, result, tx)
+
+        if (result.outcome === 'waiting' || result.outcome === 'failed') {
+          await tx.flowInstance.update({
+            data: {
+              status: result.outcome === 'waiting' ? FlowInstanceStatus.WAITING : FlowInstanceStatus.FAILED,
+            },
+            where: { id: flowInstanceId },
+          })
+          return null
+        }
+
+        const nextOrder = this.resolveNextOrder(snapshot.steps, current.stepOrder)
+        if (nextOrder !== null) {
+          await tx.flowStepInstance.updateMany({
+            data: { status: FlowStepStatus.READY },
+            where: {
+              flowInstanceId,
+              status: FlowStepStatus.NOT_STARTED,
+              stepOrder: nextOrder,
+            },
+          })
+        }
+        await tx.flowInstance.update({
+          data: { currentStepOrder: nextOrder },
           where: { id: flowInstanceId },
         })
-        return
-      }
 
-      const nextOrder = this.resolveNextOrder(snapshot.steps, current.stepOrder)
-      await prisma.flowInstance.update({
-        data: { currentStepOrder: nextOrder },
-        where: { id: flowInstanceId },
+        return this.claimNextStep(tx, flowInstanceId)
       })
-
-      claimed = await this.claimNextStep(prisma, flowInstanceId)
     }
 
-    await prisma.flowInstance.update({
+    // Complete the flow if no more steps
+    await prisma.flowInstance.updateMany({
       data: { status: FlowInstanceStatus.COMPLETED },
-      where: { id: flowInstanceId },
+      where: { id: flowInstanceId, status: FlowInstanceStatus.IN_PROGRESS },
     })
   }
 
@@ -244,7 +291,8 @@ export class FlowOrchestrator {
         flowSnapshot: this.normalizeJson(snapshot),
         status: FlowInstanceStatus.IN_PROGRESS,
         steps: {
-          create: snapshot.steps.map(step => ({
+          create: snapshot.steps.map((step, index) => ({
+            status: index === 0 ? FlowStepStatus.READY : FlowStepStatus.NOT_STARTED,
             stepOrder: step.stepOrder,
             stepType: step.stepType,
           })),
@@ -257,8 +305,11 @@ export class FlowOrchestrator {
     await this.run(instance.id)
   }
 
-  private async buildRuntimeContext(flowInstanceId: string): Promise<FlowStepRuntimeContext & { flowSnapshot: unknown }> {
-    const prisma = await this.dbProvider.getClient()
+  private async buildRuntimeContext(
+    flowInstanceId: string,
+    txClient?: Awaited<ReturnType<IDatabaseClientProvider['getClient']>> | Prisma.TransactionClient,
+  ): Promise<FlowStepRuntimeContext & { flowSnapshot: unknown }> {
+    const prisma = txClient ?? await this.dbProvider.getClient()
     const instance = await prisma.flowInstance.findUnique({
       include: { steps: true },
       where: { id: flowInstanceId },
@@ -354,7 +405,7 @@ export class FlowOrchestrator {
     }
   }
 
-  private async claimNextStep(prisma: Awaited<ReturnType<IDatabaseClientProvider['getClient']>>, flowInstanceId: string) {
+  private async claimNextStep(prisma: Awaited<ReturnType<IDatabaseClientProvider['getClient']>> | Prisma.TransactionClient, flowInstanceId: string) {
     const next = await prisma.flowStepInstance.findFirst({
       orderBy: { stepOrder: 'asc' },
       where: { flowInstanceId, status: FlowStepStatus.READY },
@@ -398,13 +449,17 @@ export class FlowOrchestrator {
     return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue
   }
 
-  private async persistStepOutcome(stepInstanceId: string, result: {
-    correlation?: Record<string, unknown>
-    error?: string
-    outcome: 'failed' | 'succeeded' | 'waiting'
-    output?: Record<string, unknown>
-  }): Promise<void> {
-    const prisma = await this.dbProvider.getClient()
+  private async persistStepOutcome(
+    stepInstanceId: string,
+    result: {
+      correlation?: Record<string, unknown>
+      error?: string
+      outcome: 'failed' | 'succeeded' | 'waiting'
+      output?: Record<string, unknown>
+    },
+    txClient?: Awaited<ReturnType<IDatabaseClientProvider['getClient']>> | Prisma.TransactionClient,
+  ): Promise<void> {
+    const prisma = txClient ?? await this.dbProvider.getClient()
     const now = new Date()
 
     if (result.outcome === 'waiting') {

@@ -271,6 +271,7 @@ enum FlowInstanceStatus {
 }
 
 enum FlowStepStatus {
+  NOT_STARTED
   READY
   RUNNING
   WAITING
@@ -441,7 +442,7 @@ model FlowStepInstance {
   flowInstance   FlowInstance  @relation(fields: [flowInstanceId], references: [id], onDelete: Cascade)
   stepOrder      Int
   stepType       FlowStepType
-  status         FlowStepStatus @default(READY)
+  status         FlowStepStatus @default(NOT_STARTED)
   attempts       Int           @default(0)
   maxAttempts    Int           @default(3)
   input          Json?
