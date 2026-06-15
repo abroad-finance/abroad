@@ -125,6 +125,25 @@ describe('WebhookController', () => {
     expect(queueHandler.postMessage).toHaveBeenCalledWith(QueueName.EXCHANGE_BALANCE_UPDATED, { provider: 'transfero' })
   })
 
+  it('enqueues Transfero credit-transaction webhooks (amount object, no top-level tax fields)', async () => {
+    const { badRequest, serverError } = setupResponses()
+    const request = { headers: { 'x-id': '1' } } as unknown as ExpressRequest
+
+    // Real Transfero credit-transaction callback (e.g. an on-chain crypto deposit):
+    // amount is a nested object and the deposit-order-only fields
+    // (createdAt/referenceId/status/taxId/taxIdCountry) are absent.
+    const creditPayload = {
+      amount: { amount: 0.2, currency: 'USDC' },
+      blockchain: 'SOLANA',
+      transactionId: 'cFzpEo3JsWy88ge7WnSPTMxjf1sdZX4DLBUyg2Rdx4mWjVdEMXntNYnnY6HjpdE7gVEoU98e4xV2PmN2zccadgi',
+      type: 'Credit',
+    }
+    const result = await controller.handleTransferoBalanceWebhook(creditPayload, request, badRequest, serverError)
+    expect(result).toEqual({ message: 'Webhook processed successfully', success: true })
+    expect(badRequest).not.toHaveBeenCalled()
+    expect(queueHandler.postMessage).toHaveBeenCalledWith(QueueName.EXCHANGE_BALANCE_UPDATED, { provider: 'transfero' })
+  })
+
   it('logs and returns server errors on Transfero failures', async () => {
     const { badRequest, serverError } = setupResponses()
     const request = { headers: { 'x-id': '1' } } as unknown as ExpressRequest

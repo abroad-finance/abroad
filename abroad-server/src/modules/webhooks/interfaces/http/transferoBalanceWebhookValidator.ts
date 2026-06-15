@@ -1,19 +1,29 @@
 import { z } from 'zod'
 
+// Transfero balance notifications arrive in two shapes:
+// - deposit-order callbacks: flat numeric `amount`, with createdAt/referenceId/
+//   status/taxId present (externalId may be absent or null).
+// - credit-transaction callbacks (e.g. on-chain crypto deposits): `amount` is a
+//   nested { amount, currency } object and the deposit-order-only fields are absent.
+// Downstream we only need to know a Transfero balance changed (the handler
+// publishes a coarse { provider: 'transfero' } signal), so accept both shapes and
+// treat all descriptive fields as optional. `amount` (number or object) is the
+// one required field, as a minimal guard against empty/garbage payloads.
+const balanceAmountSchema = z.union([
+  z.number(),
+  z.object({}).loose(),
+])
+
 const transferoBalanceWebhookSchema = z.object({
-  accountId: z.string().min(1),
-  amount: z.number().nonnegative(),
-  blockchain: z.string().min(1),
-  createdAt: z.string().min(1).refine(value => !Number.isNaN(Date.parse(value)), {
-    message: 'createdAt must be a valid ISO date string',
-  }),
-  // Transfero's deposit/credit callbacks omit externalId (it can also be null);
-  // it is not used downstream, so accept it as optional to avoid 400-dropping real deposits.
+  accountId: z.string().min(1).nullish(),
+  amount: balanceAmountSchema,
+  blockchain: z.string().min(1).nullish(),
+  createdAt: z.string().min(1).nullish(),
   externalId: z.string().min(1).nullish(),
-  referenceId: z.string().min(1),
-  status: z.string().min(1),
-  taxId: z.string().min(1),
-  taxIdCountry: z.string().min(1),
+  referenceId: z.string().min(1).nullish(),
+  status: z.string().min(1).nullish(),
+  taxId: z.string().min(1).nullish(),
+  taxIdCountry: z.string().min(1).nullish(),
 }).loose()
 
 type TransferoBalanceWebhookValidationResult
