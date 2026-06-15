@@ -55,11 +55,13 @@ export class FlowInstanceController extends Controller {
   public async list(
     @Query() status?: FlowInstanceStatus,
     @Query() transactionId?: string,
+    @Query() onChainId?: string,
     @Query() page?: number,
     @Query() pageSize?: number,
     @Query() stuckMinutes?: number,
   ): Promise<FlowInstanceListResponse> {
     return this.auditService.list({
+      onChainId,
       page,
       pageSize,
       status,

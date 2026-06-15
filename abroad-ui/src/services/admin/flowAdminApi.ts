@@ -15,6 +15,7 @@ import type {
 import { adminRequest, unwrapAdminResult } from './adminRequest'
 
 export const listFlowInstances = async (params: {
+  onChainId?: string
   page?: number
   pageSize?: number
   status?: FlowInstanceStatus
@@ -24,6 +25,7 @@ export const listFlowInstances = async (params: {
   const result = await adminRequest<FlowInstanceListResponse>('/ops/flows/instances', {
     method: 'GET',
     query: {
+      onChainId: params.onChainId,
       page: params.page,
       pageSize: params.pageSize,
       status: params.status,

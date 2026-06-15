@@ -42,6 +42,7 @@ const FlowOpsList = () => {
   const [error, setError] = useState<null | string>(null)
   const [status, setStatus] = useState<'' | FlowInstanceStatus>('')
   const [transactionId, setTransactionId] = useState('')
+  const [onChainId, setOnChainId] = useState('')
   const [stuckMinutes, setStuckMinutes] = useState<string>('')
   const [page, setPage] = useState(1)
   const pageSize = 20
@@ -52,6 +53,7 @@ const FlowOpsList = () => {
     const normalizedStuck = Number.isFinite(parsedStuck) && parsedStuck > 0 ? parsedStuck : undefined
 
     return {
+      onChainId: onChainId.trim() || undefined,
       page,
       pageSize,
       status: status || undefined,
@@ -59,6 +61,7 @@ const FlowOpsList = () => {
       transactionId: transactionId.trim() || undefined,
     }
   }, [
+    onChainId,
     page,
     pageSize,
     status,
@@ -145,7 +148,7 @@ const FlowOpsList = () => {
 
           <OpsApiKeyPanel />
 
-          <div className="mt-8 grid grid-cols-1 gap-4 lg:grid-cols-[2fr_1fr_1fr_1fr_auto] bg-white/70 backdrop-blur rounded-2xl border border-white/70 p-4 shadow-[0_20px_45px_-35px_rgba(15,23,42,0.45)]">
+          <div className="mt-8 grid grid-cols-1 gap-4 lg:grid-cols-[2fr_2fr_1fr_1fr_1fr_auto] bg-white/70 backdrop-blur rounded-2xl border border-white/70 p-4 shadow-[0_20px_45px_-35px_rgba(15,23,42,0.45)]">
             <div className="flex flex-col">
               <label className="ops-label">Transaction ID</label>
               <input
@@ -153,6 +156,15 @@ const FlowOpsList = () => {
                 onChange={event => setTransactionId(event.target.value)}
                 placeholder="UUID"
                 value={transactionId}
+              />
+            </div>
+            <div className="flex flex-col">
+              <label className="ops-label">On-chain ID</label>
+              <input
+                className="mt-2 ops-input"
+                onChange={event => setOnChainId(event.target.value)}
+                placeholder="tx hash"
+                value={onChainId}
               />
             </div>
             <div className="flex flex-col">
@@ -275,6 +287,13 @@ const FlowOpsList = () => {
                       {' '}
                       {instance.transactionId}
                     </div>
+                    {instance.transaction?.onChainId && (
+                      <div className="mt-1 text-xs text-slate-400 break-all">
+                        On-chain
+                        {' '}
+                        {instance.transaction.onChainId}
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex flex-col items-start gap-2 text-sm text-gray-800">

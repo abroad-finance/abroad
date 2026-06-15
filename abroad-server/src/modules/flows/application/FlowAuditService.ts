@@ -38,6 +38,7 @@ export type FlowInstanceDetailDto = {
 }
 
 export type FlowInstanceListFilters = {
+  onChainId?: string
   page?: number
   pageSize?: number
   status?: FlowInstanceStatus
@@ -254,7 +255,7 @@ export class FlowAuditService {
   public async list(filters: FlowInstanceListFilters): Promise<FlowInstanceListResponse> {
     const page = this.normalizePage(filters.page)
     const pageSize = this.normalizePageSize(filters.pageSize)
-    const where = this.buildWhere(filters)
+    const where = await this.buildWhere(filters)
 
     const client = await this.dbProvider.getClient()
     const [total, instances] = await client.$transaction([
@@ -427,11 +428,12 @@ export class FlowAuditService {
     return summary
   }
 
-  private buildWhere(filters: FlowInstanceListFilters): Prisma.FlowInstanceWhereInput {
+  private async buildWhere(filters: FlowInstanceListFilters): Promise<Prisma.FlowInstanceWhereInput> {
     const where: Prisma.FlowInstanceWhereInput = {}
 
-    if (filters.transactionId) {
-      where.transactionId = filters.transactionId
+    const transactionId = await this.resolveTransactionIdFilter(filters)
+    if (transactionId !== undefined) {
+      where.transactionId = transactionId
     }
 
     const stuckMinutes = this.normalizeStuckMinutes(filters.stuckMinutes)
@@ -474,6 +476,31 @@ export class FlowAuditService {
   private normalizeStuckMinutes(stuckMinutes?: number): null | number {
     if (!stuckMinutes || stuckMinutes <= 0) return null
     return Math.floor(stuckMinutes)
+  }
+
+  /**
+   * Resolve the transaction-id filter. An `onChainId` filter is mapped to the
+   * matching transaction (onChainId is unique); when no transaction matches we
+   * return an empty `in` list so the query matches no flows.
+   */
+  private async resolveTransactionIdFilter(
+    filters: FlowInstanceListFilters,
+  ): Promise<Prisma.FlowInstanceWhereInput['transactionId']> {
+    if (!filters.onChainId) {
+      return filters.transactionId
+    }
+
+    const client = await this.dbProvider.getClient()
+    const match = await client.transaction.findFirst({
+      select: { id: true },
+      where: { onChainId: filters.onChainId },
+    })
+
+    if (!match || (filters.transactionId && filters.transactionId !== match.id)) {
+      return { in: [] }
+    }
+
+    return match.id
   }
 
   private toRecord(value: null | Prisma.JsonValue): null | Record<string, unknown> {
