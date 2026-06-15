@@ -17,8 +17,12 @@ import {
 
 @injectable()
 export class TransferoExchangeProvider implements IExchangeProvider {
+  // Transfero accepts BRL deposits on multiple chains (STELLAR and SOLANA — see
+  // getExchangeAddress). Leave blockchain undefined so the provider factory
+  // selects Transfero for any BRL corridor not claimed by a chain-specific
+  // provider (e.g. CELO → BinanceBrl), instead of only STELLAR.
   public readonly capability: ExchangeProviderCapability = {
-    blockchain: BlockchainNetwork.STELLAR,
+    blockchain: undefined,
     targetCurrency: TargetCurrency.BRL,
   }
 
