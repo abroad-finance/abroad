@@ -17,15 +17,18 @@ type TransferoSubscription = {
  * keeps the fix self-contained so a fresh deploy restores delivery with no
  * extra config step. Only ever used from prod (allowlisted Transfero egress).
  */
-export const DEFAULT_TRANSFERO_WEBHOOK_URL = 'https://abroad-api-c6gdkvniqq-ue.a.run.app/webhook/transfero/balance'
+export const DEFAULT_TRANSFERO_WEBHOOK_URL = 'https://api.abroad.finance/webhook/transfero/balance'
 
 /**
  * The deposit/credit callbacks both notify the same `/webhook/transfero/balance`
  * endpoint, so we distinguish them by entity type when checking idempotency.
  */
+// Idempotency is matched against the entityType Transfero returns from GET
+// /callback/v2.0/subscription: deposit-order callbacks report "DepositOrder",
+// and credit-transaction callbacks report "Transaction" (not "CreditTransaction").
 const REQUIRED_CALLBACKS = [
   { label: 'deposit', match: /deposit/i, path: 'depositorders' },
-  { label: 'credit', match: /credit/i, path: 'credittransactions' },
+  { label: 'credit', match: /transaction|credit/i, path: 'credittransactions' },
 ] as const
 
 /**

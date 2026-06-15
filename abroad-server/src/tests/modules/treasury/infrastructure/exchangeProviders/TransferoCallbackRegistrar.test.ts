@@ -64,8 +64,10 @@ describe('TransferoCallbackRegistrar', () => {
     mockedAxios.post.mockResolvedValueOnce(tokenResponse)
     mockedAxios.get.mockResolvedValueOnce({
       data: [
+        // Real entityTypes Transfero returns: deposit-order callbacks are
+        // "DepositOrder"; credit-transaction callbacks are "Transaction".
         { entityType: 'DepositOrder', id: 'd', notificationTo: WEBHOOK_URL, notificationType: 'Webhook' },
-        { entityType: 'CreditTransaction', id: 'c', notificationTo: WEBHOOK_URL, notificationType: 'Webhook' },
+        { entityType: 'Transaction', id: 'c', notificationTo: WEBHOOK_URL, notificationType: 'Webhook' },
       ],
     } as AxiosResponse)
 
