@@ -7,7 +7,9 @@ const transferoBalanceWebhookSchema = z.object({
   createdAt: z.string().min(1).refine(value => !Number.isNaN(Date.parse(value)), {
     message: 'createdAt must be a valid ISO date string',
   }),
-  externalId: z.string().min(1),
+  // Transfero's deposit/credit callbacks omit externalId (it can also be null);
+  // it is not used downstream, so accept it as optional to avoid 400-dropping real deposits.
+  externalId: z.string().min(1).nullish(),
   referenceId: z.string().min(1),
   status: z.string().min(1),
   taxId: z.string().min(1),

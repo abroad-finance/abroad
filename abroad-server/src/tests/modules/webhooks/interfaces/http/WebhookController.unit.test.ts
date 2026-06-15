@@ -104,6 +104,27 @@ describe('WebhookController', () => {
     expect(queueHandler.postMessage).toHaveBeenCalledWith(QueueName.EXCHANGE_BALANCE_UPDATED, { provider: 'transfero' })
   })
 
+  it('enqueues Transfero balance webhooks that omit externalId (real deposit payload)', async () => {
+    const { badRequest, serverError } = setupResponses()
+    const request = { headers: { 'x-id': '1' } } as unknown as ExpressRequest
+
+    // Real Transfero deposit/credit callbacks do not include an externalId field.
+    const depositPayload = {
+      accountId: '000',
+      amount: 100.0,
+      blockchain: 'None',
+      createdAt: '2024-10-15T18:17:03.1451537+00:00',
+      referenceId: 'TESTE2410151703145154TESTE',
+      status: 'DepositCreated',
+      taxId: '12345678910',
+      taxIdCountry: 'BRA',
+    }
+    const result = await controller.handleTransferoBalanceWebhook(depositPayload, request, badRequest, serverError)
+    expect(result).toEqual({ message: 'Webhook processed successfully', success: true })
+    expect(badRequest).not.toHaveBeenCalled()
+    expect(queueHandler.postMessage).toHaveBeenCalledWith(QueueName.EXCHANGE_BALANCE_UPDATED, { provider: 'transfero' })
+  })
+
   it('logs and returns server errors on Transfero failures', async () => {
     const { badRequest, serverError } = setupResponses()
     const request = { headers: { 'x-id': '1' } } as unknown as ExpressRequest
