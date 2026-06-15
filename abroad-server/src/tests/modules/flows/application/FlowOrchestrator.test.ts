@@ -250,4 +250,61 @@ describe('FlowOrchestrator', () => {
       expect(promotionCall).toBeDefined()
     })
   })
+
+  describe('handleSignal - step promotion', () => {
+    it('promotes the next step after a waiting step succeeds via signal', async () => {
+      const snapshot = {
+        definition: {
+          blockchain: 'STELLAR', cryptoCurrency: 'USDC', exchangeFeePct: 0, fixedFee: 0,
+          id: 'def-1', maxAmount: null, minAmount: null, name: 'Test Flow',
+          payoutProvider: 'BREB', pricingProvider: 'BINANCE', targetCurrency: 'COP',
+        },
+        steps: [
+          { completionPolicy: 'SYNC', config: {}, signalMatch: null, stepOrder: 1, stepType: 'PAYOUT_SEND' },
+          { completionPolicy: 'AWAIT_EVENT', config: {}, signalMatch: null, stepOrder: 2, stepType: 'AWAIT_PROVIDER_STATUS' },
+          { completionPolicy: 'SYNC', config: {}, signalMatch: null, stepOrder: 3, stepType: 'EXCHANGE_SEND' },
+        ],
+      }
+      const mockExecutor = {
+        execute: jest.fn(),
+        handleSignal: jest.fn().mockResolvedValue({ outcome: 'succeeded' }),
+        stepType: FlowStepType.AWAIT_PROVIDER_STATUS,
+      }
+      const dbProvider: IDatabaseClientProvider = {
+        getClient: jest.fn(async () => mockPrisma as unknown as PrismaClientLike),
+      }
+      orchestrator = new FlowOrchestrator(
+        dbProvider,
+        new FlowExecutorRegistry([mockExecutor] as unknown as ConstructorParameters<typeof FlowExecutorRegistry>[0]),
+        createMockLogger(),
+      )
+
+      const instance = { flowSnapshot: JSON.parse(JSON.stringify(snapshot)), id: 'fi-1', steps: [], transactionId: 'tx-1' }
+      mockPrisma.flowInstance.findUnique.mockResolvedValue(instance)
+      mockPrisma.transaction.findUnique.mockResolvedValue(buildTransaction())
+      mockPrisma.flowSignal.create.mockResolvedValue({ id: 'sig-1' })
+      mockPrisma.flowSignal.update.mockResolvedValue({})
+      mockPrisma.flowStepInstance.findMany.mockResolvedValue([
+        { correlation: { externalId: 'x' }, flowInstanceId: 'fi-1', id: 's2', status: FlowStepStatus.WAITING, stepOrder: 2, stepType: FlowStepType.AWAIT_PROVIDER_STATUS },
+      ])
+      mockPrisma.flowStepInstance.update.mockResolvedValue({})
+      mockPrisma.flowInstance.update.mockResolvedValue({})
+      // run()'s lock is skipped so the subsequent run() is a no-op — isolate the promotion.
+      mockPrisma.$queryRawUnsafe.mockResolvedValue([])
+
+      await orchestrator.handleSignal({
+        correlationKeys: { externalId: 'x' },
+        eventType: 'payment.status.updated',
+        payload: {},
+        transactionId: 'tx-1',
+      })
+
+      const promotion = mockPrisma.flowStepInstance.updateMany.mock.calls.find(call =>
+        call[0].data?.status === FlowStepStatus.READY
+        && call[0].where?.stepOrder === 3
+        && call[0].where?.status === FlowStepStatus.NOT_STARTED,
+      )
+      expect(promotion).toBeDefined()
+    })
+  })
 })

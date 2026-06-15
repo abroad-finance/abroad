@@ -93,6 +93,7 @@ export class FlowOrchestrator {
           data: { consumedAt: new Date(), stepInstanceId: step.id },
           where: { id: signalRecord.id },
         })
+        await this.promoteNextStep(prisma, flowInstance.id, snapshot.steps, step.stepOrder)
         await this.run(flowInstance.id)
         return
       }
@@ -111,6 +112,7 @@ export class FlowOrchestrator {
       })
 
       if (result.outcome === 'succeeded') {
+        await this.promoteNextStep(prisma, flowInstance.id, snapshot.steps, step.stepOrder)
         await this.run(flowInstance.id)
       }
 
@@ -483,6 +485,33 @@ export class FlowOrchestrator {
         status: result.outcome === 'succeeded' ? FlowStepStatus.SUCCEEDED : FlowStepStatus.FAILED,
       },
       where: { id: stepInstanceId },
+    })
+  }
+
+  /**
+   * Promote the step after `currentStepOrder` from NOT_STARTED to READY so the
+   * next run() can claim it. Mirrors the run() loop's promotion, and is required
+   * on the signal path: a WAITING step resumed via handleSignal would otherwise
+   * leave its successor NOT_STARTED, so run() finds nothing READY and the flow
+   * is marked COMPLETED with later steps skipped.
+   */
+  private async promoteNextStep(
+    client: Awaited<ReturnType<IDatabaseClientProvider['getClient']>> | Prisma.TransactionClient,
+    flowInstanceId: string,
+    steps: FlowSnapshotStep[],
+    currentStepOrder: number,
+  ): Promise<void> {
+    const nextOrder = this.resolveNextOrder(steps, currentStepOrder)
+    if (nextOrder === null) {
+      return
+    }
+    await client.flowStepInstance.updateMany({
+      data: { status: FlowStepStatus.READY },
+      where: { flowInstanceId, status: FlowStepStatus.NOT_STARTED, stepOrder: nextOrder },
+    })
+    await client.flowInstance.update({
+      data: { currentStepOrder: nextOrder },
+      where: { id: flowInstanceId },
     })
   }
 
