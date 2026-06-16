@@ -86,6 +86,22 @@ export class TransferoExchangeProvider implements IExchangeProvider {
            * Retrieves (or creates) the deposit wallet for the partner account.
            * Falls back to the first wallet that matches both currency and chain.
            */
+  /**
+   * Transfero accepts stablecoin deposits (USDC/USDT) on Solana — its USDC
+   * deposit wallet is the Solana TRANSFERO_SOLANA_WALLET. Used by treasury
+   * transfers to pin both the deposit address and the source-venue withdraw
+   * network to Solana so USDC cannot be bridged on the wrong chain.
+   */
+  getDepositNetwork: NonNullable<IExchangeProvider['getDepositNetwork']> = ({ cryptoCurrency }) => {
+    switch (cryptoCurrency) {
+      case CryptoCurrency.USDC:
+      case CryptoCurrency.USDT:
+        return BlockchainNetwork.SOLANA
+      default:
+        return undefined
+    }
+  }
+
   getExchangeAddress: IExchangeProvider['getExchangeAddress'] = async ({
     blockchain,
   }): Promise<ExchangeAddressResult> => {

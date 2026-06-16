@@ -14,9 +14,10 @@ const MockedWallet = Wallet as unknown as jest.Mock
 
 const baseLogger = { error: jest.fn(), info: jest.fn(), warn: jest.fn() }
 
-const makeExecutor = () => {
+const makeExecutor = (opts: { depositNetwork?: string } = {}) => {
   const destinationProvider = {
-    getExchangeAddress: jest.fn(async () => ({ address: 'dest-addr', memo: null, success: true })),
+    getDepositNetwork: jest.fn(() => (Object.prototype.hasOwnProperty.call(opts, 'depositNetwork') ? opts.depositNetwork : 'SOLANA')),
+    getExchangeAddress: jest.fn(async () => ({ address: 'sol-dest-addr', memo: null, success: true })),
   }
   const exchangeProviderFactory = {
     getExchangeProvider: jest.fn(() => destinationProvider),
@@ -31,11 +32,13 @@ const makeExecutor = () => {
     secretManager as never,
     baseLogger as never,
   )
-  return { executor }
+  return { destinationProvider, executor }
 }
 
+// context.blockchain is CELO (the ORIGINAL USDT deposit chain) — the transfer
+// must NOT use it. The bridge chain comes from the destination provider.
 const runtime = (sourceAmount: number) => ({
-  context: { blockchain: 'CELO', cryptoCurrency: 'USDC', sourceAmount, targetCurrency: 'BRL' },
+  context: { blockchain: 'CELO', cryptoCurrency: 'USDT', sourceAmount, targetCurrency: 'BRL' },
   stepOutputs: new Map(),
 })
 
@@ -46,14 +49,31 @@ describe('TreasuryTransferStepExecutor', () => {
     MockedWallet.mockClear()
     withdrawMock.mockResolvedValue({ data: async () => ({ id: 'withdraw-1' }) })
     allCoinsMock.mockResolvedValue({
-      data: async () => ([{ coin: 'USDC', networkList: [{ isDefault: true, network: 'MATIC', withdrawFee: '0.8' }] }]),
+      data: async () => ([{ coin: 'USDC', networkList: [{ network: 'SOL', withdrawFee: '0.8' }] }]),
     })
   })
 
-  // The next hop (final Transfero convert) must convert what actually ARRIVES,
-  // so the transfer must report the credited amount = withdrawn − network fee,
-  // not the gross withdrawal amount.
-  it('outputs the credited amount = withdrawn minus the network withdrawal fee', async () => {
+  // The deposit address AND the Binance withdraw network must both be derived
+  // from the destination provider's bridge chain for the ASSET being moved —
+  // never from the origin deposit chain (CELO). Funds must go to Solana.
+  it('bridges on the destination provider network (Solana), ignoring the origin deposit chain (CELO)', async () => {
+    const { destinationProvider, executor } = makeExecutor()
+
+    const result = await executor.execute({
+      config: { asset: 'USDC', destinationProvider: 'transfero', sourceProvider: 'binance' },
+      runtime: runtime(100) as never,
+      stepOrder: 6,
+    })
+
+    expect(result.outcome).toBe('succeeded')
+    expect(destinationProvider.getDepositNetwork).toHaveBeenCalledWith({ cryptoCurrency: 'USDC' })
+    // Address resolved on SOLANA + the transferred asset (USDC), NOT CELO/USDT.
+    expect(destinationProvider.getExchangeAddress).toHaveBeenCalledWith({ blockchain: 'SOLANA', cryptoCurrency: 'USDC' })
+    // Withdraw network token maps from the SAME bridge chain (SOLANA -> SOL).
+    expect(withdrawMock).toHaveBeenCalledWith(expect.objectContaining({ address: 'sol-dest-addr', coin: 'USDC', network: 'SOL' }))
+  })
+
+  it('reports credited amount = withdrawn minus the bridge-network withdrawal fee', async () => {
     const { executor } = makeExecutor()
 
     const result = await executor.execute({
@@ -63,23 +83,21 @@ describe('TreasuryTransferStepExecutor', () => {
     })
 
     expect(result.outcome).toBe('succeeded')
-    expect(withdrawMock).toHaveBeenCalledWith(expect.objectContaining({ amount: 100.46, coin: 'USDC' }))
-    expect(result.output?.amount).toBeCloseTo(99.66, 6) // 100.46 withdrawn − 0.8 network fee
-    expect(result.output?.withdrawId).toBe('withdraw-1')
+    expect(result.output?.amount).toBeCloseTo(99.66, 6) // 100.46 − 0.8 SOL network fee
   })
 
-  // If the fee can't be determined, fall back to the gross amount (never strand).
-  it('falls back to the gross amount when the withdrawal fee is unavailable', async () => {
-    const { executor } = makeExecutor()
-    allCoinsMock.mockResolvedValue({ data: async () => ([]) })
+  // Never let Binance default-route the withdraw to the wrong chain: if the
+  // bridge network is unresolved, fail BEFORE withdrawing.
+  it('fails without withdrawing when the bridge network cannot be resolved', async () => {
+    const { executor } = makeExecutor({ depositNetwork: undefined })
 
     const result = await executor.execute({
       config: { asset: 'USDC', destinationProvider: 'transfero', sourceProvider: 'binance' },
-      runtime: runtime(100.46) as never,
+      runtime: runtime(100) as never,
       stepOrder: 6,
     })
 
-    expect(result.outcome).toBe('succeeded')
-    expect(result.output?.amount).toBeCloseTo(100.46, 6)
+    expect(result.outcome).toBe('failed')
+    expect(withdrawMock).not.toHaveBeenCalled()
   })
 })

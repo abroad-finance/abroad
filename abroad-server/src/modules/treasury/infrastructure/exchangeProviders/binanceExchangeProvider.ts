@@ -17,6 +17,7 @@ import {
   ExchangeProviderCapability,
   IExchangeProvider,
 } from '../../application/contracts/IExchangeProvider'
+import { mapBlockchainToBinanceNetwork } from './binanceNetworkMap'
 
 type BinanceBookTickerResponse = {
   askPrice: string
@@ -207,16 +208,11 @@ export class BinanceExchangeProvider implements IExchangeProvider {
    * @returns The corresponding Binance network name
    */
   private mapBlockchainToNetwork(blockchain: BlockchainNetwork): string {
-    switch (blockchain) {
-      case BlockchainNetwork.CELO:
-        return 'CELO'
-      case BlockchainNetwork.SOLANA:
-        return 'SOL'
-      case BlockchainNetwork.STELLAR:
-        return 'XLM'
-      default:
-        throw new Error(`Unsupported blockchain: ${blockchain}`)
+    const network = mapBlockchainToBinanceNetwork(blockchain)
+    if (!network) {
+      throw new Error(`Unsupported blockchain: ${blockchain}`)
     }
+    return network
   }
 }
 
