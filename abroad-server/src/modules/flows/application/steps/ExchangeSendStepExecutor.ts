@@ -1,4 +1,4 @@
-import { FlowStepType, TargetCurrency } from '@prisma/client'
+import { FlowStepType } from '@prisma/client'
 import { inject, injectable } from 'inversify'
 import { z } from 'zod'
 
@@ -64,13 +64,11 @@ export class ExchangeSendStepExecutor implements FlowStepExecutor {
         return { error: addressResult.reason ?? 'exchange_address_unavailable', outcome: 'failed' }
       }
 
-      if (config.provider) {
-        const expected = this.normalizeProvider(runtime.context.targetCurrency)
-        if (expected && config.provider !== expected) {
-          return { error: `Exchange provider mismatch: expected ${expected}`, outcome: 'failed' }
-        }
-      }
-
+      // The step's venue is decided by the flow definition (config.provider) and
+      // the deposit address is resolved by capability above. No target-currency
+      // cross-check here: multi-venue corridors (e.g. USDT/CELO → Binance →
+      // Transfero → BRL) legitimately send the first hop to a provider other
+      // than the target currency's settlement provider.
       const walletHandler = this.walletHandlerFactory.getWalletHandlerForCapability?.({
         blockchain: runtime.context.blockchain,
       }) ?? this.walletHandlerFactory.getWalletHandler(runtime.context.blockchain)
@@ -101,11 +99,5 @@ export class ExchangeSendStepExecutor implements FlowStepExecutor {
       this.logger.error('Exchange send failed', error)
       return { error: message, outcome: 'failed' }
     }
-  }
-
-  private normalizeProvider(targetCurrency: TargetCurrency): null | string {
-    if (targetCurrency === TargetCurrency.COP) return 'binance'
-    if (targetCurrency === TargetCurrency.BRL) return 'transfero'
-    return null
   }
 }
