@@ -22,9 +22,12 @@ steps:
           abroad-server
     waitFor: ["-"]
 
-  # 2. Render kustomization without apt-get to save startup time
+  # 2. Render kustomization without apt-get to save startup time.
+  # Uses a plain Python image (this step only needs python for expandvars; no
+  # gcloud). cloud-sdk:slim stopped exposing python3/python on PATH, which broke
+  # this step — pin a Python image so it can't drift again.
   - id: Substitute kustomization
-    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    name: python:3.12-slim
     entrypoint: bash
     args:
       - -c
