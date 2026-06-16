@@ -93,12 +93,19 @@ export class TreasuryTransferStepExecutor implements FlowStepExecutor {
 
       const data = await response.data()
 
+      // Report the amount that will ARRIVE at the destination (withdrawn − the
+      // network withdrawal fee) so the next hop converts what was actually
+      // credited, not the gross withdrawal. Falls back to gross if unknown.
+      const withdrawalFee = await this.resolveWithdrawalFee(client, config.asset, config.network)
+      const creditedAmount = withdrawalFee !== undefined ? Math.max(0, amount - withdrawalFee) : amount
+
       return {
         outcome: 'succeeded',
         output: {
           address: addressResult.address,
-          amount,
+          amount: creditedAmount,
           destinationProvider: config.destinationProvider,
+          grossAmount: amount,
           memo: addressResult.memo ?? null,
           withdrawId: data?.id ?? null,
         },
@@ -114,5 +121,29 @@ export class TreasuryTransferStepExecutor implements FlowStepExecutor {
   private resolveProviderCurrency(provider: TreasuryTransferConfig['destinationProvider']): TargetCurrency {
     if (provider === 'binance') return TargetCurrency.COP
     return TargetCurrency.BRL
+  }
+
+  /**
+   * The Binance withdrawal network fee for a coin/network (deducted from the
+   * withdrawal, so the recipient receives amount − fee). Best-effort: returns
+   * undefined on any failure so the caller falls back to the gross amount.
+   */
+  private async resolveWithdrawalFee(client: Wallet, coin: string, network: string | undefined): Promise<number | undefined> {
+    try {
+      const response = await client.restAPI.allCoinsInformation()
+      const data = await response.data()
+      const coins = Array.isArray(data) ? data : []
+      const match = coins.find(entry => typeof entry?.coin === 'string' && entry.coin.toUpperCase() === coin.toUpperCase())
+      const networks = Array.isArray(match?.networkList) ? match.networkList : []
+      const networkEntry = network
+        ? networks.find(item => item?.network === network)
+        : networks.find(item => item?.isDefault) ?? networks[0]
+      const fee = Number(networkEntry?.withdrawFee)
+      return Number.isFinite(fee) && fee >= 0 ? fee : undefined
+    }
+    catch (error) {
+      this.logger.warn('Unable to resolve Binance withdrawal fee; using gross amount', { coin, error, network })
+      return undefined
+    }
   }
 }

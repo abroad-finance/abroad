@@ -66,10 +66,12 @@ export class FlowDefinitionBuilder {
       state = result.state
     }
 
-    return systemSteps.map((step, index) => ({
+    const ordered = systemSteps.map((step, index) => ({
       ...step,
       stepOrder: index + 1,
     }))
+    this.wireAmountSources(ordered)
+    return ordered
   }
 
   private buildAwaitProviderStatus(): FlowSystemStep {
@@ -83,11 +85,15 @@ export class FlowDefinitionBuilder {
 
   private buildBinanceConvert(
     step: Extract<FlowBusinessStep, { type: 'CONVERT' }>,
-  ): { side: 'BUY' | 'SELL', symbol: string } {
-    const symbol = `${step.fromAsset}${step.toAsset}`
+  ): { fromAsset: SupportedCurrency, toAsset: SupportedCurrency } {
+    // Emit the conversion intent only. Binance lists each pair in a single
+    // direction (e.g. USDCUSDT, never USDTUSDC), so the venue-specific trading
+    // symbol and side are resolved at execution time against live exchangeInfo
+    // by the ExchangeConvertStepExecutor — guessing `${from}${to}` + SELL here
+    // produced invalid symbols (e.g. USDTUSDC) for half of all pairs.
     return {
-      side: 'SELL',
-      symbol,
+      fromAsset: step.fromAsset,
+      toAsset: step.toAsset,
     }
   }
 
@@ -268,11 +274,52 @@ export class FlowDefinitionBuilder {
     }
   }
 
+  private findPrecedingStepOrder(steps: FlowSystemStep[], index: number, stepType: FlowStepType): number | undefined {
+    for (let cursor = index - 1; cursor >= 0; cursor -= 1) {
+      if (steps[cursor].stepType === stepType) {
+        return steps[cursor].stepOrder
+      }
+    }
+    return undefined
+  }
+
   private isTargetCurrency(value: SupportedCurrency): value is TargetCurrency {
     return Object.values(TargetCurrency).includes(value as TargetCurrency)
   }
 
   private mapVenueToProvider(venue: FlowVenue): 'binance' | 'transfero' {
     return venue === 'BINANCE' ? 'binance' : 'transfero'
+  }
+
+  /**
+   * Propagate REALIZED amounts between money-moving hops. Each hop loses value
+   * to spread/fees, so a step must act on what the previous step actually
+   * produced — never the original quoted sourceAmount:
+   *  - TREASURY_TRANSFER withdraws the preceding EXCHANGE_CONVERT's realized output.
+   *  - an EXCHANGE_CONVERT that follows a TREASURY_TRANSFER converts what that
+   *    transfer delivered.
+   * The first convert (no preceding transfer) keeps the default sourceAmount: it
+   * converts the deposit that EXCHANGE_SEND moved onto the venue.
+   */
+  private wireAmountSources(steps: FlowSystemStep[]): void {
+    for (let index = 0; index < steps.length; index += 1) {
+      const step = steps[index]
+      if (step.config.amountSource !== undefined) {
+        continue
+      }
+
+      if (step.stepType === FlowStepType.TREASURY_TRANSFER) {
+        const convertOrder = this.findPrecedingStepOrder(steps, index, FlowStepType.EXCHANGE_CONVERT)
+        if (convertOrder !== undefined) {
+          step.config = { ...step.config, amountSource: { field: 'amount', kind: 'step', stepOrder: convertOrder } }
+        }
+      }
+      else if (step.stepType === FlowStepType.EXCHANGE_CONVERT) {
+        const transferOrder = this.findPrecedingStepOrder(steps, index, FlowStepType.TREASURY_TRANSFER)
+        if (transferOrder !== undefined) {
+          step.config = { ...step.config, amountSource: { field: 'amount', kind: 'step', stepOrder: transferOrder } }
+        }
+      }
+    }
   }
 }
