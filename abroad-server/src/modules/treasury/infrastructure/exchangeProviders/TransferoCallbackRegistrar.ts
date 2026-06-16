@@ -4,6 +4,13 @@ import { createScopedLogger, ScopedLogger } from '../../../../core/logging/scope
 import { ILogger } from '../../../../core/logging/types'
 import { ISecretManager } from '../../../../platform/secrets/ISecretManager'
 
+type TransferoAccount = {
+  accountId?: string
+  currency?: string
+  depositAddress?: null | Record<string, string>
+  label?: string
+}
+
 type TransferoSubscription = {
   entityType?: string
   id?: string
@@ -19,10 +26,6 @@ type TransferoSubscription = {
  */
 export const DEFAULT_TRANSFERO_WEBHOOK_URL = 'https://api.abroad.finance/webhook/transfero/balance'
 
-/**
- * The deposit/credit callbacks both notify the same `/webhook/transfero/balance`
- * endpoint, so we distinguish them by entity type when checking idempotency.
- */
 // Idempotency is matched against the entityType Transfero returns from GET
 // /callback/v2.0/subscription: deposit-order callbacks report "DepositOrder",
 // and credit-transaction callbacks report "Transaction" (not "CreditTransaction").
@@ -33,11 +36,12 @@ const REQUIRED_CALLBACKS = [
 
 /**
  * Ensures Transfero is configured to POST deposit/credit notifications to our
- * webhook. Transfero requires an explicit per-account, per-event-type callback
- * subscription; if it lapses (e.g. auto-disabled after repeated delivery
- * failures) deposits stop notifying us and `AWAIT_EXCHANGE_BALANCE` flow steps
- * never resume. Running this idempotently at startup keeps the subscription
- * self-healing. Must run from an allowlisted egress (prod), never blocks boot.
+ * webhook. Crypto deposits are credited to the per-currency CRYPTO accounts
+ * (e.g. USDC/USDT), NOT the BRL account — so the deposit/credit callbacks must
+ * be subscribed on each crypto account. We discover accounts via GET
+ * /api/v2.0/accounts and subscribe the deposit-capable ones (those with a
+ * crypto depositAddress). Idempotent and self-healing on each startup.
+ * Must run from an allowlisted egress (prod); best-effort — never blocks boot.
  */
 export class TransferoCallbackRegistrar {
   private readonly logger: ScopedLogger
@@ -52,52 +56,95 @@ export class TransferoCallbackRegistrar {
   public async ensureSubscriptions(): Promise<void> {
     try {
       const {
-        TRANSFERO_ACCOUNT_ID: accountId,
         TRANSFERO_BASE_URL: baseUrl,
         TRANSFERO_CLIENT_ID: clientId,
         TRANSFERO_CLIENT_SCOPE: scope,
         TRANSFERO_CLIENT_SECRET: clientSecret,
       } = await this.secretManager.getSecrets([
-        'TRANSFERO_ACCOUNT_ID',
         'TRANSFERO_BASE_URL',
         'TRANSFERO_CLIENT_ID',
         'TRANSFERO_CLIENT_SCOPE',
         'TRANSFERO_CLIENT_SECRET',
       ])
 
-      if (!baseUrl || !accountId) {
-        this.logger.warn('Transfero base URL or account id missing; skipping Transfero callback registration')
+      if (!baseUrl) {
+        this.logger.warn('Transfero base URL missing; skipping Transfero callback registration')
         return
       }
 
       const webhookUrl = await this.resolveWebhookUrl()
       const token = await this.getAccessToken({ baseUrl, clientId, clientSecret, scope })
-      const existing = await this.fetchSubscriptions({ accountId, baseUrl, token })
 
-      for (const callback of REQUIRED_CALLBACKS) {
-        try {
-          const alreadyRegistered = existing.some(subscription =>
-            subscription.notificationTo === webhookUrl
-            && typeof subscription.entityType === 'string'
-            && callback.match.test(subscription.entityType))
+      const accounts = await this.fetchAccounts({ baseUrl, token })
+      // Deposit-capable (crypto) accounts have a populated depositAddress object;
+      // the BRL account has depositAddress: null and only receives payments.
+      const cryptoAccounts = accounts.filter(account =>
+        typeof account.accountId === 'string'
+        && account.depositAddress != null
+        && typeof account.depositAddress === 'object')
 
-          if (alreadyRegistered) {
-            this.logger.info('Transfero callback already registered', { type: callback.label })
-            continue
-          }
+      if (cryptoAccounts.length === 0) {
+        this.logger.warn('No deposit-capable Transfero accounts found; skipping callback registration', {
+          accountCount: accounts.length,
+        })
+        return
+      }
 
-          await this.subscribe({ accountId, baseUrl, path: callback.path, token, webhookUrl })
-          this.logger.info('Registered Transfero callback', { notificationTo: webhookUrl, type: callback.label })
-        }
-        catch (error) {
-          this.logger.error('Failed to register Transfero callback', { error, type: callback.label })
-        }
+      for (const account of cryptoAccounts) {
+        await this.ensureAccountSubscriptions({
+          accountId: account.accountId as string,
+          baseUrl,
+          currency: account.currency,
+          token,
+          webhookUrl,
+        })
       }
     }
     catch (error) {
       // Best-effort: callback registration must never block service startup.
       this.logger.error('Failed to ensure Transfero callback subscriptions', error)
     }
+  }
+
+  private async ensureAccountSubscriptions(params: {
+    accountId: string
+    baseUrl: string
+    currency?: string
+    token: string
+    webhookUrl: string
+  }): Promise<void> {
+    const { accountId, baseUrl, currency, token, webhookUrl } = params
+    const existing = await this.fetchSubscriptions({ accountId, baseUrl, token })
+
+    for (const callback of REQUIRED_CALLBACKS) {
+      try {
+        const alreadyRegistered = existing.some(subscription =>
+          subscription.notificationTo === webhookUrl
+          && typeof subscription.entityType === 'string'
+          && callback.match.test(subscription.entityType))
+
+        if (alreadyRegistered) {
+          this.logger.info('Transfero callback already registered', { accountId, currency, type: callback.label })
+          continue
+        }
+
+        await this.subscribe({ accountId, baseUrl, path: callback.path, token, webhookUrl })
+        this.logger.info('Registered Transfero callback', { accountId, currency, notificationTo: webhookUrl, type: callback.label })
+      }
+      catch (error) {
+        this.logger.error('Failed to register Transfero callback', { accountId, error, type: callback.label })
+      }
+    }
+  }
+
+  private async fetchAccounts(params: { baseUrl: string, token: string }): Promise<TransferoAccount[]> {
+    const { baseUrl, token } = params
+    const { data } = await axios.get(
+      `${baseUrl}/api/v2.0/accounts`,
+      { headers: { Accept: 'application/json', Authorization: `Bearer ${token}` } },
+    )
+    const parsed = typeof data === 'string' ? JSON.parse(data) : data
+    return Array.isArray(parsed) ? parsed as TransferoAccount[] : []
   }
 
   private async fetchSubscriptions(params: { accountId: string, baseUrl: string, token: string }): Promise<TransferoSubscription[]> {

@@ -10,13 +10,13 @@ import { createMockLogger } from '../../../../setup/mockFactories'
 jest.mock('axios')
 const mockedAxios = axios as jest.Mocked<typeof axios>
 
+const BASE = 'https://transfero.example.com'
 const WEBHOOK_URL = 'https://abroad.example.com/webhook/transfero/balance'
 
 const SECRETS: Record<string, string> = {
-  TRANSFERO_ACCOUNT_ID: 'acc-1',
-  TRANSFERO_BASE_URL: 'https://transfero.example.com',
+  TRANSFERO_BASE_URL: BASE,
   TRANSFERO_CLIENT_ID: 'client-id',
-  TRANSFERO_CLIENT_SCOPE: 'payments',
+  TRANSFERO_CLIENT_SCOPE: 'scope',
   TRANSFERO_CLIENT_SECRET: 'client-secret',
   TRANSFERO_WEBHOOK_URL: WEBHOOK_URL,
 }
@@ -30,9 +30,28 @@ const makeSecretManager = (overrides: Record<string, string> = {}): ISecretManag
   }
 }
 
-const tokenResponse = { data: { access_token: 'tok', expires_in: 900 } } as AxiosResponse
-const subscribeUrls = () =>
-  mockedAxios.post.mock.calls
+// 1841 = BRL (no depositAddress); 1842/1843 = crypto (deposit-capable).
+const ACCOUNTS = [
+  { accountId: '1841', currency: 'BRL', depositAddress: null },
+  { accountId: '1842', currency: 'USDT', depositAddress: { Tron: 'Tabc' } },
+  { accountId: '1843', currency: 'USDC', depositAddress: { Solana: 'B7Agt' } },
+]
+
+const setupAxios = (existingSubsByAccount: Record<string, unknown[]> = {}): void => {
+  ;(mockedAxios.post as jest.Mock).mockImplementation(async (url: string) => {
+    if (url.endsWith('/auth/token')) return { data: { access_token: 'tok' } } as AxiosResponse
+    return { data: { subscriptionId: 'new' } } as AxiosResponse
+  })
+  ;(mockedAxios.get as jest.Mock).mockImplementation(async (url: string) => {
+    if (url.endsWith('/api/v2.0/accounts')) return { data: ACCOUNTS } as AxiosResponse
+    const matched = url.match(/subscription\/accounts\/(\w+)/)
+    const account = matched ? matched[1] : ''
+    return { data: existingSubsByAccount[account] ?? [] } as AxiosResponse
+  })
+}
+
+const subscribeCalls = (): string[] =>
+  (mockedAxios.post as jest.Mock).mock.calls
     .map(call => String(call[0]))
     .filter(url => url.includes('/callback/v2.0/subscribe/'))
 
@@ -42,49 +61,42 @@ beforeEach(() => {
 })
 
 describe('TransferoCallbackRegistrar', () => {
-  it('subscribes deposit and credit callbacks when none exist for our URL', async () => {
-    mockedAxios.post.mockResolvedValueOnce(tokenResponse)
-    mockedAxios.get.mockResolvedValueOnce({
-      data: [{ entityType: 'Payment', id: 'p', notificationTo: 'https://abroad.example.com/webhook/transfero', notificationType: 'Webhook' }],
-    } as AxiosResponse)
-    mockedAxios.post.mockResolvedValue({ data: { subscriptionId: 'new' } } as AxiosResponse)
+  it('subscribes deposit + credit callbacks on the crypto accounts, not the BRL account', async () => {
+    setupAxios({})
 
     await new TransferoCallbackRegistrar(makeSecretManager(), createMockLogger()).ensureSubscriptions()
 
-    const urls = subscribeUrls()
+    const urls = subscribeCalls()
     expect(urls).toEqual(expect.arrayContaining([
-      'https://transfero.example.com/callback/v2.0/subscribe/credittransactions/accounts/acc-1',
-      'https://transfero.example.com/callback/v2.0/subscribe/depositorders/accounts/acc-1',
+      `${BASE}/callback/v2.0/subscribe/credittransactions/accounts/1842`,
+      `${BASE}/callback/v2.0/subscribe/credittransactions/accounts/1843`,
+      `${BASE}/callback/v2.0/subscribe/depositorders/accounts/1842`,
+      `${BASE}/callback/v2.0/subscribe/depositorders/accounts/1843`,
     ]))
-    const depositCall = mockedAxios.post.mock.calls.find(call => String(call[0]).includes('depositorders'))
+    // The BRL account (1841) must NOT get deposit/credit subscriptions.
+    expect(urls.some(url => url.includes('/accounts/1841'))).toBe(false)
+    const depositCall = (mockedAxios.post as jest.Mock).mock.calls.find(call => String(call[0]).includes('depositorders/accounts/1843'))
     expect(depositCall?.[1]).toMatchObject({ notification: WEBHOOK_URL, notificationType: 'Webhook' })
   })
 
-  it('is idempotent: skips event types already pointing at our URL', async () => {
-    mockedAxios.post.mockResolvedValueOnce(tokenResponse)
-    mockedAxios.get.mockResolvedValueOnce({
-      data: [
-        // Real entityTypes Transfero returns: deposit-order callbacks are
-        // "DepositOrder"; credit-transaction callbacks are "Transaction".
-        { entityType: 'DepositOrder', id: 'd', notificationTo: WEBHOOK_URL, notificationType: 'Webhook' },
-        { entityType: 'Transaction', id: 'c', notificationTo: WEBHOOK_URL, notificationType: 'Webhook' },
-      ],
-    } as AxiosResponse)
+  it('is idempotent: skips crypto accounts already subscribed to our URL', async () => {
+    const subs = [
+      { entityType: 'DepositOrder', notificationTo: WEBHOOK_URL, notificationType: 'Webhook' },
+      { entityType: 'Transaction', notificationTo: WEBHOOK_URL, notificationType: 'Webhook' },
+    ]
+    setupAxios({ 1842: subs, 1843: subs })
 
     await new TransferoCallbackRegistrar(makeSecretManager(), createMockLogger()).ensureSubscriptions()
 
-    expect(subscribeUrls()).toHaveLength(0)
+    expect(subscribeCalls()).toHaveLength(0)
   })
 
   it('falls back to the default webhook URL when TRANSFERO_WEBHOOK_URL is unset', async () => {
-    mockedAxios.post.mockResolvedValueOnce(tokenResponse)
-    mockedAxios.get.mockResolvedValueOnce({ data: [] } as AxiosResponse)
-    mockedAxios.post.mockResolvedValue({ data: { subscriptionId: 'new' } } as AxiosResponse)
+    setupAxios({})
 
     await new TransferoCallbackRegistrar(makeSecretManager({ TRANSFERO_WEBHOOK_URL: '' }), createMockLogger()).ensureSubscriptions()
 
-    expect(subscribeUrls()).toHaveLength(2)
-    const depositCall = mockedAxios.post.mock.calls.find(call => String(call[0]).includes('depositorders'))
+    const depositCall = (mockedAxios.post as jest.Mock).mock.calls.find(call => String(call[0]).includes('depositorders/accounts/1843'))
     expect(depositCall?.[1]).toMatchObject({ notification: DEFAULT_TRANSFERO_WEBHOOK_URL, notificationType: 'Webhook' })
   })
 })
