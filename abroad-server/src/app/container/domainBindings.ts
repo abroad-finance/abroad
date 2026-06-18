@@ -10,6 +10,7 @@ import { PublicCorridorService } from '../../modules/flows/application/PublicCor
 import { RefundCoordinator } from '../../modules/flows/application/RefundCoordinator'
 import { AwaitExchangeBalanceStepExecutor } from '../../modules/flows/application/steps/AwaitExchangeBalanceStepExecutor'
 import { AwaitProviderStatusStepExecutor } from '../../modules/flows/application/steps/AwaitProviderStatusStepExecutor'
+import { EnqueueBridgeStepExecutor } from '../../modules/flows/application/steps/EnqueueBridgeStepExecutor'
 import { ExchangeConvertStepExecutor } from '../../modules/flows/application/steps/ExchangeConvertStepExecutor'
 import { ExchangeSendStepExecutor } from '../../modules/flows/application/steps/ExchangeSendStepExecutor'
 import { PayoutSendStepExecutor } from '../../modules/flows/application/steps/PayoutSendStepExecutor'
@@ -41,6 +42,9 @@ import { ReceivedCryptoTransactionUseCase } from '../../modules/transactions/app
 import { StellarOrphanRefundService } from '../../modules/transactions/application/StellarOrphanRefundService'
 import { TransactionAcceptanceService } from '../../modules/transactions/application/TransactionAcceptanceService'
 import { TransactionStatusService } from '../../modules/transactions/application/TransactionStatusService'
+import { BridgeFloatService } from '../../modules/treasury/application/BridgeFloatService'
+import { BridgeSweepService } from '../../modules/treasury/application/BridgeSweepService'
+import { BridgeSweepWorker } from '../../modules/treasury/application/BridgeSweepWorker'
 import { ExchangeProviderFactory } from '../../modules/treasury/application/ExchangeProviderFactory'
 import { BinanceExchangeProvider } from '../../modules/treasury/infrastructure/exchangeProviders/binanceExchangeProvider'
 import { BinanceBrlExchangeProvider } from '../../modules/treasury/infrastructure/exchangeProviders/binanceExchangeProvider'
@@ -94,12 +98,16 @@ const domainBindings: ReadonlyArray<BindingRegistration<unknown>> = [
   { identifier: TYPES.FlowExecutorRegistry, implementation: FlowExecutorRegistry },
   { identifier: TYPES.FlowOrchestrator, implementation: FlowOrchestrator },
   { bindSelf: true, identifier: RefundCoordinator, implementation: RefundCoordinator },
+  { bindSelf: true, identifier: BridgeFloatService, implementation: BridgeFloatService },
+  { bindSelf: true, identifier: BridgeSweepService, implementation: BridgeSweepService },
+  { bindSelf: true, identifier: BridgeSweepWorker, implementation: BridgeSweepWorker },
   { identifier: TYPES.FlowStepExecutor, implementation: PayoutSendStepExecutor },
   { identifier: TYPES.FlowStepExecutor, implementation: AwaitProviderStatusStepExecutor },
   { identifier: TYPES.FlowStepExecutor, implementation: ExchangeSendStepExecutor },
   { identifier: TYPES.FlowStepExecutor, implementation: ExchangeConvertStepExecutor },
   { identifier: TYPES.FlowStepExecutor, implementation: AwaitExchangeBalanceStepExecutor },
   { identifier: TYPES.FlowStepExecutor, implementation: TreasuryTransferStepExecutor },
+  { identifier: TYPES.FlowStepExecutor, implementation: EnqueueBridgeStepExecutor },
 ] as const
 
 export function bindDomainServices(container: Container): void {

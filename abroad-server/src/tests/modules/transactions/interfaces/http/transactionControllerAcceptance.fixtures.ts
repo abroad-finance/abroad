@@ -119,12 +119,18 @@ export const buildAcceptController = (
     }),
   } as unknown as LiquidityCacheService
 
+  const bridgeFloatService = {
+    canSettle: jest.fn(async () => ({ cap: 2000, deficit: 0, ok: true })),
+    getOutstandingDeficit: jest.fn(async () => 0),
+  } as unknown as import('../../../../../modules/treasury/application/BridgeFloatService').BridgeFloatService
+
   const acceptanceService = new TransactionAcceptanceService(
     dbProvider,
     paymentServiceFactory,
     kycService,
     outboxDispatcher as never,
     liquidityCacheService,
+    bridgeFloatService,
     logger,
   )
   const statusService = new TransactionStatusService(dbProvider)

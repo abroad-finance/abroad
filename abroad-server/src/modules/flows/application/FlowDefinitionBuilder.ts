@@ -97,6 +97,15 @@ export class FlowDefinitionBuilder {
     }
   }
 
+  private buildEnqueueBridge(pendingBridge: { asset: SupportedCurrency, destNetwork: string }): FlowSystemStep {
+    return {
+      completionPolicy: FlowStepCompletionPolicy.SYNC,
+      config: { asset: pendingBridge.asset, destNetwork: pendingBridge.destNetwork },
+      stepOrder: 1,
+      stepType: FlowStepType.ENQUEUE_BRIDGE,
+    }
+  }
+
   private buildPayoutStep(paymentMethod: PaymentMethod): FlowSystemStep {
     return {
       completionPolicy: FlowStepCompletionPolicy.SYNC,
@@ -165,20 +174,19 @@ export class FlowDefinitionBuilder {
       ? this.buildTransferoConvert(step, targetCurrency)
       : this.buildBinanceConvert(step)
 
-    return {
-      state: { ...state, asset: step.toAsset },
-      systemSteps: [
-        {
-          completionPolicy: FlowStepCompletionPolicy.SYNC,
-          config: {
-            provider,
-            ...config,
-          },
-          stepOrder: 1,
-          stepType: FlowStepType.EXCHANGE_CONVERT,
+    const systemSteps: FlowSystemStep[] = [
+      {
+        completionPolicy: FlowStepCompletionPolicy.SYNC,
+        config: {
+          provider,
+          ...config,
         },
-      ],
-    }
+        stepOrder: 1,
+        stepType: FlowStepType.EXCHANGE_CONVERT,
+      },
+    ]
+
+    return { state: { ...state, asset: step.toAsset }, systemSteps }
   }
 
   private expandMoveToExchange(
@@ -220,7 +228,7 @@ export class FlowDefinitionBuilder {
       case 'MOVE_TO_EXCHANGE':
         return this.expandMoveToExchange(step, state)
       case 'TRANSFER_VENUE':
-        return this.expandTransferVenue(step, state, targetCurrency)
+        return this.expandTransferVenue(step, state)
       case 'PAYOUT':
       default:
         throw new FlowDefinitionBuilderError('Unexpected payout step outside first position')
@@ -230,7 +238,6 @@ export class FlowDefinitionBuilder {
   private expandTransferVenue(
     step: Extract<FlowBusinessStep, { type: 'TRANSFER_VENUE' }>,
     state: BuildState,
-    targetCurrency: TargetCurrency,
   ): { state: BuildState, systemSteps: FlowSystemStep[] } {
     if (state.location !== step.fromVenue) {
       throw new FlowDefinitionBuilderError(`Transfer requires funds at ${step.fromVenue}`)
@@ -248,35 +255,29 @@ export class FlowDefinitionBuilder {
       throw new FlowDefinitionBuilderError('Only Binance can be used as a transfer source today')
     }
 
-    const destinationProvider = this.mapVenueToProvider(step.toVenue)
+    if (step.toVenue !== 'TRANSFERO') {
+      throw new FlowDefinitionBuilderError('Only Binance->Transfero transfers are supported today')
+    }
 
+    // Defer the Binance->Transfero crossing to a batched sweep. Emit NO
+    // per-flow withdrawal (which would hit Binance's 5-USDC per-withdrawal
+    // floor and strand small txs). Record the owed Binance USDC as an
+    // ENQUEUE_BRIDGE leg HERE — before the following Transfero convert settles
+    // the flow against the float — so a convert failure can never lose the
+    // accounting of USDC that is already on Binance. The funds are logically at
+    // the destination (settled against the float by the next convert).
+    // destNetwork is the Binance withdrawal network for Transfero's USDC
+    // deposit (Solana); the sweep re-verifies it against the provider before
+    // withdrawing, so funds can never go to the wrong chain.
     return {
       state: { ...state, location: step.toVenue },
-      systemSteps: [
-        {
-          completionPolicy: FlowStepCompletionPolicy.SYNC,
-          config: {
-            asset: step.asset,
-            destinationProvider,
-            destinationTargetCurrency: targetCurrency,
-            sourceProvider: 'binance',
-          },
-          stepOrder: 1,
-          stepType: FlowStepType.TREASURY_TRANSFER,
-        },
-        {
-          completionPolicy: FlowStepCompletionPolicy.AWAIT_EVENT,
-          config: { provider: destinationProvider },
-          stepOrder: 1,
-          stepType: FlowStepType.AWAIT_EXCHANGE_BALANCE,
-        },
-      ],
+      systemSteps: [this.buildEnqueueBridge({ asset: step.asset, destNetwork: 'SOL' })],
     }
   }
 
-  private findPrecedingStepOrder(steps: FlowSystemStep[], index: number, stepType: FlowStepType): number | undefined {
+  private findPreceding(steps: FlowSystemStep[], index: number, predicate: (step: FlowSystemStep) => boolean): number | undefined {
     for (let cursor = index - 1; cursor >= 0; cursor -= 1) {
-      if (steps[cursor].stepType === stepType) {
+      if (predicate(steps[cursor])) {
         return steps[cursor].stepOrder
       }
     }
@@ -292,32 +293,43 @@ export class FlowDefinitionBuilder {
   }
 
   /**
-   * Propagate REALIZED amounts between money-moving hops. Each hop loses value
-   * to spread/fees, so a step must act on what the previous step actually
-   * produced — never the original quoted sourceAmount:
-   *  - TREASURY_TRANSFER withdraws the preceding EXCHANGE_CONVERT's realized output.
-   *  - an EXCHANGE_CONVERT that follows a TREASURY_TRANSFER converts what that
-   *    transfer delivered.
-   * The first convert (no preceding transfer) keeps the default sourceAmount: it
-   * converts the deposit that EXCHANGE_SEND moved onto the venue.
+   * Propagate REALIZED amounts between hops. Each step must act on what the
+   * previous step actually produced — never the original quoted sourceAmount,
+   * which ignores spread + fees. The USDC that reaches Binance is the Binance
+   * USDT->USDC convert's realized output (USDT corridors) or, with no Binance
+   * convert, the deposit itself (default sourceAmount — pure-USDC corridors and
+   * Solana/Stellar direct corridors):
+   *  - the Transfero (float) convert converts exactly that USDC;
+   *  - the ENQUEUE_BRIDGE leg records exactly that USDC for the sweep.
+   * The legacy synchronous TREASURY_TRANSFER (if any corridor still uses it)
+   * withdraws the preceding convert's realized output.
    */
   private wireAmountSources(steps: FlowSystemStep[]): void {
+    const isBinanceConvert = (s: FlowSystemStep) => s.stepType === FlowStepType.EXCHANGE_CONVERT && s.config.provider === 'binance'
+
     for (let index = 0; index < steps.length; index += 1) {
       const step = steps[index]
       if (step.config.amountSource !== undefined) {
         continue
       }
 
-      if (step.stepType === FlowStepType.TREASURY_TRANSFER) {
-        const convertOrder = this.findPrecedingStepOrder(steps, index, FlowStepType.EXCHANGE_CONVERT)
-        if (convertOrder !== undefined) {
-          step.config = { ...step.config, amountSource: { field: 'amount', kind: 'step', stepOrder: convertOrder } }
+      if (step.stepType === FlowStepType.ENQUEUE_BRIDGE) {
+        const order = this.findPreceding(steps, index, isBinanceConvert)
+        if (order !== undefined) {
+          step.config = { ...step.config, amountSource: { field: 'amount', kind: 'step', stepOrder: order } }
         }
       }
-      else if (step.stepType === FlowStepType.EXCHANGE_CONVERT) {
-        const transferOrder = this.findPrecedingStepOrder(steps, index, FlowStepType.TREASURY_TRANSFER)
-        if (transferOrder !== undefined) {
-          step.config = { ...step.config, amountSource: { field: 'amount', kind: 'step', stepOrder: transferOrder } }
+      else if (step.stepType === FlowStepType.EXCHANGE_CONVERT && step.config.provider === 'transfero') {
+        const order = this.findPreceding(steps, index, isBinanceConvert)
+          ?? this.findPreceding(steps, index, s => s.stepType === FlowStepType.TREASURY_TRANSFER)
+        if (order !== undefined) {
+          step.config = { ...step.config, amountSource: { field: 'amount', kind: 'step', stepOrder: order } }
+        }
+      }
+      else if (step.stepType === FlowStepType.TREASURY_TRANSFER) {
+        const order = this.findPreceding(steps, index, s => s.stepType === FlowStepType.EXCHANGE_CONVERT)
+        if (order !== undefined) {
+          step.config = { ...step.config, amountSource: { field: 'amount', kind: 'step', stepOrder: order } }
         }
       }
     }
