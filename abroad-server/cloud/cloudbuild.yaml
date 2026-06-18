@@ -94,7 +94,7 @@ steps:
       - --image=$_AR_HOSTNAME/$PROJECT_ID/cloud-run-source-deploy/$REPO_NAME/$_SERVICE_NAME:$COMMIT_SHA
       - --labels=managed-by=gcp-cloud-build-deploy-cloud-run,commit-sha=$COMMIT_SHA,gcb-build-id=$BUILD_ID,gcb-trigger-id=$_TRIGGER_ID
       - --region=$_DEPLOY_REGION
-      - --update-env-vars=SENTRY_ENVIRONMENT=$_SENTRY_ENVIRONMENT,SENTRY_RELEASE=$COMMIT_SHA
+      - --update-env-vars=SENTRY_ENVIRONMENT=$_SENTRY_ENVIRONMENT,SENTRY_RELEASE=$COMMIT_SHA,BRIDGE_FLOAT_CAP_USDC=$_BRIDGE_FLOAT_CAP_USDC
       - --update-secrets=SENTRY_DSN=SENTRY_DSN:latest
       - --quiet
       - --async
@@ -158,7 +158,7 @@ steps:
     args: ["apply", "-k", "abroad-server/k8s"]
     waitFor: ["Substitute kustomization", "Execute migrate job", "Sync GKE secrets"]
 
-  # 6. Wait for listener, consumer, and outbox rollouts
+  # 6. Wait for listener, consumer, outbox, and bridge-sweep rollouts
   - id: Verify GKE rollouts
     name: gcr.io/cloud-builders/kubectl
     entrypoint: bash
@@ -172,6 +172,7 @@ steps:
         kubectl rollout status deployment/abroad-listeners --timeout=10s || true
         kubectl rollout status deployment/abroad-consumers --timeout=10s || true
         kubectl rollout status deployment/abroad-outbox --timeout=10s || true
+        kubectl rollout status deployment/abroad-bridge-sweep --timeout=10s || true
     waitFor: ["Deploy GKE workloads"]
 
 # images list removed: docker buildx already pushes the image; Cloud Build post-check fails on buildx manifest lists
@@ -190,6 +191,10 @@ substitutions:
   _SENTRY_ENVIRONMENT: production
   _TRIGGER_ID: ""
   _GKE_CLUSTER: ""
+  # Bridge float admission cap (USDC). Bounds total outstanding PENDING+BATCHED
+  # exposure at transaction acceptance; if unset the guard fails OPEN, so it is
+  # pinned here (re-applied on every deploy) rather than set by hand once.
+  _BRIDGE_FLOAT_CAP_USDC: "1000"
 
 tags:
   - gcp-cloud-build-deploy-cloud-run

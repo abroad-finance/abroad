@@ -1,0 +1,68 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: abroad-bridge-sweep
+  labels:
+    app: abroad-bridge-sweep
+spec:
+  # Single instance only: the sweep issues real Binance withdrawals. Concurrency
+  # is guarded by deterministic withdrawOrderId + atomic batch claim, but running
+  # one replica with Recreate keeps two sweepers from ever racing a batch.
+  replicas: 1
+  selector:
+    matchLabels:
+      app: abroad-bridge-sweep
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: abroad-bridge-sweep
+    spec:
+      serviceAccountName: abroad-stellar-sa
+      containers:
+        - name: abroad-bridge-sweep-container
+          image: abroad-bridge-sweep-container
+          command: ["node"]
+          args: ["dist/app/workers/bridge-sweep/server.js"]
+          imagePullPolicy: Always
+          env:
+            - name: HEALTH_PORT
+              value: "3000"
+            - name: BRIDGE_SWEEP_INTERVAL_MS
+              value: "300000"
+            - name: SENTRY_DSN
+              valueFrom:
+                secretKeyRef:
+                  name: sentry-dsn
+                  key: SENTRY_DSN
+            - name: SENTRY_ENVIRONMENT
+              value: "${_SENTRY_ENVIRONMENT}"
+            - name: SENTRY_RELEASE
+              value: "${COMMIT_SHA}"
+          resources:
+            requests:
+              cpu: "1"
+              memory: "1Gi"
+            limits:
+              cpu: "2"
+              memory: "2Gi"
+          ports:
+            - name: http
+              containerPort: 3000
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
