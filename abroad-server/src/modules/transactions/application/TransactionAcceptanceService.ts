@@ -1,4 +1,6 @@
 import {
+  BlockchainNetwork,
+  CryptoCurrency,
   KycStatus,
   KYCTier,
   PaymentMethod,
@@ -20,6 +22,7 @@ import { IKycService } from '../../kyc/application/contracts/IKycService'
 import { getNextTier, type KycCountry } from '../../kyc/application/kycTierRules'
 import { IPaymentServiceFactory } from '../../payments/application/contracts/IPaymentServiceFactory'
 import { LiquidityCacheService } from '../../payments/application/LiquidityCacheService'
+import { BridgeFloatService } from '../../treasury/application/BridgeFloatService'
 import { uuidToBase64 } from '../infrastructure/transactionEncoding'
 import { toWebhookTransactionPayload } from './transactionPayload'
 
@@ -79,6 +82,7 @@ export class TransactionAcceptanceService {
     @inject(TYPES.IKycService) private readonly kycService: IKycService,
     @inject(TYPES.IOutboxDispatcher) private readonly outboxDispatcher: OutboxDispatcher,
     @inject(LiquidityCacheService) private readonly liquidityCacheService: LiquidityCacheService,
+    @inject(BridgeFloatService) private readonly bridgeFloatService: BridgeFloatService,
     @inject(TYPES.ILogger) logger: ILogger,
   ) {
     this.logger = createScopedLogger(logger, { scope: 'TransactionAcceptance' })
@@ -104,6 +108,7 @@ export class TransactionAcceptanceService {
     const preflightPaymentService = this.resolvePaymentService(preflightQuote)
     this.assertPaymentServiceIsEnabled(preflightPaymentService, preflightQuote.paymentMethod)
     await this.enforceLiquidity(preflightPaymentService, preflightQuote.paymentMethod, preflightQuote.targetAmount)
+    await this.enforceBridgeFloat(preflightQuote)
 
     let decision: TransactionDecision
     try {
@@ -278,6 +283,35 @@ export class TransactionAcceptanceService {
 
   private dailyCountCap(paymentService: PaymentServiceInstance): number {
     return this.normalizeCountCap(paymentService.MAX_USER_TRANSACTIONS_PER_DAY)
+  }
+
+  /**
+   * Admission control for the bridge float. A CELO->BRL flow settles
+   * immediately against the Transfero USDC float and only later replenishes it
+   * via the batched sweep, so we must not accept one if the float can't front
+   * it — the recipient is paid first, so this guard cannot live in the flow.
+   * Other corridors settle directly and have no float to over-draw.
+   */
+  private async enforceBridgeFloat(quote: {
+    cryptoCurrency: CryptoCurrency
+    network: BlockchainNetwork
+    sourceAmount: number
+    targetCurrency: TargetCurrency
+  }): Promise<void> {
+    if (quote.network !== BlockchainNetwork.CELO || quote.targetCurrency !== TargetCurrency.BRL) {
+      return
+    }
+    // The bridge asset is always USDC (USDT corridors convert to USDC on Binance
+    // before bridging); stablecoin source amounts are ~1:1 in USDC terms.
+    const check = await this.bridgeFloatService.canSettle({ amount: quote.sourceAmount, asset: CryptoCurrency.USDC })
+    if (!check.ok) {
+      this.logger.warn('Rejecting CELO->BRL transaction: bridge float at capacity', {
+        cap: check.cap,
+        deficit: check.deficit,
+        sourceAmount: quote.sourceAmount,
+      })
+      throw new TransactionValidationError('This payout is temporarily unavailable while we rebalance liquidity. Please try again shortly or use a smaller amount.')
+    }
   }
 
   private async enforceLiquidity(

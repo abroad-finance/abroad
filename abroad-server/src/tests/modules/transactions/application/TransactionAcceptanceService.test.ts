@@ -53,12 +53,18 @@ describe('TransactionAcceptanceService helpers', () => {
     }),
   } as unknown as LiquidityCacheService
 
+  const bridgeFloatService = {
+    canSettle: jest.fn(async () => ({ cap: 2000, deficit: 0, ok: true })),
+    getOutstandingDeficit: jest.fn(async () => 0),
+  } as unknown as import('../../../../modules/treasury/application/BridgeFloatService').BridgeFloatService
+
   const service = new TransactionAcceptanceService(
     prismaProvider as unknown as import('../../../../platform/persistence/IDatabaseClientProvider').IDatabaseClientProvider,
     paymentServiceFactory as unknown as import('../../../../modules/payments/application/contracts/IPaymentServiceFactory').IPaymentServiceFactory,
     kycService as unknown as import('../../../../modules/kyc/application/contracts/IKycService').IKycService,
     outboxDispatcher as unknown as import('../../../../platform/outbox/OutboxDispatcher').OutboxDispatcher,
     liquidityCacheService,
+    bridgeFloatService,
     logger,
   )
 
@@ -191,6 +197,7 @@ describe('TransactionAcceptanceService helpers', () => {
       { getKycLink: jest.fn() } as unknown as import('../../../../modules/kyc/application/contracts/IKycService').IKycService,
       { enqueueQueue: jest.fn(), enqueueWebhook: jest.fn() } as never,
       liquidityCacheService,
+      bridgeFloatService,
       logger,
     )
 

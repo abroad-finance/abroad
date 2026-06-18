@@ -55,46 +55,74 @@ describe('FlowDefinitionBuilder Binance convert', () => {
     expect(convert?.config).not.toHaveProperty('side')
   })
 
-  // Multi-hop must propagate the REALIZED amount between money-moving hops:
-  // the post-convert TREASURY_TRANSFER must withdraw what the convert produced,
-  // and the final Transfero convert must convert what the transfer delivered —
-  // never the original quoted sourceAmount (which ignores spread + fees).
-  it('wires amountSource so each hop consumes the prior step realized output', () => {
+  // CELO->BRL bridges through Binance, which has a 5-USDC per-withdrawal floor.
+  // Small txs must still settle, so the corridor must NOT emit a per-flow
+  // TREASURY_TRANSFER. Instead it settles by converting against the Transfero
+  // float and records the owed Binance USDC as an ENQUEUE_BRIDGE leg for a
+  // batched sweep. (USDT path: a Binance USDT->USDC convert precedes it.)
+  it('routes a USDT/CELO->BRL bridge through convert-against-float + ENQUEUE_BRIDGE (no per-flow transfer)', () => {
     const builder = makeBuilder()
 
     const steps = builder.build({
       blockchain: BlockchainNetwork.CELO,
       cryptoCurrency: CryptoCurrency.USDT,
-      name: 'usdt-celo-brl-multihop',
+      name: 'usdt-celo-brl',
       payoutProvider: PaymentMethod.PIX,
       pricingProvider: FlowPricingProvider.BINANCE,
+      steps: multiHopSteps(),
+      targetCurrency: TargetCurrency.BRL,
+    })
+
+    expect(steps.find(s => s.stepType === FlowStepType.TREASURY_TRANSFER)).toBeUndefined()
+    expect(steps.find(s => s.stepType === FlowStepType.AWAIT_EXCHANGE_BALANCE && s.config.provider === 'transfero')).toBeUndefined()
+
+    const binanceConvert = steps.find(s => s.stepType === FlowStepType.EXCHANGE_CONVERT && s.config.provider === 'binance')
+    const transferoConvert = steps.find(s => s.stepType === FlowStepType.EXCHANGE_CONVERT && s.config.provider === 'transfero')
+    const enqueue = steps.find(s => s.stepType === FlowStepType.ENQUEUE_BRIDGE)
+
+    expect(enqueue?.config).toMatchObject({ asset: 'USDC', destNetwork: 'SOL' })
+    // ENQUEUE_BRIDGE is recorded BEFORE the float convert, so a convert failure
+    // can never lose the accounting of USDC already on Binance.
+    expect(enqueue?.stepOrder).toBeLessThan(transferoConvert?.stepOrder ?? 0)
+    // Both the float convert and the bridge leg act on the realized Binance USDC
+    // (the USDT->USDC convert's output), not the quoted USDT deposit.
+    expect(transferoConvert?.config.amountSource).toEqual({ field: 'amount', kind: 'step', stepOrder: binanceConvert?.stepOrder })
+    expect(enqueue?.config.amountSource).toEqual({ field: 'amount', kind: 'step', stepOrder: binanceConvert?.stepOrder })
+  })
+
+  // Pure USDC/CELO->BRL has no Binance convert: the USDC deposited at Binance IS
+  // the quoted sourceAmount, so the float convert + bridge leg both default to it.
+  it('routes a pure USDC/CELO->BRL bridge through float convert + ENQUEUE_BRIDGE (default amount)', () => {
+    const builder = makeBuilder()
+
+    const steps = builder.build({
+      blockchain: BlockchainNetwork.CELO,
+      cryptoCurrency: CryptoCurrency.USDC,
+      name: 'usdc-celo-brl',
+      payoutProvider: PaymentMethod.PIX,
+      pricingProvider: FlowPricingProvider.TRANSFERO,
       steps: [
         { type: 'PAYOUT' },
         { type: 'MOVE_TO_EXCHANGE', venue: 'BINANCE' },
-        { fromAsset: SupportedCurrency.USDT, toAsset: SupportedCurrency.USDC, type: 'CONVERT', venue: 'BINANCE' },
         { asset: SupportedCurrency.USDC, fromVenue: 'BINANCE', toVenue: 'TRANSFERO', type: 'TRANSFER_VENUE' },
         { fromAsset: SupportedCurrency.USDC, toAsset: SupportedCurrency.BRL, type: 'CONVERT', venue: 'TRANSFERO' },
       ],
       targetCurrency: TargetCurrency.BRL,
     })
 
-    const binanceConvert = steps.find(s => s.stepType === FlowStepType.EXCHANGE_CONVERT && s.config.provider === 'binance')
-    const transfer = steps.find(s => s.stepType === FlowStepType.TREASURY_TRANSFER)
+    expect(steps.find(s => s.stepType === FlowStepType.TREASURY_TRANSFER)).toBeUndefined()
+    expect(steps.find(s => s.stepType === FlowStepType.EXCHANGE_CONVERT && s.config.provider === 'binance')).toBeUndefined()
+
     const transferoConvert = steps.find(s => s.stepType === FlowStepType.EXCHANGE_CONVERT && s.config.provider === 'transfero')
+    const enqueue = steps.find(s => s.stepType === FlowStepType.ENQUEUE_BRIDGE)
 
-    // First (Binance) convert converts the deposited amount — no upstream wiring.
-    expect(binanceConvert?.config).not.toHaveProperty('amountSource')
-
-    // Transfer withdraws exactly the Binance convert's realized output.
-    expect(transfer?.config.amountSource).toEqual({ field: 'amount', kind: 'step', stepOrder: binanceConvert?.stepOrder })
-
-    // Final Transfero convert converts exactly what the transfer delivered.
-    expect(transferoConvert?.config.amountSource).toEqual({ field: 'amount', kind: 'step', stepOrder: transfer?.stepOrder })
+    expect(transferoConvert?.config).not.toHaveProperty('amountSource')
+    expect(enqueue?.config).not.toHaveProperty('amountSource')
+    expect(enqueue?.config).toMatchObject({ asset: 'USDC', destNetwork: 'SOL' })
   })
 
-  // An async payout inserts AWAIT_PROVIDER_STATUS, shifting every later step's
-  // absolute order. The wiring uses absolute orders, so it must follow the shift.
-  it('wires amountSource to shifted absolute orders when the payout is async', () => {
+  // Async payout inserts AWAIT_PROVIDER_STATUS; absolute-order wiring must follow.
+  it('keeps amountSource wiring correct under an async payout (order shift)', () => {
     const builder = makeBuilder(true)
 
     const steps = builder.build({
@@ -108,15 +136,11 @@ describe('FlowDefinitionBuilder Binance convert', () => {
     })
 
     expect(steps.find(s => s.stepType === FlowStepType.AWAIT_PROVIDER_STATUS)?.stepOrder).toBe(2)
-
     const binanceConvert = steps.find(s => s.stepType === FlowStepType.EXCHANGE_CONVERT && s.config.provider === 'binance')
-    const transfer = steps.find(s => s.stepType === FlowStepType.TREASURY_TRANSFER)
     const transferoConvert = steps.find(s => s.stepType === FlowStepType.EXCHANGE_CONVERT && s.config.provider === 'transfero')
-
-    expect(transfer?.config.amountSource).toEqual({ field: 'amount', kind: 'step', stepOrder: binanceConvert?.stepOrder })
-    expect(transferoConvert?.config.amountSource).toEqual({ field: 'amount', kind: 'step', stepOrder: transfer?.stepOrder })
-    // Sanity: the shift really happened (orders are not the sync-case values).
-    expect(binanceConvert?.stepOrder).toBe(5)
-    expect(transfer?.stepOrder).toBe(6)
+    const enqueue = steps.find(s => s.stepType === FlowStepType.ENQUEUE_BRIDGE)
+    // Absolute-order wiring survives the shift; leg recorded before the float convert.
+    expect(enqueue?.config.amountSource).toEqual({ field: 'amount', kind: 'step', stepOrder: binanceConvert?.stepOrder })
+    expect(enqueue?.stepOrder).toBeLessThan(transferoConvert?.stepOrder ?? 0)
   })
 })

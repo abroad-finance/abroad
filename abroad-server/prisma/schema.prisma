@@ -255,6 +255,7 @@ enum FlowStepType {
   TREASURY_TRANSFER
   AWAIT_PROVIDER_STATUS
   AWAIT_EXCHANGE_BALANCE
+  ENQUEUE_BRIDGE
 }
 
 enum FlowStepCompletionPolicy {
@@ -470,4 +471,59 @@ model FlowSignal {
 
   @@index([eventType])
   @@index([consumedAt])
+}
+
+enum BridgeLegStatus {
+  PENDING
+  BATCHED
+  SETTLED
+  FAILED
+}
+
+enum BridgeBatchStatus {
+  OPEN
+  SUBMITTED
+  CREDITED
+  FAILED
+}
+
+// One per ENQUEUE_BRIDGE step: the USDC a flow deposited at Binance that still
+// owes a CELO->Solana bridge crossing. Accumulated across flows and swept to
+// Transfero in batches >= the per-withdrawal minimum (the flow itself settles
+// immediately by converting against the Transfero float — see ENQUEUE_BRIDGE).
+model BridgePendingTransfer {
+  id            String          @id @default(uuid())
+  transactionId String
+  stepOrder     Int
+  asset         CryptoCurrency
+  destNetwork   String
+  amount        Float
+  status        BridgeLegStatus @default(PENDING)
+  batchId       String?
+  batch         BridgeBatch?    @relation(fields: [batchId], references: [id])
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  // (transactionId, stepOrder) is the idempotency anchor: re-running the
+  // ENQUEUE_BRIDGE step never double-enrolls a leg.
+  @@unique([transactionId, stepOrder])
+  @@index([asset, destNetwork, status])
+  @@index([batchId])
+}
+
+// One pooled Binance withdrawal that bridges many BridgePendingTransfer legs.
+model BridgeBatch {
+  id          String                  @id @default(uuid())
+  asset       CryptoCurrency
+  destNetwork String
+  grossAmount Float
+  withdrawFee Float?
+  withdrawId  String?
+  status      BridgeBatchStatus       @default(OPEN)
+  members     BridgePendingTransfer[]
+  createdAt   DateTime                @default(now())
+  updatedAt   DateTime                @updatedAt
+  settledAt   DateTime?
+
+  @@index([asset, destNetwork, status])
 }
