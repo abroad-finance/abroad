@@ -251,7 +251,7 @@
   "user_verification.subtitle": "Verifica tu cuenta para acceder a todas las funciones.",
   "user_verification.title": "Se requiere verificación de usuario",
 
-  "wait_sign.wait_message": "MiniPay te pedirá que confirmes la transacción.",
+  "wait_sign.wait_message": "Tu billetera te pedirá que confirmes la transacción.",
   "wait_sign.wait_sign": "Confirma tu pago en tu billetera",
 
   "wallet_details.actions.back": "Atrás",

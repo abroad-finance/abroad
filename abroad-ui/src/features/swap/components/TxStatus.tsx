@@ -16,9 +16,9 @@ import { cn } from '@/shared/utils'
 
 // S6478: component defined at module scope (not inside parent)
 const DetailRow = ({ className, label, value }: { className?: string, label: string, value: React.ReactNode }) => (
-  <div className={cn('flex items-center justify-between border-b border-ab-border pb-[17px]', className)}>
-    <span className="text-base font-normal text-ab-text-3">{label}</span>
-    <span className="text-base font-medium text-ab-text">{value}</span>
+  <div className={cn('flex items-center justify-between border-b border-ab-border pb-[clamp(6px,1.5vh,14px)]', className)}>
+    <span className="text-[clamp(0.7rem,2.5vw,0.875rem)] font-normal text-ab-text-3">{label}</span>
+    <span className="text-[clamp(0.7rem,2.5vw,0.875rem)] font-medium text-ab-text">{value}</span>
   </div>
 )
 
@@ -217,21 +217,21 @@ const TxStatus = ({
       <div className="flex flex-1 flex-col items-center justify-center w-full max-w-[448px]">
         <div className="flex w-full flex-col items-center">
           {/* Success icon – Figma 17:93 */}
-          <div className="mb-8">{renderIcon()}</div>
+          <div className="mb-[clamp(0.5rem,2vh,2rem)]">{renderIcon()}</div>
 
           {/* Title – Figma 17:50 */}
-          <h1 className="mb-2 text-center text-[30px] font-bold leading-9 text-ab-text">
+          <h1 className="mb-1 text-center text-[clamp(1.1rem,5vw,1.6rem)] font-bold leading-tight text-ab-text">
             {t('tx_status.payment_confirmed', 'Payment Confirmed!')}
           </h1>
 
           {/* Subtitle – Figma 17:53 */}
-          <p className="mb-10 text-center text-base font-medium text-ab-text-3">
+          <p className="mb-[clamp(0.5rem,2vh,2rem)] text-center text-[clamp(0.7rem,2.5vw,0.875rem)] font-medium text-ab-text-3">
             {t('tx_status.settled_via', 'Settled via {rail}', { rail: txStatusDetails.rail })}
           </p>
 
           {/* Transaction details card – Figma 17:55 */}
-          <div className="mb-8 w-full overflow-hidden rounded-[24px] border border-ab-border bg-ab-input shadow-[0px_1px_2px_0px_rgba(0,0,0,0.05)]">
-            <div className="flex flex-col gap-5 p-6">
+          <div className="mb-[clamp(0.5rem,2vh,2rem)] w-full overflow-hidden rounded-[16px] border border-ab-border bg-ab-input shadow-[0px_1px_2px_0px_rgba(0,0,0,0.05)]">
+            <div className="flex flex-col gap-[clamp(6px,1.5vh,16px)] p-[clamp(0.75rem,3vw,1.5rem)]">
               <DetailRow
                 label={t('tx_status.merchant', 'Merchant')}
                 value={merchant}
@@ -274,8 +274,8 @@ const TxStatus = ({
                 )}
               />
               <div className="flex items-center justify-between">
-                <span className="text-base font-normal text-ab-text-3">{t('tx_status.rail', 'Rail')}</span>
-                <span className="flex items-center gap-2 text-base font-medium text-ab-text">
+                <span className="text-[clamp(0.7rem,2.5vw,0.875rem)] font-normal text-ab-text-3">{t('tx_status.rail', 'Rail')}</span>
+                <span className="flex items-center gap-2 text-[clamp(0.7rem,2.5vw,0.875rem)] font-medium text-ab-text">
                   {CURRENCY_FLAG_URL[targetCurrency] && (
                     <img
                       alt={targetCurrency}
@@ -297,7 +297,7 @@ const TxStatus = ({
 
           {/* Done button – Figma 17:96 */}
           <Button
-            className="w-full rounded-2xl bg-ab-green py-4 text-base font-semibold text-white shadow-[0px_10px_15px_-3px_rgba(16,185,129,0.2),0px_4px_6px_-4px_rgba(16,185,129,0.2)] hover:opacity-95"
+            className="w-full rounded-2xl bg-ab-green py-[clamp(0.6rem,2vh,1rem)] text-[clamp(0.8rem,3vw,1rem)] font-semibold text-white shadow-[0px_10px_15px_-3px_rgba(16,185,129,0.2),0px_4px_6px_-4px_rgba(16,185,129,0.2)] hover:opacity-95"
             onClick={onNewTransaction}
             type="button"
           >
@@ -354,7 +354,7 @@ const TxStatus = ({
       {error && <div className="text-ab-error text-sm">{error}</div>}
 
       <div
-        className="relative w-full max-w-md min-h-[60vh] rounded-2xl bg-ab-card/5 p-6 backdrop-blur-xl flex flex-col items-center justify-center space-y-4"
+        className="relative w-full max-w-md py-[clamp(2.5rem,8vh,5rem)] rounded-2xl bg-ab-card/5 p-6 backdrop-blur-xl flex flex-col items-center justify-center space-y-4"
         id="bg-container"
       >
         <div>{renderIcon()}</div>
