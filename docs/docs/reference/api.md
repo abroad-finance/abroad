@@ -279,7 +279,7 @@ Retrieve the bank list for a payment method (defaults to `BREB` if omitted).
 For `BREB`, the bank list maps to its payout rails:
 
 - `9101` (`ENT`) — intra-BreB accounts  
-- `9102` (`TFY`) — Transfiya rail
+- `9102` (`TFY`) — interbank rail
 
 `bank_code` is optional for supported methods. BREB resolves rails from the account details, and PIX ignores `bank_code`.
 

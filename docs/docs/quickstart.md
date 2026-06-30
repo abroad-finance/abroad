@@ -23,7 +23,7 @@ graph LR
 ## Prerequisites
 
 :::info
-You will need an API key to proceed. If you don't have one, please contact [support@abroad.com](mailto:support@abroad.com).
+You will need an API key to proceed. If you don't have one, please contact [support@abroad.finance](mailto:support@abroad.finance).
 :::
 
 - **Base URL**: `https://api.abroad.finance`

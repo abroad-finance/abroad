@@ -119,7 +119,7 @@ const config: Config = {
             },
             {
               label: 'Support',
-              href: 'mailto:support@abroad.com',
+              href: 'mailto:support@abroad.finance',
             },
           ],
         },
