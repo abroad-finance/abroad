@@ -37,6 +37,7 @@ import { StellarDepositVerifier } from '../../modules/payments/infrastructure/wa
 import { StellarWalletHandler } from '../../modules/payments/infrastructure/wallets/StellarWalletHandler'
 import { QuoteUseCase } from '../../modules/quotes/application/quoteUseCase'
 import { FlowCorridorPricingProvider } from '../../modules/quotes/infrastructure/FlowCorridorPricingProvider'
+import { OpsTransactionQueryService } from '../../modules/transactions/application/OpsTransactionQueryService'
 import { OpsTransactionReconciliationService } from '../../modules/transactions/application/OpsTransactionReconciliationService'
 import { ReceivedCryptoTransactionUseCase } from '../../modules/transactions/application/receivedCryptoTransactionUseCase'
 import { StellarOrphanRefundService } from '../../modules/transactions/application/StellarOrphanRefundService'
@@ -46,6 +47,7 @@ import { BridgeFloatService } from '../../modules/treasury/application/BridgeFlo
 import { BridgeSweepService } from '../../modules/treasury/application/BridgeSweepService'
 import { BridgeSweepWorker } from '../../modules/treasury/application/BridgeSweepWorker'
 import { ExchangeProviderFactory } from '../../modules/treasury/application/ExchangeProviderFactory'
+import { OpsBridgeService } from '../../modules/treasury/application/OpsBridgeService'
 import { BinanceExchangeProvider } from '../../modules/treasury/infrastructure/exchangeProviders/binanceExchangeProvider'
 import { BinanceBrlExchangeProvider } from '../../modules/treasury/infrastructure/exchangeProviders/binanceExchangeProvider'
 import { TransferoExchangeProvider } from '../../modules/treasury/infrastructure/exchangeProviders/transferoExchangeProvider'
@@ -86,6 +88,7 @@ const domainBindings: ReadonlyArray<BindingRegistration<unknown>> = [
   { identifier: TYPES.TransactionStatusService, implementation: TransactionStatusService },
   { identifier: TYPES.StellarOrphanRefundService, implementation: StellarOrphanRefundService },
   { bindSelf: true, identifier: OpsTransactionReconciliationService, implementation: OpsTransactionReconciliationService },
+  { bindSelf: true, identifier: OpsTransactionQueryService, implementation: OpsTransactionQueryService },
   { identifier: TYPES.PaymentUseCase, implementation: PaymentUseCase },
   { identifier: TYPES.ReceivedCryptoTransactionUseCase, implementation: ReceivedCryptoTransactionUseCase },
   { bindSelf: true, identifier: PersonaWebhookService, implementation: PersonaWebhookService },
@@ -101,6 +104,7 @@ const domainBindings: ReadonlyArray<BindingRegistration<unknown>> = [
   { bindSelf: true, identifier: BridgeFloatService, implementation: BridgeFloatService },
   { bindSelf: true, identifier: BridgeSweepService, implementation: BridgeSweepService },
   { bindSelf: true, identifier: BridgeSweepWorker, implementation: BridgeSweepWorker },
+  { bindSelf: true, identifier: OpsBridgeService, implementation: OpsBridgeService },
   { identifier: TYPES.FlowStepExecutor, implementation: PayoutSendStepExecutor },
   { identifier: TYPES.FlowStepExecutor, implementation: AwaitProviderStatusStepExecutor },
   { identifier: TYPES.FlowStepExecutor, implementation: ExchangeSendStepExecutor },

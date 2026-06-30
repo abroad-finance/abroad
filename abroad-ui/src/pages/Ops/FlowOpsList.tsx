@@ -3,8 +3,9 @@ import {
 } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 
-import { listFlowInstances } from '../../services/admin/flowAdminApi'
+import { bulkRetryFlowInstances, listFlowInstances } from '../../services/admin/flowAdminApi'
 import {
+  FlowBulkRetryResponse,
   FlowInstanceListResponse,
   FlowInstanceStatus,
   flowInstanceStatuses,
@@ -45,8 +46,25 @@ const FlowOpsList = () => {
   const [onChainId, setOnChainId] = useState('')
   const [stuckMinutes, setStuckMinutes] = useState<string>('')
   const [page, setPage] = useState(1)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set())
+  const [bulkLoading, setBulkLoading] = useState(false)
+  const [bulkResult, setBulkResult] = useState<FlowBulkRetryResponse | null>(null)
   const pageSize = 20
   const opsApiKey = useOpsApiKey()
+
+  const toggleSelection = useCallback((id: string) => {
+    setSelectedIds((current) => {
+      const next = new Set(current)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }, [])
+
+  const clearSelection = useCallback(() => {
+    setSelectedIds(new Set())
+    setBulkResult(null)
+  }, [])
 
   const query = useMemo(() => {
     const parsedStuck = Number(stuckMinutes)
@@ -91,6 +109,30 @@ const FlowOpsList = () => {
     }
   }, [opsApiKey, query])
 
+  const handleBulkRetry = useCallback(async () => {
+    if (!opsApiKey || selectedIds.size === 0) return
+    setBulkLoading(true)
+    setBulkResult(null)
+    setError(null)
+
+    try {
+      const result = await bulkRetryFlowInstances(Array.from(selectedIds))
+      setBulkResult(result)
+      setSelectedIds(new Set())
+      await fetchData()
+    }
+    catch (err) {
+      setError(err instanceof Error ? err.message : 'Bulk retry failed')
+    }
+    finally {
+      setBulkLoading(false)
+    }
+  }, [
+    fetchData,
+    opsApiKey,
+    selectedIds,
+  ])
+
   useEffect(() => {
     void fetchData()
   }, [fetchData])
@@ -128,6 +170,18 @@ const FlowOpsList = () => {
                 to="/ops/partners"
               >
                 Partners
+              </Link>
+              <Link
+                className="ops-nav-link"
+                to="/ops/transactions"
+              >
+                Transactions
+              </Link>
+              <Link
+                className="ops-nav-link"
+                to="/ops/treasury/bridge"
+              >
+                Bridge
               </Link>
               <Link
                 className="ops-nav-link"
@@ -243,6 +297,66 @@ const FlowOpsList = () => {
             </div>
           )}
 
+          {selectedIds.size > 0 && (
+            <div className="mt-4 flex flex-col gap-3 rounded-2xl border border-abroad-dark/30 bg-white/80 px-5 py-4 shadow-[0_15px_45px_-35px_rgba(15,23,42,0.5)] md:flex-row md:items-center md:justify-between">
+              <div className="text-sm font-medium text-gray-800">
+                {selectedIds.size}
+                {' '}
+                flow
+                {selectedIds.size === 1 ? '' : 's'}
+                {' '}
+                selected
+                <span className="ml-2 text-xs text-gray-500">Retries the earliest failed step of each.</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <button
+                  className="rounded-xl border border-ops-border bg-white px-4 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-50"
+                  disabled={bulkLoading}
+                  onClick={clearSelection}
+                  type="button"
+                >
+                  Clear
+                </button>
+                <button
+                  className="rounded-xl border border-abroad-dark bg-abroad-dark px-4 py-2 text-xs font-semibold text-white hover:bg-ops-brand-hover disabled:opacity-40"
+                  disabled={bulkLoading || !opsApiKey}
+                  onClick={() => void handleBulkRetry()}
+                  type="button"
+                >
+                  {bulkLoading ? 'Retrying...' : `Retry ${selectedIds.size} selected`}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {bulkResult && (
+            <div className="mt-4 rounded-2xl border border-white/70 bg-white/80 px-5 py-4 text-sm shadow-[0_15px_45px_-35px_rgba(15,23,42,0.5)]">
+              <div className="font-medium text-gray-800">
+                Bulk retry:
+                {' '}
+                <span className="text-emerald-700">{bulkResult.succeeded}</span>
+                {' '}
+                succeeded ·
+                {' '}
+                <span className="text-rose-700">{bulkResult.failed}</span>
+                {' '}
+                failed
+              </div>
+              {bulkResult.failed > 0 && (
+                <ul className="mt-2 space-y-1 text-xs text-rose-700">
+                  {bulkResult.results.filter(item => !item.ok).map(item => (
+                    <li className="break-all" key={item.flowInstanceId}>
+                      {item.flowInstanceId}
+                      :
+                      {' '}
+                      {item.error ?? 'failed'}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+
           <div className="mt-8 space-y-4">
             {loading && opsApiKey && (
               <div className="text-sm text-ops-label">Loading flows...</div>
@@ -255,63 +369,71 @@ const FlowOpsList = () => {
             )}
 
             {data?.items.map(instance => (
-              <button
-                className="w-full text-left rounded-2xl border border-white/80 bg-white/80 backdrop-blur px-6 py-4 shadow-[0_15px_45px_-35px_rgba(15,23,42,0.5)] hover:shadow-[0_20px_55px_-35px_rgba(15,23,42,0.55)] transition"
-                key={instance.id}
-                onClick={() => navigate(`/ops/flows/${instance.id}`)}
-                type="button"
-              >
-                <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                  <div>
-                    <div className="flex items-center gap-3">
-                      <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold ${statusClasses[instance.status]}`}>
-                        {instance.status}
-                      </span>
-                      <span className="text-xs uppercase tracking-wider text-slate-500">{instance.definition?.name ?? 'Unlabeled flow'}</span>
-                    </div>
-                    <div className="mt-2 text-lg font-semibold">
-                      {instance.definition?.cryptoCurrency ?? '—'}
-                      {' '}
-                      ·
-                      {instance.definition?.blockchain ?? '—'}
-                      {' '}
-                      →
-                      {instance.definition?.targetCurrency ?? '—'}
-                    </div>
-                    <div className="mt-1 text-sm text-slate-500">
-                      Updated
-                      {' '}
-                      {formatDate(instance.updatedAt)}
-                      {' '}
-                      · Transaction
-                      {' '}
-                      {instance.transactionId}
-                    </div>
-                    {instance.transaction?.onChainId && (
-                      <div className="mt-1 text-xs text-slate-400 break-all">
-                        On-chain
-                        {' '}
-                        {instance.transaction.onChainId}
+              <div className="flex items-start gap-3" key={instance.id}>
+                <input
+                  aria-label={`Select flow ${instance.id}`}
+                  checked={selectedIds.has(instance.id)}
+                  className="mt-6 h-4 w-4 shrink-0 rounded border-ops-border"
+                  onChange={() => toggleSelection(instance.id)}
+                  type="checkbox"
+                />
+                <button
+                  className="flex-1 text-left rounded-2xl border border-white/80 bg-white/80 backdrop-blur px-6 py-4 shadow-[0_15px_45px_-35px_rgba(15,23,42,0.5)] hover:shadow-[0_20px_55px_-35px_rgba(15,23,42,0.55)] transition"
+                  onClick={() => navigate(`/ops/flows/${instance.id}`)}
+                  type="button"
+                >
+                  <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                    <div>
+                      <div className="flex items-center gap-3">
+                        <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold ${statusClasses[instance.status]}`}>
+                          {instance.status}
+                        </span>
+                        <span className="text-xs uppercase tracking-wider text-slate-500">{instance.definition?.name ?? 'Unlabeled flow'}</span>
                       </div>
-                    )}
-                  </div>
+                      <div className="mt-2 text-lg font-semibold">
+                        {instance.definition?.cryptoCurrency ?? '—'}
+                        {' '}
+                        ·
+                        {instance.definition?.blockchain ?? '—'}
+                        {' '}
+                        →
+                        {instance.definition?.targetCurrency ?? '—'}
+                      </div>
+                      <div className="mt-1 text-sm text-slate-500">
+                        Updated
+                        {' '}
+                        {formatDate(instance.updatedAt)}
+                        {' '}
+                        · Transaction
+                        {' '}
+                        {instance.transactionId}
+                      </div>
+                      {instance.transaction?.onChainId && (
+                        <div className="mt-1 text-xs text-slate-400 break-all">
+                          On-chain
+                          {' '}
+                          {instance.transaction.onChainId}
+                        </div>
+                      )}
+                    </div>
 
-                  <div className="flex flex-col items-start gap-2 text-sm text-gray-800">
-                    <div className="font-medium">Step Pulse</div>
-                    <div className="text-xs text-gray-500">{buildStepSummary(instance.stepSummary)}</div>
-                    {instance.currentStep && (
-                      <div className="text-xs text-gray-500">
-                        Current:
-                        {instance.currentStep.stepType}
-                        {' '}
-                        (#
-                        {instance.currentStep.stepOrder}
-                        )
-                      </div>
-                    )}
+                    <div className="flex flex-col items-start gap-2 text-sm text-gray-800">
+                      <div className="font-medium">Step Pulse</div>
+                      <div className="text-xs text-gray-500">{buildStepSummary(instance.stepSummary)}</div>
+                      {instance.currentStep && (
+                        <div className="text-xs text-gray-500">
+                          Current:
+                          {instance.currentStep.stepType}
+                          {' '}
+                          (#
+                          {instance.currentStep.stepOrder}
+                          )
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-              </button>
+                </button>
+              </div>
             ))}
           </div>
         </div>

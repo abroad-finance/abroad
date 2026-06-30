@@ -49,6 +49,19 @@ export type CryptoAssetUpdateInput = {
   mintAddress?: null | string
 }
 
+export type FlowBulkRetryResponse = {
+  failed: number
+  results: FlowBulkRetryResult[]
+  succeeded: number
+}
+
+export type FlowBulkRetryResult = {
+  error?: string
+  flowInstanceId: string
+  ok: boolean
+  stepInstanceId?: string
+}
+
 export type FlowBusinessStep
   = | {
     asset: SupportedCurrency

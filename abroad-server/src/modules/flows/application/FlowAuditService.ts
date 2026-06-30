@@ -17,6 +17,13 @@ import { IDatabaseClientProvider } from '../../../platform/persistence/IDatabase
 import { FlowOrchestrator } from './FlowOrchestrator'
 import { FlowSnapshot } from './flowTypes'
 
+export type FlowBulkRetryResult = {
+  error?: string
+  flowInstanceId: string
+  ok: boolean
+  stepInstanceId?: string
+}
+
 export type FlowInstanceCurrentStepDto = {
   status: FlowStepStatus
   stepOrder: number
@@ -171,6 +178,32 @@ export class FlowAuditService {
     @inject(TYPES.FlowOrchestrator) private readonly orchestrator: FlowOrchestrator,
   ) {}
 
+  /**
+   * Resume many stalled flow instances. Runs sequentially so each instance's
+   * orchestrator pass completes before the next begins (correctness over speed
+   * for an operator-triggered bulk action) and reports a per-instance outcome
+   * so one failure never aborts the batch.
+   */
+  public async bulkRetry(flowInstanceIds: string[]): Promise<FlowBulkRetryResult[]> {
+    const results: FlowBulkRetryResult[] = []
+
+    for (const flowInstanceId of flowInstanceIds) {
+      try {
+        const step = await this.resumeInstance(flowInstanceId)
+        results.push({ flowInstanceId, ok: true, stepInstanceId: step.id })
+      }
+      catch (error) {
+        results.push({
+          error: error instanceof Error ? error.message : 'Unknown error',
+          flowInstanceId,
+          ok: false,
+        })
+      }
+    }
+
+    return results
+  }
+
   public async getInstance(flowInstanceId: string): Promise<FlowInstanceDetailDto> {
     const client = await this.dbProvider.getClient()
     const instance = await client.flowInstance.findUnique({
@@ -322,6 +355,7 @@ export class FlowAuditService {
     flowInstanceId: string,
     stepInstanceId: string,
     action: FlowStepAction,
+    options: { force?: boolean } = {},
   ): Promise<FlowStepInstanceDto> {
     const client = await this.dbProvider.getClient()
     const step = await client.flowStepInstance.findUnique({ where: { id: stepInstanceId } })
@@ -333,6 +367,13 @@ export class FlowAuditService {
     const allowedStatuses: FlowStepStatus[] = action === 'retry'
       ? [FlowStepStatus.FAILED]
       : [FlowStepStatus.WAITING]
+
+    // A force-reset additionally permits a stuck RUNNING step to be re-queued.
+    // Operator-gated: re-running a non-idempotent money step
+    // (PAYOUT_SEND / EXCHANGE_SEND / TREASURY_TRANSFER) risks double execution.
+    if (options.force) {
+      allowedStatuses.push(FlowStepStatus.RUNNING)
+    }
 
     if (!allowedStatuses.includes(step.status)) {
       throw new FlowStepActionError(`Step is not in a ${allowedStatuses.join(' or ')} state`)
@@ -377,6 +418,31 @@ export class FlowAuditService {
     }
   }
 
+  /**
+   * Resume a stalled flow instance by retrying its earliest FAILED step.
+   * This is the instance-level counterpart to {@link resetStep}: an operator
+   * does not need to know which step failed, only that the flow is stuck.
+   */
+  public async resumeInstance(flowInstanceId: string): Promise<FlowStepInstanceDto> {
+    const client = await this.dbProvider.getClient()
+    const instance = await client.flowInstance.findUnique({ where: { id: flowInstanceId } })
+
+    if (!instance) {
+      throw new FlowInstanceNotFoundError('Flow instance not found')
+    }
+
+    const failedStep = await client.flowStepInstance.findFirst({
+      orderBy: { stepOrder: 'asc' },
+      where: { flowInstanceId, status: FlowStepStatus.FAILED },
+    })
+
+    if (!failedStep) {
+      throw new FlowStepActionError('Flow instance has no FAILED step to resume')
+    }
+
+    return this.resetStep(flowInstanceId, failedStep.id, 'retry')
+  }
+
   private buildCurrentStep(
     steps: Array<{ status: FlowStepStatus, stepOrder: number, stepType: FlowStepType }>,
     currentStepOrder: null | number,
@@ -406,6 +472,9 @@ export class FlowAuditService {
       switch (step.status) {
         case FlowStepStatus.FAILED:
           summary.failed += 1
+          break
+        case FlowStepStatus.NOT_STARTED:
+          // Not tallied: NOT_STARTED steps have no summary bucket.
           break
         case FlowStepStatus.READY:
           summary.ready += 1

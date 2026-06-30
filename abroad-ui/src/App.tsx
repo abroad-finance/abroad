@@ -18,6 +18,9 @@ const FlowDefinitions = lazy(() => import('./pages/Ops/FlowDefinitions'))
 const CryptoAssets = lazy(() => import('./pages/Ops/CryptoAssets'))
 const PartnerApiKeys = lazy(() => import('./pages/Ops/PartnerApiKeys'))
 const TransactionReconcile = lazy(() => import('./pages/Ops/TransactionReconcile'))
+const TransactionsList = lazy(() => import('./pages/Ops/TransactionsList'))
+const TransactionDetail = lazy(() => import('./pages/Ops/TransactionDetail'))
+const BridgeOps = lazy(() => import('./pages/Ops/BridgeOps'))
 
 function App() {
   return (
@@ -38,7 +41,10 @@ function App() {
                   <Route element={<FlowDefinitions />} path="/ops/flows/definitions" />
                   <Route element={<CryptoAssets />} path="/ops/crypto-assets" />
                   <Route element={<PartnerApiKeys />} path="/ops/partners" />
+                  <Route element={<BridgeOps />} path="/ops/treasury/bridge" />
+                  <Route element={<TransactionsList />} path="/ops/transactions" />
                   <Route element={<TransactionReconcile />} path="/ops/transactions/reconcile" />
+                  <Route element={<TransactionDetail />} path="/ops/transactions/:transactionId" />
                 </Routes>
               </Suspense>
             </Router>

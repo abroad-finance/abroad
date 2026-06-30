@@ -3,7 +3,12 @@ import {
 } from 'react'
 import { Link, useParams } from 'react-router-dom'
 
-import { getFlowInstance, requeueFlowStep, retryFlowStep } from '../../services/admin/flowAdminApi'
+import {
+  getFlowInstance,
+  requeueFlowStep,
+  resumeFlowInstance,
+  retryFlowStep,
+} from '../../services/admin/flowAdminApi'
 import {
   FlowInstanceDetail,
   FlowInstanceStatus,
@@ -117,6 +122,58 @@ const FlowOpsDetail = () => {
     opsApiKey,
   ])
 
+  const handleResume = useCallback(async () => {
+    if (!flowInstanceId || !opsApiKey) return
+    setActionLoading('resume')
+    setError(null)
+
+    try {
+      await resumeFlowInstance(flowInstanceId)
+      await load()
+    }
+    catch (err) {
+      setError(err instanceof Error ? err.message : 'Resume failed')
+    }
+    finally {
+      setActionLoading(null)
+    }
+  }, [
+    flowInstanceId,
+    load,
+    opsApiKey,
+  ])
+
+  const handleForceReset = useCallback(async (step: FlowStepInstance) => {
+    if (!flowInstanceId || !opsApiKey) return
+    const confirmed = window.confirm(
+      `Force-reset RUNNING step #${step.stepOrder} (${step.stepType})?\n\n`
+      + 'This re-queues a step that is still marked as running. If the step performs a '
+      + 'non-idempotent money action (payout, exchange send, treasury transfer), forcing it '
+      + 'can DOUBLE-EXECUTE that action. Only proceed if you have confirmed the original '
+      + 'execution did not complete.',
+    )
+    if (!confirmed) return
+
+    const key = `force-${step.id}`
+    setActionLoading(key)
+    setError(null)
+
+    try {
+      await retryFlowStep(flowInstanceId, step.id, { force: true })
+      await load()
+    }
+    catch (err) {
+      setError(err instanceof Error ? err.message : 'Force reset failed')
+    }
+    finally {
+      setActionLoading(null)
+    }
+  }, [
+    flowInstanceId,
+    load,
+    opsApiKey,
+  ])
+
   return (
     <div className="ops-page">
       <div className="relative overflow-hidden">
@@ -143,6 +200,16 @@ const FlowOpsDetail = () => {
                   Updated
                   {formatDate(data.updatedAt)}
                 </div>
+                {data.status === 'FAILED' && (
+                  <button
+                    className="rounded-xl border border-abroad-dark bg-abroad-dark px-4 py-2 text-xs font-semibold text-white hover:bg-ops-brand-hover disabled:opacity-40"
+                    disabled={actionLoading === 'resume' || !opsApiKey}
+                    onClick={() => void handleResume()}
+                    type="button"
+                  >
+                    {actionLoading === 'resume' ? 'Resuming...' : 'Resume Flow'}
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -296,6 +363,17 @@ const FlowOpsDetail = () => {
                                 type="button"
                               >
                                 {actionLoading === actionKey ? 'Requeuing...' : 'Requeue Step'}
+                              </button>
+                            )}
+                            {step.status === 'RUNNING' && (
+                              <button
+                                className="rounded-xl border border-rose-300 bg-white px-4 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-50"
+                                disabled={actionLoading === `force-${step.id}` || !opsApiKey}
+                                onClick={() => void handleForceReset(step)}
+                                title="Re-queue a stuck RUNNING step. Risks double execution for money steps."
+                                type="button"
+                              >
+                                {actionLoading === `force-${step.id}` ? 'Forcing...' : 'Force Reset ⚠'}
                               </button>
                             )}
                           </div>

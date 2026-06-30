@@ -2,6 +2,7 @@ import type {
   CryptoAssetCoverage,
   CryptoAssetCoverageResponse,
   CryptoAssetUpdateInput,
+  FlowBulkRetryResponse,
   FlowCorridorListResponse,
   FlowCorridorUpdateInput,
   FlowDefinition,
@@ -117,11 +118,36 @@ export const getFlowInstance = async (flowInstanceId: string): Promise<FlowInsta
 export const retryFlowStep = async (
   flowInstanceId: string,
   stepInstanceId: string,
+  options?: { force?: boolean },
 ): Promise<FlowStepInstance> => {
   const result = await adminRequest<FlowStepInstance>(
     `/ops/flows/instances/${flowInstanceId}/steps/${stepInstanceId}/retry`,
+    {
+      method: 'POST',
+      query: { force: options?.force ? true : undefined },
+    },
+  )
+
+  return unwrapAdminResult(result)
+}
+
+export const resumeFlowInstance = async (flowInstanceId: string): Promise<FlowStepInstance> => {
+  const result = await adminRequest<FlowStepInstance>(
+    `/ops/flows/instances/${flowInstanceId}/resume`,
     { method: 'POST' },
   )
+
+  return unwrapAdminResult(result)
+}
+
+export const bulkRetryFlowInstances = async (
+  flowInstanceIds: string[],
+): Promise<FlowBulkRetryResponse> => {
+  const result = await adminRequest<FlowBulkRetryResponse>('/ops/flows/instances/bulk-retry', {
+    body: JSON.stringify({ flowInstanceIds }),
+    headers: { 'Content-Type': 'application/json' },
+    method: 'POST',
+  })
 
   return unwrapAdminResult(result)
 }

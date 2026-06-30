@@ -48,6 +48,14 @@ export class BridgeFloatService {
     return { cap: this.capUsdc, deficit, ok }
   }
 
+  /**
+   * The configured float cap in USDC, or undefined when the guard is disabled.
+   * Exposed so ops read models can render the float gauge without re-reading env.
+   */
+  public getCapUsdc(): number | undefined {
+    return this.capUsdc
+  }
+
   public async getOutstandingDeficit(asset: CryptoCurrency): Promise<number> {
     const client = await this.dbProvider.getClient()
     const aggregate = await client.bridgePendingTransfer.aggregate({

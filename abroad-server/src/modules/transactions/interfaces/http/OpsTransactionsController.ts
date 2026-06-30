@@ -1,9 +1,13 @@
+import { TransactionStatus } from '@prisma/client'
 import { inject } from 'inversify'
 import {
   Body,
   Controller,
+  Get,
   OperationId,
+  Path,
   Post,
+  Query,
   Res,
   Response,
   Route,
@@ -12,6 +16,7 @@ import {
   TsoaResponse,
 } from 'tsoa'
 
+import { OpsTransactionDetailDto, OpsTransactionListResponse, OpsTransactionNotFoundError, OpsTransactionQueryService } from '../../application/OpsTransactionQueryService'
 import { OpsTransactionReconciliationService } from '../../application/OpsTransactionReconciliationService'
 import { OpsReconcileHashRequest, opsReconcileHashRequestSchema, OpsReconcileHashResponse } from './opsContracts'
 
@@ -21,8 +26,28 @@ export class OpsTransactionsController extends Controller {
   constructor(
     @inject(OpsTransactionReconciliationService)
     private readonly reconciliationService: OpsTransactionReconciliationService,
+    @inject(OpsTransactionQueryService)
+    private readonly queryService: OpsTransactionQueryService,
   ) {
     super()
+  }
+
+  @Get('{transactionId}')
+  @OperationId('OpsGetTransaction')
+  @Response<404, { reason: string }>(404, 'Not Found')
+  public async getById(
+    @Path() transactionId: string,
+    @Res() notFound: TsoaResponse<404, { reason: string }>,
+  ): Promise<OpsTransactionDetailDto> {
+    try {
+      return await this.queryService.getById(transactionId)
+    }
+    catch (error) {
+      if (error instanceof OpsTransactionNotFoundError) {
+        return notFound(404, { reason: error.message })
+      }
+      throw error
+    }
   }
 
   @OperationId('OpsReconcileTransactionByHash')
@@ -52,5 +77,28 @@ export class OpsTransactionsController extends Controller {
       transaction_id: result.transactionId,
       transaction_status: result.transactionStatus,
     }
+  }
+
+  @Get()
+  @OperationId('OpsSearchTransactions')
+  @SuccessResponse('200', 'Transactions retrieved')
+  public async search(
+    @Query() status?: TransactionStatus,
+    @Query() partnerId?: string,
+    @Query() userId?: string,
+    @Query() onChainId?: string,
+    @Query() externalId?: string,
+    @Query() page?: number,
+    @Query() pageSize?: number,
+  ): Promise<OpsTransactionListResponse> {
+    return this.queryService.search({
+      externalId,
+      onChainId,
+      page,
+      pageSize,
+      partnerId,
+      status,
+      userId,
+    })
   }
 }
