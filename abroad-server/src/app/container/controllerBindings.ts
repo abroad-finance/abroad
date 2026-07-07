@@ -20,6 +20,7 @@ import { PublicTransactionsController } from '../../modules/transactions/interfa
 import { TransactionController } from '../../modules/transactions/interfaces/http/TransactionController'
 import { TransactionsController } from '../../modules/transactions/interfaces/http/TransactionsController'
 import { OpsBridgeController } from '../../modules/treasury/interfaces/http/OpsBridgeController'
+import { OpsTreasuryController } from '../../modules/treasury/interfaces/http/OpsTreasuryController'
 import { WebhookController } from '../../modules/webhooks/interfaces/http/WebhookController'
 import { BindingRegistration, registerBindings } from './bindingSupport'
 
@@ -45,6 +46,7 @@ const controllerBindings: ReadonlyArray<BindingRegistration<unknown>> = [
   { bindSelf: true, identifier: PublicCorridorController, implementation: PublicCorridorController },
   { bindSelf: true, identifier: FlowInstanceController, implementation: FlowInstanceController },
   { bindSelf: true, identifier: OpsBridgeController, implementation: OpsBridgeController },
+  { bindSelf: true, identifier: OpsTreasuryController, implementation: OpsTreasuryController },
 ] as const
 
 export function bindHttpControllers(container: Container): void {

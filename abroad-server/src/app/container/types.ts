@@ -27,6 +27,7 @@ const typeKeys = [
   'IQueueHandler',
   'ISecretManager',
   'ISlackNotifier',
+  'ITreasuryBalanceSource',
   'IWalletHandlerFactory',
   'IWebhookNotifier',
   'IWebSocketService',

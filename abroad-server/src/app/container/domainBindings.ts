@@ -48,6 +48,14 @@ import { BridgeSweepService } from '../../modules/treasury/application/BridgeSwe
 import { BridgeSweepWorker } from '../../modules/treasury/application/BridgeSweepWorker'
 import { ExchangeProviderFactory } from '../../modules/treasury/application/ExchangeProviderFactory'
 import { OpsBridgeService } from '../../modules/treasury/application/OpsBridgeService'
+import { OpsTreasuryService } from '../../modules/treasury/application/OpsTreasuryService'
+import { TreasurySnapshotWorker } from '../../modules/treasury/application/TreasurySnapshotWorker'
+import { BinanceBalanceSource } from '../../modules/treasury/infrastructure/balanceSources/BinanceBalanceSource'
+import { CeloBalanceSource } from '../../modules/treasury/infrastructure/balanceSources/CeloBalanceSource'
+import { MoviiBalanceSource } from '../../modules/treasury/infrastructure/balanceSources/MoviiBalanceSource'
+import { SolanaBalanceSource } from '../../modules/treasury/infrastructure/balanceSources/SolanaBalanceSource'
+import { StellarBalanceSource } from '../../modules/treasury/infrastructure/balanceSources/StellarBalanceSource'
+import { TransferoBalanceSource } from '../../modules/treasury/infrastructure/balanceSources/TransferoBalanceSource'
 import { BinanceExchangeProvider } from '../../modules/treasury/infrastructure/exchangeProviders/binanceExchangeProvider'
 import { BinanceBrlExchangeProvider } from '../../modules/treasury/infrastructure/exchangeProviders/binanceExchangeProvider'
 import { TransferoExchangeProvider } from '../../modules/treasury/infrastructure/exchangeProviders/transferoExchangeProvider'
@@ -105,6 +113,14 @@ const domainBindings: ReadonlyArray<BindingRegistration<unknown>> = [
   { bindSelf: true, identifier: BridgeSweepService, implementation: BridgeSweepService },
   { bindSelf: true, identifier: BridgeSweepWorker, implementation: BridgeSweepWorker },
   { bindSelf: true, identifier: OpsBridgeService, implementation: OpsBridgeService },
+  { identifier: TYPES.ITreasuryBalanceSource, implementation: BinanceBalanceSource },
+  { identifier: TYPES.ITreasuryBalanceSource, implementation: TransferoBalanceSource },
+  { identifier: TYPES.ITreasuryBalanceSource, implementation: StellarBalanceSource },
+  { identifier: TYPES.ITreasuryBalanceSource, implementation: CeloBalanceSource },
+  { identifier: TYPES.ITreasuryBalanceSource, implementation: SolanaBalanceSource },
+  { identifier: TYPES.ITreasuryBalanceSource, implementation: MoviiBalanceSource },
+  { bindSelf: true, identifier: OpsTreasuryService, implementation: OpsTreasuryService },
+  { bindSelf: true, identifier: TreasurySnapshotWorker, implementation: TreasurySnapshotWorker },
   { identifier: TYPES.FlowStepExecutor, implementation: PayoutSendStepExecutor },
   { identifier: TYPES.FlowStepExecutor, implementation: AwaitProviderStatusStepExecutor },
   { identifier: TYPES.FlowStepExecutor, implementation: ExchangeSendStepExecutor },

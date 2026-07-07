@@ -83,6 +83,7 @@ const BridgeOps = () => {
             <div>
               <div className="flex items-center gap-3 text-sm">
                 <Link className="text-ops-brand hover:text-abroad-dark" to="/ops/flows">← Back to flows</Link>
+                <Link className="text-ops-brand hover:text-abroad-dark" to="/ops/treasury">Treasury</Link>
                 <Link className="text-ops-brand hover:text-abroad-dark" to="/ops/transactions">Transactions</Link>
               </div>
               <div className="mt-3 text-sm uppercase tracking-[0.3em] text-abroad-dark">Treasury</div>

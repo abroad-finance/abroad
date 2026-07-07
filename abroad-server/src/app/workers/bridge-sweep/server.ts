@@ -4,6 +4,7 @@ import http from 'http'
 import { createScopedLogger } from '../../../core/logging/scopedLogger'
 import { ILogger } from '../../../core/logging/types'
 import { BridgeSweepWorker } from '../../../modules/treasury/application/BridgeSweepWorker'
+import { TreasurySnapshotWorker } from '../../../modules/treasury/application/TreasurySnapshotWorker'
 import { initSentry } from '../../../platform/observability/sentry'
 import { iocContainer } from '../../container'
 import { TYPES } from '../../container/types'
@@ -30,19 +31,25 @@ export const createHealthHandler = (state: { live: boolean, ready: boolean }) =>
   }
 
 let worker: BridgeSweepWorker | null = null
+let snapshotWorker: null | TreasurySnapshotWorker = null
 
 export function startBridgeSweepWorker(): void {
   worker = iocContainer.get<BridgeSweepWorker>(BridgeSweepWorker)
   worker.start()
+  // The treasury snapshot loop rides along in this service: same lifecycle,
+  // no extra Cloud Run deployment for an hourly background read.
+  snapshotWorker = iocContainer.get<TreasurySnapshotWorker>(TreasurySnapshotWorker)
+  snapshotWorker.start()
   health.ready = true
 }
 
 export async function stopBridgeSweepWorker(): Promise<void> {
   try {
-    await worker?.stop()
+    await Promise.all([worker?.stop(), snapshotWorker?.stop()])
   }
   finally {
     worker = null
+    snapshotWorker = null
     health.ready = false
   }
 }

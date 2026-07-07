@@ -527,3 +527,20 @@ model BridgeBatch {
 
   @@index([asset, destNetwork, status])
 }
+
+// Point-in-time balance of one (venue, account, currency) cell, captured by the
+// treasury snapshot worker. usdRate/usdValue freeze the indicative FX at capture
+// time so historical USD charts do not drift when today's rate changes.
+model TreasuryBalanceSnapshot {
+  id         String   @id @default(uuid())
+  venue      String
+  account    String   @default("")
+  currency   String
+  amount     Float
+  usdRate    Float?
+  usdValue   Float?
+  capturedAt DateTime @default(now())
+
+  @@index([venue, currency, capturedAt])
+  @@index([capturedAt])
+}

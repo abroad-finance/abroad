@@ -91,6 +91,7 @@ const TransactionsList = () => {
             <div>
               <div className="flex items-center gap-3 text-sm">
                 <Link className="text-ops-brand hover:text-abroad-dark" to="/ops/flows">← Flows</Link>
+                <Link className="text-ops-brand hover:text-abroad-dark" to="/ops/treasury">Treasury</Link>
                 <Link className="text-ops-brand hover:text-abroad-dark" to="/ops/treasury/bridge">Bridge</Link>
                 <Link className="text-ops-brand hover:text-abroad-dark" to="/ops/transactions/reconcile">Reconcile hash</Link>
               </div>

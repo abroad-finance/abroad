@@ -179,6 +179,12 @@ const FlowOpsList = () => {
               </Link>
               <Link
                 className="ops-nav-link"
+                to="/ops/treasury"
+              >
+                Treasury
+              </Link>
+              <Link
+                className="ops-nav-link"
                 to="/ops/treasury/bridge"
               >
                 Bridge
