@@ -19,6 +19,13 @@ import { ISecretManager, Secrets } from '../../../../platform/secrets/ISecretMan
 import { IWalletHandler, WalletSendParams, WalletSendResult } from '../../application/contracts/IWalletHandler'
 import { CryptoAssetConfigService } from '../../application/CryptoAssetConfigService'
 
+// Horizon GET reads (loadAccount/fetchBaseFee) default to no HTTP timeout. Since the
+// withdrawal critical section runs inside a Postgres SESSION advisory lock held until
+// the function resolves, a hung read would hold that lock (and its DB connection) forever
+// and stall every Stellar send cluster-wide. Bound the shared Horizon client so a hung
+// read aborts the socket. submitTransaction keeps its own 60s cap (submit unchanged).
+const HORIZON_HTTP_TIMEOUT_MS = 30_000
+
 function safeMemo(m: string): string {
   // Memo.text must be <= 28 bytes (UTF-8). Trim if user passes longer text.
   const enc = new TextEncoder()
@@ -45,6 +52,13 @@ export class StellarWalletHandler implements IWalletHandler {
     @inject(TYPES.ILogger) baseLogger: ILogger,
   ) {
     this.logger = createScopedLogger(baseLogger, { scope: 'StellarWalletHandler' })
+    // See HORIZON_HTTP_TIMEOUT_MS: bound Horizon reads so a hung request can't hold the
+    // advisory lock forever. Idempotent; respects any timeout already configured. Null-safe
+    // so the constructor never throws if the SDK's shared client is absent/mocked.
+    const axiosDefaults = Horizon.AxiosClient?.defaults
+    if (axiosDefaults && !axiosDefaults.timeout) {
+      axiosDefaults.timeout = HORIZON_HTTP_TIMEOUT_MS
+    }
   }
 
   async getAddressFromTransaction({ onChainId }: { onChainId?: string }): Promise<string> {

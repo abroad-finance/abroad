@@ -3,7 +3,7 @@ import { Container } from 'inversify'
 import { ConsoleLogger } from '../../core/logging/consoleLogger'
 import { PersonaKycService } from '../../modules/kyc/application/PersonaKycService'
 import { PartnerService } from '../../modules/partners/application/partnerService'
-import { RedisLockManager } from '../../platform/cacheLock/redisLockManager'
+import { PostgresAdvisoryLockManager } from '../../platform/cacheLock/postgresAdvisoryLockManager'
 import { GCPPubSubQueueHandler } from '../../platform/messaging/gcpPubSubQueueHandler'
 import { SlackNotifier } from '../../platform/notifications/slackNotifier'
 import { SocketIOWebSocketService } from '../../platform/notifications/socketIoWebSocketService'
@@ -28,7 +28,7 @@ const infrastructureBindings: ReadonlyArray<BindingRegistration<unknown>> = [
   { identifier: TYPES.ISlackNotifier, implementation: SlackNotifier },
   { identifier: TYPES.IWebSocketService, implementation: SocketIOWebSocketService },
   { identifier: TYPES.IWebhookNotifier, implementation: WebhookNotifier },
-  { identifier: TYPES.ILockManager, implementation: RedisLockManager },
+  { identifier: TYPES.ILockManager, implementation: PostgresAdvisoryLockManager },
   { identifier: TYPES.IPartnerService, implementation: PartnerService },
   { identifier: TYPES.IKycService, implementation: PersonaKycService },
   { identifier: TYPES.IOpsAuthService, implementation: OpsAuthService },
