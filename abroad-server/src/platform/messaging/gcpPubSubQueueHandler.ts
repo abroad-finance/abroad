@@ -40,6 +40,28 @@ export class GCPPubSubQueueHandler implements IQueueHandler {
     this.subscriptions.clear()
   }
 
+  public async deleteSubscription(queueName: QueueName): Promise<void> {
+    const subscription = this.subscriptions.get(queueName)
+    if (!subscription) {
+      return
+    }
+    const { name: subscriptionName } = subscription
+    try {
+      await subscription.close()
+      await subscription.delete()
+      this.logger.info('[IQueueHandler] Deleted subscription', { queueName, subscriptionName })
+    }
+    catch (err) {
+      // Best-effort: on a Cloud Run scale-down the instance may be killed before
+      // this completes. Worst case is no worse than before (GCP's subscription
+      // expiration policy is the backstop); never block shutdown on it.
+      this.logger.error('Failed to delete subscription', err)
+    }
+    finally {
+      this.subscriptions.delete(queueName)
+    }
+  }
+
   public async postMessage<Name extends QueueName>(
     queueName: Name,
     message: QueuePayloadByName[Name],

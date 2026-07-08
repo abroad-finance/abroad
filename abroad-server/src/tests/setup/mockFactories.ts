@@ -31,9 +31,13 @@ export const createMockQueueHandler = (
   const closeAllSubscriptions: NonNullable<IQueueHandler['closeAllSubscriptions']> = jest.fn(
     async () => undefined,
   )
+  const deleteSubscription: NonNullable<IQueueHandler['deleteSubscription']> = jest.fn(
+    async () => undefined,
+  )
 
   return {
     closeAllSubscriptions,
+    deleteSubscription,
     postMessage,
     subscribeToQueue,
     ...overrides,

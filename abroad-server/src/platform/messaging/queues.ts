@@ -28,6 +28,14 @@ export enum QueueName {
 export interface IQueueHandler {
   /** Optional: allow implementations to close subscriptions on shutdown. */
   closeAllSubscriptions?: () => Promise<void>
+  /**
+   * Optional: fully delete a specific subscription from the broker (not just
+   * detach it). Intended for ephemeral, per-instance subscriptions such as the
+   * WebSocket bridge's `user-notification-<uuid>`, which would otherwise leak one
+   * subscription per restart/scale-down. MUST NOT be used for durable, shared
+   * subscriptions (e.g. the financial-event consumers) — those must only close.
+   */
+  deleteSubscription?: (queueName: QueueName) => Promise<void>
   postMessage<Name extends QueueName>(
     queueName: Name,
     message: QueuePayloadByName[Name],

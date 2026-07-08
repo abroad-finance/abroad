@@ -137,7 +137,16 @@ export class WebSocketBridge {
 
   private async performShutdown(): Promise<void> {
     try {
-      if (this.queueHandler.closeAllSubscriptions) {
+      // This bridge owns an ephemeral, per-instance subscription
+      // (`user-notification-<uuid>`); delete it so a subscription is not leaked on
+      // every Cloud Run scale-down. Fall back to close() only if the handler
+      // cannot delete. Do NOT reroute this through closeAllSubscriptions()->delete:
+      // that path is shared with the durable financial-event consumers, which must
+      // never be deleted.
+      if (this.queueHandler.deleteSubscription) {
+        await this.queueHandler.deleteSubscription(QueueName.USER_NOTIFICATION)
+      }
+      else if (this.queueHandler.closeAllSubscriptions) {
         await this.queueHandler.closeAllSubscriptions()
       }
     }
