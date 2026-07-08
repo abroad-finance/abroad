@@ -180,7 +180,9 @@ steps:
 options:
   substitutionOption: ALLOW_LOOSE
   logging: CLOUD_LOGGING_ONLY
-  machineType: E2_HIGHCPU_32
+  # E2_HIGHCPU_8 (8 vCPU): the buildx pipeline is registry-cache bound and tsc/npm
+  # ci don't scale past a few cores, so 32 vCPU sat mostly idle at 4x the cost.
+  machineType: E2_HIGHCPU_8
 
 substitutions:
   _DEPLOY_REGION: us-east1
