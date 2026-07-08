@@ -31,16 +31,16 @@ describe('CachedSecretManager', () => {
   it('reuses cached secrets when fetching multiple values', async () => {
     getSecretMock
       .mockResolvedValueOnce('postgres://cached-url')
-      .mockResolvedValueOnce('redis://cache')
+      .mockResolvedValueOnce('https://hooks.slack.test')
 
     const manager = new CachedSecretManager()
     await manager.getSecret(Secrets.DATABASE_URL)
 
-    const secrets = await manager.getSecrets([Secrets.DATABASE_URL, Secrets.REDIS_URL] as const)
+    const secrets = await manager.getSecrets([Secrets.DATABASE_URL, Secrets.SLACK_WEBHOOK_URL] as const)
 
     expect(secrets).toEqual({
       DATABASE_URL: 'postgres://cached-url',
-      REDIS_URL: 'redis://cache',
+      SLACK_WEBHOOK_URL: 'https://hooks.slack.test',
     })
     expect(getSecretMock).toHaveBeenCalledTimes(2)
   })
