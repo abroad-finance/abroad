@@ -41,9 +41,12 @@ spec:
             - name: SENTRY_RELEASE
               value: "${COMMIT_SHA}"
           resources:
+            # Right-sized to measured 7-day usage (~94m CPU / 243Mi peak — highest of
+            # the workers, and most critical: real Binance withdrawals). Extra memory
+            # headroom. Autopilot bills on requests; limits stay high for burst.
             requests:
-              cpu: "1"
-              memory: "1Gi"
+              cpu: "150m"
+              memory: "512Mi"
             limits:
               cpu: "2"
               memory: "2Gi"

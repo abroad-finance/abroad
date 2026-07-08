@@ -36,9 +36,11 @@ spec:
             - name: SENTRY_RELEASE
               value: "${COMMIT_SHA}"
           resources:
+            # Right-sized to measured 7-day usage (steady ~165m CPU / 175Mi). Autopilot
+            # bills on requests; cluster supports bursting so limits stay high for burst.
             requests:
-              cpu: "1"
-              memory: "1Gi"
+              cpu: "250m"
+              memory: "320Mi"
             limits:
               cpu: "2"
               memory: "2Gi"
