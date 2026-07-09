@@ -1,7 +1,9 @@
+import type { ReactNode } from 'react'
+
 import {
   useCallback, useEffect, useMemo, useState,
 } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 
 import {
   getFlowInstance,
@@ -16,26 +18,33 @@ import {
   FlowStepStatus,
 } from '../../services/admin/flowTypes'
 import { useOpsApiKey } from '../../services/admin/opsAuthStore'
-import OpsApiKeyPanel from './OpsApiKeyPanel'
+import { cn } from '../../shared/utils'
+import {
+  formatAmount,
+  formatDateTime,
+  OpsEmptyState,
+  OpsLoading,
+  OpsPageShell,
+  OpsStatusBadge,
+  OpsTone,
+} from './shared'
 
-const flowStatusClasses: Record<FlowInstanceStatus, string> = {
-  COMPLETED: 'bg-emerald-100 text-emerald-800 border-emerald-200',
-  FAILED: 'bg-rose-100 text-rose-800 border-rose-200',
-  IN_PROGRESS: 'bg-sky-100 text-sky-800 border-sky-200',
-  NOT_STARTED: 'bg-slate-100 text-slate-700 border-slate-200',
-  WAITING: 'bg-amber-100 text-amber-800 border-amber-200',
+const flowStatusTone: Record<FlowInstanceStatus, OpsTone> = {
+  COMPLETED: 'success',
+  FAILED: 'danger',
+  IN_PROGRESS: 'info',
+  NOT_STARTED: 'neutral',
+  WAITING: 'warning',
 }
 
-const stepStatusClasses: Record<FlowStepStatus, string> = {
-  FAILED: 'bg-rose-100 text-rose-800 border-rose-200',
-  READY: 'bg-slate-100 text-slate-700 border-slate-200',
-  RUNNING: 'bg-sky-100 text-sky-800 border-sky-200',
-  SKIPPED: 'bg-slate-100 text-slate-600 border-slate-200',
-  SUCCEEDED: 'bg-emerald-100 text-emerald-800 border-emerald-200',
-  WAITING: 'bg-amber-100 text-amber-800 border-amber-200',
+const stepStatusTone: Record<FlowStepStatus, OpsTone> = {
+  FAILED: 'danger',
+  READY: 'neutral',
+  RUNNING: 'info',
+  SKIPPED: 'neutral',
+  SUCCEEDED: 'success',
+  WAITING: 'warning',
 }
-
-const formatDate = (value: null | string) => (value ? new Date(value).toLocaleString() : '—')
 
 const formatJson = (value: unknown) => {
   if (!value) return '—'
@@ -56,6 +65,19 @@ const extractErrorMessage = (error: FlowStepInstance['error']): string => {
   }
   return ''
 }
+
+const Field = ({ className, label, value }: {
+  className?: string
+  label: ReactNode
+  value: ReactNode
+}) => (
+  <div className={cn('text-xs text-ops-muted', className)}>
+    {label}
+    :
+    {' '}
+    {value}
+  </div>
+)
 
 const FlowOpsDetail = () => {
   const { flowInstanceId } = useParams()
@@ -175,285 +197,257 @@ const FlowOpsDetail = () => {
   ])
 
   return (
-    <div className="ops-page">
-      <div className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(27,94,89,0.18),_transparent_55%)]" />
-        <div className="relative max-w-6xl mx-auto px-6 py-10">
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <div>
-              <div className="flex items-center gap-3 text-sm">
-                <Link className="text-ops-brand hover:text-abroad-dark" to="/ops/flows">← Back to flows</Link>
-                <Link className="text-ops-brand hover:text-abroad-dark" to="/ops/flows/definitions">Edit definitions</Link>
-                <Link className="text-ops-brand hover:text-abroad-dark" to="/ops/partners">Partners & API keys</Link>
-                <Link className="text-ops-brand hover:text-abroad-dark" to="/ops/transactions/reconcile">Reconcile hash</Link>
-              </div>
-              <div className="mt-3 text-sm uppercase tracking-[0.3em] text-abroad-dark">Flow Instance</div>
-              <h1 className="text-3xl md:text-4xl font-semibold">{headerDefinition}</h1>
-              <p className="text-xs text-gray-500 mt-2">{flowInstanceId}</p>
-            </div>
-            {data && (
-              <div className="flex items-center gap-3">
-                <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold ${flowStatusClasses[data.status]}`}>
-                  {data.status}
-                </span>
-                <div className="text-xs text-gray-500">
-                  Updated
-                  {formatDate(data.updatedAt)}
-                </div>
-                {data.status === 'FAILED' && (
-                  <button
-                    className="rounded-xl border border-abroad-dark bg-abroad-dark px-4 py-2 text-xs font-semibold text-white hover:bg-ops-brand-hover disabled:opacity-40"
-                    disabled={actionLoading === 'resume' || !opsApiKey}
-                    onClick={() => void handleResume()}
-                    type="button"
-                  >
-                    {actionLoading === 'resume' ? 'Resuming...' : 'Resume Flow'}
-                  </button>
-                )}
-              </div>
-            )}
+    <OpsPageShell
+      actions={data && (
+        <>
+          <OpsStatusBadge label={data.status} tone={flowStatusTone[data.status]} />
+          <div className="text-xs text-ops-muted">
+            Updated
+            {' '}
+            {formatDateTime(data.updatedAt)}
           </div>
+          {data.status === 'FAILED' && (
+            <button
+              className="ops-btn-primary"
+              disabled={actionLoading === 'resume' || !opsApiKey}
+              onClick={() => void handleResume()}
+              type="button"
+            >
+              {actionLoading === 'resume' ? 'Resuming...' : 'Resume Flow'}
+            </button>
+          )}
+        </>
+      )}
+      backLink={{ label: 'Back to flows', to: '/ops/flows' }}
+      error={error}
+      eyebrow="Flow Instance"
+      keyRequiredMessage="Ops API key required to load flow details."
+      subtitle={flowInstanceId}
+      title={headerDefinition}
+    >
+      {loading && opsApiKey && (
+        <OpsLoading label="Loading flow instance…" />
+      )}
 
-          <OpsApiKeyPanel />
-
-          {error && (
-            <div className="mt-6 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-              {error}
+      {data && opsApiKey && (
+        <>
+          <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-3">
+            <div className="ops-card p-5">
+              <div className="ops-label">Transaction</div>
+              <div className="mt-2 text-sm font-medium">{data.transaction?.id ?? '—'}</div>
+              <Field className="mt-1" label="Status" value={data.transaction?.status ?? '—'} />
+              <Field className="mt-3" label="External ID" value={data.transaction?.externalId ?? '—'} />
+              <Field label="On-chain" value={data.transaction?.onChainId ?? '—'} />
             </div>
-          )}
-
-          {!opsApiKey && (
-            <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
-              Ops API key required to load flow details.
-            </div>
-          )}
-
-          {loading && opsApiKey && (
-            <div className="mt-6 text-sm text-gray-500">Loading flow instance...</div>
-          )}
-
-          {data && opsApiKey && (
-            <>
-              <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-3">
-                <div className="rounded-2xl border border-white/70 bg-white/80 p-5 shadow-[0_20px_45px_-35px_rgba(15,23,42,0.45)]">
-                  <div className="text-xs uppercase tracking-wider text-gray-500">Transaction</div>
-                  <div className="mt-2 text-sm font-medium">{data.transaction?.id ?? '—'}</div>
-                  <div className="mt-1 text-xs text-gray-500">
-                    Status:
-                    {data.transaction?.status ?? '—'}
-                  </div>
-                  <div className="mt-3 text-xs text-gray-500">
-                    External ID:
-                    {data.transaction?.externalId ?? '—'}
-                  </div>
-                  <div className="text-xs text-gray-500">
-                    On-chain:
-                    {data.transaction?.onChainId ?? '—'}
-                  </div>
-                </div>
-                <div className="rounded-2xl border border-white/70 bg-white/80 p-5 shadow-[0_20px_45px_-35px_rgba(15,23,42,0.45)]">
-                  <div className="text-xs uppercase tracking-wider text-gray-500">Amounts</div>
-                  <div className="mt-2 text-sm font-medium">
-                    Source:
-                    {data.transaction?.quote.sourceAmount ?? '—'}
-                  </div>
-                  <div className="text-xs text-gray-500">
-                    Target:
-                    {data.transaction?.quote.targetAmount ?? '—'}
+            <div className="ops-card p-5">
+              <div className="ops-label">Amounts</div>
+              <div className="mt-2 text-sm font-medium">
+                Source:
+                {' '}
+                {formatAmount(data.transaction?.quote.sourceAmount)}
+              </div>
+              <Field
+                label="Target"
+                value={(
+                  <>
+                    {formatAmount(data.transaction?.quote.targetAmount)}
                     {' '}
                     {data.transaction?.quote.targetCurrency ?? ''}
-                  </div>
-                  <div className="mt-3 text-xs text-gray-500">
-                    Network:
-                    {data.transaction?.quote.network ?? '—'}
-                  </div>
-                  <div className="text-xs text-gray-500">
-                    Payment:
-                    {data.transaction?.paymentMethod ?? '—'}
-                  </div>
-                </div>
-                <div className="rounded-2xl border border-white/70 bg-white/80 p-5 shadow-[0_20px_45px_-35px_rgba(15,23,42,0.45)]">
-                  <div className="text-xs uppercase tracking-wider text-gray-500">Snapshot</div>
-                  <div className="mt-2 text-sm font-medium">{data.definition?.name ?? '—'}</div>
-                  <div className="text-xs text-gray-500">
-                    Pricing:
-                    {data.definition?.pricingProvider ?? '—'}
-                  </div>
-                  <div className="mt-3 text-xs text-gray-500">
-                    Fee:
-                    {data.definition?.exchangeFeePct ?? 0}
+                  </>
+                )}
+              />
+              <Field className="mt-3" label="Network" value={data.transaction?.quote.network ?? '—'} />
+              <Field label="Payment" value={data.transaction?.paymentMethod ?? '—'} />
+            </div>
+            <div className="ops-card p-5">
+              <div className="ops-label">Snapshot</div>
+              <div className="mt-2 text-sm font-medium">{data.definition?.name ?? '—'}</div>
+              <Field label="Pricing" value={data.definition?.pricingProvider ?? '—'} />
+              <Field
+                className="mt-3"
+                label="Fee"
+                value={(
+                  <>
+                    {formatAmount(data.definition?.exchangeFeePct ?? 0)}
                     % +
-                    {data.definition?.fixedFee ?? 0}
-                  </div>
-                  <div className="text-xs text-gray-500">
-                    Limits:
-                    {data.definition?.minAmount ?? '—'}
+                    {' '}
+                    {formatAmount(data.definition?.fixedFee ?? 0)}
+                  </>
+                )}
+              />
+              <Field
+                label="Limits"
+                value={(
+                  <>
+                    {formatAmount(data.definition?.minAmount)}
                     {' '}
                     -
-                    {data.definition?.maxAmount ?? '—'}
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-10">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-xl font-semibold">Steps</h2>
-                  <div className="text-xs text-gray-500">
-                    {data.steps.length}
                     {' '}
-                    steps
-                  </div>
-                </div>
-                <div className="mt-4 space-y-4">
-                  {data.steps.map((step) => {
-                    const errorMessage = extractErrorMessage(step.error)
-                    const actionKey = `${step.status === 'FAILED' ? 'retry' : 'requeue'}-${step.id}`
-                    return (
-                      <div
-                        className="rounded-2xl border border-white/70 bg-white/80 p-5 shadow-[0_15px_45px_-35px_rgba(15,23,42,0.45)]"
-                        key={step.id}
-                      >
-                        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                          <div>
-                            <div className="flex items-center gap-3">
-                              <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold ${stepStatusClasses[step.status]}`}>
-                                {step.status}
-                              </span>
-                              <span className="text-xs uppercase tracking-wider text-slate-500">
-                                Step
-                                {step.stepOrder}
-                              </span>
-                            </div>
-                            <div className="mt-2 text-lg font-semibold">{step.stepType}</div>
-                            <div className="mt-1 text-xs text-gray-500">
-                              Attempts
-                              {step.attempts}
-                              {' '}
-                              /
-                              {step.maxAttempts}
-                            </div>
-                            <div className="mt-2 text-xs text-gray-500">
-                              Started
-                              {formatDate(step.startedAt)}
-                              {' '}
-                              · Ended
-                              {formatDate(step.endedAt)}
-                            </div>
-                            {errorMessage && (
-                              <div className="mt-2 text-xs text-rose-700">{errorMessage}</div>
-                            )}
-                          </div>
+                    {formatAmount(data.definition?.maxAmount)}
+                  </>
+                )}
+              />
+            </div>
+          </div>
 
-                          <div className="flex flex-col items-end gap-2">
-                            {step.status === 'FAILED' && (
-                              <button
-                                className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-100"
-                                disabled={actionLoading === actionKey || !opsApiKey}
-                                onClick={() => void handleAction(step, 'retry')}
-                                type="button"
-                              >
-                                {actionLoading === actionKey ? 'Retrying...' : 'Retry Step'}
-                              </button>
-                            )}
-                            {step.status === 'WAITING' && (
-                              <button
-                                className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-xs font-semibold text-amber-700 hover:bg-amber-100"
-                                disabled={actionLoading === actionKey || !opsApiKey}
-                                onClick={() => void handleAction(step, 'requeue')}
-                                type="button"
-                              >
-                                {actionLoading === actionKey ? 'Requeuing...' : 'Requeue Step'}
-                              </button>
-                            )}
-                            {step.status === 'RUNNING' && (
-                              <button
-                                className="rounded-xl border border-rose-300 bg-white px-4 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-50"
-                                disabled={actionLoading === `force-${step.id}` || !opsApiKey}
-                                onClick={() => void handleForceReset(step)}
-                                title="Re-queue a stuck RUNNING step. Risks double execution for money steps."
-                                type="button"
-                              >
-                                {actionLoading === `force-${step.id}` ? 'Forcing...' : 'Force Reset ⚠'}
-                              </button>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3 text-xs">
-                          <details className="rounded-xl border border-gray-200 bg-white/70 p-3">
-                            <summary className="cursor-pointer font-semibold">Input</summary>
-                            <pre className="mt-2 whitespace-pre-wrap text-[11px] text-gray-600">{formatJson(step.input)}</pre>
-                          </details>
-                          <details className="rounded-xl border border-gray-200 bg-white/70 p-3">
-                            <summary className="cursor-pointer font-semibold">Output</summary>
-                            <pre className="mt-2 whitespace-pre-wrap text-[11px] text-gray-600">{formatJson(step.output)}</pre>
-                          </details>
-                          <details className="rounded-xl border border-gray-200 bg-white/70 p-3">
-                            <summary className="cursor-pointer font-semibold">Correlation</summary>
-                            <pre className="mt-2 whitespace-pre-wrap text-[11px] text-gray-600">{formatJson(step.correlation)}</pre>
-                          </details>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
+          <div className="mt-10">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-semibold">Steps</h2>
+              <div className="text-xs text-ops-muted">
+                {data.steps.length}
+                {' '}
+                steps
               </div>
-
-              <div className="mt-10">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-xl font-semibold">Signals</h2>
-                  <div className="text-xs text-gray-500">
-                    {data.signals.length}
-                    {' '}
-                    events
-                  </div>
-                </div>
-                <div className="mt-4 space-y-3">
-                  {data.signals.length === 0 && (
-                    <div className="rounded-xl border border-dashed border-neutral-300 bg-white/70 px-6 py-8 text-center text-sm text-gray-500">
-                      No signals recorded for this instance.
-                    </div>
-                  )}
-                  {data.signals.map(signal => (
-                    <div
-                      className="rounded-xl border border-white/70 bg-white/80 p-4 text-xs text-gray-600"
-                      key={signal.id}
-                    >
-                      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                        <div>
-                          <div className="font-semibold text-gray-800">{signal.eventType}</div>
-                          <div className="text-[11px]">
-                            Created
-                            {formatDate(signal.createdAt)}
+            </div>
+            <div className="mt-4 space-y-4">
+              {data.steps.length === 0 && (
+                <OpsEmptyState>No steps recorded for this instance.</OpsEmptyState>
+              )}
+              {data.steps.map((step) => {
+                const errorMessage = extractErrorMessage(step.error)
+                const actionKey = `${step.status === 'FAILED' ? 'retry' : 'requeue'}-${step.id}`
+                return (
+                  <div className="ops-card p-5" key={step.id}>
+                    <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                      <div>
+                        <div className="flex items-center gap-3">
+                          <OpsStatusBadge label={step.status} tone={stepStatusTone[step.status]} />
+                          <span className="text-xs uppercase tracking-wider text-ops-muted">
+                            Step
                             {' '}
-                            · Consumed
-                            {formatDate(signal.consumedAt)}
-                          </div>
+                            {step.stepOrder}
+                          </span>
                         </div>
-                        <div className="text-[11px]">
-                          Step
-                          {signal.stepInstanceId ?? '—'}
+                        <div className="mt-2 text-lg font-semibold">{step.stepType}</div>
+                        <div className="mt-1 text-xs text-ops-muted">
+                          Attempts
+                          {' '}
+                          {step.attempts}
+                          {' '}
+                          /
+                          {' '}
+                          {step.maxAttempts}
                         </div>
+                        <div className="mt-2 text-xs text-ops-muted">
+                          Started
+                          {' '}
+                          {formatDateTime(step.startedAt)}
+                          {' '}
+                          · Ended
+                          {' '}
+                          {formatDateTime(step.endedAt)}
+                        </div>
+                        {errorMessage && (
+                          <div className="mt-2 text-xs text-rose-700">{errorMessage}</div>
+                        )}
                       </div>
-                      <div className="mt-2 grid grid-cols-1 gap-2 md:grid-cols-2">
-                        <details className="rounded-lg border border-gray-200 bg-white/70 p-2">
-                          <summary className="cursor-pointer font-semibold">Correlation</summary>
-                          <pre className="mt-2 whitespace-pre-wrap text-[11px]">{formatJson(signal.correlationKeys)}</pre>
-                        </details>
-                        <details className="rounded-lg border border-gray-200 bg-white/70 p-2">
-                          <summary className="cursor-pointer font-semibold">Payload</summary>
-                          <pre className="mt-2 whitespace-pre-wrap text-[11px]">{formatJson(signal.payload)}</pre>
-                        </details>
+
+                      <div className="flex flex-col items-end gap-2">
+                        {step.status === 'FAILED' && (
+                          <button
+                            className="ops-btn-danger ops-btn-sm"
+                            disabled={actionLoading === actionKey || !opsApiKey}
+                            onClick={() => void handleAction(step, 'retry')}
+                            type="button"
+                          >
+                            {actionLoading === actionKey ? 'Retrying...' : 'Retry Step'}
+                          </button>
+                        )}
+                        {step.status === 'WAITING' && (
+                          <button
+                            className="ops-btn-neutral ops-btn-sm"
+                            disabled={actionLoading === actionKey || !opsApiKey}
+                            onClick={() => void handleAction(step, 'requeue')}
+                            type="button"
+                          >
+                            {actionLoading === actionKey ? 'Requeuing...' : 'Requeue Step'}
+                          </button>
+                        )}
+                        {step.status === 'RUNNING' && (
+                          <button
+                            className="ops-btn-danger ops-btn-sm"
+                            disabled={actionLoading === `force-${step.id}` || !opsApiKey}
+                            onClick={() => void handleForceReset(step)}
+                            title="Re-queue a stuck RUNNING step. Risks double execution for money steps."
+                            type="button"
+                          >
+                            {actionLoading === `force-${step.id}` ? 'Forcing...' : 'Force Reset ⚠'}
+                          </button>
+                        )}
                       </div>
                     </div>
-                  ))}
-                </div>
+
+                    <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3 text-xs">
+                      <details className="rounded-xl border border-ops-border bg-white/70 p-3">
+                        <summary className="cursor-pointer font-semibold">Input</summary>
+                        <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-all text-[11px] text-ops-muted">{formatJson(step.input)}</pre>
+                      </details>
+                      <details className="rounded-xl border border-ops-border bg-white/70 p-3">
+                        <summary className="cursor-pointer font-semibold">Output</summary>
+                        <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-all text-[11px] text-ops-muted">{formatJson(step.output)}</pre>
+                      </details>
+                      <details className="rounded-xl border border-ops-border bg-white/70 p-3">
+                        <summary className="cursor-pointer font-semibold">Correlation</summary>
+                        <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-all text-[11px] text-ops-muted">{formatJson(step.correlation)}</pre>
+                      </details>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+
+          <div className="mt-10">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-semibold">Signals</h2>
+              <div className="text-xs text-ops-muted">
+                {data.signals.length}
+                {' '}
+                events
               </div>
-            </>
-          )}
-        </div>
-      </div>
-    </div>
+            </div>
+            <div className="mt-4 space-y-3">
+              {data.signals.length === 0 && (
+                <OpsEmptyState>No signals recorded for this instance.</OpsEmptyState>
+              )}
+              {data.signals.map(signal => (
+                <div className="ops-card p-4 text-xs text-ops-muted" key={signal.id}>
+                  <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                    <div>
+                      <div className="font-semibold text-ops-text">{signal.eventType}</div>
+                      <div className="text-[11px]">
+                        Created
+                        {' '}
+                        {formatDateTime(signal.createdAt)}
+                        {' '}
+                        · Consumed
+                        {' '}
+                        {formatDateTime(signal.consumedAt)}
+                      </div>
+                    </div>
+                    <div className="text-[11px]">
+                      Step
+                      {' '}
+                      {signal.stepInstanceId ?? '—'}
+                    </div>
+                  </div>
+                  <div className="mt-2 grid grid-cols-1 gap-2 md:grid-cols-2">
+                    <details className="rounded-lg border border-ops-border bg-white/70 p-2">
+                      <summary className="cursor-pointer font-semibold">Correlation</summary>
+                      <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-all text-[11px]">{formatJson(signal.correlationKeys)}</pre>
+                    </details>
+                    <details className="rounded-lg border border-ops-border bg-white/70 p-2">
+                      <summary className="cursor-pointer font-semibold">Payload</summary>
+                      <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-all text-[11px]">{formatJson(signal.payload)}</pre>
+                    </details>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+    </OpsPageShell>
   )
 }
 

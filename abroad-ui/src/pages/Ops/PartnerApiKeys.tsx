@@ -1,7 +1,6 @@
 import {
   useCallback, useEffect, useMemo, useState,
 } from 'react'
-import { Link } from 'react-router-dom'
 
 import { useOpsApiKey } from '../../services/admin/opsAuthStore'
 import {
@@ -12,7 +11,15 @@ import {
   updatePartnerClientDomain,
 } from '../../services/admin/partnerAdminApi'
 import { OpsCreatePartnerInput, OpsPartner } from '../../services/admin/partnerTypes'
-import OpsApiKeyPanel from './OpsApiKeyPanel'
+import {
+  formatDateTime,
+  OpsEmptyState,
+  OpsField,
+  OpsLoading,
+  OpsPageShell,
+  OpsPagination,
+  OpsStatusBadge,
+} from './shared'
 
 const pageSize = 20
 
@@ -42,8 +49,6 @@ const emptyDraft: CreatePartnerDraft = {
   lastName: '',
   phone: '',
 }
-
-const formatDate = (value: string): string => new Date(value).toLocaleString()
 
 const validateDraft = (draft: CreatePartnerDraft): null | string => {
   if (!draft.company.trim()) return 'Company is required.'
@@ -275,368 +280,328 @@ const PartnerApiKeys = () => {
   }
 
   return (
-    <div className="ops-page">
-      <div className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(27,94,89,0.18),_transparent_55%)]" />
-        <div className="relative max-w-7xl mx-auto px-6 py-10">
-          <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+    <OpsPageShell
+      actions={(
+        <button
+          className="ops-btn-ghost"
+          disabled={!opsApiKey || loading}
+          onClick={() => void loadPartners()}
+          type="button"
+        >
+          Refresh
+        </button>
+      )}
+      error={error}
+      eyebrow="Operations"
+      keyRequiredMessage="Ops API key required to manage partners."
+      subtitle="Create partner accounts, issue one-time API keys, rotate compromised keys, revoke access, and manage trusted browser domains."
+      title="Partners & API Keys"
+      width="full"
+    >
+      {revealedKey && (
+        <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 shadow-[0_20px_45px_-35px_rgba(15,23,42,0.35)]">
+          <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
             <div>
-              <div className="text-sm uppercase tracking-[0.3em] text-abroad-dark">Operations</div>
-              <h1 className="text-3xl md:text-4xl font-semibold">Partners & API Keys</h1>
-              <p className="text-sm text-gray-600 max-w-2xl mt-2">
-                Create partner accounts, issue one-time API keys, rotate compromised keys, revoke access, and manage trusted browser domains.
-              </p>
+              <div className="text-xs uppercase tracking-[0.3em] text-amber-700">One-Time API Key</div>
+              <div className="mt-1 text-sm text-amber-900">
+                Partner
+                {' '}
+                <span className="font-semibold">{revealedKey.partnerName}</span>
+                {' '}
+                API key was
+                {' '}
+                <span className="font-semibold">{revealedKey.action === 'created' ? 'created' : 'rotated'}</span>
+                .
+                Store it now, this value will not be shown again.
+              </div>
             </div>
-            <div className="flex flex-wrap items-center gap-3">
-              <Link
-                className="ops-nav-link"
-                to="/ops/flows"
-              >
-                Flow Ops
-              </Link>
-              <Link
-                className="ops-nav-link"
-                to="/ops/flows/definitions"
-              >
-                Flow Definitions
-              </Link>
-              <Link
-                className="ops-nav-link"
-                to="/ops/crypto-assets"
-              >
-                Crypto Assets
-              </Link>
-              <button
-                className="ops-btn-ghost"
-                disabled={!opsApiKey || loading}
-                onClick={() => void loadPartners()}
-                type="button"
-              >
-                Refresh
-              </button>
-            </div>
+            <button
+              className="rounded-xl border border-amber-300 bg-white px-3 py-1.5 text-sm text-amber-900 hover:bg-amber-100 transition"
+              onClick={() => setRevealedKey(null)}
+              type="button"
+            >
+              Dismiss
+            </button>
           </div>
+          <div className="mt-3 flex flex-col gap-2 md:flex-row md:items-center">
+            <code className="flex-1 break-all rounded-xl border border-amber-300 bg-white px-3 py-2 text-sm text-amber-900">
+              {revealedKey.apiKey}
+            </code>
+            <button
+              className="rounded-xl border border-amber-400 bg-amber-500 px-4 py-2 text-sm font-medium text-white hover:bg-amber-600 transition"
+              onClick={() => void copyKey()}
+              type="button"
+            >
+              {copied ? 'Copied' : 'Copy'}
+            </button>
+          </div>
+        </div>
+      )}
 
-          <OpsApiKeyPanel />
-
-          {revealedKey && (
-            <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 shadow-[0_20px_45px_-35px_rgba(15,23,42,0.35)]">
-              <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                <div>
-                  <div className="text-xs uppercase tracking-[0.3em] text-amber-700">One-Time API Key</div>
-                  <div className="mt-1 text-sm text-amber-900">
-                    Partner
-                    {' '}
-                    <span className="font-semibold">{revealedKey.partnerName}</span>
-                    {' '}
-                    API key was
-                    {' '}
-                    <span className="font-semibold">{revealedKey.action === 'created' ? 'created' : 'rotated'}</span>
-                    .
-                    Store it now, this value will not be shown again.
-                  </div>
-                </div>
-                <button
-                  className="rounded-xl border border-amber-300 bg-white px-3 py-1.5 text-sm text-amber-900 hover:bg-amber-100 transition"
-                  onClick={() => setRevealedKey(null)}
-                  type="button"
-                >
-                  Dismiss
-                </button>
-              </div>
-              <div className="mt-3 flex flex-col gap-2 md:flex-row md:items-center">
-                <code className="flex-1 break-all rounded-xl border border-amber-300 bg-white px-3 py-2 text-sm text-amber-900">
-                  {revealedKey.apiKey}
-                </code>
-                <button
-                  className="rounded-xl border border-amber-400 bg-amber-500 px-4 py-2 text-sm font-medium text-white hover:bg-amber-600 transition"
-                  onClick={() => void copyKey()}
-                  type="button"
-                >
-                  {copied ? 'Copied' : 'Copy'}
-                </button>
-              </div>
-            </div>
-          )}
-
-          {error && (
-            <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-              {error}
-            </div>
-          )}
-
-          {!opsApiKey && (
-            <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
-              Ops API key required to manage partners.
-            </div>
-          )}
-
-          <div className="mt-8 grid gap-6 xl:grid-cols-[1.1fr_1.9fr]">
-            <div className="rounded-2xl border border-white/70 bg-white/80 p-5 shadow-[0_20px_45px_-35px_rgba(15,23,42,0.45)]">
-              <div className="ops-label">Create Partner</div>
-              <h2 className="mt-2 text-xl font-semibold">Onboard New Partner</h2>
-              <div className="mt-4 grid grid-cols-1 gap-3">
+      <div className="mt-8 grid gap-6 xl:grid-cols-[300px_minmax(0,1fr)]">
+        <div className="ops-card p-5">
+          <div className="ops-label">Create Partner</div>
+          <h2 className="mt-2 text-xl font-semibold">Onboard New Partner</h2>
+          <div className="mt-4 grid grid-cols-1 gap-3">
+            <OpsField label="Company">
+              <input
+                className="ops-input"
+                onChange={event => setDraft(current => ({ ...current, company: event.target.value }))}
+                value={draft.company}
+              />
+            </OpsField>
+            <div className="grid grid-cols-2 gap-3">
+              <OpsField label="Country">
                 <input
                   className="ops-input"
-                  onChange={event => setDraft(current => ({ ...current, company: event.target.value }))}
-                  placeholder="Company"
-                  value={draft.company}
+                  onChange={event => setDraft(current => ({ ...current, country: event.target.value }))}
+                  value={draft.country}
                 />
-                <div className="grid grid-cols-2 gap-3">
-                  <input
-                    className="ops-input"
-                    onChange={event => setDraft(current => ({ ...current, country: event.target.value }))}
-                    placeholder="Country"
-                    value={draft.country}
-                  />
-                  <input
-                    className="ops-input"
-                    onChange={event => setDraft(current => ({ ...current, phone: event.target.value }))}
-                    placeholder="Phone (optional)"
-                    value={draft.phone}
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <input
-                    className="ops-input"
-                    onChange={event => setDraft(current => ({ ...current, firstName: event.target.value }))}
-                    placeholder="First name"
-                    value={draft.firstName}
-                  />
-                  <input
-                    className="ops-input"
-                    onChange={event => setDraft(current => ({ ...current, lastName: event.target.value }))}
-                    placeholder="Last name"
-                    value={draft.lastName}
-                  />
-                </div>
+              </OpsField>
+              <OpsField label="Phone">
                 <input
                   className="ops-input"
-                  onChange={event => setDraft(current => ({ ...current, email: event.target.value }))}
-                  placeholder="Email"
-                  type="email"
-                  value={draft.email}
+                  onChange={event => setDraft(current => ({ ...current, phone: event.target.value }))}
+                  placeholder="Optional"
+                  value={draft.phone}
                 />
+              </OpsField>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <OpsField label="First name">
                 <input
                   className="ops-input"
-                  onChange={event => setDraft(current => ({ ...current, clientDomain: event.target.value }))}
-                  placeholder="Client domain (optional)"
-                  type="text"
-                  value={draft.clientDomain}
+                  onChange={event => setDraft(current => ({ ...current, firstName: event.target.value }))}
+                  value={draft.firstName}
                 />
-                <div className="text-xs text-gray-500">
+              </OpsField>
+              <OpsField label="Last name">
+                <input
+                  className="ops-input"
+                  onChange={event => setDraft(current => ({ ...current, lastName: event.target.value }))}
+                  value={draft.lastName}
+                />
+              </OpsField>
+            </div>
+            <OpsField label="Email">
+              <input
+                className="ops-input"
+                onChange={event => setDraft(current => ({ ...current, email: event.target.value }))}
+                type="email"
+                value={draft.email}
+              />
+            </OpsField>
+            <OpsField
+              hint={(
+                <>
                   Enter a hostname like
                   {' '}
                   <span className="font-medium">app.example.com</span>
                   {' '}
                   or a full URL. Abroad will store the canonical host only.
-                </div>
-                <button
-                  className="mt-1 ops-btn-primary disabled:opacity-60"
-                  disabled={!opsApiKey || creating}
-                  onClick={() => void handleCreatePartner()}
-                  type="button"
-                >
-                  {creating ? 'Creating...' : 'Create Partner & Generate Key'}
-                </button>
-              </div>
+                </>
+              )}
+              label="Client domain"
+            >
+              <input
+                className="ops-input"
+                onChange={event => setDraft(current => ({ ...current, clientDomain: event.target.value }))}
+                placeholder="Optional"
+                type="text"
+                value={draft.clientDomain}
+              />
+            </OpsField>
+            <button
+              className="ops-btn-primary mt-1"
+              disabled={!opsApiKey || creating}
+              onClick={() => void handleCreatePartner()}
+              type="button"
+            >
+              {creating ? 'Creating...' : 'Create Partner & Generate Key'}
+            </button>
+          </div>
+        </div>
+
+        <div className="ops-card p-5">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="ops-label">Partner Directory</div>
+              <h2 className="mt-2 text-xl font-semibold">Current Partners</h2>
             </div>
+            <div className="text-xs text-ops-muted">
+              Page
+              {' '}
+              {page}
+              {' '}
+              of
+              {' '}
+              {totalPages}
+            </div>
+          </div>
 
-            <div className="rounded-2xl border border-white/70 bg-white/80 p-5 shadow-[0_20px_45px_-35px_rgba(15,23,42,0.45)]">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="ops-label">Partner Directory</div>
-                  <h2 className="mt-2 text-xl font-semibold">Current Partners</h2>
-                </div>
-                <div className="text-xs text-gray-500">
-                  Page
-                  {' '}
-                  {page}
-                  {' '}
-                  of
-                  {' '}
-                  {totalPages}
-                </div>
-              </div>
+          <div className="mt-4 overflow-x-auto">
+            <table className="w-full min-w-[980px] text-sm">
+              <thead>
+                <tr className="text-left text-xs uppercase tracking-wider text-ops-muted">
+                  <th className="px-2 py-2" scope="col">Partner</th>
+                  <th className="px-2 py-2" scope="col">Contact</th>
+                  <th className="px-2 py-2" scope="col">Client Domain</th>
+                  <th className="px-2 py-2" scope="col">Created</th>
+                  <th className="px-2 py-2" scope="col">API Key</th>
+                  <th className="px-2 py-2" scope="col">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {partners.map((partner) => {
+                  const isEditing = editingPartnerId === partner.id
+                  const partnerBusy = isPartnerBusy(partner.id)
+                  const saveDomainKey = buildActionKey('save-domain', partner.id)
+                  const clearDomainKey = buildActionKey('clear-domain', partner.id)
+                  const rotateKey = buildActionKey('rotate', partner.id)
+                  const revokeKey = buildActionKey('revoke', partner.id)
+                  const editingAnotherPartner = editingPartnerId !== null && editingPartnerId !== partner.id
 
-              <div className="mt-4 overflow-x-auto">
-                <table className="w-full min-w-[980px] text-sm">
-                  <thead>
-                    <tr className="text-left text-xs uppercase tracking-wider text-gray-500">
-                      <th className="px-2 py-2">Partner</th>
-                      <th className="px-2 py-2">Contact</th>
-                      <th className="px-2 py-2">Client Domain</th>
-                      <th className="px-2 py-2">Created</th>
-                      <th className="px-2 py-2">API Key</th>
-                      <th className="px-2 py-2">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {partners.map((partner) => {
-                      const isEditing = editingPartnerId === partner.id
-                      const partnerBusy = isPartnerBusy(partner.id)
-                      const saveDomainKey = buildActionKey('save-domain', partner.id)
-                      const clearDomainKey = buildActionKey('clear-domain', partner.id)
-                      const rotateKey = buildActionKey('rotate', partner.id)
-                      const revokeKey = buildActionKey('revoke', partner.id)
-                      const editingAnotherPartner = editingPartnerId !== null && editingPartnerId !== partner.id
-
-                      return (
-                        <tr className="border-t border-neutral-200" key={partner.id}>
-                          <td className="px-2 py-3 align-top">
-                            <div className="font-medium">{partner.name}</div>
-                            <div className="text-xs text-gray-500">{partner.id}</div>
-                          </td>
-                          <td className="px-2 py-3 align-top">
-                            <div>{partner.email || '—'}</div>
-                            <div className="text-xs text-gray-500">
-                              {partner.firstName || ''}
-                              {partner.firstName && partner.lastName ? ' ' : ''}
-                              {partner.lastName || ''}
-                            </div>
-                          </td>
-                          <td className="px-2 py-3 align-top">
-                            {isEditing
-                              ? (
-                                  <div className="flex flex-col gap-2">
-                                    <input
-                                      aria-label={`Client domain for ${partner.name}`}
-                                      className="ops-input h-10"
-                                      onChange={event => setEditingClientDomain(event.target.value)}
-                                      placeholder="app.example.com"
-                                      type="text"
-                                      value={editingClientDomain}
-                                    />
-                                    <div className="text-xs text-gray-500">
-                                      Save a hostname or full URL. The backend stores the canonical host only.
-                                    </div>
-                                  </div>
-                                )
-                              : (
-                                  <div>
-                                    <div className="break-all font-medium">
-                                      {partner.clientDomain || '—'}
-                                    </div>
-                                    <div className="text-xs text-gray-500">
-                                      {partner.clientDomain ? 'Origin-based auth enabled' : 'No browser origin configured'}
-                                    </div>
-                                  </div>
-                                )}
-                          </td>
-                          <td className="px-2 py-3 align-top text-xs text-gray-500">{formatDate(partner.createdAt)}</td>
-                          <td className="px-2 py-3 align-top">
-                            <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${
-                              partner.hasApiKey
-                                ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
-                                : 'bg-rose-100 text-rose-800 border-rose-200'
-                            }`}
-                            >
-                              {partner.hasApiKey ? 'Active' : 'Revoked'}
-                            </span>
-                          </td>
-                          <td className="px-2 py-3 align-top">
-                            <div className="flex flex-wrap items-center gap-2">
-                              {isEditing
-                                ? (
-                                    <>
-                                      <button
-                                        className="rounded-lg border border-abroad-dark bg-abroad-dark px-3 py-1.5 text-xs font-medium text-white hover:bg-abroad-dark/90 transition disabled:opacity-60"
-                                        disabled={!opsApiKey || partnerBusy}
-                                        onClick={() => void handleSaveClientDomain(partner)}
-                                        type="button"
-                                      >
-                                        {actionLoading === saveDomainKey ? 'Saving...' : 'Save'}
-                                      </button>
-                                      <button
-                                        className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-neutral-100 transition disabled:opacity-60"
-                                        disabled={partnerBusy}
-                                        onClick={stopEditingClientDomain}
-                                        type="button"
-                                      >
-                                        Cancel
-                                      </button>
-                                    </>
-                                  )
-                                : (
-                                    <>
-                                      <button
-                                        className="rounded-lg border border-abroad-dark bg-white px-3 py-1.5 text-xs font-medium text-abroad-dark hover:bg-abroad-dark/5 transition disabled:opacity-60"
-                                        disabled={!opsApiKey || partnerBusy || editingAnotherPartner}
-                                        onClick={() => startEditingClientDomain(partner)}
-                                        type="button"
-                                      >
-                                        {partner.clientDomain ? 'Edit Domain' : 'Set Domain'}
-                                      </button>
-                                      {partner.clientDomain && (
-                                        <button
-                                          className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-neutral-100 transition disabled:opacity-60"
-                                          disabled={!opsApiKey || partnerBusy || editingAnotherPartner}
-                                          onClick={() => void handleClearClientDomain(partner)}
-                                          type="button"
-                                        >
-                                          {actionLoading === clearDomainKey ? 'Clearing...' : 'Clear Domain'}
-                                        </button>
-                                      )}
-                                    </>
+                  return (
+                    <tr className="border-t border-ops-border" key={partner.id}>
+                      <td className="px-2 py-3 align-top">
+                        <div className="font-medium">{partner.name}</div>
+                        <div className="text-xs text-ops-muted">{partner.id}</div>
+                      </td>
+                      <td className="px-2 py-3 align-top">
+                        <div>{partner.email || '—'}</div>
+                        <div className="text-xs text-ops-muted">
+                          {partner.firstName || ''}
+                          {partner.firstName && partner.lastName ? ' ' : ''}
+                          {partner.lastName || ''}
+                        </div>
+                      </td>
+                      <td className="px-2 py-3 align-top">
+                        {isEditing
+                          ? (
+                              <div className="flex flex-col gap-2">
+                                <input
+                                  aria-label={`Client domain for ${partner.name}`}
+                                  className="ops-input h-10"
+                                  onChange={event => setEditingClientDomain(event.target.value)}
+                                  placeholder="app.example.com"
+                                  type="text"
+                                  value={editingClientDomain}
+                                />
+                                <div className="text-xs text-ops-muted">
+                                  Save a hostname or full URL. The backend stores the canonical host only.
+                                </div>
+                              </div>
+                            )
+                          : (
+                              <div>
+                                <div className="break-all font-medium">
+                                  {partner.clientDomain || '—'}
+                                </div>
+                                <div className="text-xs text-ops-muted">
+                                  {partner.clientDomain ? 'Origin-based auth enabled' : 'No browser origin configured'}
+                                </div>
+                              </div>
+                            )}
+                      </td>
+                      <td className="px-2 py-3 align-top text-xs text-ops-muted">{formatDateTime(partner.createdAt)}</td>
+                      <td className="px-2 py-3 align-top">
+                        <OpsStatusBadge tone={partner.hasApiKey ? 'success' : 'danger'}>
+                          {partner.hasApiKey ? 'Active' : 'Revoked'}
+                        </OpsStatusBadge>
+                      </td>
+                      <td className="px-2 py-3 align-top">
+                        <div className="flex flex-wrap items-center gap-2">
+                          {isEditing
+                            ? (
+                                <>
+                                  <button
+                                    className="ops-btn-primary ops-btn-sm"
+                                    disabled={!opsApiKey || partnerBusy}
+                                    onClick={() => void handleSaveClientDomain(partner)}
+                                    type="button"
+                                  >
+                                    {actionLoading === saveDomainKey ? 'Saving...' : 'Save'}
+                                  </button>
+                                  <button
+                                    className="ops-btn-neutral ops-btn-sm"
+                                    disabled={partnerBusy}
+                                    onClick={stopEditingClientDomain}
+                                    type="button"
+                                  >
+                                    Cancel
+                                  </button>
+                                </>
+                              )
+                            : (
+                                <>
+                                  <button
+                                    className="ops-btn-neutral ops-btn-sm"
+                                    disabled={!opsApiKey || partnerBusy || editingAnotherPartner}
+                                    onClick={() => startEditingClientDomain(partner)}
+                                    type="button"
+                                  >
+                                    {partner.clientDomain ? 'Edit Domain' : 'Set Domain'}
+                                  </button>
+                                  {partner.clientDomain && (
+                                    <button
+                                      className="ops-btn-neutral ops-btn-sm"
+                                      disabled={!opsApiKey || partnerBusy || editingAnotherPartner}
+                                      onClick={() => void handleClearClientDomain(partner)}
+                                      type="button"
+                                    >
+                                      {actionLoading === clearDomainKey ? 'Clearing...' : 'Clear Domain'}
+                                    </button>
                                   )}
-                              <button
-                                className="rounded-lg border border-abroad-dark bg-white px-3 py-1.5 text-xs font-medium text-abroad-dark hover:bg-abroad-dark/5 transition disabled:opacity-60"
-                                disabled={!opsApiKey || partnerBusy || isEditing}
-                                onClick={() => void handleRotate(partner)}
-                                type="button"
-                              >
-                                {actionLoading === rotateKey ? 'Rotating...' : 'Rotate Key'}
-                              </button>
-                              <button
-                                className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-neutral-100 transition disabled:opacity-60"
-                                disabled={!opsApiKey || partnerBusy || isEditing || !partner.hasApiKey}
-                                onClick={() => void handleRevoke(partner)}
-                                type="button"
-                              >
-                                {actionLoading === revokeKey ? 'Revoking...' : 'Revoke'}
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
+                                </>
+                              )}
+                          <button
+                            className="ops-btn-neutral ops-btn-sm"
+                            disabled={!opsApiKey || partnerBusy || isEditing}
+                            onClick={() => void handleRotate(partner)}
+                            type="button"
+                          >
+                            {actionLoading === rotateKey ? 'Rotating...' : 'Rotate Key'}
+                          </button>
+                          <button
+                            className="ops-btn-danger ops-btn-sm"
+                            disabled={!opsApiKey || partnerBusy || isEditing || !partner.hasApiKey}
+                            onClick={() => void handleRevoke(partner)}
+                            type="button"
+                          >
+                            {actionLoading === revokeKey ? 'Revoking...' : 'Revoke'}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
 
-              {!loading && opsApiKey && partners.length === 0 && (
-                <div className="mt-6 rounded-xl border border-dashed border-neutral-300 px-4 py-10 text-center text-sm text-gray-500">
-                  No partners found.
-                </div>
-              )}
-
-              {loading && opsApiKey && (
-                <div className="mt-6 text-sm text-gray-500">Loading partners...</div>
-              )}
-
-              <div className="mt-5 flex items-center justify-end gap-2">
-                <button
-                  className="h-9 w-9 rounded-xl border border-ops-border bg-white text-lg disabled:opacity-40"
-                  disabled={page <= 1 || loading}
-                  onClick={() => setPage(current => Math.max(1, current - 1))}
-                  type="button"
-                >
-                  ‹
-                </button>
-                <button
-                  className="h-9 w-9 rounded-xl border border-ops-border bg-white text-lg disabled:opacity-40"
-                  disabled={page >= totalPages || loading}
-                  onClick={() => setPage(current => Math.min(totalPages, current + 1))}
-                  type="button"
-                >
-                  ›
-                </button>
-              </div>
+          {!loading && opsApiKey && partners.length === 0 && (
+            <div className="mt-6">
+              <OpsEmptyState>No partners found.</OpsEmptyState>
             </div>
+          )}
+
+          {loading && opsApiKey && (
+            <div className="mt-6">
+              <OpsLoading label="Loading partners…" />
+            </div>
+          )}
+
+          <div className="mt-5 flex items-center justify-end">
+            <OpsPagination
+              loading={loading}
+              onChange={setPage}
+              page={page}
+              totalPages={totalPages}
+            />
           </div>
         </div>
       </div>
-    </div>
+    </OpsPageShell>
   )
 }
 

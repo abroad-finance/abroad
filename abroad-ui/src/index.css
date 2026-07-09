@@ -47,11 +47,17 @@
 
   /* ── Ops admin panel tokens (always light, no dark variant) ── */
   --color-ops-bg: #F7F3EC;
+  --color-ops-surface: #FFFFFF;
   --color-ops-text: #1A1A1A;
   --color-ops-label: #5B6B6A;
+  --color-ops-muted: #4B5563; /* AA (>=4.5:1) on the beige ops-bg for captions/secondary text */
   --color-ops-brand: #1B4D48;
   --color-ops-brand-hover: #2B5B57;
   --color-ops-border: #DADADA;
+
+  /* Ops card elevation — one canonical shadow, plus a tighter variant for nested tiles */
+  --shadow-ops-card: 0 20px 45px -35px rgba(15, 23, 42, 0.45);
+  --shadow-ops-card-sm: 0 15px 40px -34px rgba(15, 23, 42, 0.5);
 }
 
 /* ── Light mode (default) ── */
@@ -270,30 +276,67 @@
   background: radial-gradient(circle at 50% 0%, rgba(16, 185, 129, 0.06) 0%, var(--ab-bg) 60%);
 }
 
-/* ── Ops admin panel component classes ── */
+/* ── Ops admin panel component classes ──
+   Always-light admin theme. Interactive chrome is standardized on --ops-brand
+   (#1B4D48) so buttons/nav/links share one teal, and every interactive element
+   carries a visible focus-visible ring + consistent disabled affordance. */
 @layer components {
   /* Page wrapper: warm beige bg, always light */
   .ops-page {
     @apply min-h-screen bg-ops-bg text-ops-text;
   }
+
+  /* Canonical card surface: visible token border (not near-invisible white/70)
+     over the beige page, one shadow token. Controls stay rounded-xl, cards rounded-2xl. */
+  .ops-card {
+    @apply rounded-2xl border border-ops-border bg-white/85 shadow-ops-card;
+  }
+  .ops-card-interactive {
+    @apply rounded-2xl border border-ops-border bg-white/85 shadow-ops-card transition-shadow hover:shadow-ops-card-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ops-brand/50 focus-visible:ring-offset-2 focus-visible:ring-offset-ops-bg;
+  }
+
   /* Standard text input / select */
   .ops-input {
-    @apply rounded-xl border border-ops-border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-abroad-dark/40;
+    @apply rounded-xl border border-ops-border bg-white px-3 py-2 text-sm text-ops-text placeholder:text-ops-muted/70 focus:outline-none focus-visible:ring-2 focus-visible:ring-ops-brand/50 focus-visible:border-ops-brand;
   }
-  /* Uppercase tracking label */
+
+  /* Uppercase tracking labels + header typography */
   .ops-label {
     @apply text-xs uppercase tracking-[0.3em] text-ops-label;
   }
-  /* Primary CTA button (filled brand) */
+  .ops-eyebrow {
+    @apply text-xs uppercase tracking-[0.3em] text-ops-brand font-medium;
+  }
+  .ops-title {
+    @apply text-3xl md:text-4xl font-semibold text-ops-text;
+  }
+  .ops-subtitle {
+    @apply text-sm text-ops-muted mt-2 max-w-2xl;
+  }
+
+  /* Buttons — filled / ghost / neutral / danger variants + a compact size.
+     Every variant carries the same focus-visible ring and disabled affordance. */
   .ops-btn-primary {
-    @apply rounded-xl border border-abroad-dark bg-abroad-dark px-4 py-2 text-sm font-medium text-white hover:bg-ops-brand-hover transition;
+    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-ops-brand bg-ops-brand px-4 py-2 text-sm font-medium text-white transition hover:bg-ops-brand-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ops-brand/50 focus-visible:ring-offset-2 focus-visible:ring-offset-ops-bg disabled:opacity-50 disabled:cursor-not-allowed;
   }
-  /* Ghost/outline button (hollow brand) */
   .ops-btn-ghost {
-    @apply px-4 py-2 rounded-xl border border-ops-brand text-ops-brand bg-white/70 hover:bg-white transition;
+    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-ops-brand bg-white/70 px-4 py-2 text-sm font-medium text-ops-brand transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ops-brand/50 focus-visible:ring-offset-2 focus-visible:ring-offset-ops-bg disabled:opacity-50 disabled:cursor-not-allowed;
   }
-  /* Navigation link pill used in every Ops page header */
+  .ops-btn-neutral {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-ops-border bg-white px-4 py-2 text-sm font-medium text-ops-text transition hover:bg-neutral-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ops-brand/50 focus-visible:ring-offset-2 focus-visible:ring-offset-ops-bg disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  .ops-btn-danger {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-rose-300 bg-white px-4 py-2 text-sm font-medium text-rose-700 transition hover:bg-rose-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400/50 focus-visible:ring-offset-2 focus-visible:ring-offset-ops-bg disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  .ops-btn-sm {
+    @apply px-3 py-1.5 text-xs;
+  }
+
+  /* Navigation pill used by the shared OpsNav */
   .ops-nav-link {
-    @apply px-4 py-2 rounded-xl border border-abroad-dark text-abroad-dark bg-white/70 hover:bg-white transition text-sm font-medium;
+    @apply inline-flex items-center rounded-xl border border-ops-border bg-white/70 px-3.5 py-2 text-sm font-medium text-ops-text transition hover:bg-white hover:border-ops-brand/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ops-brand/50 focus-visible:ring-offset-2 focus-visible:ring-offset-ops-bg;
+  }
+  .ops-nav-link-active {
+    @apply border-ops-brand bg-ops-brand text-white hover:bg-ops-brand-hover hover:border-ops-brand;
   }
 }

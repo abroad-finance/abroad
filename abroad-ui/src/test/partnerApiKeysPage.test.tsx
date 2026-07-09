@@ -63,11 +63,11 @@ describe('PartnerApiKeys page', () => {
     )
 
     const user = userEvent.setup()
-    await user.type(screen.getByPlaceholderText('Company'), 'Acme')
-    await user.type(screen.getByPlaceholderText('First name'), 'Ada')
-    await user.type(screen.getByPlaceholderText('Last name'), 'Lovelace')
-    await user.type(screen.getByPlaceholderText('Email'), 'acme@example.com')
-    await user.type(screen.getByPlaceholderText('Client domain (optional)'), 'https://App.Abroad.Finance/swap')
+    await user.type(screen.getByLabelText('Company'), 'Acme')
+    await user.type(screen.getByLabelText('First name'), 'Ada')
+    await user.type(screen.getByLabelText('Last name'), 'Lovelace')
+    await user.type(screen.getByLabelText('Email'), 'acme@example.com')
+    await user.type(screen.getByLabelText('Client domain'), 'https://App.Abroad.Finance/swap')
     await user.click(screen.getByRole('button', { name: 'Create Partner & Generate Key' }))
 
     await screen.findByText('One-Time API Key')

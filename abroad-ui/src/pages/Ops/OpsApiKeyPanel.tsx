@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 
 import { clearOpsApiKey, setOpsApiKey, useOpsApiKey } from '../../services/admin/opsAuthStore'
+import { OpsStatusBadge } from './shared/opsStatus'
 
 const OpsApiKeyPanel = () => {
   const apiKey = useOpsApiKey()
@@ -11,26 +12,23 @@ const OpsApiKeyPanel = () => {
   }, [apiKey])
 
   const isReady = Boolean(apiKey)
+  const trimmedDraft = draft.trim()
+  const canSetKey = trimmedDraft.length > 0 && trimmedDraft !== (apiKey ?? '')
 
   return (
-    <div className="mt-6 rounded-2xl border border-white/70 bg-white/80 px-5 py-4 shadow-[0_20px_45px_-35px_rgba(15,23,42,0.45)]">
+    <div className="ops-card mt-6 px-5 py-4">
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
-          <div className="text-xs uppercase tracking-[0.3em] text-abroad-dark">Ops Access</div>
-          <div className="text-sm text-gray-600">Enter the ops API key for this session. It stays in memory only.</div>
+          <div className="ops-eyebrow">Ops Access</div>
+          <div className="text-sm text-ops-muted">Enter the ops API key for this session. It stays in memory only.</div>
         </div>
-        <div className="flex items-center gap-2">
-          <span
-            className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${
-              isReady ? 'bg-emerald-100 text-emerald-800 border-emerald-200' : 'bg-rose-100 text-rose-800 border-rose-200'
-            }`}
-          >
-            {isReady ? 'Key Loaded' : 'Key Required'}
-          </span>
-        </div>
+        <OpsStatusBadge tone={isReady ? 'success' : 'danger'}>
+          {isReady ? 'Key Loaded' : 'Key Required'}
+        </OpsStatusBadge>
       </div>
       <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-center">
         <input
+          aria-label="Ops API key"
           className="flex-1 ops-input"
           onChange={event => setDraft(event.target.value)}
           placeholder="ops_********"
@@ -39,13 +37,15 @@ const OpsApiKeyPanel = () => {
         />
         <button
           className="ops-btn-primary"
+          disabled={!canSetKey}
           onClick={() => setOpsApiKey(draft)}
           type="button"
         >
           Set Key
         </button>
         <button
-          className="rounded-xl border border-ops-border bg-white px-4 py-2 text-sm font-medium text-gray-800 hover:bg-neutral-100 transition"
+          className="ops-btn-neutral"
+          disabled={!isReady && trimmedDraft.length === 0}
           onClick={() => {
             clearOpsApiKey()
             setDraft('')

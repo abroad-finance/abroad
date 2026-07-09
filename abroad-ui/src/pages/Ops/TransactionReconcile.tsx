@@ -1,6 +1,5 @@
 import { useTranslate } from '@tolgee/react'
 import { FormEvent, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
 
 import { useOpsApiKey } from '../../services/admin/opsAuthStore'
 import { reconcileTransactionHash } from '../../services/admin/transactionAdminApi'
@@ -9,17 +8,22 @@ import {
   OpsReconcileTransactionHashResponse,
   reconciliationBlockchains,
 } from '../../services/admin/transactionAdminTypes'
-import OpsApiKeyPanel from './OpsApiKeyPanel'
+import {
+  OpsField,
+  OpsPageShell,
+  OpsStatusBadge,
+  OpsTone,
+} from './shared'
 
 type ReconciliationBlockchain = OpsReconcileTransactionHashInput['blockchain']
 
-const resultClasses: Record<OpsReconcileTransactionHashResponse['result'], string> = {
-  alreadyProcessed: 'bg-slate-100 text-slate-700 border-slate-200',
-  enqueued: 'bg-emerald-100 text-emerald-800 border-emerald-200',
-  failed: 'bg-rose-100 text-rose-800 border-rose-200',
-  invalid: 'bg-amber-100 text-amber-800 border-amber-200',
-  notFound: 'bg-orange-100 text-orange-800 border-orange-200',
-  unresolved: 'bg-indigo-100 text-indigo-800 border-indigo-200',
+const resultTone: Record<OpsReconcileTransactionHashResponse['result'], OpsTone> = {
+  alreadyProcessed: 'neutral',
+  enqueued: 'success',
+  failed: 'danger',
+  invalid: 'warning',
+  notFound: 'warning',
+  unresolved: 'info',
 }
 
 const TransactionReconcile = () => {
@@ -65,134 +69,92 @@ const TransactionReconcile = () => {
   }
 
   return (
-    <div className="ops-page">
-      <div className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(27,94,89,0.18),_transparent_55%)]" />
-        <div className="relative max-w-4xl mx-auto px-6 py-10">
-          <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-            <div>
-              <div className="text-sm uppercase tracking-[0.3em] text-abroad-dark">{t('ops.operations', 'Operations')}</div>
-              <h1 className="text-3xl md:text-4xl font-semibold">{t('ops.tx_reconcile_title', 'Transaction Hash Reconcile')}</h1>
-              <p className="text-sm text-gray-600 max-w-xl mt-2">
-                {t('ops.tx_reconcile_desc', 'Trigger blockchain hash reconciliation through OPS-only controls.')}
-              </p>
-            </div>
-            <div className="flex items-center gap-3">
-              <Link
-                className="ops-nav-link"
-                to="/ops/flows"
-              >
-                Flow Control Room
-              </Link>
-              <Link
-                className="ops-nav-link"
-                to="/ops/partners"
-              >
-                Partners
-              </Link>
-            </div>
-          </div>
-
-          <OpsApiKeyPanel />
-
-          {!opsApiKey && (
-            <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
-              Ops API key required to reconcile transaction hashes.
-            </div>
-          )}
-
-          <form
-            className="mt-8 rounded-2xl border border-white/70 bg-white/80 backdrop-blur p-6 shadow-[0_20px_45px_-35px_rgba(15,23,42,0.45)] space-y-4"
-            onSubmit={(event) => {
-              void handleSubmit(event)
-            }}
-          >
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <label className="flex flex-col">
-                <span className="ops-label">Blockchain</span>
-                <select
-                  className="mt-2 ops-input"
-                  onChange={event => setBlockchain(event.target.value as ReconciliationBlockchain)}
-                  value={blockchain}
-                >
-                  {reconciliationBlockchains.map(item => (
-                    <option key={item} value={item}>{item}</option>
-                  ))}
-                </select>
-              </label>
-              <label className="flex flex-col">
-                <span className="ops-label">Transaction ID (optional)</span>
-                <input
-                  className="mt-2 ops-input"
-                  onChange={event => setTransactionId(event.target.value)}
-                  placeholder="UUID (required for unresolved SOLANA/CELO hashes)"
-                  value={transactionId}
-                />
-              </label>
-            </div>
-            <label className="flex flex-col">
-              <span className="ops-label">On-chain hash / signature</span>
-              <input
-                className="mt-2 ops-input"
-                onChange={event => setOnChainTx(event.target.value)}
-                placeholder="Paste tx hash/signature"
-                value={onChainTx}
-              />
-            </label>
-            <div className="text-xs text-gray-500">
-              This endpoint does not use heuristic matching. If SOLANA/CELO hash is not linked yet, provide
-              {' '}
-              <code>transaction_id</code>
-              .
-            </div>
-            <div className="flex justify-end">
-              <button
-                className="ops-btn-primary disabled:cursor-not-allowed disabled:opacity-60"
-                disabled={isSubmitDisabled}
-                type="submit"
-              >
-                {submitting ? 'Reconciling...' : 'Reconcile Hash'}
-              </button>
-            </div>
-          </form>
-
-          {error && (
-            <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-              {error}
-            </div>
-          )}
-
-          {result && (
-            <div className="mt-6 rounded-2xl border border-white/70 bg-white/80 p-6 shadow-[0_20px_45px_-35px_rgba(15,23,42,0.45)]">
-              <div className="flex items-center justify-between gap-3">
-                <span className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${resultClasses[result.result]}`}>
-                  {result.result}
-                </span>
-                <span className="text-xs uppercase tracking-wider text-slate-500">{result.blockchain}</span>
-              </div>
-              <dl className="mt-4 space-y-2 text-sm">
-                <div className="grid grid-cols-[130px_1fr] gap-2">
-                  <dt className="text-gray-500">On-chain</dt>
-                  <dd className="font-mono break-all">{result.on_chain_tx}</dd>
-                </div>
-                <div className="grid grid-cols-[130px_1fr] gap-2">
-                  <dt className="text-gray-500">Transaction ID</dt>
-                  <dd>{result.transaction_id ?? '—'}</dd>
-                </div>
-                <div className="grid grid-cols-[130px_1fr] gap-2">
-                  <dt className="text-gray-500">Transaction Status</dt>
-                  <dd>{result.transaction_status ?? '—'}</dd>
-                </div>
-                <div className="grid grid-cols-[130px_1fr] gap-2">
-                  <dt className="text-gray-500">Reason</dt>
-                  <dd>{result.reason ?? '—'}</dd>
-                </div>
-              </dl>
-            </div>
-          )}
+    <OpsPageShell
+      error={error}
+      eyebrow={t('ops.operations', 'Operations')}
+      keyRequiredMessage="Ops API key required to reconcile transaction hashes."
+      subtitle={t('ops.tx_reconcile_desc', 'Trigger blockchain hash reconciliation through OPS-only controls.')}
+      title={t('ops.tx_reconcile_title', 'Transaction Hash Reconcile')}
+    >
+      <form
+        className="ops-card mt-8 space-y-4 p-6"
+        onSubmit={(event) => {
+          void handleSubmit(event)
+        }}
+      >
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <OpsField label="Blockchain">
+            <select
+              className="ops-input"
+              onChange={event => setBlockchain(event.target.value as ReconciliationBlockchain)}
+              value={blockchain}
+            >
+              {reconciliationBlockchains.map(item => (
+                <option key={item} value={item}>{item}</option>
+              ))}
+            </select>
+          </OpsField>
+          <OpsField label="Transaction ID (optional)">
+            <input
+              className="ops-input"
+              onChange={event => setTransactionId(event.target.value)}
+              placeholder="UUID (required for unresolved SOLANA/CELO hashes)"
+              value={transactionId}
+            />
+          </OpsField>
         </div>
-      </div>
-    </div>
+        <OpsField label="On-chain hash / signature">
+          <input
+            className="ops-input"
+            onChange={event => setOnChainTx(event.target.value)}
+            placeholder="Paste tx hash/signature"
+            value={onChainTx}
+          />
+        </OpsField>
+        <div className="text-xs text-ops-muted">
+          This endpoint does not use heuristic matching. If SOLANA/CELO hash is not linked yet, provide
+          {' '}
+          <code>transaction_id</code>
+          .
+        </div>
+        <div className="flex justify-end">
+          <button
+            className="ops-btn-primary disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={isSubmitDisabled}
+            type="submit"
+          >
+            {submitting ? 'Reconciling...' : 'Reconcile Hash'}
+          </button>
+        </div>
+      </form>
+
+      {result && (
+        <div className="ops-card mt-6 p-6" role="status">
+          <div className="flex items-center justify-between gap-3">
+            <OpsStatusBadge label={result.result} tone={resultTone[result.result]} />
+            <span className="text-xs uppercase tracking-wider text-ops-muted">{result.blockchain}</span>
+          </div>
+          <dl className="mt-4 space-y-2 text-sm">
+            <div className="grid grid-cols-[130px_1fr] gap-2">
+              <dt className="text-ops-muted">On-chain</dt>
+              <dd className="font-mono break-all">{result.on_chain_tx}</dd>
+            </div>
+            <div className="grid grid-cols-[130px_1fr] gap-2">
+              <dt className="text-ops-muted">Transaction ID</dt>
+              <dd>{result.transaction_id ?? '—'}</dd>
+            </div>
+            <div className="grid grid-cols-[130px_1fr] gap-2">
+              <dt className="text-ops-muted">Transaction Status</dt>
+              <dd>{result.transaction_status ?? '—'}</dd>
+            </div>
+            <div className="grid grid-cols-[130px_1fr] gap-2">
+              <dt className="text-ops-muted">Reason</dt>
+              <dd>{result.reason ?? '—'}</dd>
+            </div>
+          </dl>
+        </div>
+      )}
+    </OpsPageShell>
   )
 }
 

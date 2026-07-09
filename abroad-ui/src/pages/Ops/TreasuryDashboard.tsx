@@ -14,7 +14,15 @@ import {
   OpsTreasuryMovementsResponse,
   OpsTreasurySnapshotsResponse,
 } from '../../services/admin/treasuryTypes'
-import OpsApiKeyPanel from './OpsApiKeyPanel'
+import {
+  formatAmount,
+  formatDateTime,
+  formatMoney,
+  OpsEmptyState,
+  OpsLoading,
+  OpsPageShell,
+  UtilizationMeter,
+} from './shared'
 
 // Categorical palette (validated: worst adjacent CVD dE 24.2, light surface).
 // Color follows the venue entity, never its rank — a missing venue must not
@@ -61,11 +69,6 @@ const compactUsd = (value: null | number): string => {
     notation: 'compact',
     style: 'currency',
   }).format(value)
-}
-
-const fullAmount = (value: null | number): string => {
-  if (value === null || !Number.isFinite(value)) return '—'
-  return value.toLocaleString('en-US', { maximumFractionDigits: 2 })
 }
 
 const niceTicks = (max: number, count = 4): number[] => {
@@ -147,7 +150,7 @@ const LineChart = ({ series }: { series: LineSeries[] }) => {
 
   if (series.every(entry => entry.points.length === 0)) {
     return (
-      <div className="py-10 text-center text-sm text-gray-500">
+      <div className="py-10 text-center text-sm text-ops-muted">
         No snapshots yet — the worker captures balances hourly, so history accrues after the next deploy tick.
       </div>
     )
@@ -156,6 +159,7 @@ const LineChart = ({ series }: { series: LineSeries[] }) => {
   return (
     <div className="relative">
       <svg
+        aria-label="Balance over time by venue (USD)"
         className="w-full"
         onPointerLeave={() => setTooltip(null)}
         onPointerMove={handlePointer}
@@ -226,15 +230,15 @@ const LineChart = ({ series }: { series: LineSeries[] }) => {
       </svg>
       {tooltip && (
         <div
-          className="pointer-events-none absolute top-2 z-10 rounded-lg border border-gray-200 bg-white px-3 py-2 shadow-lg"
+          className="pointer-events-none absolute top-2 z-10 rounded-lg border border-ops-border bg-white px-3 py-2 shadow-lg"
           style={{ left: `min(max(${tooltip.xPct}%, 10%), 78%)`, transform: 'translateX(-50%)' }}
         >
-          <div className="text-[11px] text-gray-500">{new Date(tooltip.at).toLocaleString()}</div>
+          <div className="text-[11px] text-ops-muted">{new Date(tooltip.at).toLocaleString()}</div>
           {tooltip.rows.map(row => (
             <div className="mt-1 flex items-center gap-2 text-xs" key={row.label}>
               <span aria-hidden className="inline-block h-0.5 w-3" style={{ backgroundColor: row.color }} />
-              <span className="font-semibold text-gray-900">{compactUsd(row.value)}</span>
-              <span className="text-gray-500">{row.label}</span>
+              <span className="font-semibold text-ops-text">{compactUsd(row.value)}</span>
+              <span className="text-ops-muted">{row.label}</span>
             </div>
           ))}
         </div>
@@ -276,10 +280,10 @@ const BarChart = ({ color, data, title }: { color: string, data: BarDatum[], tit
   const thickness = Math.min(24, Math.max(2, band - 2))
 
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-3">
-      <div className="text-xs font-medium text-gray-600">{title}</div>
+    <div className="ops-card p-3">
+      <div className="text-xs font-medium text-ops-muted">{title}</div>
       <div className="relative mt-1">
-        <svg className="w-full" role="img" viewBox={`0 0 ${BAR_W} ${BAR_H}`}>
+        <svg aria-label={title} className="w-full" role="img" viewBox={`0 0 ${BAR_W} ${BAR_H}`}>
           {ticks.map(tick => (
             <g key={tick}>
               <line
@@ -340,9 +344,9 @@ const BarChart = ({ color, data, title }: { color: string, data: BarDatum[], tit
           ))}
         </svg>
         {hover !== null && data[hover] && (
-          <div className="pointer-events-none absolute left-1/2 top-1 z-10 -translate-x-1/2 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs shadow-lg">
-            <span className="font-semibold text-gray-900">{fullAmount(data[hover].value)}</span>
-            <span className="ml-2 text-gray-500">{data[hover].label}</span>
+          <div className="pointer-events-none absolute left-1/2 top-1 z-10 -translate-x-1/2 rounded-lg border border-ops-border bg-white px-3 py-1.5 text-xs shadow-lg">
+            <span className="font-semibold text-ops-text">{formatAmount(data[hover].value, 2)}</span>
+            <span className="ml-2 text-ops-muted">{data[hover].label}</span>
           </div>
         )}
       </div>
@@ -462,10 +466,6 @@ const TreasuryDashboard = () => {
   }, [movements])
 
   const float = balances?.float
-  const utilization = float && float.cap && float.cap > 0
-    ? Math.min(100, Math.round((float.deficit / float.cap) * 100))
-    : null
-  const meterColor = utilization === null ? '#2a78d6' : utilization > 90 ? '#d03b3b' : utilization > 70 ? '#fab219' : '#2a78d6'
 
   const errorByVenue = useMemo(() => {
     const map = new Map<string, string>()
@@ -474,274 +474,246 @@ const TreasuryDashboard = () => {
   }, [balances])
 
   return (
-    <div className="ops-page">
-      <div className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(27,94,89,0.18),_transparent_55%)]" />
-        <div className="relative max-w-6xl mx-auto px-6 py-10">
-          <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-            <div>
-              <div className="flex items-center gap-3 text-sm">
-                <Link className="text-ops-brand hover:text-abroad-dark" to="/ops/flows">← Flows</Link>
-                <Link className="text-ops-brand hover:text-abroad-dark" to="/ops/treasury/bridge">Bridge</Link>
-                <Link className="text-ops-brand hover:text-abroad-dark" to="/ops/transactions">Transactions</Link>
+    <OpsPageShell
+      actions={(
+        <button
+          className="ops-btn-ghost"
+          disabled={!opsApiKey || loading}
+          onClick={() => void load()}
+          type="button"
+        >
+          Refresh
+        </button>
+      )}
+      error={error}
+      eyebrow="Treasury"
+      keyRequiredMessage="Ops API key required to load treasury data."
+      subtitle="Everything we hold across venues, an indicative USD roll-up, and how money has moved."
+      title="Balances & Money Movement"
+    >
+      {balances && (
+        <div className={loading ? 'opacity-60 transition-opacity' : 'transition-opacity'}>
+          <div className="mt-8 grid grid-cols-1 gap-4 lg:grid-cols-3">
+            <div className="ops-card p-5 backdrop-blur lg:col-span-1">
+              <div className="text-sm text-ops-muted">Total treasury (indicative)</div>
+              <div className="mt-1 text-5xl font-semibold text-ops-text">{compactUsd(balances.totalUsd)}</div>
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                {balances.totalUsdIsPartial && (
+                  <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-amber-700">
+                    ⚠ partial — some venues or rates unavailable
+                  </span>
+                )}
+                {balances.fxRates.map(rate => (
+                  <span className="rounded-full border border-ops-border bg-white px-2 py-0.5 text-ops-muted" key={rate.currency}>
+                    1 USD ≈
+                    {' '}
+                    {formatAmount(1 / rate.usdPerUnit, 2)}
+                    {' '}
+                    {rate.currency}
+                  </span>
+                ))}
               </div>
-              <div className="mt-3 text-sm uppercase tracking-[0.3em] text-abroad-dark">Treasury</div>
-              <h1 className="text-3xl md:text-4xl font-semibold">Balances &amp; Money Movement</h1>
-              <p className="text-sm text-gray-600 max-w-xl mt-2">
-                Everything we hold across venues, an indicative USD roll-up, and how money has moved.
-              </p>
+              <div className="mt-3 text-xs text-ops-muted">
+                as of
+                {' '}
+                {formatDateTime(balances.capturedAt)}
+              </div>
             </div>
-            <button
-              className="ops-btn-ghost"
-              disabled={!opsApiKey || loading}
-              onClick={() => void load()}
-              type="button"
-            >
-              Refresh
-            </button>
+
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:col-span-2">
+              {venueTotals.map(([venue, total]) => (
+                <div className="ops-card p-4 backdrop-blur" key={venue}>
+                  <div className="flex items-center gap-2 text-xs text-ops-muted">
+                    <span aria-hidden className="inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: venueColor(venue) }} />
+                    {venueLabel(venue)}
+                  </div>
+                  {errorByVenue.has(venue)
+                    ? (
+                        <div className="mt-1">
+                          <span className="rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-xs text-rose-700" title={errorByVenue.get(venue)}>
+                            unavailable
+                          </span>
+                        </div>
+                      )
+                    : (
+                        <div className="mt-1 text-2xl font-semibold text-ops-text">
+                          {compactUsd(total.usd)}
+                          {total.hasUnpriced && <span className="ml-1 align-top text-xs text-amber-600" title="Holds currency without a USD rate">*</span>}
+                        </div>
+                      )}
+                </div>
+              ))}
+            </div>
           </div>
 
-          <OpsApiKeyPanel />
-
-          {error && (
-            <div className="mt-6 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-              {error}
-            </div>
-          )}
-          {!opsApiKey && (
-            <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
-              Ops API key required to load treasury data.
-            </div>
-          )}
-
-          {balances && (
-            <div className={loading ? 'opacity-60 transition-opacity' : 'transition-opacity'}>
-              <div className="mt-8 grid grid-cols-1 gap-4 lg:grid-cols-3">
-                <div className="rounded-2xl border border-white/70 bg-white/70 p-5 shadow-[0_20px_45px_-35px_rgba(15,23,42,0.45)] backdrop-blur lg:col-span-1">
-                  <div className="text-sm text-gray-600">Total treasury (indicative)</div>
-                  <div className="mt-1 text-5xl font-semibold text-gray-900">{compactUsd(balances.totalUsd)}</div>
-                  <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
-                    {balances.totalUsdIsPartial && (
-                      <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-amber-700">
-                        ⚠ partial — some venues or rates unavailable
-                      </span>
-                    )}
-                    {balances.fxRates.map(rate => (
-                      <span className="rounded-full border border-gray-200 bg-white px-2 py-0.5 text-gray-500" key={rate.currency}>
-                        1 USD ≈
-                        {' '}
-                        {fullAmount(1 / rate.usdPerUnit)}
-                        {' '}
-                        {rate.currency}
-                      </span>
-                    ))}
-                  </div>
-                  <div className="mt-3 text-xs text-gray-400">
-                    as of
-                    {new Date(balances.capturedAt).toLocaleString()}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:col-span-2">
-                  {venueTotals.map(([venue, total]) => (
-                    <div className="rounded-2xl border border-white/70 bg-white/70 p-4 backdrop-blur" key={venue}>
-                      <div className="flex items-center gap-2 text-xs text-gray-600">
-                        <span aria-hidden className="inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: venueColor(venue) }} />
-                        {venueLabel(venue)}
-                      </div>
-                      {errorByVenue.has(venue)
-                        ? (
-                            <div className="mt-1">
-                              <span className="rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-xs text-rose-700" title={errorByVenue.get(venue)}>
-                                unavailable
-                              </span>
-                            </div>
-                          )
-                        : (
-                            <div className="mt-1 text-2xl font-semibold text-gray-900">
-                              {compactUsd(total.usd)}
-                              {total.hasUnpriced && <span className="ml-1 align-top text-xs text-amber-600" title="Holds currency without a USD rate">*</span>}
-                            </div>
-                          )}
-                    </div>
-                  ))}
-                </div>
+          {float?.enabled && (
+            <div className="ops-card mt-4 p-4 backdrop-blur">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-ops-muted">Bridge float utilization (context — already counted at Binance)</span>
+                <span className="font-medium text-ops-text">
+                  {formatAmount(float.deficit, 2)}
+                  {' '}
+                  /
+                  {' '}
+                  {formatAmount(float.cap, 2)}
+                  {' '}
+                  USDC outstanding
+                </span>
               </div>
+              <UtilizationMeter cap={float.cap} className="mt-2" deficit={float.deficit} />
+            </div>
+          )}
 
-              {float?.enabled && (
-                <div className="mt-4 rounded-2xl border border-white/70 bg-white/70 p-4 backdrop-blur">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-600">Bridge float utilization (context — already counted at Binance)</span>
-                    <span className="font-medium text-gray-900">
-                      {fullAmount(float.deficit)}
-                      {' '}
-                      /
-                      {fullAmount(float.cap)}
-                      {' '}
-                      USDC outstanding
-                    </span>
-                  </div>
-                  <div className="mt-2 h-2 rounded-full" style={{ backgroundColor: '#cde2fb' }}>
-                    <div
-                      className="h-2 rounded-full transition-all"
-                      style={{ backgroundColor: meterColor, width: `${utilization ?? 0}%` }}
-                    />
-                  </div>
-                </div>
-              )}
-
-              <div className="mt-8 overflow-hidden rounded-2xl border border-white/70 bg-white/80 backdrop-blur">
-                <div className="border-b border-gray-100 px-4 py-3 text-sm font-medium text-gray-700">All balances</div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="text-left text-xs uppercase tracking-wide text-gray-500">
-                        <th className="px-4 py-2">Venue</th>
-                        <th className="px-4 py-2">Account</th>
-                        <th className="px-4 py-2">Currency</th>
-                        <th className="px-4 py-2 text-right">Amount</th>
-                        <th className="px-4 py-2 text-right">USD (indicative)</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {balances.cells.map(cell => (
-                        <tr className="border-t border-gray-100" key={`${cell.venue}-${cell.account}-${cell.currency}`}>
-                          <td className="px-4 py-2">
-                            <span className="flex items-center gap-2">
-                              <span aria-hidden className="inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: venueColor(cell.venue) }} />
-                              {venueLabel(cell.venue)}
-                            </span>
-                          </td>
-                          <td className="max-w-[180px] truncate px-4 py-2 font-mono text-xs text-gray-500" title={cell.account}>
-                            {cell.account || '—'}
-                          </td>
-                          <td className="px-4 py-2">{cell.currency}</td>
-                          <td className="px-4 py-2 text-right tabular-nums">{fullAmount(cell.amount)}</td>
-                          <td className="px-4 py-2 text-right tabular-nums">{cell.usdValue === null ? '—' : compactUsd(cell.usdValue)}</td>
+          <div className="ops-card mt-8 overflow-hidden backdrop-blur">
+            <h2 className="border-b border-ops-border px-4 py-3 text-sm font-medium text-ops-text">All balances</h2>
+            {balances.cells.length === 0
+              ? <OpsEmptyState className="m-4">No balances to show.</OpsEmptyState>
+              : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="text-left text-xs uppercase tracking-wide text-ops-muted">
+                          <th className="px-4 py-2" scope="col">Venue</th>
+                          <th className="px-4 py-2" scope="col">Account</th>
+                          <th className="px-4 py-2" scope="col">Currency</th>
+                          <th className="px-4 py-2 text-right" scope="col">Amount</th>
+                          <th className="px-4 py-2 text-right" scope="col">USD (indicative)</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+                      </thead>
+                      <tbody>
+                        {balances.cells.map(cell => (
+                          <tr className="border-t border-ops-border" key={`${cell.venue}-${cell.account}-${cell.currency}`}>
+                            <td className="px-4 py-2">
+                              <span className="flex items-center gap-2">
+                                <span aria-hidden className="inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: venueColor(cell.venue) }} />
+                                {venueLabel(cell.venue)}
+                              </span>
+                            </td>
+                            <td className="max-w-[180px] truncate px-4 py-2 font-mono text-xs text-ops-muted" title={cell.account}>
+                              {cell.account || '—'}
+                            </td>
+                            <td className="px-4 py-2">{cell.currency}</td>
+                            <td className="px-4 py-2 text-right tabular-nums">{formatAmount(cell.amount, 2)}</td>
+                            <td className="px-4 py-2 text-right tabular-nums">{cell.usdValue === null ? '—' : compactUsd(cell.usdValue)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+          </div>
 
-              <div className="mt-10 flex items-center gap-2">
-                <span className="text-sm text-gray-600">History range:</span>
-                {RANGE_PRESETS.map(preset => (
-                  <button
-                    className={rangeDays === preset
-                      ? 'rounded-full bg-abroad-dark px-3 py-1 text-xs font-medium text-white'
-                      : 'rounded-full border border-gray-300 bg-white px-3 py-1 text-xs text-gray-600 hover:border-abroad-dark'}
-                    key={preset}
-                    onClick={() => setRangeDays(preset)}
-                    type="button"
-                  >
-                    Last
-                    {' '}
-                    {preset}
-                    {' '}
-                    days
-                  </button>
+          <div className="mt-10 flex items-center gap-2">
+            <span className="text-sm text-ops-muted">History range:</span>
+            {RANGE_PRESETS.map(preset => (
+              <button
+                className={rangeDays === preset
+                  ? 'rounded-full bg-abroad-dark px-3 py-1 text-xs font-medium text-white'
+                  : 'rounded-full border border-ops-border bg-white px-3 py-1 text-xs text-ops-muted hover:border-abroad-dark'}
+                key={preset}
+                onClick={() => setRangeDays(preset)}
+                type="button"
+              >
+                Last
+                {' '}
+                {preset}
+                {' '}
+                days
+              </button>
+            ))}
+          </div>
+
+          <div className="ops-card mt-4 p-4 backdrop-blur">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 className="text-sm font-medium text-ops-text">Balance over time (USD, per venue)</h2>
+              <div className="flex flex-wrap items-center gap-3 text-xs text-ops-muted">
+                {lineSeries.map(entry => (
+                  <span className="flex items-center gap-1.5" key={entry.label}>
+                    <span aria-hidden className="inline-block h-0.5 w-4" style={{ backgroundColor: entry.color }} />
+                    {entry.label}
+                  </span>
+                ))}
+              </div>
+            </div>
+            <div className="mt-2">
+              <LineChart series={lineSeries} />
+            </div>
+          </div>
+
+          {movements && (
+            <>
+              <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                <BarChart
+                  color="#2a78d6"
+                  data={movementCharts.stables}
+                  title="Stablecoins received per day (USD)"
+                />
+                {movementCharts.fiat.map(chart => (
+                  <BarChart
+                    color="#1baf7a"
+                    data={chart.data}
+                    key={chart.currency}
+                    title={`Fiat paid out per day (${chart.currency})`}
+                  />
                 ))}
               </div>
 
-              <div className="mt-4 rounded-2xl border border-white/70 bg-white/80 p-4 backdrop-blur">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="text-sm font-medium text-gray-700">Balance over time (USD, per venue)</div>
-                  <div className="flex flex-wrap items-center gap-3 text-xs text-gray-600">
-                    {lineSeries.map(entry => (
-                      <span className="flex items-center gap-1.5" key={entry.label}>
-                        <span aria-hidden className="inline-block h-0.5 w-4" style={{ backgroundColor: entry.color }} />
-                        {entry.label}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-                <div className="mt-2">
-                  <LineChart series={lineSeries} />
-                </div>
+              <div className="ops-card mt-4 overflow-hidden backdrop-blur">
+                <h2 className="border-b border-ops-border px-4 py-3 text-sm font-medium text-ops-text">Recent movements</h2>
+                {movements.recent.length === 0
+                  ? <OpsEmptyState className="m-4">No movements in this window.</OpsEmptyState>
+                  : (
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="text-left text-xs uppercase tracking-wide text-ops-muted">
+                              <th className="px-4 py-2" scope="col">When</th>
+                              <th className="px-4 py-2" scope="col">Kind</th>
+                              <th className="px-4 py-2 text-right" scope="col">Amount</th>
+                              <th className="px-4 py-2" scope="col">Reference</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {movements.recent.map(event => (
+                              <tr className="border-t border-ops-border" key={`${event.kind}-${event.reference}-${event.at}`}>
+                                <td className="whitespace-nowrap px-4 py-2 text-ops-muted">{formatDateTime(event.at)}</td>
+                                <td className="px-4 py-2">
+                                  <span className="rounded-full border border-ops-border bg-white/60 px-2 py-0.5 text-xs text-ops-text">
+                                    <span aria-hidden>{event.direction === 'IN' ? '↓' : '↑'}</span>
+                                    <span className="sr-only">{event.direction === 'IN' ? 'Inbound' : 'Outbound'}</span>
+                                    {' '}
+                                    {eventKindLabels[event.kind] ?? event.kind}
+                                  </span>
+                                </td>
+                                <td className="whitespace-nowrap px-4 py-2 text-right tabular-nums">
+                                  {formatMoney(event.amount, event.currency)}
+                                </td>
+                                <td className="px-4 py-2 font-mono text-xs">
+                                  {event.kind === 'BRIDGE_SETTLED'
+                                    ? <span className="text-ops-muted">{event.reference}</span>
+                                    : (
+                                        <Link className="text-ops-brand hover:text-ops-brand-hover" to={`/ops/transactions/${event.reference}`}>
+                                          {event.reference.slice(0, 8)}
+                                          …
+                                        </Link>
+                                      )}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
               </div>
-
-              {movements && (
-                <>
-                  <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-                    <BarChart
-                      color="#2a78d6"
-                      data={movementCharts.stables}
-                      title="Stablecoins received per day (USD)"
-                    />
-                    {movementCharts.fiat.map(chart => (
-                      <BarChart
-                        color="#1baf7a"
-                        data={chart.data}
-                        key={chart.currency}
-                        title={`Fiat paid out per day (${chart.currency})`}
-                      />
-                    ))}
-                  </div>
-
-                  <div className="mt-4 overflow-hidden rounded-2xl border border-white/70 bg-white/80 backdrop-blur">
-                    <div className="border-b border-gray-100 px-4 py-3 text-sm font-medium text-gray-700">Recent movements</div>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="text-left text-xs uppercase tracking-wide text-gray-500">
-                            <th className="px-4 py-2">When</th>
-                            <th className="px-4 py-2">Kind</th>
-                            <th className="px-4 py-2 text-right">Amount</th>
-                            <th className="px-4 py-2">Reference</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {movements.recent.length === 0 && (
-                            <tr>
-                              <td className="px-4 py-6 text-center text-gray-500" colSpan={4}>
-                                No movements in this window.
-                              </td>
-                            </tr>
-                          )}
-                          {movements.recent.map(event => (
-                            <tr className="border-t border-gray-100" key={`${event.kind}-${event.reference}-${event.at}`}>
-                              <td className="whitespace-nowrap px-4 py-2 text-gray-500">{new Date(event.at).toLocaleString()}</td>
-                              <td className="px-4 py-2">
-                                <span className="rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-xs text-gray-700">
-                                  {event.direction === 'IN' ? '↓' : '↑'}
-                                  {' '}
-                                  {eventKindLabels[event.kind] ?? event.kind}
-                                </span>
-                              </td>
-                              <td className="whitespace-nowrap px-4 py-2 text-right tabular-nums">
-                                {fullAmount(event.amount)}
-                                {' '}
-                                {event.currency}
-                              </td>
-                              <td className="px-4 py-2 font-mono text-xs">
-                                {event.kind === 'BRIDGE_SETTLED'
-                                  ? <span className="text-gray-500">{event.reference}</span>
-                                  : (
-                                      <Link className="text-ops-brand hover:text-abroad-dark" to={`/ops/transactions/${event.reference}`}>
-                                        {event.reference.slice(0, 8)}
-                                        …
-                                      </Link>
-                                    )}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
-          )}
-
-          {loading && opsApiKey && !balances && (
-            <div className="mt-6 text-sm text-gray-500">Loading treasury data...</div>
+            </>
           )}
         </div>
-      </div>
-    </div>
+      )}
+
+      {loading && opsApiKey && !balances && (
+        <OpsLoading className="mt-6" label="Loading treasury data…" />
+      )}
+    </OpsPageShell>
   )
 }
 

@@ -1,7 +1,6 @@
 import {
   useCallback, useEffect, useMemo, useState,
 } from 'react'
-import { Link } from 'react-router-dom'
 
 import {
   createFlowDefinition,
@@ -13,6 +12,7 @@ import {
 import {
   FlowBusinessStep,
   FlowCorridor,
+  FlowCorridorStatus,
   FlowCorridorSupportStatus,
   FlowDefinition,
   FlowDefinitionInput,
@@ -22,7 +22,15 @@ import {
   SupportedCurrency,
 } from '../../services/admin/flowTypes'
 import { useOpsApiKey } from '../../services/admin/opsAuthStore'
-import OpsApiKeyPanel from './OpsApiKeyPanel'
+import {
+  formatDateTime,
+  OpsEmptyState,
+  OpsField,
+  OpsLoading,
+  OpsPageShell,
+  OpsStatusBadge,
+  OpsTone,
+} from './shared'
 
 const venues: FlowVenue[] = ['BINANCE', 'TRANSFERO']
 const payoutProviders: PaymentMethod[] = ['BREB', 'PIX']
@@ -41,6 +49,12 @@ const pricingProviderDefaults: Record<FlowPricingProvider, { exchangeFeePct: num
 const payoutProviderDefaults: Record<PaymentMethod, { fixedFee: number, maxAmount: null | number, minAmount: null | number }> = {
   BREB: { fixedFee: 0, maxAmount: 5_000_000, minAmount: 5_000 },
   PIX: { fixedFee: 0, maxAmount: null, minAmount: 0 },
+}
+
+const corridorStatusTone: Record<FlowCorridorStatus, OpsTone> = {
+  DEFINED: 'success',
+  MISSING: 'danger',
+  UNSUPPORTED: 'warning',
 }
 
 type DefinitionDraft = {
@@ -66,11 +80,6 @@ const buildCorridorKey = (corridor: {
   cryptoCurrency: string
   targetCurrency: string
 }): string => `${corridor.cryptoCurrency}:${corridor.blockchain}:${corridor.targetCurrency}`
-
-const formatDate = (value: null | string | undefined): string => {
-  if (!value) return '—'
-  return new Date(value).toLocaleString()
-}
 
 const defaultPayoutProvider = (targetCurrency: string): PaymentMethod => (
   targetCurrency === 'BRL' ? 'PIX' : 'BREB'
@@ -520,549 +529,496 @@ const FlowDefinitions = () => {
   )
 
   return (
-    <div className="ops-page">
-      <div className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(27,94,89,0.18),_transparent_55%)]" />
-        <div className="relative max-w-7xl mx-auto px-6 py-10">
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <div>
-              <div className="flex flex-wrap items-center gap-4 text-sm">
-                <Link className="text-ops-brand hover:text-abroad-dark" to="/ops/flows">← Back to runs</Link>
-                <Link className="text-ops-brand hover:text-abroad-dark" to="/ops/crypto-assets">Crypto asset coverage</Link>
-                <Link className="text-ops-brand hover:text-abroad-dark" to="/ops/partners">Partners & API keys</Link>
-              </div>
-              <div className="mt-3 text-sm uppercase tracking-[0.3em] text-abroad-dark">Flow Coverage</div>
-              <h1 className="text-3xl md:text-4xl font-semibold">Corridor Flow Builder</h1>
-              <p className="text-sm text-gray-600 max-w-xl mt-2">
-                Define the business pipeline for each corridor. System logic handles payouts, waits, and refunds automatically.
-              </p>
-            </div>
-            <div className="flex items-center gap-3">
-              <button
-                className="ops-btn-ghost"
-                disabled={!opsApiKey || loading}
-                onClick={() => void loadData()}
-                type="button"
-              >
-                Refresh
-              </button>
-            </div>
-          </div>
-
-          <OpsApiKeyPanel />
-
-          {error && (
-            <div className="mt-6 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-              {error}
-            </div>
-          )}
-
-          {!opsApiKey && (
-            <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
-              Ops API key required to load corridor coverage.
-            </div>
-          )}
-
-          <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-4">
-            <div className="rounded-2xl border border-white/70 bg-white/80 p-4 shadow-[0_16px_40px_-35px_rgba(15,23,42,0.45)]">
-              <div className="text-xs uppercase tracking-[0.3em] text-gray-500">Total</div>
-              <div className="mt-2 text-2xl font-semibold">{corridorSummary?.total ?? '—'}</div>
-            </div>
-            <div className="rounded-2xl border border-white/70 bg-white/80 p-4 shadow-[0_16px_40px_-35px_rgba(15,23,42,0.45)]">
-              <div className="text-xs uppercase tracking-[0.3em] text-gray-500">Defined</div>
-              <div className="mt-2 text-2xl font-semibold text-emerald-700">{corridorSummary?.defined ?? '—'}</div>
-            </div>
-            <div className="rounded-2xl border border-white/70 bg-white/80 p-4 shadow-[0_16px_40px_-35px_rgba(15,23,42,0.45)]">
-              <div className="text-xs uppercase tracking-[0.3em] text-gray-500">Missing</div>
-              <div className="mt-2 text-2xl font-semibold text-rose-700">{corridorSummary?.missing ?? '—'}</div>
-            </div>
-            <div className="rounded-2xl border border-white/70 bg-white/80 p-4 shadow-[0_16px_40px_-35px_rgba(15,23,42,0.45)]">
-              <div className="text-xs uppercase tracking-[0.3em] text-gray-500">Unsupported</div>
-              <div className="mt-2 text-2xl font-semibold text-amber-700">{corridorSummary?.unsupported ?? '—'}</div>
-            </div>
-          </div>
-
-          <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-[1.1fr_2fr]">
-            <div className="rounded-2xl border border-white/70 bg-white/80 p-5 shadow-[0_20px_45px_-35px_rgba(15,23,42,0.45)]">
-              <div className="flex flex-col gap-3">
-                <div className="text-sm font-semibold">Corridors</div>
-                <input
-                  className="w-full ops-input"
-                  onChange={event => setSearch(event.target.value)}
-                  placeholder="Search corridor"
-                  value={search}
-                />
-                <div className="flex flex-wrap gap-2 text-xs">
-                  {[
-                    'all',
-                    'defined',
-                    'missing',
-                    'unsupported',
-                  ].map(value => (
-                    <button
-                      className={`rounded-full border px-3 py-1 ${filter === value ? 'border-abroad-dark bg-abroad-dark/10 text-ops-brand' : 'border-ops-border text-gray-500'}`}
-                      key={value}
-                      onClick={() => setFilter(value as typeof filter)}
-                      type="button"
-                    >
-                      {value}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div className="mt-4 space-y-3">
-                {loading && (
-                  <div className="text-xs text-gray-500">Loading corridors...</div>
-                )}
-                {!loading && opsApiKey && filteredCorridors.length === 0 && (
-                  <div className="rounded-xl border border-dashed border-neutral-300 bg-white/70 px-4 py-6 text-center text-xs text-gray-500">
-                    No corridors found.
-                  </div>
-                )}
-                {filteredCorridors.map(corridor => (
-                  <button
-                    className={`w-full text-left rounded-xl border px-4 py-3 transition ${
-                      selectedKey === buildCorridorKey(corridor)
-                        ? 'border-abroad-dark bg-abroad-dark/10'
-                        : 'border-white/70 bg-white/60 hover:bg-white'
-                    }`}
-                    key={buildCorridorKey(corridor)}
-                    onClick={() => selectCorridor(corridor)}
-                    type="button"
-                  >
-                    <div className="text-sm font-semibold">{corridorTitle(corridor)}</div>
-                    <div className="mt-1 flex items-center gap-2 text-[11px] text-gray-500">
-                      <span className={`rounded-full px-2 py-[2px] ${
-                        corridor.status === 'DEFINED'
-                          ? 'bg-emerald-100 text-emerald-700'
-                          : corridor.status === 'UNSUPPORTED'
-                            ? 'bg-amber-100 text-amber-700'
-                            : 'bg-rose-100 text-rose-700'
-                      }`}
-                      >
-                        {corridor.status === 'DEFINED' ? 'Defined' : corridor.status === 'UNSUPPORTED' ? 'Unsupported' : 'Missing'}
-                      </span>
-                      {corridor.definitionName && (
-                        <span>{corridor.definitionName}</span>
-                      )}
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-white/70 bg-white/80 p-6 shadow-[0_20px_45px_-35px_rgba(15,23,42,0.45)]">
-              {draft && selectedCorridor
-                ? (
-                    <>
-                      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                        <div>
-                          <div className="text-xs uppercase tracking-wider text-gray-500">Corridor</div>
-                          <div className="text-lg font-semibold">{corridorTitle(selectedCorridor)}</div>
-                          <div className="text-xs text-gray-500">
-                            Updated
-                            {formatDate(selectedCorridor.updatedAt)}
-                          </div>
-                        </div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <button
-                            className="rounded-xl border border-ops-border bg-white px-3 py-2 text-xs font-semibold text-gray-800 hover:bg-neutral-100"
-                            disabled={!isDirty}
-                            onClick={() => {
-                              if (!baseline) return
-                              setDraft(JSON.parse(baseline) as DefinitionDraft)
-                              setValidationErrors({})
-                            }}
-                            type="button"
-                          >
-                            Discard changes
-                          </button>
-                          <button
-                            className="rounded-xl border border-abroad-dark bg-abroad-dark px-4 py-2 text-xs font-semibold text-white hover:bg-ops-brand-hover"
-                            disabled={saving || !opsApiKey}
-                            onClick={() => void handleSave()}
-                            type="button"
-                          >
-                            {saving ? 'Saving…' : draft.id ? 'Save flow' : 'Create flow'}
-                          </button>
-                        </div>
-                      </div>
-
-                      <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
-                        <div>
-                          <label className="ops-label">Name</label>
-                          <input
-                            className="mt-2 w-full ops-input"
-                            onChange={event => updateDraftField('name', event.target.value)}
-                            value={draft.name}
-                          />
-                          {validationErrors.name && (
-                            <div className="mt-1 text-xs text-rose-600">{validationErrors.name}</div>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <label className="ops-label">Enabled</label>
-                          <button
-                            className={`rounded-full border px-4 py-2 text-xs font-semibold transition ${
-                              draft.enabled ? 'border-emerald-300 bg-emerald-100 text-emerald-800' : 'border-rose-300 bg-rose-100 text-rose-800'
-                            }`}
-                            onClick={() => updateDraftField('enabled', !draft.enabled)}
-                            type="button"
-                          >
-                            {draft.enabled ? 'Enabled' : 'Disabled'}
-                          </button>
-                        </div>
-                        <div>
-                          <label className="ops-label">Payout Provider</label>
-                          <select
-                            className="mt-2 w-full rounded-xl border border-ops-border bg-white px-3 py-2 text-sm"
-                            onChange={event => updateDraftField('payoutProvider', event.target.value)}
-                            value={draft.payoutProvider}
-                          >
-                            {payoutProviders.map(item => (
-                              <option key={item} value={item}>{item}</option>
-                            ))}
-                          </select>
-                        </div>
-                        <div>
-                          <label className="ops-label">Pricing Provider</label>
-                          <select
-                            className="mt-2 w-full rounded-xl border border-ops-border bg-white px-3 py-2 text-sm"
-                            onChange={event => updateDraftField('pricingProvider', event.target.value)}
-                            value={draft.pricingProvider}
-                          >
-                            {pricingProviders.map(item => (
-                              <option key={item} value={item}>{item}</option>
-                            ))}
-                          </select>
-                        </div>
-                      </div>
-
-                      <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-4">
-                        <div>
-                          <label className="ops-label">Exchange Fee %</label>
-                          <input
-                            className="mt-2 w-full rounded-xl border border-ops-border bg-white px-3 py-2 text-sm"
-                            onChange={event => updateDraftField('exchangeFeePct', event.target.value)}
-                            type="number"
-                            value={draft.exchangeFeePct}
-                          />
-                          {validationErrors.exchangeFeePct && (
-                            <div className="mt-1 text-xs text-rose-600">{validationErrors.exchangeFeePct}</div>
-                          )}
-                        </div>
-                        <div>
-                          <label className="ops-label">Fixed Fee</label>
-                          <input
-                            className="mt-2 w-full rounded-xl border border-ops-border bg-white px-3 py-2 text-sm"
-                            onChange={event => updateDraftField('fixedFee', event.target.value)}
-                            type="number"
-                            value={draft.fixedFee}
-                          />
-                          {validationErrors.fixedFee && (
-                            <div className="mt-1 text-xs text-rose-600">{validationErrors.fixedFee}</div>
-                          )}
-                        </div>
-                        <div>
-                          <label className="ops-label">
-                            Min Amount
-                            <span className="ml-1">
-                              (
-                              {draft.targetCurrency}
-                              )
-                            </span>
-                          </label>
-                          <input
-                            className="mt-2 w-full rounded-xl border border-ops-border bg-white px-3 py-2 text-sm"
-                            onChange={event => updateDraftField('minAmount', event.target.value)}
-                            type="number"
-                            value={draft.minAmount}
-                          />
-                          {validationErrors.minAmount && (
-                            <div className="mt-1 text-xs text-rose-600">{validationErrors.minAmount}</div>
-                          )}
-                        </div>
-                        <div>
-                          <label className="ops-label">
-                            Max Amount
-                            <span className="ml-1">
-                              (
-                              {draft.targetCurrency}
-                              )
-                            </span>
-                          </label>
-                          <input
-                            className="mt-2 w-full rounded-xl border border-ops-border bg-white px-3 py-2 text-sm"
-                            onChange={event => updateDraftField('maxAmount', event.target.value)}
-                            type="number"
-                            value={draft.maxAmount}
-                          />
-                          {validationErrors.maxAmount && (
-                            <div className="mt-1 text-xs text-rose-600">{validationErrors.maxAmount}</div>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="mt-6 rounded-2xl border border-dashed border-neutral-300 bg-white/60 p-4">
-                        <div className="text-sm font-semibold">System enforced gates</div>
-                        <p className="mt-1 text-xs text-gray-500">
-                          Payout confirmation and refunds are handled automatically. Exchange balance waits are inserted when funds move between venues.
-                        </p>
-                      </div>
-
-                      <div className="mt-8">
-                        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                          <div>
-                            <div className="text-sm font-semibold">Pipeline Steps</div>
-                            <div className="text-xs text-gray-500">Business steps only — no technical configuration required.</div>
-                          </div>
-                          <div className="flex flex-wrap items-center gap-2">
-                            <select
-                              className="rounded-xl border border-ops-border bg-white px-3 py-2 text-xs"
-                              onChange={event => setNewStepType(event.target.value as typeof newStepType)}
-                              value={newStepType}
-                            >
-                              <option value="MOVE_TO_EXCHANGE">Move to exchange</option>
-                              <option value="CONVERT">Convert</option>
-                              <option value="TRANSFER_VENUE">Transfer venue</option>
-                            </select>
-                            <button
-                              className="rounded-xl border border-abroad-dark bg-abroad-dark px-3 py-2 text-xs font-semibold text-white hover:bg-ops-brand-hover"
-                              onClick={addStep}
-                              type="button"
-                            >
-                              Add Step
-                            </button>
-                          </div>
-                        </div>
-
-                        {validationErrors.steps && (
-                          <div className="mt-2 text-xs text-rose-600">{validationErrors.steps}</div>
-                        )}
-
-                        <div className="mt-4 space-y-4">
-                          {draft.steps.map((step, index) => (
-                            <div
-                              className="rounded-2xl border border-white/70 bg-white/90 p-4 shadow-[0_10px_30px_-25px_rgba(15,23,42,0.35)]"
-                              key={`${step.type}-${index}`}
-                            >
-                              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                                <div>
-                                  <div className="text-xs uppercase tracking-wider text-gray-500">
-                                    Step
-                                    {' '}
-                                    {index + 1}
-                                  </div>
-                                  <div className="text-base font-semibold">
-                                    {step.type === 'PAYOUT'
-                                      ? 'Payout to user'
-                                      : step.type === 'MOVE_TO_EXCHANGE'
-                                        ? 'Move to exchange'
-                                        : step.type === 'CONVERT'
-                                          ? 'Convert'
-                                          : 'Transfer venue'}
-                                  </div>
-                                  {validationErrors[`step-${index}`] && (
-                                    <div className="mt-1 text-xs text-rose-600">{validationErrors[`step-${index}`]}</div>
-                                  )}
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <button
-                                    className="rounded-lg border border-ops-border bg-white px-2 py-1 text-xs"
-                                    disabled={index <= 1}
-                                    onClick={() => reorderStep(index, 'up')}
-                                    type="button"
-                                  >
-                                    ↑
-                                  </button>
-                                  <button
-                                    className="rounded-lg border border-ops-border bg-white px-2 py-1 text-xs"
-                                    disabled={index === 0 || index >= draft.steps.length - 1}
-                                    onClick={() => reorderStep(index, 'down')}
-                                    type="button"
-                                  >
-                                    ↓
-                                  </button>
-                                  <button
-                                    className="rounded-lg border border-rose-200 bg-rose-50 px-2 py-1 text-xs text-rose-600"
-                                    disabled={index === 0}
-                                    onClick={() => removeStep(index)}
-                                    type="button"
-                                  >
-                                    Remove
-                                  </button>
-                                </div>
-                              </div>
-
-                              {step.type === 'MOVE_TO_EXCHANGE' && (
-                                <div className="mt-4">
-                                  <label className="ops-label">Venue</label>
-                                  <select
-                                    className="mt-2 w-full rounded-xl border border-ops-border bg-white px-3 py-2 text-sm"
-                                    onChange={event => updateStep(index, prev => ({
-                                      ...prev,
-                                      venue: event.target.value as FlowVenue,
-                                    }))}
-                                    value={step.venue}
-                                  >
-                                    {venues.map(item => (
-                                      <option key={item} value={item}>{item}</option>
-                                    ))}
-                                  </select>
-                                </div>
-                              )}
-
-                              {step.type === 'CONVERT' && (
-                                <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
-                                  <div>
-                                    <label className="ops-label">Venue</label>
-                                    <select
-                                      className="mt-2 w-full rounded-xl border border-ops-border bg-white px-3 py-2 text-sm"
-                                      onChange={event => updateStep(index, prev => ({
-                                        ...prev,
-                                        venue: event.target.value as FlowVenue,
-                                      }))}
-                                      value={step.venue}
-                                    >
-                                      {venues.map(item => (
-                                        <option key={item} value={item}>{item}</option>
-                                      ))}
-                                    </select>
-                                  </div>
-                                  <div>
-                                    <label className="ops-label">From</label>
-                                    <select
-                                      className="mt-2 w-full rounded-xl border border-ops-border bg-white px-3 py-2 text-sm"
-                                      onChange={event => updateStep(index, prev => ({
-                                        ...prev,
-                                        fromAsset: event.target.value as SupportedCurrency,
-                                      }))}
-                                      value={step.fromAsset}
-                                    >
-                                      {getConvertFromOptions(step.venue).map(item => (
-                                        <option key={item} value={item}>{item}</option>
-                                      ))}
-                                    </select>
-                                  </div>
-                                  <div>
-                                    <label className="ops-label">To</label>
-                                    <select
-                                      className="mt-2 w-full rounded-xl border border-ops-border bg-white px-3 py-2 text-sm"
-                                      onChange={event => updateStep(index, prev => ({
-                                        ...prev,
-                                        toAsset: event.target.value as SupportedCurrency,
-                                      }))}
-                                      value={step.toAsset}
-                                    >
-                                      {getConvertToOptions(step.venue, draft.targetCurrency).map(item => (
-                                        <option key={item} value={item}>{item}</option>
-                                      ))}
-                                    </select>
-                                  </div>
-                                </div>
-                              )}
-
-                              {step.type === 'TRANSFER_VENUE' && (
-                                <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
-                                  <div>
-                                    <label className="ops-label">From Venue</label>
-                                    <select
-                                      className="mt-2 w-full rounded-xl border border-ops-border bg-white px-3 py-2 text-sm"
-                                      onChange={event => updateStep(index, prev => ({
-                                        ...prev,
-                                        fromVenue: event.target.value as FlowVenue,
-                                      }))}
-                                      value={step.fromVenue}
-                                    >
-                                      {['BINANCE' as FlowVenue].map(item => (
-                                        <option key={item} value={item}>{item}</option>
-                                      ))}
-                                    </select>
-                                  </div>
-                                  <div>
-                                    <label className="ops-label">To Venue</label>
-                                    <select
-                                      className="mt-2 w-full rounded-xl border border-ops-border bg-white px-3 py-2 text-sm"
-                                      onChange={event => updateStep(index, prev => ({
-                                        ...prev,
-                                        toVenue: event.target.value as FlowVenue,
-                                      }))}
-                                      value={step.toVenue}
-                                    >
-                                      {['TRANSFERO' as FlowVenue].map(item => (
-                                        <option key={item} value={item}>{item}</option>
-                                      ))}
-                                    </select>
-                                  </div>
-                                  <div>
-                                    <label className="ops-label">Asset</label>
-                                    <select
-                                      className="mt-2 w-full rounded-xl border border-ops-border bg-white px-3 py-2 text-sm"
-                                      onChange={event => updateStep(index, prev => ({
-                                        ...prev,
-                                        asset: event.target.value as SupportedCurrency,
-                                      }))}
-                                      value={step.asset}
-                                    >
-                                      {transferoSourceAssets.map(item => (
-                                        <option key={item} value={item}>{item}</option>
-                                      ))}
-                                    </select>
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div className="mt-8 rounded-2xl border border-white/70 bg-white/60 p-4">
-                        <div className="text-sm font-semibold">Corridor Support</div>
-                        <p className="mt-1 text-xs text-gray-500">
-                          Mark corridors as unsupported to prevent new transactions from being processed.
-                        </p>
-                        <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-[2fr_auto]">
-                          <input
-                            className="rounded-xl border border-ops-border bg-white px-3 py-2 text-sm"
-                            onChange={event => setUnsupportedReason(event.target.value)}
-                            placeholder="Optional reason"
-                            value={unsupportedReason}
-                          />
-                          {selectedCorridor.status === 'UNSUPPORTED'
-                            ? (
-                                <button
-                                  className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-semibold text-emerald-700"
-                                  disabled={saving}
-                                  onClick={() => void handleCorridorStatus('SUPPORTED')}
-                                  type="button"
-                                >
-                                  Mark Supported
-                                </button>
-                              )
-                            : (
-                                <button
-                                  className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-xs font-semibold text-amber-700"
-                                  disabled={saving}
-                                  onClick={() => void handleCorridorStatus('UNSUPPORTED')}
-                                  type="button"
-                                >
-                                  Mark Unsupported
-                                </button>
-                              )}
-                        </div>
-                      </div>
-                    </>
-                  )
-                : (
-                    <div className="rounded-xl border border-dashed border-neutral-300 bg-white/70 px-6 py-12 text-center text-sm text-gray-500">
-                      Select a corridor to create or edit its flow.
-                    </div>
-                  )}
-            </div>
-          </div>
+    <OpsPageShell
+      actions={(
+        <button
+          className="ops-btn-ghost"
+          disabled={!opsApiKey || loading}
+          onClick={() => void loadData()}
+          type="button"
+        >
+          Refresh
+        </button>
+      )}
+      backLink={{ label: 'Back to runs', to: '/ops/flows' }}
+      error={error}
+      eyebrow="Flow Coverage"
+      keyRequiredMessage="Ops API key required to load corridor coverage."
+      subtitle="Define the business pipeline for each corridor. System logic handles payouts, waits, and refunds automatically."
+      title="Corridor Flow Builder"
+    >
+      <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-4">
+        <div className="ops-card p-4">
+          <div className="text-xs uppercase tracking-[0.3em] text-ops-muted">Total</div>
+          <div className="mt-2 text-2xl font-semibold">{corridorSummary?.total ?? '—'}</div>
+        </div>
+        <div className="ops-card p-4">
+          <div className="text-xs uppercase tracking-[0.3em] text-ops-muted">Defined</div>
+          <div className="mt-2 text-2xl font-semibold text-emerald-700">{corridorSummary?.defined ?? '—'}</div>
+        </div>
+        <div className="ops-card p-4">
+          <div className="text-xs uppercase tracking-[0.3em] text-ops-muted">Missing</div>
+          <div className="mt-2 text-2xl font-semibold text-rose-700">{corridorSummary?.missing ?? '—'}</div>
+        </div>
+        <div className="ops-card p-4">
+          <div className="text-xs uppercase tracking-[0.3em] text-ops-muted">Unsupported</div>
+          <div className="mt-2 text-2xl font-semibold text-amber-700">{corridorSummary?.unsupported ?? '—'}</div>
         </div>
       </div>
-    </div>
+
+      <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-[1.1fr_2fr]">
+        <div className="ops-card p-5">
+          <div className="flex flex-col gap-3">
+            <h2 className="text-sm font-semibold">Corridors</h2>
+            <input
+              aria-label="Search corridors"
+              className="ops-input w-full"
+              onChange={event => setSearch(event.target.value)}
+              placeholder="Search corridor"
+              value={search}
+            />
+            <div className="flex flex-wrap gap-2 text-xs">
+              {[
+                'all',
+                'defined',
+                'missing',
+                'unsupported',
+              ].map(value => (
+                <button
+                  className={`rounded-full border px-3 py-1 ${filter === value ? 'border-abroad-dark bg-abroad-dark/10 text-ops-brand' : 'border-ops-border text-ops-muted'}`}
+                  key={value}
+                  onClick={() => setFilter(value as typeof filter)}
+                  type="button"
+                >
+                  {value}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="mt-4 space-y-3">
+            {loading && (
+              <OpsLoading label="Loading corridors…" />
+            )}
+            {!loading && opsApiKey && filteredCorridors.length === 0 && (
+              <OpsEmptyState>No corridors found.</OpsEmptyState>
+            )}
+            {filteredCorridors.map(corridor => (
+              <button
+                className={`w-full text-left rounded-xl border px-4 py-3 transition ${
+                  selectedKey === buildCorridorKey(corridor)
+                    ? 'border-abroad-dark bg-abroad-dark/10'
+                    : 'border-white/70 bg-white/60 hover:bg-white'
+                }`}
+                key={buildCorridorKey(corridor)}
+                onClick={() => selectCorridor(corridor)}
+                type="button"
+              >
+                <div className="text-sm font-semibold">{corridorTitle(corridor)}</div>
+                <div className="mt-1 flex items-center gap-2 text-[11px] text-ops-muted">
+                  <OpsStatusBadge label={corridor.status} tone={corridorStatusTone[corridor.status]} />
+                  {corridor.definitionName && (
+                    <span>{corridor.definitionName}</span>
+                  )}
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="ops-card p-6">
+          {draft && selectedCorridor
+            ? (
+                <>
+                  <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                    <div>
+                      <div className="text-xs uppercase tracking-wider text-ops-muted">Corridor</div>
+                      <div className="text-lg font-semibold">{corridorTitle(selectedCorridor)}</div>
+                      <div className="text-xs text-ops-muted">
+                        Updated
+                        {' '}
+                        {formatDateTime(selectedCorridor.updatedAt)}
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        className="ops-btn-neutral ops-btn-sm"
+                        disabled={!isDirty}
+                        onClick={() => {
+                          if (!baseline) return
+                          setDraft(JSON.parse(baseline) as DefinitionDraft)
+                          setValidationErrors({})
+                        }}
+                        type="button"
+                      >
+                        Discard changes
+                      </button>
+                      <button
+                        className="ops-btn-primary ops-btn-sm"
+                        disabled={saving || !opsApiKey}
+                        onClick={() => void handleSave()}
+                        type="button"
+                      >
+                        {saving ? 'Saving…' : draft.id ? 'Save flow' : 'Create flow'}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <OpsField error={validationErrors.name} label="Name">
+                      <input
+                        className="ops-input"
+                        onChange={event => updateDraftField('name', event.target.value)}
+                        value={draft.name}
+                      />
+                    </OpsField>
+                    <div className="flex items-center gap-3">
+                      <label className="ops-label">Enabled</label>
+                      <button
+                        className={`rounded-full border px-4 py-2 text-xs font-semibold transition ${
+                          draft.enabled ? 'border-emerald-300 bg-emerald-100 text-emerald-800' : 'border-rose-300 bg-rose-100 text-rose-800'
+                        }`}
+                        onClick={() => updateDraftField('enabled', !draft.enabled)}
+                        type="button"
+                      >
+                        {draft.enabled ? 'Enabled' : 'Disabled'}
+                      </button>
+                    </div>
+                    <OpsField label="Payout Provider">
+                      <select
+                        className="ops-input"
+                        onChange={event => updateDraftField('payoutProvider', event.target.value)}
+                        value={draft.payoutProvider}
+                      >
+                        {payoutProviders.map(item => (
+                          <option key={item} value={item}>{item}</option>
+                        ))}
+                      </select>
+                    </OpsField>
+                    <OpsField label="Pricing Provider">
+                      <select
+                        className="ops-input"
+                        onChange={event => updateDraftField('pricingProvider', event.target.value)}
+                        value={draft.pricingProvider}
+                      >
+                        {pricingProviders.map(item => (
+                          <option key={item} value={item}>{item}</option>
+                        ))}
+                      </select>
+                    </OpsField>
+                  </div>
+
+                  <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-4">
+                    <OpsField error={validationErrors.exchangeFeePct} label="Exchange Fee %">
+                      <input
+                        className="ops-input"
+                        onChange={event => updateDraftField('exchangeFeePct', event.target.value)}
+                        type="number"
+                        value={draft.exchangeFeePct}
+                      />
+                    </OpsField>
+                    <OpsField error={validationErrors.fixedFee} label="Fixed Fee">
+                      <input
+                        className="ops-input"
+                        onChange={event => updateDraftField('fixedFee', event.target.value)}
+                        type="number"
+                        value={draft.fixedFee}
+                      />
+                    </OpsField>
+                    <OpsField
+                      error={validationErrors.minAmount}
+                      label={(
+                        <>
+                          Min Amount
+                          <span className="ml-1">
+                            (
+                            {draft.targetCurrency}
+                            )
+                          </span>
+                        </>
+                      )}
+                    >
+                      <input
+                        className="ops-input"
+                        onChange={event => updateDraftField('minAmount', event.target.value)}
+                        type="number"
+                        value={draft.minAmount}
+                      />
+                    </OpsField>
+                    <OpsField
+                      error={validationErrors.maxAmount}
+                      label={(
+                        <>
+                          Max Amount
+                          <span className="ml-1">
+                            (
+                            {draft.targetCurrency}
+                            )
+                          </span>
+                        </>
+                      )}
+                    >
+                      <input
+                        className="ops-input"
+                        onChange={event => updateDraftField('maxAmount', event.target.value)}
+                        type="number"
+                        value={draft.maxAmount}
+                      />
+                    </OpsField>
+                  </div>
+
+                  <div className="mt-6 rounded-2xl border border-dashed border-ops-border bg-white/60 p-4">
+                    <h3 className="text-sm font-semibold">System enforced gates</h3>
+                    <p className="mt-1 text-xs text-ops-muted">
+                      Payout confirmation and refunds are handled automatically. Exchange balance waits are inserted when funds move between venues.
+                    </p>
+                  </div>
+
+                  <div className="mt-8">
+                    <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                      <div>
+                        <h2 className="text-sm font-semibold">Pipeline Steps</h2>
+                        <div className="text-xs text-ops-muted">Business steps only — no technical configuration required.</div>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <select
+                          aria-label="New step type"
+                          className="ops-input"
+                          onChange={event => setNewStepType(event.target.value as typeof newStepType)}
+                          value={newStepType}
+                        >
+                          <option value="MOVE_TO_EXCHANGE">Move to exchange</option>
+                          <option value="CONVERT">Convert</option>
+                          <option value="TRANSFER_VENUE">Transfer venue</option>
+                        </select>
+                        <button
+                          className="ops-btn-primary ops-btn-sm"
+                          onClick={addStep}
+                          type="button"
+                        >
+                          Add Step
+                        </button>
+                      </div>
+                    </div>
+
+                    {validationErrors.steps && (
+                      <div className="mt-2 text-xs text-rose-600">{validationErrors.steps}</div>
+                    )}
+
+                    <div className="mt-4 space-y-4">
+                      {draft.steps.map((step, index) => (
+                        <div
+                          className="ops-card p-4"
+                          key={`${step.type}-${index}`}
+                        >
+                          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                            <div>
+                              <div className="text-xs uppercase tracking-wider text-ops-muted">
+                                Step
+                                {' '}
+                                {index + 1}
+                              </div>
+                              <div className="text-base font-semibold">
+                                {step.type === 'PAYOUT'
+                                  ? 'Payout to user'
+                                  : step.type === 'MOVE_TO_EXCHANGE'
+                                    ? 'Move to exchange'
+                                    : step.type === 'CONVERT'
+                                      ? 'Convert'
+                                      : 'Transfer venue'}
+                              </div>
+                              {validationErrors[`step-${index}`] && (
+                                <div className="mt-1 text-xs text-rose-600">{validationErrors[`step-${index}`]}</div>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button
+                                aria-label="Move step up"
+                                className="rounded-lg border border-ops-border bg-white px-2 py-1 text-xs"
+                                disabled={index <= 1}
+                                onClick={() => reorderStep(index, 'up')}
+                                type="button"
+                              >
+                                ↑
+                              </button>
+                              <button
+                                aria-label="Move step down"
+                                className="rounded-lg border border-ops-border bg-white px-2 py-1 text-xs"
+                                disabled={index === 0 || index >= draft.steps.length - 1}
+                                onClick={() => reorderStep(index, 'down')}
+                                type="button"
+                              >
+                                ↓
+                              </button>
+                              <button
+                                className="ops-btn-danger ops-btn-sm"
+                                disabled={index === 0}
+                                onClick={() => removeStep(index)}
+                                type="button"
+                              >
+                                Remove
+                              </button>
+                            </div>
+                          </div>
+
+                          {step.type === 'MOVE_TO_EXCHANGE' && (
+                            <OpsField className="mt-4" label="Venue">
+                              <select
+                                className="ops-input"
+                                onChange={event => updateStep(index, prev => ({
+                                  ...prev,
+                                  venue: event.target.value as FlowVenue,
+                                }))}
+                                value={step.venue}
+                              >
+                                {venues.map(item => (
+                                  <option key={item} value={item}>{item}</option>
+                                ))}
+                              </select>
+                            </OpsField>
+                          )}
+
+                          {step.type === 'CONVERT' && (
+                            <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
+                              <OpsField label="Venue">
+                                <select
+                                  className="ops-input"
+                                  onChange={event => updateStep(index, prev => ({
+                                    ...prev,
+                                    venue: event.target.value as FlowVenue,
+                                  }))}
+                                  value={step.venue}
+                                >
+                                  {venues.map(item => (
+                                    <option key={item} value={item}>{item}</option>
+                                  ))}
+                                </select>
+                              </OpsField>
+                              <OpsField label="From">
+                                <select
+                                  className="ops-input"
+                                  onChange={event => updateStep(index, prev => ({
+                                    ...prev,
+                                    fromAsset: event.target.value as SupportedCurrency,
+                                  }))}
+                                  value={step.fromAsset}
+                                >
+                                  {getConvertFromOptions(step.venue).map(item => (
+                                    <option key={item} value={item}>{item}</option>
+                                  ))}
+                                </select>
+                              </OpsField>
+                              <OpsField label="To">
+                                <select
+                                  className="ops-input"
+                                  onChange={event => updateStep(index, prev => ({
+                                    ...prev,
+                                    toAsset: event.target.value as SupportedCurrency,
+                                  }))}
+                                  value={step.toAsset}
+                                >
+                                  {getConvertToOptions(step.venue, draft.targetCurrency).map(item => (
+                                    <option key={item} value={item}>{item}</option>
+                                  ))}
+                                </select>
+                              </OpsField>
+                            </div>
+                          )}
+
+                          {step.type === 'TRANSFER_VENUE' && (
+                            <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
+                              <OpsField label="From Venue">
+                                <select
+                                  className="ops-input"
+                                  onChange={event => updateStep(index, prev => ({
+                                    ...prev,
+                                    fromVenue: event.target.value as FlowVenue,
+                                  }))}
+                                  value={step.fromVenue}
+                                >
+                                  {['BINANCE' as FlowVenue].map(item => (
+                                    <option key={item} value={item}>{item}</option>
+                                  ))}
+                                </select>
+                              </OpsField>
+                              <OpsField label="To Venue">
+                                <select
+                                  className="ops-input"
+                                  onChange={event => updateStep(index, prev => ({
+                                    ...prev,
+                                    toVenue: event.target.value as FlowVenue,
+                                  }))}
+                                  value={step.toVenue}
+                                >
+                                  {['TRANSFERO' as FlowVenue].map(item => (
+                                    <option key={item} value={item}>{item}</option>
+                                  ))}
+                                </select>
+                              </OpsField>
+                              <OpsField label="Asset">
+                                <select
+                                  className="ops-input"
+                                  onChange={event => updateStep(index, prev => ({
+                                    ...prev,
+                                    asset: event.target.value as SupportedCurrency,
+                                  }))}
+                                  value={step.asset}
+                                >
+                                  {transferoSourceAssets.map(item => (
+                                    <option key={item} value={item}>{item}</option>
+                                  ))}
+                                </select>
+                              </OpsField>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="mt-8 ops-card p-4">
+                    <h3 className="text-sm font-semibold">Corridor Support</h3>
+                    <p className="mt-1 text-xs text-ops-muted">
+                      Mark corridors as unsupported to prevent new transactions from being processed.
+                    </p>
+                    <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-[2fr_auto]">
+                      <input
+                        aria-label="Unsupported reason"
+                        className="ops-input"
+                        onChange={event => setUnsupportedReason(event.target.value)}
+                        placeholder="Optional reason"
+                        value={unsupportedReason}
+                      />
+                      {selectedCorridor.status === 'UNSUPPORTED'
+                        ? (
+                            <button
+                              className="ops-btn-primary ops-btn-sm"
+                              disabled={saving}
+                              onClick={() => void handleCorridorStatus('SUPPORTED')}
+                              type="button"
+                            >
+                              Mark Supported
+                            </button>
+                          )
+                        : (
+                            <button
+                              className="ops-btn-danger ops-btn-sm"
+                              disabled={saving}
+                              onClick={() => void handleCorridorStatus('UNSUPPORTED')}
+                              type="button"
+                            >
+                              Mark Unsupported
+                            </button>
+                          )}
+                    </div>
+                  </div>
+                </>
+              )
+            : (
+                <OpsEmptyState>Select a corridor to create or edit its flow.</OpsEmptyState>
+              )}
+        </div>
+      </div>
+    </OpsPageShell>
   )
 }
 
