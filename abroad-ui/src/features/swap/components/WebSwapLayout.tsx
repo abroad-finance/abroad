@@ -59,10 +59,10 @@ const WebSwapLayout: React.FC<WebSwapLayoutProps & WebSwapLayoutSlots> = ({ disc
     <div
       className={cn(
         'w-full min-h-0 flex-1 flex flex-col items-center overflow-x-hidden overflow-y-auto px-3 py-[clamp(0.5rem,2vh,1.5rem)] md:px-4',
-        isMainFlow ? 'hero-gradient justify-start' : 'justify-center',
+        isMainFlow ? 'hero-gradient' : '',
       )}
     >
-      <div className={cn('w-full', isMainFlow ? 'max-w-[576px]' : 'max-w-md')}>
+      <div className={cn('w-full', isMainFlow ? 'max-w-[576px]' : 'max-w-md my-auto')}>
         {renderSwap}
         {disclosure}
       </div>
