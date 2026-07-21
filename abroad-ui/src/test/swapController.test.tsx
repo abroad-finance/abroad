@@ -118,7 +118,7 @@ const mocked = vi.hoisted(() => {
 
   const acceptTransactionRequestMock = vi.fn(async () => ({
     data: {
-      id: 'tx-1', kycLink: null, payment_context: null, transaction_reference: 'ref',
+      id: 'tx-1', kycRequired: false, payment_context: null, transaction_reference: 'ref',
     },
     headers: new Headers(),
     ok: true,
@@ -195,7 +195,6 @@ const Wrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
     <WalletAuthContext.Provider value={{
       defaultWallet: mockKit,
       getWalletHandler: vi.fn(() => mockKit),
-      kycUrl: null,
       miniPay: {
         isActive: false,
         isReady: false,
@@ -203,7 +202,6 @@ const Wrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
         status: 'inactive' as const,
       },
       setActiveWallet: vi.fn(),
-      setKycUrl: vi.fn(),
       wallet: mockKit,
       walletAuthentication: mockWalletAuthentication,
     }}
@@ -409,7 +407,6 @@ describe('useWebSwapController', () => {
         <WalletAuthContext.Provider value={{
           defaultWallet: miniPayWallet,
           getWalletHandler: vi.fn(() => miniPayWallet),
-          kycUrl: null,
           miniPay: {
             isActive: true,
             isReady: true,
@@ -417,7 +414,6 @@ describe('useWebSwapController', () => {
             status: 'ready',
           },
           setActiveWallet: vi.fn(),
-          setKycUrl: vi.fn(),
           wallet: miniPayWallet,
           walletAuthentication: {
             ...mockWalletAuthentication,

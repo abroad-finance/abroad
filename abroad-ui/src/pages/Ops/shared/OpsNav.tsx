@@ -8,6 +8,7 @@ const NAV_ITEMS: { label: string, to: string }[] = [
   { label: 'Definitions', to: '/ops/flows/definitions' },
   { label: 'Crypto Assets', to: '/ops/crypto-assets' },
   { label: 'Partners', to: '/ops/partners' },
+  { label: 'KYC', to: '/ops/kyc' },
   { label: 'Transactions', to: '/ops/transactions' },
   { label: 'Reconcile', to: '/ops/transactions/reconcile' },
   { label: 'Treasury', to: '/ops/treasury' },

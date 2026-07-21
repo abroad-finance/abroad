@@ -39,6 +39,12 @@ model PartnerUser {
   kyc              PartnerUserKyc[]
   kycExternalToken String?
 
+  // Account disable/enable (operator action from the Ops dashboard).
+  // disabledAt == null means the user is enabled.
+  disabledAt     DateTime?
+  disabledReason String?
+  disabledBy     String?
+
   // Unique constraint to ensure a user is only once per partner
   @@unique([partnerId, userId])
 }
@@ -48,10 +54,25 @@ model PartnerUserKyc {
   partnerUser   PartnerUser @relation(fields: [partnerUserId], references: [id])
   partnerUserId String
 
-  externalId String
-  status     KycStatus @default(PENDING)
-  tier       KYCTier   @default(NONE)
-  link       String
+  status KycStatus @default(PENDING)
+
+  // Self-service KYC form fields (auto-approved on complete submission).
+  fullName          String?
+  documentType      DocumentType?
+  documentNumber    String?
+  documentImagePath String? // GCS object key for the uploaded ID image
+  dateOfBirth       DateTime?
+  nationality       String?
+  city              String?
+  address           String?
+  email             String?
+  phone             String?
+  reviewedAt        DateTime?
+
+  // Deprecated Persona fields (kept nullable for historical rows; no longer written).
+  externalId String?
+  tier       KYCTier @default(NONE)
+  link       String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -175,6 +196,14 @@ enum KycStatus {
   APPROVED
   REJECTED
   PENDING_APPROVAL
+}
+
+enum DocumentType {
+  NATIONAL_ID
+  PASSPORT
+  DRIVERS_LICENSE
+  FOREIGN_ID
+  OTHER
 }
 
 enum TransactionStatus {

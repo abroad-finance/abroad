@@ -1,5 +1,4 @@
 import React, {
-  useCallback,
   useEffect,
   useMemo,
   useState,
@@ -15,7 +14,6 @@ import { getWalletTypeByDevice } from '../shared/utils'
 import { WalletAuthContext } from './WalletAuthContext'
 
 export const WalletAuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [kycUrl, _setKycUrl] = useState<null | string>(() => localStorage.getItem('kycUrl'))
   const [initialized, setInitialized] = useState(false)
   const walletAuthentication = useWalletAuthentication()
   const walletFactory = useWalletFactory({ walletAuth: walletAuthentication })
@@ -150,24 +148,12 @@ export const WalletAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     walletFactory.miniPay.isActive,
   ])
 
-  const setKycUrl = useCallback((url: null | string) => {
-    _setKycUrl(url)
-    if (url) {
-      localStorage.setItem('kycUrl', url)
-    }
-    else {
-      localStorage.removeItem('kycUrl')
-    }
-  }, [])
-
   return (
     <WalletAuthContext.Provider value={{
       defaultWallet,
       getWalletHandler: walletFactory.getWalletHandler,
-      kycUrl,
       miniPay: walletFactory.miniPay,
       setActiveWallet: setWallet,
-      setKycUrl,
       wallet,
       walletAuthentication,
     }}

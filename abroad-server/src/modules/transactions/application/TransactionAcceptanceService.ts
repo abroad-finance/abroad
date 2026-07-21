@@ -1,8 +1,6 @@
 import {
   BlockchainNetwork,
   CryptoCurrency,
-  KycStatus,
-  KYCTier,
   PaymentMethod,
   Prisma,
   TargetCurrency,
@@ -19,9 +17,9 @@ import { WebhookEvent } from '../../../platform/notifications/IWebhookNotifier'
 import { OutboxDispatcher } from '../../../platform/outbox/OutboxDispatcher'
 import { IDatabaseClientProvider } from '../../../platform/persistence/IDatabaseClientProvider'
 import { IKycService } from '../../kyc/application/contracts/IKycService'
-import { getNextTier, type KycCountry } from '../../kyc/application/kycTierRules'
 import { IPaymentServiceFactory } from '../../payments/application/contracts/IPaymentServiceFactory'
 import { LiquidityCacheService } from '../../payments/application/LiquidityCacheService'
+import { assertPartnerUserEnabled, DisabledUserError } from '../../shared/partnerUserAccess'
 import { BridgeFloatService } from '../../treasury/application/BridgeFloatService'
 import { uuidToBase64 } from '../infrastructure/transactionEncoding'
 import { toWebhookTransactionPayload } from './transactionPayload'
@@ -37,7 +35,7 @@ interface AcceptTransactionRequest {
 
 interface AcceptTransactionResponse {
   id: null | string
-  kycLink: null | string
+  kycRequired: boolean
   transactionReference: null | string
 }
 
@@ -56,8 +54,6 @@ type TransactionDecision
   = | {
     outcome: 'kyc'
     partnerUserId: string
-    quote: { country: string }
-    totalUserAmountMonthly: number
   }
   | {
     outcome: 'transaction'
@@ -134,6 +130,9 @@ export class TransactionAcceptanceService {
             },
           },
         })
+        // Disabled users are blocked from every authenticated action; this is the
+        // point where the wallet-authenticated request resolves to a PartnerUser.
+        assertPartnerUserEnabled(partnerUser)
         await this.lockPartnerUser(tx, partnerUser.id)
         await this.lockPartner(tx, partner.id)
 
@@ -144,14 +143,11 @@ export class TransactionAcceptanceService {
           partner,
           partnerUser.id,
           totalUserAmountMonthly,
-          quote.country,
         )
         if (shouldRequestKyc) {
           return {
             outcome: 'kyc',
             partnerUserId: partnerUser.id,
-            quote: { country: quote.country },
-            totalUserAmountMonthly,
           } as const
         }
 
@@ -207,21 +203,18 @@ export class TransactionAcceptanceService {
       if (error instanceof TransactionValidationError) {
         throw error
       }
+      // A disabled user must surface as 403 (user_disabled), not a generic 400.
+      if (error instanceof DisabledUserError) {
+        throw error
+      }
       this.logger.error('Failed to accept transaction', error)
       throw new TransactionValidationError('We could not create your transaction right now. Please try again in a few moments.')
     }
 
     if (decision.outcome === 'kyc') {
-      const kycLink = await this.resolveKycLinkAfterDecision(
-        decision.totalUserAmountMonthly,
-        decision.quote.country,
-        request.redirectUrl,
-        decision.partnerUserId,
-      )
-
       return {
         id: null,
-        kycLink,
+        kycRequired: true,
         transactionReference: null,
       }
     }
@@ -229,7 +222,7 @@ export class TransactionAcceptanceService {
     const transactionReference = uuidToBase64(decision.transaction.id)
     return {
       id: decision.transaction.id,
-      kycLink: null,
+      kycRequired: false,
       transactionReference,
     }
   }
@@ -439,18 +432,6 @@ export class TransactionAcceptanceService {
     }
   }
 
-  private async fetchApprovedKycTier(
-    prismaClient: SerializableTx,
-    partnerUserId: string,
-  ): Promise<KYCTier> {
-    const approvedKyc = await prismaClient.partnerUserKyc.findFirst({
-      orderBy: { createdAt: 'desc' },
-      where: { partnerUserId, status: KycStatus.APPROVED },
-    })
-
-    return approvedKyc?.tier ?? KYCTier.NONE
-  }
-
   private async fetchQuote(prismaClient: PrismaClientLike, quoteId: string, partnerId: string) {
     const quote = await prismaClient.quote.findUnique({
       where: { id: quoteId, partnerId },
@@ -521,14 +502,6 @@ export class TransactionAcceptanceService {
 
   private normalizeCountCap(value: number): number {
     return Number.isFinite(value) ? value : TransactionAcceptanceService.UNBOUNDED_COUNT_CAP
-  }
-
-  private normalizeCountry(country: string): KycCountry {
-    const upper = country.toUpperCase()
-    if (upper === 'CO') {
-      return 'CO'
-    }
-    throw new TransactionValidationError(`KYC verification is not available for ${country}. Please provide a supported country or contact support.`)
   }
 
   private async publishUserNotification(
@@ -668,27 +641,6 @@ export class TransactionAcceptanceService {
     }
   }
 
-  private async resolveKycLinkAfterDecision(
-    totalUserAmountMonthly: number,
-    country: string,
-    redirectUrl: string | undefined,
-    partnerUserId: string,
-  ): Promise<string> {
-    const normalizedCountry = this.normalizeCountry(country)
-    const kycLink = await this.kycService.getKycLink({
-      amount: totalUserAmountMonthly,
-      country: normalizedCountry,
-      redirectUrl,
-      userId: partnerUserId,
-    })
-
-    if (!kycLink) {
-      throw new TransactionValidationError('We could not start the verification process right now. Please try again in a few moments.')
-    }
-
-    return kycLink
-  }
-
   private resolvePaymentService(quote: {
     paymentMethod: PaymentMethod
     targetCurrency: TargetCurrency
@@ -705,7 +657,6 @@ export class TransactionAcceptanceService {
     partner: PartnerUserContext,
     partnerUserId: string,
     totalUserAmountMonthly: number,
-    country: string,
   ): Promise<boolean> {
     if (!partner.needsKyc) {
       return false
@@ -715,10 +666,9 @@ export class TransactionAcceptanceService {
       return false
     }
 
-    const normalizedCountry = this.normalizeCountry(country)
-    const approvedTier = await this.fetchApprovedKycTier(prismaClient, partnerUserId)
-    const nextTier = getNextTier(normalizedCountry, totalUserAmountMonthly, approvedTier)
-    return nextTier !== null
+    // A complete self-service KYC submission is auto-approved; gate only users
+    // who are not yet approved.
+    return !(await this.kycService.hasApprovedKyc(partnerUserId, prismaClient))
   }
 
   private startOfDay(): Date {

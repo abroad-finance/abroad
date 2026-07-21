@@ -15,6 +15,8 @@ import { ExchangeConvertStepExecutor } from '../../modules/flows/application/ste
 import { ExchangeSendStepExecutor } from '../../modules/flows/application/steps/ExchangeSendStepExecutor'
 import { PayoutSendStepExecutor } from '../../modules/flows/application/steps/PayoutSendStepExecutor'
 import { TreasuryTransferStepExecutor } from '../../modules/flows/application/steps/TreasuryTransferStepExecutor'
+import { KycSubmissionService } from '../../modules/kyc/application/KycSubmissionService'
+import { OpsKycService } from '../../modules/kyc/application/OpsKycService'
 import { OpsPartnerService } from '../../modules/partners/application/OpsPartnerService'
 import { CryptoAssetConfigService } from '../../modules/payments/application/CryptoAssetConfigService'
 import { DepositVerifierRegistry } from '../../modules/payments/application/DepositVerifierRegistry'
@@ -60,7 +62,6 @@ import { BinanceExchangeProvider } from '../../modules/treasury/infrastructure/e
 import { BinanceBrlExchangeProvider } from '../../modules/treasury/infrastructure/exchangeProviders/binanceExchangeProvider'
 import { TransferoExchangeProvider } from '../../modules/treasury/infrastructure/exchangeProviders/transferoExchangeProvider'
 import { StellarListener } from '../../modules/treasury/interfaces/listeners/StellarListener'
-import { PersonaWebhookService } from '../../modules/webhooks/application/PersonaWebhookService'
 import { BindingRegistration, registerBindings } from './bindingSupport'
 import { TYPES } from './types'
 
@@ -99,7 +100,8 @@ const domainBindings: ReadonlyArray<BindingRegistration<unknown>> = [
   { bindSelf: true, identifier: OpsTransactionQueryService, implementation: OpsTransactionQueryService },
   { identifier: TYPES.PaymentUseCase, implementation: PaymentUseCase },
   { identifier: TYPES.ReceivedCryptoTransactionUseCase, implementation: ReceivedCryptoTransactionUseCase },
-  { bindSelf: true, identifier: PersonaWebhookService, implementation: PersonaWebhookService },
+  { bindSelf: true, identifier: KycSubmissionService, implementation: KycSubmissionService },
+  { bindSelf: true, identifier: OpsKycService, implementation: OpsKycService },
   { bindSelf: true, identifier: OpsPartnerService, implementation: OpsPartnerService },
   { bindSelf: true, identifier: FlowDefinitionBuilder, implementation: FlowDefinitionBuilder },
   { bindSelf: true, identifier: FlowDefinitionService, implementation: FlowDefinitionService },

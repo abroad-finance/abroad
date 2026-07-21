@@ -23,14 +23,14 @@ export interface AcceptTransactionRequest {
 
 export interface AcceptTransactionResponse {
   id: null | string
-  kycLink: null | string
+  kycRequired: boolean
   payment_context?: null | PaymentContext
   transaction_reference: null | string
 }
 
 export interface TransactionStatusResponse {
   id: string
-  kycLink: null | string
+  kycRequired: boolean
   on_chain_tx_hash: null | string
   status: TransactionStatus
   transaction_reference: string

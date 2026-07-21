@@ -56,7 +56,7 @@ export const buildMinimalController = () => {
     getPaymentServiceForCapability: jest.fn(),
   }
   const kycService: IKycService = {
-    getKycLink: jest.fn(),
+    hasApprovedKyc: jest.fn(async () => false),
   }
   const outboxDispatcher = {
     enqueueQueue: jest.fn(),

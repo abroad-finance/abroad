@@ -7,21 +7,17 @@ import { IWalletFactory, MiniPayRuntime } from '../interfaces/IWalletFactory'
 interface WalletAuthState {
   defaultWallet?: IWallet
   getWalletHandler?: IWalletFactory['getWalletHandler']
-  kycUrl: null | string
   miniPay: MiniPayRuntime
   setActiveWallet?: (wallet: IWallet) => void
-  setKycUrl: (url: null | string) => void
   wallet?: IWallet
   walletAuthentication?: IWalletAuthentication
 }
 
 export const WalletAuthContext = createContext<WalletAuthState>({
-  kycUrl: null,
   miniPay: {
     isActive: false,
     isReady: false,
     isResolving: false,
     status: 'inactive',
   },
-  setKycUrl: () => { },
 })

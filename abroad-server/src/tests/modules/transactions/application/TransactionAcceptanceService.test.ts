@@ -3,6 +3,7 @@ import { PaymentMethod, TargetCurrency, TransactionStatus } from '@prisma/client
 
 import type { LiquidityCacheService } from '../../../../modules/payments/application/LiquidityCacheService'
 
+import { DisabledUserError } from '../../../../modules/shared/partnerUserAccess'
 import { TransactionAcceptanceService, TransactionValidationError } from '../../../../modules/transactions/application/TransactionAcceptanceService'
 import { createMockLogger } from '../../../setup/mockFactories'
 
@@ -35,7 +36,7 @@ describe('TransactionAcceptanceService helpers', () => {
     getPaymentServiceForCapability: jest.fn(() => paymentService),
   }
   const kycService = {
-    getKycLink: jest.fn(),
+    hasApprovedKyc: jest.fn(async () => false),
   }
   const prismaProvider = {
     getClient: jest.fn(),
@@ -70,22 +71,6 @@ describe('TransactionAcceptanceService helpers', () => {
 
   beforeEach(() => {
     jest.clearAllMocks()
-  })
-
-  it('rejects unsupported KYC countries', () => {
-    const normalizeCountry = (service as unknown as {
-      normalizeCountry: (country: string) => string
-    }).normalizeCountry
-
-    expect(() => normalizeCountry('BR')).toThrow(TransactionValidationError)
-  })
-
-  it('normalizes supported countries case-insensitively', () => {
-    const normalizeCountry = (service as unknown as {
-      normalizeCountry: (country: string) => string
-    }).normalizeCountry
-
-    expect(normalizeCountry('co')).toBe('CO')
   })
 
   it('enforces liquidity thresholds and invokes the provider through the cache', async () => {
@@ -162,7 +147,7 @@ describe('TransactionAcceptanceService helpers', () => {
         order.push('$transaction')
         return cb(orderingPrisma)
       }),
-      partnerUser: { upsert: jest.fn().mockResolvedValue({ id: 'pu-1', partnerId: 'partner-1', userId: 'user-1' }) },
+      partnerUser: { upsert: jest.fn().mockResolvedValue({ disabledAt: null, id: 'pu-1', partnerId: 'partner-1', userId: 'user-1' }) },
       partnerUserKyc: { findFirst: jest.fn().mockResolvedValue(null) },
       quote: {
         aggregate: jest.fn(async () => ({ _count: { _all: 0 }, _sum: { sourceAmount: 0, targetAmount: 0 } })),
@@ -194,7 +179,7 @@ describe('TransactionAcceptanceService helpers', () => {
     const orderingService = new TransactionAcceptanceService(
       { getClient: jest.fn(async () => orderingPrisma) } as unknown as import('../../../../platform/persistence/IDatabaseClientProvider').IDatabaseClientProvider,
       orderingFactory as unknown as import('../../../../modules/payments/application/contracts/IPaymentServiceFactory').IPaymentServiceFactory,
-      { getKycLink: jest.fn() } as unknown as import('../../../../modules/kyc/application/contracts/IKycService').IKycService,
+      { hasApprovedKyc: jest.fn(async () => false) } as unknown as import('../../../../modules/kyc/application/contracts/IKycService').IKycService,
       { enqueueQueue: jest.fn(), enqueueWebhook: jest.fn() } as never,
       liquidityCacheService,
       bridgeFloatService,
@@ -504,5 +489,152 @@ describe('TransactionAcceptanceService helpers', () => {
       expect.stringContaining('transaction.created'),
       expect.objectContaining({ client: prismaClient, deliverNow: false }),
     )
+  })
+})
+
+describe('TransactionAcceptanceService.acceptTransaction KYC gating', () => {
+  const logger = createMockLogger()
+
+  const liquidityCacheService = {
+    getLiquidity: jest.fn(async ({ fetchLiquidity }: { fetchLiquidity: () => Promise<number> }) => {
+      const liquidity = await fetchLiquidity()
+      return { fromCache: false, liquidity, success: true }
+    }),
+  } as unknown as LiquidityCacheService
+
+  const bridgeFloatService = {
+    canSettle: jest.fn(async () => ({ cap: 2000, deficit: 0, ok: true })),
+    getOutstandingDeficit: jest.fn(async () => 0),
+  } as unknown as import('../../../../modules/treasury/application/BridgeFloatService').BridgeFloatService
+
+  const buildHarness = (opts?: {
+    disabledAt?: Date | null
+    hasApprovedKyc?: boolean
+    needsKyc?: boolean
+    sourceAmount?: number
+  }) => {
+    const sourceAmount = opts?.sourceAmount ?? 10
+    const paymentService = {
+      ...buildPaymentService(),
+      getLiquidity: jest.fn(async () => 1_000),
+      isEnabled: true,
+      MAX_TOTAL_AMOUNT_PER_DAY: 1_000,
+      MAX_USER_AMOUNT_PER_TRANSACTION: 1_000,
+      MAX_USER_TRANSACTIONS_PER_DAY: 10,
+      verifyAccount: jest.fn(async () => true),
+    }
+    const paymentServiceFactory = {
+      getPaymentService: jest.fn(() => paymentService),
+      getPaymentServiceForCapability: jest.fn(() => paymentService),
+    }
+
+    const prisma = {} as {
+      $executeRaw: jest.Mock
+      $transaction: jest.Mock
+      partnerUser: { upsert: jest.Mock }
+      partnerUserKyc: { findFirst: jest.Mock }
+      quote: { aggregate: jest.Mock, findUnique: jest.Mock }
+      transaction: { create: jest.Mock, findUnique: jest.Mock }
+    }
+    Object.assign(prisma, {
+      $executeRaw: jest.fn(async () => 1),
+      $transaction: jest.fn(async (cb: (tx: unknown) => Promise<unknown>) => cb(prisma)),
+      partnerUser: {
+        upsert: jest.fn().mockResolvedValue({
+          disabledAt: opts?.disabledAt ?? null,
+          id: 'pu-1',
+          partnerId: 'partner-1',
+          userId: 'user-1',
+        }),
+      },
+      partnerUserKyc: { findFirst: jest.fn().mockResolvedValue(null) },
+      quote: {
+        aggregate: jest.fn(async () => ({ _count: { _all: 0 }, _sum: { sourceAmount: 0, targetAmount: 0 } })),
+        findUnique: jest.fn().mockResolvedValue({
+          cryptoCurrency: 'USDC',
+          id: 'quote-1',
+          network: 'STELLAR',
+          partnerId: 'partner-1',
+          paymentMethod: PaymentMethod.BREB,
+          sourceAmount,
+          targetAmount: 20,
+          targetCurrency: TargetCurrency.COP,
+        }),
+      },
+      transaction: {
+        create: jest.fn(async () => ({ bankCode: null, id: 't-1' })),
+        findUnique: jest.fn().mockResolvedValue({
+          id: 't-1',
+          partnerUser: { partnerId: 'partner-1', userId: 'user-1' },
+          quote: { id: 'quote-1', paymentMethod: PaymentMethod.BREB, targetCurrency: TargetCurrency.COP },
+        }),
+      },
+    })
+
+    const kycService = {
+      hasApprovedKyc: jest.fn(async () => opts?.hasApprovedKyc ?? false),
+    }
+
+    const service = new TransactionAcceptanceService(
+      { getClient: jest.fn(async () => prisma) } as unknown as import('../../../../platform/persistence/IDatabaseClientProvider').IDatabaseClientProvider,
+      paymentServiceFactory as unknown as import('../../../../modules/payments/application/contracts/IPaymentServiceFactory').IPaymentServiceFactory,
+      kycService as unknown as import('../../../../modules/kyc/application/contracts/IKycService').IKycService,
+      { enqueueQueue: jest.fn(), enqueueWebhook: jest.fn() } as never,
+      liquidityCacheService,
+      bridgeFloatService,
+      logger,
+    )
+
+    const partner = {
+      id: 'partner-1',
+      isKybApproved: true,
+      needsKyc: opts?.needsKyc ?? true,
+      webhookUrl: 'https://webhook.test',
+    }
+
+    return { kycService, partner, prisma, service }
+  }
+
+  const request = { accountNumber: '123', quoteId: 'quote-1', userId: 'user-1' }
+
+  it('requires KYC (creating no transaction) when above threshold and not approved', async () => {
+    const { kycService, partner, prisma, service } = buildHarness({ hasApprovedKyc: false, sourceAmount: 30 })
+
+    const result = await service.acceptTransaction(request, partner)
+
+    expect(result).toEqual({ id: null, kycRequired: true, transactionReference: null })
+    expect(kycService.hasApprovedKyc).toHaveBeenCalledWith('pu-1', prisma)
+    expect(prisma.transaction.create).not.toHaveBeenCalled()
+  })
+
+  it('proceeds when above threshold but the user already has approved KYC', async () => {
+    const { kycService, partner, prisma, service } = buildHarness({ hasApprovedKyc: true, sourceAmount: 30 })
+
+    const result = await service.acceptTransaction(request, partner)
+
+    expect(result.id).toBe('t-1')
+    expect(result.kycRequired).toBe(false)
+    expect(kycService.hasApprovedKyc).toHaveBeenCalled()
+    expect(prisma.transaction.create).toHaveBeenCalled()
+  })
+
+  it('proceeds without checking KYC when below the exemption threshold', async () => {
+    const { kycService, partner, prisma, service } = buildHarness({ sourceAmount: 10 })
+
+    const result = await service.acceptTransaction(request, partner)
+
+    expect(result.id).toBe('t-1')
+    expect(result.kycRequired).toBe(false)
+    expect(kycService.hasApprovedKyc).not.toHaveBeenCalled()
+    expect(prisma.transaction.create).toHaveBeenCalled()
+  })
+
+  it('rejects a disabled partner user without creating a transaction', async () => {
+    const { partner, prisma, service } = buildHarness({ disabledAt: new Date('2026-01-01T00:00:00Z'), sourceAmount: 30 })
+
+    // assertPartnerUserEnabled throws DisabledUserError inside the $transaction
+    // callback; acceptTransaction re-throws it so the controller can surface 403.
+    await expect(service.acceptTransaction(request, partner)).rejects.toThrow(DisabledUserError)
+    expect(prisma.transaction.create).not.toHaveBeenCalled()
   })
 })

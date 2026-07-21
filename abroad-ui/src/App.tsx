@@ -17,6 +17,7 @@ const FlowOpsDetail = lazy(() => import('./pages/Ops/FlowOpsDetail'))
 const FlowDefinitions = lazy(() => import('./pages/Ops/FlowDefinitions'))
 const CryptoAssets = lazy(() => import('./pages/Ops/CryptoAssets'))
 const PartnerApiKeys = lazy(() => import('./pages/Ops/PartnerApiKeys'))
+const KycSubmissions = lazy(() => import('./pages/Ops/KycSubmissions'))
 const TransactionReconcile = lazy(() => import('./pages/Ops/TransactionReconcile'))
 const TransactionsList = lazy(() => import('./pages/Ops/TransactionsList'))
 const TransactionDetail = lazy(() => import('./pages/Ops/TransactionDetail'))
@@ -42,6 +43,7 @@ function App() {
                   <Route element={<FlowDefinitions />} path="/ops/flows/definitions" />
                   <Route element={<CryptoAssets />} path="/ops/crypto-assets" />
                   <Route element={<PartnerApiKeys />} path="/ops/partners" />
+                  <Route element={<KycSubmissions />} path="/ops/kyc" />
                   <Route element={<TreasuryDashboard />} path="/ops/treasury" />
                   <Route element={<BridgeOps />} path="/ops/treasury/bridge" />
                   <Route element={<TransactionsList />} path="/ops/transactions" />

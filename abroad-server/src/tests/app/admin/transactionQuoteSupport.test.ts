@@ -2,9 +2,7 @@ import type { ActionContext, ActionRequest } from 'adminjs'
 import type AdminJSClass from 'adminjs'
 import type { Request, Response } from 'express'
 
-import { TransactionStatus } from '@prisma/client'
-
-import type { PersonaInquiryDetailsService } from '../../../modules/kyc/application/PersonaInquiryDetailsService'
+import { KycStatus, TransactionStatus } from '@prisma/client'
 
 import { createTransactionQuoteSupport } from '../../../app/admin/transactionQuoteSupport'
 
@@ -29,6 +27,18 @@ type AdminResourceStub = {
   find: jest.Mock<Promise<AdminRecordStub[]>, [unknown, unknown, ActionContext]>
 }
 
+// Minimal shape of a persisted PartnerUserKyc row as read by the support layer.
+type KycRow = {
+  address?: null | string
+  city?: null | string
+  documentNumber?: null | string
+  documentType?: null | string
+  email?: null | string
+  fullName?: null | string
+  nationality?: null | string
+  phone?: null | string
+}
+
 const flattenObject = (input: Record<string, unknown>, prefix = ''): Record<string, unknown> => {
   const entries: Record<string, unknown> = {}
   for (const [key, value] of Object.entries(input)) {
@@ -44,8 +54,7 @@ const flattenObject = (input: Record<string, unknown>, prefix = ''): Record<stri
 
 describe('createTransactionQuoteSupport', () => {
   let adminModule: AdminModuleStub
-  let personaService: jest.Mocked<Pick<PersonaInquiryDetailsService, 'getDetails'>>
-  let prisma: { partnerUserKyc: { findFirst: jest.Mock<Promise<null | { externalId: string }>, [unknown]> } }
+  let prisma: { partnerUserKyc: { findFirst: jest.Mock<Promise<KycRow | null>, [unknown]> } }
   let support: ReturnType<typeof createTransactionQuoteSupport>
   let resource: AdminResourceStub
   let records: AdminRecordStub[]
@@ -93,23 +102,6 @@ describe('createTransactionQuoteSupport', () => {
       flat,
       populator,
       ViewHelpers: ViewHelpersStub,
-    }
-
-    personaService = {
-      getDetails: jest.fn(async (inquiryId: string) => {
-        void inquiryId
-        return {
-          address: '742 Evergreen Terrace',
-          city: 'Springfield',
-          country: 'US',
-          department: 'Any State',
-          documentType: 'ID',
-          email: 'lisa@example.com',
-          fullName: 'Lisa Simpson',
-          idNumber: 'ABC123',
-          phone: '+123456789',
-        }
-      }),
     }
 
     prisma = {
@@ -176,7 +168,6 @@ describe('createTransactionQuoteSupport', () => {
 
     support = createTransactionQuoteSupport({
       adminModule: adminModule as unknown as typeof import('adminjs'),
-      personaInquiryDetailsService: personaService as unknown as PersonaInquiryDetailsService,
       prisma: prisma as unknown as import('@prisma/client').PrismaClient,
     })
   })
@@ -297,10 +288,20 @@ describe('createTransactionQuoteSupport', () => {
     expect(send).toHaveBeenCalledWith('Resource not found')
   })
 
-  it('streams a CSV using enriched transaction quote data', async () => {
+  it('streams a CSV enriched with stored KYC identity fields', async () => {
+    // The APPROVED lookup misses; the latest-submission lookup returns the stored row.
     prisma.partnerUserKyc.findFirst
       .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce({ externalId: 'kyc-123' })
+      .mockResolvedValueOnce({
+        address: '742 Evergreen Terrace',
+        city: 'Springfield',
+        documentNumber: 'ABC123',
+        documentType: 'NATIONAL_ID',
+        email: 'ada@example.com',
+        fullName: 'Ada Lovelace',
+        nationality: 'CO',
+        phone: '+5712345678',
+      })
 
     const req = {
       query: { filters: {}, q: ['a', 'b'] },
@@ -328,10 +329,17 @@ describe('createTransactionQuoteSupport', () => {
 
     expect(resource.count).toHaveBeenCalled()
     expect(resource.find).toHaveBeenCalled()
+    // Both records share partnerUserId 'partner-1', so the lookup runs once (2 sub-queries) and is cached.
     expect(prisma.partnerUserKyc.findFirst).toHaveBeenCalledTimes(2)
-    expect(personaService.getDetails).toHaveBeenCalledWith('kyc-123')
+    expect(prisma.partnerUserKyc.findFirst).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      where: { partnerUserId: 'partner-1', status: KycStatus.APPROVED },
+    }))
+    expect(prisma.partnerUserKyc.findFirst).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      where: { partnerUserId: 'partner-1' },
+    }))
     expect(sentHeaders['Content-Type']).toBe('text/csv; charset=utf-8')
     expect(sentHeaders['Content-Disposition']).toContain('transaction-quote-detailed-view.csv')
+    expect(res.send).toHaveBeenCalledWith(expect.stringContaining('Ada Lovelace'))
     expect(res.send).toHaveBeenCalledWith(expect.stringContaining('Venta'))
     expect(res.send).toHaveBeenCalledWith(expect.stringContaining('hash-2'))
     expect(next).not.toHaveBeenCalled()
@@ -434,17 +442,15 @@ describe('createTransactionQuoteSupport', () => {
   })
 
   it('escapes CSV values containing commas, quotes, and objects', async () => {
-    prisma.partnerUserKyc.findFirst
-      .mockResolvedValueOnce({ externalId: 'escape-kyc' })
-    personaService.getDetails.mockResolvedValueOnce({
+    // The APPROVED lookup returns the stored identity row directly.
+    prisma.partnerUserKyc.findFirst.mockResolvedValueOnce({
       address: '123 Main St',
       city: 'Bogota',
-      country: 'CO',
-      department: 'Cundinamarca',
-      documentType: 'ID',
+      documentNumber: 'ABC123',
+      documentType: 'NATIONAL_ID',
       email: 'doe@example.com',
       fullName: 'Doe, "Jane"',
-      idNumber: 'ABC123',
+      nationality: 'CO',
       phone: '+5712345678',
     })
 

@@ -1,5 +1,5 @@
 import 'reflect-metadata'
-import { KYCTier, TransactionStatus } from '@prisma/client'
+import { TransactionStatus } from '@prisma/client'
 
 import { QueueName } from '../../../../../platform/messaging/queues'
 import { baseQuote, buildAcceptController, partner, requestBody } from './transactionControllerAcceptance.fixtures'
@@ -32,27 +32,24 @@ describe('TransactionController acceptance flows', () => {
     expect(response).toEqual({ reason: 'We could not verify the account number provided. Please double-check the details and try again.' })
   })
 
-  it('returns a KYC link when the partner requires verification', async () => {
-    const { controller, kycService, prisma } = buildAcceptController({
-      kycLink: 'https://kyc.test',
+  it('requires KYC when the partner needs verification and the user is not approved', async () => {
+    const { controller, kycService } = buildAcceptController({
+      hasApprovedKyc: false,
       quote: { ...baseQuote, sourceAmount: 30 },
     })
-    prisma.quote.aggregate
-      .mockResolvedValueOnce({ _count: { _all: 0 }, _sum: { sourceAmount: 30, targetAmount: 0 } })
-      .mockResolvedValue({ _count: { _all: 0 }, _sum: { sourceAmount: 0, targetAmount: 0 } })
     const response = await controller.acceptTransaction(
       requestBody,
       { user: { ...partner, needsKyc: true } } as unknown as import('express').Request,
       badRequest,
     )
 
-    expect(kycService.getKycLink).toHaveBeenCalled()
-    expect(response).toEqual({ id: null, kycLink: 'https://kyc.test', payment_context: null, transaction_reference: null })
+    expect(kycService.hasApprovedKyc).toHaveBeenCalled()
+    expect(response).toEqual({ id: null, kycRequired: true, payment_context: null, transaction_reference: null })
   })
 
-  it('skips KYC when the user already meets the required tier', async () => {
+  it('skips KYC when the user already has an approved submission', async () => {
     const { controller, kycService } = buildAcceptController({
-      approvedKycTier: KYCTier.ENHANCED,
+      hasApprovedKyc: true,
       quote: { ...baseQuote, sourceAmount: 30 },
     })
     const response = await controller.acceptTransaction(
@@ -61,27 +58,12 @@ describe('TransactionController acceptance flows', () => {
       badRequest,
     )
 
-    expect(kycService.getKycLink).not.toHaveBeenCalled()
+    expect(kycService.hasApprovedKyc).toHaveBeenCalled()
     expect(response).toEqual({
       id: '11111111-2222-3333-4444-555555555555',
-      kycLink: null,
+      kycRequired: false,
       payment_context: null,
       transaction_reference: Buffer.from('11111111222233334444555555555555', 'hex').toString('base64'),
-    })
-  })
-
-  it('fails when KYC is required but no link can be generated', async () => {
-    const { controller } = buildAcceptController({
-      quote: { ...baseQuote, sourceAmount: 30 },
-    })
-    const response = await controller.acceptTransaction(
-      requestBody,
-      { user: { ...partner, needsKyc: true } } as unknown as import('express').Request,
-      badRequest,
-    )
-
-    expect(response).toEqual({
-      reason: 'We could not start the verification process right now. Please try again in a few moments.',
     })
   })
 
@@ -95,10 +77,10 @@ describe('TransactionController acceptance flows', () => {
 
     const expectedReference = Buffer.from('11111111222233334444555555555555', 'hex').toString('base64')
 
-    expect(kycService.getKycLink).not.toHaveBeenCalled()
+    expect(kycService.hasApprovedKyc).not.toHaveBeenCalled()
     expect(response).toEqual({
       id: '11111111-2222-3333-4444-555555555555',
-      kycLink: null,
+      kycRequired: false,
       payment_context: null,
       transaction_reference: expectedReference,
     })

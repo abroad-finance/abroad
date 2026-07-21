@@ -50,7 +50,9 @@ import {
   isSupportedStablecoinSymbol,
   parseStablecoinBalance,
 } from '../../features/swap/lib/stablecoinPortfolio'
-import { type OnboardingRates, SwapView } from '../../features/swap/types'
+import {
+  type KycFormValues, type KycSubmitOutcome, type OnboardingRates, SwapView,
+} from '../../features/swap/types'
 import {
   BRL_TRANSFER_FEE,
   buildChainLabel,
@@ -62,6 +64,7 @@ import {
 } from '../../features/swap/utils/corridorHelpers'
 import { IWallet, type WalletConnectOptions } from '../../interfaces/IWallet'
 import { parseEMVQR } from '../../lib/qr/emv-parser'
+import { submitKyc } from '../../services/public/kycApi'
 import {
   acceptTransactionRequest, fetchPublicCorridors, notifyPayment, requestQuote, requestReverseQuote,
 } from '../../services/public/publicApi'
@@ -377,7 +380,6 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     getWalletHandler,
     miniPay,
     setActiveWallet,
-    setKycUrl,
     wallet,
     walletAuthentication,
   } = useWalletAuth()
@@ -1565,13 +1567,12 @@ export const useWebSwapController = (): WebSwapControllerProps => {
 
       const {
         id: acceptedTxId,
-        kycLink,
+        kycRequired,
         payment_context: paymentContext,
         transaction_reference,
       } = response.data
 
-      if (kycLink) {
-        setKycUrl(kycLink)
+      if (kycRequired) {
         dispatch({ type: 'SET_VIEW', view: 'kyc-needed' })
         return
       }
@@ -1768,7 +1769,6 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     notifyError,
     selectedCorridor,
     resetForNewTransaction,
-    setKycUrl,
     state.accountNumber,
     state.pixKey,
     state.qrCode,
@@ -1895,9 +1895,22 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     taxId: state.taxId,
   }
 
-  const handleKycApproved = useCallback(() => {
+  const handleKycSubmit = useCallback(async (values: KycFormValues): Promise<KycSubmitOutcome> => {
+    if (!walletUserId) {
+      return { error: t('kyc_form.error_no_user', 'We could not identify your session. Please reconnect your wallet.'), ok: false }
+    }
+    const result = await submitKyc({ ...values, userId: walletUserId })
+    if (!result.ok) {
+      const reason = extractReason(result.error?.body) || result.error?.message || t('kyc_form.submit_error', 'We could not submit your verification. Please try again.')
+      return { error: reason, ok: false }
+    }
+    if (result.data.status !== 'APPROVED') {
+      return { error: t('kyc_form.submit_error', 'We could not submit your verification. Please try again.'), ok: false }
+    }
+    // Auto-approved: resume the paused transaction flow.
     dispatch({ type: 'SET_VIEW', view: 'confirm-qr' })
-  }, [])
+    return { ok: true }
+  }, [t, walletUserId])
 
   const txStatusDetails = useMemo(() => {
     let rail = ''
@@ -1930,7 +1943,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     currentBgUrl,
     goToManual,
     handleBackToSwap,
-    handleKycApproved,
+    handleKycSubmit,
     handleQrResult,
     handleWalletDetailsClose,
     handleWalletDetailsOpen,

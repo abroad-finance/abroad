@@ -8,7 +8,7 @@ import {
   assignTransactionMetadata,
   escapeCsvValue,
   formatDateTime,
-  hydratePersonaAndQuoteFields,
+  hydrateKycAndQuoteFields,
   parseNumber,
 } from '../../../app/admin/transactionQuoteFormatters'
 
@@ -116,12 +116,12 @@ describe('transactionQuoteFormatters helpers', () => {
     expect(parseNumber(Number.NaN)).toBeNull()
   })
 
-  it('hydrates persona and quote fields with currency-aware labels', () => {
+  it('hydrates kyc and quote fields with currency-aware labels', () => {
     const record: { params: Record<string, unknown> } = {
       params: { cryptoCurrency: 'USDC', sourceAmount: '5', targetAmount: '1000', targetCurrency: 'COP' },
     }
 
-    hydratePersonaAndQuoteFields(record, null, new Set(['BRL', 'COP']))
+    hydrateKycAndQuoteFields(record, null, new Set(['BRL', 'COP']))
 
     expect(record.params.montoCop).toBe('1.000,00')
     expect(record.params.montoUsdc).toBe('5,00')

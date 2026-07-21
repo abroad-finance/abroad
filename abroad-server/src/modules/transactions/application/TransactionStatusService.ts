@@ -9,7 +9,7 @@ import { uuidToBase64 } from '../infrastructure/transactionEncoding'
 
 interface TransactionStatusResult {
   id: string
-  kycLink: null | string
+  kycRequired: boolean
   onChainTxHash: null | string
   status: TransactionStatus
   transactionReference: string
@@ -47,7 +47,7 @@ export class TransactionStatusService {
 
     return {
       id: transaction.id,
-      kycLink: kyc?.status !== 'APPROVED' ? kyc?.link ?? null : null,
+      kycRequired: kyc !== null && kyc.status !== 'APPROVED',
       onChainTxHash: transaction.onChainId,
       status: transaction.status,
       transactionReference,

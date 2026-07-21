@@ -9,7 +9,9 @@ import type { ConfirmQrProps } from '../../features/swap/components/ConfirmQr'
 import type { SwapProps } from '../../features/swap/components/Swap'
 import type { ChainOption, TokenOption } from '../../features/swap/components/TokenSelectModal'
 import type { TxDetailItem } from '../../features/swap/constants'
-import type { OnboardingRates, SwapView } from '../../features/swap/types'
+import type {
+  KycFormValues, KycSubmitOutcome, OnboardingRates, SwapView,
+} from '../../features/swap/types'
 
 import { _36EnumsTargetCurrency as TargetCurrency, type TransactionListItem } from '../../api/index'
 import { ChainSelectorModal, ConnectWalletChainModal } from '../../components/ui'
@@ -17,13 +19,13 @@ import BankDetailsRoute from '../../features/swap/components/BankDetailsRoute'
 import ConfirmQr from '../../features/swap/components/ConfirmQr'
 import HistorySheet from '../../features/swap/components/HistorySheet'
 import HomeScreen from '../../features/swap/components/HomeScreen'
+import KycForm from '../../features/swap/components/KycForm'
 import MiniPayDisclosure from '../../features/swap/components/MiniPayDisclosure'
 import NavBarResponsive from '../../features/swap/components/NavBarResponsive'
 import Swap from '../../features/swap/components/Swap'
 import TokenSelectModal from '../../features/swap/components/TokenSelectModal'
 import TxDetailSheet from '../../features/swap/components/TxDetailSheet'
 import TxStatus from '../../features/swap/components/TxStatus'
-import UserVerification from '../../features/swap/components/UserVerification'
 import WaitSign from '../../features/swap/components/WaitSign'
 import WebSwapLayout from '../../features/swap/components/WebSwapLayout'
 import { useWalletDetails } from '../../features/swap/hooks/useWalletDetails'
@@ -45,7 +47,7 @@ export interface WebSwapControllerProps {
   currentBgUrl: string
   goToManual: () => void
   handleBackToSwap: () => void
-  handleKycApproved: () => void
+  handleKycSubmit: (values: KycFormValues) => Promise<KycSubmitOutcome>
   handleQrResult: (text: string) => Promise<void>
   handleWalletDetailsClose: () => void
   handleWalletDetailsOpen: () => void
@@ -133,7 +135,7 @@ const WebSwap: React.FC = () => {
     confirmQrProps,
     goToManual,
     handleBackToSwap,
-    handleKycApproved,
+    handleKycSubmit,
     handleQrResult,
     handleWalletDetailsClose,
     hasPassedOnboarding,
@@ -300,7 +302,7 @@ const WebSwap: React.FC = () => {
               />
             ),
             kycNeeded: (
-              <UserVerification isDark={navBar.isDark} onApproved={handleKycApproved} onClose={handleBackToSwap} />
+              <KycForm isDark={navBar.isDark} onClose={handleBackToSwap} onSubmit={handleKycSubmit} />
             ),
             swap: (
               <Swap

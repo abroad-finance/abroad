@@ -1,7 +1,5 @@
 import {
   Country,
-  KycStatus,
-  KYCTier,
   PaymentMethod,
   TargetCurrency,
 } from '@prisma/client'
@@ -52,8 +50,8 @@ type PrismaMock = {
 
 export const buildAcceptController = (
   overrides?: Partial<{
-    approvedKycTier: KYCTier
-    kycLink: null | string
+    hasApprovedKyc: boolean
+    partnerUser: unknown
     paymentService: Partial<jest.Mocked<IPaymentService>>
     quote: unknown
     transactionCreate: () => Promise<unknown>
@@ -63,15 +61,15 @@ export const buildAcceptController = (
 ) => {
   const quoteValue = overrides?.quote === undefined ? baseQuote : overrides.quote
   const transactionId = '11111111-2222-3333-4444-555555555555'
-  const approvedKycTier = overrides?.approvedKycTier
+  const partnerUserValue = overrides?.partnerUser === undefined
+    ? { id: 'pu-1', disabledAt: null, partnerId: partner.id, userId: 'user-1' }
+    : overrides.partnerUser
   const prisma: PrismaMock = {
     $executeRaw: jest.fn(async () => 1),
     $transaction: jest.fn(),
-    partnerUser: { upsert: jest.fn().mockResolvedValue({ id: 'pu-1', partnerId: partner.id, userId: 'user-1' }) },
+    partnerUser: { upsert: jest.fn().mockResolvedValue(partnerUserValue) },
     partnerUserKyc: {
-      findFirst: jest.fn().mockResolvedValue(approvedKycTier
-        ? { status: KycStatus.APPROVED, tier: approvedKycTier }
-        : null),
+      findFirst: jest.fn().mockResolvedValue(null),
     },
     quote: {
       aggregate: jest.fn(async () => ({
@@ -95,7 +93,7 @@ export const buildAcceptController = (
     getPaymentServiceForCapability: jest.fn().mockReturnValue(paymentService as unknown as IPaymentService),
   }
   const kycService: IKycService = {
-    getKycLink: jest.fn().mockResolvedValue(overrides?.kycLink ?? null),
+    hasApprovedKyc: jest.fn().mockResolvedValue(overrides?.hasApprovedKyc ?? false),
   }
   const outboxDispatcher = {
     enqueueQueue: jest.fn(),

@@ -14,7 +14,7 @@ import { httpClient } from '../http/httpClient'
 
 export type TransactionStatusResponse = {
   id: string
-  kycLink: null | string
+  kycRequired: boolean
   on_chain_tx_hash: null | string
   status: TransactionStatus
   transaction_reference: null | string

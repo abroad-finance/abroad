@@ -25,6 +25,8 @@
     "@stryker-mutator/core",
     "concurrently",
     "depcheck",
+    "multer",
+    "@types/multer",
     "nodemon",
     "prisma",
     "tsx"

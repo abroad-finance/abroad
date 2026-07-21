@@ -17,8 +17,6 @@ import { TYPES } from '../../../../app/container/types'
 import { ILogger } from '../../../../core/logging/types'
 import { IQueueHandler, QueueName } from '../../../../platform/messaging/queues'
 import { IDatabaseClientProvider } from '../../../../platform/persistence/IDatabaseClientProvider'
-import { PersonaWebhookService } from '../../application/PersonaWebhookService'
-import { WebhookProcessingResult } from '../../application/types'
 import { parseTransferoBalanceWebhook } from './transferoBalanceWebhookValidator'
 import { parseTransferoWebhook } from './transferoWebhookValidator'
 import { WebhookResponse } from './types'
@@ -32,35 +30,8 @@ export class WebhookController extends Controller {
     private logger: ILogger,
     @inject(TYPES.IQueueHandler)
     private queueHandler: IQueueHandler,
-    @inject(PersonaWebhookService)
-    private readonly personaWebhookService: PersonaWebhookService,
   ) {
     super()
-  }
-
-  /**
-   * Handle Persona webhook notifications for KYC inquiry updates
-   *
-   * Notes:
-   * - If PERSONA_WEBHOOK_SECRET is set, we verify the HMAC signature header.
-   * - We try to match PartnerUserKyc.externalId by Persona inquiry id (data.id)
-   *   and, if present, by attributes.reference_id (in case you store that instead).
-   */
-  @Hidden()
-  @Post('persona')
-  @Response('400', 'Bad Request - Invalid payload or signature')
-  @Response('404', 'Not Found - KYC session not found')
-  @Response('500', 'Internal Server Error')
-  @SuccessResponse('200', 'Webhook processed successfully')
-  public async handlePersonaWebhook(
-    @Body() body: Record<string, unknown>,
-    @Request() request: RequestExpress & { rawBody?: string }, // rawBody required for signature verification
-    @Res() badRequest: TsoaResponse<400, { message: string, success: false }>,
-    @Res() notFound: TsoaResponse<404, { message: string, success: false }>,
-    @Res() serverError: TsoaResponse<500, { message: string, success: false }>,
-  ): Promise<WebhookResponse> {
-    const result = await this.personaWebhookService.processWebhook(body, request)
-    return this.resolveWebhookResponse(result, badRequest, notFound, serverError)
   }
 
   /**
@@ -160,27 +131,5 @@ export class WebhookController extends Controller {
         success: false,
       })
     }
-  }
-
-  private resolveWebhookResponse(
-    result: WebhookProcessingResult,
-    badRequest: TsoaResponse<400, { message: string, success: false }>,
-    notFound: TsoaResponse<404, { message: string, success: false }>,
-    serverError: TsoaResponse<500, { message: string, success: false }>,
-  ): WebhookResponse {
-    if (result.status === 'bad_request') {
-      return badRequest(400, result.payload)
-    }
-
-    if (result.status === 'not_found') {
-      return notFound(404, result.payload)
-    }
-
-    if (result.status === 'error') {
-      return serverError(500, result.payload)
-    }
-
-    this.setStatus(200)
-    return result.payload
   }
 }

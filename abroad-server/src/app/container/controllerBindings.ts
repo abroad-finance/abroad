@@ -5,6 +5,8 @@ import { FlowCorridorController } from '../../modules/flows/interfaces/http/Flow
 import { FlowDefinitionController } from '../../modules/flows/interfaces/http/FlowDefinitionController'
 import { FlowInstanceController } from '../../modules/flows/interfaces/http/FlowInstanceController'
 import { PublicCorridorController } from '../../modules/flows/interfaces/http/PublicCorridorController'
+import { KycController } from '../../modules/kyc/interfaces/http/KycController'
+import { OpsKycController } from '../../modules/kyc/interfaces/http/OpsKycController'
 import { OpsPartnerController } from '../../modules/partners/interfaces/http/OpsPartnerController'
 import { PartnerController } from '../../modules/partners/interfaces/http/PartnerController'
 import { PartnerUserController } from '../../modules/partners/interfaces/http/PartnerUserController'
@@ -26,6 +28,8 @@ import { BindingRegistration, registerBindings } from './bindingSupport'
 
 const controllerBindings: ReadonlyArray<BindingRegistration<unknown>> = [
   { bindSelf: true, identifier: WebhookController, implementation: WebhookController },
+  { bindSelf: true, identifier: KycController, implementation: KycController },
+  { bindSelf: true, identifier: OpsKycController, implementation: OpsKycController },
   { bindSelf: true, identifier: PartnerController, implementation: PartnerController },
   { bindSelf: true, identifier: OpsPartnerController, implementation: OpsPartnerController },
   { bindSelf: true, identifier: PartnerUserController, implementation: PartnerUserController },

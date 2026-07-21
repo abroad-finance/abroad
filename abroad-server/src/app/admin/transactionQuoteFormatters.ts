@@ -1,6 +1,20 @@
-import type { PersonaInquiryDetails } from '../../modules/kyc/application/PersonaInquiryDetailsService'
-
 const DEFAULT_LOCALE = 'es-CO'
+
+/**
+ * Identity fields surfaced in the AdminJS transaction-quote view / CSV export.
+ * Sourced from the user's stored KYC submission (previously fetched from Persona).
+ */
+export interface KycRecordDetails {
+  address?: string
+  city?: string
+  country?: string
+  department?: string
+  documentType?: string
+  email?: string
+  fullName?: string
+  idNumber?: string
+  phone?: string
+}
 
 export function applyQuoteProjection(record: { params: Record<string, unknown> }, values: {
   cryptoCurrency: string | undefined
@@ -49,12 +63,12 @@ export function formatDateTime(value: unknown): string {
   return date.toISOString().replace('T', ' ').slice(0, 16)
 }
 
-export function hydratePersonaAndQuoteFields(
+export function hydrateKycAndQuoteFields(
   record: { params: Record<string, unknown> },
-  persona: null | PersonaInquiryDetails,
+  kyc: KycRecordDetails | null,
   fiatCurrencies: ReadonlySet<string>,
 ) {
-  ensurePersonaFields(record, persona)
+  ensureKycFields(record, kyc)
 
   const targetAmount = parseNumber(record.params.targetAmount)
   const sourceAmount = parseNumber(record.params.sourceAmount)
@@ -86,16 +100,16 @@ function deriveTrm(targetAmount: null | number, sourceAmount: null | number): nu
   return targetAmount / sourceAmount
 }
 
-function ensurePersonaFields(record: { params: Record<string, unknown> }, persona: null | PersonaInquiryDetails) {
-  record.params.tipoDocumento = persona?.documentType ?? ''
-  record.params.numeroDocumento = persona?.idNumber ?? ''
-  record.params.nombreRazonSocial = persona?.fullName ?? ''
-  record.params.direccion = persona?.address ?? ''
-  record.params.telefono = persona?.phone ?? ''
-  record.params.email = persona?.email ?? ''
-  record.params.pais = persona?.country ?? ''
-  record.params.departamento = persona?.department ?? ''
-  record.params.municipio = persona?.city ?? ''
+function ensureKycFields(record: { params: Record<string, unknown> }, kyc: KycRecordDetails | null) {
+  record.params.tipoDocumento = kyc?.documentType ?? ''
+  record.params.numeroDocumento = kyc?.idNumber ?? ''
+  record.params.nombreRazonSocial = kyc?.fullName ?? ''
+  record.params.direccion = kyc?.address ?? ''
+  record.params.telefono = kyc?.phone ?? ''
+  record.params.email = kyc?.email ?? ''
+  record.params.pais = kyc?.country ?? ''
+  record.params.departamento = kyc?.department ?? ''
+  record.params.municipio = kyc?.city ?? ''
 }
 
 function formatAmount(value: null | number, locale: string = DEFAULT_LOCALE): string {

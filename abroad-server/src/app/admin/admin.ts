@@ -8,9 +8,7 @@ import { Prisma } from '@prisma/client'
 import session from 'express-session'
 import { createRequire } from 'module'
 
-import { PersonaInquiryDetailsService } from '../../modules/kyc/application/PersonaInquiryDetailsService'
 import { IDatabaseClientProvider } from '../../platform/persistence/IDatabaseClientProvider'
-import { ISecretManager } from '../../platform/secrets/ISecretManager'
 import { iocContainer } from '../container'
 import { TYPES } from '../container/types'
 import { createTransactionQuoteSupport } from './transactionQuoteSupport'
@@ -65,12 +63,9 @@ export async function initAdmin(app: Express) {
   // Acquire Prisma client
   const databaseProvider = iocContainer.get<IDatabaseClientProvider>(TYPES.IDatabaseClientProvider)
   const prisma = await databaseProvider.getClient()
-  const secretManager = iocContainer.get<ISecretManager>(TYPES.ISecretManager)
-  const personaInquiryDetailsService = new PersonaInquiryDetailsService(secretManager)
 
   const transactionQuoteSupport = createTransactionQuoteSupport({
     adminModule: AdminJSImport!,
-    personaInquiryDetailsService,
     prisma,
   })
 

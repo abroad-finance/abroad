@@ -20,6 +20,9 @@ const buildTransaction = (overrides: Partial<TransactionWithRelations> = {}): Tr
   onChainId: 'on-chain-1',
   partnerUser: {
     createdAt: new Date(),
+    disabledAt: null,
+    disabledBy: null,
+    disabledReason: null,
     id: 'partner-user-1',
     kycExternalToken: null,
     partner: {

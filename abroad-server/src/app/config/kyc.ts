@@ -8,6 +8,19 @@
 export const KYC_EXEMPTION_USD_THRESHOLD = 25
 
 /**
+ * Name of the private GCS bucket that stores uploaded identity-document images.
+ * Provisioned once per environment; the runtime service account needs object
+ * read/write on it (auth via ADC, same as pubsub/secret-manager).
+ */
+export function getKycDocumentsBucket(): string {
+  const bucket = process.env.KYC_DOCUMENTS_BUCKET
+  if (!bucket) {
+    throw new Error('KYC_DOCUMENTS_BUCKET is not configured')
+  }
+  return bucket
+}
+
+/**
  * Determine whether a user's cumulative volume is small enough to bypass KYC.
  */
 export function isKycExemptByAmount(amountInUsd: number): boolean {

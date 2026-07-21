@@ -1,7 +1,8 @@
 import { Container } from 'inversify'
 
 import { ConsoleLogger } from '../../core/logging/consoleLogger'
-import { PersonaKycService } from '../../modules/kyc/application/PersonaKycService'
+import { KycService } from '../../modules/kyc/application/KycService'
+import { GcsKycDocumentStorage } from '../../modules/kyc/infrastructure/GcsKycDocumentStorage'
 import { PartnerService } from '../../modules/partners/application/partnerService'
 import { PostgresAdvisoryLockManager } from '../../platform/cacheLock/postgresAdvisoryLockManager'
 import { GCPPubSubQueueHandler } from '../../platform/messaging/gcpPubSubQueueHandler'
@@ -30,7 +31,8 @@ const infrastructureBindings: ReadonlyArray<BindingRegistration<unknown>> = [
   { identifier: TYPES.IWebhookNotifier, implementation: WebhookNotifier },
   { identifier: TYPES.ILockManager, implementation: PostgresAdvisoryLockManager },
   { identifier: TYPES.IPartnerService, implementation: PartnerService },
-  { identifier: TYPES.IKycService, implementation: PersonaKycService },
+  { identifier: TYPES.IKycService, implementation: KycService },
+  { identifier: TYPES.IKycDocumentStorage, implementation: GcsKycDocumentStorage },
   { identifier: TYPES.IOpsAuthService, implementation: OpsAuthService },
 ] as const
 

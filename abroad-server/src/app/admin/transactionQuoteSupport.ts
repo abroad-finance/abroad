@@ -11,15 +11,13 @@ import type { NextFunction, Request, Response } from 'express'
 
 import { KycStatus, Prisma, TransactionStatus } from '@prisma/client'
 
-import type { PersonaInquiryDetails } from '../../modules/kyc/application/PersonaInquiryDetailsService'
-import type { PersonaInquiryDetailsService } from '../../modules/kyc/application/PersonaInquiryDetailsService'
-
 import { buildActionRequestSearchParams, ensureDefaultTransactionQuoteFilters, normalizeQueryParams } from './transactionQuoteFilters'
 import {
   applyQuoteProjection,
   assignTransactionMetadata,
   escapeCsvValue,
-  hydratePersonaAndQuoteFields,
+  hydrateKycAndQuoteFields,
+  type KycRecordDetails,
   parseNumber,
 } from './transactionQuoteFormatters'
 import { transactionQuoteProperties } from './transactionQuoteProperties'
@@ -82,7 +80,6 @@ type StreamCsv = (
 
 interface TransactionQuoteSupportDeps {
   adminModule: AdminModule
-  personaInquiryDetailsService: PersonaInquiryDetailsService
   prisma: PrismaClient
 }
 
@@ -106,35 +103,42 @@ const transactionQuoteViewModel = (() => {
 })()
 
 export function createTransactionQuoteSupport(deps: TransactionQuoteSupportDeps): TransactionQuoteSupport {
-  const { adminModule, personaInquiryDetailsService, prisma } = deps
+  const { adminModule, prisma } = deps
 
-  const kycInquiryCache = new Map<string, null | string>()
+  const kycDetailsCache = new Map<string, KycRecordDetails | null>()
   const enforceDefaultFilters = <T extends ActionRequest>(request: T): T =>
     ensureDefaultTransactionQuoteFilters(request, FILTER_DEFAULTS)
   const buildSearchParams = (request: ActionRequest): string =>
     buildActionRequestSearchParams(adminModule.flat, request)
 
-  const getInquiryIdForPartnerUser = async (partnerUserId: string): Promise<null | string> => {
-    if (kycInquiryCache.has(partnerUserId)) {
-      return kycInquiryCache.get(partnerUserId) ?? null
+  const getKycDetailsForPartnerUser = async (partnerUserId: string): Promise<KycRecordDetails | null> => {
+    if (kycDetailsCache.has(partnerUserId)) {
+      return kycDetailsCache.get(partnerUserId) ?? null
     }
 
     const approved = await prisma.partnerUserKyc.findFirst({
       orderBy: { createdAt: 'desc' },
       where: { partnerUserId, status: KycStatus.APPROVED },
     })
+    const record = approved ?? await prisma.partnerUserKyc.findFirst({
+      orderBy: { createdAt: 'desc' },
+      where: { partnerUserId },
+    })
 
-    let record = approved
-    if (!record) {
-      record = await prisma.partnerUserKyc.findFirst({
-        orderBy: { createdAt: 'desc' },
-        where: { partnerUserId },
-      })
-    }
-
-    const inquiryId = record?.externalId ?? null
-    kycInquiryCache.set(partnerUserId, inquiryId)
-    return inquiryId
+    const details: KycRecordDetails | null = record
+      ? {
+          address: record.address ?? undefined,
+          city: record.city ?? undefined,
+          country: record.nationality ?? undefined,
+          documentType: record.documentType ?? undefined,
+          email: record.email ?? undefined,
+          fullName: record.fullName ?? undefined,
+          idNumber: record.documentNumber ?? undefined,
+          phone: record.phone ?? undefined,
+        }
+      : null
+    kycDetailsCache.set(partnerUserId, details)
+    return details
   }
 
   const enrichRecord = async (record: AdminRecord) => {
@@ -142,15 +146,11 @@ export function createTransactionQuoteSupport(deps: TransactionQuoteSupportDeps)
       ? record.params.partnerUserId
       : undefined
 
-    let personaDetails: null | PersonaInquiryDetails = null
-    if (partnerUserId) {
-      const inquiryId = await getInquiryIdForPartnerUser(partnerUserId)
-      if (inquiryId) {
-        personaDetails = await personaInquiryDetailsService.getDetails(inquiryId)
-      }
-    }
+    const kycDetails = partnerUserId
+      ? await getKycDetailsForPartnerUser(partnerUserId)
+      : null
 
-    hydratePersonaAndQuoteFields(record, personaDetails, FIAT_TARGET_CURRENCIES)
+    hydrateKycAndQuoteFields(record, kycDetails, FIAT_TARGET_CURRENCIES)
     assignTransactionMetadata(
       record,
       record.params.transactionCreatedAt,

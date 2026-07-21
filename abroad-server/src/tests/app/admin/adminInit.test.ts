@@ -33,7 +33,6 @@ async function loadInitAdmin() {
   const componentLoaderSpy = jest.fn()
   const authRouterGet = jest.fn()
   const buildAuthenticatedRouter = jest.fn(() => ({ get: authRouterGet }))
-  const personaSpy = jest.fn()
 
   jest.doMock('adminjs', () => {
     class MockComponentLoader {
@@ -60,15 +59,6 @@ async function loadInitAdmin() {
   }), { virtual: true })
 
   jest.doMock('@adminjs/prisma', () => prismaAdapterMocks, { virtual: true })
-
-  jest.doMock('../../../modules/kyc/application/PersonaInquiryDetailsService', () => ({
-    __esModule: true,
-    PersonaInquiryDetailsService: class MockPersona {
-      constructor() {
-        personaSpy()
-      }
-    },
-  }))
 
   const quoteSupport = {
     baseResource: { name: 'base' },
@@ -106,7 +96,6 @@ async function loadInitAdmin() {
     dbProvider,
     initAdmin,
     initialize,
-    personaSpy,
     quoteSupport,
     registerAdapter,
     watch,

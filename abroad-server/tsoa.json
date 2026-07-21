@@ -41,6 +41,11 @@
   "routes": {
     "routesDir": "src/app/http",
     "authenticationModule": "./src/app/http/authentication.ts",
-    "iocModule": "./src/app/container/index.ts"
+    "iocModule": "./src/app/container/index.ts",
+    "multerOpts": {
+      "limits": {
+        "fileSize": 8388608
+      }
+    }
   }
 }

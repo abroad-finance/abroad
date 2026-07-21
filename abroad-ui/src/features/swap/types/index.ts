@@ -1,3 +1,23 @@
+// Self-service KYC form values collected by the KycForm component and submitted
+// through the controller (feature components do not call services directly).
+export interface KycFormValues {
+  address: string
+  city: string
+  dateOfBirth: string
+  document: File
+  documentNumber: string
+  documentType: string
+  email: string
+  fullName: string
+  nationality: string
+  phone: string
+}
+
+export interface KycSubmitOutcome {
+  error?: string
+  ok: boolean
+}
+
 export type OnboardingRates = {
   brl: {
     USDC: null | number

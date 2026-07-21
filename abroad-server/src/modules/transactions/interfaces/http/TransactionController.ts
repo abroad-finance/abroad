@@ -94,13 +94,13 @@ export class TransactionController extends Controller {
         partnerContext,
       )
 
-      const paymentContext = response.id && !response.kycLink
+      const paymentContext = response.id && !response.kycRequired
         ? await this.buildPaymentContext(response.id, response.transactionReference)
         : null
 
       return {
         id: response.id,
-        kycLink: response.kycLink,
+        kycRequired: response.kycRequired,
         payment_context: paymentContext,
         transaction_reference: response.transactionReference,
       }
@@ -134,7 +134,7 @@ export class TransactionController extends Controller {
 
     return {
       id: status.id,
-      kycLink: status.kycLink,
+      kycRequired: status.kycRequired,
       on_chain_tx_hash: status.onChainTxHash,
       status: status.status,
       transaction_reference: status.transactionReference,

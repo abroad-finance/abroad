@@ -2,8 +2,6 @@ import type { Request as ExpressRequest } from 'express'
 
 import { TargetCurrency } from '@prisma/client'
 
-import type { PersonaWebhookService } from '../../../../../modules/webhooks/application/PersonaWebhookService'
-import type { WebhookProcessingResult } from '../../../../../modules/webhooks/application/types'
 import type { IDatabaseClientProvider } from '../../../../../platform/persistence/IDatabaseClientProvider'
 
 import { WebhookController } from '../../../../../modules/webhooks/interfaces/http/WebhookController'
@@ -22,38 +20,12 @@ describe('WebhookController', () => {
   let logger: MockLogger
   let dbProvider: IDatabaseClientProvider
   let controller: WebhookController
-  let personaWebhookService: PersonaWebhookService
 
   beforeEach(() => {
     queueHandler = createMockQueueHandler()
     logger = createMockLogger()
     dbProvider = { getClient: jest.fn(async () => ({} as unknown as import('@prisma/client').PrismaClient)) }
-    personaWebhookService = {
-      processWebhook: jest.fn(),
-    } as unknown as PersonaWebhookService
-    controller = new WebhookController(dbProvider, logger, queueHandler, personaWebhookService)
-  })
-
-  it('routes Persona webhook responses to the correct TSOA handlers', async () => {
-    const responses = setupResponses()
-    const request = { headers: {} } as unknown as ExpressRequest
-
-    ;(personaWebhookService.processWebhook as jest.Mock).mockResolvedValueOnce({ payload: { message: 'bad', success: false }, status: 'bad_request' } satisfies WebhookProcessingResult)
-    expect(await controller.handlePersonaWebhook({}, request, responses.badRequest, responses.notFound, responses.serverError))
-      .toEqual({ message: 'bad', success: false })
-    expect(responses.badRequest).toHaveBeenCalledWith(400, { message: 'bad', success: false })
-
-    ;(personaWebhookService.processWebhook as jest.Mock).mockResolvedValueOnce({ payload: { message: 'missing', success: false }, status: 'not_found' } satisfies WebhookProcessingResult)
-    await controller.handlePersonaWebhook({}, request, responses.badRequest, responses.notFound, responses.serverError)
-    expect(responses.notFound).toHaveBeenCalledWith(404, { message: 'missing', success: false })
-
-    ;(personaWebhookService.processWebhook as jest.Mock).mockResolvedValueOnce({ payload: { message: 'err', success: false }, status: 'error' } satisfies WebhookProcessingResult)
-    await controller.handlePersonaWebhook({}, request, responses.badRequest, responses.notFound, responses.serverError)
-    expect(responses.serverError).toHaveBeenCalledWith(500, { message: 'err', success: false })
-
-    ;(personaWebhookService.processWebhook as jest.Mock).mockResolvedValueOnce({ payload: { message: 'ok', success: true }, status: 'ok' } satisfies WebhookProcessingResult)
-    const success = await controller.handlePersonaWebhook({}, request, responses.badRequest, responses.notFound, responses.serverError)
-    expect(success).toEqual({ message: 'ok', success: true })
+    controller = new WebhookController(dbProvider, logger, queueHandler)
   })
 
   it('validates and enqueues Transfero webhooks', async () => {
@@ -153,7 +125,7 @@ describe('WebhookController', () => {
       throw new Error('queue down')
     })
     const erroringQueue = createMockQueueHandler({ postMessage: failingPost })
-    const failing = new WebhookController(dbProvider, logger, erroringQueue, personaWebhookService)
+    const failing = new WebhookController(dbProvider, logger, erroringQueue)
 
     const result = await failing.handleTransferoWebhook(
       { Currency: TargetCurrency.BRL, PaymentId: 'id', PaymentStatus: 'status' },
