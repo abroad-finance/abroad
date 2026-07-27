@@ -17,6 +17,20 @@ export type TransparencyDailyOutcome = {
   otherTerminal: number
 }
 
+export type TransparencyHistoricalOutcome = {
+  accepted: number
+  completed: number
+  failed: number
+  inFlight: number
+  otherTerminal: number
+  periodStart: string
+}
+
+export type TransparencyHistory = {
+  granularity: 'month'
+  outcomes: TransparencyHistoricalOutcome[]
+}
+
 export type TransparencyMetricsResponse = {
   generatedAt: string
   openSource: TransparencyOpenSourceMetrics
@@ -49,6 +63,7 @@ export type TransparencyPlatformMetrics = {
   coverage: TransparencyCoverage
   dailyOutcomes: TransparencyDailyOutcome[]
   generatedAt: string
+  history: TransparencyHistory
   rolling30Days: TransparencyPeriodMetrics
   totals: {
     acceptedTransactions: number

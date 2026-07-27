@@ -1,20 +1,21 @@
-import type { TransparencyDailyOutcome } from '../../api'
+import type { TransparencyHistoricalOutcome } from '../../api'
 
 type OutcomeSeries = {
   className: string
   key: keyof Pick<
-    TransparencyDailyOutcome,
+    TransparencyHistoricalOutcome,
     'completed' | 'failed' | 'inFlight' | 'otherTerminal'
   >
   label: string
 }
 
 type TransparencyOutcomesChartProps = {
-  outcomes: TransparencyDailyOutcome[]
+  outcomes: TransparencyHistoricalOutcome[]
 }
 
 const CHART_HEIGHT = 260
-const CHART_WIDTH = 760
+const CHART_MIN_WIDTH = 760
+const MINIMUM_MONTH_WIDTH = 28
 const PADDING = {
   bottom: 42,
   left: 42,
@@ -50,14 +51,13 @@ const compactNumber = new Intl.NumberFormat('en-US', {
   notation: 'compact',
 })
 
-const shortDate = new Intl.DateTimeFormat('en-US', {
-  day: 'numeric',
+const shortMonth = new Intl.DateTimeFormat('en-US', {
   month: 'short',
   timeZone: 'UTC',
+  year: 'numeric',
 })
 
-const longDate = new Intl.DateTimeFormat('en-US', {
-  day: 'numeric',
+const longMonth = new Intl.DateTimeFormat('en-US', {
   month: 'long',
   timeZone: 'UTC',
   year: 'numeric',
@@ -85,16 +85,20 @@ export const TransparencyOutcomesChart = ({
   if (outcomes.length === 0) {
     return (
       <p className="transparency-empty">
-        Daily outcomes will appear after the first accepted transaction in this window.
+        Historical activity will appear here as it is recorded.
       </p>
     )
   }
 
-  const plotWidth = CHART_WIDTH - PADDING.left - PADDING.right
+  const chartWidth = Math.max(
+    CHART_MIN_WIDTH,
+    PADDING.left + PADDING.right + outcomes.length * MINIMUM_MONTH_WIDTH,
+  )
+  const plotWidth = chartWidth - PADDING.left - PADDING.right
   const plotHeight = CHART_HEIGHT - PADDING.top - PADDING.bottom
   const maximum = niceMaximum(Math.max(...outcomes.map(outcome => outcome.accepted)))
   const slotWidth = plotWidth / outcomes.length
-  const barWidth = Math.min(15, slotWidth * 0.62)
+  const barWidth = Math.min(18, slotWidth * 0.66)
   const yFor = (value: number): number => (
     PADDING.top + plotHeight - (value / maximum) * plotHeight
   )
@@ -103,24 +107,29 @@ export const TransparencyOutcomesChart = ({
     maximum / 2,
     0,
   ]
-  const xLabelIndexes = new Set([
-    0,
-    Math.floor((outcomes.length - 1) / 2),
-    outcomes.length - 1,
-  ])
+  const xLabelIndexes = new Set([0, outcomes.length - 1])
+  outcomes.forEach((outcome, index) => {
+    if (utcDate(outcome.periodStart).getUTCMonth() === 0) {
+      xLabelIndexes.add(index)
+    }
+  })
 
   return (
     <>
       <div className="transparency-chart">
         <svg
-          aria-labelledby="daily-outcomes-title daily-outcomes-description"
+          aria-labelledby="historical-outcomes-title historical-outcomes-description"
           preserveAspectRatio="xMidYMid meet"
           role="img"
-          viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
+          viewBox={`0 0 ${chartWidth} ${CHART_HEIGHT}`}
+          width={chartWidth}
         >
-          <title id="daily-outcomes-title">Accepted transaction outcomes over the last 30 days</title>
-          <desc id="daily-outcomes-description">
-            Stacked daily bars compare completed, failed, in-flight, and other terminal transaction records.
+          <title id="historical-outcomes-title">
+            Transaction outcomes since Abroad’s first recorded activity
+          </title>
+          <desc id="historical-outcomes-description">
+            Stacked monthly bars compare completed, failed, in-flight, and other terminal
+            transaction records by acceptance month and current status.
           </desc>
 
           {yTicks.map(tick => (
@@ -128,7 +137,7 @@ export const TransparencyOutcomesChart = ({
               <line
                 className="transparency-chart__grid"
                 x1={PADDING.left}
-                x2={CHART_WIDTH - PADDING.right}
+                x2={chartWidth - PADDING.right}
                 y1={yFor(tick)}
                 y2={yFor(tick)}
               />
@@ -148,9 +157,10 @@ export const TransparencyOutcomesChart = ({
             let cumulativeValue = 0
 
             return (
-              <g key={outcome.date}>
+              <g key={outcome.periodStart}>
                 <title>
-                  {`${longDate.format(utcDate(outcome.date))}: ${outcome.completed} completed, `
+                  {`${longMonth.format(utcDate(outcome.periodStart))}: `
+                    + `${outcome.accepted} accepted, ${outcome.completed} completed, `
                     + `${outcome.failed} failed, ${outcome.inFlight} in flight, `
                     + `${outcome.otherTerminal} expired or wrong amount`}
                 </title>
@@ -177,10 +187,10 @@ export const TransparencyOutcomesChart = ({
                   <text
                     className="transparency-chart__axis"
                     textAnchor={index === 0 ? 'start' : index === outcomes.length - 1 ? 'end' : 'middle'}
-                    x={index === 0 ? PADDING.left : index === outcomes.length - 1 ? CHART_WIDTH - PADDING.right : x + barWidth / 2}
+                    x={index === 0 ? PADDING.left : index === outcomes.length - 1 ? chartWidth - PADDING.right : x + barWidth / 2}
                     y={CHART_HEIGHT - 10}
                   >
-                    {shortDate.format(utcDate(outcome.date))}
+                    {shortMonth.format(utcDate(outcome.periodStart))}
                   </text>
                 )}
               </g>
@@ -202,12 +212,12 @@ export const TransparencyOutcomesChart = ({
       </div>
 
       <details className="transparency-data-table">
-        <summary>Inspect the 30-day daily data</summary>
+        <summary>Inspect the complete monthly history</summary>
         <div className="transparency-data-table__scroll">
           <table>
             <thead>
               <tr>
-                <th>Date (UTC)</th>
+                <th>Month (UTC)</th>
                 <th>Accepted</th>
                 <th>Completed</th>
                 <th>Failed</th>
@@ -217,8 +227,10 @@ export const TransparencyOutcomesChart = ({
             </thead>
             <tbody>
               {outcomes.map(outcome => (
-                <tr key={outcome.date}>
-                  <th scope="row">{outcome.date}</th>
+                <tr key={outcome.periodStart}>
+                  <th scope="row">
+                    {longMonth.format(utcDate(outcome.periodStart))}
+                  </th>
                   <td>{outcome.accepted}</td>
                   <td>{outcome.completed}</td>
                   <td>{outcome.failed}</td>

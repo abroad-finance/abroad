@@ -85,11 +85,51 @@ const buildPrisma = (): MockPrisma => {
   })
 
   return {
-    $queryRaw: jest.fn(async () => [
-      { count: 8n, date: '2026-07-27', status: TransactionStatus.PAYMENT_COMPLETED },
-      { count: 2n, date: '2026-07-27', status: TransactionStatus.PAYMENT_FAILED },
-      { count: 1n, date: '2026-07-27', status: TransactionStatus.PROCESSING_PAYMENT },
-    ]),
+    $queryRaw: jest.fn()
+      .mockResolvedValueOnce([
+        {
+          count: 8n,
+          periodStart: '2026-07-27',
+          status: TransactionStatus.PAYMENT_COMPLETED,
+        },
+        {
+          count: 2n,
+          periodStart: '2026-07-27',
+          status: TransactionStatus.PAYMENT_FAILED,
+        },
+        {
+          count: 1n,
+          periodStart: '2026-07-27',
+          status: TransactionStatus.PROCESSING_PAYMENT,
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          count: 12n,
+          periodStart: '2024-10-01',
+          status: TransactionStatus.PAYMENT_COMPLETED,
+        },
+        {
+          count: 1n,
+          periodStart: '2024-12-01',
+          status: TransactionStatus.PAYMENT_FAILED,
+        },
+        {
+          count: 8n,
+          periodStart: '2026-07-01',
+          status: TransactionStatus.PAYMENT_COMPLETED,
+        },
+        {
+          count: 2n,
+          periodStart: '2026-07-01',
+          status: TransactionStatus.PAYMENT_FAILED,
+        },
+        {
+          count: 1n,
+          periodStart: '2026-07-01',
+          status: TransactionStatus.PROCESSING_PAYMENT,
+        },
+      ]),
     partner: {
       count: jest.fn(async (params?: unknown) => params ? 6 : 51),
     },
@@ -223,6 +263,36 @@ describe('TransparencyMetricsService', () => {
       inFlight: 1,
       otherTerminal: 0,
     })
+    expect(result.platform.history).toEqual(expect.objectContaining({
+      granularity: 'month',
+      outcomes: expect.arrayContaining([
+        {
+          accepted: 12,
+          completed: 12,
+          failed: 0,
+          inFlight: 0,
+          otherTerminal: 0,
+          periodStart: '2024-10-01',
+        },
+        {
+          accepted: 0,
+          completed: 0,
+          failed: 0,
+          inFlight: 0,
+          otherTerminal: 0,
+          periodStart: '2024-11-01',
+        },
+      ]),
+    }))
+    expect(result.platform.history.outcomes).toHaveLength(22)
+    expect(result.platform.history.outcomes.at(-1)).toEqual({
+      accepted: 11,
+      completed: 8,
+      failed: 2,
+      inFlight: 1,
+      otherTerminal: 0,
+      periodStart: '2026-07-01',
+    })
     expect(result.openSource).toEqual(expect.objectContaining({
       cache: 'fresh',
       commitsLast90Days: 51,
@@ -245,7 +315,7 @@ describe('TransparencyMetricsService', () => {
     await Promise.all([service.getMetrics(), service.getMetrics()])
 
     expect(prisma.transaction.groupBy).toHaveBeenCalledTimes(2)
-    expect(prisma.$queryRaw).toHaveBeenCalledTimes(1)
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(2)
     expect(fetchMock).toHaveBeenCalledTimes(5)
   })
 

@@ -1,13 +1,9 @@
-import { CryptoCurrency, Prisma, type PrismaClient, TransactionStatus } from '@prisma/client'
+import { CryptoCurrency, type PrismaClient, TransactionStatus } from '@prisma/client'
 
 import type { PublicCorridorService } from '../../flows/application/PublicCorridorService'
-import type {
-  TransparencyCoverage,
-  TransparencyDailyOutcome,
-  TransparencyPlatformSnapshot,
-  TransparencyStatusCount,
-  TransparencyVolume,
-} from './transparencyContracts'
+import type { TransparencyCoverage, TransparencyPlatformSnapshot, TransparencyStatusCount, TransparencyVolume } from './transparencyContracts'
+
+import { readDailyStatusCounts, readMonthlyStatusCounts, toDailyOutcomes, toHistoricalOutcomes } from './transparencyOutcomeHistory'
 
 const DAY_MS = 24 * 60 * 60 * 1000
 const ROLLING_WINDOW_DAYS = 30
@@ -17,12 +13,6 @@ const TERMINAL_STATUSES = new Set<TransactionStatus>([
   TransactionStatus.PAYMENT_FAILED,
   TransactionStatus.WRONG_AMOUNT,
 ])
-
-type DailyStatusRow = {
-  count: bigint
-  date: string
-  status: TransactionStatus
-}
 
 type StatusSummary = {
   accepted: number
@@ -55,22 +45,6 @@ const readCompletedVolume = async (
       }
     }),
   )
-)
-
-const readDailyStatusCounts = async (
-  client: PrismaClient,
-  createdAt: Date,
-): Promise<DailyStatusRow[]> => (
-  client.$queryRaw<DailyStatusRow[]>(Prisma.sql`
-    SELECT
-      TO_CHAR("createdAt" AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS "date",
-      "status",
-      COUNT(*)::bigint AS "count"
-    FROM "Transaction"
-    WHERE "createdAt" >= ${createdAt}
-    GROUP BY 1, 2
-    ORDER BY 1, 2
-  `)
 )
 
 const readStatusCounts = async (
@@ -134,40 +108,6 @@ const toCoverage = (
   sourceAssets: uniqueSorted(corridors.map(corridor => corridor.cryptoCurrency)),
 })
 
-const toDailyOutcomes = (
-  rows: DailyStatusRow[],
-  start: Date,
-  numberOfDays: number,
-): TransparencyDailyOutcome[] => {
-  const byDay = new Map<string, Map<TransactionStatus, number>>()
-  for (const row of rows) {
-    const day = byDay.get(row.date) ?? new Map<TransactionStatus, number>()
-    day.set(row.status, Number(row.count))
-    byDay.set(row.date, day)
-  }
-
-  return Array.from({ length: numberOfDays }, (_, index) => {
-    const date = new Date(start.getTime() + index * DAY_MS)
-    const key = date.toISOString().slice(0, 10)
-    const counts = byDay.get(key) ?? new Map<TransactionStatus, number>()
-    const completed = counts.get(TransactionStatus.PAYMENT_COMPLETED) ?? 0
-    const failed = counts.get(TransactionStatus.PAYMENT_FAILED) ?? 0
-    const otherTerminal = (counts.get(TransactionStatus.PAYMENT_EXPIRED) ?? 0)
-      + (counts.get(TransactionStatus.WRONG_AMOUNT) ?? 0)
-    const inFlight = (counts.get(TransactionStatus.AWAITING_PAYMENT) ?? 0)
-      + (counts.get(TransactionStatus.PROCESSING_PAYMENT) ?? 0)
-
-    return {
-      accepted: completed + failed + otherTerminal + inFlight,
-      completed,
-      date: key,
-      failed,
-      inFlight,
-      otherTerminal,
-    }
-  })
-}
-
 const uniqueSorted = (values: string[]): string[] => (
   [...new Set(values)].sort((left, right) => left.localeCompare(right))
 )
@@ -191,6 +131,7 @@ export const readTransparencyPlatformMetrics = async (
     allVolume,
     rollingVolume,
     dailyRows,
+    monthlyRows,
     coverageResponse,
   ] = await Promise.all([
     client.partner.count(),
@@ -214,6 +155,7 @@ export const readTransparencyPlatformMetrics = async (
     readCompletedVolume(client),
     readCompletedVolume(client, rollingStart),
     readDailyStatusCounts(client, rollingStart),
+    readMonthlyStatusCounts(client),
     corridorService.list(),
   ])
 
@@ -224,6 +166,7 @@ export const readTransparencyPlatformMetrics = async (
     coverage: toCoverage(coverageResponse.corridors),
     dailyOutcomes: toDailyOutcomes(dailyRows, rollingStart, ROLLING_WINDOW_DAYS),
     generatedAt: new Date().toISOString(),
+    history: toHistoricalOutcomes(monthlyRows, now),
     rolling30Days: {
       acceptedTransactions: rollingSummary.accepted,
       activePartnerOrganizations,

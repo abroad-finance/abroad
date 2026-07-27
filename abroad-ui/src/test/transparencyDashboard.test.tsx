@@ -66,6 +66,35 @@ const buildMetrics = (
       otherTerminal: 0,
     }],
     generatedAt: '2026-07-27T11:59:30.000Z',
+    history: {
+      granularity: 'month',
+      outcomes: [
+        {
+          accepted: 18,
+          completed: 16,
+          failed: 1,
+          inFlight: 0,
+          otherTerminal: 1,
+          periodStart: '2024-10-01',
+        },
+        {
+          accepted: 0,
+          completed: 0,
+          failed: 0,
+          inFlight: 0,
+          otherTerminal: 0,
+          periodStart: '2024-11-01',
+        },
+        {
+          accepted: 120,
+          completed: 108,
+          failed: 8,
+          inFlight: 4,
+          otherTerminal: 0,
+          periodStart: '2026-07-01',
+        },
+      ],
+    },
     rolling30Days: {
       acceptedTransactions: 120,
       activePartnerOrganizations: 9,
@@ -104,7 +133,14 @@ describe('TransparencyDashboard', () => {
     expect(screen.getByText('1,050')).toBeInTheDocument()
     expect(screen.getByText('88.5%')).toBeInTheDocument()
     expect(screen.getByText('abroad-finance/abroad')).toBeInTheDocument()
-    expect(screen.getByText('What is—and is not—published.')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Abroad, month by month.' })).toBeInTheDocument()
+    expect(screen.getByRole('img', {
+      name: /^Transaction outcomes since Abroad’s first recorded activity/,
+    })).toBeInTheDocument()
+    expect(screen.getByText(/Accepted records from October 2024 through today/)).toBeInTheDocument()
+    expect(screen.getByText('Recent pulse · 30 days')).toBeInTheDocument()
+    expect(screen.queryByText('What is—and is not—published.')).not.toBeInTheDocument()
+    expect(screen.queryByText('Not yet published')).not.toBeInTheDocument()
     expect(screen.getByRole('link', { name: /View machine-readable JSON/ })).toHaveAttribute(
       'href',
       'https://api.abroad.finance/public/transparency',

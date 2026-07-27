@@ -31,6 +31,11 @@ const dateTimeFormatter = new Intl.DateTimeFormat('en-US', {
   timeStyle: 'short',
   timeZone: 'UTC',
 })
+const monthFormatter = new Intl.DateTimeFormat('en-US', {
+  month: 'long',
+  timeZone: 'UTC',
+  year: 'numeric',
+})
 
 type CoverageRowProps = {
   items: string[]
@@ -93,6 +98,10 @@ const formatDateTime = (value: null | string): string => {
   const date = new Date(value)
   return Number.isNaN(date.getTime()) ? 'Unavailable' : `${dateTimeFormatter.format(date)} UTC`
 }
+
+const formatMonth = (value: string): string => (
+  monthFormatter.format(new Date(`${value}T00:00:00.000Z`))
+)
 
 const volumeByAsset = (volumes: TransparencyVolume[]): Map<string, number> => (
   new Map(volumes.map(volume => [volume.asset, volume.amount]))
@@ -181,11 +190,12 @@ const PlatformMetrics = ({
 }) => {
   const {
     coverage,
-    dailyOutcomes,
     generatedAt,
+    history,
     rolling30Days,
     totals,
   } = data.platform
+  const historicalOutcomes = history?.outcomes ?? []
   const totalVolume = volumeByAsset(totals.completedSourceVolume)
   const rollingVolume = volumeByAsset(rolling30Days.completedSourceVolume)
   const volumeAssets = [...new Set([...rollingVolume.keys(), ...totalVolume.keys()])].sort((left, right) => left.localeCompare(right))
@@ -241,10 +251,28 @@ const PlatformMetrics = ({
           />
         </dl>
 
+        <div className="transparency-chart-block">
+          <div className="transparency-chart-block__heading">
+            <div>
+              <h3>Abroad, month by month.</h3>
+              <p>
+                {historicalOutcomes.length > 0
+                  ? `Accepted records from ${formatMonth(historicalOutcomes[0].periodStart)} through today, grouped by acceptance month and current status.`
+                  : 'A monthly view of accepted records, grouped by acceptance month and current status.'}
+              </p>
+            </div>
+            <span>Records / month</span>
+          </div>
+          <span className="transparency-chart-block__mobile-hint">
+            Swipe through the full history →
+          </span>
+          <TransparencyOutcomesChart outcomes={historicalOutcomes} />
+        </div>
+
         <div className="transparency-period">
           <div className="transparency-period__heading">
             <div>
-              <span>Rolling 30 days</span>
+              <span>Recent pulse · 30 days</span>
               <p>UTC calendar days, including today</p>
             </div>
             <strong>
@@ -271,20 +299,6 @@ const PlatformMetrics = ({
               <dd>{countFormatter.format(rolling30Days.activeUserRecords)}</dd>
             </div>
           </dl>
-        </div>
-
-        <div className="transparency-chart-block">
-          <div className="transparency-chart-block__heading">
-            <div>
-              <h3>Daily transaction outcomes</h3>
-              <p>Every accepted record, grouped by its current status.</p>
-            </div>
-            <span>Records / day</span>
-          </div>
-          <span className="transparency-chart-block__mobile-hint">
-            Swipe to inspect all 30 days →
-          </span>
-          <TransparencyOutcomesChart outcomes={dailyOutcomes} />
         </div>
 
         <div className="transparency-volume">
@@ -344,53 +358,6 @@ const PlatformMetrics = ({
   )
 }
 
-const DisclosureSection = () => (
-  <section className="transparency-section" id="disclosures">
-    <div className="transparency-section__heading">
-      <div>
-        <span className="transparency-kicker">04 / Disclosure register</span>
-        <h2>What is—and is not—published.</h2>
-      </div>
-      <p className="transparency-section__lede">
-        A missing number stays visibly missing. Abroad does not estimate unpublished company metrics.
-      </p>
-    </div>
-
-    <div className="transparency-disclosures">
-      <div className="transparency-disclosure transparency-disclosure--published">
-        <span>Published live</span>
-        <strong>Platform adoption and outcomes</strong>
-        <p>Aggregate database metrics with a short cache and explicit generation time.</p>
-      </div>
-      <div className="transparency-disclosure transparency-disclosure--published">
-        <span>Published live</span>
-        <strong>Enabled product coverage</strong>
-        <p>Current flow and crypto-asset configuration, with unsupported paths excluded.</p>
-      </div>
-      <div className="transparency-disclosure transparency-disclosure--published">
-        <span>Published live</span>
-        <strong>Open-source activity</strong>
-        <p>Public GitHub API metrics, independently cached and allowed to fail safely.</p>
-      </div>
-      <div className="transparency-disclosure">
-        <span>Not yet published</span>
-        <strong>Financial performance</strong>
-        <p>Revenue, cost, and treasury reporting need an approved public accounting policy.</p>
-      </div>
-      <div className="transparency-disclosure">
-        <span>Not yet published</span>
-        <strong>Reliability and incidents</strong>
-        <p>Requires a consolidated uptime series and a durable public incident standard.</p>
-      </div>
-      <div className="transparency-disclosure">
-        <span>Not yet published</span>
-        <strong>Team and governance</strong>
-        <p>Requires stable definitions, reporting ownership, and an agreed update cadence.</p>
-      </div>
-    </div>
-  </section>
-)
-
 const TransparencyDashboard = () => {
   const {
     data,
@@ -418,7 +385,6 @@ const TransparencyDashboard = () => {
           <a href="#platform">Platform</a>
           <a href="#coverage">Coverage</a>
           <a href="#open-source">Open source</a>
-          <a href="#disclosures">Disclosures</a>
         </nav>
         <a className="transparency-header__github" href={REPOSITORY_URL} rel="noreferrer" target="_blank">
           <Github aria-hidden="true" size={17} />
@@ -433,7 +399,7 @@ const TransparencyDashboard = () => {
             <h1>Every number comes with a receipt.</h1>
             <p>
               A live, public view of Abroad’s platform, coverage, and open-source work—
-              with definitions, freshness, and disclosure gaps included.
+              with definitions, source freshness, and history from the first recorded activity.
             </p>
             <div className="transparency-hero__actions">
               <button
@@ -501,7 +467,6 @@ const TransparencyDashboard = () => {
             <>
               <PlatformMetrics data={data} />
               <OpenSourceSection metrics={data.openSource} />
-              <DisclosureSection />
             </>
           )}
 
@@ -512,7 +477,7 @@ const TransparencyDashboard = () => {
           </div>
           <div className="transparency-methodology__grid">
             <article>
-              <strong>Current, not real-time theater</strong>
+              <strong>Freshness you can verify</strong>
               <p>
                 Platform aggregates use a bounded server cache. The exact database generation
                 time is shown even when an API response is served from cache.
@@ -529,7 +494,7 @@ const TransparencyDashboard = () => {
               <strong>Independent source health</strong>
               <p>
                 GitHub is fetched and cached separately. If it is unavailable, Abroad’s platform
-                metrics continue to load and the upstream gap is made explicit.
+                metrics continue to load and the source status remains visible.
               </p>
             </article>
           </div>

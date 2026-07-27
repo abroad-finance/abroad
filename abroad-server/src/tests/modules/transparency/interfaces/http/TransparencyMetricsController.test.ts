@@ -31,6 +31,10 @@ describe('TransparencyMetricsController', () => {
         },
         dailyOutcomes: [],
         generatedAt: '2026-07-27T12:00:00.000Z',
+        history: {
+          granularity: 'month' as const,
+          outcomes: [],
+        },
         rolling30Days: {
           acceptedTransactions: 0,
           activePartnerOrganizations: 0,
