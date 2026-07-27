@@ -149,3 +149,9 @@ abroad-server/src/app/http/routes.ts
 
 # Internal FinOps / infra cost analysis docs (local only, not committed)
 .finops/
+
+# Local agent planning and browser artifacts
+/task_plan.md
+/findings.md
+/progress.md
+/.playwright-mcp/

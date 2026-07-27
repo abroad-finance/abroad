@@ -8,16 +8,20 @@ export class TransferoPayoutStatusAdapter implements IPayoutStatusAdapter {
   public readonly name = 'transfero'
 
   public mapStatus(rawStatus: string): TransactionStatus {
-    const normalized = rawStatus.toLowerCase()
-    if (['canceled', 'cancelled', 'error', 'failed', 'rejected'].some(word => normalized.includes(word))) {
-      return TransactionStatus.PAYMENT_FAILED
+    switch (rawStatus.trim().toUpperCase()) {
+      case 'CANCELLED':
+      case 'FAILED':
+      case 'REJECTED':
+      case 'RETURNED':
+        return TransactionStatus.PAYMENT_FAILED
+      case 'SETTLED':
+        return TransactionStatus.PAYMENT_COMPLETED
+      case 'APPROVED':
+      case 'PENDING':
+      case 'PENDING_APPROVAL':
+      case 'PROCESSING':
+      default:
+        return TransactionStatus.PROCESSING_PAYMENT
     }
-    if (['processed', 'settled', 'success', 'completed'].some(word => normalized.includes(word))) {
-      return TransactionStatus.PAYMENT_COMPLETED
-    }
-    if (['pending', 'processing', 'queued'].some(word => normalized.includes(word))) {
-      return TransactionStatus.PROCESSING_PAYMENT
-    }
-    return TransactionStatus.PROCESSING_PAYMENT
   }
 }

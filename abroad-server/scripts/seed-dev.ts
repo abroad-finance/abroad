@@ -240,12 +240,13 @@ async function seedFlowDefinitions() {
       fixedFee: 0.75,
       maxAmount: null,
       minAmount: 20,
-      name: 'USDC Solana → BRL (Transfero)',
+      name: 'USDC Solana → BRL (Transfero Ultra via Binance)',
       payoutProvider: PaymentMethod.PIX,
       pricingProvider: FlowPricingProvider.TRANSFERO,
       steps: [
         { type: 'PAYOUT' },
-        { type: 'MOVE_TO_EXCHANGE', venue: 'TRANSFERO' },
+        { type: 'MOVE_TO_EXCHANGE', venue: 'BINANCE' },
+        { asset: 'USDC', fromVenue: 'BINANCE', toVenue: 'TRANSFERO', type: 'TRANSFER_VENUE' },
         { fromAsset: 'USDC', toAsset: 'BRL', type: 'CONVERT', venue: 'TRANSFERO' },
       ],
       systemSteps: [
@@ -263,15 +264,21 @@ async function seedFlowDefinitions() {
         },
         {
           completionPolicy: FlowStepCompletionPolicy.SYNC,
-          config: { provider: 'transfero' },
+          config: { provider: 'binance' },
           stepOrder: 3,
           stepType: FlowStepType.EXCHANGE_SEND,
         },
         {
           completionPolicy: FlowStepCompletionPolicy.AWAIT_EVENT,
-          config: { provider: 'transfero' },
+          config: { provider: 'binance' },
           stepOrder: 4,
           stepType: FlowStepType.AWAIT_EXCHANGE_BALANCE,
+        },
+        {
+          completionPolicy: FlowStepCompletionPolicy.SYNC,
+          config: { asset: 'USDC', destNetwork: 'MATIC' },
+          stepOrder: 5,
+          stepType: FlowStepType.ENQUEUE_BRIDGE,
         },
         {
           completionPolicy: FlowStepCompletionPolicy.SYNC,
@@ -280,7 +287,7 @@ async function seedFlowDefinitions() {
             sourceCurrency: 'USDC',
             targetCurrency: TargetCurrency.BRL,
           },
-          stepOrder: 5,
+          stepOrder: 6,
           stepType: FlowStepType.EXCHANGE_CONVERT,
         },
       ],

@@ -147,6 +147,7 @@ export class ExchangeConvertStepExecutor implements FlowStepExecutor {
         }) ?? this.exchangeProviderFactory.getExchangeProvider(config.targetCurrency)
 
         const result = await exchangeProvider.createMarketOrder({
+          operationId: `${runtime.context.transactionId}:exchange:${params.stepOrder}`,
           sourceAmount: amount,
           sourceCurrency: config.sourceCurrency as Parameters<typeof exchangeProvider.createMarketOrder>[0]['sourceCurrency'],
           targetCurrency: config.targetCurrency,

@@ -517,7 +517,7 @@ enum BridgeBatchStatus {
 }
 
 // One per ENQUEUE_BRIDGE step: the USDC a flow deposited at Binance that still
-// owes a CELO->Solana bridge crossing. Accumulated across flows and swept to
+// owes a cross-chain bridge to Transfero. Accumulated across flows and swept to
 // Transfero in batches >= the per-withdrawal minimum (the flow itself settles
 // immediately by converting against the Transfero float — see ENQUEUE_BRIDGE).
 model BridgePendingTransfer {

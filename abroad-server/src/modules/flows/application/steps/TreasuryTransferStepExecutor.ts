@@ -17,7 +17,6 @@ const treasuryTransferConfigSchema = z.object({
   asset: z.string().min(1),
   destinationProvider: z.enum(['binance', 'transfero']),
   destinationTargetCurrency: z.nativeEnum(TargetCurrency).optional(),
-  network: z.string().min(1).optional(),
   sourceProvider: z.enum(['binance']),
 })
 
@@ -63,7 +62,7 @@ export class TreasuryTransferStepExecutor implements FlowStepExecutor {
       const destinationProvider = this.exchangeProviderFactory.getExchangeProvider(destinationCurrency)
 
       // The bridge chain is a property of the destination provider + the asset
-      // being moved (e.g. Transfero accepts USDC on Solana) — NOT the original
+      // being moved (e.g. Transfero Ultra accepts USDC on Polygon) — NOT the original
       // deposit chain (runtime.context.blockchain is the source USDT/CELO leg).
       // Resolve it ONCE and derive BOTH the deposit address and the Binance
       // withdraw network from it, so they can never refer to different chains

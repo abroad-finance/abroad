@@ -79,7 +79,7 @@ describe('OutboxDispatcher', () => {
       currency: TargetCurrency.BRL,
       externalId: 'ext-00000000',
       provider: 'transfero' as const,
-      status: 'processed',
+      status: 'SETTLED',
     }
     await dispatcher.enqueueQueue(QueueName.PAYMENT_STATUS_UPDATED, payload, 'ctx')
     expect(repository.create).toHaveBeenCalledWith(

@@ -16,8 +16,11 @@ const baseLogger = { error: jest.fn(), info: jest.fn(), warn: jest.fn() }
 
 const makeExecutor = (opts: { depositNetwork?: string } = {}) => {
   const destinationProvider = {
-    getDepositNetwork: jest.fn(() => (Object.prototype.hasOwnProperty.call(opts, 'depositNetwork') ? opts.depositNetwork : 'SOLANA')),
-    getExchangeAddress: jest.fn(async () => ({ address: 'sol-dest-addr', memo: null, success: true })),
+    getDepositNetwork: jest.fn(() => (Object.prototype.hasOwnProperty.call(opts, 'depositNetwork') ? opts.depositNetwork : 'POLYGON')),
+    getExchangeAddress: jest.fn(async () => ({
+      address: '0x1111222233334444555566667777888899990000',
+      success: true,
+    })),
   }
   const exchangeProviderFactory = {
     getExchangeProvider: jest.fn(() => destinationProvider),
@@ -49,14 +52,14 @@ describe('TreasuryTransferStepExecutor', () => {
     MockedWallet.mockClear()
     withdrawMock.mockResolvedValue({ data: async () => ({ id: 'withdraw-1' }) })
     allCoinsMock.mockResolvedValue({
-      data: async () => ([{ coin: 'USDC', networkList: [{ network: 'SOL', withdrawFee: '0.8' }] }]),
+      data: async () => ([{ coin: 'USDC', networkList: [{ network: 'MATIC', withdrawFee: '0.8' }] }]),
     })
   })
 
   // The deposit address AND the Binance withdraw network must both be derived
   // from the destination provider's bridge chain for the ASSET being moved —
-  // never from the origin deposit chain (CELO). Funds must go to Solana.
-  it('bridges on the destination provider network (Solana), ignoring the origin deposit chain (CELO)', async () => {
+  // never from the origin deposit chain (CELO). Funds must go to Polygon.
+  it('bridges on the Ultra destination network (Polygon), ignoring the origin deposit chain (CELO)', async () => {
     const { destinationProvider, executor } = makeExecutor()
 
     const result = await executor.execute({
@@ -67,10 +70,17 @@ describe('TreasuryTransferStepExecutor', () => {
 
     expect(result.outcome).toBe('succeeded')
     expect(destinationProvider.getDepositNetwork).toHaveBeenCalledWith({ cryptoCurrency: 'USDC' })
-    // Address resolved on SOLANA + the transferred asset (USDC), NOT CELO/USDT.
-    expect(destinationProvider.getExchangeAddress).toHaveBeenCalledWith({ blockchain: 'SOLANA', cryptoCurrency: 'USDC' })
-    // Withdraw network token maps from the SAME bridge chain (SOLANA -> SOL).
-    expect(withdrawMock).toHaveBeenCalledWith(expect.objectContaining({ address: 'sol-dest-addr', coin: 'USDC', network: 'SOL' }))
+    // Address resolved on POLYGON + the transferred asset (USDC), NOT CELO/USDT.
+    expect(destinationProvider.getExchangeAddress).toHaveBeenCalledWith({
+      blockchain: 'POLYGON',
+      cryptoCurrency: 'USDC',
+    })
+    // Binance calls Polygon MATIC; address and network derive from one source.
+    expect(withdrawMock).toHaveBeenCalledWith(expect.objectContaining({
+      address: '0x1111222233334444555566667777888899990000',
+      coin: 'USDC',
+      network: 'MATIC',
+    }))
   })
 
   it('reports credited amount = withdrawn minus the bridge-network withdrawal fee', async () => {
@@ -83,7 +93,7 @@ describe('TreasuryTransferStepExecutor', () => {
     })
 
     expect(result.outcome).toBe('succeeded')
-    expect(result.output?.amount).toBeCloseTo(99.66, 6) // 100.46 − 0.8 SOL network fee
+    expect(result.output?.amount).toBeCloseTo(99.66, 6) // 100.46 − 0.8 Polygon network fee
   })
 
   // Never let Binance default-route the withdraw to the wrong chain: if the

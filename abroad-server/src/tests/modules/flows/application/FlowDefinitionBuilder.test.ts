@@ -80,7 +80,7 @@ describe('FlowDefinitionBuilder Binance convert', () => {
     const transferoConvert = steps.find(s => s.stepType === FlowStepType.EXCHANGE_CONVERT && s.config.provider === 'transfero')
     const enqueue = steps.find(s => s.stepType === FlowStepType.ENQUEUE_BRIDGE)
 
-    expect(enqueue?.config).toMatchObject({ asset: 'USDC', destNetwork: 'SOL' })
+    expect(enqueue?.config).toMatchObject({ asset: 'USDC', destNetwork: 'MATIC' })
     // ENQUEUE_BRIDGE is recorded BEFORE the float convert, so a convert failure
     // can never lose the accounting of USDC already on Binance.
     expect(enqueue?.stepOrder).toBeLessThan(transferoConvert?.stepOrder ?? 0)
@@ -118,7 +118,7 @@ describe('FlowDefinitionBuilder Binance convert', () => {
 
     expect(transferoConvert?.config).not.toHaveProperty('amountSource')
     expect(enqueue?.config).not.toHaveProperty('amountSource')
-    expect(enqueue?.config).toMatchObject({ asset: 'USDC', destNetwork: 'SOL' })
+    expect(enqueue?.config).toMatchObject({ asset: 'USDC', destNetwork: 'MATIC' })
   })
 
   // Async payout inserts AWAIT_PROVIDER_STATUS; absolute-order wiring must follow.
@@ -142,5 +142,30 @@ describe('FlowDefinitionBuilder Binance convert', () => {
     // Absolute-order wiring survives the shift; leg recorded before the float convert.
     expect(enqueue?.config.amountSource).toEqual({ field: 'amount', kind: 'step', stepOrder: binanceConvert?.stepOrder })
     expect(enqueue?.stepOrder).toBeLessThan(transferoConvert?.stepOrder ?? 0)
+  })
+
+  it('rejects direct hot-wallet deposits into Transfero Ultra', () => {
+    const builder = makeBuilder()
+
+    expect(() => builder.build({
+      blockchain: BlockchainNetwork.SOLANA,
+      cryptoCurrency: CryptoCurrency.USDC,
+      name: 'legacy-direct-transfero',
+      payoutProvider: PaymentMethod.PIX,
+      pricingProvider: FlowPricingProvider.TRANSFERO,
+      steps: [
+        { type: 'PAYOUT' },
+        { type: 'MOVE_TO_EXCHANGE', venue: 'TRANSFERO' },
+        {
+          fromAsset: SupportedCurrency.USDC,
+          toAsset: SupportedCurrency.BRL,
+          type: 'CONVERT',
+          venue: 'TRANSFERO',
+        },
+      ],
+      targetCurrency: TargetCurrency.BRL,
+    })).toThrow(
+      'Transfero Ultra deposits must route through Binance and TRANSFER_VENUE on Polygon',
+    )
   })
 })

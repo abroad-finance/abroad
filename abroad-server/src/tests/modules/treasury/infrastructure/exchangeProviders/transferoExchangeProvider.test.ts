@@ -1,209 +1,232 @@
+import 'reflect-metadata'
 import { BlockchainNetwork, CryptoCurrency, TargetCurrency } from '@prisma/client'
-import axios from 'axios'
 
+import { TransferoUltraClient, TransferoUltraError } from '../../../../../modules/transfero/infrastructure/TransferoUltraClient'
 import { TransferoExchangeProvider } from '../../../../../modules/treasury/infrastructure/exchangeProviders/transferoExchangeProvider'
-import { ISecretManager, Secret } from '../../../../../platform/secrets/ISecretManager'
 import { createMockLogger } from '../../../../setup/mockFactories'
 
-jest.mock('axios')
+type UltraClientMock = jest.Mocked<
+  Pick<TransferoUltraClient, 'get' | 'patch' | 'post'>
+>
 
-class SecretManagerStub implements ISecretManager {
-  constructor(private readonly secrets: Partial<Record<Secret, string>>) { }
+const SESSION_ID = '11111111-2222-4333-8444-555555555555'
+const TRADE_ID = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee'
 
-  async getSecret(secretName: Secret): Promise<string> {
-    return this.secrets[secretName] ?? ''
-  }
+const createUltraClient = (): UltraClientMock => ({
+  get: jest.fn(),
+  patch: jest.fn(),
+  post: jest.fn(),
+})
 
-  async getSecrets<T extends readonly Secret[]>(secretNames: T): Promise<Record<T[number], string>> {
-    const result: Record<string, string> = {}
-    secretNames.forEach((name) => {
-      result[name] = this.secrets[name] ?? ''
-    })
-    return result as Record<T[number], string>
-  }
+const createProvider = () => {
+  const ultraClient = createUltraClient()
+  const logger = createMockLogger()
+  const provider = new TransferoExchangeProvider(
+    ultraClient as unknown as TransferoUltraClient,
+    logger,
+  )
+  return { logger, provider, ultraClient }
 }
 
-const mockedAxios = axios as jest.Mocked<typeof axios>
-
-const baseSecrets: Partial<Record<Secret, string>> = {
-  TRANSFERO_BASE_URL: 'https://transfero.test',
-  TRANSFERO_CLIENT_ID: 'id-1',
-  TRANSFERO_CLIENT_SCOPE: 'scope-1',
-  TRANSFERO_CLIENT_SECRET: 'secret-1',
-  TRANSFERO_SOLANA_WALLET: 'solana-wallet',
-  TRANSFERO_STELLAR_WALLET: 'stellar-wallet',
+const otcSession = {
+  amount: 5,
+  client_name: 'Abroad',
+  created_at: '2026-07-27T10:00:00.000Z',
+  currency: 'USDC',
+  expires_at: '2026-07-27T10:00:10.000Z',
+  price: 5,
+  session_id: SESSION_ID,
+  settlement: 'D0',
+  side: 'SELL',
+  spot: 5,
+  status: 'OPEN',
+  total_brl: 25,
 }
 
 describe('TransferoExchangeProvider', () => {
-  beforeEach(() => {
-    jest.clearAllMocks()
+  it('uses the Ultra Polygon vault address for supported stablecoins', async () => {
+    const { provider, ultraClient } = createProvider()
+    ultraClient.get.mockResolvedValue([
+      {
+        address: '0x1111222233334444555566667777888899990000',
+        asset: 'USDC',
+        blockchain: 'POLYGON',
+        id: '11111111-2222-4333-8444-555555555555',
+        network: 'mainnet',
+        tag: null,
+      },
+    ])
+
+    await expect(provider.getExchangeAddress({
+      blockchain: 'POLYGON',
+      cryptoCurrency: CryptoCurrency.USDC,
+    })).resolves.toEqual({
+      address: '0x1111222233334444555566667777888899990000',
+      success: true,
+    })
+    expect(provider.getDepositNetwork({
+      cryptoCurrency: CryptoCurrency.USDC,
+    })).toBe('POLYGON')
+    expect(ultraClient.get).toHaveBeenCalledWith('/api/v1/vault/addresses')
   })
 
-  const createProvider = (secrets: Partial<Record<Secret, string>> = baseSecrets) =>
-    new TransferoExchangeProvider(new SecretManagerStub(secrets), createMockLogger())
+  it('rejects direct legacy source chains before looking up an address', async () => {
+    const { provider, ultraClient } = createProvider()
 
-  describe('getExchangeAddress', () => {
-    it('returns the configured stellar wallet', async () => {
-      const provider = createProvider()
-
-      const address = await provider.getExchangeAddress({
-        blockchain: BlockchainNetwork.STELLAR,
-        cryptoCurrency: CryptoCurrency.USDC,
-      })
-
-      expect(address).toEqual({ address: 'stellar-wallet', success: true })
+    await expect(provider.getExchangeAddress({
+      blockchain: BlockchainNetwork.SOLANA,
+      cryptoCurrency: CryptoCurrency.USDC,
+    })).resolves.toEqual({
+      code: 'validation',
+      reason: 'transfero_ultra_unsupported_blockchain:SOLANA',
+      success: false,
     })
-
-    it('returns the configured solana wallet', async () => {
-      const provider = createProvider()
-
-      const address = await provider.getExchangeAddress({
-        blockchain: BlockchainNetwork.SOLANA,
-        cryptoCurrency: CryptoCurrency.USDC,
-      })
-
-      expect(address).toEqual({ address: 'solana-wallet', success: true })
-    })
-
-    it('returns failure for unsupported blockchains', async () => {
-      const provider = createProvider()
-
-      const result = await provider.getExchangeAddress({
-        blockchain: 'UNSUPPORTED' as BlockchainNetwork,
-        cryptoCurrency: CryptoCurrency.USDC,
-      })
-      expect(result).toEqual({ code: 'validation', reason: 'Unsupported blockchain: UNSUPPORTED', success: false })
-    })
+    expect(ultraClient.get).not.toHaveBeenCalled()
   })
 
-  describe('getExchangeRate', () => {
-    it('returns source-based pricing', async () => {
-      mockedAxios.post
-        .mockResolvedValueOnce({ data: { access_token: 'token-1', expires_in: 900 } })
-        .mockResolvedValueOnce({ data: [{ price: '2.5' }] })
-
-      const provider = createProvider()
-
-      const rate = await provider.getExchangeRate({
-        sourceAmount: 10,
-        sourceCurrency: CryptoCurrency.USDC,
-        targetCurrency: TargetCurrency.BRL,
-      })
-
-      expect(rate).toBeCloseTo(4)
-      expect(mockedAxios.post).toHaveBeenCalledWith(
-        'https://transfero.test/auth/token',
-        {
-          client_id: 'id-1',
-          client_secret: 'secret-1',
-          grant_type: 'client_credentials',
-          scope: 'scope-1',
+  it('inverts Ultra all-in D0 SELL prices for the quote use case', async () => {
+    const { provider, ultraClient } = createProvider()
+    ultraClient.get.mockResolvedValue({
+      prices: {
+        USDC: {
+          D0: { price: 5 },
+          D1: { price: 5.01 },
+          D2: { price: 5.02 },
         },
-        {
-          headers: { 'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
-        },
-      )
-      expect(mockedAxios.post).toHaveBeenCalledWith(
-        'https://transfero.test/api/quote/v2.0/requestquote',
-        expect.objectContaining({
-          baseCurrency: CryptoCurrency.USDC,
-          baseCurrencySize: 10,
-          quoteCurrency: TargetCurrency.BRL,
-          quoteCurrencySize: undefined,
-          side: 'sell',
-        }),
-        expect.any(Object),
-      )
+      },
+      spot: 5.03,
+      timestamp: '2026-07-27T10:00:00.000Z',
     })
 
-    it('returns target-based pricing when source amount is undefined', async () => {
-      mockedAxios.post
-        .mockResolvedValueOnce({ data: { access_token: 'token-2', expires_in: 900 } })
-        .mockResolvedValueOnce({ data: [{ price: '200' }] })
+    await expect(provider.getExchangeRate({
+      sourceAmount: 10,
+      sourceCurrency: CryptoCurrency.USDC,
+      targetCurrency: TargetCurrency.BRL,
+    })).resolves.toBeCloseTo(0.2)
+    expect(ultraClient.get).toHaveBeenCalledWith(
+      '/api/v1/otc/prices',
+      { side: 'SELL' },
+    )
+  })
 
-      const provider = createProvider()
-
-      const rate = await provider.getExchangeRate({
-        sourceCurrency: CryptoCurrency.USDC,
-        targetAmount: 100,
-        targetCurrency: TargetCurrency.BRL,
-      })
-
-      expect(rate).toBeCloseTo(2)
+  it('creates, confirms, and fully settles a D0 SELL session from holdings', async () => {
+    const { provider, ultraClient } = createProvider()
+    ultraClient.post
+      .mockResolvedValueOnce(otcSession)
+      .mockResolvedValueOnce('5.00000000')
+    ultraClient.patch.mockResolvedValue({
+      closing: {},
+      trade: { id: TRADE_ID },
     })
 
-    it('throws when Transfero returns an invalid price', async () => {
-      mockedAxios.post
-        .mockResolvedValueOnce({ data: { access_token: 'token-3', expires_in: 900 } })
-        .mockResolvedValueOnce({ data: [{ price: undefined }] })
+    await expect(provider.createMarketOrder({
+      operationId: 'transaction-1:exchange:6',
+      sourceAmount: 5,
+      sourceCurrency: CryptoCurrency.USDC,
+      targetCurrency: TargetCurrency.BRL,
+    })).resolves.toEqual({ success: true })
 
-      const provider = createProvider()
+    expect(ultraClient.post).toHaveBeenNthCalledWith(
+      1,
+      '/api/v1/otc/sessions',
+      {
+        amount: 5,
+        currency: CryptoCurrency.USDC,
+        settlement: 'D0',
+        side: 'SELL',
+        validity_seconds: 10,
+      },
+      'abroad:otc:transaction-1:exchange:6:session',
+    )
+    expect(ultraClient.patch).toHaveBeenCalledWith(
+      `/api/v1/otc/sessions/${SESSION_ID}`,
+      {
+        oid: 'transaction-1:exchange:6',
+        side: 'SELL',
+        source: 'api',
+      },
+      'abroad:otc:transaction-1:exchange:6:confirmation',
+    )
+    expect(ultraClient.post).toHaveBeenNthCalledWith(
+      2,
+      `/api/v1/otc/trades/${TRADE_ID}/settle-from-holdings`,
+      undefined,
+      'abroad:otc:transaction-1:exchange:6:settlement',
+    )
+  })
 
-      await expect(provider.getExchangeRate({
-        sourceAmount: 1,
-        sourceCurrency: CryptoCurrency.USDC,
-        targetCurrency: TargetCurrency.COP,
-      })).rejects.toThrow('Invalid price returned from Transfero')
+  it('fails closed when holdings do not settle the complete requested amount', async () => {
+    const { provider, ultraClient } = createProvider()
+    ultraClient.post
+      .mockResolvedValueOnce(otcSession)
+      .mockResolvedValueOnce('4.90000000')
+    ultraClient.patch.mockResolvedValue({
+      closing: {},
+      trade: { id: TRADE_ID },
     })
 
-    it('reuses cached access tokens to avoid extra auth requests', async () => {
-      const provider = createProvider()
-      Reflect.set(
-        provider as unknown as Record<string, unknown>,
-        'cachedToken',
-        { exp: Date.now() + 120_000, value: 'cached-token' },
-      )
-
-      mockedAxios.post.mockResolvedValueOnce({ data: [{ price: '10' }] })
-
-      const rate = await provider.getExchangeRate({
-        sourceAmount: 20,
-        sourceCurrency: CryptoCurrency.USDC,
-        targetCurrency: TargetCurrency.BRL,
-      })
-
-      expect(rate).toBeCloseTo(2)
-      expect(mockedAxios.post).toHaveBeenCalledTimes(1)
-      expect(mockedAxios.post).toHaveBeenCalledWith(
-        'https://transfero.test/api/quote/v2.0/requestquote',
-        expect.objectContaining({
-          baseCurrency: CryptoCurrency.USDC,
-          baseCurrencySize: 20,
-          quoteCurrency: TargetCurrency.BRL,
-        }),
-        expect.any(Object),
-      )
+    await expect(provider.createMarketOrder({
+      operationId: 'transaction-partial',
+      sourceAmount: 5,
+      sourceCurrency: CryptoCurrency.USDC,
+      targetCurrency: TargetCurrency.BRL,
+    })).resolves.toEqual({
+      code: 'permanent',
+      reason: 'transfero_ultra_partial_holdings_settlement:4.90000000',
+      success: false,
     })
   })
 
-  describe('createMarketOrder', () => {
-    it('returns success when quote acceptance succeeds', async () => {
-      mockedAxios.post
-        .mockResolvedValueOnce({ data: { access_token: 'token-4', expires_in: 900 } })
-        .mockResolvedValueOnce({ data: [{ quoteId: 'q-1' }] })
-        .mockResolvedValueOnce({ data: { success: true } })
-
-      const provider = createProvider()
-      const result = await provider.createMarketOrder({
-        sourceAmount: 5,
-        sourceCurrency: CryptoCurrency.USDC,
-        targetCurrency: TargetCurrency.BRL,
-      })
-
-      expect(result).toEqual({ success: true })
+  it('does not confirm a session whose locked trade differs from the request', async () => {
+    const { provider, ultraClient } = createProvider()
+    ultraClient.post.mockResolvedValue({
+      ...otcSession,
+      amount: 6,
     })
 
-    it('returns false when quote creation fails', async () => {
-      mockedAxios.post.mockRejectedValue(new Error('network down'))
+    await expect(provider.createMarketOrder({
+      operationId: 'transaction-session-mismatch',
+      sourceAmount: 5,
+      sourceCurrency: CryptoCurrency.USDC,
+      targetCurrency: TargetCurrency.BRL,
+    })).resolves.toEqual({
+      code: 'permanent',
+      reason: 'transfero_ultra_otc_session_mismatch:amount',
+      success: false,
+    })
+    expect(ultraClient.patch).not.toHaveBeenCalled()
+    expect(ultraClient.post).toHaveBeenCalledTimes(1)
+  })
 
-      const provider = createProvider()
-      const result = await provider.createMarketOrder({
-        sourceAmount: 5,
-        sourceCurrency: CryptoCurrency.USDC,
-        targetCurrency: TargetCurrency.BRL,
-      })
+  it('preserves Ultra failure classification and treats malformed responses as permanent', async () => {
+    const { provider, ultraClient } = createProvider()
+    ultraClient.post
+      .mockRejectedValueOnce(new TransferoUltraError({
+        code: 'retriable',
+        message: 'Transfero Ultra HTTP_503',
+        status: 503,
+      }))
+      .mockResolvedValueOnce({ session_id: 'invalid' })
 
-      expect(result).toEqual({ code: 'retriable', reason: 'network down', success: false })
+    await expect(provider.createMarketOrder({
+      operationId: 'transaction-retry',
+      sourceAmount: 5,
+      sourceCurrency: CryptoCurrency.USDC,
+      targetCurrency: TargetCurrency.BRL,
+    })).resolves.toEqual({
+      code: 'retriable',
+      reason: 'Transfero Ultra HTTP_503',
+      success: false,
+    })
+    await expect(provider.createMarketOrder({
+      operationId: 'transaction-schema',
+      sourceAmount: 5,
+      sourceCurrency: CryptoCurrency.USDC,
+      targetCurrency: TargetCurrency.BRL,
+    })).resolves.toEqual({
+      code: 'permanent',
+      reason: 'transfero_ultra_otc_schema_mismatch',
+      success: false,
     })
   })
 })

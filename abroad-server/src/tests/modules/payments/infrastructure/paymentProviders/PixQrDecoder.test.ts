@@ -1,134 +1,153 @@
-import axios from 'axios'
-
-import type { ISecretManager } from '../../../../../platform/secrets/ISecretManager'
+import 'reflect-metadata'
 
 import { PixQrDecoder } from '../../../../../modules/payments/infrastructure/paymentProviders/PixQrDecoder'
-import { createMockLogger, MockLogger } from '../../../../setup/mockFactories'
+import { TransferoUltraClient, TransferoUltraError } from '../../../../../modules/transfero/infrastructure/TransferoUltraClient'
+import { createMockLogger } from '../../../../setup/mockFactories'
 
-jest.mock('axios')
+type UltraClientMock = jest.Mocked<
+  Pick<TransferoUltraClient, 'get' | 'patch' | 'post'>
+>
+
+const createUltraClient = (): UltraClientMock => ({
+  get: jest.fn(),
+  patch: jest.fn(),
+  post: jest.fn(),
+})
+
+const payablePreview = {
+  amount: 25.5,
+  currency: '986',
+  merchantCity: 'SAO PAULO',
+  merchantName: 'Alice',
+  pixKey: 'pix-key',
+  status: 'created',
+  txid: 'tx-123',
+  type: 'dynamic' as const,
+  url: 'https://pix.example/tx-123',
+}
 
 describe('PixQrDecoder', () => {
-  let secretManager: ISecretManager
-  let logger: MockLogger
-  const isAxiosErrorMock = axios.isAxiosError as jest.MockedFunction<typeof axios.isAxiosError>
-  const postMock = axios.post as jest.MockedFunction<typeof axios.post>
+  it('previews a payable Ultra BR code and normalizes the public result', async () => {
+    const ultraClient = createUltraClient()
+    ultraClient.post.mockResolvedValue(payablePreview)
+    const decoder = new PixQrDecoder(
+      ultraClient as unknown as TransferoUltraClient,
+      createMockLogger(),
+    )
 
-  beforeEach(() => {
-    jest.clearAllMocks()
-    isAxiosErrorMock.mockReset()
-    isAxiosErrorMock.mockImplementation(() => false)
-    secretManager = {
-      getSecret: jest.fn(async (key: string) => `secret-${key.toLowerCase()}`),
-      getSecrets: jest.fn(async (keys: ReadonlyArray<string>) => {
-        const result: Record<string, string> = {}
-        keys.forEach((k) => {
-          result[k] = `val-${k.toLowerCase()}`
-        })
-        return result as Record<(typeof keys)[number], string>
-      }),
-    }
-    logger = createMockLogger()
-  })
-
-  it('decodes a PIX QR code and normalizes response', async () => {
-    postMock
-      .mockResolvedValueOnce({ data: { access_token: 'token-123', expires_in: 900 } })
-      .mockResolvedValueOnce({
-        data: {
-          amount: 25.5,
-          brCode: { keyId: 'pix-key' },
-          name: 'Alice',
-          taxId: '123',
-        },
-      })
-
-    const decoder = new PixQrDecoder(secretManager, logger)
-    const decoded = await decoder.decode('qr-123')
-
-    expect(decoded).toEqual({
-      account: 'pix-key',
-      amount: '25.50',
-      currency: 'BRL',
-      name: 'Alice',
-      taxId: '123',
+    const result = await decoder.validateForPayment({
+      idempotencyKey: 'abroad:pix-preview:transaction-1',
+      qrCode: 'br-code',
     })
-    expect(postMock).toHaveBeenCalledTimes(2)
-  })
 
-  it('returns null when taxId is masked and reuses cached token', async () => {
-    postMock.mockResolvedValueOnce({ data: { access_token: 'token-abc', expires_in: 3600 } })
-    postMock.mockResolvedValueOnce({
-      data: {
-        amount: 10,
-        brCode: { keyId: 'k' },
-        name: 'Bob',
-        taxId: '****1234',
+    expect(result).toEqual({
+      decoded: {
+        account: 'pix-key',
+        amount: '25.50',
+        currency: 'BRL',
+        name: 'Alice',
+        status: 'CREATED',
+        txid: 'tx-123',
+        type: 'dynamic',
       },
+      success: true,
     })
-    const decoder = new PixQrDecoder(secretManager, logger)
-    await decoder.decode('first')
-
-    // Cached token should bypass another auth call
-    postMock.mockResolvedValueOnce({
-      data: {
-        amount: 5,
-        brCode: { keyId: 'k2' },
-        name: 'Carol',
-        taxId: '****5678',
-      },
-    })
-
-    const decoded = await decoder.decode('second')
-
-    expect(decoded?.taxId).toBeNull()
-    expect(postMock).toHaveBeenCalledTimes(3)
+    expect(ultraClient.post).toHaveBeenCalledWith(
+      '/api/v1/pix/brcode-previews',
+      { brcode: 'br-code' },
+      'abroad:pix-preview:transaction-1',
+    )
   })
 
-  it('returns null on errors', async () => {
-    postMock.mockRejectedValueOnce(new Error('network'))
-    const decoder = new PixQrDecoder(secretManager, logger)
+  it('rejects a non-payable QR status without accepting legacy status aliases', async () => {
+    const ultraClient = createUltraClient()
+    ultraClient.post.mockResolvedValue({
+      ...payablePreview,
+      status: 'expired',
+    })
+    const decoder = new PixQrDecoder(
+      ultraClient as unknown as TransferoUltraClient,
+      createMockLogger(),
+    )
 
-    const decoded = await decoder.decode('bad')
-
-    expect(decoded).toBeNull()
-    expect(postMock).toHaveBeenCalledTimes(1)
-    expect(logger.error).toHaveBeenCalledWith('Transfero Pix QR decode failed', 'network')
+    await expect(decoder.validateForPayment({
+      idempotencyKey: 'preview-2',
+      qrCode: 'expired-code',
+    })).resolves.toEqual({
+      code: 'validation',
+      reason: 'pix_qr_not_payable:EXPIRED',
+      success: false,
+    })
+    await expect(decoder.decode('expired-code')).resolves.toBeNull()
   })
 
-  describe('describeError', () => {
-    it('handles axios responses with strings, objects, and circular payloads', () => {
-      const decoder = new PixQrDecoder(secretManager, logger)
-      const describe = decoder as unknown as { describeError: (err: unknown) => string }
-
-      isAxiosErrorMock.mockReturnValueOnce(true)
-      const stringResponse: unknown = { message: 'string resp', response: { data: 'failure' } }
-      expect(describe.describeError(stringResponse)).toBe('failure')
-
-      isAxiosErrorMock.mockReturnValueOnce(true)
-      const objectResponse: unknown = { message: 'object resp', response: { data: { code: 400 } } }
-      expect(describe.describeError(objectResponse)).toBe(JSON.stringify({ code: 400 }))
-
-      isAxiosErrorMock.mockReturnValueOnce(true)
-      const circularPayload: Record<string, unknown> = {}
-      circularPayload.self = circularPayload
-      const circularResponse: unknown = { message: 'circular', response: { data: circularPayload } }
-      expect(describe.describeError(circularResponse)).toBe('circular')
+  it('rejects currencies outside BRL and ISO-4217 numeric code 986', async () => {
+    const ultraClient = createUltraClient()
+    ultraClient.post.mockResolvedValue({
+      ...payablePreview,
+      currency: 'USD',
     })
+    const decoder = new PixQrDecoder(
+      ultraClient as unknown as TransferoUltraClient,
+      createMockLogger(),
+    )
 
-    it('falls back cleanly for non-Axios errors and unserializable objects', () => {
-      const decoder = new PixQrDecoder(secretManager, logger)
-      const describe = decoder as unknown as { describeError: (err: unknown) => string }
-
-      isAxiosErrorMock.mockReturnValueOnce(false)
-      expect(describe.describeError(new Error('plain'))).toBe('plain')
-
-      isAxiosErrorMock.mockReturnValueOnce(false)
-      expect(describe.describeError('text error')).toBe('text error')
-
-      isAxiosErrorMock.mockReturnValueOnce(false)
-      const circular: Record<string, unknown> = {}
-      circular.self = circular
-      expect(describe.describeError(circular)).toBe('[object Object]')
+    await expect(decoder.validateForPayment({
+      idempotencyKey: 'preview-3',
+      qrCode: 'foreign-code',
+    })).resolves.toEqual({
+      code: 'validation',
+      reason: 'pix_qr_currency_not_supported:USD',
+      success: false,
     })
+  })
+
+  it('preserves Ultra transport failure classification', async () => {
+    const ultraClient = createUltraClient()
+    ultraClient.post.mockRejectedValue(new TransferoUltraError({
+      code: 'retriable',
+      message: 'Transfero Ultra RATE_LIMIT',
+      providerCode: 'RATE_LIMIT',
+      status: 429,
+    }))
+    const decoder = new PixQrDecoder(
+      ultraClient as unknown as TransferoUltraClient,
+      createMockLogger(),
+    )
+
+    await expect(decoder.validateForPayment({
+      idempotencyKey: 'preview-4',
+      qrCode: 'code',
+    })).resolves.toEqual({
+      code: 'retriable',
+      reason: 'Transfero Ultra RATE_LIMIT',
+      success: false,
+    })
+  })
+
+  it('fails permanently when the Ultra response violates its schema', async () => {
+    const ultraClient = createUltraClient()
+    const logger = createMockLogger()
+    ultraClient.post.mockResolvedValue({
+      currency: '986',
+      status: 'created',
+    })
+    const decoder = new PixQrDecoder(
+      ultraClient as unknown as TransferoUltraClient,
+      logger,
+    )
+
+    await expect(decoder.validateForPayment({
+      idempotencyKey: 'preview-5',
+      qrCode: 'code',
+    })).resolves.toEqual({
+      code: 'permanent',
+      reason: 'transfero_ultra_qr_preview_schema_mismatch',
+      success: false,
+    })
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.stringContaining('Transfero Ultra PIX QR preview schema mismatch'),
+      expect.objectContaining({ issues: expect.any(Array) }),
+    )
   })
 })

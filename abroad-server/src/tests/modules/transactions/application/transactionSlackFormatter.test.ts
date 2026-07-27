@@ -76,7 +76,7 @@ describe('transactionSlackFormatter', () => {
       notes: {
         provider: 'transfero',
         providerAmount: 10,
-        providerStatus: 'processed',
+        providerStatus: 'SETTLED',
       },
       status: TransactionStatus.PAYMENT_COMPLETED,
       trigger: 'TransactionFormatterTest',
@@ -89,7 +89,7 @@ describe('transactionSlackFormatter', () => {
     expect(message).toContain('Amounts: 10 USDC -> 20 BRL')
     expect(message).toContain('Payment: BREB | Network: STELLAR | Account: 123456789')
     expect(message).toContain('References: External: external-1 | On-chain: on-chain-1 | Refund: refund-1')
-    expect(message).toContain('Notes: provider: transfero | providerAmount: 10 | providerStatus: processed')
+    expect(message).toContain('Notes: provider: transfero | providerAmount: 10 | providerStatus: SETTLED')
     expect(message).toContain('Country: 🇧🇷')
   })
 

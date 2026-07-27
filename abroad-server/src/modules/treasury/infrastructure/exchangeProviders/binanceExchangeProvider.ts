@@ -13,6 +13,7 @@ import { ISecretManager } from '../../../../platform/secrets/ISecretManager'
 import {
   ExchangeAddressResult,
   ExchangeFailureCode,
+  ExchangeNetwork,
   ExchangeOperationResult,
   ExchangeProviderCapability,
   IExchangeProvider,
@@ -207,7 +208,7 @@ export class BinanceExchangeProvider implements IExchangeProvider {
    * @param blockchain The blockchain network from our system
    * @returns The corresponding Binance network name
    */
-  private mapBlockchainToNetwork(blockchain: BlockchainNetwork): string {
+  private mapBlockchainToNetwork(blockchain: ExchangeNetwork): string {
     const network = mapBlockchainToBinanceNetwork(blockchain)
     if (!network) {
       throw new Error(`Unsupported blockchain: ${blockchain}`)

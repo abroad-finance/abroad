@@ -3,16 +3,22 @@ import { BlockchainNetwork, TargetCurrency } from '@prisma/client'
 
 import type { ISecretManager } from '../../../../platform/secrets/ISecretManager'
 
+import { TransferoUltraClient } from '../../../../modules/transfero/infrastructure/TransferoUltraClient'
 import { ExchangeProviderFactory } from '../../../../modules/treasury/application/ExchangeProviderFactory'
 import { BinanceBrlExchangeProvider, BinanceExchangeProvider } from '../../../../modules/treasury/infrastructure/exchangeProviders/binanceExchangeProvider'
 import { TransferoExchangeProvider } from '../../../../modules/treasury/infrastructure/exchangeProviders/transferoExchangeProvider'
 import { createMockLogger } from '../../../setup/mockFactories'
 
 const secretManager = { getSecret: jest.fn(), getSecrets: jest.fn() } as unknown as ISecretManager
+const ultraClient = {
+  get: jest.fn(),
+  patch: jest.fn(),
+  post: jest.fn(),
+} as unknown as TransferoUltraClient
 
 const buildFactory = () => {
   const logger = createMockLogger()
-  const transfero = new TransferoExchangeProvider(secretManager, logger)
+  const transfero = new TransferoExchangeProvider(ultraClient, logger)
   const binance = new BinanceExchangeProvider(secretManager, logger)
   const binanceBrl = new BinanceBrlExchangeProvider(secretManager, logger)
   const factory = new ExchangeProviderFactory(transfero, binance, binanceBrl)
@@ -20,7 +26,7 @@ const buildFactory = () => {
 }
 
 describe('ExchangeProviderFactory BRL routing', () => {
-  it('routes USDC on SOLANA → BRL to Transfero (which supports Solana deposits)', () => {
+  it('routes a SOLANA-funded BRL corridor to Transfero for settlement', () => {
     const { factory, transfero } = buildFactory()
     const provider = factory.getExchangeProviderForCapability({
       blockchain: BlockchainNetwork.SOLANA,
@@ -29,7 +35,7 @@ describe('ExchangeProviderFactory BRL routing', () => {
     expect(provider).toBe(transfero)
   })
 
-  it('routes STELLAR → BRL to Transfero', () => {
+  it('keeps source-chain capability routing separate from the Polygon treasury hop', () => {
     const { factory, transfero } = buildFactory()
     expect(factory.getExchangeProviderForCapability({
       blockchain: BlockchainNetwork.STELLAR,

@@ -45,6 +45,9 @@ import { ReceivedCryptoTransactionUseCase } from '../../modules/transactions/app
 import { StellarOrphanRefundService } from '../../modules/transactions/application/StellarOrphanRefundService'
 import { TransactionAcceptanceService } from '../../modules/transactions/application/TransactionAcceptanceService'
 import { TransactionStatusService } from '../../modules/transactions/application/TransactionStatusService'
+import { TransferoUltraClient } from '../../modules/transfero/infrastructure/TransferoUltraClient'
+import { TransferoUltraWebhookConfigurationVerifier } from '../../modules/transfero/infrastructure/TransferoUltraWebhookConfigurationVerifier'
+import { TransferoUltraWebhookVerifier } from '../../modules/transfero/infrastructure/TransferoUltraWebhookVerifier'
 import { TransparencyMetricsService } from '../../modules/transparency/application/TransparencyMetricsService'
 import { BridgeFloatService } from '../../modules/treasury/application/BridgeFloatService'
 import { BridgeSweepService } from '../../modules/treasury/application/BridgeSweepService'
@@ -71,6 +74,9 @@ const domainBindings: ReadonlyArray<BindingRegistration<unknown>> = [
   { identifier: TYPES.IDepositVerifierRegistry, implementation: DepositVerifierRegistry },
   { bindSelf: true, identifier: PayoutStatusAdapterRegistry, implementation: PayoutStatusAdapterRegistry },
   { bindSelf: true, identifier: LiquidityCacheService, implementation: LiquidityCacheService },
+  { bindSelf: true, identifier: TransferoUltraClient, implementation: TransferoUltraClient },
+  { bindSelf: true, identifier: TransferoUltraWebhookConfigurationVerifier, implementation: TransferoUltraWebhookConfigurationVerifier },
+  { bindSelf: true, identifier: TransferoUltraWebhookVerifier, implementation: TransferoUltraWebhookVerifier },
   { identifier: TYPES.IPayoutStatusAdapter, implementation: TransferoPayoutStatusAdapter },
   { identifier: TYPES.IPayoutStatusAdapter, implementation: BrebPayoutStatusAdapter },
   { identifier: TYPES.IExchangeProviderFactory, implementation: ExchangeProviderFactory },

@@ -1,12 +1,19 @@
-import { BlockchainNetwork, CryptoCurrency, TargetCurrency } from '@prisma/client'
-// src/services/transferoExchangeProvider.ts
-import axios from 'axios'
+import { CryptoCurrency, TargetCurrency } from '@prisma/client'
 import { inject, injectable } from 'inversify'
+import { createHash } from 'node:crypto'
+import { ZodError } from 'zod'
 
 import { TYPES } from '../../../../app/container/types'
 import { createScopedLogger, ScopedLogger } from '../../../../core/logging/scopedLogger'
 import { ILogger } from '../../../../core/logging/types'
-import { ISecretManager } from '../../../../platform/secrets/ISecretManager'
+import { TransferoUltraClient, TransferoUltraError } from '../../../transfero/infrastructure/TransferoUltraClient'
+import {
+  transferoUltraDecimalSchema,
+  transferoUltraOtcConfirmationResponseSchema,
+  transferoUltraOtcPricesResponseSchema,
+  transferoUltraOtcSessionResponseSchema,
+  transferoUltraVaultAddressesResponseSchema,
+} from '../../../transfero/infrastructure/transferoUltraSchemas'
 import {
   ExchangeAddressResult,
   ExchangeFailureCode,
@@ -15,200 +22,297 @@ import {
   IExchangeProvider,
 } from '../../application/contracts/IExchangeProvider'
 
+const ULTRA_SETTLEMENT = 'D0'
+const ULTRA_SIDE = 'SELL'
+const ULTRA_QUOTE_VALIDITY_SECONDS = 10
+
 @injectable()
 export class TransferoExchangeProvider implements IExchangeProvider {
-  // Transfero accepts BRL deposits on multiple chains (STELLAR and SOLANA — see
-  // getExchangeAddress). Leave blockchain undefined so the provider factory
-  // selects Transfero for any BRL corridor not claimed by a chain-specific
-  // provider (e.g. CELO → BinanceBrl), instead of only STELLAR.
   public readonly capability: ExchangeProviderCapability = {
     blockchain: undefined,
     targetCurrency: TargetCurrency.BRL,
   }
 
-  readonly exchangePercentageFee = 0.001
-
-  private cachedToken?: { exp: number, value: string }
+  public readonly exchangePercentageFee = 0
   private readonly logger: ScopedLogger
 
-  constructor(
-    @inject(TYPES.ISecretManager) private readonly secretManager: ISecretManager,
+  public constructor(
+    @inject(TransferoUltraClient) private readonly ultraClient: TransferoUltraClient,
     @inject(TYPES.ILogger) baseLogger: ILogger,
   ) {
-    this.logger = createScopedLogger(baseLogger, { scope: 'TransferoExchangeProvider' })
+    this.logger = createScopedLogger(baseLogger, { scope: 'TransferoUltraExchangeProvider' })
   }
 
-  async createMarketOrder({ sourceAmount, sourceCurrency, targetCurrency }: { sourceAmount: number, sourceCurrency: CryptoCurrency, targetCurrency: TargetCurrency }): Promise<ExchangeOperationResult> {
+  public async createMarketOrder(params: {
+    operationId: string
+    sourceAmount: number
+    sourceCurrency: CryptoCurrency
+    targetCurrency: TargetCurrency
+  }): Promise<ExchangeOperationResult> {
+    if (params.targetCurrency !== TargetCurrency.BRL) {
+      return this.buildOperationFailure('validation', 'transfero_ultra_only_supports_brl_sales')
+    }
+    if (!Number.isFinite(params.sourceAmount) || params.sourceAmount <= 0) {
+      return this.buildOperationFailure('validation', 'transfero_ultra_trade_amount_must_be_positive')
+    }
+    if (!params.operationId.trim()) {
+      return this.buildOperationFailure('validation', 'transfero_ultra_operation_id_required')
+    }
+
     try {
-      const token = await this.getAccessToken()
-      const { TRANSFERO_BASE_URL: apiUrl } = await this.secretManager.getSecrets([
-        'TRANSFERO_BASE_URL',
-      ])
-
-      // create quote:
-      const { data } = await axios.post(
-        `${apiUrl}/api/quote/v2.0/requestquote`,
+      const sessionResponse = await this.ultraClient.post(
+        '/api/v1/otc/sessions',
         {
-          baseCurrency: sourceCurrency,
-          baseCurrencySize: sourceAmount,
-          quoteCurrency: targetCurrency,
-          quoteCurrencySize: 0,
-          side: 'sell',
+          amount: params.sourceAmount,
+          currency: params.sourceCurrency,
+          settlement: ULTRA_SETTLEMENT,
+          side: ULTRA_SIDE,
+          validity_seconds: ULTRA_QUOTE_VALIDITY_SECONDS,
         },
-        { headers: { 'Accept': 'application/json', 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' } },
+        this.buildIdempotencyKey(params.operationId, 'session'),
       )
-
-      const quoteId = data[0].quoteId
-
-      // acceptquote
-      const { data: acceptQuoteData } = await axios.post(
-        `${apiUrl}/api/trade/v2.0/acceptquote`,
-        {
-          name: 'Abroad',
-          quoteId,
-        },
-        { headers: { 'Accept': 'application/json', 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' } },
-      )
-
-      if (acceptQuoteData.success) {
-        return { success: true }
+      const session = transferoUltraOtcSessionResponseSchema.parse(sessionResponse)
+      const sessionMismatch = this.describeSessionMismatch(session, params)
+      if (sessionMismatch) {
+        this.logger.error('Transfero Ultra OTC session did not match request', {
+          operationId: params.operationId,
+          reason: sessionMismatch,
+          sessionId: session.session_id,
+        })
+        return this.buildOperationFailure(
+          'permanent',
+          `transfero_ultra_otc_session_mismatch:${sessionMismatch}`,
+        )
       }
-      return { code: 'retriable', reason: 'Transfero trade was not accepted', success: false }
+
+      const confirmationResponse = await this.ultraClient.patch(
+        `/api/v1/otc/sessions/${encodeURIComponent(session.session_id)}`,
+        {
+          oid: params.operationId.slice(0, 128),
+          side: ULTRA_SIDE,
+          source: 'api',
+        },
+        this.buildIdempotencyKey(params.operationId, 'confirmation'),
+      )
+      const confirmation = transferoUltraOtcConfirmationResponseSchema.parse(
+        confirmationResponse,
+      )
+
+      const settlementResponse = await this.ultraClient.post(
+        `/api/v1/otc/trades/${encodeURIComponent(confirmation.trade.id)}/settle-from-holdings`,
+        undefined,
+        this.buildIdempotencyKey(params.operationId, 'settlement'),
+      )
+      const settledAmount = transferoUltraDecimalSchema.parse(
+        settlementResponse,
+      )
+      if (!this.coversRequestedAmount(settledAmount, params.sourceAmount)) {
+        this.logger.error('Transfero Ultra trade was not fully settled from holdings', {
+          requestedAmount: params.sourceAmount,
+          settledAmount,
+          tradeId: confirmation.trade.id,
+        })
+        return this.buildOperationFailure(
+          'permanent',
+          `transfero_ultra_partial_holdings_settlement:${settledAmount}`,
+        )
+      }
+
+      this.logger.info('Transfero Ultra OTC sale settled from holdings', {
+        sessionId: session.session_id,
+        settledAmount,
+        tradeId: confirmation.trade.id,
+      })
+      return { success: true }
     }
     catch (error) {
-      const reason = error instanceof Error ? error.message : 'Unknown error creating market order'
-      this.logger.error('Error creating market order', error)
-      return { code: 'retriable', reason, success: false }
+      const failure = this.toOperationFailure(error)
+      this.logger.warn('Transfero Ultra OTC sale failed', {
+        code: failure.code,
+        providerCode: error instanceof TransferoUltraError
+          ? error.providerCode
+          : undefined,
+        status: error instanceof TransferoUltraError ? error.status : undefined,
+      })
+      return failure
     }
   }
 
-  /**
-           * Retrieves (or creates) the deposit wallet for the partner account.
-           * Falls back to the first wallet that matches both currency and chain.
-           */
-  /**
-   * Transfero accepts stablecoin deposits (USDC/USDT) on Solana — its USDC
-   * deposit wallet is the Solana TRANSFERO_SOLANA_WALLET. Used by treasury
-   * transfers to pin both the deposit address and the source-venue withdraw
-   * network to Solana so USDC cannot be bridged on the wrong chain.
-   */
-  getDepositNetwork: NonNullable<IExchangeProvider['getDepositNetwork']> = ({ cryptoCurrency }) => {
+  public getDepositNetwork: NonNullable<IExchangeProvider['getDepositNetwork']> = ({
+    cryptoCurrency,
+  }) => {
     switch (cryptoCurrency) {
       case CryptoCurrency.USDC:
       case CryptoCurrency.USDT:
-        return BlockchainNetwork.SOLANA
+        return 'POLYGON'
       default:
         return undefined
     }
   }
 
-  getExchangeAddress: IExchangeProvider['getExchangeAddress'] = async ({
+  public getExchangeAddress: IExchangeProvider['getExchangeAddress'] = async ({
     blockchain,
+    cryptoCurrency,
   }): Promise<ExchangeAddressResult> => {
-    const secretName = (() => {
-      switch (blockchain) {
-        case BlockchainNetwork.CELO:
-          return undefined
-        case BlockchainNetwork.SOLANA:
-          return 'TRANSFERO_SOLANA_WALLET'
-        case BlockchainNetwork.STELLAR:
-          return 'TRANSFERO_STELLAR_WALLET'
-        default:
-          return undefined
-      }
-    })()
-
-    if (!secretName) {
-      return { code: 'validation', reason: `Unsupported blockchain: ${blockchain}`, success: false }
-    }
-
-    const secrets = await this.secretManager.getSecrets([secretName])
-
-    return {
-      address: secrets[secretName],
-      success: true,
-    }
-  }
-
-  /** ---------- Internals ---------- */
-
-  /**
- * Uses “request quote” with `fromSize = 1` to obtain the unit price.
- */
-  getExchangeRate: IExchangeProvider['getExchangeRate'] = async ({
-    sourceAmount,
-    sourceCurrency,
-    targetAmount,
-    targetCurrency,
-  }) => {
-    try {
-      const token = await this.getAccessToken()
-      const { TRANSFERO_BASE_URL: apiUrl } = await this.secretManager.getSecrets([
-        'TRANSFERO_BASE_URL',
-      ])
-
-      const { data } = await axios.post(
-        `${apiUrl}/api/quote/v2.0/requestquote`,
-        {
-          baseCurrency: sourceCurrency,
-          baseCurrencySize: sourceAmount,
-          quoteCurrency: targetCurrency,
-          quoteCurrencySize: targetAmount,
-          side: 'sell',
-        },
-        { headers: { 'Accept': 'application/json', 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' } },
+    if (blockchain !== 'POLYGON') {
+      return this.buildAddressFailure(
+        'validation',
+        `transfero_ultra_unsupported_blockchain:${blockchain}`,
       )
+    }
 
-      const price = Number(data[0].price ?? data[0].Price)
-      if (!price || Number.isNaN(price))
-        throw new Error('Invalid price returned from Transfero')
+    try {
+      const response = await this.ultraClient.get('/api/v1/vault/addresses')
+      const addresses = transferoUltraVaultAddressesResponseSchema.parse(response)
+      const address = addresses.find(candidate =>
+        candidate.asset === cryptoCurrency
+        && candidate.blockchain === 'POLYGON')
+      if (!address) {
+        return this.buildAddressFailure(
+          'permanent',
+          `transfero_ultra_polygon_address_missing:${cryptoCurrency}`,
+        )
+      }
 
-      this.logger.info('Fetched exchange rate', { price, sourceAmount, sourceCurrency, targetAmount, targetCurrency })
-
-      return sourceAmount ? (sourceAmount / price) : targetAmount ? (price / targetAmount) : 0
+      return {
+        address: address.address,
+        memo: address.tag ?? undefined,
+        success: true,
+      }
     }
     catch (error) {
-      this.logger.error('Error getting exchange rate', error)
-      throw new Error(`Failed to get exchange rate: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      if (error instanceof TransferoUltraError) {
+        return this.buildAddressFailure(error.code, error.message)
+      }
+      if (error instanceof ZodError) {
+        this.logger.error('Transfero Ultra vault address schema mismatch', {
+          issues: error.issues,
+        })
+        return this.buildAddressFailure(
+          'permanent',
+          'transfero_ultra_vault_address_schema_mismatch',
+        )
+      }
+      return this.buildAddressFailure(
+        'retriable',
+        error instanceof Error ? error.message : 'transfero_ultra_vault_address_error',
+      )
     }
   }
 
-  private buildFailure(code: ExchangeFailureCode, reason?: string): ExchangeAddressResult {
+  public getExchangeRate: IExchangeProvider['getExchangeRate'] = async ({
+    sourceCurrency,
+    targetCurrency,
+  }): Promise<number> => {
+    if (targetCurrency !== TargetCurrency.BRL) {
+      throw new Error('Transfero Ultra only quotes stablecoin sales into BRL')
+    }
+
+    try {
+      const response = await this.ultraClient.get('/api/v1/otc/prices', {
+        side: ULTRA_SIDE,
+      })
+      const prices = transferoUltraOtcPricesResponseSchema.parse(response)
+      const brlPerStablecoin = prices.prices[sourceCurrency]?.D0.price
+      if (!brlPerStablecoin || !Number.isFinite(brlPerStablecoin)) {
+        throw new Error(`Transfero Ultra D0 SELL price missing for ${sourceCurrency}`)
+      }
+
+      // QuoteUseCase consumes stablecoin-per-fiat. Ultra publishes the inverse:
+      // BRL per stablecoin, so invert the all-in D0 SELL desk price once.
+      return 1 / brlPerStablecoin
+    }
+    catch (error) {
+      this.logger.error('Transfero Ultra exchange-rate request failed', {
+        error: error instanceof Error ? error.message : 'unknown_error',
+        sourceCurrency,
+        targetCurrency,
+      })
+      throw new Error(
+        `Failed to get Transfero Ultra exchange rate: ${
+          error instanceof Error ? error.message : 'unknown_error'
+        }`,
+      )
+    }
+  }
+
+  private buildAddressFailure(
+    code: ExchangeFailureCode,
+    reason: string,
+  ): ExchangeAddressResult {
     return { code, reason, success: false }
   }
 
-  /** OAuth2 client-credentials flow */
-  private async getAccessToken(): Promise<string> {
-    const now = Date.now()
-    if (this.cachedToken && now < this.cachedToken.exp - 60_000) {
-      return this.cachedToken.value
+  private buildIdempotencyKey(operationId: string, phase: string): string {
+    const candidate = `abroad:otc:${operationId}:${phase}`
+    if (candidate.length <= 255) {
+      return candidate
     }
+    return `abroad:otc:${createHash('sha256').update(operationId).digest('hex')}:${phase}`
+  }
 
-    const {
-      TRANSFERO_BASE_URL,
-      TRANSFERO_CLIENT_ID,
-      TRANSFERO_CLIENT_SCOPE,
-      TRANSFERO_CLIENT_SECRET,
-    } = await this.secretManager.getSecrets([
-      'TRANSFERO_BASE_URL',
-      'TRANSFERO_CLIENT_ID',
-      'TRANSFERO_CLIENT_SECRET',
-      'TRANSFERO_CLIENT_SCOPE',
-    ])
+  private buildOperationFailure(
+    code: ExchangeFailureCode,
+    reason: string,
+  ): Extract<ExchangeOperationResult, { success: false }> {
+    return { code, reason, success: false }
+  }
 
-    const { data } = await axios.post(`${TRANSFERO_BASE_URL}/auth/token`, {
-      client_id: TRANSFERO_CLIENT_ID,
-      client_secret: TRANSFERO_CLIENT_SECRET,
-      grant_type: 'client_credentials',
-      scope: TRANSFERO_CLIENT_SCOPE,
-    }, {
-      headers: { 'Accept': 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
-    })
+  private coversRequestedAmount(settledAmount: string, requestedAmount: number): boolean {
+    const settled = Number(settledAmount)
+    if (!Number.isFinite(settled)) return false
 
-    const value = data.access_token ?? data
-    const seconds = Number(data.expires_in ?? 900) // default 15 min
-    this.cachedToken = { exp: now + seconds * 1000, value }
+    // Ultra reports fixed-point crypto strings while the flow stores a JS
+    // number. One atomic-unit tolerance avoids a false partial caused only by
+    // representation, without accepting an economically meaningful shortfall.
+    const atomicTolerance = 1e-8
+    return settled + atomicTolerance >= requestedAmount
+  }
 
-    return value
+  private describeSessionMismatch(
+    session: {
+      amount: number
+      currency: 'USDC' | 'USDT'
+      settlement: 'D0' | 'D1' | 'D2'
+      side: 'BUY' | 'SELL'
+    },
+    request: {
+      sourceAmount: number
+      sourceCurrency: CryptoCurrency
+    },
+  ): string | undefined {
+    if (session.currency !== request.sourceCurrency) {
+      return 'currency'
+    }
+    if (session.side !== ULTRA_SIDE) {
+      return 'side'
+    }
+    if (session.settlement !== ULTRA_SETTLEMENT) {
+      return 'settlement'
+    }
+    return Math.abs(session.amount - request.sourceAmount) > 1e-8
+      ? 'amount'
+      : undefined
+  }
+
+  private toOperationFailure(
+    error: unknown,
+  ): Extract<ExchangeOperationResult, { success: false }> {
+    if (error instanceof TransferoUltraError) {
+      return this.buildOperationFailure(error.code, error.message)
+    }
+    if (error instanceof ZodError) {
+      this.logger.error('Transfero Ultra OTC response schema mismatch', {
+        issues: error.issues,
+      })
+      return this.buildOperationFailure(
+        'permanent',
+        'transfero_ultra_otc_schema_mismatch',
+      )
+    }
+    return this.buildOperationFailure(
+      'retriable',
+      error instanceof Error ? error.message : 'transfero_ultra_otc_unknown_error',
+    )
   }
 }

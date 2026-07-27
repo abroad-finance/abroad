@@ -196,6 +196,11 @@ export class FlowDefinitionBuilder {
     if (state.location !== 'HOT_WALLET') {
       throw new FlowDefinitionBuilderError('Funds must be in hot wallet before moving to an exchange')
     }
+    if (step.venue === 'TRANSFERO') {
+      throw new FlowDefinitionBuilderError(
+        'Transfero Ultra deposits must route through Binance and TRANSFER_VENUE on Polygon',
+      )
+    }
 
     const provider = this.mapVenueToProvider(step.venue)
     return {
@@ -266,12 +271,12 @@ export class FlowDefinitionBuilder {
     // the flow against the float — so a convert failure can never lose the
     // accounting of USDC that is already on Binance. The funds are logically at
     // the destination (settled against the float by the next convert).
-    // destNetwork is the Binance withdrawal network for Transfero's USDC
-    // deposit (Solana); the sweep re-verifies it against the provider before
+    // destNetwork is the Binance withdrawal network for Transfero Ultra's USDC
+    // Polygon deposit; the sweep re-verifies it against the provider before
     // withdrawing, so funds can never go to the wrong chain.
     return {
       state: { ...state, location: step.toVenue },
-      systemSteps: [this.buildEnqueueBridge({ asset: step.asset, destNetwork: 'SOL' })],
+      systemSteps: [this.buildEnqueueBridge({ asset: step.asset, destNetwork: 'MATIC' })],
     }
   }
 
@@ -297,12 +302,11 @@ export class FlowDefinitionBuilder {
    * previous step actually produced — never the original quoted sourceAmount,
    * which ignores spread + fees. The USDC that reaches Binance is the Binance
    * USDT->USDC convert's realized output (USDT corridors) or, with no Binance
-   * convert, the deposit itself (default sourceAmount — pure-USDC corridors and
-   * Solana/Stellar direct corridors):
+   * convert, the deposit itself (default sourceAmount — pure-USDC corridors):
    *  - the Transfero (float) convert converts exactly that USDC;
    *  - the ENQUEUE_BRIDGE leg records exactly that USDC for the sweep.
-   * The legacy synchronous TREASURY_TRANSFER (if any corridor still uses it)
-   * withdraws the preceding convert's realized output.
+   * A synchronous TREASURY_TRANSFER withdraws the preceding convert's realized
+   * output when a future corridor explicitly uses that step.
    */
   private wireAmountSources(steps: FlowSystemStep[]): void {
     const isBinanceConvert = (s: FlowSystemStep) => s.stepType === FlowStepType.EXCHANGE_CONVERT && s.config.provider === 'binance'

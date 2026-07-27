@@ -5,6 +5,7 @@ export type ExchangeAddressResult
     | { code?: ExchangeFailureCode, reason?: string, success: false }
 
 export type ExchangeFailureCode = 'permanent' | 'retriable' | 'validation'
+export type ExchangeNetwork = 'POLYGON' | BlockchainNetwork
 
 export type ExchangeOperationResult
   = | { code?: ExchangeFailureCode, reason?: string, success: false }
@@ -18,6 +19,7 @@ export type ExchangeProviderCapability = {
 export interface IExchangeProvider {
   readonly capability?: ExchangeProviderCapability
   createMarketOrder(params: {
+    operationId: string
     sourceAmount: number
     sourceCurrency: CryptoCurrency
     targetCurrency: TargetCurrency
@@ -25,16 +27,16 @@ export interface IExchangeProvider {
   readonly exchangePercentageFee: number
 
   /**
-   * The blockchain this provider accepts deposits of `cryptoCurrency` on (e.g.
-   * Transfero accepts USDC on Solana). Lets a treasury transfer derive BOTH the
+   * The blockchain this provider accepts deposits of `cryptoCurrency` on. Lets
+   * a treasury transfer derive BOTH the
    * destination deposit address and the source-venue withdraw network from one
    * authoritative value, so funds can never be sent to a mismatched chain.
    * Returns undefined when the provider has no deposit chain for the asset.
    */
-  getDepositNetwork?(params: { cryptoCurrency: CryptoCurrency }): BlockchainNetwork | undefined
+  getDepositNetwork?(params: { cryptoCurrency: CryptoCurrency }): ExchangeNetwork | undefined
 
   getExchangeAddress(params: {
-    blockchain: BlockchainNetwork
+    blockchain: ExchangeNetwork
     cryptoCurrency: CryptoCurrency
   }): Promise<ExchangeAddressResult>
 

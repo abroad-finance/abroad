@@ -1,5 +1,5 @@
 import { Wallet } from '@binance/wallet'
-import { BlockchainNetwork, CryptoCurrency, TargetCurrency } from '@prisma/client'
+import { CryptoCurrency, TargetCurrency } from '@prisma/client'
 import { inject, injectable } from 'inversify'
 
 import { TYPES } from '../../../app/container/types'
@@ -19,9 +19,9 @@ export type BridgeSweepResult = {
 }
 
 // The single bridge this system operates: USDC pooled at Binance, withdrawn on
-// Solana to Transfero's USDC deposit wallet (whose settlement currency is BRL).
+// Polygon to Transfero Ultra's USDC vault (whose settlement currency is BRL).
 const BRIDGE_ASSET = CryptoCurrency.USDC
-const BRIDGE_DEST_NETWORK = 'SOL'
+const BRIDGE_DEST_NETWORK = 'MATIC'
 const BRIDGE_DESTINATION_CURRENCY = TargetCurrency.BRL
 
 // Binance withdrawal status codes: 6 = Completed (sent on-chain);
@@ -41,7 +41,7 @@ type BridgeBatchRow = { destNetwork: string, id: string }
 const STALE_SUBMITTED_MS = 60 * 60_000
 
 /**
- * Bridges pooled small-tx USDC across Binance->Transfero (Solana). Each flow
+ * Bridges pooled small-tx USDC across Binance->Transfero Ultra (Polygon). Each flow
  * already settled against the Transfero float; this drains the PENDING legs
  * into ONE withdrawal that clears the per-withdrawal minimum, so amounts that
  * could never withdraw individually settle in bulk.
@@ -238,7 +238,10 @@ export class BridgeSweepService {
       this.logger.error('Bridge destination network mismatch', { depositNetwork, expected: BRIDGE_DEST_NETWORK })
       return undefined
     }
-    const addressResult = await provider.getExchangeAddress({ blockchain: depositNetwork as BlockchainNetwork, cryptoCurrency: BRIDGE_ASSET })
+    const addressResult = await provider.getExchangeAddress({
+      blockchain: depositNetwork,
+      cryptoCurrency: BRIDGE_ASSET,
+    })
     if (!addressResult.success) {
       this.logger.error('Bridge destination address unavailable', { reason: addressResult.reason })
       return undefined

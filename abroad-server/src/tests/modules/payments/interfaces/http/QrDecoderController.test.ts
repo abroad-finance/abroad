@@ -12,12 +12,15 @@ describe('QrDecoderController', () => {
     amount: '100.00',
     currency: 'BRL',
     name: 'Test Merchant',
-    taxId: '123.456.789-00',
+    status: 'CREATED',
+    txid: 'tx-123',
+    type: 'dynamic',
   }
 
   beforeEach(() => {
     decoder = {
       decode: jest.fn(),
+      validateForPayment: jest.fn(),
     }
     badRequest = jest.fn((status: number, payload: { reason: string }) => ({ status, ...payload }))
     controller = new QrDecoderController(decoder)

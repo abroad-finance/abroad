@@ -103,7 +103,7 @@ const createPaymentStatusUpdatedPayload = (): QueuePayloadByName[QueueName.PAYME
   currency: TargetCurrency.BRL,
   externalId: 'ext-00000000',
   provider: 'transfero',
-  status: 'processed',
+  status: 'SETTLED',
 })
 
 beforeEach(() => {

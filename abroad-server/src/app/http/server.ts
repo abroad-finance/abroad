@@ -8,13 +8,14 @@ import geoip from 'geoip-lite'
 import path from 'path'
 import swaggerUi from 'swagger-ui-express'
 
+import type { RawBodyRequest } from '../../modules/webhooks/interfaces/http/WebhookController'
+
 import packageJson from '../../../package.json'
 import { mapErrorToHttpResponse } from '../../core/errors'
 import { ILogger } from '../../core/logging/types'
 import { requestContextMiddleware } from '../../core/requestContext'
-import { TransferoCallbackRegistrar } from '../../modules/treasury/infrastructure/exchangeProviders/TransferoCallbackRegistrar'
+import { TransferoUltraWebhookConfigurationVerifier } from '../../modules/transfero/infrastructure/TransferoUltraWebhookConfigurationVerifier'
 import { initSentry, setupSentryExpressErrorHandler } from '../../platform/observability/sentry'
-import { ISecretManager } from '../../platform/secrets/ISecretManager'
 import { initAdmin } from '../admin/admin'
 import { RuntimeConfig } from '../config/runtime'
 import { iocContainer } from '../container'
@@ -28,9 +29,26 @@ const app = express()
 const logger = iocContainer.get<ILogger>(TYPES.ILogger)
 const health = { ready: false }
 app.use(cors())
-app.use(bodyParser.json())
+
+const captureTransferoUltraRawBody: bodyParser.OptionsJson['verify'] = (
+  request,
+  _response,
+  buffer,
+) => {
+  const incoming = request as typeof request & { originalUrl?: string }
+  const pathWithoutQuery = (incoming.originalUrl ?? incoming.url ?? '').split('?', 1)[0]
+  if (pathWithoutQuery === '/webhook/transfero') {
+    const rawBodyRequest = request as unknown as RawBodyRequest
+    rawBodyRequest.rawBody = Buffer.from(buffer)
+  }
+}
+
+app.use(bodyParser.json({ verify: captureTransferoUltraRawBody }))
 // Handle text/json content-type generically (kept small)
-app.use(bodyParser.json({ type: 'text/json' }))
+app.use(bodyParser.json({
+  type: 'text/json',
+  verify: captureTransferoUltraRawBody,
+}))
 app.use(requestContextMiddleware)
 
 // ---------------------------
@@ -170,18 +188,23 @@ async function start() {
     console.warn('AdminJS failed to initialize:', error)
   }
 
-  // Ensure Transfero is subscribed to deposit/credit callbacks so incoming
-  // deposits notify our webhook and AWAIT_EXCHANGE_BALANCE steps resume.
-  // Idempotent and best-effort: it must never block service startup.
+  // Ultra returns webhook secrets only once, so endpoint creation belongs in
+  // deployment provisioning. Startup verifies the pre-provisioned endpoint
+  // without mutating provider state or risking secret loss.
   try {
-    const callbackRegistrar = new TransferoCallbackRegistrar(
-      iocContainer.get<ISecretManager>(TYPES.ISecretManager),
-      logger,
-    )
-    void callbackRegistrar.ensureSubscriptions()
+    const verifier = iocContainer.get(TransferoUltraWebhookConfigurationVerifier)
+    void verifier.verify().catch((error: unknown) => {
+      logger.error(
+        'Transfero Ultra webhook configuration verification failed',
+        error instanceof Error ? error : new Error(String(error)),
+      )
+    })
   }
   catch (e) {
-    logger.warn('Failed to start Transfero callback registration', e instanceof Error ? e : new Error(String(e)))
+    logger.error(
+      'Failed to start Transfero Ultra webhook configuration verification',
+      e instanceof Error ? e : new Error(String(e)),
+    )
   }
 
   const port = RuntimeConfig.server.port

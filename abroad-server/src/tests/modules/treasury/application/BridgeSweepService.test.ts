@@ -22,14 +22,14 @@ const makeService = (opts: {
   stale?: { destNetwork: string, id: string }
   submitted?: { createdAt?: Date, id: string }[]
 } = {}) => {
-  const pending = (opts.pending ?? []).map(p => ({ ...p, asset: 'USDC', destNetwork: 'SOL', status: 'PENDING' }))
+  const pending = (opts.pending ?? []).map(p => ({ ...p, asset: 'USDC', destNetwork: 'MATIC', status: 'PENDING' }))
   // Legs that a submitBatch re-derive (findMany by batchId) sees; defaults to
   // the pending set (the claimed legs), overridable for resume/empty cases.
-  const members = (opts.members ?? opts.pending ?? []).map(p => ({ ...p, asset: 'USDC', destNetwork: 'SOL', status: 'BATCHED' }))
+  const members = (opts.members ?? opts.pending ?? []).map(p => ({ ...p, asset: 'USDC', destNetwork: 'MATIC', status: 'BATCHED' }))
   const findMany = jest.fn(async (args?: { where?: { batchId?: string, status?: string } }) =>
     (args?.where?.batchId ? members : pending))
   const updateMany = jest.fn(async () => ({ count: pending.length }))
-  const batchCreate = jest.fn(async () => ({ destNetwork: 'SOL', id: 'batch-1' }))
+  const batchCreate = jest.fn(async () => ({ destNetwork: 'MATIC', id: 'batch-1' }))
   const batchUpdate = jest.fn(async () => ({}))
   const batchFindFirst = jest.fn(async () => opts.stale ?? null)
   const batchFindMany = jest.fn(async () => opts.submitted ?? [])
@@ -41,8 +41,11 @@ const makeService = (opts: {
   const dbProvider = { getClient: jest.fn(async () => client) }
 
   const destinationProvider = {
-    getDepositNetwork: jest.fn(() => 'SOLANA'),
-    getExchangeAddress: jest.fn(async () => ({ address: 'B7Agt8Cc-sol-usdc', memo: null, success: true })),
+    getDepositNetwork: jest.fn(() => 'POLYGON'),
+    getExchangeAddress: jest.fn(async () => ({
+      address: '0x1111222233334444555566667777888899990000',
+      success: true,
+    })),
   }
   const exchangeProviderFactory = {
     getExchangeProvider: jest.fn(() => destinationProvider),
@@ -67,7 +70,7 @@ describe('BridgeSweepService.sweep', () => {
     MockedWallet.mockClear()
     withdrawMock.mockResolvedValue({ data: async () => ({ id: 'wd-1' }) })
     allCoinsMock.mockResolvedValue({
-      data: async () => ([{ coin: 'USDC', networkList: [{ network: 'SOL', withdrawFee: '0.3', withdrawMin: '5' }] }]),
+      data: async () => ([{ coin: 'USDC', networkList: [{ network: 'MATIC', withdrawFee: '0.3', withdrawMin: '5' }] }]),
     })
   })
 
@@ -87,7 +90,13 @@ describe('BridgeSweepService.sweep', () => {
     expect(result.swept).toBe(true)
     expect(result.amount).toBeCloseTo(7.0, 6)
     expect(batchCreate).toHaveBeenCalled()
-    expect(withdrawMock).toHaveBeenCalledWith(expect.objectContaining({ address: 'B7Agt8Cc-sol-usdc', amount: 7.0, coin: 'USDC', network: 'SOL', withdrawOrderId: 'batch-1' }))
+    expect(withdrawMock).toHaveBeenCalledWith(expect.objectContaining({
+      address: '0x1111222233334444555566667777888899990000',
+      amount: 7.0,
+      coin: 'USDC',
+      network: 'MATIC',
+      withdrawOrderId: 'batch-1',
+    }))
     expect(batchUpdate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ grossAmount: 7.0, status: 'SUBMITTED', withdrawId: 'wd-1' }) }))
   })
 
@@ -116,7 +125,7 @@ describe('BridgeSweepService.sweep', () => {
     const { batchUpdate, findMany, service } = makeService({
       members: [{ amount: 6.5, id: 'leg-old' }],
       pending: [{ amount: 9, id: 'leg-new' }],
-      stale: { destNetwork: 'SOL', id: 'batch-open' },
+      stale: { destNetwork: 'MATIC', id: 'batch-open' },
     })
     const result = await service.sweep()
     expect(result.swept).toBe(true)
@@ -129,7 +138,7 @@ describe('BridgeSweepService.sweep', () => {
 
   it('treats a duplicate-withdrawal rejection as already submitted (no re-withdraw)', async () => {
     withdrawMock.mockRejectedValue({ code: -4034, message: 'Duplicate withdraw order' })
-    const { batchUpdate, service } = makeService({ members: [{ amount: 6.5, id: 'leg-old' }], stale: { destNetwork: 'SOL', id: 'batch-open' } })
+    const { batchUpdate, service } = makeService({ members: [{ amount: 6.5, id: 'leg-old' }], stale: { destNetwork: 'MATIC', id: 'batch-open' } })
     const result = await service.sweep()
     expect(result.swept).toBe(true)
     expect(batchUpdate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: 'SUBMITTED' }) }))
@@ -137,7 +146,7 @@ describe('BridgeSweepService.sweep', () => {
 
   it('leaves the batch OPEN (retryable) when the withdrawal fails non-duplicately', async () => {
     withdrawMock.mockRejectedValue(new Error('network down'))
-    const { batchUpdate, service } = makeService({ members: [{ amount: 6.5, id: 'leg-old' }], stale: { destNetwork: 'SOL', id: 'batch-open' } })
+    const { batchUpdate, service } = makeService({ members: [{ amount: 6.5, id: 'leg-old' }], stale: { destNetwork: 'MATIC', id: 'batch-open' } })
     const result = await service.sweep()
     expect(result.swept).toBe(false)
     expect(result.reason).toBe('withdraw_failed')

@@ -18,15 +18,15 @@ describe('EnqueueBridgeStepExecutor', () => {
     const { executor, upsert } = makeExecutor()
 
     const result = await executor.execute({
-      config: { asset: 'USDC', destNetwork: 'SOL' },
+      config: { asset: 'USDC', destNetwork: 'MATIC' },
       runtime: { context: { sourceAmount: 0.45, transactionId: 'tx-1' }, stepOutputs: new Map() } as never,
       stepOrder: 6,
     })
 
     expect(result.outcome).toBe('succeeded')
-    expect(result.output).toMatchObject({ amount: 0.45, asset: 'USDC', bridged: false, destNetwork: 'SOL' })
+    expect(result.output).toMatchObject({ amount: 0.45, asset: 'USDC', bridged: false, destNetwork: 'MATIC' })
     expect(upsert).toHaveBeenCalledWith(expect.objectContaining({
-      create: expect.objectContaining({ amount: 0.45, asset: 'USDC', destNetwork: 'SOL', stepOrder: 6, transactionId: 'tx-1' }),
+      create: expect.objectContaining({ amount: 0.45, asset: 'USDC', destNetwork: 'MATIC', stepOrder: 6, transactionId: 'tx-1' }),
       update: {},
       where: { transactionId_stepOrder: { stepOrder: 6, transactionId: 'tx-1' } },
     }))
@@ -36,7 +36,7 @@ describe('EnqueueBridgeStepExecutor', () => {
     const { executor, upsert } = makeExecutor()
 
     const result = await executor.execute({
-      config: { amountSource: { field: 'amount', kind: 'step', stepOrder: 3 }, asset: 'USDC', destNetwork: 'SOL' },
+      config: { amountSource: { field: 'amount', kind: 'step', stepOrder: 3 }, asset: 'USDC', destNetwork: 'MATIC' },
       runtime: { context: { sourceAmount: 999, transactionId: 'tx-1' }, stepOutputs: new Map([[3, { amount: 0.45 }]]) } as never,
       stepOrder: 6,
     })
@@ -49,7 +49,7 @@ describe('EnqueueBridgeStepExecutor', () => {
     const { executor, upsert } = makeExecutor()
 
     const result = await executor.execute({
-      config: { asset: 'USDC', destNetwork: 'SOL' },
+      config: { asset: 'USDC', destNetwork: 'MATIC' },
       runtime: { context: { sourceAmount: 0, transactionId: 'tx-1' }, stepOutputs: new Map() } as never,
       stepOrder: 6,
     })

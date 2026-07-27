@@ -64,7 +64,7 @@ describe('PaymentStatusUpdatedController', () => {
       currency: TargetCurrency.BRL,
       externalId: 'ext-1',
       provider: 'transfero',
-      status: 'processed',
+      status: 'SETTLED',
     }
     const prisma = await dbProvider.getClient()
     ;(prisma as unknown as { transaction: { findUnique: jest.Mock } }).transaction.findUnique

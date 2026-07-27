@@ -1,8 +1,8 @@
 /**
- * A read-only view over one venue's balances. Implementations must never load
- * signing keys — address/read secrets only — so the ops dashboard path cannot
- * touch funds. Errors should be thrown (not swallowed): the aggregator isolates
- * per-venue failures so one venue being down degrades, never blanks, the board.
+ * A read-only view over one venue's balances. Implementations may authenticate
+ * with a provider credential but must only invoke read operations. Errors
+ * should be thrown (not swallowed): the aggregator isolates per-venue failures
+ * so one venue being down degrades, never blanks, the board.
  */
 export interface ITreasuryBalanceSource {
   getBalances(): Promise<TreasuryBalance[]>
