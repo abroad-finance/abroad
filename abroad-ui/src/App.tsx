@@ -1,15 +1,9 @@
-import { TolgeeProvider } from '@tolgee/react'
 import { lazy, Suspense } from 'react'
 import { Route, BrowserRouter as Router, Routes } from 'react-router-dom'
 
-import { tolgee } from './contexts/LanguageContext'
-import { NoticeProvider } from './contexts/NoticeContext'
-import { WalletAuthProvider } from './contexts/WalletAuthProvider'
-import { WebSocketProvider } from './contexts/WebSocketContext'
-import { ConnectionStatusBanner } from './shared/components/ConnectionStatusBanner'
-import HiddenLogViewer from './shared/components/HiddenLogViewer'
-
 // Route-level code splitting
+const ProductApplicationShell = lazy(() => import('./ProductApplicationShell'))
+const TransparencyDashboard = lazy(() => import('./pages/Transparency/TransparencyDashboard'))
 const WebSwap = lazy(() => import('./pages/WebSwap/WebSwap'))
 const Meridian = lazy(() => import('./pages/Meridian/Meridian'))
 const FlowOpsList = lazy(() => import('./pages/Ops/FlowOpsList'))
@@ -26,37 +20,28 @@ const TreasuryDashboard = lazy(() => import('./pages/Ops/TreasuryDashboard'))
 
 function App() {
   return (
-    <TolgeeProvider tolgee={tolgee}>
-      <NoticeProvider>
-        <WalletAuthProvider>
-          <WebSocketProvider>
-            <ConnectionStatusBanner />
-            <Router>
-              <Suspense fallback={<div />}>
-                {' '}
-                {/* simple lightweight fallback */}
-                <Routes>
-                  <Route element={<WebSwap />} path="/" />
-                  <Route element={<Meridian />} path="/meridian" />
-                  <Route element={<FlowOpsList />} path="/ops/flows" />
-                  <Route element={<FlowOpsDetail />} path="/ops/flows/:flowInstanceId" />
-                  <Route element={<FlowDefinitions />} path="/ops/flows/definitions" />
-                  <Route element={<CryptoAssets />} path="/ops/crypto-assets" />
-                  <Route element={<PartnerApiKeys />} path="/ops/partners" />
-                  <Route element={<KycSubmissions />} path="/ops/kyc" />
-                  <Route element={<TreasuryDashboard />} path="/ops/treasury" />
-                  <Route element={<BridgeOps />} path="/ops/treasury/bridge" />
-                  <Route element={<TransactionsList />} path="/ops/transactions" />
-                  <Route element={<TransactionReconcile />} path="/ops/transactions/reconcile" />
-                  <Route element={<TransactionDetail />} path="/ops/transactions/:transactionId" />
-                </Routes>
-              </Suspense>
-            </Router>
-          </WebSocketProvider>
-          <HiddenLogViewer />
-        </WalletAuthProvider>
-      </NoticeProvider>
-    </TolgeeProvider>
+    <Router>
+      <Suspense fallback={<div />}>
+        <Routes>
+          <Route element={<TransparencyDashboard />} path="/transparency" />
+          <Route element={<ProductApplicationShell />}>
+            <Route element={<WebSwap />} path="/" />
+            <Route element={<Meridian />} path="/meridian" />
+            <Route element={<FlowOpsList />} path="/ops/flows" />
+            <Route element={<FlowOpsDetail />} path="/ops/flows/:flowInstanceId" />
+            <Route element={<FlowDefinitions />} path="/ops/flows/definitions" />
+            <Route element={<CryptoAssets />} path="/ops/crypto-assets" />
+            <Route element={<PartnerApiKeys />} path="/ops/partners" />
+            <Route element={<KycSubmissions />} path="/ops/kyc" />
+            <Route element={<TreasuryDashboard />} path="/ops/treasury" />
+            <Route element={<BridgeOps />} path="/ops/treasury/bridge" />
+            <Route element={<TransactionsList />} path="/ops/transactions" />
+            <Route element={<TransactionReconcile />} path="/ops/transactions/reconcile" />
+            <Route element={<TransactionDetail />} path="/ops/transactions/:transactionId" />
+          </Route>
+        </Routes>
+      </Suspense>
+    </Router>
   )
 }
 

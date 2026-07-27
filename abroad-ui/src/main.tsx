@@ -14,6 +14,8 @@ if (!rootEl) {
 }
 
 const root = createRoot(rootEl)
+const isTransparencyRoute = window.location.pathname === '/transparency'
+  || window.location.pathname.startsWith('/transparency/')
 
 const AppShell = (
   <StrictMode>
@@ -54,7 +56,7 @@ async function isGeoBlocked(): Promise<boolean> {
 }
 
 void (async () => {
-  if (await isGeoBlocked()) {
+  if (!isTransparencyRoute && await isGeoBlocked()) {
     document.title = 'Service unavailable in your region'
     root.render(<UnavailableInRegion />)
     return

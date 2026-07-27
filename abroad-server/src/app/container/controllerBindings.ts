@@ -21,6 +21,7 @@ import { OpsTransactionsController } from '../../modules/transactions/interfaces
 import { PublicTransactionsController } from '../../modules/transactions/interfaces/http/PublicTransactionsController'
 import { TransactionController } from '../../modules/transactions/interfaces/http/TransactionController'
 import { TransactionsController } from '../../modules/transactions/interfaces/http/TransactionsController'
+import { TransparencyMetricsController } from '../../modules/transparency/interfaces/http/TransparencyMetricsController'
 import { OpsBridgeController } from '../../modules/treasury/interfaces/http/OpsBridgeController'
 import { OpsTreasuryController } from '../../modules/treasury/interfaces/http/OpsTreasuryController'
 import { WebhookController } from '../../modules/webhooks/interfaces/http/WebhookController'
@@ -38,6 +39,7 @@ const controllerBindings: ReadonlyArray<BindingRegistration<unknown>> = [
   { bindSelf: true, identifier: TransactionsController, implementation: TransactionsController },
   { bindSelf: true, identifier: PublicTransactionsController, implementation: PublicTransactionsController },
   { bindSelf: true, identifier: OpsTransactionsController, implementation: OpsTransactionsController },
+  { bindSelf: true, identifier: TransparencyMetricsController, implementation: TransparencyMetricsController },
   { bindSelf: true, identifier: PaymentsController, implementation: PaymentsController },
   { bindSelf: true, identifier: CryptoAssetController, implementation: CryptoAssetController },
   { bindSelf: true, identifier: QrDecoderController, implementation: QrDecoderController },

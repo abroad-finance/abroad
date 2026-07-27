@@ -45,6 +45,7 @@ import { ReceivedCryptoTransactionUseCase } from '../../modules/transactions/app
 import { StellarOrphanRefundService } from '../../modules/transactions/application/StellarOrphanRefundService'
 import { TransactionAcceptanceService } from '../../modules/transactions/application/TransactionAcceptanceService'
 import { TransactionStatusService } from '../../modules/transactions/application/TransactionStatusService'
+import { TransparencyMetricsService } from '../../modules/transparency/application/TransparencyMetricsService'
 import { BridgeFloatService } from '../../modules/treasury/application/BridgeFloatService'
 import { BridgeSweepService } from '../../modules/treasury/application/BridgeSweepService'
 import { BridgeSweepWorker } from '../../modules/treasury/application/BridgeSweepWorker'
@@ -98,6 +99,7 @@ const domainBindings: ReadonlyArray<BindingRegistration<unknown>> = [
   { identifier: TYPES.StellarOrphanRefundService, implementation: StellarOrphanRefundService },
   { bindSelf: true, identifier: OpsTransactionReconciliationService, implementation: OpsTransactionReconciliationService },
   { bindSelf: true, identifier: OpsTransactionQueryService, implementation: OpsTransactionQueryService },
+  { bindSelf: true, identifier: TransparencyMetricsService, implementation: TransparencyMetricsService },
   { identifier: TYPES.PaymentUseCase, implementation: PaymentUseCase },
   { identifier: TYPES.ReceivedCryptoTransactionUseCase, implementation: ReceivedCryptoTransactionUseCase },
   { bindSelf: true, identifier: KycSubmissionService, implementation: KycSubmissionService },
