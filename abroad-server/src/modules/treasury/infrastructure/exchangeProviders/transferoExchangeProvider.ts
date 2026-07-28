@@ -8,7 +8,7 @@ import { createScopedLogger, ScopedLogger } from '../../../../core/logging/scope
 import { ILogger } from '../../../../core/logging/types'
 import { TransferoUltraClient, TransferoUltraError } from '../../../transfero/infrastructure/TransferoUltraClient'
 import {
-  transferoUltraDecimalSchema,
+  transferoUltraHoldingsSettlementResponseSchema,
   transferoUltraOtcConfirmationResponseSchema,
   transferoUltraOtcPricesResponseSchema,
   transferoUltraOtcSessionResponseSchema,
@@ -108,9 +108,9 @@ export class TransferoExchangeProvider implements IExchangeProvider {
         undefined,
         this.buildIdempotencyKey(params.operationId, 'settlement'),
       )
-      const settledAmount = transferoUltraDecimalSchema.parse(
-        settlementResponse,
-      )
+      const settledAmount = transferoUltraHoldingsSettlementResponseSchema
+        .parse(settlementResponse)
+        .swept
       if (!this.coversRequestedAmount(settledAmount, params.sourceAmount)) {
         this.logger.error('Transfero Ultra trade was not fully settled from holdings', {
           requestedAmount: params.sourceAmount,

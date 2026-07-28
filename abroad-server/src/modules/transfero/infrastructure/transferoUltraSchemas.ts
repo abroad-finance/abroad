@@ -79,7 +79,7 @@ export const transferoUltraOtcSessionResponseSchema = z.object({
   currency: z.enum(['USDC', 'USDT']),
   expires_at: z.string().min(1),
   price: z.number().finite().positive(),
-  session_id: z.string().uuid(),
+  session_id: z.string().min(1).max(128),
   settlement: z.enum(['D0', 'D1', 'D2']),
   side: z.enum(['BUY', 'SELL']),
   spot: z.number().finite().positive(),
@@ -94,6 +94,10 @@ export const transferoUltraOtcConfirmationResponseSchema = z.object({
   trade: z.object({
     id: z.string().uuid(),
   }).loose(),
+}).loose()
+
+export const transferoUltraHoldingsSettlementResponseSchema = z.object({
+  swept: transferoUltraDecimalSchema,
 }).loose()
 
 const transferoUltraVaultAddressSchema = z.object({

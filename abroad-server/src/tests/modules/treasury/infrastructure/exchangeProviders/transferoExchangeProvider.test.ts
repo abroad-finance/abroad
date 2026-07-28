@@ -9,7 +9,7 @@ type UltraClientMock = jest.Mocked<
   Pick<TransferoUltraClient, 'get' | 'patch' | 'post'>
 >
 
-const SESSION_ID = '11111111-2222-4333-8444-555555555555'
+const SESSION_ID = 'sess_11111111-2222-4333-8444-555555555555'
 const TRADE_ID = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee'
 
 const createUltraClient = (): UltraClientMock => ({
@@ -127,7 +127,7 @@ describe('TransferoExchangeProvider', () => {
     const { provider, ultraClient } = createProvider()
     ultraClient.post
       .mockResolvedValueOnce(otcSession)
-      .mockResolvedValueOnce('5.00000000')
+      .mockResolvedValueOnce({ swept: '5.00000000' })
     ultraClient.patch.mockResolvedValue({
       closing: {},
       trade: { id: TRADE_ID },
@@ -173,7 +173,7 @@ describe('TransferoExchangeProvider', () => {
     const { provider, ultraClient } = createProvider()
     ultraClient.post
       .mockResolvedValueOnce(otcSession)
-      .mockResolvedValueOnce('4.90000000')
+      .mockResolvedValueOnce({ swept: '4.90000000' })
     ultraClient.patch.mockResolvedValue({
       closing: {},
       trade: { id: TRADE_ID },
