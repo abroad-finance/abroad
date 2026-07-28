@@ -1450,10 +1450,12 @@ export const useWebSwapController = (): WebSwapControllerProps => {
           const normalizedAmount = amountText?.replace(',', '.').trim() ?? ''
           const parsedAmount = normalizedAmount ? Number.parseFloat(normalizedAmount) : Number.NaN
           const pixKey = decoded?.account
+          const taxIdDecoded = decoded?.taxId
           const name = decoded?.name
 
           if (name) dispatch({ recipientName: name, type: 'SET_BANK_DETAILS' })
           if (pixKey) dispatch({ pixKey, type: 'SET_BANK_DETAILS' })
+          if (taxIdDecoded && !taxIdDecoded.includes('*')) dispatch({ taxId: taxIdDecoded, type: 'SET_BANK_DETAILS' })
 
           if (Number.isFinite(parsedAmount) && parsedAmount > 0) {
             const quoted = await quoteFromTarget(normalizedAmount)

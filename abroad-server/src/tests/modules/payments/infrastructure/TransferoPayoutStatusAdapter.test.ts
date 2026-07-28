@@ -16,7 +16,13 @@ describe('TransferoPayoutStatusAdapter', () => {
   })
 
   it('maps every Ultra in-flight status to processing', () => {
-    for (const status of ['PENDING_APPROVAL', 'APPROVED', 'PENDING', 'PROCESSING']) {
+    for (const status of [
+      'PENDING_APPROVAL',
+      'HELD_FOR_REVIEW',
+      'APPROVED',
+      'PENDING',
+      'PROCESSING',
+    ]) {
       expect(adapter.mapStatus(status)).toBe(TransactionStatus.PROCESSING_PAYMENT)
     }
   })

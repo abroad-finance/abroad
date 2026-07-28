@@ -25,6 +25,11 @@ import {
 const ULTRA_SETTLEMENT = 'D0'
 const ULTRA_SIDE = 'SELL'
 const ULTRA_QUOTE_VALIDITY_SECONDS = 10
+const ULTRA_PRODUCTION_POLYGON_NETWORKS = new Set([
+  'MAINNET',
+  'POLYGON',
+  'POLYGON_MAINNET',
+])
 
 @injectable()
 export class TransferoExchangeProvider implements IExchangeProvider {
@@ -165,8 +170,9 @@ export class TransferoExchangeProvider implements IExchangeProvider {
       const response = await this.ultraClient.get('/api/v1/vault/addresses')
       const addresses = transferoUltraVaultAddressesResponseSchema.parse(response)
       const address = addresses.find(candidate =>
-        candidate.asset === cryptoCurrency
-        && candidate.blockchain === 'POLYGON')
+        candidate.asset.toUpperCase() === cryptoCurrency
+        && candidate.blockchain.toUpperCase() === 'POLYGON'
+        && this.isProductionPolygonNetwork(candidate.network))
       if (!address) {
         return this.buildAddressFailure(
           'permanent',
@@ -293,6 +299,10 @@ export class TransferoExchangeProvider implements IExchangeProvider {
     return Math.abs(session.amount - request.sourceAmount) > 1e-8
       ? 'amount'
       : undefined
+  }
+
+  private isProductionPolygonNetwork(network: string): boolean {
+    return ULTRA_PRODUCTION_POLYGON_NETWORKS.has(network.trim().toUpperCase())
   }
 
   private toOperationFailure(

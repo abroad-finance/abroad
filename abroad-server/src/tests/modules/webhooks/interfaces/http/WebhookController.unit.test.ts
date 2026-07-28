@@ -218,6 +218,30 @@ describe('WebhookController Transfero Ultra webhook', () => {
     expect(setStatus).toHaveBeenCalledWith(200)
   })
 
+  it('accepts a review-held status on the submitted event', async () => {
+    const body = buildPixEnvelope(
+      'pix.withdrawal.submitted',
+      'HELD_FOR_REVIEW',
+    )
+    const { badRequest, serverError, unauthorized } = responders()
+
+    await expect(controller.handleTransferoWebhook(
+      body,
+      buildRequest(body),
+      badRequest,
+      unauthorized,
+      serverError,
+    )).resolves.toEqual({
+      message: 'Webhook processed successfully',
+      success: true,
+    })
+
+    expect(queueHandler.postMessage).toHaveBeenCalledWith(
+      QueueName.PAYMENT_STATUS_UPDATED,
+      expect.objectContaining({ status: 'HELD_FOR_REVIEW' }),
+    )
+  })
+
   it('accepts Ultra cancellation and rejection statuses on the failed event', async () => {
     const { badRequest, serverError, unauthorized } = responders()
 

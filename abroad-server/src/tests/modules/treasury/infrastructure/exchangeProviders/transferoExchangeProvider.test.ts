@@ -48,6 +48,22 @@ describe('TransferoExchangeProvider', () => {
     const { provider, ultraClient } = createProvider()
     ultraClient.get.mockResolvedValue([
       {
+        address: '0xbrz',
+        asset: 'BRZ',
+        blockchain: 'POLYGON',
+        id: '99999999-2222-4333-8444-555555555555',
+        network: 'mainnet',
+        tag: null,
+      },
+      {
+        address: '0xtestnet',
+        asset: 'USDC',
+        blockchain: 'POLYGON',
+        id: '88888888-2222-4333-8444-555555555555',
+        network: 'amoy',
+        tag: null,
+      },
+      {
         address: '0x1111222233334444555566667777888899990000',
         asset: 'USDC',
         blockchain: 'POLYGON',
@@ -90,8 +106,6 @@ describe('TransferoExchangeProvider', () => {
       prices: {
         USDC: {
           D0: { price: 5 },
-          D1: { price: 5.01 },
-          D2: { price: 5.02 },
         },
       },
       spot: 5.03,

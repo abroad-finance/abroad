@@ -13,9 +13,7 @@ export interface PixDecoded {
   amount?: string
   currency?: string
   name?: string
-  status: string
-  txid?: string
-  type: 'dynamic' | 'static'
+  taxId?: null | string
 }
 
 export type PixQrValidationResult

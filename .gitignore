@@ -155,3 +155,4 @@ abroad-server/src/app/http/routes.ts
 /findings.md
 /progress.md
 /.playwright-mcp/
+/.local-plans/

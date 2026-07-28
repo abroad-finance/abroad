@@ -59,9 +59,11 @@ const createService = () => {
 
 describe('TransferoPaymentService', () => {
   const previousDelay = process.env.TRANSFERO_ULTRA_RETRY_DELAY_MS
+  const previousRateLimitCooldown = process.env.TRANSFERO_ULTRA_RATE_LIMIT_COOLDOWN_MS
 
   beforeAll(() => {
     process.env.TRANSFERO_ULTRA_RETRY_DELAY_MS = '1'
+    process.env.TRANSFERO_ULTRA_RATE_LIMIT_COOLDOWN_MS = '60000'
   })
 
   afterAll(() => {
@@ -70,6 +72,12 @@ describe('TransferoPaymentService', () => {
     }
     else {
       process.env.TRANSFERO_ULTRA_RETRY_DELAY_MS = previousDelay
+    }
+    if (previousRateLimitCooldown === undefined) {
+      delete process.env.TRANSFERO_ULTRA_RATE_LIMIT_COOLDOWN_MS
+    }
+    else {
+      process.env.TRANSFERO_ULTRA_RATE_LIMIT_COOLDOWN_MS = previousRateLimitCooldown
     }
   })
 
@@ -117,10 +125,36 @@ describe('TransferoPaymentService', () => {
         description: 'Abroad payout transaction-1',
         idempotencyKey: 'abroad:pix-withdrawal:transaction-1',
         pixKey: '+5521987654321',
+        pixKeyType: 'PHONE',
       },
       'abroad:pix-withdrawal:transaction-1',
     )
   })
+
+  it.each([
+    ['user@example.com', 'EMAIL', 'user@example.com'],
+    ['529.982.247-25', 'CPF', '52998224725'],
+    ['11.222.333/0001-81', 'CNPJ', '11222333000181'],
+    ['123e4567-e89b-42d3-a456-426614174000', 'EVP', '123e4567-e89b-42d3-a456-426614174000'],
+  ] as const)(
+    'classifies %s as an explicit %s PIX key',
+    async (account, pixKeyType, pixKey) => {
+      const { service, ultraClient } = createService()
+      ultraClient.post.mockResolvedValue(withdrawalResponse())
+
+      await expect(service.sendPayment({
+        account,
+        id: `transaction-${pixKeyType.toLowerCase()}`,
+        value: 10,
+      })).resolves.toMatchObject({ success: true })
+
+      expect(ultraClient.post).toHaveBeenCalledWith(
+        '/api/v1/pix/withdrawals',
+        expect.objectContaining({ pixKey, pixKeyType }),
+        expect.any(String),
+      )
+    },
+  )
 
   it('validates a BR code with a stable preview key before withdrawing', async () => {
     const { decoder, service, ultraClient } = createService()
@@ -129,8 +163,7 @@ describe('TransferoPaymentService', () => {
         account: 'pix-key',
         amount: '10.00',
         currency: 'BRL',
-        status: 'CREATED',
-        type: 'dynamic',
+        taxId: null,
       },
       success: true,
     })
@@ -171,8 +204,7 @@ describe('TransferoPaymentService', () => {
         decoded: {
           amount: '9.00',
           currency: 'BRL',
-          status: 'CREATED',
-          type: 'dynamic',
+          taxId: null,
         },
         success: true,
       })
@@ -222,6 +254,49 @@ describe('TransferoPaymentService', () => {
     expect(ultraClient.post.mock.calls[1][1]).toEqual(ultraClient.post.mock.calls[0][1])
   })
 
+  it('accepts a review-held withdrawal as safely pending', async () => {
+    const { service, ultraClient } = createService()
+    ultraClient.post.mockResolvedValue(withdrawalResponse('HELD_FOR_REVIEW'))
+
+    await expect(service.sendPayment({
+      account: 'user@example.com',
+      id: 'transaction-review',
+      value: 10,
+    })).resolves.toEqual({
+      success: true,
+      transactionId: '11111111-2222-4333-8444-555555555555',
+    })
+  })
+
+  it('opens a local cooldown instead of immediately retrying HTTP 429', async () => {
+    const { service, ultraClient } = createService()
+    ultraClient.post.mockRejectedValue(new TransferoUltraError({
+      code: 'retriable',
+      message: 'Transfero Ultra request failed: RATE_LIMIT_EXCEEDED',
+      providerCode: 'RATE_LIMIT_EXCEEDED',
+      status: 429,
+    }))
+
+    await expect(service.sendPayment({
+      account: 'user@example.com',
+      id: 'transaction-rate-limited',
+      value: 10,
+    })).resolves.toMatchObject({
+      code: 'retriable',
+      success: false,
+    })
+    await expect(service.sendPayment({
+      account: 'user@example.com',
+      id: 'transaction-during-cooldown',
+      value: 10,
+    })).resolves.toEqual({
+      code: 'retriable',
+      reason: 'transfero_ultra_withdrawal_rate_limit_cooldown',
+      success: false,
+    })
+    expect(ultraClient.post).toHaveBeenCalledTimes(1)
+  })
+
   it('does not retry validation failures and rejects terminal initial states', async () => {
     const { service, ultraClient } = createService()
     ultraClient.post
@@ -233,7 +308,7 @@ describe('TransferoPaymentService', () => {
       .mockResolvedValueOnce(withdrawalResponse('FAILED'))
 
     await expect(service.sendPayment({
-      account: 'bad-key',
+      account: 'bad@example.com',
       id: 'transaction-invalid',
       value: 10,
     })).resolves.toEqual({
@@ -286,7 +361,7 @@ describe('TransferoPaymentService', () => {
     })
   })
 
-  it('rejects values below Ultra minimum and empty PIX keys locally', async () => {
+  it('rejects values below Ultra minimum and unsupported PIX keys locally', async () => {
     const { service, ultraClient } = createService()
 
     await expect(service.sendPayment({
@@ -298,7 +373,7 @@ describe('TransferoPaymentService', () => {
       success: false,
     })
     await expect(service.sendPayment({
-      account: '   ',
+      account: 'not-a-pix-key',
       id: 'missing-key',
       value: 1,
     })).resolves.toMatchObject({

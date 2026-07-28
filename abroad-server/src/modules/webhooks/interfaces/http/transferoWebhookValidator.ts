@@ -53,6 +53,7 @@ const transferoUltraCryptoDepositCreditFailedDataSchema = z.object({
 
 const submittedStatuses = new Set([
   'APPROVED',
+  'HELD_FOR_REVIEW',
   'PENDING',
   'PENDING_APPROVAL',
   'PROCESSING',

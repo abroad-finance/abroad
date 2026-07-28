@@ -22,6 +22,7 @@ export const transferoUltraBalanceResponseSchema = z.array(transferoUltraBalance
 
 export const transferoUltraWithdrawalStatusSchema = z.enum([
   'PENDING_APPROVAL',
+  'HELD_FOR_REVIEW',
   'APPROVED',
   'REJECTED',
   'CANCELLED',
@@ -61,8 +62,8 @@ const transferoUltraOtcPriceSchema = z.object({
 
 const transferoUltraOtcSettlementGridSchema = z.object({
   D0: transferoUltraOtcPriceSchema,
-  D1: transferoUltraOtcPriceSchema,
-  D2: transferoUltraOtcPriceSchema,
+  D1: transferoUltraOtcPriceSchema.optional(),
+  D2: transferoUltraOtcPriceSchema.optional(),
 }).loose()
 
 export const transferoUltraOtcPricesResponseSchema = z.object({
@@ -97,8 +98,8 @@ export const transferoUltraOtcConfirmationResponseSchema = z.object({
 
 const transferoUltraVaultAddressSchema = z.object({
   address: z.string().min(1),
-  asset: z.enum(['USDC', 'USDT']),
-  blockchain: z.literal('POLYGON'),
+  asset: z.string().min(1),
+  blockchain: z.string().min(1),
   id: z.string().uuid(),
   network: z.string().min(1),
   tag: z.string().min(1).nullable(),

@@ -17,12 +17,21 @@ import {
 } from '../../application/contracts/IPaymentService'
 import { IPixQrDecoder } from '../../application/contracts/IQrDecoder'
 
-type TransferoUltraWithdrawalRequest = {
+type TransferoUltraPixKeyType = 'CNPJ' | 'CPF' | 'EMAIL' | 'EVP' | 'PHONE'
+
+type TransferoUltraWithdrawalRequest
+  = | TransferoUltraWithdrawalRequestBase & {
+    brcode: string
+  }
+  | TransferoUltraWithdrawalRequestBase & {
+    pixKey: string
+    pixKeyType: TransferoUltraPixKeyType
+  }
+
+type TransferoUltraWithdrawalRequestBase = {
   amount: number
-  brcode?: string
   description: string
   idempotencyKey: string
-  pixKey?: string
 }
 
 const TERMINAL_FAILURE_STATUSES = new Set([
@@ -66,7 +75,9 @@ export class TransferoPaymentService implements IPaymentService {
 
   private readonly logger: ScopedLogger
   private readonly maxSendAttempts: number
+  private readonly rateLimitCooldownMs: number
   private readonly retryDelayMs: number
+  private withdrawalRateLimitedUntilMs = 0
 
   public constructor(
     @inject(TransferoUltraClient) private readonly ultraClient: TransferoUltraClient,
@@ -81,6 +92,10 @@ export class TransferoPaymentService implements IPaymentService {
     this.retryDelayMs = this.readPositiveInteger(
       'TRANSFERO_ULTRA_RETRY_DELAY_MS',
       250,
+    )
+    this.rateLimitCooldownMs = this.readPositiveInteger(
+      'TRANSFERO_ULTRA_RATE_LIMIT_COOLDOWN_MS',
+      60_000,
     )
   }
 
@@ -135,6 +150,12 @@ export class TransferoPaymentService implements IPaymentService {
     if (!requestResult.success) {
       return requestResult
     }
+    if (Date.now() < this.withdrawalRateLimitedUntilMs) {
+      return this.buildFailure(
+        'retriable',
+        'transfero_ultra_withdrawal_rate_limit_cooldown',
+      )
+    }
 
     for (let attempt = 1; attempt <= this.maxSendAttempts; attempt += 1) {
       try {
@@ -179,10 +200,14 @@ export class TransferoPaymentService implements IPaymentService {
             : undefined,
           status: error instanceof TransferoUltraError ? error.status : undefined,
         })
+        if (error instanceof TransferoUltraError && error.status === 429) {
+          this.withdrawalRateLimitedUntilMs = Date.now() + this.rateLimitCooldownMs
+          return failure
+        }
         if (failure.code !== 'retriable' || attempt === this.maxSendAttempts) {
           return failure
         }
-        await this.sleep(this.retryDelayMs * attempt)
+        await this.sleep(this.calculateRetryDelayMs(attempt))
       }
     }
 
@@ -190,7 +215,7 @@ export class TransferoPaymentService implements IPaymentService {
   }
 
   public verifyAccount({ account }: { account: string }): Promise<boolean> {
-    return Promise.resolve(account.trim().length > 0)
+    return Promise.resolve(this.buildPixDestination(account) !== null)
   }
 
   private buildFailure(
@@ -209,9 +234,32 @@ export class TransferoPaymentService implements IPaymentService {
     return `abroad:${operation}:${digest}`
   }
 
-  private buildPixKey(account: string): string {
+  private buildPixDestination(account: string): null | {
+    pixKey: string
+    pixKeyType: TransferoUltraPixKeyType
+  } {
+    const trimmed = account.trim()
+    if (!trimmed) return null
+
+    if (this.isEmailPixKey(trimmed)) {
+      return { pixKey: trimmed, pixKeyType: 'EMAIL' }
+    }
+    if (this.isEvpPixKey(trimmed)) {
+      return { pixKey: trimmed.toLowerCase(), pixKeyType: 'EVP' }
+    }
+
+    const digits = trimmed.replace(/\D+/g, '')
+    if (this.isValidCpf(digits)) {
+      return { pixKey: digits, pixKeyType: 'CPF' }
+    }
+    if (this.isValidCnpj(digits)) {
+      return { pixKey: digits, pixKeyType: 'CNPJ' }
+    }
+
     const normalizedBrazilPhone = this.normalizeBrazilPhoneNumber(account)
-    return normalizedBrazilPhone ? `+55${normalizedBrazilPhone}` : account.trim()
+    return normalizedBrazilPhone
+      ? { pixKey: `+55${normalizedBrazilPhone}`, pixKeyType: 'PHONE' }
+      : null
   }
 
   private async buildWithdrawalRequest(params: {
@@ -226,12 +274,20 @@ export class TransferoPaymentService implements IPaymentService {
   > {
     const description = `Abroad payout ${params.id}`.slice(0, 140)
     if (!params.qrCode) {
+      const destination = this.buildPixDestination(params.account)
+      if (!destination) {
+        return {
+          code: 'validation',
+          reason: 'pix_key_type_unsupported',
+          success: false,
+        }
+      }
       return {
         request: {
           amount: params.value,
           description,
           idempotencyKey: params.withdrawalKey,
-          pixKey: this.buildPixKey(params.account),
+          ...destination,
         },
         success: true,
       }
@@ -270,6 +326,23 @@ export class TransferoPaymentService implements IPaymentService {
     }
   }
 
+  private calculateCheckDigit(baseDigits: string, weights: readonly number[]): number {
+    const sum = weights.reduce(
+      (total, weight, index) => total + Number(baseDigits[index]) * weight,
+      0,
+    )
+    const remainder = sum % 11
+    return remainder < 2 ? 0 : 11 - remainder
+  }
+
+  private calculateRetryDelayMs(attempt: number): number {
+    const exponentialDelay = Math.min(
+      30_000,
+      this.retryDelayMs * (2 ** Math.max(0, attempt - 1)),
+    )
+    return exponentialDelay + Math.floor(Math.random() * exponentialDelay)
+  }
+
   private describeError(error: unknown): string {
     if (error instanceof TransferoUltraError) return error.message
     if (error instanceof ZodError) return 'transfero_ultra_response_schema_mismatch'
@@ -280,8 +353,44 @@ export class TransferoPaymentService implements IPaymentService {
     return digits.length === 10 || digits.length === 11
   }
 
+  private isEmailPixKey(value: string): boolean {
+    return value.length <= 255
+      && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
+  }
+
+  private isEvpPixKey(value: string): boolean {
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+      .test(value)
+  }
+
   private isTollFreeNumber(digits: string): boolean {
     return /^0800\d{7}$/.test(digits)
+  }
+
+  private isValidCnpj(digits: string): boolean {
+    if (digits.length !== 14 || /^(\d)\1{13}$/.test(digits)) return false
+    const first = this.calculateCheckDigit(
+      digits.slice(0, 12),
+      [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2],
+    )
+    const second = this.calculateCheckDigit(
+      `${digits.slice(0, 12)}${first}`,
+      [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2],
+    )
+    return digits.endsWith(`${first}${second}`)
+  }
+
+  private isValidCpf(digits: string): boolean {
+    if (digits.length !== 11 || /^(\d)\1{10}$/.test(digits)) return false
+    const first = this.calculateCheckDigit(
+      digits.slice(0, 9),
+      [10, 9, 8, 7, 6, 5, 4, 3, 2],
+    )
+    const second = this.calculateCheckDigit(
+      `${digits.slice(0, 9)}${first}`,
+      [11, 10, 9, 8, 7, 6, 5, 4, 3, 2],
+    )
+    return digits.endsWith(`${first}${second}`)
   }
 
   private isValidLocalNumber(local: string): boolean {

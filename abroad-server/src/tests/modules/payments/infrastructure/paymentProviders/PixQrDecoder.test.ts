@@ -46,9 +46,7 @@ describe('PixQrDecoder', () => {
         amount: '25.50',
         currency: 'BRL',
         name: 'Alice',
-        status: 'CREATED',
-        txid: 'tx-123',
-        type: 'dynamic',
+        taxId: null,
       },
       success: true,
     })

@@ -12,9 +12,7 @@ describe('QrDecoderController', () => {
     amount: '100.00',
     currency: 'BRL',
     name: 'Test Merchant',
-    status: 'CREATED',
-    txid: 'tx-123',
-    type: 'dynamic',
+    taxId: '123.456.789-00',
   }
 
   beforeEach(() => {

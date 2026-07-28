@@ -17,6 +17,7 @@ export class TransferoPayoutStatusAdapter implements IPayoutStatusAdapter {
       case 'SETTLED':
         return TransactionStatus.PAYMENT_COMPLETED
       case 'APPROVED':
+      case 'HELD_FOR_REVIEW':
       case 'PENDING':
       case 'PENDING_APPROVAL':
       case 'PROCESSING':

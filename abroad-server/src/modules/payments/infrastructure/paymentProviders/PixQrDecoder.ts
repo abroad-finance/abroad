@@ -73,9 +73,7 @@ export class PixQrDecoder implements IPixQrDecoder {
             : preview.amount.toFixed(2),
           currency: 'BRL',
           name: preview.merchantName ?? undefined,
-          status,
-          txid: preview.txid ?? undefined,
-          type: preview.type,
+          taxId: null,
         },
         success: true,
       }

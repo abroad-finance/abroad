@@ -23,8 +23,9 @@ and make every request fail authentication.
 Optional runtime tuning uses only Ultra-prefixed environment variables:
 `TRANSFERO_ULTRA_REQUEST_TIMEOUT_MS` (default `8000`),
 `TRANSFERO_ULTRA_MAX_SEND_ATTEMPTS` (default `3`), and
-`TRANSFERO_ULTRA_RETRY_DELAY_MS` (default `250`). Legacy `TRANSFERO_*` retry
-variables are intentionally ignored.
+`TRANSFERO_ULTRA_RETRY_DELAY_MS` (default `250`), and
+`TRANSFERO_ULTRA_RATE_LIMIT_COOLDOWN_MS` (default `60000`). Legacy
+`TRANSFERO_*` retry variables are intentionally ignored.
 
 The API key must authorize all runtime operations used by Abroad:
 
@@ -54,30 +55,26 @@ It will log an error if the configured URL is missing, inactive, malformed, or
 does not have exactly those six events. It never creates or rotates a webhook
 endpoint.
 
-## Cutover sequence
+## Direct production release sequence
 
-1. Provision and test the Ultra API key, Polygon vault addresses, webhook
-   endpoint, subscriptions, and all five secrets in staging.
-2. Ensure the Ultra account has the BRZ payout liquidity and stablecoin holdings
-   required by the live corridors.
+1. Provision the production Ultra API key, webhook endpoint, exact
+   subscriptions, and all five production Secret Manager values.
+2. Confirm the production account exposes a mainnet Polygon USDC vault address
+   and has the PIX limits, BRZ liquidity, OTC permissions, and stablecoin
+   holdings required by the live corridors.
 3. Stop admission of new Transfero-backed BRL flows.
-4. Drain every non-terminal legacy Transfero flow and every `SOL` bridge batch
-   or leg. The database migration aborts if any remain.
-5. Take a database backup and deploy during a maintenance window. Cloud Build
-   applies the guarded migration before starting the new application version.
-6. Re-enable the BRL corridors only after startup reports that the Ultra webhook
-   configuration is verified and a staging-equivalent smoke payout has
-   completed.
-7. Monitor PIX withdrawal failures, OTC partial-settlement failures, confirmed
-   Polygon deposits, bridge batches, and webhook delivery attempts.
+4. Let every retained legacy payout and every `SOL` bridge batch or leg reach a
+   terminal state. The migration aborts while any retained payout remains
+   active; legacy snapshots older than the provider's 15-day retention window
+   are retired internally without inventing a transaction outcome.
+5. Push the validated `main` SHA and run the normal production backend trigger
+   against that exact SHA. Cloud Build applies the migration atomically before
+   starting the Ultra-only runtime.
+6. Verify the production key, balances, OTC prices, Polygon vault address,
+   webhook endpoint, Cloud Run revision, and GKE worker images.
+7. Re-enable all migrated BRL corridors and confirm normal production webhook
+   delivery and persisted flow state.
 
 The migration rewrites future direct Transfero flow definitions to the
 Binance-first route and moves future pooled bridge legs from Binance network
 `SOL` to `MATIC` (Polygon). Historical terminal records remain unchanged.
-
-## Rollback boundary
-
-There is no in-process fallback to the legacy API. After the database migration,
-rolling only the application image back is unsafe. A rollback requires stopping
-traffic and restoring the pre-cutover database definitions and application
-version together.
