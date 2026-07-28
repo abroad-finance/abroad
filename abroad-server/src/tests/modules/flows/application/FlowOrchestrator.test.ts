@@ -1,5 +1,5 @@
 import 'reflect-metadata'
-import { FlowStepCompletionPolicy, FlowStepStatus, FlowStepType } from '@prisma/client'
+import { FlowInstanceStatus, FlowStepCompletionPolicy, FlowStepStatus, FlowStepType } from '@prisma/client'
 
 import type { IDatabaseClientProvider } from '../../../../platform/persistence/IDatabaseClientProvider'
 
@@ -154,6 +154,19 @@ describe('FlowOrchestrator', () => {
       expect(steps[0].status).toBe(FlowStepStatus.READY)
       expect(steps[1].status).toBe(FlowStepStatus.NOT_STARTED)
     })
+
+    it('does not resume an existing terminal flow', async () => {
+      mockPrisma.flowInstance.findUnique.mockResolvedValue({
+        id: 'fi-terminal',
+        status: FlowInstanceStatus.COMPLETED,
+      })
+      const runSpy = jest.spyOn(orchestrator, 'run')
+
+      await orchestrator.startFlow('tx-1')
+
+      expect(runSpy).not.toHaveBeenCalled()
+      expect(mockPrisma.transaction.findUnique).not.toHaveBeenCalled()
+    })
   })
 
   describe('run - pessimistic lock', () => {
@@ -174,6 +187,16 @@ describe('FlowOrchestrator', () => {
       await orchestrator.run('fi-1')
 
       expect(mockPrisma.flowStepInstance.findFirst).toHaveBeenCalled()
+    })
+
+    it('does not claim work when the locked instance is terminal', async () => {
+      mockPrisma.$queryRawUnsafe.mockResolvedValue([{ id: 'fi-1' }])
+      mockPrisma.flowInstance.updateMany.mockResolvedValue({ count: 0 })
+
+      await orchestrator.run('fi-1')
+
+      expect(mockPrisma.flowStepInstance.findFirst).not.toHaveBeenCalled()
+      expect(mockPrisma.flowInstance.update).not.toHaveBeenCalled()
     })
   })
 
@@ -279,7 +302,13 @@ describe('FlowOrchestrator', () => {
         createMockLogger(),
       )
 
-      const instance = { flowSnapshot: JSON.parse(JSON.stringify(snapshot)), id: 'fi-1', steps: [], transactionId: 'tx-1' }
+      const instance = {
+        flowSnapshot: JSON.parse(JSON.stringify(snapshot)),
+        id: 'fi-1',
+        status: FlowInstanceStatus.IN_PROGRESS,
+        steps: [],
+        transactionId: 'tx-1',
+      }
       mockPrisma.flowInstance.findUnique.mockResolvedValue(instance)
       mockPrisma.transaction.findUnique.mockResolvedValue(buildTransaction())
       mockPrisma.flowSignal.create.mockResolvedValue({ id: 'sig-1' })
@@ -305,6 +334,24 @@ describe('FlowOrchestrator', () => {
         && call[0].where?.status === FlowStepStatus.NOT_STARTED,
       )
       expect(promotion).toBeDefined()
+    })
+
+    it('does not deliver a signal to a terminal flow', async () => {
+      mockPrisma.flowInstance.findUnique.mockResolvedValue({
+        id: 'fi-terminal',
+        status: FlowInstanceStatus.FAILED,
+        transactionId: 'tx-1',
+      })
+
+      await orchestrator.handleSignal({
+        correlationKeys: { provider: 'binance' },
+        eventType: 'exchange.balance.updated',
+        payload: {},
+        transactionId: 'tx-1',
+      })
+
+      expect(mockPrisma.flowSignal.create).not.toHaveBeenCalled()
+      expect(mockPrisma.flowStepInstance.findMany).not.toHaveBeenCalled()
     })
   })
 })

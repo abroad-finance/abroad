@@ -15,6 +15,17 @@ import {
   FlowStepRuntimeContext,
 } from './flowTypes'
 
+const RUNNABLE_FLOW_STATUSES = [
+  FlowInstanceStatus.NOT_STARTED,
+  FlowInstanceStatus.IN_PROGRESS,
+  FlowInstanceStatus.WAITING,
+] as const
+
+const TERMINAL_FLOW_STATUSES = new Set<FlowInstanceStatus>([
+  FlowInstanceStatus.COMPLETED,
+  FlowInstanceStatus.FAILED,
+])
+
 export class FlowNotFoundError extends Error {
   constructor(message: string) {
     super(message)
@@ -39,6 +50,15 @@ export class FlowOrchestrator {
     const flowInstance = signal.transactionId
       ? await prisma.flowInstance.findUnique({ where: { transactionId: signal.transactionId } })
       : null
+
+    if (flowInstance && TERMINAL_FLOW_STATUSES.has(flowInstance.status)) {
+      this.logger.info('Ignoring signal for terminal flow instance', {
+        eventType: signal.eventType,
+        flowInstanceId: flowInstance.id,
+        status: flowInstance.status,
+      })
+      return
+    }
 
     const signalRecord = await prisma.flowSignal.create({
       data: {
@@ -135,10 +155,14 @@ export class FlowOrchestrator {
         return null
       }
 
-      await tx.flowInstance.updateMany({
+      const activation = await tx.flowInstance.updateMany({
         data: { status: FlowInstanceStatus.IN_PROGRESS },
-        where: { id: flowInstanceId, status: FlowInstanceStatus.WAITING },
+        where: { id: flowInstanceId, status: { in: [...RUNNABLE_FLOW_STATUSES] } },
       })
+      if (activation.count === 0) {
+        this.logger.info('Flow instance is not runnable; skipping execution', { flowInstanceId })
+        return null
+      }
 
       return this.claimNextStep(tx, flowInstanceId)
     })
@@ -240,6 +264,14 @@ export class FlowOrchestrator {
 
     const existing = await prisma.flowInstance.findUnique({ where: { transactionId } })
     if (existing) {
+      if (TERMINAL_FLOW_STATUSES.has(existing.status)) {
+        this.logger.info('Terminal flow instance will not be resumed', {
+          flowInstanceId: existing.id,
+          status: existing.status,
+          transactionId,
+        })
+        return
+      }
       this.logger.info('Flow instance already exists; resuming', { flowInstanceId: existing.id, transactionId })
       await this.run(existing.id)
       return
