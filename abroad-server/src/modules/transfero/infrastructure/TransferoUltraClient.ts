@@ -263,7 +263,13 @@ export class TransferoUltraClient {
         ...signedHeaders,
         Accept: 'application/json',
         ...(isStateChanging ? { 'Idempotency-Key': params.idempotencyKey } : {}),
+        // Axios otherwise injects application/x-www-form-urlencoded for
+        // bodyless POST/PATCH requests. Ultra's bodyless endpoints reject that
+        // media type; null keeps the header out of the transmitted request.
         ...(params.body === undefined ? {} : { 'Content-Type': 'application/json' }),
+        ...(isStateChanging && params.body === undefined
+          ? { 'Content-Type': null }
+          : {}),
       },
       method: params.method,
       timeout: this.requestTimeoutMs,

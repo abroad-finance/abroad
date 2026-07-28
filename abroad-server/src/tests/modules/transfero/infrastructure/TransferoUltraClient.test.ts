@@ -152,6 +152,26 @@ describe('TransferoUltraClient', () => {
     expect(mockedAxios.request).not.toHaveBeenCalled()
   })
 
+  it('suppresses Axios form encoding for bodyless state-changing requests', async () => {
+    const client = new TransferoUltraClient(
+      createSecretManager(),
+      createMockLogger(),
+    )
+
+    await client.post(
+      '/api/v1/otc/trades/trade-123/settle-from-holdings',
+      undefined,
+      'abroad:otc:operation:settlement',
+    )
+
+    const config = getRequestConfig()
+    expect(config.data).toBeUndefined()
+    expect(config.headers).toMatchObject({
+      'Content-Type': null,
+      'Idempotency-Key': 'abroad:otc:operation:settlement',
+    })
+  })
+
   it('classifies rate limits and server failures as retriable without leaking credentials', async () => {
     const logger = createMockLogger()
     const client = new TransferoUltraClient(createSecretManager(), logger)
