@@ -44,6 +44,16 @@ export class BinanceListener {
     }
   }
 
+  private buildWebSocketProxyBaseUrl = (apiBaseUrl: string): string => {
+    const url = new URL(apiBaseUrl)
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+      throw new Error('[Binance WS]: API URL must use HTTP or HTTPS')
+    }
+
+    const websocketProtocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
+    return `${websocketProtocol}//${url.host}`
+  }
+
   private handleSpotUserDataStream = (data: WsUserDataEvents) => {
     const correlationId = generateCorrelationId(String(data.eventTime ?? Date.now()))
     runWithCorrelationId(correlationId, () => {
@@ -83,8 +93,8 @@ export class BinanceListener {
     // Binance deprecated POST /api/v3/userDataStream on 2026-02-20.
     // Use WebsocketAPIClient which subscribes via userDataStream.subscribe.signature (WS API).
     // Both REST and WS connections go through the proxy to avoid Binance geo-blocking (451 from US IPs).
-    // The proxy routes /ws-api/ to wss://ws-api.binance.com:443.
-    const wsProxyUrl = BINANCE_API_URL.replace(/^https:/, 'wss:').replace(/^http:/, 'ws:').replace(/\/$/, '') + '/ws-api/'
+    // The SDK appends /ws-api/v3, so wsUrl must be the proxy origin without a path suffix.
+    const wsProxyUrl = this.buildWebSocketProxyBaseUrl(BINANCE_API_URL)
     this.wsApiClient = new WebsocketAPIClient({
       api_key: BINANCE_API_KEY,
       api_secret: BINANCE_API_SECRET,
@@ -152,5 +162,4 @@ export class BinanceListener {
     await this.wsApiClient.subscribeUserDataStream('mainWSAPI')
     this.logger.info('Subscribed to spot user data stream via WebSocket API')
   }
-
 }

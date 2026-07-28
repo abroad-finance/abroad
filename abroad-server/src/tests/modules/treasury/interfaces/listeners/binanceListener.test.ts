@@ -1,5 +1,5 @@
 import 'reflect-metadata'
-import { WebsocketClient } from 'binance'
+import { WebsocketAPIClient } from 'binance'
 
 import type { ILogger } from '../../../../../core/logging/types'
 import type { ISecretManager } from '../../../../../platform/secrets/ISecretManager'
@@ -13,11 +13,9 @@ type HandlerMap = Record<string, ((data: unknown) => void)[]>
 let handlerMap: HandlerMap = {}
 
 class FakeWebsocketClient {
-  public closeAll = jest.fn()
   private handlers: HandlerMap = {}
 
-  public constructor(_config?: unknown) {
-    void _config
+  public constructor() {
     handlerMap = this.handlers
   }
 
@@ -27,14 +25,30 @@ class FakeWebsocketClient {
     }
     this.handlers[event]!.push(handler)
   }
+}
 
-  public subscribeSpotUserDataStream(): Promise<{ wsKey: string }> {
-    return Promise.resolve({ wsKey: 'spot' })
+let webSocketApiConfig: unknown
+
+class FakeWebsocketAPIClient {
+  public disconnectAll = jest.fn(() => Promise.resolve())
+  public subscribeUserDataStream = jest.fn((wsKey: string) => {
+    void wsKey
+    return Promise.resolve()
+  })
+
+  private readonly wsClient = new FakeWebsocketClient()
+
+  public constructor(config?: unknown) {
+    webSocketApiConfig = config
+  }
+
+  public getWSClient() {
+    return this.wsClient
   }
 }
 
 jest.mock('binance', () => ({
-  WebsocketClient: jest.fn((config: unknown) => new FakeWebsocketClient(config)),
+  WebsocketAPIClient: jest.fn((config: unknown) => new FakeWebsocketAPIClient(config)),
 }))
 
 const queueHandler = createMockQueueHandler()
@@ -58,6 +72,7 @@ describe('BinanceListener', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     handlerMap = {}
+    webSocketApiConfig = undefined
     ;(secretManager.getSecret as jest.Mock).mockReset()
     ;(secretManager.getSecrets as jest.Mock).mockResolvedValue({
       BINANCE_API_KEY: 'api-key',
@@ -74,12 +89,14 @@ describe('BinanceListener', () => {
     const listener = new BinanceListener(secretManager, queueHandler, logger)
     await listener.start()
 
-    expect(WebsocketClient).toHaveBeenCalledWith({
+    expect(WebsocketAPIClient).toHaveBeenCalledWith({
       api_key: 'api-key',
       api_secret: 'api-secret',
       restOptions: { baseUrl: 'https://api.binance.com' },
       wsUrl: 'wss://api.binance.com',
     })
+    const client = (WebsocketAPIClient as unknown as jest.Mock).mock.results[0]?.value as FakeWebsocketAPIClient
+    expect(client.subscribeUserDataStream).toHaveBeenCalledWith('mainWSAPI')
 
     flushHandlers('message', [])
     flushHandlers('message', { streamName: 'user', wsKey: 'spot' })
@@ -119,45 +136,39 @@ describe('BinanceListener', () => {
   })
 
   it('stops the listener safely', async () => {
-    ;(secretManager.getSecret as jest.Mock).mockReset()
-    ;(secretManager.getSecret as jest.Mock).mockResolvedValueOnce('api-key')
-    ;(secretManager.getSecret as jest.Mock).mockResolvedValueOnce('api-secret')
-    ;(secretManager.getSecret as jest.Mock).mockResolvedValueOnce('https://api.binance.com')
     const listener = new BinanceListener(secretManager, queueHandler, logger)
     await listener.start()
     await listener.stop()
 
-    const clientInstance = (WebsocketClient as unknown as jest.Mock).mock.results[0]?.value as FakeWebsocketClient
-    expect(clientInstance.closeAll).toHaveBeenCalledWith(true)
+    const client = (WebsocketAPIClient as unknown as jest.Mock).mock.results[0]?.value as FakeWebsocketAPIClient
+    expect(client.disconnectAll).toHaveBeenCalled()
   })
 
-  it('subscribes even when websocket client does not return a wsKey', async () => {
-    const subscribeSpy = jest.spyOn(FakeWebsocketClient.prototype, 'subscribeSpotUserDataStream')
-    subscribeSpy.mockResolvedValueOnce(undefined as unknown as { wsKey: string })
+  it('uses only the proxy origin when the REST base URL contains a path', async () => {
+    ;(secretManager.getSecrets as jest.Mock).mockResolvedValue({
+      BINANCE_API_KEY: 'api-key',
+      BINANCE_API_SECRET: 'api-secret',
+      BINANCE_API_URL: 'http://proxy.internal:8080/rest/',
+    })
     const listener = new BinanceListener(secretManager, queueHandler, logger)
 
     await listener.start()
 
-    expect(subscribeSpy).toHaveBeenCalled()
-    expect(logger.info).toHaveBeenCalledWith('[BinanceListener] Subscribed to spot user data stream')
+    expect(webSocketApiConfig).toEqual(expect.objectContaining({
+      restOptions: { baseUrl: 'http://proxy.internal:8080/rest/' },
+      wsUrl: 'ws://proxy.internal:8080',
+    }))
   })
 
-  it('converts arbitrary urls to websocket equivalents with suffix', () => {
+  it('rejects non-HTTP proxy URLs', async () => {
+    ;(secretManager.getSecrets as jest.Mock).mockResolvedValue({
+      BINANCE_API_KEY: 'api-key',
+      BINANCE_API_SECRET: 'api-secret',
+      BINANCE_API_URL: 'ftp://proxy.internal',
+    })
     const listener = new BinanceListener(secretManager, queueHandler, logger)
-    const toWsUrl = (listener as unknown as { toWsUrl: (httpUrl: string, pathSuffix?: string) => string }).toWsUrl
 
-    const url = toWsUrl('not-a-url', 'stream')
-
-    expect(url).toBe('not-a-url/stream')
-  })
-
-  it('normalizes websocket urls across protocols and suffixes', () => {
-    const listener = new BinanceListener(secretManager, queueHandler, logger)
-    const toWsUrl = (listener as unknown as { toWsUrl: (httpUrl: string, pathSuffix?: string) => string }).toWsUrl
-
-    expect(toWsUrl('http://api.binance.com/base', 'ws')).toBe('ws://api.binance.com/base/ws')
-    expect(toWsUrl('ws://api.binance.com/root/', '/stream')).toBe('ws://api.binance.com/root/stream')
-    expect(toWsUrl('not-a-url', '/fallback')).toBe('not-a-url/fallback')
+    await expect(listener.start()).rejects.toThrow('[Binance WS]: API URL must use HTTP or HTTPS')
   })
 
   it('logs and rethrows when startListener fails', async () => {
