@@ -44,7 +44,7 @@ const otcSession = {
 }
 
 describe('TransferoExchangeProvider', () => {
-  it('uses the Ultra Polygon vault address for supported stablecoins', async () => {
+  it('uses the Ultra Polygon vault address and treats blank tags as absent', async () => {
     const { provider, ultraClient } = createProvider()
     ultraClient.get.mockResolvedValue([
       {
@@ -61,7 +61,7 @@ describe('TransferoExchangeProvider', () => {
         blockchain: 'POLYGON',
         id: '88888888-2222-4333-8444-555555555555',
         network: 'amoy',
-        tag: null,
+        tag: '',
       },
       {
         address: '0x1111222233334444555566667777888899990000',
@@ -69,7 +69,7 @@ describe('TransferoExchangeProvider', () => {
         blockchain: 'POLYGON',
         id: '11111111-2222-4333-8444-555555555555',
         network: 'mainnet',
-        tag: null,
+        tag: '',
       },
     ])
 

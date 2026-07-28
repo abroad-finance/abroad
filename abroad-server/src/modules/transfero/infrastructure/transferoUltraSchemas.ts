@@ -102,7 +102,10 @@ const transferoUltraVaultAddressSchema = z.object({
   blockchain: z.string().min(1),
   id: z.string().uuid(),
   network: z.string().min(1),
-  tag: z.string().min(1).nullable(),
+  tag: z.preprocess(
+    value => typeof value === 'string' && value.trim().length === 0 ? null : value,
+    z.string().min(1).nullable(),
+  ),
 }).loose()
 
 export const transferoUltraVaultAddressesResponseSchema = z.array(transferoUltraVaultAddressSchema)
