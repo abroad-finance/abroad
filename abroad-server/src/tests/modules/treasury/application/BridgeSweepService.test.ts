@@ -100,6 +100,20 @@ describe('BridgeSweepService.sweep', () => {
     expect(batchUpdate).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ grossAmount: 7.0, status: 'SUBMITTED', withdrawId: 'wd-1' }) }))
   })
 
+  it('sums member legs in USDC atomic units before submitting the withdrawal', async () => {
+    const { batchUpdate, service } = makeService({
+      pending: [{ amount: 19.87, id: 'leg-1' }, { amount: 0.42, id: 'leg-2' }],
+    })
+
+    const result = await service.sweep()
+
+    expect(result).toEqual(expect.objectContaining({ amount: 20.29, swept: true }))
+    expect(withdrawMock).toHaveBeenCalledWith(expect.objectContaining({ amount: 20.29 }))
+    expect(batchUpdate).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ grossAmount: 20.29, status: 'SUBMITTED' }),
+    }))
+  })
+
   // The crash-between-create-and-claim case: a batch with no member legs must
   // NOT withdraw its stored grossAmount — it is failed and withdraws nothing.
   it('does not withdraw an empty batch (no member legs); marks it FAILED', async () => {
@@ -109,6 +123,23 @@ describe('BridgeSweepService.sweep', () => {
     expect(result.reason).toBe('no_member_legs')
     expect(withdrawMock).not.toHaveBeenCalled()
     expect(batchUpdate).toHaveBeenCalledWith(expect.objectContaining({ data: { status: 'FAILED' } }))
+  })
+
+  it('leaves an OPEN batch untouched when a member amount is invalid', async () => {
+    const { batchUpdate, service } = makeService({
+      members: [{ amount: Number.NaN, id: 'leg-invalid' }],
+      stale: { destNetwork: 'MATIC', id: 'batch-open' },
+    })
+
+    const result = await service.sweep()
+
+    expect(result).toEqual(expect.objectContaining({
+      batchId: 'batch-open',
+      reason: 'invalid_member_amount',
+      swept: false,
+    }))
+    expect(withdrawMock).not.toHaveBeenCalled()
+    expect(batchUpdate).not.toHaveBeenCalled()
   })
 
   it('does not withdraw when the Binance minimum is unresolved', async () => {

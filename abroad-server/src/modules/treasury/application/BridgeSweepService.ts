@@ -23,6 +23,7 @@ export type BridgeSweepResult = {
 const BRIDGE_ASSET = CryptoCurrency.USDC
 const BRIDGE_DEST_NETWORK = 'MATIC'
 const BRIDGE_DESTINATION_CURRENCY = TargetCurrency.BRL
+const BRIDGE_ASSET_SCALE = 1_000_000
 
 // Binance withdrawal status codes: 6 = Completed (sent on-chain);
 // 1 = Cancelled, 3 = Rejected, 5 = Failure are terminal failures (funds
@@ -35,6 +36,7 @@ type BinanceCoinInfo = {
   networkList?: { network?: string, withdrawFee?: string, withdrawMin?: string }[]
 }
 type BridgeBatchRow = { destNetwork: string, id: string }
+type BridgeMemberRow = { amount: number }
 
 // A SUBMITTED batch unresolved past this age is surfaced (delivered-but-unmatched
 // or a >7-day Binance withdrawHistory lookback gap), instead of silently stuck.
@@ -261,10 +263,14 @@ export class BridgeSweepService {
     // an empty batch withdraws nothing and is failed; its legs stay PENDING for
     // a fresh batch.
     const members = await client.bridgePendingTransfer.findMany({ where: { batchId: batch.id, status: 'BATCHED' } })
-    const total = members.reduce((sum, leg) => sum + (Number(leg.amount) || 0), 0)
-    if (members.length === 0 || !(total > 0)) {
+    const total = this.sumBridgeAssetAmount(members)
+    if (members.length === 0) {
       await client.bridgeBatch.update({ data: { status: 'FAILED' }, where: { id: batch.id } })
       return { batchId: batch.id, reason: 'no_member_legs', swept: false }
+    }
+    if (total === undefined) {
+      this.logger.error('Bridge batch contains an invalid USDC amount', { batchId: batch.id })
+      return { batchId: batch.id, reason: 'invalid_member_amount', swept: false }
     }
 
     const destination = knownDestination ?? await this.resolveDestination()
@@ -299,5 +305,28 @@ export class BridgeSweepService {
       this.logger.error('Bridge sweep withdrawal failed; will retry batch', { batchId: batch.id, error })
       return { batchId: batch.id, reason: 'withdraw_failed', swept: false }
     }
+  }
+
+  /**
+   * Sum USDC in atomic units before crossing the Binance API boundary.
+   * JavaScript addition can turn 19.87 + 0.42 into 20.290000000000003, while
+   * Binance requires the withdrawal to be an exact multiple of 0.000001 USDC.
+   */
+  private sumBridgeAssetAmount(members: BridgeMemberRow[]): number | undefined {
+    let totalUnits = 0
+    for (const member of members) {
+      const amount = Number(member.amount)
+      if (!Number.isFinite(amount) || amount <= 0) {
+        return undefined
+      }
+
+      const units = Math.round(amount * BRIDGE_ASSET_SCALE)
+      if (!Number.isSafeInteger(units) || !Number.isSafeInteger(totalUnits + units)) {
+        return undefined
+      }
+      totalUnits += units
+    }
+
+    return totalUnits > 0 ? totalUnits / BRIDGE_ASSET_SCALE : undefined
   }
 }
