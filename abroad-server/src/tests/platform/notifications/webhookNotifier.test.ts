@@ -94,19 +94,19 @@ describe('WebhookNotifier', () => {
     expect(axios.post).toHaveBeenCalledTimes(1)
   })
 
-  it('logs an error when the webhook post fails', async () => {
+  it('logs a safe error and propagates delivery failure to the outbox', async () => {
     (axios.post as jest.Mock).mockRejectedValueOnce(new Error('fail'))
     partnerClient.findUnique.mockResolvedValueOnce(null)
     const notifier = new WebhookNotifier(logger, secretManager, RuntimeConfig, databaseClientProvider)
 
-    await notifier.notifyWebhook('https://hook', {
+    await expect(notifier.notifyWebhook('https://hook/private/path', {
       data: { id: 'x' },
       event: WebhookEvent.TRANSACTION_UPDATED,
-    })
+    })).rejects.toThrow('Webhook delivery failed')
 
     expect(logger.error).toHaveBeenCalledWith('Failed to notify webhook', expect.objectContaining({
       event: WebhookEvent.TRANSACTION_UPDATED,
-      url: 'https://hook',
+      targetOrigin: 'https://hook',
     }))
   })
 })

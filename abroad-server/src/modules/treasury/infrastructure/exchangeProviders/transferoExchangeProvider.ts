@@ -6,8 +6,10 @@ import { ZodError } from 'zod'
 import { TYPES } from '../../../../app/container/types'
 import { createScopedLogger, ScopedLogger } from '../../../../core/logging/scopedLogger'
 import { ILogger } from '../../../../core/logging/types'
+import { ILockManager } from '../../../../platform/cacheLock/ILockManager'
 import { TransferoUltraClient, TransferoUltraError } from '../../../transfero/infrastructure/TransferoUltraClient'
 import {
+  transferoUltraBalanceResponseSchema,
   transferoUltraHoldingsSettlementResponseSchema,
   transferoUltraOtcConfirmationResponseSchema,
   transferoUltraOtcPricesResponseSchema,
@@ -25,11 +27,19 @@ import {
 const ULTRA_SETTLEMENT = 'D0'
 const ULTRA_SIDE = 'SELL'
 const ULTRA_QUOTE_VALIDITY_SECONDS = 10
+const ULTRA_SETTLEMENT_LOCK_KEY = 'transfero-ultra:otc-sale'
+const ULTRA_SETTLEMENT_LOCK_TIMEOUT_MS = 60_000
 const ULTRA_PRODUCTION_POLYGON_NETWORKS = new Set([
   'MAINNET',
   'POLYGON',
   'POLYGON_MAINNET',
 ])
+
+type AvailableHoldingsResult
+  = | Extract<ExchangeOperationResult, { success: false }>
+    | { available: number, success: true }
+
+type UltraSaleCurrency = Extract<CryptoCurrency, 'USDC' | 'USDT'>
 
 @injectable()
 export class TransferoExchangeProvider implements IExchangeProvider {
@@ -43,6 +53,7 @@ export class TransferoExchangeProvider implements IExchangeProvider {
 
   public constructor(
     @inject(TransferoUltraClient) private readonly ultraClient: TransferoUltraClient,
+    @inject(TYPES.ILockManager) private readonly lockManager: ILockManager,
     @inject(TYPES.ILogger) baseLogger: ILogger,
   ) {
     this.logger = createScopedLogger(baseLogger, { scope: 'TransferoUltraExchangeProvider' })
@@ -63,72 +74,25 @@ export class TransferoExchangeProvider implements IExchangeProvider {
     if (!params.operationId.trim()) {
       return this.buildOperationFailure('validation', 'transfero_ultra_operation_id_required')
     }
+    if (
+      params.sourceCurrency !== CryptoCurrency.USDC
+      && params.sourceCurrency !== CryptoCurrency.USDT
+    ) {
+      return this.buildOperationFailure(
+        'validation',
+        `transfero_ultra_unsupported_sale_currency:${params.sourceCurrency}`,
+      )
+    }
 
     try {
-      const sessionResponse = await this.ultraClient.post(
-        '/api/v1/otc/sessions',
-        {
-          amount: params.sourceAmount,
-          currency: params.sourceCurrency,
-          settlement: ULTRA_SETTLEMENT,
-          side: ULTRA_SIDE,
-          validity_seconds: ULTRA_QUOTE_VALIDITY_SECONDS,
-        },
-        this.buildIdempotencyKey(params.operationId, 'session'),
+      // Ultra holdings are shared by every flow. Keep the availability read
+      // and all subsequent OTC mutations in one cross-process critical section
+      // so concurrent workers cannot both spend the same available balance.
+      return await this.lockManager.withLock(
+        ULTRA_SETTLEMENT_LOCK_KEY,
+        ULTRA_SETTLEMENT_LOCK_TIMEOUT_MS,
+        () => this.createMarketOrderWithLock(params),
       )
-      const session = transferoUltraOtcSessionResponseSchema.parse(sessionResponse)
-      const sessionMismatch = this.describeSessionMismatch(session, params)
-      if (sessionMismatch) {
-        this.logger.error('Transfero Ultra OTC session did not match request', {
-          operationId: params.operationId,
-          reason: sessionMismatch,
-          sessionId: session.session_id,
-        })
-        return this.buildOperationFailure(
-          'permanent',
-          `transfero_ultra_otc_session_mismatch:${sessionMismatch}`,
-        )
-      }
-
-      const confirmationResponse = await this.ultraClient.patch(
-        `/api/v1/otc/sessions/${encodeURIComponent(session.session_id)}`,
-        {
-          oid: params.operationId.slice(0, 128),
-          side: ULTRA_SIDE,
-          source: 'api',
-        },
-        this.buildIdempotencyKey(params.operationId, 'confirmation'),
-      )
-      const confirmation = transferoUltraOtcConfirmationResponseSchema.parse(
-        confirmationResponse,
-      )
-
-      const settlementResponse = await this.ultraClient.post(
-        `/api/v1/otc/trades/${encodeURIComponent(confirmation.trade.id)}/settle-from-holdings`,
-        undefined,
-        this.buildIdempotencyKey(params.operationId, 'settlement'),
-      )
-      const settledAmount = transferoUltraHoldingsSettlementResponseSchema
-        .parse(settlementResponse)
-        .swept
-      if (!this.coversRequestedAmount(settledAmount, params.sourceAmount)) {
-        this.logger.error('Transfero Ultra trade was not fully settled from holdings', {
-          requestedAmount: params.sourceAmount,
-          settledAmount,
-          tradeId: confirmation.trade.id,
-        })
-        return this.buildOperationFailure(
-          'permanent',
-          `transfero_ultra_partial_holdings_settlement:${settledAmount}`,
-        )
-      }
-
-      this.logger.info('Transfero Ultra OTC sale settled from holdings', {
-        sessionId: session.session_id,
-        settledAmount,
-        tradeId: confirmation.trade.id,
-      })
-      return { success: true }
     }
     catch (error) {
       const failure = this.toOperationFailure(error)
@@ -264,15 +228,103 @@ export class TransferoExchangeProvider implements IExchangeProvider {
     return { code, reason, success: false }
   }
 
-  private coversRequestedAmount(settledAmount: string, requestedAmount: number): boolean {
-    const settled = Number(settledAmount)
-    if (!Number.isFinite(settled)) return false
+  private coversRequestedAmount(actualAmount: number | string, requestedAmount: number): boolean {
+    const actual = Number(actualAmount)
+    if (!Number.isFinite(actual)) return false
 
     // Ultra reports fixed-point crypto strings while the flow stores a JS
     // number. One atomic-unit tolerance avoids a false partial caused only by
     // representation, without accepting an economically meaningful shortfall.
     const atomicTolerance = 1e-8
-    return settled + atomicTolerance >= requestedAmount
+    return actual + atomicTolerance >= requestedAmount
+  }
+
+  private async createMarketOrderWithLock(params: {
+    operationId: string
+    sourceAmount: number
+    sourceCurrency: UltraSaleCurrency
+    targetCurrency: TargetCurrency
+  }): Promise<ExchangeOperationResult> {
+    const holdings = await this.readAvailableHoldings(params.sourceCurrency)
+    if (!holdings.success) {
+      return holdings
+    }
+    if (!this.coversRequestedAmount(holdings.available, params.sourceAmount)) {
+      this.logger.info('Transfero Ultra OTC sale waiting for available holdings', {
+        availableAmount: holdings.available,
+        requestedAmount: params.sourceAmount,
+        sourceCurrency: params.sourceCurrency,
+      })
+      return this.buildOperationFailure(
+        'insufficient_balance',
+        'transfero_ultra_insufficient_available_holdings',
+      )
+    }
+
+    const sessionResponse = await this.ultraClient.post(
+      '/api/v1/otc/sessions',
+      {
+        amount: params.sourceAmount,
+        currency: params.sourceCurrency,
+        settlement: ULTRA_SETTLEMENT,
+        side: ULTRA_SIDE,
+        validity_seconds: ULTRA_QUOTE_VALIDITY_SECONDS,
+      },
+      this.buildIdempotencyKey(params.operationId, 'session'),
+    )
+    const session = transferoUltraOtcSessionResponseSchema.parse(sessionResponse)
+    const sessionMismatch = this.describeSessionMismatch(session, params)
+    if (sessionMismatch) {
+      this.logger.error('Transfero Ultra OTC session did not match request', {
+        operationId: params.operationId,
+        reason: sessionMismatch,
+        sessionId: session.session_id,
+      })
+      return this.buildOperationFailure(
+        'permanent',
+        `transfero_ultra_otc_session_mismatch:${sessionMismatch}`,
+      )
+    }
+
+    const confirmationResponse = await this.ultraClient.patch(
+      `/api/v1/otc/sessions/${encodeURIComponent(session.session_id)}`,
+      {
+        oid: params.operationId.slice(0, 128),
+        side: ULTRA_SIDE,
+        source: 'api',
+      },
+      this.buildIdempotencyKey(params.operationId, 'confirmation'),
+    )
+    const confirmation = transferoUltraOtcConfirmationResponseSchema.parse(
+      confirmationResponse,
+    )
+
+    const settlementResponse = await this.ultraClient.post(
+      `/api/v1/otc/trades/${encodeURIComponent(confirmation.trade.id)}/settle-from-holdings`,
+      undefined,
+      this.buildIdempotencyKey(params.operationId, 'settlement'),
+    )
+    const settledAmount = transferoUltraHoldingsSettlementResponseSchema
+      .parse(settlementResponse)
+      .swept
+    if (!this.coversRequestedAmount(settledAmount, params.sourceAmount)) {
+      this.logger.error('Transfero Ultra trade was not fully settled from holdings', {
+        requestedAmount: params.sourceAmount,
+        settledAmount,
+        tradeId: confirmation.trade.id,
+      })
+      return this.buildOperationFailure(
+        'permanent',
+        `transfero_ultra_partial_holdings_settlement:${settledAmount}`,
+      )
+    }
+
+    this.logger.info('Transfero Ultra OTC sale settled from holdings', {
+      sessionId: session.session_id,
+      settledAmount,
+      tradeId: confirmation.trade.id,
+    })
+    return { success: true }
   }
 
   private describeSessionMismatch(
@@ -303,6 +355,41 @@ export class TransferoExchangeProvider implements IExchangeProvider {
 
   private isProductionPolygonNetwork(network: string): boolean {
     return ULTRA_PRODUCTION_POLYGON_NETWORKS.has(network.trim().toUpperCase())
+  }
+
+  private async readAvailableHoldings(
+    sourceCurrency: UltraSaleCurrency,
+  ): Promise<AvailableHoldingsResult> {
+    const response = await this.ultraClient.get('/api/v1/balance')
+    const parsed = transferoUltraBalanceResponseSchema.safeParse(response)
+    if (!parsed.success) {
+      this.logger.error('Transfero Ultra balance response schema mismatch', {
+        issues: parsed.error.issues,
+      })
+      return this.buildOperationFailure(
+        'permanent',
+        'transfero_ultra_balance_schema_mismatch',
+      )
+    }
+
+    const row = parsed.data.find(balance =>
+      balance.asset.trim().toUpperCase() === sourceCurrency)
+    if (!row) {
+      return this.buildOperationFailure(
+        'permanent',
+        `transfero_ultra_balance_asset_missing:${sourceCurrency}`,
+      )
+    }
+
+    const available = Number(row.available)
+    if (!Number.isFinite(available) || available < 0) {
+      return this.buildOperationFailure(
+        'permanent',
+        `transfero_ultra_available_balance_invalid:${sourceCurrency}`,
+      )
+    }
+
+    return { available, success: true }
   }
 
   private toOperationFailure(

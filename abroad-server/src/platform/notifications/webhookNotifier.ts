@@ -53,12 +53,20 @@ export class WebhookNotifier implements IWebhookNotifier {
       })
     }
     catch (error) {
-      const normalizedError = error instanceof Error ? error : new Error(String(error))
+      const status = axios.isAxiosError(error) ? error.response?.status : undefined
+      const normalizedError = new Error(
+        status
+          ? `Webhook delivery failed with HTTP ${status}`
+          : 'Webhook delivery failed',
+        { cause: error },
+      )
       this.logger.error('Failed to notify webhook', {
         error: normalizedError,
         event: payload.event,
-        url: target,
+        status,
+        targetOrigin: this.readTargetOrigin(target),
       })
+      throw normalizedError
     }
   }
 
@@ -104,6 +112,15 @@ export class WebhookNotifier implements IWebhookNotifier {
     }
     const trimmed = url.trim()
     return trimmed.length > 0 ? trimmed : null
+  }
+
+  private readTargetOrigin(target: string): string {
+    try {
+      return new URL(target).origin
+    }
+    catch {
+      return 'invalid-url'
+    }
   }
 
   private async resolveTargets(primaryUrl: null | string): Promise<string[]> {

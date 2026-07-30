@@ -1,6 +1,7 @@
 import 'reflect-metadata'
 import { BlockchainNetwork, TargetCurrency } from '@prisma/client'
 
+import type { ILockManager } from '../../../../platform/cacheLock/ILockManager'
 import type { ISecretManager } from '../../../../platform/secrets/ISecretManager'
 
 import { TransferoUltraClient } from '../../../../modules/transfero/infrastructure/TransferoUltraClient'
@@ -10,6 +11,9 @@ import { TransferoExchangeProvider } from '../../../../modules/treasury/infrastr
 import { createMockLogger } from '../../../setup/mockFactories'
 
 const secretManager = { getSecret: jest.fn(), getSecrets: jest.fn() } as unknown as ISecretManager
+const lockManager = {
+  withLock: jest.fn(async <T>(_key: string, _ttlMs: number, operation: () => Promise<T>) => operation()),
+} as ILockManager
 const ultraClient = {
   get: jest.fn(),
   patch: jest.fn(),
@@ -18,7 +22,7 @@ const ultraClient = {
 
 const buildFactory = () => {
   const logger = createMockLogger()
-  const transfero = new TransferoExchangeProvider(ultraClient, logger)
+  const transfero = new TransferoExchangeProvider(ultraClient, lockManager, logger)
   const binance = new BinanceExchangeProvider(secretManager, logger)
   const binanceBrl = new BinanceBrlExchangeProvider(secretManager, logger)
   const factory = new ExchangeProviderFactory(transfero, binance, binanceBrl)

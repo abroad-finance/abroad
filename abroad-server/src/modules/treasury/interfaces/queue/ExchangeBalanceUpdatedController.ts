@@ -13,7 +13,7 @@ import { FlowOrchestrator } from '../../../flows/application/FlowOrchestrator'
 
 /**
  * Listens for exchange balance updates (any exchange) and emits flow signals
- * so waiting `AWAIT_EXCHANGE_BALANCE` steps can resume.
+ * so waiting balance and holdings-dependent conversion steps can resume.
  *
  * This is intentionally coarse-grained today (correlated primarily by provider),
  * so it should be hardened with more specific correlation keys once available.
@@ -56,13 +56,16 @@ export class ExchangeBalanceUpdatedController {
 
     try {
       const prisma = await this.dbProvider.getClient()
+      const resumableStepTypes = provider === 'transfero'
+        ? [FlowStepType.AWAIT_EXCHANGE_BALANCE, FlowStepType.EXCHANGE_CONVERT]
+        : [FlowStepType.AWAIT_EXCHANGE_BALANCE]
       const waitingSteps = await prisma.flowStepInstance.findMany({
         distinct: ['flowInstanceId'],
         select: { flowInstance: { select: { transactionId: true } } },
         where: {
           correlation: { equals: provider, path: ['provider'] },
           status: FlowStepStatus.WAITING,
-          stepType: FlowStepType.AWAIT_EXCHANGE_BALANCE,
+          stepType: { in: resumableStepTypes },
         },
       })
 

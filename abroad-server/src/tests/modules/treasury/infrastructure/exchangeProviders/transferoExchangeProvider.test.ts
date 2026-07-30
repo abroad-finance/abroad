@@ -1,6 +1,8 @@
 import 'reflect-metadata'
 import { BlockchainNetwork, CryptoCurrency, TargetCurrency } from '@prisma/client'
 
+import type { ILockManager } from '../../../../../platform/cacheLock/ILockManager'
+
 import { TransferoUltraClient, TransferoUltraError } from '../../../../../modules/transfero/infrastructure/TransferoUltraClient'
 import { TransferoExchangeProvider } from '../../../../../modules/treasury/infrastructure/exchangeProviders/transferoExchangeProvider'
 import { createMockLogger } from '../../../../setup/mockFactories'
@@ -18,14 +20,32 @@ const createUltraClient = (): UltraClientMock => ({
   post: jest.fn(),
 })
 
+const createBalanceResponse = (available: string) => [{
+  asset: 'USDC',
+  available,
+  blocked: '0',
+  credit: '0',
+  ledgerBalance: available,
+  openDebt: '0',
+  openWithdrawals: '0',
+  overdueDebt: '0',
+  owedDue: '0',
+  processing: '0',
+}]
+
 const createProvider = () => {
   const ultraClient = createUltraClient()
+  ultraClient.get.mockResolvedValue(createBalanceResponse('5'))
   const logger = createMockLogger()
+  const lockManager: ILockManager = {
+    withLock: jest.fn(async <T>(_key: string, _ttlMs: number, operation: () => Promise<T>) => operation()),
+  }
   const provider = new TransferoExchangeProvider(
     ultraClient as unknown as TransferoUltraClient,
+    lockManager,
     logger,
   )
-  return { logger, provider, ultraClient }
+  return { lockManager, logger, provider, ultraClient }
 }
 
 const otcSession = {
@@ -128,7 +148,7 @@ describe('TransferoExchangeProvider', () => {
   })
 
   it('creates, confirms, and fully settles a D0 SELL session from holdings', async () => {
-    const { provider, ultraClient } = createProvider()
+    const { lockManager, provider, ultraClient } = createProvider()
     ultraClient.post
       .mockResolvedValueOnce(otcSession)
       .mockResolvedValueOnce({ swept: '5.00000000' })
@@ -144,6 +164,12 @@ describe('TransferoExchangeProvider', () => {
       targetCurrency: TargetCurrency.BRL,
     })).resolves.toEqual({ success: true })
 
+    expect(lockManager.withLock).toHaveBeenCalledWith(
+      'transfero-ultra:otc-sale',
+      60_000,
+      expect.any(Function),
+    )
+    expect(ultraClient.get).toHaveBeenCalledWith('/api/v1/balance')
     expect(ultraClient.post).toHaveBeenNthCalledWith(
       1,
       '/api/v1/otc/sessions',
@@ -171,6 +197,44 @@ describe('TransferoExchangeProvider', () => {
       undefined,
       'abroad:otc:transaction-1:exchange:6:settlement',
     )
+  })
+
+  it('waits without creating an OTC session when available holdings are insufficient', async () => {
+    const { provider, ultraClient } = createProvider()
+    ultraClient.get.mockResolvedValueOnce(createBalanceResponse('4.99999998'))
+
+    await expect(provider.createMarketOrder({
+      operationId: 'transaction-waiting',
+      sourceAmount: 5,
+      sourceCurrency: CryptoCurrency.USDC,
+      targetCurrency: TargetCurrency.BRL,
+    })).resolves.toEqual({
+      code: 'insufficient_balance',
+      reason: 'transfero_ultra_insufficient_available_holdings',
+      success: false,
+    })
+
+    expect(ultraClient.post).not.toHaveBeenCalled()
+    expect(ultraClient.patch).not.toHaveBeenCalled()
+  })
+
+  it('fails closed without mutating when the requested balance row is missing', async () => {
+    const { provider, ultraClient } = createProvider()
+    ultraClient.get.mockResolvedValueOnce([])
+
+    await expect(provider.createMarketOrder({
+      operationId: 'transaction-missing-balance',
+      sourceAmount: 5,
+      sourceCurrency: CryptoCurrency.USDC,
+      targetCurrency: TargetCurrency.BRL,
+    })).resolves.toEqual({
+      code: 'permanent',
+      reason: 'transfero_ultra_balance_asset_missing:USDC',
+      success: false,
+    })
+
+    expect(ultraClient.post).not.toHaveBeenCalled()
+    expect(ultraClient.patch).not.toHaveBeenCalled()
   })
 
   it('fails closed when holdings do not settle the complete requested amount', async () => {

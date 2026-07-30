@@ -1,4 +1,5 @@
 import 'reflect-metadata'
+import { FlowStepType } from '@prisma/client'
 
 import type { IDatabaseClientProvider } from '../../../../../platform/persistence/IDatabaseClientProvider'
 
@@ -9,13 +10,16 @@ import { createMockLogger, createMockQueueHandler, MockLogger, MockQueueHandler 
 
 type WaitingStep = { flowInstance: { transactionId: string } }
 
-const createDbProvider = (steps: WaitingStep[] = []): IDatabaseClientProvider => ({
-  getClient: jest.fn(async () => ({
+const createDbProvider = (steps: WaitingStep[] = []): IDatabaseClientProvider => {
+  const client = {
     flowStepInstance: {
       findMany: jest.fn(async () => steps),
     },
-  })),
-}) as unknown as IDatabaseClientProvider
+  }
+  return {
+    getClient: jest.fn(async () => client),
+  } as unknown as IDatabaseClientProvider
+}
 
 const buildController = (overrides?: {
   dbProvider?: IDatabaseClientProvider
@@ -63,19 +67,46 @@ describe('ExchangeBalanceUpdatedController', () => {
   })
 
   it('emits a flow signal when the update is valid', async () => {
+    const dbProvider = createDbProvider([{ flowInstance: { transactionId: 'tx-1' } }])
     const { controller, orchestrator } = buildController({
-      dbProvider: createDbProvider([{ flowInstance: { transactionId: 'tx-1' } }]),
+      dbProvider,
     })
     const runner = controller as unknown as { onBalanceUpdated: (msg: unknown) => Promise<void> }
 
     await runner.onBalanceUpdated({ provider: 'transfero' })
 
+    const prisma = await dbProvider.getClient()
+    expect(prisma.flowStepInstance.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        stepType: {
+          in: [
+            FlowStepType.AWAIT_EXCHANGE_BALANCE,
+            FlowStepType.EXCHANGE_CONVERT,
+          ],
+        },
+      }),
+    }))
     expect(orchestrator.handleSignal).toHaveBeenCalledWith({
       correlationKeys: { provider: 'transfero' },
       eventType: 'exchange.balance.updated',
       payload: { provider: 'transfero' },
       transactionId: 'tx-1',
     })
+  })
+
+  it('does not wake conversion steps for Binance balance updates', async () => {
+    const dbProvider = createDbProvider()
+    const { controller } = buildController({ dbProvider })
+    const runner = controller as unknown as { onBalanceUpdated: (msg: unknown) => Promise<void> }
+
+    await runner.onBalanceUpdated({ provider: 'binance' })
+
+    const prisma = await dbProvider.getClient()
+    expect(prisma.flowStepInstance.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        stepType: { in: [FlowStepType.AWAIT_EXCHANGE_BALANCE] },
+      }),
+    }))
   })
 
   it('logs when the orchestrator throws', async () => {

@@ -10,7 +10,7 @@ import { ILogger } from '../../../../core/logging/types'
 import { ISecretManager, Secrets } from '../../../../platform/secrets/ISecretManager'
 import { EXCHANGE_PROVIDER_IDS, IExchangeProviderFactory } from '../../../treasury/application/contracts/IExchangeProviderFactory'
 import { AmountSource, amountSourceSchema, resolveAmount } from '../flowAmountResolver'
-import { FlowStepExecutionResult, FlowStepExecutor, FlowStepRuntimeContext } from '../flowTypes'
+import { FlowSignalInput, FlowStepExecutionResult, FlowStepExecutor, FlowStepRuntimeContext } from '../flowTypes'
 
 type BinanceBookTickerResponse = {
   askPrice: string
@@ -152,6 +152,22 @@ export class ExchangeConvertStepExecutor implements FlowStepExecutor {
         })
 
         if (!result.success) {
+          if (result.code === 'insufficient_balance') {
+            this.logger.info('Transfero conversion waiting for available holdings', {
+              amount,
+              sourceCurrency: config.sourceCurrency,
+            })
+            return {
+              correlation: { provider: 'transfero' },
+              outcome: 'waiting',
+              output: {
+                amount,
+                provider: 'transfero',
+                sourceCurrency: config.sourceCurrency,
+                targetCurrency: config.targetCurrency,
+              },
+            }
+          }
           return { error: result.reason ?? result.code ?? 'transfero_convert_failed', outcome: 'failed' }
         }
 
@@ -260,14 +276,37 @@ export class ExchangeConvertStepExecutor implements FlowStepExecutor {
         return { error: error.message, outcome: 'failed' }
       }
 
-      // Convert errors are terminal-but-operator-retryable: there is no signal
-      // that resumes a WAITING EXCHANGE_CONVERT (the balance-update channel only
-      // wakes AWAIT_EXCHANGE_BALANCE steps), so a 'waiting' convert would strand
-      // forever. Recovery is an explicit ops retry, which re-runs execute().
+      // Binance convert errors remain terminal-but-operator-retryable. Unlike
+      // Transfero's explicit insufficient-holdings result, Binance provides no
+      // correlated signal that can safely re-run this step. Returning waiting
+      // here would therefore strand the flow indefinitely.
       const message = error instanceof Error ? error.message : 'binance_convert_error'
       this.logger.error('Binance conversion failed', error)
       return { error: message, outcome: 'failed' }
     }
+  }
+
+  public async handleSignal(params: {
+    config: Record<string, unknown>
+    runtime: FlowStepRuntimeContext
+    signal: FlowSignalInput
+    stepOrder: number
+  }): Promise<FlowStepExecutionResult> {
+    if (
+      params.signal.eventType !== 'exchange.balance.updated'
+      || params.signal.correlationKeys.provider !== 'transfero'
+    ) {
+      return {
+        error: 'Transfero conversion received an unsupported resume signal',
+        outcome: 'failed',
+      }
+    }
+
+    return this.execute({
+      config: params.config,
+      runtime: params.runtime,
+      stepOrder: params.stepOrder,
+    })
   }
 
   private async buildBinanceOrderPayload(params: {

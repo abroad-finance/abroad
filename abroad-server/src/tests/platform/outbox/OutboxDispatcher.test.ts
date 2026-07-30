@@ -142,6 +142,34 @@ describe('OutboxDispatcher', () => {
     }
   })
 
+  it('reschedules a failed webhook instead of marking it delivered', async () => {
+    const { dispatcher, repository, webhookNotifier } = buildMocks()
+    const deliveryError = new Error('Webhook delivery failed with HTTP 401')
+    webhookNotifier.notifyWebhook.mockRejectedValueOnce(deliveryError)
+    const record: OutboxRecord = {
+      ...baseRecord,
+      payload: {
+        kind: 'webhook',
+        payload: {
+          data: { status: 'PAYMENT_COMPLETED' },
+          event: 'transaction.updated',
+        },
+        target: 'https://partner.example/webhook',
+      },
+      type: 'webhook',
+    }
+
+    await dispatcher.deliver(record, 'webhook')
+
+    expect(repository.reschedule).toHaveBeenCalledWith(
+      record.id,
+      expect.any(Date),
+      deliveryError,
+      undefined,
+    )
+    expect(repository.markDelivered).not.toHaveBeenCalled()
+  })
+
   it('logs warnings when slack or dead-letter publishing fails on permanent errors', async () => {
     const { dispatcher, logger, queueHandler, repository, slackNotifier } = buildMocks()
     const permanentFailure = new Error('primary failure')

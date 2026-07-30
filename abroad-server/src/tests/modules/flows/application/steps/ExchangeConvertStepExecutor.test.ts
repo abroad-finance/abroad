@@ -2,6 +2,7 @@ import axios from 'axios'
 import { MainClient } from 'binance'
 
 import { ExchangeConvertStepExecutor } from '../../../../../modules/flows/application/steps/ExchangeConvertStepExecutor'
+import { IExchangeProvider } from '../../../../../modules/treasury/application/contracts/IExchangeProvider'
 
 jest.mock('axios', () => ({ get: jest.fn() }))
 const submitNewOrderMock = jest.fn()
@@ -39,8 +40,12 @@ const makeExecutor = () => {
     }),
     getSecrets: jest.fn(async () => ({})),
   }
-  const transferoProvider = {
-    createMarketOrder: jest.fn(async () => ({ success: true })),
+  const createMarketOrder = jest.fn<
+    ReturnType<IExchangeProvider['createMarketOrder']>,
+    Parameters<IExchangeProvider['createMarketOrder']>
+  >(async () => ({ success: true }))
+  const transferoProvider: jest.Mocked<Pick<IExchangeProvider, 'createMarketOrder'>> = {
+    createMarketOrder,
   }
   const exchangeProviderFactory = {
     getExchangeProvider: jest.fn(),
@@ -368,5 +373,108 @@ describe('ExchangeConvertStepExecutor Transfero venue routing', () => {
       sourceCurrency: 'USDC',
       targetCurrency: 'BRL',
     })
+  })
+
+  it('waits for an Ultra balance update without consuming a failed OTC idempotency key', async () => {
+    const { executor, transferoProvider } = makeExecutor()
+    transferoProvider.createMarketOrder.mockResolvedValueOnce({
+      code: 'insufficient_balance',
+      reason: 'transfero_ultra_insufficient_available_holdings',
+      success: false,
+    })
+
+    const result = await executor.execute({
+      config: {
+        provider: 'transfero',
+        sourceCurrency: 'USDC',
+        targetCurrency: 'BRL',
+      },
+      runtime: {
+        context: {
+          sourceAmount: 10,
+          transactionId: 'transaction-waiting',
+        },
+      } as never,
+      stepOrder: 6,
+    })
+
+    expect(result).toEqual({
+      correlation: { provider: 'transfero' },
+      outcome: 'waiting',
+      output: {
+        amount: 10,
+        provider: 'transfero',
+        sourceCurrency: 'USDC',
+        targetCurrency: 'BRL',
+      },
+    })
+  })
+
+  it('re-executes a waiting Transfero conversion on its correlated balance signal', async () => {
+    const { executor, transferoProvider } = makeExecutor()
+    const config = {
+      provider: 'transfero',
+      sourceCurrency: 'USDC',
+      targetCurrency: 'BRL',
+    }
+    const runtime = {
+      context: {
+        sourceAmount: 10,
+        transactionId: 'transaction-resumed',
+      },
+    } as never
+
+    await expect(executor.handleSignal({
+      config,
+      runtime,
+      signal: {
+        correlationKeys: { provider: 'transfero' },
+        eventType: 'exchange.balance.updated',
+        payload: { provider: 'transfero' },
+        transactionId: 'transaction-resumed',
+      },
+      stepOrder: 6,
+    })).resolves.toEqual({
+      outcome: 'succeeded',
+      output: { amount: 10, provider: 'transfero', targetCurrency: 'BRL' },
+    })
+
+    expect(transferoProvider.createMarketOrder).toHaveBeenCalledTimes(1)
+    expect(transferoProvider.createMarketOrder).toHaveBeenCalledWith({
+      operationId: 'transaction-resumed:exchange:6',
+      sourceAmount: 10,
+      sourceCurrency: 'USDC',
+      targetCurrency: 'BRL',
+    })
+  })
+
+  it('fails closed when a waiting conversion receives an unrelated signal', async () => {
+    const { executor, transferoProvider } = makeExecutor()
+
+    await expect(executor.handleSignal({
+      config: {
+        provider: 'transfero',
+        sourceCurrency: 'USDC',
+        targetCurrency: 'BRL',
+      },
+      runtime: {
+        context: {
+          sourceAmount: 10,
+          transactionId: 'transaction-invalid-signal',
+        },
+      } as never,
+      signal: {
+        correlationKeys: { provider: 'binance' },
+        eventType: 'exchange.balance.updated',
+        payload: { provider: 'binance' },
+        transactionId: 'transaction-invalid-signal',
+      },
+      stepOrder: 6,
+    })).resolves.toEqual({
+      error: 'Transfero conversion received an unsupported resume signal',
+      outcome: 'failed',
+    })
+
+    expect(transferoProvider.createMarketOrder).not.toHaveBeenCalled()
   })
 })

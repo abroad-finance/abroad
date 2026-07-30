@@ -4,7 +4,11 @@ export type ExchangeAddressResult
   = | { address: string, memo?: string, success: true }
     | { code?: ExchangeFailureCode, reason?: string, success: false }
 
-export type ExchangeFailureCode = 'permanent' | 'retriable' | 'validation'
+export type ExchangeFailureCode
+  = | 'insufficient_balance'
+    | 'permanent'
+    | 'retriable'
+    | 'validation'
 export type ExchangeNetwork = 'POLYGON' | BlockchainNetwork
 
 export type ExchangeOperationResult
