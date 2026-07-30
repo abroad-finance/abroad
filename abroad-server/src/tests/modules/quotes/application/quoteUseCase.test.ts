@@ -70,13 +70,15 @@ describe('QuoteUseCase', () => {
     paymentServiceFactory = {
       getPaymentService: jest.fn(() => paymentService),
     }
+    const exchangeProvider = {
+      createMarketOrder: jest.fn(),
+      exchangePercentageFee: 0.01,
+      getExchangeAddress: jest.fn(),
+      getExchangeRate: jest.fn(async () => 1.01),
+    }
     exchangeProviderFactory = {
-      getExchangeProvider: jest.fn(() => ({
-        createMarketOrder: jest.fn(),
-        exchangePercentageFee: 0.01,
-        getExchangeAddress: jest.fn(),
-        getExchangeRate: jest.fn(async () => 1.01),
-      })),
+      getExchangeProvider: jest.fn(() => exchangeProvider),
+      getExchangeProviderById: jest.fn(() => exchangeProvider),
     }
     secretManager = {
       getSecret: jest.fn(async () => 'sep-partner'),

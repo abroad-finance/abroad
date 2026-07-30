@@ -2,6 +2,7 @@ import { FlowStepType } from '@prisma/client'
 import { injectable } from 'inversify'
 import { z } from 'zod'
 
+import { EXCHANGE_PROVIDER_IDS } from '../../../treasury/application/contracts/IExchangeProviderFactory'
 import {
   FlowSignalInput,
   FlowStepExecutionResult,
@@ -11,7 +12,7 @@ import {
 } from '../flowTypes'
 
 const awaitExchangeBalanceConfigSchema = z.object({
-  provider: z.enum(['binance', 'transfero']).default('binance'),
+  provider: z.enum(EXCHANGE_PROVIDER_IDS),
 })
 
 @injectable()

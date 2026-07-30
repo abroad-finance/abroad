@@ -39,8 +39,12 @@ const makeExecutor = () => {
     }),
     getSecrets: jest.fn(async () => ({})),
   }
+  const transferoProvider = {
+    createMarketOrder: jest.fn(async () => ({ success: true })),
+  }
   const exchangeProviderFactory = {
     getExchangeProvider: jest.fn(),
+    getExchangeProviderById: jest.fn(() => transferoProvider),
     getExchangeProviderForCapability: jest.fn(),
   }
   const executor = new ExchangeConvertStepExecutor(
@@ -48,7 +52,7 @@ const makeExecutor = () => {
     secretManager as never,
     baseLogger as never,
   )
-  return { executor }
+  return { exchangeProviderFactory, executor, transferoProvider }
 }
 
 // exchangeInfo answers ONLY for the symbols passed in `valid`; everything else
@@ -329,5 +333,40 @@ describe('ExchangeConvertStepExecutor Binance market resolution', () => {
     })
 
     expect(result.outcome).toBe('failed')
+  })
+})
+
+describe('ExchangeConvertStepExecutor Transfero venue routing', () => {
+  it('settles through the explicitly configured Transfero provider', async () => {
+    const { exchangeProviderFactory, executor, transferoProvider } = makeExecutor()
+
+    const result = await executor.execute({
+      config: {
+        provider: 'transfero',
+        sourceCurrency: 'USDC',
+        targetCurrency: 'BRL',
+      },
+      runtime: {
+        context: {
+          sourceAmount: 10,
+          transactionId: 'transaction-1',
+        },
+      } as never,
+      stepOrder: 6,
+    })
+
+    expect(result).toEqual({
+      outcome: 'succeeded',
+      output: { amount: 10, provider: 'transfero', targetCurrency: 'BRL' },
+    })
+    expect(exchangeProviderFactory.getExchangeProviderById).toHaveBeenCalledWith('transfero')
+    expect(exchangeProviderFactory.getExchangeProvider).not.toHaveBeenCalled()
+    expect(exchangeProviderFactory.getExchangeProviderForCapability).not.toHaveBeenCalled()
+    expect(transferoProvider.createMarketOrder).toHaveBeenCalledWith({
+      operationId: 'transaction-1:exchange:6',
+      sourceAmount: 10,
+      sourceCurrency: 'USDC',
+      targetCurrency: 'BRL',
+    })
   })
 })

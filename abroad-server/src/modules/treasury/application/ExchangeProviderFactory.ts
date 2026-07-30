@@ -3,10 +3,11 @@ import { inject, named } from 'inversify'
 
 import { TYPES } from '../../../app/container/types'
 import { IExchangeProvider } from './contracts/IExchangeProvider'
-import { IExchangeProviderFactory } from './contracts/IExchangeProviderFactory'
+import { ExchangeProviderId, IExchangeProviderFactory } from './contracts/IExchangeProviderFactory'
 
 export class ExchangeProviderFactory implements IExchangeProviderFactory {
   private readonly providers: IExchangeProvider[]
+  private readonly providersById: ReadonlyMap<ExchangeProviderId, IExchangeProvider>
 
   public constructor(
     @inject(TYPES.IExchangeProvider) @named('transfero') transferoExchangeProvider: IExchangeProvider,
@@ -14,10 +15,22 @@ export class ExchangeProviderFactory implements IExchangeProviderFactory {
     @inject(TYPES.IExchangeProvider) @named('binance-brl') binanceBrlExchangeProvider: IExchangeProvider,
   ) {
     this.providers = [transferoExchangeProvider, binanceExchangeProvider, binanceBrlExchangeProvider]
+    this.providersById = new Map<ExchangeProviderId, IExchangeProvider>([
+      ['binance', binanceExchangeProvider],
+      ['transfero', transferoExchangeProvider],
+    ])
   }
 
   getExchangeProvider(currency: TargetCurrency): IExchangeProvider {
     return this.resolveExchangeProvider({ targetCurrency: currency })
+  }
+
+  getExchangeProviderById(providerId: ExchangeProviderId): IExchangeProvider {
+    const provider = this.providersById.get(providerId)
+    if (!provider) {
+      throw new Error(`No exchange provider found for id: ${providerId}`)
+    }
+    return provider
   }
 
   getExchangeProviderForCapability(params: {

@@ -24,6 +24,7 @@ const makeExecutor = (opts: { depositNetwork?: string } = {}) => {
   }
   const exchangeProviderFactory = {
     getExchangeProvider: jest.fn(() => destinationProvider),
+    getExchangeProviderById: jest.fn(() => destinationProvider),
     getExchangeProviderForCapability: jest.fn(() => destinationProvider),
   }
   const secretManager = {
@@ -35,7 +36,7 @@ const makeExecutor = (opts: { depositNetwork?: string } = {}) => {
     secretManager as never,
     baseLogger as never,
   )
-  return { destinationProvider, executor }
+  return { destinationProvider, exchangeProviderFactory, executor }
 }
 
 // context.blockchain is CELO (the ORIGINAL USDT deposit chain) — the transfer
@@ -60,7 +61,7 @@ describe('TreasuryTransferStepExecutor', () => {
   // from the destination provider's bridge chain for the ASSET being moved —
   // never from the origin deposit chain (CELO). Funds must go to Polygon.
   it('bridges on the Ultra destination network (Polygon), ignoring the origin deposit chain (CELO)', async () => {
-    const { destinationProvider, executor } = makeExecutor()
+    const { destinationProvider, exchangeProviderFactory, executor } = makeExecutor()
 
     const result = await executor.execute({
       config: { asset: 'USDC', destinationProvider: 'transfero', sourceProvider: 'binance' },
@@ -69,6 +70,8 @@ describe('TreasuryTransferStepExecutor', () => {
     })
 
     expect(result.outcome).toBe('succeeded')
+    expect(exchangeProviderFactory.getExchangeProviderById).toHaveBeenCalledWith('transfero')
+    expect(exchangeProviderFactory.getExchangeProvider).not.toHaveBeenCalled()
     expect(destinationProvider.getDepositNetwork).toHaveBeenCalledWith({ cryptoCurrency: 'USDC' })
     // Address resolved on POLYGON + the transferred asset (USDC), NOT CELO/USDT.
     expect(destinationProvider.getExchangeAddress).toHaveBeenCalledWith({

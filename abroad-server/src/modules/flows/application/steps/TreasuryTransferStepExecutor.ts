@@ -1,5 +1,5 @@
 import { Wallet } from '@binance/wallet'
-import { CryptoCurrency, FlowStepType, TargetCurrency } from '@prisma/client'
+import { CryptoCurrency, FlowStepType } from '@prisma/client'
 import { inject, injectable } from 'inversify'
 import { z } from 'zod'
 
@@ -7,7 +7,7 @@ import { TYPES } from '../../../../app/container/types'
 import { createScopedLogger, ScopedLogger } from '../../../../core/logging/scopedLogger'
 import { ILogger } from '../../../../core/logging/types'
 import { ISecretManager, Secrets } from '../../../../platform/secrets/ISecretManager'
-import { IExchangeProviderFactory } from '../../../treasury/application/contracts/IExchangeProviderFactory'
+import { EXCHANGE_PROVIDER_IDS, IExchangeProviderFactory } from '../../../treasury/application/contracts/IExchangeProviderFactory'
 import { mapBlockchainToBinanceNetwork } from '../../../treasury/infrastructure/exchangeProviders/binanceNetworkMap'
 import { AmountSource, amountSourceSchema, resolveAmount } from '../flowAmountResolver'
 import { FlowStepExecutionResult, FlowStepExecutor, FlowStepRuntimeContext } from '../flowTypes'
@@ -15,9 +15,8 @@ import { FlowStepExecutionResult, FlowStepExecutor, FlowStepRuntimeContext } fro
 const treasuryTransferConfigSchema = z.object({
   amountSource: amountSourceSchema.optional(),
   asset: z.string().min(1),
-  destinationProvider: z.enum(['binance', 'transfero']),
-  destinationTargetCurrency: z.nativeEnum(TargetCurrency).optional(),
-  sourceProvider: z.enum(['binance']),
+  destinationProvider: z.enum(EXCHANGE_PROVIDER_IDS),
+  sourceProvider: z.literal('binance'),
 })
 
 type TreasuryTransferConfig = z.infer<typeof treasuryTransferConfigSchema>
@@ -58,8 +57,7 @@ export class TreasuryTransferStepExecutor implements FlowStepExecutor {
     }
 
     try {
-      const destinationCurrency = config.destinationTargetCurrency ?? this.resolveProviderCurrency(config.destinationProvider)
-      const destinationProvider = this.exchangeProviderFactory.getExchangeProvider(destinationCurrency)
+      const destinationProvider = this.exchangeProviderFactory.getExchangeProviderById(config.destinationProvider)
 
       // The bridge chain is a property of the destination provider + the asset
       // being moved (e.g. Transfero Ultra accepts USDC on Polygon) — NOT the original
@@ -133,11 +131,6 @@ export class TreasuryTransferStepExecutor implements FlowStepExecutor {
       this.logger.error('Treasury transfer failed', error)
       return { error: message, outcome: 'failed' }
     }
-  }
-
-  private resolveProviderCurrency(provider: TreasuryTransferConfig['destinationProvider']): TargetCurrency {
-    if (provider === 'binance') return TargetCurrency.COP
-    return TargetCurrency.BRL
   }
 
   /**

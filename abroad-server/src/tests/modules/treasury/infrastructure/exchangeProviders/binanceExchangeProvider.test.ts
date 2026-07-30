@@ -61,14 +61,18 @@ describe('BinanceExchangeProvider', () => {
   }
 
   describe('getExchangeAddress', () => {
-    it('returns deposit address and memo for supported blockchains', async () => {
+    it.each([
+      [BlockchainNetwork.CELO, 'CELO'],
+      [BlockchainNetwork.SOLANA, 'SOL'],
+      [BlockchainNetwork.STELLAR, 'XLM'],
+    ] as const)('routes %s source funds through Binance network %s', async (blockchain, network) => {
       depositAddressMock.mockResolvedValue({
         data: () => Promise.resolve({ address: 'addr-1', tag: 'memo-1' }),
       })
 
       const provider = createProvider()
       const result = await provider.getExchangeAddress({
-        blockchain: BlockchainNetwork.SOLANA,
+        blockchain,
         cryptoCurrency: CryptoCurrency.USDC,
       })
 
@@ -79,23 +83,8 @@ describe('BinanceExchangeProvider', () => {
           basePath: 'https://binance.test',
         },
       })
-      expect(depositAddressMock).toHaveBeenCalledWith({ coin: CryptoCurrency.USDC, network: 'SOL' })
+      expect(depositAddressMock).toHaveBeenCalledWith({ coin: CryptoCurrency.USDC, network })
       expect(result).toEqual({ address: 'addr-1', memo: 'memo-1', success: true })
-    })
-
-    it('defaults to the CELO network when no override is provided', async () => {
-      depositAddressMock.mockResolvedValue({
-        data: () => Promise.resolve({ address: 'addr-celo', tag: 'memo-celo' }),
-      })
-
-      const provider = createProvider()
-      const result = await provider.getExchangeAddress({
-        blockchain: BlockchainNetwork.CELO,
-        cryptoCurrency: CryptoCurrency.USDC,
-      })
-
-      expect(depositAddressMock).toHaveBeenCalledWith({ coin: CryptoCurrency.USDC, network: 'CELO' })
-      expect(result).toEqual({ address: 'addr-celo', memo: 'memo-celo', success: true })
     })
 
     it('returns failure when Binance does not return an address', async () => {

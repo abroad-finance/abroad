@@ -22,10 +22,17 @@ const buildFactory = () => {
   const binance = new BinanceExchangeProvider(secretManager, logger)
   const binanceBrl = new BinanceBrlExchangeProvider(secretManager, logger)
   const factory = new ExchangeProviderFactory(transfero, binance, binanceBrl)
-  return { binanceBrl, factory, transfero }
+  return { binance, binanceBrl, factory, transfero }
 }
 
 describe('ExchangeProviderFactory BRL routing', () => {
+  it('resolves operational venues by exact identity', () => {
+    const { binance, factory, transfero } = buildFactory()
+
+    expect(factory.getExchangeProviderById('binance')).toBe(binance)
+    expect(factory.getExchangeProviderById('transfero')).toBe(transfero)
+  })
+
   it('routes a SOLANA-funded BRL corridor to Transfero for settlement', () => {
     const { factory, transfero } = buildFactory()
     const provider = factory.getExchangeProviderForCapability({
@@ -49,5 +56,12 @@ describe('ExchangeProviderFactory BRL routing', () => {
       blockchain: BlockchainNetwork.CELO,
       targetCurrency: TargetCurrency.BRL,
     })).toBe(binanceBrl)
+  })
+
+  it('rejects an unknown operational venue instead of falling back by currency', () => {
+    const { factory } = buildFactory()
+
+    expect(() => factory.getExchangeProviderById('unknown' as never))
+      .toThrow('No exchange provider found for id: unknown')
   })
 })

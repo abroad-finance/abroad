@@ -1,5 +1,5 @@
 import { Wallet } from '@binance/wallet'
-import { CryptoCurrency, TargetCurrency } from '@prisma/client'
+import { CryptoCurrency } from '@prisma/client'
 import { inject, injectable } from 'inversify'
 
 import { TYPES } from '../../../app/container/types'
@@ -22,7 +22,6 @@ export type BridgeSweepResult = {
 // Polygon to Transfero Ultra's USDC vault (whose settlement currency is BRL).
 const BRIDGE_ASSET = CryptoCurrency.USDC
 const BRIDGE_DEST_NETWORK = 'MATIC'
-const BRIDGE_DESTINATION_CURRENCY = TargetCurrency.BRL
 const BRIDGE_ASSET_SCALE = 1_000_000
 
 // Binance withdrawal status codes: 6 = Completed (sent on-chain);
@@ -229,7 +228,7 @@ export class BridgeSweepService {
   }
 
   private async resolveDestination(): Promise<undefined | { address: string, memo?: string }> {
-    const provider = this.exchangeProviderFactory.getExchangeProvider(BRIDGE_DESTINATION_CURRENCY)
+    const provider = this.exchangeProviderFactory.getExchangeProviderById('transfero')
     const depositNetwork = provider.getDepositNetwork?.({ cryptoCurrency: BRIDGE_ASSET })
     if (!depositNetwork) {
       this.logger.error('Bridge destination has no deposit network', { asset: BRIDGE_ASSET })

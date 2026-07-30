@@ -6,13 +6,13 @@ import { TYPES } from '../../../../app/container/types'
 import { createScopedLogger, ScopedLogger } from '../../../../core/logging/scopedLogger'
 import { ILogger } from '../../../../core/logging/types'
 import { IWalletHandlerFactory } from '../../../payments/application/contracts/IWalletHandlerFactory'
-import { IExchangeProviderFactory } from '../../../treasury/application/contracts/IExchangeProviderFactory'
+import { EXCHANGE_PROVIDER_IDS, IExchangeProviderFactory } from '../../../treasury/application/contracts/IExchangeProviderFactory'
 import { AmountSource, amountSourceSchema, resolveAmount } from '../flowAmountResolver'
 import { FlowStepExecutionResult, FlowStepExecutor, FlowStepRuntimeContext } from '../flowTypes'
 
 const exchangeSendConfigSchema = z.object({
   amountSource: amountSourceSchema.optional(),
-  provider: z.enum(['binance', 'transfero']).optional(),
+  provider: z.enum(EXCHANGE_PROVIDER_IDS),
 })
 
 type ExchangeSendConfig = z.infer<typeof exchangeSendConfigSchema>
@@ -50,10 +50,7 @@ export class ExchangeSendStepExecutor implements FlowStepExecutor {
     }
 
     try {
-      const exchangeProvider = this.exchangeProviderFactory.getExchangeProviderForCapability?.({
-        blockchain: runtime.context.blockchain,
-        targetCurrency: runtime.context.targetCurrency,
-      }) ?? this.exchangeProviderFactory.getExchangeProvider(runtime.context.targetCurrency)
+      const exchangeProvider = this.exchangeProviderFactory.getExchangeProviderById(config.provider)
 
       const addressResult = await exchangeProvider.getExchangeAddress({
         blockchain: runtime.context.blockchain,
@@ -64,11 +61,9 @@ export class ExchangeSendStepExecutor implements FlowStepExecutor {
         return { error: addressResult.reason ?? 'exchange_address_unavailable', outcome: 'failed' }
       }
 
-      // The step's venue is decided by the flow definition (config.provider) and
-      // the deposit address is resolved by capability above. No target-currency
-      // cross-check here: multi-venue corridors (e.g. USDT/CELO → Binance →
-      // Transfero → BRL) legitimately send the first hop to a provider other
-      // than the target currency's settlement provider.
+      // The flow definition owns venue routing. Capability-based selection is
+      // intentionally reserved for pricing; using it here can select the BRL
+      // settlement provider for a non-Polygon source-chain deposit.
       const walletHandler = this.walletHandlerFactory.getWalletHandlerForCapability?.({
         blockchain: runtime.context.blockchain,
       }) ?? this.walletHandlerFactory.getWalletHandler(runtime.context.blockchain)

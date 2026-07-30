@@ -86,15 +86,19 @@ describe('TransferoExchangeProvider', () => {
     expect(ultraClient.get).toHaveBeenCalledWith('/api/v1/vault/addresses')
   })
 
-  it('rejects direct legacy source chains before looking up an address', async () => {
+  it.each([
+    BlockchainNetwork.CELO,
+    BlockchainNetwork.SOLANA,
+    BlockchainNetwork.STELLAR,
+  ])('rejects direct %s deposits before looking up an address', async (blockchain) => {
     const { provider, ultraClient } = createProvider()
 
     await expect(provider.getExchangeAddress({
-      blockchain: BlockchainNetwork.SOLANA,
+      blockchain,
       cryptoCurrency: CryptoCurrency.USDC,
     })).resolves.toEqual({
       code: 'validation',
-      reason: 'transfero_ultra_unsupported_blockchain:SOLANA',
+      reason: `transfero_ultra_unsupported_blockchain:${blockchain}`,
       success: false,
     })
     expect(ultraClient.get).not.toHaveBeenCalled()

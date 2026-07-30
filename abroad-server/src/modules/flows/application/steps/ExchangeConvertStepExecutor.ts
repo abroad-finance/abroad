@@ -8,7 +8,7 @@ import { TYPES } from '../../../../app/container/types'
 import { createScopedLogger, ScopedLogger } from '../../../../core/logging/scopedLogger'
 import { ILogger } from '../../../../core/logging/types'
 import { ISecretManager, Secrets } from '../../../../platform/secrets/ISecretManager'
-import { IExchangeProviderFactory } from '../../../treasury/application/contracts/IExchangeProviderFactory'
+import { EXCHANGE_PROVIDER_IDS, IExchangeProviderFactory } from '../../../treasury/application/contracts/IExchangeProviderFactory'
 import { AmountSource, amountSourceSchema, resolveAmount } from '../flowAmountResolver'
 import { FlowStepExecutionResult, FlowStepExecutor, FlowStepRuntimeContext } from '../flowTypes'
 
@@ -93,7 +93,7 @@ class BinanceOrderConstraintError extends Error {
 const exchangeConvertConfigSchema = z.object({
   amountSource: amountSourceSchema.optional(),
   fromAsset: z.string().min(2).optional(),
-  provider: z.enum(['binance', 'transfero']),
+  provider: z.enum(EXCHANGE_PROVIDER_IDS),
   side: z.enum(['BUY', 'SELL']).optional(),
   sourceCurrency: z.string().min(1).optional(),
   symbol: z.string().min(3).optional(),
@@ -142,9 +142,7 @@ export class ExchangeConvertStepExecutor implements FlowStepExecutor {
       }
 
       try {
-        const exchangeProvider = this.exchangeProviderFactory.getExchangeProviderForCapability?.({
-          targetCurrency: config.targetCurrency,
-        }) ?? this.exchangeProviderFactory.getExchangeProvider(config.targetCurrency)
+        const exchangeProvider = this.exchangeProviderFactory.getExchangeProviderById(config.provider)
 
         const result = await exchangeProvider.createMarketOrder({
           operationId: `${runtime.context.transactionId}:exchange:${params.stepOrder}`,

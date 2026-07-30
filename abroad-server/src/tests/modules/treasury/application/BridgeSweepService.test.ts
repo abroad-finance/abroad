@@ -49,6 +49,7 @@ const makeService = (opts: {
   }
   const exchangeProviderFactory = {
     getExchangeProvider: jest.fn(() => destinationProvider),
+    getExchangeProviderById: jest.fn(() => destinationProvider),
     getExchangeProviderForCapability: jest.fn(() => destinationProvider),
   }
   const secretManager = { getSecret: jest.fn(async () => 'secret'), getSecrets: jest.fn(async () => ({})) }
@@ -59,7 +60,7 @@ const makeService = (opts: {
     secretManager as never,
     baseLogger as never,
   )
-  return { batchCreate, batchUpdate, findMany, service, updateMany }
+  return { batchCreate, batchUpdate, exchangeProviderFactory, findMany, service, updateMany }
 }
 
 describe('BridgeSweepService.sweep', () => {
@@ -85,11 +86,18 @@ describe('BridgeSweepService.sweep', () => {
   })
 
   it('issues one batched withdrawal (amount re-derived from claimed legs) when the pool clears the minimum', async () => {
-    const { batchCreate, batchUpdate, service } = makeService({ pending: [{ amount: 4.0, id: 'leg-1' }, { amount: 3.0, id: 'leg-2' }] })
+    const {
+      batchCreate,
+      batchUpdate,
+      exchangeProviderFactory,
+      service,
+    } = makeService({ pending: [{ amount: 4.0, id: 'leg-1' }, { amount: 3.0, id: 'leg-2' }] })
     const result = await service.sweep()
     expect(result.swept).toBe(true)
     expect(result.amount).toBeCloseTo(7.0, 6)
     expect(batchCreate).toHaveBeenCalled()
+    expect(exchangeProviderFactory.getExchangeProviderById).toHaveBeenCalledWith('transfero')
+    expect(exchangeProviderFactory.getExchangeProvider).not.toHaveBeenCalled()
     expect(withdrawMock).toHaveBeenCalledWith(expect.objectContaining({
       address: '0x1111222233334444555566667777888899990000',
       amount: 7.0,
