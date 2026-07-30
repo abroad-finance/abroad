@@ -23,6 +23,20 @@ describe('TransactionController minimal branches', () => {
     expect(response).toEqual(expect.objectContaining({ reason: expect.any(String) }))
   })
 
+  it('requires either an account number or QR code', async () => {
+    const { controller } = buildMinimalController()
+
+    const response = await controller.acceptTransaction(
+      { quote_id: 'quote-1', user_id: 'user-1' },
+      authRequest('partner-1'),
+      badRequest,
+    )
+
+    expect(response).toEqual(expect.objectContaining({
+      reason: expect.stringContaining('Account number or QR code is required'),
+    }))
+  })
+
   it('throws when transaction is not found', async () => {
     const { controller, prisma } = buildMinimalController()
     prisma.transaction.findUnique.mockResolvedValueOnce(null)

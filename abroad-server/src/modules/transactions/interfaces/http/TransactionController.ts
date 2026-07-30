@@ -72,6 +72,8 @@ export class TransactionController extends Controller {
       tax_id: taxId,
       user_id: userId,
     } = parsed.data
+    const normalizedAccountNumber = accountNumber?.trim() ?? ''
+    const normalizedQrCode = qrCode?.trim() || null
 
     const partner = request.user
     const partnerContext = {
@@ -87,8 +89,8 @@ export class TransactionController extends Controller {
     try {
       const response = await this.transactionAcceptanceService.acceptTransaction(
         {
-          accountNumber,
-          qrCode,
+          accountNumber: normalizedAccountNumber,
+          qrCode: normalizedQrCode,
           quoteId,
           redirectUrl,
           taxId,

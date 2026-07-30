@@ -121,7 +121,13 @@ export class TransactionAcceptanceService {
         await this.lockPaymentMethod(tx, quote.paymentMethod)
 
         this.enforceTransactionAmountBounds(quote, paymentService, quote.paymentMethod)
-        await this.ensureAccountIsValid(paymentService, request.accountNumber)
+        // For PIX QR payouts, the BR Code is the authoritative destination:
+        // Ultra previews and submits it without using the separately supplied
+        // manual PIX key. Every other payout path still requires account
+        // validation before any transaction or limit reservation is persisted.
+        if (quote.paymentMethod !== PaymentMethod.PIX || !request.qrCode?.trim()) {
+          await this.ensureAccountIsValid(paymentService, request.accountNumber)
+        }
 
         const partnerUser = await tx.partnerUser.upsert({
           create: {
@@ -433,7 +439,9 @@ export class TransactionAcceptanceService {
     paymentService: PaymentServiceInstance,
     accountNumber: string,
   ) {
-    const isAccountValid = await paymentService.verifyAccount({ account: accountNumber })
+    const normalizedAccountNumber = accountNumber.trim()
+    const isAccountValid = normalizedAccountNumber.length > 0
+      && await paymentService.verifyAccount({ account: normalizedAccountNumber })
     if (!isAccountValid) {
       throw new TransactionValidationError('We could not verify the account number provided. Please double-check the details and try again.')
     }

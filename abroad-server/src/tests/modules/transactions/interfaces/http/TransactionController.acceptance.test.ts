@@ -1,5 +1,5 @@
 import 'reflect-metadata'
-import { TransactionOrigin, TransactionStatus } from '@prisma/client'
+import { PaymentMethod, TargetCurrency, TransactionOrigin, TransactionStatus } from '@prisma/client'
 
 import { QueueName } from '../../../../../platform/messaging/queues'
 import { baseQuote, buildAcceptController, partner, requestBody } from './transactionControllerAcceptance.fixtures'
@@ -30,6 +30,74 @@ describe('TransactionController acceptance flows', () => {
 
     expect(prisma.quote.findUnique).toHaveBeenCalled()
     expect(response).toEqual({ reason: 'We could not verify the account number provided. Please double-check the details and try again.' })
+  })
+
+  it('accepts a PIX QR code without an account number', async () => {
+    const verifyAccount = jest.fn().mockResolvedValue(false)
+    const { controller, paymentService, prisma } = buildAcceptController({
+      paymentService: {
+        getLiquidity: jest.fn().mockResolvedValue(1000),
+        MAX_TOTAL_AMOUNT_PER_DAY: 500,
+        MAX_USER_TRANSACTIONS_PER_DAY: 3,
+        verifyAccount,
+      },
+    })
+
+    const response = await controller.acceptTransaction(
+      {
+        qr_code: '  qr-payload  ',
+        quote_id: requestBody.quote_id,
+        user_id: requestBody.user_id,
+      },
+      { user: partner } as unknown as import('express').Request,
+      badRequest,
+    )
+
+    expect(paymentService.verifyAccount).not.toHaveBeenCalled()
+    expect(prisma.transaction.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        accountNumber: '',
+        qrCode: 'qr-payload',
+      }),
+      select: { bankCode: true, id: true },
+    })
+    expect(response).toEqual(expect.objectContaining({
+      id: '11111111-2222-3333-4444-555555555555',
+      kycRequired: false,
+    }))
+  })
+
+  it('does not let a QR code bypass account validation for non-PIX quotes', async () => {
+    const verifyAccount = jest.fn().mockResolvedValue(true)
+    const { controller, prisma } = buildAcceptController({
+      paymentService: {
+        getLiquidity: jest.fn().mockResolvedValue(1000),
+        MAX_TOTAL_AMOUNT_PER_DAY: 500,
+        MAX_USER_TRANSACTIONS_PER_DAY: 3,
+        verifyAccount,
+      },
+      quote: {
+        ...baseQuote,
+        paymentMethod: PaymentMethod.BREB,
+        targetCurrency: TargetCurrency.COP,
+      },
+    })
+
+    const response = await controller.acceptTransaction(
+      {
+        qr_code: 'qr-payload',
+        quote_id: requestBody.quote_id,
+        user_id: requestBody.user_id,
+      },
+      { user: partner } as unknown as import('express').Request,
+      badRequest,
+    )
+
+    expect(verifyAccount).not.toHaveBeenCalled()
+    expect(prisma.transaction.create).not.toHaveBeenCalled()
+    expect(response).toEqual({
+      reason: 'We could not verify the account number provided. Please double-check the details and try again.',
+    })
   })
 
   it('requires KYC when the partner needs verification and the user is not approved', async () => {

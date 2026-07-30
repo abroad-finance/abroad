@@ -3,17 +3,31 @@ import { z } from 'zod'
 
 import { PaymentContext } from '../../../payments/application/PaymentContextService'
 
+const hasDestinationValue = (value: null | string | undefined): boolean =>
+  typeof value === 'string' && value.trim().length > 0
+
 export const acceptTransactionRequestSchema = z.object({
-  account_number: z.string().min(1, 'Account number is required'),
+  account_number: z.string().optional(),
   qr_code: z.string().nullable().optional(),
   quote_id: z.string().min(1, 'Quote ID is required'),
   redirectUrl: z.string().optional(),
   tax_id: z.string().optional(),
   user_id: z.string().min(1, 'User ID is required'),
+}).superRefine((request, context) => {
+  if (
+    !hasDestinationValue(request.account_number)
+    && !hasDestinationValue(request.qr_code)
+  ) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Account number or QR code is required',
+      path: ['account_number'],
+    })
+  }
 })
 
 export interface AcceptTransactionRequest {
-  account_number: string
+  account_number?: string
   qr_code?: null | string
   quote_id: string
   redirectUrl?: string
