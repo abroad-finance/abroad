@@ -17,6 +17,7 @@ import { PaymentsNotifyController } from '../../modules/payments/interfaces/http
 import { QrDecoderController } from '../../modules/payments/interfaces/http/QrDecoderController'
 import { SolanaPaymentsController } from '../../modules/payments/interfaces/http/SolanaPaymentsController'
 import { QuoteController } from '../../modules/quotes/interfaces/http/QuoteController'
+import { PixCheckoutTelemetryController } from '../../modules/telemetry/interfaces/http/PixCheckoutTelemetryController'
 import { OpsTransactionsController } from '../../modules/transactions/interfaces/http/OpsTransactionsController'
 import { PublicTransactionsController } from '../../modules/transactions/interfaces/http/PublicTransactionsController'
 import { TransactionController } from '../../modules/transactions/interfaces/http/TransactionController'
@@ -35,6 +36,7 @@ const controllerBindings: ReadonlyArray<BindingRegistration<unknown>> = [
   { bindSelf: true, identifier: OpsPartnerController, implementation: OpsPartnerController },
   { bindSelf: true, identifier: PartnerUserController, implementation: PartnerUserController },
   { bindSelf: true, identifier: QuoteController, implementation: QuoteController },
+  { bindSelf: true, identifier: PixCheckoutTelemetryController, implementation: PixCheckoutTelemetryController },
   { bindSelf: true, identifier: TransactionController, implementation: TransactionController },
   { bindSelf: true, identifier: TransactionsController, implementation: TransactionsController },
   { bindSelf: true, identifier: PublicTransactionsController, implementation: PublicTransactionsController },

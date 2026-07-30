@@ -64,6 +64,12 @@ import {
 } from '../../features/swap/utils/corridorHelpers'
 import { IWallet, type WalletConnectOptions } from '../../interfaces/IWallet'
 import { parseEMVQR } from '../../lib/qr/emv-parser'
+import {
+  buildPixCheckoutTelemetryContext,
+  classifyPixCheckoutStatus,
+  recordPixCheckoutEvent,
+  resolvePixCheckoutGate,
+} from '../../observability/pixCheckoutTelemetry'
 import { submitKyc } from '../../services/public/kycApi'
 import {
   acceptTransactionRequest, fetchPublicCorridors, notifyPayment, requestQuote, requestReverseQuote,
@@ -408,6 +414,9 @@ export const useWebSwapController = (): WebSwapControllerProps => {
   const decodeAbortRef = useRef<AbortController | null>(null)
   const miniPayManualAssetSelectionRef = useRef(false)
   const pendingActionAfterConnectRef = useRef<'continue-to-confirm' | 'continue-to-confirm-from-swap' | 'process-qr' | null>(null)
+  const lastPixGateTelemetryRef = useRef<null | string>(null)
+  const lastPixQuoteTelemetryRef = useRef<null | string>(null)
+  const previousTelemetryViewRef = useRef<SwapView>(state.view)
   const [quoteBelowMinimum, setQuoteBelowMinimum] = useState(false)
   const stablecoinBalances = useStablecoinBalances({
     address: wallet?.address,
@@ -871,6 +880,136 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     state.targetCurrency,
     state.taxId,
   ])
+
+  const pixCheckoutTelemetryContext = useMemo(() => {
+    if (
+      state.targetCurrency !== TargetCurrency.BRL
+      || selectedCorridor?.paymentMethod !== 'PIX'
+    ) {
+      return null
+    }
+
+    return buildPixCheckoutTelemetryContext({
+      blockchain: selectedCorridor.blockchain,
+      chainFamily: selectedCorridor.chainFamily,
+      cryptoCurrency: selectedCorridor.cryptoCurrency,
+      entryPoint: state.qrCode ? 'qr' : 'manual',
+      walletSurface: isMiniPay ? 'minipay' : 'web',
+    })
+  }, [
+    isMiniPay,
+    selectedCorridor,
+    state.qrCode,
+    state.targetCurrency,
+  ])
+
+  const hasPixCheckoutIntent = Boolean(
+    state.pixKey
+    || state.qrCode
+    || state.quoteId
+    || state.sourceAmount
+    || state.targetAmount
+    || state.taxId,
+  )
+
+  const pixCheckoutGate = useMemo(() => resolvePixCheckoutGate({
+    authenticated: isAuthenticated,
+    balanceLoading: stablecoinBalances.isLoading,
+    hasAmounts: !isPrimaryDisabled(),
+    hasPixKey: Boolean(state.pixKey.trim()),
+    hasQuote: Boolean(state.quoteId),
+    hasTaxId: Boolean(state.taxId.trim()),
+    insufficientBalance: hasInsufficientFunds,
+    isAboveMaximum,
+    isBelowMinimum,
+    isMiniPay,
+    isMiniPayReady: miniPay.isReady,
+    quoteLoading: state.loadingSource || state.loadingTarget,
+  }), [
+    hasInsufficientFunds,
+    isAboveMaximum,
+    isAuthenticated,
+    isBelowMinimum,
+    isMiniPay,
+    isPrimaryDisabled,
+    miniPay.isReady,
+    stablecoinBalances.isLoading,
+    state.loadingSource,
+    state.loadingTarget,
+    state.pixKey,
+    state.quoteId,
+    state.taxId,
+  ])
+
+  useEffect(() => {
+    if (!pixCheckoutTelemetryContext || !state.quoteId) {
+      if (!state.quoteId) {
+        lastPixQuoteTelemetryRef.current = null
+      }
+      return
+    }
+
+    const quoteTelemetryKey = [
+      pixCheckoutTelemetryContext.blockchain,
+      pixCheckoutTelemetryContext.sourceAsset,
+      state.quoteId,
+    ].join(':')
+    if (lastPixQuoteTelemetryRef.current === quoteTelemetryKey) return
+
+    lastPixQuoteTelemetryRef.current = quoteTelemetryKey
+    recordPixCheckoutEvent({
+      context: pixCheckoutTelemetryContext,
+      name: 'quote_ready',
+    })
+  }, [pixCheckoutTelemetryContext, state.quoteId])
+
+  useEffect(() => {
+    if (!pixCheckoutTelemetryContext || !hasPixCheckoutIntent) {
+      lastPixGateTelemetryRef.current = null
+      return
+    }
+
+    const gateState = pixCheckoutGate ?? 'ready'
+    const gateTelemetryKey = [
+      pixCheckoutTelemetryContext.blockchain,
+      pixCheckoutTelemetryContext.sourceAsset,
+      pixCheckoutTelemetryContext.entryPoint,
+      gateState,
+    ].join(':')
+    if (lastPixGateTelemetryRef.current === gateTelemetryKey) return
+
+    lastPixGateTelemetryRef.current = gateTelemetryKey
+    recordPixCheckoutEvent(pixCheckoutGate
+      ? {
+          context: pixCheckoutTelemetryContext,
+          gate: pixCheckoutGate,
+          name: 'gate_blocked',
+        }
+      : {
+          context: pixCheckoutTelemetryContext,
+          name: 'checkout_ready',
+        })
+  }, [
+    hasPixCheckoutIntent,
+    pixCheckoutGate,
+    pixCheckoutTelemetryContext,
+  ])
+
+  useEffect(() => {
+    const previousView = previousTelemetryViewRef.current
+    previousTelemetryViewRef.current = state.view
+
+    if (
+      pixCheckoutTelemetryContext
+      && state.view === 'confirm-qr'
+      && previousView !== 'confirm-qr'
+    ) {
+      recordPixCheckoutEvent({
+        context: pixCheckoutTelemetryContext,
+        name: 'confirmation_viewed',
+      })
+    }
+  }, [pixCheckoutTelemetryContext, state.view])
 
   const sourceAmountForBalanceCheck = useMemo(() => {
     if (state.sourceAmount) return state.sourceAmount
@@ -1547,22 +1686,56 @@ export const useWebSwapController = (): WebSwapControllerProps => {
       )
       const isBrazil = state.targetCurrency === TargetCurrency.BRL
 
-      const response = await acceptTransactionRequest({
-        account_number:
-          isBrazil ? state.pixKey : state.accountNumber.trim(),
-        qr_code: state.qrCode,
-        quote_id: state.quoteId,
-        redirectUrl,
-        tax_id: isBrazil ? state.taxId : undefined,
-        user_id: walletUserId,
-      })
+      if (pixCheckoutTelemetryContext) {
+        recordPixCheckoutEvent({
+          context: pixCheckoutTelemetryContext,
+          name: 'submission_started',
+        })
+      }
+
+      let response: Awaited<ReturnType<typeof acceptTransactionRequest>>
+      try {
+        response = await acceptTransactionRequest({
+          account_number:
+            isBrazil ? state.pixKey : state.accountNumber.trim(),
+          qr_code: state.qrCode,
+          quote_id: state.quoteId,
+          redirectUrl,
+          tax_id: isBrazil ? state.taxId : undefined,
+          user_id: walletUserId,
+        })
+      }
+      catch (error) {
+        if (pixCheckoutTelemetryContext) {
+          recordPixCheckoutEvent({
+            context: pixCheckoutTelemetryContext,
+            name: 'submission_rejected',
+            statusClass: 'network_error',
+          })
+        }
+        throw error
+      }
 
       if (!response.ok) {
+        if (pixCheckoutTelemetryContext) {
+          recordPixCheckoutEvent({
+            context: pixCheckoutTelemetryContext,
+            name: 'submission_rejected',
+            statusClass: classifyPixCheckoutStatus(response.status),
+          })
+        }
         if (!isAbortError(response)) {
           const reason = extractReason(response.error?.body) || response.error?.message || t('swap.accept_error', 'We could not start the transaction.')
           notifyError(reason, response.error?.message)
         }
         return
+      }
+
+      if (pixCheckoutTelemetryContext) {
+        recordPixCheckoutEvent({
+          context: pixCheckoutTelemetryContext,
+          name: 'submission_accepted',
+        })
       }
 
       const {
@@ -1767,6 +1940,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
   }, [
     buildPaymentXdr,
     notifyError,
+    pixCheckoutTelemetryContext,
     selectedCorridor,
     resetForNewTransaction,
     state.accountNumber,

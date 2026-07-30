@@ -12,6 +12,42 @@ import type {
 
 import { httpClient } from '../http/httpClient'
 
+export type PixCheckoutTelemetryRequest = {
+  blockchain: 'CELO' | 'OTHER' | 'SOLANA' | 'STELLAR'
+  chainFamily: 'evm' | 'other' | 'solana' | 'stellar'
+  entryPoint: 'manual' | 'qr'
+  eventName:
+    | 'checkout_ready'
+    | 'confirmation_viewed'
+    | 'gate_blocked'
+    | 'quote_ready'
+    | 'submission_accepted'
+    | 'submission_rejected'
+    | 'submission_started'
+  gate?:
+    | 'above_maximum'
+    | 'amount_missing'
+    | 'balance_pending'
+    | 'below_minimum'
+    | 'cpf_missing'
+    | 'insufficient_balance'
+    | 'pix_key_missing'
+    | 'quote_pending'
+    | 'quote_unavailable'
+    | 'wallet_not_authenticated'
+    | 'wallet_not_ready'
+  rail: 'PIX'
+  schemaVersion: 1
+  sourceAsset: 'OTHER' | 'USDC' | 'USDT'
+  statusClass?:
+    | 'client_error'
+    | 'network_error'
+    | 'server_error'
+    | 'unexpected'
+  targetCurrency: 'BRL'
+  walletSurface: 'minipay' | 'web'
+}
+
 export type TransactionStatusResponse = {
   id: string
   kycRequired: boolean
@@ -59,6 +95,17 @@ export const acceptTransactionRequest = async (
   return httpClient.request<AcceptTransactionResponse>('/transaction', {
     body: JSON.stringify(payload),
     headers: jsonHeaders,
+    method: 'POST',
+  })
+}
+
+export const sendPixCheckoutTelemetry = async (
+  payload: PixCheckoutTelemetryRequest,
+): Promise<ApiResult<{ accepted: true }>> => {
+  return httpClient.request<{ accepted: true }>('/telemetry/pix-checkout', {
+    body: JSON.stringify(payload),
+    headers: jsonHeaders,
+    keepalive: true,
     method: 'POST',
   })
 }

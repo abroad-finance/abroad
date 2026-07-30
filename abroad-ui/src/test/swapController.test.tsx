@@ -59,6 +59,17 @@ const createStablecoinBalanceState = (overrides?: Partial<{
 }
 
 const stablecoinBalancesMock = vi.hoisted(() => vi.fn(() => createStablecoinBalanceState()))
+const pixCheckoutTelemetryMock = vi.hoisted(() => ({
+  recordPixCheckoutEvent: vi.fn(),
+}))
+
+vi.mock('../observability/pixCheckoutTelemetry', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../observability/pixCheckoutTelemetry')>()
+  return {
+    ...actual,
+    recordPixCheckoutEvent: pixCheckoutTelemetryMock.recordPixCheckoutEvent,
+  }
+})
 
 const createWalletRequestMock = (
   response: string = '0x-minipay-transaction',
@@ -134,8 +145,24 @@ const mocked = vi.hoisted(() => {
       maxAmount: null,
       minAmount: null,
       notify: { endpoint: null, required: false },
-      paymentMethod: 'BREB',
+      paymentMethod: 'PIX',
       targetCurrency: 'BRL',
+      walletConnect: {
+        chainId: 'stellar:pubnet',
+        events: [],
+        methods: ['stellar_signXDR'],
+        namespace: 'stellar',
+      },
+    }, {
+      blockchain: 'STELLAR',
+      chainFamily: 'stellar',
+      chainId: 'stellar:pubnet',
+      cryptoCurrency: 'USDC',
+      maxAmount: null,
+      minAmount: null,
+      notify: { endpoint: null, required: false },
+      paymentMethod: 'BREB',
+      targetCurrency: 'COP',
       walletConnect: {
         chainId: 'stellar:pubnet',
         events: [],
@@ -256,7 +283,7 @@ describe('useWebSwapController', () => {
         maxAmount: null,
         minAmount: null,
         notify: { endpoint: null, required: false },
-        paymentMethod: 'BREB',
+        paymentMethod: 'PIX',
         targetCurrency: 'BRL',
         walletConnect: {
           chainId: 'eip155:8453',
@@ -272,7 +299,7 @@ describe('useWebSwapController', () => {
         maxAmount: null,
         minAmount: null,
         notify: { endpoint: null, required: false },
-        paymentMethod: 'BREB',
+        paymentMethod: 'PIX',
         targetCurrency: 'BRL',
         walletConnect: {
           chainId: 'stellar:pubnet',
@@ -308,6 +335,91 @@ describe('useWebSwapController', () => {
     })
 
     expect(result.current.view).toBe('swap')
+  })
+
+  it('submits a valid BRL PIX quote through the transaction API after confirmation', async () => {
+    mocked.acceptTransactionRequestMock.mockResolvedValueOnce({
+      data: {
+        id: 'accepted-pix-transaction',
+        kycRequired: true,
+        payment_context: null,
+        transaction_reference: 'accepted-reference',
+      },
+      headers: new Headers(),
+      ok: true,
+      status: 200,
+    })
+
+    const { result } = renderHook(() => useWebSwapController(), { wrapper: Wrapper })
+
+    await act(async () => {
+      await Promise.resolve()
+      await mocked.fetchPublicCorridorsMock.mock.results[0]?.value
+    })
+
+    act(() => {
+      result.current.swapViewProps.onTargetChange('5')
+      result.current.swapViewProps.onRecipientChange?.('test-pix-key')
+      result.current.swapViewProps.onTaxIdChange?.('12345678901')
+    })
+
+    await act(async () => {
+      vi.runAllTimers()
+    })
+
+    expect(mocked.requestQuoteMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        amount: 5,
+        payment_method: 'PIX',
+        target_currency: 'BRL',
+      }),
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    )
+    expect(result.current.swapViewProps.continueDisabled).toBe(false)
+    expect(result.current.swapViewProps.hasInsufficientFunds).toBe(false)
+
+    await act(async () => {
+      await result.current.swapViewProps.onPrimaryAction()
+    })
+
+    expect(result.current.view).toBe('confirm-qr')
+
+    await act(async () => {
+      result.current.confirmQrProps.onConfirm()
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    expect(mocked.acceptTransactionRequestMock).toHaveBeenCalledTimes(1)
+    expect(mocked.acceptTransactionRequestMock).toHaveBeenCalledWith(expect.objectContaining({
+      account_number: 'test-pix-key',
+      qr_code: null,
+      quote_id: 'q-5',
+      tax_id: '12345678901',
+    }))
+    expect(result.current.view).toBe('kyc-needed')
+    expect(pixCheckoutTelemetryMock.recordPixCheckoutEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'quote_ready' }),
+    )
+    expect(pixCheckoutTelemetryMock.recordPixCheckoutEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'checkout_ready' }),
+    )
+    expect(pixCheckoutTelemetryMock.recordPixCheckoutEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'confirmation_viewed' }),
+    )
+    expect(pixCheckoutTelemetryMock.recordPixCheckoutEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'submission_started' }),
+    )
+    expect(pixCheckoutTelemetryMock.recordPixCheckoutEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'submission_accepted' }),
+    )
+    const telemetryJson = JSON.stringify(pixCheckoutTelemetryMock.recordPixCheckoutEvent.mock.calls)
+    expect(telemetryJson).not.toContain('test-pix-key')
+    expect(telemetryJson).not.toContain('12345678901')
+    expect(telemetryJson).not.toContain('q-5')
+    expect(telemetryJson).not.toContain('GADDR')
+    expect(telemetryJson).not.toContain('accepted-pix-transaction')
+    expect(telemetryJson).not.toContain('accepted-reference')
   })
 
   it('requires only the BRE-B key when using COP payouts', async () => {
@@ -356,7 +468,7 @@ describe('useWebSwapController', () => {
           maxAmount: null,
           minAmount: null,
           notify: { endpoint: '/payments/notify', required: true },
-          paymentMethod: 'BREB',
+          paymentMethod: 'PIX',
           targetCurrency: 'BRL',
           walletConnect: {
             chainId: 'eip155:42220',
@@ -373,7 +485,7 @@ describe('useWebSwapController', () => {
           maxAmount: null,
           minAmount: null,
           notify: { endpoint: '/payments/notify', required: true },
-          paymentMethod: 'BREB',
+          paymentMethod: 'PIX',
           targetCurrency: 'BRL',
           walletConnect: {
             chainId: 'eip155:42220',
@@ -390,7 +502,7 @@ describe('useWebSwapController', () => {
           maxAmount: null,
           minAmount: null,
           notify: { endpoint: null, required: false },
-          paymentMethod: 'BREB',
+          paymentMethod: 'PIX',
           targetCurrency: 'BRL',
           walletConnect: {
             chainId: 'stellar:pubnet',
