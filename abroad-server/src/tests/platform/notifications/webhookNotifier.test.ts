@@ -26,6 +26,11 @@ describe('WebhookNotifier', () => {
         if (secretName === 'STELLAR_SEP_PARTNER_ID') {
           return 'sep-partner'
         }
+        if (secretName === 'ABROAD_WEBHOOK_SECRETS_BY_ORIGIN') {
+          return JSON.stringify({
+            'https://api-v3.production.decafapi.com': 'decaf-secret',
+          })
+        }
         return 'secret'
       }),
       getSecrets: jest.fn(),
@@ -92,6 +97,61 @@ describe('WebhookNotifier', () => {
     })
 
     expect(axios.post).toHaveBeenCalledTimes(1)
+  })
+
+  it('uses an origin-specific secret without changing the SEP secret', async () => {
+    partnerClient.findUnique.mockResolvedValueOnce({ webhookUrl: 'https://sep-hook' })
+    const notifier = new WebhookNotifier(logger, secretManager, RuntimeConfig, databaseClientProvider)
+
+    await notifier.notifyWebhook('https://api-v3.production.decafapi.com/abroad/webhook', {
+      data: { id: '123' },
+      event: WebhookEvent.TRANSACTION_UPDATED,
+    })
+
+    expect(axios.post).toHaveBeenCalledWith(
+      'https://api-v3.production.decafapi.com/abroad/webhook',
+      expect.anything(),
+      expect.objectContaining({
+        headers: { 'X-Abroad-Webhook-Secret': 'decaf-secret' },
+      }),
+    )
+    expect(axios.post).toHaveBeenCalledWith(
+      'https://sep-hook',
+      expect.anything(),
+      expect.objectContaining({
+        headers: { 'X-Abroad-Webhook-Secret': 'secret' },
+      }),
+    )
+  })
+
+  it('falls back to the default secret when the per-origin configuration is invalid', async () => {
+    jest.mocked(secretManager.getSecret).mockImplementation(async (secretName) => {
+      if (secretName === 'STELLAR_SEP_PARTNER_ID') {
+        return 'sep-partner'
+      }
+      if (secretName === 'ABROAD_WEBHOOK_SECRETS_BY_ORIGIN') {
+        return 'invalid-json'
+      }
+      return 'secret'
+    })
+    partnerClient.findUnique.mockResolvedValueOnce(null)
+    const notifier = new WebhookNotifier(logger, secretManager, RuntimeConfig, databaseClientProvider)
+
+    await notifier.notifyWebhook('https://api-v3.production.decafapi.com/abroad/webhook', {
+      data: {},
+      event: WebhookEvent.TRANSACTION_UPDATED,
+    })
+
+    expect(axios.post).toHaveBeenCalledWith(
+      'https://api-v3.production.decafapi.com/abroad/webhook',
+      expect.anything(),
+      expect.objectContaining({
+        headers: { 'X-Abroad-Webhook-Secret': 'secret' },
+      }),
+    )
+    expect(logger.warn).toHaveBeenCalledWith(
+      'Failed to resolve per-origin webhook secrets; using default webhook secret',
+    )
   })
 
   it('logs a safe error and propagates delivery failure to the outbox', async () => {
