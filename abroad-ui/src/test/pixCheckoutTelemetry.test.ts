@@ -22,7 +22,6 @@ const readyGateSnapshot: PixCheckoutGateSnapshot = {
   hasAmounts: true,
   hasPixKey: true,
   hasQuote: true,
-  hasTaxId: true,
   insufficientBalance: false,
   isAboveMaximum: false,
   isBelowMinimum: false,
@@ -92,10 +91,6 @@ describe('PIX checkout telemetry', () => {
       expected: 'pix_key_missing',
       snapshot: { hasPixKey: false },
     },
-    {
-      expected: 'cpf_missing',
-      snapshot: { hasTaxId: false },
-    },
   ])('reports the $expected gate with deterministic precedence', ({ expected, snapshot }) => {
     expect(resolvePixCheckoutGate({
       ...readyGateSnapshot,
@@ -116,7 +111,7 @@ describe('PIX checkout telemetry', () => {
         entryPoint: 'qr',
         walletSurface: 'web',
       }),
-      gate: 'cpf_missing',
+      gate: 'pix_key_missing',
       name: 'gate_blocked',
     })
 
@@ -125,7 +120,7 @@ describe('PIX checkout telemetry', () => {
       chainFamily: 'stellar',
       entryPoint: 'qr',
       eventName: 'gate_blocked',
-      gate: 'cpf_missing',
+      gate: 'pix_key_missing',
       rail: 'PIX',
       schemaVersion: 1,
       sourceAsset: 'USDC',

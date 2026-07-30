@@ -25,7 +25,6 @@ export type PixCheckoutGate
     | 'amount_missing'
     | 'balance_pending'
     | 'below_minimum'
-    | 'cpf_missing'
     | 'insufficient_balance'
     | 'pix_key_missing'
     | 'quote_pending'
@@ -39,7 +38,6 @@ export type PixCheckoutGateSnapshot = {
   hasAmounts: boolean
   hasPixKey: boolean
   hasQuote: boolean
-  hasTaxId: boolean
   insufficientBalance: boolean
   isAboveMaximum: boolean
   isBelowMinimum: boolean
@@ -136,7 +134,6 @@ export const resolvePixCheckoutGate = ({
   hasAmounts,
   hasPixKey,
   hasQuote,
-  hasTaxId,
   insufficientBalance,
   isAboveMaximum,
   isBelowMinimum,
@@ -154,7 +151,6 @@ export const resolvePixCheckoutGate = ({
   if (balanceLoading) return 'balance_pending'
   if (insufficientBalance) return 'insufficient_balance'
   if (!hasPixKey) return 'pix_key_missing'
-  if (!hasTaxId) return 'cpf_missing'
   return null
 }
 

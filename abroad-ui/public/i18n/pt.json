@@ -4,9 +4,8 @@
   "bank_details.breb_disclaimer": "Sua transação será processada imediatamente pela BRE-B. Insira a chave do destinatário correta. Esta transação não pode ser revertida.",
   "bank_details.breb_key_placeholder": "Chave Bre-B",
   "bank_details.continue": "Continuar",
-  "bank_details.cpf_placeholder": "CPF",
   "bank_details.network": "Rede:",
-  "bank_details.pix_disclaimer": "Sua transação será processada imediatamente. Certifique-se de que a chave PIX e o CPF do destinatário estejam corretos. Esta transação não pode ser revertida.",
+  "bank_details.pix_disclaimer": "Sua transação será processada imediatamente. Certifique-se de que a chave PIX do destinatário esteja correta. Esta transação não pode ser revertida.",
   "bank_details.pix_key_placeholder": "Chave Pix",
   "bank_details.title": "Dados do destinatário",
 
@@ -21,7 +20,6 @@
   "confirm_qr.account_breb": "Conta / Bre-B",
   "confirm_qr.back_aria": "Voltar",
   "confirm_qr.confirm": "Continuar",
-  "confirm_qr.cpf_cnpj": "CPF/CNPJ",
   "confirm_qr.details_title": "Dados do destinatário",
   "confirm_qr.edit": "Editar",
   "confirm_qr.missing_amount": "Valores ausentes para continuar.",

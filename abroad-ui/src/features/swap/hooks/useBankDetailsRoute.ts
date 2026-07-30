@@ -15,11 +15,9 @@ type UseBankDetailsRouteArgs = {
   pixKey: string
   setAccountNumber: (accountNumber: string) => void
   setPixKey: (pixKey: string) => void
-  setTaxId: (taxId: string) => void
   setView: (view: SwapView) => void
   targetAmount: string
   targetCurrency: (typeof TargetCurrency)[keyof typeof TargetCurrency]
-  taxId: string
 }
 
 const PENDING_TX_KEY = 'pendingTransaction'
@@ -30,11 +28,9 @@ export const useBankDetailsRoute = ({
   pixKey,
   setAccountNumber,
   setPixKey,
-  setTaxId,
   setView,
   targetAmount,
   targetCurrency,
-  taxId,
 }: UseBankDetailsRouteArgs): BankDetailsRouteProps => {
   const { walletAuthentication } = useWalletAuth()
 
@@ -50,13 +46,11 @@ export const useBankDetailsRoute = ({
         account_number?: string
         accountNumber?: string
         pixKey?: string
-        taxId?: string
       }
 
       const accountNumberValue = parsed.accountNumber ?? parsed.account_number
       if (accountNumberValue) setAccountNumber(accountNumberValue)
       if (parsed.pixKey) setPixKey(parsed.pixKey)
-      if (parsed.taxId) setTaxId(parsed.taxId)
     }
     catch (e) {
       if (import.meta.env.DEV) {
@@ -66,20 +60,18 @@ export const useBankDetailsRoute = ({
   }, [
     setAccountNumber,
     setPixKey,
-    setTaxId,
     walletAuthentication?.jwtToken,
   ])
 
   const continueDisabled = useMemo(() => {
     if (targetCurrency === TargetCurrency.BRL) {
-      return !(pixKey && taxId)
+      return pixKey.trim().length === 0
     }
     return accountNumber.trim().length < 6
   }, [
     targetCurrency,
     accountNumber,
     pixKey,
-    taxId,
   ])
 
   // --------------------------- INPUT HANDLERS ---------------------------------
@@ -88,14 +80,6 @@ export const useBankDetailsRoute = ({
     const sanitized = value.trim().slice(0, 64)
     setAccountNumber(sanitized)
   }, [setAccountNumber])
-
-  const onTaxIdChange = useCallback(
-    (value: string) => {
-      const input = value.replace(/[^\d]/g, '')
-      setTaxId(input)
-    },
-    [setTaxId],
-  )
 
   const onPixKeyChange = useCallback(
     (value: string) => setPixKey(value),
@@ -113,10 +97,8 @@ export const useBankDetailsRoute = ({
     onBackClick,
     onContinue,
     onPixKeyChange,
-    onTaxIdChange,
     pixKey,
     targetAmount,
     targetCurrency,
-    taxId,
   }
 }

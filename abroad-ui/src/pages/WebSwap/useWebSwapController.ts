@@ -87,7 +87,7 @@ import {
 
 type DecodeQrApiResponse = ApiClientResponse<decodeQrCodeBRResponse, DecodeQrCodeBR400>
 type SwapAction
-  = | { accountNumber?: string, pixKey?: string, recipientName?: string, taxId?: string, type: 'SET_BANK_DETAILS' }
+  = | { accountNumber?: string, pixKey?: string, recipientName?: string, type: 'SET_BANK_DETAILS' }
     | { corridorKey: string, type: 'SET_CORRIDOR' }
     | { isDecodingQr: boolean, type: 'SET_DECODING' }
     | { isDesktop: boolean, type: 'SET_DESKTOP' }
@@ -122,7 +122,6 @@ type SwapControllerState = {
   sourceAmount: string
   targetAmount: string
   targetCurrency: TargetCurrency
-  taxId: string
   transactionId: null | string
   view: SwapView
 }
@@ -182,7 +181,6 @@ const createInitialState = (isDesktop: boolean): SwapControllerState => ({
   sourceAmount: '',
   targetAmount: '',
   targetCurrency: TargetCurrency.BRL,
-  taxId: '',
   transactionId: null,
   view: 'home',
 })
@@ -209,7 +207,6 @@ const reducer = (state: SwapControllerState, action: SwapAction): SwapController
         accountNumber: action.accountNumber ?? state.accountNumber,
         pixKey: action.pixKey ?? state.pixKey,
         recipientName: action.recipientName ?? state.recipientName,
-        taxId: action.taxId ?? state.taxId,
       }
     case 'SET_CORRIDOR':
       return { ...state, corridorKey: action.corridorKey }
@@ -253,7 +250,6 @@ type PersistedSwap = {
   sourceAmount?: string
   targetAmount?: string
   targetCurrency?: TargetCurrency
-  taxId?: string
   view?: SwapView
 }
 
@@ -278,7 +274,6 @@ const persistState = (state: SwapControllerState) => {
     sourceAmount: state.sourceAmount,
     targetAmount: state.targetAmount,
     targetCurrency: state.targetCurrency,
-    taxId: state.taxId,
     view: state.view,
   }
   const hasData = Boolean(
@@ -861,7 +856,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     if (!isAuthenticated) return false
     const baseDisabled = isPrimaryDisabled() || !state.quoteId || isBelowMinimum || isAboveMaximum
     if (state.targetCurrency === TargetCurrency.BRL) {
-      return baseDisabled || !state.pixKey?.trim() || !state.taxId?.trim()
+      return baseDisabled || !state.pixKey.trim()
     }
     if (state.targetCurrency === TargetCurrency.COP) {
       return baseDisabled || state.accountNumber.trim().length < 6
@@ -878,7 +873,6 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     state.pixKey,
     state.quoteId,
     state.targetCurrency,
-    state.taxId,
   ])
 
   const pixCheckoutTelemetryContext = useMemo(() => {
@@ -908,8 +902,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     || state.qrCode
     || state.quoteId
     || state.sourceAmount
-    || state.targetAmount
-    || state.taxId,
+    || state.targetAmount,
   )
 
   const pixCheckoutGate = useMemo(() => resolvePixCheckoutGate({
@@ -918,7 +911,6 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     hasAmounts: !isPrimaryDisabled(),
     hasPixKey: Boolean(state.pixKey.trim()),
     hasQuote: Boolean(state.quoteId),
-    hasTaxId: Boolean(state.taxId.trim()),
     insufficientBalance: hasInsufficientFunds,
     isAboveMaximum,
     isBelowMinimum,
@@ -938,7 +930,6 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     state.loadingTarget,
     state.pixKey,
     state.quoteId,
-    state.taxId,
   ])
 
   useEffect(() => {
@@ -1057,7 +1048,6 @@ export const useWebSwapController = (): WebSwapControllerProps => {
           sourceAmount: stored.sourceAmount ?? '',
           targetAmount: stored.targetAmount ?? '',
           targetCurrency: stored.targetCurrency ?? TargetCurrency.BRL,
-          taxId: stored.taxId ?? '',
           view: restoredView,
         },
         type: 'HYDRATE',
@@ -1078,7 +1068,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
       }
       // Clear any previous transaction data to show clean dashboard
       dispatch({
-        accountNumber: '', pixKey: '', recipientName: '', taxId: '', type: 'SET_BANK_DETAILS',
+        accountNumber: '', pixKey: '', recipientName: '', type: 'SET_BANK_DETAILS',
       })
       dispatch({
         quoteId: '', sourceAmount: '', targetAmount: '', type: 'SET_AMOUNTS',
@@ -1589,12 +1579,10 @@ export const useWebSwapController = (): WebSwapControllerProps => {
           const normalizedAmount = amountText?.replace(',', '.').trim() ?? ''
           const parsedAmount = normalizedAmount ? Number.parseFloat(normalizedAmount) : Number.NaN
           const pixKey = decoded?.account
-          const taxIdDecoded = decoded?.taxId
           const name = decoded?.name
 
           if (name) dispatch({ recipientName: name, type: 'SET_BANK_DETAILS' })
           if (pixKey) dispatch({ pixKey, type: 'SET_BANK_DETAILS' })
-          if (taxIdDecoded && !taxIdDecoded.includes('*')) dispatch({ taxId: taxIdDecoded, type: 'SET_BANK_DETAILS' })
 
           if (Number.isFinite(parsedAmount) && parsedAmount > 0) {
             const quoted = await quoteFromTarget(normalizedAmount)
@@ -1701,7 +1689,6 @@ export const useWebSwapController = (): WebSwapControllerProps => {
           qr_code: state.qrCode,
           quote_id: state.quoteId,
           redirectUrl,
-          tax_id: isBrazil ? state.taxId : undefined,
           user_id: walletUserId,
         })
       }
@@ -1949,7 +1936,6 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     state.quoteId,
     state.sourceAmount,
     state.targetCurrency,
-    state.taxId,
     t,
     wallet,
     walletUserId,
@@ -1961,7 +1947,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
       dispatch({ type: 'SET_VIEW', view: 'swap' })
       return
     }
-    if (state.targetCurrency === TargetCurrency.BRL && (!state.taxId || !state.pixKey)) {
+    if (state.targetCurrency === TargetCurrency.BRL && !state.pixKey.trim()) {
       notifyError(t('confirm_qr.missing_data', 'Missing data to complete the transaction.'))
       dispatch({ type: 'SET_VIEW', view: 'swap' })
       return
@@ -1974,20 +1960,18 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     state.sourceAmount,
     state.targetAmount,
     state.targetCurrency,
-    state.taxId,
     t,
   ])
 
   const bankDetailsContinueDisabled = useMemo(() => {
     if (state.targetCurrency === TargetCurrency.BRL) {
-      return !(state.pixKey && state.taxId)
+      return state.pixKey.trim().length === 0
     }
     return state.accountNumber.trim().length < 6
   }, [
     state.accountNumber,
     state.pixKey,
     state.targetCurrency,
-    state.taxId,
   ])
 
   const bankDetailsProps: BankDetailsRouteProps = {
@@ -2000,14 +1984,9 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     onBackClick: handleBackToSwap,
     onContinue: () => dispatch({ type: 'SET_VIEW', view: 'confirm-qr' }),
     onPixKeyChange: (value: string) => dispatch({ pixKey: value, type: 'SET_BANK_DETAILS' }),
-    onTaxIdChange: (value: string) => {
-      const input = value.replace(/[^\d]/g, '')
-      dispatch({ taxId: input, type: 'SET_BANK_DETAILS' })
-    },
     pixKey: state.pixKey,
     targetAmount: state.targetAmount,
     targetCurrency: state.targetCurrency,
-    taxId: state.taxId,
     // Let BankDetailsRoute use theme (--ab-text / --ab-text-muted) for readable contrast on the card
   }
 
@@ -2033,9 +2012,6 @@ export const useWebSwapController = (): WebSwapControllerProps => {
       : v => dispatch({ accountNumber: v.trim(), type: 'SET_BANK_DETAILS' }),
     onSourceChange,
     onTargetChange,
-    onTaxIdChange: state.targetCurrency === TargetCurrency.BRL
-      ? v => dispatch({ taxId: v.replace(/[^\d]/g, ''), type: 'SET_BANK_DETAILS' })
-      : undefined,
     recipientName: state.recipientName,
     recipientValue: state.targetCurrency === TargetCurrency.BRL ? state.pixKey : state.accountNumber,
     selectCurrency,
@@ -2043,7 +2019,6 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     sourceAmount: state.sourceAmount,
     targetAmount: state.targetAmount,
     targetCurrency: state.targetCurrency,
-    taxId: state.taxId,
     transferFeeDisplay,
     transferFeeIsZero: transferFee === 0,
     walletStatusLabel: isMiniPay
@@ -2066,7 +2041,6 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     selectedAssetLabel,
     sourceAmount: state.sourceAmount,
     targetAmount: state.targetAmount,
-    taxId: state.taxId,
   }
 
   const handleKycSubmit = useCallback(async (values: KycFormValues): Promise<KycSubmitOutcome> => {

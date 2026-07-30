@@ -16,11 +16,9 @@ export interface BankDetailsRouteProps {
   onBackClick: () => void
   onContinue: () => void
   onPixKeyChange: (value: string) => void
-  onTaxIdChange: (value: string) => void
   pixKey: string
   targetAmount: string
   targetCurrency: (typeof TargetCurrency)[keyof typeof TargetCurrency]
-  taxId: string
 }
 
 export default function BankDetailsRoute({
@@ -30,11 +28,9 @@ export default function BankDetailsRoute({
   onBackClick,
   onContinue,
   onPixKeyChange,
-  onTaxIdChange,
   pixKey,
   targetAmount,
   targetCurrency,
-  taxId,
 }: BankDetailsRouteProps): React.JSX.Element {
   const { t } = useTranslate()
 
@@ -66,33 +62,17 @@ export default function BankDetailsRoute({
         <div className="flex-1 flex flex-col items-center justify-center w-full space-y-3 py-2">
           {targetCurrency === TargetCurrency.BRL
             ? (
-                <>
-                  {/* PIX Key */}
-                  <div className="w-full bg-[var(--ab-bg-subtle)] border border-[var(--ab-border)] backdrop-blur-xl rounded-2xl p-4 md:p-6 flex items-center space-x-3" id="pix-key-input">
-                    <Hash className="w-5 h-5 sm:w-6 sm:h-6 text-ab-text" />
-                    <input
-                      className="w-full bg-transparent font-semibold focus:outline-none text-base sm:text-lg text-ab-text"
-                      inputMode="text"
-                      onChange={e => onPixKeyChange(e.target.value)}
-                      placeholder={t('bank_details.pix_key_placeholder', 'PIX Key')}
-                      type="text"
-                      value={pixKey}
-                    />
-                  </div>
-                  {/* CPF */}
-                  <div className="w-full bg-[var(--ab-bg-subtle)] border border-[var(--ab-border)] backdrop-blur-xl rounded-2xl p-4 md:p-6 flex items-center space-x-3" id="cpf-input">
-                    <Hash className="w-5 h-5 sm:w-6 sm:h-6 text-ab-text" />
-                    <input
-                      className="w-full bg-transparent font-semibold focus:outline-none text-base sm:text-lg text-ab-text"
-                      inputMode="numeric"
-                      onChange={e => onTaxIdChange(e.target.value)}
-                      pattern="[0-9]*"
-                      placeholder={t('bank_details.cpf_placeholder', 'CPF')}
-                      type="text"
-                      value={taxId}
-                    />
-                  </div>
-                </>
+                <div className="w-full bg-[var(--ab-bg-subtle)] border border-[var(--ab-border)] backdrop-blur-xl rounded-2xl p-4 md:p-6 flex items-center space-x-3" id="pix-key-input">
+                  <Hash className="w-5 h-5 sm:w-6 sm:h-6 text-ab-text" />
+                  <input
+                    className="w-full bg-transparent font-semibold focus:outline-none text-base sm:text-lg text-ab-text"
+                    inputMode="text"
+                    onChange={e => onPixKeyChange(e.target.value)}
+                    placeholder={t('bank_details.pix_key_placeholder', 'PIX Key')}
+                    type="text"
+                    value={pixKey}
+                  />
+                </div>
               )
             : (
                 <>
@@ -155,7 +135,7 @@ export default function BankDetailsRoute({
                   <span className="font-medium text-xs pl-1 text-ab-text-muted">
                     {t(
                       'bank_details.pix_disclaimer',
-                      'Your transaction will be processed immediately. Make sure the recipient\'s PIX key and CPF are correct. This transaction cannot be reversed.',
+                      'Your transaction will be processed immediately. Make sure the recipient\'s PIX key is correct. This transaction cannot be reversed.',
                     )}
                   </span>
                 </>

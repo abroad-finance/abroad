@@ -37,7 +37,6 @@ export interface SwapProps {
   onRecipientChange?: (value: string) => void
   onSourceChange?: (value: string) => void
   onTargetChange: (value: string) => void
-  onTaxIdChange?: (value: string) => void
   recipientName?: string
   recipientValue?: string
   selectCurrency?: (currency: (typeof TargetCurrency)[keyof typeof TargetCurrency]) => void
@@ -45,7 +44,6 @@ export interface SwapProps {
   sourceAmount: string
   targetAmount: string
   targetCurrency: (typeof TargetCurrency)[keyof typeof TargetCurrency]
-  taxId?: string
   transferFeeDisplay: string
   transferFeeIsZero?: boolean
   usdcBalance?: string
@@ -68,7 +66,6 @@ export default function Swap({
   onPrimaryAction,
   onRecipientChange,
   onTargetChange,
-  onTaxIdChange,
   recipientName,
   recipientValue = '',
   selectCurrency,
@@ -76,7 +73,6 @@ export default function Swap({
   sourceAmount,
   targetAmount,
   targetCurrency,
-  taxId = '',
   transferFeeDisplay,
   transferFeeIsZero = false,
   usdcBalance,
@@ -91,6 +87,10 @@ export default function Swap({
   const sendToPlaceholder = targetCurrency === TargetCurrency.BRL
     ? t('swap.send_to_placeholder_pix', 'PIX key or phone number')
     : t('swap.send_to_placeholder_breb', 'Bre-B ID or phone number')
+  const pixDisclaimer = t(
+    'bank_details.pix_disclaimer',
+    'Your transaction will be processed immediately. Make sure the recipient\'s PIX key is correct. This transaction cannot be reversed.',
+  )
 
   const ctaDisabled = isAuthenticated && (continueDisabled || hasInsufficientFunds)
   const ctaLabelDisabled = hasInsufficientFunds
@@ -251,7 +251,7 @@ export default function Swap({
                 </div>
                 <span className="mt-2 block pl-1 font-medium text-xs text-ab-text-3">
                   {targetCurrency === TargetCurrency.BRL
-                    ? t('bank_details.pix_disclaimer', 'Your transaction will be processed immediately. Make sure the PIX key and recipient CPF are correct. This transaction cannot be reversed.')
+                    ? pixDisclaimer
                     : t('bank_details.breb_disclaimer', 'Your transaction will be processed immediately via BRE-B. Enter the correct recipient key. This transaction cannot be reversed.')}
                 </span>
               </div>
@@ -272,29 +272,9 @@ export default function Swap({
                   type="text"
                   value={recipientValue}
                 />
-                {targetCurrency === TargetCurrency.BRL && onTaxIdChange && (
-                  <div className="relative mt-3">
-                    <label
-                      className="absolute left-4 -top-2.5 bg-[var(--ab-bg-card)] px-1 text-xs font-bold uppercase tracking-[0.6px] text-[var(--ab-text-muted)]"
-                      htmlFor="swap-cpf"
-                    >
-                      {t('bank_details.cpf_placeholder', 'CPF')}
-                    </label>
-                    <input
-                      className="w-full rounded-2xl border border-[var(--ab-border)] bg-[var(--ab-bg-subtle)] px-4 py-[19px] text-base text-[var(--ab-text)] placeholder:text-[var(--ab-text-muted)] focus:border-[var(--ab-green)] focus:outline-none focus:ring-1 focus:ring-[var(--ab-green)]"
-                      id="swap-cpf"
-                      inputMode="numeric"
-                      onChange={e => onTaxIdChange(e.target.value.replace(/[^\d]/g, ''))}
-                      pattern="[0-9]*"
-                      placeholder={t('bank_details.cpf_placeholder', 'CPF')}
-                      type="text"
-                      value={taxId}
-                    />
-                  </div>
-                )}
                 <span className="mt-2 block pl-1 font-medium text-xs text-ab-text-3">
                   {targetCurrency === TargetCurrency.BRL
-                    ? t('bank_details.pix_disclaimer', 'Your transaction will be processed immediately. Make sure the PIX key and recipient CPF are correct. This transaction cannot be reversed.')
+                    ? pixDisclaimer
                     : t('bank_details.breb_disclaimer', 'Your transaction will be processed immediately via BRE-B. Enter the correct recipient key. This transaction cannot be reversed.')}
                 </span>
               </div>

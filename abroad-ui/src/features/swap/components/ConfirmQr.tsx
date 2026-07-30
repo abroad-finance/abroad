@@ -21,8 +21,6 @@ export interface ConfirmQrProps {
   selectedAssetLabel?: string
   sourceAmount?: string
   targetAmount?: string
-  /** CPF/CNPJ (BRL) */
-  taxId?: string
 }
 
 const ConfirmQr: React.FC<ConfirmQrProps> = ({
@@ -37,7 +35,6 @@ const ConfirmQr: React.FC<ConfirmQrProps> = ({
   selectedAssetLabel = 'USDC',
   sourceAmount,
   targetAmount,
-  taxId,
 }) => {
   const { t } = useTranslate()
   const isBRL = currency === TargetCurrency.BRL
@@ -48,7 +45,7 @@ const ConfirmQr: React.FC<ConfirmQrProps> = ({
     if (isBRL) {
       return t(
         'confirm_qr.disclaimer',
-        'Your transaction will be processed immediately. Make sure the PIX key and CPF are correct. This transaction cannot be reversed.',
+        'Your transaction will be processed immediately. Make sure the PIX key is correct. This transaction cannot be reversed.',
       )
     }
     return t(
@@ -126,10 +123,6 @@ const ConfirmQr: React.FC<ConfirmQrProps> = ({
                   <div className="flex justify-between gap-3">
                     <span className="text-ab-text-3 shrink-0">{t('confirm_qr.pix_key', 'PIX Key')}</span>
                     <span className="font-medium text-ab-text break-all font-mono text-right">{pixKey || '—'}</span>
-                  </div>
-                  <div className="flex justify-between gap-3">
-                    <span className="text-ab-text-3 shrink-0">{t('confirm_qr.cpf_cnpj', 'CPF/CNPJ')}</span>
-                    <span className="font-medium text-ab-text break-all font-mono text-right">{taxId || '—'}</span>
                   </div>
                 </div>
               )

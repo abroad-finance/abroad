@@ -11,7 +11,10 @@ import {
 import type { IWallet } from '../interfaces/IWallet'
 import type { WalletConnectRequest } from '../interfaces/IWallet'
 import type { IWalletAuthentication } from '../interfaces/IWalletAuthentication'
-import type { PublicCorridorResponse } from '../services/public/types'
+import type {
+  AcceptTransactionRequest,
+  PublicCorridorResponse,
+} from '../services/public/types'
 
 import { NoticeProvider } from '../contexts/NoticeContext'
 import { WalletAuthContext } from '../contexts/WalletAuthContext'
@@ -127,14 +130,17 @@ const mocked = vi.hoisted(() => {
     status: 200,
   }))
 
-  const acceptTransactionRequestMock = vi.fn(async () => ({
-    data: {
-      id: 'tx-1', kycRequired: false, payment_context: null, transaction_reference: 'ref',
-    },
-    headers: new Headers(),
-    ok: true,
-    status: 200,
-  }))
+  const acceptTransactionRequestMock = vi.fn(async (request: AcceptTransactionRequest) => {
+    void request
+    return {
+      data: {
+        id: 'tx-1', kycRequired: false, payment_context: null, transaction_reference: 'ref',
+      },
+      headers: new Headers(),
+      ok: true,
+      status: 200,
+    }
+  })
 
   const fetchPublicCorridorsMock = vi.fn<[], Promise<PublicCorridorResponse>>(async () => ({
     corridors: [{
@@ -360,7 +366,6 @@ describe('useWebSwapController', () => {
     act(() => {
       result.current.swapViewProps.onTargetChange('5')
       result.current.swapViewProps.onRecipientChange?.('test-pix-key')
-      result.current.swapViewProps.onTaxIdChange?.('12345678901')
     })
 
     await act(async () => {
@@ -395,8 +400,8 @@ describe('useWebSwapController', () => {
       account_number: 'test-pix-key',
       qr_code: null,
       quote_id: 'q-5',
-      tax_id: '12345678901',
     }))
+    expect(mocked.acceptTransactionRequestMock.mock.calls[0]?.[0]).not.toHaveProperty('tax_id')
     expect(result.current.view).toBe('kyc-needed')
     expect(pixCheckoutTelemetryMock.recordPixCheckoutEvent).toHaveBeenCalledWith(
       expect.objectContaining({ name: 'quote_ready' }),
@@ -415,7 +420,7 @@ describe('useWebSwapController', () => {
     )
     const telemetryJson = JSON.stringify(pixCheckoutTelemetryMock.recordPixCheckoutEvent.mock.calls)
     expect(telemetryJson).not.toContain('test-pix-key')
-    expect(telemetryJson).not.toContain('12345678901')
+    expect(telemetryJson).not.toContain('tax_id')
     expect(telemetryJson).not.toContain('q-5')
     expect(telemetryJson).not.toContain('GADDR')
     expect(telemetryJson).not.toContain('accepted-pix-transaction')

@@ -4,9 +4,8 @@
   "bank_details.breb_disclaimer": "Ваша транзакция будет обработана немедленно через BRE-B. Введите правильный ключ получателя. Эта транзакция не может быть отменена.",
   "bank_details.breb_key_placeholder": "Ключ Bre-B",
   "bank_details.continue": "Продолжить",
-  "bank_details.cpf_placeholder": "CPF",
   "bank_details.network": "Сеть:",
-  "bank_details.pix_disclaimer": "Ваша транзакция будет обработана немедленно. Убедитесь, что PIX-ключ и CPF получателя верны. Эта транзакция не может быть отменена.",
+  "bank_details.pix_disclaimer": "Ваша транзакция будет обработана немедленно. Убедитесь, что PIX-ключ получателя указан верно. Эта транзакция не может быть отменена.",
   "bank_details.pix_key_placeholder": "Ключ Pix",
   "bank_details.title": "Данные получателя",
 
@@ -21,7 +20,6 @@
   "confirm_qr.account_breb": "Счёт / Bre-B",
   "confirm_qr.back_aria": "Назад",
   "confirm_qr.confirm": "Продолжить",
-  "confirm_qr.cpf_cnpj": "CPF/CNPJ",
   "confirm_qr.details_title": "Данные получателя",
   "confirm_qr.edit": "Редактировать",
   "confirm_qr.missing_amount": "Недостаточно данных для продолжения.",
