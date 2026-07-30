@@ -1,5 +1,11 @@
 import 'reflect-metadata'
-import { BlockchainNetwork, CryptoCurrency, PaymentMethod, TransactionStatus } from '.prisma/client'
+import {
+  BlockchainNetwork,
+  CryptoCurrency,
+  PaymentMethod,
+  TransactionOrigin,
+  TransactionStatus,
+} from '.prisma/client'
 
 import { PublicTransactionsController } from '../../../../../modules/transactions/interfaces/http/PublicTransactionsController'
 import { QueueName } from '../../../../../platform/messaging/queues'
@@ -30,6 +36,7 @@ type TransactionFindArgs = { where: { id: string } }
 
 type TransactionFixture = {
   id: string
+  origin: TransactionOrigin
   partnerUser: { partner: { id: string, name: string, webhookUrl: string }, userId: string }
   quote: {
     cryptoCurrency: CryptoCurrency
@@ -72,6 +79,15 @@ const buildContext = () => {
     enqueueQueue: jest.fn(),
     enqueueWebhook: jest.fn(),
   }
+  const transactionWebhookRouter = {
+    enqueue: jest.fn(async (
+      target: null | string,
+      _origin: unknown,
+      payload: unknown,
+      context: string,
+      options: unknown,
+    ) => outboxDispatcher.enqueueWebhook(target, payload, context, options)),
+  }
   const orphanRefundService = {
     refundOrphanPayment: jest.fn().mockResolvedValue({
       outcome: 'refunded',
@@ -93,6 +109,7 @@ const buildContext = () => {
       prismaProvider,
       logger,
       outboxDispatcher as never,
+      transactionWebhookRouter as never,
       depositVerifierRegistry as never,
       orphanRefundService as never,
       { listEnabledAssets: jest.fn(async () => []) } as never,
@@ -132,6 +149,7 @@ describe('PublicTransactionsController.checkExpiredTransactions', () => {
     const expiredTransactions: TransactionFixture[] = [
       {
         id: 'tx-1',
+        origin: TransactionOrigin.DIRECT,
         partnerUser: {
           partner: { id: 'p1', name: 'Partner 1', webhookUrl: 'http://webhook-1' },
           userId: 'user-1',
@@ -149,6 +167,7 @@ describe('PublicTransactionsController.checkExpiredTransactions', () => {
       },
       {
         id: 'tx-2',
+        origin: TransactionOrigin.DIRECT,
         partnerUser: {
           partner: { id: 'p2', name: 'Partner 2', webhookUrl: 'http://webhook-2' },
           userId: 'user-2',
@@ -166,6 +185,7 @@ describe('PublicTransactionsController.checkExpiredTransactions', () => {
       },
       {
         id: 'tx-3',
+        origin: TransactionOrigin.DIRECT,
         partnerUser: {
           partner: { id: 'p3', name: 'Partner 3', webhookUrl: 'http://webhook-3' },
           userId: 'user-3',

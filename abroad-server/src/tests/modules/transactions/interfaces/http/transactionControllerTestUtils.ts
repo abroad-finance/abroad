@@ -8,6 +8,7 @@ import type { IDatabaseClientProvider } from '../../../../../platform/persistenc
 import { LiquidityCacheService } from '../../../../../modules/payments/application/LiquidityCacheService'
 import { TransactionAcceptanceService } from '../../../../../modules/transactions/application/TransactionAcceptanceService'
 import { TransactionStatusService } from '../../../../../modules/transactions/application/TransactionStatusService'
+import { TransactionWebhookRouter } from '../../../../../modules/transactions/application/TransactionWebhookRouter'
 import { TransactionController } from '../../../../../modules/transactions/interfaces/http/TransactionController'
 import { createMockLogger } from '../../../../setup/mockFactories'
 
@@ -62,6 +63,12 @@ export const buildMinimalController = () => {
     enqueueQueue: jest.fn(),
     enqueueWebhook: jest.fn(),
   }
+  const transactionWebhookRouter = {
+    enqueueTargets: jest.fn(),
+    resolveTargets: jest.fn(async (target: null | string) => (
+      target ? [target] : []
+    )),
+  } as unknown as TransactionWebhookRouter
   const logger = createMockLogger()
 
   const liquidityCacheService = {
@@ -87,6 +94,7 @@ export const buildMinimalController = () => {
     paymentServiceFactory,
     kycService,
     outboxDispatcher as never,
+    transactionWebhookRouter,
     liquidityCacheService,
     bridgeFloatService,
     logger,

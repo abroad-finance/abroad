@@ -28,7 +28,7 @@ interface PaginatedTransactionList {
   transactions: TransactionListItem[]
 }
 
-type TransactionListItem = Omit<Transaction, 'bankCode'> & {
+type TransactionListItem = Omit<Transaction, 'bankCode' | 'origin'> & {
   quote: {
     cryptoCurrency: string
     id: string

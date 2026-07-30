@@ -1,8 +1,4 @@
-import {
-  Country,
-  PaymentMethod,
-  TargetCurrency,
-} from '@prisma/client'
+import { Country, PaymentMethod, TargetCurrency } from '@prisma/client'
 
 import type { IKycService } from '../../../../../modules/kyc/application/contracts/IKycService'
 import type { IPaymentService } from '../../../../../modules/payments/application/contracts/IPaymentService'
@@ -12,11 +8,13 @@ import type { IDatabaseClientProvider } from '../../../../../platform/persistenc
 import { LiquidityCacheService } from '../../../../../modules/payments/application/LiquidityCacheService'
 import { TransactionAcceptanceService } from '../../../../../modules/transactions/application/TransactionAcceptanceService'
 import { TransactionStatusService } from '../../../../../modules/transactions/application/TransactionStatusService'
+import { TransactionWebhookRouter } from '../../../../../modules/transactions/application/TransactionWebhookRouter'
 import { TransactionController } from '../../../../../modules/transactions/interfaces/http/TransactionController'
 import { createMockLogger } from '../../../../setup/mockFactories'
 import { buildPaymentService } from './transactionControllerTestUtils'
 
 export const partner = {
+  authenticationSource: 'API_KEY' as const,
   id: 'partner-1',
   isKybApproved: true,
   needsKyc: false,
@@ -62,7 +60,7 @@ export const buildAcceptController = (
   const quoteValue = overrides?.quote === undefined ? baseQuote : overrides.quote
   const transactionId = '11111111-2222-3333-4444-555555555555'
   const partnerUserValue = overrides?.partnerUser === undefined
-    ? { id: 'pu-1', disabledAt: null, partnerId: partner.id, userId: 'user-1' }
+    ? { disabledAt: null, id: 'pu-1', partnerId: partner.id, userId: 'user-1' }
     : overrides.partnerUser
   const prisma: PrismaMock = {
     $executeRaw: jest.fn(async () => 1),
@@ -99,6 +97,21 @@ export const buildAcceptController = (
     enqueueQueue: jest.fn(),
     enqueueWebhook: jest.fn(),
   }
+  const transactionWebhookRouter = {
+    enqueueTargets: jest.fn(async (
+      targets: readonly string[],
+      payload: unknown,
+      context: string,
+      options: unknown,
+    ) => {
+      for (const target of targets) {
+        await outboxDispatcher.enqueueWebhook(target, payload, context, options)
+      }
+    }),
+    resolveTargets: jest.fn(async (target: null | string) => (
+      target ? [target] : []
+    )),
+  } as unknown as TransactionWebhookRouter
   const dbProvider: IDatabaseClientProvider = {
     getClient: jest.fn(async () => prisma as unknown as import('@prisma/client').PrismaClient),
   }
@@ -127,6 +140,7 @@ export const buildAcceptController = (
     paymentServiceFactory,
     kycService,
     outboxDispatcher as never,
+    transactionWebhookRouter,
     liquidityCacheService,
     bridgeFloatService,
     logger,

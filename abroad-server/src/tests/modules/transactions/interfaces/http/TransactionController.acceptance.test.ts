@@ -1,5 +1,5 @@
 import 'reflect-metadata'
-import { TransactionStatus } from '@prisma/client'
+import { TransactionOrigin, TransactionStatus } from '@prisma/client'
 
 import { QueueName } from '../../../../../platform/messaging/queues'
 import { baseQuote, buildAcceptController, partner, requestBody } from './transactionControllerAcceptance.fixtures'
@@ -184,7 +184,10 @@ describe('TransactionController acceptance flows', () => {
 
     const response = await controller.acceptTransaction(requestBody, { user: partner } as unknown as import('express').Request, badRequest)
 
-    expect(prisma.transaction.create).toHaveBeenCalled()
+    expect(prisma.transaction.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ origin: TransactionOrigin.DIRECT }),
+      select: { bankCode: true, id: true },
+    })
     expect(outboxDispatcher.enqueueWebhook).toHaveBeenCalled()
     expect(outboxDispatcher.enqueueQueue).toHaveBeenCalledWith(
       QueueName.USER_NOTIFICATION,
@@ -193,6 +196,23 @@ describe('TransactionController acceptance flows', () => {
       expect.objectContaining({ deliverNow: false }),
     )
     expect(response.transaction_reference).toBeDefined()
+  })
+
+  it('persists SEP origin without changing the client request', async () => {
+    const { controller, prisma } = buildAcceptController()
+
+    await controller.acceptTransaction(
+      requestBody,
+      {
+        user: { ...partner, authenticationSource: 'SEP_24' },
+      } as unknown as import('express').Request,
+      badRequest,
+    )
+
+    expect(prisma.transaction.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ origin: TransactionOrigin.SEP_24 }),
+      select: { bankCode: true, id: true },
+    })
   })
 
   it('surfaces create failures as bad requests', async () => {

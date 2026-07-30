@@ -1,9 +1,9 @@
-import { Partner } from '@prisma/client'
+import type { AuthenticatedPartner } from './modules/partners/application/contracts/IPartnerService'
 
 declare global {
   namespace Express {
     interface Request {
-      user: Partner // Or the specific type returned by your auth function
+      user: AuthenticatedPartner
     }
   }
 }

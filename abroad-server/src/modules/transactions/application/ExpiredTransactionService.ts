@@ -14,6 +14,7 @@ import { OutboxDispatcher } from '../../../platform/outbox/OutboxDispatcher'
 import { IDatabaseClientProvider } from '../../../platform/persistence/IDatabaseClientProvider'
 import { toWebhookTransactionPayload } from './transactionPayload'
 import { TransactionRepository } from './TransactionRepository'
+import { TransactionWebhookRouter } from './TransactionWebhookRouter'
 
 export type ExpiredTransactionsSummary = {
   awaiting: number
@@ -33,6 +34,7 @@ export class ExpiredTransactionService {
   constructor(
     private readonly prismaProvider: IDatabaseClientProvider,
     private readonly outboxDispatcher: OutboxDispatcher,
+    private readonly transactionWebhookRouter: TransactionWebhookRouter,
     private readonly logger: ILogger,
   ) {
     this.repository = new TransactionRepository(prismaProvider)
@@ -129,8 +131,9 @@ export class ExpiredTransactionService {
     }
 
     try {
-      await this.outboxDispatcher.enqueueWebhook(
+      await this.transactionWebhookRouter.enqueue(
         webhookTarget,
+        transaction.origin,
         { data: webhookPayload, event: WebhookEvent.TRANSACTION_UPDATED },
         'transaction.expired',
         { deliverNow: false },

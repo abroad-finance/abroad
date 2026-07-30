@@ -1,10 +1,11 @@
 import 'reflect-metadata'
-import { PaymentMethod, TargetCurrency, TransactionStatus } from '@prisma/client'
+import { PaymentMethod, TargetCurrency, TransactionOrigin, TransactionStatus } from '@prisma/client'
 
 import type { LiquidityCacheService } from '../../../../modules/payments/application/LiquidityCacheService'
 
 import { DisabledUserError } from '../../../../modules/shared/partnerUserAccess'
-import { TransactionAcceptanceService, TransactionValidationError } from '../../../../modules/transactions/application/TransactionAcceptanceService'
+import { TransactionAcceptanceService } from '../../../../modules/transactions/application/TransactionAcceptanceService'
+import { TransactionWebhookRouter } from '../../../../modules/transactions/application/TransactionWebhookRouter'
 import { createMockLogger } from '../../../setup/mockFactories'
 
 const buildPaymentService = () => ({
@@ -31,6 +32,12 @@ describe('TransactionAcceptanceService helpers', () => {
     enqueueQueue: jest.fn(),
     enqueueWebhook: jest.fn(),
   }
+  const transactionWebhookRouter = {
+    enqueueTargets: jest.fn(),
+    resolveTargets: jest.fn(async (target: null | string) => (
+      target ? [target] : []
+    )),
+  } as unknown as TransactionWebhookRouter
   const paymentServiceFactory = {
     getPaymentService: jest.fn(() => paymentService),
     getPaymentServiceForCapability: jest.fn(() => paymentService),
@@ -64,6 +71,7 @@ describe('TransactionAcceptanceService helpers', () => {
     paymentServiceFactory as unknown as import('../../../../modules/payments/application/contracts/IPaymentServiceFactory').IPaymentServiceFactory,
     kycService as unknown as import('../../../../modules/kyc/application/contracts/IKycService').IKycService,
     outboxDispatcher as unknown as import('../../../../platform/outbox/OutboxDispatcher').OutboxDispatcher,
+    transactionWebhookRouter,
     liquidityCacheService,
     bridgeFloatService,
     logger,
@@ -181,6 +189,7 @@ describe('TransactionAcceptanceService helpers', () => {
       orderingFactory as unknown as import('../../../../modules/payments/application/contracts/IPaymentServiceFactory').IPaymentServiceFactory,
       { hasApprovedKyc: jest.fn(async () => false) } as unknown as import('../../../../modules/kyc/application/contracts/IKycService').IKycService,
       { enqueueQueue: jest.fn(), enqueueWebhook: jest.fn() } as never,
+      transactionWebhookRouter,
       liquidityCacheService,
       bridgeFloatService,
       logger,
@@ -188,7 +197,13 @@ describe('TransactionAcceptanceService helpers', () => {
 
     await orderingService.acceptTransaction(
       { accountNumber: '123', quoteId: 'quote-1', userId: 'user-1' },
-      { id: 'partner-1', isKybApproved: true, needsKyc: false, webhookUrl: 'https://webhook.test' },
+      {
+        id: 'partner-1',
+        isKybApproved: true,
+        needsKyc: false,
+        origin: TransactionOrigin.DIRECT,
+        webhookUrl: 'https://webhook.test',
+      },
     )
 
     expect(order).toEqual(['enforceLiquidity', '$transaction'])
@@ -494,6 +509,12 @@ describe('TransactionAcceptanceService helpers', () => {
 
 describe('TransactionAcceptanceService.acceptTransaction KYC gating', () => {
   const logger = createMockLogger()
+  const transactionWebhookRouter = {
+    enqueueTargets: jest.fn(),
+    resolveTargets: jest.fn(async (target: null | string) => (
+      target ? [target] : []
+    )),
+  } as unknown as TransactionWebhookRouter
 
   const liquidityCacheService = {
     getLiquidity: jest.fn(async ({ fetchLiquidity }: { fetchLiquidity: () => Promise<number> }) => {
@@ -580,6 +601,7 @@ describe('TransactionAcceptanceService.acceptTransaction KYC gating', () => {
       paymentServiceFactory as unknown as import('../../../../modules/payments/application/contracts/IPaymentServiceFactory').IPaymentServiceFactory,
       kycService as unknown as import('../../../../modules/kyc/application/contracts/IKycService').IKycService,
       { enqueueQueue: jest.fn(), enqueueWebhook: jest.fn() } as never,
+      transactionWebhookRouter,
       liquidityCacheService,
       bridgeFloatService,
       logger,
@@ -589,6 +611,7 @@ describe('TransactionAcceptanceService.acceptTransaction KYC gating', () => {
       id: 'partner-1',
       isKybApproved: true,
       needsKyc: opts?.needsKyc ?? true,
+      origin: TransactionOrigin.DIRECT,
       webhookUrl: 'https://webhook.test',
     }
 

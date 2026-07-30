@@ -117,6 +117,7 @@ model Transaction {
   externalId    String?           @unique
   qrCode        String?
   exchangeHandoffAt DateTime?
+  origin        TransactionOrigin @default(LEGACY)
   transitions   TransactionTransition[]
 
   @@index([partnerUserId, status, createdAt], name: "transaction_partnerUser_status_createdAt_idx")
@@ -213,6 +214,12 @@ enum TransactionStatus {
   PAYMENT_EXPIRED
   PAYMENT_COMPLETED
   WRONG_AMOUNT
+}
+
+enum TransactionOrigin {
+  DIRECT
+  SEP_24
+  LEGACY
 }
 
 enum OrderSide {

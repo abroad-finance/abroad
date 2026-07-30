@@ -10,6 +10,7 @@ import { IDatabaseClientProvider } from '../../../../platform/persistence/IDatab
 import { IPaymentServiceFactory } from '../../../payments/application/contracts/IPaymentServiceFactory'
 import { TransactionEventDispatcher } from '../../../transactions/application/TransactionEventDispatcher'
 import { TransactionRepository } from '../../../transactions/application/TransactionRepository'
+import { TransactionWebhookRouter } from '../../../transactions/application/TransactionWebhookRouter'
 import { FlowStepExecutionResult, FlowStepExecutor, FlowStepRuntimeContext } from '../flowTypes'
 import { RefundCoordinator } from '../RefundCoordinator'
 
@@ -26,10 +27,16 @@ export class PayoutSendStepExecutor implements FlowStepExecutor {
     @inject(TYPES.IPaymentServiceFactory) private readonly paymentServiceFactory: IPaymentServiceFactory,
     @inject(TYPES.ILogger) baseLogger: ILogger,
     @inject(TYPES.IOutboxDispatcher) outboxDispatcher: OutboxDispatcher,
+    @inject(TransactionWebhookRouter)
+    transactionWebhookRouter: TransactionWebhookRouter,
     @inject(RefundCoordinator) refundCoordinator: RefundCoordinator,
   ) {
     this.repository = new TransactionRepository(dbProvider)
-    this.dispatcher = new TransactionEventDispatcher(outboxDispatcher, baseLogger)
+    this.dispatcher = new TransactionEventDispatcher(
+      outboxDispatcher,
+      transactionWebhookRouter,
+      baseLogger,
+    )
     this.logger = createScopedLogger(baseLogger, { scope: 'FlowPayoutSend' })
     this.refundCoordinator = refundCoordinator
   }

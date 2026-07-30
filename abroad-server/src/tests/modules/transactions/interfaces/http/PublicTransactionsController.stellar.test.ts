@@ -220,6 +220,7 @@ const buildContext = () => {
       prismaProvider,
       logger,
       outboxDispatcher as never,
+      {} as never,
       depositVerifierRegistry as never,
       orphanRefundService as never,
       assetConfigService as never,

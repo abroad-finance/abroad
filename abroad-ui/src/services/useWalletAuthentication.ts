@@ -25,7 +25,11 @@ type ChallengeResponse = {
   xdr?: string
 }
 
-type JwtPayload = { exp?: number }
+type JwtPayload = {
+  exp?: number
+  iss?: string
+  jti?: string
+}
 
 type RefreshResponse = { token: string }
 
@@ -94,6 +98,11 @@ export const useWalletAuthentication = (): IWalletAuthentication => {
     if (!token) return
     const payload = safeParseJwt(token)
     if (!payload.exp) return
+    if (payload.iss && payload.jti) {
+      // SEP session tokens are issued and renewed by Polaris. Refreshing one
+      // through Abroad would discard the signed SEP transaction provenance.
+      return
+    }
     const delay = payload.exp * 1000 - Date.now() - REFRESH_GRACE_MS
     const timeoutMs = Math.max(delay, 1000)
     refreshTimeoutRef.current = window.setTimeout(async () => {

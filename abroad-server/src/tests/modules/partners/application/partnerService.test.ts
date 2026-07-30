@@ -83,7 +83,8 @@ describe('PartnerService', () => {
       client_domain: 'client.example.com',
       exp: Math.floor(Date.now() / 1000) + 3600,
       iat: Math.floor(Date.now() / 1000),
-      iss: 'issuer',
+      iss: 'https://sep-stellar.abroad.finance/auth',
+      jti: 'sep-challenge-hash',
       sub: 'subject',
     })
   })
@@ -118,53 +119,91 @@ describe('PartnerService', () => {
   })
 
   it('uses client_domain to resolve partner from SEP JWT', async () => {
-    const result = await service.getPartnerFromSepJwt('token-123')
+    const result = await service.authenticateBearerToken('token-123')
 
     expect(secretManager.getSecret).toHaveBeenCalledWith('STELLAR_SEP_JWT_SECRET')
     expect(secretManager.getSecret).toHaveBeenCalledWith('STELLAR_SEP_PARTNER_ID')
     expect(jwt.verify).toHaveBeenCalledWith('token-123', 'secret-STELLAR_SEP_JWT_SECRET')
     expect(findFirst).toHaveBeenCalledWith({ where: { clientDomainHash: hashedClientDomain } })
-    expect(result).toBe(partnerFromDomain)
+    expect(result).toEqual({
+      partner: partnerFromDomain,
+      source: 'SEP_24',
+    })
   })
 
   it('falls back to SEP partner when client_domain is missing', async () => {
     ;(jwt.verify as jest.Mock).mockReturnValueOnce({
       exp: Math.floor(Date.now() / 1000) + 3600,
       iat: Math.floor(Date.now() / 1000),
-      iss: 'issuer',
+      iss: 'https://sep-stellar.abroad.finance/auth',
+      jti: 'sep-challenge-hash',
       sub: 'subject',
     })
 
-    const result = await service.getPartnerFromSepJwt('token-without-domain')
+    const result = await service.authenticateBearerToken('token-without-domain')
 
     expect(findFirst).toHaveBeenCalledTimes(1)
     expect(findFirst).toHaveBeenCalledWith({ where: { id: 'secret-STELLAR_SEP_PARTNER_ID' } })
-    expect(result).toBe(defaultPartner)
+    expect(result).toEqual({
+      partner: defaultPartner,
+      source: 'SEP_24',
+    })
   })
 
   it('falls back to SEP partner when client_domain has no matching partner', async () => {
     delete partnersByClientDomainHash[hashedClientDomain]
 
-    const result = await service.getPartnerFromSepJwt('token-no-partner')
+    const result = await service.authenticateBearerToken('token-no-partner')
 
     expect(findFirst).toHaveBeenCalledWith({ where: { clientDomainHash: hashedClientDomain } })
     expect(findFirst).toHaveBeenCalledWith({ where: { id: 'secret-STELLAR_SEP_PARTNER_ID' } })
-    expect(result).toBe(defaultPartner)
+    expect(result).toEqual({
+      partner: defaultPartner,
+      source: 'SEP_24',
+    })
   })
 
   it('throws when SEP verification fails or partner missing', async () => {
     ;(jwt.verify as jest.Mock).mockImplementationOnce(() => {
       throw new Error('bad')
     })
-    await expect(service.getPartnerFromSepJwt('broken')).rejects.toThrow('SEP JWT verification failed')
+    await expect(service.authenticateBearerToken('broken')).rejects.toThrow('Bearer JWT verification failed')
 
     partnersById = {}
     ;(jwt.verify as jest.Mock).mockReturnValueOnce({
       exp: Math.floor(Date.now() / 1000) + 3600,
       iat: Math.floor(Date.now() / 1000),
-      iss: 'issuer',
+      iss: 'https://sep-stellar.abroad.finance/auth',
+      jti: 'sep-challenge-hash',
       sub: 'subject',
     })
-    await expect(service.getPartnerFromSepJwt('token')).rejects.toThrow('SEP JWT verification failed')
+    await expect(service.authenticateBearerToken('token')).rejects.toThrow('Bearer JWT verification failed')
+  })
+
+  it('classifies Abroad wallet tokens as direct wallet authentication', async () => {
+    ;(jwt.verify as jest.Mock).mockReturnValueOnce({
+      exp: Math.floor(Date.now() / 1000) + 3600,
+      signers: ['GABC'],
+      sub: 'stellar:pubnet:GABC',
+    })
+
+    const result = await service.authenticateBearerToken('wallet-token')
+
+    expect(result).toEqual({
+      partner: defaultPartner,
+      source: 'WALLET',
+    })
+  })
+
+  it('does not trust malformed SEP issuer claims as SEP provenance', async () => {
+    ;(jwt.verify as jest.Mock).mockReturnValueOnce({
+      iss: 'not-a-url',
+      jti: 'claim-id',
+      sub: 'subject',
+    })
+
+    const result = await service.authenticateBearerToken('ambiguous-token')
+
+    expect(result.source).toBe('WALLET')
   })
 })

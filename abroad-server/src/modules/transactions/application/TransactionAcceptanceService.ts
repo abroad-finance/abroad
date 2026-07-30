@@ -4,6 +4,7 @@ import {
   PaymentMethod,
   Prisma,
   TargetCurrency,
+  TransactionOrigin,
   TransactionStatus,
 } from '@prisma/client'
 import { inject, injectable } from 'inversify'
@@ -23,6 +24,7 @@ import { assertPartnerUserEnabled, DisabledUserError } from '../../shared/partne
 import { BridgeFloatService } from '../../treasury/application/BridgeFloatService'
 import { uuidToBase64 } from '../infrastructure/transactionEncoding'
 import { toWebhookTransactionPayload } from './transactionPayload'
+import { TransactionWebhookRouter } from './TransactionWebhookRouter'
 
 interface AcceptTransactionRequest {
   accountNumber: string
@@ -45,6 +47,7 @@ type PartnerUserContext = {
   id: string
   isKybApproved: boolean
   needsKyc: boolean
+  origin: TransactionOrigin
   webhookUrl: string
 }
 type PaymentServiceInstance = ReturnType<IPaymentServiceFactory['getPaymentService']>
@@ -77,6 +80,8 @@ export class TransactionAcceptanceService {
     private readonly paymentServiceFactory: IPaymentServiceFactory,
     @inject(TYPES.IKycService) private readonly kycService: IKycService,
     @inject(TYPES.IOutboxDispatcher) private readonly outboxDispatcher: OutboxDispatcher,
+    @inject(TransactionWebhookRouter)
+    private readonly transactionWebhookRouter: TransactionWebhookRouter,
     @inject(LiquidityCacheService) private readonly liquidityCacheService: LiquidityCacheService,
     @inject(BridgeFloatService) private readonly bridgeFloatService: BridgeFloatService,
     @inject(TYPES.ILogger) logger: ILogger,
@@ -105,6 +110,7 @@ export class TransactionAcceptanceService {
     this.assertPaymentServiceIsEnabled(preflightPaymentService, preflightQuote.paymentMethod)
     await this.enforceLiquidity(preflightPaymentService, preflightQuote.paymentMethod, preflightQuote.targetAmount)
     await this.enforceBridgeFloat(preflightQuote)
+    const webhookTargets = await this.resolveWebhookTargets(partner)
 
     let decision: TransactionDecision
     try {
@@ -162,6 +168,7 @@ export class TransactionAcceptanceService {
         const transaction = await tx.transaction.create({
           data: {
             accountNumber: request.accountNumber,
+            origin: partner.origin,
             partnerUserId: partnerUser.id,
             qrCode: request.qrCode,
             quoteId: quote.id,
@@ -174,8 +181,8 @@ export class TransactionAcceptanceService {
         const payload = toWebhookTransactionPayload(transaction)
 
         try {
-          await this.outboxDispatcher.enqueueWebhook(
-            partner.webhookUrl,
+          await this.transactionWebhookRouter.enqueueTargets(
+            webhookTargets,
             { data: payload, event: WebhookEvent.TRANSACTION_CREATED },
             'transaction.created',
             { client: tx, deliverNow: false },
@@ -650,6 +657,24 @@ export class TransactionAcceptanceService {
       paymentMethod: quote.paymentMethod,
       targetCurrency: quote.targetCurrency,
     }) ?? basePaymentService
+  }
+
+  private async resolveWebhookTargets(
+    partner: PartnerUserContext,
+  ): Promise<string[]> {
+    try {
+      return await this.transactionWebhookRouter.resolveTargets(
+        partner.webhookUrl,
+        partner.origin,
+        { requireSepTarget: partner.origin === TransactionOrigin.SEP_24 },
+      )
+    }
+    catch (error) {
+      this.logger.error('Failed to resolve required transaction webhook targets', error)
+      throw new TransactionValidationError(
+        'We could not create your transaction right now. Please try again in a few moments.',
+      )
+    }
   }
 
   private async shouldRequestKyc(

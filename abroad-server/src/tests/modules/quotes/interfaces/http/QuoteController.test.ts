@@ -36,9 +36,9 @@ describe('QuoteController', () => {
     } as unknown as jest.Mocked<IQuoteUseCase>
 
     mockPartnerService = {
+      authenticateBearerToken: jest.fn(),
       getPartnerFromApiKey: jest.fn(),
       getPartnerFromClientDomain: jest.fn(),
-      getPartnerFromSepJwt: jest.fn(),
     } as unknown as jest.Mocked<IPartnerService>
 
     controller = new QuoteController(mockQuoteUseCase, mockPartnerService)
@@ -157,6 +157,38 @@ describe('QuoteController', () => {
       expect(result).toEqual({ reason: 'Invalid API key' })
       expect(mockQuoteUseCase.createQuote).not.toHaveBeenCalled()
       expect(badRequest).toHaveBeenCalledWith(400, { reason: 'Invalid API key' })
+    })
+
+    it('resolves an optional Bearer token for a client-domain SEP quote', async () => {
+      const quote: QuoteResponse = {
+        expiration_time: Date.now() + 60_000,
+        quote_id: 'q-sep',
+        value: 610,
+      }
+      const sepPartner = { id: 'partner-sep-client' } as Partner
+      const bearerRequest = {
+        header: jest.fn((name: string) => (
+          name === 'Authorization' ? 'Bearer sep-token' : undefined
+        )),
+      } as unknown as RequestExpress
+      mockPartnerService.authenticateBearerToken.mockResolvedValueOnce({
+        partner: sepPartner,
+        source: 'SEP_24',
+      })
+      mockQuoteUseCase.createQuote.mockResolvedValueOnce(quote)
+
+      const result = await controller.getQuote(
+        validQuoteBody,
+        bearerRequest,
+        badRequest,
+        undefined,
+      )
+
+      expect(result).toEqual(quote)
+      expect(mockPartnerService.authenticateBearerToken).toHaveBeenCalledWith('sep-token')
+      expect(mockQuoteUseCase.createQuote).toHaveBeenCalledWith(
+        expect.objectContaining({ partner: sepPartner }),
+      )
     })
   })
 

@@ -115,6 +115,16 @@ export class WalletAuthController extends Controller {
     const { STELLAR_SEP_JWT_SECRET } = await this.getSecrets()
     try {
       const payload = jwt.verify(body.token, STELLAR_SEP_JWT_SECRET, { ignoreExpiration: true }) as jwt.JwtPayload
+      if (
+        typeof payload.iss === 'string'
+        && payload.iss.trim().length > 0
+        && typeof payload.jti === 'string'
+        && payload.jti.trim().length > 0
+      ) {
+        // Polaris owns SEP session lifetime. Turning one of its tokens into an
+        // Abroad wallet token would strip the signed transaction provenance.
+        throw new Error('SEP session tokens cannot be refreshed as wallet tokens')
+      }
       const newToken = jwt.sign(
         { signers: payload.signers, sub: payload.sub },
         STELLAR_SEP_JWT_SECRET,

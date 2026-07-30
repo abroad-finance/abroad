@@ -45,6 +45,7 @@ import { ReceivedCryptoTransactionUseCase } from '../../modules/transactions/app
 import { StellarOrphanRefundService } from '../../modules/transactions/application/StellarOrphanRefundService'
 import { TransactionAcceptanceService } from '../../modules/transactions/application/TransactionAcceptanceService'
 import { TransactionStatusService } from '../../modules/transactions/application/TransactionStatusService'
+import { TransactionWebhookRouter } from '../../modules/transactions/application/TransactionWebhookRouter'
 import { TransferoUltraClient } from '../../modules/transfero/infrastructure/TransferoUltraClient'
 import { TransferoUltraWebhookConfigurationVerifier } from '../../modules/transfero/infrastructure/TransferoUltraWebhookConfigurationVerifier'
 import { TransferoUltraWebhookVerifier } from '../../modules/transfero/infrastructure/TransferoUltraWebhookVerifier'
@@ -102,6 +103,7 @@ const domainBindings: ReadonlyArray<BindingRegistration<unknown>> = [
   { identifier: TYPES.IExchangeProvider, implementation: TransferoExchangeProvider, name: 'transfero' },
   { identifier: TYPES.TransactionAcceptanceService, implementation: TransactionAcceptanceService },
   { identifier: TYPES.TransactionStatusService, implementation: TransactionStatusService },
+  { bindSelf: true, identifier: TransactionWebhookRouter, implementation: TransactionWebhookRouter },
   { identifier: TYPES.StellarOrphanRefundService, implementation: StellarOrphanRefundService },
   { bindSelf: true, identifier: OpsTransactionReconciliationService, implementation: OpsTransactionReconciliationService },
   { bindSelf: true, identifier: OpsTransactionQueryService, implementation: OpsTransactionQueryService },

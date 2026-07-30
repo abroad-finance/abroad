@@ -68,9 +68,9 @@ const buildController = () => {
     getClient: jest.fn(async () => prisma as unknown as import('@prisma/client').PrismaClient),
   }
   const partnerService: IPartnerService = {
+    authenticateBearerToken: jest.fn(),
     getPartnerFromApiKey: jest.fn(),
     getPartnerFromClientDomain: jest.fn(),
-    getPartnerFromSepJwt: jest.fn(),
   }
   return { controller: new TransactionsController(dbProvider, partnerService), prisma }
 }

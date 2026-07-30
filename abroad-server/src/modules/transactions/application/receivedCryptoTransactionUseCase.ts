@@ -14,6 +14,7 @@ import { FlowOrchestrator } from '../../flows/application/FlowOrchestrator'
 import { RefundCoordinator } from '../../flows/application/RefundCoordinator'
 import { TransactionEventDispatcher } from './TransactionEventDispatcher'
 import { TransactionRepository } from './TransactionRepository'
+import { TransactionWebhookRouter } from './TransactionWebhookRouter'
 
 export interface IReceivedCryptoTransactionUseCase {
   process(rawMessage: unknown): Promise<void>
@@ -29,10 +30,16 @@ export class ReceivedCryptoTransactionUseCase implements IReceivedCryptoTransact
     @inject(TYPES.FlowOrchestrator) private readonly orchestrator: FlowOrchestrator,
     @inject(RefundCoordinator) private readonly refundCoordinator: RefundCoordinator,
     @inject(TYPES.IOutboxDispatcher) outboxDispatcher: OutboxDispatcher,
+    @inject(TransactionWebhookRouter)
+    transactionWebhookRouter: TransactionWebhookRouter,
     @inject(TYPES.ILogger) private readonly logger: ILogger,
   ) {
     this.repository = new TransactionRepository(dbProvider)
-    this.dispatcher = new TransactionEventDispatcher(outboxDispatcher, this.logger)
+    this.dispatcher = new TransactionEventDispatcher(
+      outboxDispatcher,
+      transactionWebhookRouter,
+      this.logger,
+    )
   }
 
   public async process(rawMessage: unknown): Promise<void> {

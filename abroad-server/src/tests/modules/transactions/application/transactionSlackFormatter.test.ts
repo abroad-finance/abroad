@@ -4,6 +4,7 @@ import {
   CryptoCurrency,
   PaymentMethod,
   TargetCurrency,
+  TransactionOrigin,
   TransactionStatus,
 } from '@prisma/client'
 
@@ -18,6 +19,7 @@ const buildTransaction = (overrides: Partial<TransactionWithRelations> = {}): Tr
   externalId: 'external-1',
   id: 'txn-1',
   onChainId: 'on-chain-1',
+  origin: TransactionOrigin.DIRECT,
   partnerUser: {
     createdAt: new Date(),
     disabledAt: null,

@@ -2,8 +2,23 @@ import { Partner } from '@prisma/client'
 
 import type { ClientDomain } from '../../domain/clientDomain'
 
+export type AuthenticatedPartner = Partner & {
+  authenticationSource: PartnerAuthenticationSource
+}
+
+export type BearerAuthentication = {
+  partner: Partner
+  source: Extract<PartnerAuthenticationSource, 'SEP_24' | 'WALLET'>
+}
+
 export interface IPartnerService {
+  authenticateBearerToken(token: string): Promise<BearerAuthentication>
   getPartnerFromApiKey(apiKey?: string): Promise<Partner>
   getPartnerFromClientDomain(clientDomain: ClientDomain): Promise<Partner>
-  getPartnerFromSepJwt(token: string): Promise<Partner>
 }
+
+export type PartnerAuthenticationSource
+  = | 'API_KEY'
+    | 'CLIENT_DOMAIN'
+    | 'SEP_24'
+    | 'WALLET'

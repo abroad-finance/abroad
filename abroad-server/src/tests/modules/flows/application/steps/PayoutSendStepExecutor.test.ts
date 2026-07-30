@@ -86,6 +86,7 @@ describe('PayoutSendStepExecutor', () => {
       paymentServiceFactory as never,
       baseLogger,
       {} as never,
+      {} as never,
       refundCoordinator as never,
     )
 

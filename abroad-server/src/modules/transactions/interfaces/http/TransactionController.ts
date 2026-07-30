@@ -1,5 +1,5 @@
 // src/modules/transactions/interfaces/http/TransactionController.ts
-
+import { TransactionOrigin } from '@prisma/client'
 import { Request as RequestExpress } from 'express'
 import { inject } from 'inversify'
 import {
@@ -78,6 +78,9 @@ export class TransactionController extends Controller {
       id: String(partner.id),
       isKybApproved: Boolean(partner.isKybApproved),
       needsKyc: Boolean(partner.needsKyc),
+      origin: partner.authenticationSource === 'SEP_24'
+        ? TransactionOrigin.SEP_24
+        : TransactionOrigin.DIRECT,
       webhookUrl: typeof partner.webhookUrl === 'string' ? partner.webhookUrl : '',
     }
 

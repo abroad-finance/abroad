@@ -10,6 +10,7 @@ import { IDatabaseClientProvider } from '../../../../platform/persistence/IDatab
 import { PayoutStatusAdapterRegistry } from '../../../payments/application/PayoutStatusAdapterRegistry'
 import { TransactionEventDispatcher } from '../../../transactions/application/TransactionEventDispatcher'
 import { TransactionRepository } from '../../../transactions/application/TransactionRepository'
+import { TransactionWebhookRouter } from '../../../transactions/application/TransactionWebhookRouter'
 import {
   FlowSignalInput,
   FlowStepExecutionResult,
@@ -32,9 +33,15 @@ export class AwaitProviderStatusStepExecutor implements FlowStepExecutor {
     @inject(RefundCoordinator) private readonly refundCoordinator: RefundCoordinator,
     @inject(TYPES.ILogger) baseLogger: ILogger,
     @inject(TYPES.IOutboxDispatcher) outboxDispatcher: OutboxDispatcher,
+    @inject(TransactionWebhookRouter)
+    transactionWebhookRouter: TransactionWebhookRouter,
   ) {
     this.repository = new TransactionRepository(dbProvider)
-    this.dispatcher = new TransactionEventDispatcher(outboxDispatcher, baseLogger)
+    this.dispatcher = new TransactionEventDispatcher(
+      outboxDispatcher,
+      transactionWebhookRouter,
+      baseLogger,
+    )
     this.logger = createScopedLogger(baseLogger, { scope: 'FlowAwaitProviderStatus' })
   }
 

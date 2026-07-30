@@ -115,6 +115,20 @@ describe('WalletAuthController', () => {
     })
   })
 
+  it('does not convert a Polaris SEP session into an Abroad wallet token', async () => {
+    verifyMock.mockReturnValue({
+      iss: 'https://sep-stellar.abroad.finance/auth',
+      jti: 'sep-challenge-hash',
+      sub: 'GABC',
+    })
+
+    await expect(controller.refresh({ token: 'sep-token' })).rejects.toMatchObject({
+      message: 'Invalid token',
+      statusCode: 401,
+    })
+    expect(signMock).not.toHaveBeenCalled()
+  })
+
   it('rejects verification when no outstanding challenge exists', async () => {
     verifyChallengeTxSignersMock.mockReturnValue(['GABC'])
 

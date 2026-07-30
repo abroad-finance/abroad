@@ -23,6 +23,8 @@ import { IQuoteUseCase, QuoteResponse } from '../../application/quoteUseCase'
 
 type PartnerResolution = { errorReason?: string, partner?: Partner }
 
+const BEARER_PREFIX = 'Bearer '
+
 type QuoteHandlerParams<TPayload> = {
   apiKey?: string
   badRequestResponse: TsoaResponse<400, { reason: string }>
@@ -179,17 +181,34 @@ export class QuoteController extends Controller {
       return { partner: request.user }
     }
 
-    if (!normalizedApiKey) {
-      return { partner: undefined }
+    if (normalizedApiKey) {
+      try {
+        const partner = await this.partnerService.getPartnerFromApiKey(normalizedApiKey)
+        return { partner }
+      }
+      catch (error) {
+        const reason = error instanceof Error ? error.message : 'Invalid API key'
+        return { errorReason: reason }
+      }
     }
 
-    try {
-      const partner = await this.partnerService.getPartnerFromApiKey(normalizedApiKey)
-      return { partner }
+    const authorization = request.header('Authorization')
+    if (authorization?.startsWith(BEARER_PREFIX)) {
+      const token = authorization.slice(BEARER_PREFIX.length).trim()
+      if (!token) {
+        return { errorReason: 'Invalid Bearer token' }
+      }
+
+      try {
+        const authentication = await this.partnerService.authenticateBearerToken(token)
+        return { partner: authentication.partner }
+      }
+      catch (error) {
+        const reason = error instanceof Error ? error.message : 'Invalid Bearer token'
+        return { errorReason: reason }
+      }
     }
-    catch (error) {
-      const reason = error instanceof Error ? error.message : 'Invalid API key'
-      return { errorReason: reason }
-    }
+
+    return { partner: undefined }
   }
 }

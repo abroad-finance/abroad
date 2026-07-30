@@ -4,7 +4,6 @@ import { inject, injectable } from 'inversify'
 import { RuntimeConfiguration } from '../../app/config/runtime'
 import { TYPES } from '../../app/container/types'
 import { ILogger } from '../../core/logging/types'
-import { IDatabaseClientProvider } from '../persistence/IDatabaseClientProvider'
 import { ISecretManager } from '../secrets/ISecretManager'
 import { IWebhookNotifier, WebhookEvent } from './IWebhookNotifier'
 
@@ -20,33 +19,26 @@ type WebhookSecrets = {
 
 @injectable()
 export class WebhookNotifier implements IWebhookNotifier {
-  private sepPartnerWebhookUrlPromise?: Promise<null | string>
-
   public constructor(
     @inject(TYPES.ILogger) private logger: ILogger,
     @inject(TYPES.ISecretManager) private secretManager: ISecretManager,
     @inject(TYPES.AppConfig) private readonly config: RuntimeConfiguration,
-    @inject(TYPES.IDatabaseClientProvider)
-    private readonly databaseClientProvider: IDatabaseClientProvider,
   ) { }
 
   async notifyWebhook(
     url: null | string,
     payload: WebhookPayload,
   ): Promise<void> {
-    const targets = await this.resolveTargets(url)
-    if (targets.length === 0) {
+    const target = this.normalizeUrl(url)
+    if (!target) {
       return
     }
 
     const secrets = await this.resolveWebhookSecrets()
-
-    await Promise.all(
-      targets.map(target => this.deliverWebhook(
-        target,
-        payload,
-        this.selectWebhookSecret(target, secrets),
-      )),
+    await this.deliverWebhook(
+      target,
+      payload,
+      this.selectWebhookSecret(target, secrets),
     )
   }
 
@@ -76,42 +68,6 @@ export class WebhookNotifier implements IWebhookNotifier {
         targetOrigin: this.readTargetOrigin(target),
       })
       throw normalizedError
-    }
-  }
-
-  private async fetchSepPartnerWebhookUrl(): Promise<null | string> {
-    const [sepPartnerId, prismaClient] = await Promise.all([
-      this.secretManager.getSecret('STELLAR_SEP_PARTNER_ID'),
-      this.databaseClientProvider.getClient(),
-    ])
-
-    if (!sepPartnerId) {
-      return null
-    }
-
-    const sepPartner = await prismaClient.partner.findUnique({
-      select: { webhookUrl: true },
-      where: { id: sepPartnerId },
-    })
-
-    const normalizedUrl = this.normalizeUrl(sepPartner?.webhookUrl ?? null)
-    return normalizedUrl
-  }
-
-  private async getSepPartnerWebhookUrl(): Promise<null | string> {
-    if (!this.sepPartnerWebhookUrlPromise) {
-      this.sepPartnerWebhookUrlPromise = this.fetchSepPartnerWebhookUrl()
-    }
-
-    try {
-      return await this.sepPartnerWebhookUrlPromise
-    }
-    catch (error) {
-      this.logger.warn('Failed to resolve SEP partner webhook URL; skipping SEP notification', {
-        error: error instanceof Error ? error : new Error(String(error)),
-      })
-      this.sepPartnerWebhookUrlPromise = undefined
-      return null
     }
   }
 
@@ -180,21 +136,6 @@ export class WebhookNotifier implements IWebhookNotifier {
       )
       return new Map()
     }
-  }
-
-  private async resolveTargets(primaryUrl: null | string): Promise<string[]> {
-    const targets: string[] = []
-    const normalizedPrimary = this.normalizeUrl(primaryUrl)
-    if (normalizedPrimary) {
-      targets.push(normalizedPrimary)
-    }
-
-    const sepWebhookUrl = await this.getSepPartnerWebhookUrl()
-    if (sepWebhookUrl && !targets.includes(sepWebhookUrl)) {
-      targets.push(sepWebhookUrl)
-    }
-
-    return targets
   }
 
   private async resolveWebhookSecrets(): Promise<WebhookSecrets> {

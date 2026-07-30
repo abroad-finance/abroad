@@ -1,15 +1,14 @@
-import { Partner } from '@prisma/client'
 import { Request } from 'express'
 
 import type { ClientDomain } from '../../modules/partners/domain/clientDomain'
 
-import { IPartnerService } from '../../modules/partners/application/contracts/IPartnerService'
+import { AuthenticatedPartner, IPartnerService, PartnerAuthenticationSource } from '../../modules/partners/application/contracts/IPartnerService'
 import { parseClientDomain } from '../../modules/partners/domain/clientDomain'
 import { iocContainer } from '../container'
 import { TYPES } from '../container/types'
 import { OpsAuthService } from './OpsAuthService'
 
-type AuthContext = Partner | { kind: 'ops' }
+type AuthContext = AuthenticatedPartner | { kind: 'ops' }
 
 const CLIENT_DOMAIN_HEADER_CANDIDATES = ['Origin', 'Referer'] as const
 const BEARER_PREFIX = 'Bearer '
@@ -39,6 +38,14 @@ const resolveBearerToken = (authorizationHeader: string | undefined): null | str
   return token.length > 0 ? token : null
 }
 
+const withAuthenticationSource = (
+  partner: Omit<AuthenticatedPartner, 'authenticationSource'>,
+  authenticationSource: PartnerAuthenticationSource,
+): AuthenticatedPartner => ({
+  ...partner,
+  authenticationSource,
+})
+
 export async function expressAuthentication(
   request: Request,
   securityName: string,
@@ -50,25 +57,40 @@ export async function expressAuthentication(
   if (securityName === 'ApiKeyAuth') {
     const apiKey = request.header('X-API-Key')
     if (apiKey) {
-      return partnerService.getPartnerFromApiKey(apiKey)
+      const partner = await partnerService.getPartnerFromApiKey(apiKey)
+      return withAuthenticationSource(partner, 'API_KEY')
+    }
+
+    if (resolveBearerToken(request.headers.authorization)) {
+      // TSOA races the configured auth alternatives. An explicit Bearer token
+      // must win over ambient Origin/Referer partner resolution so its signed
+      // SEP provenance cannot be discarded nondeterministically.
+      throw new Error('Bearer token takes precedence over client domain')
     }
 
     const clientDomain = resolveClientDomain(request)
     if (clientDomain) {
-      return partnerService.getPartnerFromClientDomain(clientDomain)
+      const partner = await partnerService.getPartnerFromClientDomain(clientDomain)
+      return withAuthenticationSource(partner, 'CLIENT_DOMAIN')
     }
 
     throw new Error('API key not provided')
   }
 
   if (securityName === 'BearerAuth') {
+    if (request.header('X-API-Key')) {
+      // Explicit API keys take precedence when both credentials are supplied.
+      throw new Error('API key takes precedence over Bearer token')
+    }
+
     const token = resolveBearerToken(request.headers.authorization)
     if (!token) {
       throw new Error('No token provided')
     }
 
     try {
-      return await partnerService.getPartnerFromSepJwt(token)
+      const authentication = await partnerService.authenticateBearerToken(token)
+      return withAuthenticationSource(authentication.partner, authentication.source)
     }
     catch {
       throw new Error('Invalid token or partner not found')

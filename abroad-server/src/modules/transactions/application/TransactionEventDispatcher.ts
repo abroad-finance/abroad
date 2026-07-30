@@ -8,6 +8,7 @@ import { OutboxDispatcher } from '../../../platform/outbox/OutboxDispatcher'
 import { TransactionWithRelations } from './transactionNotificationTypes'
 import { toWebhookTransactionPayload } from './transactionPayload'
 import { buildTransactionSlackMessage } from './transactionSlackFormatter'
+import { TransactionWebhookRouter } from './TransactionWebhookRouter'
 
 type PrismaClientLike = Prisma.TransactionClient | PrismaClient
 
@@ -16,6 +17,7 @@ export class TransactionEventDispatcher {
 
   public constructor(
     private readonly outboxDispatcher: OutboxDispatcher,
+    private readonly transactionWebhookRouter: TransactionWebhookRouter,
     baseLogger: ILogger,
   ) {
     this.logger = createScopedLogger(baseLogger, { scope: 'TransactionEvents' })
@@ -30,8 +32,9 @@ export class TransactionEventDispatcher {
   ): Promise<void> {
     const payload = toWebhookTransactionPayload(transaction)
     try {
-      await this.outboxDispatcher.enqueueWebhook(
+      await this.transactionWebhookRouter.enqueue(
         transaction.partnerUser.partner.webhookUrl,
+        transaction.origin,
         { data: payload, event },
         context,
         { client: options.prismaClient, deliverNow: options.deliverNow },

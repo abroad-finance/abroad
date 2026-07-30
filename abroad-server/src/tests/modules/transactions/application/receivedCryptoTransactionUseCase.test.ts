@@ -22,6 +22,7 @@ const buildHarness = () => {
     orchestrator as never,
     { refundToSender: jest.fn() } as never,
     { enqueueQueue: jest.fn(), enqueueWebhook: jest.fn() } as never,
+    {} as never,
     logger,
   )
 

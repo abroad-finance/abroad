@@ -6,9 +6,9 @@ import { iocContainer } from '../../../app/container'
 import { expressAuthentication } from '../../../app/http/authentication'
 
 const partnerService: jest.Mocked<IPartnerService> = {
+  authenticateBearerToken: jest.fn(),
   getPartnerFromApiKey: jest.fn(),
   getPartnerFromClientDomain: jest.fn(),
-  getPartnerFromSepJwt: jest.fn(),
 } as jest.Mocked<IPartnerService>
 
 jest.mock('../../../app/container', () => ({
@@ -22,9 +22,12 @@ describe('expressAuthentication', () => {
 
   beforeEach(() => {
     jest.clearAllMocks()
+    partnerService.authenticateBearerToken.mockResolvedValue({
+      partner,
+      source: 'SEP_24',
+    })
     partnerService.getPartnerFromApiKey.mockResolvedValue(partner)
     partnerService.getPartnerFromClientDomain.mockResolvedValue(partner)
-    partnerService.getPartnerFromSepJwt.mockResolvedValue(partner)
     ;(iocContainer.get as jest.Mock).mockReturnValue(partnerService)
   })
 
@@ -47,7 +50,7 @@ describe('expressAuthentication', () => {
 
     const result = await expressAuthentication(req, 'ApiKeyAuth')
 
-    expect(result).toBe(partner)
+    expect(result).toEqual({ ...partner, authenticationSource: 'API_KEY' })
     expect(partnerService.getPartnerFromApiKey).toHaveBeenCalledWith('api-key-123')
   })
 
@@ -70,7 +73,7 @@ describe('expressAuthentication', () => {
 
     const result = await expressAuthentication(req, 'ApiKeyAuth')
 
-    expect(result).toBe(partner)
+    expect(result).toEqual({ ...partner, authenticationSource: 'CLIENT_DOMAIN' })
     expect(partnerService.getPartnerFromClientDomain).toHaveBeenCalledWith('app.abroad.finance')
     expect(partnerService.getPartnerFromApiKey).not.toHaveBeenCalled()
   })
@@ -87,7 +90,7 @@ describe('expressAuthentication', () => {
 
     const result = await expressAuthentication(req, 'ApiKeyAuth')
 
-    expect(result).toBe(partner)
+    expect(result).toEqual({ ...partner, authenticationSource: 'CLIENT_DOMAIN' })
     expect(partnerService.getPartnerFromClientDomain).toHaveBeenCalledWith('app.abroad.finance')
   })
 
@@ -96,22 +99,50 @@ describe('expressAuthentication', () => {
 
     const result = await expressAuthentication(req, 'BearerAuth')
 
-    expect(result).toBe(partner)
-    expect(partnerService.getPartnerFromSepJwt).toHaveBeenCalledWith('jwt-token')
+    expect(result).toEqual({ ...partner, authenticationSource: 'SEP_24' })
+    expect(partnerService.authenticateBearerToken).toHaveBeenCalledWith('jwt-token')
   })
 
   it('throws when the bearer token is missing', async () => {
     const req = buildRequest({ headers: {} })
 
     await expect(expressAuthentication(req, 'BearerAuth')).rejects.toThrow('No token provided')
-    expect(partnerService.getPartnerFromSepJwt).not.toHaveBeenCalled()
+    expect(partnerService.authenticateBearerToken).not.toHaveBeenCalled()
   })
 
   it('throws when the bearer token is invalid', async () => {
     const req = buildRequest({ headers: { authorization: 'Bearer bad-token' } })
-    partnerService.getPartnerFromSepJwt.mockRejectedValueOnce(new Error('invalid'))
+    partnerService.authenticateBearerToken.mockRejectedValueOnce(new Error('invalid'))
 
     await expect(expressAuthentication(req, 'BearerAuth')).rejects.toThrow('Invalid token or partner not found')
+  })
+
+  it('does not let ambient client-domain auth race an explicit bearer token', async () => {
+    const req = buildRequest({
+      header: jest.fn((name: string) => (
+        name === 'Origin' ? 'https://app.abroad.finance' : undefined
+      )) as unknown as Request['header'],
+      headers: { authorization: 'Bearer jwt-token' },
+    })
+
+    await expect(expressAuthentication(req, 'ApiKeyAuth')).rejects.toThrow(
+      'Bearer token takes precedence over client domain',
+    )
+    expect(partnerService.getPartnerFromClientDomain).not.toHaveBeenCalled()
+  })
+
+  it('gives an explicit API key precedence over a bearer token', async () => {
+    const req = buildRequest({
+      header: jest.fn((name: string) => (
+        name === 'X-API-Key' ? 'api-key-123' : undefined
+      )) as unknown as Request['header'],
+      headers: { authorization: 'Bearer jwt-token' },
+    })
+
+    await expect(expressAuthentication(req, 'BearerAuth')).rejects.toThrow(
+      'API key takes precedence over Bearer token',
+    )
+    expect(partnerService.authenticateBearerToken).not.toHaveBeenCalled()
   })
 
   it('throws for unsupported security schemes', async () => {

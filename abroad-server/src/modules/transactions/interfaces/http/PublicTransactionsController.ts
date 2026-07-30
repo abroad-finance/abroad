@@ -12,6 +12,7 @@ import { CryptoAssetConfigService } from '../../../payments/application/CryptoAs
 import { ExpiredTransactionService, type ExpiredTransactionsSummary } from '../../application/ExpiredTransactionService'
 import { StellarOrphanRefundService } from '../../application/StellarOrphanRefundService'
 import { CheckUnprocessedStellarResponse, StellarReconciliationService } from '../../application/StellarReconciliationService'
+import { TransactionWebhookRouter } from '../../application/TransactionWebhookRouter'
 
 @Route('transactions')
 export class PublicTransactionsController extends Controller {
@@ -22,6 +23,8 @@ export class PublicTransactionsController extends Controller {
     @inject(TYPES.IDatabaseClientProvider) private prismaClientProvider: IDatabaseClientProvider,
     @inject(TYPES.ILogger) private readonly logger: ILogger,
     @inject(TYPES.IOutboxDispatcher) outboxDispatcher: OutboxDispatcher,
+    @inject(TransactionWebhookRouter)
+    transactionWebhookRouter: TransactionWebhookRouter,
     @inject(TYPES.IDepositVerifierRegistry) depositVerifierRegistry: IDepositVerifierRegistry,
     @inject(TYPES.StellarOrphanRefundService) orphanRefundService: StellarOrphanRefundService,
     @inject(CryptoAssetConfigService) assetConfigService: CryptoAssetConfigService,
@@ -31,6 +34,7 @@ export class PublicTransactionsController extends Controller {
     this.expiredTransactionService = new ExpiredTransactionService(
       prismaClientProvider,
       outboxDispatcher,
+      transactionWebhookRouter,
       this.logger,
     )
     this.stellarReconciliationService = new StellarReconciliationService(
