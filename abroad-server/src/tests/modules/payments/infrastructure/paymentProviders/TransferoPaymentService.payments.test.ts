@@ -131,6 +131,42 @@ describe('TransferoPaymentService', () => {
     )
   })
 
+  it('accepts an already-canonical Brazilian E.164 phone key without adding another country code', async () => {
+    const { service, ultraClient } = createService()
+    ultraClient.post.mockResolvedValue(withdrawalResponse())
+
+    await expect(service.sendPayment({
+      account: '+55 21 98765-4321',
+      id: 'transaction-e164-phone',
+      value: 10,
+    })).resolves.toMatchObject({ success: true })
+
+    expect(ultraClient.post).toHaveBeenCalledWith(
+      '/api/v1/pix/withdrawals',
+      expect.objectContaining({
+        pixKey: '+5521987654321',
+        pixKeyType: 'PHONE',
+      }),
+      'abroad:pix-withdrawal:transaction-e164-phone',
+    )
+  })
+
+  it.each([
+    ['21 98765-4321', true],
+    ['0 21 98765-4321', true],
+    ['+55 21 98765-4321', true],
+    ['+1 21 98765-4321', false],
+    ['+55 20 98765-4321', false],
+    ['+55 21 18765-4321', false],
+  ] as const)(
+    'validates Brazilian phone PIX key %s as %s',
+    async (account, expected) => {
+      const { service } = createService()
+
+      await expect(service.verifyAccount({ account })).resolves.toBe(expected)
+    },
+  )
+
   it.each([
     ['user@example.com', 'EMAIL', 'user@example.com'],
     ['529.982.247-25', 'CPF', '52998224725'],

@@ -401,11 +401,15 @@ export class TransferoPaymentService implements IPaymentService {
   }
 
   private normalizeBrazilPhoneNumber(input: string): null | string {
-    const digits = input.replace(/\D+/g, '')
+    const trimmed = input.trim()
+    const digits = trimmed.replace(/\D+/g, '')
     if (!digits) return null
-    if (this.isTollFreeNumber(digits)) return digits
 
-    const normalized = this.removeCarrierPrefix(digits)
+    const domesticDigits = this.removeBrazilCountryCode(trimmed, digits)
+    if (domesticDigits === null) return null
+    if (this.isTollFreeNumber(domesticDigits)) return domesticDigits
+
+    const normalized = this.removeCarrierPrefix(domesticDigits)
     if (!this.hasValidLength(normalized)) return null
 
     const ddd = normalized.slice(0, 2)
@@ -418,6 +422,11 @@ export class TransferoPaymentService implements IPaymentService {
   private readPositiveInteger(envKey: string, fallback: number): number {
     const parsed = Number(process.env[envKey])
     return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : fallback
+  }
+
+  private removeBrazilCountryCode(input: string, digits: string): null | string {
+    if (!input.startsWith('+')) return digits
+    return digits.startsWith('55') ? digits.slice(2) : null
   }
 
   private removeCarrierPrefix(digits: string): string {
