@@ -3,6 +3,7 @@ import { inject, injectable } from 'inversify'
 import { TYPES } from '../../../app/container/types'
 import { createScopedLogger, ScopedLogger } from '../../../core/logging/scopedLogger'
 import { ILogger } from '../../../core/logging/types'
+import { IQueueHandler, QueueName } from '../../../platform/messaging/queues'
 import { BridgeSweepService } from './BridgeSweepService'
 
 type BridgeSweepWorkerOptions = {
@@ -11,9 +12,10 @@ type BridgeSweepWorkerOptions = {
 
 /**
  * Periodically runs the bridge sweep. The cadence only affects how long pooled
- * USDC waits to physically bridge — the user-facing flow already settled
- * against the float, so this is a treasury-side background job. Single-instance
- * (no concurrent sweep); a tick failure is logged and never breaks the loop.
+ * USDC waits to physically bridge. The customer payout has already completed,
+ * while the flow's source-side Ultra reconciliation may remain WAITING until
+ * the bridged deposit is consumed. Single-instance (no concurrent sweep); a
+ * tick failure is logged and never breaks the loop.
  */
 @injectable()
 export class BridgeSweepWorker {
@@ -24,6 +26,7 @@ export class BridgeSweepWorker {
 
   public constructor(
     @inject(BridgeSweepService) private readonly sweepService: BridgeSweepService,
+    @inject(TYPES.IQueueHandler) private readonly queueHandler: IQueueHandler,
     @inject(TYPES.ILogger) baseLogger: ILogger,
     options: BridgeSweepWorkerOptions = {},
   ) {
@@ -46,6 +49,20 @@ export class BridgeSweepWorker {
     }
     catch (error) {
       this.logger.error('Bridge sweep tick failed', error)
+    }
+
+    try {
+      // Provider webhooks are the fast path. This periodic signal closes the
+      // delivery-order gap where a Polygon deposit is observed before its
+      // conversion step has persisted WAITING state, and also recovers a lost
+      // webhook without creating another trade or bridge obligation.
+      await this.queueHandler.postMessage(
+        QueueName.EXCHANGE_BALANCE_UPDATED,
+        { provider: 'transfero' },
+      )
+    }
+    catch (error) {
+      this.logger.error('Unable to publish periodic Transfero reconciliation signal', error)
     }
   }
 

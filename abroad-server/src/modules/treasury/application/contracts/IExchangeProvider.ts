@@ -12,18 +12,32 @@ export type ExchangeFailureCode
 export type ExchangeNetwork = 'POLYGON' | BlockchainNetwork
 
 export type ExchangeOperationResult
-  = | { code?: ExchangeFailureCode, reason?: string, success: false }
-    | { success: true }
+  = | { code?: ExchangeFailureCode, outcome: 'failed', reason?: string }
+    | {
+      outcome: 'pending'
+      reconciliation: ExchangeSettlementReconciliation
+    }
+    | {
+      outcome: 'succeeded'
+      reconciliation?: ExchangeSettlementReconciliation
+    }
 
 export type ExchangeProviderCapability = {
   blockchain?: BlockchainNetwork
   targetCurrency: TargetCurrency
 }
 
+export type ExchangeSettlementReconciliation = {
+  nextSettlementAttempt: number
+  providerOperationId: string
+  settledSourceAmount: string
+}
+
 export interface IExchangeProvider {
   readonly capability?: ExchangeProviderCapability
   createMarketOrder(params: {
     operationId: string
+    reconciliation?: ExchangeSettlementReconciliation
     sourceAmount: number
     sourceCurrency: CryptoCurrency
     targetCurrency: TargetCurrency

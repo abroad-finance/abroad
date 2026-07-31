@@ -18,9 +18,10 @@ const enqueueBridgeConfigSchema = z.object({
 /**
  * Records the USDC a flow deposited at Binance as a PENDING bridge leg, to be
  * swept to Transfero in batches that clear the per-withdrawal minimum. The
- * user-facing settlement (the Transfero convert against the float) has already
- * happened, so this step does NO external call — it cannot hit the 5-USDC floor
- * and never parks the flow. Idempotent on (transactionId, stepOrder).
+ * customer payout has already happened and the Transfero conversion follows
+ * this accounting step, so this step does NO external call — it cannot hit the
+ * 5-USDC floor and never parks the flow. Idempotent on
+ * (transactionId, stepOrder).
  */
 @injectable()
 export class EnqueueBridgeStepExecutor implements FlowStepExecutor {

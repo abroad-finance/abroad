@@ -100,6 +100,16 @@ export const transferoUltraHoldingsSettlementResponseSchema = z.object({
   swept: transferoUltraDecimalSchema,
 }).loose()
 
+export const transferoUltraOtcTradeDetailResponseSchema = z.object({
+  trade: z.object({
+    amountUsd: transferoUltraDecimalSchema,
+    cryptoReceived: transferoUltraDecimalSchema,
+    currency: z.enum(['USDC', 'USDT']),
+    id: z.string().uuid(),
+    side: z.enum(['BUY', 'SELL']),
+  }).loose(),
+}).loose()
+
 const transferoUltraVaultAddressSchema = z.object({
   address: z.string().min(1),
   asset: z.string().min(1),

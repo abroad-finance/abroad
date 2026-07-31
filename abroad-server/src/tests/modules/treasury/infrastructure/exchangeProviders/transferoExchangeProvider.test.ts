@@ -33,6 +33,16 @@ const createBalanceResponse = (available: string) => [{
   processing: '0',
 }]
 
+const createTradeDetail = (cryptoReceived: string) => ({
+  trade: {
+    amountUsd: '5',
+    cryptoReceived,
+    currency: 'USDC',
+    id: TRADE_ID,
+    side: 'SELL',
+  },
+})
+
 const createProvider = () => {
   const ultraClient = createUltraClient()
   ultraClient.get.mockResolvedValue(createBalanceResponse('5'))
@@ -149,6 +159,10 @@ describe('TransferoExchangeProvider', () => {
 
   it('creates, confirms, and fully settles a D0 SELL session from holdings', async () => {
     const { lockManager, provider, ultraClient } = createProvider()
+    ultraClient.get
+      .mockResolvedValueOnce(createBalanceResponse('5'))
+      .mockResolvedValueOnce(createTradeDetail('0'))
+      .mockResolvedValueOnce(createTradeDetail('5.00000000'))
     ultraClient.post
       .mockResolvedValueOnce(otcSession)
       .mockResolvedValueOnce({ swept: '5.00000000' })
@@ -162,7 +176,14 @@ describe('TransferoExchangeProvider', () => {
       sourceAmount: 5,
       sourceCurrency: CryptoCurrency.USDC,
       targetCurrency: TargetCurrency.BRL,
-    })).resolves.toEqual({ success: true })
+    })).resolves.toEqual({
+      outcome: 'succeeded',
+      reconciliation: {
+        nextSettlementAttempt: 1,
+        providerOperationId: TRADE_ID,
+        settledSourceAmount: '5.00000000',
+      },
+    })
 
     expect(lockManager.withLock).toHaveBeenCalledWith(
       'transfero-ultra:otc-sale',
@@ -195,7 +216,7 @@ describe('TransferoExchangeProvider', () => {
       2,
       `/api/v1/otc/trades/${TRADE_ID}/settle-from-holdings`,
       undefined,
-      'abroad:otc:transaction-1:exchange:6:settlement',
+      'abroad:otc:transaction-1:exchange:6:settlement:0',
     )
   })
 
@@ -210,8 +231,8 @@ describe('TransferoExchangeProvider', () => {
       targetCurrency: TargetCurrency.BRL,
     })).resolves.toEqual({
       code: 'insufficient_balance',
+      outcome: 'failed',
       reason: 'transfero_ultra_insufficient_available_holdings',
-      success: false,
     })
 
     expect(ultraClient.post).not.toHaveBeenCalled()
@@ -229,16 +250,20 @@ describe('TransferoExchangeProvider', () => {
       targetCurrency: TargetCurrency.BRL,
     })).resolves.toEqual({
       code: 'permanent',
+      outcome: 'failed',
       reason: 'transfero_ultra_balance_asset_missing:USDC',
-      success: false,
     })
 
     expect(ultraClient.post).not.toHaveBeenCalled()
     expect(ultraClient.patch).not.toHaveBeenCalled()
   })
 
-  it('fails closed when holdings do not settle the complete requested amount', async () => {
+  it('journals a partial holdings settlement for a later reconciliation attempt', async () => {
     const { provider, ultraClient } = createProvider()
+    ultraClient.get
+      .mockResolvedValueOnce(createBalanceResponse('5'))
+      .mockResolvedValueOnce(createTradeDetail('0'))
+      .mockResolvedValueOnce(createTradeDetail('4.90000000'))
     ultraClient.post
       .mockResolvedValueOnce(otcSession)
       .mockResolvedValueOnce({ swept: '4.90000000' })
@@ -253,9 +278,161 @@ describe('TransferoExchangeProvider', () => {
       sourceCurrency: CryptoCurrency.USDC,
       targetCurrency: TargetCurrency.BRL,
     })).resolves.toEqual({
+      outcome: 'pending',
+      reconciliation: {
+        nextSettlementAttempt: 1,
+        providerOperationId: TRADE_ID,
+        settledSourceAmount: '4.90000000',
+      },
+    })
+  })
+
+  it('reconciles the same partially settled trade with a new logical attempt', async () => {
+    const { provider, ultraClient } = createProvider()
+    ultraClient.get
+      .mockResolvedValueOnce(createTradeDetail('4.90000000'))
+      .mockResolvedValueOnce(createTradeDetail('5.00000000'))
+    ultraClient.post.mockResolvedValueOnce({ swept: '0.10000000' })
+
+    await expect(provider.createMarketOrder({
+      operationId: 'transaction-partial:exchange:6',
+      reconciliation: {
+        nextSettlementAttempt: 1,
+        providerOperationId: TRADE_ID,
+        settledSourceAmount: '4.90000000',
+      },
+      sourceAmount: 5,
+      sourceCurrency: CryptoCurrency.USDC,
+      targetCurrency: TargetCurrency.BRL,
+    })).resolves.toEqual({
+      outcome: 'succeeded',
+      reconciliation: {
+        nextSettlementAttempt: 2,
+        providerOperationId: TRADE_ID,
+        settledSourceAmount: '5.00000000',
+      },
+    })
+
+    expect(ultraClient.patch).not.toHaveBeenCalled()
+    expect(ultraClient.post).toHaveBeenCalledWith(
+      `/api/v1/otc/trades/${TRADE_ID}/settle-from-holdings`,
+      undefined,
+      'abroad:otc:transaction-partial:exchange:6:settlement:1',
+    )
+  })
+
+  it('accepts automatic deposit matching observed before the next settlement attempt', async () => {
+    const { provider, ultraClient } = createProvider()
+    ultraClient.get.mockResolvedValueOnce(createTradeDetail('5.00000000'))
+
+    await expect(provider.createMarketOrder({
+      operationId: 'transaction-auto-match:exchange:6',
+      reconciliation: {
+        nextSettlementAttempt: 1,
+        providerOperationId: TRADE_ID,
+        settledSourceAmount: '4.90000000',
+      },
+      sourceAmount: 5,
+      sourceCurrency: CryptoCurrency.USDC,
+      targetCurrency: TargetCurrency.BRL,
+    })).resolves.toEqual({
+      outcome: 'succeeded',
+      reconciliation: {
+        nextSettlementAttempt: 1,
+        providerOperationId: TRADE_ID,
+        settledSourceAmount: '5.00000000',
+      },
+    })
+
+    expect(ultraClient.post).not.toHaveBeenCalled()
+    expect(ultraClient.patch).not.toHaveBeenCalled()
+  })
+
+  it('keeps a booked trade pending when its detail is temporarily unavailable', async () => {
+    const { provider, ultraClient } = createProvider()
+    ultraClient.get.mockRejectedValueOnce(new TransferoUltraError({
+      code: 'retriable',
+      message: 'Transfero Ultra HTTP_503',
+      status: 503,
+    }))
+    const reconciliation = {
+      nextSettlementAttempt: 1,
+      providerOperationId: TRADE_ID,
+      settledSourceAmount: '4.90000000',
+    }
+
+    await expect(provider.createMarketOrder({
+      operationId: 'transaction-detail-retry:exchange:6',
+      reconciliation,
+      sourceAmount: 5,
+      sourceCurrency: CryptoCurrency.USDC,
+      targetCurrency: TargetCurrency.BRL,
+    })).resolves.toEqual({
+      outcome: 'pending',
+      reconciliation,
+    })
+
+    expect(ultraClient.post).not.toHaveBeenCalled()
+    expect(ultraClient.patch).not.toHaveBeenCalled()
+  })
+
+  it('fails closed before mutation when trade detail does not match the journal', async () => {
+    const { provider, ultraClient } = createProvider()
+    ultraClient.get.mockResolvedValueOnce({
+      trade: {
+        ...createTradeDetail('4.90000000').trade,
+        amountUsd: '6',
+      },
+    })
+
+    await expect(provider.createMarketOrder({
+      operationId: 'transaction-mismatch:exchange:6',
+      reconciliation: {
+        nextSettlementAttempt: 1,
+        providerOperationId: TRADE_ID,
+        settledSourceAmount: '4.90000000',
+      },
+      sourceAmount: 5,
+      sourceCurrency: CryptoCurrency.USDC,
+      targetCurrency: TargetCurrency.BRL,
+    })).resolves.toEqual({
       code: 'permanent',
-      reason: 'transfero_ultra_partial_holdings_settlement:4.90000000',
-      success: false,
+      outcome: 'failed',
+      reason: 'transfero_ultra_trade_reconciliation_mismatch:amount',
+    })
+
+    expect(ultraClient.post).not.toHaveBeenCalled()
+    expect(ultraClient.patch).not.toHaveBeenCalled()
+  })
+
+  it('reconciles an ambiguous settlement response from authoritative trade detail', async () => {
+    const { provider, ultraClient } = createProvider()
+    ultraClient.get
+      .mockResolvedValueOnce(createTradeDetail('4.90000000'))
+      .mockResolvedValueOnce(createTradeDetail('5.00000000'))
+    ultraClient.post.mockRejectedValueOnce(new TransferoUltraError({
+      code: 'retriable',
+      message: 'Transfero Ultra HTTP_503',
+      status: 503,
+    }))
+
+    await expect(provider.createMarketOrder({
+      operationId: 'transaction-ambiguous:exchange:6',
+      reconciliation: {
+        nextSettlementAttempt: 1,
+        providerOperationId: TRADE_ID,
+        settledSourceAmount: '4.90000000',
+      },
+      sourceAmount: 5,
+      sourceCurrency: CryptoCurrency.USDC,
+      targetCurrency: TargetCurrency.BRL,
+    })).resolves.toEqual({
+      outcome: 'succeeded',
+      reconciliation: {
+        nextSettlementAttempt: 2,
+        providerOperationId: TRADE_ID,
+        settledSourceAmount: '5.00000000',
+      },
     })
   })
 
@@ -273,8 +450,8 @@ describe('TransferoExchangeProvider', () => {
       targetCurrency: TargetCurrency.BRL,
     })).resolves.toEqual({
       code: 'permanent',
+      outcome: 'failed',
       reason: 'transfero_ultra_otc_session_mismatch:amount',
-      success: false,
     })
     expect(ultraClient.patch).not.toHaveBeenCalled()
     expect(ultraClient.post).toHaveBeenCalledTimes(1)
@@ -297,8 +474,8 @@ describe('TransferoExchangeProvider', () => {
       targetCurrency: TargetCurrency.BRL,
     })).resolves.toEqual({
       code: 'retriable',
+      outcome: 'failed',
       reason: 'Transfero Ultra HTTP_503',
-      success: false,
     })
     await expect(provider.createMarketOrder({
       operationId: 'transaction-schema',
@@ -307,8 +484,8 @@ describe('TransferoExchangeProvider', () => {
       targetCurrency: TargetCurrency.BRL,
     })).resolves.toEqual({
       code: 'permanent',
+      outcome: 'failed',
       reason: 'transfero_ultra_otc_schema_mismatch',
-      success: false,
     })
   })
 })

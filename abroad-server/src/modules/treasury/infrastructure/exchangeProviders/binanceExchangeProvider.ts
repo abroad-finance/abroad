@@ -57,8 +57,8 @@ export class BinanceExchangeProvider implements IExchangeProvider {
 
   createMarketOrder: IExchangeProvider['createMarketOrder'] = async (): Promise<ExchangeOperationResult> => ({
     code: 'permanent',
+    outcome: 'failed',
     reason: 'Binance market orders are not supported in this service.',
-    success: false,
   })
 
   /**

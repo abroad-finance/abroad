@@ -29,7 +29,7 @@ const buildExchangeProvider = (
   blockchain?: BlockchainNetwork,
 ): IExchangeProvider => ({
   capability: { blockchain, targetCurrency },
-  createMarketOrder: async () => ({ success: true }),
+  createMarketOrder: async () => ({ outcome: 'succeeded' }),
   exchangePercentageFee: 0.01,
   getExchangeAddress: async () => ({ address: `${id}-addr`, success: true }),
   getExchangeRate: async () => 1,

@@ -43,9 +43,11 @@ const STALE_SUBMITTED_MS = 60 * 60_000
 
 /**
  * Bridges pooled small-tx USDC across Binance->Transfero Ultra (Polygon). Each flow
- * already settled against the Transfero float; this drains the PENDING legs
- * into ONE withdrawal that clears the per-withdrawal minimum, so amounts that
- * could never withdraw individually settle in bulk.
+ * records its source obligation before conversion; this drains the PENDING
+ * legs into ONE withdrawal that clears the per-withdrawal minimum, so amounts
+ * that could never withdraw individually settle in bulk. A conversion that
+ * only consumed part of the float remains WAITING until Ultra consumes the
+ * bridged source amount.
  *
  * Safety invariants:
  *  - Idempotent: the Binance withdrawOrderId == batch id, so a crash/retry

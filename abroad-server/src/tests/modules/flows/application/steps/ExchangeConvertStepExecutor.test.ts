@@ -43,7 +43,7 @@ const makeExecutor = () => {
   const createMarketOrder = jest.fn<
     ReturnType<IExchangeProvider['createMarketOrder']>,
     Parameters<IExchangeProvider['createMarketOrder']>
-  >(async () => ({ success: true }))
+  >(async () => ({ outcome: 'succeeded' }))
   const transferoProvider: jest.Mocked<Pick<IExchangeProvider, 'createMarketOrder'>> = {
     createMarketOrder,
   }
@@ -362,7 +362,12 @@ describe('ExchangeConvertStepExecutor Transfero venue routing', () => {
 
     expect(result).toEqual({
       outcome: 'succeeded',
-      output: { amount: 10, provider: 'transfero', targetCurrency: 'BRL' },
+      output: {
+        amount: 10,
+        provider: 'transfero',
+        sourceCurrency: 'USDC',
+        targetCurrency: 'BRL',
+      },
     })
     expect(exchangeProviderFactory.getExchangeProviderById).toHaveBeenCalledWith('transfero')
     expect(exchangeProviderFactory.getExchangeProvider).not.toHaveBeenCalled()
@@ -379,8 +384,8 @@ describe('ExchangeConvertStepExecutor Transfero venue routing', () => {
     const { executor, transferoProvider } = makeExecutor()
     transferoProvider.createMarketOrder.mockResolvedValueOnce({
       code: 'insufficient_balance',
+      outcome: 'failed',
       reason: 'transfero_ultra_insufficient_available_holdings',
-      success: false,
     })
 
     const result = await executor.execute({
@@ -436,7 +441,12 @@ describe('ExchangeConvertStepExecutor Transfero venue routing', () => {
       stepOrder: 6,
     })).resolves.toEqual({
       outcome: 'succeeded',
-      output: { amount: 10, provider: 'transfero', targetCurrency: 'BRL' },
+      output: {
+        amount: 10,
+        provider: 'transfero',
+        sourceCurrency: 'USDC',
+        targetCurrency: 'BRL',
+      },
     })
 
     expect(transferoProvider.createMarketOrder).toHaveBeenCalledTimes(1)
@@ -446,6 +456,139 @@ describe('ExchangeConvertStepExecutor Transfero venue routing', () => {
       sourceCurrency: 'USDC',
       targetCurrency: 'BRL',
     })
+  })
+
+  it('persists and resumes an Ultra partial-settlement journal', async () => {
+    const { executor, transferoProvider } = makeExecutor()
+    const reconciliation = {
+      nextSettlementAttempt: 1,
+      providerOperationId: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
+      settledSourceAmount: '9.90000000',
+    }
+    transferoProvider.createMarketOrder
+      .mockResolvedValueOnce({
+        outcome: 'pending',
+        reconciliation,
+      })
+      .mockResolvedValueOnce({
+        outcome: 'succeeded',
+        reconciliation: {
+          ...reconciliation,
+          nextSettlementAttempt: 2,
+          settledSourceAmount: '10.00000000',
+        },
+      })
+    const config = {
+      provider: 'transfero',
+      sourceCurrency: 'USDC',
+      targetCurrency: 'BRL',
+    }
+    const context = {
+      sourceAmount: 10,
+      transactionId: 'transaction-partial',
+    }
+
+    await expect(executor.execute({
+      config,
+      runtime: {
+        context,
+        stepOutputs: new Map(),
+      } as never,
+      stepOrder: 6,
+    })).resolves.toEqual({
+      correlation: { provider: 'transfero' },
+      outcome: 'waiting',
+      output: {
+        amount: 10,
+        provider: 'transfero',
+        reconciliation,
+        sourceCurrency: 'USDC',
+        targetCurrency: 'BRL',
+      },
+    })
+
+    await expect(executor.handleSignal({
+      config,
+      runtime: {
+        context,
+        stepOutputs: new Map([
+          [6, {
+            amount: 10,
+            provider: 'transfero',
+            reconciliation,
+            sourceCurrency: 'USDC',
+            targetCurrency: 'BRL',
+          }],
+        ]),
+      } as never,
+      signal: {
+        correlationKeys: { provider: 'transfero' },
+        eventType: 'exchange.balance.updated',
+        payload: { provider: 'transfero' },
+        transactionId: 'transaction-partial',
+      },
+      stepOrder: 6,
+    })).resolves.toEqual({
+      outcome: 'succeeded',
+      output: {
+        amount: 10,
+        provider: 'transfero',
+        reconciliation: {
+          ...reconciliation,
+          nextSettlementAttempt: 2,
+          settledSourceAmount: '10.00000000',
+        },
+        sourceCurrency: 'USDC',
+        targetCurrency: 'BRL',
+      },
+    })
+
+    expect(transferoProvider.createMarketOrder).toHaveBeenNthCalledWith(2, {
+      operationId: 'transaction-partial:exchange:6',
+      reconciliation,
+      sourceAmount: 10,
+      sourceCurrency: 'USDC',
+      targetCurrency: 'BRL',
+    })
+  })
+
+  it('fails closed before provider access when persisted reconciliation is invalid', async () => {
+    const { executor, transferoProvider } = makeExecutor()
+
+    await expect(executor.handleSignal({
+      config: {
+        provider: 'transfero',
+        sourceCurrency: 'USDC',
+        targetCurrency: 'BRL',
+      },
+      runtime: {
+        context: {
+          sourceAmount: 10,
+          transactionId: 'transaction-invalid-journal',
+        },
+        stepOutputs: new Map([
+          [6, {
+            reconciliation: {
+              nextSettlementAttempt: -1,
+              providerOperationId: 'not-a-trade-id',
+              settledSourceAmount: 'NaN',
+            },
+          }],
+        ]),
+      } as never,
+      signal: {
+        correlationKeys: { provider: 'transfero' },
+        eventType: 'exchange.balance.updated',
+        payload: { provider: 'transfero' },
+        transactionId: 'transaction-invalid-journal',
+      },
+      stepOrder: 6,
+    })).resolves.toEqual({
+      error: 'Transfero conversion reconciliation state is invalid',
+      outcome: 'failed',
+    })
+
+    expect(transferoProvider.createMarketOrder).not.toHaveBeenCalled()
   })
 
   it('fails closed when a waiting conversion receives an unrelated signal', async () => {

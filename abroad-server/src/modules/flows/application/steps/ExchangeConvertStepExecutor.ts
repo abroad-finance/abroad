@@ -8,6 +8,7 @@ import { TYPES } from '../../../../app/container/types'
 import { createScopedLogger, ScopedLogger } from '../../../../core/logging/scopedLogger'
 import { ILogger } from '../../../../core/logging/types'
 import { ISecretManager, Secrets } from '../../../../platform/secrets/ISecretManager'
+import { ExchangeSettlementReconciliation } from '../../../treasury/application/contracts/IExchangeProvider'
 import { EXCHANGE_PROVIDER_IDS, IExchangeProviderFactory } from '../../../treasury/application/contracts/IExchangeProviderFactory'
 import { AmountSource, amountSourceSchema, resolveAmount } from '../flowAmountResolver'
 import { FlowSignalInput, FlowStepExecutionResult, FlowStepExecutor, FlowStepRuntimeContext } from '../flowTypes'
@@ -101,6 +102,12 @@ const exchangeConvertConfigSchema = z.object({
   toAsset: z.string().min(2).optional(),
 })
 
+const exchangeSettlementReconciliationSchema = z.object({
+  nextSettlementAttempt: z.number().int().nonnegative(),
+  providerOperationId: z.string().uuid(),
+  settledSourceAmount: z.string().regex(/^(?:0|[1-9]\d*)(?:\.\d+)?$/),
+}).strict()
+
 type ExchangeConvertConfig = z.infer<typeof exchangeConvertConfigSchema>
 
 @injectable()
@@ -143,37 +150,70 @@ export class ExchangeConvertStepExecutor implements FlowStepExecutor {
 
       try {
         const exchangeProvider = this.exchangeProviderFactory.getExchangeProviderById(config.provider)
+        const persistedOutput = runtime.stepOutputs?.get(params.stepOrder)
+        let reconciliation: ExchangeSettlementReconciliation | undefined
+        if (persistedOutput?.reconciliation !== undefined) {
+          const parsedReconciliation = exchangeSettlementReconciliationSchema.safeParse(
+            persistedOutput.reconciliation,
+          )
+          if (!parsedReconciliation.success) {
+            return {
+              error: 'Transfero conversion reconciliation state is invalid',
+              outcome: 'failed',
+            }
+          }
+          reconciliation = parsedReconciliation.data
+        }
 
         const result = await exchangeProvider.createMarketOrder({
           operationId: `${runtime.context.transactionId}:exchange:${params.stepOrder}`,
+          ...(reconciliation ? { reconciliation } : {}),
           sourceAmount: amount,
           sourceCurrency: config.sourceCurrency as Parameters<typeof exchangeProvider.createMarketOrder>[0]['sourceCurrency'],
           targetCurrency: config.targetCurrency,
         })
 
-        if (!result.success) {
-          if (result.code === 'insufficient_balance') {
+        const buildOutput = (
+          settlementReconciliation?: ExchangeSettlementReconciliation,
+        ): Record<string, unknown> => ({
+          amount,
+          provider: 'transfero',
+          ...(settlementReconciliation
+            ? { reconciliation: settlementReconciliation }
+            : {}),
+          sourceCurrency: config.sourceCurrency,
+          targetCurrency: config.targetCurrency,
+        })
+
+        if (result.outcome === 'failed') {
+          if (
+            result.code === 'insufficient_balance'
+            || result.code === 'retriable'
+          ) {
             this.logger.info('Transfero conversion waiting for available holdings', {
               amount,
+              code: result.code,
               sourceCurrency: config.sourceCurrency,
             })
             return {
               correlation: { provider: 'transfero' },
               outcome: 'waiting',
-              output: {
-                amount,
-                provider: 'transfero',
-                sourceCurrency: config.sourceCurrency,
-                targetCurrency: config.targetCurrency,
-              },
+              output: buildOutput(reconciliation),
             }
           }
           return { error: result.reason ?? result.code ?? 'transfero_convert_failed', outcome: 'failed' }
         }
+        if (result.outcome === 'pending') {
+          return {
+            correlation: { provider: 'transfero' },
+            outcome: 'waiting',
+            output: buildOutput(result.reconciliation),
+          }
+        }
 
         return {
           outcome: 'succeeded',
-          output: { amount, provider: 'transfero', targetCurrency: config.targetCurrency },
+          output: buildOutput(result.reconciliation),
         }
       }
       catch (error) {

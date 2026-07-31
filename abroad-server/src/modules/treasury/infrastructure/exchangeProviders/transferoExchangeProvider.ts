@@ -1,7 +1,7 @@
 import { CryptoCurrency, TargetCurrency } from '@prisma/client'
 import { inject, injectable } from 'inversify'
 import { createHash } from 'node:crypto'
-import { ZodError } from 'zod'
+import { z, ZodError } from 'zod'
 
 import { TYPES } from '../../../../app/container/types'
 import { createScopedLogger, ScopedLogger } from '../../../../core/logging/scopedLogger'
@@ -10,10 +10,12 @@ import { ILockManager } from '../../../../platform/cacheLock/ILockManager'
 import { TransferoUltraClient, TransferoUltraError } from '../../../transfero/infrastructure/TransferoUltraClient'
 import {
   transferoUltraBalanceResponseSchema,
+  transferoUltraDecimalSchema,
   transferoUltraHoldingsSettlementResponseSchema,
   transferoUltraOtcConfirmationResponseSchema,
   transferoUltraOtcPricesResponseSchema,
   transferoUltraOtcSessionResponseSchema,
+  transferoUltraOtcTradeDetailResponseSchema,
   transferoUltraVaultAddressesResponseSchema,
 } from '../../../transfero/infrastructure/transferoUltraSchemas'
 import {
@@ -21,14 +23,17 @@ import {
   ExchangeFailureCode,
   ExchangeOperationResult,
   ExchangeProviderCapability,
+  ExchangeSettlementReconciliation,
   IExchangeProvider,
 } from '../../application/contracts/IExchangeProvider'
 
 const ULTRA_SETTLEMENT = 'D0'
 const ULTRA_SIDE = 'SELL'
+const ULTRA_TRADE_ID_SCHEMA = z.string().uuid()
 const ULTRA_QUOTE_VALIDITY_SECONDS = 10
 const ULTRA_SETTLEMENT_LOCK_KEY = 'transfero-ultra:otc-sale'
 const ULTRA_SETTLEMENT_LOCK_TIMEOUT_MS = 60_000
+const ULTRA_MAX_SETTLEMENT_ATTEMPTS = 1_000_000
 const ULTRA_PRODUCTION_POLYGON_NETWORKS = new Set([
   'MAINNET',
   'POLYGON',
@@ -36,8 +41,15 @@ const ULTRA_PRODUCTION_POLYGON_NETWORKS = new Set([
 ])
 
 type AvailableHoldingsResult
-  = | Extract<ExchangeOperationResult, { success: false }>
-    | { available: number, success: true }
+  = | ExchangeOperationFailure
+    | { available: number, outcome: 'succeeded' }
+type ExchangeOperationFailure = Extract<ExchangeOperationResult, { outcome: 'failed' }>
+
+type ExchangeOperationPending = Extract<ExchangeOperationResult, { outcome: 'pending' }>
+
+type TradeSettlementReadResult
+  = | { failure: ExchangeOperationFailure, success: false }
+    | { settledSourceAmount: string, success: true }
 
 type UltraSaleCurrency = Extract<CryptoCurrency, 'USDC' | 'USDT'>
 
@@ -61,6 +73,7 @@ export class TransferoExchangeProvider implements IExchangeProvider {
 
   public async createMarketOrder(params: {
     operationId: string
+    reconciliation?: ExchangeSettlementReconciliation
     sourceAmount: number
     sourceCurrency: CryptoCurrency
     targetCurrency: TargetCurrency
@@ -81,6 +94,16 @@ export class TransferoExchangeProvider implements IExchangeProvider {
       return this.buildOperationFailure(
         'validation',
         `transfero_ultra_unsupported_sale_currency:${params.sourceCurrency}`,
+      )
+    }
+    const reconciliationMismatch = this.describeReconciliationMismatch(
+      params.reconciliation,
+      params.sourceAmount,
+    )
+    if (reconciliationMismatch) {
+      return this.buildOperationFailure(
+        'validation',
+        `transfero_ultra_reconciliation_invalid:${reconciliationMismatch}`,
       )
     }
 
@@ -224,8 +247,38 @@ export class TransferoExchangeProvider implements IExchangeProvider {
   private buildOperationFailure(
     code: ExchangeFailureCode,
     reason: string,
-  ): Extract<ExchangeOperationResult, { success: false }> {
-    return { code, reason, success: false }
+  ): ExchangeOperationFailure {
+    return { code, outcome: 'failed', reason }
+  }
+
+  private buildPendingReconciliation(params: {
+    nextSettlementAttempt: number
+    providerOperationId: string
+    settledSourceAmount: string
+  }): ExchangeOperationPending {
+    return {
+      outcome: 'pending',
+      reconciliation: {
+        nextSettlementAttempt: params.nextSettlementAttempt,
+        providerOperationId: params.providerOperationId,
+        settledSourceAmount: params.settledSourceAmount,
+      },
+    }
+  }
+
+  private buildSuccessfulReconciliation(params: {
+    nextSettlementAttempt: number
+    providerOperationId: string
+    settledSourceAmount: string
+  }): Extract<ExchangeOperationResult, { outcome: 'succeeded' }> {
+    return {
+      outcome: 'succeeded',
+      reconciliation: {
+        nextSettlementAttempt: params.nextSettlementAttempt,
+        providerOperationId: params.providerOperationId,
+        settledSourceAmount: params.settledSourceAmount,
+      },
+    }
   }
 
   private coversRequestedAmount(actualAmount: number | string, requestedAmount: number): boolean {
@@ -241,12 +294,24 @@ export class TransferoExchangeProvider implements IExchangeProvider {
 
   private async createMarketOrderWithLock(params: {
     operationId: string
+    reconciliation?: ExchangeSettlementReconciliation
     sourceAmount: number
     sourceCurrency: UltraSaleCurrency
     targetCurrency: TargetCurrency
   }): Promise<ExchangeOperationResult> {
+    if (params.reconciliation) {
+      return this.reconcileBookedTrade({
+        nextSettlementAttempt: params.reconciliation.nextSettlementAttempt,
+        operationId: params.operationId,
+        providerOperationId: params.reconciliation.providerOperationId,
+        requestedAmount: params.sourceAmount,
+        settledSourceAmount: params.reconciliation.settledSourceAmount,
+        sourceCurrency: params.sourceCurrency,
+      })
+    }
+
     const holdings = await this.readAvailableHoldings(params.sourceCurrency)
-    if (!holdings.success) {
+    if (holdings.outcome === 'failed') {
       return holdings
     }
     if (!this.coversRequestedAmount(holdings.available, params.sourceAmount)) {
@@ -299,32 +364,50 @@ export class TransferoExchangeProvider implements IExchangeProvider {
       confirmationResponse,
     )
 
-    const settlementResponse = await this.ultraClient.post(
-      `/api/v1/otc/trades/${encodeURIComponent(confirmation.trade.id)}/settle-from-holdings`,
-      undefined,
-      this.buildIdempotencyKey(params.operationId, 'settlement'),
-    )
-    const settledAmount = transferoUltraHoldingsSettlementResponseSchema
-      .parse(settlementResponse)
-      .swept
-    if (!this.coversRequestedAmount(settledAmount, params.sourceAmount)) {
-      this.logger.error('Transfero Ultra trade was not fully settled from holdings', {
-        requestedAmount: params.sourceAmount,
-        settledAmount,
-        tradeId: confirmation.trade.id,
-      })
-      return this.buildOperationFailure(
-        'permanent',
-        `transfero_ultra_partial_holdings_settlement:${settledAmount}`,
-      )
-    }
-
-    this.logger.info('Transfero Ultra OTC sale settled from holdings', {
+    return this.reconcileBookedTrade({
+      nextSettlementAttempt: 0,
+      operationId: params.operationId,
+      providerOperationId: confirmation.trade.id,
+      requestedAmount: params.sourceAmount,
+      settledSourceAmount: '0',
+      sourceCurrency: params.sourceCurrency,
+    }, {
+      creditSettled: confirmation.creditSettled === true,
       sessionId: session.session_id,
-      settledAmount,
-      tradeId: confirmation.trade.id,
     })
-    return { success: true }
+  }
+
+  private describeReconciliationMismatch(
+    reconciliation: ExchangeSettlementReconciliation | undefined,
+    requestedAmount: number,
+  ): string | undefined {
+    if (!reconciliation) {
+      return undefined
+    }
+    if (
+      !Number.isSafeInteger(reconciliation.nextSettlementAttempt)
+      || reconciliation.nextSettlementAttempt < 0
+      || reconciliation.nextSettlementAttempt > ULTRA_MAX_SETTLEMENT_ATTEMPTS
+    ) {
+      return 'next_settlement_attempt'
+    }
+    if (!ULTRA_TRADE_ID_SCHEMA.safeParse(reconciliation.providerOperationId).success) {
+      return 'provider_operation_id'
+    }
+    if (!transferoUltraDecimalSchema.safeParse(
+      reconciliation.settledSourceAmount,
+    ).success) {
+      return 'settled_source_amount'
+    }
+    const settledSourceAmount = Number(reconciliation.settledSourceAmount)
+    if (
+      !Number.isFinite(settledSourceAmount)
+      || settledSourceAmount < 0
+      || settledSourceAmount > requestedAmount + 1e-8
+    ) {
+      return 'settled_source_amount'
+    }
+    return undefined
   }
 
   private describeSessionMismatch(
@@ -351,6 +434,43 @@ export class TransferoExchangeProvider implements IExchangeProvider {
     return Math.abs(session.amount - request.sourceAmount) > 1e-8
       ? 'amount'
       : undefined
+  }
+
+  private describeTradeDetailMismatch(
+    trade: {
+      amountUsd: string
+      cryptoReceived: string
+      currency: 'USDC' | 'USDT'
+      id: string
+      side: 'BUY' | 'SELL'
+    },
+    expected: {
+      providerOperationId: string
+      requestedAmount: number
+      sourceCurrency: UltraSaleCurrency
+    },
+  ): string | undefined {
+    if (trade.id !== expected.providerOperationId) {
+      return 'trade_id'
+    }
+    if (trade.currency !== expected.sourceCurrency) {
+      return 'currency'
+    }
+    if (trade.side !== ULTRA_SIDE) {
+      return 'side'
+    }
+    if (Math.abs(Number(trade.amountUsd) - expected.requestedAmount) > 1e-8) {
+      return 'amount'
+    }
+    const settledSourceAmount = Number(trade.cryptoReceived)
+    if (
+      !Number.isFinite(settledSourceAmount)
+      || settledSourceAmount < 0
+      || settledSourceAmount > expected.requestedAmount + 1e-8
+    ) {
+      return 'crypto_received'
+    }
+    return undefined
   }
 
   private isProductionPolygonNetwork(network: string): boolean {
@@ -389,12 +509,181 @@ export class TransferoExchangeProvider implements IExchangeProvider {
       )
     }
 
-    return { available, success: true }
+    return { available, outcome: 'succeeded' }
+  }
+
+  private async readTradeSettlement(params: {
+    providerOperationId: string
+    requestedAmount: number
+    sourceCurrency: UltraSaleCurrency
+  }): Promise<TradeSettlementReadResult> {
+    const response = await this.ultraClient.get(
+      `/api/v1/otc/trades/${encodeURIComponent(params.providerOperationId)}/detail`,
+    )
+    const detail = transferoUltraOtcTradeDetailResponseSchema.parse(response)
+    const mismatch = this.describeTradeDetailMismatch(detail.trade, params)
+    if (mismatch) {
+      this.logger.error('Transfero Ultra trade detail did not match reconciliation', {
+        providerOperationId: params.providerOperationId,
+        reason: mismatch,
+      })
+      return {
+        failure: this.buildOperationFailure(
+          'permanent',
+          `transfero_ultra_trade_reconciliation_mismatch:${mismatch}`,
+        ),
+        success: false,
+      }
+    }
+    return {
+      settledSourceAmount: detail.trade.cryptoReceived,
+      success: true,
+    }
+  }
+
+  private async reconcileBookedTrade(
+    params: {
+      nextSettlementAttempt: number
+      operationId: string
+      providerOperationId: string
+      requestedAmount: number
+      settledSourceAmount: string
+      sourceCurrency: UltraSaleCurrency
+    },
+    bookingContext?: {
+      creditSettled: boolean
+      sessionId: string
+    },
+  ): Promise<ExchangeOperationResult> {
+    let beforeSettlement: TradeSettlementReadResult
+    try {
+      beforeSettlement = await this.readTradeSettlement(params)
+    }
+    catch (error) {
+      const failure = this.toOperationFailure(error)
+      this.logger.warn('Transfero Ultra booked trade reconciliation is temporarily unavailable', {
+        code: failure.code,
+        nextSettlementAttempt: params.nextSettlementAttempt,
+        providerOperationId: params.providerOperationId,
+      })
+      return this.buildPendingReconciliation(params)
+    }
+    if (!beforeSettlement.success) {
+      return beforeSettlement.failure
+    }
+    if (this.coversRequestedAmount(
+      beforeSettlement.settledSourceAmount,
+      params.requestedAmount,
+    )) {
+      this.logger.info('Transfero Ultra OTC sale source obligation is settled', {
+        creditSettled: bookingContext?.creditSettled,
+        providerOperationId: params.providerOperationId,
+        sessionId: bookingContext?.sessionId,
+        settledSourceAmount: beforeSettlement.settledSourceAmount,
+      })
+      return this.buildSuccessfulReconciliation({
+        ...params,
+        settledSourceAmount: beforeSettlement.settledSourceAmount,
+      })
+    }
+
+    const followingAttempt = params.nextSettlementAttempt + 1
+    if (followingAttempt > ULTRA_MAX_SETTLEMENT_ATTEMPTS) {
+      return this.buildOperationFailure(
+        'permanent',
+        'transfero_ultra_settlement_attempt_limit_reached',
+      )
+    }
+
+    let sweptAmount: string | undefined
+    try {
+      const settlementResponse = await this.ultraClient.post(
+        `/api/v1/otc/trades/${encodeURIComponent(params.providerOperationId)}/settle-from-holdings`,
+        undefined,
+        this.buildIdempotencyKey(
+          params.operationId,
+          `settlement:${params.nextSettlementAttempt}`,
+        ),
+      )
+      const parsedSettlement = transferoUltraHoldingsSettlementResponseSchema.safeParse(
+        settlementResponse,
+      )
+      if (parsedSettlement.success) {
+        sweptAmount = parsedSettlement.data.swept
+      }
+      else {
+        this.logger.error('Transfero Ultra holdings settlement response schema mismatch', {
+          issues: parsedSettlement.error.issues,
+          providerOperationId: params.providerOperationId,
+        })
+      }
+    }
+    catch (error) {
+      const failure = this.toOperationFailure(error)
+      this.logger.warn('Transfero Ultra holdings settlement attempt is ambiguous', {
+        code: failure.code,
+        providerOperationId: params.providerOperationId,
+        settlementAttempt: params.nextSettlementAttempt,
+      })
+    }
+
+    let afterSettlement: TradeSettlementReadResult
+    try {
+      afterSettlement = await this.readTradeSettlement(params)
+    }
+    catch (error) {
+      const failure = this.toOperationFailure(error)
+      this.logger.warn('Transfero Ultra post-settlement reconciliation is temporarily unavailable', {
+        code: failure.code,
+        providerOperationId: params.providerOperationId,
+        settlementAttempt: params.nextSettlementAttempt,
+        sweptAmount,
+      })
+      return this.buildPendingReconciliation({
+        ...params,
+        nextSettlementAttempt: followingAttempt,
+        settledSourceAmount: beforeSettlement.settledSourceAmount,
+      })
+    }
+    if (!afterSettlement.success) {
+      return afterSettlement.failure
+    }
+    if (this.coversRequestedAmount(
+      afterSettlement.settledSourceAmount,
+      params.requestedAmount,
+    )) {
+      this.logger.info('Transfero Ultra OTC sale source obligation is settled', {
+        creditSettled: bookingContext?.creditSettled,
+        providerOperationId: params.providerOperationId,
+        sessionId: bookingContext?.sessionId,
+        settledSourceAmount: afterSettlement.settledSourceAmount,
+        settlementAttempt: params.nextSettlementAttempt,
+        sweptAmount,
+      })
+      return this.buildSuccessfulReconciliation({
+        ...params,
+        nextSettlementAttempt: followingAttempt,
+        settledSourceAmount: afterSettlement.settledSourceAmount,
+      })
+    }
+
+    this.logger.warn('Transfero Ultra OTC sale is waiting for source settlement', {
+      providerOperationId: params.providerOperationId,
+      requestedAmount: params.requestedAmount,
+      settledSourceAmount: afterSettlement.settledSourceAmount,
+      settlementAttempt: params.nextSettlementAttempt,
+      sweptAmount,
+    })
+    return this.buildPendingReconciliation({
+      ...params,
+      nextSettlementAttempt: followingAttempt,
+      settledSourceAmount: afterSettlement.settledSourceAmount,
+    })
   }
 
   private toOperationFailure(
     error: unknown,
-  ): Extract<ExchangeOperationResult, { success: false }> {
+  ): ExchangeOperationFailure {
     if (error instanceof TransferoUltraError) {
       return this.buildOperationFailure(error.code, error.message)
     }

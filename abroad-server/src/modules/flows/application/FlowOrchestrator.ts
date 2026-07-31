@@ -131,6 +131,17 @@ export class FlowOrchestrator {
         where: { id: signalRecord.id },
       })
 
+      if (result.outcome === 'failed') {
+        await prisma.flowInstance.updateMany({
+          data: { status: FlowInstanceStatus.FAILED },
+          where: {
+            id: flowInstance.id,
+            status: { in: [...RUNNABLE_FLOW_STATUSES] },
+          },
+        })
+        return
+      }
+
       if (result.outcome === 'succeeded') {
         await this.promoteNextStep(prisma, flowInstance.id, snapshot.steps, step.stepOrder)
         await this.run(flowInstance.id)
