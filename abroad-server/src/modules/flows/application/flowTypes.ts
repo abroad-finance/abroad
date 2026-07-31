@@ -66,6 +66,7 @@ export type FlowStepExecutionResult
     correlation: CorrelationKeys
     outcome: 'waiting'
     output?: Record<string, unknown>
+    retryAt?: Date
   }
   | {
     correlation?: CorrelationKeys
@@ -81,7 +82,9 @@ export type FlowStepExecutionResult
 
 export interface FlowStepExecutor {
   execute(params: {
+    attempt: number
     config: Record<string, unknown>
+    maxAttempts: number
     runtime: FlowStepRuntimeContext
     stepOrder: number
   }): Promise<FlowStepExecutionResult>

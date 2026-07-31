@@ -383,6 +383,7 @@ export class FlowAuditService {
       data: {
         correlation: Prisma.DbNull,
         endedAt: null,
+        retryAt: null,
         startedAt: null,
         status: FlowStepStatus.READY,
       },

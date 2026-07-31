@@ -3,6 +3,7 @@ import http from 'http'
 
 import { createScopedLogger } from '../../../core/logging/scopedLogger'
 import { ILogger } from '../../../core/logging/types'
+import { FlowRetryWorker } from '../../../modules/flows/application/FlowRetryWorker'
 import { BridgeSweepWorker } from '../../../modules/treasury/application/BridgeSweepWorker'
 import { TreasurySnapshotWorker } from '../../../modules/treasury/application/TreasurySnapshotWorker'
 import { initSentry } from '../../../platform/observability/sentry'
@@ -31,6 +32,7 @@ export const createHealthHandler = (state: { live: boolean, ready: boolean }) =>
   }
 
 let worker: BridgeSweepWorker | null = null
+let retryWorker: FlowRetryWorker | null = null
 let snapshotWorker: null | TreasurySnapshotWorker = null
 
 export function startBridgeSweepWorker(): void {
@@ -40,15 +42,18 @@ export function startBridgeSweepWorker(): void {
   // no extra Cloud Run deployment for an hourly background read.
   snapshotWorker = iocContainer.get<TreasurySnapshotWorker>(TreasurySnapshotWorker)
   snapshotWorker.start()
+  retryWorker = iocContainer.get<FlowRetryWorker>(FlowRetryWorker)
+  retryWorker.start()
   health.ready = true
 }
 
 export async function stopBridgeSweepWorker(): Promise<void> {
   try {
-    await Promise.all([worker?.stop(), snapshotWorker?.stop()])
+    await Promise.all([retryWorker?.stop(), worker?.stop(), snapshotWorker?.stop()])
   }
   finally {
     worker = null
+    retryWorker = null
     snapshotWorker = null
     health.ready = false
   }

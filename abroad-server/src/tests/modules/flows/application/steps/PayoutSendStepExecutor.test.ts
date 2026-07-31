@@ -1,5 +1,7 @@
 import { FlowStepType, PaymentMethod, TransactionStatus } from '@prisma/client'
 
+import type { PaymentSendResult } from '../../../../../modules/payments/application/contracts/IPaymentService'
+
 import { PayoutSendStepExecutor } from '../../../../../modules/flows/application/steps/PayoutSendStepExecutor'
 import { TransactionEventDispatcher } from '../../../../../modules/transactions/application/TransactionEventDispatcher'
 import { TransactionRepository } from '../../../../../modules/transactions/application/TransactionRepository'
@@ -15,14 +17,16 @@ describe('PayoutSendStepExecutor', () => {
     applyTransitionResult?: null | object
     initialStatus?: TransactionStatus
     network?: string
-    paymentFailureReason: string
+    paymentFailureReason?: string
+    paymentResult?: PaymentSendResult
   }
 
   const setup = ({
     applyTransitionResult,
     initialStatus,
     network = 'stellar',
-    paymentFailureReason,
+    paymentFailureReason = 'provider_failed',
+    paymentResult,
   }: SetupOptions) => {
     const prismaClient = {
       transaction: {
@@ -67,12 +71,12 @@ describe('PayoutSendStepExecutor', () => {
         isAsync: true,
         isEnabled: true,
         provider: 'transfero',
-        sendPayment: jest.fn(async () => ({
+        sendPayment: jest.fn(async () => paymentResult ?? ({
           code: 'validation',
           reason: paymentFailureReason,
           success: false,
           transactionId: 'provider-tx-1',
-        })),
+        } as const)),
       })),
       getPaymentServiceForCapability: jest.fn(),
     }
@@ -94,6 +98,7 @@ describe('PayoutSendStepExecutor', () => {
   }
 
   afterEach(() => {
+    jest.useRealTimers()
     jest.restoreAllMocks()
     jest.clearAllMocks()
   })
@@ -106,7 +111,9 @@ describe('PayoutSendStepExecutor', () => {
     expect(executor.stepType).toBe(FlowStepType.PAYOUT_SEND)
 
     const result = await executor.execute({
+      attempt: 1,
       config: {},
+      maxAttempts: 3,
       runtime: { context: { transactionId: 'tx-1' }, flowRunId: 'flow-1', stepExecutionId: 'step-1' } as never,
       stepOrder: 1,
     })
@@ -135,7 +142,9 @@ describe('PayoutSendStepExecutor', () => {
     })
 
     const result = await executor.execute({
+      attempt: 3,
       config: {},
+      maxAttempts: 3,
       runtime: { context: { transactionId: 'tx-1' }, flowRunId: 'flow-1', stepExecutionId: 'step-1' } as never,
       stepOrder: 1,
     })
@@ -153,5 +162,109 @@ describe('PayoutSendStepExecutor', () => {
       transactionId: 'tx-1',
     }))
     expect(result).toEqual({ error: 'provider_failed', outcome: 'failed' })
+  })
+
+  it('keeps a retriable payout waiting without terminal transition, notification, or refund', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-07-31T12:00:00.000Z'))
+    const { applyTransition, executor, notifyPartnerAndUser, notifySlack, refundCoordinator } = setup({
+      paymentResult: {
+        code: 'retriable',
+        reason: 'Transfero Ultra request failed: RATE_LIMIT_EXCEEDED',
+        success: false,
+      },
+    })
+
+    const result = await executor.execute({
+      attempt: 1,
+      config: {},
+      maxAttempts: 3,
+      runtime: { context: { transactionId: 'tx-1' } } as never,
+      stepOrder: 1,
+    })
+
+    expect(result).toEqual({
+      correlation: { transactionId: 'tx-1' },
+      outcome: 'waiting',
+      output: {
+        provider: 'transfero',
+        retry: {
+          attempt: 1,
+          maxAttempts: 3,
+          nextAttemptAt: '2026-07-31T12:01:05.000Z',
+          reason: 'provider_retriable',
+        },
+      },
+      retryAt: new Date('2026-07-31T12:01:05.000Z'),
+    })
+    expect(applyTransition).not.toHaveBeenCalled()
+    expect(notifyPartnerAndUser).not.toHaveBeenCalled()
+    expect(notifySlack).not.toHaveBeenCalled()
+    expect(refundCoordinator.refundByOnChainId).not.toHaveBeenCalled()
+  })
+
+  it('doubles the retry delay for the second bounded attempt', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-07-31T12:00:00.000Z'))
+    const { executor } = setup({
+      paymentResult: { code: 'retriable', reason: 'rate_limited', success: false },
+    })
+
+    await expect(executor.execute({
+      attempt: 2,
+      config: {},
+      maxAttempts: 3,
+      runtime: { context: { transactionId: 'tx-1' } } as never,
+      stepOrder: 1,
+    })).resolves.toEqual(expect.objectContaining({
+      outcome: 'waiting',
+      retryAt: new Date('2026-07-31T12:02:10.000Z'),
+    }))
+  })
+
+  it('terminalizes and refunds exactly once when retriable attempts are exhausted', async () => {
+    const { applyTransition, executor, notifyPartnerAndUser, notifySlack, refundCoordinator } = setup({
+      paymentResult: {
+        code: 'retriable',
+        reason: 'Transfero Ultra request failed: RATE_LIMIT_EXCEEDED',
+        success: false,
+      },
+    })
+
+    const result = await executor.execute({
+      attempt: 3,
+      config: {},
+      maxAttempts: 3,
+      runtime: { context: { transactionId: 'tx-1' } } as never,
+      stepOrder: 1,
+    })
+
+    expect(applyTransition).toHaveBeenCalledTimes(1)
+    expect(notifyPartnerAndUser).toHaveBeenCalledTimes(1)
+    expect(notifySlack).toHaveBeenCalledTimes(1)
+    expect(refundCoordinator.refundByOnChainId).toHaveBeenCalledTimes(1)
+    expect(result).toEqual({
+      error: 'Transfero Ultra request failed: RATE_LIMIT_EXCEEDED',
+      outcome: 'failed',
+    })
+  })
+
+  it('allows a retried async payout to recover through the existing success path', async () => {
+    const { applyTransition, executor, notifyPartnerAndUser, refundCoordinator } = setup({
+      paymentResult: { success: true, transactionId: 'provider-success' },
+    })
+
+    await expect(executor.execute({
+      attempt: 2,
+      config: {},
+      maxAttempts: 3,
+      runtime: { context: { transactionId: 'tx-1' } } as never,
+      stepOrder: 1,
+    })).resolves.toEqual({
+      correlation: { externalId: 'provider-success' },
+      outcome: 'succeeded',
+      output: { externalId: 'provider-success', provider: 'transfero' },
+    })
+    expect(applyTransition).not.toHaveBeenCalled()
+    expect(notifyPartnerAndUser).not.toHaveBeenCalled()
+    expect(refundCoordinator.refundByOnChainId).not.toHaveBeenCalled()
   })
 })

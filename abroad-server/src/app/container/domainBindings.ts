@@ -6,6 +6,7 @@ import { FlowDefinitionBuilder } from '../../modules/flows/application/FlowDefin
 import { FlowDefinitionService } from '../../modules/flows/application/FlowDefinitionService'
 import { FlowExecutorRegistry } from '../../modules/flows/application/FlowExecutorRegistry'
 import { FlowOrchestrator } from '../../modules/flows/application/FlowOrchestrator'
+import { FlowRetryWorker } from '../../modules/flows/application/FlowRetryWorker'
 import { PublicCorridorService } from '../../modules/flows/application/PublicCorridorService'
 import { RefundCoordinator } from '../../modules/flows/application/RefundCoordinator'
 import { AwaitExchangeBalanceStepExecutor } from '../../modules/flows/application/steps/AwaitExchangeBalanceStepExecutor'
@@ -120,6 +121,7 @@ const domainBindings: ReadonlyArray<BindingRegistration<unknown>> = [
   { bindSelf: true, identifier: FlowAuditService, implementation: FlowAuditService },
   { identifier: TYPES.FlowExecutorRegistry, implementation: FlowExecutorRegistry },
   { identifier: TYPES.FlowOrchestrator, implementation: FlowOrchestrator },
+  { bindSelf: true, identifier: FlowRetryWorker, implementation: FlowRetryWorker },
   { bindSelf: true, identifier: RefundCoordinator, implementation: RefundCoordinator },
   { bindSelf: true, identifier: BridgeFloatService, implementation: BridgeFloatService },
   { bindSelf: true, identifier: BridgeSweepService, implementation: BridgeSweepService },

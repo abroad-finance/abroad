@@ -488,10 +488,12 @@ model FlowStepInstance {
   correlation    Json?
   startedAt      DateTime?
   endedAt        DateTime?
+  retryAt        DateTime?
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
   @@index([flowInstanceId])
+  @@index([status, stepType, retryAt], name: "flow_step_retry_due_idx")
   @@unique([flowInstanceId, stepOrder], name: "flow_step_instance_order_unique")
 }
 

@@ -1,6 +1,8 @@
 import { FlowStepType, PaymentMethod, TransactionStatus } from '@prisma/client'
 import { inject, injectable } from 'inversify'
 
+import type { PaymentSendResult } from '../../../payments/application/contracts/IPaymentService'
+
 import { TYPES } from '../../../../app/container/types'
 import { createScopedLogger, ScopedLogger } from '../../../../core/logging/scopedLogger'
 import { ILogger } from '../../../../core/logging/types'
@@ -13,6 +15,9 @@ import { TransactionRepository } from '../../../transactions/application/Transac
 import { TransactionWebhookRouter } from '../../../transactions/application/TransactionWebhookRouter'
 import { FlowStepExecutionResult, FlowStepExecutor, FlowStepRuntimeContext } from '../flowTypes'
 import { RefundCoordinator } from '../RefundCoordinator'
+
+const PAYOUT_RETRY_BASE_DELAY_MS = 65_000
+const PAYOUT_RETRY_MAX_DELAY_MS = 5 * 60_000
 
 @injectable()
 export class PayoutSendStepExecutor implements FlowStepExecutor {
@@ -42,7 +47,9 @@ export class PayoutSendStepExecutor implements FlowStepExecutor {
   }
 
   public async execute(params: {
+    attempt: number
     config: Record<string, unknown>
+    maxAttempts: number
     runtime: FlowStepRuntimeContext
     stepOrder: number
   }): Promise<FlowStepExecutionResult> {
@@ -106,6 +113,30 @@ export class PayoutSendStepExecutor implements FlowStepExecutor {
 
       if (paymentResponse.success && paymentResponse.transactionId) {
         await this.repository.persistExternalId(prismaClient, transaction.id, paymentResponse.transactionId)
+      }
+
+      if (this.shouldScheduleRetry(paymentResponse, params.attempt, params.maxAttempts)) {
+        const retryAt = this.nextRetryAt(params.attempt)
+        this.logger.warn('Payout retry scheduled', {
+          attempt: params.attempt,
+          maxAttempts: params.maxAttempts,
+          retryAt: retryAt.toISOString(),
+          transactionId: transaction.id,
+        })
+        return {
+          correlation: { transactionId: transaction.id },
+          outcome: 'waiting',
+          output: {
+            provider: paymentService.provider ?? paymentMethod,
+            retry: {
+              attempt: params.attempt,
+              maxAttempts: params.maxAttempts,
+              nextAttemptAt: retryAt.toISOString(),
+              reason: 'provider_retriable',
+            },
+          },
+          retryAt,
+        }
       }
 
       const transitionName = paymentResponse.success ? 'payment_completed' : 'payment_failed'
@@ -195,6 +226,12 @@ export class PayoutSendStepExecutor implements FlowStepExecutor {
     }
   }
 
+  private nextRetryAt(attempt: number): Date {
+    const exponent = Math.max(0, attempt - 1)
+    const delayMs = Math.min(PAYOUT_RETRY_BASE_DELAY_MS * 2 ** exponent, PAYOUT_RETRY_MAX_DELAY_MS)
+    return new Date(Date.now() + delayMs)
+  }
+
   private resolvePaymentMethod(config: Record<string, unknown>, fallback: PaymentMethod): PaymentMethod {
     const configValue = typeof config.paymentMethod === 'string' ? config.paymentMethod : null
     const normalized = configValue?.toUpperCase()
@@ -202,10 +239,20 @@ export class PayoutSendStepExecutor implements FlowStepExecutor {
     return method ?? fallback
   }
 
-  private shouldRefund(paymentResponse: { code?: 'permanent' | 'retriable' | 'validation', success: boolean }): boolean {
+  private shouldRefund(paymentResponse: PaymentSendResult): boolean {
     if (paymentResponse.success) {
       return false
     }
-    return paymentResponse.code !== 'retriable'
+    return paymentResponse.code !== 'retriable' || !paymentResponse.transactionId
+  }
+
+  private shouldScheduleRetry(
+    paymentResponse: PaymentSendResult,
+    attempt: number,
+    maxAttempts: number,
+  ): boolean {
+    return !paymentResponse.success
+      && paymentResponse.code === 'retriable'
+      && attempt < maxAttempts
   }
 }

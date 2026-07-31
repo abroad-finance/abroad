@@ -211,7 +211,9 @@ export class FlowOrchestrator {
 
       // Execute OUTSIDE the transaction — this is where HTTP calls happen
       const result = await executor.execute({
+        attempt: current.attempts + 1,
         config: stepDefinition.config,
+        maxAttempts: current.maxAttempts,
         runtime,
         stepOrder: current.stepOrder,
       })
@@ -463,6 +465,7 @@ export class FlowOrchestrator {
     const updated = await prisma.flowStepInstance.updateMany({
       data: {
         attempts: { increment: 1 },
+        retryAt: null,
         startedAt: new Date(),
         status: FlowStepStatus.RUNNING,
       },
@@ -501,6 +504,7 @@ export class FlowOrchestrator {
       error?: string
       outcome: 'failed' | 'succeeded' | 'waiting'
       output?: Record<string, unknown>
+      retryAt?: Date
     },
     txClient?: Awaited<ReturnType<IDatabaseClientProvider['getClient']>> | Prisma.TransactionClient,
   ): Promise<void> {
@@ -512,6 +516,7 @@ export class FlowOrchestrator {
         data: {
           correlation: result.correlation ? this.normalizeJson(result.correlation) : undefined,
           output: result.output ? this.normalizeJson(result.output) : undefined,
+          retryAt: result.retryAt ?? null,
           status: FlowStepStatus.WAITING,
         },
         where: { id: stepInstanceId },
@@ -525,6 +530,7 @@ export class FlowOrchestrator {
         endedAt: now,
         error: result.error ? this.normalizeJson({ message: result.error }) : undefined,
         output: result.output ? this.normalizeJson(result.output) : undefined,
+        retryAt: null,
         status: result.outcome === 'succeeded' ? FlowStepStatus.SUCCEEDED : FlowStepStatus.FAILED,
       },
       where: { id: stepInstanceId },

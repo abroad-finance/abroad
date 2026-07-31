@@ -264,6 +264,12 @@ describe('FlowOrchestrator', () => {
 
       await orchestrator.run('fi-1')
 
+      expect(mockExecutor.execute).toHaveBeenCalledWith(expect.objectContaining({
+        attempt: 1,
+        maxAttempts: 3,
+        stepOrder: 1,
+      }))
+
       const promotionCalls = mockPrisma.flowStepInstance.updateMany.mock.calls
       const promotionCall = promotionCalls.find(call =>
         call[0].data?.status === FlowStepStatus.READY
@@ -271,6 +277,72 @@ describe('FlowOrchestrator', () => {
         && call[0].where?.status === FlowStepStatus.NOT_STARTED,
       )
       expect(promotionCall).toBeDefined()
+    })
+
+    it('persists a retry due time when a claimed step returns waiting', async () => {
+      const retryAt = new Date('2026-07-31T12:01:05.000Z')
+      const mockExecutor = {
+        execute: jest.fn().mockResolvedValue({
+          correlation: { transactionId: 'tx-1' },
+          outcome: 'waiting',
+          output: { retry: { attempt: 1 } },
+          retryAt,
+        }),
+        stepType: FlowStepType.PAYOUT_SEND,
+      }
+      const dbProvider: IDatabaseClientProvider = {
+        getClient: jest.fn(async () => mockPrisma as unknown as PrismaClientLike),
+      }
+      orchestrator = new FlowOrchestrator(
+        dbProvider,
+        new FlowExecutorRegistry([mockExecutor] as unknown as ConstructorParameters<typeof FlowExecutorRegistry>[0]),
+        createMockLogger(),
+      )
+
+      const flowSnapshot = {
+        definition: {
+          blockchain: 'STELLAR', cryptoCurrency: 'USDC', exchangeFeePct: 0, fixedFee: 0,
+          id: 'def-1', maxAmount: null, minAmount: null, name: 'Test Flow',
+          payoutProvider: 'BREB', pricingProvider: 'BINANCE', targetCurrency: 'COP',
+        },
+        steps: [
+          { completionPolicy: 'SYNC', config: {}, signalMatch: null, stepOrder: 1, stepType: 'PAYOUT_SEND' },
+        ],
+      }
+      mockPrisma.$queryRawUnsafe.mockResolvedValue([{ id: 'fi-1' }])
+      mockPrisma.flowInstance.updateMany.mockResolvedValue({ count: 1 })
+      mockPrisma.flowStepInstance.findFirst.mockResolvedValueOnce({
+        attempts: 0,
+        flowInstanceId: 'fi-1',
+        id: 'fsi-1',
+        maxAttempts: 3,
+        status: FlowStepStatus.READY,
+        stepOrder: 1,
+        stepType: FlowStepType.PAYOUT_SEND,
+      })
+      mockPrisma.flowInstance.findUnique.mockResolvedValue({
+        flowSnapshot: JSON.parse(JSON.stringify(flowSnapshot)),
+        id: 'fi-1',
+        steps: [],
+        transactionId: 'tx-1',
+      })
+      mockPrisma.transaction.findUnique.mockResolvedValue(buildTransaction())
+      mockPrisma.flowStepInstance.update.mockResolvedValue({})
+      mockPrisma.flowInstance.update.mockResolvedValue({})
+
+      await orchestrator.run('fi-1')
+
+      expect(mockPrisma.flowStepInstance.update).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          retryAt,
+          status: FlowStepStatus.WAITING,
+        }),
+        where: { id: 'fsi-1' },
+      })
+      expect(mockPrisma.flowInstance.update).toHaveBeenCalledWith({
+        data: { status: FlowInstanceStatus.WAITING },
+        where: { id: 'fi-1' },
+      })
     })
   })
 
