@@ -10,7 +10,11 @@ import {
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 
-import type { PartnerTransactionDelivery, PartnerTransactionDetail as PartnerTransactionDetailData } from '../../services/partnerPortal/partnerPortalTypes'
+import type {
+  PartnerTransactionDelivery,
+  PartnerTransactionDetail as PartnerTransactionDetailData,
+  PartnerTransactionRefund,
+} from '../../services/partnerPortal/partnerPortalTypes'
 
 import { getPartnerTransaction } from '../../services/partnerPortal/partnerPortalApi'
 import {
@@ -34,6 +38,13 @@ const deliveryStatus = (delivery: PartnerTransactionDelivery): { className: stri
   return { className: 'text-amber-700', label: 'Queued' }
 }
 
+const refundStatusMeta: Record<PartnerTransactionRefund['status'], { className: string, label: string }> = {
+  COMPLETED: { className: 'text-emerald-700', label: 'Refunded' },
+  FAILED: { className: 'text-rose-700', label: 'Refund failed' },
+  NOT_STARTED: { className: 'text-amber-700', label: 'Not started' },
+  PROCESSING: { className: 'text-sky-700', label: 'Refund processing' },
+}
+
 const DetailField = ({ children, label }: {
   children: React.ReactNode
   label: string
@@ -42,6 +53,13 @@ const DetailField = ({ children, label }: {
     <dt className="partner-label">{label}</dt>
     <dd className="mt-2 min-w-0 text-sm font-medium text-partner-ink">{children}</dd>
   </div>
+)
+
+const CopyableIdentifier = ({ label, value }: { label: string, value: string }) => (
+  <span className="flex w-full min-w-0 items-center gap-2">
+    <span className="min-w-0 flex-1 truncate font-mono" title={value}>{value}</span>
+    <CopyValueButton label={label} value={value} />
+  </span>
 )
 
 const PartnerTransactionDetail = () => {
@@ -103,6 +121,7 @@ const PartnerTransactionDetail = () => {
   }
 
   const status = partnerStatusMeta[data.status]
+  const refundStatus = data.refund ? refundStatusMeta[data.refund.status] : null
 
   return (
     <>
@@ -173,21 +192,36 @@ const PartnerTransactionDetail = () => {
           <DetailField label="Created">{formatPartnerDateTime(data.createdAt)}</DetailField>
           <DetailField label="User reference">{data.userReference}</DetailField>
           <DetailField label="Transaction ID">
-            <span className="flex w-full min-w-0 items-center gap-2">
-              <span className="min-w-0 flex-1 truncate font-mono" title={data.id}>{data.id}</span>
-              <CopyValueButton label="transaction ID" value={data.id} />
-            </span>
+            <CopyableIdentifier label="transaction ID" value={data.id} />
           </DetailField>
           <DetailField label="On-chain ID">
             {data.onChainId
-              ? (
-                  <span className="flex w-full min-w-0 items-center gap-2">
-                    <span className="min-w-0 flex-1 truncate font-mono" title={data.onChainId}>{data.onChainId}</span>
-                    <CopyValueButton label="on-chain ID" value={data.onChainId} />
-                  </span>
-                )
+              ? <CopyableIdentifier label="on-chain ID" value={data.onChainId} />
               : 'Not available'}
           </DetailField>
+          {data.quote.paymentMethod === 'PIX'
+            ? (
+                <DetailField label="PIX E2E ID">
+                  {data.pixEndToEndId
+                    ? <CopyableIdentifier label="PIX E2E ID" value={data.pixEndToEndId} />
+                    : 'Not available yet'}
+                </DetailField>
+              )
+            : null}
+          {data.refund && refundStatus
+            ? (
+                <>
+                  <DetailField label="Refund status">
+                    <span className={refundStatus.className}>{refundStatus.label}</span>
+                  </DetailField>
+                  <DetailField label="Refund on-chain ID">
+                    {data.refund.onChainId
+                      ? <CopyableIdentifier label="refund on-chain ID" value={data.refund.onChainId} />
+                      : 'Not available yet'}
+                  </DetailField>
+                </>
+              )
+            : null}
         </dl>
       </section>
 

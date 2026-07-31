@@ -47,11 +47,12 @@ const buildEnvelope = (
 const buildPixEnvelope = (
   eventType = 'pix.withdrawal.settled',
   status = 'SETTLED',
+  endToEndId: null | string = null,
 ): Record<string, unknown> => buildEnvelope(eventType, {
   amount: '12.50',
   createdAt: '2026-07-27T12:30:00.000Z',
   currency: 'BRL',
-  endToEndId: null,
+  endToEndId,
   failureReason: null,
   pixKey: '***@example.com',
   pixKeyType: 'EMAIL',
@@ -186,7 +187,11 @@ describe('WebhookController Transfero Ultra webhook', () => {
   })
 
   it('publishes an exact Ultra PIX withdrawal status update', async () => {
-    const body = buildPixEnvelope()
+    const body = buildPixEnvelope(
+      'pix.withdrawal.settled',
+      'SETTLED',
+      'E1234567890123456789012345678901',
+    )
     const { badRequest, serverError, unauthorized } = responders()
     const setStatus = jest.spyOn(controller, 'setStatus')
 
@@ -211,6 +216,7 @@ describe('WebhookController Transfero Ultra webhook', () => {
         amount: 12.5,
         currency: 'BRL',
         externalId: WITHDRAWAL_ID,
+        pixEndToEndId: 'E1234567890123456789012345678901',
         provider: 'transfero',
         status: 'SETTLED',
       },

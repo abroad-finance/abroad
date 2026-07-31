@@ -131,6 +131,7 @@ model Transaction {
   quote         Quote             @relation(fields: [quoteId], references: [id])
   onChainId     String?           @unique
   refundOnChainId String?         @unique
+  pixEndToEndId String?           @unique
   taxId         String?
   externalId    String?           @unique
   qrCode        String?

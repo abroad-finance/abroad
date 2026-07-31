@@ -24,6 +24,8 @@ export type PartnerTransactionDetail = PartnerTransactionSummary & {
   deliveries: PartnerTransactionDelivery[]
   lifecycle: PartnerTransactionLifecycle[]
   payoutDestinationHint: null | string
+  pixEndToEndId: null | string
+  refund: null | PartnerTransactionRefund
 }
 
 export type PartnerTransactionFilters = {
@@ -57,6 +59,11 @@ export type PartnerTransactionQuote = {
   sourceAmount: number
   targetAmount: number
   targetCurrency: string
+}
+
+export type PartnerTransactionRefund = {
+  onChainId: null | string
+  status: 'COMPLETED' | 'FAILED' | 'NOT_STARTED' | 'PROCESSING'
 }
 
 export type PartnerTransactionStatus = typeof partnerTransactionStatuses[number]

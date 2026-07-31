@@ -1,4 +1,4 @@
-import { OutboxStatus, Prisma, TransactionStatus } from '@prisma/client'
+import { OutboxStatus, PaymentMethod, Prisma, TransactionStatus } from '@prisma/client'
 import { inject, injectable } from 'inversify'
 
 import { TYPES } from '../../../app/container/types'
@@ -12,6 +12,11 @@ const MAX_EXPORT_ROWS = 5_000
 const MAX_DELIVERY_ROWS = 20
 const ISO_DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/
 const FORMULA_PREFIX_PATTERN = /^[\t\r\n ]*[=+\-@]/
+const refundRelevantStatuses: ReadonlySet<TransactionStatus> = new Set([
+  TransactionStatus.PAYMENT_EXPIRED,
+  TransactionStatus.PAYMENT_FAILED,
+  TransactionStatus.WRONG_AMOUNT,
+])
 
 const transactionStatuses = [
   TransactionStatus.AWAITING_PAYMENT,
@@ -42,6 +47,8 @@ export type PartnerTransactionDetailDto = PartnerTransactionSummaryDto & {
   deliveries: PartnerTransactionDeliveryDto[]
   lifecycle: PartnerTransactionLifecycleDto[]
   payoutDestinationHint: null | string
+  pixEndToEndId: null | string
+  refund: null | PartnerTransactionRefundDto
 }
 
 export type PartnerTransactionExport = {
@@ -72,6 +79,11 @@ export type PartnerTransactionQuoteDto = {
   sourceAmount: number
   targetAmount: number
   targetCurrency: string
+}
+
+export type PartnerTransactionRefundDto = {
+  onChainId: null | string
+  status: 'COMPLETED' | 'FAILED' | 'NOT_STARTED' | 'PROCESSING'
 }
 
 export type PartnerTransactionSearchFilters = {
@@ -215,6 +227,10 @@ export class PartnerTransactionQueryService {
       })),
       lifecycle: this.toLifecycle(transaction),
       payoutDestinationHint: this.maskDestination(transaction.accountNumber),
+      pixEndToEndId: transaction.quote.paymentMethod === PaymentMethod.PIX
+        ? transaction.pixEndToEndId
+        : null,
+      refund: this.toRefund(transaction),
     }
   }
 
@@ -296,6 +312,16 @@ export class PartnerTransactionQueryService {
     return typeof value === 'object' && value !== null && !Array.isArray(value)
   }
 
+  private latestRefundTransition(transaction: DetailRow): DetailRow['transitions'][number] | undefined {
+    for (let index = transaction.transitions.length - 1; index >= 0; index -= 1) {
+      const transition = transaction.transitions[index]
+      if (transition.event === 'refund') {
+        return transition
+      }
+    }
+    return undefined
+  }
+
   private maskDestination(accountNumber: string): null | string {
     const normalized = accountNumber.trim()
     if (!normalized) {
@@ -361,6 +387,18 @@ export class PartnerTransactionQueryService {
     return date
   }
 
+  private readRefundContextStatus(
+    context: Prisma.JsonValue | undefined,
+  ): 'failed' | 'pending' | 'succeeded' | undefined {
+    if (!this.isJsonObject(context)) {
+      return undefined
+    }
+    const status = context.status
+    return status === 'failed' || status === 'pending' || status === 'succeeded'
+      ? status
+      : undefined
+  }
+
   private readWebhookEvent(payload: Prisma.JsonValue): PartnerTransactionDeliveryDto['event'] {
     if (!this.isJsonObject(payload)) {
       return 'unknown'
@@ -397,6 +435,29 @@ export class PartnerTransactionQueryService {
         type: 'STATUS_CHANGED' as const,
       })),
     ]
+  }
+
+  private toRefund(transaction: DetailRow): null | PartnerTransactionRefundDto {
+    const refundTransition = this.latestRefundTransition(transaction)
+    if (!refundRelevantStatuses.has(transaction.status) && !refundTransition && !transaction.refundOnChainId) {
+      return null
+    }
+
+    if (transaction.refundOnChainId) {
+      return { onChainId: transaction.refundOnChainId, status: 'COMPLETED' }
+    }
+
+    const contextStatus = this.readRefundContextStatus(refundTransition?.context)
+    if (contextStatus === 'succeeded') {
+      return { onChainId: null, status: 'COMPLETED' }
+    }
+    if (contextStatus === 'pending') {
+      return { onChainId: null, status: 'PROCESSING' }
+    }
+    if (contextStatus === 'failed') {
+      return { onChainId: null, status: 'FAILED' }
+    }
+    return { onChainId: null, status: 'NOT_STARTED' }
   }
 
   private toSummary(transaction: SummaryRow): PartnerTransactionSummaryDto {

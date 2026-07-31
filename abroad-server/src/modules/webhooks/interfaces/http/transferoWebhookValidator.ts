@@ -208,6 +208,7 @@ function parsePixWithdrawal(
         amount,
         currency: TargetCurrency.BRL,
         externalId: parsed.data.withdrawalId,
+        pixEndToEndId: parsed.data.endToEndId?.trim() || null,
         provider: 'transfero',
         status: parsed.data.status,
       },

@@ -35,18 +35,24 @@ const transaction = {
   id: '11111111-1111-4111-8111-111111111111',
   onChainId: '0xabc',
   partnerUser: { userId: '=dangerous-reference' },
+  pixEndToEndId: 'E1234567890123456789012345678901',
   quote,
+  refundOnChainId: null,
   status: TransactionStatus.PAYMENT_COMPLETED,
   taxId: 'sensitive-tax-id',
   transitions: [
     {
+      context: null,
       createdAt: new Date('2026-07-30T10:02:00.000Z'),
+      event: 'status_changed',
       fromStatus: TransactionStatus.AWAITING_PAYMENT,
       id: 'transition-1',
       toStatus: TransactionStatus.PROCESSING_PAYMENT,
     },
     {
+      context: null,
       createdAt: new Date('2026-07-30T10:05:00.000Z'),
+      event: 'status_changed',
       fromStatus: TransactionStatus.PROCESSING_PAYMENT,
       id: 'transition-2',
       toStatus: TransactionStatus.PAYMENT_COMPLETED,
@@ -189,6 +195,8 @@ describe('PartnerTransactionQueryService.getById', () => {
       },
     ])
     expect(result.payoutDestinationHint).toBe('•••• .com')
+    expect(result.pixEndToEndId).toBe(transaction.pixEndToEndId)
+    expect(result.refund).toBeNull()
     expect(result.deliveries).toEqual([{
       attempts: 1,
       event: 'transaction.updated',
@@ -199,6 +207,77 @@ describe('PartnerTransactionQueryService.getById', () => {
     expect(result).not.toHaveProperty('bankCode')
     expect(result).not.toHaveProperty('externalId')
     expect(result).not.toHaveProperty('taxId')
+  })
+
+  it.each([
+    {
+      contextStatus: undefined,
+      expectedStatus: 'NOT_STARTED',
+      refundOnChainId: null,
+    },
+    {
+      contextStatus: 'pending',
+      expectedStatus: 'PROCESSING',
+      refundOnChainId: null,
+    },
+    {
+      contextStatus: 'failed',
+      expectedStatus: 'FAILED',
+      refundOnChainId: null,
+    },
+    {
+      contextStatus: 'succeeded',
+      expectedStatus: 'COMPLETED',
+      refundOnChainId: null,
+    },
+    {
+      contextStatus: 'failed',
+      expectedStatus: 'COMPLETED',
+      refundOnChainId: '0xrefund',
+    },
+  ] as const)('derives refund status from durable evidence: $expectedStatus', async ({
+    contextStatus,
+    expectedStatus,
+    refundOnChainId,
+  }) => {
+    const prisma = makePrisma()
+    prisma.transaction.findFirst.mockResolvedValue({
+      ...transaction,
+      refundOnChainId,
+      status: TransactionStatus.PAYMENT_FAILED,
+      transitions: contextStatus
+        ? [
+            ...transaction.transitions,
+            {
+              context: { status: contextStatus },
+              createdAt: new Date('2026-07-30T10:07:00.000Z'),
+              event: 'refund',
+              fromStatus: TransactionStatus.PAYMENT_FAILED,
+              id: 'refund-transition',
+              toStatus: TransactionStatus.PAYMENT_FAILED,
+            },
+          ]
+        : transaction.transitions,
+    })
+
+    const result = await makeService(prisma).getById('partner-1', transaction.id)
+
+    expect(result.refund).toEqual({
+      onChainId: refundOnChainId,
+      status: expectedStatus,
+    })
+  })
+
+  it('does not expose a stored PIX identifier for a non-PIX transaction', async () => {
+    const prisma = makePrisma()
+    prisma.transaction.findFirst.mockResolvedValue({
+      ...transaction,
+      quote: { ...transaction.quote, paymentMethod: 'BREB' },
+    })
+
+    const result = await makeService(prisma).getById('partner-1', transaction.id)
+
+    expect(result.pixEndToEndId).toBeNull()
   })
 
   it('uses the same not-found response for missing and cross-tenant transactions', async () => {

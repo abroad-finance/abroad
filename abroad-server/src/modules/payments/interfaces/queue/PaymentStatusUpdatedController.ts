@@ -51,7 +51,7 @@ export class PaymentStatusUpdatedController {
     try {
       const prisma = await this.dbProvider.getClient()
       const transaction = await prisma.transaction.findUnique({
-        select: { id: true },
+        select: { id: true, pixEndToEndId: true },
         where: { externalId: message.externalId },
       })
 
@@ -60,6 +60,25 @@ export class PaymentStatusUpdatedController {
           externalId: message.externalId,
         })
         return
+      }
+
+      if (message.pixEndToEndId && transaction.pixEndToEndId !== message.pixEndToEndId) {
+        if (transaction.pixEndToEndId) {
+          scopedLogger.warn('[PaymentStatusUpdated queue]: Ignoring conflicting PIX end-to-end ID', {
+            transactionId: transaction.id,
+          })
+        }
+        else {
+          const update = await prisma.transaction.updateMany({
+            data: { pixEndToEndId: message.pixEndToEndId },
+            where: { id: transaction.id, pixEndToEndId: null },
+          })
+          if (update.count === 0) {
+            scopedLogger.warn('[PaymentStatusUpdated queue]: PIX end-to-end ID was already recorded concurrently', {
+              transactionId: transaction.id,
+            })
+          }
+        }
       }
 
       await this.orchestrator.handleSignal({
