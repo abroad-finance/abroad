@@ -9,18 +9,18 @@ import { OutboxRecord, OutboxRepository } from './OutboxRepository'
 type OutboxWorkerOptions = {
   batchSize?: number
   pollIntervalMs?: number
-  slackOnFailure?: boolean
 }
+
+const FAILURE_REPORT_INTERVAL_MS = 60_000
 
 @injectable()
 export class OutboxWorker {
   private readonly batchSize: number
   private isRunning = false
-  private lastFailureAlertAt = 0
+  private lastFailureReportAt = 0
   private readonly logger: ReturnType<typeof createScopedLogger>
   private loopPromise: null | Promise<void> = null
   private readonly pollIntervalMs: number
-  private readonly slackOnFailure: boolean
 
   public constructor(
     @inject(OutboxRepository) private readonly repository: OutboxRepository,
@@ -30,7 +30,6 @@ export class OutboxWorker {
   ) {
     this.batchSize = options.batchSize ?? this.readNumber('OUTBOX_BATCH_SIZE', 50)
     this.pollIntervalMs = options.pollIntervalMs ?? this.readNumber('OUTBOX_POLL_INTERVAL_MS', 1_000)
-    this.slackOnFailure = options.slackOnFailure ?? this.readBoolean('OUTBOX_SLACK_ALERTS', true)
     this.logger = createScopedLogger(baseLogger, { scope: 'OutboxWorker' })
   }
 
@@ -41,17 +40,12 @@ export class OutboxWorker {
     }
 
     const now = Date.now()
-    const throttleMs = 60_000
-    if (now - this.lastFailureAlertAt < throttleMs) {
+    if (now - this.lastFailureReportAt < FAILURE_REPORT_INTERVAL_MS) {
       return
     }
-    this.lastFailureAlertAt = now
+    this.lastFailureReportAt = now
 
     this.logger.warn('Outbox failure backlog detected', summary)
-    if (!this.slackOnFailure) return
-
-    const message = `[OutboxWorker] Failed: ${summary.failed}, Delivering: ${summary.delivering}, Pending: ${summary.pending}`
-    await this.dispatcher.enqueueSlack(message, 'outbox-worker')
   }
 
   public async runOnce(): Promise<void> {
@@ -92,12 +86,6 @@ export class OutboxWorker {
       }
       await this.sleep(this.pollIntervalMs)
     }
-  }
-
-  private readBoolean(envKey: string, fallback: boolean): boolean {
-    const raw = process.env[envKey]
-    if (raw === undefined) return fallback
-    return raw.toLowerCase() === 'true'
   }
 
   private readNumber(envKey: string, fallback: number): number {

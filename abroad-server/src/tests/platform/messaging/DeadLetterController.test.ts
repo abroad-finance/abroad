@@ -8,9 +8,8 @@ import { createMockLogger, createMockQueueHandler } from '../../setup/mockFactor
 describe('DeadLetterController', () => {
   it('registers consumer for dead-letter queue', () => {
     const queueHandler = createMockQueueHandler()
-    const outboxDispatcher = { enqueueSlack: jest.fn() }
     const logger = createMockLogger()
-    const controller = new DeadLetterController(queueHandler, outboxDispatcher as never, logger)
+    const controller = new DeadLetterController(queueHandler, logger)
 
     controller.registerConsumers()
 
@@ -21,12 +20,11 @@ describe('DeadLetterController', () => {
     )
   })
 
-  it('logs and alerts when receiving a dead-letter message', async () => {
+  it('logs dead-letter messages without creating transaction-channel notifications', () => {
     const queueHandler = createMockQueueHandler()
-    const outboxDispatcher = { enqueueSlack: jest.fn() }
     const logger = createMockLogger()
-    const controller = new DeadLetterController(queueHandler, outboxDispatcher as never, logger)
-    const handler = (controller as unknown as { onDeadLetter: (msg: unknown) => Promise<void> }).onDeadLetter
+    const controller = new DeadLetterController(queueHandler, logger)
+    const handler = (controller as unknown as { onDeadLetter: (msg: unknown) => void }).onDeadLetter
 
     const message: DeadLetterMessage = {
       error: 'boom',
@@ -35,30 +33,32 @@ describe('DeadLetterController', () => {
       reason: 'handler_failed',
     }
 
-    await handler.call(controller, message)
+    handler.call(controller, message)
 
-    expect(outboxDispatcher.enqueueSlack).toHaveBeenCalledWith(
-      expect.stringContaining('[DLQ]'),
-      'dead-letter',
-      expect.objectContaining({ deliverNow: false }),
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.stringContaining('Dead-letter message received'),
+      expect.objectContaining({
+        context: {
+          originalQueue: QueueName.PAYMENT_STATUS_UPDATED,
+          reason: 'handler_failed',
+        },
+      }),
+      { error: 'boom', payloadPreview: '{"foo":"bar"}' },
     )
-    expect(logger.warn).toHaveBeenCalled()
   })
 
-  it('logs validation warnings for malformed dead-letter messages', async () => {
+  it('logs validation warnings for malformed dead-letter messages', () => {
     const queueHandler = createMockQueueHandler()
-    const outboxDispatcher = { enqueueSlack: jest.fn() }
     const logger = createMockLogger()
-    const controller = new DeadLetterController(queueHandler, outboxDispatcher as never, logger)
-    const handler = (controller as unknown as { onDeadLetter: (msg: unknown) => Promise<void> }).onDeadLetter
+    const controller = new DeadLetterController(queueHandler, logger)
+    const handler = (controller as unknown as { onDeadLetter: (msg: unknown) => void }).onDeadLetter
 
-    await handler.call(controller, { invalid: true })
+    handler.call(controller, { invalid: true })
 
     expect(logger.warn).toHaveBeenCalledWith(
       expect.stringContaining('[DeadLetter] Invalid message received'),
       expect.any(Array),
     )
-    expect(outboxDispatcher.enqueueSlack).not.toHaveBeenCalled()
   })
 
   it('logs registration failures when subscribing to the dead-letter queue', () => {
@@ -68,20 +68,18 @@ describe('DeadLetterController', () => {
         throw new Error('subscription failed')
       }),
     }
-    const outboxDispatcher = { enqueueSlack: jest.fn() }
     const logger = createMockLogger()
-    const controller = new DeadLetterController(queueHandler as never, outboxDispatcher as never, logger)
+    const controller = new DeadLetterController(queueHandler as never, logger)
 
     controller.registerConsumers()
 
     expect(logger.error).toHaveBeenCalledWith(expect.stringContaining('[DeadLetter] Failed to register consumer'), expect.any(Error))
   })
 
-  it('falls back to a placeholder when payload serialization fails', async () => {
+  it('falls back to a placeholder when payload serialization fails', () => {
     const queueHandler = createMockQueueHandler()
-    const outboxDispatcher = { enqueueSlack: jest.fn() }
     const logger = createMockLogger()
-    const controller = new DeadLetterController(queueHandler, outboxDispatcher as never, logger)
+    const controller = new DeadLetterController(queueHandler, logger)
     const preview = (controller as unknown as { previewPayload: (payload: unknown) => string }).previewPayload
 
     expect(preview.call(controller, BigInt(10))).toBe('[unserializable]')
@@ -89,55 +87,11 @@ describe('DeadLetterController', () => {
 
   it('truncates oversized payload previews', () => {
     const queueHandler = createMockQueueHandler()
-    const outboxDispatcher = { enqueueSlack: jest.fn() }
     const logger = createMockLogger()
-    const controller = new DeadLetterController(queueHandler, outboxDispatcher as never, logger)
+    const controller = new DeadLetterController(queueHandler, logger)
     const preview = (controller as unknown as { previewPayload: (payload: unknown) => string }).previewPayload
 
     const longPayload = 'x'.repeat(600)
     expect(preview.call(controller, longPayload)).toBe(`${'x'.repeat(500)}…`)
-  })
-
-  it('logs Slack enqueue failures', async () => {
-    const queueHandler = createMockQueueHandler()
-    const outboxDispatcher = {
-      enqueueSlack: jest.fn(async () => {
-        throw new Error('slack unavailable')
-      }),
-    }
-    const logger = createMockLogger()
-    const controller = new DeadLetterController(queueHandler, outboxDispatcher as never, logger)
-    const enqueue = (controller as unknown as { enqueueSlack: (message: DeadLetterMessage) => Promise<void> }).enqueueSlack
-
-    await enqueue.call(controller, {
-      error: 'oops',
-      originalQueue: QueueName.PAYMENT_STATUS_UPDATED,
-      payload: { data: 'sample' },
-      reason: 'unroutable',
-    })
-
-    expect(logger.error).toHaveBeenCalledWith(
-      expect.stringContaining('[DeadLetter] Failed to enqueue Slack alert'),
-      expect.any(Error),
-    )
-  })
-
-  it('uses a neutral body when the dead-letter message lacks an error', async () => {
-    const queueHandler = createMockQueueHandler()
-    const enqueueSlack = jest.fn()
-    const outboxDispatcher = { enqueueSlack }
-    const logger = createMockLogger()
-    const controller = new DeadLetterController(queueHandler, outboxDispatcher as never, logger)
-    const enqueue = (controller as unknown as { enqueueSlack: (message: DeadLetterMessage) => Promise<void> }).enqueueSlack
-
-    await enqueue.call(controller, {
-      error: undefined,
-      originalQueue: QueueName.DEAD_LETTER,
-      payload: { sample: true },
-      reason: 'no_error',
-    })
-
-    const [messageBody] = enqueueSlack.mock.calls[0] as [string]
-    expect(messageBody).toContain('no error provided')
   })
 })

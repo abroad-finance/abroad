@@ -19,7 +19,7 @@ describe('OutboxWorker', () => {
           updatedAt: new Date(),
         },
       ]),
-      summarizeFailures: jest.fn(async () => ({ delivering: 0, failed: 0 })),
+      summarizeFailures: jest.fn(async () => ({ delivering: 0, failed: 0, pending: 0 })),
     }
     const dispatcher = {
       deliver: jest.fn(async () => undefined),
@@ -37,7 +37,7 @@ describe('OutboxWorker', () => {
   it('starts a loop and can be stopped', async () => {
     const repository = {
       nextBatch: jest.fn(async () => []),
-      summarizeFailures: jest.fn(async () => ({ delivering: 0, failed: 0 })),
+      summarizeFailures: jest.fn(async () => ({ delivering: 0, failed: 0, pending: 0 })),
     }
     const dispatcher = { deliver: jest.fn(), enqueueSlack: jest.fn() }
     const logger = { error: jest.fn(), info: jest.fn(), warn: jest.fn() }
@@ -46,7 +46,7 @@ describe('OutboxWorker', () => {
       repository as never,
       dispatcher as never,
       logger as never,
-      { pollIntervalMs: 10, slackOnFailure: false },
+      { pollIntervalMs: 10 },
     )
     worker.start()
     await new Promise(resolve => setTimeout(resolve, 25))
@@ -55,10 +55,10 @@ describe('OutboxWorker', () => {
     expect(repository.nextBatch).toHaveBeenCalled()
   })
 
-  it('sends slack alert when failures accumulate', async () => {
+  it('logs failure backlogs without sending Slack messages', async () => {
     const repository = {
       nextBatch: jest.fn(async () => []),
-      summarizeFailures: jest.fn(async () => ({ delivering: 1, failed: 2 })),
+      summarizeFailures: jest.fn(async () => ({ delivering: 1, failed: 2, pending: 3 })),
     }
     const dispatcher = { deliver: jest.fn(), enqueueSlack: jest.fn(async () => undefined) }
     const logger = { error: jest.fn(), info: jest.fn(), warn: jest.fn() }
@@ -67,28 +67,38 @@ describe('OutboxWorker', () => {
     await worker.runOnce()
     await worker.reportFailures()
 
-    expect(logger.warn).toHaveBeenCalledWith('[OutboxWorker] Outbox failure backlog detected', { delivering: 1, failed: 2 })
-    expect(dispatcher.enqueueSlack).toHaveBeenCalledWith(
-      expect.stringContaining('Failed: 2'),
-      'outbox-worker',
+    expect(logger.warn).toHaveBeenCalledWith(
+      '[OutboxWorker] Outbox failure backlog detected',
+      { delivering: 1, failed: 2, pending: 3 },
     )
+    expect(dispatcher.enqueueSlack).not.toHaveBeenCalled()
   })
 
-  it('throttles repeated failure alerts', async () => {
+  it('throttles repeated failure logs without creating Slack notifications', async () => {
     jest.useFakeTimers().setSystemTime(new Date('2024-01-01T00:00:00.000Z'))
-    const repository = {
-      nextBatch: jest.fn(async () => []),
-      summarizeFailures: jest.fn(async () => ({ delivering: 1, failed: 1 })),
+    try {
+      const repository = {
+        nextBatch: jest.fn(async () => []),
+        summarizeFailures: jest.fn(async () => ({ delivering: 1, failed: 1, pending: 0 })),
+      }
+      const dispatcher = { deliver: jest.fn(), enqueueSlack: jest.fn(async () => undefined) }
+      const logger = { error: jest.fn(), info: jest.fn(), warn: jest.fn() }
+
+      const worker = new OutboxWorker(repository as never, dispatcher as never, logger as never)
+      await worker.reportFailures()
+      await worker.reportFailures()
+
+      expect(logger.warn).toHaveBeenCalledTimes(1)
+
+      jest.advanceTimersByTime(60_000)
+      await worker.reportFailures()
+
+      expect(logger.warn).toHaveBeenCalledTimes(2)
+      expect(dispatcher.enqueueSlack).not.toHaveBeenCalled()
     }
-    const dispatcher = { deliver: jest.fn(), enqueueSlack: jest.fn(async () => undefined) }
-    const logger = { error: jest.fn(), info: jest.fn(), warn: jest.fn() }
-
-    const worker = new OutboxWorker(repository as never, dispatcher as never, logger as never, { slackOnFailure: true })
-    await worker.reportFailures()
-    await worker.reportFailures()
-
-    expect(dispatcher.enqueueSlack).toHaveBeenCalledTimes(1)
-    jest.useRealTimers()
+    finally {
+      jest.useRealTimers()
+    }
   })
 
   it('logs delivery failures and continues processing', async () => {
@@ -105,7 +115,7 @@ describe('OutboxWorker', () => {
     }
     const repository = {
       nextBatch: jest.fn(async () => [failingRecord]),
-      summarizeFailures: jest.fn(async () => ({ delivering: 0, failed: 0 })),
+      summarizeFailures: jest.fn(async () => ({ delivering: 0, failed: 0, pending: 0 })),
     }
     const dispatcher = {
       deliver: jest.fn(async () => {

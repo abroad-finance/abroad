@@ -71,7 +71,6 @@ export class OutboxDispatcher {
       if (attempts >= MAX_ATTEMPTS) {
         this.logger.error(`[Outbox] delivery failed permanently (${context})`, normalized)
         await this.repository.markFailed(record.id, normalized, client)
-        await this.safeNotifySlack(`[Outbox] Permanently failed to deliver ${record.type} (${record.id}); last error=${normalized.message}`)
         await this.safePublishDeadLetter(normalized, record)
         return
       }
@@ -183,15 +182,6 @@ export class OutboxDispatcher {
         ...payload.payload,
         data: this.normalizeJsonValue(payload.payload.data),
       },
-    }
-  }
-
-  private async safeNotifySlack(message: string): Promise<void> {
-    try {
-      await this.slackNotifier.sendMessage(message)
-    }
-    catch (error) {
-      this.logger.warn('[Outbox] Failed to notify Slack about permanent failure', error)
     }
   }
 

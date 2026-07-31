@@ -91,7 +91,7 @@ describe('OutboxDispatcher', () => {
     expect(queueHandler.postMessage).toHaveBeenCalledWith(QueueName.PAYMENT_STATUS_UPDATED, payload)
   })
 
-  it('alerts slack when delivery fails permanently', async () => {
+  it('publishes a dead letter without posting an operational Slack message when delivery fails permanently', async () => {
     const { dispatcher, queueHandler, repository, slackNotifier } = buildMocks()
     const failingRecord: OutboxRecord = {
       ...baseRecord,
@@ -104,7 +104,7 @@ describe('OutboxDispatcher', () => {
     await dispatcher.deliver(failingRecord, 'ctx')
 
     expect(repository.markFailed).toHaveBeenCalledWith(failingRecord.id, expect.any(Error), undefined)
-    expect(slackNotifier.sendMessage).toHaveBeenCalledWith(expect.stringContaining(failingRecord.id))
+    expect(slackNotifier.sendMessage).not.toHaveBeenCalled()
     expect(queueHandler.postMessage).toHaveBeenCalledWith(QueueName.DEAD_LETTER, expect.objectContaining({
       error: 'network down',
       originalQueue: 'outbox',
@@ -170,13 +170,12 @@ describe('OutboxDispatcher', () => {
     expect(repository.markDelivered).not.toHaveBeenCalled()
   })
 
-  it('logs warnings when slack or dead-letter publishing fails on permanent errors', async () => {
+  it('logs a warning when dead-letter publishing fails on permanent errors', async () => {
     const { dispatcher, logger, queueHandler, repository, slackNotifier } = buildMocks()
     const permanentFailure = new Error('primary failure')
     queueHandler.postMessage
       .mockRejectedValueOnce(permanentFailure)
       .mockRejectedValueOnce(new Error('dlq down'))
-    slackNotifier.sendMessage.mockRejectedValueOnce(new Error('slack down'))
 
     const record: OutboxRecord = {
       ...baseRecord,
@@ -187,7 +186,7 @@ describe('OutboxDispatcher', () => {
     await dispatcher.deliver(record, 'ctx')
 
     expect(repository.markFailed).toHaveBeenCalledWith(record.id, permanentFailure, undefined)
-    expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining('Failed to notify Slack about permanent failure'), expect.any(Error))
+    expect(slackNotifier.sendMessage).not.toHaveBeenCalled()
     expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining('Failed to publish dead-letter for outbox delivery failure'), expect.any(Error))
   })
 
