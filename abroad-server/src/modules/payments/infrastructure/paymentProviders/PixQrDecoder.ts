@@ -10,6 +10,7 @@ import { transferoUltraQrPreviewResponseSchema } from '../../../transfero/infras
 import { IPixQrDecoder, PixDecoded, PixQrValidationResult } from '../../application/contracts/IQrDecoder'
 
 const PAYABLE_QR_STATUS = 'CREATED'
+const UNAVAILABLE_QR_STATUS = 'STATUS_UNAVAILABLE'
 
 @injectable()
 export class PixQrDecoder implements IPixQrDecoder {
@@ -47,11 +48,13 @@ export class PixQrDecoder implements IPixQrDecoder {
         params.idempotencyKey,
       )
       const preview = transferoUltraQrPreviewResponseSchema.parse(response)
-      const status = preview.status.trim().toUpperCase()
-      if (status !== PAYABLE_QR_STATUS) {
+      const status = preview.status?.trim().toUpperCase() || null
+      const isPayable = status === PAYABLE_QR_STATUS
+        || (preview.type === 'static' && status === null)
+      if (!isPayable) {
         return {
           code: 'validation',
-          reason: `pix_qr_not_payable:${status}`,
+          reason: `pix_qr_not_payable:${status ?? UNAVAILABLE_QR_STATUS}`,
           success: false,
         }
       }

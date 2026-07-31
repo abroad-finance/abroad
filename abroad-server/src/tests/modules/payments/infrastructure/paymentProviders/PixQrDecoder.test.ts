@@ -57,6 +57,58 @@ describe('PixQrDecoder', () => {
     )
   })
 
+  it('accepts a static QR preview when Ultra has no charge status', async () => {
+    const ultraClient = createUltraClient()
+    ultraClient.post.mockResolvedValue({
+      ...payablePreview,
+      status: null,
+      txid: null,
+      type: 'static',
+      url: null,
+    })
+    const decoder = new PixQrDecoder(
+      ultraClient as unknown as TransferoUltraClient,
+      createMockLogger(),
+    )
+
+    await expect(decoder.validateForPayment({
+      idempotencyKey: 'preview-static',
+      qrCode: 'static-code',
+    })).resolves.toEqual({
+      decoded: {
+        account: 'pix-key',
+        amount: '25.50',
+        currency: 'BRL',
+        name: 'Alice',
+        taxId: null,
+      },
+      success: true,
+    })
+  })
+
+  it('rejects a dynamic QR with no status as validation, not a schema mismatch', async () => {
+    const ultraClient = createUltraClient()
+    const logger = createMockLogger()
+    ultraClient.post.mockResolvedValue({
+      ...payablePreview,
+      status: null,
+    })
+    const decoder = new PixQrDecoder(
+      ultraClient as unknown as TransferoUltraClient,
+      logger,
+    )
+
+    await expect(decoder.validateForPayment({
+      idempotencyKey: 'preview-dynamic-status-unavailable',
+      qrCode: 'dynamic-code',
+    })).resolves.toEqual({
+      code: 'validation',
+      reason: 'pix_qr_not_payable:STATUS_UNAVAILABLE',
+      success: false,
+    })
+    expect(logger.error).not.toHaveBeenCalled()
+  })
+
   it('rejects a non-payable QR status without accepting legacy status aliases', async () => {
     const ultraClient = createUltraClient()
     ultraClient.post.mockResolvedValue({

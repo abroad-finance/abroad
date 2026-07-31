@@ -268,6 +268,27 @@ describe('TransferoPaymentService', () => {
     expect(ultraClient.post).not.toHaveBeenCalled()
   })
 
+  it('does not withdraw after a controlled dynamic QR status rejection', async () => {
+    const { decoder, service, ultraClient } = createService()
+    decoder.validateForPayment.mockResolvedValue({
+      code: 'validation',
+      reason: 'pix_qr_not_payable:STATUS_UNAVAILABLE',
+      success: false,
+    })
+
+    await expect(service.sendPayment({
+      account: 'ignored',
+      id: 'transaction-dynamic-status-unavailable',
+      qrCode: 'dynamic-code',
+      value: 10,
+    })).resolves.toEqual({
+      code: 'validation',
+      reason: 'pix_qr_not_payable:STATUS_UNAVAILABLE',
+      success: false,
+    })
+    expect(ultraClient.post).not.toHaveBeenCalled()
+  })
+
   it('retries only retriable Ultra failures using the same idempotency key', async () => {
     const { service, ultraClient } = createService()
     ultraClient.post

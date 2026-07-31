@@ -50,7 +50,7 @@ export const transferoUltraQrPreviewResponseSchema = z.object({
   merchantCity: z.string().min(1).nullable().optional(),
   merchantName: z.string().min(1).nullable().optional(),
   pixKey: z.string().min(1),
-  status: z.string().min(1),
+  status: z.string().min(1).nullable(),
   txid: z.string().min(1).nullable().optional(),
   type: z.enum(['dynamic', 'static']),
   url: z.string().min(1).nullable().optional(),
