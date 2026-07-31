@@ -1,4 +1,4 @@
-import type { Partner } from '@prisma/client'
+import type { Partner, Prisma } from '@prisma/client'
 
 import { inject, injectable } from 'inversify'
 import jwt from 'jsonwebtoken'
@@ -22,9 +22,18 @@ export type PartnerPortalSession = {
 
 interface PartnerPortalJwtPayload extends jwt.JwtPayload {
   scope: typeof PORTAL_SCOPE
+  sessionVersion: number
   sub: string
   tokenUse: typeof PORTAL_TOKEN_USE
 }
+
+const portalUserWithPartner = {
+  partner: true,
+} satisfies Prisma.PartnerPortalUserInclude
+
+export type PartnerPortalSessionUser = Prisma.PartnerPortalUserGetPayload<{
+  include: typeof portalUserWithPartner
+}>
 
 @injectable()
 export class PartnerPortalSessionService {
@@ -35,12 +44,13 @@ export class PartnerPortalSessionService {
     private readonly secretManager: ISecretManager,
   ) {}
 
-  public async createSession(partner: Partner): Promise<PartnerPortalSession> {
+  public async createSession(portalUser: PartnerPortalSessionUser): Promise<PartnerPortalSession> {
     const signingSecret = await this.getSigningSecret()
     const issuedAtMs = Date.now()
     const accessToken = jwt.sign(
       {
         scope: PORTAL_SCOPE,
+        sessionVersion: portalUser.sessionVersion,
         tokenUse: PORTAL_TOKEN_USE,
       },
       signingSecret,
@@ -49,14 +59,14 @@ export class PartnerPortalSessionService {
         audience: PORTAL_AUDIENCE,
         expiresIn: SESSION_TTL_SECONDS,
         issuer: PORTAL_ISSUER,
-        subject: partner.id,
+        subject: portalUser.id,
       },
     )
 
     return {
       accessToken,
       expiresAt: new Date(issuedAtMs + SESSION_TTL_SECONDS * 1_000),
-      partnerName: partner.name,
+      partnerName: portalUser.partner.name,
     }
   }
 
@@ -74,12 +84,19 @@ export class PartnerPortalSessionService {
       }
 
       const prismaClient = await this.databaseClientProvider.getClient()
-      const partner = await prismaClient.partner.findUnique({ where: { id: payload.sub } })
-      if (!partner) {
-        throw new Error('Partner not found')
+      const portalUser = await prismaClient.partnerPortalUser.findUnique({
+        include: portalUserWithPartner,
+        where: { id: payload.sub },
+      })
+      if (
+        !portalUser
+        || portalUser.disabledAt
+        || portalUser.sessionVersion !== payload.sessionVersion
+      ) {
+        throw new Error('Partner portal user not found')
       }
 
-      return partner
+      return portalUser.partner
     }
     catch {
       throw new Error('Partner portal token verification failed')
@@ -103,6 +120,10 @@ export class PartnerPortalSessionService {
       && payload.sub.trim().length > 0
       && 'scope' in payload
       && payload.scope === PORTAL_SCOPE
+      && 'sessionVersion' in payload
+      && typeof payload.sessionVersion === 'number'
+      && Number.isSafeInteger(payload.sessionVersion)
+      && payload.sessionVersion > 0
       && 'tokenUse' in payload
       && payload.tokenUse === PORTAL_TOKEN_USE
     )

@@ -37,11 +37,18 @@ const queryFromFilters = (filters: PartnerTransactionFilters) => ({
   status: filters.status,
 })
 
-export const createPartnerPortalSession = async (apiKey: string): Promise<PartnerPortalSession> => {
+export const createPartnerPortalSession = async (
+  email: string,
+  password: string,
+): Promise<PartnerPortalSession> => {
   const result = await bootstrapClient.request<PartnerPortalSession, ApiErrorBody>(
     '/partner-portal/session',
     {
-      headers: { 'X-API-Key': apiKey.trim() },
+      body: JSON.stringify({
+        email: email.trim().toLowerCase(),
+        password,
+      }),
+      headers: { 'Content-Type': 'application/json' },
       method: 'POST',
     },
   )

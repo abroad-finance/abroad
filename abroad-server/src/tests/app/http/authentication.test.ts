@@ -111,35 +111,6 @@ describe('expressAuthentication', () => {
     expect(partnerService.authenticateBearerToken).toHaveBeenCalledWith('jwt-token')
   })
 
-  it('bootstraps a portal session only from an explicit partner API key', async () => {
-    const req = buildRequest({
-      header: jest.fn((name: string) => {
-        if (name === 'X-API-Key') return 'partner-key'
-        if (name === 'Origin') return 'https://api-v3.production.decafapi.com'
-        return undefined
-      }) as unknown as Request['header'],
-    })
-
-    const result = await expressAuthentication(req, 'PartnerPortalBootstrapAuth')
-
-    expect(result).toEqual({ ...partner, authenticationSource: 'API_KEY' })
-    expect(partnerService.getPartnerFromApiKey).toHaveBeenCalledWith('partner-key')
-    expect(partnerService.getPartnerFromClientDomain).not.toHaveBeenCalled()
-  })
-
-  it('does not let ambient Origin authentication bootstrap a portal session', async () => {
-    const req = buildRequest({
-      header: jest.fn((name: string) => (
-        name === 'Origin' ? 'https://api-v3.production.decafapi.com' : undefined
-      )) as unknown as Request['header'],
-    })
-
-    await expect(expressAuthentication(req, 'PartnerPortalBootstrapAuth')).rejects.toThrow(
-      'Partner API key not provided',
-    )
-    expect(partnerService.getPartnerFromClientDomain).not.toHaveBeenCalled()
-  })
-
   it('authenticates a purpose-specific partner portal token', async () => {
     const req = buildRequest({ headers: { authorization: 'Bearer portal-token' } })
 

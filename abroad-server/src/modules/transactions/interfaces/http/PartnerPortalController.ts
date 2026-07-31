@@ -3,6 +3,7 @@ import type { Request as ExpressRequest } from 'express'
 import { TransactionStatus } from '@prisma/client'
 import { inject } from 'inversify'
 import {
+  Body,
   Controller,
   Get,
   OperationId,
@@ -18,8 +19,10 @@ import {
   SuccessResponse,
   TsoaResponse,
 } from 'tsoa'
+import { z } from 'zod'
 
-import { PartnerPortalSession, PartnerPortalSessionService } from '../../../partners/application/PartnerPortalSessionService'
+import { PartnerPortalAccountService, PartnerPortalAccountValidationError, PartnerPortalAuthenticationError, PartnerPortalCredentials } from '../../../partners/application/PartnerPortalAccountService'
+import { PartnerPortalSession } from '../../../partners/application/PartnerPortalSessionService'
 import {
   PartnerTransactionDetailDto,
   PartnerTransactionListResponse,
@@ -31,11 +34,16 @@ import {
 
 type ErrorResponse = { reason: string }
 
+const partnerPortalLoginSchema = z.object({
+  email: z.string().trim().email().max(254),
+  password: z.string().min(1).max(128),
+}).strict() satisfies z.ZodType<PartnerPortalCredentials>
+
 @Route('partner-portal')
 export class PartnerPortalController extends Controller {
   public constructor(
-    @inject(PartnerPortalSessionService)
-    private readonly sessionService: PartnerPortalSessionService,
+    @inject(PartnerPortalAccountService)
+    private readonly accountService: PartnerPortalAccountService,
     @inject(PartnerTransactionQueryService)
     private readonly transactionQueryService: PartnerTransactionQueryService,
   ) {
@@ -44,11 +52,32 @@ export class PartnerPortalController extends Controller {
 
   @OperationId('CreatePartnerPortalSession')
   @Post('session')
-  @Security('PartnerPortalBootstrapAuth')
+  @Response<400, { reason: string }>(400, 'Bad Request')
+  @Response<401, { reason: string }>(401, 'Unauthorized')
   @SuccessResponse('200', 'Partner portal session created')
-  public async createSession(@Request() request: ExpressRequest): Promise<PartnerPortalSession> {
+  public async createSession(
+    @Body() body: PartnerPortalCredentials,
+    @Res() badRequest: TsoaResponse<400, ErrorResponse>,
+    @Res() unauthorized: TsoaResponse<401, ErrorResponse>,
+  ): Promise<PartnerPortalSession> {
     this.setHeader('Cache-Control', 'no-store')
-    return this.sessionService.createSession(request.user)
+    const parsedBody = partnerPortalLoginSchema.safeParse(body)
+    if (!parsedBody.success) {
+      return badRequest(400, { reason: 'Enter a valid email and password' })
+    }
+
+    try {
+      return await this.accountService.authenticate(parsedBody.data)
+    }
+    catch (error) {
+      if (error instanceof PartnerPortalAuthenticationError) {
+        return unauthorized(401, { reason: error.message })
+      }
+      if (error instanceof PartnerPortalAccountValidationError) {
+        return badRequest(400, { reason: 'Enter a valid email and password' })
+      }
+      throw error
+    }
   }
 
   @Get('transactions/export.csv')

@@ -5,12 +5,12 @@ import type { TsoaResponse } from '@tsoa/runtime'
 
 import { TransactionStatus } from '@prisma/client'
 
-import { PartnerPortalSessionService } from '../../../../../modules/partners/application/PartnerPortalSessionService'
+import { PartnerPortalAccountService, PartnerPortalAuthenticationError } from '../../../../../modules/partners/application/PartnerPortalAccountService'
 import { PartnerTransactionNotFoundError, PartnerTransactionQueryService, PartnerTransactionQueryValidationError } from '../../../../../modules/transactions/application/PartnerTransactionQueryService'
 import { PartnerPortalController } from '../../../../../modules/transactions/interfaces/http/PartnerPortalController'
 
+type AccountServiceMock = Pick<PartnerPortalAccountService, 'authenticate'>
 type QueryServiceMock = Pick<PartnerTransactionQueryService, 'exportCsv' | 'getById' | 'search'>
-type SessionServiceMock = Pick<PartnerPortalSessionService, 'createSession'>
 
 const partner = { id: 'partner-1', name: 'Decaf' } as Partner
 const request = { user: partner } as unknown as import('express').Request
@@ -19,21 +19,25 @@ const badRequestResponder = (): TsoaResponse<400, { reason: string }> => (
   jest.fn((_status: 400, payload: { reason: string }) => payload)
 )
 
+const unauthorizedResponder = (): TsoaResponse<401, { reason: string }> => (
+  jest.fn((_status: 401, payload: { reason: string }) => payload)
+)
+
 const notFoundResponder = (): TsoaResponse<404, { reason: string }> => (
   jest.fn((_status: 404, payload: { reason: string }) => payload)
 )
 
-const buildSessionService = (): jest.Mocked<SessionServiceMock> => {
-  const createSession = jest.fn<
-    ReturnType<PartnerPortalSessionService['createSession']>,
-    Parameters<PartnerPortalSessionService['createSession']>
+const buildAccountService = (): jest.Mocked<AccountServiceMock> => {
+  const authenticate = jest.fn<
+    ReturnType<PartnerPortalAccountService['authenticate']>,
+    Parameters<PartnerPortalAccountService['authenticate']>
   >()
-  createSession.mockResolvedValue({
+  authenticate.mockResolvedValue({
     accessToken: 'portal-token',
     expiresAt: new Date('2026-07-31T12:30:00.000Z'),
     partnerName: 'Decaf',
   })
-  return { createSession }
+  return { authenticate }
 }
 
 const buildQueryService = (): jest.Mocked<QueryServiceMock> => {
@@ -65,29 +69,72 @@ const buildQueryService = (): jest.Mocked<QueryServiceMock> => {
 }
 
 const buildController = (
-  sessionService: SessionServiceMock = buildSessionService(),
+  accountService: AccountServiceMock = buildAccountService(),
   queryService: QueryServiceMock = buildQueryService(),
 ) => new PartnerPortalController(
-  sessionService as PartnerPortalSessionService,
+  accountService as PartnerPortalAccountService,
   queryService as PartnerTransactionQueryService,
 )
 
 describe('PartnerPortalController', () => {
-  it('creates a no-store session for the authenticated partner', async () => {
-    const sessionService = buildSessionService()
-    const controller = buildController(sessionService)
+  it('creates a no-store session from email and password', async () => {
+    const accountService = buildAccountService()
+    const controller = buildController(accountService)
     const setHeader = jest.spyOn(controller, 'setHeader')
 
-    const result = await controller.createSession(request)
+    const result = await controller.createSession(
+      { email: ' Operator@Decaf.So ', password: 'correct horse battery staple' },
+      badRequestResponder(),
+      unauthorizedResponder(),
+    )
 
-    expect(sessionService.createSession).toHaveBeenCalledWith(partner)
+    expect(accountService.authenticate).toHaveBeenCalledWith({
+      email: 'Operator@Decaf.So',
+      password: 'correct horse battery staple',
+    })
     expect(setHeader).toHaveBeenCalledWith('Cache-Control', 'no-store')
     expect(result.accessToken).toBe('portal-token')
   })
 
+  it('rejects malformed credentials before authentication', async () => {
+    const accountService = buildAccountService()
+    const controller = buildController(accountService)
+    const badRequest = badRequestResponder()
+
+    const result = await controller.createSession(
+      { email: 'not-an-email', password: '' },
+      badRequest,
+      unauthorizedResponder(),
+    )
+
+    expect(result).toEqual({ reason: 'Enter a valid email and password' })
+    expect(badRequest).toHaveBeenCalledWith(400, {
+      reason: 'Enter a valid email and password',
+    })
+    expect(accountService.authenticate).not.toHaveBeenCalled()
+  })
+
+  it('returns one generic authentication error for invalid credentials', async () => {
+    const accountService = buildAccountService()
+    accountService.authenticate.mockRejectedValueOnce(new PartnerPortalAuthenticationError())
+    const controller = buildController(accountService)
+    const unauthorized = unauthorizedResponder()
+
+    const result = await controller.createSession(
+      { email: 'operator@decaf.so', password: 'incorrect-password' },
+      badRequestResponder(),
+      unauthorized,
+    )
+
+    expect(result).toEqual({ reason: 'Email or password is incorrect' })
+    expect(unauthorized).toHaveBeenCalledWith(401, {
+      reason: 'Email or password is incorrect',
+    })
+  })
+
   it('forwards tenant-owned list filters and pagination', async () => {
     const queryService = buildQueryService()
-    const controller = buildController(buildSessionService(), queryService)
+    const controller = buildController(buildAccountService(), queryService)
 
     await controller.listTransactions(
       request,
@@ -113,7 +160,7 @@ describe('PartnerPortalController', () => {
   it('maps public query validation failures to HTTP 400', async () => {
     const queryService = buildQueryService()
     queryService.search.mockRejectedValue(new PartnerTransactionQueryValidationError('Invalid dates'))
-    const controller = buildController(buildSessionService(), queryService)
+    const controller = buildController(buildAccountService(), queryService)
     const badRequest = badRequestResponder()
 
     const result = await controller.listTransactions(request, badRequest)
@@ -125,7 +172,7 @@ describe('PartnerPortalController', () => {
   it('returns the same HTTP 404 for unavailable transaction details', async () => {
     const queryService = buildQueryService()
     queryService.getById.mockRejectedValue(new PartnerTransactionNotFoundError())
-    const controller = buildController(buildSessionService(), queryService)
+    const controller = buildController(buildAccountService(), queryService)
     const notFound = notFoundResponder()
 
     const result = await controller.getTransaction('transaction-1', request, notFound)
@@ -138,7 +185,7 @@ describe('PartnerPortalController', () => {
   it('sets bounded download headers for CSV exports', async () => {
     const queryService = buildQueryService()
     queryService.exportCsv.mockResolvedValue({ csv: 'header\r\n', rowCount: 5_000, truncated: true })
-    const controller = buildController(buildSessionService(), queryService)
+    const controller = buildController(buildAccountService(), queryService)
     const setHeader = jest.spyOn(controller, 'setHeader')
 
     const result = await controller.exportTransactions(

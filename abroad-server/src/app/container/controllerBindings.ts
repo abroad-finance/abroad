@@ -8,6 +8,7 @@ import { PublicCorridorController } from '../../modules/flows/interfaces/http/Pu
 import { KycController } from '../../modules/kyc/interfaces/http/KycController'
 import { OpsKycController } from '../../modules/kyc/interfaces/http/OpsKycController'
 import { OpsPartnerController } from '../../modules/partners/interfaces/http/OpsPartnerController'
+import { OpsPartnerPortalController } from '../../modules/partners/interfaces/http/OpsPartnerPortalController'
 import { PartnerController } from '../../modules/partners/interfaces/http/PartnerController'
 import { PartnerUserController } from '../../modules/partners/interfaces/http/PartnerUserController'
 import { CeloPaymentsController } from '../../modules/payments/interfaces/http/CeloPaymentsController'
@@ -35,6 +36,7 @@ const controllerBindings: ReadonlyArray<BindingRegistration<unknown>> = [
   { bindSelf: true, identifier: OpsKycController, implementation: OpsKycController },
   { bindSelf: true, identifier: PartnerController, implementation: PartnerController },
   { bindSelf: true, identifier: OpsPartnerController, implementation: OpsPartnerController },
+  { bindSelf: true, identifier: OpsPartnerPortalController, implementation: OpsPartnerPortalController },
   { bindSelf: true, identifier: PartnerUserController, implementation: PartnerUserController },
   { bindSelf: true, identifier: QuoteController, implementation: QuoteController },
   { bindSelf: true, identifier: PixCheckoutTelemetryController, implementation: PixCheckoutTelemetryController },

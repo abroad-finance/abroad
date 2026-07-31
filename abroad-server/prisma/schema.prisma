@@ -25,7 +25,25 @@ model Partner {
   needsKyc      Boolean?      @default(true)
   webhookUrl    String?
   users         PartnerUser[]
+  portalUsers   PartnerPortalUser[]
   quotes        Quote[]
+}
+
+model PartnerPortalUser {
+  id                  String   @id @default(uuid())
+  partnerId           String
+  partner             Partner  @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  email               String   @unique
+  passwordVerifier    String
+  sessionVersion      Int      @default(1)
+  failedLoginAttempts Int      @default(0)
+  lockedUntil         DateTime?
+  lastLoginAt         DateTime?
+  disabledAt          DateTime?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([partnerId])
 }
 
 model PartnerUser {

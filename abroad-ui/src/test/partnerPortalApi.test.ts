@@ -30,10 +30,15 @@ afterEach(() => {
 afterAll(() => server.close())
 
 describe('partner portal API', () => {
-  it('exchanges the trimmed API key without attaching a bearer token', async () => {
-    server.use(http.post('https://api.abroad.finance/partner-portal/session', ({ request }) => {
-      expect(request.headers.get('x-api-key')).toBe('partner-key')
+  it('exchanges normalized credentials without attaching a bearer token', async () => {
+    server.use(http.post('https://api.abroad.finance/partner-portal/session', async ({ request }) => {
+      expect(request.headers.get('content-type')).toBe('application/json')
+      expect(request.headers.get('x-api-key')).toBeNull()
       expect(request.headers.get('authorization')).toBeNull()
+      await expect(request.json()).resolves.toEqual({
+        email: 'operator@decaf.so',
+        password: 'secret portal password',
+      })
       return HttpResponse.json({
         accessToken: 'portal-token',
         expiresAt: '2099-01-01T00:00:00.000Z',
@@ -41,7 +46,10 @@ describe('partner portal API', () => {
       })
     }))
 
-    const session = await createPartnerPortalSession('  partner-key  ')
+    const session = await createPartnerPortalSession(
+      '  Operator@Decaf.So  ',
+      'secret portal password',
+    )
 
     expect(session.partnerName).toBe('Decaf')
   })

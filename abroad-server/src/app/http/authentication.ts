@@ -78,15 +78,6 @@ export async function expressAuthentication(
     throw new Error('API key not provided')
   }
 
-  if (securityName === 'PartnerPortalBootstrapAuth') {
-    const apiKey = request.header('X-API-Key')
-    if (!apiKey) {
-      throw new Error('Partner API key not provided')
-    }
-    const partner = await partnerService.getPartnerFromApiKey(apiKey)
-    return withAuthenticationSource(partner, 'API_KEY')
-  }
-
   if (securityName === 'PartnerPortalAuth') {
     const token = resolveBearerToken(request.headers.authorization)
     if (!token) {

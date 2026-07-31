@@ -8,6 +8,7 @@ import type {
   OpsPartnerRotateApiKeyResult,
   OpsPartnerSummary,
 } from '../../application/OpsPartnerService'
+import type { PartnerPortalCredentials, PartnerPortalUserProvisioningResult } from '../../application/PartnerPortalAccountService'
 
 import { createPartnerRequestSchema } from './contracts'
 
@@ -21,6 +22,8 @@ export type OpsPartnerListResponse = OpsPartnerListResult
 export type OpsRotatePartnerApiKeyResponse = OpsPartnerRotateApiKeyResult
 export type OpsUpdatePartnerClientDomainRequest = OpsPartnerClientDomainInput
 export type OpsUpdatePartnerClientDomainResponse = OpsPartnerSummary
+export type OpsUpsertPartnerPortalUserRequest = PartnerPortalCredentials
+export type OpsUpsertPartnerPortalUserResponse = PartnerPortalUserProvisioningResult
 
 const partnerIdSchema = z.string().uuid()
 const paginationSchema = z.object({
@@ -30,6 +33,10 @@ const paginationSchema = z.object({
 const updatePartnerClientDomainSchema = z.object({
   clientDomain: z.string().nullable(),
 }).strict() satisfies z.ZodType<OpsUpdatePartnerClientDomainRequest>
+const upsertPartnerPortalUserSchema = z.object({
+  email: z.string().trim().email().max(254),
+  password: z.string().min(12).max(128),
+}).strict() satisfies z.ZodType<OpsUpsertPartnerPortalUserRequest>
 
 type PaginationInput = {
   page?: number
@@ -38,6 +45,7 @@ type PaginationInput = {
 
 export const opsCreatePartnerRequestSchema = createPartnerRequestSchema
 export const opsUpdatePartnerClientDomainRequestSchema = updatePartnerClientDomainSchema
+export const opsUpsertPartnerPortalUserRequestSchema = upsertPartnerPortalUserSchema
 
 export const parsePartnerId = (value: string): { data: string } | { error: string } => {
   const parsed = partnerIdSchema.safeParse(value)

@@ -1,5 +1,5 @@
 import {
-  ArrowRight, Eye, EyeOff, KeyRound, LoaderCircle, ShieldCheck,
+  ArrowRight, Eye, EyeOff, LoaderCircle, LockKeyhole, Mail, ShieldCheck,
 } from 'lucide-react'
 import { FormEvent, useState } from 'react'
 
@@ -8,21 +8,23 @@ import { createPartnerPortalSession } from '../../services/partnerPortal/partner
 import { setPartnerPortalSession } from '../../services/partnerPortal/partnerPortalSessionStore'
 
 const PartnerPortalSignIn = () => {
-  const [apiKey, setApiKey] = useState('')
+  const [email, setEmail] = useState('')
   const [error, setError] = useState<null | string>(null)
   const [loading, setLoading] = useState(false)
-  const [showKey, setShowKey] = useState(false)
+  const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    const normalizedKey = apiKey.trim()
-    if (!normalizedKey || loading) return
+    const normalizedEmail = email.trim().toLowerCase()
+    if (!normalizedEmail || !password || loading) return
 
     setLoading(true)
     setError(null)
     try {
-      const session = await createPartnerPortalSession(normalizedKey)
-      setApiKey('')
+      const session = await createPartnerPortalSession(normalizedEmail, password)
+      setEmail('')
+      setPassword('')
       setPartnerPortalSession(session)
     }
     catch (caught) {
@@ -41,7 +43,7 @@ const PartnerPortalSignIn = () => {
         <img alt="Abroad" className="h-9 w-auto" src={AbroadLogo} />
 
         <div className="mt-10 inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-partner-mint text-partner-forest">
-          <KeyRound aria-hidden className="h-5 w-5" />
+          <LockKeyhole aria-hidden className="h-5 w-5" />
         </div>
         <p className="mt-6 text-xs font-semibold uppercase tracking-[0.24em] text-partner-forest">
           Partner workspace
@@ -50,31 +52,47 @@ const PartnerPortalSignIn = () => {
           Your transaction ledger
         </h1>
         <p className="mt-3 text-sm leading-6 text-partner-muted">
-          Enter your Abroad partner API key to open a temporary, read-only session.
+          Sign in with the credentials provided by Abroad to open your read-only workspace.
         </p>
 
         <form className="mt-8" onSubmit={event => void submit(event)}>
-          <label className="partner-label" htmlFor="partner-api-key">Partner API key</label>
+          <label className="partner-label" htmlFor="partner-email">Email</label>
           <div className="relative mt-2">
+            <Mail aria-hidden className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-partner-muted" />
             <input
               autoCapitalize="none"
-              autoComplete="off"
+              autoComplete="username"
+              className="partner-input w-full pl-10"
+              disabled={loading}
+              id="partner-email"
+              inputMode="email"
+              onChange={event => setEmail(event.target.value)}
+              placeholder="you@company.com"
+              spellCheck={false}
+              type="email"
+              value={email}
+            />
+          </div>
+
+          <label className="partner-label mt-5 block" htmlFor="partner-password">Password</label>
+          <div className="relative mt-2">
+            <input
+              autoComplete="current-password"
               className="partner-input w-full pr-12"
               disabled={loading}
-              id="partner-api-key"
-              onChange={event => setApiKey(event.target.value)}
-              placeholder="Paste your API key"
-              spellCheck={false}
-              type={showKey ? 'text' : 'password'}
-              value={apiKey}
+              id="partner-password"
+              onChange={event => setPassword(event.target.value)}
+              placeholder="Enter your password"
+              type={showPassword ? 'text' : 'password'}
+              value={password}
             />
             <button
-              aria-label={showKey ? 'Hide API key' : 'Show API key'}
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
               className="absolute inset-y-0 right-0 flex w-11 items-center justify-center text-partner-muted transition hover:text-partner-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-partner-forest"
-              onClick={() => setShowKey(current => !current)}
+              onClick={() => setShowPassword(current => !current)}
               type="button"
             >
-              {showKey ? <EyeOff aria-hidden className="h-4 w-4" /> : <Eye aria-hidden className="h-4 w-4" />}
+              {showPassword ? <EyeOff aria-hidden className="h-4 w-4" /> : <Eye aria-hidden className="h-4 w-4" />}
             </button>
           </div>
 
@@ -86,20 +104,20 @@ const PartnerPortalSignIn = () => {
 
           <button
             className="partner-button-primary mt-5 w-full"
-            disabled={!apiKey.trim() || loading}
+            disabled={!email.trim() || !password || loading}
             type="submit"
           >
             {loading
               ? <LoaderCircle aria-hidden className="h-4 w-4 animate-spin motion-reduce:animate-none" />
               : <ArrowRight aria-hidden className="h-4 w-4" />}
-            {loading ? 'Opening workspace…' : 'Open transactions'}
+            {loading ? 'Signing in…' : 'Sign in'}
           </button>
         </form>
 
         <div className="mt-7 flex gap-3 border-t border-partner-border pt-6 text-xs leading-5 text-partner-muted">
           <ShieldCheck aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-partner-forest" />
           <p>
-            Your key is exchanged for a 30-minute read-only session and is never saved in this browser.
+            Your password is never saved in this browser. Sessions are read-only and expire after 30 minutes.
           </p>
         </div>
       </section>

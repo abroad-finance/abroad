@@ -19,6 +19,8 @@ import { TreasuryTransferStepExecutor } from '../../modules/flows/application/st
 import { KycSubmissionService } from '../../modules/kyc/application/KycSubmissionService'
 import { OpsKycService } from '../../modules/kyc/application/OpsKycService'
 import { OpsPartnerService } from '../../modules/partners/application/OpsPartnerService'
+import { PartnerPortalAccountService } from '../../modules/partners/application/PartnerPortalAccountService'
+import { PartnerPortalPasswordService } from '../../modules/partners/application/PartnerPortalPasswordService'
 import { PartnerPortalSessionService } from '../../modules/partners/application/PartnerPortalSessionService'
 import { CryptoAssetConfigService } from '../../modules/payments/application/CryptoAssetConfigService'
 import { DepositVerifierRegistry } from '../../modules/payments/application/DepositVerifierRegistry'
@@ -117,7 +119,9 @@ const domainBindings: ReadonlyArray<BindingRegistration<unknown>> = [
   { bindSelf: true, identifier: KycSubmissionService, implementation: KycSubmissionService },
   { bindSelf: true, identifier: OpsKycService, implementation: OpsKycService },
   { bindSelf: true, identifier: OpsPartnerService, implementation: OpsPartnerService },
+  { bindSelf: true, identifier: PartnerPortalPasswordService, implementation: PartnerPortalPasswordService },
   { bindSelf: true, identifier: PartnerPortalSessionService, implementation: PartnerPortalSessionService },
+  { bindSelf: true, identifier: PartnerPortalAccountService, implementation: PartnerPortalAccountService },
   { bindSelf: true, identifier: FlowDefinitionBuilder, implementation: FlowDefinitionBuilder },
   { bindSelf: true, identifier: FlowDefinitionService, implementation: FlowDefinitionService },
   { bindSelf: true, identifier: FlowCorridorService, implementation: FlowCorridorService },
