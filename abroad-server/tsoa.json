@@ -23,6 +23,16 @@
         "in": "header",
         "name": "X-OPS-API-KEY"
       },
+      "PartnerPortalBootstrapAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-API-Key"
+      },
+      "PartnerPortalAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      },
       "BearerAuth": {
         "type": "http",
         "scheme": "bearer",

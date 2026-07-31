@@ -1,5 +1,7 @@
 import { lazy, Suspense } from 'react'
-import { Route, BrowserRouter as Router, Routes } from 'react-router-dom'
+import {
+  Navigate, Route, BrowserRouter as Router, Routes,
+} from 'react-router-dom'
 
 // Route-level code splitting
 const ProductApplicationShell = lazy(() => import('./ProductApplicationShell'))
@@ -17,13 +19,21 @@ const TransactionsList = lazy(() => import('./pages/Ops/TransactionsList'))
 const TransactionDetail = lazy(() => import('./pages/Ops/TransactionDetail'))
 const BridgeOps = lazy(() => import('./pages/Ops/BridgeOps'))
 const TreasuryDashboard = lazy(() => import('./pages/Ops/TreasuryDashboard'))
+const PartnerPortalShell = lazy(() => import('./pages/PartnerPortal/PartnerPortalShell'))
+const PartnerTransactions = lazy(() => import('./pages/PartnerPortal/PartnerTransactions'))
+const PartnerTransactionDetail = lazy(() => import('./pages/PartnerPortal/PartnerTransactionDetail'))
 
 function App() {
   return (
     <Router>
-      <Suspense fallback={<div />}>
+      <Suspense fallback={<div aria-label="Loading page" className="min-h-screen bg-[#F5F8F6]" role="status" />}>
         <Routes>
           <Route element={<TransparencyDashboard />} path="/transparency" />
+          <Route element={<PartnerPortalShell />}>
+            <Route element={<Navigate replace to="/partner/transactions" />} path="/partner" />
+            <Route element={<PartnerTransactions />} path="/partner/transactions" />
+            <Route element={<PartnerTransactionDetail />} path="/partner/transactions/:transactionId" />
+          </Route>
           <Route element={<ProductApplicationShell />}>
             <Route element={<WebSwap />} path="/" />
             <Route element={<Meridian />} path="/meridian" />

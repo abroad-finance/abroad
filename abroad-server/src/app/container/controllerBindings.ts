@@ -19,6 +19,7 @@ import { SolanaPaymentsController } from '../../modules/payments/interfaces/http
 import { QuoteController } from '../../modules/quotes/interfaces/http/QuoteController'
 import { PixCheckoutTelemetryController } from '../../modules/telemetry/interfaces/http/PixCheckoutTelemetryController'
 import { OpsTransactionsController } from '../../modules/transactions/interfaces/http/OpsTransactionsController'
+import { PartnerPortalController } from '../../modules/transactions/interfaces/http/PartnerPortalController'
 import { PublicTransactionsController } from '../../modules/transactions/interfaces/http/PublicTransactionsController'
 import { TransactionController } from '../../modules/transactions/interfaces/http/TransactionController'
 import { TransactionsController } from '../../modules/transactions/interfaces/http/TransactionsController'
@@ -41,6 +42,7 @@ const controllerBindings: ReadonlyArray<BindingRegistration<unknown>> = [
   { bindSelf: true, identifier: TransactionsController, implementation: TransactionsController },
   { bindSelf: true, identifier: PublicTransactionsController, implementation: PublicTransactionsController },
   { bindSelf: true, identifier: OpsTransactionsController, implementation: OpsTransactionsController },
+  { bindSelf: true, identifier: PartnerPortalController, implementation: PartnerPortalController },
   { bindSelf: true, identifier: TransparencyMetricsController, implementation: TransparencyMetricsController },
   { bindSelf: true, identifier: PaymentsController, implementation: PaymentsController },
   { bindSelf: true, identifier: CryptoAssetController, implementation: CryptoAssetController },

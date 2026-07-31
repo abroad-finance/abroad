@@ -3,6 +3,7 @@ import { Request } from 'express'
 import type { ClientDomain } from '../../modules/partners/domain/clientDomain'
 
 import { AuthenticatedPartner, IPartnerService, PartnerAuthenticationSource } from '../../modules/partners/application/contracts/IPartnerService'
+import { PartnerPortalSessionService } from '../../modules/partners/application/PartnerPortalSessionService'
 import { parseClientDomain } from '../../modules/partners/domain/clientDomain'
 import { iocContainer } from '../container'
 import { TYPES } from '../container/types'
@@ -75,6 +76,31 @@ export async function expressAuthentication(
     }
 
     throw new Error('API key not provided')
+  }
+
+  if (securityName === 'PartnerPortalBootstrapAuth') {
+    const apiKey = request.header('X-API-Key')
+    if (!apiKey) {
+      throw new Error('Partner API key not provided')
+    }
+    const partner = await partnerService.getPartnerFromApiKey(apiKey)
+    return withAuthenticationSource(partner, 'API_KEY')
+  }
+
+  if (securityName === 'PartnerPortalAuth') {
+    const token = resolveBearerToken(request.headers.authorization)
+    if (!token) {
+      throw new Error('Partner portal token not provided')
+    }
+
+    try {
+      const sessionService = iocContainer.get<PartnerPortalSessionService>(PartnerPortalSessionService)
+      const partner = await sessionService.verifySession(token)
+      return withAuthenticationSource(partner, 'PARTNER_PORTAL')
+    }
+    catch {
+      throw new Error('Invalid partner portal token')
+    }
   }
 
   if (securityName === 'BearerAuth') {

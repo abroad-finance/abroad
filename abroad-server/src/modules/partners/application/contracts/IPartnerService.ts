@@ -20,5 +20,6 @@ export interface IPartnerService {
 export type PartnerAuthenticationSource
   = | 'API_KEY'
     | 'CLIENT_DOMAIN'
+    | 'PARTNER_PORTAL'
     | 'SEP_24'
     | 'WALLET'

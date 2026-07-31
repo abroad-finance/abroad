@@ -58,6 +58,150 @@
   /* Ops card elevation — one canonical shadow, plus a tighter variant for nested tiles */
   --shadow-ops-card: 0 20px 45px -35px rgba(15, 23, 42, 0.45);
   --shadow-ops-card-sm: 0 15px 40px -34px rgba(15, 23, 42, 0.5);
+
+  /* ── Partner transaction workspace ── */
+  --color-partner-ink: #14231F;
+  --color-partner-forest: #245E54;
+  --color-partner-forest-hover: #194B43;
+  --color-partner-mint: #BEE7D9;
+  --color-partner-ledger: #F5F8F6;
+  --color-partner-muted: #61706B;
+  --color-partner-border: #DCE6E1;
+  --shadow-partner-sheet: 0 24px 70px -52px rgba(20, 35, 31, 0.5);
+}
+
+@layer components {
+  .partner-page {
+    @apply bg-partner-ledger font-cereal text-partner-ink;
+    background-image:
+      radial-gradient(circle at 10% -10%, rgba(190, 231, 217, 0.55), transparent 34rem),
+      radial-gradient(circle at 100% 10%, rgba(255, 255, 255, 0.85), transparent 30rem);
+  }
+
+  .partner-login-panel {
+    @apply rounded-[1.75rem] border border-partner-border bg-white p-7 shadow-partner-sheet sm:p-10;
+  }
+
+  .partner-login-orb {
+    @apply pointer-events-none fixed rounded-full blur-3xl;
+  }
+
+  .partner-login-orb-left {
+    @apply -left-24 top-24 h-72 w-72 bg-partner-mint/55;
+  }
+
+  .partner-login-orb-right {
+    @apply -right-20 bottom-10 h-80 w-80 bg-white/90;
+  }
+
+  .partner-eyebrow {
+    @apply text-xs font-semibold uppercase tracking-[0.24em] text-partner-forest;
+  }
+
+  .partner-label {
+    @apply text-[0.6875rem] font-semibold uppercase tracking-[0.16em] text-partner-muted;
+  }
+
+  .partner-input {
+    @apply h-11 rounded-xl border border-partner-border bg-white px-3.5 text-sm text-partner-ink shadow-sm outline-none placeholder:text-partner-muted/65 focus:border-partner-forest focus:ring-2 focus:ring-partner-mint disabled:cursor-not-allowed disabled:opacity-60;
+  }
+
+  .partner-button-primary {
+    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-partner-forest bg-partner-forest px-4 py-2.5 text-sm font-semibold text-white transition hover:border-partner-forest-hover hover:bg-partner-forest-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-partner-forest focus-visible:ring-offset-2 focus-visible:ring-offset-partner-ledger disabled:cursor-not-allowed disabled:opacity-55;
+  }
+
+  .partner-button-secondary {
+    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-partner-border bg-white px-4 py-2.5 text-sm font-semibold text-partner-ink transition hover:border-partner-forest/40 hover:bg-partner-ledger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-partner-forest focus-visible:ring-offset-2 focus-visible:ring-offset-partner-ledger disabled:cursor-not-allowed disabled:opacity-55;
+  }
+
+  .partner-icon-button {
+    @apply inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-partner-border bg-white text-partner-forest transition hover:border-partner-forest/40 hover:bg-partner-ledger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-partner-forest focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-40;
+  }
+
+  .partner-skip-link {
+    @apply fixed left-4 top-3 z-50 -translate-y-20 rounded-lg bg-partner-ink px-4 py-2 text-sm font-semibold text-white transition-transform focus:translate-y-0 focus:outline-none;
+  }
+
+  .partner-spectrum {
+    @apply rounded-[1.25rem] border border-partner-border bg-white p-5 shadow-partner-sheet sm:p-6;
+  }
+
+  .partner-spectrum-button {
+    @apply flex min-w-0 items-center justify-between gap-2 rounded-xl border border-transparent bg-partner-ledger px-3 py-2.5 text-left text-xs text-partner-muted transition hover:border-partner-border hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-partner-forest;
+  }
+
+  .partner-spectrum-button strong {
+    @apply font-semibold tabular-nums text-partner-ink;
+  }
+
+  .partner-spectrum-button-active {
+    @apply border-partner-forest/30 bg-partner-mint/45 text-partner-forest;
+  }
+
+  .partner-filter-bar {
+    @apply flex flex-col gap-4 rounded-[1.25rem] border border-partner-border bg-white p-4 shadow-partner-sheet lg:flex-row lg:items-end;
+  }
+
+  .partner-table-shell {
+    @apply overflow-hidden rounded-[1.25rem] border border-partner-border bg-white shadow-partner-sheet transition-opacity;
+  }
+
+  .partner-table-shell thead {
+    @apply bg-partner-ledger;
+  }
+
+  .partner-table-shell th {
+    @apply border-b border-partner-border px-4 py-3 text-[0.6875rem] font-semibold uppercase tracking-[0.14em] text-partner-muted;
+  }
+
+  .partner-table-shell td {
+    @apply border-b border-partner-border/75 px-4 py-4 align-middle;
+  }
+
+  .partner-table-shell tbody tr:last-child td {
+    @apply border-b-0;
+  }
+
+  .partner-table-shell tbody tr {
+    @apply transition-colors hover:bg-partner-ledger/70;
+  }
+
+  .partner-mobile-transaction {
+    @apply block rounded-[1.25rem] border border-partner-border bg-white p-5 shadow-partner-sheet transition hover:border-partner-forest/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-partner-forest;
+  }
+
+  .partner-empty-state {
+    @apply flex items-center justify-center gap-3 rounded-[1.25rem] border border-dashed border-partner-border bg-white/70 p-8 text-sm text-partner-muted;
+  }
+
+  .partner-detail-sheet {
+    @apply overflow-hidden rounded-[1.25rem] border border-partner-border bg-white shadow-partner-sheet;
+  }
+
+  .partner-timeline {
+    @apply ml-2 border-l border-partner-border;
+  }
+
+  .partner-timeline-item {
+    @apply relative pl-7;
+  }
+
+  .partner-timeline-node {
+    @apply absolute -left-[0.4375rem] top-1 h-3 w-3 rounded-full border-2 border-white ring-2 ring-partner-border;
+  }
+
+  .partner-notification-row {
+    @apply flex items-start gap-3 rounded-2xl border border-partner-border bg-white p-4 shadow-partner-sheet;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .partner-page *,
+  .partner-page *::before,
+  .partner-page *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 /* ── Light mode (default) ── */
