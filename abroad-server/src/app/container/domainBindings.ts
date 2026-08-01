@@ -21,8 +21,16 @@ import { OpsKycService } from '../../modules/kyc/application/OpsKycService'
 import { OpsOverviewService } from '../../modules/operations/application/OpsOverviewService'
 import { OpsPartnerService } from '../../modules/partners/application/OpsPartnerService'
 import { PartnerPortalAccountService } from '../../modules/partners/application/PartnerPortalAccountService'
+import { PartnerPortalApiKeyService } from '../../modules/partners/application/PartnerPortalApiKeyService'
+import { PartnerPortalAuditService } from '../../modules/partners/application/PartnerPortalAuditService'
+import { PartnerPortalIdentityService } from '../../modules/partners/application/PartnerPortalIdentityService'
+import { PartnerPortalMfaService } from '../../modules/partners/application/PartnerPortalMfaService'
 import { PartnerPortalPasswordService } from '../../modules/partners/application/PartnerPortalPasswordService'
+import { PartnerPortalSecretEnvelopeService } from '../../modules/partners/application/PartnerPortalSecretEnvelopeService'
 import { PartnerPortalSessionService } from '../../modules/partners/application/PartnerPortalSessionService'
+import { PartnerPortalTeamService } from '../../modules/partners/application/PartnerPortalTeamService'
+import { PartnerPortalWebhookService } from '../../modules/partners/application/PartnerPortalWebhookService'
+import { PartnerWebhookSecretResolver } from '../../modules/partners/application/PartnerWebhookSecretResolver'
 import { CryptoAssetConfigService } from '../../modules/payments/application/CryptoAssetConfigService'
 import { DepositVerifierRegistry } from '../../modules/payments/application/DepositVerifierRegistry'
 import { LiquidityCacheService } from '../../modules/payments/application/LiquidityCacheService'
@@ -46,7 +54,10 @@ import { QuoteUseCase } from '../../modules/quotes/application/quoteUseCase'
 import { FlowCorridorPricingProvider } from '../../modules/quotes/infrastructure/FlowCorridorPricingProvider'
 import { OpsTransactionQueryService } from '../../modules/transactions/application/OpsTransactionQueryService'
 import { OpsTransactionReconciliationService } from '../../modules/transactions/application/OpsTransactionReconciliationService'
+import { PartnerPixReceiptService } from '../../modules/transactions/application/PartnerPixReceiptService'
+import { PartnerPixReconciliationService } from '../../modules/transactions/application/PartnerPixReconciliationService'
 import { PartnerTransactionQueryService } from '../../modules/transactions/application/PartnerTransactionQueryService'
+import { PartnerWebhookRedeliveryService } from '../../modules/transactions/application/PartnerWebhookRedeliveryService'
 import { ReceivedCryptoTransactionUseCase } from '../../modules/transactions/application/receivedCryptoTransactionUseCase'
 import { StellarOrphanRefundService } from '../../modules/transactions/application/StellarOrphanRefundService'
 import { TransactionAcceptanceService } from '../../modules/transactions/application/TransactionAcceptanceService'
@@ -113,7 +124,10 @@ const domainBindings: ReadonlyArray<BindingRegistration<unknown>> = [
   { identifier: TYPES.StellarOrphanRefundService, implementation: StellarOrphanRefundService },
   { bindSelf: true, identifier: OpsTransactionReconciliationService, implementation: OpsTransactionReconciliationService },
   { bindSelf: true, identifier: OpsTransactionQueryService, implementation: OpsTransactionQueryService },
+  { bindSelf: true, identifier: PartnerPixReceiptService, implementation: PartnerPixReceiptService },
+  { bindSelf: true, identifier: PartnerPixReconciliationService, implementation: PartnerPixReconciliationService },
   { bindSelf: true, identifier: PartnerTransactionQueryService, implementation: PartnerTransactionQueryService },
+  { bindSelf: true, identifier: PartnerWebhookRedeliveryService, implementation: PartnerWebhookRedeliveryService },
   { bindSelf: true, identifier: TransparencyMetricsService, implementation: TransparencyMetricsService },
   { identifier: TYPES.PaymentUseCase, implementation: PaymentUseCase },
   { identifier: TYPES.ReceivedCryptoTransactionUseCase, implementation: ReceivedCryptoTransactionUseCase },
@@ -122,6 +136,14 @@ const domainBindings: ReadonlyArray<BindingRegistration<unknown>> = [
   { bindSelf: true, identifier: OpsOverviewService, implementation: OpsOverviewService },
   { bindSelf: true, identifier: OpsPartnerService, implementation: OpsPartnerService },
   { bindSelf: true, identifier: PartnerPortalPasswordService, implementation: PartnerPortalPasswordService },
+  { bindSelf: true, identifier: PartnerPortalApiKeyService, implementation: PartnerPortalApiKeyService },
+  { bindSelf: true, identifier: PartnerPortalMfaService, implementation: PartnerPortalMfaService },
+  { bindSelf: true, identifier: PartnerPortalSecretEnvelopeService, implementation: PartnerPortalSecretEnvelopeService },
+  { bindSelf: true, identifier: PartnerPortalAuditService, implementation: PartnerPortalAuditService },
+  { bindSelf: true, identifier: PartnerPortalIdentityService, implementation: PartnerPortalIdentityService },
+  { bindSelf: true, identifier: PartnerPortalTeamService, implementation: PartnerPortalTeamService },
+  { bindSelf: true, identifier: PartnerPortalWebhookService, implementation: PartnerPortalWebhookService },
+  { bindSelf: true, identifier: PartnerWebhookSecretResolver, implementation: PartnerWebhookSecretResolver },
   { bindSelf: true, identifier: PartnerPortalSessionService, implementation: PartnerPortalSessionService },
   { bindSelf: true, identifier: PartnerPortalAccountService, implementation: PartnerPortalAccountService },
   { bindSelf: true, identifier: FlowDefinitionBuilder, implementation: FlowDefinitionBuilder },

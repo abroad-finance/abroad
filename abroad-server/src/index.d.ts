@@ -1,9 +1,9 @@
-import type { AuthenticatedPartner } from './modules/partners/application/contracts/IPartnerService'
+import type { RequestAuthentication } from './app/http/authenticationContext'
 
 declare global {
   namespace Express {
     interface Request {
-      user: AuthenticatedPartner
+      user?: RequestAuthentication
     }
   }
 }

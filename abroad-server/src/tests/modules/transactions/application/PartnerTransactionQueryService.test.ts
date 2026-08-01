@@ -149,14 +149,23 @@ describe('PartnerTransactionQueryService.getById', () => {
     prisma.transaction.findFirst.mockResolvedValue(transaction)
     prisma.outboxEvent.findMany.mockResolvedValue([
       {
+        _count: { redeliveries: 0 },
         attempts: 0,
+        availableAt: new Date('2026-07-30T10:06:00.000Z'),
+        id: 'delivery-1',
+        lastAttemptDurationMs: 175,
+        lastError: null,
+        lastHttpStatus: 204,
         payload: {
           kind: 'webhook',
           payload: { data: { id: transaction.id }, event: 'transaction.updated' },
           target: 'https://must-not-leak.example',
         },
+        sourceOutboxEventId: null,
         status: OutboxStatus.DELIVERED,
         updatedAt: new Date('2026-07-30T10:06:00.000Z'),
+        webhookEvent: 'transaction.updated',
+        webhookPurpose: 'TRANSACTION',
       },
     ])
 
@@ -167,13 +176,28 @@ describe('PartnerTransactionQueryService.getById', () => {
     }))
     expect(prisma.outboxEvent.findMany).toHaveBeenCalledWith(expect.objectContaining({
       select: {
+        _count: { select: { redeliveries: true } },
         attempts: true,
+        availableAt: true,
+        id: true,
+        lastAttemptDurationMs: true,
+        lastError: true,
+        lastHttpStatus: true,
         payload: true,
+        sourceOutboxEventId: true,
         status: true,
         updatedAt: true,
+        webhookEvent: true,
+        webhookPurpose: true,
       },
       where: {
-        payload: { equals: transaction.id, path: ['payload', 'data', 'id'] },
+        OR: [
+          { partnerId: 'partner-1', transactionId: transaction.id },
+          {
+            partnerId: null,
+            payload: { equals: transaction.id, path: ['payload', 'data', 'id'] },
+          },
+        ],
         type: 'webhook',
       },
     }))
@@ -200,8 +224,16 @@ describe('PartnerTransactionQueryService.getById', () => {
     expect(result.refund).toBeNull()
     expect(result.deliveries).toEqual([{
       attempts: 1,
+      canRedeliver: false,
+      durationMs: 175,
       event: 'transaction.updated',
+      failureCode: null,
+      httpStatus: 204,
+      id: 'delivery-1',
       lastAttemptAt: new Date('2026-07-30T10:06:00.000Z'),
+      nextAttemptAt: null,
+      purpose: 'TRANSACTION',
+      sourceDeliveryId: null,
       status: OutboxStatus.DELIVERED,
     }])
     expect(result).not.toHaveProperty('accountNumber')
@@ -238,6 +270,46 @@ describe('PartnerTransactionQueryService.getById', () => {
     expect(result.failureReason).toBe('The PIX QR code amount does not match the transaction amount.')
     expect(JSON.stringify(result)).not.toContain('must-not-leak')
     expect(JSON.stringify(result)).not.toContain('providerStatus')
+  })
+
+  it('exposes bounded delivery diagnostics without leaking stored transport errors', async () => {
+    const prisma = makePrisma()
+    prisma.transaction.findFirst.mockResolvedValue(transaction)
+    prisma.outboxEvent.findMany.mockResolvedValue([
+      {
+        _count: { redeliveries: 2 },
+        attempts: 5,
+        availableAt: new Date('2026-07-30T10:06:00.000Z'),
+        id: 'failed-delivery',
+        lastAttemptDurationMs: 900,
+        lastError: 'connect ECONNREFUSED 10.0.0.1 with internal details',
+        lastHttpStatus: 401,
+        payload: {
+          kind: 'webhook',
+          payload: { data: { id: transaction.id }, event: 'transaction.updated' },
+        },
+        sourceOutboxEventId: null,
+        status: OutboxStatus.FAILED,
+        updatedAt: new Date('2026-07-30T10:06:00.000Z'),
+        webhookEvent: 'transaction.updated',
+        webhookPurpose: 'TRANSACTION',
+      },
+    ])
+
+    const result = await makeService(prisma).getById('partner-1', transaction.id)
+
+    expect(result.deliveries).toEqual([expect.objectContaining({
+      attempts: 5,
+      canRedeliver: true,
+      durationMs: 900,
+      failureCode: 'http_error',
+      httpStatus: 401,
+      id: 'failed-delivery',
+      purpose: 'TRANSACTION',
+      status: OutboxStatus.FAILED,
+    })])
+    expect(JSON.stringify(result)).not.toContain('ECONNREFUSED')
+    expect(JSON.stringify(result)).not.toContain('10.0.0.1')
   })
 
   it('normalizes and bounds provider failure text and hides stale reasons after completion', async () => {

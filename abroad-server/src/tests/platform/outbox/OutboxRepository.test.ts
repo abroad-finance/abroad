@@ -20,11 +20,22 @@ const buildMockClient = (): MockOutboxClient => {
     availableAt: new Date(),
     createdAt: new Date(),
     id: 'outbox-1',
+    idempotencyKey: null,
+    initiatedByPortalUserId: null,
+    lastAttemptDurationMs: null,
     lastError: null,
+    lastHttpStatus: null,
+    maxAttempts: 5,
+    partnerId: null,
     payload: { payload: true },
+    sourceOutboxEventId: null,
     status: OutboxStatus.PENDING,
+    transactionId: null,
     type: 'queue',
     updatedAt: new Date(),
+    webhookCredentialMode: null,
+    webhookEvent: null,
+    webhookPurpose: null,
   }
 
   return {
@@ -59,21 +70,46 @@ describe('OutboxRepository', () => {
     const created = await repository.create('queue', payload, availableAt, externalClient as never)
     expect(provider.getClient).not.toHaveBeenCalled()
     expect(externalClient.outboxEvent.create).toHaveBeenCalledWith({
-      data: { availableAt, payload, type: 'queue' },
+      data: {
+        availableAt,
+        idempotencyKey: undefined,
+        initiatedByPortalUserId: undefined,
+        maxAttempts: undefined,
+        partnerId: undefined,
+        payload,
+        sourceOutboxEventId: undefined,
+        transactionId: undefined,
+        type: 'queue',
+        webhookCredentialMode: undefined,
+        webhookEvent: undefined,
+        webhookPurpose: undefined,
+      },
     })
     expect(created.payload).toEqual(payload)
     expect(created.availableAt).toEqual(availableAt)
 
     await repository.markDelivered(created.id, externalClient as never)
     expect(externalClient.outboxEvent.update).toHaveBeenCalledWith({
-      data: { attempts: { increment: 1 }, lastError: null, status: OutboxStatus.DELIVERED },
+      data: {
+        attempts: { increment: 1 },
+        lastAttemptDurationMs: undefined,
+        lastError: null,
+        lastHttpStatus: undefined,
+        status: OutboxStatus.DELIVERED,
+      },
       where: { id: created.id },
     })
 
     const failure = new Error('network')
     await repository.markFailed(created.id, failure, externalClient as never)
     expect(externalClient.outboxEvent.update).toHaveBeenCalledWith({
-      data: { attempts: { increment: 1 }, lastError: 'network', status: OutboxStatus.FAILED },
+      data: {
+        attempts: { increment: 1 },
+        lastAttemptDurationMs: undefined,
+        lastError: 'network',
+        lastHttpStatus: undefined,
+        status: OutboxStatus.FAILED,
+      },
       where: { id: created.id },
     })
 
@@ -83,7 +119,9 @@ describe('OutboxRepository', () => {
       data: {
         attempts: { increment: 1 },
         availableAt: nextAttempt,
+        lastAttemptDurationMs: undefined,
         lastError: 'network',
+        lastHttpStatus: undefined,
         status: OutboxStatus.PENDING,
       },
       where: { id: created.id },
@@ -102,7 +140,13 @@ describe('OutboxRepository', () => {
 
     await repository.markDelivered('abc')
     expect(client.outboxEvent.update).toHaveBeenCalledWith({
-      data: { attempts: { increment: 1 }, lastError: null, status: OutboxStatus.DELIVERED },
+      data: {
+        attempts: { increment: 1 },
+        lastAttemptDurationMs: undefined,
+        lastError: null,
+        lastHttpStatus: undefined,
+        status: OutboxStatus.DELIVERED,
+      },
       where: { id: 'abc' },
     })
 

@@ -10,11 +10,22 @@ describe('OutboxDispatcher', () => {
     availableAt: new Date(),
     createdAt: new Date(),
     id: 'rec-1',
+    idempotencyKey: null,
+    initiatedByPortalUserId: null,
+    lastAttemptDurationMs: null,
     lastError: null,
+    lastHttpStatus: null,
+    maxAttempts: 5,
+    partnerId: null,
     payload: { kind: 'slack', message: 'hello' },
+    sourceOutboxEventId: null,
     status: 'PENDING',
+    transactionId: null,
     type: 'slack',
     updatedAt: new Date(),
+    webhookCredentialMode: null,
+    webhookEvent: null,
+    webhookPurpose: null,
   }
 
   const buildMocks = () => {
@@ -31,7 +42,9 @@ describe('OutboxDispatcher', () => {
     }
     const slackNotifier = { sendMessage: jest.fn(async () => {}) }
     const queueHandler = { postMessage: jest.fn(async () => {}) }
-    const webhookNotifier = { notifyWebhook: jest.fn(async () => {}) }
+    const webhookNotifier = {
+      notifyWebhook: jest.fn(async () => ({ durationMs: 10, httpStatus: 204 })),
+    }
     const logger = { error: jest.fn(), info: jest.fn(), warn: jest.fn() }
     const dispatcher = new OutboxDispatcher(
       repository as never,
@@ -46,9 +59,9 @@ describe('OutboxDispatcher', () => {
   it('delivers slack messages immediately', async () => {
     const { dispatcher, repository, slackNotifier } = buildMocks()
     await dispatcher.enqueueSlack('hello', 'test')
-    expect(repository.create).toHaveBeenCalledWith('slack', { kind: 'slack', message: 'hello' }, expect.any(Date), undefined)
+    expect(repository.create).toHaveBeenCalledWith('slack', { kind: 'slack', message: 'hello' }, expect.any(Date), undefined, undefined)
     expect(slackNotifier.sendMessage).toHaveBeenCalledWith('hello')
-    expect(repository.markDelivered).toHaveBeenCalledWith(baseRecord.id, undefined)
+    expect(repository.markDelivered).toHaveBeenCalledWith(baseRecord.id, undefined, undefined)
   })
 
   it('delivers webhook payloads', async () => {
@@ -58,17 +71,22 @@ describe('OutboxDispatcher', () => {
       kind: 'webhook',
       payload: { data: { ok: true }, event: 'TRANSACTION_CREATED' },
       target: 'https://example.com',
-    }, expect.any(Date), undefined)
+    }, expect.any(Date), undefined, { webhookEvent: 'TRANSACTION_CREATED' })
     expect(webhookNotifier.notifyWebhook).toHaveBeenCalledWith('https://example.com', {
       data: { ok: true },
       event: 'TRANSACTION_CREATED',
-    })
+    }, { credentialMode: null, partnerId: null })
+    expect(repository.markDelivered).toHaveBeenCalledWith(
+      baseRecord.id,
+      undefined,
+      { durationMs: 10, httpStatus: 204 },
+    )
   })
 
   it('defers delivery when instructed', async () => {
     const { dispatcher, repository, slackNotifier } = buildMocks()
     await dispatcher.enqueueSlack('queued', 'ctx', { deliverNow: false })
-    expect(repository.create).toHaveBeenCalledWith('slack', { kind: 'slack', message: 'queued' }, expect.any(Date), undefined)
+    expect(repository.create).toHaveBeenCalledWith('slack', { kind: 'slack', message: 'queued' }, expect.any(Date), undefined, undefined)
     expect(slackNotifier.sendMessage).not.toHaveBeenCalled()
   })
 
@@ -87,6 +105,7 @@ describe('OutboxDispatcher', () => {
       { kind: 'queue', payload, queueName: QueueName.PAYMENT_STATUS_UPDATED },
       expect.any(Date),
       undefined,
+      undefined,
     )
     expect(queueHandler.postMessage).toHaveBeenCalledWith(QueueName.PAYMENT_STATUS_UPDATED, payload)
   })
@@ -103,7 +122,12 @@ describe('OutboxDispatcher', () => {
 
     await dispatcher.deliver(failingRecord, 'ctx')
 
-    expect(repository.markFailed).toHaveBeenCalledWith(failingRecord.id, expect.any(Error), undefined)
+    expect(repository.markFailed).toHaveBeenCalledWith(
+      failingRecord.id,
+      expect.any(Error),
+      undefined,
+      undefined,
+    )
     expect(slackNotifier.sendMessage).not.toHaveBeenCalled()
     expect(queueHandler.postMessage).toHaveBeenCalledWith(QueueName.DEAD_LETTER, expect.objectContaining({
       error: 'network down',
@@ -166,6 +190,7 @@ describe('OutboxDispatcher', () => {
       expect.any(Date),
       deliveryError,
       undefined,
+      undefined,
     )
     expect(repository.markDelivered).not.toHaveBeenCalled()
   })
@@ -185,7 +210,12 @@ describe('OutboxDispatcher', () => {
     }
     await dispatcher.deliver(record, 'ctx')
 
-    expect(repository.markFailed).toHaveBeenCalledWith(record.id, permanentFailure, undefined)
+    expect(repository.markFailed).toHaveBeenCalledWith(
+      record.id,
+      permanentFailure,
+      undefined,
+      undefined,
+    )
     expect(slackNotifier.sendMessage).not.toHaveBeenCalled()
     expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining('Failed to publish dead-letter for outbox delivery failure'), expect.any(Error))
   })

@@ -19,6 +19,7 @@ import {
 } from 'tsoa'
 
 import { TYPES } from '../../../../app/container/types'
+import { requireAuthenticatedPartner } from '../../../../app/http/authenticationContext'
 import { IDatabaseClientProvider } from '../../../../platform/persistence/IDatabaseClientProvider'
 import { normalizeClientDomainInput } from '../../domain/clientDomain'
 import { type CreatePartnerRequest, createPartnerRequestSchema, type CreatePartnerResponse, type PartnerInfoResponse } from './contracts'
@@ -89,12 +90,12 @@ export class PartnerController extends Controller {
    */
   @Get()
   @Security('BearerAuth')
-  @Security('ApiKeyAuth')
+  @Security('ApiKeyAuth', ['transactions:read'])
   @SuccessResponse('200', 'Partner info retrieved')
   public async getPartnerInfo(
     @Request() request: RequestExpress,
   ): Promise<PartnerInfoResponse> {
-    const partner = request.user as Partner
+    const partner = requireAuthenticatedPartner(request.user)
     return {
       country: partner.country ?? undefined,
       createdAt: partner.createdAt,

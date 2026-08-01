@@ -1,10 +1,7 @@
-import { Request as ExpressRequest } from 'express'
 import { z, type ZodType } from 'zod'
 
 export const DEFAULT_PAGE_SIZE = 20
 const MAX_PAGE_SIZE = 100
-
-export type AuthenticatedRequest = ExpressRequest & { user: { id: string } }
 
 export interface CreatePartnerUserRequest {
   kycExternalToken?: null | string

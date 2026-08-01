@@ -6,6 +6,7 @@ import {
   Body,
   Controller,
   Get,
+  Header,
   OperationId,
   Path,
   Post,
@@ -21,8 +22,29 @@ import {
 } from 'tsoa'
 import { z } from 'zod'
 
-import { PartnerPortalAccountService, PartnerPortalAccountValidationError, PartnerPortalAuthenticationError, PartnerPortalCredentials } from '../../../partners/application/PartnerPortalAccountService'
-import { PartnerPortalSession } from '../../../partners/application/PartnerPortalSessionService'
+import { requirePartnerPortalMfaAdministrator, requirePartnerPortalPrincipal } from '../../../../app/http/authenticationContext'
+import {
+  PartnerPortalAccountService,
+  PartnerPortalAccountValidationError,
+  PartnerPortalAuthenticationError,
+  PartnerPortalCredentials,
+  PartnerPortalLoginResult,
+} from '../../../partners/application/PartnerPortalAccountService'
+import {
+  PartnerPixReceiptDto,
+  PartnerPixReceiptLanguage,
+  PartnerPixReceiptNotFoundError,
+  PartnerPixReceiptProviderError,
+  PartnerPixReceiptService,
+  PartnerPixReceiptUnavailableError,
+} from '../../application/PartnerPixReceiptService'
+import {
+  PartnerPixReconciliationNotFoundError,
+  PartnerPixReconciliationRunDto,
+  PartnerPixReconciliationRunList,
+  PartnerPixReconciliationService,
+  PartnerPixReconciliationValidationError,
+} from '../../application/PartnerPixReconciliationService'
 import {
   PartnerTransactionDetailDto,
   PartnerTransactionListResponse,
@@ -31,6 +53,7 @@ import {
   PartnerTransactionQueryValidationError,
   PartnerTransactionSearchFilters,
 } from '../../application/PartnerTransactionQueryService'
+import { PartnerWebhookRedeliveryNotFoundError, PartnerWebhookRedeliveryResult, PartnerWebhookRedeliveryService, PartnerWebhookRedeliveryValidationError } from '../../application/PartnerWebhookRedeliveryService'
 
 type ErrorResponse = { reason: string }
 
@@ -39,6 +62,12 @@ const partnerPortalLoginSchema = z.object({
   password: z.string().min(1).max(128),
 }).strict() satisfies z.ZodType<PartnerPortalCredentials>
 
+const pixReceiptLanguageSchema = z.enum(['pt-BR', 'en'])
+
+const reconciliationStartSchema = z.object({
+  batchSize: z.number().int().min(1).max(5).optional(),
+}).strict()
+
 @Route('partner-portal')
 export class PartnerPortalController extends Controller {
   public constructor(
@@ -46,8 +75,43 @@ export class PartnerPortalController extends Controller {
     private readonly accountService: PartnerPortalAccountService,
     @inject(PartnerTransactionQueryService)
     private readonly transactionQueryService: PartnerTransactionQueryService,
+    @inject(PartnerPixReceiptService)
+    private readonly pixReceiptService: PartnerPixReceiptService,
+    @inject(PartnerPixReconciliationService)
+    private readonly pixReconciliationService: PartnerPixReconciliationService,
+    @inject(PartnerWebhookRedeliveryService)
+    private readonly webhookRedeliveryService: PartnerWebhookRedeliveryService,
   ) {
     super()
+  }
+
+  @OperationId('ContinuePartnerPortalPixReconciliation')
+  @Post('reconciliation-runs/{runId}/continue')
+  @Response<400, { reason: string }>(400, 'Bad Request')
+  @Response<404, { reason: string }>(404, 'Not Found')
+  @Security('PartnerPortalAuth', ['admin', 'mfa'])
+  @SuccessResponse('200', 'PIX reconciliation batch completed')
+  public async continuePixReconciliation(
+    @Path() runId: string,
+    @Request() request: ExpressRequest,
+    @Res() badRequest: TsoaResponse<400, ErrorResponse>,
+    @Res() notFound: TsoaResponse<404, ErrorResponse>,
+  ): Promise<PartnerPixReconciliationRunDto> {
+    try {
+      return await this.pixReconciliationService.continue(
+        requirePartnerPortalMfaAdministrator(request.user),
+        runId,
+      )
+    }
+    catch (error) {
+      if (error instanceof PartnerPixReconciliationValidationError) {
+        return badRequest(400, { reason: error.message })
+      }
+      if (error instanceof PartnerPixReconciliationNotFoundError) {
+        return notFound(404, { reason: error.message })
+      }
+      throw error
+    }
   }
 
   @OperationId('CreatePartnerPortalSession')
@@ -59,7 +123,7 @@ export class PartnerPortalController extends Controller {
     @Body() body: PartnerPortalCredentials,
     @Res() badRequest: TsoaResponse<400, ErrorResponse>,
     @Res() unauthorized: TsoaResponse<401, ErrorResponse>,
-  ): Promise<PartnerPortalSession> {
+  ): Promise<PartnerPortalLoginResult> {
     this.setHeader('Cache-Control', 'no-store')
     const parsedBody = partnerPortalLoginSchema.safeParse(body)
     if (!parsedBody.success) {
@@ -95,7 +159,7 @@ export class PartnerPortalController extends Controller {
   ): Promise<string> {
     try {
       const result = await this.transactionQueryService.exportCsv(
-        request.user.id,
+        requirePartnerPortalPrincipal(request.user).partner.id,
         this.toFilters(query, status, createdFrom, createdTo),
       )
       this.setHeader('Cache-Control', 'private, no-store')
@@ -113,6 +177,48 @@ export class PartnerPortalController extends Controller {
     }
   }
 
+  @Get('transactions/{transactionId}/receipt')
+  @OperationId('GetPartnerPortalPixReceipt')
+  @Response<400, { reason: string }>(400, 'Bad Request')
+  @Response<404, { reason: string }>(404, 'Not Found')
+  @Response<409, { reason: string }>(409, 'Conflict')
+  @Response<502, { reason: string }>(502, 'Bad Gateway')
+  @Security('PartnerPortalAuth')
+  public async getPixReceipt(
+    @Path() transactionId: string,
+    @Request() request: ExpressRequest,
+    @Res() badRequest: TsoaResponse<400, ErrorResponse>,
+    @Res() notFound: TsoaResponse<404, ErrorResponse>,
+    @Res() unavailable: TsoaResponse<409, ErrorResponse>,
+    @Res() badGateway: TsoaResponse<502, ErrorResponse>,
+    @Query() lang: PartnerPixReceiptLanguage = 'pt-BR',
+  ): Promise<PartnerPixReceiptDto> {
+    const parsedLanguage = pixReceiptLanguageSchema.safeParse(lang)
+    if (!parsedLanguage.success) {
+      return badRequest(400, { reason: 'Receipt language must be pt-BR or en' })
+    }
+    try {
+      this.setHeader('Cache-Control', 'private, no-store')
+      return await this.pixReceiptService.getReceipt(
+        requirePartnerPortalPrincipal(request.user).partner.id,
+        transactionId,
+        parsedLanguage.data,
+      )
+    }
+    catch (error) {
+      if (error instanceof PartnerPixReceiptNotFoundError) {
+        return notFound(404, { reason: error.message })
+      }
+      if (error instanceof PartnerPixReceiptUnavailableError) {
+        return unavailable(409, { reason: error.message })
+      }
+      if (error instanceof PartnerPixReceiptProviderError) {
+        return badGateway(502, { reason: error.message })
+      }
+      throw error
+    }
+  }
+
   @Get('transactions/{transactionId}')
   @OperationId('GetPartnerPortalTransaction')
   @Response<404, { reason: string }>(404, 'Not Found')
@@ -124,7 +230,10 @@ export class PartnerPortalController extends Controller {
   ): Promise<PartnerTransactionDetailDto> {
     try {
       this.setHeader('Cache-Control', 'private, no-store')
-      return await this.transactionQueryService.getById(request.user.id, transactionId)
+      return await this.transactionQueryService.getById(
+        requirePartnerPortalPrincipal(request.user).partner.id,
+        transactionId,
+      )
     }
     catch (error) {
       if (error instanceof PartnerTransactionNotFoundError) {
@@ -132,6 +241,16 @@ export class PartnerPortalController extends Controller {
       }
       throw error
     }
+  }
+
+  @Get('reconciliation-runs')
+  @OperationId('ListPartnerPortalPixReconciliations')
+  @Security('PartnerPortalAuth', ['admin', 'mfa'])
+  public async listPixReconciliations(
+    @Request() request: ExpressRequest,
+  ): Promise<PartnerPixReconciliationRunList> {
+    const principal = requirePartnerPortalMfaAdministrator(request.user)
+    return this.pixReconciliationService.list(principal.partner.id)
   }
 
   @Get('transactions')
@@ -151,12 +270,75 @@ export class PartnerPortalController extends Controller {
     try {
       this.setHeader('Cache-Control', 'private, no-store')
       return await this.transactionQueryService.search(
-        request.user.id,
+        requirePartnerPortalPrincipal(request.user).partner.id,
         this.toFilters(query, status, createdFrom, createdTo, page, pageSize),
       )
     }
     catch (error) {
       if (error instanceof PartnerTransactionQueryValidationError) {
+        return badRequest(400, { reason: error.message })
+      }
+      throw error
+    }
+  }
+
+  @OperationId('RedeliverPartnerPortalTransactionWebhook')
+  @Post('transactions/{transactionId}/deliveries/{deliveryId}/redelivery')
+  @Response<400, { reason: string }>(400, 'Bad Request')
+  @Response<404, { reason: string }>(404, 'Not Found')
+  @Security('PartnerPortalAuth', ['admin', 'mfa'])
+  @SuccessResponse('200', 'Webhook redelivery requested')
+  public async redeliverWebhook(
+    @Path() transactionId: string,
+    @Path() deliveryId: string,
+    @Header('Idempotency-Key') idempotencyKey: string,
+    @Request() request: ExpressRequest,
+    @Res() badRequest: TsoaResponse<400, ErrorResponse>,
+    @Res() notFound: TsoaResponse<404, ErrorResponse>,
+  ): Promise<PartnerWebhookRedeliveryResult> {
+    try {
+      return await this.webhookRedeliveryService.redeliver(
+        requirePartnerPortalMfaAdministrator(request.user),
+        transactionId,
+        deliveryId,
+        idempotencyKey,
+      )
+    }
+    catch (error) {
+      if (error instanceof PartnerWebhookRedeliveryValidationError) {
+        return badRequest(400, { reason: error.message })
+      }
+      if (error instanceof PartnerWebhookRedeliveryNotFoundError) {
+        return notFound(404, { reason: error.message })
+      }
+      throw error
+    }
+  }
+
+  @OperationId('StartPartnerPortalPixReconciliation')
+  @Post('reconciliation-runs')
+  @Response<400, { reason: string }>(400, 'Bad Request')
+  @Security('PartnerPortalAuth', ['admin', 'mfa'])
+  @SuccessResponse('201', 'PIX reconciliation started')
+  public async startPixReconciliation(
+    @Body() body: { batchSize?: number },
+    @Request() request: ExpressRequest,
+    @Res() badRequest: TsoaResponse<400, ErrorResponse>,
+    @Res() created: TsoaResponse<201, PartnerPixReconciliationRunDto>,
+  ): Promise<PartnerPixReconciliationRunDto> {
+    const parsed = reconciliationStartSchema.safeParse(body)
+    if (!parsed.success) {
+      return badRequest(400, { reason: 'Batch size must be between 1 and 5' })
+    }
+    try {
+      const result = await this.pixReconciliationService.start(
+        requirePartnerPortalMfaAdministrator(request.user),
+        parsed.data.batchSize,
+      )
+      return created(201, result)
+    }
+    catch (error) {
+      if (error instanceof PartnerPixReconciliationValidationError) {
         return badRequest(400, { reason: error.message })
       }
       throw error

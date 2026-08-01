@@ -31,8 +31,6 @@ interface OnboardRequest {
 type OnboardResponse = OnboardResult
 
 @Route('payments')
-@Security('ApiKeyAuth')
-@Security('BearerAuth')
 export class PaymentsController extends Controller {
   constructor(
     @inject(TYPES.PaymentUseCase)
@@ -49,6 +47,8 @@ export class PaymentsController extends Controller {
    */
   @Get('liquidity')
   @Response('400', 'Bad Request')
+  @Security('ApiKeyAuth', ['transactions:read'])
+  @Security('BearerAuth')
   @SuccessResponse('200', 'Liquidity retrieved successfully')
   public async getLiquidity(@Query() paymentMethod?: SupportedPaymentMethod): Promise<LiquidityResponse> {
     try {
@@ -74,6 +74,8 @@ export class PaymentsController extends Controller {
   @Hidden()
   @Post('onboard')
   @Response('400', 'Bad Request')
+  @Security('ApiKeyAuth', ['transactions:write'])
+  @Security('BearerAuth')
   @SuccessResponse('200', 'User onboarded')
   public async onboardUser(@Body() requestBody: OnboardRequest): Promise<OnboardResponse> {
     try {

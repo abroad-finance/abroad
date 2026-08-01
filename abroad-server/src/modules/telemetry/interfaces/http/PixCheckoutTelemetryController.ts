@@ -20,7 +20,7 @@ import { parsePixCheckoutTelemetry, PixCheckoutTelemetryRequest, PixCheckoutTele
 export const PIX_CHECKOUT_TELEMETRY_LOG_MESSAGE = '[PixCheckoutTelemetry] PIX checkout funnel event'
 
 @Route('telemetry/pix-checkout')
-@Security('ApiKeyAuth')
+@Security('ApiKeyAuth', ['telemetry:write'])
 @Security('BearerAuth')
 export class PixCheckoutTelemetryController extends Controller {
   public constructor(

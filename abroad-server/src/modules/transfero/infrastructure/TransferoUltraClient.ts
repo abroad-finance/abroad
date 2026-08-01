@@ -1,4 +1,4 @@
-import axios, { AxiosRequestConfig } from 'axios'
+import axios, { AxiosRequestConfig, AxiosResponse } from 'axios'
 import { inject, injectable } from 'inversify'
 import { createHash, createHmac, randomUUID } from 'node:crypto'
 
@@ -12,6 +12,13 @@ type TransferoUltraErrorPayload = {
 }
 type TransferoUltraFailureCode = 'permanent' | 'retriable' | 'validation'
 type TransferoUltraHttpMethod = 'GET' | 'PATCH' | 'POST'
+
+const MAX_TRANSFERO_ULTRA_PDF_BYTES = 2 * 1024 * 1024
+
+export type TransferoUltraPdfResponse = {
+  contentType: 'application/pdf'
+  data: Buffer
+}
 
 type TransferoUltraQuery = Readonly<Record<string, boolean | number | string | undefined>>
 
@@ -90,7 +97,36 @@ export class TransferoUltraClient {
   }
 
   public async get(path: string, query: TransferoUltraQuery = {}): Promise<unknown> {
-    return this.request({ method: 'GET', path, query })
+    return (await this.request<unknown>({ method: 'GET', path, query })).data
+  }
+
+  public async getPdf(
+    path: string,
+    query: TransferoUltraQuery = {},
+  ): Promise<TransferoUltraPdfResponse> {
+    const response = await this.request<ArrayBuffer | Buffer>(
+      { method: 'GET', path, query },
+      {
+        accept: 'application/pdf',
+        maxContentLength: MAX_TRANSFERO_ULTRA_PDF_BYTES,
+        responseType: 'arraybuffer',
+      },
+    )
+    const contentType = this.normalizeContentType(response.headers['content-type'])
+    if (contentType !== 'application/pdf') {
+      throw new TransferoUltraError({
+        code: 'permanent',
+        message: 'Transfero Ultra receipt response was not a PDF',
+      })
+    }
+    const data = this.toBuffer(response.data)
+    if (data.length === 0 || data.length > MAX_TRANSFERO_ULTRA_PDF_BYTES) {
+      throw new TransferoUltraError({
+        code: 'permanent',
+        message: 'Transfero Ultra receipt response size is invalid',
+      })
+    }
+    return { contentType, data }
   }
 
   public async patch(
@@ -98,7 +134,7 @@ export class TransferoUltraClient {
     body: unknown,
     idempotencyKey: string,
   ): Promise<unknown> {
-    return this.request({ body, idempotencyKey, method: 'PATCH', path })
+    return (await this.request<unknown>({ body, idempotencyKey, method: 'PATCH', path })).data
   }
 
   public async post(
@@ -106,7 +142,7 @@ export class TransferoUltraClient {
     body: unknown,
     idempotencyKey: string,
   ): Promise<unknown> {
-    return this.request({ body, idempotencyKey, method: 'POST', path })
+    return (await this.request<unknown>({ body, idempotencyKey, method: 'POST', path })).data
   }
 
   private buildPathWithQuery(path: string, query: TransferoUltraQuery): string {
@@ -187,6 +223,13 @@ export class TransferoUltraClient {
     return parsed.origin
   }
 
+  private normalizeContentType(value: unknown): string {
+    if (typeof value !== 'string') {
+      return ''
+    }
+    return value.split(';', 1)[0]?.trim().toLowerCase() ?? ''
+  }
+
   private readErrorPayload(value: unknown): TransferoUltraErrorPayload {
     if (!value || typeof value !== 'object') {
       return {}
@@ -205,13 +248,17 @@ export class TransferoUltraClient {
     return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : fallback
   }
 
-  private async request(params: {
+  private async request<T>(params: {
     body?: unknown
     idempotencyKey?: string
     method: TransferoUltraHttpMethod
     path: string
     query?: TransferoUltraQuery
-  }): Promise<unknown> {
+  }, responseOptions: {
+    accept?: string
+    maxContentLength?: number
+    responseType?: AxiosRequestConfig['responseType']
+  } = {}): Promise<AxiosResponse<T>> {
     const isStateChanging = params.method !== 'GET'
     if (
       isStateChanging
@@ -261,7 +308,7 @@ export class TransferoUltraClient {
       data: rawBody || undefined,
       headers: {
         ...signedHeaders,
-        Accept: 'application/json',
+        Accept: responseOptions.accept ?? 'application/json',
         ...(isStateChanging ? { 'Idempotency-Key': params.idempotencyKey } : {}),
         // Axios otherwise injects application/x-www-form-urlencoded for
         // bodyless POST/PATCH requests. Ultra's bodyless endpoints reject that
@@ -271,15 +318,17 @@ export class TransferoUltraClient {
           ? { 'Content-Type': null }
           : {}),
       },
+      maxBodyLength: responseOptions.maxContentLength,
+      maxContentLength: responseOptions.maxContentLength,
       method: params.method,
+      responseType: responseOptions.responseType,
       timeout: this.requestTimeoutMs,
       transformRequest: [value => value],
       url: `${baseUrl}${pathWithQuery}`,
     }
 
     try {
-      const response = await axios.request<unknown>(requestConfig)
-      return response.data
+      return await axios.request<T>(requestConfig)
     }
     catch (error) {
       const normalized = this.describeAxiosError(error)
@@ -312,5 +361,21 @@ export class TransferoUltraClient {
         message: 'Transfero Ultra request body is not JSON serializable',
       })
     }
+  }
+
+  private toBuffer(value: unknown): Buffer {
+    if (Buffer.isBuffer(value)) {
+      return Buffer.from(value)
+    }
+    if (value instanceof ArrayBuffer) {
+      return Buffer.from(value)
+    }
+    if (ArrayBuffer.isView(value)) {
+      return Buffer.from(value.buffer, value.byteOffset, value.byteLength)
+    }
+    throw new TransferoUltraError({
+      code: 'permanent',
+      message: 'Transfero Ultra receipt response was not binary',
+    })
   }
 }

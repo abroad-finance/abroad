@@ -2,6 +2,8 @@ import 'reflect-metadata'
 
 import type { Partner, PartnerPortalUser, PrismaClient } from '@prisma/client'
 
+import { PartnerPortalRole } from '@prisma/client'
+
 import { PartnerPortalAccountService, PartnerPortalAccountValidationError, PartnerPortalAuthenticationError } from '../../../../modules/partners/application/PartnerPortalAccountService'
 import { PartnerPortalPasswordService } from '../../../../modules/partners/application/PartnerPortalPasswordService'
 import { PartnerPortalSessionService } from '../../../../modules/partners/application/PartnerPortalSessionService'
@@ -11,7 +13,8 @@ type PasswordServiceMock = Pick<
   PartnerPortalPasswordService,
   'buildVerifier' | 'performDummyVerification' | 'verify'
 >
-type SessionServiceMock = Pick<PartnerPortalSessionService, 'createSession'>
+type SessionServiceMock = Pick<PartnerPortalSessionService, 'createMfaChallenge'>
+  & Pick<PartnerPortalSessionService, 'createSession'>
 
 const partner = {
   apiKey: null,
@@ -38,8 +41,16 @@ const portalUser: PartnerPortalUser = {
   id: '22222222-2222-4222-8222-222222222222',
   lastLoginAt: null,
   lockedUntil: null,
+  mfaEnabledAt: null,
+  mfaFailedAttempts: 0,
+  mfaLastUsedCounter: null,
+  mfaLockedUntil: null,
+  mfaPendingCreatedAt: null,
+  mfaPendingSecretCiphertext: null,
+  mfaSecretCiphertext: null,
   partnerId: partner.id,
   passwordVerifier: 'stored-verifier',
+  role: PartnerPortalRole.ADMIN,
   sessionVersion: 1,
   updatedAt: new Date('2026-07-31T12:00:00.000Z'),
 }
@@ -51,6 +62,7 @@ type PortalUserCreateInput = {
     email: string
     partnerId: string
     passwordVerifier: string
+    role: PartnerPortalRole
   }
 }
 type PortalUserFindUniqueInput = {
@@ -98,16 +110,29 @@ const buildPasswordService = (): jest.Mocked<PasswordServiceMock> => {
 }
 
 const buildSessionService = (): jest.Mocked<SessionServiceMock> => {
+  const createMfaChallenge = jest.fn<
+    ReturnType<PartnerPortalSessionService['createMfaChallenge']>,
+    Parameters<PartnerPortalSessionService['createMfaChallenge']>
+  >()
+  createMfaChallenge.mockResolvedValue({
+    challengeToken: 'mfa-challenge-token',
+    expiresAt: new Date('2026-07-31T12:05:00.000Z'),
+  })
   const createSession = jest.fn<
     ReturnType<PartnerPortalSessionService['createSession']>,
     Parameters<PartnerPortalSessionService['createSession']>
   >()
   createSession.mockResolvedValue({
     accessToken: 'portal-token',
+    email: portalUser.email,
     expiresAt: new Date('2026-07-31T12:30:00.000Z'),
+    mfaEnabled: false,
+    mfaVerified: false,
     partnerName: 'Decaf',
+    role: PartnerPortalRole.ADMIN,
+    userId: portalUser.id,
   })
-  return { createSession }
+  return { createMfaChallenge, createSession }
 }
 
 const buildHarness = () => {
@@ -187,7 +212,10 @@ describe('PartnerPortalAccountService', () => {
       where: { id: portalUser.id },
     })
     expect(harness.sessionService.createSession).toHaveBeenCalledWith(portalUserWithPartner)
-    expect(result.accessToken).toBe('portal-token')
+    expect(result).toEqual(expect.objectContaining({
+      session: expect.objectContaining({ accessToken: 'portal-token' }),
+      status: 'AUTHENTICATED',
+    }))
   })
 
   it('performs dummy work and returns the generic error for an unknown email', async () => {
@@ -204,6 +232,32 @@ describe('PartnerPortalAccountService', () => {
     )
     expect(harness.passwordService.verify).not.toHaveBeenCalled()
     expect(harness.portalUserUpdate).not.toHaveBeenCalled()
+  })
+
+  it('returns a short-lived MFA challenge instead of a session for an enrolled user', async () => {
+    const harness = buildHarness()
+    const enrolledUser = {
+      ...portalUserWithPartner,
+      mfaEnabledAt: new Date('2026-07-31T12:00:00.000Z'),
+      mfaSecretCiphertext: 'active-envelope',
+    }
+    harness.portalUserFindUnique.mockResolvedValueOnce(enrolledUser)
+    harness.portalUserUpdate.mockResolvedValueOnce(enrolledUser)
+
+    const result = await harness.service.authenticate({
+      email: portalUser.email,
+      password: 'correct horse battery staple',
+    })
+
+    expect(result).toEqual({
+      challenge: {
+        challengeToken: 'mfa-challenge-token',
+        expiresAt: new Date('2026-07-31T12:05:00.000Z'),
+      },
+      status: 'MFA_REQUIRED',
+    })
+    expect(harness.sessionService.createMfaChallenge).toHaveBeenCalledWith(enrolledUser)
+    expect(harness.sessionService.createSession).not.toHaveBeenCalled()
   })
 
   it('locks the account for fifteen minutes on the fifth failed attempt', async () => {
@@ -308,6 +362,7 @@ describe('PartnerPortalAccountService', () => {
         email: 'operator@decaf.so',
         partnerId: partner.id,
         passwordVerifier: 'new-verifier',
+        role: PartnerPortalRole.ADMIN,
       },
     })
     expect(result).toEqual({
@@ -340,6 +395,7 @@ describe('PartnerPortalAccountService', () => {
         failedLoginAttempts: 0,
         lockedUntil: null,
         passwordVerifier: 'new-verifier',
+        role: PartnerPortalRole.ADMIN,
         sessionVersion: { increment: 1 },
       },
       where: { id: portalUser.id },

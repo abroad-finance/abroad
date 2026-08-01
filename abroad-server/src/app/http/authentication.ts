@@ -3,13 +3,13 @@ import { Request } from 'express'
 import type { ClientDomain } from '../../modules/partners/domain/clientDomain'
 
 import { AuthenticatedPartner, IPartnerService, PartnerAuthenticationSource } from '../../modules/partners/application/contracts/IPartnerService'
+import { isPartnerApiKeyScopeName } from '../../modules/partners/application/partnerApiKeyScopes'
 import { PartnerPortalSessionService } from '../../modules/partners/application/PartnerPortalSessionService'
 import { parseClientDomain } from '../../modules/partners/domain/clientDomain'
 import { iocContainer } from '../container'
 import { TYPES } from '../container/types'
+import { RequestAuthentication } from './authenticationContext'
 import { OpsAuthService } from './OpsAuthService'
-
-type AuthContext = AuthenticatedPartner | { kind: 'ops' }
 
 const CLIENT_DOMAIN_HEADER_CANDIDATES = ['Origin', 'Referer'] as const
 const BEARER_PREFIX = 'Bearer '
@@ -50,7 +50,8 @@ const withAuthenticationSource = (
 export async function expressAuthentication(
   request: Request,
   securityName: string,
-): Promise<AuthContext> {
+  scopes: string[] = [],
+): Promise<RequestAuthentication> {
   const partnerService = iocContainer.get<IPartnerService>(
     TYPES.IPartnerService,
   )
@@ -58,8 +59,17 @@ export async function expressAuthentication(
   if (securityName === 'ApiKeyAuth') {
     const apiKey = request.header('X-API-Key')
     if (apiKey) {
-      const partner = await partnerService.getPartnerFromApiKey(apiKey)
-      return withAuthenticationSource(partner, 'API_KEY')
+      const authentication = await partnerService.authenticateApiKey(apiKey)
+      if (
+        authentication.kind === 'MANAGED'
+        && scopes.some(scope => (
+          !isPartnerApiKeyScopeName(scope)
+          || !authentication.scopes.includes(scope)
+        ))
+      ) {
+        throw new Error('API key does not include a required scope')
+      }
+      return withAuthenticationSource(authentication.partner, 'API_KEY')
     }
 
     if (resolveBearerToken(request.headers.authorization)) {
@@ -86,8 +96,17 @@ export async function expressAuthentication(
 
     try {
       const sessionService = iocContainer.get<PartnerPortalSessionService>(PartnerPortalSessionService)
-      const partner = await sessionService.verifySession(token)
-      return withAuthenticationSource(partner, 'PARTNER_PORTAL')
+      const principal = await sessionService.verifySession(token)
+      if (scopes.includes('admin') && principal.role !== 'ADMIN') {
+        throw new Error('Partner portal administrator access is required')
+      }
+      if (
+        scopes.includes('mfa')
+        && (!principal.mfaEnabled || !principal.mfaVerified)
+      ) {
+        throw new Error('Partner portal MFA verification is required')
+      }
+      return principal
     }
     catch {
       throw new Error('Invalid partner portal token')

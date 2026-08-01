@@ -191,7 +191,13 @@ export class TransactionAcceptanceService {
             webhookTargets,
             { data: payload, event: WebhookEvent.TRANSACTION_CREATED },
             'transaction.created',
-            { client: tx, deliverNow: false },
+            {
+              client: tx,
+              deliverNow: false,
+              partnerId: partner.id,
+              primaryTarget: partner.webhookUrl,
+              transactionId: transaction.id,
+            },
           )
           await this.publishUserNotification(tx, transaction.id, request.userId)
         }

@@ -136,7 +136,11 @@ export class ExpiredTransactionService {
         transaction.origin,
         { data: webhookPayload, event: WebhookEvent.TRANSACTION_UPDATED },
         'transaction.expired',
-        { deliverNow: false },
+        {
+          deliverNow: false,
+          partnerId: transaction.partnerUser.partner.id,
+          transactionId: transaction.id,
+        },
       )
     }
     catch (error) {

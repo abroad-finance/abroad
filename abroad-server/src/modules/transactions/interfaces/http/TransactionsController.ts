@@ -17,6 +17,7 @@ import {
 } from 'tsoa'
 
 import { TYPES } from '../../../../app/container/types'
+import { requireAuthenticatedPartner } from '../../../../app/http/authenticationContext'
 import { IDatabaseClientProvider } from '../../../../platform/persistence/IDatabaseClientProvider'
 import { IPartnerService } from '../../../partners/application/contracts/IPartnerService'
 import { toWebhookTransactionPayload } from '../../application/transactionPayload'
@@ -41,7 +42,7 @@ type TransactionListItem = Omit<Transaction, 'bankCode' | 'origin'> & {
 }
 
 @Route('transactions')
-@Security('ApiKeyAuth')
+@Security('ApiKeyAuth', ['transactions:read'])
 @Security('BearerAuth')
 export class TransactionsController extends Controller {
   constructor(
@@ -67,7 +68,7 @@ export class TransactionsController extends Controller {
     if (page < 1 || pageSize < 1 || pageSize > 100) {
       return badRequest(400, { reason: 'Invalid pagination parameters' })
     }
-    const partner = request.user
+    const partner = requireAuthenticatedPartner(request.user)
     const prismaClient = await this.prismaClientProvider.getClient()
     const whereClause = {
       partnerUser: { partnerId: partner.id },
@@ -103,7 +104,7 @@ export class TransactionsController extends Controller {
     if (page < 1 || pageSize < 1 || pageSize > 100) {
       return badRequest(400, { reason: 'Invalid pagination parameters' })
     }
-    const partner = request.user
+    const partner = requireAuthenticatedPartner(request.user)
     const prismaClient = await this.prismaClientProvider.getClient()
     const [transactions, total] = await Promise.all([
       prismaClient.transaction.findMany({

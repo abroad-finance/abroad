@@ -5,6 +5,7 @@ const PARTNER_API_KEY_PREFIX = 'partner_'
 const PARTNER_API_KEY_BYTES = 24
 
 type PartnerApiKeyCandidate = {
+  displayPrefix: string
   hashed: string
   plaintext: string
 }
@@ -20,6 +21,7 @@ export const hashPartnerApiKey = (apiKey: string): string => {
 export const buildPartnerApiKeyCandidate = (): PartnerApiKeyCandidate => {
   const plaintext = `${PARTNER_API_KEY_PREFIX}${randomBytes(PARTNER_API_KEY_BYTES).toString('base64url')}`
   return {
+    displayPrefix: plaintext.slice(0, 12),
     hashed: hashPartnerApiKey(plaintext),
     plaintext,
   }

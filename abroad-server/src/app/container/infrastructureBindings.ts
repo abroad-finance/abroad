@@ -9,6 +9,7 @@ import { GCPPubSubQueueHandler } from '../../platform/messaging/gcpPubSubQueueHa
 import { SlackNotifier } from '../../platform/notifications/slackNotifier'
 import { SocketIOWebSocketService } from '../../platform/notifications/socketIoWebSocketService'
 import { WebhookNotifier } from '../../platform/notifications/webhookNotifier'
+import { WebhookTargetPolicy } from '../../platform/notifications/WebhookTargetPolicy'
 import { OutboxDispatcher } from '../../platform/outbox/OutboxDispatcher'
 import { OutboxRepository } from '../../platform/outbox/OutboxRepository'
 import { OutboxWorker } from '../../platform/outbox/OutboxWorker'
@@ -29,6 +30,7 @@ const infrastructureBindings: ReadonlyArray<BindingRegistration<unknown>> = [
   { identifier: TYPES.ISlackNotifier, implementation: SlackNotifier },
   { identifier: TYPES.IWebSocketService, implementation: SocketIOWebSocketService },
   { identifier: TYPES.IWebhookNotifier, implementation: WebhookNotifier },
+  { bindSelf: true, identifier: WebhookTargetPolicy, implementation: WebhookTargetPolicy },
   { identifier: TYPES.ILockManager, implementation: PostgresAdvisoryLockManager },
   { identifier: TYPES.IPartnerService, implementation: PartnerService },
   { identifier: TYPES.IKycService, implementation: KycService },

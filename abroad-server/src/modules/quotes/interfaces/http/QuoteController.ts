@@ -17,6 +17,7 @@ import {
 import { z } from 'zod'
 
 import { TYPES } from '../../../../app/container/types'
+import { requireAuthenticatedPartner } from '../../../../app/http/authenticationContext'
 import { IPartnerService } from '../../../partners/application/contracts/IPartnerService'
 import { SUPPORTED_PAYMENT_METHODS, SupportedPaymentMethod } from '../../../payments/application/supportedPaymentMethods'
 import { IQuoteUseCase, QuoteResponse } from '../../application/quoteUseCase'
@@ -178,7 +179,7 @@ export class QuoteController extends Controller {
     const normalizedApiKey = apiKey?.trim()
 
     if (request.user) {
-      return { partner: request.user }
+      return { partner: requireAuthenticatedPartner(request.user) }
     }
 
     if (normalizedApiKey) {

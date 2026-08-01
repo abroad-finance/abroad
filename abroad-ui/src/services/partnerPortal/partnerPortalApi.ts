@@ -1,9 +1,26 @@
 import type { ApiResult } from '../http/types'
 import type {
+  PartnerApiKeyScope,
+  PartnerPixReceipt,
+  PartnerPortalApiKeyList,
+  PartnerPortalApiKeySecretResult,
+  PartnerPortalApiKeySummary,
+  PartnerPortalAuditEvent,
+  PartnerPortalLoginResult,
+  PartnerPortalMfaConfirmation,
+  PartnerPortalMfaEnrollment,
+  PartnerPortalResetToken,
+  PartnerPortalRole,
   PartnerPortalSession,
+  PartnerPortalUser,
+  PartnerPortalWebhookConfiguration,
+  PartnerPortalWebhookSecretResult,
+  PartnerPortalWebhookTestResult,
+  PartnerReconciliationRun,
   PartnerTransactionDetail,
   PartnerTransactionFilters,
   PartnerTransactionListResponse,
+  PartnerWebhookRedeliveryResult,
 } from './partnerPortalTypes'
 
 import { HttpClient } from '../http/httpClient'
@@ -37,20 +54,297 @@ const queryFromFilters = (filters: PartnerTransactionFilters) => ({
   status: filters.status,
 })
 
+const jsonRequest = (method: 'PATCH' | 'POST' | 'PUT', body?: unknown) => ({
+  ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+  headers: { 'Content-Type': 'application/json' },
+  method,
+})
+
+export const activatePartnerWebhook = async (): Promise<PartnerPortalWebhookConfiguration> => {
+  const result = await portalClient.request<PartnerPortalWebhookConfiguration, ApiErrorBody>(
+    '/partner-portal/integration/webhook/activation',
+    jsonRequest('POST'),
+  )
+  return unwrap(result)
+}
+
+export const beginPartnerMfaEnrollment = async (
+  currentPassword: string,
+): Promise<PartnerPortalMfaEnrollment> => {
+  const result = await portalClient.request<PartnerPortalMfaEnrollment, ApiErrorBody>(
+    '/partner-portal/security/mfa/enrollment',
+    jsonRequest('POST', { currentPassword }),
+  )
+  return unwrap(result)
+}
+
+export const changePartnerPortalPassword = async (
+  currentPassword: string,
+  newPassword: string,
+): Promise<void> => {
+  const result = await portalClient.request<void, ApiErrorBody>(
+    '/partner-portal/security/password',
+    jsonRequest('PATCH', { currentPassword, newPassword }),
+  )
+  unwrap(result)
+}
+
+export const completePartnerMfaChallenge = async (
+  challengeToken: string,
+  code: string,
+): Promise<PartnerPortalSession> => {
+  const result = await bootstrapClient.request<PartnerPortalSession, ApiErrorBody>(
+    '/partner-portal/session/mfa',
+    jsonRequest('POST', { challengeToken, code }),
+  )
+  return unwrap(result)
+}
+
+export const confirmPartnerMfaEnrollment = async (
+  code: string,
+): Promise<PartnerPortalMfaConfirmation> => {
+  const result = await portalClient.request<PartnerPortalMfaConfirmation, ApiErrorBody>(
+    '/partner-portal/security/mfa/confirmation',
+    jsonRequest('POST', { code }),
+  )
+  return unwrap(result)
+}
+
+export const continuePartnerPixReconciliation = async (
+  runId: string,
+): Promise<PartnerReconciliationRun> => {
+  const result = await portalClient.request<PartnerReconciliationRun, ApiErrorBody>(
+    `/partner-portal/reconciliation-runs/${encodeURIComponent(runId)}/continue`,
+    jsonRequest('POST'),
+  )
+  return unwrap(result)
+}
+
+export const createPartnerApiKey = async (input: {
+  expiresAt?: string
+  name: string
+  scopes: PartnerApiKeyScope[]
+}): Promise<PartnerPortalApiKeySecretResult> => {
+  const result = await portalClient.request<PartnerPortalApiKeySecretResult, ApiErrorBody>(
+    '/partner-portal/integration/api-keys',
+    jsonRequest('POST', input),
+  )
+  return unwrap(result)
+}
+
 export const createPartnerPortalSession = async (
   email: string,
   password: string,
-): Promise<PartnerPortalSession> => {
-  const result = await bootstrapClient.request<PartnerPortalSession, ApiErrorBody>(
+): Promise<PartnerPortalLoginResult> => {
+  const result = await bootstrapClient.request<PartnerPortalLoginResult, ApiErrorBody>(
     '/partner-portal/session',
+    jsonRequest('POST', {
+      email: email.trim().toLowerCase(),
+      password,
+    }),
+  )
+  return unwrap(result)
+}
+
+export const createPartnerPortalUser = async (
+  email: string,
+  role: PartnerPortalRole,
+): Promise<PartnerPortalResetToken> => {
+  const result = await portalClient.request<PartnerPortalResetToken, ApiErrorBody>(
+    '/partner-portal/team',
+    jsonRequest('POST', { email, role }),
+  )
+  return unwrap(result)
+}
+
+export const discardPartnerWebhookDraft = async (): Promise<PartnerPortalWebhookConfiguration> => {
+  const result = await portalClient.request<PartnerPortalWebhookConfiguration, ApiErrorBody>(
+    '/partner-portal/integration/webhook/draft',
+    { method: 'DELETE' },
+  )
+  return unwrap(result)
+}
+
+export const getPartnerPixReceipt = async (
+  transactionId: string,
+  lang: 'en' | 'pt-BR' = 'pt-BR',
+): Promise<PartnerPixReceipt> => {
+  const result = await portalClient.request<PartnerPixReceipt, ApiErrorBody>(
+    `/partner-portal/transactions/${encodeURIComponent(transactionId)}/receipt`,
+    { method: 'GET', query: { lang } },
+  )
+  return unwrap(result)
+}
+
+export const getPartnerWebhookConfiguration = async (): Promise<PartnerPortalWebhookConfiguration> => {
+  const result = await portalClient.request<PartnerPortalWebhookConfiguration, ApiErrorBody>(
+    '/partner-portal/integration/webhook',
+    { method: 'GET' },
+  )
+  return unwrap(result)
+}
+
+export const issuePartnerPasswordReset = async (
+  userId: string,
+): Promise<PartnerPortalResetToken> => {
+  const result = await portalClient.request<PartnerPortalResetToken, ApiErrorBody>(
+    `/partner-portal/team/${encodeURIComponent(userId)}/password-reset`,
+    jsonRequest('POST'),
+  )
+  return unwrap(result)
+}
+
+export const listPartnerApiKeys = async (): Promise<PartnerPortalApiKeyList> => {
+  const result = await portalClient.request<PartnerPortalApiKeyList, ApiErrorBody>(
+    '/partner-portal/integration/api-keys',
+    { method: 'GET' },
+  )
+  return unwrap(result)
+}
+
+export const listPartnerAuditEvents = async (): Promise<PartnerPortalAuditEvent[]> => {
+  const result = await portalClient.request<PartnerPortalAuditEvent[], ApiErrorBody>(
+    '/partner-portal/team/audit-events',
+    { method: 'GET' },
+  )
+  return unwrap(result)
+}
+
+export const listPartnerPixReconciliations = async (): Promise<PartnerReconciliationRun[]> => {
+  const result = await portalClient.request<{ items: PartnerReconciliationRun[] }, ApiErrorBody>(
+    '/partner-portal/reconciliation-runs',
+    { method: 'GET' },
+  )
+  return unwrap(result).items
+}
+
+export const listPartnerPortalUsers = async (): Promise<PartnerPortalUser[]> => {
+  const result = await portalClient.request<PartnerPortalUser[], ApiErrorBody>(
+    '/partner-portal/team',
+    { method: 'GET' },
+  )
+  return unwrap(result)
+}
+
+export const redeliverPartnerWebhook = async (
+  transactionId: string,
+  deliveryId: string,
+  idempotencyKey: string,
+): Promise<PartnerWebhookRedeliveryResult> => {
+  const result = await portalClient.request<PartnerWebhookRedeliveryResult, ApiErrorBody>(
+    `/partner-portal/transactions/${encodeURIComponent(transactionId)}/deliveries/${encodeURIComponent(deliveryId)}/redelivery`,
     {
-      body: JSON.stringify({
-        email: email.trim().toLowerCase(),
-        password,
-      }),
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Idempotency-Key': idempotencyKey },
       method: 'POST',
     },
+  )
+  return unwrap(result)
+}
+
+export const regeneratePartnerRecoveryCodes = async (
+  currentPassword: string,
+): Promise<string[]> => {
+  const result = await portalClient.request<{ recoveryCodes: string[] }, ApiErrorBody>(
+    '/partner-portal/security/mfa/recovery-codes',
+    jsonRequest('POST', { currentPassword }),
+  )
+  return unwrap(result).recoveryCodes
+}
+
+export const resetPartnerMfa = async (userId: string): Promise<PartnerPortalUser> => {
+  const result = await portalClient.request<PartnerPortalUser, ApiErrorBody>(
+    `/partner-portal/team/${encodeURIComponent(userId)}/mfa-reset`,
+    jsonRequest('POST'),
+  )
+  return unwrap(result)
+}
+
+export const resetPartnerPasswordWithRecoveryCode = async (input: {
+  email: string
+  newPassword: string
+  recoveryCode: string
+}): Promise<void> => {
+  const result = await bootstrapClient.request<void, ApiErrorBody>(
+    '/partner-portal/session/password/recovery',
+    jsonRequest('POST', input),
+  )
+  unwrap(result)
+}
+
+export const resetPartnerPasswordWithToken = async (
+  token: string,
+  newPassword: string,
+): Promise<void> => {
+  const result = await bootstrapClient.request<void, ApiErrorBody>(
+    '/partner-portal/session/password/reset',
+    jsonRequest('POST', { newPassword, token }),
+  )
+  unwrap(result)
+}
+
+export const revokePartnerApiKey = async (
+  apiKeyId: string,
+): Promise<PartnerPortalApiKeySummary> => {
+  const result = await portalClient.request<PartnerPortalApiKeySummary, ApiErrorBody>(
+    `/partner-portal/integration/api-keys/${encodeURIComponent(apiKeyId)}`,
+    { method: 'DELETE' },
+  )
+  return unwrap(result)
+}
+
+export const rotatePartnerApiKey = async (
+  apiKeyId: string,
+): Promise<PartnerPortalApiKeySecretResult> => {
+  const result = await portalClient.request<PartnerPortalApiKeySecretResult, ApiErrorBody>(
+    `/partner-portal/integration/api-keys/${encodeURIComponent(apiKeyId)}/rotation`,
+    jsonRequest('POST'),
+  )
+  return unwrap(result)
+}
+
+export const rotatePartnerWebhookSecret = async (): Promise<PartnerPortalWebhookSecretResult> => {
+  const result = await portalClient.request<PartnerPortalWebhookSecretResult, ApiErrorBody>(
+    '/partner-portal/integration/webhook/secret-rotation',
+    jsonRequest('POST'),
+  )
+  return unwrap(result)
+}
+
+export const stagePartnerWebhookUrl = async (
+  url: string,
+): Promise<PartnerPortalWebhookConfiguration> => {
+  const result = await portalClient.request<PartnerPortalWebhookConfiguration, ApiErrorBody>(
+    '/partner-portal/integration/webhook/draft',
+    jsonRequest('PUT', { url }),
+  )
+  return unwrap(result)
+}
+
+export const startPartnerPixReconciliation = async (
+  batchSize = 5,
+): Promise<PartnerReconciliationRun> => {
+  const result = await portalClient.request<PartnerReconciliationRun, ApiErrorBody>(
+    '/partner-portal/reconciliation-runs',
+    jsonRequest('POST', { batchSize }),
+  )
+  return unwrap(result)
+}
+
+export const testPartnerWebhookDraft = async (): Promise<PartnerPortalWebhookTestResult> => {
+  const result = await portalClient.request<PartnerPortalWebhookTestResult, ApiErrorBody>(
+    '/partner-portal/integration/webhook/test',
+    jsonRequest('POST'),
+  )
+  return unwrap(result)
+}
+
+export const updatePartnerPortalUser = async (
+  userId: string,
+  input: { disabled?: boolean, role?: PartnerPortalRole },
+): Promise<PartnerPortalUser> => {
+  const result = await portalClient.request<PartnerPortalUser, ApiErrorBody>(
+    `/partner-portal/team/${encodeURIComponent(userId)}`,
+    jsonRequest('PATCH', input),
   )
   return unwrap(result)
 }

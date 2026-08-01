@@ -26,6 +26,11 @@ model Partner {
   webhookUrl    String?
   users         PartnerUser[]
   portalUsers   PartnerPortalUser[]
+  portalApiKeys        PartnerApiKey[]
+  portalAuditEvents    PartnerPortalAuditEvent[]
+  webhookConfiguration PartnerWebhookConfiguration?
+  outboxEvents         OutboxEvent[]
+  reconciliationRuns   PartnerReconciliationRun[]
   quotes        Quote[]
 }
 
@@ -34,16 +39,114 @@ model PartnerPortalUser {
   partnerId           String
   partner             Partner  @relation(fields: [partnerId], references: [id], onDelete: Cascade)
   email               String   @unique
-  passwordVerifier    String
+  passwordVerifier           String?
+  role                       PartnerPortalRole                 @default(MEMBER)
   sessionVersion      Int      @default(1)
   failedLoginAttempts Int      @default(0)
   lockedUntil         DateTime?
   lastLoginAt         DateTime?
   disabledAt          DateTime?
+  mfaSecretCiphertext        String?
+  mfaPendingSecretCiphertext String?
+  mfaPendingCreatedAt        DateTime?
+  mfaEnabledAt               DateTime?
+  mfaLastUsedCounter         BigInt?
+  mfaFailedAttempts          Int                               @default(0)
+  mfaLockedUntil             DateTime?
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
+  createdApiKeys             PartnerApiKey[]                   @relation("PartnerApiKeyCreator")
+  auditEvents                PartnerPortalAuditEvent[]         @relation("PartnerPortalAuditActor")
+  createdResetTokens         PartnerPortalPasswordResetToken[] @relation("PartnerPortalPasswordResetCreator")
+  resetTokens                PartnerPortalPasswordResetToken[] @relation("PartnerPortalPasswordResetSubject")
+  mfaRecoveryCodes           PartnerPortalMfaRecoveryCode[]
+  initiatedOutboxEvents      OutboxEvent[]                     @relation("OutboxPortalInitiator")
+  reconciliationRuns         PartnerReconciliationRun[]        @relation("PartnerReconciliationInitiator")
 
   @@index([partnerId])
+}
+
+model PartnerApiKey {
+  id              String               @id @default(uuid())
+  partnerId       String
+  partner         Partner              @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  name            String
+  secretHash      String               @unique
+  displayPrefix   String
+  scopes          PartnerApiKeyScope[]
+  expiresAt       DateTime?
+  revokedAt       DateTime?
+  lastUsedAt      DateTime?
+  createdByUserId String
+  createdBy       PartnerPortalUser    @relation("PartnerApiKeyCreator", fields: [createdByUserId], references: [id])
+  rotatedFromId   String?              @unique
+  rotatedFrom     PartnerApiKey?       @relation("PartnerApiKeyRotation", fields: [rotatedFromId], references: [id], onDelete: SetNull)
+  rotatedTo       PartnerApiKey?       @relation("PartnerApiKeyRotation")
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  @@index([partnerId, revokedAt, expiresAt])
+}
+
+model PartnerWebhookConfiguration {
+  partnerId               String    @id
+  partner                 Partner   @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  activeSecretCiphertext  String?
+  activeSecretPrefix      String?
+  activeSecretVersion     Int       @default(0)
+  pendingUrl              String?
+  pendingSecretCiphertext String?
+  pendingSecretPrefix     String?
+  pendingRevision         Int       @default(0)
+  lastTestedRevision      Int?
+  lastTestedAt            DateTime?
+  lastTestSucceeded       Boolean?
+  lastTestHttpStatus      Int?
+  lastTestDurationMs      Int?
+  lastTestFailureCode     String?
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+}
+
+model PartnerPortalMfaRecoveryCode {
+  id         String            @id @default(uuid())
+  userId     String
+  user       PartnerPortalUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+  codeHash   String            @unique
+  consumedAt DateTime?
+  createdAt  DateTime          @default(now())
+
+  @@index([userId, consumedAt])
+}
+
+model PartnerPortalPasswordResetToken {
+  id              String                            @id @default(uuid())
+  userId          String
+  user            PartnerPortalUser                 @relation("PartnerPortalPasswordResetSubject", fields: [userId], references: [id], onDelete: Cascade)
+  createdByUserId String?
+  createdBy       PartnerPortalUser?                @relation("PartnerPortalPasswordResetCreator", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  tokenHash       String                            @unique
+  purpose         PartnerPortalPasswordResetPurpose
+  expiresAt       DateTime
+  consumedAt      DateTime?
+  createdAt       DateTime                          @default(now())
+
+  @@index([userId, expiresAt])
+}
+
+model PartnerPortalAuditEvent {
+  id           String             @id @default(uuid())
+  partnerId    String
+  partner      Partner            @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  actorUserId  String?
+  actor        PartnerPortalUser? @relation("PartnerPortalAuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+  action       String
+  resourceType String
+  resourceId   String?
+  metadata     Json?
+  createdAt    DateTime           @default(now())
+
+  @@index([partnerId, createdAt])
 }
 
 model PartnerUser {
@@ -138,6 +241,8 @@ model Transaction {
   exchangeHandoffAt DateTime?
   origin        TransactionOrigin @default(LEGACY)
   transitions   TransactionTransition[]
+  outboxEvents        OutboxEvent[]
+  reconciliationItems PartnerReconciliationItem[]
 
   @@index([partnerUserId, status, createdAt], name: "transaction_partnerUser_status_createdAt_idx")
 }
@@ -204,11 +309,69 @@ model OutboxEvent {
   status       OutboxStatus @default(PENDING)
   attempts     Int          @default(0)
   lastError    String?
+  partnerId               String?
+  partner                 Partner?                @relation(fields: [partnerId], references: [id], onDelete: SetNull)
+  transactionId           String?
+  transaction             Transaction?            @relation(fields: [transactionId], references: [id], onDelete: SetNull)
+  webhookEvent            String?
+  webhookPurpose          WebhookDeliveryPurpose?
+  webhookCredentialMode   WebhookCredentialMode?
+  sourceOutboxEventId     String?
+  sourceOutboxEvent       OutboxEvent?            @relation("OutboxRedeliveries", fields: [sourceOutboxEventId], references: [id], onDelete: SetNull)
+  redeliveries            OutboxEvent[]           @relation("OutboxRedeliveries")
+  initiatedByPortalUserId String?
+  initiatedByPortalUser   PartnerPortalUser?      @relation("OutboxPortalInitiator", fields: [initiatedByPortalUserId], references: [id], onDelete: SetNull)
+  idempotencyKey          String?                 @unique
+  maxAttempts             Int                     @default(5)
+  lastHttpStatus          Int?
+  lastAttemptDurationMs   Int?
   availableAt  DateTime     @default(now())
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
 
   @@index([status, availableAt])
+  @@index([partnerId, transactionId, createdAt])
+  @@index([sourceOutboxEventId, createdAt])
+}
+
+model PartnerReconciliationRun {
+  id                      String                         @id @default(uuid())
+  partnerId               String
+  partner                 Partner                        @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  initiatedByPortalUserId String
+  initiatedByPortalUser   PartnerPortalUser              @relation("PartnerReconciliationInitiator", fields: [initiatedByPortalUserId], references: [id])
+  status                  PartnerReconciliationRunStatus @default(RUNNING)
+  batchSize               Int
+  cursorCreatedAt         DateTime?
+  cursorTransactionId     String?
+  leaseToken              String?
+  leaseExpiresAt          DateTime?
+  processedCount          Int                            @default(0)
+  updatedCount            Int                            @default(0)
+  unchangedCount          Int                            @default(0)
+  ineligibleCount         Int                            @default(0)
+  failureCount            Int                            @default(0)
+  completedAt             DateTime?
+  createdAt               DateTime                       @default(now())
+  updatedAt               DateTime                       @updatedAt
+  items                   PartnerReconciliationItem[]
+
+  @@index([partnerId, createdAt])
+}
+
+model PartnerReconciliationItem {
+  id            String                          @id @default(uuid())
+  runId         String
+  run           PartnerReconciliationRun        @relation(fields: [runId], references: [id], onDelete: Cascade)
+  transactionId String
+  transaction   Transaction                     @relation(fields: [transactionId], references: [id])
+  status        PartnerReconciliationItemStatus
+  failureCode   String?
+  createdAt     DateTime                        @default(now())
+  updatedAt     DateTime                        @updatedAt
+
+  @@unique([runId, transactionId])
+  @@index([transactionId])
 }
 
 enum KycStatus {
@@ -216,6 +379,51 @@ enum KycStatus {
   APPROVED
   REJECTED
   PENDING_APPROVAL
+}
+
+enum PartnerPortalRole {
+  ADMIN
+  MEMBER
+}
+
+enum PartnerApiKeyScope {
+  TRANSACTIONS_READ
+  TRANSACTIONS_WRITE
+  PARTNER_USERS_READ
+  PARTNER_USERS_WRITE
+  KYC_READ
+  KYC_WRITE
+  TELEMETRY_WRITE
+}
+
+enum PartnerPortalPasswordResetPurpose {
+  INVITATION
+  PASSWORD_RESET
+}
+
+enum WebhookDeliveryPurpose {
+  TRANSACTION
+  TEST
+  REDELIVERY
+}
+
+enum WebhookCredentialMode {
+  PARTNER_CURRENT
+  PARTNER_PENDING
+  LEGACY_ORIGIN
+}
+
+enum PartnerReconciliationRunStatus {
+  RUNNING
+  COMPLETED
+  COMPLETED_WITH_ERRORS
+}
+
+enum PartnerReconciliationItemStatus {
+  UPDATED
+  UNCHANGED
+  INELIGIBLE
+  FAILED
 }
 
 enum DocumentType {

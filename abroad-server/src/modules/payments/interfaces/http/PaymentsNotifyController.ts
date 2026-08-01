@@ -32,7 +32,7 @@ interface NotifyPaymentRequest {
 }
 
 @Route('payments')
-@Security('ApiKeyAuth')
+@Security('ApiKeyAuth', ['transactions:write'])
 @Security('BearerAuth')
 export class PaymentsNotifyController extends Controller {
   constructor(

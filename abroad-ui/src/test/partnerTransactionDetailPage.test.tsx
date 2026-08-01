@@ -1,4 +1,5 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import {
   afterEach,
@@ -9,21 +10,34 @@ import {
 } from 'vitest'
 
 import PartnerTransactionDetail from '../pages/PartnerPortal/PartnerTransactionDetail'
+import { clearPartnerPortalSession, setPartnerPortalSession } from '../services/partnerPortal/partnerPortalSessionStore'
 
 const mocked = vi.hoisted(() => ({
+  getPartnerPixReceipt: vi.fn(),
   getPartnerTransaction: vi.fn(),
+  redeliverPartnerWebhook: vi.fn(),
 }))
 
 vi.mock('../services/partnerPortal/partnerPortalApi', () => ({
+  getPartnerPixReceipt: mocked.getPartnerPixReceipt,
   getPartnerTransaction: mocked.getPartnerTransaction,
+  redeliverPartnerWebhook: mocked.redeliverPartnerWebhook,
 }))
 
 const transactionDetail = {
   createdAt: '2026-07-30T10:00:00.000Z',
   deliveries: [{
     attempts: 1,
+    canRedeliver: false,
+    durationMs: 83,
     event: 'transaction.updated',
+    failureCode: null,
+    httpStatus: 204,
+    id: 'delivery-1',
     lastAttemptAt: '2026-07-30T10:06:00.000Z',
+    nextAttemptAt: null,
+    purpose: 'TRANSACTION',
+    sourceDeliveryId: null,
     status: 'DELIVERED',
   }],
   failureReason: null,
@@ -55,6 +69,9 @@ const renderDetail = () => render(
 )
 
 afterEach(() => {
+  clearPartnerPortalSession()
+  Reflect.deleteProperty(URL, 'createObjectURL')
+  Reflect.deleteProperty(URL, 'revokeObjectURL')
   vi.clearAllMocks()
 })
 
@@ -135,5 +152,72 @@ describe('PartnerTransactionDetail', () => {
 
     expect(await screen.findByRole('heading', { name: 'Transaction unavailable' })).toBeInTheDocument()
     expect(screen.getByText('Transaction not found')).toBeInTheDocument()
+  })
+
+  it('downloads an available settled PIX receipt without exposing provider data', async () => {
+    mocked.getPartnerTransaction.mockResolvedValue(transactionDetail)
+    mocked.getPartnerPixReceipt.mockResolvedValue({
+      contentBase64: 'JVBERg==',
+      contentType: 'application/pdf',
+      fileName: 'receipt.pdf',
+      sizeBytes: 4,
+    })
+    const createObjectUrl = vi.fn(() => 'blob:receipt')
+    const revokeObjectUrl = vi.fn()
+    Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: createObjectUrl })
+    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: revokeObjectUrl })
+    const anchorClick = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined)
+    renderDetail()
+    const user = userEvent.setup()
+
+    await user.click(await screen.findByRole('button', { name: 'Download PIX receipt' }))
+
+    await waitFor(() => expect(mocked.getPartnerPixReceipt).toHaveBeenCalledWith(transactionDetail.id))
+    expect(createObjectUrl).toHaveBeenCalledOnce()
+    expect(anchorClick).toHaveBeenCalledOnce()
+    expect(revokeObjectUrl).toHaveBeenCalledWith('blob:receipt')
+  })
+
+  it('shows safe failed-delivery diagnostics and uses controlled redelivery for an MFA administrator', async () => {
+    setPartnerPortalSession({
+      accessToken: 'admin-token',
+      email: 'operator@decaf.so',
+      expiresAt: '2099-01-01T00:00:00.000Z',
+      mfaEnabled: true,
+      mfaVerified: true,
+      partnerName: 'Decaf',
+      role: 'ADMIN',
+      userId: 'user-1',
+    })
+    mocked.getPartnerTransaction.mockResolvedValue({
+      ...transactionDetail,
+      deliveries: [{
+        ...transactionDetail.deliveries[0],
+        canRedeliver: true,
+        failureCode: 'HTTP_503',
+        httpStatus: 503,
+        status: 'FAILED',
+      }],
+    })
+    mocked.redeliverPartnerWebhook.mockResolvedValue({
+      alreadyExisted: false,
+      attempts: 1,
+      deliveryId: 'redelivery-1',
+      durationMs: 91,
+      httpStatus: 204,
+      status: 'DELIVERED',
+    })
+    renderDetail()
+    const user = userEvent.setup()
+
+    expect(await screen.findByText('HTTP_503')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Redeliver webhook' }))
+
+    await waitFor(() => expect(mocked.redeliverPartnerWebhook).toHaveBeenCalledOnce())
+    expect(mocked.redeliverPartnerWebhook).toHaveBeenCalledWith(
+      transactionDetail.id,
+      'delivery-1',
+      expect.stringMatching(/^portal-\d+-delivery-1$/u),
+    )
   })
 })

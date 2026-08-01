@@ -1,4 +1,10 @@
-import { Prisma, PrismaClient, TransactionOrigin } from '@prisma/client'
+import {
+  Prisma,
+  PrismaClient,
+  TransactionOrigin,
+  WebhookCredentialMode,
+  WebhookDeliveryPurpose,
+} from '@prisma/client'
 import { inject, injectable } from 'inversify'
 
 import { TYPES } from '../../../app/container/types'
@@ -12,6 +18,9 @@ import { ISecretManager } from '../../../platform/secrets/ISecretManager'
 type EnqueueOptions = {
   client?: PrismaClientLike
   deliverNow?: boolean
+  partnerId: string
+  primaryTarget?: string
+  transactionId: string
 }
 
 type PrismaClientLike = Prisma.TransactionClient | PrismaClient
@@ -43,24 +52,45 @@ export class TransactionWebhookRouter {
     origin: TransactionOrigin,
     payload: { data: unknown, event: WebhookEvent },
     context: string,
-    options: EnqueueOptions = {},
+    options: EnqueueOptions,
   ): Promise<void> {
     const targets = await this.resolveTargets(primaryTarget, origin)
-    await this.enqueueTargets(targets, payload, context, options)
+    await this.enqueueTargets(targets, payload, context, {
+      ...options,
+      primaryTarget: primaryTarget ?? undefined,
+    })
   }
 
   public async enqueueTargets(
     targets: readonly string[],
     payload: { data: unknown, event: WebhookEvent },
     context: string,
-    options: EnqueueOptions = {},
+    options: EnqueueOptions,
   ): Promise<void> {
+    const primaryCredentialMode = options.primaryTarget?.trim()
+      ? await this.resolvePrimaryCredentialMode(options.partnerId, options.client)
+      : WebhookCredentialMode.LEGACY_ORIGIN
     for (const target of this.normalizeTargets(targets)) {
+      const isPrimaryTarget = Boolean(
+        options.primaryTarget
+        && target === options.primaryTarget.trim(),
+      )
       await this.outboxDispatcher.enqueueWebhook(
         target,
         payload,
         `${context}:${this.targetOrigin(target)}`,
-        options,
+        {
+          client: options.client,
+          deliverNow: options.deliverNow,
+          metadata: {
+            partnerId: isPrimaryTarget ? options.partnerId : undefined,
+            transactionId: options.transactionId,
+            webhookCredentialMode: isPrimaryTarget
+              ? primaryCredentialMode
+              : WebhookCredentialMode.LEGACY_ORIGIN,
+            webhookPurpose: WebhookDeliveryPurpose.TRANSACTION,
+          },
+        },
       )
     }
   }
@@ -139,6 +169,20 @@ export class TransactionWebhookRouter {
     }
 
     return normalizedTargets
+  }
+
+  private async resolvePrimaryCredentialMode(
+    partnerId: string,
+    client?: PrismaClientLike,
+  ): Promise<WebhookCredentialMode> {
+    const prismaClient = client ?? await this.databaseClientProvider.getClient()
+    const configuration = await prismaClient.partnerWebhookConfiguration.findUnique({
+      select: { activeSecretCiphertext: true },
+      where: { partnerId },
+    })
+    return configuration?.activeSecretCiphertext
+      ? WebhookCredentialMode.PARTNER_CURRENT
+      : WebhookCredentialMode.LEGACY_ORIGIN
   }
 
   private targetOrigin(target: string): string {

@@ -16,14 +16,13 @@ import {
 } from 'tsoa'
 
 import { TYPES } from '../../../../app/container/types'
+import { requireAuthenticatedPartner } from '../../../../app/http/authenticationContext'
 import { ValidationError } from '../../../../core/errors'
 import { IDatabaseClientProvider } from '../../../../platform/persistence/IDatabaseClientProvider'
 import { KycSubmissionService } from '../../application/KycSubmissionService'
 import { KycStatusResponse, kycSubmissionFormSchema, KycSubmitResponse, resolveDocumentExtension } from './kycContracts'
 
 @Route('kyc')
-@Security('ApiKeyAuth')
-@Security('BearerAuth')
 export class KycController extends Controller {
   constructor(
     @inject(KycSubmissionService)
@@ -39,12 +38,14 @@ export class KycController extends Controller {
    * verification form before an above-threshold transaction.
    */
   @Get('status')
+  @Security('ApiKeyAuth', ['kyc:read'])
+  @Security('BearerAuth')
   @SuccessResponse('200', 'KYC status retrieved')
   public async getKycStatus(
     @Request() request: RequestExpress,
     @Query() userId: string,
   ): Promise<KycStatusResponse> {
-    const partner = request.user
+    const partner = requireAuthenticatedPartner(request.user)
     const prisma = await this.dbProvider.getClient()
 
     const partnerUser = await prisma.partnerUser.findUnique({
@@ -75,6 +76,8 @@ export class KycController extends Controller {
    */
   @Post()
   @Response<400, { reason: string }>(400, 'Bad Request')
+  @Security('ApiKeyAuth', ['kyc:write'])
+  @Security('BearerAuth')
   @SuccessResponse('201', 'KYC submitted')
   public async submitKyc(
     @Request() request: RequestExpress,
@@ -90,7 +93,7 @@ export class KycController extends Controller {
     @FormField() email: string,
     @FormField() phone: string,
   ): Promise<KycSubmitResponse> {
-    const partner = request.user
+    const partner = requireAuthenticatedPartner(request.user)
 
     if (!document) {
       throw new ValidationError('Document image is required')

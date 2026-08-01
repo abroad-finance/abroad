@@ -17,6 +17,7 @@ import {
 import { Body, Post } from 'tsoa'
 
 import { TYPES } from '../../../../app/container/types'
+import { requireAuthenticatedPartner } from '../../../../app/http/authenticationContext'
 import { IDatabaseClientProvider } from '../../../../platform/persistence/IDatabaseClientProvider'
 import { PaymentContextService } from '../../../payments/application/PaymentContextService'
 import { TransactionAcceptanceService, TransactionValidationError } from '../../application/TransactionAcceptanceService'
@@ -24,8 +25,6 @@ import { TransactionStatusService } from '../../application/TransactionStatusSer
 import { type AcceptTransactionRequest, acceptTransactionRequestSchema, type AcceptTransactionResponse, type TransactionStatusResponse } from './contracts'
 
 @Route('transaction')
-@Security('ApiKeyAuth')
-@Security('BearerAuth')
 export class TransactionController extends Controller {
   private readonly paymentContextService: PaymentContextService
   private readonly transactionAcceptanceService: TransactionAcceptanceService
@@ -54,6 +53,8 @@ export class TransactionController extends Controller {
    */
   @Post()
   @Response<400, { reason: string }>(400, 'Bad Request')
+  @Security('ApiKeyAuth', ['transactions:write'])
+  @Security('BearerAuth')
   @SuccessResponse('200', 'Transaction accepted')
   public async acceptTransaction(
     @Body() requestBody: AcceptTransactionRequest,
@@ -75,7 +76,7 @@ export class TransactionController extends Controller {
     const normalizedAccountNumber = accountNumber?.trim() ?? ''
     const normalizedQrCode = qrCode?.trim() || null
 
-    const partner = request.user
+    const partner = requireAuthenticatedPartner(request.user)
     const partnerContext = {
       id: String(partner.id),
       isKybApproved: Boolean(partner.isKybApproved),
@@ -129,12 +130,14 @@ export class TransactionController extends Controller {
   @Response('401', 'Unauthorized')
   @Response('404', 'Not Found')
   @Response('500', 'Internal Server Error')
+  @Security('ApiKeyAuth', ['transactions:read'])
+  @Security('BearerAuth')
   @SuccessResponse('200', 'Transaction status retrieved')
   public async getTransactionStatus(
     @Path() transactionId: string,
     @Request() request: RequestExpress,
   ): Promise<TransactionStatusResponse> {
-    const partnerId = String(request.user.id)
+    const partnerId = String(requireAuthenticatedPartner(request.user).id)
     const status = await this.transactionStatusService.getStatus(transactionId, partnerId)
 
     return {

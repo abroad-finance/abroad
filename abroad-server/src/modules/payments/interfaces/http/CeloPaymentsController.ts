@@ -30,7 +30,7 @@ interface CeloPaymentNotificationRequest {
 }
 
 @Route('celo/payments')
-@Security('ApiKeyAuth')
+@Security('ApiKeyAuth', ['transactions:write'])
 @Security('BearerAuth')
 export class CeloPaymentsController extends Controller {
   public constructor(

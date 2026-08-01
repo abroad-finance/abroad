@@ -9,8 +9,11 @@ import { TYPES } from '../../../app/container/types'
 import { IDatabaseClientProvider } from '../../../platform/persistence/IDatabaseClientProvider'
 import { ISecretManager } from '../../../platform/secrets/ISecretManager'
 import { type ClientDomain, hashClientDomain, parseClientDomain as parseClientDomainValue } from '../domain/clientDomain'
-import { BearerAuthentication, IPartnerService } from './contracts/IPartnerService'
+import { BearerAuthentication, IPartnerService, PartnerApiKeyAuthentication } from './contracts/IPartnerService'
 import { hashPartnerApiKey } from './partnerApiKey'
+import { fromDatabasePartnerApiKeyScope } from './partnerApiKeyScopes'
+
+const LAST_USED_WRITE_INTERVAL_MS = 5 * 60 * 1_000
 
 interface VerifiedBearerPayload extends jwt.JwtPayload {
   client_domain?: string
@@ -25,6 +28,56 @@ export class PartnerService implements IPartnerService {
     private databaseClientProvider: IDatabaseClientProvider,
     @inject(TYPES.ISecretManager) private secretManager: ISecretManager,
   ) { }
+
+  public async authenticateApiKey(apiKey?: string): Promise<PartnerApiKeyAuthentication> {
+    const normalizedApiKey = apiKey?.trim()
+    if (!normalizedApiKey) {
+      throw new Error('API key not provided')
+    }
+
+    const prismaClient = await this.databaseClientProvider.getClient()
+    const hashedApiKey = hashPartnerApiKey(normalizedApiKey)
+    const managedKey = await prismaClient.partnerApiKey.findUnique({
+      include: { partner: true },
+      where: { secretHash: hashedApiKey },
+    })
+    const now = new Date()
+    if (managedKey) {
+      if (
+        managedKey.revokedAt
+        || (managedKey.expiresAt && managedKey.expiresAt <= now)
+      ) {
+        throw new Error('Partner not found')
+      }
+      if (
+        !managedKey.lastUsedAt
+        || now.getTime() - managedKey.lastUsedAt.getTime() >= LAST_USED_WRITE_INTERVAL_MS
+      ) {
+        await prismaClient.partnerApiKey.updateMany({
+          data: { lastUsedAt: now },
+          where: {
+            id: managedKey.id,
+            OR: [
+              { lastUsedAt: null },
+              { lastUsedAt: { lte: new Date(now.getTime() - LAST_USED_WRITE_INTERVAL_MS) } },
+            ],
+          },
+        })
+      }
+      return {
+        keyId: managedKey.id,
+        kind: 'MANAGED',
+        partner: managedKey.partner,
+        scopes: managedKey.scopes.map(fromDatabasePartnerApiKeyScope),
+      }
+    }
+
+    const partner = await this.findPartnerByApiKey(prismaClient, hashedApiKey)
+    if (!partner) {
+      throw new Error('Partner not found')
+    }
+    return { kind: 'LEGACY', partner }
+  }
 
   public async authenticateBearerToken(token: string): Promise<BearerAuthentication> {
     try {
@@ -65,23 +118,7 @@ export class PartnerService implements IPartnerService {
   }
 
   public async getPartnerFromApiKey(apiKey?: string) {
-    const normalizedApiKey = apiKey?.trim()
-
-    if (!normalizedApiKey) {
-      throw new Error('API key not provided')
-    }
-
-    const prismaClient = await this.databaseClientProvider.getClient()
-
-    const hashedApiKey = hashPartnerApiKey(normalizedApiKey)
-
-    const partner = await this.findPartnerByApiKey(prismaClient, hashedApiKey)
-
-    if (!partner) {
-      throw new Error('Partner not found')
-    }
-
-    return partner
+    return (await this.authenticateApiKey(apiKey)).partner
   }
 
   public async getPartnerFromClientDomain(clientDomain: ClientDomain): Promise<Partner> {

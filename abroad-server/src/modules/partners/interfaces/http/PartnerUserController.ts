@@ -1,3 +1,5 @@
+import type { Request as ExpressRequest } from 'express'
+
 import { type PartnerUser as PartnerUserModel, Prisma } from '@prisma/client'
 import { inject } from 'inversify'
 import {
@@ -18,10 +20,10 @@ import {
 } from 'tsoa'
 
 import { TYPES } from '../../../../app/container/types'
+import { requireAuthenticatedPartner } from '../../../../app/http/authenticationContext'
 import { IDatabaseClientProvider } from '../../../../platform/persistence/IDatabaseClientProvider'
 import { IPaymentServiceFactory } from '../../../payments/application/contracts/IPaymentServiceFactory'
 import {
-  AuthenticatedRequest,
   CreatePartnerUserRequest,
   createPartnerUserSchema,
   DEFAULT_PAGE_SIZE,
@@ -34,8 +36,6 @@ import {
 } from './userContracts'
 
 @Route('partnerUser')
-@Security('BearerAuth')
-@Security('ApiKeyAuth')
 export class PartnerUserController extends Controller {
   constructor(
     @inject(TYPES.IDatabaseClientProvider)
@@ -53,10 +53,12 @@ export class PartnerUserController extends Controller {
 
   @Post()
   @Response<400, { reason: string }>(400, 'Bad Request')
+  @Security('ApiKeyAuth', ['partner-users:write'])
+  @Security('BearerAuth')
   @SuccessResponse('201', 'Partner user created')
   public async createPartnerUser(
     @Body() body: CreatePartnerUserRequest,
-    @Request() req: AuthenticatedRequest,
+    @Request() req: ExpressRequest,
     @Res() badRequest: TsoaResponse<400, { reason: string }>,
   ): Promise<PartnerUserDto> {
     const validation = parsePayload(createPartnerUserSchema, body)
@@ -65,12 +67,13 @@ export class PartnerUserController extends Controller {
     }
 
     const prisma = await this.dbProvider.getClient()
+    const partner = requireAuthenticatedPartner(req.user)
 
     try {
       const record = await prisma.partnerUser.create({
         data: {
           kycExternalToken: validation.data.kycExternalToken ?? null,
-          partnerId: req.user.id,
+          partnerId: partner.id,
           userId: validation.data.userId,
         },
       })
@@ -89,11 +92,13 @@ export class PartnerUserController extends Controller {
 
   @Get()
   @Response<400, { reason: string }>(400, 'Bad Request')
+  @Security('ApiKeyAuth', ['partner-users:read'])
+  @Security('BearerAuth')
   @SuccessResponse('200', 'Partner users retrieved')
   public async listPartnerUsers(
     @Query() page: number = 1,
     @Query() pageSize: number = DEFAULT_PAGE_SIZE,
-    @Request() req: AuthenticatedRequest,
+    @Request() req: ExpressRequest,
     @Res() badRequest: TsoaResponse<400, { reason: string }>,
   ): Promise<PaginatedPartnerUsers> {
     const pagination = parsePagination({ page, pageSize })
@@ -102,15 +107,16 @@ export class PartnerUserController extends Controller {
     }
 
     const prisma = await this.dbProvider.getClient()
+    const partner = requireAuthenticatedPartner(req.user)
 
     const [records, total] = await Promise.all([
       prisma.partnerUser.findMany({
         orderBy: { createdAt: 'desc' },
         skip: (pagination.data.page - 1) * pagination.data.pageSize,
         take: pagination.data.pageSize,
-        where: { partnerId: req.user.id },
+        where: { partnerId: partner.id },
       }),
-      prisma.partnerUser.count({ where: { partnerId: req.user.id } }),
+      prisma.partnerUser.count({ where: { partnerId: partner.id } }),
     ])
 
     return {
@@ -128,11 +134,13 @@ export class PartnerUserController extends Controller {
   @Patch('{userId}')
   @Response<400, { reason: string }>(400, 'Bad Request')
   @Response<404, { reason: string }>(404, 'Not Found')
+  @Security('ApiKeyAuth', ['partner-users:write'])
+  @Security('BearerAuth')
   @SuccessResponse('200', 'Partner user updated')
   public async updatePartnerUser(
     @Path() userId: string,
     @Body() body: UpdatePartnerUserRequest,
-    @Request() req: AuthenticatedRequest,
+    @Request() req: ExpressRequest,
     @Res() res: TsoaResponse<400 | 404, { reason: string }>,
   ): Promise<PartnerUserDto> {
     const validation = parsePayload(updatePartnerUserSchema, body)
@@ -141,13 +149,14 @@ export class PartnerUserController extends Controller {
     }
 
     const prisma = await this.dbProvider.getClient()
+    const partner = requireAuthenticatedPartner(req.user)
 
     try {
       const record = await prisma.partnerUser.update({
         data: validation.data,
         where: {
           partnerId_userId: {
-            partnerId: req.user.id,
+            partnerId: partner.id,
             userId,
           },
         },

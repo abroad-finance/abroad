@@ -31,7 +31,7 @@ interface SolanaPaymentNotificationRequest {
 }
 
 @Route('solana/payments')
-@Security('ApiKeyAuth')
+@Security('ApiKeyAuth', ['transactions:write'])
 @Security('BearerAuth')
 export class SolanaPaymentsController extends Controller {
   public constructor(

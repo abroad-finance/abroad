@@ -108,6 +108,72 @@ describe('TransferoUltraClient', () => {
     )
   })
 
+  it('downloads only a bounded PDF receipt with the requested language', async () => {
+    const client = new TransferoUltraClient(
+      createSecretManager(),
+      createMockLogger(),
+    )
+    const pdf = Buffer.from('%PDF-1.7 receipt')
+    mockedAxios.request.mockResolvedValueOnce({
+      data: pdf,
+      headers: { 'content-type': 'application/pdf; charset=binary' },
+    })
+
+    await expect(client.getPdf(
+      '/api/v1/pix/withdrawals/11111111-1111-4111-8111-111111111111/receipt',
+      { lang: 'pt-BR' },
+    )).resolves.toEqual({ contentType: 'application/pdf', data: pdf })
+
+    expect(getRequestConfig()).toMatchObject({
+      headers: { Accept: 'application/pdf' },
+      maxBodyLength: 2 * 1024 * 1024,
+      maxContentLength: 2 * 1024 * 1024,
+      method: 'GET',
+      responseType: 'arraybuffer',
+      url: 'https://ultra.example/api/v1/pix/withdrawals/11111111-1111-4111-8111-111111111111/receipt?lang=pt-BR',
+    })
+  })
+
+  it('rejects empty, oversized, non-binary, or non-PDF receipt responses', async () => {
+    const client = new TransferoUltraClient(
+      createSecretManager(),
+      createMockLogger(),
+    )
+
+    mockedAxios.request.mockResolvedValueOnce({
+      data: Buffer.from('not a pdf'),
+      headers: { 'content-type': 'application/json' },
+    })
+    await expect(client.getPdf('/receipt')).rejects.toMatchObject({
+      code: 'permanent',
+      message: 'Transfero Ultra receipt response was not a PDF',
+    })
+
+    mockedAxios.request.mockResolvedValueOnce({
+      data: Buffer.alloc(0),
+      headers: { 'content-type': 'application/pdf' },
+    })
+    await expect(client.getPdf('/receipt')).rejects.toMatchObject({
+      message: 'Transfero Ultra receipt response size is invalid',
+    })
+
+    mockedAxios.request.mockResolvedValueOnce({
+      data: Buffer.alloc(2 * 1024 * 1024 + 1),
+      headers: { 'content-type': 'application/pdf' },
+    })
+    await expect(client.getPdf('/receipt')).rejects.toMatchObject({
+      message: 'Transfero Ultra receipt response size is invalid',
+    })
+
+    mockedAxios.request.mockResolvedValueOnce({
+      data: 'not binary',
+      headers: { 'content-type': 'application/pdf' },
+    })
+    await expect(client.getPdf('/receipt')).rejects.toMatchObject({
+      message: 'Transfero Ultra receipt response was not binary',
+    })
+  })
+
   it('transmits the exact signed JSON body and requires idempotency for POST', async () => {
     const client = new TransferoUltraClient(
       createSecretManager(),

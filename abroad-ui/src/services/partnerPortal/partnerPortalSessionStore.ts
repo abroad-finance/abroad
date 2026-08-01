@@ -2,7 +2,7 @@ import { useSyncExternalStore } from 'react'
 
 import type { PartnerPortalSession } from './partnerPortalTypes'
 
-const STORAGE_KEY = 'abroad.partnerPortal.session.v1'
+const STORAGE_KEY = 'abroad.partnerPortal.session.v2'
 const listeners = new Set<() => void>()
 
 const isSession = (value: unknown): value is PartnerPortalSession => {
@@ -17,12 +17,24 @@ const isSession = (value: unknown): value is PartnerPortalSession => {
     && 'partnerName' in value
     && typeof value.partnerName === 'string'
     && value.partnerName.trim().length > 0
+    && 'email' in value
+    && typeof value.email === 'string'
+    && 'mfaEnabled' in value
+    && typeof value.mfaEnabled === 'boolean'
+    && 'mfaVerified' in value
+    && typeof value.mfaVerified === 'boolean'
+    && 'role' in value
+    && (value.role === 'ADMIN' || value.role === 'MEMBER')
+    && 'userId' in value
+    && typeof value.userId === 'string'
+    && value.userId.length > 0
   )
 }
 
 const readStoredSession = (): null | PartnerPortalSession => {
   if (typeof window === 'undefined') return null
   try {
+    window.sessionStorage.removeItem('abroad.partnerPortal.session.v1')
     const raw = window.sessionStorage.getItem(STORAGE_KEY)
     if (!raw) return null
     const parsed: unknown = JSON.parse(raw)
@@ -64,6 +76,7 @@ export const getPartnerPortalToken = (): null | string => (
 export const setPartnerPortalSession = (session: PartnerPortalSession): void => {
   currentSession = session
   if (typeof window !== 'undefined') {
+    window.sessionStorage.removeItem('abroad.partnerPortal.session.v1')
     window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(session))
   }
   emit()

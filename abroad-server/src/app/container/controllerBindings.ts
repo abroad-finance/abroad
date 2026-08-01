@@ -10,6 +10,9 @@ import { OpsKycController } from '../../modules/kyc/interfaces/http/OpsKycContro
 import { OpsPartnerController } from '../../modules/partners/interfaces/http/OpsPartnerController'
 import { OpsPartnerPortalController } from '../../modules/partners/interfaces/http/OpsPartnerPortalController'
 import { PartnerController } from '../../modules/partners/interfaces/http/PartnerController'
+import { PartnerPortalIdentityController } from '../../modules/partners/interfaces/http/PartnerPortalIdentityController'
+import { PartnerPortalIntegrationController } from '../../modules/partners/interfaces/http/PartnerPortalIntegrationController'
+import { PartnerPortalTeamController } from '../../modules/partners/interfaces/http/PartnerPortalTeamController'
 import { PartnerUserController } from '../../modules/partners/interfaces/http/PartnerUserController'
 import { CeloPaymentsController } from '../../modules/payments/interfaces/http/CeloPaymentsController'
 import { CryptoAssetController } from '../../modules/payments/interfaces/http/CryptoAssetController'
@@ -37,6 +40,9 @@ const controllerBindings: ReadonlyArray<BindingRegistration<unknown>> = [
   { bindSelf: true, identifier: PartnerController, implementation: PartnerController },
   { bindSelf: true, identifier: OpsPartnerController, implementation: OpsPartnerController },
   { bindSelf: true, identifier: OpsPartnerPortalController, implementation: OpsPartnerPortalController },
+  { bindSelf: true, identifier: PartnerPortalIdentityController, implementation: PartnerPortalIdentityController },
+  { bindSelf: true, identifier: PartnerPortalIntegrationController, implementation: PartnerPortalIntegrationController },
+  { bindSelf: true, identifier: PartnerPortalTeamController, implementation: PartnerPortalTeamController },
   { bindSelf: true, identifier: PartnerUserController, implementation: PartnerUserController },
   { bindSelf: true, identifier: QuoteController, implementation: QuoteController },
   { bindSelf: true, identifier: PixCheckoutTelemetryController, implementation: PixCheckoutTelemetryController },

@@ -5,14 +5,12 @@ import { inject, injectable } from 'inversify'
 
 import { TYPES } from '../../../app/container/types'
 import { IDatabaseClientProvider } from '../../../platform/persistence/IDatabaseClientProvider'
+import { normalizePartnerPortalEmail, PartnerPortalCredentialValidationError } from './partnerPortalCredentials'
 import { PartnerPortalPasswordService, PartnerPortalPasswordValidationError } from './PartnerPortalPasswordService'
-import { PartnerPortalSession, PartnerPortalSessionService } from './PartnerPortalSessionService'
+import { PartnerPortalMfaChallenge, PartnerPortalSession, PartnerPortalSessionService } from './PartnerPortalSessionService'
 
 const MAX_FAILED_LOGIN_ATTEMPTS = 5
 const LOGIN_LOCK_DURATION_MS = 15 * 60 * 1_000
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-const MAX_EMAIL_LENGTH = 254
-
 const portalUserWithPartner = {
   partner: true,
 } satisfies Prisma.PartnerPortalUserInclude
@@ -21,6 +19,16 @@ export type PartnerPortalCredentials = {
   email: string
   password: string
 }
+
+export type PartnerPortalLoginResult
+  = | {
+    challenge: PartnerPortalMfaChallenge
+    status: 'MFA_REQUIRED'
+  }
+  | {
+    session: PartnerPortalSession
+    status: 'AUTHENTICATED'
+  }
 
 export type PartnerPortalUserProvisioningResult = {
   created: boolean
@@ -61,7 +69,7 @@ export class PartnerPortalAccountService {
     private readonly sessionService: PartnerPortalSessionService,
   ) {}
 
-  public async authenticate(credentials: PartnerPortalCredentials): Promise<PartnerPortalSession> {
+  public async authenticate(credentials: PartnerPortalCredentials): Promise<PartnerPortalLoginResult> {
     const email = this.normalizeEmail(credentials.email)
     const prismaClient = await this.databaseClientProvider.getClient()
     const portalUser = await prismaClient.partnerPortalUser.findUnique({
@@ -69,7 +77,7 @@ export class PartnerPortalAccountService {
       where: { email },
     })
 
-    if (!portalUser) {
+    if (!portalUser || portalUser.passwordVerifier === null) {
       await this.passwordService.performDummyVerification(credentials.password)
       throw new PartnerPortalAuthenticationError()
     }
@@ -96,7 +104,16 @@ export class PartnerPortalAccountService {
       include: portalUserWithPartner,
       where: { id: portalUser.id },
     })
-    return this.sessionService.createSession(authenticatedUser)
+    if (authenticatedUser.mfaEnabledAt && authenticatedUser.mfaSecretCiphertext) {
+      return {
+        challenge: await this.sessionService.createMfaChallenge(authenticatedUser),
+        status: 'MFA_REQUIRED',
+      }
+    }
+    return {
+      session: await this.sessionService.createSession(authenticatedUser),
+      status: 'AUTHENTICATED',
+    }
   }
 
   public async provision(
@@ -134,6 +151,7 @@ export class PartnerPortalAccountService {
               failedLoginAttempts: 0,
               lockedUntil: null,
               passwordVerifier,
+              role: 'ADMIN',
               sessionVersion: { increment: 1 },
             },
             where: { id: existingUser.id },
@@ -143,6 +161,7 @@ export class PartnerPortalAccountService {
               email,
               partnerId,
               passwordVerifier,
+              role: 'ADMIN',
             },
           })
 
@@ -168,15 +187,15 @@ export class PartnerPortalAccountService {
   }
 
   private normalizeEmail(email: string): string {
-    const normalized = email.trim().toLowerCase()
-    if (
-      normalized.length === 0
-      || normalized.length > MAX_EMAIL_LENGTH
-      || !EMAIL_PATTERN.test(normalized)
-    ) {
-      throw new PartnerPortalAccountValidationError('Email is invalid')
+    try {
+      return normalizePartnerPortalEmail(email)
     }
-    return normalized
+    catch (error) {
+      if (error instanceof PartnerPortalCredentialValidationError) {
+        throw new PartnerPortalAccountValidationError(error.message)
+      }
+      throw error
+    }
   }
 
   private async recordFailedLogin(portalUser: PartnerPortalUser, now: Date): Promise<void> {

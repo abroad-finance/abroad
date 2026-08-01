@@ -1,3 +1,4 @@
+import { PartnerApiKeyScope } from '@prisma/client'
 import { sha512_224 } from 'js-sha512'
 import jwt from 'jsonwebtoken'
 
@@ -41,6 +42,8 @@ describe('PartnerService', () => {
   let secretManager: ISecretManager
   let service: PartnerService
   let findFirst: jest.Mock
+  let managedFindUnique: jest.Mock
+  let managedUpdateMany: jest.Mock
 
   beforeEach(() => {
     partnersByApiKey = {
@@ -64,10 +67,16 @@ describe('PartnerService', () => {
       }
       return null
     })
+    managedFindUnique = jest.fn(async () => null)
+    managedUpdateMany = jest.fn(async () => ({ count: 1 }))
 
     const prismaMock = {
       partner: {
         findFirst,
+      },
+      partnerApiKey: {
+        findUnique: managedFindUnique,
+        updateMany: managedUpdateMany,
       },
     }
     dbProvider = {
@@ -95,6 +104,71 @@ describe('PartnerService', () => {
     expect(dbProvider.getClient).toHaveBeenCalled()
     expect(findFirst).toHaveBeenCalledWith({ where: { apiKey: hashedApiKey } })
     expect(result).toBe(partnerFromApiKey)
+  })
+
+  it('authenticates an active managed key with scopes and rate-limited usage metadata', async () => {
+    managedFindUnique.mockResolvedValueOnce({
+      expiresAt: new Date(Date.now() + 60_000),
+      id: 'managed-key-1',
+      lastUsedAt: null,
+      partner: partnerFromApiKey,
+      revokedAt: null,
+      scopes: [PartnerApiKeyScope.TRANSACTIONS_READ],
+    })
+
+    const result = await service.authenticateApiKey(' api-key ')
+
+    expect(managedFindUnique).toHaveBeenCalledWith({
+      include: { partner: true },
+      where: { secretHash: hashedApiKey },
+    })
+    expect(result).toEqual({
+      keyId: 'managed-key-1',
+      kind: 'MANAGED',
+      partner: partnerFromApiKey,
+      scopes: ['transactions:read'],
+    })
+    expect(managedUpdateMany).toHaveBeenCalledWith({
+      data: { lastUsedAt: expect.any(Date) },
+      where: {
+        id: 'managed-key-1',
+        OR: [
+          { lastUsedAt: null },
+          { lastUsedAt: { lte: expect.any(Date) } },
+        ],
+      },
+    })
+    expect(findFirst).not.toHaveBeenCalled()
+  })
+
+  it('rejects revoked managed keys without falling back to the legacy key', async () => {
+    managedFindUnique.mockResolvedValueOnce({
+      expiresAt: null,
+      id: 'managed-key-1',
+      lastUsedAt: null,
+      partner: partnerFromApiKey,
+      revokedAt: new Date(),
+      scopes: [PartnerApiKeyScope.TRANSACTIONS_READ],
+    })
+
+    await expect(service.authenticateApiKey('api-key')).rejects.toThrow('Partner not found')
+    expect(findFirst).not.toHaveBeenCalled()
+    expect(managedUpdateMany).not.toHaveBeenCalled()
+  })
+
+  it('does not rewrite recent managed-key last-used metadata', async () => {
+    managedFindUnique.mockResolvedValueOnce({
+      expiresAt: null,
+      id: 'managed-key-1',
+      lastUsedAt: new Date(),
+      partner: partnerFromApiKey,
+      revokedAt: null,
+      scopes: [PartnerApiKeyScope.TRANSACTIONS_WRITE],
+    })
+
+    await service.authenticateApiKey('api-key')
+
+    expect(managedUpdateMany).not.toHaveBeenCalled()
   })
 
   it('throws when API key is missing or partner not found', async () => {

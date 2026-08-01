@@ -1,4 +1,4 @@
-import { Prisma, PrismaClient } from '@prisma/client'
+import { Prisma, PrismaClient, WebhookDeliveryPurpose } from '@prisma/client'
 import { inject, injectable } from 'inversify'
 
 import { TYPES } from '../../app/container/types'
@@ -6,8 +6,8 @@ import { createScopedLogger, ScopedLogger } from '../../core/logging/scopedLogge
 import { ILogger } from '../../core/logging/types'
 import { IQueueHandler, QueueName, QueuePayloadByName } from '../messaging/queues'
 import { ISlackNotifier } from '../notifications/ISlackNotifier'
-import { IWebhookNotifier, WebhookEvent } from '../notifications/IWebhookNotifier'
-import { OutboxRecord, OutboxRepository } from './OutboxRepository'
+import { IWebhookNotifier, WebhookDeliveryError, WebhookEvent } from '../notifications/IWebhookNotifier'
+import { OutboxCreateMetadata, OutboxDeliveryDiagnostics, OutboxRecord, OutboxRepository } from './OutboxRepository'
 
 type OutboxPayload
   = | {
@@ -24,13 +24,13 @@ type OutboxPayload
 
 type PrismaClientLike = Prisma.TransactionClient | PrismaClient
 
-const MAX_ATTEMPTS = 5
 const DEFAULT_DELAY_MS = 5_000
 
 type EnqueueOptions = {
   availableAt?: Date
   client?: PrismaClientLike
   deliverNow?: boolean
+  metadata?: OutboxCreateMetadata
 }
 
 @injectable()
@@ -50,11 +50,17 @@ export class OutboxDispatcher {
   public async deliver(record: OutboxRecord, context: string, client?: PrismaClientLike): Promise<void> {
     const payload = record.payload as OutboxPayload
     try {
+      let diagnostics: OutboxDeliveryDiagnostics | undefined
       if (payload.kind === 'webhook') {
-        await this.webhookNotifier.notifyWebhook(
+        const result = await this.webhookNotifier.notifyWebhook(
           payload.target,
           { data: this.toWebhookPayloadData(payload.payload.data), event: payload.payload.event },
+          {
+            credentialMode: record.webhookCredentialMode,
+            partnerId: record.partnerId,
+          },
         )
+        diagnostics = { durationMs: result.durationMs, httpStatus: result.httpStatus }
       }
       else if (payload.kind === 'slack') {
         await this.slackNotifier.sendMessage(payload.message)
@@ -62,16 +68,21 @@ export class OutboxDispatcher {
       else if (payload.kind === 'queue') {
         await this.queueHandler.postMessage(payload.queueName, payload.payload)
       }
-      await this.repository.markDelivered(record.id, client)
+      await this.repository.markDelivered(record.id, client, diagnostics)
     }
     catch (error) {
       const normalized = error instanceof Error ? error : new Error(String(error))
+      const diagnostics = error instanceof WebhookDeliveryError
+        ? { durationMs: error.durationMs, httpStatus: error.httpStatus }
+        : undefined
       const attempts = record.attempts + 1
       const backoffMs = Math.min(60_000, Math.max(DEFAULT_DELAY_MS, 2 ** attempts * 1000))
-      if (attempts >= MAX_ATTEMPTS) {
+      if (attempts >= record.maxAttempts) {
         this.logger.error(`[Outbox] delivery failed permanently (${context})`, normalized)
-        await this.repository.markFailed(record.id, normalized, client)
-        await this.safePublishDeadLetter(normalized, record)
+        await this.repository.markFailed(record.id, normalized, client, diagnostics)
+        if (record.webhookPurpose !== WebhookDeliveryPurpose.TEST) {
+          await this.safePublishDeadLetter(normalized, record)
+        }
         return
       }
       const nextAttempt = new Date(Date.now() + backoffMs)
@@ -79,7 +90,7 @@ export class OutboxDispatcher {
         `[Outbox] delivery failed; scheduling retry in ${backoffMs}ms (${context})`,
         normalized,
       )
-      await this.repository.reschedule(record.id, nextAttempt, normalized, client)
+      await this.repository.reschedule(record.id, nextAttempt, normalized, client, diagnostics)
     }
   }
 
@@ -100,6 +111,7 @@ export class OutboxDispatcher {
       this.normalizePayload(payload),
       options.availableAt ?? new Date(),
       options.client,
+      options.metadata,
     )
     if (deliverNow) {
       await this.deliver(record, context, options.client)
@@ -119,6 +131,7 @@ export class OutboxDispatcher {
       this.normalizePayload(payload),
       options.availableAt ?? new Date(),
       options.client,
+      options.metadata,
     )
     if (deliverNow) {
       await this.deliver(record, context, options.client)
@@ -130,8 +143,8 @@ export class OutboxDispatcher {
     payload: { data: unknown, event: WebhookEvent },
     context: string,
     options: EnqueueOptions = {},
-  ): Promise<void> {
-    if (!target?.trim()) return
+  ): Promise<null | OutboxRecord> {
+    if (!target?.trim()) return null
     const deliverNow = options.deliverNow ?? !options.client
     const normalizedPayload: OutboxPayload = {
       kind: 'webhook',
@@ -146,10 +159,15 @@ export class OutboxDispatcher {
       this.normalizePayload(normalizedPayload),
       options.availableAt ?? new Date(),
       options.client,
+      {
+        ...options.metadata,
+        webhookEvent: options.metadata?.webhookEvent ?? payload.event,
+      },
     )
     if (deliverNow) {
       await this.deliver(record, context, options.client)
     }
+    return record
   }
 
   public async processPending(): Promise<void> {

@@ -2,6 +2,7 @@ import {
   ArrowUpRight,
   ChevronLeft,
   ChevronRight,
+  DatabaseZap,
   Download,
   FilterX,
   LoaderCircle,
@@ -19,6 +20,7 @@ import type {
 } from '../../services/partnerPortal/partnerPortalTypes'
 
 import { exportPartnerTransactions, listPartnerTransactions } from '../../services/partnerPortal/partnerPortalApi'
+import { usePartnerPortalSession } from '../../services/partnerPortal/partnerPortalSessionStore'
 import { partnerTransactionStatuses } from '../../services/partnerPortal/partnerPortalTypes'
 import {
   formatPartnerAmount,
@@ -127,6 +129,7 @@ const MobileTransaction = ({ transaction }: { transaction: PartnerTransactionSum
 )
 
 const PartnerTransactions = () => {
+  const session = usePartnerPortalSession()
   const [activeStatus, setActiveStatus] = useState<PartnerTransactionStatus | undefined>()
   const [appliedFilters, setAppliedFilters] = useState<AppliedFilters>(emptyFilters)
   const [data, setData] = useState<null | PartnerTransactionListResponse>(null)
@@ -228,6 +231,12 @@ const PartnerTransactions = () => {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {session?.role === 'ADMIN' && session.mfaVerified && (
+            <Link className="partner-button-secondary" to="/partner/reconciliation">
+              <DatabaseZap aria-hidden className="h-4 w-4" />
+              PIX reconciliation
+            </Link>
+          )}
           <button
             className="partner-button-secondary"
             disabled={loading}

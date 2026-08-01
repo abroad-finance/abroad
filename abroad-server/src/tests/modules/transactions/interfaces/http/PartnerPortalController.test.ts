@@ -3,17 +3,31 @@ import 'reflect-metadata'
 import type { Partner } from '@prisma/client'
 import type { TsoaResponse } from '@tsoa/runtime'
 
-import { TransactionStatus } from '@prisma/client'
+import { PartnerPortalRole, TransactionStatus } from '@prisma/client'
 
 import { PartnerPortalAccountService, PartnerPortalAuthenticationError } from '../../../../../modules/partners/application/PartnerPortalAccountService'
+import { PartnerPortalPrincipal } from '../../../../../modules/partners/application/PartnerPortalSessionService'
+import { PartnerPixReceiptService } from '../../../../../modules/transactions/application/PartnerPixReceiptService'
+import { PartnerPixReconciliationService } from '../../../../../modules/transactions/application/PartnerPixReconciliationService'
 import { PartnerTransactionNotFoundError, PartnerTransactionQueryService, PartnerTransactionQueryValidationError } from '../../../../../modules/transactions/application/PartnerTransactionQueryService'
+import { PartnerWebhookRedeliveryService } from '../../../../../modules/transactions/application/PartnerWebhookRedeliveryService'
 import { PartnerPortalController } from '../../../../../modules/transactions/interfaces/http/PartnerPortalController'
 
 type AccountServiceMock = Pick<PartnerPortalAccountService, 'authenticate'>
 type QueryServiceMock = Pick<PartnerTransactionQueryService, 'exportCsv' | 'getById' | 'search'>
 
 const partner = { id: 'partner-1', name: 'Decaf' } as Partner
-const request = { user: partner } as unknown as import('express').Request
+const principal: PartnerPortalPrincipal = {
+  authenticationSource: 'PARTNER_PORTAL',
+  email: 'operator@decaf.so',
+  kind: 'partner_portal',
+  mfaEnabled: true,
+  mfaVerified: true,
+  partner,
+  role: PartnerPortalRole.ADMIN,
+  userId: 'portal-user-1',
+}
+const request = { user: principal } as unknown as import('express').Request
 
 const badRequestResponder = (): TsoaResponse<400, { reason: string }> => (
   jest.fn((_status: 400, payload: { reason: string }) => payload)
@@ -33,9 +47,17 @@ const buildAccountService = (): jest.Mocked<AccountServiceMock> => {
     Parameters<PartnerPortalAccountService['authenticate']>
   >()
   authenticate.mockResolvedValue({
-    accessToken: 'portal-token',
-    expiresAt: new Date('2026-07-31T12:30:00.000Z'),
-    partnerName: 'Decaf',
+    session: {
+      accessToken: 'portal-token',
+      email: principal.email,
+      expiresAt: new Date('2026-07-31T12:30:00.000Z'),
+      mfaEnabled: false,
+      mfaVerified: false,
+      partnerName: 'Decaf',
+      role: PartnerPortalRole.ADMIN,
+      userId: principal.userId,
+    },
+    status: 'AUTHENTICATED',
   })
   return { authenticate }
 }
@@ -74,6 +96,9 @@ const buildController = (
 ) => new PartnerPortalController(
   accountService as PartnerPortalAccountService,
   queryService as PartnerTransactionQueryService,
+  {} as unknown as PartnerPixReceiptService,
+  {} as unknown as PartnerPixReconciliationService,
+  {} as unknown as PartnerWebhookRedeliveryService,
 )
 
 describe('PartnerPortalController', () => {
@@ -93,7 +118,10 @@ describe('PartnerPortalController', () => {
       password: 'correct horse battery staple',
     })
     expect(setHeader).toHaveBeenCalledWith('Cache-Control', 'no-store')
-    expect(result.accessToken).toBe('portal-token')
+    expect(result).toEqual(expect.objectContaining({
+      session: expect.objectContaining({ accessToken: 'portal-token' }),
+      status: 'AUTHENTICATED',
+    }))
   })
 
   it('rejects malformed credentials before authentication', async () => {

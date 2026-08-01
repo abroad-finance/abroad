@@ -2,6 +2,7 @@ import 'reflect-metadata'
 
 import type { Partner, PartnerPortalUser, PrismaClient } from '@prisma/client'
 
+import { PartnerPortalRole } from '@prisma/client'
 import jwt from 'jsonwebtoken'
 
 import { PartnerPortalSessionService, PartnerPortalSessionUser } from '../../../../modules/partners/application/PartnerPortalSessionService'
@@ -21,9 +22,17 @@ const portalUser = {
   id: '22222222-2222-4222-8222-222222222222',
   lastLoginAt: null,
   lockedUntil: null,
+  mfaEnabledAt: null,
+  mfaFailedAttempts: 0,
+  mfaLastUsedCounter: null,
+  mfaLockedUntil: null,
+  mfaPendingCreatedAt: null,
+  mfaPendingSecretCiphertext: null,
+  mfaSecretCiphertext: null,
   partner,
   partnerId: partner.id,
   passwordVerifier: 'not-used-by-session-tests',
+  role: PartnerPortalRole.ADMIN,
   sessionVersion: 3,
   updatedAt: new Date('2026-07-31T12:00:00.000Z'),
 } satisfies PartnerPortalUser & { partner: Partner }
@@ -57,7 +66,7 @@ describe('PartnerPortalSessionService', () => {
     const { findUnique, service } = buildService()
 
     const session = await service.createSession(portalUser)
-    const verifiedPartner = await service.verifySession(session.accessToken)
+    const principal = await service.verifySession(session.accessToken)
     const decoded = jwt.decode(session.accessToken)
 
     expect(session.partnerName).toBe('Decaf')
@@ -65,6 +74,8 @@ describe('PartnerPortalSessionService', () => {
     expect(decoded).toEqual(expect.objectContaining({
       aud: 'abroad-partner-portal',
       iss: 'https://api.abroad.finance/partner-portal',
+      mfaVerified: false,
+      role: PartnerPortalRole.ADMIN,
       scope: 'transactions:read',
       sessionVersion: 3,
       sub: portalUser.id,
@@ -74,7 +85,14 @@ describe('PartnerPortalSessionService', () => {
       include: { partner: true },
       where: { id: portalUser.id },
     })
-    expect(verifiedPartner).toBe(partner)
+    expect(principal).toEqual(expect.objectContaining({
+      email: portalUser.email,
+      mfaEnabled: false,
+      mfaVerified: false,
+      partner,
+      role: PartnerPortalRole.ADMIN,
+      userId: portalUser.id,
+    }))
   })
 
   it('rejects a validly signed token without the portal scope', async () => {
@@ -96,6 +114,82 @@ describe('PartnerPortalSessionService', () => {
 
     await expect(service.verifySession(token)).rejects.toThrow(
       'Partner portal token verification failed',
+    )
+  })
+
+  it('creates and verifies a purpose-specific MFA challenge for an enrolled user', async () => {
+    const enrolledUser: PartnerPortalSessionUser = {
+      ...portalUser,
+      mfaEnabledAt: new Date('2026-07-31T12:00:00.000Z'),
+      mfaSecretCiphertext: 'active-envelope',
+    }
+    const { service } = buildService({ foundUser: enrolledUser })
+
+    const challenge = await service.createMfaChallenge(enrolledUser)
+    const verifiedUser = await service.verifyMfaChallenge(challenge.challengeToken)
+    const decoded = jwt.decode(challenge.challengeToken)
+
+    expect(challenge.expiresAt.getTime()).toBeGreaterThan(Date.now())
+    expect(decoded).toEqual(expect.objectContaining({
+      aud: 'abroad-partner-portal',
+      iss: 'https://api.abroad.finance/partner-portal',
+      sessionVersion: enrolledUser.sessionVersion,
+      sub: enrolledUser.id,
+      tokenUse: 'partner_portal_mfa_challenge',
+    }))
+    expect(verifiedUser).toBe(enrolledUser)
+    await expect(service.verifySession(challenge.challengeToken)).rejects.toThrow(
+      'Partner portal token verification failed',
+    )
+  })
+
+  it('does not accept a normal session token as an MFA challenge', async () => {
+    const enrolledUser: PartnerPortalSessionUser = {
+      ...portalUser,
+      mfaEnabledAt: new Date('2026-07-31T12:00:00.000Z'),
+      mfaSecretCiphertext: 'active-envelope',
+    }
+    const { service } = buildService({ foundUser: enrolledUser })
+    const session = await service.createSession(enrolledUser)
+
+    await expect(service.verifyMfaChallenge(session.accessToken)).rejects.toThrow(
+      'Partner portal MFA challenge verification failed',
+    )
+  })
+
+  it('binds sessions to current role and MFA enrollment state', async () => {
+    const enrolledUser: PartnerPortalSessionUser = {
+      ...portalUser,
+      mfaEnabledAt: new Date('2026-07-31T12:00:00.000Z'),
+      mfaSecretCiphertext: 'active-envelope',
+    }
+    const creator = buildService({ foundUser: enrolledUser }).service
+    const session = await creator.createSession(enrolledUser, true)
+
+    const changedRole = buildService({
+      foundUser: { ...enrolledUser, role: PartnerPortalRole.MEMBER },
+    }).service
+    await expect(changedRole.verifySession(session.accessToken)).rejects.toThrow(
+      'Partner portal token verification failed',
+    )
+
+    const resetMfa = buildService({
+      foundUser: {
+        ...enrolledUser,
+        mfaEnabledAt: null,
+        mfaSecretCiphertext: null,
+      },
+    }).service
+    await expect(resetMfa.verifySession(session.accessToken)).rejects.toThrow(
+      'Partner portal token verification failed',
+    )
+  })
+
+  it('refuses to mint an MFA-verified session without an enrolled factor', async () => {
+    const { service } = buildService()
+
+    await expect(service.createSession(portalUser, true)).rejects.toThrow(
+      'MFA cannot be verified for a user without an enrolled factor',
     )
   })
 

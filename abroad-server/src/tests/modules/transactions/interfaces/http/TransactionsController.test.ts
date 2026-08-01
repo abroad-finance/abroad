@@ -68,6 +68,7 @@ const buildController = () => {
     getClient: jest.fn(async () => prisma as unknown as import('@prisma/client').PrismaClient),
   }
   const partnerService: IPartnerService = {
+    authenticateApiKey: jest.fn(),
     authenticateBearerToken: jest.fn(),
     getPartnerFromApiKey: jest.fn(),
     getPartnerFromClientDomain: jest.fn(),

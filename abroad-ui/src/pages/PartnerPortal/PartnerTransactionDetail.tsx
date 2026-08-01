@@ -3,8 +3,10 @@ import {
   CheckCircle2,
   CircleDashed,
   Clock3,
+  Download,
   LoaderCircle,
   RadioTower,
+  RotateCcw,
   WalletCards,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
@@ -16,7 +18,8 @@ import type {
   PartnerTransactionRefund,
 } from '../../services/partnerPortal/partnerPortalTypes'
 
-import { getPartnerTransaction } from '../../services/partnerPortal/partnerPortalApi'
+import { getPartnerPixReceipt, getPartnerTransaction, redeliverPartnerWebhook } from '../../services/partnerPortal/partnerPortalApi'
+import { usePartnerPortalSession } from '../../services/partnerPortal/partnerPortalSessionStore'
 import {
   formatPartnerAmount,
   formatPartnerDateTime,
@@ -24,6 +27,20 @@ import {
   shortTransactionId,
 } from './partnerPortalPresentation'
 import { CopyValueButton, PartnerStatusBadge } from './partnerPortalUi'
+
+const downloadBase64Pdf = (contentBase64: string, fileName: string): void => {
+  const binary = window.atob(contentBase64)
+  const bytes = new Uint8Array(binary.length)
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index)
+  }
+  const url = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }))
+  const anchor = document.createElement('a')
+  anchor.download = fileName
+  anchor.href = url
+  anchor.click()
+  URL.revokeObjectURL(url)
+}
 
 const deliveryLabel = (delivery: PartnerTransactionDelivery): string => {
   if (delivery.event === 'transaction.created') return 'Transaction created'
@@ -63,10 +80,15 @@ const CopyableIdentifier = ({ label, value }: { label: string, value: string }) 
 )
 
 const PartnerTransactionDetail = () => {
+  const session = usePartnerPortalSession()
   const { transactionId } = useParams()
   const [data, setData] = useState<null | PartnerTransactionDetailData>(null)
   const [error, setError] = useState<null | string>(null)
   const [loading, setLoading] = useState(true)
+  const [operationError, setOperationError] = useState<null | string>(null)
+  const [receiptLoading, setReceiptLoading] = useState(false)
+  const [redeliveryKeys, setRedeliveryKeys] = useState<Record<string, string>>({})
+  const [redeliveringId, setRedeliveringId] = useState<null | string>(null)
   const [refreshKey, setRefreshKey] = useState(0)
 
   useEffect(() => {
@@ -122,6 +144,45 @@ const PartnerTransactionDetail = () => {
 
   const status = partnerStatusMeta[data.status]
   const refundStatus = data.refund ? refundStatusMeta[data.refund.status] : null
+  const canAdminister = session?.role === 'ADMIN' && session.mfaVerified
+
+  const downloadReceipt = async () => {
+    setReceiptLoading(true)
+    setOperationError(null)
+    try {
+      const receipt = await getPartnerPixReceipt(data.id)
+      downloadBase64Pdf(receipt.contentBase64, receipt.fileName)
+    }
+    catch (caught) {
+      setOperationError(caught instanceof Error ? caught.message : 'Could not download the PIX receipt')
+    }
+    finally {
+      setReceiptLoading(false)
+    }
+  }
+
+  const redeliver = async (delivery: PartnerTransactionDelivery) => {
+    const idempotencyKey = redeliveryKeys[delivery.id]
+      ?? `portal-${Date.now()}-${delivery.id}`
+    setRedeliveryKeys(current => ({ ...current, [delivery.id]: idempotencyKey }))
+    setRedeliveringId(delivery.id)
+    setOperationError(null)
+    try {
+      await redeliverPartnerWebhook(data.id, delivery.id, idempotencyKey)
+      setRedeliveryKeys((current) => {
+        const remaining = { ...current }
+        delete remaining[delivery.id]
+        return remaining
+      })
+      setRefreshKey(key => key + 1)
+    }
+    catch (caught) {
+      setOperationError(caught instanceof Error ? caught.message : 'Could not redeliver the webhook')
+    }
+    finally {
+      setRedeliveringId(null)
+    }
+  }
 
   return (
     <>
@@ -145,11 +206,21 @@ const PartnerTransactionDetail = () => {
           </h1>
           <p className="mt-3 max-w-2xl text-sm leading-6 text-partner-muted">{status.explanation}</p>
         </div>
-        <button className="partner-button-secondary" disabled={loading} onClick={() => setRefreshKey(key => key + 1)} type="button">
-          {loading && <LoaderCircle aria-hidden className="h-4 w-4 animate-spin motion-reduce:animate-none" />}
-          Refresh
-        </button>
+        <div className="flex flex-wrap gap-2">
+          {data.quote.paymentMethod === 'PIX' && data.status === 'PAYMENT_COMPLETED' && (
+            <button className="partner-button-primary" disabled={receiptLoading} onClick={() => void downloadReceipt()} type="button">
+              {receiptLoading ? <LoaderCircle aria-hidden className="h-4 w-4 animate-spin" /> : <Download aria-hidden className="h-4 w-4" />}
+              Download PIX receipt
+            </button>
+          )}
+          <button className="partner-button-secondary" disabled={loading} onClick={() => setRefreshKey(key => key + 1)} type="button">
+            {loading && <LoaderCircle aria-hidden className="h-4 w-4 animate-spin motion-reduce:animate-none" />}
+            Refresh
+          </button>
+        </div>
       </header>
+
+      {operationError && <div aria-live="polite" className="mt-5 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800" role="alert">{operationError}</div>}
 
       <section aria-label="Transaction summary" className="partner-detail-sheet mt-9">
         <div className="grid gap-8 border-b border-partner-border p-6 sm:p-8 lg:grid-cols-[1.15fr_0.85fr]">
@@ -277,7 +348,7 @@ const PartnerTransactionDetail = () => {
                   {data.deliveries.map((delivery, index) => {
                     const deliveryMeta = deliveryStatus(delivery)
                     return (
-                      <li className="partner-notification-row" key={`${delivery.event}-${delivery.lastAttemptAt}-${index}`}>
+                      <li className="partner-notification-row" key={delivery.id || `${delivery.event}-${delivery.lastAttemptAt}-${index}`}>
                         {delivery.status === 'DELIVERED'
                           ? <CheckCircle2 aria-hidden className="h-5 w-5 text-emerald-600" />
                           : <CircleDashed aria-hidden className="h-5 w-5 text-partner-muted" />}
@@ -287,8 +358,22 @@ const PartnerTransactionDetail = () => {
                             <span className={`text-xs font-semibold ${deliveryMeta.className}`}>{deliveryMeta.label}</span>
                           </div>
                           <p className="mt-1 text-xs text-partner-muted">
-                            {`${formatPartnerDateTime(delivery.lastAttemptAt)} · ${delivery.attempts} attempt${delivery.attempts === 1 ? '' : 's'}`}
+                            {`${formatPartnerDateTime(delivery.lastAttemptAt)} · ${delivery.attempts} attempt${delivery.attempts === 1 ? '' : 's'} · HTTP ${delivery.httpStatus ?? 'unavailable'}${delivery.durationMs === null ? '' : ` · ${delivery.durationMs} ms`}`}
                           </p>
+                          {delivery.failureCode && <p className="mt-1 text-xs font-medium text-rose-700">{delivery.failureCode}</p>}
+                          {delivery.nextAttemptAt && (
+                            <p className="mt-1 text-xs text-partner-muted">
+                              Next retry
+                              {formatPartnerDateTime(delivery.nextAttemptAt)}
+                            </p>
+                          )}
+                          {delivery.sourceDeliveryId && <p className="mt-1 text-[0.6875rem] font-semibold uppercase tracking-wide text-partner-muted">Controlled redelivery</p>}
+                          {delivery.canRedeliver && canAdminister && (
+                            <button className="partner-button-secondary mt-3 min-h-9 px-3 py-1.5 text-xs" disabled={redeliveringId !== null} onClick={() => void redeliver(delivery)} type="button">
+                              {redeliveringId === delivery.id ? <LoaderCircle aria-hidden className="h-3.5 w-3.5 animate-spin" /> : <RotateCcw aria-hidden className="h-3.5 w-3.5" />}
+                              Redeliver webhook
+                            </button>
+                          )}
                         </div>
                       </li>
                     )

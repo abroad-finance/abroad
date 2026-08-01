@@ -37,7 +37,12 @@ export class TransactionEventDispatcher {
         transaction.origin,
         { data: payload, event },
         context,
-        { client: options.prismaClient, deliverNow: options.deliverNow },
+        {
+          client: options.prismaClient,
+          deliverNow: options.deliverNow,
+          partnerId: transaction.partnerUser.partner.id,
+          transactionId: transaction.id,
+        },
       )
     }
     catch (error) {

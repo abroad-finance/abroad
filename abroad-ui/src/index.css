@@ -178,6 +178,14 @@
     @apply overflow-hidden rounded-[1.25rem] border border-partner-border bg-white shadow-partner-sheet;
   }
 
+  .partner-section {
+    @apply rounded-[1.25rem] border border-partner-border bg-white p-5 shadow-partner-sheet sm:p-7;
+  }
+
+  .partner-select {
+    @apply h-11 rounded-xl border border-partner-border bg-white px-3.5 text-sm text-partner-ink shadow-sm outline-none focus:border-partner-forest focus:ring-2 focus:ring-partner-mint disabled:cursor-not-allowed disabled:opacity-60;
+  }
+
   .partner-timeline {
     @apply ml-2 border-l border-partner-border;
   }

@@ -1,11 +1,20 @@
+import { WebhookCredentialMode } from '@prisma/client'
 import axios from 'axios'
 import { inject, injectable } from 'inversify'
 
 import { RuntimeConfiguration } from '../../app/config/runtime'
 import { TYPES } from '../../app/container/types'
 import { ILogger } from '../../core/logging/types'
+import { PartnerWebhookSecretResolver } from '../../modules/partners/application/PartnerWebhookSecretResolver'
 import { ISecretManager } from '../secrets/ISecretManager'
-import { IWebhookNotifier, WebhookEvent } from './IWebhookNotifier'
+import {
+  IWebhookNotifier,
+  WebhookDeliveryContext,
+  WebhookDeliveryError,
+  WebhookDeliveryResult,
+  WebhookEvent,
+} from './IWebhookNotifier'
+import { WebhookTargetPolicy, WebhookTargetValidationError } from './WebhookTargetPolicy'
 
 type WebhookPayload = {
   data: Record<string, unknown>
@@ -17,57 +26,74 @@ type WebhookSecrets = {
   fallback: string | undefined
 }
 
+const MAX_WEBHOOK_RESPONSE_BYTES = 64 * 1_024
+
+class WebhookCredentialUnavailableError extends Error {
+  public constructor() {
+    super('Managed webhook credential is unavailable')
+    this.name = 'WebhookCredentialUnavailableError'
+  }
+}
+
 @injectable()
 export class WebhookNotifier implements IWebhookNotifier {
   public constructor(
-    @inject(TYPES.ILogger) private logger: ILogger,
-    @inject(TYPES.ISecretManager) private secretManager: ISecretManager,
+    @inject(TYPES.ILogger) private readonly logger: ILogger,
+    @inject(TYPES.ISecretManager) private readonly secretManager: ISecretManager,
     @inject(TYPES.AppConfig) private readonly config: RuntimeConfiguration,
-  ) { }
+    @inject(PartnerWebhookSecretResolver)
+    private readonly partnerSecretResolver: PartnerWebhookSecretResolver,
+    @inject(WebhookTargetPolicy)
+    private readonly targetPolicy: WebhookTargetPolicy,
+  ) {}
 
-  async notifyWebhook(
+  public async notifyWebhook(
     url: null | string,
     payload: WebhookPayload,
-  ): Promise<void> {
+    context: WebhookDeliveryContext = {
+      credentialMode: null,
+      partnerId: null,
+    },
+  ): Promise<WebhookDeliveryResult> {
     const target = this.normalizeUrl(url)
     if (!target) {
-      return
+      return { durationMs: 0, httpStatus: 204 }
     }
 
-    const secrets = await this.resolveWebhookSecrets()
-    await this.deliverWebhook(
-      target,
-      payload,
-      this.selectWebhookSecret(target, secrets),
-    )
-  }
-
-  private async deliverWebhook(
-    target: string,
-    payload: WebhookPayload,
-    secret: string | undefined,
-  ): Promise<void> {
+    const startedAt = Date.now()
+    let destroyAgent: (() => void) | undefined
     try {
-      await axios.post(target, payload, {
+      const validatedTarget = await this.targetPolicy.validate(target)
+      destroyAgent = () => validatedTarget.httpsAgent.destroy()
+      const secret = await this.resolveSecret(validatedTarget.url, context)
+      const response = await axios.post(validatedTarget.url, payload, {
         headers: secret ? { 'X-Abroad-Webhook-Secret': secret } : undefined,
+        httpsAgent: validatedTarget.httpsAgent,
+        maxBodyLength: MAX_WEBHOOK_RESPONSE_BYTES,
+        maxContentLength: MAX_WEBHOOK_RESPONSE_BYTES,
+        maxRedirects: 0,
         timeout: this.config.axiosTimeoutMs,
       })
+      return {
+        durationMs: Math.max(0, Date.now() - startedAt),
+        httpStatus: response.status,
+      }
     }
     catch (error) {
+      const durationMs = Math.max(0, Date.now() - startedAt)
       const status = axios.isAxiosError(error) ? error.response?.status : undefined
-      const normalizedError = new Error(
-        status
-          ? `Webhook delivery failed with HTTP ${status}`
-          : 'Webhook delivery failed',
-        { cause: error },
-      )
+      const failureCode = this.toFailureCode(error, status)
       this.logger.error('Failed to notify webhook', {
-        error: normalizedError,
+        durationMs,
         event: payload.event,
+        failureCode,
         status,
         targetOrigin: this.readTargetOrigin(target),
       })
-      throw normalizedError
+      throw new WebhookDeliveryError({ durationMs, failureCode, httpStatus: status })
+    }
+    finally {
+      destroyAgent?.()
     }
   }
 
@@ -115,12 +141,19 @@ export class WebhookNotifier implements IWebhookNotifier {
       const secret = await this.secretManager.getSecret('ABROAD_WEBHOOK_SECRET')
       return secret?.trim() ? secret : undefined
     }
-    catch (error) {
+    catch {
       this.logger.warn('Failed to fetch webhook secret; continuing without authentication header', {
-        error: error instanceof Error ? error : new Error(String(error)),
+        error: new Error('Secret resolution failed'),
       })
       return undefined
     }
+  }
+
+  private async resolveLegacySecret(target: string): Promise<string | undefined> {
+    const secrets = await this.resolveWebhookSecrets()
+    const targetOrigin = this.tryReadTargetOrigin(target)
+    return (targetOrigin ? secrets.byOrigin.get(targetOrigin) : undefined)
+      ?? secrets.fallback
   }
 
   private async resolvePerOriginWebhookSecrets(): Promise<ReadonlyMap<string, string>> {
@@ -138,6 +171,27 @@ export class WebhookNotifier implements IWebhookNotifier {
     }
   }
 
+  private async resolveSecret(
+    target: string,
+    context: WebhookDeliveryContext,
+  ): Promise<string | undefined> {
+    if (
+      context.partnerId
+      && context.credentialMode
+      && context.credentialMode !== WebhookCredentialMode.LEGACY_ORIGIN
+    ) {
+      const managedSecret = await this.partnerSecretResolver.resolve(
+        context.partnerId,
+        context.credentialMode,
+      )
+      if (managedSecret) {
+        return managedSecret
+      }
+      throw new WebhookCredentialUnavailableError()
+    }
+    return this.resolveLegacySecret(target)
+  }
+
   private async resolveWebhookSecrets(): Promise<WebhookSecrets> {
     const [byOrigin, fallback] = await Promise.all([
       this.resolvePerOriginWebhookSecrets(),
@@ -146,13 +200,20 @@ export class WebhookNotifier implements IWebhookNotifier {
     return { byOrigin, fallback }
   }
 
-  private selectWebhookSecret(
-    target: string,
-    secrets: WebhookSecrets,
-  ): string | undefined {
-    const targetOrigin = this.tryReadTargetOrigin(target)
-    return (targetOrigin ? secrets.byOrigin.get(targetOrigin) : undefined)
-      ?? secrets.fallback
+  private toFailureCode(error: unknown, status: number | undefined): string {
+    if (error instanceof WebhookTargetValidationError) {
+      return 'target_rejected'
+    }
+    if (error instanceof WebhookCredentialUnavailableError) {
+      return 'credential_unavailable'
+    }
+    if (status !== undefined) {
+      return 'http_error'
+    }
+    if (axios.isAxiosError(error) && error.code === 'ECONNABORTED') {
+      return 'timeout'
+    }
+    return 'network_error'
   }
 
   private tryReadTargetOrigin(target: string): null | string {

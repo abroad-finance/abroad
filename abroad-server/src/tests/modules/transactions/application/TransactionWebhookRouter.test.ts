@@ -1,4 +1,4 @@
-import { TransactionOrigin } from '@prisma/client'
+import { TransactionOrigin, WebhookCredentialMode, WebhookDeliveryPurpose } from '@prisma/client'
 
 import type { ISecretManager } from '../../../../platform/secrets/ISecretManager'
 
@@ -17,6 +17,7 @@ describe('TransactionWebhookRouter', () => {
   }
 
   const buildRouter = (options?: {
+    managedSecret?: boolean
     sepPartnerId?: string
     sepTarget?: null | string
   }) => {
@@ -28,6 +29,11 @@ describe('TransactionWebhookRouter', () => {
     const databaseClientProvider: IDatabaseClientProvider = {
       getClient: jest.fn(async () => ({
         partner: { findUnique: partnerFindUnique },
+        partnerWebhookConfiguration: {
+          findUnique: jest.fn(async () => (
+            options?.managedSecret ? { activeSecretCiphertext: 'active-envelope' } : null
+          )),
+        },
       }) as unknown as import('@prisma/client').PrismaClient),
     }
     const secretManager: ISecretManager = {
@@ -68,7 +74,11 @@ describe('TransactionWebhookRouter', () => {
       TransactionOrigin.DIRECT,
       payload,
       'transaction.updated',
-      { deliverNow: false },
+      {
+        deliverNow: false,
+        partnerId: 'partner-1',
+        transactionId: 'transaction-1',
+      },
     )
 
     expect(outboxDispatcher.enqueueWebhook).toHaveBeenCalledTimes(1)
@@ -76,22 +86,39 @@ describe('TransactionWebhookRouter', () => {
       primaryTarget,
       payload,
       'transaction.updated:https://api-v3.production.decafapi.com',
-      { deliverNow: false },
+      {
+        client: undefined,
+        deliverNow: false,
+        metadata: {
+          partnerId: 'partner-1',
+          transactionId: 'transaction-1',
+          webhookCredentialMode: WebhookCredentialMode.LEGACY_ORIGIN,
+          webhookPurpose: WebhookDeliveryPurpose.TRANSACTION,
+        },
+      },
     )
-    expect(databaseClientProvider.getClient).not.toHaveBeenCalled()
+    expect(databaseClientProvider.getClient).toHaveBeenCalledTimes(1)
     expect(secretManager.getSecret).not.toHaveBeenCalled()
   })
 
   it('creates one independently retryable row for partner and SEP targets', async () => {
     const { outboxDispatcher, router } = buildRouter()
-    const client = { transaction: {} } as unknown as import('@prisma/client').PrismaClient
+    const client = {
+      partnerWebhookConfiguration: { findUnique: jest.fn(async () => null) },
+      transaction: {},
+    } as unknown as import('@prisma/client').PrismaClient
 
     await router.enqueue(
       primaryTarget,
       TransactionOrigin.SEP_24,
       payload,
       'transaction.updated',
-      { client, deliverNow: false },
+      {
+        client,
+        deliverNow: false,
+        partnerId: 'partner-1',
+        transactionId: 'transaction-1',
+      },
     )
 
     expect(outboxDispatcher.enqueueWebhook).toHaveBeenCalledTimes(2)
@@ -100,14 +127,32 @@ describe('TransactionWebhookRouter', () => {
       primaryTarget,
       payload,
       'transaction.updated:https://api-v3.production.decafapi.com',
-      { client, deliverNow: false },
+      {
+        client,
+        deliverNow: false,
+        metadata: {
+          partnerId: 'partner-1',
+          transactionId: 'transaction-1',
+          webhookCredentialMode: WebhookCredentialMode.LEGACY_ORIGIN,
+          webhookPurpose: WebhookDeliveryPurpose.TRANSACTION,
+        },
+      },
     )
     expect(outboxDispatcher.enqueueWebhook).toHaveBeenNthCalledWith(
       2,
       sepTarget,
       payload,
       'transaction.updated:https://sep-stellar.abroad.finance',
-      { client, deliverNow: false },
+      {
+        client,
+        deliverNow: false,
+        metadata: {
+          partnerId: undefined,
+          transactionId: 'transaction-1',
+          webhookCredentialMode: WebhookCredentialMode.LEGACY_ORIGIN,
+          webhookPurpose: WebhookDeliveryPurpose.TRANSACTION,
+        },
+      },
     )
   })
 
@@ -119,6 +164,7 @@ describe('TransactionWebhookRouter', () => {
       TransactionOrigin.SEP_24,
       payload,
       'transaction.created',
+      { partnerId: 'partner-1', transactionId: 'transaction-1' },
     )
 
     expect(outboxDispatcher.enqueueWebhook).toHaveBeenCalledTimes(1)
@@ -126,7 +172,16 @@ describe('TransactionWebhookRouter', () => {
       sepTarget,
       payload,
       'transaction.created:https://sep-stellar.abroad.finance',
-      {},
+      {
+        client: undefined,
+        deliverNow: undefined,
+        metadata: {
+          partnerId: 'partner-1',
+          transactionId: 'transaction-1',
+          webhookCredentialMode: WebhookCredentialMode.LEGACY_ORIGIN,
+          webhookPurpose: WebhookDeliveryPurpose.TRANSACTION,
+        },
+      },
     )
   })
 
@@ -142,12 +197,37 @@ describe('TransactionWebhookRouter', () => {
       TransactionOrigin.LEGACY,
       payload,
       'transaction.updated',
+      { partnerId: 'partner-1', transactionId: 'transaction-1' },
     )
 
     expect(outboxDispatcher.enqueueWebhook).toHaveBeenCalledTimes(1)
     expect(logger.warn).toHaveBeenCalledWith(
       '[TransactionWebhookRouter] Failed to resolve SEP webhook target; preserving primary delivery only',
       expect.any(Error),
+    )
+  })
+
+  it('pins managed credentials only after the partner has an active managed secret', async () => {
+    const { outboxDispatcher, router } = buildRouter({ managedSecret: true })
+
+    await router.enqueue(
+      primaryTarget,
+      TransactionOrigin.DIRECT,
+      payload,
+      'transaction.updated',
+      { partnerId: 'partner-1', transactionId: 'transaction-1' },
+    )
+
+    expect(outboxDispatcher.enqueueWebhook).toHaveBeenCalledWith(
+      primaryTarget,
+      payload,
+      'transaction.updated:https://api-v3.production.decafapi.com',
+      expect.objectContaining({
+        metadata: expect.objectContaining({
+          partnerId: 'partner-1',
+          webhookCredentialMode: WebhookCredentialMode.PARTNER_CURRENT,
+        }),
+      }),
     )
   })
 

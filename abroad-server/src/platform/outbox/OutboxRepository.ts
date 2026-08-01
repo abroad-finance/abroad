@@ -1,20 +1,34 @@
-import { OutboxStatus, Prisma, PrismaClient } from '@prisma/client'
+import {
+  OutboxEvent,
+  OutboxStatus,
+  Prisma,
+  PrismaClient,
+  WebhookCredentialMode,
+  WebhookDeliveryPurpose,
+} from '@prisma/client'
 import { inject, injectable } from 'inversify'
 
 import { TYPES } from '../../app/container/types'
 import { IDatabaseClientProvider } from '../persistence/IDatabaseClientProvider'
 
-export type OutboxRecord = {
-  attempts: number
-  availableAt: Date
-  createdAt: Date
-  id: string
-  lastError: null | string
-  payload: Prisma.JsonValue
-  status: OutboxStatus
-  type: string
-  updatedAt: Date
+export type OutboxCreateMetadata = {
+  idempotencyKey?: string
+  initiatedByPortalUserId?: string
+  maxAttempts?: number
+  partnerId?: string
+  sourceOutboxEventId?: string
+  transactionId?: string
+  webhookCredentialMode?: WebhookCredentialMode
+  webhookEvent?: string
+  webhookPurpose?: WebhookDeliveryPurpose
 }
+
+export type OutboxDeliveryDiagnostics = {
+  durationMs: number
+  httpStatus: null | number
+}
+
+export type OutboxRecord = OutboxEvent
 
 type PrismaClientLike = Prisma.TransactionClient | PrismaClient
 
@@ -30,36 +44,59 @@ export class OutboxRepository {
     payload: Prisma.InputJsonValue,
     availableAt: Date = new Date(),
     client?: PrismaClientLike,
+    metadata: OutboxCreateMetadata = {},
   ): Promise<OutboxRecord> {
     const prisma = client ?? await this.dbProvider.getClient()
     const created = await prisma.outboxEvent.create({
       data: {
         availableAt,
+        idempotencyKey: metadata.idempotencyKey,
+        initiatedByPortalUserId: metadata.initiatedByPortalUserId,
+        maxAttempts: metadata.maxAttempts,
+        partnerId: metadata.partnerId,
         payload,
+        sourceOutboxEventId: metadata.sourceOutboxEventId,
+        transactionId: metadata.transactionId,
         type,
+        webhookCredentialMode: metadata.webhookCredentialMode,
+        webhookEvent: metadata.webhookEvent,
+        webhookPurpose: metadata.webhookPurpose,
       },
     })
     return created
   }
 
-  public async markDelivered(id: string, client?: PrismaClientLike): Promise<void> {
+  public async markDelivered(
+    id: string,
+    client?: PrismaClientLike,
+    diagnostics?: OutboxDeliveryDiagnostics,
+  ): Promise<void> {
     const prisma = client ?? await this.dbProvider.getClient()
     await prisma.outboxEvent.update({
       data: {
         attempts: { increment: 1 },
+        lastAttemptDurationMs: diagnostics?.durationMs,
         lastError: null,
+        lastHttpStatus: diagnostics?.httpStatus,
         status: OutboxStatus.DELIVERED,
       },
       where: { id },
     })
   }
 
-  public async markFailed(id: string, error: Error, client?: PrismaClientLike): Promise<void> {
+  public async markFailed(
+    id: string,
+    error: Error,
+    client?: PrismaClientLike,
+    diagnostics?: OutboxDeliveryDiagnostics,
+  ): Promise<void> {
     const prisma = client ?? await this.dbProvider.getClient()
     await prisma.outboxEvent.update({
       data: {
         attempts: { increment: 1 },
+        lastAttemptDurationMs: diagnostics?.durationMs,
         lastError: error.message,
+        lastHttpStatus: diagnostics?.httpStatus,
         status: OutboxStatus.FAILED,
       },
       where: { id },
@@ -83,13 +120,16 @@ export class OutboxRepository {
     nextAttempt: Date,
     error: Error,
     client?: PrismaClientLike,
+    diagnostics?: OutboxDeliveryDiagnostics,
   ): Promise<void> {
     const prisma = client ?? await this.dbProvider.getClient()
     await prisma.outboxEvent.update({
       data: {
         attempts: { increment: 1 },
         availableAt: nextAttempt,
+        lastAttemptDurationMs: diagnostics?.durationMs,
         lastError: error.message,
+        lastHttpStatus: diagnostics?.httpStatus,
         status: OutboxStatus.PENDING,
       },
       where: { id },

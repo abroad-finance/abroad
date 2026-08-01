@@ -1,4 +1,10 @@
-import { OutboxStatus, PaymentMethod, Prisma, TransactionStatus } from '@prisma/client'
+import {
+  OutboxStatus,
+  PaymentMethod,
+  Prisma,
+  TransactionStatus,
+  WebhookDeliveryPurpose,
+} from '@prisma/client'
 import { inject, injectable } from 'inversify'
 
 import { TYPES } from '../../../app/container/types'
@@ -54,8 +60,16 @@ const detailInclude = {
 
 export type PartnerTransactionDeliveryDto = {
   attempts: number
+  canRedeliver: boolean
+  durationMs: null | number
   event: 'unknown' | WebhookEvent
+  failureCode: null | string
+  httpStatus: null | number
+  id: string
   lastAttemptAt: Date
+  nextAttemptAt: Date | null
+  purpose: WebhookDeliveryPurpose
+  sourceDeliveryId: null | string
   status: OutboxStatus
 }
 export type PartnerTransactionDetailDto = PartnerTransactionSummaryDto & {
@@ -159,7 +173,7 @@ export class PartnerTransactionQueryService {
     const normalizedFilters = this.normalizeFilters(filters)
     const prismaClient = await this.databaseClientProvider.getClient()
     const rows = await prismaClient.transaction.findMany({
-      include: summaryInclude,
+      include: detailInclude,
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       take: MAX_EXPORT_ROWS + 1,
       where: this.buildWhere(partnerId, normalizedFilters, true),
@@ -178,20 +192,31 @@ export class PartnerTransactionQueryService {
         'network',
         'payment_method',
         'on_chain_id',
+        'pix_end_to_end_id',
+        'refund_status',
+        'refund_on_chain_id',
+        'failure_reason',
       ],
-      ...exportedRows.map(row => [
-        row.createdAt.toISOString(),
-        row.id,
-        row.status,
-        row.partnerUser.userId,
-        row.quote.sourceAmount,
-        row.quote.cryptoCurrency,
-        row.quote.targetAmount,
-        row.quote.targetCurrency,
-        row.quote.network,
-        row.quote.paymentMethod,
-        row.onChainId ?? '',
-      ]),
+      ...exportedRows.map((row) => {
+        const refund = this.toRefund(row)
+        return [
+          row.createdAt.toISOString(),
+          row.id,
+          row.status,
+          row.partnerUser.userId,
+          row.quote.sourceAmount,
+          row.quote.cryptoCurrency,
+          row.quote.targetAmount,
+          row.quote.targetCurrency,
+          row.quote.network,
+          row.quote.paymentMethod,
+          row.onChainId ?? '',
+          row.quote.paymentMethod === PaymentMethod.PIX ? row.pixEndToEndId ?? '' : '',
+          refund?.status ?? '',
+          refund?.onChainId ?? '',
+          this.toFailureReason(row) ?? '',
+        ]
+      }),
     ]
 
     return {
@@ -218,17 +243,32 @@ export class PartnerTransactionQueryService {
     const deliveries = await prismaClient.outboxEvent.findMany({
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       select: {
+        _count: { select: { redeliveries: true } },
         attempts: true,
+        availableAt: true,
+        id: true,
+        lastAttemptDurationMs: true,
+        lastError: true,
+        lastHttpStatus: true,
         payload: true,
+        sourceOutboxEventId: true,
         status: true,
         updatedAt: true,
+        webhookEvent: true,
+        webhookPurpose: true,
       },
       take: MAX_DELIVERY_ROWS,
       where: {
-        payload: {
-          equals: transactionId,
-          path: ['payload', 'data', 'id'],
-        },
+        OR: [
+          { partnerId, transactionId },
+          {
+            partnerId: null,
+            payload: {
+              equals: transactionId,
+              path: ['payload', 'data', 'id'],
+            },
+          },
+        ],
         type: 'webhook',
       },
     })
@@ -237,8 +277,24 @@ export class PartnerTransactionQueryService {
       ...this.toSummary(transaction),
       deliveries: deliveries.map(delivery => ({
         attempts: Math.max(1, delivery.attempts),
-        event: this.readWebhookEvent(delivery.payload),
+        canRedeliver: (
+          delivery.status === OutboxStatus.FAILED
+          && delivery.webhookPurpose !== WebhookDeliveryPurpose.TEST
+          && delivery._count.redeliveries < 3
+        ),
+        durationMs: delivery.lastAttemptDurationMs,
+        event: this.readWebhookEvent(delivery.payload, delivery.webhookEvent),
+        failureCode: delivery.status === OutboxStatus.FAILED
+          ? delivery.lastHttpStatus ? 'http_error' : 'delivery_failed'
+          : null,
+        httpStatus: delivery.lastHttpStatus,
+        id: delivery.id,
         lastAttemptAt: delivery.updatedAt,
+        nextAttemptAt: delivery.status === OutboxStatus.PENDING
+          ? delivery.availableAt
+          : null,
+        purpose: delivery.webhookPurpose ?? WebhookDeliveryPurpose.TRANSACTION,
+        sourceDeliveryId: delivery.sourceOutboxEventId,
         status: delivery.status,
       })),
       failureReason: this.toFailureReason(transaction),
@@ -308,6 +364,8 @@ export class PartnerTransactionQueryService {
       where.OR = [
         { id: { contains: filters.query, mode: 'insensitive' } },
         { onChainId: { contains: filters.query, mode: 'insensitive' } },
+        { pixEndToEndId: { contains: filters.query, mode: 'insensitive' } },
+        { refundOnChainId: { contains: filters.query, mode: 'insensitive' } },
         { partnerUser: { userId: { contains: filters.query, mode: 'insensitive' } } },
       ]
     }
@@ -433,7 +491,16 @@ export class PartnerTransactionQueryService {
     return typeof context.reason === 'string' ? context.reason : null
   }
 
-  private readWebhookEvent(payload: Prisma.JsonValue): PartnerTransactionDeliveryDto['event'] {
+  private readWebhookEvent(
+    payload: Prisma.JsonValue,
+    storedEvent: null | string,
+  ): PartnerTransactionDeliveryDto['event'] {
+    if (
+      storedEvent === WebhookEvent.TRANSACTION_CREATED
+      || storedEvent === WebhookEvent.TRANSACTION_UPDATED
+    ) {
+      return storedEvent
+    }
     if (!this.isJsonObject(payload)) {
       return 'unknown'
     }

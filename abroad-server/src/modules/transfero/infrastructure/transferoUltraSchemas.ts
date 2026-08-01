@@ -44,6 +44,12 @@ export const transferoUltraWithdrawalResponseSchema = z.object({
   status: transferoUltraWithdrawalStatusSchema,
 }).loose()
 
+export const transferoUltraWithdrawalDetailResponseSchema = z.object({
+  endToEndId: z.string().trim().min(1).max(128).nullable(),
+  id: z.string().uuid(),
+  status: transferoUltraWithdrawalStatusSchema,
+}).loose()
+
 export const transferoUltraQrPreviewResponseSchema = z.object({
   amount: z.number().finite().nonnegative().nullable().optional(),
   currency: z.string().min(1),
