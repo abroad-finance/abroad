@@ -4,6 +4,7 @@ import { cn } from '../../../shared/utils'
 
 /** Single source of truth for Ops destinations — rendered identically on every page. */
 const NAV_ITEMS: { label: string, to: string }[] = [
+  { label: 'Overview', to: '/ops' },
   { label: 'Flows', to: '/ops/flows' },
   { label: 'Definitions', to: '/ops/flows/definitions' },
   { label: 'Crypto Assets', to: '/ops/crypto-assets' },

@@ -8,6 +8,7 @@ const ProductApplicationShell = lazy(() => import('./ProductApplicationShell'))
 const TransparencyDashboard = lazy(() => import('./pages/Transparency/TransparencyDashboard'))
 const WebSwap = lazy(() => import('./pages/WebSwap/WebSwap'))
 const Meridian = lazy(() => import('./pages/Meridian/Meridian'))
+const OpsControlTower = lazy(() => import('./pages/Ops/OpsControlTower'))
 const FlowOpsList = lazy(() => import('./pages/Ops/FlowOpsList'))
 const FlowOpsDetail = lazy(() => import('./pages/Ops/FlowOpsDetail'))
 const FlowDefinitions = lazy(() => import('./pages/Ops/FlowDefinitions'))
@@ -37,6 +38,7 @@ function App() {
           <Route element={<ProductApplicationShell />}>
             <Route element={<WebSwap />} path="/" />
             <Route element={<Meridian />} path="/meridian" />
+            <Route element={<OpsControlTower />} path="/ops" />
             <Route element={<FlowOpsList />} path="/ops/flows" />
             <Route element={<FlowOpsDetail />} path="/ops/flows/:flowInstanceId" />
             <Route element={<FlowDefinitions />} path="/ops/flows/definitions" />

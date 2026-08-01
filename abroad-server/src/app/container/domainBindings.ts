@@ -18,6 +18,7 @@ import { PayoutSendStepExecutor } from '../../modules/flows/application/steps/Pa
 import { TreasuryTransferStepExecutor } from '../../modules/flows/application/steps/TreasuryTransferStepExecutor'
 import { KycSubmissionService } from '../../modules/kyc/application/KycSubmissionService'
 import { OpsKycService } from '../../modules/kyc/application/OpsKycService'
+import { OpsOverviewService } from '../../modules/operations/application/OpsOverviewService'
 import { OpsPartnerService } from '../../modules/partners/application/OpsPartnerService'
 import { PartnerPortalAccountService } from '../../modules/partners/application/PartnerPortalAccountService'
 import { PartnerPortalPasswordService } from '../../modules/partners/application/PartnerPortalPasswordService'
@@ -118,6 +119,7 @@ const domainBindings: ReadonlyArray<BindingRegistration<unknown>> = [
   { identifier: TYPES.ReceivedCryptoTransactionUseCase, implementation: ReceivedCryptoTransactionUseCase },
   { bindSelf: true, identifier: KycSubmissionService, implementation: KycSubmissionService },
   { bindSelf: true, identifier: OpsKycService, implementation: OpsKycService },
+  { bindSelf: true, identifier: OpsOverviewService, implementation: OpsOverviewService },
   { bindSelf: true, identifier: OpsPartnerService, implementation: OpsPartnerService },
   { bindSelf: true, identifier: PartnerPortalPasswordService, implementation: PartnerPortalPasswordService },
   { bindSelf: true, identifier: PartnerPortalSessionService, implementation: PartnerPortalSessionService },
