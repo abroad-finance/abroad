@@ -708,18 +708,30 @@ const FlowDefinitions = () => {
                   </div>
 
                   <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-4">
-                    <OpsField error={validationErrors.exchangeFeePct} label="Exchange Fee %">
+                    <OpsField
+                      error={validationErrors.exchangeFeePct}
+                      hint="Enter the fee as a decimal. Example: 0.01 = 1%; 0.001 = 0.1%."
+                      label="Percentage Fee"
+                    >
                       <input
                         className="ops-input"
+                        min="0"
                         onChange={event => updateDraftField('exchangeFeePct', event.target.value)}
+                        placeholder="0.01"
                         type="number"
                         value={draft.exchangeFeePct}
                       />
                     </OpsField>
-                    <OpsField error={validationErrors.fixedFee} label="Fixed Fee">
+                    <OpsField
+                      error={validationErrors.fixedFee}
+                      hint={`Added once per transaction in the payout currency. Example: 2.50 ${draft.targetCurrency}.`}
+                      label={`Fixed Fee (${draft.targetCurrency})`}
+                    >
                       <input
                         className="ops-input"
+                        min="0"
                         onChange={event => updateDraftField('fixedFee', event.target.value)}
+                        placeholder="2.50"
                         type="number"
                         value={draft.fixedFee}
                       />
