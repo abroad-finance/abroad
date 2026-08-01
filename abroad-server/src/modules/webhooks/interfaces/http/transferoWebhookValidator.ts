@@ -65,6 +65,7 @@ const failedStatuses = new Set([
 ])
 const returnedStatuses = new Set(['RETURNED'])
 const settledStatuses = new Set(['SETTLED'])
+const MAX_PROVIDER_FAILURE_REASON_LENGTH = 500
 
 type TransferoUltraWebhookAction
   = | {
@@ -173,6 +174,11 @@ export function parseTransferoWebhook(
   }
 }
 
+function normalizeProviderFailureReason(value: null | string): null | string {
+  const normalized = value?.trim()
+  return normalized ? normalized.slice(0, MAX_PROVIDER_FAILURE_REASON_LENGTH) : null
+}
+
 function parsePixWithdrawal(
   envelope: z.infer<typeof transferoUltraWebhookEnvelopeSchema>,
   expectedStatuses?: ReadonlySet<string>,
@@ -208,6 +214,7 @@ function parsePixWithdrawal(
         amount,
         currency: TargetCurrency.BRL,
         externalId: parsed.data.withdrawalId,
+        failureReason: normalizeProviderFailureReason(parsed.data.failureReason),
         pixEndToEndId: parsed.data.endToEndId?.trim() || null,
         provider: 'transfero',
         status: parsed.data.status,

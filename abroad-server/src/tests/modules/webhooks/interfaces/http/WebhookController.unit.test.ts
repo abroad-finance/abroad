@@ -48,12 +48,13 @@ const buildPixEnvelope = (
   eventType = 'pix.withdrawal.settled',
   status = 'SETTLED',
   endToEndId: null | string = null,
+  failureReason: null | string = null,
 ): Record<string, unknown> => buildEnvelope(eventType, {
   amount: '12.50',
   createdAt: '2026-07-27T12:30:00.000Z',
   currency: 'BRL',
   endToEndId,
-  failureReason: null,
+  failureReason,
   pixKey: '***@example.com',
   pixKeyType: 'EMAIL',
   pspTransactionId: null,
@@ -216,12 +217,39 @@ describe('WebhookController Transfero Ultra webhook', () => {
         amount: 12.5,
         currency: 'BRL',
         externalId: WITHDRAWAL_ID,
+        failureReason: null,
         pixEndToEndId: 'E1234567890123456789012345678901',
         provider: 'transfero',
         status: 'SETTLED',
       },
     )
     expect(setStatus).toHaveBeenCalledWith(200)
+  })
+
+  it('publishes a normalized Ultra PIX withdrawal failure reason', async () => {
+    const body = buildPixEnvelope(
+      'pix.withdrawal.failed',
+      'FAILED',
+      null,
+      '  Recipient account is closed  ',
+    )
+    const { badRequest, serverError, unauthorized } = responders()
+
+    await expect(controller.handleTransferoWebhook(
+      body,
+      buildRequest(body),
+      badRequest,
+      unauthorized,
+      serverError,
+    )).resolves.toMatchObject({ success: true })
+
+    expect(queueHandler.postMessage).toHaveBeenCalledWith(
+      QueueName.PAYMENT_STATUS_UPDATED,
+      expect.objectContaining({
+        failureReason: 'Recipient account is closed',
+        status: 'FAILED',
+      }),
+    )
   })
 
   it('accepts a review-held status on the submitted event', async () => {

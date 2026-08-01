@@ -195,6 +195,7 @@ describe('PartnerTransactionQueryService.getById', () => {
       },
     ])
     expect(result.payoutDestinationHint).toBe('•••• .com')
+    expect(result.failureReason).toBeNull()
     expect(result.pixEndToEndId).toBe(transaction.pixEndToEndId)
     expect(result.refund).toBeNull()
     expect(result.deliveries).toEqual([{
@@ -207,6 +208,67 @@ describe('PartnerTransactionQueryService.getById', () => {
     expect(result).not.toHaveProperty('bankCode')
     expect(result).not.toHaveProperty('externalId')
     expect(result).not.toHaveProperty('taxId')
+  })
+
+  it('returns a mapped partner-safe reason from the latest payment failure transition', async () => {
+    const prisma = makePrisma()
+    prisma.transaction.findFirst.mockResolvedValue({
+      ...transaction,
+      status: TransactionStatus.PAYMENT_FAILED,
+      transitions: [
+        ...transaction.transitions,
+        {
+          context: {
+            externalId: 'must-not-leak',
+            provider: 'transfero',
+            providerStatus: 'FAILED',
+            reason: 'pix_qr_amount_mismatch',
+          },
+          createdAt: new Date('2026-07-30T10:07:00.000Z'),
+          event: 'payment_failed',
+          fromStatus: TransactionStatus.PROCESSING_PAYMENT,
+          id: 'failure-transition',
+          toStatus: TransactionStatus.PAYMENT_FAILED,
+        },
+      ],
+    })
+
+    const result = await makeService(prisma).getById('partner-1', transaction.id)
+
+    expect(result.failureReason).toBe('The PIX QR code amount does not match the transaction amount.')
+    expect(JSON.stringify(result)).not.toContain('must-not-leak')
+    expect(JSON.stringify(result)).not.toContain('providerStatus')
+  })
+
+  it('normalizes and bounds provider failure text and hides stale reasons after completion', async () => {
+    const prisma = makePrisma()
+    const failureTransition = {
+      context: { reason: `  Recipient\naccount is closed ${'x'.repeat(300)}  ` },
+      createdAt: new Date('2026-07-30T10:07:00.000Z'),
+      event: 'payment_failed',
+      fromStatus: TransactionStatus.PROCESSING_PAYMENT,
+      id: 'failure-transition',
+      toStatus: TransactionStatus.PAYMENT_FAILED,
+    }
+    prisma.transaction.findFirst.mockResolvedValue({
+      ...transaction,
+      status: TransactionStatus.PAYMENT_FAILED,
+      transitions: [...transaction.transitions, failureTransition],
+    })
+
+    const failedResult = await makeService(prisma).getById('partner-1', transaction.id)
+
+    expect(failedResult.failureReason).toHaveLength(240)
+    expect(failedResult.failureReason).toMatch(/^Recipient account is closed/)
+    expect(failedResult.failureReason).toMatch(/…$/)
+
+    prisma.transaction.findFirst.mockResolvedValue({
+      ...transaction,
+      transitions: [...transaction.transitions, failureTransition],
+    })
+
+    const completedResult = await makeService(prisma).getById('partner-1', transaction.id)
+    expect(completedResult.failureReason).toBeNull()
   })
 
   it.each([

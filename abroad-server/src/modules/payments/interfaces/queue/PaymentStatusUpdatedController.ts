@@ -88,6 +88,7 @@ export class PaymentStatusUpdatedController {
           amount: message.amount ?? 0,
           currency: message.currency,
           externalId: message.externalId,
+          failureReason: message.failureReason ?? null,
           provider: message.provider,
           status: message.status,
         },

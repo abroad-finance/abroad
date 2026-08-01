@@ -119,6 +119,9 @@ export class AwaitProviderStatusStepExecutor implements FlowStepExecutor {
 
     const provider = typeof signal.payload.provider === 'string' ? signal.payload.provider : undefined
     const rawStatus = typeof signal.payload.status === 'string' ? signal.payload.status : undefined
+    const failureReason = typeof signal.payload.failureReason === 'string'
+      ? signal.payload.failureReason.trim() || undefined
+      : undefined
 
     if (!provider || !rawStatus) {
       return { error: 'Provider status payload missing required fields', outcome: 'failed' }
@@ -140,6 +143,7 @@ export class AwaitProviderStatusStepExecutor implements FlowStepExecutor {
         externalId,
         provider,
         providerStatus: rawStatus,
+        ...(transitionName === 'payment_failed' && failureReason ? { reason: failureReason } : {}),
       },
       idempotencyKey: `flow:provider:${externalId}:${rawStatus}`,
       name: transitionName,

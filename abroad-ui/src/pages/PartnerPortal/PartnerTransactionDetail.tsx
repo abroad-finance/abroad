@@ -199,6 +199,13 @@ const PartnerTransactionDetail = () => {
               ? <CopyableIdentifier label="on-chain ID" value={data.onChainId} />
               : 'Not available'}
           </DetailField>
+          {data.status === 'PAYMENT_FAILED'
+            ? (
+                <DetailField label="Failure reason">
+                  {data.failureReason ?? 'Not provided by the payout provider'}
+                </DetailField>
+              )
+            : null}
           {data.quote.paymentMethod === 'PIX'
             ? (
                 <DetailField label="PIX E2E ID">

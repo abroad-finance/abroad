@@ -10,6 +10,7 @@ const MAX_PAGE_SIZE = 100
 const MAX_QUERY_LENGTH = 200
 const MAX_EXPORT_ROWS = 5_000
 const MAX_DELIVERY_ROWS = 20
+const MAX_PUBLIC_FAILURE_REASON_LENGTH = 240
 const ISO_DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/
 const FORMULA_PREFIX_PATTERN = /^[\t\r\n ]*[=+\-@]/
 const refundRelevantStatuses: ReadonlySet<TransactionStatus> = new Set([
@@ -17,6 +18,20 @@ const refundRelevantStatuses: ReadonlySet<TransactionStatus> = new Set([
   TransactionStatus.PAYMENT_FAILED,
   TransactionStatus.WRONG_AMOUNT,
 ])
+const partnerFailureReasonMessages: Readonly<Record<string, string>> = {
+  invalid_amount: 'The payout amount is invalid.',
+  invalid_destination: 'The payout destination is invalid.',
+  missing_transaction_id: 'The payout provider did not return a transaction identifier.',
+  payout_failed: 'The payout provider reported that the payment failed.',
+  pix_key_type_unsupported: 'The PIX key type is not supported.',
+  pix_qr_amount_mismatch: 'The PIX QR code amount does not match the transaction amount.',
+  provider_failed: 'The payout provider reported that the payment failed.',
+  tax_id_missing: 'The recipient tax ID was unavailable.',
+  transaction_failed: 'The payout provider reported that the payment failed.',
+  transfero_ultra_qr_preview_schema_mismatch: 'The PIX QR code could not be validated by the payout provider.',
+  transfero_ultra_withdrawal_schema_mismatch: 'The payout provider returned an invalid withdrawal response.',
+  unsupported_currency: 'The payout currency is not supported.',
+}
 
 const transactionStatuses = [
   TransactionStatus.AWAITING_PAYMENT,
@@ -45,6 +60,7 @@ export type PartnerTransactionDeliveryDto = {
 }
 export type PartnerTransactionDetailDto = PartnerTransactionSummaryDto & {
   deliveries: PartnerTransactionDeliveryDto[]
+  failureReason: null | string
   lifecycle: PartnerTransactionLifecycleDto[]
   payoutDestinationHint: null | string
   pixEndToEndId: null | string
@@ -225,6 +241,7 @@ export class PartnerTransactionQueryService {
         lastAttemptAt: delivery.updatedAt,
         status: delivery.status,
       })),
+      failureReason: this.toFailureReason(transaction),
       lifecycle: this.toLifecycle(transaction),
       payoutDestinationHint: this.maskDestination(transaction.accountNumber),
       pixEndToEndId: transaction.quote.paymentMethod === PaymentMethod.PIX
@@ -310,6 +327,16 @@ export class PartnerTransactionQueryService {
 
   private isJsonObject(value: Prisma.JsonValue | undefined): value is Prisma.JsonObject {
     return typeof value === 'object' && value !== null && !Array.isArray(value)
+  }
+
+  private latestPaymentFailureTransition(transaction: DetailRow): DetailRow['transitions'][number] | undefined {
+    for (let index = transaction.transitions.length - 1; index >= 0; index -= 1) {
+      const transition = transaction.transitions[index]
+      if (transition.event === 'payment_failed') {
+        return transition
+      }
+    }
+    return undefined
   }
 
   private latestRefundTransition(transaction: DetailRow): DetailRow['transitions'][number] | undefined {
@@ -399,6 +426,13 @@ export class PartnerTransactionQueryService {
       : undefined
   }
 
+  private readTransitionReason(context: Prisma.JsonValue | undefined): null | string {
+    if (!this.isJsonObject(context)) {
+      return null
+    }
+    return typeof context.reason === 'string' ? context.reason : null
+  }
+
   private readWebhookEvent(payload: Prisma.JsonValue): PartnerTransactionDeliveryDto['event'] {
     if (!this.isJsonObject(payload)) {
       return 'unknown'
@@ -419,6 +453,46 @@ export class PartnerTransactionQueryService {
       ? `'${normalized}`
       : normalized
     return `"${spreadsheetSafe.replace(/"/g, '""')}"`
+  }
+
+  private toFailureReason(transaction: DetailRow): null | string {
+    if (transaction.status !== TransactionStatus.PAYMENT_FAILED) {
+      return null
+    }
+
+    const transition = this.latestPaymentFailureTransition(transaction)
+    const rawReason = this.readTransitionReason(transition?.context)
+    if (!rawReason) {
+      return null
+    }
+
+    const normalized = Array.from(rawReason)
+      .map((character) => {
+        const codePoint = character.codePointAt(0) ?? 0
+        return codePoint < 32 || codePoint === 127 ? ' ' : character
+      })
+      .join('')
+      .replace(/\s+/g, ' ')
+      .trim()
+
+    if (!normalized) {
+      return null
+    }
+
+    const knownMessage = partnerFailureReasonMessages[normalized.toLowerCase()]
+    if (knownMessage) {
+      return knownMessage
+    }
+    if (normalized.toLowerCase().startsWith('pix_qr_not_payable:')) {
+      return 'The PIX QR code is not payable.'
+    }
+    if (normalized.toLowerCase().startsWith('pix_qr_currency_not_supported:')) {
+      return 'The PIX QR code currency is not supported.'
+    }
+    if (normalized.length <= MAX_PUBLIC_FAILURE_REASON_LENGTH) {
+      return normalized
+    }
+    return `${normalized.slice(0, MAX_PUBLIC_FAILURE_REASON_LENGTH - 1).trimEnd()}…`
   }
 
   private toLifecycle(transaction: DetailRow): PartnerTransactionLifecycleDto[] {

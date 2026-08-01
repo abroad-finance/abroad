@@ -26,6 +26,7 @@ const transactionDetail = {
     lastAttemptAt: '2026-07-30T10:06:00.000Z',
     status: 'DELIVERED',
   }],
+  failureReason: null,
   id: '11111111-1111-4111-8111-111111111111',
   lifecycle: [{ occurredAt: '2026-07-30T10:00:00.000Z', status: 'AWAITING_PAYMENT', type: 'CREATED' }, { occurredAt: '2026-07-30T10:05:00.000Z', status: 'PAYMENT_COMPLETED', type: 'STATUS_CHANGED' }],
   onChainId: '0xabc',
@@ -72,6 +73,7 @@ describe('PartnerTransactionDetail', () => {
     expect(screen.getByText(transactionDetail.pixEndToEndId)).toBeInTheDocument()
     expect(screen.getAllByText('Completed')).not.toHaveLength(0)
     expect(screen.queryByText('Refund status')).not.toBeInTheDocument()
+    expect(screen.queryByText('Failure reason')).not.toBeInTheDocument()
     expect(screen.queryByText(/tax/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/provider/i)).not.toBeInTheDocument()
   })
@@ -79,6 +81,7 @@ describe('PartnerTransactionDetail', () => {
   it('shows completed refund evidence for a failed transaction', async () => {
     mocked.getPartnerTransaction.mockResolvedValue({
       ...transactionDetail,
+      failureReason: 'The recipient account is closed.',
       refund: { onChainId: '0xrefund', status: 'COMPLETED' },
       status: 'PAYMENT_FAILED',
     })
@@ -89,6 +92,8 @@ describe('PartnerTransactionDetail', () => {
     expect(screen.getByText('Refunded')).toBeInTheDocument()
     expect(screen.getByText('Refund on-chain ID')).toBeInTheDocument()
     expect(screen.getByText('0xrefund')).toBeInTheDocument()
+    expect(screen.getByText('Failure reason')).toBeInTheDocument()
+    expect(screen.getByText('The recipient account is closed.')).toBeInTheDocument()
   })
 
   it('shows a processing refund before an on-chain ID is available', async () => {

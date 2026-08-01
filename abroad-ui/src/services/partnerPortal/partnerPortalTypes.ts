@@ -22,6 +22,7 @@ export type PartnerTransactionDelivery = {
 
 export type PartnerTransactionDetail = PartnerTransactionSummary & {
   deliveries: PartnerTransactionDelivery[]
+  failureReason: null | string
   lifecycle: PartnerTransactionLifecycle[]
   payoutDestinationHint: null | string
   pixEndToEndId: null | string
