@@ -379,7 +379,7 @@ export default function HomeScreen({
               <QrCode className="h-full w-full p-[clamp(0.375rem,1.5vh,0.5rem)] text-white" strokeWidth={1.5} />
             </div>
             <span className="text-[clamp(0.8rem,2vw+0.5vh,1.125rem)] font-bold leading-tight text-white">
-              {t('home.scan_to_pay', 'Scan to Pay')}
+              {t('home.scan_or_paste', 'Scan or paste')}
             </span>
             <img
               alt={targetCurrency === TargetCurrency.BRL ? 'PIX' : 'Bre-B'}
