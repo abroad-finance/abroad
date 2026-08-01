@@ -19,13 +19,14 @@ const createProps = (): HomeScreenProps => ({
   onPasteQr: vi.fn(),
   onRequestConnect: vi.fn(),
   onScanQr: vi.fn(),
+  onUploadQr: vi.fn(),
   recentTransactions: [],
   selectedTokenLabel: 'USDC',
   targetCurrency: 'BRL' as HomeScreenProps['targetCurrency'],
 })
 
 describe('HomeScreen payment actions', () => {
-  it('exposes distinct scan, paste, and manual payment actions', async () => {
+  it('exposes distinct scan, paste, upload, and manual payment actions', async () => {
     const props = createProps()
     const user = userEvent.setup()
 
@@ -33,16 +34,19 @@ describe('HomeScreen payment actions', () => {
 
     const scanButton = screen.getByRole('button', { name: 'Scan to Pay' })
     const pasteButton = screen.getByRole('button', { name: 'Paste PIX code' })
+    const uploadButton = screen.getByRole('button', { name: 'Upload QR image' })
     const manualButton = screen.getByRole('button', { name: 'Manual Payment' })
 
     expect(screen.queryByText('Scan or paste')).not.toBeInTheDocument()
 
     await user.click(scanButton)
     await user.click(pasteButton)
+    await user.click(uploadButton)
     await user.click(manualButton)
 
     expect(props.onScanQr).toHaveBeenCalledOnce()
     expect(props.onPasteQr).toHaveBeenCalledOnce()
+    expect(props.onUploadQr).toHaveBeenCalledOnce()
     expect(props.onGoToManual).toHaveBeenCalledOnce()
   })
 })

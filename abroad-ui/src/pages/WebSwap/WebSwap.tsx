@@ -162,6 +162,7 @@ const WebSwap: React.FC = () => {
 
   const openQrCamera = useCallback(() => openQr('camera'), [openQr])
   const openQrPaste = useCallback(() => openQr('paste'), [openQr])
+  const openQrUpload = useCallback(() => openQr('upload'), [openQr])
 
   // Modal state for connect-wallet chain (must be before navBar, which uses handleConnectWalletClick)
   const [showConnectChainModal, setShowConnectChainModal] = useState(false)
@@ -291,6 +292,7 @@ const WebSwap: React.FC = () => {
                 onScanQr={openQrCamera}
                 onSelectCurrency={selectCurrency}
                 onSelectTransaction={tx => setSelectedTx(transactionToTxDetailItem(tx))}
+                onUploadQr={openQrUpload}
                 recentTransactions={
                   selectedChainKey
                     ? walletDetails.transactions

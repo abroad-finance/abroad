@@ -275,6 +275,9 @@ describe('useWebSwapController', () => {
 
     act(() => result.current.openQr('camera'))
     expect(result.current.qrEntryMode).toBe('camera')
+
+    act(() => result.current.openQr('upload'))
+    expect(result.current.qrEntryMode).toBe('upload')
   })
 
   it('aborts stale quote requests', async () => {
