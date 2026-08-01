@@ -101,8 +101,8 @@ const CompletedVolume = ({ maximumAmount, rank, volume }: CompletedVolumeProps) 
     : 'border-ops-border bg-stone-50 text-ops-muted'
 
   return (
-    <div className="min-w-[240px] space-y-2.5">
-      <div className="flex items-center gap-3">
+    <div className="min-w-0 space-y-2.5">
+      <div className="flex min-w-0 items-center gap-3">
         <div
           aria-label={`Volume rank ${rank}`}
           className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border text-xs font-bold tabular-nums ${rankClassName}`}
@@ -111,7 +111,7 @@ const CompletedVolume = ({ maximumAmount, rank, volume }: CompletedVolumeProps) 
           {rank}
         </div>
         <div className="min-w-0">
-          <div className="flex items-baseline gap-1.5">
+          <div className="flex min-w-0 flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
             <span className="text-lg font-semibold tabular-nums text-ops-text">
               {formatAmount(volume.stablecoinAmount)}
             </span>
@@ -475,8 +475,8 @@ const PartnerApiKeys = () => {
         </div>
       )}
 
-      <div className="mt-8 grid gap-6 xl:grid-cols-[300px_minmax(0,1fr)]">
-        <div className="ops-card p-5">
+      <div className="mt-8 grid min-w-0 gap-6 xl:grid-cols-[280px_minmax(0,1fr)]">
+        <div className="ops-card h-fit min-w-0 p-5">
           <div className="ops-label">Create Partner</div>
           <h2 className="mt-2 text-xl font-semibold">Onboard New Partner</h2>
           <div className="mt-4 grid grid-cols-1 gap-3">
@@ -559,70 +559,101 @@ const PartnerApiKeys = () => {
           </div>
         </div>
 
-        <div className="ops-card p-5">
-          <div className="flex items-center justify-between">
+        <div className="ops-card min-w-0 p-5">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <div className="ops-label">Partner Directory</div>
               <h2 className="mt-2 text-xl font-semibold">Current Partners</h2>
             </div>
-            <div className="text-xs text-ops-muted">
-              Page
-              {' '}
-              {page}
-              {' '}
-              of
-              {' '}
-              {totalPages}
+            <div className="flex flex-wrap items-center gap-2 text-xs text-ops-muted">
+              <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 font-semibold text-amber-800">
+                Highest Volume First
+              </span>
+              <span>
+                Page
+                {' '}
+                {page}
+                {' '}
+                of
+                {' '}
+                {totalPages}
+              </span>
             </div>
           </div>
 
-          <div className="mt-4 overflow-x-auto">
-            <table className="w-full min-w-[1240px] text-sm">
-              <thead>
-                <tr className="text-left text-xs uppercase tracking-wider text-ops-muted">
-                  <th className="px-2 py-2" scope="col">Partner</th>
-                  <th className="px-2 py-2" scope="col">Contact</th>
-                  <th className="px-2 py-2" scope="col">Client Domain</th>
-                  <th className="px-2 py-2" scope="col">
-                    <div>Completed Volume</div>
-                    <div className="mt-0.5 normal-case tracking-normal">Highest first</div>
-                  </th>
-                  <th className="px-2 py-2" scope="col">Created</th>
-                  <th className="px-2 py-2" scope="col">API Key</th>
-                  <th className="px-2 py-2" scope="col">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {partners.map((partner, index) => {
-                  const isEditing = editingPartnerId === partner.id
-                  const partnerBusy = isPartnerBusy(partner.id)
-                  const saveDomainKey = buildActionKey('save-domain', partner.id)
-                  const clearDomainKey = buildActionKey('clear-domain', partner.id)
-                  const rotateKey = buildActionKey('rotate', partner.id)
-                  const revokeKey = buildActionKey('revoke', partner.id)
-                  const editingAnotherPartner = editingPartnerId !== null && editingPartnerId !== partner.id
+          {partners.length > 0 && (
+            <ol aria-label="Partners ranked by completed volume" className="mt-4 space-y-3">
+              {partners.map((partner, index) => {
+                const isEditing = editingPartnerId === partner.id
+                const partnerBusy = isPartnerBusy(partner.id)
+                const saveDomainKey = buildActionKey('save-domain', partner.id)
+                const clearDomainKey = buildActionKey('clear-domain', partner.id)
+                const rotateKey = buildActionKey('rotate', partner.id)
+                const revokeKey = buildActionKey('revoke', partner.id)
+                const editingAnotherPartner = editingPartnerId !== null && editingPartnerId !== partner.id
 
-                  return (
-                    <tr className="border-t border-ops-border" key={partner.id}>
-                      <td className="px-2 py-3 align-top">
-                        <div className="font-medium">{partner.name}</div>
-                        <div className="text-xs text-ops-muted">{partner.id}</div>
-                      </td>
-                      <td className="px-2 py-3 align-top">
-                        <div>{partner.email || '—'}</div>
-                        <div className="text-xs text-ops-muted">
-                          {partner.firstName || ''}
-                          {partner.firstName && partner.lastName ? ' ' : ''}
-                          {partner.lastName || ''}
+                return (
+                  <li
+                    className="min-w-0 rounded-2xl border border-ops-border bg-white/70 p-4 shadow-[0_16px_36px_-34px_rgba(15,23,42,0.55)]"
+                    key={partner.id}
+                  >
+                    <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(260px,1.1fr)_auto] lg:items-start">
+                      <div className="min-w-0">
+                        <div className="ops-label">Partner</div>
+                        <div className="mt-1 break-words text-base font-semibold text-ops-text">
+                          {partner.name}
                         </div>
-                      </td>
-                      <td className="px-2 py-3 align-top">
+                        <div className="mt-1 break-all font-mono text-[11px] text-ops-muted">
+                          {partner.id}
+                        </div>
+                        <div className="mt-3 space-y-1 text-xs text-ops-muted">
+                          <div className="min-w-0">
+                            <span className="font-semibold text-ops-label">Email</span>
+                            {' · '}
+                            <span className="break-all">{partner.email || '—'}</span>
+                          </div>
+                          {(partner.firstName || partner.lastName) && (
+                            <div className="break-words">
+                              {[partner.firstName, partner.lastName].filter(Boolean).join(' ')}
+                            </div>
+                          )}
+                          <div>
+                            Created
+                            {' '}
+                            {formatDateTime(partner.createdAt)}
+                          </div>
+                        </div>
+                      </div>
+
+                      <CompletedVolume
+                        maximumAmount={maximumStablecoinAmount}
+                        rank={((page - 1) * pageSize) + index + 1}
+                        volume={partner.completedVolume}
+                      />
+
+                      <div className="flex items-start lg:justify-end">
+                        <div>
+                          <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-ops-label">
+                            API Key
+                          </div>
+                          <OpsStatusBadge tone={partner.hasApiKey ? 'success' : 'danger'}>
+                            {partner.hasApiKey ? 'Active' : 'Revoked'}
+                          </OpsStatusBadge>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 grid min-w-0 gap-4 border-t border-ops-border pt-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+                      <div className="min-w-0">
+                        <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-ops-label">
+                          Trusted Browser Domain
+                        </div>
                         {isEditing
                           ? (
-                              <div className="flex flex-col gap-2">
+                              <div className="flex min-w-0 flex-col gap-2">
                                 <input
                                   aria-label={`Client domain for ${partner.name}`}
-                                  className="ops-input h-10"
+                                  className="ops-input h-10 min-w-0 w-full"
                                   onChange={event => setEditingClientDomain(event.target.value)}
                                   placeholder="app.example.com"
                                   type="text"
@@ -634,7 +665,7 @@ const PartnerApiKeys = () => {
                               </div>
                             )
                           : (
-                              <div>
+                              <div className="min-w-0">
                                 <div className="break-all font-medium">
                                   {partner.clientDomain || '—'}
                                 </div>
@@ -643,89 +674,75 @@ const PartnerApiKeys = () => {
                                 </div>
                               </div>
                             )}
-                      </td>
-                      <td className="px-2 py-3 align-top">
-                        <CompletedVolume
-                          maximumAmount={maximumStablecoinAmount}
-                          rank={((page - 1) * pageSize) + index + 1}
-                          volume={partner.completedVolume}
-                        />
-                      </td>
-                      <td className="px-2 py-3 align-top text-xs text-ops-muted">{formatDateTime(partner.createdAt)}</td>
-                      <td className="px-2 py-3 align-top">
-                        <OpsStatusBadge tone={partner.hasApiKey ? 'success' : 'danger'}>
-                          {partner.hasApiKey ? 'Active' : 'Revoked'}
-                        </OpsStatusBadge>
-                      </td>
-                      <td className="px-2 py-3 align-top">
-                        <div className="flex flex-wrap items-center gap-2">
-                          {isEditing
-                            ? (
-                                <>
-                                  <button
-                                    className="ops-btn-primary ops-btn-sm"
-                                    disabled={!opsApiKey || partnerBusy}
-                                    onClick={() => void handleSaveClientDomain(partner)}
-                                    type="button"
-                                  >
-                                    {actionLoading === saveDomainKey ? 'Saving...' : 'Save'}
-                                  </button>
-                                  <button
-                                    className="ops-btn-neutral ops-btn-sm"
-                                    disabled={partnerBusy}
-                                    onClick={stopEditingClientDomain}
-                                    type="button"
-                                  >
-                                    Cancel
-                                  </button>
-                                </>
-                              )
-                            : (
-                                <>
+                      </div>
+
+                      <div className="flex min-w-0 flex-wrap items-center gap-2 lg:max-w-[360px] lg:justify-end">
+                        {isEditing
+                          ? (
+                              <>
+                                <button
+                                  className="ops-btn-primary ops-btn-sm"
+                                  disabled={!opsApiKey || partnerBusy}
+                                  onClick={() => void handleSaveClientDomain(partner)}
+                                  type="button"
+                                >
+                                  {actionLoading === saveDomainKey ? 'Saving...' : 'Save'}
+                                </button>
+                                <button
+                                  className="ops-btn-neutral ops-btn-sm"
+                                  disabled={partnerBusy}
+                                  onClick={stopEditingClientDomain}
+                                  type="button"
+                                >
+                                  Cancel
+                                </button>
+                              </>
+                            )
+                          : (
+                              <>
+                                <button
+                                  className="ops-btn-neutral ops-btn-sm"
+                                  disabled={!opsApiKey || partnerBusy || editingAnotherPartner}
+                                  onClick={() => startEditingClientDomain(partner)}
+                                  type="button"
+                                >
+                                  {partner.clientDomain ? 'Edit Domain' : 'Set Domain'}
+                                </button>
+                                {partner.clientDomain && (
                                   <button
                                     className="ops-btn-neutral ops-btn-sm"
                                     disabled={!opsApiKey || partnerBusy || editingAnotherPartner}
-                                    onClick={() => startEditingClientDomain(partner)}
+                                    onClick={() => void handleClearClientDomain(partner)}
                                     type="button"
                                   >
-                                    {partner.clientDomain ? 'Edit Domain' : 'Set Domain'}
+                                    {actionLoading === clearDomainKey ? 'Clearing...' : 'Clear Domain'}
                                   </button>
-                                  {partner.clientDomain && (
-                                    <button
-                                      className="ops-btn-neutral ops-btn-sm"
-                                      disabled={!opsApiKey || partnerBusy || editingAnotherPartner}
-                                      onClick={() => void handleClearClientDomain(partner)}
-                                      type="button"
-                                    >
-                                      {actionLoading === clearDomainKey ? 'Clearing...' : 'Clear Domain'}
-                                    </button>
-                                  )}
-                                </>
-                              )}
-                          <button
-                            className="ops-btn-neutral ops-btn-sm"
-                            disabled={!opsApiKey || partnerBusy || isEditing}
-                            onClick={() => void handleRotate(partner)}
-                            type="button"
-                          >
-                            {actionLoading === rotateKey ? 'Rotating...' : 'Rotate Key'}
-                          </button>
-                          <button
-                            className="ops-btn-danger ops-btn-sm"
-                            disabled={!opsApiKey || partnerBusy || isEditing || !partner.hasApiKey}
-                            onClick={() => void handleRevoke(partner)}
-                            type="button"
-                          >
-                            {actionLoading === revokeKey ? 'Revoking...' : 'Revoke'}
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
+                                )}
+                              </>
+                            )}
+                        <button
+                          className="ops-btn-neutral ops-btn-sm"
+                          disabled={!opsApiKey || partnerBusy || isEditing}
+                          onClick={() => void handleRotate(partner)}
+                          type="button"
+                        >
+                          {actionLoading === rotateKey ? 'Rotating...' : 'Rotate Key'}
+                        </button>
+                        <button
+                          className="ops-btn-danger ops-btn-sm"
+                          disabled={!opsApiKey || partnerBusy || isEditing || !partner.hasApiKey}
+                          onClick={() => void handleRevoke(partner)}
+                          type="button"
+                        >
+                          {actionLoading === revokeKey ? 'Revoking...' : 'Revoke'}
+                        </button>
+                      </div>
+                    </div>
+                  </li>
+                )
+              })}
+            </ol>
+          )}
 
           {!loading && opsApiKey && partners.length === 0 && (
             <div className="mt-6">

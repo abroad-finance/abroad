@@ -208,7 +208,7 @@ describe('PartnerApiKeys page', () => {
     expect(screen.getByText('315.62')).toBeInTheDocument()
   })
 
-  it('renders partners in server-ranked order with proportional visual rails', async () => {
+  it('renders a responsive partner ranking with proportional visual rails', async () => {
     setOpsApiKey('ops_key')
 
     mocked.listPartners.mockResolvedValue({
@@ -252,14 +252,16 @@ describe('PartnerApiKeys page', () => {
     )
 
     await screen.findByText('High Volume')
-    const rows = screen.getAllByRole('row').slice(1)
-    expect(within(rows[0]).getByText('High Volume')).toBeInTheDocument()
-    expect(within(rows[0]).getByLabelText('Volume rank 1')).toBeInTheDocument()
-    expect(within(rows[1]).getByText('Lower Volume')).toBeInTheDocument()
-    expect(within(rows[1]).getByLabelText('Volume rank 2')).toBeInTheDocument()
+    const rankedList = screen.getByRole('list', { name: 'Partners ranked by completed volume' })
+    const rankedPartners = within(rankedList).getAllByRole('listitem')
+    expect(screen.queryByRole('table')).not.toBeInTheDocument()
+    expect(within(rankedPartners[0]).getByText('High Volume')).toBeInTheDocument()
+    expect(within(rankedPartners[0]).getByLabelText('Volume rank 1')).toBeInTheDocument()
+    expect(within(rankedPartners[1]).getByText('Lower Volume')).toBeInTheDocument()
+    expect(within(rankedPartners[1]).getByLabelText('Volume rank 2')).toBeInTheDocument()
 
-    const leaderRail = within(rows[0]).getByRole('img', { name: /Rank 1: 900 USD stablecoins/ })
+    const leaderRail = within(rankedPartners[0]).getByRole('img', { name: /Rank 1: 900 USD stablecoins/ })
     expect(leaderRail.querySelector('[data-currency="USDC"]')).toHaveAttribute('width', '100')
-    expect(within(rows[1]).getByRole('img', { name: /Rank 2: 100 USD stablecoins/ })).toBeInTheDocument()
+    expect(within(rankedPartners[1]).getByRole('img', { name: /Rank 2: 100 USD stablecoins/ })).toBeInTheDocument()
   })
 })
