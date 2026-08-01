@@ -139,7 +139,6 @@ const WebSwap: React.FC = () => {
     handleKycSubmit,
     handleQrResult,
     handleWalletDetailsClose,
-    hasPassedOnboarding,
     isDecodingQr,
     isMiniPay,
     isQrOpen,
@@ -281,10 +280,7 @@ const WebSwap: React.FC = () => {
                 getStatusStyle={walletDetails.getStatusStyle}
                 getStatusText={walletDetails.getStatusText}
                 hasEnteredApp={hasEnteredApp || swapViewProps.isAuthenticated}
-                isAuthenticated={
-                  hasPassedOnboarding
-                  || Boolean(walletDetails.address && selectedChainKey)
-                }
+                isAuthenticated={swapViewProps.isAuthenticated}
                 onboardingRates={onboardingRates}
                 onEnterApp={handleEnterApp}
                 onGoToManual={goToManual}

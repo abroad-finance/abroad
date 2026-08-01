@@ -1,6 +1,7 @@
 import React, {
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react'
 
@@ -13,86 +14,95 @@ import { useWalletFactory } from '../services/useWalletFactory'
 import { getWalletTypeByDevice } from '../shared/utils'
 import { WalletAuthContext } from './WalletAuthContext'
 
+const VALID_WALLET_TYPES: ReadonlySet<string> = new Set<WalletType>([
+  'mini-pay',
+  'sep24',
+  'solana',
+  'stellar-kit',
+  'wallet-connect',
+])
+
+const isWalletType = (value: string): value is WalletType => VALID_WALLET_TYPES.has(value)
+
+const resolveSessionWalletType = ({ chainId, walletId }: {
+  chainId: string
+  walletId: string
+}): null | WalletType => {
+  if (isWalletType(walletId)) {
+    return walletId
+  }
+  // StellarKit persists the selected extension id (for example, Freighter)
+  // so it can restore that module. Those legacy sessions still belong to the
+  // StellarKit wallet surface.
+  if (chainId.startsWith('stellar:')) {
+    return 'stellar-kit'
+  }
+  return null
+}
+
+const isStoredTokenValid = (): boolean => {
+  const token = authTokenStore.getToken()
+  if (!token) return false
+  try {
+    const [, payload] = token.split('.')
+    if (!payload) return false
+    const padded = payload.replace(/-/g, '+').replace(/_/g, '/') + '=='.slice(0, (4 - payload.length % 4) % 4)
+    const decoded = JSON.parse(atob(padded)) as { exp?: unknown }
+    return typeof decoded.exp === 'number' && decoded.exp * 1000 > Date.now()
+  }
+  catch {
+    return false
+  }
+}
+
+const restoreWalletSession = async (walletFactory: ReturnType<typeof useWalletFactory>): Promise<void> => {
+  const session = sessionStore.get()
+  if (!session) return
+  if (!sessionStore.isValid()) {
+    sessionStore.clear()
+    return
+  }
+
+  const walletType = resolveSessionWalletType(session)
+  if (!walletType) {
+    sessionStore.clear()
+    return
+  }
+
+  try {
+    const savedWallet = walletFactory.getWalletHandler(walletType)
+    if (isStoredTokenValid() && savedWallet.address && savedWallet.chainId) {
+      return
+    }
+    await savedWallet.connect({ chainId: session.chainId })
+  }
+  catch (error) {
+    if (import.meta.env.DEV) {
+      console.error('Failed to restore wallet session', error)
+    }
+    sessionStore.clear()
+  }
+}
+
 export const WalletAuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [initialized, setInitialized] = useState(false)
   const walletAuthentication = useWalletAuthentication()
   const walletFactory = useWalletFactory({ walletAuth: walletAuthentication })
+  const restorePromiseRef = useRef<null | Promise<void>>(null)
 
   // Restore wallet session on mount (reconnect if needed)
   useEffect(() => {
-    const restoreSession = async () => {
-      const session = sessionStore.get()
-      if (session && session.address && session.walletId) {
-        try {
-          // Validate walletId against WalletType enum
-          const validWalletTypes: WalletType[] = [
-            'mini-pay',
-            'sep24',
-            'stellar-kit',
-            'wallet-connect',
-            'solana',
-          ]
-          if (!validWalletTypes.includes(session.walletId as WalletType)) {
-            // Invalid walletId in session, clear it
-            sessionStore.clear()
-            setInitialized(true)
-            return
-          }
-
-          // Get the wallet handler for the saved wallet FIRST
-          const savedWallet = walletFactory.getWalletHandler(session.walletId as WalletType)
-          if (!savedWallet) {
-            sessionStore.clear()
-            setInitialized(true)
-            return
-          }
-
-          // Verify JWT validity AND wallet connection state before skipping reconnect
-          const token = authTokenStore.getToken()
-          if (token) {
-            try {
-              const [, payload] = token.split('.')
-              if (payload) {
-                const padded = payload.replace(/-/g, '+').replace(/_/g, '/') + '=='.slice(0, (4 - payload.length % 4) % 4)
-                const decoded = JSON.parse(atob(padded))
-                const isTokenValid = typeof decoded?.exp === 'number' && decoded.exp * 1000 > Date.now()
-                if (isTokenValid) {
-                  // Token is valid, but we still need to ensure wallet is connected
-                  // Check if the wallet has a way to verify connection state
-                  const walletAddress = savedWallet.address
-                  const walletChainId = savedWallet.chainId
-
-                  // Only skip reconnect if wallet is actually connected (has address and chainId)
-                  if (walletAddress && walletChainId) {
-                    setInitialized(true)
-                    return
-                  }
-                  // Wallet not connected despite valid JWT - need to reconnect
-                }
-              }
-            }
-            catch {
-              // Token parsing failed, proceed with re-authentication
-            }
-          }
-
-          // Reconnect the wallet with saved session data
-          await savedWallet.connect({
-            chainId: session.chainId,
-          })
-        }
-        catch (err) {
-          // If reconnection fails, clear the session
-          if (import.meta.env.DEV) {
-            console.error('Failed to restore wallet session', err)
-          }
-          sessionStore.clear()
-        }
-      }
-      setInitialized(true)
+    if (!restorePromiseRef.current) {
+      restorePromiseRef.current = restoreWalletSession(walletFactory)
     }
 
-    restoreSession()
+    let subscribed = true
+    void restorePromiseRef.current.finally(() => {
+      if (subscribed) setInitialized(true)
+    })
+    return () => {
+      subscribed = false
+    }
   }, [walletFactory])
 
   const defaultWallet = useMemo<IWallet | undefined>(() => {
@@ -108,17 +118,11 @@ export const WalletAuthProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
     // Prioritize saved session over MiniPay and device defaults
     const session = sessionStore.get()
-    if (session?.walletId && session?.address) {
-      const validWalletTypes: WalletType[] = [
-        'mini-pay',
-        'sep24',
-        'stellar-kit',
-        'wallet-connect',
-        'solana',
-      ]
-      if (validWalletTypes.includes(session.walletId as WalletType)) {
-        return walletFactory.getWalletHandler(session.walletId as WalletType)
-      }
+    const sessionWalletType = session && sessionStore.isValid()
+      ? resolveSessionWalletType(session)
+      : null
+    if (sessionWalletType) {
+      return walletFactory.getWalletHandler(sessionWalletType)
     }
 
     // Only use MiniPay as default if no saved session exists

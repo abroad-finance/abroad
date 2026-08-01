@@ -9,6 +9,7 @@ import type { IWallet, WalletConnectRequest } from '../../interfaces/IWallet'
 import type { IWalletAuthentication } from '../../interfaces/IWalletAuthentication'
 
 import { WALLET_CONNECT_ID } from '../../shared/constants'
+import { commitAuthenticatedWallet } from './shared/authenticated-wallet-session'
 // Import shared utilities
 import {
   clearWCSession,
@@ -77,12 +78,9 @@ export function useWalletConnectWallet({ walletAuth }: {
         return false
       }
       topicRef.current = wcSession.topic
-      setChainId(targetChainId)
       const ns = session.namespaces?.[namespace]
       const caip10 = ns?.accounts?.[0]
-      if (caip10) {
-        setAddress(caip10ToAddress(caip10))
-      }
+      if (!caip10ToAddress(caip10 ?? '')) return false
       return true
     }
     catch {
@@ -200,17 +198,21 @@ export function useWalletConnectWallet({ walletAuth }: {
       throw new Error('Failed to get wallet address')
     }
 
-    setAddress(resolvedAddress)
-    setChainId(targetChainId)
-
-    await walletAuth.authenticate({
-      address: resolvedAddress,
-      chainId: targetChainId,
-      signMessage: (message: string) => signAuthMessage({
+    await commitAuthenticatedWallet({
+      authenticate: () => walletAuth.authenticate({
         address: resolvedAddress,
         chainId: targetChainId,
-        message,
+        signMessage: (message: string) => signAuthMessage({
+          address: resolvedAddress,
+          chainId: targetChainId,
+          message,
+        }),
       }),
+      onCommitted: () => {
+        setAddress(resolvedAddress)
+        setChainId(targetChainId)
+      },
+      session: { address: resolvedAddress, chainId: targetChainId, walletId: 'wallet-connect' },
     })
   }, [
     ensureClient,

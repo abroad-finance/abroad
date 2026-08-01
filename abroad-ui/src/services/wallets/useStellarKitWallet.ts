@@ -4,6 +4,7 @@ import {
   HanaModule,
   HotWalletModule,
   LobstrModule,
+  type ModuleInterface,
   ModuleType,
   StellarWalletsKit,
   WalletNetwork,
@@ -23,6 +24,7 @@ import { WALLET_CONNECT_ID } from '../../shared/constants'
 import { authTokenStore } from '../auth/authTokenStore'
 import { sessionStore } from '../auth/sessionStore'
 // Import shared utilities
+import { commitAuthenticatedWallet } from './shared/authenticated-wallet-session'
 import {
   getWCSession,
   saveWCSession,
@@ -35,8 +37,7 @@ import { caip10ToAddress } from './shared/wallet-utils'
 // have the `stellar` namespace defined, because it blindly maps `session.namespaces.stellar.accounts`.
 // Since we intercept WalletConnect in `isWalletConnect` and handle it manually, we only need this
 // mock to display "Wallet Connect" in the StellarWalletsKit UI modal without crashing.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const mockWalletConnectModule: any = {
+const mockWalletConnectModule: ModuleInterface = {
   getAddress: async () => { throw new Error('Handled externally') },
   getNetwork: async () => { throw new Error('Handled externally') },
   isAvailable: async () => true,
@@ -338,40 +339,44 @@ export function useStellarKitWallet(
 
           if (isWalletConnect(options.id)) {
             const address = await resolveWcAddress()
-            setAddress(address)
-            await walletAuth.authenticate({
-              address,
-              chainId: STELLAR_CHAIN_ID,
-              signMessage: async (challenge: string) => {
-                const client = await ensureWalletConnectClient()
-                const result = await client.request({
-                  chainId: STELLAR_CHAIN_ID,
-                  request: { method: 'stellar_signXDR', params: { network: 'PUBLIC', xdr: challenge } },
-                  topic: wcTopicRef.current as string,
-                })
-                return (result as { signedXDR: string }).signedXDR
-              },
+            await commitAuthenticatedWallet({
+              authenticate: () => walletAuth.authenticate({
+                address,
+                chainId: STELLAR_CHAIN_ID,
+                signMessage: async (challenge: string) => {
+                  const client = await ensureWalletConnectClient()
+                  const result = await client.request({
+                    chainId: STELLAR_CHAIN_ID,
+                    request: { method: 'stellar_signXDR', params: { network: 'PUBLIC', xdr: challenge } },
+                    topic: wcTopicRef.current as string,
+                  })
+                  return (result as { signedXDR: string }).signedXDR
+                },
+              }),
+              onCommitted: () => setAddress(address),
+              session: { address, chainId: STELLAR_CHAIN_ID, walletId: normalizedWalletId },
             })
-            sessionStore.set({ address, chainId: STELLAR_CHAIN_ID, walletId: normalizedWalletId })
             return
           }
 
           const result = await kit.getAddress()
           const address = result?.address ?? null
           if (!address) throw new Error('Failed to get wallet address')
-          setAddress(address)
-          await walletAuth.authenticate({
-            address,
-            chainId: STELLAR_CHAIN_ID,
-            signMessage: async (challenge: string) => {
-              const { signedTxXdr } = await kit.signTransaction(challenge, {
-                address,
-                networkPassphrase: network,
-              })
-              return signedTxXdr
-            },
+          await commitAuthenticatedWallet({
+            authenticate: () => walletAuth.authenticate({
+              address,
+              chainId: STELLAR_CHAIN_ID,
+              signMessage: async (challenge: string) => {
+                const { signedTxXdr } = await kit.signTransaction(challenge, {
+                  address,
+                  networkPassphrase: network,
+                })
+                return signedTxXdr
+              },
+            }),
+            onCommitted: () => setAddress(address),
+            session: { address, chainId: STELLAR_CHAIN_ID, walletId: normalizedWalletId },
           })
-          sessionStore.set({ address, chainId: STELLAR_CHAIN_ID, walletId: normalizedWalletId })
         }
         catch (err) {
           const message = getErrorMessage(err)

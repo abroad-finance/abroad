@@ -15,6 +15,7 @@ import {
   WalletErrorCode,
 } from '../../interfaces/wallet-errors'
 import { sessionStore } from '../auth/sessionStore'
+import { commitAuthenticatedWallet } from './shared/authenticated-wallet-session'
 
 // Constants
 export const SOLANA_CHAIN_ID = 'solana:mainnet'
@@ -114,39 +115,33 @@ export const useSolanaWallet = (walletAuth?: IWalletAuthentication): SolanaWalle
         )
       }
 
-      setConnectedAddress(address)
-
-      // Save session
-      sessionStore.set({
-        address,
-        chainId: SOLANA_CHAIN_ID,
-        walletId: 'solana',
-      })
-
-      // Authenticate if walletAuth is provided
-      if (walletAuth) {
-        await walletAuth.authenticate({
-          address,
-          chainId: SOLANA_CHAIN_ID,
-          signMessage: async (message: string) => {
-            if (!provider.signMessage) {
-              throw createWalletError(
-                WalletErrorCode.SIGNATURE_FAILED,
-                'Provider does not support signMessage',
-              )
-            }
-            const encoder = new TextEncoder()
-            const messageBytes = encoder.encode(message)
-            const signed = await provider.signMessage(messageBytes)
-            // Convert Uint8Array to base64
-            let binary = ''
-            signed.signature.forEach((byte) => {
-              binary += String.fromCharCode(byte)
+      await commitAuthenticatedWallet({
+        authenticate: walletAuth
+          ? () => walletAuth.authenticate({
+              address,
+              chainId: SOLANA_CHAIN_ID,
+              signMessage: async (message: string) => {
+                if (!provider.signMessage) {
+                  throw createWalletError(
+                    WalletErrorCode.SIGNATURE_FAILED,
+                    'Provider does not support signMessage',
+                  )
+                }
+                const encoder = new TextEncoder()
+                const messageBytes = encoder.encode(message)
+                const signed = await provider.signMessage(messageBytes)
+                // Convert Uint8Array to base64
+                let binary = ''
+                signed.signature.forEach((byte) => {
+                  binary += String.fromCharCode(byte)
+                })
+                return btoa(binary)
+              },
             })
-            return btoa(binary)
-          },
-        })
-      }
+          : () => Promise.resolve(),
+        onCommitted: () => setConnectedAddress(address),
+        session: { address, chainId: SOLANA_CHAIN_ID, walletId: 'solana' },
+      })
     }
     catch (error) {
       const errorMessage = getErrorMessage(error)
