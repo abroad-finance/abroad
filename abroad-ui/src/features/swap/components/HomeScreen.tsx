@@ -1,6 +1,6 @@
 import { useTranslate } from '@tolgee/react'
 import {
-  ChevronDown, ChevronRight, ClipboardPaste, ImageUp, Keyboard, Lock, PiggyBank, QrCode, Store, Wallet, Zap,
+  ChevronDown, ChevronRight, ClipboardPaste, Keyboard, Lock, PiggyBank, QrCode, Store, Wallet, Zap,
 } from 'lucide-react'
 import React from 'react'
 
@@ -20,7 +20,7 @@ import { _36EnumsTargetCurrency as TargetCurrency, type TransactionListItem } fr
 const CHAIN_CONFIG = CHAIN_CONFIG_ARRAY
 const TOKEN_ICON_URL = TOKEN_ICONS
 
-const PAYMENT_ACTION_CARD_CLASS = 'flex h-full min-h-[clamp(92px,14vh,118px)] w-full flex-col items-center justify-center gap-[clamp(0.25rem,1vh,0.5rem)] rounded-[clamp(1rem,3vh,1.5rem)] p-[clamp(0.5rem,1.5vw,1rem)] text-center transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3ca383] focus-visible:ring-offset-2'
+const PAYMENT_ACTION_CARD_CLASS = 'flex h-full min-h-[clamp(92px,14vh,118px)] w-full flex-col items-center justify-center gap-[clamp(0.25rem,1vh,0.5rem)] rounded-[clamp(1rem,3vh,1.5rem)] p-[clamp(0.5rem,1.5vw,1rem)] text-center transition-[background-color,border-color,box-shadow,opacity] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3ca383] focus-visible:ring-offset-2'
 const PAYMENT_ACTION_ICON_CLASS = 'flex h-[clamp(2.25rem,6vh,3.25rem)] w-[clamp(2.25rem,6vh,3.25rem)] shrink-0 items-center justify-center rounded-[clamp(0.5rem,1.5vh,0.875rem)]'
 const PAYMENT_ACTION_LABEL_CLASS = 'text-[clamp(0.75rem,1.8vw+0.4vh,1.05rem)] font-bold leading-tight'
 
@@ -47,7 +47,6 @@ export interface HomeScreenProps {
   onScanQr: () => void
   onSelectCurrency?: (currency: TargetCurrency) => void
   onSelectTransaction?: (tx: TransactionListItem) => void
-  onUploadQr: () => void
   recentTransactions: TransactionListItem[]
   selectedChainKey?: string
   selectedTokenLabel: string
@@ -71,7 +70,6 @@ export default function HomeScreen({
   onScanQr,
   onSelectCurrency,
   onSelectTransaction,
-  onUploadQr,
   recentTransactions,
   selectedChainKey,
   selectedTokenLabel,
@@ -269,9 +267,10 @@ export default function HomeScreen({
   // Helper to check if we should show transactions section.
   // Only the user's own (scoped) transactions are shown — never partner-wide data.
   const hasTransactions = isAuthenticated && recentTransactions.length > 0
-  const pasteQrLabel = t('home.paste_pix_code', 'Paste PIX code')
-  const scanQrLabel = t('home.scan_to_pay', 'Scan to Pay')
-  const uploadQrLabel = t('home.upload_qr_image', 'Upload QR image')
+  const pasteQrLabel = t('home.pix_copy_paste', 'PIX Copy & Paste')
+  const pixKeyLabel = t('home.pay_with_pix_key', 'Pay with PIX key')
+  const scanQrHint = t('home.scan_pix_qr_hint', 'Use camera or image')
+  const scanQrLabel = t('home.scan_pix_qr', 'Scan PIX QR')
 
   return (
     <div className="flex w-full h-full flex-col items-center px-0 overflow-y-auto">
@@ -368,12 +367,13 @@ export default function HomeScreen({
           )}
         </div>
 
-        {/* Payment actions: scan, paste, upload an image, or enter details manually. */}
+        {/* Payment journeys: QR, Copia e Cola, or Pix key. Image upload remains inside the QR journey. */}
         <div className="mt-[clamp(0.75rem,2.5vh,1.5rem)] grid grid-cols-2 items-stretch gap-[clamp(0.375rem,1.25vw,0.75rem)] sm:grid-cols-4">
           <button
             aria-label={scanQrLabel}
             className={cn(
               PAYMENT_ACTION_CARD_CLASS,
+              'col-span-2 flex-row justify-start px-[clamp(1rem,3vw,1.5rem)] text-left',
               isAuthenticated
                 ? 'bg-[#3ca383] shadow-[0px_0px_15px_0px_rgba(16,185,129,0.3)] hover:opacity-95'
                 : 'bg-[#3ca383]/80 hover:bg-[#3ca383]',
@@ -384,37 +384,19 @@ export default function HomeScreen({
             <div className={cn(PAYMENT_ACTION_ICON_CLASS, 'bg-white/20 backdrop-blur-[2px]')}>
               <QrCode className="h-full w-full p-[clamp(0.375rem,1.5vh,0.5rem)] text-white" strokeWidth={1.5} />
             </div>
-            <span className={cn(PAYMENT_ACTION_LABEL_CLASS, 'text-white')}>
-              {scanQrLabel}
+            <span className="flex min-w-0 flex-1 flex-col items-start gap-1">
+              <span className={cn(PAYMENT_ACTION_LABEL_CLASS, 'text-white')}>
+                {scanQrLabel}
+              </span>
+              <span className="text-[clamp(0.7rem,1.4vw,0.8rem)] font-medium leading-tight text-white/80">
+                {scanQrHint}
+              </span>
             </span>
             <img
               alt=""
-              className="h-[clamp(0.875rem,2.5vh,1rem)] w-auto shrink-0"
+              className="h-[clamp(1rem,2.5vh,1.25rem)] w-auto shrink-0"
               src="/pix-white.svg"
             />
-          </button>
-
-          <button
-            aria-label={uploadQrLabel}
-            className={cn(
-              PAYMENT_ACTION_CARD_CLASS,
-              'border border-[#2d7f9d]/40 bg-[var(--ab-bg-card)] shadow-[0px_4px_10px_rgba(45,127,157,0.08)] hover:border-[#2d7f9d]/70 hover:shadow-md',
-            )}
-            onClick={onUploadQr}
-            type="button"
-          >
-            <div className={cn(PAYMENT_ACTION_ICON_CLASS, 'bg-[#2d7f9d]/15')}>
-              <ImageUp
-                className="h-full w-full p-[clamp(0.375rem,1.5vh,0.5rem)] text-[#2d7f9d]"
-                strokeWidth={1.5}
-              />
-            </div>
-            <span className={cn(PAYMENT_ACTION_LABEL_CLASS, 'text-[var(--ab-text)]')}>
-              {uploadQrLabel}
-            </span>
-            <span className="rounded bg-[#2d7f9d] px-1.5 py-0.5 text-[0.625rem] font-extrabold uppercase leading-none tracking-[0.08em] text-white">
-              JPG · PNG
-            </span>
           </button>
 
           <button
@@ -435,12 +417,10 @@ export default function HomeScreen({
             <span className={cn(PAYMENT_ACTION_LABEL_CLASS, 'text-[var(--ab-text)]')}>
               {pasteQrLabel}
             </span>
-            <span className="rounded bg-[#3ca383] px-1.5 py-0.5 text-[0.625rem] font-extrabold uppercase leading-none tracking-[0.08em] text-white">
-              PIX
-            </span>
           </button>
 
           <button
+            aria-label={pixKeyLabel}
             className={cn(
               PAYMENT_ACTION_CARD_CLASS,
               isAuthenticated
@@ -457,7 +437,7 @@ export default function HomeScreen({
               />
             </div>
             <span className={cn(PAYMENT_ACTION_LABEL_CLASS, 'text-[var(--ab-text)]')}>
-              {t('home.manual_payment', 'Manual Payment')}
+              {pixKeyLabel}
             </span>
           </button>
         </div>

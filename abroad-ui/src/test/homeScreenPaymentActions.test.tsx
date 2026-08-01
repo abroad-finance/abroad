@@ -19,34 +19,32 @@ const createProps = (): HomeScreenProps => ({
   onPasteQr: vi.fn(),
   onRequestConnect: vi.fn(),
   onScanQr: vi.fn(),
-  onUploadQr: vi.fn(),
   recentTransactions: [],
   selectedTokenLabel: 'USDC',
   targetCurrency: 'BRL' as HomeScreenProps['targetCurrency'],
 })
 
 describe('HomeScreen payment actions', () => {
-  it('exposes distinct scan, paste, upload, and manual payment actions', async () => {
+  it('exposes three PIX journeys without a duplicate upload action', async () => {
     const props = createProps()
     const user = userEvent.setup()
 
     render(<HomeScreen {...props} />)
 
-    const scanButton = screen.getByRole('button', { name: 'Scan to Pay' })
-    const pasteButton = screen.getByRole('button', { name: 'Paste PIX code' })
-    const uploadButton = screen.getByRole('button', { name: 'Upload QR image' })
-    const manualButton = screen.getByRole('button', { name: 'Manual Payment' })
+    const scanButton = screen.getByRole('button', { name: 'Scan PIX QR' })
+    const pasteButton = screen.getByRole('button', { name: 'PIX Copy & Paste' })
+    const manualButton = screen.getByRole('button', { name: 'Pay with PIX key' })
 
+    expect(screen.getByText('Use camera or image')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Upload QR image' })).not.toBeInTheDocument()
     expect(screen.queryByText('Scan or paste')).not.toBeInTheDocument()
 
     await user.click(scanButton)
     await user.click(pasteButton)
-    await user.click(uploadButton)
     await user.click(manualButton)
 
     expect(props.onScanQr).toHaveBeenCalledOnce()
     expect(props.onPasteQr).toHaveBeenCalledOnce()
-    expect(props.onUploadQr).toHaveBeenCalledOnce()
     expect(props.onGoToManual).toHaveBeenCalledOnce()
   })
 })

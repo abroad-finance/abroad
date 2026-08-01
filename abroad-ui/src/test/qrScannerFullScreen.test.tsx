@@ -64,6 +64,8 @@ describe('QrScannerFullScreen', () => {
 
     render(<QrScannerFullScreen initialMode="camera" onClose={vi.fn()} onResult={onResult} />)
 
+    expect(screen.getByRole('button', { name: 'Upload image' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Paste PIX code' })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Simulate camera scan' }))
 
     expect(onResult).toHaveBeenCalledOnce()
