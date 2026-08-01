@@ -10,7 +10,7 @@ import type { SwapProps } from '../../features/swap/components/Swap'
 import type { ChainOption, TokenOption } from '../../features/swap/components/TokenSelectModal'
 import type { TxDetailItem } from '../../features/swap/constants'
 import type {
-  KycFormValues, KycSubmitOutcome, OnboardingRates, SwapView,
+  KycFormValues, KycSubmitOutcome, OnboardingRates, QrEntryMode, SwapView,
 } from '../../features/swap/types'
 
 import { _36EnumsTargetCurrency as TargetCurrency, type TransactionListItem } from '../../api/index'
@@ -58,7 +58,8 @@ export interface WebSwapControllerProps {
   isWalletDetailsOpen: boolean
   onboardingRates: OnboardingRates
   onWalletConnect: () => Promise<void>
-  openQr: () => void
+  openQr: (entryMode: QrEntryMode) => void
+  qrEntryMode: QrEntryMode
   requestConnectAfterChainSelect: () => void
   resetForNewTransaction: () => void
   selectAssetOption: (key: string) => void
@@ -144,6 +145,7 @@ const WebSwap: React.FC = () => {
     isQrOpen,
     onboardingRates,
     openQr,
+    qrEntryMode,
     requestConnectAfterChainSelect,
     resetForNewTransaction,
     selectAssetOption,
@@ -158,6 +160,9 @@ const WebSwap: React.FC = () => {
     txStatusDetails,
     view,
   } = controller
+
+  const openQrCamera = useCallback(() => openQr('camera'), [openQr])
+  const openQrPaste = useCallback(() => openQr('paste'), [openQr])
 
   // Modal state for connect-wallet chain (must be before navBar, which uses handleConnectWalletClick)
   const [showConnectChainModal, setShowConnectChainModal] = useState(false)
@@ -285,8 +290,9 @@ const WebSwap: React.FC = () => {
                 onGoToManual={goToManual}
                 onHistoryClick={() => setShowHistory(true)}
                 onOpenChainModal={openSourceModal}
-                onOpenQr={openQr}
+                onPasteQr={openQrPaste}
                 onRequestConnect={handleConnectWalletClick}
+                onScanQr={openQrCamera}
                 onSelectCurrency={selectCurrency}
                 onSelectTransaction={tx => setSelectedTx(transactionToTxDetailItem(tx))}
                 recentTransactions={
@@ -434,7 +440,7 @@ const WebSwap: React.FC = () => {
       {/* Full-screen QR Scanner */}
       {isQrOpen && (
         <Suspense fallback={null}>
-          <QrScannerFullScreen onClose={closeQr} onResult={handleQrResult} />
+          <QrScannerFullScreen initialMode={qrEntryMode} onClose={closeQr} onResult={handleQrResult} />
         </Suspense>
       )}
 

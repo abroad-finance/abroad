@@ -51,7 +51,7 @@ import {
   parseStablecoinBalance,
 } from '../../features/swap/lib/stablecoinPortfolio'
 import {
-  type KycFormValues, type KycSubmitOutcome, type OnboardingRates, SwapView,
+  type KycFormValues, type KycSubmitOutcome, type OnboardingRates, type QrEntryMode, SwapView,
 } from '../../features/swap/types'
 import {
   BRL_TRANSFER_FEE,
@@ -89,9 +89,9 @@ type DecodeQrApiResponse = ApiClientResponse<decodeQrCodeBRResponse, DecodeQrCod
 type SwapAction
   = | { accountNumber?: string, pixKey?: string, recipientName?: string, type: 'SET_BANK_DETAILS' }
     | { corridorKey: string, type: 'SET_CORRIDOR' }
+    | { entryMode: QrEntryMode, type: 'OPEN_QR' }
     | { isDecodingQr: boolean, type: 'SET_DECODING' }
     | { isDesktop: boolean, type: 'SET_DESKTOP' }
-    | { isQrOpen: boolean, type: 'SET_QR_OPEN' }
     | { isWalletDetailsOpen: boolean, type: 'SET_WALLET_DETAILS_OPEN' }
     | { loadingSource?: boolean, loadingTarget?: boolean, type: 'SET_LOADING' }
     | { loadingSubmit: boolean, type: 'SET_SUBMITTING' }
@@ -101,6 +101,7 @@ type SwapAction
     | { rates: OnboardingRates, type: 'SET_ONBOARDING_RATES' }
     | { targetCurrency: TargetCurrency, type: 'SET_TARGET_CURRENCY' }
     | { transactionId: null | string, type: 'SET_TRANSACTION_ID' }
+    | { type: 'CLOSE_QR' }
     | { type: 'RESET' }
     | { type: 'SET_VIEW', view: SwapView }
 
@@ -117,6 +118,7 @@ type SwapControllerState = {
   onboardingRates: OnboardingRates
   pixKey: string
   qrCode: null | string
+  qrEntryMode: QrEntryMode
   quoteId: string
   recipientName: string
   sourceAmount: string
@@ -176,6 +178,7 @@ const createInitialState = (isDesktop: boolean): SwapControllerState => ({
   },
   pixKey: '',
   qrCode: null,
+  qrEntryMode: 'camera',
   quoteId: '',
   recipientName: '',
   sourceAmount: '',
@@ -187,8 +190,17 @@ const createInitialState = (isDesktop: boolean): SwapControllerState => ({
 
 const reducer = (state: SwapControllerState, action: SwapAction): SwapControllerState => {
   switch (action.type) {
+    case 'CLOSE_QR':
+      return { ...state, isQrOpen: false }
     case 'HYDRATE':
       return { ...state, ...action.payload }
+    case 'OPEN_QR':
+      return {
+        ...state,
+        isQrOpen: true,
+        qrEntryMode: action.entryMode,
+        targetCurrency: TargetCurrency.BRL,
+      }
     case 'RESET':
       return {
         ...createInitialState(state.isDesktop),
@@ -224,8 +236,6 @@ const reducer = (state: SwapControllerState, action: SwapAction): SwapController
       return { ...state, onboardingRates: action.rates }
     case 'SET_QR_CODE':
       return { ...state, qrCode: action.qrCode }
-    case 'SET_QR_OPEN':
-      return { ...state, isQrOpen: action.isQrOpen }
     case 'SET_SUBMITTING':
       return { ...state, loadingSubmit: action.loadingSubmit }
     case 'SET_TARGET_CURRENCY':
@@ -1323,11 +1333,12 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     void quoteFromTarget(formatted)
   }, [quoteFromTarget])
 
-  const openQr = useCallback(() => {
+  const openQr = useCallback((entryMode: QrEntryMode) => {
     // Always allow opening QR scanner - auth check happens on scan result
-    dispatch({ isQrOpen: true, type: 'SET_QR_OPEN' })
-    dispatch({ targetCurrency: TargetCurrency.BRL, type: 'SET_TARGET_CURRENCY' })
+    dispatch({ entryMode, type: 'OPEN_QR' })
   }, [])
+
+  const closeQr = useCallback(() => dispatch({ type: 'CLOSE_QR' }), [])
 
   const currencyMenuRef = useRef<HTMLDivElement | null>(null)
   const skipNextDocumentClickRef = useRef(false)
@@ -1449,7 +1460,6 @@ export const useWebSwapController = (): WebSwapControllerProps => {
   const resetToHome = useCallback((...extra: SwapAction[]) => {
     localStorage.removeItem(PENDING_TX_KEY)
     dispatch({ type: 'RESET' })
-    dispatch({ isQrOpen: false, type: 'SET_QR_OPEN' })
     for (const action of extra) dispatch(action)
     dispatch({ type: 'SET_VIEW', view: 'home' })
   }, [])
@@ -1498,7 +1508,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
   const handleWalletDetailsClose = useCallback(() => dispatch({ isWalletDetailsOpen: false, type: 'SET_WALLET_DETAILS_OPEN' }), [])
 
   const handleQrResult = useCallback(async (text: string) => {
-    dispatch({ isQrOpen: false, type: 'SET_QR_OPEN' })
+    dispatch({ type: 'CLOSE_QR' })
     dispatch({ qrCode: text, type: 'SET_QR_CODE' })
 
     // Check authentication before processing QR
@@ -2086,7 +2096,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     assetOptions,
     bankDetailsProps,
     chainOptions,
-    closeQr: () => dispatch({ isQrOpen: false, type: 'SET_QR_OPEN' }),
+    closeQr,
     confirmQrProps,
     currentBgUrl,
     goToManual,
@@ -2103,6 +2113,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     onboardingRates: state.onboardingRates,
     onWalletConnect: connectWallet,
     openQr,
+    qrEntryMode: state.qrEntryMode,
     requestConnectAfterChainSelect,
     resetForNewTransaction,
     selectAssetOption,

@@ -34,12 +34,11 @@ describe('QrScannerFullScreen', () => {
     const onResult = vi.fn()
     const user = userEvent.setup()
 
-    render(<QrScannerFullScreen onClose={vi.fn()} onResult={onResult} />)
-
-    await user.click(screen.getByRole('button', { name: 'Paste PIX code' }))
+    render(<QrScannerFullScreen initialMode="paste" onClose={vi.fn()} onResult={onResult} />)
 
     const input = screen.getByLabelText('PIX Copia e Cola code')
     const continueButton = screen.getByRole('button', { name: 'Continue' })
+    expect(screen.queryByRole('button', { name: 'Simulate camera scan' })).not.toBeInTheDocument()
     expect(continueButton).toBeDisabled()
 
     await user.type(input, '  0002010102112636-pix-payload  ')
@@ -53,7 +52,7 @@ describe('QrScannerFullScreen', () => {
     const onResult = vi.fn()
     const user = userEvent.setup()
 
-    render(<QrScannerFullScreen onClose={vi.fn()} onResult={onResult} />)
+    render(<QrScannerFullScreen initialMode="camera" onClose={vi.fn()} onResult={onResult} />)
 
     await user.click(screen.getByRole('button', { name: 'Simulate camera scan' }))
 
@@ -65,9 +64,8 @@ describe('QrScannerFullScreen', () => {
     const onResult = vi.fn().mockRejectedValueOnce(new Error('decode failed'))
     const user = userEvent.setup()
 
-    render(<QrScannerFullScreen onClose={vi.fn()} onResult={onResult} />)
+    render(<QrScannerFullScreen initialMode="paste" onClose={vi.fn()} onResult={onResult} />)
 
-    await user.click(screen.getByRole('button', { name: 'Paste PIX code' }))
     await user.type(screen.getByLabelText('PIX Copia e Cola code'), '000201-pix-payload')
     await user.click(screen.getByRole('button', { name: 'Continue' }))
 

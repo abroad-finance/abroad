@@ -8,10 +8,12 @@ import React, {
   useCallback, useEffect, useRef, useState,
 } from 'react'
 
-type QrEntryMode = 'camera' | 'paste'
+import type { QrEntryMode } from '../types'
+
 type QrResultSource = 'camera' | 'paste'
 
 interface QrScannerFullScreenProps {
+  initialMode: QrEntryMode
   onClose: () => void
   onResult: (text: string) => Promise<void> | void
 }
@@ -40,10 +42,10 @@ const extractScanText = (result: unknown): string => {
   return ''
 }
 
-const QrScannerFullScreen: React.FC<QrScannerFullScreenProps> = ({ onClose, onResult }) => {
+const QrScannerFullScreen: React.FC<QrScannerFullScreenProps> = ({ initialMode, onClose, onResult }) => {
   const { t } = useTranslate()
   const [cameraError, setCameraError] = useState<null | string>(null)
-  const [entryMode, setEntryMode] = useState<QrEntryMode>('camera')
+  const [entryMode, setEntryMode] = useState<QrEntryMode>(initialMode)
   const [isSubmittingPaste, setIsSubmittingPaste] = useState(false)
   const [pasteError, setPasteError] = useState<null | string>(null)
   const [pastedQrCode, setPastedQrCode] = useState('')

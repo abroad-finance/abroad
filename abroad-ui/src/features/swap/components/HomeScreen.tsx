@@ -1,6 +1,6 @@
 import { useTranslate } from '@tolgee/react'
 import {
-  ChevronDown, ChevronRight, Keyboard, Lock, PiggyBank, QrCode, Store, Wallet, Zap,
+  ChevronDown, ChevronRight, ClipboardPaste, Keyboard, Lock, PiggyBank, QrCode, Store, Wallet, Zap,
 } from 'lucide-react'
 import React from 'react'
 
@@ -15,16 +15,14 @@ import {
 } from '@/shared/utils'
 
 import { _36EnumsTargetCurrency as TargetCurrency, type TransactionListItem } from '../../../api'
-import BreBLogo from '../../../assets/Logos/networks/Bre-b.svg'
 
 // Alias for backwards compatibility
 const CHAIN_CONFIG = CHAIN_CONFIG_ARRAY
 const TOKEN_ICON_URL = TOKEN_ICONS
 
-const RAIL_LOGO: Record<string, string> = {
-  BRL: '/pix-white.svg',
-  COP: BreBLogo,
-}
+const PAYMENT_ACTION_CARD_CLASS = 'flex h-full min-h-[clamp(100px,18vh,140px)] w-full flex-col items-center justify-center gap-[clamp(0.25rem,1vh,0.5rem)] rounded-[clamp(1rem,3vh,1.5rem)] p-[clamp(0.5rem,1.5vw,1rem)] text-center transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3ca383] focus-visible:ring-offset-2'
+const PAYMENT_ACTION_ICON_CLASS = 'flex h-[clamp(2.5rem,8vh,4rem)] w-[clamp(2.5rem,8vh,4rem)] shrink-0 items-center justify-center rounded-[clamp(0.5rem,1.5vh,0.875rem)]'
+const PAYMENT_ACTION_LABEL_CLASS = 'text-[clamp(0.75rem,1.8vw+0.4vh,1.05rem)] font-bold leading-tight'
 
 const TRUST_BADGE_DATA = [
   { defaultLabel: '< 3s settlement', i18nKey: 'home.trust_settlement' as const, Icon: Zap },
@@ -44,8 +42,9 @@ export interface HomeScreenProps {
   onGoToManual: () => void
   onHistoryClick: () => void
   onOpenChainModal?: () => void
-  onOpenQr: () => void
+  onPasteQr: () => void
   onRequestConnect: () => void
+  onScanQr: () => void
   onSelectCurrency?: (currency: TargetCurrency) => void
   onSelectTransaction?: (tx: TransactionListItem) => void
   recentTransactions: TransactionListItem[]
@@ -66,8 +65,9 @@ export default function HomeScreen({
   onGoToManual,
   onHistoryClick,
   onOpenChainModal,
-  onOpenQr,
+  onPasteQr,
   onRequestConnect,
+  onScanQr,
   onSelectCurrency,
   onSelectTransaction,
   recentTransactions,
@@ -267,6 +267,8 @@ export default function HomeScreen({
   // Helper to check if we should show transactions section.
   // Only the user's own (scoped) transactions are shown — never partner-wide data.
   const hasTransactions = isAuthenticated && recentTransactions.length > 0
+  const pasteQrLabel = t('home.paste_pix_code', 'Paste PIX code')
+  const scanQrLabel = t('home.scan_to_pay', 'Scan to Pay')
 
   return (
     <div className="flex w-full h-full flex-col items-center px-0 overflow-y-auto">
@@ -363,34 +365,58 @@ export default function HomeScreen({
           )}
         </div>
 
-        {/* Payment cards - Figma 1:71, 2 cols equal height, responsive */}
-        <div className="mt-[clamp(0.75rem,2.5vh,1.5rem)] grid grid-cols-2 gap-[clamp(0.5rem,1.5vw,0.75rem)] items-stretch">
+        {/* Payment actions: scan, paste PIX, or enter payment details manually. */}
+        <div className="mt-[clamp(0.75rem,2.5vh,1.5rem)] grid grid-cols-3 items-stretch gap-[clamp(0.375rem,1.25vw,0.75rem)]">
           <button
+            aria-label={scanQrLabel}
             className={cn(
-              'flex h-full min-h-[clamp(100px,18vh,140px)] w-full flex-col items-center justify-center gap-[clamp(0.25rem,1vh,0.5rem)] rounded-[clamp(1rem,3vh,1.5rem)] p-[clamp(0.75rem,2vh,1rem)] text-center transition-all',
+              PAYMENT_ACTION_CARD_CLASS,
               isAuthenticated
                 ? 'bg-[#3ca383] shadow-[0px_0px_15px_0px_rgba(16,185,129,0.3)] hover:opacity-95'
                 : 'bg-[#3ca383]/80 hover:bg-[#3ca383]',
             )}
-            onClick={onOpenQr}
+            onClick={onScanQr}
             type="button"
           >
-            <div className="flex h-[clamp(2.5rem,8vh,4rem)] w-[clamp(2.5rem,8vh,4rem)] shrink-0 items-center justify-center rounded-[clamp(0.5rem,1.5vh,0.875rem)] bg-white/20 backdrop-blur-[2px]">
+            <div className={cn(PAYMENT_ACTION_ICON_CLASS, 'bg-white/20 backdrop-blur-[2px]')}>
               <QrCode className="h-full w-full p-[clamp(0.375rem,1.5vh,0.5rem)] text-white" strokeWidth={1.5} />
             </div>
-            <span className="text-[clamp(0.8rem,2vw+0.5vh,1.125rem)] font-bold leading-tight text-white">
-              {t('home.scan_or_paste', 'Scan or paste')}
+            <span className={cn(PAYMENT_ACTION_LABEL_CLASS, 'text-white')}>
+              {scanQrLabel}
             </span>
             <img
-              alt={targetCurrency === TargetCurrency.BRL ? 'PIX' : 'Bre-B'}
+              alt=""
               className="h-[clamp(0.875rem,2.5vh,1rem)] w-auto shrink-0"
-              src={RAIL_LOGO[targetCurrency]}
+              src="/pix-white.svg"
             />
           </button>
 
           <button
+            aria-label={pasteQrLabel}
             className={cn(
-              'flex h-full min-h-[clamp(100px,18vh,140px)] w-full flex-col items-center justify-center gap-[clamp(0.25rem,1vh,0.5rem)] rounded-[clamp(1rem,3vh,1.5rem)] p-[clamp(0.75rem,2vh,1rem)] text-center transition-all',
+              PAYMENT_ACTION_CARD_CLASS,
+              'border border-[#3ca383]/40 bg-[var(--ab-bg-card)] shadow-[0px_4px_10px_rgba(16,185,129,0.08)] hover:border-[#3ca383]/70 hover:shadow-md',
+            )}
+            onClick={onPasteQr}
+            type="button"
+          >
+            <div className={cn(PAYMENT_ACTION_ICON_CLASS, 'bg-[#3ca383]/15')}>
+              <ClipboardPaste
+                className="h-full w-full p-[clamp(0.375rem,1.5vh,0.5rem)] text-[#3ca383]"
+                strokeWidth={1.5}
+              />
+            </div>
+            <span className={cn(PAYMENT_ACTION_LABEL_CLASS, 'text-[var(--ab-text)]')}>
+              {pasteQrLabel}
+            </span>
+            <span className="rounded bg-[#3ca383] px-1.5 py-0.5 text-[0.625rem] font-extrabold uppercase leading-none tracking-[0.08em] text-white">
+              PIX
+            </span>
+          </button>
+
+          <button
+            className={cn(
+              PAYMENT_ACTION_CARD_CLASS,
               isAuthenticated
                 ? 'bg-[var(--ab-bg-card)] shadow-[0px_4px_6px_-1px_rgba(0,0,0,0.02),0px_2px_4px_-1px_rgba(0,0,0,0.02)] hover:shadow-md'
                 : 'bg-[var(--ab-bg-subtle)] border border-[var(--ab-border)]',
@@ -398,13 +424,13 @@ export default function HomeScreen({
             onClick={onGoToManual}
             type="button"
           >
-            <div className="flex h-[clamp(2.5rem,8vh,4rem)] w-[clamp(2.5rem,8vh,4rem)] shrink-0 items-center justify-center rounded-[clamp(0.5rem,1.5vh,0.875rem)] bg-[var(--ab-bg-subtle)]">
+            <div className={cn(PAYMENT_ACTION_ICON_CLASS, 'bg-[var(--ab-bg-subtle)]')}>
               <Keyboard
                 className="h-full w-full p-[clamp(0.375rem,1.5vh,0.5rem)] text-[var(--ab-text-secondary)]"
                 strokeWidth={1.5}
               />
             </div>
-            <span className="text-[clamp(0.8rem,2vw+0.5vh,1.125rem)] font-bold leading-tight text-[var(--ab-text)]">
+            <span className={cn(PAYMENT_ACTION_LABEL_CLASS, 'text-[var(--ab-text)]')}>
               {t('home.manual_payment', 'Manual Payment')}
             </span>
           </button>

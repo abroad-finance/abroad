@@ -257,6 +257,26 @@ afterEach(() => {
 })
 
 describe('useWebSwapController', () => {
+  it('opens the PIX surface in the requested entry mode', async () => {
+    const { result } = renderHook(() => useWebSwapController(), { wrapper: Wrapper })
+
+    await act(async () => {
+      await Promise.resolve()
+      await mocked.fetchPublicCorridorsMock.mock.results[0]?.value
+    })
+
+    act(() => result.current.openQr('paste'))
+
+    expect(result.current.isQrOpen).toBe(true)
+    expect(result.current.qrEntryMode).toBe('paste')
+
+    act(() => result.current.closeQr())
+    expect(result.current.isQrOpen).toBe(false)
+
+    act(() => result.current.openQr('camera'))
+    expect(result.current.qrEntryMode).toBe('camera')
+  })
+
   it('aborts stale quote requests', async () => {
     const { result } = renderHook(() => useWebSwapController(), { wrapper: Wrapper })
 
