@@ -28,11 +28,31 @@ export type OpsPartner = {
   phone?: string
 }
 
+export type OpsPartnerCompletedVolume = {
+  completedTransactions: number
+  payout: OpsPartnerPayoutVolume[]
+  source: OpsPartnerSourceVolume[]
+}
+
+export type OpsPartnerListItem = OpsPartner & {
+  completedVolume: OpsPartnerCompletedVolume
+}
+
 export type OpsPartnerListResponse = {
-  items: OpsPartner[]
+  items: OpsPartnerListItem[]
   page: number
   pageSize: number
   total: number
+}
+
+export type OpsPartnerPayoutVolume = {
+  amount: number
+  currency: 'BRL' | 'COP'
+}
+
+export type OpsPartnerSourceVolume = {
+  amount: number
+  currency: 'USDC' | 'USDT'
 }
 
 export type OpsRotatePartnerApiKeyResponse = {

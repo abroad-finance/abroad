@@ -1,5 +1,5 @@
 import 'reflect-metadata'
-import { Prisma } from '@prisma/client'
+import { CryptoCurrency, Prisma, TargetCurrency, TransactionStatus } from '@prisma/client'
 
 import type { IDatabaseClientProvider } from '../../../../platform/persistence/IDatabaseClientProvider'
 
@@ -32,6 +32,28 @@ type PartnerUpdateData = {
   apiKey?: null | string
   clientDomain?: null | string
   clientDomainHash?: null | string
+}
+
+type QuoteDelegateMock = {
+  groupBy: jest.MockedFunction<(args: QuoteGroupByArgs) => Promise<QuoteVolumeGroup[]>>
+}
+
+type QuoteGroupByArgs = {
+  _count: { _all: true }
+  _sum: { sourceAmount: true, targetAmount: true }
+  by: ['partnerId', 'cryptoCurrency', 'targetCurrency']
+  where: {
+    partnerId: { in: string[] }
+    transaction: { is: { status: TransactionStatus } }
+  }
+}
+
+type QuoteVolumeGroup = {
+  _count: { _all: number }
+  _sum: { sourceAmount: null | number, targetAmount: null | number }
+  cryptoCurrency: CryptoCurrency
+  partnerId: string
+  targetCurrency: TargetCurrency
 }
 
 const basePartner = (overrides?: Partial<PartnerModel>): PartnerModel => ({
@@ -82,26 +104,58 @@ const buildPartnerMock = (): PartnerDelegateMock => {
   }
 }
 
+const buildQuoteMock = (): QuoteDelegateMock => ({
+  groupBy: jest.fn(async (_args: QuoteGroupByArgs): Promise<QuoteVolumeGroup[]> => {
+    void _args
+    return []
+  }),
+})
+
 describe('OpsPartnerService', () => {
   let partner: PartnerDelegateMock
+  let quote: QuoteDelegateMock
   let dbProvider: IDatabaseClientProvider
   let service: OpsPartnerService
 
   beforeEach(() => {
     jest.resetAllMocks()
     partner = buildPartnerMock()
+    quote = buildQuoteMock()
     dbProvider = {
-      getClient: jest.fn(async () => ({ partner }) as unknown as import('@prisma/client').PrismaClient),
+      getClient: jest.fn(async () => ({ partner, quote }) as unknown as import('@prisma/client').PrismaClient),
     }
     service = new OpsPartnerService(dbProvider)
   })
 
-  it('lists partners with hasApiKey projection and client domain', async () => {
+  it('lists partners with completed volumes grouped by source and payout currency', async () => {
     partner.findMany.mockResolvedValueOnce([
       basePartner({ apiKey: 'hashed-a', clientDomain: 'app.abroad.finance', id: 'partner-a' }),
       basePartner({ apiKey: null, clientDomain: null, id: 'partner-b' }),
     ])
     partner.count.mockResolvedValueOnce(2)
+    quote.groupBy.mockResolvedValueOnce([
+      {
+        _count: { _all: 2 },
+        _sum: { sourceAmount: 15.12345678, targetAmount: 75.6 },
+        cryptoCurrency: CryptoCurrency.USDC,
+        partnerId: 'partner-a',
+        targetCurrency: TargetCurrency.BRL,
+      },
+      {
+        _count: { _all: 1 },
+        _sum: { sourceAmount: 5, targetAmount: 21_000 },
+        cryptoCurrency: CryptoCurrency.USDC,
+        partnerId: 'partner-a',
+        targetCurrency: TargetCurrency.COP,
+      },
+      {
+        _count: { _all: 3 },
+        _sum: { sourceAmount: 10.25, targetAmount: 51.23 },
+        cryptoCurrency: CryptoCurrency.USDT,
+        partnerId: 'partner-a',
+        targetCurrency: TargetCurrency.BRL,
+      },
+    ])
 
     const result = await service.listPartners({ page: 2, pageSize: 1 })
 
@@ -110,15 +164,45 @@ describe('OpsPartnerService', () => {
       skip: 1,
       take: 1,
     })
+    expect(quote.groupBy).toHaveBeenCalledWith({
+      _count: { _all: true },
+      _sum: {
+        sourceAmount: true,
+        targetAmount: true,
+      },
+      by: ['partnerId', 'cryptoCurrency', 'targetCurrency'],
+      where: {
+        partnerId: { in: ['partner-a', 'partner-b'] },
+        transaction: {
+          is: { status: TransactionStatus.PAYMENT_COMPLETED },
+        },
+      },
+    })
     expect(result).toEqual({
       items: [
         expect.objectContaining({
           clientDomain: 'app.abroad.finance',
+          completedVolume: {
+            completedTransactions: 6,
+            payout: [
+              { amount: 126.83, currency: TargetCurrency.BRL },
+              { amount: 21_000, currency: TargetCurrency.COP },
+            ],
+            source: [
+              { amount: 20.123457, currency: CryptoCurrency.USDC },
+              { amount: 10.25, currency: CryptoCurrency.USDT },
+            ],
+          },
           hasApiKey: true,
           id: 'partner-a',
         }),
         expect.objectContaining({
           clientDomain: undefined,
+          completedVolume: {
+            completedTransactions: 0,
+            payout: [],
+            source: [],
+          },
           hasApiKey: false,
           id: 'partner-b',
         }),
@@ -126,6 +210,21 @@ describe('OpsPartnerService', () => {
       page: 2,
       pageSize: 1,
       total: 2,
+    })
+  })
+
+  it('does not query completed volume when the requested page has no partners', async () => {
+    partner.findMany.mockResolvedValueOnce([])
+    partner.count.mockResolvedValueOnce(22)
+
+    const result = await service.listPartners({ page: 3, pageSize: 10 })
+
+    expect(quote.groupBy).not.toHaveBeenCalled()
+    expect(result).toEqual({
+      items: [],
+      page: 3,
+      pageSize: 10,
+      total: 22,
     })
   })
 

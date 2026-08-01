@@ -1,4 +1,11 @@
-import { Partner, Prisma } from '@prisma/client'
+import {
+  CryptoCurrency,
+  type Partner,
+  Prisma,
+  type PrismaClient,
+  TargetCurrency,
+  TransactionStatus,
+} from '@prisma/client'
 import { inject, injectable } from 'inversify'
 
 import { TYPES } from '../../../app/container/types'
@@ -10,6 +17,12 @@ const API_KEY_RETRY_ATTEMPTS = 5
 
 export type OpsPartnerClientDomainInput = {
   clientDomain: null | string
+}
+
+export type OpsPartnerCompletedVolume = {
+  completedTransactions: number
+  payout: OpsPartnerPayoutVolume[]
+  source: OpsPartnerSourceVolume[]
 }
 
 export type OpsPartnerCreateInput = {
@@ -27,21 +40,35 @@ export type OpsPartnerCreateResult = {
   partner: OpsPartnerSummary
 }
 
+export type OpsPartnerListItem = OpsPartnerSummary & {
+  completedVolume: OpsPartnerCompletedVolume
+}
+
 export type OpsPartnerListParams = {
   page: number
   pageSize: number
 }
 
 export type OpsPartnerListResult = {
-  items: OpsPartnerSummary[]
+  items: OpsPartnerListItem[]
   page: number
   pageSize: number
   total: number
 }
 
+export type OpsPartnerPayoutVolume = {
+  amount: number
+  currency: TargetCurrency
+}
+
 export type OpsPartnerRotateApiKeyResult = {
   apiKey: string
   partner: OpsPartnerSummary
+}
+
+export type OpsPartnerSourceVolume = {
+  amount: number
+  currency: CryptoCurrency
 }
 
 export type OpsPartnerSummary = {
@@ -59,6 +86,12 @@ export type OpsPartnerSummary = {
   phone?: string
 }
 
+type MutablePartnerVolume = {
+  completedTransactions: number
+  payout: Map<TargetCurrency, number>
+  source: Map<CryptoCurrency, number>
+}
+
 export class OpsPartnerNotFoundError extends Error {
   constructor(message: string) {
     super(message)
@@ -72,6 +105,26 @@ export class OpsPartnerValidationError extends Error {
     this.name = 'OpsPartnerValidationError'
   }
 }
+
+const roundAmount = (value: number): number => (
+  Math.round((value + Number.EPSILON) * 1_000_000) / 1_000_000
+)
+
+const addAmount = <TCurrency extends string>(
+  amounts: Map<TCurrency, number>,
+  currency: TCurrency,
+  amount: number,
+): void => {
+  amounts.set(currency, (amounts.get(currency) ?? 0) + amount)
+}
+
+const toSortedAmounts = <TCurrency extends string>(
+  amounts: Map<TCurrency, number>,
+): Array<{ amount: number, currency: TCurrency }> => (
+  [...amounts.entries()]
+    .map(([currency, amount]) => ({ amount: roundAmount(amount), currency }))
+    .sort((left, right) => left.currency.localeCompare(right.currency))
+)
 
 @injectable()
 export class OpsPartnerService {
@@ -145,9 +198,16 @@ export class OpsPartnerService {
       }),
       prisma.partner.count(),
     ])
+    const completedVolumeByPartner = await this.readCompletedVolume(
+      prisma,
+      partners.map(partner => partner.id),
+    )
 
     return {
-      items: partners.map(partner => this.toSummary(partner)),
+      items: partners.map(partner => ({
+        ...this.toSummary(partner),
+        completedVolume: completedVolumeByPartner.get(partner.id) ?? this.emptyCompletedVolume(),
+      })),
       page: params.page,
       pageSize: params.pageSize,
       total,
@@ -234,6 +294,14 @@ export class OpsPartnerService {
     }
   }
 
+  private emptyCompletedVolume(): OpsPartnerCompletedVolume {
+    return {
+      completedTransactions: 0,
+      payout: [],
+      source: [],
+    }
+  }
+
   private isNotFoundError(error: unknown): boolean {
     return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025'
   }
@@ -263,6 +331,52 @@ export class OpsPartnerService {
       const message = error instanceof Error ? error.message : 'Client domain is invalid'
       throw new OpsPartnerValidationError(message)
     }
+  }
+
+  private async readCompletedVolume(
+    prisma: PrismaClient,
+    partnerIds: string[],
+  ): Promise<Map<string, OpsPartnerCompletedVolume>> {
+    if (partnerIds.length === 0) return new Map()
+
+    const rows = await prisma.quote.groupBy({
+      _count: { _all: true },
+      _sum: {
+        sourceAmount: true,
+        targetAmount: true,
+      },
+      by: ['partnerId', 'cryptoCurrency', 'targetCurrency'],
+      where: {
+        partnerId: { in: partnerIds },
+        transaction: {
+          is: { status: TransactionStatus.PAYMENT_COMPLETED },
+        },
+      },
+    })
+    const mutableByPartner = new Map<string, MutablePartnerVolume>()
+
+    for (const row of rows) {
+      const volume = mutableByPartner.get(row.partnerId) ?? {
+        completedTransactions: 0,
+        payout: new Map<TargetCurrency, number>(),
+        source: new Map<CryptoCurrency, number>(),
+      }
+      volume.completedTransactions += row._count._all
+      addAmount(volume.source, row.cryptoCurrency, row._sum.sourceAmount ?? 0)
+      addAmount(volume.payout, row.targetCurrency, row._sum.targetAmount ?? 0)
+      mutableByPartner.set(row.partnerId, volume)
+    }
+
+    return new Map(
+      [...mutableByPartner.entries()].map(([partnerId, volume]) => [
+        partnerId,
+        {
+          completedTransactions: volume.completedTransactions,
+          payout: toSortedAmounts(volume.payout),
+          source: toSortedAmounts(volume.source),
+        },
+      ]),
+    )
   }
 
   private toSummary(partner: Partner): OpsPartnerSummary {

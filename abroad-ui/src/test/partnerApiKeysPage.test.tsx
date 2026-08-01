@@ -87,6 +87,11 @@ describe('PartnerApiKeys page', () => {
     mocked.listPartners.mockResolvedValue({
       items: [{
         clientDomain: 'old.abroad.finance',
+        completedVolume: {
+          completedTransactions: 3,
+          payout: [{ amount: 1_500, currency: 'BRL' }, { amount: 23_000, currency: 'COP' }],
+          source: [{ amount: 303.12, currency: 'USDC' }, { amount: 12.5, currency: 'USDT' }],
+        },
         createdAt: new Date('2024-01-01T00:00:00.000Z').toISOString(),
         email: 'acme@example.com',
         firstName: 'Ada',
@@ -151,6 +156,9 @@ describe('PartnerApiKeys page', () => {
     )
 
     await screen.findByText('Acme')
+    expect(screen.getByText('3 completed transactions')).toBeInTheDocument()
+    expect(screen.getByText('303.12 USDC · 12.5 USDT')).toBeInTheDocument()
+    expect(screen.getByText('1,500.00 BRL · 23,000.00 COP')).toBeInTheDocument()
 
     const user = userEvent.setup()
     await user.click(screen.getByRole('button', { name: 'Rotate Key' }))
@@ -187,5 +195,6 @@ describe('PartnerApiKeys page', () => {
       expect(mocked.revokePartnerApiKey).toHaveBeenCalledWith('partner-1')
     })
     expect(screen.getByText('Revoked')).toBeInTheDocument()
+    expect(screen.getByText('3 completed transactions')).toBeInTheDocument()
   })
 })

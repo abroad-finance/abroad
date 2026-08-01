@@ -46,7 +46,14 @@ const buildService = (): jest.Mocked<OpsPartnerServiceMock> => ({
   listPartners: jest.fn(async (_params) => {
     void _params
     return {
-      items: [buildPartnerSummary()],
+      items: [{
+        ...buildPartnerSummary(),
+        completedVolume: {
+          completedTransactions: 2,
+          payout: [{ amount: 500, currency: 'BRL' as const }],
+          source: [{ amount: 100, currency: 'USDC' as const }],
+        },
+      }],
       page: 1,
       pageSize: 20,
       total: 1,
@@ -115,6 +122,11 @@ describe('OpsPartnerController', () => {
     expect(badRequest).not.toHaveBeenCalled()
     expect(service.listPartners).toHaveBeenCalledWith({ page: 1, pageSize: 20 })
     expect(response.items).toHaveLength(1)
+    expect(response.items[0]?.completedVolume).toEqual({
+      completedTransactions: 2,
+      payout: [{ amount: 500, currency: 'BRL' }],
+      source: [{ amount: 100, currency: 'USDC' }],
+    })
   })
 
   it('returns 400 for invalid create payload', async () => {

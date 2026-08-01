@@ -10,9 +10,16 @@ import {
   rotatePartnerApiKey,
   updatePartnerClientDomain,
 } from '../../services/admin/partnerAdminApi'
-import { OpsCreatePartnerInput, OpsPartner } from '../../services/admin/partnerTypes'
 import {
+  OpsCreatePartnerInput,
+  OpsPartner,
+  OpsPartnerCompletedVolume,
+  OpsPartnerListItem,
+} from '../../services/admin/partnerTypes'
+import {
+  formatAmount,
   formatDateTime,
+  formatMoney,
   OpsEmptyState,
   OpsField,
   OpsLoading,
@@ -65,9 +72,50 @@ const buildActionKey = (
   partnerId: string,
 ): string => `${action}:${partnerId}`
 
+const CompletedVolume = ({ volume }: { volume: OpsPartnerCompletedVolume }) => {
+  const transactionLabel = volume.completedTransactions === 1 ? 'transaction' : 'transactions'
+
+  if (volume.completedTransactions === 0) {
+    return (
+      <div className="min-w-[180px] text-xs text-ops-muted">
+        No completed volume
+      </div>
+    )
+  }
+
+  const source = volume.source
+    .map(item => `${formatAmount(item.amount)} ${item.currency}`)
+    .join(' · ')
+  const payout = volume.payout
+    .map(item => formatMoney(item.amount, item.currency))
+    .join(' · ')
+
+  return (
+    <div className="min-w-[180px] space-y-1.5">
+      <div className="font-semibold text-ops-text">
+        {volume.completedTransactions.toLocaleString('en-US')}
+        {' '}
+        completed
+        {' '}
+        {transactionLabel}
+      </div>
+      <div className="text-xs leading-relaxed text-ops-muted">
+        <span className="font-medium text-ops-text">Received</span>
+        {' '}
+        {source || '—'}
+      </div>
+      <div className="text-xs leading-relaxed text-ops-muted">
+        <span className="font-medium text-ops-text">Paid out</span>
+        {' '}
+        {payout || '—'}
+      </div>
+    </div>
+  )
+}
+
 const PartnerApiKeys = () => {
   const opsApiKey = useOpsApiKey()
-  const [partners, setPartners] = useState<OpsPartner[]>([])
+  const [partners, setPartners] = useState<OpsPartnerListItem[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(false)
@@ -127,7 +175,9 @@ const PartnerApiKeys = () => {
 
   const updatePartnerRecord = useCallback((nextPartner: OpsPartner) => {
     setPartners(current => current.map(item => (
-      item.id === nextPartner.id ? nextPartner : item
+      item.id === nextPartner.id
+        ? { ...item, ...nextPartner, clientDomain: nextPartner.clientDomain }
+        : item
     )))
   }, [])
 
@@ -294,7 +344,7 @@ const PartnerApiKeys = () => {
       error={error}
       eyebrow="Operations"
       keyRequiredMessage="Ops API key required to manage partners."
-      subtitle="Create partner accounts, issue one-time API keys, rotate compromised keys, revoke access, and manage trusted browser domains."
+      subtitle="Track completed volume by partner, create accounts, manage trusted browser domains, and control API-key access."
       title="Partners & API Keys"
       width="full"
     >
@@ -440,12 +490,13 @@ const PartnerApiKeys = () => {
           </div>
 
           <div className="mt-4 overflow-x-auto">
-            <table className="w-full min-w-[980px] text-sm">
+            <table className="w-full min-w-[1180px] text-sm">
               <thead>
                 <tr className="text-left text-xs uppercase tracking-wider text-ops-muted">
                   <th className="px-2 py-2" scope="col">Partner</th>
                   <th className="px-2 py-2" scope="col">Contact</th>
                   <th className="px-2 py-2" scope="col">Client Domain</th>
+                  <th className="px-2 py-2" scope="col">Completed Volume</th>
                   <th className="px-2 py-2" scope="col">Created</th>
                   <th className="px-2 py-2" scope="col">API Key</th>
                   <th className="px-2 py-2" scope="col">Actions</th>
@@ -502,6 +553,9 @@ const PartnerApiKeys = () => {
                                 </div>
                               </div>
                             )}
+                      </td>
+                      <td className="px-2 py-3 align-top">
+                        <CompletedVolume volume={partner.completedVolume} />
                       </td>
                       <td className="px-2 py-3 align-top text-xs text-ops-muted">{formatDateTime(partner.createdAt)}</td>
                       <td className="px-2 py-3 align-top">
