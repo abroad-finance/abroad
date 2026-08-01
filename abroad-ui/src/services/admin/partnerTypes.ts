@@ -32,6 +32,7 @@ export type OpsPartnerCompletedVolume = {
   completedTransactions: number
   payout: OpsPartnerPayoutVolume[]
   source: OpsPartnerSourceVolume[]
+  stablecoinAmount: number
 }
 
 export type OpsPartnerListItem = OpsPartner & {
@@ -40,6 +41,7 @@ export type OpsPartnerListItem = OpsPartner & {
 
 export type OpsPartnerListResponse = {
   items: OpsPartnerListItem[]
+  maximumStablecoinAmount: number
   page: number
   pageSize: number
   total: number

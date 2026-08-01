@@ -22,8 +22,12 @@ type PartnerCreateData = {
 type PartnerDelegateMock = {
   count: jest.MockedFunction<() => Promise<number>>
   create: jest.MockedFunction<(args: { data: PartnerCreateData }) => Promise<PartnerModel>>
-  findMany: jest.MockedFunction<(args: { orderBy: { createdAt: 'desc' }, skip: number, take: number }) => Promise<PartnerModel[]>>
+  findMany: jest.MockedFunction<(args: PartnerFindManyArgs) => Promise<PartnerModel[]>>
   update: jest.MockedFunction<(args: { data: PartnerUpdateData, where: { id: string } }) => Promise<PartnerModel>>
+}
+
+type PartnerFindManyArgs = {
+  where: { id: { in: string[] } }
 }
 
 type PartnerModel = import('@prisma/client').Partner
@@ -54,6 +58,11 @@ type QuoteVolumeGroup = {
   cryptoCurrency: CryptoCurrency
   partnerId: string
   targetCurrency: TargetCurrency
+}
+
+type RankedPartnerRow = {
+  id: string
+  maximumStablecoinAmount: number
 }
 
 const basePartner = (overrides?: Partial<PartnerModel>): PartnerModel => ({
@@ -90,7 +99,7 @@ const buildPartnerMock = (): PartnerDelegateMock => {
       phone: typeof data.phone === 'string' ? data.phone : null,
     })),
     findMany: jest.fn(async (
-      _args: { orderBy: { createdAt: 'desc' }, skip: number, take: number },
+      _args: PartnerFindManyArgs,
     ): Promise<PartnerModel[]> => {
       void _args
       return []
@@ -114,6 +123,7 @@ const buildQuoteMock = (): QuoteDelegateMock => ({
 describe('OpsPartnerService', () => {
   let partner: PartnerDelegateMock
   let quote: QuoteDelegateMock
+  let queryRaw: jest.MockedFunction<(query: Prisma.Sql) => Promise<RankedPartnerRow[]>>
   let dbProvider: IDatabaseClientProvider
   let service: OpsPartnerService
 
@@ -121,16 +131,28 @@ describe('OpsPartnerService', () => {
     jest.resetAllMocks()
     partner = buildPartnerMock()
     quote = buildQuoteMock()
+    queryRaw = jest.fn(async (_query: Prisma.Sql): Promise<RankedPartnerRow[]> => {
+      void _query
+      return []
+    })
     dbProvider = {
-      getClient: jest.fn(async () => ({ partner, quote }) as unknown as import('@prisma/client').PrismaClient),
+      getClient: jest.fn(async () => ({
+        $queryRaw: queryRaw,
+        partner,
+        quote,
+      }) as unknown as import('@prisma/client').PrismaClient),
     }
     service = new OpsPartnerService(dbProvider)
   })
 
   it('lists partners with completed volumes grouped by source and payout currency', async () => {
+    queryRaw.mockResolvedValueOnce([
+      { id: 'partner-a', maximumStablecoinAmount: 42.12345678 },
+      { id: 'partner-b', maximumStablecoinAmount: 42.12345678 },
+    ])
     partner.findMany.mockResolvedValueOnce([
-      basePartner({ apiKey: 'hashed-a', clientDomain: 'app.abroad.finance', id: 'partner-a' }),
       basePartner({ apiKey: null, clientDomain: null, id: 'partner-b' }),
+      basePartner({ apiKey: 'hashed-a', clientDomain: 'app.abroad.finance', id: 'partner-a' }),
     ])
     partner.count.mockResolvedValueOnce(2)
     quote.groupBy.mockResolvedValueOnce([
@@ -160,10 +182,16 @@ describe('OpsPartnerService', () => {
     const result = await service.listPartners({ page: 2, pageSize: 1 })
 
     expect(partner.findMany).toHaveBeenCalledWith({
-      orderBy: { createdAt: 'desc' },
-      skip: 1,
-      take: 1,
+      where: { id: { in: ['partner-a', 'partner-b'] } },
     })
+    const rankingQuery = queryRaw.mock.calls[0]?.[0]
+    expect(rankingQuery?.sql).toContain('ORDER BY')
+    expect(rankingQuery?.sql).toContain('MAX("stablecoinAmount") OVER ()')
+    expect(rankingQuery?.values).toEqual([
+      TransactionStatus.PAYMENT_COMPLETED,
+      1,
+      1,
+    ])
     expect(quote.groupBy).toHaveBeenCalledWith({
       _count: { _all: true },
       _sum: {
@@ -192,6 +220,7 @@ describe('OpsPartnerService', () => {
               { amount: 20.123457, currency: CryptoCurrency.USDC },
               { amount: 10.25, currency: CryptoCurrency.USDT },
             ],
+            stablecoinAmount: 30.373457,
           },
           hasApiKey: true,
           id: 'partner-a',
@@ -202,11 +231,13 @@ describe('OpsPartnerService', () => {
             completedTransactions: 0,
             payout: [],
             source: [],
+            stablecoinAmount: 0,
           },
           hasApiKey: false,
           id: 'partner-b',
         }),
       ],
+      maximumStablecoinAmount: 42.123457,
       page: 2,
       pageSize: 1,
       total: 2,
@@ -214,14 +245,16 @@ describe('OpsPartnerService', () => {
   })
 
   it('does not query completed volume when the requested page has no partners', async () => {
-    partner.findMany.mockResolvedValueOnce([])
     partner.count.mockResolvedValueOnce(22)
 
     const result = await service.listPartners({ page: 3, pageSize: 10 })
 
+    expect(queryRaw).toHaveBeenCalledTimes(1)
+    expect(partner.findMany).not.toHaveBeenCalled()
     expect(quote.groupBy).not.toHaveBeenCalled()
     expect(result).toEqual({
       items: [],
+      maximumStablecoinAmount: 0,
       page: 3,
       pageSize: 10,
       total: 22,

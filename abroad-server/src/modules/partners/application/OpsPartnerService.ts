@@ -23,6 +23,7 @@ export type OpsPartnerCompletedVolume = {
   completedTransactions: number
   payout: OpsPartnerPayoutVolume[]
   source: OpsPartnerSourceVolume[]
+  stablecoinAmount: number
 }
 
 export type OpsPartnerCreateInput = {
@@ -51,6 +52,7 @@ export type OpsPartnerListParams = {
 
 export type OpsPartnerListResult = {
   items: OpsPartnerListItem[]
+  maximumStablecoinAmount: number
   page: number
   pageSize: number
   total: number
@@ -90,6 +92,17 @@ type MutablePartnerVolume = {
   completedTransactions: number
   payout: Map<TargetCurrency, number>
   source: Map<CryptoCurrency, number>
+  stablecoinAmount: number
+}
+
+type RankedPartnerPage = {
+  ids: string[]
+  maximumStablecoinAmount: number
+}
+
+type RankedPartnerRow = {
+  id: string
+  maximumStablecoinAmount: number
 }
 
 export class OpsPartnerNotFoundError extends Error {
@@ -190,24 +203,43 @@ export class OpsPartnerService {
     const prisma = await this.dbProvider.getClient()
     const skip = (params.page - 1) * params.pageSize
 
-    const [partners, total] = await Promise.all([
-      prisma.partner.findMany({
-        orderBy: { createdAt: 'desc' },
-        skip,
-        take: params.pageSize,
-      }),
+    const [rankedPartnerPage, total] = await Promise.all([
+      this.readRankedPartnerPage(prisma, skip, params.pageSize),
       prisma.partner.count(),
     ])
-    const completedVolumeByPartner = await this.readCompletedVolume(
-      prisma,
-      partners.map(partner => partner.id),
-    )
+    const rankedPartnerIds = rankedPartnerPage.ids
+
+    if (rankedPartnerIds.length === 0) {
+      return {
+        items: [],
+        maximumStablecoinAmount: 0,
+        page: params.page,
+        pageSize: params.pageSize,
+        total,
+      }
+    }
+
+    const [unorderedPartners, completedVolumeByPartner] = await Promise.all([
+      prisma.partner.findMany({
+        where: { id: { in: rankedPartnerIds } },
+      }),
+      this.readCompletedVolume(prisma, rankedPartnerIds),
+    ])
+    const partnerById = new Map(unorderedPartners.map(partner => [partner.id, partner]))
+    const partners = rankedPartnerIds.map((partnerId) => {
+      const partner = partnerById.get(partnerId)
+      if (!partner) {
+        throw new Error(`Ranked partner ${partnerId} was not returned by the database`)
+      }
+      return partner
+    })
 
     return {
       items: partners.map(partner => ({
         ...this.toSummary(partner),
         completedVolume: completedVolumeByPartner.get(partner.id) ?? this.emptyCompletedVolume(),
       })),
+      maximumStablecoinAmount: roundAmount(rankedPartnerPage.maximumStablecoinAmount),
       page: params.page,
       pageSize: params.pageSize,
       total,
@@ -299,6 +331,7 @@ export class OpsPartnerService {
       completedTransactions: 0,
       payout: [],
       source: [],
+      stablecoinAmount: 0,
     }
   }
 
@@ -360,9 +393,12 @@ export class OpsPartnerService {
         completedTransactions: 0,
         payout: new Map<TargetCurrency, number>(),
         source: new Map<CryptoCurrency, number>(),
+        stablecoinAmount: 0,
       }
+      const sourceAmount = row._sum.sourceAmount ?? 0
       volume.completedTransactions += row._count._all
-      addAmount(volume.source, row.cryptoCurrency, row._sum.sourceAmount ?? 0)
+      volume.stablecoinAmount += sourceAmount
+      addAmount(volume.source, row.cryptoCurrency, sourceAmount)
       addAmount(volume.payout, row.targetCurrency, row._sum.targetAmount ?? 0)
       mutableByPartner.set(row.partnerId, volume)
     }
@@ -374,9 +410,50 @@ export class OpsPartnerService {
           completedTransactions: volume.completedTransactions,
           payout: toSortedAmounts(volume.payout),
           source: toSortedAmounts(volume.source),
+          stablecoinAmount: roundAmount(volume.stablecoinAmount),
         },
       ]),
     )
+  }
+
+  private async readRankedPartnerPage(
+    prisma: PrismaClient,
+    skip: number,
+    take: number,
+  ): Promise<RankedPartnerPage> {
+    const rows = await prisma.$queryRaw<RankedPartnerRow[]>(Prisma.sql`
+      WITH partner_volume AS (
+        SELECT
+          partner."id",
+          partner."createdAt",
+          COALESCE(
+            SUM(quote."sourceAmount") FILTER (WHERE completed_transaction."id" IS NOT NULL),
+            0
+          ) AS "stablecoinAmount"
+        FROM "Partner" AS partner
+        LEFT JOIN "Quote" AS quote
+          ON quote."partnerId" = partner."id"
+        LEFT JOIN "Transaction" AS completed_transaction
+          ON completed_transaction."quoteId" = quote."id"
+          AND completed_transaction."status" = ${TransactionStatus.PAYMENT_COMPLETED}::"TransactionStatus"
+        GROUP BY partner."id", partner."createdAt"
+      )
+      SELECT
+        "id",
+        MAX("stablecoinAmount") OVER () AS "maximumStablecoinAmount"
+      FROM partner_volume
+      ORDER BY
+        "stablecoinAmount" DESC,
+        "createdAt" DESC,
+        "id" ASC
+      LIMIT ${take}
+      OFFSET ${skip}
+    `)
+
+    return {
+      ids: rows.map(row => row.id),
+      maximumStablecoinAmount: rows[0]?.maximumStablecoinAmount ?? 0,
+    }
   }
 
   private toSummary(partner: Partner): OpsPartnerSummary {

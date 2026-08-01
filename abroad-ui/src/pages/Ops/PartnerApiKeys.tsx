@@ -72,42 +72,126 @@ const buildActionKey = (
   partnerId: string,
 ): string => `${action}:${partnerId}`
 
-const CompletedVolume = ({ volume }: { volume: OpsPartnerCompletedVolume }) => {
-  const transactionLabel = volume.completedTransactions === 1 ? 'transaction' : 'transactions'
+type CompletedVolumeProps = {
+  maximumAmount: number
+  rank: number
+  volume: OpsPartnerCompletedVolume
+}
 
-  if (volume.completedTransactions === 0) {
-    return (
-      <div className="min-w-[180px] text-xs text-ops-muted">
-        No completed volume
-      </div>
-    )
-  }
+const readSourceAmount = (
+  volume: OpsPartnerCompletedVolume,
+  currency: 'USDC' | 'USDT',
+): number => volume.source.find(item => item.currency === currency)?.amount ?? 0
 
-  const source = volume.source
+const CompletedVolume = ({ maximumAmount, rank, volume }: CompletedVolumeProps) => {
+  const usdcAmount = readSourceAmount(volume, 'USDC')
+  const usdtAmount = readSourceAmount(volume, 'USDT')
+  const sourceAmount = usdcAmount + usdtAmount
+  const totalWidth = maximumAmount > 0
+    ? Math.min(100, Math.max(0, (volume.stablecoinAmount / maximumAmount) * 100))
+    : 0
+  const usdcWidth = sourceAmount > 0 ? (usdcAmount / sourceAmount) * totalWidth : 0
+  const usdtWidth = sourceAmount > 0 ? totalWidth - usdcWidth : 0
+  const sourceBreakdown = volume.source
     .map(item => `${formatAmount(item.amount)} ${item.currency}`)
-    .join(' · ')
-  const payout = volume.payout
-    .map(item => formatMoney(item.amount, item.currency))
-    .join(' · ')
+    .join(', ')
+  const meterLabel = `Rank ${rank}: ${formatAmount(volume.stablecoinAmount)} USD stablecoins across ${volume.completedTransactions.toLocaleString('en-US')} completed transactions${sourceBreakdown ? `; ${sourceBreakdown}` : ''}`
+  const rankClassName = rank <= 3
+    ? 'border-amber-200 bg-amber-50 text-amber-800'
+    : 'border-ops-border bg-stone-50 text-ops-muted'
 
   return (
-    <div className="min-w-[180px] space-y-1.5">
-      <div className="font-semibold text-ops-text">
-        {volume.completedTransactions.toLocaleString('en-US')}
-        {' '}
-        completed
-        {' '}
-        {transactionLabel}
+    <div className="min-w-[240px] space-y-2.5">
+      <div className="flex items-center gap-3">
+        <div
+          aria-label={`Volume rank ${rank}`}
+          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border text-xs font-bold tabular-nums ${rankClassName}`}
+        >
+          #
+          {rank}
+        </div>
+        <div className="min-w-0">
+          <div className="flex items-baseline gap-1.5">
+            <span className="text-lg font-semibold tabular-nums text-ops-text">
+              {formatAmount(volume.stablecoinAmount)}
+            </span>
+            <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-ops-label">
+              USD stablecoins
+            </span>
+          </div>
+          <div className="text-xs text-ops-muted">
+            {volume.completedTransactions.toLocaleString('en-US')}
+            {' '}
+            completed
+          </div>
+        </div>
       </div>
-      <div className="text-xs leading-relaxed text-ops-muted">
-        <span className="font-medium text-ops-text">Received</span>
-        {' '}
-        {source || '—'}
+
+      <svg
+        aria-label={meterLabel}
+        className="block h-2.5 w-full overflow-visible"
+        preserveAspectRatio="none"
+        role="img"
+        viewBox="0 0 100 8"
+      >
+        <rect className="fill-stone-200" height="8" rx="4" width="100" x="0" y="0" />
+        {usdcWidth > 0 && (
+          <rect
+            className="fill-ops-brand"
+            data-currency="USDC"
+            height="8"
+            rx={usdtWidth > 0 ? 0 : 4}
+            width={usdcWidth}
+            x="0"
+            y="0"
+          />
+        )}
+        {usdtWidth > 0 && (
+          <rect
+            className="fill-amber-400"
+            data-currency="USDT"
+            height="8"
+            rx="4"
+            width={usdtWidth}
+            x={usdcWidth}
+            y="0"
+          />
+        )}
+      </svg>
+
+      <div className="flex flex-wrap gap-1.5">
+        {volume.source.map(item => (
+          <span
+            className="inline-flex items-center gap-1.5 rounded-full border border-ops-border bg-white px-2 py-1 text-[11px] font-medium tabular-nums text-ops-text"
+            key={item.currency}
+          >
+            <span
+              aria-hidden="true"
+              className={`h-2 w-2 rounded-full ${item.currency === 'USDC' ? 'bg-ops-brand' : 'bg-amber-400'}`}
+            />
+            {formatAmount(item.amount)}
+            {' '}
+            {item.currency}
+          </span>
+        ))}
+        {volume.source.length === 0 && (
+          <span className="rounded-full border border-dashed border-ops-border px-2 py-1 text-[11px] text-ops-muted">
+            No completed volume
+          </span>
+        )}
       </div>
-      <div className="text-xs leading-relaxed text-ops-muted">
-        <span className="font-medium text-ops-text">Paid out</span>
-        {' '}
-        {payout || '—'}
+
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-ops-label">Paid</span>
+        {volume.payout.map(item => (
+          <span
+            className="rounded-full bg-stone-100 px-2 py-1 text-[11px] font-medium tabular-nums text-ops-muted"
+            key={item.currency}
+          >
+            {formatMoney(item.amount, item.currency)}
+          </span>
+        ))}
+        {volume.payout.length === 0 && <span className="text-[11px] text-ops-muted">—</span>}
       </div>
     </div>
   )
@@ -116,6 +200,7 @@ const CompletedVolume = ({ volume }: { volume: OpsPartnerCompletedVolume }) => {
 const PartnerApiKeys = () => {
   const opsApiKey = useOpsApiKey()
   const [partners, setPartners] = useState<OpsPartnerListItem[]>([])
+  const [maximumStablecoinAmount, setMaximumStablecoinAmount] = useState(0)
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(false)
@@ -133,6 +218,7 @@ const PartnerApiKeys = () => {
   const loadPartners = useCallback(async (targetPage: number = page) => {
     if (!opsApiKey) {
       setPartners([])
+      setMaximumStablecoinAmount(0)
       setTotal(0)
       setLoading(false)
       return
@@ -143,6 +229,7 @@ const PartnerApiKeys = () => {
     try {
       const response = await listPartners({ page: targetPage, pageSize })
       setPartners(response.items)
+      setMaximumStablecoinAmount(response.maximumStablecoinAmount)
       setTotal(response.total)
     }
     catch (loadError) {
@@ -344,7 +431,7 @@ const PartnerApiKeys = () => {
       error={error}
       eyebrow="Operations"
       keyRequiredMessage="Ops API key required to manage partners."
-      subtitle="Track completed volume by partner, create accounts, manage trusted browser domains, and control API-key access."
+      subtitle="Partners are ranked by completed USD-stablecoin volume. Manage accounts, trusted browser domains, and API-key access in the same view."
       title="Partners & API Keys"
       width="full"
     >
@@ -490,20 +577,23 @@ const PartnerApiKeys = () => {
           </div>
 
           <div className="mt-4 overflow-x-auto">
-            <table className="w-full min-w-[1180px] text-sm">
+            <table className="w-full min-w-[1240px] text-sm">
               <thead>
                 <tr className="text-left text-xs uppercase tracking-wider text-ops-muted">
                   <th className="px-2 py-2" scope="col">Partner</th>
                   <th className="px-2 py-2" scope="col">Contact</th>
                   <th className="px-2 py-2" scope="col">Client Domain</th>
-                  <th className="px-2 py-2" scope="col">Completed Volume</th>
+                  <th className="px-2 py-2" scope="col">
+                    <div>Completed Volume</div>
+                    <div className="mt-0.5 normal-case tracking-normal">Highest first</div>
+                  </th>
                   <th className="px-2 py-2" scope="col">Created</th>
                   <th className="px-2 py-2" scope="col">API Key</th>
                   <th className="px-2 py-2" scope="col">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {partners.map((partner) => {
+                {partners.map((partner, index) => {
                   const isEditing = editingPartnerId === partner.id
                   const partnerBusy = isPartnerBusy(partner.id)
                   const saveDomainKey = buildActionKey('save-domain', partner.id)
@@ -555,7 +645,11 @@ const PartnerApiKeys = () => {
                             )}
                       </td>
                       <td className="px-2 py-3 align-top">
-                        <CompletedVolume volume={partner.completedVolume} />
+                        <CompletedVolume
+                          maximumAmount={maximumStablecoinAmount}
+                          rank={((page - 1) * pageSize) + index + 1}
+                          volume={partner.completedVolume}
+                        />
                       </td>
                       <td className="px-2 py-3 align-top text-xs text-ops-muted">{formatDateTime(partner.createdAt)}</td>
                       <td className="px-2 py-3 align-top">

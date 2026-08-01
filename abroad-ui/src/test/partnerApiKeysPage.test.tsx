@@ -1,4 +1,6 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import {
+  render, screen, waitFor, within,
+} from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import {
@@ -39,6 +41,7 @@ describe('PartnerApiKeys page', () => {
 
     mocked.listPartners.mockResolvedValue({
       items: [],
+      maximumStablecoinAmount: 0,
       page: 1,
       pageSize: 20,
       total: 0,
@@ -91,6 +94,7 @@ describe('PartnerApiKeys page', () => {
           completedTransactions: 3,
           payout: [{ amount: 1_500, currency: 'BRL' }, { amount: 23_000, currency: 'COP' }],
           source: [{ amount: 303.12, currency: 'USDC' }, { amount: 12.5, currency: 'USDT' }],
+          stablecoinAmount: 315.62,
         },
         createdAt: new Date('2024-01-01T00:00:00.000Z').toISOString(),
         email: 'acme@example.com',
@@ -102,6 +106,7 @@ describe('PartnerApiKeys page', () => {
         name: 'Acme',
         needsKyc: true,
       }],
+      maximumStablecoinAmount: 315.62,
       page: 1,
       pageSize: 20,
       total: 1,
@@ -156,9 +161,14 @@ describe('PartnerApiKeys page', () => {
     )
 
     await screen.findByText('Acme')
-    expect(screen.getByText('3 completed transactions')).toBeInTheDocument()
-    expect(screen.getByText('303.12 USDC · 12.5 USDT')).toBeInTheDocument()
-    expect(screen.getByText('1,500.00 BRL · 23,000.00 COP')).toBeInTheDocument()
+    expect(screen.getByLabelText('Volume rank 1')).toBeInTheDocument()
+    expect(screen.getByRole('img', {
+      name: 'Rank 1: 315.62 USD stablecoins across 3 completed transactions; 303.12 USDC, 12.5 USDT',
+    })).toBeInTheDocument()
+    expect(screen.getByText('303.12 USDC')).toBeInTheDocument()
+    expect(screen.getByText('12.5 USDT')).toBeInTheDocument()
+    expect(screen.getByText('1,500.00 BRL')).toBeInTheDocument()
+    expect(screen.getByText('23,000.00 COP')).toBeInTheDocument()
 
     const user = userEvent.setup()
     await user.click(screen.getByRole('button', { name: 'Rotate Key' }))
@@ -195,6 +205,61 @@ describe('PartnerApiKeys page', () => {
       expect(mocked.revokePartnerApiKey).toHaveBeenCalledWith('partner-1')
     })
     expect(screen.getByText('Revoked')).toBeInTheDocument()
-    expect(screen.getByText('3 completed transactions')).toBeInTheDocument()
+    expect(screen.getByText('315.62')).toBeInTheDocument()
+  })
+
+  it('renders partners in server-ranked order with proportional visual rails', async () => {
+    setOpsApiKey('ops_key')
+
+    mocked.listPartners.mockResolvedValue({
+      items: [{
+        completedVolume: {
+          completedTransactions: 9,
+          payout: [{ amount: 4_500, currency: 'BRL' }],
+          source: [{ amount: 900, currency: 'USDC' }],
+          stablecoinAmount: 900,
+        },
+        createdAt: new Date('2024-01-01T00:00:00.000Z').toISOString(),
+        hasApiKey: true,
+        id: 'partner-high',
+        isKybApproved: false,
+        name: 'High Volume',
+        needsKyc: true,
+      }, {
+        completedVolume: {
+          completedTransactions: 2,
+          payout: [{ amount: 500, currency: 'BRL' }],
+          source: [{ amount: 50, currency: 'USDC' }, { amount: 50, currency: 'USDT' }],
+          stablecoinAmount: 100,
+        },
+        createdAt: new Date('2024-02-01T00:00:00.000Z').toISOString(),
+        hasApiKey: true,
+        id: 'partner-low',
+        isKybApproved: false,
+        name: 'Lower Volume',
+        needsKyc: true,
+      }],
+      maximumStablecoinAmount: 900,
+      page: 1,
+      pageSize: 20,
+      total: 2,
+    })
+
+    render(
+      <MemoryRouter>
+        <PartnerApiKeys />
+      </MemoryRouter>,
+    )
+
+    await screen.findByText('High Volume')
+    const rows = screen.getAllByRole('row').slice(1)
+    expect(within(rows[0]).getByText('High Volume')).toBeInTheDocument()
+    expect(within(rows[0]).getByLabelText('Volume rank 1')).toBeInTheDocument()
+    expect(within(rows[1]).getByText('Lower Volume')).toBeInTheDocument()
+    expect(within(rows[1]).getByLabelText('Volume rank 2')).toBeInTheDocument()
+
+    const leaderRail = within(rows[0]).getByRole('img', { name: /Rank 1: 900 USD stablecoins/ })
+    expect(leaderRail.querySelector('[data-currency="USDC"]')).toHaveAttribute('width', '100')
+    expect(within(rows[1]).getByRole('img', { name: /Rank 2: 100 USD stablecoins/ })).toBeInTheDocument()
   })
 })
