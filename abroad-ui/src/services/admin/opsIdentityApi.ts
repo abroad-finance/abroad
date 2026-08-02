@@ -157,7 +157,13 @@ const initializeOpsAuth = async (): Promise<Auth> => {
 }
 
 const getOpsAuth = (): Promise<Auth> => {
-  authPromise ??= initializeOpsAuth()
+  authPromise ??= initializeOpsAuth().catch((error: unknown) => {
+    // Identity-provider recovery must remain possible after a transient config,
+    // SDK, or network failure. Caching a rejected promise would otherwise make
+    // the emergency legacy path await the same permanent rejection forever.
+    authPromise = null
+    throw error
+  })
   return authPromise
 }
 

@@ -610,7 +610,7 @@ const OpsControlTower = () => {
               <button
                 aria-pressed={range === option.value}
                 className={cn(
-                  'rounded-lg px-3 py-1.5 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ops-brand/50',
+                  'min-h-11 rounded-lg px-3 py-1.5 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ops-brand/50',
                   range === option.value ? 'bg-ops-brand text-white' : 'text-ops-muted hover:bg-white hover:text-ops-text',
                 )}
                 key={option.value}

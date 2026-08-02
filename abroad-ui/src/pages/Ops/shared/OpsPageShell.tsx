@@ -155,12 +155,18 @@ const ShellTopbar = () => {
           <span aria-hidden className="size-1.5 rounded-full bg-emerald-500" />
           Production
         </span>
-        <Link className="ops-topbar-link" to="/ops/search">
+        <Link aria-label="Search operations" className="ops-topbar-link" to="/ops/search">
           <Search aria-hidden size={17} />
           <span className="hidden sm:inline">Search</span>
           <kbd className="hidden rounded border border-ops-border bg-white px-1.5 py-0.5 text-[10px] font-normal text-ops-muted xl:inline">⌘ K</kbd>
         </Link>
-        <Link className="ops-topbar-link" to="/ops/incidents">
+        <Link
+          aria-label={incidentCount === null
+            ? 'Open Incident Center'
+            : `Open Incident Center, ${incidentCount} active ${incidentCount === 1 ? 'incident' : 'incidents'}`}
+          className="ops-topbar-link"
+          to="/ops/incidents"
+        >
           <Bell aria-hidden size={17} />
           <span className="hidden sm:inline">Incidents</span>
           {incidentCount !== null && (

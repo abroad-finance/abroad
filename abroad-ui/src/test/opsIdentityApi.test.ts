@@ -170,4 +170,29 @@ describe('opsIdentityApi', () => {
     expect(firebaseMocks.signOut).toHaveBeenCalled()
     expect(getOpsAuthState().session).toBeNull()
   })
+
+  test('keeps emergency legacy access usable after identity initialization fails', async () => {
+    vi.resetModules()
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url.endsWith('/ops/auth/config')) {
+        return jsonResponse({ reason: 'Identity configuration is temporarily unavailable' }, 503)
+      }
+      throw new Error(`Unhandled request: ${url}`)
+    }))
+
+    const isolatedStore = await import('../services/admin/opsAuthStore')
+    const isolatedIdentity = await import('../services/admin/opsIdentityApi')
+    isolatedStore.setOpsApiKey('emergency-key')
+
+    await expect(isolatedIdentity.restoreOpsSession()).rejects.toThrow(
+      'Identity configuration is temporarily unavailable',
+    )
+
+    const headers = await isolatedIdentity.getOpsCredentialHeaders()
+    expect(headers.get('x-ops-api-key')).toBe('emergency-key')
+    expect(headers.has('authorization')).toBe(false)
+    isolatedStore.clearOpsApiKey()
+    isolatedStore.setOpsSession(null)
+  })
 })

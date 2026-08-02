@@ -128,6 +128,8 @@ describe('task-oriented Ops shell', () => {
     expect(screen.getByTestId('ops-compact-session')).toHaveTextContent('Ana Administrator')
     expect(screen.queryByRole('heading', { name: 'Sign in with your Abroad account' })).not.toBeInTheDocument()
     expect(screen.getAllByText('Production').length).toBeGreaterThan(0)
+    expect(screen.getByRole('link', { name: 'Search operations' })).toHaveAttribute('href', '/ops/search')
+    expect(screen.getByRole('link', { name: 'Open Incident Center, 3 active incidents' })).toHaveAttribute('href', '/ops/incidents')
     expect(screen.getAllByLabelText('3 active incidents')).toHaveLength(1)
     expect(screen.getByLabelText('Live data. Refresh shell status')).toBeInTheDocument()
     await waitFor(() => expect(document.title).toBe('Control Tower | Abroad Ops'))
