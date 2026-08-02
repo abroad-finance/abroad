@@ -87,7 +87,7 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({
   const chainPillChain = selectedChainKey ? chainPillChainFromKey(selectedChainKey) : null
   const showChainPill = isConnected && chainPillChain && selectedTokenLabel && onOpenChainModal
 
-  const actionButtons = (
+  const renderActionButtons = (includeDesktopControls: boolean) => (
     <>
       {onToggleTheme && (
         <button
@@ -99,7 +99,7 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({
           {isDark ? <Sun className="w-4.5 h-4.5" /> : <Moon className="w-4.5 h-4.5" />}
         </button>
       )}
-      {isConnected && onSelectCurrency && targetCurrency && (
+      {includeDesktopControls && isConnected && onSelectCurrency && targetCurrency && (
         <div className="hidden md:block">
           <CurrencyToggle
             onChange={onSelectCurrency}
@@ -107,7 +107,7 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({
           />
         </div>
       )}
-      {showChainPill && chainPillChain && (
+      {includeDesktopControls && showChainPill && chainPillChain && (
         <ChainPill
           chain={chainPillChain}
           className="hidden md:flex"
@@ -187,7 +187,7 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({
                 {labels.connectWallet}
               </button>
             )}
-            {actionButtons}
+            {renderActionButtons(false)}
           </div>
         </div>
       </div>
@@ -212,7 +212,7 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({
               {labels.connectWallet}
             </button>
           )}
-          {actionButtons}
+          {renderActionButtons(true)}
         </div>
       </div>
     </nav>

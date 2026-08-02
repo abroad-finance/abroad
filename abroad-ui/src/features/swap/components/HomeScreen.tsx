@@ -6,6 +6,7 @@ import React from 'react'
 
 import type { OnboardingRates } from '@/features/swap/types'
 
+import BreBLogo from '@/assets/Logos/networks/Bre-b.svg'
 import { CurrencyToggle } from '@/components/ui'
 import {
   CHAIN_CONFIG_ARRAY, CHAIN_MAP, COUNTRIES, CURRENCY_FLAG_URL, RECENT_COUNTRY_CONFIG, TOKEN_ICONS,
@@ -267,10 +268,17 @@ export default function HomeScreen({
   // Helper to check if we should show transactions section.
   // Only the user's own (scoped) transactions are shown — never partner-wide data.
   const hasTransactions = isAuthenticated && recentTransactions.length > 0
-  const pasteQrLabel = t('home.pix_copy_paste', 'PIX Copy & Paste')
-  const pixKeyLabel = t('home.pay_with_pix_key', 'Pay with PIX key')
+  const isPixRail = targetCurrency === TargetCurrency.BRL
+  const pasteQrLabel = isPixRail
+    ? t('home.pix_copy_paste', 'PIX Copy & Paste')
+    : t('home.breb_copy_paste', 'BRE-B Copy & Paste')
+  const paymentKeyLabel = isPixRail
+    ? t('home.pay_with_pix_key', 'Pay with PIX key')
+    : t('home.pay_with_breb_key', 'Pay with BRE-B key')
   const scanQrHint = t('home.scan_pix_qr_hint', 'Use camera or image')
-  const scanQrLabel = t('home.scan_pix_qr', 'Scan PIX QR')
+  const scanQrLabel = isPixRail
+    ? t('home.scan_pix_qr', 'Scan PIX QR')
+    : t('home.scan_breb_qr', 'Scan BRE-B QR')
 
   return (
     <div className="flex w-full h-full flex-col items-center px-0 overflow-y-auto">
@@ -361,13 +369,14 @@ export default function HomeScreen({
           )}
           {onSelectCurrency && (
             <CurrencyToggle
+              className={cn(isAuthenticated && 'md:hidden')}
               onChange={c => onSelectCurrency(c)}
               value={targetCurrency}
             />
           )}
         </div>
 
-        {/* Payment journeys: QR, Copia e Cola, or Pix key. Image upload remains inside the QR journey. */}
+        {/* Payment journeys for the selected local rail: QR, copy/paste, or recipient key. */}
         <div className="mt-[clamp(0.75rem,2.5vh,1.5rem)] grid grid-cols-2 items-stretch gap-[clamp(0.375rem,1.25vw,0.75rem)] sm:grid-cols-4">
           <button
             aria-label={scanQrLabel}
@@ -394,8 +403,11 @@ export default function HomeScreen({
             </span>
             <img
               alt=""
-              className="h-[clamp(1rem,2.5vh,1.25rem)] w-auto shrink-0"
-              src="/pix-white.svg"
+              className={cn(
+                'h-[clamp(1rem,2.5vh,1.25rem)] w-auto shrink-0',
+                !isPixRail && 'rounded bg-white px-1 py-0.5',
+              )}
+              src={isPixRail ? '/pix-white.svg' : BreBLogo}
             />
           </button>
 
@@ -420,7 +432,7 @@ export default function HomeScreen({
           </button>
 
           <button
-            aria-label={pixKeyLabel}
+            aria-label={paymentKeyLabel}
             className={cn(
               PAYMENT_ACTION_CARD_CLASS,
               isAuthenticated
@@ -437,7 +449,7 @@ export default function HomeScreen({
               />
             </div>
             <span className={cn(PAYMENT_ACTION_LABEL_CLASS, 'text-[var(--ab-text)]')}>
-              {pixKeyLabel}
+              {paymentKeyLabel}
             </span>
           </button>
         </div>
