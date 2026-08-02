@@ -31,12 +31,13 @@ import {
   revokePartnerAiConnection,
   testPartnerAiConnection,
 } from '../../services/partnerPortal/partnerPortalApi'
+import {
+  PARTNER_AI_DOCUMENTATION_URL,
+  PARTNER_AI_MCP_RESOURCE_URL,
+} from '../../services/partnerPortal/partnerAiConfiguration'
 import { usePartnerPortalSession } from '../../services/partnerPortal/partnerPortalSessionStore'
 import { formatPartnerDateTime } from './partnerPortalPresentation'
 import { PartnerConfirmDialog, PartnerNotice } from './partnerPortalUi'
-
-const MCP_URL = 'https://api.abroad.finance/mcp'
-const DOCUMENTATION_URL = 'https://api.abroad.finance/ai-integration'
 
 const entryPointFromLocation = (): PartnerAiProductEventInput['entryPoint'] => {
   const source = new URLSearchParams(window.location.search).get('from')
@@ -245,7 +246,7 @@ const PartnerAiIntegration = () => {
             {t('partner.ai.intro', 'Connect Abroad to compatible AI assistants for documentation, request validation, transaction visibility, and webhook diagnostics.')}
           </p>
         </div>
-        <a className="partner-button-secondary" href={DOCUMENTATION_URL} rel="noreferrer" target="_blank">
+        <a className="partner-button-secondary" href={PARTNER_AI_DOCUMENTATION_URL} rel="noreferrer" target="_blank">
           {t('partner.ai.documentation', 'Read the setup guide')}
           <ExternalLink aria-hidden className="h-4 w-4" />
         </a>
@@ -262,8 +263,8 @@ const PartnerAiIntegration = () => {
             </div>
           </div>
           <div className="mt-6 flex flex-col gap-3 rounded-2xl border border-partner-border bg-partner-ledger p-4 sm:flex-row sm:items-center">
-            <code className="min-w-0 flex-1 break-all text-sm font-semibold text-partner-ink">{MCP_URL}</code>
-            <button className="partner-button-secondary shrink-0" onClick={() => void copy('mcp-url', MCP_URL, t('partner.ai.copy_announcement', 'MCP connection address copied.'))} type="button">
+            <code className="min-w-0 flex-1 break-all text-sm font-semibold text-partner-ink">{PARTNER_AI_MCP_RESOURCE_URL}</code>
+            <button className="partner-button-secondary shrink-0" onClick={() => void copy('mcp-url', PARTNER_AI_MCP_RESOURCE_URL, t('partner.ai.copy_announcement', 'MCP connection address copied.'))} type="button">
               {copiedValue === 'mcp-url' ? <Check aria-hidden className="h-4 w-4" /> : <Copy aria-hidden className="h-4 w-4" />}
               {copiedValue === 'mcp-url' ? t('partner.ai.copied', 'Copied') : t('partner.ai.copy_address', 'Copy address')}
             </button>

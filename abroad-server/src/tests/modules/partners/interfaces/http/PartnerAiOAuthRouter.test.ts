@@ -75,7 +75,7 @@ describe('PartnerAiOAuthRouter', () => {
       await expect(protectedResource.json()).resolves.toEqual(expect.objectContaining({
         authorization_servers: ['https://api.abroad.finance'],
         resource: 'https://api.abroad.finance/mcp',
-        resource_documentation: 'https://api.abroad.finance/ai-integration',
+        resource_documentation: 'https://abroad-docs.web.app/ai-integration',
       }))
       await expect(authorizationServer.json()).resolves.toEqual(expect.objectContaining({
         authorization_endpoint: 'https://api.abroad.finance/oauth/authorize',

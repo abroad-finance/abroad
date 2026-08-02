@@ -6,6 +6,7 @@ import type { PartnerAiAccessPrincipal } from './PartnerAiTokenService'
 import { quoteRequestSchema, reverseQuoteRequestSchema } from '../../quotes/interfaces/http/contracts'
 import { PartnerTransactionDetailDto, PartnerTransactionListResponse, PartnerTransactionQueryService, PartnerTransactionSearchFilters } from '../../transactions/application/PartnerTransactionQueryService'
 import { acceptTransactionRequestSchema } from '../../transactions/interfaces/http/contracts'
+import { PARTNER_AI_DOCUMENTATION_ORIGIN, PARTNER_AI_DOCUMENTATION_URL } from './partnerAiConfiguration'
 import { PartnerAiWebhookDiagnostics, PartnerAiWebhookDiagnosticsService } from './PartnerAiWebhookDiagnosticsService'
 
 export const partnerAiValidationOperations = [
@@ -45,37 +46,37 @@ const documentationCatalog: readonly DocumentationEntry[] = [
     excerpt: 'Connect a compatible AI client with Abroad OAuth, review read-only permissions, test the connection, and revoke it from the partner portal.',
     keywords: ['ai', 'mcp', 'oauth', 'connect', 'assistant', 'permissions', 'revoke'],
     title: 'Connect Abroad to AI',
-    url: 'https://api.abroad.finance/ai-integration',
+    url: PARTNER_AI_DOCUMENTATION_URL,
   },
   {
     excerpt: 'Create and authenticate a production partner workspace, verify email, enable MFA, and manage integration access.',
     keywords: ['workspace', 'signup', 'email', 'mfa', 'administrator', 'production'],
     title: 'Self-service setup',
-    url: 'https://api.abroad.finance/self-service-setup',
+    url: `${PARTNER_AI_DOCUMENTATION_ORIGIN}/self-service-setup`,
   },
   {
     excerpt: 'Authenticate public API requests with a scoped production API key created in the partner portal.',
     keywords: ['authentication', 'api', 'key', 'scope', 'header'],
     title: 'Authentication',
-    url: 'https://api.abroad.finance/authentication',
+    url: `${PARTNER_AI_DOCUMENTATION_ORIGIN}/authentication`,
   },
   {
     excerpt: 'Create a quote, accept a transaction, send funds on the selected network, and track status safely.',
     keywords: ['quickstart', 'quote', 'transaction', 'payout', 'send', 'funds'],
     title: 'Quickstart',
-    url: 'https://api.abroad.finance/quickstart',
+    url: `${PARTNER_AI_DOCUMENTATION_ORIGIN}/quickstart`,
   },
   {
     excerpt: 'Validate webhook signatures, process transaction lifecycle events idempotently, and diagnose delivery failures.',
     keywords: ['webhook', 'signature', 'event', 'delivery', 'retry', 'diagnostics'],
     title: 'Webhooks',
-    url: 'https://api.abroad.finance/reference/webhooks',
+    url: `${PARTNER_AI_DOCUMENTATION_ORIGIN}/reference/webhooks`,
   },
   {
     excerpt: 'Understand awaiting, processing, completed, failed, expired, and wrong-amount transaction states.',
     keywords: ['status', 'lifecycle', 'failed', 'expired', 'completed', 'transaction'],
     title: 'Status lifecycle',
-    url: 'https://api.abroad.finance/workflows/status-lifecycle',
+    url: `${PARTNER_AI_DOCUMENTATION_ORIGIN}/workflows/status-lifecycle`,
   },
 ] as const
 

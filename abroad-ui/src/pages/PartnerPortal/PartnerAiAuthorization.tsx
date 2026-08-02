@@ -27,6 +27,7 @@ import {
   getPartnerAiAuthorizationRequest,
   recordPartnerAiProductEvent,
 } from '../../services/partnerPortal/partnerPortalApi'
+import { PARTNER_AI_DOCUMENTATION_URL } from '../../services/partnerPortal/partnerAiConfiguration'
 import { formatPartnerDateTime } from './partnerPortalPresentation'
 import { PartnerNotice } from './partnerPortalUi'
 
@@ -140,7 +141,7 @@ const PartnerAiAuthorization = () => {
         </p>
         <div className="mt-7 flex flex-col justify-center gap-3 sm:flex-row">
           <Link className="partner-button-primary" to="/partner/integration/ai">{t('partner.ai.authorization.back', 'Back to AI integrations')}</Link>
-          <a className="partner-button-secondary" href="https://api.abroad.finance/ai-integration" rel="noreferrer" target="_blank">
+          <a className="partner-button-secondary" href={PARTNER_AI_DOCUMENTATION_URL} rel="noreferrer" target="_blank">
             {t('partner.ai.documentation', 'Read the setup guide')}
             <ExternalLink aria-hidden className="h-4 w-4" />
           </a>

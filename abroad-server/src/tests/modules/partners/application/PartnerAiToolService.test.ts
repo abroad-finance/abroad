@@ -79,7 +79,7 @@ describe('PartnerAiToolService', () => {
 
     expect(result.results[0]).toEqual(expect.objectContaining({
       title: 'Connect Abroad to AI',
-      url: 'https://api.abroad.finance/ai-integration',
+      url: 'https://abroad-docs.web.app/ai-integration',
     }))
     expect(result.results.length).toBeLessThanOrEqual(5)
     expect(harness.search).not.toHaveBeenCalled()

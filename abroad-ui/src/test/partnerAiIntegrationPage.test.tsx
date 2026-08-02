@@ -92,6 +92,10 @@ describe('PartnerAiIntegration', () => {
     expect(screen.getByText('https://api.abroad.finance/mcp')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Read-only by design' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Other MCP client' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Read the setup guide' })).toHaveAttribute(
+      'href',
+      'https://abroad-docs.web.app/ai-integration',
+    )
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
     expect(await screen.findByText('No AI clients connected')).toBeInTheDocument()
     expect(screen.getByText(/Verify MFA to revoke connected clients/iu)).toBeInTheDocument()

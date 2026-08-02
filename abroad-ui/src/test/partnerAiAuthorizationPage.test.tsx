@@ -183,6 +183,10 @@ describe('PartnerAiAuthorization', () => {
     renderPage(query)
 
     expect(screen.getByRole('heading', { name: title })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Read the setup guide' })).toHaveAttribute(
+      'href',
+      'https://abroad-docs.web.app/ai-integration',
+    )
     expect(mocked.getPartnerAiAuthorizationRequest).not.toHaveBeenCalled()
     await waitFor(() => expect(mocked.recordPartnerAiProductEvent).toHaveBeenCalledWith({
       clientCategory: 'UNSUPPORTED',
