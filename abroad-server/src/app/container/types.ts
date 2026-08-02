@@ -21,6 +21,7 @@ const typeKeys = [
   'ILogger',
   'IPartnerService',
   'IOpsAuthService',
+  'IOpsIdentityProvider',
   'IPaymentService',
   'IPaymentServiceFactory',
   'IPayoutStatusAdapter',

@@ -1,13 +1,12 @@
 import {
   useCallback, useEffect, useMemo, useState,
 } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
 
+import { createOpsConfigurationRelease } from '../../services/admin/configurationReleaseAdminApi'
 import {
-  createFlowDefinition,
   listFlowCorridors,
   listFlowDefinitions,
-  updateFlowCorridor,
-  updateFlowDefinition,
 } from '../../services/admin/flowAdminApi'
 import {
   FlowBusinessStep,
@@ -21,16 +20,21 @@ import {
   PaymentMethod,
   SupportedCurrency,
 } from '../../services/admin/flowTypes'
-import { useOpsApiKey } from '../../services/admin/opsAuthStore'
+import { useOpsApiKey, useOpsSession } from '../../services/admin/opsAuthStore'
 import {
   formatDateTime,
+  humanizeStatus,
+  OpsBanner,
+  OpsDialog,
   OpsEmptyState,
   OpsField,
   OpsLoading,
   OpsPageShell,
   OpsStatusBadge,
   OpsTone,
+  OpsUnsavedChangesGuard,
 } from './shared'
+import { isOpsMutationCancelledError, useOpsMutation } from './shared/opsMutationContext'
 
 const venues: FlowVenue[] = ['BINANCE', 'TRANSFERO']
 const payoutProviders: PaymentMethod[] = ['BREB', 'PIX']
@@ -60,6 +64,7 @@ const corridorStatusTone: Record<FlowCorridorStatus, OpsTone> = {
 type DefinitionDraft = {
   blockchain: string
   cryptoCurrency: string
+  effectiveAt: string
   enabled: boolean
   exchangeFeePct: string
   fixedFee: string
@@ -71,6 +76,7 @@ type DefinitionDraft = {
   pricingProvider: FlowPricingProvider
   steps: FlowBusinessStep[]
   targetCurrency: string
+  version?: number
 }
 
 type ValidationErrorMap = Record<string, string>
@@ -123,6 +129,7 @@ const buildEmptyDraft = (corridor: FlowCorridor): DefinitionDraft => {
   return {
     blockchain: corridor.blockchain,
     cryptoCurrency: corridor.cryptoCurrency,
+    effectiveAt: '',
     enabled: true,
     exchangeFeePct,
     fixedFee: payoutDefaults.fixedFee,
@@ -139,6 +146,7 @@ const buildEmptyDraft = (corridor: FlowCorridor): DefinitionDraft => {
 const fromDefinition = (definition: FlowDefinition): DefinitionDraft => ({
   blockchain: definition.blockchain,
   cryptoCurrency: definition.cryptoCurrency,
+  effectiveAt: '',
   enabled: definition.enabled,
   exchangeFeePct: String(definition.exchangeFeePct ?? 0),
   fixedFee: String(definition.fixedFee ?? 0),
@@ -150,6 +158,7 @@ const fromDefinition = (definition: FlowDefinition): DefinitionDraft => ({
   pricingProvider: definition.pricingProvider,
   steps: definition.steps.length > 0 ? definition.steps : [{ type: 'PAYOUT' }],
   targetCurrency: definition.targetCurrency,
+  version: definition.version,
 })
 
 const parseNumberField = (value: string, fallback: number): number => {
@@ -172,22 +181,39 @@ const isNumeric = (value: string): boolean => {
 
 const isTargetCurrency = (value: SupportedCurrency): boolean => value === 'BRL' || value === 'COP'
 
+type CorridorFilter = 'all' | 'defined' | 'missing' | 'unsupported'
+
+const readCorridorFilter = (params: URLSearchParams): CorridorFilter => {
+  const status = params.get('status')
+  return status === 'defined' || status === 'missing' || status === 'unsupported' ? status : 'all'
+}
+
 const FlowDefinitions = () => {
   const opsApiKey = useOpsApiKey()
+  const session = useOpsSession()
+  const { requestMutation } = useOpsMutation()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const paramsKey = searchParams.toString()
+  const appliedSearch = useMemo(() => new URLSearchParams(paramsKey).get('query') ?? '', [paramsKey])
+  const appliedFilter = useMemo(() => readCorridorFilter(new URLSearchParams(paramsKey)), [paramsKey])
+  const selectedKey = useMemo(() => new URLSearchParams(paramsKey).get('corridor'), [paramsKey])
   const [corridors, setCorridors] = useState<FlowCorridor[]>([])
   const [corridorSummary, setCorridorSummary] = useState<null | { defined: number, missing: number, total: number, unsupported: number }>(null)
   const [definitions, setDefinitions] = useState<FlowDefinition[]>([])
-  const [selectedKey, setSelectedKey] = useState<null | string>(null)
   const [draft, setDraft] = useState<DefinitionDraft | null>(null)
   const [baseline, setBaseline] = useState<null | string>(null)
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<null | string>(null)
   const [validationErrors, setValidationErrors] = useState<ValidationErrorMap>({})
-  const [search, setSearch] = useState('')
-  const [filter, setFilter] = useState<'all' | 'defined' | 'missing' | 'unsupported'>('all')
+  const [searchDraft, setSearchDraft] = useState(appliedSearch)
+  const [filterDraft, setFilterDraft] = useState<CorridorFilter>(appliedFilter)
   const [unsupportedReason, setUnsupportedReason] = useState('')
+  const [supportBaseline, setSupportBaseline] = useState('')
+  const [createdDraft, setCreatedDraft] = useState<null | { id: string, title: string }>(null)
+  const [pendingCorridor, setPendingCorridor] = useState<FlowCorridor | null>(null)
   const [newStepType, setNewStepType] = useState<'CONVERT' | 'MOVE_TO_EXCHANGE' | 'TRANSFER_VENUE'>('MOVE_TO_EXCHANGE')
+  const canManage = Boolean(session?.permissions.includes('configuration:manage'))
 
   const definitionsById = useMemo(() => new Map(definitions.map(def => [def.id, def])), [definitions])
   const corridorByKey = useMemo(() => new Map(corridors.map(corridor => [buildCorridorKey(corridor), corridor])), [corridors])
@@ -199,20 +225,22 @@ const FlowDefinitions = () => {
     return JSON.stringify(draft) !== baseline
   }, [baseline, draft])
 
+  const hasUnsavedChanges = isDirty || unsupportedReason !== supportBaseline
+
   const filteredCorridors = useMemo(() => {
-    const term = search.trim().toLowerCase()
+    const term = appliedSearch.trim().toLowerCase()
     return corridors.filter((corridor) => {
-      if (filter === 'defined' && corridor.status !== 'DEFINED') return false
-      if (filter === 'missing' && corridor.status !== 'MISSING') return false
-      if (filter === 'unsupported' && corridor.status !== 'UNSUPPORTED') return false
+      if (appliedFilter === 'defined' && corridor.status !== 'DEFINED') return false
+      if (appliedFilter === 'missing' && corridor.status !== 'MISSING') return false
+      if (appliedFilter === 'unsupported' && corridor.status !== 'UNSUPPORTED') return false
       if (!term) return true
       const label = `${corridor.cryptoCurrency} ${corridor.blockchain} ${corridor.targetCurrency}`.toLowerCase()
       return label.includes(term)
     })
   }, [
     corridors,
-    filter,
-    search,
+    appliedFilter,
+    appliedSearch,
   ])
 
   const loadData = useCallback(async () => {
@@ -221,7 +249,6 @@ const FlowDefinitions = () => {
       setCorridorSummary(null)
       setDefinitions([])
       setDraft(null)
-      setSelectedKey(null)
       setBaseline(null)
       return
     }
@@ -247,14 +274,47 @@ const FlowDefinitions = () => {
     void loadData()
   }, [loadData])
 
-  const selectCorridor = (corridor: FlowCorridor) => {
-    setSelectedKey(buildCorridorKey(corridor))
+  useEffect(() => {
+    setSearchDraft(appliedSearch)
+    setFilterDraft(appliedFilter)
+  }, [appliedFilter, appliedSearch])
+
+  useEffect(() => {
+    if (!selectedKey) {
+      setDraft(null)
+      setBaseline(null)
+      setUnsupportedReason('')
+      setSupportBaseline('')
+      return
+    }
+    const corridor = corridorByKey.get(selectedKey)
+    if (!corridor) return
     const definition = corridor.definitionId ? definitionsById.get(corridor.definitionId) : null
     const nextDraft = definition ? fromDefinition(definition) : buildEmptyDraft(corridor)
     setDraft(nextDraft)
     setBaseline(JSON.stringify(nextDraft))
     setValidationErrors({})
-    setUnsupportedReason(corridor.unsupportedReason ?? '')
+    const nextReason = corridor.unsupportedReason ?? ''
+    setUnsupportedReason(nextReason)
+    setSupportBaseline(nextReason)
+  }, [
+    corridorByKey,
+    definitionsById,
+    selectedKey,
+  ])
+
+  const applyCorridorSelection = (corridor: FlowCorridor): void => {
+    const next = new URLSearchParams(searchParams)
+    next.set('corridor', buildCorridorKey(corridor))
+    setSearchParams(next)
+  }
+
+  const selectCorridor = (corridor: FlowCorridor): void => {
+    if (hasUnsavedChanges && buildCorridorKey(corridor) !== selectedKey) {
+      setPendingCorridor(corridor)
+      return
+    }
+    applyCorridorSelection(corridor)
   }
 
   const updateDraftField = (field: keyof DefinitionDraft, value: boolean | string) => {
@@ -479,22 +539,34 @@ const FlowDefinitions = () => {
       setSaving(false)
       return
     }
+    const validatedPayload = validation.payload
 
     try {
-      const saved = draft.id
-        ? await updateFlowDefinition(draft.id, validation.payload)
-        : await createFlowDefinition(validation.payload)
-
-      await loadData()
-      const nextDraft = fromDefinition(saved)
-      setSelectedKey(buildCorridorKey(saved))
-      setDraft(nextDraft)
-      setBaseline(JSON.stringify(nextDraft))
+      const definitionId = draft.id
+      const title = `${definitionId ? 'Update' : 'Create'} ${draft.cryptoCurrency} on ${humanizeStatus(draft.blockchain)} to ${draft.targetCurrency} flow`
+      const release = await requestMutation({
+        action: 'configuration.release.create',
+        execute: mutation => createOpsConfigurationRelease({
+          effectiveAt: draft.effectiveAt ? new Date(draft.effectiveAt).toISOString() : undefined,
+          payload: {
+            definitionId,
+            kind: 'FLOW_DEFINITION',
+            operation: definitionId ? 'UPDATE' : 'CREATE',
+            value: validatedPayload,
+          },
+          title,
+        }, mutation),
+        resourceLabel: `${draft.cryptoCurrency} on ${humanizeStatus(draft.blockchain)} to ${draft.targetCurrency}`,
+        title: 'Create flow review draft',
+      })
+      setCreatedDraft({ id: release.id, title: release.title })
+      if (baseline) setDraft(JSON.parse(baseline) as DefinitionDraft)
       setValidationErrors({})
       setError(null)
     }
     catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save flow definition')
+      if (isOpsMutationCancelledError(err)) return
+      setError(err instanceof Error ? err.message : 'Failed to create flow review draft')
     }
     finally {
       setSaving(false)
@@ -507,17 +579,32 @@ const FlowDefinitions = () => {
     setError(null)
 
     try {
-      await updateFlowCorridor({
-        blockchain: selectedCorridor.blockchain,
-        cryptoCurrency: selectedCorridor.cryptoCurrency,
-        reason: unsupportedReason.trim() || undefined,
-        status,
-        targetCurrency: selectedCorridor.targetCurrency,
+      const title = `${status === 'SUPPORTED' ? 'Support' : 'Pause'} ${corridorTitle(selectedCorridor)} corridor`
+      const release = await requestMutation({
+        action: 'configuration.release.create',
+        execute: mutation => createOpsConfigurationRelease({
+          effectiveAt: draft?.effectiveAt ? new Date(draft.effectiveAt).toISOString() : undefined,
+          payload: {
+            kind: 'FLOW_CORRIDOR',
+            value: {
+              blockchain: selectedCorridor.blockchain,
+              cryptoCurrency: selectedCorridor.cryptoCurrency,
+              reason: unsupportedReason.trim() || undefined,
+              status,
+              targetCurrency: selectedCorridor.targetCurrency,
+            },
+          },
+          title,
+        }, mutation),
+        resourceLabel: corridorTitle(selectedCorridor),
+        title: status === 'SUPPORTED' ? 'Create corridor support draft' : 'Create corridor pause draft',
       })
-      await loadData()
+      setCreatedDraft({ id: release.id, title: release.title })
+      setUnsupportedReason(supportBaseline)
     }
     catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update corridor status')
+      if (isOpsMutationCancelledError(err)) return
+      setError(err instanceof Error ? err.message : 'Failed to create corridor review draft')
     }
     finally {
       setSaving(false)
@@ -525,28 +612,68 @@ const FlowDefinitions = () => {
   }
 
   const corridorTitle = (corridor: FlowCorridor): string => (
-    `${corridor.cryptoCurrency} · ${corridor.blockchain} → ${corridor.targetCurrency}`
+    `${corridor.cryptoCurrency} · ${humanizeStatus(corridor.blockchain)} → ${corridor.targetCurrency}`
   )
+
+  const applyFilters = (): void => {
+    const next = new URLSearchParams()
+    if (searchDraft.trim()) next.set('query', searchDraft.trim())
+    if (filterDraft !== 'all') next.set('status', filterDraft)
+    if (selectedKey) next.set('corridor', selectedKey)
+    setSearchParams(next)
+  }
+
+  const showMissingCorridors = (): void => {
+    setSearchParams(new URLSearchParams({ status: 'missing' }))
+  }
+
+  const discardEditorChanges = (): void => {
+    if (baseline) setDraft(JSON.parse(baseline) as DefinitionDraft)
+    setUnsupportedReason(supportBaseline)
+    setValidationErrors({})
+  }
+
+  const confirmCorridorSelection = (): void => {
+    if (!pendingCorridor) return
+    const next = pendingCorridor
+    setPendingCorridor(null)
+    discardEditorChanges()
+    applyCorridorSelection(next)
+  }
 
   return (
     <OpsPageShell
       actions={(
         <button
           className="ops-btn-ghost"
-          disabled={!opsApiKey || loading}
+          disabled={!opsApiKey || loading || hasUnsavedChanges}
           onClick={() => void loadData()}
           type="button"
         >
           Refresh
         </button>
       )}
-      backLink={{ label: 'Back to runs', to: '/ops/flows' }}
       error={error}
-      eyebrow="Flow Coverage"
-      keyRequiredMessage="Ops API key required to load corridor coverage."
-      subtitle="Define the business pipeline for each corridor. System logic handles payouts, waits, and refunds automatically."
-      title="Corridor Flow Builder"
+      eyebrow="Configuration"
+      keyRequiredMessage="Sign in to review corridor coverage."
+      subtitle="Prepare reviewed corridor, fee, and routing changes. Production changes only after approval."
+      title="Corridors & Flows"
     >
+      <OpsUnsavedChangesGuard active={hasUnsavedChanges} />
+      {createdDraft && (
+        <OpsBanner className="mt-5" variant="success">
+          Review draft created:
+          {' '}
+          <Link className="font-semibold underline underline-offset-4" to={`/ops/configuration/history?release=${encodeURIComponent(createdDraft.id)}`}>{createdDraft.title}</Link>
+          . Production is unchanged until approval.
+        </OpsBanner>
+      )}
+      {hasUnsavedChanges && <OpsBanner className="mt-5" variant="info">Unsaved configuration is protected. Create a review draft or discard changes before changing filters or refreshing.</OpsBanner>}
+      {!canManage && opsApiKey && (
+        <OpsBanner className="mt-5" variant="info">
+          Read-only access. You can inspect current corridors and flow versions, but creating a configuration draft requires configuration management permission.
+        </OpsBanner>
+      )}
       <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-4">
         <div className="ops-card p-4">
           <div className="text-xs uppercase tracking-[0.3em] text-ops-muted">Total</div>
@@ -556,10 +683,11 @@ const FlowDefinitions = () => {
           <div className="text-xs uppercase tracking-[0.3em] text-ops-muted">Defined</div>
           <div className="mt-2 text-2xl font-semibold text-emerald-700">{corridorSummary?.defined ?? '—'}</div>
         </div>
-        <div className="ops-card p-4">
+        <button className="ops-card min-h-24 p-4 text-left hover:border-rose-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ops-brand" disabled={hasUnsavedChanges} onClick={showMissingCorridors} type="button">
           <div className="text-xs uppercase tracking-[0.3em] text-ops-muted">Missing</div>
           <div className="mt-2 text-2xl font-semibold text-rose-700">{corridorSummary?.missing ?? '—'}</div>
-        </div>
+          <div className="mt-1 text-xs font-medium text-rose-800">Open configuration gaps</div>
+        </button>
         <div className="ops-card p-4">
           <div className="text-xs uppercase tracking-[0.3em] text-ops-muted">Unsupported</div>
           <div className="mt-2 text-2xl font-semibold text-amber-700">{corridorSummary?.unsupported ?? '—'}</div>
@@ -573,26 +701,21 @@ const FlowDefinitions = () => {
             <input
               aria-label="Search corridors"
               className="ops-input w-full"
-              onChange={event => setSearch(event.target.value)}
+              onChange={event => setSearchDraft(event.target.value)}
               placeholder="Search corridor"
-              value={search}
+              value={searchDraft}
             />
-            <div className="flex flex-wrap gap-2 text-xs">
-              {[
-                'all',
-                'defined',
-                'missing',
-                'unsupported',
-              ].map(value => (
-                <button
-                  className={`rounded-full border px-3 py-1 ${filter === value ? 'border-abroad-dark bg-abroad-dark/10 text-ops-brand' : 'border-ops-border text-ops-muted'}`}
-                  key={value}
-                  onClick={() => setFilter(value as typeof filter)}
-                  type="button"
-                >
-                  {value}
-                </button>
-              ))}
+            <OpsField label="Coverage status">
+              <select className="ops-input" name="corridor-status-filter" onChange={event => setFilterDraft(event.target.value as CorridorFilter)} value={filterDraft}>
+                <option value="all">All corridors</option>
+                <option value="defined">Configured</option>
+                <option value="missing">Missing configuration</option>
+                <option value="unsupported">Paused as unsupported</option>
+              </select>
+            </OpsField>
+            <div className="flex flex-wrap gap-2">
+              <button className="ops-btn-primary ops-btn-sm" disabled={hasUnsavedChanges} onClick={applyFilters} type="button">Apply filters</button>
+              <button className="ops-btn-neutral ops-btn-sm" disabled={hasUnsavedChanges} onClick={() => setSearchParams(new URLSearchParams())} type="button">Clear</button>
             </div>
           </div>
           <div className="mt-4 space-y-3">
@@ -614,8 +737,9 @@ const FlowDefinitions = () => {
                 type="button"
               >
                 <div className="text-sm font-semibold">{corridorTitle(corridor)}</div>
+                <code className="mt-1 block break-all text-[10px] text-ops-muted">{buildCorridorKey(corridor)}</code>
                 <div className="mt-1 flex items-center gap-2 text-[11px] text-ops-muted">
-                  <OpsStatusBadge label={corridor.status} tone={corridorStatusTone[corridor.status]} />
+                  <OpsStatusBadge label={humanizeStatus(corridor.status)} tone={corridorStatusTone[corridor.status]} />
                   {corridor.definitionName && (
                     <span>{corridor.definitionName}</span>
                   )}
@@ -633,6 +757,7 @@ const FlowDefinitions = () => {
                     <div>
                       <div className="text-xs uppercase tracking-wider text-ops-muted">Corridor</div>
                       <div className="text-lg font-semibold">{corridorTitle(selectedCorridor)}</div>
+                      <code className="mt-1 block break-all text-[11px] text-ops-muted">{buildCorridorKey(selectedCorridor)}</code>
                       <div className="text-xs text-ops-muted">
                         Updated
                         {' '}
@@ -642,23 +767,19 @@ const FlowDefinitions = () => {
                     <div className="flex flex-wrap items-center gap-2">
                       <button
                         className="ops-btn-neutral ops-btn-sm"
-                        disabled={!isDirty}
-                        onClick={() => {
-                          if (!baseline) return
-                          setDraft(JSON.parse(baseline) as DefinitionDraft)
-                          setValidationErrors({})
-                        }}
+                        disabled={!canManage || !isDirty}
+                        onClick={discardEditorChanges}
                         type="button"
                       >
                         Discard changes
                       </button>
                       <button
                         className="ops-btn-primary ops-btn-sm"
-                        disabled={saving || !opsApiKey}
+                        disabled={saving || !opsApiKey || !canManage || !isDirty}
                         onClick={() => void handleSave()}
                         type="button"
                       >
-                        {saving ? 'Saving…' : draft.id ? 'Save flow' : 'Create flow'}
+                        {saving ? 'Creating draft…' : 'Create review draft'}
                       </button>
                     </div>
                   </div>
@@ -667,6 +788,7 @@ const FlowDefinitions = () => {
                     <OpsField error={validationErrors.name} label="Name">
                       <input
                         className="ops-input"
+                        disabled={!canManage}
                         onChange={event => updateDraftField('name', event.target.value)}
                         value={draft.name}
                       />
@@ -677,6 +799,7 @@ const FlowDefinitions = () => {
                         className={`rounded-full border px-4 py-2 text-xs font-semibold transition ${
                           draft.enabled ? 'border-emerald-300 bg-emerald-100 text-emerald-800' : 'border-rose-300 bg-rose-100 text-rose-800'
                         }`}
+                        disabled={!canManage}
                         onClick={() => updateDraftField('enabled', !draft.enabled)}
                         type="button"
                       >
@@ -686,26 +809,48 @@ const FlowDefinitions = () => {
                     <OpsField label="Payout Provider">
                       <select
                         className="ops-input"
+                        disabled={!canManage}
                         onChange={event => updateDraftField('payoutProvider', event.target.value)}
                         value={draft.payoutProvider}
                       >
                         {payoutProviders.map(item => (
-                          <option key={item} value={item}>{item}</option>
+                          <option key={item} value={item}>{humanizeStatus(item)}</option>
                         ))}
                       </select>
                     </OpsField>
                     <OpsField label="Pricing Provider">
                       <select
                         className="ops-input"
+                        disabled={!canManage}
                         onChange={event => updateDraftField('pricingProvider', event.target.value)}
                         value={draft.pricingProvider}
                       >
                         {pricingProviders.map(item => (
-                          <option key={item} value={item}>{item}</option>
+                          <option key={item} value={item}>{humanizeStatus(item)}</option>
                         ))}
                       </select>
                     </OpsField>
+                    <OpsField hint="Leave blank to apply immediately after approval." label="Effective time">
+                      <input
+                        className="ops-input"
+                        disabled={!canManage}
+                        name="flow-release-effective-at"
+                        onChange={event => updateDraftField('effectiveAt', event.target.value)}
+                        type="datetime-local"
+                        value={draft.effectiveAt}
+                      />
+                    </OpsField>
                   </div>
+                  <p className="mt-2 text-xs text-ops-muted">
+                    Provider keys:
+                    {' '}
+                    payout
+                    {' '}
+                    <code>{draft.payoutProvider}</code>
+                    , pricing
+                    {' '}
+                    <code>{draft.pricingProvider}</code>
+                  </p>
 
                   <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-4">
                     <OpsField
@@ -715,6 +860,7 @@ const FlowDefinitions = () => {
                     >
                       <input
                         className="ops-input"
+                        disabled={!canManage}
                         min="0"
                         onChange={event => updateDraftField('exchangeFeePct', event.target.value)}
                         placeholder="0.01"
@@ -729,6 +875,7 @@ const FlowDefinitions = () => {
                     >
                       <input
                         className="ops-input"
+                        disabled={!canManage}
                         min="0"
                         onChange={event => updateDraftField('fixedFee', event.target.value)}
                         placeholder="2.50"
@@ -751,6 +898,7 @@ const FlowDefinitions = () => {
                     >
                       <input
                         className="ops-input"
+                        disabled={!canManage}
                         onChange={event => updateDraftField('minAmount', event.target.value)}
                         type="number"
                         value={draft.minAmount}
@@ -771,6 +919,7 @@ const FlowDefinitions = () => {
                     >
                       <input
                         className="ops-input"
+                        disabled={!canManage}
                         onChange={event => updateDraftField('maxAmount', event.target.value)}
                         type="number"
                         value={draft.maxAmount}
@@ -795,6 +944,7 @@ const FlowDefinitions = () => {
                         <select
                           aria-label="New step type"
                           className="ops-input"
+                          disabled={!canManage}
                           onChange={event => setNewStepType(event.target.value as typeof newStepType)}
                           value={newStepType}
                         >
@@ -804,6 +954,7 @@ const FlowDefinitions = () => {
                         </select>
                         <button
                           className="ops-btn-primary ops-btn-sm"
+                          disabled={!canManage}
                           onClick={addStep}
                           type="button"
                         >
@@ -846,7 +997,7 @@ const FlowDefinitions = () => {
                               <button
                                 aria-label="Move step up"
                                 className="rounded-lg border border-ops-border bg-white px-2 py-1 text-xs"
-                                disabled={index <= 1}
+                                disabled={!canManage || index <= 1}
                                 onClick={() => reorderStep(index, 'up')}
                                 type="button"
                               >
@@ -855,7 +1006,7 @@ const FlowDefinitions = () => {
                               <button
                                 aria-label="Move step down"
                                 className="rounded-lg border border-ops-border bg-white px-2 py-1 text-xs"
-                                disabled={index === 0 || index >= draft.steps.length - 1}
+                                disabled={!canManage || index === 0 || index >= draft.steps.length - 1}
                                 onClick={() => reorderStep(index, 'down')}
                                 type="button"
                               >
@@ -863,7 +1014,7 @@ const FlowDefinitions = () => {
                               </button>
                               <button
                                 className="ops-btn-danger ops-btn-sm"
-                                disabled={index === 0}
+                                disabled={!canManage || index === 0}
                                 onClick={() => removeStep(index)}
                                 type="button"
                               >
@@ -876,6 +1027,7 @@ const FlowDefinitions = () => {
                             <OpsField className="mt-4" label="Venue">
                               <select
                                 className="ops-input"
+                                disabled={!canManage}
                                 onChange={event => updateStep(index, prev => ({
                                   ...prev,
                                   venue: event.target.value as FlowVenue,
@@ -894,6 +1046,7 @@ const FlowDefinitions = () => {
                               <OpsField label="Venue">
                                 <select
                                   className="ops-input"
+                                  disabled={!canManage}
                                   onChange={event => updateStep(index, prev => ({
                                     ...prev,
                                     venue: event.target.value as FlowVenue,
@@ -908,6 +1061,7 @@ const FlowDefinitions = () => {
                               <OpsField label="From">
                                 <select
                                   className="ops-input"
+                                  disabled={!canManage}
                                   onChange={event => updateStep(index, prev => ({
                                     ...prev,
                                     fromAsset: event.target.value as SupportedCurrency,
@@ -922,6 +1076,7 @@ const FlowDefinitions = () => {
                               <OpsField label="To">
                                 <select
                                   className="ops-input"
+                                  disabled={!canManage}
                                   onChange={event => updateStep(index, prev => ({
                                     ...prev,
                                     toAsset: event.target.value as SupportedCurrency,
@@ -941,6 +1096,7 @@ const FlowDefinitions = () => {
                               <OpsField label="From Venue">
                                 <select
                                   className="ops-input"
+                                  disabled={!canManage}
                                   onChange={event => updateStep(index, prev => ({
                                     ...prev,
                                     fromVenue: event.target.value as FlowVenue,
@@ -955,6 +1111,7 @@ const FlowDefinitions = () => {
                               <OpsField label="To Venue">
                                 <select
                                   className="ops-input"
+                                  disabled={!canManage}
                                   onChange={event => updateStep(index, prev => ({
                                     ...prev,
                                     toVenue: event.target.value as FlowVenue,
@@ -969,6 +1126,7 @@ const FlowDefinitions = () => {
                               <OpsField label="Asset">
                                 <select
                                   className="ops-input"
+                                  disabled={!canManage}
                                   onChange={event => updateStep(index, prev => ({
                                     ...prev,
                                     asset: event.target.value as SupportedCurrency,
@@ -988,14 +1146,15 @@ const FlowDefinitions = () => {
                   </div>
 
                   <div className="mt-8 ops-card p-4">
-                    <h3 className="text-sm font-semibold">Corridor Support</h3>
+                    <h3 className="text-sm font-semibold">Corridor availability</h3>
                     <p className="mt-1 text-xs text-ops-muted">
-                      Mark corridors as unsupported to prevent new transactions from being processed.
+                      Create a reviewed change to pause or restore new work on this corridor. Existing flow snapshots are unchanged.
                     </p>
                     <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-[2fr_auto]">
                       <input
                         aria-label="Unsupported reason"
                         className="ops-input"
+                        disabled={!canManage}
                         onChange={event => setUnsupportedReason(event.target.value)}
                         placeholder="Optional reason"
                         value={unsupportedReason}
@@ -1004,21 +1163,21 @@ const FlowDefinitions = () => {
                         ? (
                             <button
                               className="ops-btn-primary ops-btn-sm"
-                              disabled={saving}
+                              disabled={saving || !canManage || isDirty}
                               onClick={() => void handleCorridorStatus('SUPPORTED')}
                               type="button"
                             >
-                              Mark Supported
+                              Create restore draft
                             </button>
                           )
                         : (
                             <button
                               className="ops-btn-danger ops-btn-sm"
-                              disabled={saving}
+                              disabled={saving || !canManage || isDirty}
                               onClick={() => void handleCorridorStatus('UNSUPPORTED')}
                               type="button"
                             >
-                              Mark Unsupported
+                              Create pause draft
                             </button>
                           )}
                     </div>
@@ -1030,6 +1189,20 @@ const FlowDefinitions = () => {
               )}
         </div>
       </div>
+      {pendingCorridor && (
+        <OpsDialog
+          description="Your current flow or corridor edits have not been saved as a review draft."
+          eyebrow="Unsaved configuration"
+          onClose={() => setPendingCorridor(null)}
+          title={`Open ${corridorTitle(pendingCorridor)}?`}
+        >
+          <p className="text-sm leading-6 text-ops-muted">Discard the current edits to open the selected corridor, or keep editing and create a review draft first.</p>
+          <div className="mt-5 flex flex-wrap justify-end gap-2">
+            <button className="ops-btn-neutral" onClick={() => setPendingCorridor(null)} type="button">Keep editing</button>
+            <button className="ops-btn-danger" onClick={confirmCorridorSelection} type="button">Discard and open</button>
+          </div>
+        </OpsDialog>
+      )}
     </OpsPageShell>
   )
 }

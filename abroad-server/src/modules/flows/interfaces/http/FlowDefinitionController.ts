@@ -7,19 +7,17 @@ import {
   Patch,
   Path,
   Post,
-  Res,
   Response,
   Route,
   Security,
   SuccessResponse,
-  TsoaResponse,
 } from 'tsoa'
 
-import { FlowDefinitionDto, FlowDefinitionInput, flowDefinitionSchema, FlowDefinitionUpdateInput } from '../../application/flowDefinitionSchemas'
-import { FlowDefinitionService, FlowDefinitionValidationError } from '../../application/FlowDefinitionService'
+import { OpsConfigurationReleaseRequiredError } from '../../../operations/application/OpsConfigurationGovernance'
+import { FlowDefinitionDto, FlowDefinitionInput, FlowDefinitionUpdateInput } from '../../application/flowDefinitionSchemas'
+import { FlowDefinitionService } from '../../application/FlowDefinitionService'
 
 @Route('ops/flows/definitions')
-@Security('OpsApiKeyAuth')
 export class FlowDefinitionController extends Controller {
   constructor(
     @inject(FlowDefinitionService) private readonly flowDefinitionService: FlowDefinitionService,
@@ -29,30 +27,17 @@ export class FlowDefinitionController extends Controller {
 
   @Post()
   @Response<400, { reason: string }>(400, 'Bad Request')
-  @SuccessResponse('201', 'Flow definition created')
+  @Response<409, { reason: string }>(409, 'Configuration release required')
+  @Security('OpsAuth', ['configuration:manage'])
   public async create(
-    @Body() body: FlowDefinitionInput,
-    @Res() badRequest: TsoaResponse<400, { reason: string }>,
+    @Body() _body: FlowDefinitionInput,
   ): Promise<FlowDefinitionDto> {
-    const parsed = flowDefinitionSchema.safeParse(body)
-    if (!parsed.success) {
-      return badRequest(400, { reason: parsed.error.message })
-    }
-
-    try {
-      const created = await this.flowDefinitionService.create(parsed.data)
-      this.setStatus(201)
-      return created
-    }
-    catch (error) {
-      if (error instanceof FlowDefinitionValidationError) {
-        return badRequest(400, { reason: error.message })
-      }
-      throw error
-    }
+    void _body
+    throw new OpsConfigurationReleaseRequiredError()
   }
 
   @Get()
+  @Security('OpsAuth', ['configuration:read'])
   @SuccessResponse('200', 'Flow definitions retrieved')
   public async list(): Promise<FlowDefinitionDto[]> {
     return this.flowDefinitionService.list()
@@ -61,25 +46,14 @@ export class FlowDefinitionController extends Controller {
   @OperationId('FlowDefinitionUpdate')
   @Patch('{flowId}')
   @Response<400, { reason: string }>(400, 'Bad Request')
-  @SuccessResponse('200', 'Flow definition updated')
+  @Response<409, { reason: string }>(409, 'Configuration release required')
+  @Security('OpsAuth', ['configuration:manage'])
   public async update(
-    @Path() flowId: string,
-    @Body() body: FlowDefinitionUpdateInput,
-    @Res() badRequest: TsoaResponse<400, { reason: string }>,
+    @Path('flowId') _flowId: string,
+    @Body() _body: FlowDefinitionUpdateInput,
   ): Promise<FlowDefinitionDto> {
-    const parsed = flowDefinitionSchema.safeParse(body)
-    if (!parsed.success) {
-      return badRequest(400, { reason: parsed.error.message })
-    }
-
-    try {
-      return await this.flowDefinitionService.update(flowId, parsed.data)
-    }
-    catch (error) {
-      if (error instanceof FlowDefinitionValidationError) {
-        return badRequest(400, { reason: error.message })
-      }
-      throw error
-    }
+    void _flowId
+    void _body
+    throw new OpsConfigurationReleaseRequiredError()
   }
 }

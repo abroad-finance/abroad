@@ -23,6 +23,7 @@ export type OpsPartner = {
   id: string
   isKybApproved: boolean
   lastName?: string
+  legacyKeyOverlapExpiresAt?: string
   name: string
   needsKyc: boolean
   phone?: string
@@ -35,6 +36,26 @@ export type OpsPartnerCompletedVolume = {
   stablecoinAmount: number
 }
 
+export type OpsPartnerCredentialEvent = {
+  action: string
+  actorLabel: string
+  createdAt: string
+  id: string
+  reason?: string
+  reference?: string
+  source: 'OPS' | 'PARTNER_PORTAL'
+}
+
+export type OpsPartnerCredentialHistory = {
+  events: OpsPartnerCredentialEvent[]
+  legacyCredential: {
+    active: boolean
+    overlapExpiresAt?: string
+  }
+  managedCredentials: OpsPartnerManagedCredential[]
+  partner: OpsPartner
+}
+
 export type OpsPartnerListItem = OpsPartner & {
   completedVolume: OpsPartnerCompletedVolume
 }
@@ -45,6 +66,20 @@ export type OpsPartnerListResponse = {
   page: number
   pageSize: number
   total: number
+}
+
+export type OpsPartnerManagedCredential = {
+  createdAt: string
+  displayPrefix: string
+  expiresAt?: string
+  id: string
+  lastUsedAt?: string
+  name: string
+  revokedAt?: string
+  rotatedFromId?: string
+  rotatedToId?: string
+  scopes: string[]
+  status: 'ACTIVE' | 'EXPIRED' | 'REVOKED'
 }
 
 export type OpsPartnerPayoutVolume = {

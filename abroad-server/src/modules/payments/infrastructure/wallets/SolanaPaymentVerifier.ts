@@ -336,6 +336,26 @@ export class SolanaPaymentVerifier implements IDepositVerifier {
     return tokenAccounts
   }
 
+  private parseTokenAmount(tokenAmount: TokenAmountInfo): number {
+    if (tokenAmount.uiAmountString) {
+      const parsed = parseFloat(tokenAmount.uiAmountString)
+      if (!Number.isNaN(parsed)) {
+        return parsed
+      }
+    }
+
+    if (typeof tokenAmount.uiAmount === 'number' && !Number.isNaN(tokenAmount.uiAmount)) {
+      return tokenAmount.uiAmount
+    }
+
+    const rawAmount = Number.parseFloat(tokenAmount.amount)
+    if (!Number.isFinite(rawAmount)) {
+      return 0
+    }
+
+    return rawAmount / Math.pow(10, tokenAmount.decimals)
+  }
+
   private async resolveWalletAddress(
     connection: Connection,
     transferInfo: TransferCheckedInfo,
@@ -357,25 +377,5 @@ export class SolanaPaymentVerifier implements IDepositVerifier {
       this.logger.warn('[SolanaPaymentVerifier] Could not resolve wallet for token account', { error, source: transferInfo.source })
       return transferInfo.source
     }
-  }
-
-  private parseTokenAmount(tokenAmount: TokenAmountInfo): number {
-    if (tokenAmount.uiAmountString) {
-      const parsed = parseFloat(tokenAmount.uiAmountString)
-      if (!Number.isNaN(parsed)) {
-        return parsed
-      }
-    }
-
-    if (typeof tokenAmount.uiAmount === 'number' && !Number.isNaN(tokenAmount.uiAmount)) {
-      return tokenAmount.uiAmount
-    }
-
-    const rawAmount = Number.parseFloat(tokenAmount.amount)
-    if (!Number.isFinite(rawAmount)) {
-      return 0
-    }
-
-    return rawAmount / Math.pow(10, tokenAmount.decimals)
   }
 }

@@ -56,10 +56,15 @@ export class SolanaBalanceSource implements ITreasuryBalanceSource {
         }
       }))
 
+      const amount = amounts.reduce((sum, value) => sum + value, 0)
       return {
         account: address,
-        amount: amounts.reduce((sum, amount) => sum + amount, 0),
+        amount,
+        availableAmount: amount,
+        blockedAmount: null,
         currency: asset.cryptoCurrency,
+        outstandingAmount: null,
+        reservedAmount: null,
         venue: this.venue,
       }
     }))

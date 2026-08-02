@@ -167,7 +167,7 @@ describe('PaymentUseCase', () => {
     expect(response).toMatchObject({ liquidity: 120, success: true })
 
     // Allow the background refresh microtask to complete.
-    await new Promise<void>((resolve) => setImmediate(resolve))
+    await new Promise<void>(resolve => setImmediate(resolve))
 
     expect(paymentService.getLiquidity).toHaveBeenCalled()
     expect(prismaClient.paymentProvider.update).toHaveBeenCalledWith({

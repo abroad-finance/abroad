@@ -1,10 +1,12 @@
 import {
   useCallback, useEffect, useMemo, useState,
 } from 'react'
+import { Link } from 'react-router-dom'
 
-import { useOpsApiKey } from '../../services/admin/opsAuthStore'
+import { useOpsApiKey, useOpsSession } from '../../services/admin/opsAuthStore'
 import {
   createPartner,
+  getPartnerCredentialHistory,
   listPartners,
   revokePartnerApiKey,
   rotatePartnerApiKey,
@@ -14,12 +16,15 @@ import {
   OpsCreatePartnerInput,
   OpsPartner,
   OpsPartnerCompletedVolume,
+  OpsPartnerCredentialHistory,
   OpsPartnerListItem,
 } from '../../services/admin/partnerTypes'
 import {
   formatAmount,
   formatDateTime,
   formatMoney,
+  humanizeStatus,
+  OpsBanner,
   OpsEmptyState,
   OpsField,
   OpsLoading,
@@ -27,6 +32,7 @@ import {
   OpsPagination,
   OpsStatusBadge,
 } from './shared'
+import { isOpsMutationCancelledError, useOpsMutation } from './shared/opsMutationContext'
 
 const pageSize = 20
 
@@ -40,12 +46,136 @@ type CreatePartnerDraft = {
   phone: string
 }
 
+type CredentialHistoryPanelProps = {
+  history: OpsPartnerCredentialHistory
+}
+
 type RevealedKey = {
   action: 'created' | 'rotated'
   apiKey: string
   partnerId: string
   partnerName: string
 }
+
+const credentialStatusTone = {
+  ACTIVE: 'success',
+  EXPIRED: 'warning',
+  REVOKED: 'danger',
+} as const
+
+const CredentialHistoryPanel = ({ history }: CredentialHistoryPanelProps) => (
+  <section
+    aria-label={`Credential history for ${history.partner.name}`}
+    className="mt-4 rounded-2xl border border-ops-border bg-stone-50/80 p-4"
+  >
+    <div className="flex flex-wrap items-start justify-between gap-3">
+      <div>
+        <div className="ops-label">Credential history</div>
+        <h3 className="mt-1 text-base font-semibold text-ops-text">Legacy and managed API keys</h3>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <OpsStatusBadge tone={history.legacyCredential.active ? 'success' : 'danger'}>
+          Legacy key
+          {' '}
+          {history.legacyCredential.active ? 'active' : 'revoked'}
+        </OpsStatusBadge>
+        {history.legacyCredential.overlapExpiresAt && (
+          <OpsStatusBadge tone="warning">
+            Previous key valid until
+            {' '}
+            {formatDateTime(history.legacyCredential.overlapExpiresAt)}
+          </OpsStatusBadge>
+        )}
+      </div>
+    </div>
+
+    <div className="mt-4 grid gap-3 xl:grid-cols-2">
+      {history.managedCredentials.map(credential => (
+        <article className="rounded-xl border border-ops-border bg-white p-3" key={credential.id}>
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div className="min-w-0">
+              <div className="break-words text-sm font-semibold text-ops-text">{credential.name}</div>
+              <code className="mt-1 block break-all text-[11px] text-ops-muted">
+                {credential.displayPrefix}
+                …
+              </code>
+            </div>
+            <OpsStatusBadge
+              label={humanizeStatus(credential.status)}
+              tone={credentialStatusTone[credential.status]}
+            />
+          </div>
+          <dl className="mt-3 grid gap-2 text-xs text-ops-muted sm:grid-cols-2">
+            <div>
+              <dt className="font-semibold text-ops-label">Created</dt>
+              <dd>{formatDateTime(credential.createdAt)}</dd>
+            </div>
+            <div>
+              <dt className="font-semibold text-ops-label">Last used</dt>
+              <dd>{formatDateTime(credential.lastUsedAt)}</dd>
+            </div>
+            <div>
+              <dt className="font-semibold text-ops-label">Expires</dt>
+              <dd>{formatDateTime(credential.expiresAt)}</dd>
+            </div>
+            <div>
+              <dt className="font-semibold text-ops-label">Scopes</dt>
+              <dd>{credential.scopes.map(humanizeStatus).join(', ') || 'None'}</dd>
+            </div>
+          </dl>
+          {(credential.rotatedFromId || credential.rotatedToId) && (
+            <div className="mt-3 break-all font-mono text-[10px] text-ops-muted">
+              {credential.rotatedFromId && `Rotated from ${credential.rotatedFromId}`}
+              {credential.rotatedFromId && credential.rotatedToId && ' · '}
+              {credential.rotatedToId && `Rotated to ${credential.rotatedToId}`}
+            </div>
+          )}
+        </article>
+      ))}
+    </div>
+    {history.managedCredentials.length === 0 && (
+      <div className="mt-4 rounded-xl border border-dashed border-ops-border bg-white px-4 py-3 text-sm text-ops-muted">
+        No managed API keys have been created for this partner.
+      </div>
+    )}
+
+    <div className="mt-5">
+      <h3 className="text-sm font-semibold text-ops-text">Lifecycle events</h3>
+      <ol className="mt-2 space-y-2">
+        {history.events.map(event => (
+          <li className="rounded-xl border border-ops-border bg-white px-3 py-2.5" key={`${event.source}:${event.id}`}>
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div>
+                <div className="text-sm font-medium text-ops-text">{humanizeStatus(event.action)}</div>
+                <div className="mt-0.5 text-xs text-ops-muted">
+                  {event.actorLabel}
+                  {' · '}
+                  {event.source === 'OPS' ? 'Abroad Ops' : 'Partner portal'}
+                </div>
+              </div>
+              <time className="text-xs text-ops-muted" dateTime={event.createdAt}>{formatDateTime(event.createdAt)}</time>
+            </div>
+            {(event.reason || event.reference) && (
+              <div className="mt-2 text-xs text-ops-muted">
+                {event.reason && <span>{event.reason}</span>}
+                {event.reason && event.reference && ' · '}
+                {event.reference && (
+                  <span>
+                    Reference:
+                    {event.reference}
+                  </span>
+                )}
+              </div>
+            )}
+          </li>
+        ))}
+      </ol>
+      {history.events.length === 0 && (
+        <div className="mt-2 text-sm text-ops-muted">No credential lifecycle events recorded yet.</div>
+      )}
+    </div>
+  </section>
+)
 
 const emptyDraft: CreatePartnerDraft = {
   clientDomain: '',
@@ -198,7 +328,10 @@ const CompletedVolume = ({ maximumAmount, rank, volume }: CompletedVolumeProps) 
 }
 
 const PartnerApiKeys = () => {
-  const opsApiKey = useOpsApiKey()
+  const { requestMutation } = useOpsMutation()
+  const authenticationMarker = useOpsApiKey()
+  const session = useOpsSession()
+  const opsApiKey = session?.permissions.includes('credentials:manage') ? authenticationMarker : null
   const [partners, setPartners] = useState<OpsPartnerListItem[]>([])
   const [maximumStablecoinAmount, setMaximumStablecoinAmount] = useState(0)
   const [total, setTotal] = useState(0)
@@ -211,6 +344,10 @@ const PartnerApiKeys = () => {
   const [error, setError] = useState<null | string>(null)
   const [draft, setDraft] = useState<CreatePartnerDraft>(emptyDraft)
   const [revealedKey, setRevealedKey] = useState<null | RevealedKey>(null)
+  const [credentialHistory, setCredentialHistory] = useState<null | OpsPartnerCredentialHistory>(null)
+  const [historyPartnerId, setHistoryPartnerId] = useState<null | string>(null)
+  const [historyLoading, setHistoryLoading] = useState(false)
+  const [historyError, setHistoryError] = useState<null | string>(null)
   const [copied, setCopied] = useState(false)
 
   const totalPages = useMemo(() => Math.max(1, Math.ceil(total / pageSize)), [total])
@@ -250,6 +387,34 @@ const PartnerApiKeys = () => {
     return () => window.clearTimeout(timeout)
   }, [copied])
 
+  const loadCredentialHistory = useCallback(async (partnerId: string) => {
+    setHistoryPartnerId(partnerId)
+    setCredentialHistory(null)
+    setHistoryLoading(true)
+    setHistoryError(null)
+    try {
+      setCredentialHistory(await getPartnerCredentialHistory(partnerId))
+    }
+    catch (historyLoadError) {
+      setHistoryError(historyLoadError instanceof Error
+        ? historyLoadError.message
+        : 'Failed to load credential history')
+    }
+    finally {
+      setHistoryLoading(false)
+    }
+  }, [])
+
+  const toggleCredentialHistory = useCallback((partnerId: string) => {
+    if (historyPartnerId === partnerId) {
+      setHistoryPartnerId(null)
+      setCredentialHistory(null)
+      setHistoryError(null)
+      return
+    }
+    void loadCredentialHistory(partnerId)
+  }, [historyPartnerId, loadCredentialHistory])
+
   const createPayload = (): OpsCreatePartnerInput => ({
     clientDomain: draft.clientDomain.trim() || undefined,
     company: draft.company.trim(),
@@ -282,7 +447,13 @@ const PartnerApiKeys = () => {
     setCreating(true)
     setError(null)
     try {
-      const response = await createPartner(createPayload())
+      const payload = createPayload()
+      const response = await requestMutation({
+        action: 'partner.create',
+        execute: mutation => createPartner(payload, mutation),
+        resourceLabel: payload.company,
+        title: 'Create production partner',
+      })
       setRevealedKey({
         action: 'created',
         apiKey: response.apiKey,
@@ -294,6 +465,7 @@ const PartnerApiKeys = () => {
       await loadPartners(1)
     }
     catch (createError) {
+      if (isOpsMutationCancelledError(createError)) return
       setError(createError instanceof Error ? createError.message : 'Failed to create partner')
     }
     finally {
@@ -307,7 +479,12 @@ const PartnerApiKeys = () => {
     setError(null)
 
     try {
-      const response = await rotatePartnerApiKey(partner.id)
+      const response = await requestMutation({
+        action: 'credentials.api_key.rotate',
+        execute: mutation => rotatePartnerApiKey(partner.id, mutation),
+        resourceLabel: partner.name,
+        title: 'Rotate partner API key',
+      })
       updatePartnerRecord(response.partner)
       setRevealedKey({
         action: 'rotated',
@@ -315,8 +492,10 @@ const PartnerApiKeys = () => {
         partnerId: response.partner.id,
         partnerName: response.partner.name,
       })
+      if (historyPartnerId === partner.id) await loadCredentialHistory(partner.id)
     }
     catch (rotateError) {
+      if (isOpsMutationCancelledError(rotateError)) return
       setError(rotateError instanceof Error ? rotateError.message : 'Failed to rotate API key')
     }
     finally {
@@ -325,15 +504,17 @@ const PartnerApiKeys = () => {
   }
 
   const handleRevoke = async (partner: OpsPartner) => {
-    const confirmed = window.confirm(`Revoke API key for ${partner.name}?`)
-    if (!confirmed) return
-
     const key = buildActionKey('revoke', partner.id)
     setActionLoading(key)
     setError(null)
 
     try {
-      await revokePartnerApiKey(partner.id)
+      await requestMutation({
+        action: 'credentials.api_key.revoke',
+        execute: mutation => revokePartnerApiKey(partner.id, mutation),
+        resourceLabel: partner.name,
+        title: 'Revoke partner API key',
+      })
       setPartners(current => current.map(item => (
         item.id === partner.id
           ? { ...item, hasApiKey: false }
@@ -342,8 +523,10 @@ const PartnerApiKeys = () => {
       if (revealedKey?.partnerId === partner.id) {
         setRevealedKey(null)
       }
+      if (historyPartnerId === partner.id) await loadCredentialHistory(partner.id)
     }
     catch (revokeError) {
+      if (isOpsMutationCancelledError(revokeError)) return
       setError(revokeError instanceof Error ? revokeError.message : 'Failed to revoke API key')
     }
     finally {
@@ -368,13 +551,19 @@ const PartnerApiKeys = () => {
     setError(null)
 
     try {
-      const updatedPartner = await updatePartnerClientDomain(partner.id, {
-        clientDomain: editingClientDomain.trim() || null,
+      const clientDomain = editingClientDomain.trim() || null
+      const updatedPartner = await requestMutation({
+        action: 'credentials.client_domain.update',
+        execute: mutation => updatePartnerClientDomain(partner.id, { clientDomain }, mutation),
+        resourceLabel: `${partner.name} · ${clientDomain ?? 'No trusted domain'}`,
+        title: 'Update trusted browser domain',
       })
       updatePartnerRecord(updatedPartner)
       stopEditingClientDomain()
+      if (historyPartnerId === partner.id) await loadCredentialHistory(partner.id)
     }
     catch (saveError) {
+      if (isOpsMutationCancelledError(saveError)) return
       setError(saveError instanceof Error ? saveError.message : 'Failed to save client domain')
     }
     finally {
@@ -383,21 +572,25 @@ const PartnerApiKeys = () => {
   }
 
   const handleClearClientDomain = async (partner: OpsPartner) => {
-    const confirmed = window.confirm(`Clear client domain for ${partner.name}?`)
-    if (!confirmed) return
-
     const key = buildActionKey('clear-domain', partner.id)
     setActionLoading(key)
     setError(null)
 
     try {
-      const updatedPartner = await updatePartnerClientDomain(partner.id, { clientDomain: null })
+      const updatedPartner = await requestMutation({
+        action: 'credentials.client_domain.update',
+        execute: mutation => updatePartnerClientDomain(partner.id, { clientDomain: null }, mutation),
+        resourceLabel: partner.name,
+        title: 'Clear trusted browser domain',
+      })
       updatePartnerRecord(updatedPartner)
       if (editingPartnerId === partner.id) {
         stopEditingClientDomain()
       }
+      if (historyPartnerId === partner.id) await loadCredentialHistory(partner.id)
     }
     catch (clearError) {
+      if (isOpsMutationCancelledError(clearError)) return
       setError(clearError instanceof Error ? clearError.message : 'Failed to clear client domain')
     }
     finally {
@@ -419,22 +612,28 @@ const PartnerApiKeys = () => {
   return (
     <OpsPageShell
       actions={(
-        <button
-          className="ops-btn-ghost"
-          disabled={!opsApiKey || loading}
-          onClick={() => void loadPartners()}
-          type="button"
-        >
-          Refresh
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <Link className="ops-btn-neutral" to="/ops/partners">Partner activity</Link>
+          <button
+            className="ops-btn-ghost"
+            disabled={!opsApiKey || loading}
+            onClick={() => void loadPartners()}
+            type="button"
+          >
+            Refresh
+          </button>
+        </div>
       )}
       error={error}
-      eyebrow="Operations"
-      keyRequiredMessage="Ops API key required to manage partners."
-      subtitle="Partners are ranked by completed USD-stablecoin volume. Manage accounts, trusted browser domains, and API-key access in the same view."
-      title="Partners & API Keys"
+      eyebrow="Partners & Compliance / Credentials"
+      keyRequiredMessage="Named administrator access is required to manage partner credentials."
+      subtitle="Administrator-only partner onboarding, trusted domains, credential status, and protected key lifecycle operations."
+      title="Partner credentials"
       width="full"
     >
+      {session && !session.permissions.includes('credentials:manage') && (
+        <OpsBanner className="mt-6" variant="warning">Your current role can review partner activity but cannot access onboarding, domains, or credentials.</OpsBanner>
+      )}
       {revealedKey && (
         <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 shadow-[0_20px_45px_-35px_rgba(15,23,42,0.35)]">
           <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
@@ -451,6 +650,11 @@ const PartnerApiKeys = () => {
                 .
                 Store it now, this value will not be shown again.
               </div>
+              {revealedKey.action === 'rotated' && (
+                <div className="mt-2 text-xs font-medium text-amber-900">
+                  The previous key remains valid for up to 24 hours so the partner can move traffic safely.
+                </div>
+              )}
             </div>
             <button
               className="rounded-xl border border-amber-300 bg-white px-3 py-1.5 text-sm text-amber-900 hover:bg-amber-100 transition"
@@ -729,6 +933,15 @@ const PartnerApiKeys = () => {
                           {actionLoading === rotateKey ? 'Rotating...' : 'Rotate Key'}
                         </button>
                         <button
+                          aria-expanded={historyPartnerId === partner.id}
+                          className="ops-btn-neutral ops-btn-sm"
+                          disabled={!opsApiKey || partnerBusy}
+                          onClick={() => toggleCredentialHistory(partner.id)}
+                          type="button"
+                        >
+                          {historyPartnerId === partner.id ? 'Hide History' : 'View History'}
+                        </button>
+                        <button
                           className="ops-btn-danger ops-btn-sm"
                           disabled={!opsApiKey || partnerBusy || isEditing || !partner.hasApiKey}
                           onClick={() => void handleRevoke(partner)}
@@ -738,6 +951,13 @@ const PartnerApiKeys = () => {
                         </button>
                       </div>
                     </div>
+                    {historyPartnerId === partner.id && (
+                      <div aria-live="polite">
+                        {historyLoading && <div className="mt-4"><OpsLoading label="Loading credential history…" /></div>}
+                        {historyError && <OpsBanner className="mt-4" variant="error">{historyError}</OpsBanner>}
+                        {credentialHistory && <CredentialHistoryPanel history={credentialHistory} />}
+                      </div>
+                    )}
                   </li>
                 )
               })}

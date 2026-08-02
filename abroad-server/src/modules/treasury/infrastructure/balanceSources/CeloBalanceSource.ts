@@ -42,10 +42,15 @@ export class CeloBalanceSource implements ITreasuryBalanceSource {
         erc20.balanceOf(owner) as Promise<ethers.BigNumber>,
         this.resolveDecimals(erc20, asset.mintAddress, asset.decimals),
       ])
+      const amount = Number(ethers.utils.formatUnits(raw, decimals))
       return {
         account: owner,
-        amount: Number(ethers.utils.formatUnits(raw, decimals)),
+        amount,
+        availableAmount: amount,
+        blockedAmount: null,
         currency: asset.cryptoCurrency,
+        outstandingAmount: null,
+        reservedAmount: null,
         venue: this.venue,
       }
     }))

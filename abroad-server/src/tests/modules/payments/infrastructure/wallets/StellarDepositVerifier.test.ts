@@ -298,7 +298,7 @@ describe('StellarDepositVerifier', () => {
 
     const nonError = await verifier.verifyNotification('on-chain', 'txn-1')
     if (nonError.outcome === 'error') {
-      expect(nonError.reason).toBe('Failed to fetch transaction operations')
+      expect(nonError.reason).toBe('Failed to fetch transaction')
       expect(nonError.status).toBe(400)
     }
   })

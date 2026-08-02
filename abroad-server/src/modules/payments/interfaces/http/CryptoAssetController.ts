@@ -5,19 +5,17 @@ import {
   Get,
   OperationId,
   Patch,
-  Res,
   Response,
   Route,
   Security,
   SuccessResponse,
-  TsoaResponse,
 } from 'tsoa'
 
-import { CryptoAssetConfigError, CryptoAssetConfigService } from '../../application/CryptoAssetConfigService'
-import { CryptoAssetCoverageDto, CryptoAssetCoverageResponse, CryptoAssetUpdateInput, cryptoAssetUpdateSchema } from '../../application/cryptoAssetSchemas'
+import { OpsConfigurationReleaseRequiredError } from '../../../operations/application/OpsConfigurationGovernance'
+import { CryptoAssetConfigService } from '../../application/CryptoAssetConfigService'
+import { CryptoAssetCoverageDto, CryptoAssetCoverageResponse, CryptoAssetUpdateInput } from '../../application/cryptoAssetSchemas'
 
 @Route('ops/crypto-assets')
-@Security('OpsApiKeyAuth')
 export class CryptoAssetController extends Controller {
   constructor(
     @inject(CryptoAssetConfigService) private readonly cryptoAssetService: CryptoAssetConfigService,
@@ -26,6 +24,7 @@ export class CryptoAssetController extends Controller {
   }
 
   @Get()
+  @Security('OpsAuth', ['configuration:read'])
   @SuccessResponse('200', 'Crypto asset coverage retrieved')
   public async list(): Promise<CryptoAssetCoverageResponse> {
     return this.cryptoAssetService.listCoverage()
@@ -34,24 +33,12 @@ export class CryptoAssetController extends Controller {
   @OperationId('CryptoAssetUpdate')
   @Patch()
   @Response<400, { reason: string }>(400, 'Bad Request')
-  @SuccessResponse('200', 'Crypto asset updated')
+  @Response<409, { reason: string }>(409, 'Configuration release required')
+  @Security('OpsAuth', ['configuration:manage'])
   public async update(
-    @Body() body: CryptoAssetUpdateInput,
-    @Res() badRequest: TsoaResponse<400, { reason: string }>,
+    @Body() _body: CryptoAssetUpdateInput,
   ): Promise<CryptoAssetCoverageDto> {
-    const parsed = cryptoAssetUpdateSchema.safeParse(body)
-    if (!parsed.success) {
-      return badRequest(400, { reason: parsed.error.message })
-    }
-
-    try {
-      return await this.cryptoAssetService.upsert(parsed.data)
-    }
-    catch (error) {
-      if (error instanceof CryptoAssetConfigError) {
-        return badRequest(400, { reason: error.message })
-      }
-      throw error
-    }
+    void _body
+    throw new OpsConfigurationReleaseRequiredError()
   }
 }

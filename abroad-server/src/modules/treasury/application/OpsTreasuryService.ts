@@ -1,4 +1,4 @@
-import { CryptoCurrency, TargetCurrency } from '@prisma/client'
+import { CryptoCurrency, Prisma, TargetCurrency } from '@prisma/client'
 import { inject, injectable, multiInject } from 'inversify'
 
 import { TYPES } from '../../../app/container/types'
@@ -12,7 +12,12 @@ import { ITreasuryBalanceSource } from './contracts/ITreasuryBalanceSource'
 export type OpsTreasuryBalanceCell = {
   account: string
   amount: number
+  availableAmount: null | number
+  blockedAmount: null | number
   currency: string
+  outstandingAmount: null | number
+  posture: OpsTreasuryCellPosture
+  reservedAmount: null | number
   /** USD per 1 unit of currency (1 for USD stables); null when no rate is available. */
   usdRate: null | number
   usdValue: null | number
@@ -25,10 +30,26 @@ export type OpsTreasuryBalancesResponse = {
   errors: OpsTreasuryVenueError[]
   /** Bridge float gauge. Outstanding legs are USDC already counted at Binance, so this is context, not an addend. */
   float: OpsTreasuryFloatDto
+  freshness: OpsTreasuryFreshness
   fxRates: OpsTreasuryFxRate[]
   totalUsd: number
   /** True when a venue errored or a cell had no FX rate — totalUsd is then a lower bound. */
   totalUsdIsPartial: boolean
+}
+
+export type OpsTreasuryCellPosture = {
+  alertPath: string
+  averageDailyOutflow: null | number
+  ownerTeam: null | string
+  runwayHours: null | number
+  state: 'CRITICAL' | 'OK' | 'UNCONFIGURED' | 'WARNING'
+  threshold: null | {
+    criticalRunwayHours: null | number
+    id: string
+    minimumAvailable: null | number
+    version: number
+    warningRunwayHours: null | number
+  }
 }
 
 export type OpsTreasuryFloatDto = {
@@ -36,6 +57,11 @@ export type OpsTreasuryFloatDto = {
   cap: null | number
   deficit: number
   enabled: boolean
+}
+
+export type OpsTreasuryFreshness = {
+  staleAt: Date
+  state: 'FRESH' | 'PARTIAL'
 }
 
 export type OpsTreasuryFxRate = {
@@ -106,6 +132,23 @@ const MAX_WINDOW_DAYS = 90
 const RECENT_EVENT_LIMIT = 25
 const SOURCE_TIMEOUT_MS = 8_000
 const USD_STABLES = new Set<string>([CryptoCurrency.USDC, CryptoCurrency.USDT])
+const RUNWAY_WINDOW_DAYS = 7
+
+type CurrencyOutflowRow = {
+  averageDailyOutflow: number
+  currency: string
+}
+
+type ThresholdRow = {
+  criticalRunwayHours: null | number
+  currency: string
+  id: string
+  minimumAvailable: null | number
+  ownerTeam: string
+  venue: string
+  version: number
+  warningRunwayHours: null | number
+}
 
 /**
  * Read model for the ops treasury dashboard: live balances fanned out across
@@ -148,8 +191,12 @@ export class OpsTreasuryService {
       data: balances.cells.map(cell => ({
         account: cell.account,
         amount: cell.amount,
+        availableAmount: cell.availableAmount,
+        blockedAmount: cell.blockedAmount,
         capturedAt: balances.capturedAt,
         currency: cell.currency,
+        outstandingAmount: cell.outstandingAmount,
+        reservedAmount: cell.reservedAmount,
         usdRate: cell.usdRate,
         usdValue: cell.usdValue,
         venue: cell.venue,
@@ -324,6 +371,57 @@ export class OpsTreasuryService {
     return { from, series, to }
   }
 
+  private buildCellPosture(
+    balance: {
+      availableAmount: null | number
+      currency: string
+      venue: string
+    },
+    threshold: ThresholdRow | undefined,
+    averageDailyOutflow: null | number,
+  ): OpsTreasuryCellPosture {
+    const runwayHours = balance.availableAmount !== null
+      && averageDailyOutflow !== null
+      && averageDailyOutflow > 0
+      ? (balance.availableAmount / averageDailyOutflow) * 24
+      : null
+    let state: OpsTreasuryCellPosture['state'] = threshold ? 'OK' : 'UNCONFIGURED'
+    if (threshold) {
+      const minimumBreached = threshold.minimumAvailable !== null
+        && balance.availableAmount !== null
+        && balance.availableAmount < threshold.minimumAvailable
+      const criticalRunwayBreached = threshold.criticalRunwayHours !== null
+        && runwayHours !== null
+        && runwayHours <= threshold.criticalRunwayHours
+      const warningRunwayBreached = threshold.warningRunwayHours !== null
+        && runwayHours !== null
+        && runwayHours <= threshold.warningRunwayHours
+      if (minimumBreached || criticalRunwayBreached) state = 'CRITICAL'
+      else if (warningRunwayBreached) state = 'WARNING'
+    }
+    const params = new URLSearchParams({
+      currency: balance.currency,
+      kind: 'TREASURY',
+      venue: balance.venue,
+    })
+    return {
+      alertPath: `/ops/incidents?${params.toString()}`,
+      averageDailyOutflow,
+      ownerTeam: threshold?.ownerTeam ?? null,
+      runwayHours,
+      state,
+      threshold: threshold
+        ? {
+            criticalRunwayHours: threshold.criticalRunwayHours,
+            id: threshold.id,
+            minimumAvailable: threshold.minimumAvailable,
+            version: threshold.version,
+            warningRunwayHours: threshold.warningRunwayHours,
+          }
+        : null,
+    }
+  }
+
   private clampDays(days: number | undefined, fallback: number): number {
     if (days === undefined || !Number.isFinite(days)) return fallback
     return Math.min(MAX_WINDOW_DAYS, Math.max(1, Math.trunc(days)))
@@ -384,14 +482,53 @@ export class OpsTreasuryService {
 
     const raw = settled.flat()
     const currencies = [...new Set(raw.map(balance => balance.currency))]
-    const fx = await this.fetchFxRates(currencies)
+    const client = await this.dbProvider.getClient()
+    const runwaySince = new Date(Date.now() - RUNWAY_WINDOW_DAYS * 24 * 60 * 60 * 1_000)
+    const [fx, thresholds, outflowRows] = await Promise.all([
+      this.fetchFxRates(currencies),
+      client.opsTreasuryThreshold.findMany({
+        select: {
+          criticalRunwayHours: true,
+          currency: true,
+          id: true,
+          minimumAvailable: true,
+          ownerTeam: true,
+          venue: true,
+          version: true,
+          warningRunwayHours: true,
+        },
+      }),
+      client.$queryRaw<CurrencyOutflowRow[]>(Prisma.sql`
+        SELECT
+          q."targetCurrency"::text AS "currency",
+          SUM(q."targetAmount")::double precision / ${RUNWAY_WINDOW_DAYS} AS "averageDailyOutflow"
+        FROM "Transaction" t
+        INNER JOIN "Quote" q ON q."id" = t."quoteId"
+        WHERE t."status" = 'PAYMENT_COMPLETED'
+          AND t."createdAt" >= ${runwaySince}
+        GROUP BY q."targetCurrency"
+      `),
+    ])
+    const outflowByCurrency = new Map(
+      outflowRows.map(row => [row.currency, Number(row.averageDailyOutflow) || 0]),
+    )
+    const thresholdByCell = new Map(
+      thresholds.map(threshold => [`${threshold.venue}:${threshold.currency}`, threshold]),
+    )
 
     const cells: OpsTreasuryBalanceCell[] = raw.map((balance) => {
       const usdRate = fx.rates.get(balance.currency) ?? null
+      const threshold = thresholdByCell.get(`${balance.venue}:${balance.currency}`)
+      const averageDailyOutflow = outflowByCurrency.get(balance.currency) ?? null
       return {
         account: balance.account,
         amount: balance.amount,
+        availableAmount: balance.availableAmount,
+        blockedAmount: balance.blockedAmount,
         currency: balance.currency,
+        outstandingAmount: balance.outstandingAmount,
+        posture: this.buildCellPosture(balance, threshold, averageDailyOutflow),
+        reservedAmount: balance.reservedAmount,
         usdRate,
         usdValue: usdRate === null ? null : balance.amount * usdRate,
         venue: balance.venue,
@@ -413,6 +550,10 @@ export class OpsTreasuryService {
         cap,
         deficit,
         enabled: cap !== null,
+      },
+      freshness: {
+        staleAt: new Date(capturedAt.getTime() + Math.max(this.cacheTtlMs * 2, 120_000)),
+        state: errors.length > 0 ? 'PARTIAL' : 'FRESH',
       },
       fxRates: [...fx.rates.entries()]
         .filter(([currency]) => !USD_STABLES.has(currency))

@@ -3,6 +3,7 @@ import { Container } from 'inversify'
 import { ConsoleLogger } from '../../core/logging/consoleLogger'
 import { KycService } from '../../modules/kyc/application/KycService'
 import { GcsKycDocumentStorage } from '../../modules/kyc/infrastructure/GcsKycDocumentStorage'
+import { FirebaseOpsIdentityProvider } from '../../modules/operations/infrastructure/FirebaseOpsIdentityProvider'
 import { PartnerService } from '../../modules/partners/application/partnerService'
 import { PostgresAdvisoryLockManager } from '../../platform/cacheLock/postgresAdvisoryLockManager'
 import { GCPPubSubQueueHandler } from '../../platform/messaging/gcpPubSubQueueHandler'
@@ -36,6 +37,7 @@ const infrastructureBindings: ReadonlyArray<BindingRegistration<unknown>> = [
   { identifier: TYPES.IKycService, implementation: KycService },
   { identifier: TYPES.IKycDocumentStorage, implementation: GcsKycDocumentStorage },
   { identifier: TYPES.IOpsAuthService, implementation: OpsAuthService },
+  { identifier: TYPES.IOpsIdentityProvider, implementation: FirebaseOpsIdentityProvider },
 ] as const
 
 export function bindInfrastructure(container: Container): void {

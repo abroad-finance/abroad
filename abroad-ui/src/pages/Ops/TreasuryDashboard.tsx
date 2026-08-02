@@ -3,11 +3,15 @@ import {
 } from 'react'
 import { Link } from 'react-router-dom'
 
-import { useOpsApiKey } from '../../services/admin/opsAuthStore'
+import type { OpsTreasuryBalanceCell, OpsTreasuryThresholdInput } from '../../services/admin/treasuryTypes'
+
+import { useOpsApiKey, useOpsSession } from '../../services/admin/opsAuthStore'
 import {
+  createTreasuryThreshold,
   getTreasuryBalances,
   getTreasuryMovements,
   getTreasurySnapshots,
+  updateTreasuryThreshold,
 } from '../../services/admin/treasuryAdminApi'
 import {
   OpsTreasuryBalancesResponse,
@@ -18,11 +22,16 @@ import {
   formatAmount,
   formatDateTime,
   formatMoney,
+  OpsBanner,
+  OpsDialog,
   OpsEmptyState,
+  OpsField,
   OpsLoading,
   OpsPageShell,
+  OpsStatusBadge,
   UtilizationMeter,
 } from './shared'
+import { isOpsMutationCancelledError, useOpsMutation } from './shared/opsMutationContext'
 
 // Categorical palette (validated: worst adjacent CVD dE 24.2, light surface).
 // Color follows the venue entity, never its rank — a missing venue must not
@@ -71,6 +80,17 @@ const compactUsd = (value: null | number): string => {
   }).format(value)
 }
 
+const postureTone = (state: OpsTreasuryBalanceCell['posture']['state']) => {
+  if (state === 'CRITICAL') return 'danger' as const
+  if (state === 'WARNING') return 'warning' as const
+  if (state === 'OK') return 'success' as const
+  return 'neutral' as const
+}
+
+const balanceComponent = (value: null | number, currency: string): string => (
+  value === null ? 'Not reported' : formatMoney(value, currency)
+)
+
 const niceTicks = (max: number, count = 4): number[] => {
   if (!Number.isFinite(max) || max <= 0) return [0]
   const rawStep = max / count
@@ -92,7 +112,6 @@ type LineSeries = { color: string, label: string, points: LinePoint[] }
 type LineTooltip = {
   at: number
   rows: { color: string, label: string, value: null | number }[]
-  xPct: number
 }
 
 const LINE_W = 720
@@ -144,7 +163,6 @@ const LineChart = ({ series }: { series: LineSeries[] }) => {
         label: entry.label,
         value: entry.points.find(point => point.at === nearest)?.value ?? null,
       })),
-      xPct: (xFor(nearest) / LINE_W) * 100,
     })
   }
 
@@ -230,19 +248,42 @@ const LineChart = ({ series }: { series: LineSeries[] }) => {
       </svg>
       {tooltip && (
         <div
-          className="pointer-events-none absolute top-2 z-10 rounded-lg border border-ops-border bg-white px-3 py-2 shadow-lg"
-          style={{ left: `min(max(${tooltip.xPct}%, 10%), 78%)`, transform: 'translateX(-50%)' }}
+          className="pointer-events-none absolute right-2 top-2 z-10 rounded-lg border border-ops-border bg-white px-3 py-2 shadow-lg"
         >
           <div className="text-[11px] text-ops-muted">{new Date(tooltip.at).toLocaleString()}</div>
           {tooltip.rows.map(row => (
             <div className="mt-1 flex items-center gap-2 text-xs" key={row.label}>
-              <span aria-hidden className="inline-block h-0.5 w-3" style={{ backgroundColor: row.color }} />
+              <svg aria-hidden className="h-1 w-3" viewBox="0 0 12 1">
+                <rect fill={row.color} height="1" width="12" />
+              </svg>
               <span className="font-semibold text-ops-text">{compactUsd(row.value)}</span>
               <span className="text-ops-muted">{row.label}</span>
             </div>
           ))}
         </div>
       )}
+      <details className="mt-3 rounded-xl border border-ops-border bg-white/70 px-3">
+        <summary className="flex min-h-11 cursor-pointer items-center text-xs font-semibold text-ops-brand">View balance history data</summary>
+        <table className="mb-3 w-full table-fixed text-left text-xs">
+          <caption className="sr-only">Balance history by venue and timestamp</caption>
+          <thead className="text-ops-muted">
+            <tr>
+              <th className="w-[42%] py-2 pr-2 font-medium" scope="col">Time</th>
+              <th className="w-[30%] py-2 pr-2 font-medium" scope="col">Venue</th>
+              <th className="py-2 text-right font-medium" scope="col">USD</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-ops-border">
+            {series.flatMap(entry => entry.points.map(point => (
+              <tr key={`${entry.label}-${point.at}`}>
+                <th className="break-words py-2 pr-2 font-medium text-ops-text" scope="row">{new Date(point.at).toLocaleString()}</th>
+                <td className="break-words py-2 pr-2">{entry.label}</td>
+                <td className="py-2 text-right tabular-nums">{formatAmount(point.value, 2)}</td>
+              </tr>
+            )))}
+          </tbody>
+        </table>
+      </details>
     </div>
   )
 }
@@ -350,6 +391,26 @@ const BarChart = ({ color, data, title }: { color: string, data: BarDatum[], tit
           </div>
         )}
       </div>
+      <details className="mt-2 rounded-xl border border-ops-border bg-white/70 px-3">
+        <summary className="flex min-h-11 cursor-pointer items-center text-xs font-semibold text-ops-brand">View chart data</summary>
+        <table className="mb-3 w-full table-fixed text-left text-xs">
+          <caption className="sr-only">{title}</caption>
+          <thead className="text-ops-muted">
+            <tr>
+              <th className="py-2 font-medium" scope="col">Date</th>
+              <th className="py-2 text-right font-medium" scope="col">Amount</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-ops-border">
+            {data.map(datum => (
+              <tr key={datum.label}>
+                <th className="break-words py-2 pr-2 font-medium text-ops-text" scope="row">{datum.label}</th>
+                <td className="py-2 text-right tabular-nums">{formatAmount(datum.value, 2)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </details>
     </div>
   )
 }
@@ -365,52 +426,97 @@ const TreasuryDashboard = () => {
   const [movements, setMovements] = useState<null | OpsTreasuryMovementsResponse>(null)
   const [snapshots, setSnapshots] = useState<null | OpsTreasurySnapshotsResponse>(null)
   const [rangeDays, setRangeDays] = useState<number>(7)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<null | string>(null)
+  const [balanceLoading, setBalanceLoading] = useState(false)
+  const [movementLoading, setMovementLoading] = useState(false)
+  const [snapshotLoading, setSnapshotLoading] = useState(false)
+  const [balanceError, setBalanceError] = useState<null | string>(null)
+  const [movementError, setMovementError] = useState<null | string>(null)
+  const [snapshotError, setSnapshotError] = useState<null | string>(null)
+  const [thresholdEditor, setThresholdEditor] = useState<null | {
+    id?: string
+    input: OpsTreasuryThresholdInput
+    version?: number
+  }>(null)
+  const [thresholdWorking, setThresholdWorking] = useState(false)
   const opsApiKey = useOpsApiKey()
-  // Only the newest request may write state — guards against out-of-order
-  // responses when the history range switches mid-flight.
-  const requestSeq = useRef(0)
+  const session = useOpsSession()
+  const { requestMutation } = useOpsMutation()
+  const canManageThresholds = Boolean(session?.kind === 'ops_user' && session.permissions.includes('treasury:manage'))
+  const balanceRequestSeq = useRef(0)
+  const movementRequestSeq = useRef(0)
+  const snapshotRequestSeq = useRef(0)
 
-  const load = useCallback(async () => {
-    const seq = ++requestSeq.current
+  const loadBalances = useCallback(async () => {
+    const seq = ++balanceRequestSeq.current
     if (!opsApiKey) {
       setBalances(null)
-      setMovements(null)
-      setSnapshots(null)
-      setLoading(false)
+      setBalanceLoading(false)
       return
     }
-    setLoading(true)
-    setError(null)
-
+    setBalanceLoading(true)
+    setBalanceError(null)
     try {
-      const [
-        balancesResult,
-        movementsResult,
-        snapshotsResult,
-      ] = await Promise.all([
-        getTreasuryBalances(),
-        getTreasuryMovements(rangeDays),
-        getTreasurySnapshots(rangeDays),
-      ])
-      if (seq !== requestSeq.current) return
-      setBalances(balancesResult)
-      setMovements(movementsResult)
-      setSnapshots(snapshotsResult)
+      const result = await getTreasuryBalances()
+      if (seq === balanceRequestSeq.current) setBalances(result)
     }
     catch (err) {
-      if (seq !== requestSeq.current) return
-      setError(err instanceof Error ? err.message : 'Failed to load treasury data')
+      if (seq === balanceRequestSeq.current) setBalanceError(err instanceof Error ? err.message : 'Balances could not be loaded')
     }
     finally {
-      if (seq === requestSeq.current) setLoading(false)
+      if (seq === balanceRequestSeq.current) setBalanceLoading(false)
+    }
+  }, [opsApiKey])
+
+  const loadMovements = useCallback(async () => {
+    const seq = ++movementRequestSeq.current
+    if (!opsApiKey) {
+      setMovements(null)
+      setMovementLoading(false)
+      return
+    }
+    setMovementLoading(true)
+    setMovementError(null)
+    try {
+      const result = await getTreasuryMovements(rangeDays)
+      if (seq === movementRequestSeq.current) setMovements(result)
+    }
+    catch (err) {
+      if (seq === movementRequestSeq.current) setMovementError(err instanceof Error ? err.message : 'Movement history could not be loaded')
+    }
+    finally {
+      if (seq === movementRequestSeq.current) setMovementLoading(false)
+    }
+  }, [opsApiKey, rangeDays])
+
+  const loadSnapshots = useCallback(async () => {
+    const seq = ++snapshotRequestSeq.current
+    if (!opsApiKey) {
+      setSnapshots(null)
+      setSnapshotLoading(false)
+      return
+    }
+    setSnapshotLoading(true)
+    setSnapshotError(null)
+    try {
+      const result = await getTreasurySnapshots(rangeDays)
+      if (seq === snapshotRequestSeq.current) setSnapshots(result)
+    }
+    catch (err) {
+      if (seq === snapshotRequestSeq.current) setSnapshotError(err instanceof Error ? err.message : 'Balance history could not be loaded')
+    }
+    finally {
+      if (seq === snapshotRequestSeq.current) setSnapshotLoading(false)
     }
   }, [opsApiKey, rangeDays])
 
   useEffect(() => {
-    void load()
-  }, [load])
+    void loadBalances()
+  }, [loadBalances])
+
+  useEffect(() => {
+    void loadMovements()
+    void loadSnapshots()
+  }, [loadMovements, loadSnapshots])
 
   const venueTotals = useMemo(() => {
     if (!balances) return []
@@ -473,245 +579,354 @@ const TreasuryDashboard = () => {
     return map
   }, [balances])
 
+  const editThreshold = (cell: OpsTreasuryBalanceCell): void => {
+    setThresholdEditor({
+      id: cell.posture.threshold?.id,
+      input: {
+        criticalRunwayHours: cell.posture.threshold?.criticalRunwayHours ?? 12,
+        currency: cell.currency,
+        minimumAvailable: cell.posture.threshold?.minimumAvailable ?? null,
+        ownerTeam: cell.posture.ownerTeam ?? 'Finance',
+        venue: cell.venue,
+        warningRunwayHours: cell.posture.threshold?.warningRunwayHours ?? 24,
+      },
+      version: cell.posture.threshold?.version,
+    })
+  }
+
+  const saveThreshold = async (): Promise<void> => {
+    if (!thresholdEditor) return
+    setThresholdWorking(true)
+    setBalanceError(null)
+    try {
+      await requestMutation({
+        action: thresholdEditor.id ? 'treasury.threshold.update' : 'treasury.threshold.create',
+        execute: mutation => thresholdEditor.id
+          ? updateTreasuryThreshold(thresholdEditor.id, thresholdEditor.input, mutation)
+          : createTreasuryThreshold(thresholdEditor.input, mutation),
+        expectedVersion: thresholdEditor.version,
+        resourceLabel: `${thresholdEditor.input.venue} · ${thresholdEditor.input.currency}`,
+        title: thresholdEditor.id ? 'Update treasury threshold' : 'Create treasury threshold',
+      })
+      setThresholdEditor(null)
+      await loadBalances()
+    }
+    catch (saveError) {
+      if (!isOpsMutationCancelledError(saveError)) {
+        setBalanceError(saveError instanceof Error ? saveError.message : 'Treasury threshold could not be saved')
+      }
+    }
+    finally {
+      setThresholdWorking(false)
+    }
+  }
+
+  const refreshing = balanceLoading || movementLoading || snapshotLoading
+
   return (
     <OpsPageShell
       actions={(
         <button
           className="ops-btn-ghost"
-          disabled={!opsApiKey || loading}
-          onClick={() => void load()}
+          disabled={!opsApiKey || refreshing}
+          onClick={() => {
+            void loadBalances()
+            void loadMovements()
+            void loadSnapshots()
+          }}
           type="button"
         >
-          Refresh
+          Refresh all panels
         </button>
       )}
-      error={error}
-      eyebrow="Treasury"
-      keyRequiredMessage="Ops API key required to load treasury data."
-      subtitle="Everything we hold across venues, an indicative USD roll-up, and how money has moved."
-      title="Balances & Money Movement"
+      eyebrow="Money / Treasury"
+      keyRequiredMessage="Sign in to load treasury evidence."
+      subtitle="Available, blocked, reserved, and outstanding value by venue and currency—with currency-matched runway, alert ownership, and independent panel freshness."
+      title="Treasury Posture"
     >
-      {balances && (
-        <div className={loading ? 'opacity-60 transition-opacity' : 'transition-opacity'}>
-          <div className="mt-8 grid grid-cols-1 gap-4 lg:grid-cols-3">
-            <div className="ops-card p-5 backdrop-blur lg:col-span-1">
-              <div className="text-sm text-ops-muted">Total treasury (indicative)</div>
-              <div className="mt-1 text-5xl font-semibold text-ops-text">{compactUsd(balances.totalUsd)}</div>
-              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
-                {balances.totalUsdIsPartial && (
-                  <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-amber-700">
-                    ⚠ partial — some venues or rates unavailable
-                  </span>
-                )}
-                {balances.fxRates.map(rate => (
-                  <span className="rounded-full border border-ops-border bg-white px-2 py-0.5 text-ops-muted" key={rate.currency}>
-                    1 USD ≈
-                    {' '}
-                    {formatAmount(1 / rate.usdPerUnit, 2)}
-                    {' '}
-                    {rate.currency}
-                  </span>
+      <section aria-labelledby="current-balances-title" className="mt-7">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h2 className="text-xl font-semibold text-ops-text" id="current-balances-title">Current balances</h2>
+            <p className="mt-1 text-sm text-ops-muted">Live provider reads; last good data stays visible if a refresh fails.</p>
+          </div>
+          {balances && (
+            <span className="text-xs text-ops-muted">
+              Captured
+              {formatDateTime(balances.capturedAt)}
+              {' '}
+              ·
+              {balances.freshness.state.toLowerCase()}
+            </span>
+          )}
+        </div>
+        {balanceError && (
+          <OpsBanner className="mt-4" variant="error">
+            Balances refresh failed:
+            {balanceError}
+            {' '}
+            <button className="ml-2 font-semibold underline" onClick={() => void loadBalances()} type="button">Retry this panel</button>
+          </OpsBanner>
+        )}
+        {balances && (
+          <div className={balanceLoading ? 'opacity-60 transition-opacity' : 'transition-opacity'}>
+            <div className="mt-4 grid gap-4 lg:grid-cols-3">
+              <div className="ops-card p-5 lg:col-span-1">
+                <div className="text-sm text-ops-muted">Indicative priced total</div>
+                <div className="mt-1 text-4xl font-semibold text-ops-text">{compactUsd(balances.totalUsd)}</div>
+                <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                  {balances.totalUsdIsPartial && <OpsStatusBadge label="Partial valuation" tone="warning" />}
+                  {balances.fxRates.map(rate => (
+                    <span className="rounded-full border border-ops-border px-2 py-1 text-ops-muted" key={rate.currency}>
+                      1 USD ≈
+                      {formatAmount(1 / rate.usdPerUnit, 2)}
+                      {' '}
+                      {rate.currency}
+                    </span>
+                  ))}
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:col-span-2">
+                {venueTotals.map(([venue, total]) => (
+                  <div className="ops-card p-4" key={venue}>
+                    <div className="flex items-center gap-2 text-xs text-ops-muted">
+                      <svg aria-hidden className="h-2.5 w-2.5" viewBox="0 0 10 10">
+                        <circle cx="5" cy="5" fill={venueColor(venue)} r="5" />
+                      </svg>
+                      {venueLabel(venue)}
+                    </div>
+                    {errorByVenue.has(venue)
+                      ? <OpsStatusBadge className="mt-2" label="Unavailable" tone="danger" />
+                      : (
+                          <div className="mt-1 text-2xl font-semibold">
+                            {compactUsd(total.usd)}
+                            {total.hasUnpriced && <span className="ml-1 text-xs text-amber-700">partial</span>}
+                          </div>
+                        )}
+                  </div>
                 ))}
               </div>
-              <div className="mt-3 text-xs text-ops-muted">
-                as of
-                {' '}
-                {formatDateTime(balances.capturedAt)}
-              </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:col-span-2">
-              {venueTotals.map(([venue, total]) => (
-                <div className="ops-card p-4 backdrop-blur" key={venue}>
-                  <div className="flex items-center gap-2 text-xs text-ops-muted">
-                    <span aria-hidden className="inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: venueColor(venue) }} />
-                    {venueLabel(venue)}
-                  </div>
-                  {errorByVenue.has(venue)
-                    ? (
-                        <div className="mt-1">
-                          <span className="rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-xs text-rose-700" title={errorByVenue.get(venue)}>
-                            unavailable
-                          </span>
-                        </div>
-                      )
-                    : (
-                        <div className="mt-1 text-2xl font-semibold text-ops-text">
-                          {compactUsd(total.usd)}
-                          {total.hasUnpriced && <span className="ml-1 align-top text-xs text-amber-600" title="Holds currency without a USD rate">*</span>}
-                        </div>
-                      )}
+            {float?.enabled && (
+              <div className="ops-card mt-4 p-4">
+                <div className="flex flex-col gap-1 text-sm sm:flex-row sm:items-center sm:justify-between">
+                  <span className="text-ops-muted">Bridge float consumed by unsettled legs (already counted at Binance)</span>
+                  <span className="font-semibold">
+                    {formatAmount(float.deficit, 2)}
+                    {' '}
+                    /
+                    {' '}
+                    {formatAmount(float.cap, 2)}
+                    {' '}
+                    USDC
+                  </span>
                 </div>
+                <UtilizationMeter cap={float.cap} className="mt-3" deficit={float.deficit} />
+                <Link className="mt-3 inline-flex min-h-11 items-center text-sm font-semibold text-ops-brand" to="/ops/treasury/bridge">Inspect bridge settlement →</Link>
+              </div>
+            )}
+
+            <div className="mt-5 grid gap-4 lg:grid-cols-2">
+              {balances.cells.map(cell => (
+                <article className="ops-card min-w-0 p-5" key={`${cell.venue}-${cell.account}-${cell.currency}`}>
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <div className="flex items-center gap-2 text-xs text-ops-muted">
+                        <svg aria-hidden className="h-2.5 w-2.5" viewBox="0 0 10 10">
+                          <circle cx="5" cy="5" fill={venueColor(cell.venue)} r="5" />
+                        </svg>
+                        {venueLabel(cell.venue)}
+                      </div>
+                      <h3 className="mt-1 text-xl font-semibold text-ops-text">{cell.currency}</h3>
+                    </div>
+                    <OpsStatusBadge label={cell.posture.state} tone={postureTone(cell.posture.state)} />
+                  </div>
+                  <dl className="mt-4 grid grid-cols-2 gap-3">
+                    {[
+                      ['Available', cell.availableAmount],
+                      ['Blocked', cell.blockedAmount],
+                      ['Reserved', cell.reservedAmount],
+                      ['Outstanding', cell.outstandingAmount],
+                    ].map(([label, value]) => (
+                      <div className="rounded-xl bg-ops-bg p-3" key={label as string}>
+                        <dt className="text-xs text-ops-muted">{label}</dt>
+                        <dd className={`mt-1 text-sm font-semibold ${(value as null | number) === null ? 'text-ops-muted' : 'text-ops-text'}`}>{balanceComponent(value as null | number, cell.currency)}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                  <div className="mt-4 grid gap-3 text-sm sm:grid-cols-3">
+                    <div>
+                      <div className="text-xs text-ops-muted">Ledger total</div>
+                      <div className="mt-0.5 font-semibold">{formatMoney(cell.amount, cell.currency)}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-ops-muted">Runway</div>
+                      <div className="mt-0.5 font-semibold">{cell.posture.runwayHours === null ? 'Not enough outflow history' : `${formatAmount(cell.posture.runwayHours, 1)} hr`}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-ops-muted">Owner</div>
+                      <div className="mt-0.5 font-semibold">{cell.posture.ownerTeam ?? 'Not assigned'}</div>
+                    </div>
+                  </div>
+                  {cell.account && (
+                    <div className="mt-3 truncate font-mono text-[11px] text-ops-muted" title={cell.account}>
+                      Account reference ·
+                      {cell.account}
+                    </div>
+                  )}
+                  <div className="mt-4 flex flex-wrap gap-2 border-t border-ops-border pt-4">
+                    {canManageThresholds && <button className="ops-btn-neutral" onClick={() => editThreshold(cell)} type="button">{cell.posture.threshold ? 'Edit thresholds' : 'Configure thresholds'}</button>}
+                    {(cell.posture.state === 'CRITICAL' || cell.posture.state === 'WARNING') && <Link className="ops-btn-neutral" to={cell.posture.alertPath}>Open alert context</Link>}
+                  </div>
+                </article>
               ))}
             </div>
+            {balances.cells.length === 0 && <OpsEmptyState className="mt-4">No venue returned a balance cell. Review the venue-specific errors above.</OpsEmptyState>}
           </div>
+        )}
+        {balanceLoading && !balances && <OpsLoading className="mt-6" label="Loading current balances…" />}
+      </section>
 
-          {float?.enabled && (
-            <div className="ops-card mt-4 p-4 backdrop-blur">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-ops-muted">Bridge float utilization (context — already counted at Binance)</span>
-                <span className="font-medium text-ops-text">
-                  {formatAmount(float.deficit, 2)}
-                  {' '}
-                  /
-                  {' '}
-                  {formatAmount(float.cap, 2)}
-                  {' '}
-                  USDC outstanding
-                </span>
-              </div>
-              <UtilizationMeter cap={float.cap} className="mt-2" deficit={float.deficit} />
-            </div>
-          )}
-
-          <div className="ops-card mt-8 overflow-hidden backdrop-blur">
-            <h2 className="border-b border-ops-border px-4 py-3 text-sm font-medium text-ops-text">All balances</h2>
-            {balances.cells.length === 0
-              ? <OpsEmptyState className="m-4">No balances to show.</OpsEmptyState>
-              : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="text-left text-xs uppercase tracking-wide text-ops-muted">
-                          <th className="px-4 py-2" scope="col">Venue</th>
-                          <th className="px-4 py-2" scope="col">Account</th>
-                          <th className="px-4 py-2" scope="col">Currency</th>
-                          <th className="px-4 py-2 text-right" scope="col">Amount</th>
-                          <th className="px-4 py-2 text-right" scope="col">USD (indicative)</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {balances.cells.map(cell => (
-                          <tr className="border-t border-ops-border" key={`${cell.venue}-${cell.account}-${cell.currency}`}>
-                            <td className="px-4 py-2">
-                              <span className="flex items-center gap-2">
-                                <span aria-hidden className="inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: venueColor(cell.venue) }} />
-                                {venueLabel(cell.venue)}
-                              </span>
-                            </td>
-                            <td className="max-w-[180px] truncate px-4 py-2 font-mono text-xs text-ops-muted" title={cell.account}>
-                              {cell.account || '—'}
-                            </td>
-                            <td className="px-4 py-2">{cell.currency}</td>
-                            <td className="px-4 py-2 text-right tabular-nums">{formatAmount(cell.amount, 2)}</td>
-                            <td className="px-4 py-2 text-right tabular-nums">{cell.usdValue === null ? '—' : compactUsd(cell.usdValue)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
+      <section aria-labelledby="balance-history-title" className="mt-12">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h2 className="text-xl font-semibold text-ops-text" id="balance-history-title">Balance history</h2>
+            <p className="mt-1 text-sm text-ops-muted">Hourly snapshots load independently from current provider balances.</p>
           </div>
-
-          <div className="mt-10 flex items-center gap-2">
-            <span className="text-sm text-ops-muted">History range:</span>
+          <div aria-label="Balance history range" className="flex flex-wrap gap-2" role="group">
             {RANGE_PRESETS.map(preset => (
-              <button
-                className={rangeDays === preset
-                  ? 'rounded-full bg-abroad-dark px-3 py-1 text-xs font-medium text-white'
-                  : 'rounded-full border border-ops-border bg-white px-3 py-1 text-xs text-ops-muted hover:border-abroad-dark'}
-                key={preset}
-                onClick={() => setRangeDays(preset)}
-                type="button"
-              >
-                Last
-                {' '}
+              <button aria-pressed={rangeDays === preset} className={rangeDays === preset ? 'ops-btn-primary' : 'ops-btn-neutral'} key={preset} onClick={() => setRangeDays(preset)} type="button">
                 {preset}
                 {' '}
                 days
               </button>
             ))}
           </div>
-
-          <div className="ops-card mt-4 p-4 backdrop-blur">
+        </div>
+        {snapshotError && (
+          <OpsBanner className="mt-4" variant="error">
+            History refresh failed:
+            {snapshotError}
+            {' '}
+            <button className="ml-2 font-semibold underline" onClick={() => void loadSnapshots()} type="button">Retry history</button>
+          </OpsBanner>
+        )}
+        {snapshots && (
+          <div className={`ops-card mt-4 p-4 ${snapshotLoading ? 'opacity-60' : ''}`}>
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <h2 className="text-sm font-medium text-ops-text">Balance over time (USD, per venue)</h2>
-              <div className="flex flex-wrap items-center gap-3 text-xs text-ops-muted">
+              <div className="text-sm font-medium text-ops-text">Indicative USD by venue</div>
+              <div className="flex flex-wrap gap-3 text-xs text-ops-muted">
                 {lineSeries.map(entry => (
                   <span className="flex items-center gap-1.5" key={entry.label}>
-                    <span aria-hidden className="inline-block h-0.5 w-4" style={{ backgroundColor: entry.color }} />
+                    <svg aria-hidden className="h-1 w-4" viewBox="0 0 16 1">
+                      <rect fill={entry.color} height="1" width="16" />
+                    </svg>
                     {entry.label}
                   </span>
                 ))}
               </div>
             </div>
-            <div className="mt-2">
-              <LineChart series={lineSeries} />
+            <div className="mt-2"><LineChart series={lineSeries} /></div>
+            <div className="mt-2 text-xs text-ops-muted">
+              Window
+              {formatDateTime(snapshots.from)}
+              {' '}
+              –
+              {formatDateTime(snapshots.to)}
             </div>
           </div>
+        )}
+        {snapshotLoading && !snapshots && <OpsLoading className="mt-6" label="Loading balance history…" />}
+      </section>
 
+      <section aria-labelledby="money-movement-title" className="mt-12">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h2 className="text-xl font-semibold text-ops-text" id="money-movement-title">Money movement</h2>
+            <p className="mt-1 text-sm text-ops-muted">Completed inbound, payout, and bridge evidence for the selected range.</p>
+          </div>
           {movements && (
-            <>
-              <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-                <BarChart
-                  color="#2a78d6"
-                  data={movementCharts.stables}
-                  title="Stablecoins received per day (USD)"
-                />
-                {movementCharts.fiat.map(chart => (
-                  <BarChart
-                    color="#1baf7a"
-                    data={chart.data}
-                    key={chart.currency}
-                    title={`Fiat paid out per day (${chart.currency})`}
-                  />
-                ))}
-              </div>
-
-              <div className="ops-card mt-4 overflow-hidden backdrop-blur">
-                <h2 className="border-b border-ops-border px-4 py-3 text-sm font-medium text-ops-text">Recent movements</h2>
-                {movements.recent.length === 0
-                  ? <OpsEmptyState className="m-4">No movements in this window.</OpsEmptyState>
-                  : (
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                          <thead>
-                            <tr className="text-left text-xs uppercase tracking-wide text-ops-muted">
-                              <th className="px-4 py-2" scope="col">When</th>
-                              <th className="px-4 py-2" scope="col">Kind</th>
-                              <th className="px-4 py-2 text-right" scope="col">Amount</th>
-                              <th className="px-4 py-2" scope="col">Reference</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {movements.recent.map(event => (
-                              <tr className="border-t border-ops-border" key={`${event.kind}-${event.reference}-${event.at}`}>
-                                <td className="whitespace-nowrap px-4 py-2 text-ops-muted">{formatDateTime(event.at)}</td>
-                                <td className="px-4 py-2">
-                                  <span className="rounded-full border border-ops-border bg-white/60 px-2 py-0.5 text-xs text-ops-text">
-                                    <span aria-hidden>{event.direction === 'IN' ? '↓' : '↑'}</span>
-                                    <span className="sr-only">{event.direction === 'IN' ? 'Inbound' : 'Outbound'}</span>
-                                    {' '}
-                                    {eventKindLabels[event.kind] ?? event.kind}
-                                  </span>
-                                </td>
-                                <td className="whitespace-nowrap px-4 py-2 text-right tabular-nums">
-                                  {formatMoney(event.amount, event.currency)}
-                                </td>
-                                <td className="px-4 py-2 font-mono text-xs">
-                                  {event.kind === 'BRIDGE_SETTLED'
-                                    ? <span className="text-ops-muted">{event.reference}</span>
-                                    : (
-                                        <Link className="text-ops-brand hover:text-ops-brand-hover" to={`/ops/transactions/${event.reference}`}>
-                                          {event.reference.slice(0, 8)}
-                                          …
-                                        </Link>
-                                      )}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
-              </div>
-            </>
+            <span className="text-xs text-ops-muted">
+              {movements.days.length}
+              {' '}
+              UTC day buckets
+            </span>
           )}
         </div>
-      )}
+        {movementError && (
+          <OpsBanner className="mt-4" variant="error">
+            Movement refresh failed:
+            {movementError}
+            {' '}
+            <button className="ml-2 font-semibold underline" onClick={() => void loadMovements()} type="button">Retry movements</button>
+          </OpsBanner>
+        )}
+        {movements && (
+          <div className={movementLoading ? 'opacity-60' : ''}>
+            <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              <BarChart color="#2a78d6" data={movementCharts.stables} title="Stablecoins received per day (USD)" />
+              {movementCharts.fiat.map(chart => <BarChart color="#1baf7a" data={chart.data} key={chart.currency} title={`Fiat paid out per day (${chart.currency})`} />)}
+            </div>
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              {movements.recent.map(event => (
+                <article className="ops-card min-w-0 p-4" key={`${event.kind}-${event.reference}-${event.at}`}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="text-xs text-ops-muted">{formatDateTime(event.at)}</div>
+                      <div className="mt-1 text-sm font-semibold text-ops-text">
+                        <span aria-hidden>{event.direction === 'IN' ? '↓' : '↑'}</span>
+                        {' '}
+                        {eventKindLabels[event.kind] ?? event.kind}
+                      </div>
+                    </div>
+                    <div className="text-right font-semibold tabular-nums">{formatMoney(event.amount, event.currency)}</div>
+                  </div>
+                  <div className="mt-3 break-all font-mono text-xs">
+                    {event.kind === 'BRIDGE_SETTLED'
+                      ? (
+                          <Link className="text-ops-brand" to={`/ops/treasury/bridge?batchId=${encodeURIComponent(event.reference)}`}>
+                            Bridge batch
+                            {event.reference.slice(0, 8)}
+                            …
+                          </Link>
+                        )
+                      : (
+                          <Link className="text-ops-brand" to={`/ops/transactions/${event.reference}`}>
+                            Transaction
+                            {event.reference.slice(0, 8)}
+                            …
+                          </Link>
+                        )}
+                  </div>
+                </article>
+              ))}
+              {movements.recent.length === 0 && <OpsEmptyState>No completed movements in this range.</OpsEmptyState>}
+            </div>
+          </div>
+        )}
+        {movementLoading && !movements && <OpsLoading className="mt-6" label="Loading money movement…" />}
+      </section>
 
-      {loading && opsApiKey && !balances && (
-        <OpsLoading className="mt-6" label="Loading treasury data…" />
+      {thresholdEditor && (
+        <OpsDialog description="Runway is calculated only from completed outflow in the same currency. Saving changes alert evaluation but never moves funds." eyebrow="Money / Treasury" onClose={() => setThresholdEditor(null)} title={`${thresholdEditor.id ? 'Edit' : 'Configure'} ${thresholdEditor.input.currency} thresholds`}>
+          <div className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <OpsField label="Venue"><input className="ops-input" disabled name="threshold-venue" value={thresholdEditor.input.venue} /></OpsField>
+              <OpsField label="Currency"><input className="ops-input" disabled name="threshold-currency" value={thresholdEditor.input.currency} /></OpsField>
+            </div>
+            <OpsField hint="Alert owner shown on the Treasury and Incident Center pages." label="Owner team"><input autoFocus className="ops-input" maxLength={60} name="threshold-owner" onChange={event => setThresholdEditor(current => current && ({ ...current, input: { ...current.input, ownerTeam: event.target.value } }))} value={thresholdEditor.input.ownerTeam} /></OpsField>
+            <OpsField hint={`Amount in ${thresholdEditor.input.currency}; leave blank to use runway only.`} label="Minimum available"><input className="ops-input" min="0" name="threshold-minimum" onChange={event => setThresholdEditor(current => current && ({ ...current, input: { ...current.input, minimumAvailable: event.target.value === '' ? null : Number(event.target.value) } }))} step="any" type="number" value={thresholdEditor.input.minimumAvailable ?? ''} /></OpsField>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <OpsField label="Warning runway (hours)"><input className="ops-input" min="0" name="threshold-warning-runway" onChange={event => setThresholdEditor(current => current && ({ ...current, input: { ...current.input, warningRunwayHours: event.target.value === '' ? null : Number(event.target.value) } }))} step="any" type="number" value={thresholdEditor.input.warningRunwayHours ?? ''} /></OpsField>
+              <OpsField hint="Must not exceed warning runway." label="Critical runway (hours)"><input className="ops-input" min="0" name="threshold-critical-runway" onChange={event => setThresholdEditor(current => current && ({ ...current, input: { ...current.input, criticalRunwayHours: event.target.value === '' ? null : Number(event.target.value) } }))} step="any" type="number" value={thresholdEditor.input.criticalRunwayHours ?? ''} /></OpsField>
+            </div>
+            <div className="flex flex-col-reverse gap-2 border-t border-ops-border pt-4 sm:flex-row sm:justify-end">
+              <button className="ops-btn-neutral" onClick={() => setThresholdEditor(null)} type="button">Cancel</button>
+              <button className="ops-btn-primary" disabled={thresholdWorking || !thresholdEditor.input.ownerTeam.trim()} onClick={() => void saveThreshold()} type="button">Continue to protected save</button>
+            </div>
+          </div>
+        </OpsDialog>
       )}
     </OpsPageShell>
   )

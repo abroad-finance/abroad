@@ -1,7 +1,12 @@
 export type OpsTreasuryBalanceCell = {
   account: string
   amount: number
+  availableAmount: null | number
+  blockedAmount: null | number
   currency: string
+  outstandingAmount: null | number
+  posture: OpsTreasuryCellPosture
+  reservedAmount: null | number
   usdRate: null | number
   usdValue: null | number
   venue: string
@@ -12,9 +17,28 @@ export type OpsTreasuryBalancesResponse = {
   cells: OpsTreasuryBalanceCell[]
   errors: OpsTreasuryVenueError[]
   float: OpsTreasuryFloat
+  freshness: {
+    staleAt: string
+    state: 'FRESH' | 'PARTIAL'
+  }
   fxRates: OpsTreasuryFxRate[]
   totalUsd: number
   totalUsdIsPartial: boolean
+}
+
+export type OpsTreasuryCellPosture = {
+  alertPath: string
+  averageDailyOutflow: null | number
+  ownerTeam: null | string
+  runwayHours: null | number
+  state: 'CRITICAL' | 'OK' | 'UNCONFIGURED' | 'WARNING'
+  threshold: null | {
+    criticalRunwayHours: null | number
+    id: string
+    minimumAvailable: null | number
+    version: number
+    warningRunwayHours: null | number
+  }
 }
 
 export type OpsTreasuryFloat = {
@@ -69,6 +93,24 @@ export type OpsTreasurySnapshotsResponse = {
   from: string
   series: OpsTreasurySnapshotSeries[]
   to: string
+}
+
+export type OpsTreasuryThreshold = OpsTreasuryThresholdInput & {
+  createdAt: string
+  createdBy: { displayName: string, id: string }
+  id: string
+  updatedAt: string
+  updatedBy: { displayName: string, id: string }
+  version: number
+}
+
+export type OpsTreasuryThresholdInput = {
+  criticalRunwayHours?: null | number
+  currency: string
+  minimumAvailable?: null | number
+  ownerTeam: string
+  venue: string
+  warningRunwayHours?: null | number
 }
 
 export type OpsTreasuryVenueError = {

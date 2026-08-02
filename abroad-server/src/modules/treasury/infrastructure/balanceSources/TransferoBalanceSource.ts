@@ -17,15 +17,29 @@ export class TransferoBalanceSource implements ITreasuryBalanceSource {
     const balances = transferoUltraBalanceResponseSchema.parse(response)
 
     return balances.map((balance) => {
-      const amount = Number(balance.available)
-      if (!Number.isFinite(amount)) {
-        throw new Error(`Transfero Ultra returned an invalid available balance for ${balance.asset}`)
+      const parseAmount = (value: string, field: string): number => {
+        const parsed = Number(value)
+        if (!Number.isFinite(parsed)) {
+          throw new Error(`Transfero Ultra returned an invalid ${field} balance for ${balance.asset}`)
+        }
+        return parsed
       }
+      const availableAmount = parseAmount(balance.available, 'available')
+      const blockedAmount = parseAmount(balance.blocked, 'blocked')
+      const reservedAmount = parseAmount(balance.processing, 'processing')
+        + parseAmount(balance.openWithdrawals, 'open withdrawals')
+      const outstandingAmount = parseAmount(balance.openDebt, 'open debt')
+        + parseAmount(balance.overdueDebt, 'overdue debt')
+        + parseAmount(balance.owedDue, 'owed due')
 
       return {
         account: balance.asset,
-        amount,
+        amount: parseAmount(balance.ledgerBalance, 'ledger'),
+        availableAmount,
+        blockedAmount,
         currency: balance.asset,
+        outstandingAmount,
+        reservedAmount,
         venue: this.venue,
       }
     })

@@ -5,6 +5,23 @@ const PAYABLE_STATUSES: ReadonlySet<TransactionStatus> = new Set([
   TransactionStatus.PAYMENT_EXPIRED,
 ])
 
+export async function ensureUniqueOnChainId(
+  prismaClient: PrismaClient,
+  onChainSignature: string,
+  transactionId: string,
+): Promise<string | undefined> {
+  const duplicateOnChain = await prismaClient.transaction.findFirst({
+    select: { id: true },
+    where: { onChainId: onChainSignature },
+  })
+
+  if (duplicateOnChain && duplicateOnChain.id !== transactionId) {
+    return 'On-chain transaction already linked to another transaction'
+  }
+
+  return undefined
+}
+
 export function validateDepositTransaction(
   transaction: {
     quote: { network: BlockchainNetwork }
@@ -18,23 +35,6 @@ export function validateDepositTransaction(
 
   if (transaction.quote.network !== expectedNetwork) {
     return `Transaction is not set for ${expectedNetwork.charAt(0)}${expectedNetwork.slice(1).toLowerCase()}`
-  }
-
-  return undefined
-}
-
-export async function ensureUniqueOnChainId(
-  prismaClient: PrismaClient,
-  onChainSignature: string,
-  transactionId: string,
-): Promise<string | undefined> {
-  const duplicateOnChain = await prismaClient.transaction.findFirst({
-    select: { id: true },
-    where: { onChainId: onChainSignature },
-  })
-
-  if (duplicateOnChain && duplicateOnChain.id !== transactionId) {
-    return 'On-chain transaction already linked to another transaction'
   }
 
   return undefined

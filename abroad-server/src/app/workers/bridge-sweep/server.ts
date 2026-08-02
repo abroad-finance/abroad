@@ -4,6 +4,8 @@ import http from 'http'
 import { createScopedLogger } from '../../../core/logging/scopedLogger'
 import { ILogger } from '../../../core/logging/types'
 import { FlowRetryWorker } from '../../../modules/flows/application/FlowRetryWorker'
+import { OpsConfigurationReleaseWorker } from '../../../modules/operations/application/OpsConfigurationReleaseWorker'
+import { OpsIncidentWorker } from '../../../modules/operations/application/OpsIncidentWorker'
 import { BridgeSweepWorker } from '../../../modules/treasury/application/BridgeSweepWorker'
 import { TreasurySnapshotWorker } from '../../../modules/treasury/application/TreasurySnapshotWorker'
 import { initSentry } from '../../../platform/observability/sentry'
@@ -33,6 +35,8 @@ export const createHealthHandler = (state: { live: boolean, ready: boolean }) =>
 
 let worker: BridgeSweepWorker | null = null
 let retryWorker: FlowRetryWorker | null = null
+let incidentWorker: null | OpsIncidentWorker = null
+let configurationReleaseWorker: null | OpsConfigurationReleaseWorker = null
 let snapshotWorker: null | TreasurySnapshotWorker = null
 
 export function startBridgeSweepWorker(): void {
@@ -44,16 +48,28 @@ export function startBridgeSweepWorker(): void {
   snapshotWorker.start()
   retryWorker = iocContainer.get<FlowRetryWorker>(FlowRetryWorker)
   retryWorker.start()
+  incidentWorker = iocContainer.get<OpsIncidentWorker>(OpsIncidentWorker)
+  incidentWorker.start()
+  configurationReleaseWorker = iocContainer.get<OpsConfigurationReleaseWorker>(OpsConfigurationReleaseWorker)
+  configurationReleaseWorker.start()
   health.ready = true
 }
 
 export async function stopBridgeSweepWorker(): Promise<void> {
   try {
-    await Promise.all([retryWorker?.stop(), worker?.stop(), snapshotWorker?.stop()])
+    await Promise.all([
+      configurationReleaseWorker?.stop(),
+      incidentWorker?.stop(),
+      retryWorker?.stop(),
+      worker?.stop(),
+      snapshotWorker?.stop(),
+    ])
   }
   finally {
     worker = null
     retryWorker = null
+    incidentWorker = null
+    configurationReleaseWorker = null
     snapshotWorker = null
     health.ready = false
   }

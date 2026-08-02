@@ -206,7 +206,12 @@
 @media (prefers-reduced-motion: reduce) {
   .partner-page *,
   .partner-page *::before,
-  .partner-page *::after {
+  .partner-page *::after,
+  .ops-page *,
+  .ops-page *::before,
+  .ops-page *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
     scroll-behavior: auto !important;
     transition-duration: 0.01ms !important;
   }
@@ -435,7 +440,31 @@
 @layer components {
   /* Page wrapper: warm beige bg, always light */
   .ops-page {
-    @apply min-h-screen bg-ops-bg text-ops-text;
+    @apply min-h-screen overflow-x-clip bg-ops-bg text-ops-text;
+  }
+
+  .ops-shell {
+    @apply min-h-screen lg:grid lg:grid-cols-[17rem_minmax(0,1fr)];
+  }
+
+  .ops-sidebar {
+    @apply sticky top-0 z-40 h-screen min-h-0 flex-col overflow-hidden bg-[#123D3A] text-white shadow-xl;
+  }
+
+  .ops-mobile-nav {
+    @apply sticky top-0 z-50 flex min-h-16 items-center justify-between gap-3 border-b border-ops-border bg-white/95 px-4 py-2 shadow-sm backdrop-blur;
+  }
+
+  .ops-shell-topbar {
+    @apply sticky top-0 z-40 flex min-h-16 items-center justify-between gap-3 border-b border-ops-border bg-white/95 px-4 py-2 shadow-sm backdrop-blur sm:px-6 xl:px-8;
+  }
+
+  .ops-topbar-link {
+    @apply inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold text-ops-text transition hover:bg-neutral-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ops-brand/50;
+  }
+
+  .ops-skip-link {
+    @apply fixed left-4 top-3 z-[100] -translate-y-24 rounded-xl bg-ops-brand px-4 py-3 text-sm font-semibold text-white shadow-xl transition-transform focus:translate-y-0 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-ops-brand;
   }
 
   /* Canonical card surface: visible token border (not near-invisible white/70)
@@ -449,7 +478,7 @@
 
   /* Standard text input / select */
   .ops-input {
-    @apply rounded-xl border border-ops-border bg-white px-3 py-2 text-sm text-ops-text placeholder:text-ops-muted/70 focus:outline-none focus-visible:ring-2 focus-visible:ring-ops-brand/50 focus-visible:border-ops-brand;
+    @apply min-h-11 rounded-xl border border-ops-border bg-white px-3 py-2 text-sm text-ops-text placeholder:text-ops-muted/70 focus:outline-none focus-visible:ring-2 focus-visible:ring-ops-brand/50 focus-visible:border-ops-brand;
   }
 
   /* Uppercase tracking labels + header typography */
@@ -469,26 +498,50 @@
   /* Buttons — filled / ghost / neutral / danger variants + a compact size.
      Every variant carries the same focus-visible ring and disabled affordance. */
   .ops-btn-primary {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-ops-brand bg-ops-brand px-4 py-2 text-sm font-medium text-white transition hover:bg-ops-brand-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ops-brand/50 focus-visible:ring-offset-2 focus-visible:ring-offset-ops-bg disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-ops-brand bg-ops-brand px-4 py-2 text-sm font-medium text-white transition hover:bg-ops-brand-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ops-brand/50 focus-visible:ring-offset-2 focus-visible:ring-offset-ops-bg disabled:opacity-50 disabled:cursor-not-allowed;
   }
   .ops-btn-ghost {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-ops-brand bg-white/70 px-4 py-2 text-sm font-medium text-ops-brand transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ops-brand/50 focus-visible:ring-offset-2 focus-visible:ring-offset-ops-bg disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-ops-brand bg-white/70 px-4 py-2 text-sm font-medium text-ops-brand transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ops-brand/50 focus-visible:ring-offset-2 focus-visible:ring-offset-ops-bg disabled:opacity-50 disabled:cursor-not-allowed;
   }
   .ops-btn-neutral {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-ops-border bg-white px-4 py-2 text-sm font-medium text-ops-text transition hover:bg-neutral-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ops-brand/50 focus-visible:ring-offset-2 focus-visible:ring-offset-ops-bg disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-ops-border bg-white px-4 py-2 text-sm font-medium text-ops-text transition hover:bg-neutral-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ops-brand/50 focus-visible:ring-offset-2 focus-visible:ring-offset-ops-bg disabled:opacity-50 disabled:cursor-not-allowed;
   }
   .ops-btn-danger {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-rose-300 bg-white px-4 py-2 text-sm font-medium text-rose-700 transition hover:bg-rose-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400/50 focus-visible:ring-offset-2 focus-visible:ring-offset-ops-bg disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-rose-300 bg-white px-4 py-2 text-sm font-medium text-rose-700 transition hover:bg-rose-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400/50 focus-visible:ring-offset-2 focus-visible:ring-offset-ops-bg disabled:opacity-50 disabled:cursor-not-allowed;
   }
   .ops-btn-sm {
-    @apply px-3 py-1.5 text-xs;
+    @apply min-h-11 px-3 py-1.5 text-xs;
+  }
+
+  .ops-icon-btn {
+    @apply inline-flex size-11 shrink-0 items-center justify-center rounded-xl border border-ops-border bg-white text-ops-text transition hover:bg-neutral-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ops-brand/50 focus-visible:ring-offset-2 focus-visible:ring-offset-ops-bg disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .ops-session-bar {
+    @apply grid min-h-16 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-2xl border border-ops-border bg-white/85 px-4 py-3 shadow-ops-card-sm;
   }
 
   /* Navigation pill used by the shared OpsNav */
   .ops-nav-link {
-    @apply inline-flex items-center rounded-xl border border-ops-border bg-white/70 px-3.5 py-2 text-sm font-medium text-ops-text transition hover:bg-white hover:border-ops-brand/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ops-brand/50 focus-visible:ring-offset-2 focus-visible:ring-offset-ops-bg;
+    @apply flex min-h-11 w-full items-center gap-3 rounded-xl border border-transparent px-3 py-2 text-sm font-medium text-ops-text transition hover:border-ops-border hover:bg-neutral-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ops-brand/50;
   }
   .ops-nav-link-active {
     @apply border-ops-brand bg-ops-brand text-white hover:bg-ops-brand-hover hover:border-ops-brand;
+  }
+
+  .ops-nav-group-label {
+    @apply px-3 text-[10px] font-bold uppercase tracking-[0.16em] text-ops-muted;
+  }
+
+  .ops-sidebar .ops-nav-group-label {
+    @apply text-emerald-100/55;
+  }
+
+  .ops-sidebar .ops-nav-link {
+    @apply text-emerald-50/85 hover:border-white/10 hover:bg-white/10 hover:text-white focus-visible:ring-emerald-200/70;
+  }
+
+  .ops-sidebar .ops-nav-link-active {
+    @apply border-white/10 bg-white/15 text-white shadow-sm hover:bg-white/20;
   }
 }

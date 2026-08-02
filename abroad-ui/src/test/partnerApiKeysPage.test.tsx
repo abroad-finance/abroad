@@ -5,17 +5,23 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import {
   afterEach,
+  beforeEach,
   describe,
   expect,
   it,
   vi,
 } from 'vitest'
 
+import type { OpsSession } from '../services/admin/opsAuthStore'
+
 import PartnerApiKeys from '../pages/Ops/PartnerApiKeys'
-import { clearOpsApiKey, setOpsApiKey } from '../services/admin/opsAuthStore'
+import { clearOpsApiKey, setOpsSession } from '../services/admin/opsAuthStore'
+import { testOpsMutationDetails } from './opsMutationTestFixtures'
+import { ImmediateOpsMutationProvider } from './opsMutationTestUtils'
 
 const mocked = vi.hoisted(() => ({
   createPartner: vi.fn(),
+  getPartnerCredentialHistory: vi.fn(),
   listPartners: vi.fn(),
   revokePartnerApiKey: vi.fn(),
   rotatePartnerApiKey: vi.fn(),
@@ -24,21 +30,42 @@ const mocked = vi.hoisted(() => ({
 
 vi.mock('../services/admin/partnerAdminApi', () => ({
   createPartner: mocked.createPartner,
+  getPartnerCredentialHistory: mocked.getPartnerCredentialHistory,
   listPartners: mocked.listPartners,
   revokePartnerApiKey: mocked.revokePartnerApiKey,
   rotatePartnerApiKey: mocked.rotatePartnerApiKey,
   updatePartnerClientDomain: mocked.updatePartnerClientDomain,
 }))
 
+const administratorSession: OpsSession = {
+  authenticatedAt: '2026-08-02T15:00:00.000Z',
+  bootstrapRequired: false,
+  displayName: 'Ops Administrator',
+  email: 'administrator@abroad.finance',
+  kind: 'ops_user',
+  permissions: [
+    'credentials:manage',
+    'partners:manage',
+    'partners:read',
+  ],
+  role: 'ADMINISTRATOR',
+  sessionVersion: 1,
+  stepUpExpiresAt: '2026-08-02T15:30:00.000Z',
+  userId: 'ops-admin-1',
+}
+
+beforeEach(() => {
+  setOpsSession(administratorSession)
+})
+
 afterEach(() => {
   clearOpsApiKey()
+  setOpsSession(null)
   vi.clearAllMocks()
 })
 
 describe('PartnerApiKeys page', () => {
   it('creates partner and includes the optional client domain', async () => {
-    setOpsApiKey('ops_key')
-
     mocked.listPartners.mockResolvedValue({
       items: [],
       maximumStablecoinAmount: 0,
@@ -61,7 +88,9 @@ describe('PartnerApiKeys page', () => {
 
     render(
       <MemoryRouter>
-        <PartnerApiKeys />
+        <ImmediateOpsMutationProvider>
+          <PartnerApiKeys />
+        </ImmediateOpsMutationProvider>
       </MemoryRouter>,
     )
 
@@ -75,18 +104,19 @@ describe('PartnerApiKeys page', () => {
 
     await screen.findByText('One-Time API Key')
     expect(screen.getByText('partner_created_key')).toBeInTheDocument()
-    expect(mocked.createPartner).toHaveBeenCalledWith(expect.objectContaining({
-      clientDomain: 'https://App.Abroad.Finance/swap',
-      company: 'Acme',
-      email: 'acme@example.com',
-      firstName: 'Ada',
-      lastName: 'Lovelace',
-    }))
+    expect(mocked.createPartner).toHaveBeenCalledWith(
+      expect.objectContaining({
+        clientDomain: 'https://App.Abroad.Finance/swap',
+        company: 'Acme',
+        email: 'acme@example.com',
+        firstName: 'Ada',
+        lastName: 'Lovelace',
+      }),
+      testOpsMutationDetails,
+    )
   })
 
   it('rotates, edits, clears, and revokes partner settings inline', async () => {
-    setOpsApiKey('ops_key')
-
     mocked.listPartners.mockResolvedValue({
       items: [{
         clientDomain: 'old.abroad.finance',
@@ -152,11 +182,11 @@ describe('PartnerApiKeys page', () => {
         needsKyc: true,
       })
     mocked.revokePartnerApiKey.mockResolvedValue(undefined)
-    vi.spyOn(window, 'confirm').mockReturnValue(true)
-
     render(
       <MemoryRouter>
-        <PartnerApiKeys />
+        <ImmediateOpsMutationProvider>
+          <PartnerApiKeys />
+        </ImmediateOpsMutationProvider>
       </MemoryRouter>,
     )
 
@@ -174,7 +204,7 @@ describe('PartnerApiKeys page', () => {
     await user.click(screen.getByRole('button', { name: 'Rotate Key' }))
 
     await screen.findByText('partner_rotated_key')
-    expect(mocked.rotatePartnerApiKey).toHaveBeenCalledWith('partner-1')
+    expect(mocked.rotatePartnerApiKey).toHaveBeenCalledWith('partner-1', testOpsMutationDetails)
 
     await user.click(screen.getByRole('button', { name: 'Edit Domain' }))
 
@@ -184,33 +214,37 @@ describe('PartnerApiKeys page', () => {
     await user.click(screen.getByRole('button', { name: 'Save' }))
 
     await waitFor(() => {
-      expect(mocked.updatePartnerClientDomain).toHaveBeenNthCalledWith(1, 'partner-1', {
-        clientDomain: 'https://App.Abroad.Finance/path',
-      })
+      expect(mocked.updatePartnerClientDomain).toHaveBeenNthCalledWith(
+        1,
+        'partner-1',
+        { clientDomain: 'https://App.Abroad.Finance/path' },
+        testOpsMutationDetails,
+      )
     })
     expect(screen.getByText('app.abroad.finance')).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Clear Domain' }))
 
     await waitFor(() => {
-      expect(mocked.updatePartnerClientDomain).toHaveBeenNthCalledWith(2, 'partner-1', {
-        clientDomain: null,
-      })
+      expect(mocked.updatePartnerClientDomain).toHaveBeenNthCalledWith(
+        2,
+        'partner-1',
+        { clientDomain: null },
+        testOpsMutationDetails,
+      )
     })
     expect(screen.getByText('No browser origin configured')).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Revoke' }))
 
     await waitFor(() => {
-      expect(mocked.revokePartnerApiKey).toHaveBeenCalledWith('partner-1')
+      expect(mocked.revokePartnerApiKey).toHaveBeenCalledWith('partner-1', testOpsMutationDetails)
     })
     expect(screen.getByText('Revoked')).toBeInTheDocument()
     expect(screen.getByText('315.62')).toBeInTheDocument()
   })
 
   it('renders a responsive partner ranking with proportional visual rails', async () => {
-    setOpsApiKey('ops_key')
-
     mocked.listPartners.mockResolvedValue({
       items: [{
         completedVolume: {
@@ -247,7 +281,9 @@ describe('PartnerApiKeys page', () => {
 
     render(
       <MemoryRouter>
-        <PartnerApiKeys />
+        <ImmediateOpsMutationProvider>
+          <PartnerApiKeys />
+        </ImmediateOpsMutationProvider>
       </MemoryRouter>,
     )
 
@@ -263,5 +299,78 @@ describe('PartnerApiKeys page', () => {
     const leaderRail = within(rankedPartners[0]).getByRole('img', { name: /Rank 1: 900 USD stablecoins/ })
     expect(leaderRail.querySelector('[data-currency="USDC"]')).toHaveAttribute('width', '100')
     expect(within(rankedPartners[1]).getByRole('img', { name: /Rank 2: 100 USD stablecoins/ })).toBeInTheDocument()
+  })
+
+  it('shows safe credential metadata, graceful overlap, and lifecycle history', async () => {
+    mocked.listPartners.mockResolvedValue({
+      items: [{
+        completedVolume: {
+          completedTransactions: 0,
+          payout: [],
+          source: [],
+          stablecoinAmount: 0,
+        },
+        createdAt: '2026-01-01T00:00:00.000Z',
+        hasApiKey: true,
+        id: 'partner-1',
+        isKybApproved: true,
+        name: 'Credential Partner',
+        needsKyc: false,
+      }],
+      maximumStablecoinAmount: 0,
+      page: 1,
+      pageSize: 20,
+      total: 1,
+    })
+    mocked.getPartnerCredentialHistory.mockResolvedValue({
+      events: [{
+        action: 'credentials.api_key.rotate.succeeded',
+        actorLabel: 'Ops Administrator',
+        createdAt: '2026-08-02T15:00:00.000Z',
+        id: 'event-1',
+        reason: 'Scheduled partner rotation',
+        source: 'OPS',
+      }],
+      legacyCredential: {
+        active: true,
+        overlapExpiresAt: '2026-08-03T15:00:00.000Z',
+      },
+      managedCredentials: [{
+        createdAt: '2026-08-01T15:00:00.000Z',
+        displayPrefix: 'partner_ab12',
+        id: 'managed-key-1',
+        lastUsedAt: '2026-08-02T14:00:00.000Z',
+        name: 'Production integration',
+        scopes: ['transactions:read', 'transactions:write'],
+        status: 'ACTIVE',
+      }],
+      partner: {
+        createdAt: '2026-01-01T00:00:00.000Z',
+        hasApiKey: true,
+        id: 'partner-1',
+        isKybApproved: true,
+        name: 'Credential Partner',
+        needsKyc: false,
+      },
+    })
+
+    render(
+      <MemoryRouter>
+        <ImmediateOpsMutationProvider>
+          <PartnerApiKeys />
+        </ImmediateOpsMutationProvider>
+      </MemoryRouter>,
+    )
+
+    const user = userEvent.setup()
+    await screen.findByText('Credential Partner')
+    await user.click(screen.getByRole('button', { name: 'View History' }))
+
+    expect(await screen.findByRole('region', { name: 'Credential history for Credential Partner' })).toBeInTheDocument()
+    expect(screen.getByText('Production integration')).toBeInTheDocument()
+    expect(screen.getByText('partner_ab12…')).toBeInTheDocument()
+    expect(screen.getByText(/Previous key valid until/)).toBeInTheDocument()
+    expect(screen.getByText('Scheduled partner rotation')).toBeInTheDocument()
+    expect(screen.queryByText(/secretHash/i)).not.toBeInTheDocument()
   })
 })

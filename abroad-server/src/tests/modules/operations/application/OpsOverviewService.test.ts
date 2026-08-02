@@ -29,6 +29,7 @@ const makeBridgeOverview = () => ({
       { amount: 3, count: 1, status: BridgeLegStatus.FAILED },
     ],
     oldestPendingAt: new Date('2026-08-01T09:00:00.000Z'),
+    recent: [],
     total: 4,
   },
 })
@@ -45,11 +46,16 @@ const makePrisma = (): PrismaMock => ({
 const makeTreasuryBalances = () => ({
   capturedAt: new Date('2026-08-01T11:59:00.000Z'),
   cells: [
-    { account: '', amount: 100, currency: 'USDC', usdRate: 1, usdValue: 100, venue: 'BINANCE' },
-    { account: '', amount: 500, currency: 'BRL', usdRate: null, usdValue: null, venue: 'TRANSFERO' },
+    {
+      account: '', amount: 100, availableAmount: 100, blockedAmount: 0, currency: 'USDC', outstandingAmount: 0, posture: { alertPath: '/ops/treasury', averageDailyOutflow: null, ownerTeam: null, runwayHours: null, state: 'UNCONFIGURED', threshold: null }, reservedAmount: 0, usdRate: 1, usdValue: 100, venue: 'BINANCE',
+    },
+    {
+      account: '', amount: 500, availableAmount: 500, blockedAmount: 0, currency: 'BRL', outstandingAmount: 0, posture: { alertPath: '/ops/treasury', averageDailyOutflow: null, ownerTeam: null, runwayHours: null, state: 'UNCONFIGURED', threshold: null }, reservedAmount: 0, usdRate: null, usdValue: null, venue: 'TRANSFERO',
+    },
   ],
   errors: [{ message: 'Unavailable', venue: 'STELLAR_HOT_WALLET' }],
   float: { available: 88, cap: 100, deficit: 12, enabled: true },
+  freshness: { staleAt: new Date('2026-08-01T12:01:00.000Z'), state: 'PARTIAL' },
   fxRates: [],
   totalUsd: 100,
   totalUsdIsPartial: true,
@@ -61,10 +67,25 @@ const makeService = (prisma: PrismaMock) => {
   }
   const bridgeService = { getOverview: jest.fn(async () => makeBridgeOverview()) }
   const treasuryService = { getBalances: jest.fn(async () => makeTreasuryBalances()) }
+  const incidentService = {
+    getOverviewInternal: jest.fn(async () => ({
+      critical: 1,
+      high: 2,
+      open: 4,
+      top: [],
+      unowned: 3,
+    })),
+  }
 
   return {
     bridgeService,
-    service: new OpsOverviewService(dbProvider, bridgeService as never, treasuryService as never),
+    incidentService,
+    service: new OpsOverviewService(
+      dbProvider,
+      bridgeService as never,
+      treasuryService as never,
+      incidentService as never,
+    ),
     treasuryService,
   }
 }
@@ -151,7 +172,12 @@ describe('OpsOverviewService', () => {
       { _count: { _all: 1 }, status: FlowInstanceStatus.FAILED },
     ])
     prisma.flowInstance.findFirst.mockResolvedValue({ updatedAt: new Date('2026-08-01T08:00:00.000Z') })
-    const { bridgeService, service, treasuryService } = makeService(prisma)
+    const {
+      bridgeService,
+      incidentService,
+      service,
+      treasuryService,
+    } = makeService(prisma)
 
     const result = await service.getOverview('7d')
 
@@ -219,6 +245,7 @@ describe('OpsOverviewService', () => {
       totalUsdIsPartial: true,
       venues: { reporting: 2, total: 3, unavailable: 1 },
     })
+    expect(result.incidents).toEqual({ critical: 1, high: 2, open: 4, top: [], unowned: 3 })
     expect(result.bridge).toEqual({
       failedLegs: { amount: 3, count: 1 },
       float: { available: 88, cap: 100, deficit: 12, enabled: true },
@@ -228,6 +255,7 @@ describe('OpsOverviewService', () => {
     expect(prisma.$queryRaw).toHaveBeenCalledTimes(2)
     expect(bridgeService.getOverview).toHaveBeenCalledTimes(1)
     expect(treasuryService.getBalances).toHaveBeenCalledTimes(1)
+    expect(incidentService.getOverviewInternal).toHaveBeenCalledTimes(1)
   })
 
   it('returns a gap-filled hourly series and null outcome rate when the window is empty', async () => {

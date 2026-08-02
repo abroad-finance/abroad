@@ -1,9 +1,13 @@
 import 'reflect-metadata'
 import type { Partner } from '@prisma/client'
 import type { TsoaResponse } from '@tsoa/runtime'
+import type { Request } from 'express'
+
+import { OpsRole } from '@prisma/client'
 
 import type { IDatabaseClientProvider } from '../../../../../platform/persistence/IDatabaseClientProvider'
 
+import { OpsMutationService } from '../../../../../modules/operations/application/opsMutation'
 import { PartnerController } from '../../../../../modules/partners/interfaces/http/PartnerController'
 
 type PartnerCreateInput = {
@@ -23,6 +27,32 @@ type PartnerModel = PartnerCreateInput & {
   isKybApproved: boolean
   needsKyc: boolean
 }
+
+const opsRequest = {
+  header: jest.fn(() => undefined),
+  user: {
+    authTime: new Date(),
+    displayName: 'Test Operator',
+    email: 'operator@abroad.finance',
+    kind: 'ops_user' as const,
+    permissions: ['partners:manage'] as const,
+    role: OpsRole.ADMINISTRATOR,
+    sessionVersion: 1,
+    userId: 'ops-user-1',
+  },
+} as unknown as Request
+
+const mutationService = {
+  execute: async (...parameters: unknown[]) => {
+    const operation = parameters[4]
+    if (typeof operation !== 'function') throw new Error('Operation callback is required')
+    return operation()
+  },
+} as unknown as OpsMutationService
+
+const buildController = (dbProvider: IDatabaseClientProvider): PartnerController => (
+  new PartnerController(dbProvider, mutationService)
+)
 
 const buildDbProvider = (overrides?: Partial<PartnerModel>) => {
   const partnerCreate = jest.fn(async (data: { data: PartnerCreateInput }): Promise<PartnerModel> => ({
@@ -65,11 +95,12 @@ describe('PartnerController', () => {
   it('rejects invalid payloads with a 400', async () => {
     const { badRequest, created } = setupTsoaResponses()
     const { dbProvider } = buildDbProvider()
-    const controller = new PartnerController(dbProvider)
+    const controller = buildController(dbProvider)
 
     const response = await controller.createPartner(
       // missing required fields
       { company: '', country: '', email: 'bad-email', firstName: '', lastName: '', phone: '' },
+      opsRequest,
       badRequest,
       created,
     )
@@ -83,7 +114,7 @@ describe('PartnerController', () => {
     const { badRequest, created } = setupTsoaResponses()
     const { dbProvider, partnerCreate } = buildDbProvider()
     partnerCreate.mockRejectedValueOnce(new Error('db down'))
-    const controller = new PartnerController(dbProvider)
+    const controller = buildController(dbProvider)
 
     const response = await controller.createPartner(
       {
@@ -94,6 +125,7 @@ describe('PartnerController', () => {
         lastName: 'Lovelace',
         phone: '123',
       },
+      opsRequest,
       badRequest,
       created,
     )
@@ -105,7 +137,7 @@ describe('PartnerController', () => {
   it('creates the partner and returns the id on success', async () => {
     const { badRequest, created } = setupTsoaResponses()
     const { dbProvider, partnerCreate } = buildDbProvider({ id: 'partner-123' })
-    const controller = new PartnerController(dbProvider)
+    const controller = buildController(dbProvider)
 
     const response = await controller.createPartner(
       {
@@ -116,6 +148,7 @@ describe('PartnerController', () => {
         lastName: 'Lovelace',
         phone: '123',
       },
+      opsRequest,
       badRequest,
       created,
     )
@@ -138,7 +171,7 @@ describe('PartnerController', () => {
   })
 
   it('maps the authenticated partner to a response DTO', async () => {
-    const controller = new PartnerController(buildDbProvider().dbProvider)
+    const controller = buildController(buildDbProvider().dbProvider)
     const partner = {
       country: 'CO',
       createdAt: new Date('2024-01-01T00:00:00.000Z'),
@@ -169,7 +202,7 @@ describe('PartnerController', () => {
   })
 
   it('defaults nullable partner fields when they are not set', async () => {
-    const controller = new PartnerController(buildDbProvider().dbProvider)
+    const controller = buildController(buildDbProvider().dbProvider)
     const partner: Partner = {
       apiKey: null,
       clientDomain: null,
@@ -184,6 +217,8 @@ describe('PartnerController', () => {
       name: 'Fallback Corp',
       needsKyc: null,
       phone: null,
+      previousApiKey: null,
+      previousApiKeyExpiresAt: null,
       webhookUrl: null,
     }
 
@@ -206,7 +241,7 @@ describe('PartnerController', () => {
   it('normalizes client domains when creating partners', async () => {
     const { badRequest, created } = setupTsoaResponses()
     const { dbProvider, partnerCreate } = buildDbProvider({ id: 'partner-domain' })
-    const controller = new PartnerController(dbProvider)
+    const controller = buildController(dbProvider)
 
     await controller.createPartner(
       {
@@ -217,6 +252,7 @@ describe('PartnerController', () => {
         firstName: 'Ada',
         lastName: 'Lovelace',
       },
+      opsRequest,
       badRequest,
       created,
     )

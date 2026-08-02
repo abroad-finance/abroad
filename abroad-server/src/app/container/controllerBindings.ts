@@ -7,7 +7,17 @@ import { FlowInstanceController } from '../../modules/flows/interfaces/http/Flow
 import { PublicCorridorController } from '../../modules/flows/interfaces/http/PublicCorridorController'
 import { KycController } from '../../modules/kyc/interfaces/http/KycController'
 import { OpsKycController } from '../../modules/kyc/interfaces/http/OpsKycController'
+import { OpsAdministrationController } from '../../modules/operations/interfaces/http/OpsAdministrationController'
+import { OpsCasesController } from '../../modules/operations/interfaces/http/OpsCasesController'
+import { OpsConfigurationReleaseController } from '../../modules/operations/interfaces/http/OpsConfigurationReleaseController'
+import { OpsIdentityController } from '../../modules/operations/interfaces/http/OpsIdentityController'
+import { OpsIncidentsController } from '../../modules/operations/interfaces/http/OpsIncidentsController'
+import { OpsIntegrationsController } from '../../modules/operations/interfaces/http/OpsIntegrationsController'
 import { OpsOverviewController } from '../../modules/operations/interfaces/http/OpsOverviewController'
+import { OpsSavedViewsController } from '../../modules/operations/interfaces/http/OpsSavedViewsController'
+import { OpsSearchController } from '../../modules/operations/interfaces/http/OpsSearchController'
+import { OpsTaskTelemetryController } from '../../modules/operations/interfaces/http/OpsTaskTelemetryController'
+import { OpsPartnerAnalyticsController } from '../../modules/partners/interfaces/http/OpsPartnerAnalyticsController'
 import { OpsPartnerController } from '../../modules/partners/interfaces/http/OpsPartnerController'
 import { OpsPartnerPortalController } from '../../modules/partners/interfaces/http/OpsPartnerPortalController'
 import { PartnerController } from '../../modules/partners/interfaces/http/PartnerController'
@@ -31,6 +41,7 @@ import { TransactionsController } from '../../modules/transactions/interfaces/ht
 import { TransparencyMetricsController } from '../../modules/transparency/interfaces/http/TransparencyMetricsController'
 import { OpsBridgeController } from '../../modules/treasury/interfaces/http/OpsBridgeController'
 import { OpsTreasuryController } from '../../modules/treasury/interfaces/http/OpsTreasuryController'
+import { OpsTreasuryThresholdController } from '../../modules/treasury/interfaces/http/OpsTreasuryThresholdController'
 import { WebhookController } from '../../modules/webhooks/interfaces/http/WebhookController'
 import { BindingRegistration, registerBindings } from './bindingSupport'
 
@@ -38,9 +49,19 @@ const controllerBindings: ReadonlyArray<BindingRegistration<unknown>> = [
   { bindSelf: true, identifier: WebhookController, implementation: WebhookController },
   { bindSelf: true, identifier: KycController, implementation: KycController },
   { bindSelf: true, identifier: OpsKycController, implementation: OpsKycController },
+  { bindSelf: true, identifier: OpsIdentityController, implementation: OpsIdentityController },
+  { bindSelf: true, identifier: OpsIncidentsController, implementation: OpsIncidentsController },
+  { bindSelf: true, identifier: OpsIntegrationsController, implementation: OpsIntegrationsController },
+  { bindSelf: true, identifier: OpsAdministrationController, implementation: OpsAdministrationController },
+  { bindSelf: true, identifier: OpsCasesController, implementation: OpsCasesController },
+  { bindSelf: true, identifier: OpsConfigurationReleaseController, implementation: OpsConfigurationReleaseController },
   { bindSelf: true, identifier: OpsOverviewController, implementation: OpsOverviewController },
+  { bindSelf: true, identifier: OpsSavedViewsController, implementation: OpsSavedViewsController },
+  { bindSelf: true, identifier: OpsSearchController, implementation: OpsSearchController },
+  { bindSelf: true, identifier: OpsTaskTelemetryController, implementation: OpsTaskTelemetryController },
   { bindSelf: true, identifier: PartnerController, implementation: PartnerController },
   { bindSelf: true, identifier: OpsPartnerController, implementation: OpsPartnerController },
+  { bindSelf: true, identifier: OpsPartnerAnalyticsController, implementation: OpsPartnerAnalyticsController },
   { bindSelf: true, identifier: OpsPartnerPortalController, implementation: OpsPartnerPortalController },
   { bindSelf: true, identifier: PartnerPortalIdentityController, implementation: PartnerPortalIdentityController },
   { bindSelf: true, identifier: PartnerPortalIntegrationController, implementation: PartnerPortalIntegrationController },
@@ -67,6 +88,7 @@ const controllerBindings: ReadonlyArray<BindingRegistration<unknown>> = [
   { bindSelf: true, identifier: FlowInstanceController, implementation: FlowInstanceController },
   { bindSelf: true, identifier: OpsBridgeController, implementation: OpsBridgeController },
   { bindSelf: true, identifier: OpsTreasuryController, implementation: OpsTreasuryController },
+  { bindSelf: true, identifier: OpsTreasuryThresholdController, implementation: OpsTreasuryThresholdController },
 ] as const
 
 export function bindHttpControllers(container: Container): void {

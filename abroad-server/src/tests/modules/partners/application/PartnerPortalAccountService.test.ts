@@ -30,6 +30,8 @@ const partner = {
   name: 'Decaf',
   needsKyc: false,
   phone: null,
+  previousApiKey: null,
+  previousApiKeyExpiresAt: null,
   webhookUrl: 'https://api-v3.production.decafapi.com/abroad/webhook',
 } satisfies Partner
 

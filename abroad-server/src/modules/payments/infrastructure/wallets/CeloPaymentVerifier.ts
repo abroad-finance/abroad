@@ -221,5 +221,4 @@ export class CeloPaymentVerifier implements IDepositVerifier {
     })
     return null
   }
-
 }

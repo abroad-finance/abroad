@@ -1,4 +1,11 @@
-import { FlowInstanceStatus } from '@prisma/client'
+import {
+  BlockchainNetwork,
+  CryptoCurrency,
+  FlowInstanceStatus,
+  PaymentMethod,
+  TargetCurrency,
+} from '@prisma/client'
+import { Request as RequestExpress } from 'express'
 import { inject } from 'inversify'
 import {
   Body,
@@ -7,6 +14,7 @@ import {
   Path,
   Post,
   Query,
+  Request,
   Res,
   Response,
   Route,
@@ -15,12 +23,17 @@ import {
   TsoaResponse,
 } from 'tsoa'
 
+import { requireOpsPrincipal } from '../../../../app/http/authenticationContext'
+import { OpsMutationService } from '../../../operations/application/opsMutation'
+import { readOpsMutationEnvelope } from '../../../operations/interfaces/http/opsMutationHeaders'
 import {
   FlowAuditService,
   FlowBulkRetryResult,
+  FlowFailureFilter,
   FlowInstanceDetailDto,
   FlowInstanceListResponse,
   FlowInstanceNotFoundError,
+  FlowQueryValidationError,
   FlowStepActionError,
   FlowStepInstanceDto,
   FlowStepNotFoundError,
@@ -39,10 +52,10 @@ export type FlowBulkRetryResponse = {
 const BULK_RETRY_MAX = 200
 
 @Route('ops/flows/instances')
-@Security('OpsApiKeyAuth')
 export class FlowInstanceController extends Controller {
   constructor(
     @inject(FlowAuditService) private readonly auditService: FlowAuditService,
+    @inject(OpsMutationService) private readonly mutationService: OpsMutationService,
   ) {
     super()
   }
@@ -52,8 +65,10 @@ export class FlowInstanceController extends Controller {
    */
   @Post('bulk-retry')
   @Response<400, { reason: string }>(400, 'Bad Request')
+  @Security('OpsAuth', ['flows:recover'])
   public async bulkRetry(
     @Body() body: FlowBulkRetryRequest,
+    @Request() request: RequestExpress,
     @Res() badRequest: TsoaResponse<400, { reason: string }>,
   ): Promise<FlowBulkRetryResponse> {
     const flowInstanceIds = body?.flowInstanceIds ?? []
@@ -64,7 +79,19 @@ export class FlowInstanceController extends Controller {
       return badRequest(400, { reason: `Cannot bulk-retry more than ${BULK_RETRY_MAX} instances at once` })
     }
 
-    const results = await this.auditService.bulkRetry(flowInstanceIds)
+    const results = await this.mutationService.execute(
+      requireOpsPrincipal(request.user),
+      'flow.bulk_retry',
+      { type: 'flow_instance_collection' },
+      readOpsMutationEnvelope(request),
+      () => this.auditService.bulkRetry(flowInstanceIds),
+      result => ({
+        metadata: {
+          attemptedCount: result.length,
+          failedCount: result.filter(item => !item.ok).length,
+        },
+      }),
+    )
     return {
       failed: results.filter(result => !result.ok).length,
       results,
@@ -74,6 +101,7 @@ export class FlowInstanceController extends Controller {
 
   @Get('{flowInstanceId}')
   @Response<404, { reason: string }>(404, 'Not Found')
+  @Security('OpsAuth', ['flows:read'])
   public async getInstance(
     @Path() flowInstanceId: string,
     @Res() notFound: TsoaResponse<404, { reason: string }>,
@@ -90,36 +118,71 @@ export class FlowInstanceController extends Controller {
   }
 
   @Get()
+  @Response<400, { reason: string }>(400, 'Bad Request')
+  @Security('OpsAuth', ['flows:read'])
   @SuccessResponse('200', 'Flow instances retrieved')
   public async list(
+    @Res() badRequest: TsoaResponse<400, { reason: string }>,
     @Query() status?: FlowInstanceStatus,
     @Query() transactionId?: string,
     @Query() onChainId?: string,
+    @Query() partnerId?: string,
+    @Query() createdFrom?: string,
+    @Query() createdTo?: string,
+    @Query() payoutProvider?: PaymentMethod,
+    @Query() cryptoCurrency?: CryptoCurrency,
+    @Query() blockchain?: BlockchainNetwork,
+    @Query() targetCurrency?: TargetCurrency,
+    @Query() failure?: FlowFailureFilter,
     @Query() page?: number,
     @Query() pageSize?: number,
     @Query() stuckMinutes?: number,
   ): Promise<FlowInstanceListResponse> {
-    return this.auditService.list({
-      onChainId,
-      page,
-      pageSize,
-      status,
-      stuckMinutes,
-      transactionId,
-    })
+    try {
+      return await this.auditService.list({
+        blockchain,
+        createdFrom,
+        createdTo,
+        cryptoCurrency,
+        failure,
+        onChainId,
+        page,
+        pageSize,
+        partnerId,
+        payoutProvider,
+        status,
+        stuckMinutes,
+        targetCurrency,
+        transactionId,
+      })
+    }
+    catch (error) {
+      if (error instanceof FlowQueryValidationError) {
+        return badRequest(400, { reason: error.message })
+      }
+      throw error
+    }
   }
 
   @Post('{flowInstanceId}/steps/{stepInstanceId}/requeue')
   @Response<400, { reason: string }>(400, 'Bad Request')
   @Response<404, { reason: string }>(404, 'Not Found')
+  @Security('OpsAuth', ['flows:recover'])
   public async requeueStep(
     @Path() flowInstanceId: string,
     @Path() stepInstanceId: string,
+    @Request() request: RequestExpress,
     @Res() badRequest: TsoaResponse<400, { reason: string }>,
     @Res() notFound: TsoaResponse<404, { reason: string }>,
   ): Promise<FlowStepInstanceDto> {
     try {
-      return await this.auditService.resetStep(flowInstanceId, stepInstanceId, 'requeue')
+      return await this.mutationService.execute(
+        requireOpsPrincipal(request.user),
+        'flow.step.requeue',
+        { id: stepInstanceId, type: 'flow_step' },
+        readOpsMutationEnvelope(request),
+        () => this.auditService.resetStep(flowInstanceId, stepInstanceId, 'requeue'),
+      )
     }
     catch (error) {
       if (error instanceof FlowStepNotFoundError) {
@@ -138,13 +201,21 @@ export class FlowInstanceController extends Controller {
   @Post('{flowInstanceId}/resume')
   @Response<400, { reason: string }>(400, 'Bad Request')
   @Response<404, { reason: string }>(404, 'Not Found')
+  @Security('OpsAuth', ['flows:recover'])
   public async resume(
     @Path() flowInstanceId: string,
+    @Request() request: RequestExpress,
     @Res() badRequest: TsoaResponse<400, { reason: string }>,
     @Res() notFound: TsoaResponse<404, { reason: string }>,
   ): Promise<FlowStepInstanceDto> {
     try {
-      return await this.auditService.resumeInstance(flowInstanceId)
+      return await this.mutationService.execute(
+        requireOpsPrincipal(request.user),
+        'flow.resume',
+        { id: flowInstanceId, type: 'flow_instance' },
+        readOpsMutationEnvelope(request),
+        () => this.auditService.resumeInstance(flowInstanceId),
+      )
     }
     catch (error) {
       if (error instanceof FlowInstanceNotFoundError || error instanceof FlowStepNotFoundError) {
@@ -165,15 +236,28 @@ export class FlowInstanceController extends Controller {
   @Post('{flowInstanceId}/steps/{stepInstanceId}/retry')
   @Response<400, { reason: string }>(400, 'Bad Request')
   @Response<404, { reason: string }>(404, 'Not Found')
+  @Security('OpsAuth', ['flows:recover'])
   public async retryStep(
     @Path() flowInstanceId: string,
     @Path() stepInstanceId: string,
+    @Request() request: RequestExpress,
     @Res() badRequest: TsoaResponse<400, { reason: string }>,
     @Res() notFound: TsoaResponse<404, { reason: string }>,
     @Query() force?: boolean,
   ): Promise<FlowStepInstanceDto> {
     try {
-      return await this.auditService.resetStep(flowInstanceId, stepInstanceId, 'retry', { force: force === true })
+      return await this.mutationService.execute(
+        requireOpsPrincipal(request.user),
+        force === true ? 'flow.step.force_retry' : 'flow.step.retry',
+        { id: stepInstanceId, type: 'flow_step' },
+        readOpsMutationEnvelope(request),
+        () => this.auditService.resetStep(
+          flowInstanceId,
+          stepInstanceId,
+          'retry',
+          { force: force === true },
+        ),
+      )
     }
     catch (error) {
       if (error instanceof FlowStepNotFoundError) {

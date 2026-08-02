@@ -3,6 +3,7 @@ import { inject, injectable } from 'inversify'
 import { z } from 'zod'
 
 import { TYPES } from '../../../app/container/types'
+import { ApplicationError } from '../../../core/errors'
 import { IDatabaseClientProvider } from '../../../platform/persistence/IDatabaseClientProvider'
 import { FlowDefinitionBuilder, FlowDefinitionBuilderError } from './FlowDefinitionBuilder'
 import {
@@ -12,6 +13,13 @@ import {
   FlowDefinitionInput,
   FlowDefinitionUpdateInput,
 } from './flowDefinitionSchemas'
+
+export class FlowDefinitionConflictError extends ApplicationError {
+  constructor() {
+    super(409, 'flow_definition_version_conflict', 'This flow definition changed after it was loaded')
+    this.name = 'FlowDefinitionConflictError'
+  }
+}
 
 export class FlowDefinitionValidationError extends Error {
   constructor(message: string) {
@@ -31,7 +39,13 @@ export class FlowDefinitionService {
 
   public async create(payload: FlowDefinitionInput): Promise<FlowDefinitionDto> {
     const client = await this.dbProvider.getClient()
+    return this.createInTransaction(client, payload)
+  }
 
+  public async createInTransaction(
+    client: Prisma.TransactionClient,
+    payload: FlowDefinitionInput,
+  ): Promise<FlowDefinitionDto> {
     try {
       const steps = this.buildSystemSteps(payload)
       const created = await client.flowDefinition.create({
@@ -85,6 +99,15 @@ export class FlowDefinitionService {
     return definition ? this.toDto(definition) : null
   }
 
+  public async findById(
+    flowId: string,
+    transaction?: Prisma.TransactionClient,
+  ): Promise<FlowDefinitionDto | null> {
+    const client = transaction ?? await this.dbProvider.getClient()
+    const definition = await client.flowDefinition.findUnique({ where: { id: flowId } })
+    return definition ? this.toDto(definition) : null
+  }
+
   public async list(): Promise<FlowDefinitionDto[]> {
     const client = await this.dbProvider.getClient()
     const definitions = await client.flowDefinition.findMany({
@@ -94,33 +117,52 @@ export class FlowDefinitionService {
     return definitions.map(definition => this.toDto(definition))
   }
 
-  public async update(flowId: string, payload: FlowDefinitionUpdateInput): Promise<FlowDefinitionDto> {
+  public async update(
+    flowId: string,
+    payload: FlowDefinitionUpdateInput,
+    expectedVersion: number,
+  ): Promise<FlowDefinitionDto> {
     const client = await this.dbProvider.getClient()
+    return client.$transaction(transaction => (
+      this.updateInTransaction(transaction, flowId, payload, expectedVersion)
+    ))
+  }
 
+  public async updateInTransaction(
+    client: Prisma.TransactionClient,
+    flowId: string,
+    payload: FlowDefinitionUpdateInput,
+    expectedVersion: number,
+  ): Promise<FlowDefinitionDto> {
     try {
       const steps = this.buildSystemSteps(payload)
-      const updated = await client.$transaction(async (tx) => {
-        await tx.flowStepDefinition.deleteMany({ where: { flowDefinitionId: flowId } })
-        return tx.flowDefinition.update({
-          data: {
-            blockchain: payload.blockchain,
-            cryptoCurrency: payload.cryptoCurrency,
-            enabled: payload.enabled ?? true,
-            exchangeFeePct: payload.exchangeFeePct ?? 0,
-            fixedFee: payload.fixedFee ?? 0,
-            maxAmount: payload.maxAmount ?? null,
-            minAmount: payload.minAmount ?? null,
-            name: payload.name.trim(),
-            payoutProvider: payload.payoutProvider,
-            pricingProvider: payload.pricingProvider,
-            steps: {
-              create: steps.map(step => this.toStepCreate(step)),
-            },
-            targetCurrency: payload.targetCurrency,
-            userSteps: this.normalizeJson(payload.steps),
+      const claimed = await client.flowDefinition.updateMany({
+        data: { version: { increment: 1 } },
+        where: { id: flowId, version: expectedVersion },
+      })
+      if (claimed.count !== 1) {
+        throw new FlowDefinitionConflictError()
+      }
+      await client.flowStepDefinition.deleteMany({ where: { flowDefinitionId: flowId } })
+      const updated = await client.flowDefinition.update({
+        data: {
+          blockchain: payload.blockchain,
+          cryptoCurrency: payload.cryptoCurrency,
+          enabled: payload.enabled ?? true,
+          exchangeFeePct: payload.exchangeFeePct ?? 0,
+          fixedFee: payload.fixedFee ?? 0,
+          maxAmount: payload.maxAmount ?? null,
+          minAmount: payload.minAmount ?? null,
+          name: payload.name.trim(),
+          payoutProvider: payload.payoutProvider,
+          pricingProvider: payload.pricingProvider,
+          steps: {
+            create: steps.map(step => this.toStepCreate(step)),
           },
-          where: { id: flowId },
-        })
+          targetCurrency: payload.targetCurrency,
+          userSteps: this.normalizeJson(payload.steps),
+        },
+        where: { id: flowId },
       })
 
       return this.toDto(updated)
@@ -172,6 +214,7 @@ export class FlowDefinitionService {
     targetCurrency: FlowDefinitionDto['targetCurrency']
     updatedAt: Date
     userSteps: Prisma.JsonValue
+    version: number
   }): FlowDefinitionDto {
     return {
       blockchain: definition.blockchain,
@@ -189,6 +232,7 @@ export class FlowDefinitionService {
       steps: this.parseUserSteps(definition.userSteps),
       targetCurrency: definition.targetCurrency,
       updatedAt: definition.updatedAt,
+      version: definition.version,
     }
   }
 

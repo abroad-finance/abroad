@@ -6,7 +6,7 @@ import { FlowAuditService, FlowInstanceNotFoundError, FlowStepActionError } from
 
 type PrismaMock = {
   $transaction: jest.Mock
-  flowInstance: { count: jest.Mock, findMany: jest.Mock, findUnique: jest.Mock, update: jest.Mock }
+  flowInstance: { count: jest.Mock, findMany: jest.Mock, findUnique: jest.Mock, groupBy: jest.Mock, update: jest.Mock }
   flowStepInstance: { findFirst: jest.Mock, findUnique: jest.Mock, update: jest.Mock }
   transaction: { findFirst: jest.Mock, findMany: jest.Mock, findUnique: jest.Mock }
 }
@@ -17,6 +17,7 @@ const makePrisma = (): PrismaMock => ({
     count: jest.fn(async () => 0),
     findMany: jest.fn(async () => []),
     findUnique: jest.fn(),
+    groupBy: jest.fn(async () => []),
     update: jest.fn(async () => ({})),
   },
   flowStepInstance: {
@@ -63,28 +64,74 @@ const makeService = (
 describe('FlowAuditService.list on-chain id filter', () => {
   it('resolves an on-chain id to its transaction id and filters flows by it', async () => {
     const prisma = makePrisma()
-    prisma.transaction.findFirst.mockResolvedValueOnce({ id: 'tx-123' })
+    prisma.transaction.findMany.mockResolvedValueOnce([{ id: 'tx-123' }])
 
     await makeService(prisma).list({ onChainId: '0xabc' })
 
-    expect(prisma.transaction.findFirst).toHaveBeenCalledWith(
+    expect(prisma.transaction.findMany).toHaveBeenCalledWith(
       expect.objectContaining({ where: { onChainId: '0xabc' } }),
     )
     expect(prisma.flowInstance.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: expect.objectContaining({ transactionId: 'tx-123' }) }),
+      expect.objectContaining({
+        where: { AND: expect.arrayContaining([{ transactionId: { in: ['tx-123'] } }]) },
+      }),
     )
   })
 
   it('matches no flows when no transaction has the given on-chain id', async () => {
     const prisma = makePrisma()
-    prisma.transaction.findFirst.mockResolvedValueOnce(null)
+    prisma.transaction.findMany.mockResolvedValueOnce([])
 
     const result = await makeService(prisma).list({ onChainId: 'missing' })
 
     expect(prisma.flowInstance.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: expect.objectContaining({ transactionId: { in: [] } }) }),
+      expect.objectContaining({
+        where: { AND: expect.arrayContaining([{ transactionId: { in: [] } }]) },
+      }),
     )
     expect(result.items).toEqual([])
+  })
+
+  it('combines partner, corridor, failure, and created-date filters while counting every status', async () => {
+    const prisma = makePrisma()
+    prisma.transaction.findMany.mockResolvedValueOnce([{ id: 'tx-partner' }])
+    prisma.flowInstance.groupBy.mockResolvedValueOnce([
+      { _count: { _all: 2 }, status: 'FAILED' },
+    ])
+
+    const result = await makeService(prisma).list({
+      blockchain: 'STELLAR' as never,
+      createdFrom: '2026-08-01',
+      createdTo: '2026-08-02',
+      cryptoCurrency: 'USDC' as never,
+      failure: 'FAILED_STEP',
+      partnerId: 'partner-1',
+      payoutProvider: 'PIX' as never,
+      targetCurrency: 'BRL' as never,
+    })
+
+    expect(prisma.transaction.findMany).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      select: { id: true },
+      where: { partnerUser: { partnerId: 'partner-1' } },
+    }))
+    expect(prisma.flowInstance.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        AND: expect.arrayContaining([
+          { transactionId: { in: ['tx-partner'] } },
+          { steps: { some: { status: 'FAILED' } } },
+        ]),
+      }),
+    }))
+    expect(result.statusCounts).toContainEqual({ count: 2, status: 'FAILED' })
+    expect(result.statusCounts).toHaveLength(5)
+  })
+
+  it('rejects invalid created-date filters before querying flow rows', async () => {
+    const prisma = makePrisma()
+
+    await expect(makeService(prisma).list({ createdFrom: 'not-a-date' }))
+      .rejects.toThrow('createdFrom must be a valid date')
+    expect(prisma.flowInstance.findMany).not.toHaveBeenCalled()
   })
 })
 

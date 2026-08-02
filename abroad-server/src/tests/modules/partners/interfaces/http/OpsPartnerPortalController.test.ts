@@ -1,13 +1,46 @@
 import 'reflect-metadata'
 
 import type { TsoaResponse } from '@tsoa/runtime'
+import type { Request } from 'express'
 
+import { OpsRole } from '@prisma/client'
+
+import { OpsMutationService } from '../../../../../modules/operations/application/opsMutation'
 import { PartnerPortalAccountNotFoundError, PartnerPortalAccountService, PartnerPortalAccountValidationError } from '../../../../../modules/partners/application/PartnerPortalAccountService'
 import { OpsPartnerPortalController } from '../../../../../modules/partners/interfaces/http/OpsPartnerPortalController'
 
 type AccountServiceMock = Pick<PartnerPortalAccountService, 'provision'>
 
 const partnerId = '3ee06787-8a54-4af2-8f74-ec26d43167aa'
+
+const request = {
+  header: jest.fn(() => undefined),
+  user: {
+    authTime: new Date(),
+    displayName: 'Test Operator',
+    email: 'operator@abroad.finance',
+    kind: 'ops_user' as const,
+    permissions: ['credentials:manage'] as const,
+    role: OpsRole.ADMINISTRATOR,
+    sessionVersion: 1,
+    userId: 'ops-user-1',
+  },
+} as unknown as Request
+
+const mutationService = {
+  execute: jest.fn(async (...parameters: unknown[]) => {
+    const operation = parameters[4]
+    if (typeof operation !== 'function') throw new Error('Operation callback is required')
+    return operation()
+  }),
+} as unknown as OpsMutationService
+
+const buildController = (service: AccountServiceMock): OpsPartnerPortalController => (
+  new OpsPartnerPortalController(
+    service as unknown as PartnerPortalAccountService,
+    mutationService,
+  )
+)
 
 const buildService = (): jest.Mocked<AccountServiceMock> => {
   const provision = jest.fn<
@@ -34,9 +67,7 @@ const notFoundResponder = (): TsoaResponse<404, { reason: string }> => (
 describe('OpsPartnerPortalController', () => {
   it('provisions a validated portal account through the Ops-only surface', async () => {
     const service = buildService()
-    const controller = new OpsPartnerPortalController(
-      service as unknown as PartnerPortalAccountService,
-    )
+    const controller = buildController(service)
 
     const result = await controller.upsertPortalUser(
       partnerId,
@@ -44,6 +75,7 @@ describe('OpsPartnerPortalController', () => {
         email: ' Operator@Decaf.So ',
         password: 'correct horse battery staple',
       },
+      request,
       badRequestResponder(),
       notFoundResponder(),
     )
@@ -57,14 +89,13 @@ describe('OpsPartnerPortalController', () => {
 
   it('rejects malformed credentials before provisioning', async () => {
     const service = buildService()
-    const controller = new OpsPartnerPortalController(
-      service as unknown as PartnerPortalAccountService,
-    )
+    const controller = buildController(service)
     const badRequest = badRequestResponder()
 
     const result = await controller.upsertPortalUser(
       partnerId,
       { email: 'invalid', password: 'short' },
+      request,
       badRequest,
       notFoundResponder(),
     )
@@ -76,14 +107,13 @@ describe('OpsPartnerPortalController', () => {
   it('maps missing partners to HTTP 404', async () => {
     const service = buildService()
     service.provision.mockRejectedValueOnce(new PartnerPortalAccountNotFoundError())
-    const controller = new OpsPartnerPortalController(
-      service as unknown as PartnerPortalAccountService,
-    )
+    const controller = buildController(service)
     const notFound = notFoundResponder()
 
     const result = await controller.upsertPortalUser(
       partnerId,
       { email: 'operator@decaf.so', password: 'correct horse battery staple' },
+      request,
       badRequestResponder(),
       notFound,
     )
@@ -97,14 +127,13 @@ describe('OpsPartnerPortalController', () => {
     service.provision.mockRejectedValueOnce(
       new PartnerPortalAccountValidationError('Portal email is already assigned'),
     )
-    const controller = new OpsPartnerPortalController(
-      service as unknown as PartnerPortalAccountService,
-    )
+    const controller = buildController(service)
     const badRequest = badRequestResponder()
 
     const result = await controller.upsertPortalUser(
       partnerId,
       { email: 'operator@decaf.so', password: 'correct horse battery staple' },
+      request,
       badRequest,
       notFoundResponder(),
     )

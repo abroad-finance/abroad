@@ -1,7 +1,8 @@
-import { BlockchainNetwork, CryptoCurrency } from '@prisma/client'
+import { BlockchainNetwork, CryptoCurrency, Prisma } from '@prisma/client'
 import { inject, injectable } from 'inversify'
 
 import { TYPES } from '../../../app/container/types'
+import { ApplicationError } from '../../../core/errors'
 import { IDatabaseClientProvider } from '../../../platform/persistence/IDatabaseClientProvider'
 import { CryptoAssetCoverageDto, CryptoAssetCoverageResponse, CryptoAssetUpdateInput } from './cryptoAssetSchemas'
 
@@ -10,6 +11,13 @@ export type EnabledCryptoAsset = {
   cryptoCurrency: CryptoCurrency
   decimals: null | number
   mintAddress: string
+}
+
+export class CryptoAssetConfigConflictError extends ApplicationError {
+  constructor() {
+    super(409, 'crypto_asset_version_conflict', 'This crypto asset changed after it was loaded')
+    this.name = 'CryptoAssetConfigConflictError'
+  }
 }
 
 export class CryptoAssetConfigError extends Error {
@@ -49,8 +57,10 @@ export class CryptoAssetConfigService {
     }
   }
 
-  public async listCoverage(): Promise<CryptoAssetCoverageResponse> {
-    const client = await this.dbProvider.getClient()
+  public async listCoverage(
+    transaction?: Prisma.TransactionClient,
+  ): Promise<CryptoAssetCoverageResponse> {
+    const client = transaction ?? await this.dbProvider.getClient()
     const configs = await client.cryptoAssetConfig.findMany()
 
     const configMap = new Map<string, typeof configs[number]>()
@@ -74,6 +84,7 @@ export class CryptoAssetConfigService {
             mintAddress: null,
             status: 'MISSING',
             updatedAt: null,
+            version: 1,
           })
           continue
         }
@@ -86,6 +97,7 @@ export class CryptoAssetConfigService {
           mintAddress: config.mintAddress,
           status: 'CONFIGURED',
           updatedAt: config.updatedAt,
+          version: config.version,
         })
       }
     }
@@ -175,8 +187,19 @@ export class CryptoAssetConfigService {
     }
   }
 
-  public async upsert(input: CryptoAssetUpdateInput): Promise<CryptoAssetCoverageDto> {
+  public async upsert(
+    input: CryptoAssetUpdateInput,
+    expectedVersion: number,
+  ): Promise<CryptoAssetCoverageDto> {
     const client = await this.dbProvider.getClient()
+    return this.upsertInTransaction(client, input, expectedVersion)
+  }
+
+  public async upsertInTransaction(
+    client: Prisma.TransactionClient,
+    input: CryptoAssetUpdateInput,
+    expectedVersion: number,
+  ): Promise<CryptoAssetCoverageDto> {
     const mintAddress = input.mintAddress?.trim() || null
 
     if (input.enabled && !mintAddress) {
@@ -185,19 +208,7 @@ export class CryptoAssetConfigService {
 
     const decimals = input.decimals ?? null
 
-    await client.cryptoAssetConfig.upsert({
-      create: {
-        blockchain: input.blockchain,
-        cryptoCurrency: input.cryptoCurrency,
-        decimals,
-        enabled: input.enabled,
-        mintAddress,
-      },
-      update: {
-        decimals,
-        enabled: input.enabled,
-        mintAddress,
-      },
+    const current = await client.cryptoAssetConfig.findUnique({
       where: {
         crypto_asset_unique: {
           blockchain: input.blockchain,
@@ -205,8 +216,41 @@ export class CryptoAssetConfigService {
         },
       },
     })
+    if ((current?.version ?? 1) !== expectedVersion) {
+      throw new CryptoAssetConfigConflictError()
+    }
 
-    const coverage = await this.listCoverage()
+    if (!current) {
+      await client.cryptoAssetConfig.create({
+        data: {
+          blockchain: input.blockchain,
+          cryptoCurrency: input.cryptoCurrency,
+          decimals,
+          enabled: input.enabled,
+          mintAddress,
+          version: 2,
+        },
+      })
+    }
+    else {
+      const updated = await client.cryptoAssetConfig.updateMany({
+        data: {
+          decimals,
+          enabled: input.enabled,
+          mintAddress,
+          version: { increment: 1 },
+        },
+        where: {
+          id: current.id,
+          version: expectedVersion,
+        },
+      })
+      if (updated.count !== 1) {
+        throw new CryptoAssetConfigConflictError()
+      }
+    }
+
+    const coverage = await this.listCoverage(client)
     const updated = coverage.assets.find(asset => (
       asset.blockchain === input.blockchain && asset.cryptoCurrency === input.cryptoCurrency
     ))

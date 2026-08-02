@@ -49,12 +49,18 @@ export class BinanceBalanceSource implements ITreasuryBalanceSource {
     const balances: TreasuryBalance[] = []
 
     for (const entry of account.balances ?? []) {
-      const total = (Number(entry.free) || 0) + (Number(entry.locked) || 0)
+      const availableAmount = Number(entry.free) || 0
+      const blockedAmount = Number(entry.locked) || 0
+      const total = availableAmount + blockedAmount
       if (total <= 0 && !CORE_COINS.has(entry.asset)) continue
       balances.push({
         account: '',
         amount: total,
+        availableAmount,
+        blockedAmount,
         currency: entry.asset,
+        outstandingAmount: null,
+        reservedAmount: null,
         venue: this.venue,
       })
     }
@@ -63,7 +69,16 @@ export class BinanceBalanceSource implements ITreasuryBalanceSource {
     // backfill the core coins so the board always renders them.
     for (const coin of CORE_COINS) {
       if (!balances.some(balance => balance.currency === coin)) {
-        balances.push({ account: '', amount: 0, currency: coin, venue: this.venue })
+        balances.push({
+          account: '',
+          amount: 0,
+          availableAmount: 0,
+          blockedAmount: 0,
+          currency: coin,
+          outstandingAmount: null,
+          reservedAmount: null,
+          venue: this.venue,
+        })
       }
     }
 

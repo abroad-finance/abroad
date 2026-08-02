@@ -3,13 +3,22 @@ import {
   CryptoCurrency,
   FlowCorridorStatus,
   PaymentMethod,
+  Prisma,
   TargetCurrency,
 } from '@prisma/client'
 import { inject, injectable } from 'inversify'
 
 import { TYPES } from '../../../app/container/types'
+import { ApplicationError } from '../../../core/errors'
 import { IDatabaseClientProvider } from '../../../platform/persistence/IDatabaseClientProvider'
 import { FlowCorridorDto, FlowCorridorListDto, FlowCorridorUpdateInput } from './flowDefinitionSchemas'
+
+export class FlowCorridorConflictError extends ApplicationError {
+  constructor() {
+    super(409, 'flow_corridor_version_conflict', 'This corridor changed after it was loaded')
+    this.name = 'FlowCorridorConflictError'
+  }
+}
 
 @injectable()
 export class FlowCorridorService {
@@ -18,8 +27,8 @@ export class FlowCorridorService {
     private readonly dbProvider: IDatabaseClientProvider,
   ) {}
 
-  public async list(): Promise<FlowCorridorListDto> {
-    const client = await this.dbProvider.getClient()
+  public async list(transaction?: Prisma.TransactionClient): Promise<FlowCorridorListDto> {
+    const client = transaction ?? await this.dbProvider.getClient()
     const [definitions, overrides, enabledAssets] = await Promise.all([
       client.flowDefinition.findMany({
         select: {
@@ -31,20 +40,25 @@ export class FlowCorridorService {
           payoutProvider: true,
           targetCurrency: true,
           updatedAt: true,
+          version: true,
         },
       }),
-      client.flowCorridor.findMany({
-        where: { status: FlowCorridorStatus.UNSUPPORTED },
-      }),
+      client.flowCorridor.findMany(),
       client.cryptoAssetConfig.findMany({
         where: { enabled: true, mintAddress: { not: null } },
       }),
     ])
 
-    const overrideMap = new Map<string, { reason: null | string }>()
+    const overrideMap = new Map<string, {
+      reason: null | string
+      status: FlowCorridorStatus
+      version: number
+    }>()
     overrides.forEach((item) => {
       overrideMap.set(this.key(item.cryptoCurrency, item.blockchain, item.targetCurrency), {
         reason: item.reason ?? null,
+        status: item.status,
+        version: item.version,
       })
     })
 
@@ -54,6 +68,7 @@ export class FlowCorridorService {
       name: string
       payoutProvider: PaymentMethod
       updatedAt: Date
+      version: number
     }>()
 
     definitions.forEach((def) => {
@@ -63,6 +78,7 @@ export class FlowCorridorService {
         name: def.name,
         payoutProvider: def.payoutProvider,
         updatedAt: def.updatedAt,
+        version: def.version,
       })
     })
 
@@ -77,13 +93,14 @@ export class FlowCorridorService {
         const override = overrideMap.get(corridorKey)
         const definition = definitionMap.get(corridorKey)
 
-        if (override) {
+        if (override?.status === FlowCorridorStatus.UNSUPPORTED) {
           corridors.push({
             blockchain,
             cryptoCurrency,
             status: 'UNSUPPORTED',
             targetCurrency,
             unsupportedReason: override.reason,
+            version: override.version,
           })
           continue
         }
@@ -99,6 +116,7 @@ export class FlowCorridorService {
             status: 'DEFINED',
             targetCurrency,
             updatedAt: definition.updatedAt,
+            version: override?.version ?? 1,
           })
           continue
         }
@@ -113,6 +131,7 @@ export class FlowCorridorService {
           status: 'MISSING',
           targetCurrency,
           updatedAt: definition?.updatedAt ?? null,
+          version: override?.version ?? 1,
         })
       }
     }
@@ -133,43 +152,62 @@ export class FlowCorridorService {
     }
   }
 
-  public async updateStatus(payload: FlowCorridorUpdateInput): Promise<FlowCorridorDto> {
+  public async updateStatus(
+    payload: FlowCorridorUpdateInput,
+    expectedVersion: number,
+  ): Promise<FlowCorridorDto> {
     const client = await this.dbProvider.getClient()
+    return this.updateStatusInTransaction(client, payload, expectedVersion)
+  }
 
-    if (payload.status === FlowCorridorStatus.UNSUPPORTED) {
-      await client.flowCorridor.upsert({
-        create: {
-          blockchain: payload.blockchain,
-          cryptoCurrency: payload.cryptoCurrency,
-          reason: payload.reason?.trim() || null,
-          status: FlowCorridorStatus.UNSUPPORTED,
-          targetCurrency: payload.targetCurrency,
-        },
-        update: {
-          reason: payload.reason?.trim() || null,
-          status: FlowCorridorStatus.UNSUPPORTED,
-        },
-        where: {
-          flow_corridor_status_unique: {
-            blockchain: payload.blockchain,
-            cryptoCurrency: payload.cryptoCurrency,
-            targetCurrency: payload.targetCurrency,
+  public async updateStatusInTransaction(
+    client: Prisma.TransactionClient,
+    payload: FlowCorridorUpdateInput,
+    expectedVersion: number,
+  ): Promise<FlowCorridorDto> {
+    const key = {
+      blockchain: payload.blockchain,
+      cryptoCurrency: payload.cryptoCurrency,
+      targetCurrency: payload.targetCurrency,
+    }
+    const current = await client.flowCorridor.findUnique({
+      where: { flow_corridor_status_unique: key },
+    })
+    if ((current?.version ?? 1) !== expectedVersion) {
+      throw new FlowCorridorConflictError()
+    }
+
+    try {
+      if (!current) {
+        await client.flowCorridor.create({
+          data: {
+            ...key,
+            reason: payload.reason?.trim() || null,
+            status: payload.status,
+            version: 2,
           },
-        },
-      })
+        })
+      }
+      else {
+        const updated = await client.flowCorridor.updateMany({
+          data: {
+            reason: payload.reason?.trim() || null,
+            status: payload.status,
+            version: { increment: 1 },
+          },
+          where: { id: current.id, version: expectedVersion },
+        })
+        if (updated.count !== 1) throw new FlowCorridorConflictError()
+      }
+    }
+    catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        throw new FlowCorridorConflictError()
+      }
+      throw error
     }
 
-    if (payload.status === FlowCorridorStatus.SUPPORTED) {
-      await client.flowCorridor.deleteMany({
-        where: {
-          blockchain: payload.blockchain,
-          cryptoCurrency: payload.cryptoCurrency,
-          targetCurrency: payload.targetCurrency,
-        },
-      })
-    }
-
-    const list = await this.list()
+    const list = await this.list(client)
     const match = list.corridors.find(item => (
       item.blockchain === payload.blockchain
       && item.cryptoCurrency === payload.cryptoCurrency

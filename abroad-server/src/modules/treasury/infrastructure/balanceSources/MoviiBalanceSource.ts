@@ -25,10 +25,15 @@ export class MoviiBalanceSource implements ITreasuryBalanceSource {
   public async getBalances(): Promise<TreasuryBalance[]> {
     const service = this.paymentServiceFactory.getPaymentService(PaymentMethod.BREB)
     const liquidity = await service.getLiquidity()
+    const amount = Number(liquidity) || 0
     return [{
       account: '',
-      amount: Number(liquidity) || 0,
+      amount,
+      availableAmount: amount,
+      blockedAmount: null,
       currency: 'COP',
+      outstandingAmount: null,
+      reservedAmount: null,
       venue: this.venue,
     }]
   }

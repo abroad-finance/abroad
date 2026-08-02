@@ -24,6 +24,8 @@ export type FlowBulkRetryResult = {
   stepInstanceId?: string
 }
 
+export type FlowFailureFilter = 'FAILED_FLOW' | 'FAILED_STEP' | 'STUCK_WAITING'
+
 export type FlowInstanceCurrentStepDto = {
   status: FlowStepStatus
   stepOrder: number
@@ -45,11 +47,19 @@ export type FlowInstanceDetailDto = {
 }
 
 export type FlowInstanceListFilters = {
+  blockchain?: BlockchainNetwork
+  createdFrom?: string
+  createdTo?: string
+  cryptoCurrency?: CryptoCurrency
+  failure?: FlowFailureFilter
   onChainId?: string
   page?: number
   pageSize?: number
+  partnerId?: string
+  payoutProvider?: PaymentMethod
   status?: FlowInstanceStatus
   stuckMinutes?: number
+  targetCurrency?: TargetCurrency
   transactionId?: string
 }
 
@@ -57,6 +67,7 @@ export type FlowInstanceListResponse = {
   items: FlowInstanceSummaryDto[]
   page: number
   pageSize: number
+  statusCounts: Array<{ count: number, status: FlowInstanceStatus }>
   total: number
 }
 
@@ -146,14 +157,29 @@ export type FlowTransactionSummaryDto = {
   externalId: null | string
   id: string
   onChainId: null | string
+  partner: { id: string, name: string }
   refundOnChainId: null | string
   status: TransactionStatus
 }
+
+type NormalizedFlowInstanceListFilters = Omit<FlowInstanceListFilters, 'createdFrom' | 'createdTo'> & {
+  createdFrom?: Date
+  createdTo?: Date
+}
+
+type ResolvedTransactionFilter = string | undefined | { in: string[] }
 
 export class FlowInstanceNotFoundError extends Error {
   constructor(message: string) {
     super(message)
     this.name = 'FlowInstanceNotFoundError'
+  }
+}
+
+export class FlowQueryValidationError extends Error {
+  public constructor(message: string) {
+    super(message)
+    this.name = 'FlowQueryValidationError'
   }
 }
 
@@ -221,7 +247,10 @@ export class FlowAuditService {
         where: { flowInstanceId: instance.id },
       }),
       client.transaction.findUnique({
-        include: { quote: true },
+        include: {
+          partnerUser: { select: { partner: { select: { id: true, name: true } } } },
+          quote: true,
+        },
         where: { id: instance.transactionId },
       }),
     ])
@@ -267,6 +296,7 @@ export class FlowAuditService {
             externalId: transaction.externalId,
             id: transaction.id,
             onChainId: transaction.onChainId,
+            partner: transaction.partnerUser.partner,
             paymentMethod: transaction.quote.paymentMethod,
             quote: {
               cryptoCurrency: transaction.quote.cryptoCurrency,
@@ -286,19 +316,27 @@ export class FlowAuditService {
   }
 
   public async list(filters: FlowInstanceListFilters): Promise<FlowInstanceListResponse> {
-    const page = this.normalizePage(filters.page)
-    const pageSize = this.normalizePageSize(filters.pageSize)
-    const where = await this.buildWhere(filters)
-
     const client = await this.dbProvider.getClient()
-    const [total, instances] = await client.$transaction([
-      client.flowInstance.count({ where }),
+    const normalized = this.normalizeFilters(filters)
+    const page = this.normalizePage(normalized.page)
+    const pageSize = this.normalizePageSize(normalized.pageSize)
+    const transactionFilter = await this.resolveTransactionFilter(normalized)
+    const baseWhere = this.buildWhere(normalized, transactionFilter, false)
+    const resultWhere = this.buildWhere(normalized, transactionFilter, true)
+    const [total, instances, statusGroups] = await client.$transaction([
+      client.flowInstance.count({ where: resultWhere }),
       client.flowInstance.findMany({
         include: { steps: true },
         orderBy: { updatedAt: 'desc' },
         skip: (page - 1) * pageSize,
         take: pageSize,
-        where,
+        where: resultWhere,
+      }),
+      client.flowInstance.groupBy({
+        _count: { _all: true },
+        by: ['status'],
+        orderBy: { status: 'asc' },
+        where: baseWhere,
       }),
     ])
 
@@ -308,6 +346,7 @@ export class FlowAuditService {
         externalId: true,
         id: true,
         onChainId: true,
+        partnerUser: { select: { partner: { select: { id: true, name: true } } } },
         refundOnChainId: true,
         status: true,
       },
@@ -334,6 +373,7 @@ export class FlowAuditService {
               externalId: transaction.externalId,
               id: transaction.id,
               onChainId: transaction.onChainId,
+              partner: transaction.partnerUser.partner,
               refundOnChainId: transaction.refundOnChainId,
               status: transaction.status,
             }
@@ -343,10 +383,20 @@ export class FlowAuditService {
       }
     })
 
+    const statusCountMap = new Map(statusGroups.map((group) => {
+      const count = typeof group._count === 'object' && group._count !== null
+        ? group._count._all ?? 0
+        : 0
+      return [group.status, count] as const
+    }))
     return {
       items,
       page,
       pageSize,
+      statusCounts: Object.values(FlowInstanceStatus).map(status => ({
+        count: statusCountMap.get(status) ?? 0,
+        status,
+      })),
       total,
     }
   }
@@ -498,27 +548,53 @@ export class FlowAuditService {
     return summary
   }
 
-  private async buildWhere(filters: FlowInstanceListFilters): Promise<Prisma.FlowInstanceWhereInput> {
-    const where: Prisma.FlowInstanceWhereInput = {}
+  private buildWhere(
+    filters: NormalizedFlowInstanceListFilters,
+    transactionFilter: ResolvedTransactionFilter,
+    includeStatus: boolean,
+  ): Prisma.FlowInstanceWhereInput {
+    const and: Prisma.FlowInstanceWhereInput[] = []
 
-    const transactionId = await this.resolveTransactionIdFilter(filters)
-    if (transactionId !== undefined) {
-      where.transactionId = transactionId
+    if (transactionFilter !== undefined) and.push({ transactionId: transactionFilter })
+    if (filters.createdFrom || filters.createdTo) {
+      and.push({
+        createdAt: {
+          ...(filters.createdFrom ? { gte: filters.createdFrom } : {}),
+          ...(filters.createdTo ? { lt: filters.createdTo } : {}),
+        },
+      })
+    }
+    if (includeStatus && filters.status) and.push({ status: filters.status })
+    if (filters.blockchain) {
+      and.push({ flowSnapshot: { equals: filters.blockchain, path: ['definition', 'blockchain'] } })
+    }
+    if (filters.cryptoCurrency) {
+      and.push({ flowSnapshot: { equals: filters.cryptoCurrency, path: ['definition', 'cryptoCurrency'] } })
+    }
+    if (filters.payoutProvider) {
+      and.push({ flowSnapshot: { equals: filters.payoutProvider, path: ['definition', 'payoutProvider'] } })
+    }
+    if (filters.targetCurrency) {
+      and.push({ flowSnapshot: { equals: filters.targetCurrency, path: ['definition', 'targetCurrency'] } })
     }
 
     const stuckMinutes = this.normalizeStuckMinutes(filters.stuckMinutes)
     if (stuckMinutes) {
-      const cutoff = new Date(Date.now() - stuckMinutes * 60 * 1000)
-      where.status = FlowInstanceStatus.WAITING
-      where.updatedAt = { lte: cutoff }
-      return where
+      and.push({
+        status: FlowInstanceStatus.WAITING,
+        updatedAt: { lte: new Date(Date.now() - stuckMinutes * 60 * 1_000) },
+      })
+    }
+    if (filters.failure === 'FAILED_FLOW') and.push({ status: FlowInstanceStatus.FAILED })
+    if (filters.failure === 'FAILED_STEP') and.push({ steps: { some: { status: FlowStepStatus.FAILED } } })
+    if (filters.failure === 'STUCK_WAITING' && !stuckMinutes) {
+      and.push({
+        status: FlowInstanceStatus.WAITING,
+        updatedAt: { lte: new Date(Date.now() - 30 * 60 * 1_000) },
+      })
     }
 
-    if (filters.status) {
-      where.status = filters.status
-    }
-
-    return where
+    return and.length === 0 ? {} : { AND: and }
   }
 
   private extractDefinition(flowSnapshot: unknown): FlowSnapshotDefinitionDto | null {
@@ -531,6 +607,17 @@ export class FlowAuditService {
     const snapshot = flowSnapshot as FlowSnapshot
     if (!snapshot.definition || !snapshot.steps) return null
     return snapshot
+  }
+
+  private normalizeFilters(filters: FlowInstanceListFilters): NormalizedFlowInstanceListFilters {
+    return {
+      ...filters,
+      createdFrom: this.parseDate(filters.createdFrom, 'createdFrom', false),
+      createdTo: this.parseDate(filters.createdTo, 'createdTo', true),
+      onChainId: filters.onChainId?.trim() || undefined,
+      partnerId: filters.partnerId?.trim() || undefined,
+      transactionId: filters.transactionId?.trim() || undefined,
+    }
   }
 
   private normalizePage(page?: number): number {
@@ -548,29 +635,29 @@ export class FlowAuditService {
     return Math.floor(stuckMinutes)
   }
 
-  /**
-   * Resolve the transaction-id filter. An `onChainId` filter is mapped to the
-   * matching transaction (onChainId is unique); when no transaction matches we
-   * return an empty `in` list so the query matches no flows.
-   */
-  private async resolveTransactionIdFilter(
-    filters: FlowInstanceListFilters,
-  ): Promise<Prisma.FlowInstanceWhereInput['transactionId']> {
-    if (!filters.onChainId) {
-      return filters.transactionId
-    }
+  private parseDate(value: string | undefined, field: string, endExclusive: boolean): Date | undefined {
+    if (!value) return undefined
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) throw new FlowQueryValidationError(`${field} must be a valid date`)
+    if (endExclusive && /^\d{4}-\d{2}-\d{2}$/.test(value)) date.setUTCDate(date.getUTCDate() + 1)
+    return date
+  }
+
+  private async resolveTransactionFilter(
+    filters: NormalizedFlowInstanceListFilters,
+  ): Promise<ResolvedTransactionFilter> {
+    if (!filters.onChainId && !filters.partnerId) return filters.transactionId
 
     const client = await this.dbProvider.getClient()
-    const match = await client.transaction.findFirst({
+    const matches = await client.transaction.findMany({
       select: { id: true },
-      where: { onChainId: filters.onChainId },
+      where: {
+        ...(filters.onChainId ? { onChainId: filters.onChainId } : {}),
+        ...(filters.partnerId ? { partnerUser: { partnerId: filters.partnerId } } : {}),
+        ...(filters.transactionId ? { id: filters.transactionId } : {}),
+      },
     })
-
-    if (!match || (filters.transactionId && filters.transactionId !== match.id)) {
-      return { in: [] }
-    }
-
-    return match.id
+    return { in: matches.map(match => match.id) }
   }
 
   private toRecord(value: null | Prisma.JsonValue): null | Record<string, unknown> {

@@ -11,7 +11,7 @@ import {
 import { OpsTreasuryBalancesResponse, OpsTreasuryMovementsResponse, OpsTreasuryService, OpsTreasurySnapshotsResponse } from '../../application/OpsTreasuryService'
 
 @Route('ops/treasury')
-@Security('OpsApiKeyAuth')
+@Security('OpsAuth', ['treasury:read'])
 export class OpsTreasuryController extends Controller {
   constructor(
     @inject(OpsTreasuryService) private readonly opsTreasuryService: OpsTreasuryService,

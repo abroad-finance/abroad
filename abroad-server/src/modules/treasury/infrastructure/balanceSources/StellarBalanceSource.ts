@@ -36,10 +36,15 @@ export class StellarBalanceSource implements ITreasuryBalanceSource {
         'asset_code' in balance
         && balance.asset_code === asset.cryptoCurrency
         && balance.asset_issuer === asset.mintAddress)
+      const amount = line ? Number(line.balance) || 0 : 0
       return {
         account: accountId,
-        amount: line ? Number(line.balance) || 0 : 0,
+        amount,
+        availableAmount: amount,
+        blockedAmount: null,
         currency: asset.cryptoCurrency,
+        outstandingAmount: null,
+        reservedAmount: null,
         venue: this.venue,
       }
     })

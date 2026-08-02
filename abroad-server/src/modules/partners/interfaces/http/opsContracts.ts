@@ -4,6 +4,7 @@ import type {
   OpsPartnerClientDomainInput,
   OpsPartnerCreateInput,
   OpsPartnerCreateResult,
+  OpsPartnerCredentialHistory,
   OpsPartnerListResult,
   OpsPartnerRotateApiKeyResult,
   OpsPartnerSummary,
@@ -17,6 +18,7 @@ const MAX_PARTNER_PAGE_SIZE = 100
 
 export type OpsCreatePartnerRequest = OpsPartnerCreateInput
 export type OpsCreatePartnerResponse = OpsPartnerCreateResult
+export type OpsPartnerCredentialHistoryResponse = OpsPartnerCredentialHistory
 export type OpsPartnerDto = OpsPartnerSummary
 export type OpsPartnerListResponse = OpsPartnerListResult
 export type OpsRotatePartnerApiKeyResponse = OpsPartnerRotateApiKeyResult

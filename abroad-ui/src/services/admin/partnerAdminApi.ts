@@ -1,6 +1,8 @@
+import type { OpsMutationDetails } from './opsMutationTypes'
 import type {
   OpsCreatePartnerInput,
   OpsCreatePartnerResponse,
+  OpsPartnerCredentialHistory,
   OpsPartnerListResponse,
   OpsRotatePartnerApiKeyResponse,
   OpsUpdatePartnerClientDomainInput,
@@ -24,27 +26,50 @@ export const listPartners = async (params: {
   return unwrapAdminResult(result)
 }
 
-export const createPartner = async (payload: OpsCreatePartnerInput): Promise<OpsCreatePartnerResponse> => {
+export const getPartnerCredentialHistory = async (
+  partnerId: string,
+): Promise<OpsPartnerCredentialHistory> => {
+  const result = await adminRequest<OpsPartnerCredentialHistory>(
+    `/ops/partners/${partnerId}/credential-history`,
+    { method: 'GET' },
+  )
+
+  return unwrapAdminResult(result)
+}
+
+export const createPartner = async (
+  payload: OpsCreatePartnerInput,
+  mutation: OpsMutationDetails,
+): Promise<OpsCreatePartnerResponse> => {
   const result = await adminRequest<OpsCreatePartnerResponse>('/ops/partners', {
     body: JSON.stringify(payload),
     headers: { 'Content-Type': 'application/json' },
     method: 'POST',
+    mutation,
   })
 
   return unwrapAdminResult(result)
 }
 
-export const rotatePartnerApiKey = async (partnerId: string): Promise<OpsRotatePartnerApiKeyResponse> => {
+export const rotatePartnerApiKey = async (
+  partnerId: string,
+  mutation: OpsMutationDetails,
+): Promise<OpsRotatePartnerApiKeyResponse> => {
   const result = await adminRequest<OpsRotatePartnerApiKeyResponse>(`/ops/partners/${partnerId}/api-key`, {
     method: 'POST',
+    mutation,
   })
 
   return unwrapAdminResult(result)
 }
 
-export const revokePartnerApiKey = async (partnerId: string): Promise<void> => {
+export const revokePartnerApiKey = async (
+  partnerId: string,
+  mutation: OpsMutationDetails,
+): Promise<void> => {
   const result = await adminRequest<null>(`/ops/partners/${partnerId}/api-key`, {
     method: 'DELETE',
+    mutation,
   })
 
   unwrapAdminResult(result)
@@ -53,6 +78,7 @@ export const revokePartnerApiKey = async (partnerId: string): Promise<void> => {
 export const updatePartnerClientDomain = async (
   partnerId: string,
   payload: OpsUpdatePartnerClientDomainInput,
+  mutation: OpsMutationDetails,
 ): Promise<OpsUpdatePartnerClientDomainResponse> => {
   const result = await adminRequest<OpsUpdatePartnerClientDomainResponse>(
     `/ops/partners/${partnerId}/client-domain`,
@@ -60,6 +86,7 @@ export const updatePartnerClientDomain = async (
       body: JSON.stringify(payload),
       headers: { 'Content-Type': 'application/json' },
       method: 'PATCH',
+      mutation,
     },
   )
 

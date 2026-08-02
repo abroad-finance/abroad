@@ -125,6 +125,7 @@ export type FlowCorridorDto = {
   targetCurrency: TargetCurrency
   unsupportedReason?: null | string
   updatedAt?: Date | null
+  version: number
 }
 
 export type FlowCorridorListDto = {
@@ -163,6 +164,7 @@ export type FlowDefinitionDto = {
   steps: FlowBusinessStep[]
   targetCurrency: TargetCurrency
   updatedAt: Date
+  version: number
 }
 
 export type FlowDefinitionUpdateInput = FlowDefinitionInput

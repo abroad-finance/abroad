@@ -13,6 +13,7 @@ import { TYPES } from '../../../app/container/types'
 import { IDatabaseClientProvider } from '../../../platform/persistence/IDatabaseClientProvider'
 import { OpsBridgeOverview, OpsBridgeService } from '../../treasury/application/OpsBridgeService'
 import { OpsTreasuryBalancesResponse, OpsTreasuryService } from '../../treasury/application/OpsTreasuryService'
+import { OpsIncidentOverviewDto, OpsIncidentService } from './OpsIncidentService'
 
 export type OpsOverviewRange = '7d' | '24h' | '30d'
 
@@ -21,6 +22,7 @@ export type OpsOverviewResponse = {
   bridge: OpsOverviewBridge
   execution: OpsOverviewExecution
   generatedAt: Date
+  incidents: OpsIncidentOverviewDto
   partners: OpsOverviewPartners
   treasury: OpsOverviewTreasury
   window: OpsOverviewWindow
@@ -304,6 +306,8 @@ export class OpsOverviewService {
     private readonly bridgeService: OpsBridgeService,
     @inject(OpsTreasuryService)
     private readonly treasuryService: OpsTreasuryService,
+    @inject(OpsIncidentService)
+    private readonly incidentService: OpsIncidentService,
   ) {}
 
   public async getOverview(range: OpsOverviewRange): Promise<OpsOverviewResponse> {
@@ -316,6 +320,7 @@ export class OpsOverviewService {
       activityRows,
       bridge,
       flowStatusRows,
+      incidents,
       oldestWaiting,
       partnerRows,
       totalPartners,
@@ -324,6 +329,7 @@ export class OpsOverviewService {
       this.readActivity(client, window, seriesUnit),
       this.bridgeService.getOverview(),
       client.flowInstance.groupBy({ _count: { _all: true }, by: ['status'] }),
+      this.incidentService.getOverviewInternal(),
       client.flowInstance.findFirst({
         orderBy: { updatedAt: 'asc' },
         select: { updatedAt: true },
@@ -339,6 +345,7 @@ export class OpsOverviewService {
       bridge: this.buildBridge(bridge),
       execution: this.buildExecution(flowStatusRows, oldestWaiting?.updatedAt ?? null),
       generatedAt,
+      incidents,
       partners: this.buildPartners(partnerRows, totalPartners),
       treasury: this.buildTreasury(treasury),
       window,

@@ -14,6 +14,18 @@ const buildSecretManager = (
   getSecrets: jest.fn(),
 })
 
+const tamperAuthenticationTag = (envelope: string): string => {
+  const [version = '', initializationVector = '', encodedAuthTag = '', ciphertext = '']
+    = envelope.split('.')
+  const authTag = Buffer.from(encodedAuthTag, 'base64url')
+  const firstByte = authTag.at(0)
+  if (firstByte === undefined) {
+    throw new Error('Expected a non-empty authentication tag')
+  }
+  authTag[0] = firstByte ^ 0x01
+  return [version, initializationVector, authTag.toString('base64url'), ciphertext].join('.')
+}
+
 describe('PartnerPortalSecretEnvelopeService', () => {
   it('round-trips a secret only under the exact authenticated context', async () => {
     const service = new PartnerPortalSecretEnvelopeService(buildSecretManager())
@@ -42,7 +54,7 @@ describe('PartnerPortalSecretEnvelopeService', () => {
   it('rejects malformed and tampered envelopes with a bounded error', async () => {
     const service = new PartnerPortalSecretEnvelopeService(buildSecretManager())
     const envelope = await service.encrypt('managed-secret', 'context')
-    const tampered = `${envelope.slice(0, -1)}${envelope.endsWith('A') ? 'B' : 'A'}`
+    const tampered = tamperAuthenticationTag(envelope)
 
     await expect(service.decrypt('not-an-envelope', 'context')).rejects.toThrow(
       'Encrypted secret envelope is invalid',

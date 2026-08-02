@@ -18,7 +18,22 @@ import { PayoutSendStepExecutor } from '../../modules/flows/application/steps/Pa
 import { TreasuryTransferStepExecutor } from '../../modules/flows/application/steps/TreasuryTransferStepExecutor'
 import { KycSubmissionService } from '../../modules/kyc/application/KycSubmissionService'
 import { OpsKycService } from '../../modules/kyc/application/OpsKycService'
+import { OpsAdministrationService } from '../../modules/operations/application/OpsAdministrationService'
+import { OpsAuditService } from '../../modules/operations/application/OpsAuditService'
+import { OpsCaseService } from '../../modules/operations/application/OpsCaseService'
+import { OpsConfigurationReleaseService } from '../../modules/operations/application/OpsConfigurationReleaseService'
+import { OpsConfigurationReleaseWorker } from '../../modules/operations/application/OpsConfigurationReleaseWorker'
+import { OpsGlobalSearchService } from '../../modules/operations/application/OpsGlobalSearchService'
+import { OpsIdentityService } from '../../modules/operations/application/OpsIdentityService'
+import { OpsIncidentDetectionService } from '../../modules/operations/application/OpsIncidentDetectionService'
+import { OpsIncidentService } from '../../modules/operations/application/OpsIncidentService'
+import { OpsIncidentWorker } from '../../modules/operations/application/OpsIncidentWorker'
+import { OpsIntegrationService } from '../../modules/operations/application/OpsIntegrationService'
+import { OpsMutationService } from '../../modules/operations/application/opsMutation'
 import { OpsOverviewService } from '../../modules/operations/application/OpsOverviewService'
+import { OpsSavedViewService } from '../../modules/operations/application/OpsSavedViewService'
+import { OpsTaskTelemetryService } from '../../modules/operations/application/OpsTaskTelemetryService'
+import { OpsPartnerAnalyticsService } from '../../modules/partners/application/OpsPartnerAnalyticsService'
 import { OpsPartnerService } from '../../modules/partners/application/OpsPartnerService'
 import { PartnerPortalAccountService } from '../../modules/partners/application/PartnerPortalAccountService'
 import { PartnerPortalApiKeyService } from '../../modules/partners/application/PartnerPortalApiKeyService'
@@ -73,6 +88,7 @@ import { BridgeSweepWorker } from '../../modules/treasury/application/BridgeSwee
 import { ExchangeProviderFactory } from '../../modules/treasury/application/ExchangeProviderFactory'
 import { OpsBridgeService } from '../../modules/treasury/application/OpsBridgeService'
 import { OpsTreasuryService } from '../../modules/treasury/application/OpsTreasuryService'
+import { OpsTreasuryThresholdService } from '../../modules/treasury/application/OpsTreasuryThresholdService'
 import { TreasurySnapshotWorker } from '../../modules/treasury/application/TreasurySnapshotWorker'
 import { BinanceBalanceSource } from '../../modules/treasury/infrastructure/balanceSources/BinanceBalanceSource'
 import { CeloBalanceSource } from '../../modules/treasury/infrastructure/balanceSources/CeloBalanceSource'
@@ -133,8 +149,23 @@ const domainBindings: ReadonlyArray<BindingRegistration<unknown>> = [
   { identifier: TYPES.ReceivedCryptoTransactionUseCase, implementation: ReceivedCryptoTransactionUseCase },
   { bindSelf: true, identifier: KycSubmissionService, implementation: KycSubmissionService },
   { bindSelf: true, identifier: OpsKycService, implementation: OpsKycService },
+  { bindSelf: true, identifier: OpsAuditService, implementation: OpsAuditService },
+  { bindSelf: true, identifier: OpsCaseService, implementation: OpsCaseService },
+  { bindSelf: true, identifier: OpsConfigurationReleaseService, implementation: OpsConfigurationReleaseService },
+  { bindSelf: true, identifier: OpsConfigurationReleaseWorker, implementation: OpsConfigurationReleaseWorker },
+  { bindSelf: true, identifier: OpsGlobalSearchService, implementation: OpsGlobalSearchService },
+  { bindSelf: true, identifier: OpsAdministrationService, implementation: OpsAdministrationService },
+  { bindSelf: true, identifier: OpsIdentityService, implementation: OpsIdentityService },
+  { bindSelf: true, identifier: OpsIncidentDetectionService, implementation: OpsIncidentDetectionService },
+  { bindSelf: true, identifier: OpsIncidentService, implementation: OpsIncidentService },
+  { bindSelf: true, identifier: OpsIncidentWorker, implementation: OpsIncidentWorker },
+  { bindSelf: true, identifier: OpsIntegrationService, implementation: OpsIntegrationService },
+  { bindSelf: true, identifier: OpsMutationService, implementation: OpsMutationService },
   { bindSelf: true, identifier: OpsOverviewService, implementation: OpsOverviewService },
+  { bindSelf: true, identifier: OpsSavedViewService, implementation: OpsSavedViewService },
+  { bindSelf: true, identifier: OpsTaskTelemetryService, implementation: OpsTaskTelemetryService },
   { bindSelf: true, identifier: OpsPartnerService, implementation: OpsPartnerService },
+  { bindSelf: true, identifier: OpsPartnerAnalyticsService, implementation: OpsPartnerAnalyticsService },
   { bindSelf: true, identifier: PartnerPortalPasswordService, implementation: PartnerPortalPasswordService },
   { bindSelf: true, identifier: PartnerPortalApiKeyService, implementation: PartnerPortalApiKeyService },
   { bindSelf: true, identifier: PartnerPortalMfaService, implementation: PartnerPortalMfaService },
@@ -166,6 +197,7 @@ const domainBindings: ReadonlyArray<BindingRegistration<unknown>> = [
   { identifier: TYPES.ITreasuryBalanceSource, implementation: SolanaBalanceSource },
   { identifier: TYPES.ITreasuryBalanceSource, implementation: MoviiBalanceSource },
   { bindSelf: true, identifier: OpsTreasuryService, implementation: OpsTreasuryService },
+  { bindSelf: true, identifier: OpsTreasuryThresholdService, implementation: OpsTreasuryThresholdService },
   { bindSelf: true, identifier: TreasurySnapshotWorker, implementation: TreasurySnapshotWorker },
   { identifier: TYPES.FlowStepExecutor, implementation: PayoutSendStepExecutor },
   { identifier: TYPES.FlowStepExecutor, implementation: AwaitProviderStatusStepExecutor },

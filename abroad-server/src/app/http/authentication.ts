@@ -2,6 +2,10 @@ import { Request } from 'express'
 
 import type { ClientDomain } from '../../modules/partners/domain/clientDomain'
 
+import { IOpsIdentityProvider } from '../../modules/operations/application/contracts/IOpsIdentityProvider'
+import { OpsAuthorizationError } from '../../modules/operations/application/opsIdentity'
+import { OpsIdentityService } from '../../modules/operations/application/OpsIdentityService'
+import { isOpsPermission } from '../../modules/operations/application/opsPermissions'
 import { AuthenticatedPartner, IPartnerService, PartnerAuthenticationSource } from '../../modules/partners/application/contracts/IPartnerService'
 import { isPartnerApiKeyScopeName } from '../../modules/partners/application/partnerApiKeyScopes'
 import { PartnerPortalSessionService } from '../../modules/partners/application/PartnerPortalSessionService'
@@ -113,6 +117,31 @@ export async function expressAuthentication(
     }
   }
 
+  if (securityName === 'OpsFirebaseAuth') {
+    const token = resolveBearerToken(request.headers.authorization)
+    if (!token) {
+      throw new Error('Ops identity token not provided')
+    }
+    const identityProvider = iocContainer.get<IOpsIdentityProvider>(TYPES.IOpsIdentityProvider)
+    const identity = await identityProvider.verifyIdToken(token)
+    return { ...identity, kind: 'ops_external' }
+  }
+
+  if (securityName === 'OpsAuth') {
+    const token = resolveBearerToken(request.headers.authorization)
+    const principal = token
+      ? await iocContainer.get(OpsIdentityService).authenticate(token)
+      : await iocContainer.get<OpsAuthService>(TYPES.IOpsAuthService)
+          .authenticateLegacyApiKey(request.header('X-OPS-API-KEY') ?? '')
+
+    for (const scope of scopes) {
+      if (!isOpsPermission(scope) || !principal.permissions.includes(scope)) {
+        throw new OpsAuthorizationError()
+      }
+    }
+    return principal
+  }
+
   if (securityName === 'BearerAuth') {
     if (request.header('X-API-Key')) {
       // Explicit API keys take precedence when both credentials are supplied.
@@ -139,18 +168,13 @@ export async function expressAuthentication(
       throw new Error('Ops API key not provided')
     }
 
-    const opsAuthService = iocContainer.get<OpsAuthService>(TYPES.IOpsAuthService)
-    let expected: string
     try {
-      expected = await opsAuthService.getOpsApiKey()
+      const opsAuthService = iocContainer.get<OpsAuthService>(TYPES.IOpsAuthService)
+      return await opsAuthService.authenticateLegacyApiKey(headerKey)
     }
     catch {
-      throw new Error('Ops API key not configured')
-    }
-    if (!expected || headerKey !== expected) {
       throw new Error('Invalid ops API key')
     }
-    return { kind: 'ops' }
   }
 
   throw new Error('Invalid security scheme')

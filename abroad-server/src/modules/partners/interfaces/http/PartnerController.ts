@@ -19,8 +19,10 @@ import {
 } from 'tsoa'
 
 import { TYPES } from '../../../../app/container/types'
-import { requireAuthenticatedPartner } from '../../../../app/http/authenticationContext'
+import { requireAuthenticatedPartner, requireOpsPrincipal } from '../../../../app/http/authenticationContext'
 import { IDatabaseClientProvider } from '../../../../platform/persistence/IDatabaseClientProvider'
+import { OpsMutationService } from '../../../operations/application/opsMutation'
+import { readOpsMutationEnvelope } from '../../../operations/interfaces/http/opsMutationHeaders'
 import { normalizeClientDomainInput } from '../../domain/clientDomain'
 import { type CreatePartnerRequest, createPartnerRequestSchema, type CreatePartnerResponse, type PartnerInfoResponse } from './contracts'
 
@@ -28,6 +30,7 @@ import { type CreatePartnerRequest, createPartnerRequestSchema, type CreatePartn
 export class PartnerController extends Controller {
   constructor(
     @inject(TYPES.IDatabaseClientProvider) private dbProvider: IDatabaseClientProvider,
+    @inject(OpsMutationService) private readonly mutationService: OpsMutationService,
   ) {
     super()
   }
@@ -38,10 +41,11 @@ export class PartnerController extends Controller {
   @Hidden()
   @Post()
   @Response<400, { reason: string }>(400, 'Bad Request')
-  @Security('OpsApiKeyAuth')
+  @Security('OpsAuth', ['partners:manage'])
   @SuccessResponse('201', 'Partner created')
   public async createPartner(
     @Body() body: CreatePartnerRequest,
+    @Request() request: RequestExpress,
     @Res() badRequest: TsoaResponse<400, { reason: string }>,
     @Res() created: TsoaResponse<201, CreatePartnerResponse>,
   ): Promise<CreatePartnerResponse> {
@@ -63,18 +67,25 @@ export class PartnerController extends Controller {
 
     let partner: Partner
     try {
-      partner = await dbClient.partner.create({
-        data: {
-          clientDomain: clientDomainRecord.clientDomain,
-          clientDomainHash: clientDomainRecord.clientDomainHash,
-          country: partnerData.country,
-          email: partnerData.email,
-          firstName: partnerData.firstName,
-          lastName: partnerData.lastName,
-          name: partnerData.company,
-          phone: partnerData.phone,
-        },
-      })
+      partner = await this.mutationService.execute(
+        requireOpsPrincipal(request.user),
+        'partner.create',
+        { type: 'partner' },
+        readOpsMutationEnvelope(request),
+        () => dbClient.partner.create({
+          data: {
+            clientDomain: clientDomainRecord.clientDomain,
+            clientDomainHash: clientDomainRecord.clientDomainHash,
+            country: partnerData.country,
+            email: partnerData.email,
+            firstName: partnerData.firstName,
+            lastName: partnerData.lastName,
+            name: partnerData.company,
+            phone: partnerData.phone,
+          },
+        }),
+        createdPartner => ({ resourceId: createdPartner.id }),
+      )
     }
     catch {
       return badRequest(400, { reason: 'Failed to create partner in the database' })

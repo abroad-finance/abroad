@@ -7,7 +7,9 @@ import { ITreasuryBalanceSource } from '../../../../modules/treasury/application
 import { OpsTreasuryService } from '../../../../modules/treasury/application/OpsTreasuryService'
 
 type PrismaMock = {
+  $queryRaw: jest.Mock
   bridgeBatch: { findMany: jest.Mock }
+  opsTreasuryThreshold: { findMany: jest.Mock }
   transaction: { findMany: jest.Mock }
   treasuryBalanceSnapshot: { createMany: jest.Mock, findMany: jest.Mock }
 }
@@ -20,7 +22,9 @@ const makeLogger = (): ILogger => ({
 }) as unknown as ILogger
 
 const makePrisma = (): PrismaMock => ({
+  $queryRaw: jest.fn(async () => []),
   bridgeBatch: { findMany: jest.fn(async () => []) },
+  opsTreasuryThreshold: { findMany: jest.fn(async () => []) },
   transaction: { findMany: jest.fn(async () => []) },
   treasuryBalanceSnapshot: {
     createMany: jest.fn(async () => ({ count: 0 })),
@@ -32,7 +36,11 @@ const makeSource = (venue: string, balances: Array<{ account?: string, amount: n
   getBalances: jest.fn(async () => balances.map(balance => ({
     account: balance.account ?? '',
     amount: balance.amount,
+    availableAmount: balance.amount,
+    blockedAmount: 0,
     currency: balance.currency,
+    outstandingAmount: 0,
+    reservedAmount: 0,
     venue,
   }))),
   venue,
@@ -108,6 +116,7 @@ describe('OpsTreasuryService.getBalances', () => {
     expect(result.totalUsd).toBeCloseTo(100 + 50 + 100)
     expect(result.totalUsdIsPartial).toBe(false)
     expect(result.float).toEqual({ available: 960, cap: 1000, deficit: 40, enabled: true })
+    expect(result.freshness.state).toBe('FRESH')
     expect(result.fxRates).toEqual([{ currency: 'COP', usdPerUnit: 1 / 4000 }])
   })
 
@@ -125,6 +134,7 @@ describe('OpsTreasuryService.getBalances', () => {
     expect(result.errors).toEqual([{ message: 'transfero down', venue: 'TRANSFERO' }])
     expect(result.totalUsd).toBe(10)
     expect(result.totalUsdIsPartial).toBe(true)
+    expect(result.freshness.state).toBe('PARTIAL')
   })
 
   it('leaves unpriced currencies out of the USD total and flags partiality', async () => {
@@ -148,6 +158,37 @@ describe('OpsTreasuryService.getBalances', () => {
     await service.getBalances()
 
     expect(source.getBalances).toHaveBeenCalledTimes(1)
+  })
+
+  it('calculates currency-matched runway and applies the configured critical posture', async () => {
+    const prisma = makePrisma()
+    prisma.opsTreasuryThreshold.findMany.mockResolvedValue([{
+      criticalRunwayHours: 4,
+      currency: 'BRL',
+      id: 'threshold-1',
+      minimumAvailable: 50,
+      ownerTeam: 'Treasury',
+      venue: 'TRANSFERO',
+      version: 2,
+      warningRunwayHours: 12,
+    }])
+    prisma.$queryRaw.mockResolvedValue([{ averageDailyOutflow: 2_400, currency: 'BRL' }])
+    const { service } = makeService({
+      brl: 0.2,
+      prisma,
+      sources: [makeSource('TRANSFERO', [{ amount: 100, currency: 'BRL' }])],
+    })
+
+    const result = await service.getBalances()
+
+    expect(result.cells[0].posture).toEqual(expect.objectContaining({
+      alertPath: '/ops/incidents?currency=BRL&kind=TREASURY&venue=TRANSFERO',
+      averageDailyOutflow: 2_400,
+      ownerTeam: 'Treasury',
+      runwayHours: 1,
+      state: 'CRITICAL',
+      threshold: expect.objectContaining({ id: 'threshold-1', version: 2 }),
+    }))
   })
 })
 
@@ -249,6 +290,7 @@ describe('OpsTreasuryService.captureSnapshot', () => {
     expect(rows).toHaveLength(2)
     expect(rows[0].capturedAt).toEqual(rows[1].capturedAt)
     expect(rows[0]).toMatchObject({ amount: 3, currency: 'USDC', usdValue: 3, venue: 'BINANCE' })
+    expect(rows[0]).toMatchObject({ availableAmount: 3, blockedAmount: 0, outstandingAmount: 0, reservedAmount: 0 })
   })
 
   it('skips the tick entirely when every venue errored', async () => {

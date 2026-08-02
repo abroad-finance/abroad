@@ -11,7 +11,9 @@ const makeService = (deficit: number, cap = 2000) => {
 }
 
 describe('BridgeFloatService', () => {
-  afterEach(() => { delete process.env.BRIDGE_FLOAT_CAP_USDC })
+  afterEach(() => {
+    delete process.env.BRIDGE_FLOAT_CAP_USDC
+  })
 
   it('outstanding deficit sums PENDING + BATCHED legs (not SETTLED)', async () => {
     const { aggregate, service } = makeService(1500)

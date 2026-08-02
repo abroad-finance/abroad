@@ -12,7 +12,7 @@ import {
 import { OpsOverviewRange, OpsOverviewResponse, OpsOverviewService } from '../../application/OpsOverviewService'
 
 @Route('ops/overview')
-@Security('OpsApiKeyAuth')
+@Security('OpsAuth', ['overview:read'])
 export class OpsOverviewController extends Controller {
   constructor(
     @inject(OpsOverviewService) private readonly overviewService: OpsOverviewService,

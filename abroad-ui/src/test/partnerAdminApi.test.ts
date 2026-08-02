@@ -9,6 +9,8 @@ import {
   test,
 } from 'vitest'
 
+import type { OpsMutationDetails } from '../services/admin/opsMutationTypes'
+
 import { clearOpsApiKey, setOpsApiKey } from '../services/admin/opsAuthStore'
 import {
   createPartner,
@@ -20,6 +22,12 @@ import {
 
 const baseUrl = 'https://api.abroad.finance'
 const server = setupServer()
+const mutation: OpsMutationDetails = {
+  confirmation: 'TEST CONFIRMATION',
+  idempotencyKey: 'd2856a20-8953-4b12-ad30-1107837ca9ef',
+  reason: 'Focused automated test operation',
+  reference: 'OPS-123',
+}
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))
 afterEach(() => {
@@ -52,6 +60,10 @@ describe('partnerAdminApi', () => {
 
     server.use(
       http.post(`${baseUrl}/ops/partners`, async ({ request }) => {
+        expect(request.headers.get('x-ops-confirmation')).toBe(mutation.confirmation)
+        expect(request.headers.get('x-ops-idempotency-key')).toBe(mutation.idempotencyKey)
+        expect(request.headers.get('x-ops-reason')).toBe(mutation.reason)
+        expect(request.headers.get('x-ops-reference')).toBe(mutation.reference)
         const body = await request.json() as {
           clientDomain?: string
           company: string
@@ -111,10 +123,10 @@ describe('partnerAdminApi', () => {
       email: 'acme@example.com',
       firstName: 'Ada',
       lastName: 'Lovelace',
-    })
-    const updated = await updatePartnerClientDomain('partner-1', { clientDomain: null })
-    const rotated = await rotatePartnerApiKey('partner-1')
-    await revokePartnerApiKey('partner-1')
+    }, mutation)
+    const updated = await updatePartnerClientDomain('partner-1', { clientDomain: null }, mutation)
+    const rotated = await rotatePartnerApiKey('partner-1', mutation)
+    await revokePartnerApiKey('partner-1', mutation)
 
     expect(created.apiKey).toBe('partner_created_key')
     expect(created.partner.clientDomain).toBe('app.abroad.finance')
@@ -123,6 +135,6 @@ describe('partnerAdminApi', () => {
   })
 
   test('throws when ops key is missing', async () => {
-    await expect(listPartners()).rejects.toThrow('Ops API key is required')
+    await expect(listPartners()).rejects.toThrow('Sign in with your Abroad account to access Ops')
   })
 })

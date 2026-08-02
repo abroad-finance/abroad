@@ -37,7 +37,9 @@ describe('overviewAdminApi', () => {
     expect(response.generatedAt).toBe('2026-08-01T12:00:00.000Z')
   })
 
-  test('rejects before making a request when the ops key is absent', async () => {
-    await expect(getOpsOverview('24h')).rejects.toThrow('Ops API key is required')
+  test('rejects before making a request when Ops authentication is absent', async () => {
+    await expect(getOpsOverview('24h')).rejects.toThrow(
+      'Sign in with your Abroad account to access Ops',
+    )
   })
 })

@@ -1,5 +1,11 @@
 import 'reflect-metadata'
-import { CryptoCurrency, Prisma, TargetCurrency, TransactionStatus } from '@prisma/client'
+import {
+  CryptoCurrency,
+  PartnerApiKeyScope,
+  Prisma,
+  TargetCurrency,
+  TransactionStatus,
+} from '@prisma/client'
 
 import type { IDatabaseClientProvider } from '../../../../platform/persistence/IDatabaseClientProvider'
 
@@ -23,6 +29,7 @@ type PartnerDelegateMock = {
   count: jest.MockedFunction<() => Promise<number>>
   create: jest.MockedFunction<(args: { data: PartnerCreateData }) => Promise<PartnerModel>>
   findMany: jest.MockedFunction<(args: PartnerFindManyArgs) => Promise<PartnerModel[]>>
+  findUnique: jest.MockedFunction<(args: { where: { id: string } }) => Promise<null | PartnerModel>>
   update: jest.MockedFunction<(args: { data: PartnerUpdateData, where: { id: string } }) => Promise<PartnerModel>>
 }
 
@@ -36,6 +43,8 @@ type PartnerUpdateData = {
   apiKey?: null | string
   clientDomain?: null | string
   clientDomainHash?: null | string
+  previousApiKey?: null | string
+  previousApiKeyExpiresAt?: Date | null
 }
 
 type QuoteDelegateMock = {
@@ -79,6 +88,8 @@ const basePartner = (overrides?: Partial<PartnerModel>): PartnerModel => ({
   name: 'Partner Inc',
   needsKyc: true,
   phone: '123',
+  previousApiKey: null,
+  previousApiKeyExpiresAt: null,
   webhookUrl: null,
   ...(overrides ?? {}),
 })
@@ -104,12 +115,27 @@ const buildPartnerMock = (): PartnerDelegateMock => {
       void _args
       return []
     }),
-    update: jest.fn(async ({ data, where }: { data: PartnerUpdateData, where: { id: string } }) => basePartner({
-      apiKey: data.apiKey ?? null,
-      clientDomain: data.clientDomain ?? null,
-      clientDomainHash: data.clientDomainHash ?? null,
+    findUnique: jest.fn(async ({ where }) => basePartner({
+      apiKey: 'current-legacy-key-hash',
       id: where.id,
     })),
+    update: jest.fn(async ({ data, where }: { data: PartnerUpdateData, where: { id: string } }) => {
+      const current = basePartner({ apiKey: 'current-legacy-key-hash', id: where.id })
+      return basePartner({
+        apiKey: data.apiKey === undefined ? current.apiKey : data.apiKey,
+        clientDomain: data.clientDomain === undefined ? current.clientDomain : data.clientDomain,
+        clientDomainHash: data.clientDomainHash === undefined
+          ? current.clientDomainHash
+          : data.clientDomainHash,
+        id: where.id,
+        previousApiKey: data.previousApiKey === undefined
+          ? current.previousApiKey
+          : data.previousApiKey,
+        previousApiKeyExpiresAt: data.previousApiKeyExpiresAt === undefined
+          ? current.previousApiKeyExpiresAt
+          : data.previousApiKeyExpiresAt,
+      })
+    }),
   }
 }
 
@@ -126,6 +152,10 @@ describe('OpsPartnerService', () => {
   let queryRaw: jest.MockedFunction<(query: Prisma.Sql) => Promise<RankedPartnerRow[]>>
   let dbProvider: IDatabaseClientProvider
   let service: OpsPartnerService
+  let transaction: jest.MockedFunction<(
+    operation: (client: import('@prisma/client').PrismaClient) => Promise<PartnerModel>,
+    options?: unknown,
+  ) => Promise<PartnerModel>>
 
   beforeEach(() => {
     jest.resetAllMocks()
@@ -135,9 +165,16 @@ describe('OpsPartnerService', () => {
       void _query
       return []
     })
+    const prismaMock = {
+      $queryRaw: queryRaw,
+      partner,
+      quote,
+    } as unknown as import('@prisma/client').PrismaClient
+    transaction = jest.fn(async operation => operation(prismaMock))
     dbProvider = {
       getClient: jest.fn(async () => ({
         $queryRaw: queryRaw,
+        $transaction: transaction,
         partner,
         quote,
       }) as unknown as import('@prisma/client').PrismaClient),
@@ -358,8 +395,15 @@ describe('OpsPartnerService', () => {
   it('rotates partner API key and returns one-time plaintext key', async () => {
     const result = await service.rotateApiKey('partner-rotate')
 
+    expect(transaction).toHaveBeenCalledWith(expect.any(Function), {
+      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+    })
     expect(partner.update).toHaveBeenCalledWith({
-      data: { apiKey: hashPartnerApiKey(result.apiKey) },
+      data: {
+        apiKey: hashPartnerApiKey(result.apiKey),
+        previousApiKey: 'current-legacy-key-hash',
+        previousApiKeyExpiresAt: expect.any(Date),
+      },
       where: { id: 'partner-rotate' },
     })
     expect(result.apiKey.startsWith('partner_')).toBe(true)
@@ -368,14 +412,86 @@ describe('OpsPartnerService', () => {
   })
 
   it('throws not found when rotating a missing partner API key', async () => {
-    partner.update.mockRejectedValueOnce(
-      new Prisma.PrismaClientKnownRequestError('missing', {
-        clientVersion: '6.14.0',
-        code: 'P2025',
-      }),
-    )
+    partner.findUnique.mockResolvedValueOnce(null)
 
     await expect(service.rotateApiKey('missing')).rejects.toThrow(OpsPartnerNotFoundError)
+  })
+
+  it('prevents a second rotation while the prior key overlap is active', async () => {
+    partner.findUnique.mockResolvedValueOnce(basePartner({
+      apiKey: 'current-hash',
+      previousApiKey: 'previous-hash',
+      previousApiKeyExpiresAt: new Date(Date.now() + 60_000),
+    }))
+
+    await expect(service.rotateApiKey('partner-rotate')).rejects.toThrow(
+      'A 24-hour credential overlap is already active',
+    )
+    expect(partner.update).not.toHaveBeenCalled()
+  })
+
+  it('returns credential history without exposing current, previous, or managed secret hashes', async () => {
+    const overlapExpiresAt = new Date(Date.now() + 60_000)
+    const historyService = new OpsPartnerService({
+      getClient: jest.fn(async () => ({
+        opsAuditEvent: {
+          findMany: jest.fn(async () => [{
+            action: 'credentials.api_key.rotate.succeeded',
+            actorLabel: 'Ops Administrator',
+            createdAt: new Date('2026-08-02T14:00:00.000Z'),
+            id: 'ops-event-1',
+            reason: 'Scheduled rotation',
+            reference: 'OPS-123',
+          }]),
+        },
+        partner: {
+          findUnique: jest.fn(async () => basePartner({
+            apiKey: 'current-secret-hash',
+            previousApiKey: 'previous-secret-hash',
+            previousApiKeyExpiresAt: overlapExpiresAt,
+          })),
+        },
+        partnerApiKey: {
+          findMany: jest.fn(async () => [{
+            createdAt: new Date('2026-08-01T14:00:00.000Z'),
+            displayPrefix: 'partner_ab12',
+            expiresAt: null,
+            id: 'managed-key-1',
+            lastUsedAt: new Date('2026-08-02T13:00:00.000Z'),
+            name: 'Production integration',
+            revokedAt: null,
+            rotatedFromId: null,
+            rotatedTo: null,
+            scopes: [PartnerApiKeyScope.TRANSACTIONS_READ],
+            secretHash: 'managed-secret-hash',
+          }]),
+        },
+        partnerPortalAuditEvent: {
+          findMany: jest.fn(async () => [{
+            action: 'api_key.created',
+            createdAt: new Date('2026-08-01T14:00:00.000Z'),
+            id: 'portal-event-1',
+          }]),
+        },
+      }) as unknown as import('@prisma/client').PrismaClient),
+    })
+
+    const result = await historyService.getCredentialHistory('partner-1')
+    const serialized = JSON.stringify(result)
+
+    expect(result.legacyCredential).toEqual({
+      active: true,
+      overlapExpiresAt,
+    })
+    expect(result.managedCredentials).toEqual([expect.objectContaining({
+      displayPrefix: 'partner_ab12',
+      scopes: ['transactions:read'],
+      status: 'ACTIVE',
+    })])
+    expect(result.events.map(event => event.source)).toEqual(['OPS', 'PARTNER_PORTAL'])
+    expect(serialized).not.toContain('current-secret-hash')
+    expect(serialized).not.toContain('previous-secret-hash')
+    expect(serialized).not.toContain('managed-secret-hash')
   })
 
   it('updates a partner client domain using the canonical host', async () => {
@@ -449,7 +565,11 @@ describe('OpsPartnerService', () => {
     await service.revokeApiKey('partner-revoke')
 
     expect(partner.update).toHaveBeenCalledWith({
-      data: { apiKey: null },
+      data: {
+        apiKey: null,
+        previousApiKey: null,
+        previousApiKeyExpiresAt: null,
+      },
       where: { id: 'partner-revoke' },
     })
   })

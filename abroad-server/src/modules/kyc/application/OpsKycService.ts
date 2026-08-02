@@ -1,31 +1,19 @@
-import { DocumentType, KycStatus, Prisma } from '@prisma/client'
+import { DocumentType, KycStatus, OpsRole, Prisma } from '@prisma/client'
 import { inject, injectable } from 'inversify'
 
 import { TYPES } from '../../../app/container/types'
-import { NotFoundError } from '../../../core/errors'
+import { ApplicationError, NotFoundError } from '../../../core/errors'
 import { IDatabaseClientProvider } from '../../../platform/persistence/IDatabaseClientProvider'
+import { getOpsRolePermissions } from '../../operations/application/opsPermissions'
 import { IKycDocumentStorage, KycDocumentDownload } from './contracts/IKycDocumentStorage'
 
-export type OpsKycDisableInput = {
-  disabledBy?: string
-  partnerUserId: string
-  reason?: string
+export type OpsKycAssignment = {
+  id: string
+  reviewer: null | OpsKycReviewer
+  version: number
 }
 
-export type OpsKycListParams = {
-  page: number
-  pageSize: number
-  status?: KycStatus
-}
-
-export type OpsKycListResult = {
-  items: OpsKycSummary[]
-  page: number
-  pageSize: number
-  total: number
-}
-
-export type OpsKycSummary = {
+export type OpsKycDetail = {
   address: null | string
   city: null | string
   dateOfBirth: Date | null
@@ -42,9 +30,63 @@ export type OpsKycSummary = {
   partnerUserId: string
   phone: null | string
   reviewedAt: Date | null
+  reviewer: null | OpsKycReviewer
   status: KycStatus
   submittedAt: Date
   userId: string
+  version: number
+}
+
+export type OpsKycDisableInput = {
+  disabledBy?: string
+  partnerUserId: string
+  reason?: string
+}
+
+export type OpsKycListParams = {
+  ageHoursGte?: number
+  createdFrom?: Date
+  createdTo?: Date
+  documentType?: DocumentType
+  nationality?: string
+  page: number
+  pageSize: number
+  partnerId?: string
+  query?: string
+  reviewer?: string
+  status?: KycStatus
+}
+
+export type OpsKycListResult = {
+  items: OpsKycSummary[]
+  page: number
+  pageSize: number
+  total: number
+}
+
+export type OpsKycReviewer = {
+  displayName: string
+  id: string
+  role: OpsRole
+}
+
+export type OpsKycSummary = {
+  disabledAt: Date | null
+  documentNumberMasked: null | string
+  documentType: DocumentType | null
+  emailMasked: null | string
+  fullNameMasked: null | string
+  hasDocument: boolean
+  id: string
+  nationality: null | string
+  partnerId: string
+  partnerName: string
+  partnerUserId: string
+  reviewedAt: Date | null
+  reviewer: null | OpsKycReviewer
+  status: KycStatus
+  submittedAt: Date
+  version: number
 }
 
 export type OpsKycUserState = {
@@ -53,8 +95,25 @@ export type OpsKycUserState = {
 }
 
 type KycWithRelations = Prisma.PartnerUserKycGetPayload<{
-  include: { partnerUser: { include: { partner: true } } }
+  include: {
+    opsReviewer: { select: { displayName: true, id: true, role: true } }
+    partnerUser: { include: { partner: true } }
+  }
 }>
+
+export class OpsKycConflictError extends ApplicationError {
+  public constructor() {
+    super(409, 'ops_kyc_conflict', 'This KYC review changed after it was loaded')
+    this.name = 'OpsKycConflictError'
+  }
+}
+
+export class OpsKycValidationError extends ApplicationError {
+  public constructor(message: string) {
+    super(400, 'ops_kyc_invalid', message)
+    this.name = 'OpsKycValidationError'
+  }
+}
 
 @injectable()
 export class OpsKycService {
@@ -64,6 +123,51 @@ export class OpsKycService {
     @inject(TYPES.IKycDocumentStorage)
     private readonly documentStorage: IKycDocumentStorage,
   ) {}
+
+  public async assignReviewer(
+    kycId: string,
+    reviewerUserId: null | string,
+    expectedVersion: number,
+  ): Promise<OpsKycAssignment> {
+    const prisma = await this.dbProvider.getClient()
+    return prisma.$transaction(async (transaction) => {
+      if (reviewerUserId) {
+        const reviewer = await transaction.opsUser.findUnique({ where: { id: reviewerUserId } })
+        if (
+          !reviewer
+          || reviewer.disabledAt
+          || !getOpsRolePermissions(reviewer.role).includes('kyc:decide')
+        ) {
+          throw new OpsKycValidationError('Reviewer must be an enabled KYC decision maker')
+        }
+      }
+
+      const update = await transaction.partnerUserKyc.updateMany({
+        data: {
+          opsReviewerUserId: reviewerUserId,
+          opsReviewVersion: { increment: 1 },
+        },
+        where: { id: kycId, opsReviewVersion: expectedVersion },
+      })
+      if (update.count !== 1) {
+        const exists = await transaction.partnerUserKyc.count({ where: { id: kycId } })
+        if (exists === 0) throw new NotFoundError('KYC submission not found')
+        throw new OpsKycConflictError()
+      }
+      const assigned = await transaction.partnerUserKyc.findUnique({
+        include: {
+          opsReviewer: { select: { displayName: true, id: true, role: true } },
+        },
+        where: { id: kycId },
+      })
+      if (!assigned) throw new NotFoundError('KYC submission not found')
+      return {
+        id: assigned.id,
+        reviewer: assigned.opsReviewer,
+        version: assigned.opsReviewVersion,
+      }
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
+  }
 
   public async disableUser(input: OpsKycDisableInput): Promise<OpsKycUserState> {
     const prisma = await this.dbProvider.getClient()
@@ -111,19 +215,75 @@ export class OpsKycService {
     return this.documentStorage.download(kyc.documentImagePath)
   }
 
+  public async getSubmission(kycId: string): Promise<OpsKycDetail> {
+    const prisma = await this.dbProvider.getClient()
+    const record = await prisma.partnerUserKyc.findUnique({
+      include: {
+        opsReviewer: { select: { displayName: true, id: true, role: true } },
+        partnerUser: { include: { partner: true } },
+      },
+      where: { id: kycId },
+    })
+    if (!record) throw new NotFoundError('KYC submission not found')
+    return this.toDetail(record)
+  }
+
+  public async listReviewers(): Promise<OpsKycReviewer[]> {
+    const prisma = await this.dbProvider.getClient()
+    return prisma.opsUser.findMany({
+      orderBy: [{ displayName: 'asc' }, { email: 'asc' }],
+      select: { displayName: true, id: true, role: true },
+      where: {
+        disabledAt: null,
+        role: { in: [OpsRole.COMPLIANCE, OpsRole.ADMINISTRATOR] },
+      },
+    })
+  }
+
   public async listSubmissions(params: OpsKycListParams): Promise<OpsKycListResult> {
     const prisma = await this.dbProvider.getClient()
     const skip = (params.page - 1) * params.pageSize
 
     // Only self-service form submissions (those carry a stored document).
+    const ageCutoff = params.ageHoursGte
+      ? new Date(Date.now() - params.ageHoursGte * 60 * 60 * 1_000)
+      : undefined
+    const upperCreatedAt = [params.createdTo, ageCutoff]
+      .filter((date): date is Date => Boolean(date))
+      .sort((left, right) => left.getTime() - right.getTime())[0]
+    const query = params.query?.trim()
     const where: Prisma.PartnerUserKycWhereInput = {
+      createdAt: params.createdFrom || upperCreatedAt
+        ? { gte: params.createdFrom, lte: upperCreatedAt }
+        : undefined,
       documentImagePath: { not: null },
-      ...(params.status ? { status: params.status } : {}),
+      documentType: params.documentType,
+      nationality: params.nationality
+        ? { equals: params.nationality, mode: 'insensitive' }
+        : undefined,
+      opsReviewerUserId: params.reviewer === 'UNASSIGNED'
+        ? null
+        : params.reviewer || undefined,
+      OR: query
+        ? [
+            { documentNumber: { contains: query, mode: 'insensitive' } },
+            { email: { contains: query, mode: 'insensitive' } },
+            { fullName: { contains: query, mode: 'insensitive' } },
+            { partnerUser: { userId: { contains: query, mode: 'insensitive' } } },
+          ]
+        : undefined,
+      partnerUser: params.partnerId
+        ? { partnerId: params.partnerId }
+        : undefined,
+      status: params.status,
     }
 
     const [records, total] = await Promise.all([
       prisma.partnerUserKyc.findMany({
-        include: { partnerUser: { include: { partner: true } } },
+        include: {
+          opsReviewer: { select: { displayName: true, id: true, role: true } },
+          partnerUser: { include: { partner: true } },
+        },
         orderBy: { createdAt: 'desc' },
         skip,
         take: params.pageSize,
@@ -162,7 +322,27 @@ export class OpsKycService {
     return error
   }
 
-  private toSummary(record: KycWithRelations): OpsKycSummary {
+  private maskDocumentNumber(value: null | string): null | string {
+    const normalized = value?.trim()
+    if (!normalized) return null
+    return `•••• ${normalized.slice(-4)}`
+  }
+
+  private maskEmail(value: null | string): null | string {
+    const normalized = value?.trim()
+    if (!normalized) return null
+    const separator = normalized.lastIndexOf('@')
+    if (separator <= 0) return '••••'
+    return `${normalized.charAt(0)}•••${normalized.slice(separator)}`
+  }
+
+  private maskName(value: null | string): null | string {
+    const normalized = value?.trim()
+    if (!normalized) return null
+    return normalized.split(/\s+/).map(part => `${part.charAt(0)}••`).join(' ')
+  }
+
+  private toDetail(record: KycWithRelations): OpsKycDetail {
     return {
       address: record.address,
       city: record.city,
@@ -180,9 +360,32 @@ export class OpsKycService {
       partnerUserId: record.partnerUserId,
       phone: record.phone,
       reviewedAt: record.reviewedAt,
+      reviewer: record.opsReviewer,
       status: record.status,
       submittedAt: record.createdAt,
       userId: record.partnerUser.userId,
+      version: record.opsReviewVersion,
+    }
+  }
+
+  private toSummary(record: KycWithRelations): OpsKycSummary {
+    return {
+      disabledAt: record.partnerUser.disabledAt,
+      documentNumberMasked: this.maskDocumentNumber(record.documentNumber),
+      documentType: record.documentType,
+      emailMasked: this.maskEmail(record.email),
+      fullNameMasked: this.maskName(record.fullName),
+      hasDocument: Boolean(record.documentImagePath),
+      id: record.id,
+      nationality: record.nationality,
+      partnerId: record.partnerUser.partnerId,
+      partnerName: record.partnerUser.partner.name,
+      partnerUserId: record.partnerUserId,
+      reviewedAt: record.reviewedAt,
+      reviewer: record.opsReviewer,
+      status: record.status,
+      submittedAt: record.createdAt,
+      version: record.opsReviewVersion,
     }
   }
 }

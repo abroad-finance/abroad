@@ -1,4 +1,5 @@
 import type { FlowInstanceStatus } from './flowTypes'
+import type { OpsIncidentOverview } from './incidentTypes'
 import type { TransactionStatus } from './transactionAdminTypes'
 
 export type OpsOverviewActivity = {
@@ -85,6 +86,7 @@ export type OpsOverviewResponse = {
   bridge: OpsOverviewBridge
   execution: OpsOverviewExecution
   generatedAt: string
+  incidents: OpsIncidentOverview
   partners: OpsOverviewPartners
   treasury: OpsOverviewTreasury
   window: OpsOverviewWindow

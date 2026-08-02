@@ -41,6 +41,8 @@ const buildTransaction = (overrides: Partial<TransactionWithRelations> = {}): Tr
       name: 'Partner',
       needsKyc: true,
       phone: null,
+      previousApiKey: null,
+      previousApiKeyExpiresAt: null,
       webhookUrl: 'http://hook',
     },
     partnerId: 'partner-1',
@@ -48,6 +50,7 @@ const buildTransaction = (overrides: Partial<TransactionWithRelations> = {}): Tr
     userId: 'user-1',
   },
   partnerUserId: 'partner-user-1',
+  pixEndToEndId: null,
   qrCode: null,
   quote: {
     country: Country.CO,

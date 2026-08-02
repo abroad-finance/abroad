@@ -9,6 +9,7 @@ export type CryptoAssetCoverageDto = {
   mintAddress?: null | string
   status: 'CONFIGURED' | 'MISSING'
   updatedAt?: Date | null
+  version: number
 }
 
 export type CryptoAssetCoverageResponse = {

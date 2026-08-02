@@ -41,13 +41,21 @@ describe('TransferoBalanceSource', () => {
       {
         account: 'BRZ',
         amount: 1234.56,
+        availableAmount: 1234.56,
+        blockedAmount: 0,
         currency: 'BRZ',
+        outstandingAmount: 0,
+        reservedAmount: 0,
         venue: 'TRANSFERO',
       },
       {
         account: 'USDC',
         amount: 42.000001,
+        availableAmount: 42.000001,
+        blockedAmount: 0,
         currency: 'USDC',
+        outstandingAmount: 0,
+        reservedAmount: 0,
         venue: 'TRANSFERO',
       },
     ])

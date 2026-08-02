@@ -25,6 +25,7 @@ export type CryptoAssetCoverage = {
   mintAddress?: null | string
   status: CryptoAssetCoverageStatus
   updatedAt?: null | string
+  version: number
 }
 
 export type CryptoAssetCoverageResponse = {
@@ -89,6 +90,7 @@ export type FlowCorridor = {
   targetCurrency: string
   unsupportedReason?: null | string
   updatedAt?: null | string
+  version: number
 }
 
 export type FlowCorridorListResponse = {
@@ -131,6 +133,7 @@ export type FlowDefinition = {
   steps: FlowBusinessStep[]
   targetCurrency: string
   updatedAt: string
+  version: number
 }
 
 export type FlowDefinitionInput = {
@@ -147,6 +150,8 @@ export type FlowDefinitionInput = {
   steps: FlowBusinessStep[]
   targetCurrency: string
 }
+
+export type FlowFailureFilter = 'FAILED_FLOW' | 'FAILED_STEP' | 'STUCK_WAITING'
 
 export type FlowInstanceCurrentStep = {
   status: FlowStepStatus
@@ -172,7 +177,25 @@ export type FlowInstanceListResponse = {
   items: FlowInstanceSummary[]
   page: number
   pageSize: number
+  statusCounts: Array<{ count: number, status: FlowInstanceStatus }>
   total: number
+}
+
+export type FlowInstanceSearchFilters = {
+  blockchain?: 'CELO' | 'SOLANA' | 'STELLAR'
+  createdFrom?: string
+  createdTo?: string
+  cryptoCurrency?: 'USDC' | 'USDT'
+  failure?: FlowFailureFilter
+  onChainId?: string
+  page?: number
+  pageSize?: number
+  partnerId?: string
+  payoutProvider?: PaymentMethod
+  status?: FlowInstanceStatus
+  stuckMinutes?: number
+  targetCurrency?: 'BRL' | 'COP'
+  transactionId?: string
 }
 
 export type FlowInstanceSummary = {
@@ -291,6 +314,7 @@ export type FlowTransactionSummary = {
   externalId: null | string
   id: string
   onChainId: null | string
+  partner: { id: string, name: string }
   refundOnChainId: null | string
   status: string
 }

@@ -44,10 +44,37 @@ export class PartnerPixReceiptService {
     private readonly transferoUltraClient: TransferoUltraClient,
   ) {}
 
+  /**
+   * Ops-only cross-partner receipt lookup. The caller cannot provide a partner
+   * scope, which prevents accidental reuse from tenant-facing routes. HTTP
+   * authorization and immutable proof-access auditing remain controller-owned.
+   */
+  public async getOpsReceipt(
+    transactionId: string,
+    language: PartnerPixReceiptLanguage,
+  ): Promise<PartnerPixReceiptDto> {
+    return this.getReceiptForWhere(transactionId, language, {
+      id: transactionId,
+      quote: { paymentMethod: PaymentMethod.PIX },
+    })
+  }
+
   public async getReceipt(
     partnerId: string,
     transactionId: string,
     language: PartnerPixReceiptLanguage,
+  ): Promise<PartnerPixReceiptDto> {
+    return this.getReceiptForWhere(transactionId, language, {
+      id: transactionId,
+      partnerUser: { partnerId },
+      quote: { paymentMethod: PaymentMethod.PIX },
+    })
+  }
+
+  private async getReceiptForWhere(
+    transactionId: string,
+    language: PartnerPixReceiptLanguage,
+    where: import('@prisma/client').Prisma.TransactionWhereInput,
   ): Promise<PartnerPixReceiptDto> {
     const prismaClient = await this.databaseClientProvider.getClient()
     const transaction = await prismaClient.transaction.findFirst({
@@ -55,11 +82,7 @@ export class PartnerPixReceiptService {
         externalId: true,
         status: true,
       },
-      where: {
-        id: transactionId,
-        partnerUser: { partnerId },
-        quote: { paymentMethod: PaymentMethod.PIX },
-      },
+      where,
     })
     if (!transaction?.externalId) {
       throw new PartnerPixReceiptNotFoundError()

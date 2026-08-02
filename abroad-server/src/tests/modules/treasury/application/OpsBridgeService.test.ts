@@ -5,16 +5,22 @@ import type { IDatabaseClientProvider } from '../../../../platform/persistence/I
 import { OpsBridgeService } from '../../../../modules/treasury/application/OpsBridgeService'
 
 type PrismaMock = {
-  bridgeBatch: { findMany: jest.Mock }
-  bridgePendingTransfer: { findFirst: jest.Mock, groupBy: jest.Mock }
+  bridgeBatch: { findMany: jest.Mock, findUnique: jest.Mock }
+  bridgePendingTransfer: { findFirst: jest.Mock, findMany: jest.Mock, groupBy: jest.Mock }
+  transaction: { findMany: jest.Mock }
 }
 
 const makePrisma = (): PrismaMock => ({
-  bridgeBatch: { findMany: jest.fn(async () => []) },
+  bridgeBatch: {
+    findMany: jest.fn(async () => []),
+    findUnique: jest.fn(async () => null),
+  },
   bridgePendingTransfer: {
     findFirst: jest.fn(async () => null),
+    findMany: jest.fn(async () => []),
     groupBy: jest.fn(async () => []),
   },
+  transaction: { findMany: jest.fn(async () => []) },
 })
 
 const makeService = (
@@ -41,6 +47,7 @@ describe('OpsBridgeService.getOverview', () => {
 
     expect(overview.float).toEqual({ available: 1983, cap: 2000, deficit: 17, enabled: true })
     expect(overview.legs.total).toBe(6)
+    expect(overview.legs.recent).toEqual([])
     expect(overview.legs.byStatus).toEqual(
       expect.arrayContaining([
         { amount: 12, count: 3, status: 'PENDING' },
@@ -83,10 +90,62 @@ describe('OpsBridgeService.getOverview', () => {
 
     expect(overview.legs.oldestPendingAt).toEqual(oldest)
     expect(overview.batches).toEqual([
-      expect.objectContaining({ id: 'batch-1', memberCount: 4, status: 'SUBMITTED', withdrawId: 'w-1' }),
+      expect.objectContaining({
+        id: 'batch-1',
+        memberCount: 4,
+        reconciliationState: 'AWAITING_PROVIDER',
+        status: 'SUBMITTED',
+        withdrawId: 'w-1',
+      }),
     ])
     expect(prisma.bridgePendingTransfer.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({ orderBy: { createdAt: 'asc' }, where: { status: 'PENDING' } }),
     )
+  })
+})
+
+describe('OpsBridgeService.getBatchDetail', () => {
+  it('links every constituent leg to its transaction, SLA, reconciliation, incident, and provider reference', async () => {
+    const prisma = makePrisma()
+    prisma.bridgeBatch.findUnique.mockResolvedValue({
+      asset: 'USDC',
+      createdAt: new Date('2026-08-02T10:00:00.000Z'),
+      destNetwork: 'POLYGON',
+      grossAmount: 25,
+      id: 'batch-1',
+      members: [{
+        amount: 25,
+        asset: 'USDC',
+        batchId: 'batch-1',
+        createdAt: new Date('2026-08-02T09:00:00.000Z'),
+        destNetwork: 'POLYGON',
+        id: 'leg-1',
+        status: 'BATCHED',
+        transactionId: 'transaction-1',
+        updatedAt: new Date('2026-08-02T10:00:00.000Z'),
+      }],
+      settledAt: null,
+      status: 'SUBMITTED',
+      withdrawFee: 0.1,
+      withdrawId: 'provider-withdrawal-1',
+    })
+    prisma.transaction.findMany.mockResolvedValue([{
+      id: 'transaction-1',
+      partnerUser: { partner: { id: 'partner-1', name: 'Partner One' } },
+      status: 'PROCESSING_PAYMENT',
+    }])
+
+    const detail = await makeService(prisma, 2_000).getBatchDetail('batch-1')
+
+    expect(detail.providerReference).toBe('provider-withdrawal-1')
+    expect(detail.members[0]).toEqual(expect.objectContaining({
+      incidentPath: '/ops/incidents?kind=BRIDGE&query=leg-1',
+      reconciliationState: 'AWAITING_PROVIDER',
+      transaction: {
+        id: 'transaction-1',
+        partner: { id: 'partner-1', name: 'Partner One' },
+        status: 'PROCESSING_PAYMENT',
+      },
+    }))
   })
 })

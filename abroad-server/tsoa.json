@@ -23,6 +23,16 @@
         "in": "header",
         "name": "X-OPS-API-KEY"
       },
+      "OpsAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "Firebase ID token"
+      },
+      "OpsFirebaseAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "Firebase ID token"
+      },
       "PartnerPortalAuth": {
         "type": "http",
         "scheme": "bearer",

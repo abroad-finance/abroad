@@ -29,7 +29,7 @@ const buildInput = (overrides?: Partial<KycSubmissionInput>): KycSubmissionInput
 
 const buildHarness = (opts?: {
   disabledAt?: Date | null
-  existingKyc?: { id: string } | null
+  existingKyc?: null | { id: string }
 }) => {
   const prisma = {
     partnerUser: {

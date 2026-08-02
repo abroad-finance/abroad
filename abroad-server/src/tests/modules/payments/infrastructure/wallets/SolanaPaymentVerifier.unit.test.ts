@@ -5,8 +5,8 @@ import { type Connection, type ParsedInstruction, type ParsedTransactionWithMeta
 import type { ILogger } from '../../../../../core/logging/types'
 import type { IDatabaseClientProvider } from '../../../../../platform/persistence/IDatabaseClientProvider'
 
-import { SolanaPaymentVerifier } from '../../../../../modules/payments/infrastructure/wallets/SolanaPaymentVerifier'
 import * as depositVerification from '../../../../../modules/payments/infrastructure/wallets/depositVerification'
+import { SolanaPaymentVerifier } from '../../../../../modules/payments/infrastructure/wallets/SolanaPaymentVerifier'
 import { type ISecretManager } from '../../../../../platform/secrets/ISecretManager'
 
 const buildVerifier = () => {

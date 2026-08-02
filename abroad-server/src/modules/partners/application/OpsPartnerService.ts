@@ -12,8 +12,11 @@ import { TYPES } from '../../../app/container/types'
 import { IDatabaseClientProvider } from '../../../platform/persistence/IDatabaseClientProvider'
 import { normalizeClientDomainInput } from '../domain/clientDomain'
 import { buildPartnerApiKeyCandidate } from './partnerApiKey'
+import { fromDatabasePartnerApiKeyScope, PartnerApiKeyScopeName } from './partnerApiKeyScopes'
 
 const API_KEY_RETRY_ATTEMPTS = 5
+const LEGACY_KEY_ROTATION_OVERLAP_MS = 24 * 60 * 60 * 1_000
+const MAX_CREDENTIAL_HISTORY_EVENTS = 100
 
 export type OpsPartnerClientDomainInput = {
   clientDomain: null | string
@@ -41,6 +44,26 @@ export type OpsPartnerCreateResult = {
   partner: OpsPartnerSummary
 }
 
+export type OpsPartnerCredentialEvent = {
+  action: string
+  actorLabel: string
+  createdAt: Date
+  id: string
+  reason?: string
+  reference?: string
+  source: 'OPS' | 'PARTNER_PORTAL'
+}
+
+export type OpsPartnerCredentialHistory = {
+  events: OpsPartnerCredentialEvent[]
+  legacyCredential: {
+    active: boolean
+    overlapExpiresAt?: Date
+  }
+  managedCredentials: OpsPartnerManagedCredential[]
+  partner: OpsPartnerSummary
+}
+
 export type OpsPartnerListItem = OpsPartnerSummary & {
   completedVolume: OpsPartnerCompletedVolume
 }
@@ -56,6 +79,20 @@ export type OpsPartnerListResult = {
   page: number
   pageSize: number
   total: number
+}
+
+export type OpsPartnerManagedCredential = {
+  createdAt: Date
+  displayPrefix: string
+  expiresAt?: Date
+  id: string
+  lastUsedAt?: Date
+  name: string
+  revokedAt?: Date
+  rotatedFromId?: string
+  rotatedToId?: string
+  scopes: PartnerApiKeyScopeName[]
+  status: 'ACTIVE' | 'EXPIRED' | 'REVOKED'
 }
 
 export type OpsPartnerPayoutVolume = {
@@ -83,6 +120,7 @@ export type OpsPartnerSummary = {
   id: string
   isKybApproved: boolean
   lastName?: string
+  legacyKeyOverlapExpiresAt?: Date
   name: string
   needsKyc: boolean
   phone?: string
@@ -199,6 +237,94 @@ export class OpsPartnerService {
     }
   }
 
+  public async getCredentialHistory(partnerId: string): Promise<OpsPartnerCredentialHistory> {
+    const prisma = await this.dbProvider.getClient()
+    const [partner, managedCredentials, opsEvents, portalEvents] = await Promise.all([
+      prisma.partner.findUnique({ where: { id: partnerId } }),
+      prisma.partnerApiKey.findMany({
+        include: { rotatedTo: { select: { id: true } } },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        where: { partnerId },
+      }),
+      prisma.opsAuditEvent.findMany({
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        take: MAX_CREDENTIAL_HISTORY_EVENTS,
+        where: {
+          OR: [
+            { action: { startsWith: 'credentials.' } },
+            { action: { startsWith: 'partner.' } },
+          ],
+          resourceId: partnerId,
+          resourceType: 'partner',
+        },
+      }),
+      prisma.partnerPortalAuditEvent.findMany({
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        take: MAX_CREDENTIAL_HISTORY_EVENTS,
+        where: {
+          action: { startsWith: 'api_key.' },
+          partnerId,
+        },
+      }),
+    ])
+    if (!partner) throw new OpsPartnerNotFoundError('Partner not found')
+
+    const now = new Date()
+    const events: OpsPartnerCredentialEvent[] = [
+      ...opsEvents.map(event => ({
+        action: event.action,
+        actorLabel: event.actorLabel,
+        createdAt: event.createdAt,
+        id: event.id,
+        reason: event.reason ?? undefined,
+        reference: event.reference ?? undefined,
+        source: 'OPS' as const,
+      })),
+      ...portalEvents.map(event => ({
+        action: event.action,
+        actorLabel: 'Partner administrator',
+        createdAt: event.createdAt,
+        id: event.id,
+        source: 'PARTNER_PORTAL' as const,
+      })),
+    ]
+      .sort((left, right) => (
+        right.createdAt.getTime() - left.createdAt.getTime()
+        || right.id.localeCompare(left.id)
+      ))
+      .slice(0, MAX_CREDENTIAL_HISTORY_EVENTS)
+
+    return {
+      events,
+      legacyCredential: {
+        active: Boolean(partner.apiKey),
+        overlapExpiresAt: partner.previousApiKey
+          && partner.previousApiKeyExpiresAt
+          && partner.previousApiKeyExpiresAt > now
+          ? partner.previousApiKeyExpiresAt
+          : undefined,
+      },
+      managedCredentials: managedCredentials.map(key => ({
+        createdAt: key.createdAt,
+        displayPrefix: key.displayPrefix,
+        expiresAt: key.expiresAt ?? undefined,
+        id: key.id,
+        lastUsedAt: key.lastUsedAt ?? undefined,
+        name: key.name,
+        revokedAt: key.revokedAt ?? undefined,
+        rotatedFromId: key.rotatedFromId ?? undefined,
+        rotatedToId: key.rotatedTo?.id,
+        scopes: key.scopes.map(fromDatabasePartnerApiKeyScope),
+        status: key.revokedAt
+          ? 'REVOKED'
+          : key.expiresAt && key.expiresAt <= now
+            ? 'EXPIRED'
+            : 'ACTIVE',
+      })),
+      partner: this.toSummary(partner),
+    }
+  }
+
   public async listPartners(params: OpsPartnerListParams): Promise<OpsPartnerListResult> {
     const prisma = await this.dbProvider.getClient()
     const skip = (params.page - 1) * params.pageSize
@@ -250,7 +376,11 @@ export class OpsPartnerService {
     const prisma = await this.dbProvider.getClient()
     try {
       await prisma.partner.update({
-        data: { apiKey: null },
+        data: {
+          apiKey: null,
+          previousApiKey: null,
+          previousApiKeyExpiresAt: null,
+        },
         where: { id: partnerId },
       })
     }
@@ -268,20 +398,43 @@ export class OpsPartnerService {
     for (let attempt = 1; attempt <= API_KEY_RETRY_ATTEMPTS; attempt += 1) {
       const candidate = buildPartnerApiKeyCandidate()
       try {
-        const updatedPartner = await prisma.partner.update({
-          data: { apiKey: candidate.hashed },
-          where: { id: partnerId },
-        })
+        const updatedPartner = await prisma.$transaction(async (transaction) => {
+          const existing = await transaction.partner.findUnique({ where: { id: partnerId } })
+          if (!existing) throw new OpsPartnerNotFoundError('Partner not found')
+
+          const now = new Date()
+          if (
+            existing.previousApiKey
+            && existing.previousApiKeyExpiresAt
+            && existing.previousApiKeyExpiresAt > now
+          ) {
+            throw new OpsPartnerValidationError(
+              'A 24-hour credential overlap is already active. Wait for it to end or revoke both keys.',
+            )
+          }
+
+          return transaction.partner.update({
+            data: {
+              apiKey: candidate.hashed,
+              previousApiKey: existing.apiKey,
+              previousApiKeyExpiresAt: existing.apiKey
+                ? new Date(now.getTime() + LEGACY_KEY_ROTATION_OVERLAP_MS)
+                : null,
+            },
+            where: { id: partnerId },
+          })
+        }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
         return {
           apiKey: candidate.plaintext,
           partner: this.toSummary(updatedPartner),
         }
       }
       catch (error) {
-        if (this.isNotFoundError(error)) {
+        if (error instanceof OpsPartnerNotFoundError || this.isNotFoundError(error)) {
           throw new OpsPartnerNotFoundError('Partner not found')
         }
-        if (this.isUniqueConstraintFor(error, 'apiKey') && attempt < API_KEY_RETRY_ATTEMPTS) {
+        if (error instanceof OpsPartnerValidationError) throw error
+        if (this.isRetryableApiKeyRotationError(error) && attempt < API_KEY_RETRY_ATTEMPTS) {
           continue
         }
         throw new OpsPartnerValidationError('Failed to rotate partner API key')
@@ -337,6 +490,11 @@ export class OpsPartnerService {
 
   private isNotFoundError(error: unknown): boolean {
     return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025'
+  }
+
+  private isRetryableApiKeyRotationError(error: unknown): boolean {
+    return error instanceof Prisma.PrismaClientKnownRequestError
+      && (error.code === 'P2002' || error.code === 'P2034')
   }
 
   private isUniqueConstraintFor(error: unknown, field: string): boolean {
@@ -467,6 +625,11 @@ export class OpsPartnerService {
       id: partner.id,
       isKybApproved: partner.isKybApproved ?? false,
       lastName: partner.lastName ?? undefined,
+      legacyKeyOverlapExpiresAt: partner.previousApiKey
+        && partner.previousApiKeyExpiresAt
+        && partner.previousApiKeyExpiresAt > new Date()
+        ? partner.previousApiKeyExpiresAt
+        : undefined,
       name: partner.name,
       needsKyc: partner.needsKyc ?? false,
       phone: partner.phone ?? undefined,

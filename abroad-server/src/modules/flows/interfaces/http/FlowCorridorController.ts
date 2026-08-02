@@ -5,19 +5,17 @@ import {
   Get,
   OperationId,
   Patch,
-  Res,
   Response,
   Route,
   Security,
   SuccessResponse,
-  TsoaResponse,
 } from 'tsoa'
 
+import { OpsConfigurationReleaseRequiredError } from '../../../operations/application/OpsConfigurationGovernance'
 import { FlowCorridorService } from '../../application/FlowCorridorService'
-import { FlowCorridorDto, FlowCorridorListDto, FlowCorridorUpdateInput, flowCorridorUpdateSchema } from '../../application/flowDefinitionSchemas'
+import { FlowCorridorDto, FlowCorridorListDto, FlowCorridorUpdateInput } from '../../application/flowDefinitionSchemas'
 
 @Route('ops/flows/corridors')
-@Security('OpsApiKeyAuth')
 export class FlowCorridorController extends Controller {
   constructor(
     @inject(FlowCorridorService) private readonly corridorService: FlowCorridorService,
@@ -26,6 +24,7 @@ export class FlowCorridorController extends Controller {
   }
 
   @Get()
+  @Security('OpsAuth', ['configuration:read'])
   @SuccessResponse('200', 'Flow corridor coverage retrieved')
   public async list(): Promise<FlowCorridorListDto> {
     return this.corridorService.list()
@@ -34,16 +33,12 @@ export class FlowCorridorController extends Controller {
   @OperationId('FlowCorridorUpdate')
   @Patch()
   @Response<400, { reason: string }>(400, 'Bad Request')
-  @SuccessResponse('200', 'Flow corridor updated')
+  @Response<409, { reason: string }>(409, 'Configuration release required')
+  @Security('OpsAuth', ['configuration:manage'])
   public async update(
-    @Body() body: FlowCorridorUpdateInput,
-    @Res() badRequest: TsoaResponse<400, { reason: string }>,
+    @Body() _body: FlowCorridorUpdateInput,
   ): Promise<FlowCorridorDto> {
-    const parsed = flowCorridorUpdateSchema.safeParse(body)
-    if (!parsed.success) {
-      return badRequest(400, { reason: parsed.error.message })
-    }
-
-    return this.corridorService.updateStatus(parsed.data)
+    void _body
+    throw new OpsConfigurationReleaseRequiredError()
   }
 }

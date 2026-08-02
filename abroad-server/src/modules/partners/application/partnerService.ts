@@ -72,7 +72,7 @@ export class PartnerService implements IPartnerService {
       }
     }
 
-    const partner = await this.findPartnerByApiKey(prismaClient, hashedApiKey)
+    const partner = await this.findPartnerByApiKey(prismaClient, hashedApiKey, now)
     if (!partner) {
       throw new Error('Partner not found')
     }
@@ -150,9 +150,18 @@ export class PartnerService implements IPartnerService {
   private async findPartnerByApiKey(
     prismaClient: PrismaClient,
     hashedApiKey: string,
+    now: Date,
   ): Promise<null | Partner> {
-    return prismaClient.partner.findFirst({
+    const current = await prismaClient.partner.findFirst({
       where: { apiKey: hashedApiKey },
+    })
+    if (current) return current
+
+    return prismaClient.partner.findFirst({
+      where: {
+        previousApiKey: hashedApiKey,
+        previousApiKeyExpiresAt: { gt: now },
+      },
     })
   }
 

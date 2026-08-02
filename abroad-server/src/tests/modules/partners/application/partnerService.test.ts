@@ -23,6 +23,14 @@ describe('PartnerService', () => {
     clientDomainHash: null,
     id: 'partner-1',
   } as unknown as PartnerModel
+  const partnerFromPreviousApiKey = {
+    apiKey: 'new-key-hash',
+    clientDomain: null,
+    clientDomainHash: null,
+    id: 'partner-previous',
+    previousApiKey: hashedApiKey,
+    previousApiKeyExpiresAt: new Date(Date.now() + 60_000),
+  } as unknown as PartnerModel
   const partnerFromDomain = {
     apiKey: null,
     clientDomain: 'client.example.com',
@@ -36,6 +44,7 @@ describe('PartnerService', () => {
   } as unknown as PartnerModel
 
   let partnersByApiKey: Record<string, PartnerModel>
+  let partnersByPreviousApiKey: Record<string, PartnerModel>
   let partnersByClientDomainHash: Record<string, PartnerModel>
   let partnersById: Record<string, PartnerModel>
   let dbProvider: IDatabaseClientProvider
@@ -49,13 +58,20 @@ describe('PartnerService', () => {
     partnersByApiKey = {
       [hashedApiKey]: partnerFromApiKey,
     }
+    partnersByPreviousApiKey = {}
     partnersByClientDomainHash = {
       [hashedClientDomain]: partnerFromDomain,
     }
     partnersById = {
       'secret-STELLAR_SEP_PARTNER_ID': defaultPartner,
     }
-    findFirst = jest.fn(async ({ where }: { where?: { apiKey?: string, clientDomainHash?: string, id?: string } } = {}) => {
+    findFirst = jest.fn(async ({ where }: { where?: {
+      apiKey?: string
+      clientDomainHash?: string
+      id?: string
+      previousApiKey?: string
+      previousApiKeyExpiresAt?: { gt: Date }
+    } } = {}) => {
       if (where?.apiKey) {
         return partnersByApiKey[where.apiKey] ?? null
       }
@@ -64,6 +80,13 @@ describe('PartnerService', () => {
       }
       if (where?.id) {
         return partnersById[where.id] ?? null
+      }
+      if (where?.previousApiKey && where.previousApiKeyExpiresAt) {
+        const partner = partnersByPreviousApiKey[where.previousApiKey] ?? null
+        return partner?.previousApiKeyExpiresAt
+          && partner.previousApiKeyExpiresAt > where.previousApiKeyExpiresAt.gt
+          ? partner
+          : null
       }
       return null
     })
@@ -104,6 +127,32 @@ describe('PartnerService', () => {
     expect(dbProvider.getClient).toHaveBeenCalled()
     expect(findFirst).toHaveBeenCalledWith({ where: { apiKey: hashedApiKey } })
     expect(result).toBe(partnerFromApiKey)
+  })
+
+  it('accepts the previous legacy key only during the bounded rotation overlap', async () => {
+    delete partnersByApiKey[hashedApiKey]
+    partnersByPreviousApiKey[hashedApiKey] = partnerFromPreviousApiKey
+
+    const result = await service.getPartnerFromApiKey('api-key')
+
+    expect(findFirst).toHaveBeenNthCalledWith(1, { where: { apiKey: hashedApiKey } })
+    expect(findFirst).toHaveBeenNthCalledWith(2, {
+      where: {
+        previousApiKey: hashedApiKey,
+        previousApiKeyExpiresAt: { gt: expect.any(Date) },
+      },
+    })
+    expect(result).toBe(partnerFromPreviousApiKey)
+  })
+
+  it('rejects an expired previous legacy key', async () => {
+    delete partnersByApiKey[hashedApiKey]
+    partnersByPreviousApiKey[hashedApiKey] = {
+      ...partnerFromPreviousApiKey,
+      previousApiKeyExpiresAt: new Date(Date.now() - 60_000),
+    }
+
+    await expect(service.getPartnerFromApiKey('api-key')).rejects.toThrow('Partner not found')
   })
 
   it('authenticates an active managed key with scopes and rate-limited usage metadata', async () => {

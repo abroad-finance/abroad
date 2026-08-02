@@ -107,6 +107,33 @@ const buildOverview = (range: OpsOverviewRange = '24h'): OpsOverviewResponse => 
     totalFlows: 20,
   },
   generatedAt: '2026-08-01T12:00:00.000Z',
+  incidents: {
+    critical: 1,
+    high: 1,
+    open: 2,
+    top: [{
+      acknowledgedAt: null,
+      affectedCount: 3,
+      ageSeconds: 7_200,
+      context: { affected: [], dimensions: [], filters: [] },
+      firstSeenAt: '2026-08-01T10:00:00.000Z',
+      id: 'incident-1',
+      kind: 'LIQUIDITY',
+      lastSeenAt: '2026-08-01T11:45:00.000Z',
+      occurrenceCount: 4,
+      owner: null,
+      resolvedAt: null,
+      runbook: null,
+      severity: 'CRITICAL',
+      status: 'OPEN',
+      summary: 'Liquidity checks are failing.',
+      team: 'Operations',
+      title: 'BRZ liquidity unavailable',
+      updatedAt: '2026-08-01T11:45:00.000Z',
+      version: 1,
+    }],
+    unowned: 1,
+  },
   partners: {
     activePartners: 2,
     top: [{
@@ -159,11 +186,13 @@ describe('OpsControlTower', () => {
 
     expect(await screen.findByRole('heading', { name: 'Control Tower' })).toBeInTheDocument()
     expect(mocked.getOpsOverview).toHaveBeenCalledWith('24h')
-    expect(screen.getByRole('link', { name: 'Overview' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('link', { name: 'Home' })).toHaveAttribute('aria-current', 'page')
     expect(screen.getByRole('img', {
       name: 'Transaction outcomes: 6 completed, 2 open, 1 failed, 1 expired',
     })).toBeInTheDocument()
     expect(screen.getByRole('img', { name: 'Transaction activity chart with 10 transactions' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Incident pulse' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /BRZ liquidity unavailable/ })).toHaveAttribute('href', '/ops/incidents/incident-1')
     expect(screen.getByText('Partial valuation')).toBeInTheDocument()
     expect(screen.getByRole('progressbar', { name: 'Float utilization' })).toHaveAttribute('aria-valuenow', '30')
 
@@ -172,7 +201,7 @@ describe('OpsControlTower', () => {
     })).getAllByRole('listitem')
     expect(within(rankedPartners[0]).getByText('High Volume')).toBeInTheDocument()
     expect(within(rankedPartners[1]).getByText('Lower Volume')).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /Inspect flows/ })).toHaveAttribute('href', '/ops/flows')
+    expect(screen.getByRole('link', { name: 'Waiting flows' })).toHaveAttribute('href', '/ops/flows?failure=STUCK_WAITING')
     expect(screen.getByRole('link', { name: /Open partner directory/ })).toHaveAttribute('href', '/ops/partners')
     expect(screen.getByRole('navigation', { name: 'Operations quick links' })).toBeInTheDocument()
   })

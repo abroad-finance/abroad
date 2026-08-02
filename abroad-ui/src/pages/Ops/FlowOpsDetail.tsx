@@ -22,12 +22,14 @@ import { cn } from '../../shared/utils'
 import {
   formatAmount,
   formatDateTime,
+  humanizeStatus,
   OpsEmptyState,
   OpsLoading,
   OpsPageShell,
   OpsStatusBadge,
   OpsTone,
 } from './shared'
+import { isOpsMutationCancelledError, useOpsMutation } from './shared/opsMutationContext'
 
 const flowStatusTone: Record<FlowInstanceStatus, OpsTone> = {
   COMPLETED: 'success',
@@ -86,6 +88,7 @@ const FlowOpsDetail = () => {
   const [actionLoading, setActionLoading] = useState<null | string>(null)
   const [error, setError] = useState<null | string>(null)
   const opsApiKey = useOpsApiKey()
+  const { requestMutation } = useOpsMutation()
 
   const load = useCallback(async () => {
     if (!flowInstanceId || !opsApiKey) {
@@ -125,14 +128,25 @@ const FlowOpsDetail = () => {
 
     try {
       if (action === 'retry') {
-        await retryFlowStep(flowInstanceId, step.id)
+        await requestMutation({
+          action: 'flow.step.retry',
+          execute: mutation => retryFlowStep(flowInstanceId, step.id, mutation),
+          resourceLabel: `Step ${step.stepOrder} · ${step.stepType}`,
+          title: 'Retry failed flow step',
+        })
       }
       else {
-        await requeueFlowStep(flowInstanceId, step.id)
+        await requestMutation({
+          action: 'flow.step.requeue',
+          execute: mutation => requeueFlowStep(flowInstanceId, step.id, mutation),
+          resourceLabel: `Step ${step.stepOrder} · ${step.stepType}`,
+          title: 'Requeue flow step',
+        })
       }
       await load()
     }
     catch (err) {
+      if (isOpsMutationCancelledError(err)) return
       setError(err instanceof Error ? err.message : 'Action failed')
     }
     finally {
@@ -142,6 +156,7 @@ const FlowOpsDetail = () => {
     flowInstanceId,
     load,
     opsApiKey,
+    requestMutation,
   ])
 
   const handleResume = useCallback(async () => {
@@ -150,10 +165,16 @@ const FlowOpsDetail = () => {
     setError(null)
 
     try {
-      await resumeFlowInstance(flowInstanceId)
+      await requestMutation({
+        action: 'flow.resume',
+        execute: mutation => resumeFlowInstance(flowInstanceId, mutation),
+        resourceLabel: flowInstanceId,
+        title: 'Resume failed flow',
+      })
       await load()
     }
     catch (err) {
+      if (isOpsMutationCancelledError(err)) return
       setError(err instanceof Error ? err.message : 'Resume failed')
     }
     finally {
@@ -163,28 +184,26 @@ const FlowOpsDetail = () => {
     flowInstanceId,
     load,
     opsApiKey,
+    requestMutation,
   ])
 
   const handleForceReset = useCallback(async (step: FlowStepInstance) => {
     if (!flowInstanceId || !opsApiKey) return
-    const confirmed = window.confirm(
-      `Force-reset RUNNING step #${step.stepOrder} (${step.stepType})?\n\n`
-      + 'This re-queues a step that is still marked as running. If the step performs a '
-      + 'non-idempotent money action (payout, exchange send, treasury transfer), forcing it '
-      + 'can DOUBLE-EXECUTE that action. Only proceed if you have confirmed the original '
-      + 'execution did not complete.',
-    )
-    if (!confirmed) return
-
     const key = `force-${step.id}`
     setActionLoading(key)
     setError(null)
 
     try {
-      await retryFlowStep(flowInstanceId, step.id, { force: true })
+      await requestMutation({
+        action: 'flow.step.force_retry',
+        execute: mutation => retryFlowStep(flowInstanceId, step.id, mutation, { force: true }),
+        resourceLabel: `Running step ${step.stepOrder} · ${step.stepType}`,
+        title: 'Force retry running step',
+      })
       await load()
     }
     catch (err) {
+      if (isOpsMutationCancelledError(err)) return
       setError(err instanceof Error ? err.message : 'Force reset failed')
     }
     finally {
@@ -194,13 +213,14 @@ const FlowOpsDetail = () => {
     flowInstanceId,
     load,
     opsApiKey,
+    requestMutation,
   ])
 
   return (
     <OpsPageShell
       actions={data && (
         <>
-          <OpsStatusBadge label={data.status} tone={flowStatusTone[data.status]} />
+          <OpsStatusBadge label={humanizeStatus(data.status)} tone={flowStatusTone[data.status]} />
           <div className="text-xs text-ops-muted">
             Updated
             {' '}
@@ -235,7 +255,7 @@ const FlowOpsDetail = () => {
             <div className="ops-card p-5">
               <div className="ops-label">Transaction</div>
               <div className="mt-2 text-sm font-medium">{data.transaction?.id ?? '—'}</div>
-              <Field className="mt-1" label="Status" value={data.transaction?.status ?? '—'} />
+              <Field className="mt-1" label="Status" value={humanizeStatus(data.transaction?.status)} />
               <Field className="mt-3" label="External ID" value={data.transaction?.externalId ?? '—'} />
               <Field label="On-chain" value={data.transaction?.onChainId ?? '—'} />
             </div>
@@ -311,14 +331,14 @@ const FlowOpsDetail = () => {
                     <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                       <div>
                         <div className="flex items-center gap-3">
-                          <OpsStatusBadge label={step.status} tone={stepStatusTone[step.status]} />
+                          <OpsStatusBadge label={humanizeStatus(step.status)} tone={stepStatusTone[step.status]} />
                           <span className="text-xs uppercase tracking-wider text-ops-muted">
                             Step
                             {' '}
                             {step.stepOrder}
                           </span>
                         </div>
-                        <div className="mt-2 text-lg font-semibold">{step.stepType}</div>
+                        <div className="mt-2 text-lg font-semibold">{humanizeStatus(step.stepType)}</div>
                         <div className="mt-1 text-xs text-ops-muted">
                           Attempts
                           {' '}

@@ -1,3 +1,4 @@
+import { Request as RequestExpress } from 'express'
 import { inject } from 'inversify'
 import {
   Body,
@@ -5,6 +6,7 @@ import {
   OperationId,
   Path,
   Put,
+  Request,
   Res,
   Response,
   Route,
@@ -13,15 +15,19 @@ import {
   TsoaResponse,
 } from 'tsoa'
 
+import { requireOpsPrincipal } from '../../../../app/http/authenticationContext'
+import { OpsMutationService } from '../../../operations/application/opsMutation'
+import { readOpsMutationEnvelope } from '../../../operations/interfaces/http/opsMutationHeaders'
 import { PartnerPortalAccountNotFoundError, PartnerPortalAccountService, PartnerPortalAccountValidationError } from '../../application/PartnerPortalAccountService'
 import { OpsUpsertPartnerPortalUserRequest, opsUpsertPartnerPortalUserRequestSchema, OpsUpsertPartnerPortalUserResponse, parsePartnerId } from './opsContracts'
 
 @Route('ops/partners')
-@Security('OpsApiKeyAuth')
 export class OpsPartnerPortalController extends Controller {
   public constructor(
     @inject(PartnerPortalAccountService)
     private readonly partnerPortalAccountService: PartnerPortalAccountService,
+    @inject(OpsMutationService)
+    private readonly mutationService: OpsMutationService,
   ) {
     super()
   }
@@ -30,10 +36,12 @@ export class OpsPartnerPortalController extends Controller {
   @Put('{partnerId}/portal-user')
   @Response<400, { reason: string }>(400, 'Bad Request')
   @Response<404, { reason: string }>(404, 'Not Found')
+  @Security('OpsAuth', ['credentials:manage'])
   @SuccessResponse('200', 'Partner portal user provisioned')
   public async upsertPortalUser(
     @Path() partnerId: string,
     @Body() body: OpsUpsertPartnerPortalUserRequest,
+    @Request() request: RequestExpress,
     @Res() badRequest: TsoaResponse<400, { reason: string }>,
     @Res() notFound: TsoaResponse<404, { reason: string }>,
   ): Promise<OpsUpsertPartnerPortalUserResponse> {
@@ -50,9 +58,15 @@ export class OpsPartnerPortalController extends Controller {
     }
 
     try {
-      return await this.partnerPortalAccountService.provision(
-        parsedPartnerId.data,
-        parsedBody.data,
+      return await this.mutationService.execute(
+        requireOpsPrincipal(request.user),
+        'credentials.portal_user.upsert',
+        { id: parsedPartnerId.data, type: 'partner' },
+        readOpsMutationEnvelope(request),
+        () => this.partnerPortalAccountService.provision(
+          parsedPartnerId.data,
+          parsedBody.data,
+        ),
       )
     }
     catch (error) {

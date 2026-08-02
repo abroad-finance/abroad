@@ -36,7 +36,7 @@ const SUPPORTED_EXTENSIONS = new Set(['.ts', '.tsx'])
 const DECLARATION_SUFFIX = '.d.ts'
 const MAINTAINABILITY_MAX = 171
 const DECORATOR_OVERRIDE = { decoratorsLegacy: true }
-const DEFAULT_IGNORED_PATHS = ['routes.ts']
+const DEFAULT_IGNORED_PATHS = ['app/http/routes.ts']
 const TRANSPILE_OPTIONS: ts.CompilerOptions = {
   experimentalDecorators: true,
   jsx: ts.JsxEmit.Preserve,

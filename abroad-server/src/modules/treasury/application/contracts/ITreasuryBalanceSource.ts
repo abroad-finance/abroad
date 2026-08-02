@@ -13,8 +13,16 @@ export type TreasuryBalance = {
   /** Sub-account / wallet address / provider account id ('' when the venue has a single account). */
   account: string
   amount: number
+  /** Funds immediately usable for new operations, when the venue exposes the distinction. */
+  availableAmount: null | number
+  /** Funds held by the venue and not currently usable, when reported. */
+  blockedAmount: null | number
   /** Currency or asset code as the venue reports it (USDC, USDT, BRL, COP, ...). */
   currency: string
+  /** Debt or unsettled obligations reported by the venue, when available. */
+  outstandingAmount: null | number
+  /** Funds committed to in-flight processing or withdrawals, when reported. */
+  reservedAmount: null | number
   venue: TreasuryVenue
 }
 

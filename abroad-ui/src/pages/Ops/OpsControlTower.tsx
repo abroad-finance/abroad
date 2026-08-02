@@ -6,6 +6,7 @@ import {
   ArrowRight,
   Minus,
   RefreshCw,
+  Siren,
   TrendingDown,
   TrendingUp,
   Users,
@@ -18,6 +19,7 @@ import {
 import { Link } from 'react-router-dom'
 
 import type { FlowInstanceStatus } from '../../services/admin/flowTypes'
+import type { OpsIncidentOverview, OpsIncidentSeverity } from '../../services/admin/incidentTypes'
 import type {
   OpsOverviewActivityPoint,
   OpsOverviewActivitySummary,
@@ -106,6 +108,90 @@ type QuickLinkProps = {
   label: string
   to: string
 }
+
+const incidentSeverityClass: Record<OpsIncidentSeverity, string> = {
+  CRITICAL: 'border-rose-300 bg-rose-100 text-rose-900',
+  HIGH: 'border-orange-300 bg-orange-100 text-orange-900',
+  INFO: 'border-stone-300 bg-stone-100 text-stone-700',
+  WARNING: 'border-amber-300 bg-amber-100 text-amber-900',
+}
+
+const formatIncidentAge = (seconds: number): string => {
+  if (seconds < 60) return '< 1 min'
+  if (seconds < 3_600) return `${Math.floor(seconds / 60)} min`
+  if (seconds < 86_400) return `${Math.floor(seconds / 3_600)} hr`
+  return `${Math.floor(seconds / 86_400)} d`
+}
+
+const IncidentPulse = ({ incidents }: { incidents: OpsIncidentOverview }) => (
+  <section aria-labelledby="incident-pulse-heading" className="ops-card overflow-hidden border-rose-200 backdrop-blur">
+    <div className="flex flex-col gap-5 p-5 md:p-6">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2 text-rose-700">
+            <Siren aria-hidden className="h-4 w-4" />
+            <span className="ops-label !text-rose-700">Operational exceptions</span>
+          </div>
+          <h2 className="mt-1 text-xl font-semibold text-ops-text" id="incident-pulse-heading">Incident pulse</h2>
+          <p className="mt-1 text-xs text-ops-muted">Start with active customer-impact and provider risk before scanning aggregate activity.</p>
+        </div>
+        <Link className="ops-btn-primary" to="/ops/incidents">
+          Open Incident Center
+          <ArrowRight aria-hidden className="h-4 w-4" />
+        </Link>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <Link className="rounded-xl border border-ops-border bg-stone-50 p-3 hover:border-ops-brand" to="/ops/incidents?status=OPEN">
+          <div className="ops-label">Active</div>
+          <div className="mt-1 text-2xl font-semibold tabular-nums">{incidents.open}</div>
+        </Link>
+        <Link className="rounded-xl border border-rose-200 bg-rose-50 p-3 hover:border-rose-400" to="/ops/incidents?severity=CRITICAL">
+          <div className="ops-label !text-rose-700">Critical</div>
+          <div className="mt-1 text-2xl font-semibold tabular-nums text-rose-900">{incidents.critical}</div>
+        </Link>
+        <Link className="rounded-xl border border-orange-200 bg-orange-50 p-3 hover:border-orange-400" to="/ops/incidents?severity=HIGH">
+          <div className="ops-label !text-orange-700">High</div>
+          <div className="mt-1 text-2xl font-semibold tabular-nums text-orange-900">{incidents.high}</div>
+        </Link>
+        <Link className="rounded-xl border border-amber-200 bg-amber-50 p-3 hover:border-amber-400" to="/ops/incidents?unowned=true">
+          <div className="ops-label !text-amber-700">Unowned</div>
+          <div className="mt-1 text-2xl font-semibold tabular-nums text-amber-900">{incidents.unowned}</div>
+        </Link>
+      </div>
+
+      {incidents.top.length === 0
+        ? <OpsEmptyState className="py-6">No active incidents. Aggregate health signals remain available below.</OpsEmptyState>
+        : (
+            <div className="divide-y divide-ops-border rounded-xl border border-ops-border bg-white">
+              {incidents.top.map(incident => (
+                <Link
+                  className="group flex min-w-0 flex-col gap-3 p-4 hover:bg-stone-50 sm:flex-row sm:items-center"
+                  key={incident.id}
+                  to={`/ops/incidents/${encodeURIComponent(incident.id)}`}
+                >
+                  <span className={`w-fit rounded-full border px-2 py-1 text-[10px] font-bold uppercase tracking-wide ${incidentSeverityClass[incident.severity]}`}>
+                    {incident.severity}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-semibold text-ops-text">{incident.title}</span>
+                    <span className="block truncate text-xs text-ops-muted">
+                      {incident.affectedCount}
+                      {' affected · '}
+                      {incident.owner?.displayName ?? incident.team ?? 'Unowned'}
+                    </span>
+                  </span>
+                  <span className="flex items-center gap-2 text-xs text-ops-muted">
+                    {formatIncidentAge(incident.ageSeconds)}
+                    <ArrowRight aria-hidden className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                  </span>
+                </Link>
+              ))}
+            </div>
+          )}
+    </div>
+  </section>
+)
 
 const CHART = {
   height: 220,
@@ -323,22 +409,34 @@ const ActivityChart = ({ series, unit }: ActivityChartProps) => {
           )
         })}
       </svg>
-      <ul className="sr-only">
-        {series.map(point => (
-          <li key={point.at}>
-            {formatBucket(point.at, unit)}
-            {': '}
-            {point.completedTransactions}
-            {' completed, '}
-            {point.openTransactions}
-            {' open, '}
-            {point.failedTransactions}
-            {' failed, and '}
-            {point.expiredTransactions}
-            {' expired.'}
-          </li>
-        ))}
-      </ul>
+      <details className="mt-3 rounded-xl border border-ops-border bg-white/70 px-3">
+        <summary className="flex min-h-11 cursor-pointer items-center text-xs font-semibold text-ops-brand">
+          View transaction activity data
+        </summary>
+        <table className="mb-3 w-full table-fixed text-left text-xs">
+          <caption className="sr-only">Transaction activity by time bucket</caption>
+          <thead className="text-ops-muted">
+            <tr>
+              <th className="w-[32%] py-2 pr-2 font-medium" scope="col">Time</th>
+              <th className="py-2 text-right font-medium" scope="col">Done</th>
+              <th className="py-2 text-right font-medium" scope="col">Open</th>
+              <th className="py-2 text-right font-medium" scope="col">Failed</th>
+              <th className="py-2 text-right font-medium" scope="col">Expired</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-ops-border">
+            {series.map(point => (
+              <tr key={point.at}>
+                <th className="break-words py-2 pr-2 font-medium text-ops-text" scope="row">{formatBucket(point.at, unit)}</th>
+                <td className="py-2 text-right tabular-nums">{point.completedTransactions}</td>
+                <td className="py-2 text-right tabular-nums">{point.openTransactions}</td>
+                <td className="py-2 text-right tabular-nums">{point.failedTransactions}</td>
+                <td className="py-2 text-right tabular-nums">{point.expiredTransactions}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </details>
     </div>
   )
 }
@@ -561,6 +659,8 @@ const OpsControlTower = () => {
             </span>
           </div>
 
+          <IncidentPulse incidents={overview.incidents} />
+
           <section aria-labelledby="outcomes-heading" className="ops-card overflow-hidden backdrop-blur">
             <h2 className="sr-only" id="outcomes-heading">Transaction outcomes</h2>
             <div className="grid gap-6 p-5 md:grid-cols-[minmax(0,1fr)_auto] md:items-start md:p-6">
@@ -591,6 +691,15 @@ const OpsControlTower = () => {
             </div>
             <div className="border-t border-ops-border px-5 py-5 md:px-6">
               <OutcomeRibbon summary={overview.activity.current} />
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Link className="ops-btn-ghost ops-btn-sm" to="/ops/transactions?status=PAYMENT_FAILED">
+                  {failedTransactions.toLocaleString('en-US')}
+                  {' failed payments'}
+                </Link>
+                <Link className="ops-btn-ghost ops-btn-sm" to="/ops/transactions?status=PROCESSING_PAYMENT">
+                  Inspect processing payments
+                </Link>
+              </div>
             </div>
             <div className="grid gap-4 border-t border-ops-border bg-stone-50/60 px-5 py-4 sm:grid-cols-2 md:px-6">
               <VolumeList label="Completed source volume" volumes={overview.activity.current.sourceVolume} />
@@ -660,10 +769,14 @@ const OpsControlTower = () => {
                   </div>
                 </div>
               </div>
-              <Link className="ops-btn-ghost ops-btn-sm mt-5 w-full" to="/ops/flows">
-                Inspect flows
-                <ArrowRight aria-hidden className="h-3.5 w-3.5" />
-              </Link>
+              <div className="mt-5 grid gap-2 sm:grid-cols-2">
+                <Link className="ops-btn-ghost ops-btn-sm" to="/ops/flows?failure=STUCK_WAITING">
+                  Waiting flows
+                </Link>
+                <Link className="ops-btn-ghost ops-btn-sm" to="/ops/flows?failure=FAILED_FLOW">
+                  Failed flows
+                </Link>
+              </div>
             </section>
           </div>
 
@@ -795,8 +908,8 @@ const OpsControlTower = () => {
                       </div>
                     )}
                 <div className="mt-5 grid grid-cols-2 gap-2">
-                  <Link className="ops-btn-ghost ops-btn-sm" to="/ops/treasury">Treasury</Link>
-                  <Link className="ops-btn-ghost ops-btn-sm" to="/ops/treasury/bridge">Bridge</Link>
+                  <Link className="ops-btn-ghost ops-btn-sm" to="/ops/treasury">Treasury posture</Link>
+                  <Link className="ops-btn-ghost ops-btn-sm" to="/ops/treasury/bridge?status=FAILED">Bridge exceptions</Link>
                 </div>
               </div>
               <div className="border-t border-ops-border bg-stone-50/70 px-5 py-3 text-xs text-ops-muted md:px-6">
@@ -809,7 +922,8 @@ const OpsControlTower = () => {
             </section>
           </div>
 
-          <nav aria-label="Operations quick links" className="ops-card grid min-w-0 gap-1 p-2 sm:grid-cols-2 lg:grid-cols-5">
+          <nav aria-label="Operations quick links" className="ops-card grid min-w-0 gap-1 p-2 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
+            <QuickLink description="Coordinate active exceptions" icon={Siren} label="Incidents" to="/ops/incidents" />
             <QuickLink description="Search every payment" icon={Activity} label="Transactions" to="/ops/transactions" />
             <QuickLink description="Inspect execution state" icon={Workflow} label="Flows" to="/ops/flows" />
             <QuickLink description="Rank and manage access" icon={Users} label="Partners" to="/ops/partners" />

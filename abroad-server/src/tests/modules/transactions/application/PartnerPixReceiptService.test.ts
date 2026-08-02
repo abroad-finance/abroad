@@ -45,6 +45,20 @@ const buildHarness = () => {
 }
 
 describe('PartnerPixReceiptService', () => {
+  it('uses a distinct cross-partner lookup for authorized Ops receipt access', async () => {
+    const harness = buildHarness()
+
+    await harness.service.getOpsReceipt(transactionId, 'pt-BR')
+
+    expect(harness.transactionFindFirst).toHaveBeenCalledWith({
+      select: { externalId: true, status: true },
+      where: {
+        id: transactionId,
+        quote: { paymentMethod: 'PIX' },
+      },
+    })
+  })
+
   it('returns a tenant-scoped bounded receipt envelope', async () => {
     const harness = buildHarness()
 

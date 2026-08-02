@@ -63,7 +63,7 @@ export const formatAmount = (
 export const humanizeStatus = (raw: null | string | undefined): string => {
   if (!raw) return '—'
   const spaced = raw
-    .replace(/[_-]+/g, ' ')
+    .replace(/[._-]+/g, ' ')
     .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
     .trim()
   if (!spaced) return raw

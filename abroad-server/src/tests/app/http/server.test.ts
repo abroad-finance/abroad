@@ -99,6 +99,7 @@ jest.mock('../../../app/container', () => ({
 }))
 
 jest.mock('fs', () => ({
+  ...jest.requireActual<typeof import('fs')>('fs'),
   readFileSync: jest.fn(() =>
     JSON.stringify({
       paths: {
@@ -111,6 +112,7 @@ jest.mock('fs', () => ({
 }))
 
 jest.mock('path', () => ({
+  join: jest.fn((...args: string[]) => args.join('/')),
   resolve: jest.fn((...args: string[]) => args.join('/')),
 }))
 

@@ -10,42 +10,44 @@ datasource db {
 }
 
 model Partner {
-  id            String        @id @default(uuid())
-  name          String
-  createdAt     DateTime      @default(now())
-  apiKey        String?       @unique
-  clientDomain  String?       @unique
-  clientDomainHash String?      @unique
-  country       String?
-  email         String?       @unique
-  phone         String?
-  firstName     String?
-  lastName      String?
-  isKybApproved Boolean?      @default(false)
-  needsKyc      Boolean?      @default(true)
-  webhookUrl    String?
-  users         PartnerUser[]
-  portalUsers   PartnerPortalUser[]
-  portalApiKeys        PartnerApiKey[]
-  portalAuditEvents    PartnerPortalAuditEvent[]
-  webhookConfiguration PartnerWebhookConfiguration?
-  outboxEvents         OutboxEvent[]
-  reconciliationRuns   PartnerReconciliationRun[]
-  quotes        Quote[]
+  id                      String                       @id @default(uuid())
+  name                    String
+  createdAt               DateTime                     @default(now())
+  apiKey                  String?                      @unique
+  previousApiKey          String?                      @unique
+  previousApiKeyExpiresAt DateTime?
+  clientDomain            String?                      @unique
+  clientDomainHash        String?                      @unique
+  country                 String?
+  email                   String?                      @unique
+  phone                   String?
+  firstName               String?
+  lastName                String?
+  isKybApproved           Boolean?                     @default(false)
+  needsKyc                Boolean?                     @default(true)
+  webhookUrl              String?
+  users                   PartnerUser[]
+  portalUsers             PartnerPortalUser[]
+  portalApiKeys           PartnerApiKey[]
+  portalAuditEvents       PartnerPortalAuditEvent[]
+  webhookConfiguration    PartnerWebhookConfiguration?
+  outboxEvents            OutboxEvent[]
+  reconciliationRuns      PartnerReconciliationRun[]
+  quotes                  Quote[]
 }
 
 model PartnerPortalUser {
-  id                  String   @id @default(uuid())
-  partnerId           String
-  partner             Partner  @relation(fields: [partnerId], references: [id], onDelete: Cascade)
-  email               String   @unique
+  id                         String                            @id @default(uuid())
+  partnerId                  String
+  partner                    Partner                           @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  email                      String                            @unique
   passwordVerifier           String?
   role                       PartnerPortalRole                 @default(MEMBER)
-  sessionVersion      Int      @default(1)
-  failedLoginAttempts Int      @default(0)
-  lockedUntil         DateTime?
-  lastLoginAt         DateTime?
-  disabledAt          DateTime?
+  sessionVersion             Int                               @default(1)
+  failedLoginAttempts        Int                               @default(0)
+  lockedUntil                DateTime?
+  lastLoginAt                DateTime?
+  disabledAt                 DateTime?
   mfaSecretCiphertext        String?
   mfaPendingSecretCiphertext String?
   mfaPendingCreatedAt        DateTime?
@@ -53,8 +55,8 @@ model PartnerPortalUser {
   mfaLastUsedCounter         BigInt?
   mfaFailedAttempts          Int                               @default(0)
   mfaLockedUntil             DateTime?
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  createdAt                  DateTime                          @default(now())
+  updatedAt                  DateTime                          @updatedAt
   createdApiKeys             PartnerApiKey[]                   @relation("PartnerApiKeyCreator")
   auditEvents                PartnerPortalAuditEvent[]         @relation("PartnerPortalAuditActor")
   createdResetTokens         PartnerPortalPasswordResetToken[] @relation("PartnerPortalPasswordResetCreator")
@@ -189,6 +191,9 @@ model PartnerUserKyc {
   email             String?
   phone             String?
   reviewedAt        DateTime?
+  opsReviewerUserId String?
+  opsReviewer       OpsUser?      @relation("OpsKycReviewer", fields: [opsReviewerUserId], references: [id], onDelete: SetNull)
+  opsReviewVersion  Int           @default(1)
 
   // Deprecated Persona fields (kept nullable for historical rows; no longer written).
   externalId String?
@@ -199,6 +204,7 @@ model PartnerUserKyc {
   updatedAt DateTime @updatedAt
 
   @@unique([partnerUserId, externalId])
+  @@index([opsReviewerUserId, status, createdAt])
 }
 
 model Quote {
@@ -223,26 +229,27 @@ model Quote {
 }
 
 model Transaction {
-  id            String            @id @default(uuid())
-  partnerUserId String
-  partnerUser   PartnerUser       @relation(fields: [partnerUserId], references: [id])
-  accountNumber String
-  bankCode      String            @default("")
-  status        TransactionStatus
-  createdAt     DateTime          @default(now())
-  quoteId       String            @unique
-  quote         Quote             @relation(fields: [quoteId], references: [id])
-  onChainId     String?           @unique
-  refundOnChainId String?         @unique
-  pixEndToEndId String?           @unique
-  taxId         String?
-  externalId    String?           @unique
-  qrCode        String?
-  exchangeHandoffAt DateTime?
-  origin        TransactionOrigin @default(LEGACY)
-  transitions   TransactionTransition[]
+  id                  String                      @id @default(uuid())
+  partnerUserId       String
+  partnerUser         PartnerUser                 @relation(fields: [partnerUserId], references: [id])
+  accountNumber       String
+  bankCode            String                      @default("")
+  status              TransactionStatus
+  createdAt           DateTime                    @default(now())
+  quoteId             String                      @unique
+  quote               Quote                       @relation(fields: [quoteId], references: [id])
+  onChainId           String?                     @unique
+  refundOnChainId     String?                     @unique
+  pixEndToEndId       String?                     @unique
+  taxId               String?
+  externalId          String?                     @unique
+  qrCode              String?
+  exchangeHandoffAt   DateTime?
+  origin              TransactionOrigin           @default(LEGACY)
+  transitions         TransactionTransition[]
   outboxEvents        OutboxEvent[]
   reconciliationItems PartnerReconciliationItem[]
+  opsCase             OpsCase?
 
   @@index([partnerUserId, status, createdAt], name: "transaction_partnerUser_status_createdAt_idx")
 }
@@ -303,12 +310,12 @@ enum OutboxStatus {
 }
 
 model OutboxEvent {
-  id           String       @id @default(uuid())
-  type         String
-  payload      Json
-  status       OutboxStatus @default(PENDING)
-  attempts     Int          @default(0)
-  lastError    String?
+  id                      String                  @id @default(uuid())
+  type                    String
+  payload                 Json
+  status                  OutboxStatus            @default(PENDING)
+  attempts                Int                     @default(0)
+  lastError               String?
   partnerId               String?
   partner                 Partner?                @relation(fields: [partnerId], references: [id], onDelete: SetNull)
   transactionId           String?
@@ -325,9 +332,9 @@ model OutboxEvent {
   maxAttempts             Int                     @default(5)
   lastHttpStatus          Int?
   lastAttemptDurationMs   Int?
-  availableAt  DateTime     @default(now())
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
+  availableAt             DateTime                @default(now())
+  createdAt               DateTime                @default(now())
+  updatedAt               DateTime                @updatedAt
 
   @@index([status, availableAt])
   @@index([partnerId, transactionId, createdAt])
@@ -554,45 +561,45 @@ model PaymentProvider {
 }
 
 model PartnerDailyLimit {
-  id            String         @id @default(uuid())
+  id            String        @id @default(uuid())
   partnerId     String
   paymentMethod PaymentMethod
   day           DateTime
-  amount        Float          @default(0)
-  count         Int            @default(0)
+  amount        Float         @default(0)
+  count         Int           @default(0)
 
   @@unique([partnerId, paymentMethod, day], name: "partner_method_day_unique")
 }
 
 model PartnerUserDailyLimit {
-  id            String         @id @default(uuid())
+  id            String        @id @default(uuid())
   partnerUserId String
   paymentMethod PaymentMethod
   day           DateTime
-  amount        Float          @default(0)
-  count         Int            @default(0)
+  amount        Float         @default(0)
+  count         Int           @default(0)
 
   @@unique([partnerUserId, paymentMethod, day], name: "partner_user_method_day_unique")
 }
 
 model PartnerMonthlyLimit {
-  id            String         @id @default(uuid())
+  id            String        @id @default(uuid())
   partnerId     String
   paymentMethod PaymentMethod
   month         DateTime
-  amount        Float          @default(0)
-  count         Int            @default(0)
+  amount        Float         @default(0)
+  count         Int           @default(0)
 
   @@unique([partnerId, paymentMethod, month], name: "partner_method_month_unique")
 }
 
 model PartnerUserMonthlyLimit {
-  id            String         @id @default(uuid())
+  id            String        @id @default(uuid())
   partnerUserId String
   paymentMethod PaymentMethod
   month         DateTime
-  amount        Float          @default(0)
-  count         Int            @default(0)
+  amount        Float         @default(0)
+  count         Int           @default(0)
 
   @@unique([partnerUserId, paymentMethod, month], name: "partner_user_method_month_unique")
 }
@@ -627,22 +634,23 @@ view TransactionQuoteView {
 }
 
 model FlowDefinition {
-  id             String               @id @default(uuid())
-  name           String
-  enabled        Boolean              @default(true)
-  cryptoCurrency CryptoCurrency
-  blockchain     BlockchainNetwork
-  targetCurrency TargetCurrency
-  payoutProvider PaymentMethod
+  id              String               @id @default(uuid())
+  name            String
+  enabled         Boolean              @default(true)
+  cryptoCurrency  CryptoCurrency
+  blockchain      BlockchainNetwork
+  targetCurrency  TargetCurrency
+  payoutProvider  PaymentMethod
   pricingProvider FlowPricingProvider
-  exchangeFeePct Float               @default(0)
-  fixedFee       Float               @default(0)
-  minAmount      Float?
-  maxAmount      Float?
-  userSteps      Json
-  createdAt      DateTime            @default(now())
-  updatedAt      DateTime            @updatedAt
-  steps          FlowStepDefinition[]
+  exchangeFeePct  Float                @default(0)
+  fixedFee        Float                @default(0)
+  minAmount       Float?
+  maxAmount       Float?
+  userSteps       Json
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+  version         Int                  @default(1)
+  steps           FlowStepDefinition[]
 
   @@unique([cryptoCurrency, blockchain, targetCurrency], name: "flow_corridor_unique")
 }
@@ -656,6 +664,7 @@ model FlowCorridor {
   reason         String?
   createdAt      DateTime           @default(now())
   updatedAt      DateTime           @updatedAt
+  version        Int                @default(1)
 
   @@unique([cryptoCurrency, blockchain, targetCurrency], name: "flow_corridor_status_unique")
 }
@@ -669,6 +678,7 @@ model CryptoAssetConfig {
   enabled        Boolean           @default(true)
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @updatedAt
+  version        Int               @default(1)
 
   @@unique([cryptoCurrency, blockchain], name: "crypto_asset_unique")
 }
@@ -685,30 +695,30 @@ model FlowStepDefinition {
   createdAt        DateTime                 @default(now())
   updatedAt        DateTime                 @updatedAt
 
-  @@index([flowDefinitionId])
   @@unique([flowDefinitionId, stepOrder], name: "flow_step_order_unique")
+  @@index([flowDefinitionId])
 }
 
 model FlowInstance {
-  id             String             @id @default(uuid())
-  transactionId  String             @unique
-  status         FlowInstanceStatus @default(NOT_STARTED)
+  id               String             @id @default(uuid())
+  transactionId    String             @unique
+  status           FlowInstanceStatus @default(NOT_STARTED)
   currentStepOrder Int?
-  flowSnapshot   Json
-  createdAt      DateTime           @default(now())
-  updatedAt      DateTime           @updatedAt
-  steps          FlowStepInstance[]
+  flowSnapshot     Json
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  steps            FlowStepInstance[]
 }
 
 model FlowStepInstance {
-  id             String        @id @default(uuid())
+  id             String         @id @default(uuid())
   flowInstanceId String
-  flowInstance   FlowInstance  @relation(fields: [flowInstanceId], references: [id], onDelete: Cascade)
+  flowInstance   FlowInstance   @relation(fields: [flowInstanceId], references: [id], onDelete: Cascade)
   stepOrder      Int
   stepType       FlowStepType
   status         FlowStepStatus @default(NOT_STARTED)
-  attempts       Int           @default(0)
-  maxAttempts    Int           @default(3)
+  attempts       Int            @default(0)
+  maxAttempts    Int            @default(3)
   input          Json?
   output         Json?
   error          Json?
@@ -716,23 +726,23 @@ model FlowStepInstance {
   startedAt      DateTime?
   endedAt        DateTime?
   retryAt        DateTime?
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
 
+  @@unique([flowInstanceId, stepOrder], name: "flow_step_instance_order_unique")
   @@index([flowInstanceId])
   @@index([status, stepType, retryAt], name: "flow_step_retry_due_idx")
-  @@unique([flowInstanceId, stepOrder], name: "flow_step_instance_order_unique")
 }
 
 model FlowSignal {
-  id             String   @id @default(uuid())
-  flowInstanceId String?
-  stepInstanceId String?
-  eventType      String
+  id              String    @id @default(uuid())
+  flowInstanceId  String?
+  stepInstanceId  String?
+  eventType       String
   correlationKeys Json
-  payload        Json
-  createdAt      DateTime @default(now())
-  consumedAt     DateTime?
+  payload         Json
+  createdAt       DateTime  @default(now())
+  consumedAt      DateTime?
 
   @@index([eventType])
   @@index([consumedAt])
@@ -797,15 +807,428 @@ model BridgeBatch {
 // treasury snapshot worker. usdRate/usdValue freeze the indicative FX at capture
 // time so historical USD charts do not drift when today's rate changes.
 model TreasuryBalanceSnapshot {
-  id         String   @id @default(uuid())
-  venue      String
-  account    String   @default("")
-  currency   String
-  amount     Float
-  usdRate    Float?
-  usdValue   Float?
-  capturedAt DateTime @default(now())
+  id                String   @id @default(uuid())
+  venue             String
+  account           String   @default("")
+  currency          String
+  amount            Float
+  availableAmount   Float?
+  blockedAmount     Float?
+  reservedAmount    Float?
+  outstandingAmount Float?
+  usdRate           Float?
+  usdValue          Float?
+  capturedAt        DateTime @default(now())
 
   @@index([venue, currency, capturedAt])
   @@index([capturedAt])
+}
+
+enum OpsRole {
+  VIEWER
+  SUPPORT
+  OPERATIONS
+  FINANCE
+  COMPLIANCE
+  ADMINISTRATOR
+}
+
+enum OpsActorKind {
+  USER
+  LEGACY_KEY
+  SYSTEM
+}
+
+enum OpsSavedViewScope {
+  PRIVATE
+  TEAM
+}
+
+enum OpsSavedViewResource {
+  INCIDENTS
+  TRANSACTIONS
+  FLOWS
+  PARTNERS
+  KYC
+  AUDIT
+  CONFIGURATION
+}
+
+enum OpsWorkStatus {
+  OPEN
+  ACKNOWLEDGED
+  RESOLVED
+}
+
+enum OpsPriority {
+  LOW
+  NORMAL
+  HIGH
+  CRITICAL
+}
+
+enum OpsNoteKind {
+  NOTE
+  ESCALATION
+  RESOLUTION
+}
+
+enum OpsIncidentSeverity {
+  INFO
+  WARNING
+  HIGH
+  CRITICAL
+}
+
+enum OpsWorkResourceType {
+  CASE
+  INCIDENT
+}
+
+enum OpsConfigurationTargetType {
+  FLOW_DEFINITION
+  FLOW_CORRIDOR
+  CRYPTO_ASSET
+}
+
+enum OpsConfigurationReleaseStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  APPLIED
+  REJECTED
+  SUPERSEDED
+  ROLLED_BACK
+}
+
+enum OpsIntegrationKind {
+  RUNBOOK
+  NOTIFICATION
+  WEBHOOK
+  PROVIDER
+}
+
+enum OpsIntegrationStatus {
+  ACTIVE
+  DEGRADED
+  DISABLED
+}
+
+enum OpsTaskResult {
+  SUCCEEDED
+  FAILED
+  ABANDONED
+}
+
+enum OpsMutationStatus {
+  REQUESTED
+  SUCCEEDED
+  FAILED
+}
+
+model OpsUser {
+  id                             String                    @id @default(uuid())
+  firebaseUid                    String?                   @unique
+  email                          String                    @unique
+  displayName                    String
+  role                           OpsRole                   @default(VIEWER)
+  version                        Int                       @default(1)
+  sessionVersion                 Int                       @default(1)
+  sessionsRevokedAt              DateTime?
+  disabledAt                     DateTime?
+  lastLoginAt                    DateTime?
+  createdAt                      DateTime                  @default(now())
+  updatedAt                      DateTime                  @updatedAt
+  auditEvents                    OpsAuditEvent[]
+  savedViews                     OpsSavedView[]
+  ownedCases                     OpsCase[]                 @relation("OpsCaseOwner")
+  caseNotes                      OpsCaseNote[]
+  ownedIncidents                 OpsIncident[]             @relation("OpsIncidentOwner")
+  incidentNotes                  OpsIncidentNote[]
+  handoffsActed                  OpsHandoff[]              @relation("OpsHandoffActor")
+  handoffsFrom                   OpsHandoff[]              @relation("OpsHandoffFrom")
+  handoffsTo                     OpsHandoff[]              @relation("OpsHandoffTo")
+  runbooksCreated                OpsRunbook[]              @relation("OpsRunbookCreatedBy")
+  runbooksUpdated                OpsRunbook[]              @relation("OpsRunbookUpdatedBy")
+  integrationsCreated            OpsIntegration[]          @relation("OpsIntegrationCreatedBy")
+  integrationsUpdated            OpsIntegration[]          @relation("OpsIntegrationUpdatedBy")
+  treasuryThresholdsCreated      OpsTreasuryThreshold[]    @relation("OpsTreasuryThresholdCreatedBy")
+  treasuryThresholdsUpdated      OpsTreasuryThreshold[]    @relation("OpsTreasuryThresholdUpdatedBy")
+  configurationReleasesRequested OpsConfigurationRelease[] @relation("OpsConfigurationRequestedBy")
+  configurationReleasesApproved  OpsConfigurationRelease[] @relation("OpsConfigurationApprovedBy")
+  configurationReleasesApplied   OpsConfigurationRelease[] @relation("OpsConfigurationAppliedBy")
+  mutationExecutions             OpsMutationExecution[]
+  taskEvents                     OpsTaskEvent[]
+  kycReviews                     PartnerUserKyc[]          @relation("OpsKycReviewer")
+
+  @@index([role, disabledAt])
+}
+
+model OpsAuditEvent {
+  id           String       @id @default(uuid())
+  actorKind    OpsActorKind
+  actorUserId  String?
+  actorUser    OpsUser?     @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+  actorLabel   String
+  action       String
+  resourceType String
+  resourceId   String?
+  reason       String?
+  reference    String?
+  metadata     Json?
+  createdAt    DateTime     @default(now())
+
+  @@index([actorUserId, createdAt])
+  @@index([action, createdAt])
+  @@index([resourceType, resourceId, createdAt])
+}
+
+model OpsSavedView {
+  id          String               @id @default(uuid())
+  ownerUserId String
+  owner       OpsUser              @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+  name        String
+  resource    OpsSavedViewResource
+  scope       OpsSavedViewScope    @default(PRIVATE)
+  filters     Json
+  version     Int                  @default(1)
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+
+  @@unique([ownerUserId, resource, name])
+  @@index([resource, scope, updatedAt])
+}
+
+model OpsCase {
+  id            String        @id @default(uuid())
+  transactionId String        @unique
+  transaction   Transaction   @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  status        OpsWorkStatus @default(OPEN)
+  priority      OpsPriority   @default(NORMAL)
+  ownerUserId   String?
+  owner         OpsUser?      @relation("OpsCaseOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
+  team          String?
+  version       Int           @default(1)
+  resolvedAt    DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  notes         OpsCaseNote[]
+  handoffs      OpsHandoff[]
+
+  @@index([status, priority, updatedAt])
+  @@index([ownerUserId, status, updatedAt])
+}
+
+model OpsCaseNote {
+  id           String      @id @default(uuid())
+  caseId       String
+  case         OpsCase     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  authorUserId String
+  author       OpsUser     @relation(fields: [authorUserId], references: [id], onDelete: Restrict)
+  kind         OpsNoteKind @default(NOTE)
+  body         String
+  createdAt    DateTime    @default(now())
+
+  @@index([caseId, createdAt])
+}
+
+model OpsIncident {
+  id              String              @id @default(uuid())
+  fingerprint     String              @unique
+  kind            String
+  title           String
+  summary         String
+  context         Json?
+  severity        OpsIncidentSeverity
+  status          OpsWorkStatus       @default(OPEN)
+  ownerUserId     String?
+  owner           OpsUser?            @relation("OpsIncidentOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
+  team            String?
+  runbookId       String?
+  runbook         OpsRunbook?         @relation(fields: [runbookId], references: [id], onDelete: SetNull)
+  firstSeenAt     DateTime
+  lastSeenAt      DateTime
+  occurrenceCount Int                 @default(1)
+  affectedCount   Int                 @default(0)
+  acknowledgedAt  DateTime?
+  resolvedAt      DateTime?
+  version         Int                 @default(1)
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  notes           OpsIncidentNote[]
+  handoffs        OpsHandoff[]
+
+  @@index([status, severity, lastSeenAt])
+  @@index([ownerUserId, status, lastSeenAt])
+  @@index([kind, status, lastSeenAt])
+}
+
+model OpsIncidentNote {
+  id           String      @id @default(uuid())
+  incidentId   String
+  incident     OpsIncident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+  authorUserId String
+  author       OpsUser     @relation(fields: [authorUserId], references: [id], onDelete: Restrict)
+  kind         OpsNoteKind @default(NOTE)
+  body         String
+  createdAt    DateTime    @default(now())
+
+  @@index([incidentId, createdAt])
+}
+
+model OpsHandoff {
+  id           String              @id @default(uuid())
+  resourceType OpsWorkResourceType
+  caseId       String?
+  case         OpsCase?            @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  incidentId   String?
+  incident     OpsIncident?        @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+  actorUserId  String
+  actor        OpsUser             @relation("OpsHandoffActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+  fromUserId   String?
+  fromUser     OpsUser?            @relation("OpsHandoffFrom", fields: [fromUserId], references: [id], onDelete: SetNull)
+  toUserId     String?
+  toUser       OpsUser?            @relation("OpsHandoffTo", fields: [toUserId], references: [id], onDelete: SetNull)
+  fromTeam     String?
+  toTeam       String?
+  note         String
+  createdAt    DateTime            @default(now())
+
+  @@index([caseId, createdAt])
+  @@index([incidentId, createdAt])
+  @@index([toUserId, createdAt])
+}
+
+model OpsRunbook {
+  id              String        @id @default(uuid())
+  slug            String        @unique
+  name            String
+  description     String
+  url             String
+  incidentKinds   String[]
+  active          Boolean       @default(true)
+  version         Int           @default(1)
+  createdByUserId String
+  createdBy       OpsUser       @relation("OpsRunbookCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  updatedByUserId String
+  updatedBy       OpsUser       @relation("OpsRunbookUpdatedBy", fields: [updatedByUserId], references: [id], onDelete: Restrict)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  incidents       OpsIncident[]
+
+  @@index([active, name])
+}
+
+model OpsIntegration {
+  id              String               @id @default(uuid())
+  name            String               @unique
+  kind            OpsIntegrationKind
+  status          OpsIntegrationStatus @default(ACTIVE)
+  description     String
+  configuration   Json
+  lastCheckedAt   DateTime?
+  lastErrorCode   String?
+  version         Int                  @default(1)
+  createdByUserId String
+  createdBy       OpsUser              @relation("OpsIntegrationCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  updatedByUserId String
+  updatedBy       OpsUser              @relation("OpsIntegrationUpdatedBy", fields: [updatedByUserId], references: [id], onDelete: Restrict)
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  @@index([kind, status, name])
+}
+
+model OpsTreasuryThreshold {
+  id                  String   @id @default(uuid())
+  venue               String
+  currency            String
+  minimumAvailable    Float?
+  warningRunwayHours  Float?
+  criticalRunwayHours Float?
+  ownerTeam           String
+  version             Int      @default(1)
+  createdByUserId     String
+  createdBy           OpsUser  @relation("OpsTreasuryThresholdCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  updatedByUserId     String
+  updatedBy           OpsUser  @relation("OpsTreasuryThresholdUpdatedBy", fields: [updatedByUserId], references: [id], onDelete: Restrict)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@unique([venue, currency])
+  @@index([ownerTeam, venue, currency])
+}
+
+model OpsConfigurationRelease {
+  id                String                        @id @default(uuid())
+  targetType        OpsConfigurationTargetType
+  targetKey         String
+  title             String
+  baseVersion       Int
+  status            OpsConfigurationReleaseStatus @default(DRAFT)
+  payload           Json
+  diff              Json
+  impact            Json
+  version           Int                           @default(1)
+  reason            String
+  reference         String?
+  idempotencyKey    String                        @unique
+  requestedByUserId String
+  requestedBy       OpsUser                       @relation("OpsConfigurationRequestedBy", fields: [requestedByUserId], references: [id], onDelete: Restrict)
+  approvedByUserId  String?
+  approvedBy        OpsUser?                      @relation("OpsConfigurationApprovedBy", fields: [approvedByUserId], references: [id], onDelete: SetNull)
+  appliedByUserId   String?
+  appliedBy         OpsUser?                      @relation("OpsConfigurationAppliedBy", fields: [appliedByUserId], references: [id], onDelete: SetNull)
+  rollbackOfId      String?
+  rollbackOf        OpsConfigurationRelease?      @relation("OpsConfigurationRollback", fields: [rollbackOfId], references: [id], onDelete: SetNull)
+  rollbacks         OpsConfigurationRelease[]     @relation("OpsConfigurationRollback")
+  rejectionReason   String?
+  effectiveAt       DateTime?
+  approvedAt        DateTime?
+  appliedAt         DateTime?
+  appliedVersion    Int?
+  createdAt         DateTime                      @default(now())
+  updatedAt         DateTime                      @updatedAt
+
+  @@index([targetType, targetKey, createdAt])
+  @@index([status, effectiveAt, createdAt])
+}
+
+model OpsTaskEvent {
+  id           String        @id @default(uuid())
+  actorUserId  String?
+  actor        OpsUser?      @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+  task         String
+  action       String
+  resourceType String?
+  resourceId   String?
+  result       OpsTaskResult
+  durationMs   Int?
+  metadata     Json?
+  createdAt    DateTime      @default(now())
+
+  @@index([task, action, createdAt])
+  @@index([actorUserId, createdAt])
+}
+
+model OpsMutationExecution {
+  id              String            @id @default(uuid())
+  idempotencyKey  String            @unique
+  action          String
+  status          OpsMutationStatus @default(REQUESTED)
+  actorUserId     String
+  actor           OpsUser           @relation(fields: [actorUserId], references: [id], onDelete: Restrict)
+  resourceType    String
+  resourceId      String?
+  reason          String
+  reference       String?
+  confirmation    String
+  expectedVersion Int?
+  failureCode     String?
+  requestedAt     DateTime          @default(now())
+  completedAt     DateTime?
+
+  @@index([actorUserId, requestedAt])
+  @@index([action, status, requestedAt])
+  @@index([resourceType, resourceId, requestedAt])
 }

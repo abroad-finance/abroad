@@ -3,7 +3,10 @@ import { Request } from 'express'
 import type { IPartnerService } from '../../../modules/partners/application/contracts/IPartnerService'
 
 import { iocContainer } from '../../../app/container'
+import { TYPES } from '../../../app/container/types'
 import { expressAuthentication } from '../../../app/http/authentication'
+import { OpsAuthService } from '../../../app/http/OpsAuthService'
+import { OpsIdentityService } from '../../../modules/operations/application/OpsIdentityService'
 import { PartnerPortalSessionService } from '../../../modules/partners/application/PartnerPortalSessionService'
 
 const partnerService: jest.Mocked<IPartnerService> = {
@@ -15,6 +18,18 @@ const partnerService: jest.Mocked<IPartnerService> = {
 
 const partnerPortalSessionService = {
   verifySession: jest.fn(),
+}
+
+const opsIdentityProvider = {
+  verifyIdToken: jest.fn(),
+}
+
+const opsIdentityService = {
+  authenticate: jest.fn(),
+}
+
+const opsAuthService = {
+  authenticateLegacyApiKey: jest.fn(),
 }
 
 jest.mock('../../../app/container', () => ({
@@ -45,9 +60,48 @@ describe('expressAuthentication', () => {
       role: 'ADMIN',
       userId: 'portal-user-1',
     })
-    ;(iocContainer.get as jest.Mock).mockImplementation(identifier => (
-      identifier === PartnerPortalSessionService ? partnerPortalSessionService : partnerService
-    ))
+    opsIdentityProvider.verifyIdToken.mockResolvedValue({
+      authTime: new Date('2026-08-02T15:00:00.000Z'),
+      displayName: 'Ops User',
+      email: 'ops@abroad.finance',
+      provider: 'google.com',
+      subject: 'firebase-subject-1',
+    })
+    opsIdentityService.authenticate.mockResolvedValue({
+      authTime: new Date('2026-08-02T15:00:00.000Z'),
+      displayName: 'Ops User',
+      email: 'ops@abroad.finance',
+      kind: 'ops_user',
+      permissions: ['overview:read', 'transactions:read'],
+      role: 'OPERATIONS',
+      sessionVersion: 1,
+      userId: 'ops-user-1',
+    })
+    opsAuthService.authenticateLegacyApiKey.mockResolvedValue({
+      authTime: null,
+      displayName: 'Legacy Ops key',
+      email: null,
+      kind: 'ops_legacy',
+      permissions: ['overview:read'],
+      role: null,
+      sessionVersion: null,
+      userId: null,
+    })
+    ;(iocContainer.get as jest.Mock).mockImplementation((identifier) => {
+      if (identifier === PartnerPortalSessionService) {
+        return partnerPortalSessionService
+      }
+      if (identifier === TYPES.IOpsIdentityProvider) {
+        return opsIdentityProvider
+      }
+      if (identifier === OpsIdentityService) {
+        return opsIdentityService
+      }
+      if (identifier === TYPES.IOpsAuthService || identifier === OpsAuthService) {
+        return opsAuthService
+      }
+      return partnerService
+    })
   })
 
   const buildRequest = (overrides?: Partial<Request>): Request => {
@@ -220,6 +274,71 @@ describe('expressAuthentication', () => {
     partnerService.authenticateBearerToken.mockRejectedValueOnce(new Error('invalid'))
 
     await expect(expressAuthentication(req, 'BearerAuth')).rejects.toThrow('Invalid token or partner not found')
+  })
+
+  it('verifies a Firebase identity for the Ops admission boundary', async () => {
+    const req = buildRequest({ headers: { authorization: 'Bearer firebase-token' } })
+
+    const result = await expressAuthentication(req, 'OpsFirebaseAuth')
+
+    expect(result).toEqual(expect.objectContaining({
+      email: 'ops@abroad.finance',
+      kind: 'ops_external',
+      subject: 'firebase-subject-1',
+    }))
+    expect(opsIdentityProvider.verifyIdToken).toHaveBeenCalledWith('firebase-token')
+  })
+
+  it('authenticates a named Ops session and enforces permission scopes', async () => {
+    const req = buildRequest({ headers: { authorization: 'Bearer firebase-token' } })
+
+    await expect(expressAuthentication(
+      req,
+      'OpsAuth',
+      ['transactions:read'],
+    )).resolves.toEqual(expect.objectContaining({
+      kind: 'ops_user',
+      userId: 'ops-user-1',
+    }))
+    expect(opsIdentityService.authenticate).toHaveBeenCalledWith('firebase-token')
+
+    await expect(expressAuthentication(
+      req,
+      'OpsAuth',
+      ['kyc:reveal'],
+    )).rejects.toThrow('You do not have permission')
+  })
+
+  it('uses the bounded legacy Ops key fallback when no bearer token is present', async () => {
+    const req = buildRequest({
+      header: jest.fn((name: string) => (
+        name === 'X-OPS-API-KEY' ? 'legacy-key' : undefined
+      )) as unknown as Request['header'],
+    })
+
+    await expect(expressAuthentication(
+      req,
+      'OpsAuth',
+      ['overview:read'],
+    )).resolves.toEqual(expect.objectContaining({ kind: 'ops_legacy' }))
+    expect(opsAuthService.authenticateLegacyApiKey).toHaveBeenCalledWith('legacy-key')
+  })
+
+  it('rejects absent Ops Firebase credentials and unknown permission scopes', async () => {
+    const req = buildRequest({ headers: {} })
+
+    await expect(expressAuthentication(req, 'OpsFirebaseAuth')).rejects.toThrow(
+      'Ops identity token not provided',
+    )
+
+    const bearerRequest = buildRequest({
+      headers: { authorization: 'Bearer firebase-token' },
+    })
+    await expect(expressAuthentication(
+      bearerRequest,
+      'OpsAuth',
+      ['not-a-real-permission'],
+    )).rejects.toThrow('You do not have permission')
   })
 
   it('does not let ambient client-domain auth race an explicit bearer token', async () => {
