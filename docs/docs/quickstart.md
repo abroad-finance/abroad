@@ -131,6 +131,7 @@ Status values and webhook events are listed in [Status lifecycle](./workflows/st
 
 ## Next steps
 
+- Connect a compatible assistant through the read-only [AI integration](./ai-integration) to validate requests and inspect transaction status without giving it an API key.
 - Read [Integration basics](./integration-basics) for headers, IDs, and operational guidance.
 - Walk through the [Workflows](./workflows/overview) guide.
 - Wire up [Webhooks](./reference/webhooks).

@@ -84,6 +84,11 @@ const config: Config = {
           position: 'left',
         },
         {
+          to: '/ai-integration',
+          label: 'Connect Abroad to AI',
+          position: 'left',
+        },
+        {
           href: 'https://github.com/abroad-finance/abroad',
           label: 'GitHub',
           position: 'right',

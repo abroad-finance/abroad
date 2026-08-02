@@ -20,6 +20,13 @@ import { KycSubmissionService } from '../../modules/kyc/application/KycSubmissio
 import { OpsKycService } from '../../modules/kyc/application/OpsKycService'
 import { OpsOverviewService } from '../../modules/operations/application/OpsOverviewService'
 import { OpsPartnerService } from '../../modules/partners/application/OpsPartnerService'
+import { PartnerAiAbuseProtectionService } from '../../modules/partners/application/PartnerAiAbuseProtectionService'
+import { PartnerAiAuthorizationService } from '../../modules/partners/application/PartnerAiAuthorizationService'
+import { PartnerAiConnectionService } from '../../modules/partners/application/PartnerAiConnectionService'
+import { PartnerAiProductEventService } from '../../modules/partners/application/PartnerAiProductEventService'
+import { PartnerAiTokenService } from '../../modules/partners/application/PartnerAiTokenService'
+import { PartnerAiToolService } from '../../modules/partners/application/PartnerAiToolService'
+import { PartnerAiWebhookDiagnosticsService } from '../../modules/partners/application/PartnerAiWebhookDiagnosticsService'
 import { PartnerPortalAccountService } from '../../modules/partners/application/PartnerPortalAccountService'
 import { PartnerPortalApiKeyService } from '../../modules/partners/application/PartnerPortalApiKeyService'
 import { PartnerPortalAuditService } from '../../modules/partners/application/PartnerPortalAuditService'
@@ -138,6 +145,13 @@ const domainBindings: ReadonlyArray<BindingRegistration<unknown>> = [
   { bindSelf: true, identifier: OpsKycService, implementation: OpsKycService },
   { bindSelf: true, identifier: OpsOverviewService, implementation: OpsOverviewService },
   { bindSelf: true, identifier: OpsPartnerService, implementation: OpsPartnerService },
+  { bindSelf: true, identifier: PartnerAiAbuseProtectionService, implementation: PartnerAiAbuseProtectionService },
+  { bindSelf: true, identifier: PartnerAiAuthorizationService, implementation: PartnerAiAuthorizationService },
+  { bindSelf: true, identifier: PartnerAiConnectionService, implementation: PartnerAiConnectionService },
+  { bindSelf: true, identifier: PartnerAiProductEventService, implementation: PartnerAiProductEventService },
+  { bindSelf: true, identifier: PartnerAiTokenService, implementation: PartnerAiTokenService },
+  { bindSelf: true, identifier: PartnerAiToolService, implementation: PartnerAiToolService },
+  { bindSelf: true, identifier: PartnerAiWebhookDiagnosticsService, implementation: PartnerAiWebhookDiagnosticsService },
   { bindSelf: true, identifier: PartnerPortalPasswordService, implementation: PartnerPortalPasswordService },
   { bindSelf: true, identifier: PartnerPortalApiKeyService, implementation: PartnerPortalApiKeyService },
   { bindSelf: true, identifier: PartnerPortalMfaService, implementation: PartnerPortalMfaService },

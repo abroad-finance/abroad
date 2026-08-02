@@ -1,5 +1,7 @@
+import { useTranslate } from '@tolgee/react'
 import {
   ArrowUpRight,
+  Cable,
   ChevronLeft,
   ChevronRight,
   DatabaseZap,
@@ -129,6 +131,7 @@ const MobileTransaction = ({ transaction }: { transaction: PartnerTransactionSum
 )
 
 const PartnerTransactions = () => {
+  const { t } = useTranslate()
   const session = usePartnerPortalSession()
   const [activeStatus, setActiveStatus] = useState<PartnerTransactionStatus | undefined>()
   const [appliedFilters, setAppliedFilters] = useState<AppliedFilters>(emptyFilters)
@@ -384,6 +387,12 @@ const PartnerTransactions = () => {
             <div>
               <p className="font-semibold text-partner-ink">No matching transactions</p>
               <p className="mt-1 text-sm text-partner-muted">Adjust the status, dates, or search reference.</p>
+              {!hasFilters && data.total === 0 && (
+                <Link className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-partner-forest underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-partner-forest" to="/partner/integration/ai?from=transaction-empty">
+                  <Cable aria-hidden className="h-4 w-4" />
+                  {t('partner.ai.empty_state_link', 'Connect your AI client')}
+                </Link>
+              )}
             </div>
           </div>
         )}

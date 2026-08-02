@@ -1,5 +1,10 @@
 import type { ApiResult } from '../http/types'
 import type {
+  PartnerAiAccountMetadata,
+  PartnerAiAuthorizationRequest,
+  PartnerAiAuthorizationResolution,
+  PartnerAiConnection,
+  PartnerAiProductEventInput,
   PartnerApiKeyScope,
   PartnerPixReceipt,
   PartnerPortalApiKeyList,
@@ -29,7 +34,7 @@ import type {
 import { HttpClient } from '../http/httpClient'
 import { clearPartnerPortalSession, getPartnerPortalToken } from './partnerPortalSessionStore'
 
-type ApiErrorBody = { reason?: string }
+type ApiErrorBody = { code?: string, reason?: string }
 
 const bootstrapClient = new HttpClient({ getAuthToken: () => null })
 const portalClient = new HttpClient({ getAuthToken: getPartnerPortalToken })
@@ -62,6 +67,74 @@ const jsonRequest = (method: 'PATCH' | 'POST' | 'PUT', body?: unknown) => ({
   headers: { 'Content-Type': 'application/json' },
   method,
 })
+
+export const approvePartnerAiAuthorization = async (
+  requestId: string,
+): Promise<PartnerAiAuthorizationResolution> => {
+  const result = await portalClient.request<PartnerAiAuthorizationResolution, ApiErrorBody>(
+    `/partner-portal/ai/authorization-requests/${encodeURIComponent(requestId)}/approval`,
+    jsonRequest('POST'),
+  )
+  return unwrap(result)
+}
+
+export const denyPartnerAiAuthorization = async (
+  requestId: string,
+): Promise<PartnerAiAuthorizationResolution> => {
+  const result = await portalClient.request<PartnerAiAuthorizationResolution, ApiErrorBody>(
+    `/partner-portal/ai/authorization-requests/${encodeURIComponent(requestId)}/denial`,
+    jsonRequest('POST'),
+  )
+  return unwrap(result)
+}
+
+export const getPartnerAiAuthorizationRequest = async (
+  requestId: string,
+): Promise<PartnerAiAuthorizationRequest> => {
+  const result = await portalClient.request<PartnerAiAuthorizationRequest, ApiErrorBody>(
+    `/partner-portal/ai/authorization-requests/${encodeURIComponent(requestId)}`,
+    { method: 'GET' },
+  )
+  return unwrap(result)
+}
+
+export const listPartnerAiConnections = async (): Promise<PartnerAiConnection[]> => {
+  const result = await portalClient.request<{ items: PartnerAiConnection[] }, ApiErrorBody>(
+    '/partner-portal/ai/connections',
+    { method: 'GET' },
+  )
+  return unwrap(result).items
+}
+
+export const recordPartnerAiProductEvent = async (
+  input: PartnerAiProductEventInput,
+): Promise<void> => {
+  const result = await portalClient.request<void, ApiErrorBody>(
+    '/partner-portal/ai/product-events',
+    jsonRequest('POST', input),
+  )
+  unwrap(result)
+}
+
+export const revokePartnerAiConnection = async (
+  connectionId: string,
+): Promise<PartnerAiConnection> => {
+  const result = await portalClient.request<PartnerAiConnection, ApiErrorBody>(
+    `/partner-portal/ai/connections/${encodeURIComponent(connectionId)}`,
+    { method: 'DELETE' },
+  )
+  return unwrap(result)
+}
+
+export const testPartnerAiConnection = async (
+  connectionId: string,
+): Promise<PartnerAiAccountMetadata> => {
+  const result = await portalClient.request<PartnerAiAccountMetadata, ApiErrorBody>(
+    `/partner-portal/ai/connections/${encodeURIComponent(connectionId)}/test`,
+    jsonRequest('POST'),
+  )
+  return unwrap(result)
+}
 
 export const activatePartnerWebhook = async (): Promise<PartnerPortalWebhookConfiguration> => {
   const result = await portalClient.request<PartnerPortalWebhookConfiguration, ApiErrorBody>(

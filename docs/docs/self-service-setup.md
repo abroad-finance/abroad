@@ -43,3 +43,5 @@ After MFA is verified, use **Integration** to:
 API keys and webhook signing secrets are shown only once. Store them in your own secret manager and never put them in browser code, mobile applications, source control, or logs.
 
 Continue with [Authentication](./authentication) to use the API key and [Webhooks](./reference/webhooks) to validate lifecycle callbacks.
+
+For read-only assistance with documentation, request validation, transaction visibility, and webhook diagnostics, use [Connect Abroad to AI](./ai-integration). The AI authorization flow uses the existing verified portal account and never asks you to paste an API key or webhook secret into the portal page.

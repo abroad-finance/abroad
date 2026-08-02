@@ -10,6 +10,7 @@ import {
 } from 'vitest'
 
 import PartnerTransactions from '../pages/PartnerPortal/PartnerTransactions'
+import { PartnerPortalTestProviders } from './partnerPortalTestProviders'
 
 const mocked = vi.hoisted(() => ({
   exportPartnerTransactions: vi.fn(),
@@ -61,9 +62,11 @@ describe('PartnerTransactions', () => {
   it('renders the partner ledger and applies status, search, date, and pagination filters', async () => {
     mocked.listPartnerTransactions.mockResolvedValue(response)
     render(
-      <MemoryRouter>
-        <PartnerTransactions />
-      </MemoryRouter>,
+      <PartnerPortalTestProviders>
+        <MemoryRouter>
+          <PartnerTransactions />
+        </MemoryRouter>
+      </PartnerPortalTestProviders>,
     )
     const user = userEvent.setup()
 
@@ -101,12 +104,18 @@ describe('PartnerTransactions', () => {
   it('presents an actionable empty state', async () => {
     mocked.listPartnerTransactions.mockResolvedValue({ ...response, items: [], total: 0 })
     render(
-      <MemoryRouter>
-        <PartnerTransactions />
-      </MemoryRouter>,
+      <PartnerPortalTestProviders>
+        <MemoryRouter>
+          <PartnerTransactions />
+        </MemoryRouter>
+      </PartnerPortalTestProviders>,
     )
 
     expect(await screen.findByText('No matching transactions')).toBeInTheDocument()
     expect(screen.getByText('Adjust the status, dates, or search reference.')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Connect your AI client' })).toHaveAttribute(
+      'href',
+      '/partner/integration/ai?from=transaction-empty',
+    )
   })
 })

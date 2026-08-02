@@ -1,9 +1,11 @@
 import type { FormEvent } from 'react'
 
+import { useTranslate } from '@tolgee/react'
 import {
   Activity, KeyRound, LoaderCircle, LockKeyhole, Plus, RefreshCw, ShieldCheck, UserRound, UsersRound,
 } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 
 import type {
   PartnerPortalAuditEvent,
@@ -34,6 +36,29 @@ import { OneTimeSecretDialog, PartnerNotice } from './partnerPortalUi'
 
 type RevealedValue = { description: string, label: string, value: string }
 
+const AI_AUTHORIZATION_REQUEST_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu
+
+const safeAiAuthorizationReturnPath = (candidate: null | string): null | string => {
+  if (!candidate) return null
+  try {
+    const url = new URL(candidate, window.location.origin)
+    const requestId = url.searchParams.get('request')
+    if (
+      url.origin !== window.location.origin
+      || url.pathname !== '/partner/integration/ai/authorize'
+      || url.searchParams.size !== 1
+      || !requestId
+      || !AI_AUTHORIZATION_REQUEST_ID_PATTERN.test(requestId)
+    ) {
+      return null
+    }
+    return `${url.pathname}?request=${encodeURIComponent(requestId)}`
+  }
+  catch {
+    return null
+  }
+}
+
 const actionLabel = (action: string): string => action
   .replace(/\./gu, ' · ')
   .replace(/_/gu, ' ')
@@ -44,7 +69,11 @@ const resetLink = (token: string): string => {
 }
 
 const PartnerPortalTeamSecurity = () => {
+  const { t } = useTranslate()
+  const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const session = usePartnerPortalSession()
+  const aiAuthorizationReturnPath = safeAiAuthorizationReturnPath(searchParams.get('returnTo'))
   const canManageTeam = session?.role === 'ADMIN' && session.mfaVerified
   const [auditEvents, setAuditEvents] = useState<PartnerPortalAuditEvent[]>([])
   const [confirmationCode, setConfirmationCode] = useState('')
@@ -57,6 +86,7 @@ const PartnerPortalTeamSecurity = () => {
   const [passwordCurrentPassword, setPasswordCurrentPassword] = useState('')
   const [pendingAction, setPendingAction] = useState<null | string>(null)
   const [revealed, setRevealed] = useState<null | RevealedValue>(null)
+  const [returnAfterMfaSecret, setReturnAfterMfaSecret] = useState(false)
   const [role, setRole] = useState<PartnerPortalRole>('MEMBER')
   const [success, setSuccess] = useState<null | string>(null)
   const [users, setUsers] = useState<PartnerPortalUser[]>([])
@@ -132,6 +162,20 @@ const PartnerPortalTeamSecurity = () => {
 
       {(error || success) && <div aria-live="polite" className="mt-6"><PartnerNotice tone={error ? 'error' : 'success'}>{error ?? success}</PartnerNotice></div>}
 
+      {aiAuthorizationReturnPath && (
+        <div className="mt-6">
+          <PartnerNotice tone="neutral">
+            {session.mfaEnabled && session.mfaVerified
+              ? (
+                  <Link className="font-semibold text-partner-forest underline-offset-4 hover:underline" to={aiAuthorizationReturnPath}>
+                    {t('partner.ai.authorization.return_to_request', 'Return to authorization request')}
+                  </Link>
+                )
+              : t('partner.ai.authorization.return_after_mfa', 'After you enable MFA and save your recovery codes, Abroad will return you to this authorization request.')}
+          </PartnerNotice>
+        </div>
+      )}
+
       <div className="mt-8 grid gap-8 xl:grid-cols-2">
         <section aria-labelledby="personal-security-title" className="partner-section">
           <div className="flex items-start gap-3">
@@ -183,6 +227,7 @@ const PartnerPortalTeamSecurity = () => {
                     setPartnerPortalSession(result.session)
                     setEnrollment(null)
                     setConfirmationCode('')
+                    setReturnAfterMfaSecret(Boolean(aiAuthorizationReturnPath))
                     setRevealed({ description: 'Store all ten codes in a password manager. Each code works once.', label: 'MFA recovery codes', value: result.recoveryCodes.join('\n') })
                   })
                 }}
@@ -383,7 +428,20 @@ const PartnerPortalTeamSecurity = () => {
         </section>
       )}
 
-      {revealed && <OneTimeSecretDialog description={revealed.description} label={revealed.label} onClose={() => setRevealed(null)} secret={revealed.value} />}
+      {revealed && (
+        <OneTimeSecretDialog
+          description={revealed.description}
+          label={revealed.label}
+          onClose={() => {
+            setRevealed(null)
+            if (returnAfterMfaSecret && aiAuthorizationReturnPath) {
+              setReturnAfterMfaSecret(false)
+              navigate(aiAuthorizationReturnPath, { replace: true })
+            }
+          }}
+          secret={revealed.value}
+        />
+      )}
     </>
   )
 }

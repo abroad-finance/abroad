@@ -14,6 +14,13 @@ import packageJson from '../../../package.json'
 import { mapErrorToHttpResponse } from '../../core/errors'
 import { ILogger } from '../../core/logging/types'
 import { requestContextMiddleware } from '../../core/requestContext'
+import { PartnerAiAbuseProtectionService } from '../../modules/partners/application/PartnerAiAbuseProtectionService'
+import { PartnerAiAuthorizationService } from '../../modules/partners/application/PartnerAiAuthorizationService'
+import { PartnerAiConnectionService } from '../../modules/partners/application/PartnerAiConnectionService'
+import { PartnerAiTokenService } from '../../modules/partners/application/PartnerAiTokenService'
+import { PartnerAiToolService } from '../../modules/partners/application/PartnerAiToolService'
+import { PartnerAiMcpRouter } from '../../modules/partners/interfaces/http/PartnerAiMcpRouter'
+import { PartnerAiOAuthRouter } from '../../modules/partners/interfaces/http/PartnerAiOAuthRouter'
 import { TransferoUltraWebhookConfigurationVerifier } from '../../modules/transfero/infrastructure/TransferoUltraWebhookConfigurationVerifier'
 import { initSentry, setupSentryExpressErrorHandler } from '../../platform/observability/sentry'
 import { initAdmin } from '../admin/admin'
@@ -50,6 +57,24 @@ app.use(bodyParser.json({
   verify: captureTransferoUltraRawBody,
 }))
 app.use(requestContextMiddleware)
+
+const partnerAiAbuseProtectionService = iocContainer.get(PartnerAiAbuseProtectionService)
+const partnerAiAuthorizationService = iocContainer.get(PartnerAiAuthorizationService)
+const partnerAiConnectionService = iocContainer.get(PartnerAiConnectionService)
+const partnerAiTokenService = iocContainer.get(PartnerAiTokenService)
+const partnerAiToolService = iocContainer.get(PartnerAiToolService)
+
+app.use(new PartnerAiOAuthRouter(
+  partnerAiAuthorizationService,
+  partnerAiTokenService,
+  partnerAiAbuseProtectionService,
+).router)
+app.use(new PartnerAiMcpRouter(
+  partnerAiTokenService,
+  partnerAiConnectionService,
+  partnerAiToolService,
+  logger,
+).router)
 
 // ---------------------------
 // tsoa‑generated application routes

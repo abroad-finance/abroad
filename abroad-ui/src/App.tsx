@@ -22,6 +22,8 @@ const BridgeOps = lazy(() => import('./pages/Ops/BridgeOps'))
 const TreasuryDashboard = lazy(() => import('./pages/Ops/TreasuryDashboard'))
 const PartnerPortalShell = lazy(() => import('./pages/PartnerPortal/PartnerPortalShell'))
 const PartnerPortalIntegration = lazy(() => import('./pages/PartnerPortal/PartnerPortalIntegration'))
+const PartnerAiAuthorization = lazy(() => import('./pages/PartnerPortal/PartnerAiAuthorization'))
+const PartnerAiIntegration = lazy(() => import('./pages/PartnerPortal/PartnerAiIntegration'))
 const PartnerPortalEmailVerification = lazy(() => import('./pages/PartnerPortal/PartnerPortalEmailVerification'))
 const PartnerPortalReconciliation = lazy(() => import('./pages/PartnerPortal/PartnerPortalReconciliation'))
 const PartnerPortalSignIn = lazy(() => import('./pages/PartnerPortal/PartnerPortalSignIn'))
@@ -42,6 +44,8 @@ function App() {
           <Route element={<PartnerPortalShell />}>
             <Route element={<Navigate replace to="/partner/transactions" />} path="/partner" />
             <Route element={<PartnerPortalIntegration />} path="/partner/integration" />
+            <Route element={<PartnerAiIntegration />} path="/partner/integration/ai" />
+            <Route element={<PartnerAiAuthorization />} path="/partner/integration/ai/authorize" />
             <Route element={<PartnerPortalReconciliation />} path="/partner/reconciliation" />
             <Route element={<PartnerPortalTeamSecurity />} path="/partner/security" />
             <Route element={<PartnerTransactions />} path="/partner/transactions" />

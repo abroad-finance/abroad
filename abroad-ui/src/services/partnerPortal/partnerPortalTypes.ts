@@ -17,6 +17,76 @@ export const partnerApiKeyScopes = [
   'telemetry:write',
 ] as const
 
+export type PartnerAiAccountMetadata = {
+  connectionId: string
+  organizationName: string
+  resource: string
+  scopes: PartnerAiScope[]
+  serverVersion: string
+  status: 'ACTIVE'
+}
+
+export type PartnerAiAuthorizationRequest = {
+  alreadyConnected: boolean
+  client: {
+    destinationHost: string
+    name: string
+    verified: boolean
+  }
+  expiresAt: string
+  organizationName: string
+  permissions: Array<{
+    description: string
+    scope: PartnerAiScope
+  }>
+  requestId: string
+  state: PartnerAiAuthorizationState
+}
+
+export type PartnerAiAuthorizationResolution = {
+  clientName: string
+  destinationHost: string
+  returnToClientUrl: string
+}
+
+export type PartnerAiAuthorizationState
+  = | 'ADMIN_REQUIRED'
+    | 'APPROVED'
+    | 'DENIED'
+    | 'EXPIRED'
+    | 'MFA_REQUIRED'
+    | 'READY'
+    | 'UNSUPPORTED_CLIENT'
+
+export type PartnerAiConnection = {
+  clientName: string
+  connectedAt: string
+  expiresAt: string
+  id: string
+  lastTestedAt: null | string
+  lastUsedAt: null | string
+  scopes: PartnerAiScope[]
+  status: PartnerAiConnectionStatus
+  verifiedClient: boolean
+}
+
+export type PartnerAiConnectionStatus = 'ACTIVE' | 'EXPIRED' | 'FAILED' | 'REVOKED'
+
+export type PartnerAiProductEventInput = {
+  clientCategory: 'GENERIC' | 'UNSUPPORTED'
+  entryPoint: 'DIRECT' | 'DOCUMENTATION' | 'INTEGRATION_CARD' | 'NAVIGATION' | 'TRANSACTION_EMPTY_STATE'
+  event: 'AI_AUTHORIZATION_COMPLETED' | 'AI_CONNECTION_REVOKED' | 'AI_CONNECTION_STARTED' | 'AI_CONNECTION_TESTED' | 'AI_INTEGRATION_PAGE_VIEWED'
+  outcome: 'APPROVED' | 'DENIED' | 'FAILED' | 'NOT_APPLICABLE' | 'REVOKED' | 'SUCCEEDED'
+}
+
+export type PartnerAiScope
+  = | 'account:read'
+    | 'docs:read'
+    | 'offline_access'
+    | 'requests:validate'
+    | 'transactions:read'
+    | 'webhooks:read'
+
 export type PartnerApiKeyScope = typeof partnerApiKeyScopes[number]
 
 export type PartnerPixReceipt = {

@@ -1,7 +1,8 @@
 import type { FormEvent } from 'react'
 
+import { useTranslate } from '@tolgee/react'
 import {
-  CheckCircle2, CircleDashed, KeyRound, LoaderCircle, Plus, RadioTower, RefreshCw, RotateCcw, ShieldCheck, Trash2,
+  ArrowRight, Cable, CheckCircle2, CircleDashed, KeyRound, LoaderCircle, Plus, RadioTower, RefreshCw, RotateCcw, ShieldCheck, Trash2,
 } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
@@ -46,6 +47,7 @@ type RevealedSecret = {
 }
 
 const PartnerPortalIntegration = () => {
+  const { t } = useTranslate()
   const session = usePartnerPortalSession()
   const authorized = session?.role === 'ADMIN' && session.mfaVerified
   const [apiKeys, setApiKeys] = useState<null | PartnerPortalApiKeyList>(null)
@@ -168,6 +170,23 @@ const PartnerPortalIntegration = () => {
           <PartnerNotice tone={error ? 'error' : 'success'}>{error ?? success}</PartnerNotice>
         </div>
       )}
+
+      <section aria-labelledby="ai-integration-card-title" className="partner-section mt-8">
+        <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-3">
+            <div className="rounded-xl bg-partner-mint/60 p-2.5 text-partner-forest"><Cable aria-hidden className="h-5 w-5" /></div>
+            <div>
+              <p className="partner-eyebrow">{t('partner.ai.integration_card.eyebrow', 'Read-only connection')}</p>
+              <h2 className="mt-1 text-xl font-semibold text-partner-ink" id="ai-integration-card-title">{t('partner.ai.integration_card.title', 'AI integrations')}</h2>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-partner-muted">{t('partner.ai.integration_card.description', 'Connect compatible AI assistants through Abroad sign-in—without sharing an API key or webhook secret.')}</p>
+            </div>
+          </div>
+          <Link className="partner-button-secondary shrink-0" to="/partner/integration/ai?from=integration-card">
+            {t('partner.ai.integration_card.action', 'Open AI integrations')}
+            <ArrowRight aria-hidden className="h-4 w-4" />
+          </Link>
+        </div>
+      </section>
 
       <div className="mt-8 grid gap-8 xl:grid-cols-[1fr_1.05fr]">
         <section aria-labelledby="api-keys-title" className="partner-section">

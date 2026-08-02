@@ -10,6 +10,7 @@ import { OpsKycController } from '../../modules/kyc/interfaces/http/OpsKycContro
 import { OpsOverviewController } from '../../modules/operations/interfaces/http/OpsOverviewController'
 import { OpsPartnerController } from '../../modules/partners/interfaces/http/OpsPartnerController'
 import { OpsPartnerPortalController } from '../../modules/partners/interfaces/http/OpsPartnerPortalController'
+import { PartnerAiController } from '../../modules/partners/interfaces/http/PartnerAiController'
 import { PartnerController } from '../../modules/partners/interfaces/http/PartnerController'
 import { PartnerPortalIdentityController } from '../../modules/partners/interfaces/http/PartnerPortalIdentityController'
 import { PartnerPortalIntegrationController } from '../../modules/partners/interfaces/http/PartnerPortalIntegrationController'
@@ -43,6 +44,7 @@ const controllerBindings: ReadonlyArray<BindingRegistration<unknown>> = [
   { bindSelf: true, identifier: PartnerController, implementation: PartnerController },
   { bindSelf: true, identifier: OpsPartnerController, implementation: OpsPartnerController },
   { bindSelf: true, identifier: OpsPartnerPortalController, implementation: OpsPartnerPortalController },
+  { bindSelf: true, identifier: PartnerAiController, implementation: PartnerAiController },
   { bindSelf: true, identifier: PartnerPortalIdentityController, implementation: PartnerPortalIdentityController },
   { bindSelf: true, identifier: PartnerPortalIntegrationController, implementation: PartnerPortalIntegrationController },
   { bindSelf: true, identifier: PartnerPortalSignupController, implementation: PartnerPortalSignupController },
