@@ -99,6 +99,7 @@ type SwapAction
     | { qrCode: null | string, type: 'SET_QR_CODE' }
     | { quoteId?: string, sourceAmount?: string, targetAmount?: string, type: 'SET_AMOUNTS' }
     | { rates: OnboardingRates, type: 'SET_ONBOARDING_RATES' }
+    | { targetCurrency: TargetCurrency, type: 'CHANGE_TARGET_CURRENCY' }
     | { targetCurrency: TargetCurrency, type: 'SET_TARGET_CURRENCY' }
     | { transactionId: null | string, type: 'SET_TRANSACTION_ID' }
     | { type: 'CLOSE_QR' }
@@ -190,6 +191,15 @@ const createInitialState = (isDesktop: boolean): SwapControllerState => ({
 
 const reducer = (state: SwapControllerState, action: SwapAction): SwapControllerState => {
   switch (action.type) {
+    case 'CHANGE_TARGET_CURRENCY':
+      // Quotes and recipient details are corridor-specific, but changing the
+      // country must not eject the user from the active payment form.
+      return {
+        ...createInitialState(state.isDesktop),
+        onboardingRates: state.onboardingRates,
+        targetCurrency: action.targetCurrency,
+        view: state.view === 'home' ? 'home' : 'swap',
+      }
     case 'CLOSE_QR':
       return { ...state, isQrOpen: false }
     case 'HYDRATE':
@@ -1394,8 +1404,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
       ? (currencyCorridors.find(corridor => chainKeyOf(corridor) === currentChainKey && corridor.cryptoCurrency === currentCrypto)
         ?? currencyCorridors.find(corridor => chainKeyOf(corridor) === currentChainKey))
       : undefined
-    dispatch({ type: 'RESET' })
-    dispatch({ targetCurrency: currency, type: 'SET_TARGET_CURRENCY' })
+    dispatch({ targetCurrency: currency, type: 'CHANGE_TARGET_CURRENCY' })
     setQuoteBelowMinimum(false)
     if (preservedCorridor) {
       dispatch({ corridorKey: corridorKeyOf(preservedCorridor), type: 'SET_CORRIDOR' })

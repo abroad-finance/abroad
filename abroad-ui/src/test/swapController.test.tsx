@@ -466,6 +466,37 @@ describe('useWebSwapController', () => {
     expect(result.current.bankDetailsProps.continueDisabled).toBe(false)
   })
 
+  it('keeps the current entry surface while switching target countries', async () => {
+    const { result } = renderHook(() => useWebSwapController(), { wrapper: Wrapper })
+
+    await act(async () => {
+      await Promise.resolve()
+      await mocked.fetchPublicCorridorsMock.mock.results[0]?.value
+    })
+
+    const onboardingRates = result.current.onboardingRates
+
+    act(() => result.current.selectCurrency('COP'))
+    expect(result.current.targetCurrency).toBe('COP')
+    expect(result.current.view).toBe('home')
+    expect(result.current.onboardingRates).toBe(onboardingRates)
+
+    act(() => result.current.goToManual())
+    expect(result.current.view).toBe('swap')
+
+    act(() => result.current.selectCurrency('BRL'))
+    expect(result.current.targetCurrency).toBe('BRL')
+    expect(result.current.swapViewProps.targetCurrency).toBe('BRL')
+    expect(result.current.view).toBe('swap')
+    expect(result.current.onboardingRates).toBe(onboardingRates)
+
+    act(() => result.current.selectCurrency('COP'))
+    expect(result.current.targetCurrency).toBe('COP')
+    expect(result.current.swapViewProps.targetCurrency).toBe('COP')
+    expect(result.current.view).toBe('swap')
+    expect(result.current.onboardingRates).toBe(onboardingRates)
+  })
+
   it('locks MiniPay mode to Celo corridors and prefers the highest supported stablecoin', async () => {
     const miniPayWallet: IWallet = {
       address: '0x1111111111111111111111111111111111111111',
