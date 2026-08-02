@@ -82,6 +82,10 @@
     @apply rounded-[1.75rem] border border-partner-border bg-white p-7 shadow-partner-sheet sm:p-10;
   }
 
+  .partner-signup-rail {
+    @apply rounded-[1.75rem] border border-partner-border bg-partner-mint/25 p-7 shadow-partner-sheet lg:sticky lg:top-8 lg:p-8;
+  }
+
   .partner-login-orb {
     @apply pointer-events-none fixed rounded-full blur-3xl;
   }

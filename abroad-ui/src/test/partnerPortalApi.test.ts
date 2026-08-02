@@ -10,15 +10,24 @@ import {
 } from 'vitest'
 
 import {
+  approvePartnerAiAuthorization,
   completePartnerMfaChallenge,
   createPartnerApiKey,
   createPartnerPortalSession,
+  createPartnerPortalSignup,
+  createPartnerPortalSignupChallenge,
   exportPartnerTransactions,
+  getPartnerAiAuthorizationRequest,
   getPartnerPixReceipt,
+  listPartnerAiConnections,
   listPartnerTransactions,
+  recordPartnerAiProductEvent,
   redeliverPartnerWebhook,
   resetPartnerPasswordWithRecoveryCode,
+  revokePartnerAiConnection,
   stagePartnerWebhookUrl,
+  testPartnerAiConnection,
+  verifyPartnerPortalSignupEmail,
 } from '../services/partnerPortal/partnerPortalApi'
 import {
   clearPartnerPortalSession,
@@ -66,6 +75,65 @@ describe('partner portal API', () => {
     )
 
     expect(session).toEqual(expect.objectContaining({ status: 'AUTHENTICATED' }))
+  })
+
+  it('uses unauthenticated challenge, idempotent signup, and verification contracts', async () => {
+    server.use(
+      http.post('https://api.abroad.finance/partner-portal/signup/challenge', ({ request }) => {
+        expect(request.headers.get('authorization')).toBeNull()
+        return HttpResponse.json({
+          challengeToken: 'signed-challenge',
+          expiresAt: '2026-08-02T15:15:00.000Z',
+          readyAt: '2026-08-02T15:00:01.500Z',
+        })
+      }),
+      http.post('https://api.abroad.finance/partner-portal/signup', async ({ request }) => {
+        expect(request.headers.get('authorization')).toBeNull()
+        expect(request.headers.get('idempotency-key')).toBe('signup-request-001')
+        await expect(request.json()).resolves.toEqual({
+          challengeToken: 'signed-challenge',
+          company: 'Atlas Payments',
+          contactWebsite: '',
+          country: 'BR',
+          email: 'admin@atlas.example',
+          firstName: 'Ana',
+          lastName: 'Silva',
+          password: 'correct horse battery staple',
+        })
+        return HttpResponse.json({ status: 'VERIFICATION_REQUIRED' }, { status: 202 })
+      }),
+      http.post('https://api.abroad.finance/partner-portal/signup/email-verification', async ({ request }) => {
+        expect(request.headers.get('authorization')).toBeNull()
+        await expect(request.json()).resolves.toEqual({ token: 'verification-token' })
+        return HttpResponse.json({
+          accessToken: 'verified-session',
+          email: 'admin@atlas.example',
+          expiresAt: '2099-01-01T00:30:00.000Z',
+          mfaEnabled: false,
+          mfaVerified: false,
+          partnerName: 'Atlas Payments',
+          role: 'ADMIN',
+          userId: 'user-1',
+        })
+      }),
+    )
+
+    await expect(createPartnerPortalSignupChallenge()).resolves.toEqual(
+      expect.objectContaining({ challengeToken: 'signed-challenge' }),
+    )
+    await expect(createPartnerPortalSignup({
+      challengeToken: 'signed-challenge',
+      company: 'Atlas Payments',
+      contactWebsite: '',
+      country: 'BR',
+      email: 'admin@atlas.example',
+      firstName: 'Ana',
+      lastName: 'Silva',
+      password: 'correct horse battery staple',
+    }, 'signup-request-001')).resolves.toEqual({ status: 'VERIFICATION_REQUIRED' })
+    await expect(verifyPartnerPortalSignupEmail('verification-token')).resolves.toEqual(
+      expect.objectContaining({ accessToken: 'verified-session' }),
+    )
   })
 
   it('sends only the portal bearer token and complete filters', async () => {
@@ -228,6 +296,106 @@ describe('partner portal API', () => {
     )
     await expect(redeliverPartnerWebhook('transaction-1', 'delivery-1', 'portal-redelivery-1')).resolves.toEqual(
       expect.objectContaining({ status: 'DELIVERED' }),
+    )
+  })
+
+  it('uses only the portal session for AI consent and connection management', async () => {
+    setPartnerPortalSession({
+      accessToken: 'ai-admin-token',
+      email: 'operator@decaf.so',
+      expiresAt: '2099-01-01T00:00:00.000Z',
+      mfaEnabled: true,
+      mfaVerified: true,
+      partnerName: 'Decaf',
+      role: 'ADMIN',
+      userId: 'user-1',
+    })
+    const requestId = '11111111-1111-4111-8111-111111111111'
+    const connectionId = '22222222-2222-4222-8222-222222222222'
+    const connection = {
+      clientName: 'Operations Assistant',
+      connectedAt: '2026-08-02T12:00:00.000Z',
+      expiresAt: '2026-09-01T12:00:00.000Z',
+      id: connectionId,
+      lastTestedAt: null,
+      lastUsedAt: null,
+      scopes: ['account:read'],
+      status: 'ACTIVE',
+      verifiedClient: false,
+    }
+    server.use(
+      http.get(`https://api.abroad.finance/partner-portal/ai/authorization-requests/${requestId}`, ({ request }) => {
+        expect(request.headers.get('authorization')).toBe('Bearer ai-admin-token')
+        expect(request.headers.get('x-api-key')).toBeNull()
+        return HttpResponse.json({
+          alreadyConnected: false,
+          client: {
+            destinationHost: 'assistant.example',
+            name: 'Operations Assistant',
+            verified: false,
+          },
+          expiresAt: '2026-08-02T12:15:00.000Z',
+          organizationName: 'Decaf',
+          permissions: [{ description: 'View account metadata', scope: 'account:read' }],
+          requestId,
+          state: 'READY',
+        })
+      }),
+      http.post(`https://api.abroad.finance/partner-portal/ai/authorization-requests/${requestId}/approval`, ({ request }) => {
+        expect(request.headers.get('authorization')).toBe('Bearer ai-admin-token')
+        return HttpResponse.json({
+          clientName: 'Operations Assistant',
+          destinationHost: 'assistant.example',
+          returnToClientUrl: 'https://assistant.example/callback?code=authorization-code-once',
+        })
+      }),
+      http.get('https://api.abroad.finance/partner-portal/ai/connections', ({ request }) => {
+        expect(request.headers.get('authorization')).toBe('Bearer ai-admin-token')
+        return HttpResponse.json({ items: [connection] })
+      }),
+      http.post(`https://api.abroad.finance/partner-portal/ai/connections/${connectionId}/test`, () => HttpResponse.json({
+        connectionId,
+        organizationName: 'Decaf',
+        resource: 'https://api.abroad.finance/mcp',
+        scopes: ['account:read'],
+        serverVersion: '1.0.0',
+        status: 'ACTIVE',
+      })),
+      http.delete(`https://api.abroad.finance/partner-portal/ai/connections/${connectionId}`, () => HttpResponse.json({
+        ...connection,
+        status: 'REVOKED',
+      })),
+      http.post('https://api.abroad.finance/partner-portal/ai/product-events', async ({ request }) => {
+        await expect(request.json()).resolves.toEqual({
+          clientCategory: 'GENERIC',
+          entryPoint: 'NAVIGATION',
+          event: 'AI_INTEGRATION_PAGE_VIEWED',
+          outcome: 'NOT_APPLICABLE',
+        })
+        return new HttpResponse(null, { status: 204 })
+      }),
+    )
+
+    await expect(getPartnerAiAuthorizationRequest(requestId)).resolves.toEqual(
+      expect.objectContaining({ state: 'READY' }),
+    )
+    const resolution = await approvePartnerAiAuthorization(requestId)
+    expect(resolution.returnToClientUrl).toContain('authorization-code-once')
+    await expect(listPartnerAiConnections()).resolves.toEqual([connection])
+    await expect(testPartnerAiConnection(connectionId)).resolves.toEqual(
+      expect.objectContaining({ organizationName: 'Decaf' }),
+    )
+    await expect(revokePartnerAiConnection(connectionId)).resolves.toEqual(
+      expect.objectContaining({ status: 'REVOKED' }),
+    )
+    await expect(recordPartnerAiProductEvent({
+      clientCategory: 'GENERIC',
+      entryPoint: 'NAVIGATION',
+      event: 'AI_INTEGRATION_PAGE_VIEWED',
+      outcome: 'NOT_APPLICABLE',
+    })).resolves.toBeUndefined()
+    expect(window.sessionStorage.getItem('abroad.partnerPortal.session.v2')).not.toContain(
+      'authorization-code-once',
     )
   })
 })

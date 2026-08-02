@@ -42,6 +42,7 @@
     "@google-cloud/pubsub": "^5.2.0",
     "@google-cloud/secret-manager": "^6.1.0",
     "@google-cloud/storage": "^7.21.0",
+    "@modelcontextprotocol/sdk": "1.30.0",
     "@prisma/client": "^6.14.0",
     "@sentry/node": "^10.38.0",
     "@solana/spl-token": "^0.4.13",

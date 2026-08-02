@@ -26,6 +26,8 @@ const portalUser = (overrides: Partial<PartnerPortalUser> = {}): PartnerPortalUs
   createdAt: new Date('2026-08-01T12:00:00.000Z'),
   disabledAt: null,
   email: 'member@decaf.so',
+  emailVerificationRequiredAt: null,
+  emailVerifiedAt: null,
   failedLoginAttempts: 0,
   id: 'member-1',
   lastLoginAt: null,

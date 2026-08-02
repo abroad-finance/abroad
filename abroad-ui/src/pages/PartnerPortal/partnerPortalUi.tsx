@@ -154,3 +154,54 @@ export const PartnerNotice = ({ children, tone = 'neutral' }: {
   }[tone]
   return <div className={`rounded-xl border px-4 py-3 text-sm ${styles}`}>{children}</div>
 }
+
+export const PartnerConfirmDialog = ({
+  cancelLabel,
+  confirmLabel,
+  description,
+  loading,
+  onCancel,
+  onConfirm,
+  title,
+}: {
+  cancelLabel: string
+  confirmLabel: string
+  description: string
+  loading?: boolean
+  onCancel: () => void
+  onConfirm: () => void
+  title: string
+}) => {
+  const dialogRef = useRef<HTMLDialogElement>(null)
+
+  useEffect(() => {
+    const dialog = dialogRef.current
+    if (!dialog) return undefined
+    dialog.showModal()
+    return () => dialog.close()
+  }, [])
+
+  return (
+    <dialog
+      aria-describedby="partner-confirm-description"
+      aria-labelledby="partner-confirm-title"
+      className="w-[calc(100%-2rem)] max-w-lg rounded-[1.5rem] border border-partner-border bg-white p-0 text-partner-ink shadow-2xl backdrop:bg-partner-ink/45 backdrop:backdrop-blur-sm"
+      onCancel={(event) => {
+        event.preventDefault()
+        if (!loading) onCancel()
+      }}
+      ref={dialogRef}
+    >
+      <div className="p-6 sm:p-8">
+        <h2 className="text-2xl font-semibold tracking-[-0.025em]" id="partner-confirm-title">{title}</h2>
+        <p className="mt-3 text-sm leading-6 text-partner-muted" id="partner-confirm-description">{description}</p>
+        <div className="mt-7 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+          <button className="partner-button-secondary" disabled={loading} onClick={onCancel} type="button">{cancelLabel}</button>
+          <button className="min-h-11 rounded-xl bg-rose-700 px-5 text-sm font-semibold text-white transition hover:bg-rose-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-700 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60" disabled={loading} onClick={onConfirm} type="button">
+            {confirmLabel}
+          </button>
+        </div>
+      </div>
+    </dialog>
+  )
+}

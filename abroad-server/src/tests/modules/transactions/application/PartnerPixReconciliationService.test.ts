@@ -56,6 +56,8 @@ const partner = {
   phone: null,
   previousApiKey: null,
   previousApiKeyExpiresAt: null,
+  publicSignupIdempotencyHash: null,
+  publicSignupOrganizationHash: null,
   webhookUrl: 'https://decaf.example/webhook',
 } satisfies Partner
 

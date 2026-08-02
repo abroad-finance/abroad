@@ -10,6 +10,8 @@ Abroad supports API keys for server-to-server requests and JWT bearer tokens for
 
 Add the `X-API-Key` header to every HTTP request. Keep this key secret and never expose it client-side.
 
+Administrators create and manage production API keys from the partner workspace after verifying their email and enabling MFA. See [Self-service setup](./self-service-setup). Keys are displayed only once.
+
 ```http
 GET /transaction/123 HTTP/1.1
 Host: api.abroad.finance

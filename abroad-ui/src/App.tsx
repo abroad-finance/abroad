@@ -36,8 +36,12 @@ const OpsIntegrations = lazy(() => import('./pages/Ops/OpsIntegrations'))
 const OpsBridgeBatchDetail = lazy(() => import('./pages/Ops/OpsBridgeBatchDetail'))
 const PartnerPortalShell = lazy(() => import('./pages/PartnerPortal/PartnerPortalShell'))
 const PartnerPortalIntegration = lazy(() => import('./pages/PartnerPortal/PartnerPortalIntegration'))
+const PartnerAiAuthorization = lazy(() => import('./pages/PartnerPortal/PartnerAiAuthorization'))
+const PartnerAiIntegration = lazy(() => import('./pages/PartnerPortal/PartnerAiIntegration'))
+const PartnerPortalEmailVerification = lazy(() => import('./pages/PartnerPortal/PartnerPortalEmailVerification'))
 const PartnerPortalReconciliation = lazy(() => import('./pages/PartnerPortal/PartnerPortalReconciliation'))
 const PartnerPortalSignIn = lazy(() => import('./pages/PartnerPortal/PartnerPortalSignIn'))
+const PartnerPortalSignup = lazy(() => import('./pages/PartnerPortal/PartnerPortalSignup'))
 const PartnerPortalTeamSecurity = lazy(() => import('./pages/PartnerPortal/PartnerPortalTeamSecurity'))
 const PartnerTransactions = lazy(() => import('./pages/PartnerPortal/PartnerTransactions'))
 const PartnerTransactionDetail = lazy(() => import('./pages/PartnerPortal/PartnerTransactionDetail'))
@@ -51,9 +55,13 @@ function App() {
             <Routes>
               <Route element={<TransparencyDashboard />} path="/transparency" />
               <Route element={<PartnerPortalSignIn />} path="/partner/password-reset" />
+              <Route element={<PartnerPortalSignup />} path="/partner/signup" />
+              <Route element={<PartnerPortalEmailVerification />} path="/partner/verify-email" />
               <Route element={<PartnerPortalShell />}>
                 <Route element={<Navigate replace to="/partner/transactions" />} path="/partner" />
                 <Route element={<PartnerPortalIntegration />} path="/partner/integration" />
+                <Route element={<PartnerAiIntegration />} path="/partner/integration/ai" />
+                <Route element={<PartnerAiAuthorization />} path="/partner/integration/ai/authorize" />
                 <Route element={<PartnerPortalReconciliation />} path="/partner/reconciliation" />
                 <Route element={<PartnerPortalTeamSecurity />} path="/partner/security" />
                 <Route element={<PartnerTransactions />} path="/partner/transactions" />

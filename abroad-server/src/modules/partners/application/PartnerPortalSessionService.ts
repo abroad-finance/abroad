@@ -78,6 +78,7 @@ export class PartnerPortalSessionService {
   public async createMfaChallenge(
     portalUser: PartnerPortalSessionUser,
   ): Promise<PartnerPortalMfaChallenge> {
+    this.assertEmailVerificationComplete(portalUser)
     const signingSecret = await this.getSigningSecret()
     const issuedAtMs = Date.now()
     const challengeToken = jwt.sign(
@@ -104,6 +105,7 @@ export class PartnerPortalSessionService {
     portalUser: PartnerPortalSessionUser,
     mfaVerified = false,
   ): Promise<PartnerPortalSession> {
+    this.assertEmailVerificationComplete(portalUser)
     if (mfaVerified && !portalUser.mfaEnabledAt) {
       throw new Error('MFA cannot be verified for a user without an enrolled factor')
     }
@@ -203,6 +205,12 @@ export class PartnerPortalSessionService {
     }
   }
 
+  private assertEmailVerificationComplete(portalUser: PartnerPortalSessionUser): void {
+    if (portalUser.emailVerificationRequiredAt && !portalUser.emailVerifiedAt) {
+      throw new Error('Partner portal email verification is required')
+    }
+  }
+
   private async findActivePortalUser(
     userId: string,
     sessionVersion: number,
@@ -215,6 +223,7 @@ export class PartnerPortalSessionService {
     if (
       !portalUser
       || portalUser.disabledAt
+      || (portalUser.emailVerificationRequiredAt && !portalUser.emailVerifiedAt)
       || portalUser.passwordVerifier === null
       || portalUser.sessionVersion !== sessionVersion
     ) {

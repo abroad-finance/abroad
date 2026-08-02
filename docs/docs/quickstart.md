@@ -23,7 +23,7 @@ graph LR
 ## Prerequisites
 
 :::info
-You will need an API key to proceed. If you don't have one, please contact [support@abroad.finance](mailto:support@abroad.finance).
+You will need a production API key to proceed. If you don't have one, follow the [self-service setup](./self-service-setup) to create a partner workspace, verify the administrator email, enable MFA, and create the key.
 :::
 
 - **Base URL**: `https://api.abroad.finance`
@@ -131,6 +131,7 @@ Status values and webhook events are listed in [Status lifecycle](./workflows/st
 
 ## Next steps
 
+- Connect a compatible assistant through the read-only [AI integration](./ai-integration) to validate requests and inspect transaction status without giving it an API key.
 - Read [Integration basics](./integration-basics) for headers, IDs, and operational guidance.
 - Walk through the [Workflows](./workflows/overview) guide.
 - Wire up [Webhooks](./reference/webhooks).

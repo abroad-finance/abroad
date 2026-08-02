@@ -1,17 +1,20 @@
+import { TolgeeProvider, useTranslate } from '@tolgee/react'
 import {
-  KeyRound, ListChecks, LogOut, ShieldCheck, UsersRound,
+  Cable, KeyRound, ListChecks, LogOut, ShieldCheck, UsersRound,
 } from 'lucide-react'
 import { useEffect } from 'react'
 import { Link, NavLink, Outlet } from 'react-router-dom'
 
 import AbroadLogo from '../../assets/Logos/AbroadLogoColored.svg'
+import { tolgee } from '../../contexts/LanguageContext'
 import {
   clearPartnerPortalSession,
   usePartnerPortalSession,
 } from '../../services/partnerPortal/partnerPortalSessionStore'
 import PartnerPortalSignIn from './PartnerPortalSignIn'
 
-const PartnerPortalShell = () => {
+const PartnerPortalShellContent = () => {
+  const { t } = useTranslate()
   const session = usePartnerPortalSession()
 
   useEffect(() => {
@@ -32,6 +35,12 @@ const PartnerPortalShell = () => {
       icon: KeyRound, label: 'Integration', to: '/partner/integration', visible: canAdminister,
     },
     {
+      icon: Cable,
+      label: t('partner.ai.navigation', 'AI integrations'),
+      to: '/partner/integration/ai?from=navigation',
+      visible: true,
+    },
+    {
       icon: UsersRound, label: 'Team & security', to: '/partner/security', visible: true,
     },
   ].filter(item => item.visible)
@@ -49,6 +58,7 @@ const PartnerPortalShell = () => {
               {navigation.map(item => (
                 <NavLink
                   className={({ isActive }) => `inline-flex min-h-10 items-center gap-2 rounded-xl px-3 text-sm font-semibold transition ${isActive ? 'bg-partner-mint/55 text-partner-forest' : 'text-partner-muted hover:bg-partner-ledger hover:text-partner-ink'}`}
+                  end={item.to === '/partner/integration'}
                   key={item.to}
                   to={item.to}
                 >
@@ -78,6 +88,7 @@ const PartnerPortalShell = () => {
           {navigation.map(item => (
             <NavLink
               className={({ isActive }) => `inline-flex min-h-10 shrink-0 items-center gap-2 rounded-xl px-3 text-sm font-semibold ${isActive ? 'bg-partner-mint/55 text-partner-forest' : 'bg-partner-ledger text-partner-muted'}`}
+              end={item.to === '/partner/integration'}
               key={item.to}
               to={item.to}
             >
@@ -101,5 +112,11 @@ const PartnerPortalShell = () => {
     </div>
   )
 }
+
+const PartnerPortalShell = () => (
+  <TolgeeProvider tolgee={tolgee}>
+    <PartnerPortalShellContent />
+  </TolgeeProvider>
+)
 
 export default PartnerPortalShell

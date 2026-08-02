@@ -39,6 +39,7 @@ const serverMock = {
 }
 
 const appMock = {
+  delete: jest.fn(() => undefined),
   get: jest.fn((path: string, handler: RouteHandler) => {
     registered.gets.push({ handler, path })
   }),
@@ -67,7 +68,12 @@ const logger = {
 
 jest.mock('express', () => {
   const expressFn = () => appMock
-  ;(expressFn as unknown as { Router: () => typeof appMock }).Router = () => appMock
+  const expressModule = expressFn as unknown as {
+    Router: () => typeof appMock
+    urlencoded: (options?: unknown) => MiddlewareHandler
+  }
+  expressModule.Router = () => appMock
+  expressModule.urlencoded = jest.fn(() => (_req: RequestStub, _res: ResponseStub, next?: () => void) => next?.())
   return expressFn
 })
 

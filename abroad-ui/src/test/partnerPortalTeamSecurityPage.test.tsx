@@ -2,6 +2,7 @@ import {
   render, screen, waitFor, within,
 } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { MemoryRouter, useLocation } from 'react-router-dom'
 import {
   afterEach, describe, expect, it, vi,
 } from 'vitest'
@@ -12,6 +13,7 @@ import {
   getPartnerPortalSession,
   setPartnerPortalSession,
 } from '../services/partnerPortal/partnerPortalSessionStore'
+import { PartnerPortalTestProviders } from './partnerPortalTestProviders'
 
 const mocked = vi.hoisted(() => ({
   beginPartnerMfaEnrollment: vi.fn(),
@@ -49,6 +51,13 @@ const adminUser = {
   role: 'ADMIN',
 } as const
 
+const authorizationRequestId = '11111111-1111-4111-8111-111111111111'
+
+const LocationProbe = () => {
+  const location = useLocation()
+  return <output data-testid="location-probe">{`${location.pathname}${location.search}`}</output>
+}
+
 afterEach(() => {
   clearPartnerPortalSession()
   vi.clearAllMocks()
@@ -72,7 +81,11 @@ describe('PartnerPortalTeamSecurity', () => {
         role: 'MEMBER',
       },
     })
-    render(<PartnerPortalTeamSecurity />)
+    render(
+      <PartnerPortalTestProviders>
+        <MemoryRouter><PartnerPortalTeamSecurity /></MemoryRouter>
+      </PartnerPortalTestProviders>,
+    )
     const user = userEvent.setup()
 
     const teamSection = await screen.findByRole('heading', { name: 'Workspace team' })
@@ -110,7 +123,11 @@ describe('PartnerPortalTeamSecurity', () => {
       recoveryCodes: ['AAAA-BBBB-CCCC', 'DDDD-EEEE-FFFF'],
       session: adminSession,
     })
-    render(<PartnerPortalTeamSecurity />)
+    render(
+      <PartnerPortalTestProviders>
+        <MemoryRouter><PartnerPortalTeamSecurity /></MemoryRouter>
+      </PartnerPortalTestProviders>,
+    )
     const user = userEvent.setup()
 
     const personalHeading = screen.getByRole('heading', { name: 'Personal security' })
@@ -128,5 +145,60 @@ describe('PartnerPortalTeamSecurity', () => {
     expect(await screen.findByRole('dialog')).toHaveTextContent('AAAA-BBBB-CCCC')
     await waitFor(() => expect(getPartnerPortalSession()?.mfaVerified).toBe(true))
     expect(window.sessionStorage.getItem('abroad.partnerPortal.session.v2')).not.toContain('AAAA-BBBB-CCCC')
+  })
+
+  it('returns to the exact authorization request only after recovery codes are dismissed', async () => {
+    setPartnerPortalSession({ ...adminSession, mfaEnabled: false, mfaVerified: false })
+    mocked.listPartnerPortalUsers.mockResolvedValue([adminUser])
+    mocked.listPartnerAuditEvents.mockResolvedValue([])
+    mocked.beginPartnerMfaEnrollment.mockResolvedValue({
+      expiresAt: '2099-01-01T00:10:00.000Z',
+      manualEntryKey: 'JBSWY3DPEHPK3PXP',
+      otpauthUri: 'otpauth://totp/Abroad:admin%40decaf.so?secret=JBSWY3DPEHPK3PXP',
+    })
+    mocked.confirmPartnerMfaEnrollment.mockResolvedValue({
+      recoveryCodes: ['AAAA-BBBB-CCCC', 'DDDD-EEEE-FFFF'],
+      session: adminSession,
+    })
+    const returnTo = `/partner/integration/ai/authorize?request=${authorizationRequestId}`
+    render(
+      <PartnerPortalTestProviders>
+        <MemoryRouter initialEntries={[`/partner/security?returnTo=${encodeURIComponent(returnTo)}`]}>
+          <PartnerPortalTeamSecurity />
+          <LocationProbe />
+        </MemoryRouter>
+      </PartnerPortalTestProviders>,
+    )
+    const user = userEvent.setup()
+
+    expect(screen.getByText(/After you enable MFA and save your recovery codes/iu)).toBeInTheDocument()
+    const personalSection = screen.getByRole('heading', { name: 'Personal security' }).closest('section')
+    expect(personalSection).not.toBeNull()
+    await user.type(
+      within(personalSection as HTMLElement).getAllByPlaceholderText('Current password')[0],
+      'current secure password',
+    )
+    await user.click(within(personalSection as HTMLElement).getByRole('button', { name: 'Set up MFA' }))
+    await user.type(await screen.findByLabelText('Six-digit code'), '123456')
+    await user.click(screen.getByRole('button', { name: 'Enable MFA' }))
+
+    expect(await screen.findByRole('dialog')).toHaveTextContent('AAAA-BBBB-CCCC')
+    expect(screen.getByTestId('location-probe')).not.toHaveTextContent(returnTo)
+    await user.click(screen.getByRole('button', { name: 'I saved it' }))
+    await waitFor(() => expect(screen.getByTestId('location-probe')).toHaveTextContent(returnTo))
+  })
+
+  it('rejects an external MFA return destination', () => {
+    setPartnerPortalSession({ ...adminSession, mfaEnabled: false, mfaVerified: false })
+
+    render(
+      <PartnerPortalTestProviders>
+        <MemoryRouter initialEntries={['/partner/security?returnTo=https%3A%2F%2Fevil.example%2Fauthorize']}>
+          <PartnerPortalTeamSecurity />
+        </MemoryRouter>
+      </PartnerPortalTestProviders>,
+    )
+
+    expect(screen.queryByText(/return you to this authorization request/iu)).not.toBeInTheDocument()
   })
 })

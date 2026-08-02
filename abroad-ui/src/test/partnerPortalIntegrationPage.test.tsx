@@ -10,6 +10,7 @@ import {
   clearPartnerPortalSession,
   setPartnerPortalSession,
 } from '../services/partnerPortal/partnerPortalSessionStore'
+import { PartnerPortalTestProviders } from './partnerPortalTestProviders'
 
 const mocked = vi.hoisted(() => ({
   activatePartnerWebhook: vi.fn(),
@@ -77,8 +78,12 @@ describe('PartnerPortalIntegration', () => {
       items: [keyResult.apiKey],
       legacyKeyActive: true,
     })
-    render(<MemoryRouter><PartnerPortalIntegration /></MemoryRouter>)
+    render(<PartnerPortalTestProviders><MemoryRouter><PartnerPortalIntegration /></MemoryRouter></PartnerPortalTestProviders>)
     const user = userEvent.setup()
+
+    const aiIntegrationLink = await screen.findByRole('link', { name: 'Open AI integrations' })
+    expect(aiIntegrationLink).toHaveAttribute('href', '/partner/integration/ai?from=integration-card')
+    expect(screen.getByText(/without sharing an API key or webhook secret/iu)).toBeInTheDocument()
 
     await user.type(await screen.findByPlaceholderText('Production checkout'), 'Production checkout')
     await user.click(screen.getByRole('button', { name: 'Create API key' }))
@@ -131,7 +136,7 @@ describe('PartnerPortalIntegration', () => {
       },
       pending: null,
     })
-    render(<MemoryRouter><PartnerPortalIntegration /></MemoryRouter>)
+    render(<PartnerPortalTestProviders><MemoryRouter><PartnerPortalIntegration /></MemoryRouter></PartnerPortalTestProviders>)
     const user = userEvent.setup()
 
     const endpoint = await screen.findByLabelText('HTTPS endpoint')
@@ -151,7 +156,7 @@ describe('PartnerPortalIntegration', () => {
   it('does not call integration APIs for members who enter the route directly', () => {
     setPartnerPortalSession({ ...adminSession, role: 'MEMBER' })
 
-    render(<MemoryRouter><PartnerPortalIntegration /></MemoryRouter>)
+    render(<PartnerPortalTestProviders><MemoryRouter><PartnerPortalIntegration /></MemoryRouter></PartnerPortalTestProviders>)
 
     expect(screen.getByRole('heading', { name: 'Administrator verification required' })).toBeInTheDocument()
     expect(mocked.listPartnerApiKeys).not.toHaveBeenCalled()

@@ -10,60 +10,69 @@ datasource db {
 }
 
 model Partner {
-  id                      String                       @id @default(uuid())
-  name                    String
-  createdAt               DateTime                     @default(now())
-  apiKey                  String?                      @unique
-  previousApiKey          String?                      @unique
-  previousApiKeyExpiresAt DateTime?
-  clientDomain            String?                      @unique
-  clientDomainHash        String?                      @unique
-  country                 String?
-  email                   String?                      @unique
-  phone                   String?
-  firstName               String?
-  lastName                String?
-  isKybApproved           Boolean?                     @default(false)
-  needsKyc                Boolean?                     @default(true)
-  webhookUrl              String?
-  users                   PartnerUser[]
-  portalUsers             PartnerPortalUser[]
-  portalApiKeys           PartnerApiKey[]
-  portalAuditEvents       PartnerPortalAuditEvent[]
-  webhookConfiguration    PartnerWebhookConfiguration?
-  outboxEvents            OutboxEvent[]
-  reconciliationRuns      PartnerReconciliationRun[]
-  quotes                  Quote[]
+  id                           String                          @id @default(uuid())
+  name                         String
+  createdAt                    DateTime                        @default(now())
+  apiKey                       String?                         @unique
+  previousApiKey               String?                         @unique
+  previousApiKeyExpiresAt      DateTime?
+  clientDomain                 String?                         @unique
+  clientDomainHash             String?                         @unique
+  publicSignupIdempotencyHash  String?                         @unique
+  publicSignupOrganizationHash String?                         @unique
+  country                      String?
+  email                        String?                         @unique
+  phone                        String?
+  firstName                    String?
+  lastName                     String?
+  isKybApproved                Boolean?                        @default(false)
+  needsKyc                     Boolean?                        @default(true)
+  webhookUrl                   String?
+  users                        PartnerUser[]
+  portalUsers                  PartnerPortalUser[]
+  portalApiKeys                PartnerApiKey[]
+  portalAuditEvents            PartnerPortalAuditEvent[]
+  aiAuthorizationRequests      PartnerAiAuthorizationRequest[]
+  aiConnections                PartnerAiConnection[]
+  webhookConfiguration         PartnerWebhookConfiguration?
+  outboxEvents                 OutboxEvent[]
+  reconciliationRuns           PartnerReconciliationRun[]
+  quotes                       Quote[]
 }
 
 model PartnerPortalUser {
-  id                         String                            @id @default(uuid())
-  partnerId                  String
-  partner                    Partner                           @relation(fields: [partnerId], references: [id], onDelete: Cascade)
-  email                      String                            @unique
-  passwordVerifier           String?
-  role                       PartnerPortalRole                 @default(MEMBER)
-  sessionVersion             Int                               @default(1)
-  failedLoginAttempts        Int                               @default(0)
-  lockedUntil                DateTime?
-  lastLoginAt                DateTime?
-  disabledAt                 DateTime?
-  mfaSecretCiphertext        String?
-  mfaPendingSecretCiphertext String?
-  mfaPendingCreatedAt        DateTime?
-  mfaEnabledAt               DateTime?
-  mfaLastUsedCounter         BigInt?
-  mfaFailedAttempts          Int                               @default(0)
-  mfaLockedUntil             DateTime?
-  createdAt                  DateTime                          @default(now())
-  updatedAt                  DateTime                          @updatedAt
-  createdApiKeys             PartnerApiKey[]                   @relation("PartnerApiKeyCreator")
-  auditEvents                PartnerPortalAuditEvent[]         @relation("PartnerPortalAuditActor")
-  createdResetTokens         PartnerPortalPasswordResetToken[] @relation("PartnerPortalPasswordResetCreator")
-  resetTokens                PartnerPortalPasswordResetToken[] @relation("PartnerPortalPasswordResetSubject")
-  mfaRecoveryCodes           PartnerPortalMfaRecoveryCode[]
-  initiatedOutboxEvents      OutboxEvent[]                     @relation("OutboxPortalInitiator")
-  reconciliationRuns         PartnerReconciliationRun[]        @relation("PartnerReconciliationInitiator")
+  id                          String                                @id @default(uuid())
+  partnerId                   String
+  partner                     Partner                               @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  email                       String                                @unique
+  passwordVerifier            String?
+  role                        PartnerPortalRole                     @default(MEMBER)
+  sessionVersion              Int                                   @default(1)
+  failedLoginAttempts         Int                                   @default(0)
+  lockedUntil                 DateTime?
+  lastLoginAt                 DateTime?
+  disabledAt                  DateTime?
+  emailVerificationRequiredAt DateTime?
+  emailVerifiedAt             DateTime?
+  mfaSecretCiphertext         String?
+  mfaPendingSecretCiphertext  String?
+  mfaPendingCreatedAt         DateTime?
+  mfaEnabledAt                DateTime?
+  mfaLastUsedCounter          BigInt?
+  mfaFailedAttempts           Int                                   @default(0)
+  mfaLockedUntil              DateTime?
+  createdAt                   DateTime                              @default(now())
+  updatedAt                   DateTime                              @updatedAt
+  createdApiKeys              PartnerApiKey[]                       @relation("PartnerApiKeyCreator")
+  auditEvents                 PartnerPortalAuditEvent[]             @relation("PartnerPortalAuditActor")
+  createdResetTokens          PartnerPortalPasswordResetToken[]     @relation("PartnerPortalPasswordResetCreator")
+  resetTokens                 PartnerPortalPasswordResetToken[]     @relation("PartnerPortalPasswordResetSubject")
+  emailVerificationTokens     PartnerPortalEmailVerificationToken[]
+  mfaRecoveryCodes            PartnerPortalMfaRecoveryCode[]
+  initiatedOutboxEvents       OutboxEvent[]                         @relation("OutboxPortalInitiator")
+  reconciliationRuns          PartnerReconciliationRun[]            @relation("PartnerReconciliationInitiator")
+  aiAuthorizationRequests     PartnerAiAuthorizationRequest[]       @relation("PartnerAiAuthorizationActor")
+  authorizedAiConnections     PartnerAiConnection[]                 @relation("PartnerAiConnectionAuthorizer")
 
   @@index([partnerId])
 }
@@ -136,6 +145,30 @@ model PartnerPortalPasswordResetToken {
   @@index([userId, expiresAt])
 }
 
+model PartnerPortalEmailVerificationToken {
+  id                String            @id @default(uuid())
+  userId            String
+  user              PartnerPortalUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash         String            @unique
+  expiresAt         DateTime
+  consumedAt        DateTime?
+  sentAt            DateTime?
+  providerMessageId String?
+  createdAt         DateTime          @default(now())
+
+  @@index([userId, createdAt])
+  @@index([expiresAt, consumedAt])
+}
+
+model PartnerPortalPublicRateLimit {
+  keyHash      String   @id
+  attempts     Int
+  windowEndsAt DateTime
+  updatedAt    DateTime @updatedAt
+
+  @@index([windowEndsAt])
+}
+
 model PartnerPortalAuditEvent {
   id           String             @id @default(uuid())
   partnerId    String
@@ -149,6 +182,114 @@ model PartnerPortalAuditEvent {
   createdAt    DateTime           @default(now())
 
   @@index([partnerId, createdAt])
+}
+
+model PartnerAiOAuthClient {
+  id                    String                          @id @default(uuid())
+  clientId              String                          @unique
+  clientName            String
+  redirectUris          String[]
+  allowedScopes         PartnerAiScope[]
+  clientUri             String?
+  verifiedKind          PartnerAiClientKind             @default(GENERIC)
+  disabledAt            DateTime?
+  lastUsedAt            DateTime?
+  createdAt             DateTime                        @default(now())
+  updatedAt             DateTime                        @updatedAt
+  authorizationRequests PartnerAiAuthorizationRequest[]
+  connections           PartnerAiConnection[]
+
+  @@index([disabledAt, createdAt])
+}
+
+model PartnerAiAuthorizationRequest {
+  id              String                        @id @default(uuid())
+  oauthClientId   String
+  oauthClient     PartnerAiOAuthClient          @relation(fields: [oauthClientId], references: [id], onDelete: Restrict)
+  redirectUri     String
+  stateCiphertext String?
+  scopes          PartnerAiScope[]
+  resource        String
+  codeChallenge   String
+  fingerprintHash String                        @unique
+  expiresAt       DateTime
+  outcome         PartnerAiAuthorizationOutcome @default(PENDING)
+  resolvedAt      DateTime?
+  partnerId       String?
+  partner         Partner?                      @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  actorUserId     String?
+  actor           PartnerPortalUser?            @relation("PartnerAiAuthorizationActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+  connectionId    String?                       @unique
+  connection      PartnerAiConnection?          @relation(fields: [connectionId], references: [id], onDelete: SetNull)
+  codeHash        String?                       @unique
+  codeExpiresAt   DateTime?
+  codeConsumedAt  DateTime?
+  createdAt       DateTime                      @default(now())
+  updatedAt       DateTime                      @updatedAt
+
+  @@index([oauthClientId, expiresAt, outcome])
+  @@index([partnerId, createdAt])
+}
+
+model PartnerAiConnection {
+  id                   String                         @id @default(uuid())
+  partnerId            String
+  partner              Partner                        @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  oauthClientId        String
+  oauthClient          PartnerAiOAuthClient           @relation(fields: [oauthClientId], references: [id], onDelete: Restrict)
+  authorizedByUserId   String?
+  authorizedBy         PartnerPortalUser?             @relation("PartnerAiConnectionAuthorizer", fields: [authorizedByUserId], references: [id], onDelete: SetNull)
+  scopes               PartnerAiScope[]
+  activeGrantKey       String?                        @unique
+  authorizedAt         DateTime                       @default(now())
+  expiresAt            DateTime
+  lastUsedAt           DateTime?
+  lastTestedAt         DateTime?
+  revokedAt            DateTime?
+  failedAt             DateTime?
+  failureCode          String?
+  createdAt            DateTime                       @default(now())
+  updatedAt            DateTime                       @updatedAt
+  authorizationRequest PartnerAiAuthorizationRequest?
+  accessTokens         PartnerAiAccessToken[]
+  refreshTokens        PartnerAiRefreshToken[]
+
+  @@index([partnerId, createdAt])
+  @@index([oauthClientId, createdAt])
+  @@index([partnerId, revokedAt, failedAt, expiresAt])
+}
+
+model PartnerAiAccessToken {
+  id           String              @id @default(uuid())
+  connectionId String
+  connection   PartnerAiConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  tokenHash    String              @unique
+  scopes       PartnerAiScope[]
+  expiresAt    DateTime
+  lastUsedAt   DateTime?
+  revokedAt    DateTime?
+  createdAt    DateTime            @default(now())
+
+  @@index([connectionId, expiresAt, revokedAt])
+}
+
+model PartnerAiRefreshToken {
+  id           String                 @id @default(uuid())
+  connectionId String
+  connection   PartnerAiConnection    @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  tokenHash    String                 @unique
+  familyId     String
+  scopes       PartnerAiScope[]
+  expiresAt    DateTime
+  consumedAt   DateTime?
+  revokedAt    DateTime?
+  replacedById String?                @unique
+  replacedBy   PartnerAiRefreshToken? @relation("PartnerAiRefreshRotation", fields: [replacedById], references: [id], onDelete: SetNull)
+  replaces     PartnerAiRefreshToken? @relation("PartnerAiRefreshRotation")
+  createdAt    DateTime               @default(now())
+
+  @@index([connectionId, expiresAt, revokedAt])
+  @@index([familyId, createdAt])
 }
 
 model PartnerUser {
@@ -391,6 +532,26 @@ enum KycStatus {
 enum PartnerPortalRole {
   ADMIN
   MEMBER
+}
+
+enum PartnerAiClientKind {
+  GENERIC
+}
+
+enum PartnerAiScope {
+  ACCOUNT_READ
+  DOCS_READ
+  REQUESTS_VALIDATE
+  TRANSACTIONS_READ
+  WEBHOOKS_READ
+  OFFLINE_ACCESS
+}
+
+enum PartnerAiAuthorizationOutcome {
+  PENDING
+  APPROVED
+  DENIED
+  EXPIRED
 }
 
 enum PartnerApiKeyScope {

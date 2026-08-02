@@ -35,6 +35,13 @@ import { OpsSavedViewService } from '../../modules/operations/application/OpsSav
 import { OpsTaskTelemetryService } from '../../modules/operations/application/OpsTaskTelemetryService'
 import { OpsPartnerAnalyticsService } from '../../modules/partners/application/OpsPartnerAnalyticsService'
 import { OpsPartnerService } from '../../modules/partners/application/OpsPartnerService'
+import { PartnerAiAbuseProtectionService } from '../../modules/partners/application/PartnerAiAbuseProtectionService'
+import { PartnerAiAuthorizationService } from '../../modules/partners/application/PartnerAiAuthorizationService'
+import { PartnerAiConnectionService } from '../../modules/partners/application/PartnerAiConnectionService'
+import { PartnerAiProductEventService } from '../../modules/partners/application/PartnerAiProductEventService'
+import { PartnerAiTokenService } from '../../modules/partners/application/PartnerAiTokenService'
+import { PartnerAiToolService } from '../../modules/partners/application/PartnerAiToolService'
+import { PartnerAiWebhookDiagnosticsService } from '../../modules/partners/application/PartnerAiWebhookDiagnosticsService'
 import { PartnerPortalAccountService } from '../../modules/partners/application/PartnerPortalAccountService'
 import { PartnerPortalApiKeyService } from '../../modules/partners/application/PartnerPortalApiKeyService'
 import { PartnerPortalAuditService } from '../../modules/partners/application/PartnerPortalAuditService'
@@ -43,9 +50,12 @@ import { PartnerPortalMfaService } from '../../modules/partners/application/Part
 import { PartnerPortalPasswordService } from '../../modules/partners/application/PartnerPortalPasswordService'
 import { PartnerPortalSecretEnvelopeService } from '../../modules/partners/application/PartnerPortalSecretEnvelopeService'
 import { PartnerPortalSessionService } from '../../modules/partners/application/PartnerPortalSessionService'
+import { PartnerPortalSignupProtectionService } from '../../modules/partners/application/PartnerPortalSignupProtectionService'
+import { PartnerPortalSignupService } from '../../modules/partners/application/PartnerPortalSignupService'
 import { PartnerPortalTeamService } from '../../modules/partners/application/PartnerPortalTeamService'
 import { PartnerPortalWebhookService } from '../../modules/partners/application/PartnerPortalWebhookService'
 import { PartnerWebhookSecretResolver } from '../../modules/partners/application/PartnerWebhookSecretResolver'
+import { ResendPartnerPortalEmailSender } from '../../modules/partners/application/ResendPartnerPortalEmailSender'
 import { CryptoAssetConfigService } from '../../modules/payments/application/CryptoAssetConfigService'
 import { DepositVerifierRegistry } from '../../modules/payments/application/DepositVerifierRegistry'
 import { LiquidityCacheService } from '../../modules/payments/application/LiquidityCacheService'
@@ -166,6 +176,13 @@ const domainBindings: ReadonlyArray<BindingRegistration<unknown>> = [
   { bindSelf: true, identifier: OpsTaskTelemetryService, implementation: OpsTaskTelemetryService },
   { bindSelf: true, identifier: OpsPartnerService, implementation: OpsPartnerService },
   { bindSelf: true, identifier: OpsPartnerAnalyticsService, implementation: OpsPartnerAnalyticsService },
+  { bindSelf: true, identifier: PartnerAiAbuseProtectionService, implementation: PartnerAiAbuseProtectionService },
+  { bindSelf: true, identifier: PartnerAiAuthorizationService, implementation: PartnerAiAuthorizationService },
+  { bindSelf: true, identifier: PartnerAiConnectionService, implementation: PartnerAiConnectionService },
+  { bindSelf: true, identifier: PartnerAiProductEventService, implementation: PartnerAiProductEventService },
+  { bindSelf: true, identifier: PartnerAiTokenService, implementation: PartnerAiTokenService },
+  { bindSelf: true, identifier: PartnerAiToolService, implementation: PartnerAiToolService },
+  { bindSelf: true, identifier: PartnerAiWebhookDiagnosticsService, implementation: PartnerAiWebhookDiagnosticsService },
   { bindSelf: true, identifier: PartnerPortalPasswordService, implementation: PartnerPortalPasswordService },
   { bindSelf: true, identifier: PartnerPortalApiKeyService, implementation: PartnerPortalApiKeyService },
   { bindSelf: true, identifier: PartnerPortalMfaService, implementation: PartnerPortalMfaService },
@@ -177,6 +194,9 @@ const domainBindings: ReadonlyArray<BindingRegistration<unknown>> = [
   { bindSelf: true, identifier: PartnerWebhookSecretResolver, implementation: PartnerWebhookSecretResolver },
   { bindSelf: true, identifier: PartnerPortalSessionService, implementation: PartnerPortalSessionService },
   { bindSelf: true, identifier: PartnerPortalAccountService, implementation: PartnerPortalAccountService },
+  { bindSelf: true, identifier: PartnerPortalSignupProtectionService, implementation: PartnerPortalSignupProtectionService },
+  { bindSelf: true, identifier: ResendPartnerPortalEmailSender, implementation: ResendPartnerPortalEmailSender },
+  { bindSelf: true, identifier: PartnerPortalSignupService, implementation: PartnerPortalSignupService },
   { bindSelf: true, identifier: FlowDefinitionBuilder, implementation: FlowDefinitionBuilder },
   { bindSelf: true, identifier: FlowDefinitionService, implementation: FlowDefinitionService },
   { bindSelf: true, identifier: FlowCorridorService, implementation: FlowCorridorService },

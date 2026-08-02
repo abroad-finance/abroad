@@ -20,9 +20,11 @@ import { OpsTaskTelemetryController } from '../../modules/operations/interfaces/
 import { OpsPartnerAnalyticsController } from '../../modules/partners/interfaces/http/OpsPartnerAnalyticsController'
 import { OpsPartnerController } from '../../modules/partners/interfaces/http/OpsPartnerController'
 import { OpsPartnerPortalController } from '../../modules/partners/interfaces/http/OpsPartnerPortalController'
+import { PartnerAiController } from '../../modules/partners/interfaces/http/PartnerAiController'
 import { PartnerController } from '../../modules/partners/interfaces/http/PartnerController'
 import { PartnerPortalIdentityController } from '../../modules/partners/interfaces/http/PartnerPortalIdentityController'
 import { PartnerPortalIntegrationController } from '../../modules/partners/interfaces/http/PartnerPortalIntegrationController'
+import { PartnerPortalSignupController } from '../../modules/partners/interfaces/http/PartnerPortalSignupController'
 import { PartnerPortalTeamController } from '../../modules/partners/interfaces/http/PartnerPortalTeamController'
 import { PartnerUserController } from '../../modules/partners/interfaces/http/PartnerUserController'
 import { CeloPaymentsController } from '../../modules/payments/interfaces/http/CeloPaymentsController'
@@ -63,8 +65,10 @@ const controllerBindings: ReadonlyArray<BindingRegistration<unknown>> = [
   { bindSelf: true, identifier: OpsPartnerController, implementation: OpsPartnerController },
   { bindSelf: true, identifier: OpsPartnerAnalyticsController, implementation: OpsPartnerAnalyticsController },
   { bindSelf: true, identifier: OpsPartnerPortalController, implementation: OpsPartnerPortalController },
+  { bindSelf: true, identifier: PartnerAiController, implementation: PartnerAiController },
   { bindSelf: true, identifier: PartnerPortalIdentityController, implementation: PartnerPortalIdentityController },
   { bindSelf: true, identifier: PartnerPortalIntegrationController, implementation: PartnerPortalIntegrationController },
+  { bindSelf: true, identifier: PartnerPortalSignupController, implementation: PartnerPortalSignupController },
   { bindSelf: true, identifier: PartnerPortalTeamController, implementation: PartnerPortalTeamController },
   { bindSelf: true, identifier: PartnerUserController, implementation: PartnerUserController },
   { bindSelf: true, identifier: QuoteController, implementation: QuoteController },
