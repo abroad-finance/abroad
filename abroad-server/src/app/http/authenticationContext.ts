@@ -2,6 +2,8 @@ import type { OpsExternalIdentity, OpsPrincipal, OpsUserPrincipal } from '../../
 import type { AuthenticatedPartner } from '../../modules/partners/application/contracts/IPartnerService'
 import type { PartnerPortalPrincipal } from '../../modules/partners/application/PartnerPortalSessionService'
 
+import { ApplicationError } from '../../core/errors'
+
 export type OpsExternalAuthentication = OpsExternalIdentity & { kind: 'ops_external' }
 
 export type RequestAuthentication
@@ -75,7 +77,11 @@ export const requireNamedOpsPrincipal = (
 ): OpsUserPrincipal => {
   const principal = requireOpsPrincipal(authentication)
   if (principal.kind !== 'ops_user') {
-    throw new Error('Named Ops authentication is required')
+    throw new ApplicationError(
+      403,
+      'ops_named_identity_required',
+      'Named Ops authentication is required',
+    )
   }
   return principal
 }

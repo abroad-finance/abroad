@@ -219,6 +219,8 @@ describe('PartnerController', () => {
       phone: null,
       previousApiKey: null,
       previousApiKeyExpiresAt: null,
+      publicSignupIdempotencyHash: null,
+      publicSignupOrganizationHash: null,
       webhookUrl: null,
     }
 
