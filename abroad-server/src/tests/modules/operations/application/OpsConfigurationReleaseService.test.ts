@@ -71,8 +71,13 @@ const integerValue = (
   return value.set
 }
 
-const buildHarness = () => {
+type HarnessOptions = {
+  enabledAdministratorCount?: number
+}
+
+const buildHarness = (options: HarnessOptions = {}) => {
   const records = new Map<string, OpsConfigurationRelease>()
+  let enabledAdministratorCount = options.enabledAdministratorCount ?? 2
   let sequence = 0
   const asset = {
     blockchain: BlockchainNetwork.STELLAR,
@@ -178,12 +183,20 @@ const buildHarness = () => {
     findUnique,
     updateMany,
   }
-  const transactionClient = { opsConfigurationRelease } as unknown as Prisma.TransactionClient
-  const prisma = {
-    $transaction: jest.fn(async (
-      callback: (transaction: Prisma.TransactionClient) => Promise<unknown>,
-    ): Promise<unknown> => callback(transactionClient)),
+  const opsUser = {
+    count: jest.fn(async () => enabledAdministratorCount),
+  }
+  const transactionClient = {
     opsConfigurationRelease,
+    opsUser,
+  } as unknown as Prisma.TransactionClient
+  const runTransaction = jest.fn(async (
+    callback: (transaction: Prisma.TransactionClient) => Promise<unknown>,
+  ): Promise<unknown> => callback(transactionClient))
+  const prisma = {
+    $transaction: runTransaction,
+    opsConfigurationRelease,
+    opsUser,
   }
   const databaseClientProvider: IDatabaseClientProvider = {
     getClient: jest.fn(async () => prisma as unknown as PrismaClient),
@@ -214,7 +227,10 @@ const buildHarness = () => {
       return { ...asset }
     }),
   }
-  const auditService = { recordSystem: jest.fn(async () => undefined) }
+  const auditService = {
+    record: jest.fn(async () => undefined),
+    recordSystem: jest.fn(async () => undefined),
+  }
   const service = new OpsConfigurationReleaseService(
     databaseClientProvider,
     {} as never,
@@ -226,8 +242,13 @@ const buildHarness = () => {
     asset,
     auditService,
     cryptoAssetService,
+    opsUser,
     records,
+    runTransaction,
     service,
+    setEnabledAdministratorCount: (count: number) => {
+      enabledAdministratorCount = count
+    },
   }
 }
 
@@ -259,7 +280,12 @@ describe('OpsConfigurationReleaseService', () => {
   it('requires a different reviewer and applies a due release atomically', async () => {
     const harness = buildHarness()
     const draft = await harness.service.createDraft(requester, assetDraft(), envelope('00000000-0000-4000-8000-000000000001'))
-    expect(draft).toMatchObject({ baseVersion: 3, status: 'DRAFT', version: 1 })
+    expect(draft).toMatchObject({
+      approvalPolicy: 'DIFFERENT_ADMIN_REQUIRED',
+      baseVersion: 3,
+      status: 'DRAFT',
+      version: 1,
+    })
     expect(draft.diff).toEqual(expect.arrayContaining([
       expect.objectContaining({ after: 'false', before: 'true', field: 'value.enabled' }),
     ]))
@@ -277,6 +303,64 @@ describe('OpsConfigurationReleaseService', () => {
       expect.anything(),
       expect.objectContaining({ enabled: false }),
       3,
+    )
+  })
+
+  it('allows the sole enabled administrator to self-approve with explicit audit evidence', async () => {
+    const harness = buildHarness({ enabledAdministratorCount: 1 })
+    const draft = await harness.service.createDraft(
+      requester,
+      assetDraft(),
+      envelope('00000000-0000-4000-8000-000000000006'),
+    )
+    expect(draft.approvalPolicy).toBe('SOLE_ADMIN_SELF_APPROVAL_ALLOWED')
+
+    const submitted = await harness.service.submit(draft.id, requester, draft.version)
+    const applied = await harness.service.approve(submitted.id, requester, submitted.version)
+
+    expect(applied).toMatchObject({
+      appliedVersion: 4,
+      approvalPolicy: 'SOLE_ADMIN_SELF_APPROVAL_ALLOWED',
+      status: 'APPLIED',
+      version: 3,
+    })
+    expect(applied.approvedBy?.id).toBe(requester.userId)
+    expect(harness.asset.enabled).toBe(false)
+    expect(harness.auditService.record).toHaveBeenCalledWith(
+      requester,
+      expect.objectContaining({
+        action: 'configuration.release.sole_admin_approved',
+        metadata: { approvalPolicy: 'SOLE_ADMIN_SELF_APPROVAL_ALLOWED' },
+        resourceId: draft.id,
+      }),
+      expect.anything(),
+    )
+    expect(harness.runTransaction).toHaveBeenCalledWith(
+      expect.any(Function),
+      { isolationLevel: 'Serializable' },
+    )
+  })
+
+  it('fails closed when another administrator becomes enabled before self-approval', async () => {
+    const harness = buildHarness({ enabledAdministratorCount: 1 })
+    const draft = await harness.service.createDraft(
+      requester,
+      assetDraft(),
+      envelope('00000000-0000-4000-8000-000000000007'),
+    )
+    expect(draft.approvalPolicy).toBe('SOLE_ADMIN_SELF_APPROVAL_ALLOWED')
+    const submitted = await harness.service.submit(draft.id, requester, draft.version)
+
+    harness.setEnabledAdministratorCount(2)
+
+    await expect(harness.service.approve(submitted.id, requester, submitted.version)).rejects.toThrow(
+      'Another enabled administrator is available',
+    )
+    expect(harness.asset.enabled).toBe(true)
+    expect(harness.auditService.record).not.toHaveBeenCalledWith(
+      requester,
+      expect.objectContaining({ action: 'configuration.release.sole_admin_approved' }),
+      expect.anything(),
     )
   })
 

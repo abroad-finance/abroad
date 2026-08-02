@@ -20,6 +20,10 @@ export const opsConfigurationTargetTypes = [
   'CRYPTO_ASSET',
 ] as const
 
+export type OpsConfigurationApprovalPolicy
+  = | 'DIFFERENT_ADMIN_REQUIRED'
+    | 'SOLE_ADMIN_SELF_APPROVAL_ALLOWED'
+
 export type OpsConfigurationDiffEntry = {
   after: null | string
   before: null | string
@@ -52,6 +56,7 @@ export type OpsConfigurationRelease = {
   appliedAt: null | string
   appliedBy: null | OpsConfigurationReleaseUser
   appliedVersion: null | number
+  approvalPolicy: OpsConfigurationApprovalPolicy
   approvedAt: null | string
   approvedBy: null | OpsConfigurationReleaseUser
   baseVersion: number

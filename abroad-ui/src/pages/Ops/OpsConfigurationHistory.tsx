@@ -341,6 +341,7 @@ const OpsConfigurationHistory = () => {
 
   const ownDraft = selected?.requestedBy.id === session?.userId
   const differentReviewer = selected?.requestedBy.id !== session?.userId
+  const selfApprovalAllowed = selected?.approvalPolicy === 'SOLE_ADMIN_SELF_APPROVAL_ALLOWED'
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
   return (
@@ -432,16 +433,16 @@ const OpsConfigurationHistory = () => {
                     </>
                   )}
                   {selected.status === 'PENDING_APPROVAL' && canApprove && differentReviewer && (
-                    <>
-                      <button className="ops-btn-danger" disabled={working} onClick={() => setRejectionReason('')} type="button">
-                        <XCircle aria-hidden size={16} />
-                        Reject
-                      </button>
-                      <button className="ops-btn-primary" disabled={working} onClick={() => void runReleaseAction('approve')} type="button">
-                        <CheckCircle2 aria-hidden size={16} />
-                        Approve
-                      </button>
-                    </>
+                    <button className="ops-btn-danger" disabled={working} onClick={() => setRejectionReason('')} type="button">
+                      <XCircle aria-hidden size={16} />
+                      Reject
+                    </button>
+                  )}
+                  {selected.status === 'PENDING_APPROVAL' && canApprove && (differentReviewer || selfApprovalAllowed) && (
+                    <button className="ops-btn-primary" disabled={working} onClick={() => void runReleaseAction('approve')} type="button">
+                      <CheckCircle2 aria-hidden size={16} />
+                      {differentReviewer ? 'Approve' : 'Approve as sole administrator'}
+                    </button>
                   )}
                   {selected.status === 'APPLIED' && canManage && (
                     <button className="ops-btn-neutral" disabled={working} onClick={() => void runReleaseAction('rollback')} type="button">
@@ -452,8 +453,13 @@ const OpsConfigurationHistory = () => {
                 </div>
               </div>
 
-              {selected.status === 'PENDING_APPROVAL' && !differentReviewer && (
-                <OpsBanner className="mt-4" variant="info">A different authorized operator must review this release.</OpsBanner>
+              {selected.status === 'PENDING_APPROVAL' && !differentReviewer && selfApprovalAllowed && (
+                <OpsBanner className="mt-4" variant="info">
+                  You are the only enabled administrator. You may approve this release after the protected verification step; the approval remains versioned and audited.
+                </OpsBanner>
+              )}
+              {selected.status === 'PENDING_APPROVAL' && !differentReviewer && !selfApprovalAllowed && (
+                <OpsBanner className="mt-4" variant="info">Another enabled administrator is available and must review this release.</OpsBanner>
               )}
               {selected.status === 'APPROVED' && selected.effectiveAt && (
                 <OpsBanner className="mt-4" variant="info">

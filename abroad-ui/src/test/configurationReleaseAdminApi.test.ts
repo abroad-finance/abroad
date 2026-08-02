@@ -32,6 +32,7 @@ const release: OpsConfigurationRelease = {
   appliedAt: null,
   appliedBy: null,
   appliedVersion: null,
+  approvalPolicy: 'DIFFERENT_ADMIN_REQUIRED',
   approvedAt: null,
   approvedBy: null,
   baseVersion: 3,

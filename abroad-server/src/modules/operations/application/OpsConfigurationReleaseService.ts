@@ -1,4 +1,4 @@
-import { OpsConfigurationReleaseStatus, OpsConfigurationTargetType, Prisma } from '@prisma/client'
+import { OpsConfigurationReleaseStatus, OpsConfigurationTargetType, OpsRole, Prisma } from '@prisma/client'
 import { inject, injectable } from 'inversify'
 import { z } from 'zod'
 
@@ -50,6 +50,7 @@ export type OpsConfigurationReleaseDto = {
   appliedAt: Date | null
   appliedBy: null | OpsConfigurationReleaseUser
   appliedVersion: null | number
+  approvalPolicy: OpsConfigurationApprovalPolicy
   approvedAt: Date | null
   approvedBy: null | OpsConfigurationReleaseUser
   baseVersion: number
@@ -98,6 +99,10 @@ type ConfigurationSnapshot = {
   targetKey: string
   targetType: OpsConfigurationTargetType
 }
+
+type OpsConfigurationApprovalPolicy
+  = | 'DIFFERENT_ADMIN_REQUIRED'
+    | 'SOLE_ADMIN_SELF_APPROVAL_ALLOWED'
 
 type ReleaseWithUsers = Prisma.OpsConfigurationReleaseGetPayload<{
   include: {
@@ -243,9 +248,13 @@ export class OpsConfigurationReleaseService {
       if (!release) throw new OpsConfigurationReleaseNotFoundError()
       this.assertState(release.status, OpsConfigurationReleaseStatus.PENDING_APPROVAL)
       this.assertVersion(release.version, expectedVersion)
-      if (release.requestedByUserId === actor.userId) {
+      const selfApproval = release.requestedByUserId === actor.userId
+      if (
+        selfApproval
+        && await this.resolveApprovalPolicy(transaction) !== 'SOLE_ADMIN_SELF_APPROVAL_ALLOWED'
+      ) {
         throw new OpsConfigurationReleaseValidationError(
-          'A configuration release must be approved by a different operator',
+          'Another enabled administrator is available, so this release must be reviewed by a different operator',
         )
       }
 
@@ -280,6 +289,14 @@ export class OpsConfigurationReleaseService {
             status: OpsConfigurationReleaseStatus.APPLIED,
           },
         })
+      }
+      if (selfApproval) {
+        await this.auditService.record(actor, {
+          action: 'configuration.release.sole_admin_approved',
+          metadata: { approvalPolicy: 'SOLE_ADMIN_SELF_APPROVAL_ALLOWED' },
+          resourceId: release.id,
+          resourceType: 'configuration_release',
+        }, transaction)
       }
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
     return this.get(releaseId)
@@ -360,7 +377,12 @@ export class OpsConfigurationReleaseService {
   }
 
   public async get(releaseId: string): Promise<OpsConfigurationReleaseDto> {
-    return this.toDto(await this.getRecord(releaseId))
+    const prismaClient = await this.databaseClientProvider.getClient()
+    const [release, approvalPolicy] = await Promise.all([
+      this.getRecord(releaseId, prismaClient),
+      this.resolveApprovalPolicy(prismaClient),
+    ])
+    return this.toDto(release, approvalPolicy)
   }
 
   public async list(query: OpsConfigurationReleaseQuery): Promise<OpsConfigurationReleaseList> {
@@ -377,7 +399,8 @@ export class OpsConfigurationReleaseService {
       status: query.status,
       targetType: query.targetType,
     }
-    const [items, total] = await Promise.all([
+    const [approvalPolicy, items, total] = await Promise.all([
+      this.resolveApprovalPolicy(prismaClient),
       prismaClient.opsConfigurationRelease.findMany({
         include: releaseInclude,
         orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
@@ -388,7 +411,7 @@ export class OpsConfigurationReleaseService {
       prismaClient.opsConfigurationRelease.count({ where }),
     ])
     return {
-      items: items.map(item => this.toDto(item)),
+      items: items.map(item => this.toDto(item, approvalPolicy)),
       page,
       pageSize,
       total,
@@ -696,8 +719,11 @@ export class OpsConfigurationReleaseService {
     return [{ after, before, field: path || 'configuration' }]
   }
 
-  private async getRecord(releaseId: string): Promise<ReleaseWithUsers> {
-    const prismaClient = await this.databaseClientProvider.getClient()
+  private async getRecord(
+    releaseId: string,
+    client?: Prisma.TransactionClient,
+  ): Promise<ReleaseWithUsers> {
+    const prismaClient = client ?? await this.databaseClientProvider.getClient()
     const release = await prismaClient.opsConfigurationRelease.findUnique({
       include: releaseInclude,
       where: { id: releaseId },
@@ -742,6 +768,20 @@ export class OpsConfigurationReleaseService {
       throw new OpsConfigurationReleaseValidationError('Stored release diff is invalid')
     }
     return parsed.data
+  }
+
+  private async resolveApprovalPolicy(
+    client: Prisma.TransactionClient,
+  ): Promise<OpsConfigurationApprovalPolicy> {
+    const enabledAdministratorCount = await client.opsUser.count({
+      where: {
+        disabledAt: null,
+        role: OpsRole.ADMINISTRATOR,
+      },
+    })
+    return enabledAdministratorCount === 1
+      ? 'SOLE_ADMIN_SELF_APPROVAL_ALLOWED'
+      : 'DIFFERENT_ADMIN_REQUIRED'
   }
 
   private async resolveSnapshot(
@@ -865,13 +905,17 @@ export class OpsConfigurationReleaseService {
     return `${payload.value.cryptoCurrency}:${payload.value.blockchain}`
   }
 
-  private toDto(release: ReleaseWithUsers): OpsConfigurationReleaseDto {
+  private toDto(
+    release: ReleaseWithUsers,
+    approvalPolicy: OpsConfigurationApprovalPolicy,
+  ): OpsConfigurationReleaseDto {
     const storedDiff = this.parseStoredDiff(release.diff)
     const impact = z.array(z.string()).safeParse(release.impact)
     return {
       appliedAt: release.appliedAt,
       appliedBy: release.appliedBy,
       appliedVersion: release.appliedVersion,
+      approvalPolicy,
       approvedAt: release.approvedAt,
       approvedBy: release.approvedBy,
       baseVersion: release.baseVersion,

@@ -31,6 +31,7 @@ const pendingRelease: OpsConfigurationRelease = {
   appliedAt: null,
   appliedBy: null,
   appliedVersion: null,
+  approvalPolicy: 'DIFFERENT_ADMIN_REQUIRED',
   approvedAt: null,
   approvedBy: null,
   baseVersion: 4,
@@ -123,5 +124,84 @@ describe('OpsConfigurationHistory', () => {
     expect(mocked.listOpsConfigurationReleases).toHaveBeenCalledWith(expect.objectContaining({
       status: 'PENDING_APPROVAL',
     }))
+  })
+
+  it('lets the sole enabled administrator approve their own submitted release', async () => {
+    const soleAdminRelease: OpsConfigurationRelease = {
+      ...pendingRelease,
+      approvalPolicy: 'SOLE_ADMIN_SELF_APPROVAL_ALLOWED',
+    }
+    setOpsSession({
+      authenticatedAt: '2026-08-02T18:00:00.000Z',
+      bootstrapRequired: false,
+      displayName: 'Configuration Owner',
+      email: 'owner@abroad.finance',
+      kind: 'ops_user',
+      permissions: ['configuration:approve', 'configuration:read'],
+      role: 'ADMINISTRATOR',
+      sessionVersion: 1,
+      stepUpExpiresAt: '2026-08-02T18:10:00.000Z',
+      userId: 'ops-owner',
+    })
+    mocked.listOpsConfigurationReleases.mockResolvedValue({
+      items: [soleAdminRelease], page: 1, pageSize: 20, total: 1,
+    })
+    mocked.approveOpsConfigurationRelease.mockResolvedValue({
+      ...soleAdminRelease,
+      appliedAt: '2026-08-03T12:00:00.000Z',
+      appliedVersion: 5,
+      approvedAt: '2026-08-02T18:06:00.000Z',
+      approvedBy: soleAdminRelease.requestedBy,
+      status: 'APPLIED',
+      version: 3,
+    })
+
+    render(
+      <MemoryRouter initialEntries={['/ops/configuration/history?status=PENDING_APPROVAL&release=release-1']}>
+        <ImmediateOpsMutationProvider>
+          <OpsConfigurationHistory />
+        </ImmediateOpsMutationProvider>
+      </MemoryRouter>,
+    )
+
+    expect(await screen.findByText(/You are the only enabled administrator/)).toBeInTheDocument()
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: 'Approve as sole administrator' }))
+
+    expect(mocked.approveOpsConfigurationRelease).toHaveBeenCalledWith(
+      'release-1',
+      expect.objectContaining({ expectedVersion: 2 }),
+    )
+    expect(await screen.findByText(/Release approved/)).toBeInTheDocument()
+  })
+
+  it('keeps self-approval unavailable when another enabled administrator exists', async () => {
+    setOpsSession({
+      authenticatedAt: '2026-08-02T18:00:00.000Z',
+      bootstrapRequired: false,
+      displayName: 'Configuration Owner',
+      email: 'owner@abroad.finance',
+      kind: 'ops_user',
+      permissions: ['configuration:approve', 'configuration:read'],
+      role: 'ADMINISTRATOR',
+      sessionVersion: 1,
+      stepUpExpiresAt: '2026-08-02T18:10:00.000Z',
+      userId: 'ops-owner',
+    })
+    mocked.listOpsConfigurationReleases.mockResolvedValue({
+      items: [pendingRelease], page: 1, pageSize: 20, total: 1,
+    })
+
+    render(
+      <MemoryRouter initialEntries={['/ops/configuration/history?status=PENDING_APPROVAL&release=release-1']}>
+        <ImmediateOpsMutationProvider>
+          <OpsConfigurationHistory />
+        </ImmediateOpsMutationProvider>
+      </MemoryRouter>,
+    )
+
+    expect(await screen.findByText(/Another enabled administrator is available/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Approve as sole administrator' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Reject' })).not.toBeInTheDocument()
   })
 })
