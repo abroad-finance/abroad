@@ -28,9 +28,12 @@ import { PartnerPortalMfaService } from '../../modules/partners/application/Part
 import { PartnerPortalPasswordService } from '../../modules/partners/application/PartnerPortalPasswordService'
 import { PartnerPortalSecretEnvelopeService } from '../../modules/partners/application/PartnerPortalSecretEnvelopeService'
 import { PartnerPortalSessionService } from '../../modules/partners/application/PartnerPortalSessionService'
+import { PartnerPortalSignupProtectionService } from '../../modules/partners/application/PartnerPortalSignupProtectionService'
+import { PartnerPortalSignupService } from '../../modules/partners/application/PartnerPortalSignupService'
 import { PartnerPortalTeamService } from '../../modules/partners/application/PartnerPortalTeamService'
 import { PartnerPortalWebhookService } from '../../modules/partners/application/PartnerPortalWebhookService'
 import { PartnerWebhookSecretResolver } from '../../modules/partners/application/PartnerWebhookSecretResolver'
+import { ResendPartnerPortalEmailSender } from '../../modules/partners/application/ResendPartnerPortalEmailSender'
 import { CryptoAssetConfigService } from '../../modules/payments/application/CryptoAssetConfigService'
 import { DepositVerifierRegistry } from '../../modules/payments/application/DepositVerifierRegistry'
 import { LiquidityCacheService } from '../../modules/payments/application/LiquidityCacheService'
@@ -146,6 +149,9 @@ const domainBindings: ReadonlyArray<BindingRegistration<unknown>> = [
   { bindSelf: true, identifier: PartnerWebhookSecretResolver, implementation: PartnerWebhookSecretResolver },
   { bindSelf: true, identifier: PartnerPortalSessionService, implementation: PartnerPortalSessionService },
   { bindSelf: true, identifier: PartnerPortalAccountService, implementation: PartnerPortalAccountService },
+  { bindSelf: true, identifier: PartnerPortalSignupProtectionService, implementation: PartnerPortalSignupProtectionService },
+  { bindSelf: true, identifier: ResendPartnerPortalEmailSender, implementation: ResendPartnerPortalEmailSender },
+  { bindSelf: true, identifier: PartnerPortalSignupService, implementation: PartnerPortalSignupService },
   { bindSelf: true, identifier: FlowDefinitionBuilder, implementation: FlowDefinitionBuilder },
   { bindSelf: true, identifier: FlowDefinitionService, implementation: FlowDefinitionService },
   { bindSelf: true, identifier: FlowCorridorService, implementation: FlowCorridorService },

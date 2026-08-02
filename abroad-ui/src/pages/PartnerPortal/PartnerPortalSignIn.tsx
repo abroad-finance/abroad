@@ -293,6 +293,16 @@ const PartnerPortalSignIn = () => {
         {error && <div aria-live="polite" className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800" role="alert">{error}</div>}
         {success && <div aria-live="polite" className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800" role="status">{success}</div>}
 
+        {mode === 'login' && (
+          <p className="mt-6 text-center text-sm text-partner-muted">
+            New to Abroad?
+            {' '}
+            <a className="font-semibold text-partner-forest underline-offset-4 hover:underline" href="/partner/signup">
+              Create a production workspace
+            </a>
+          </p>
+        )}
+
         <div className="mt-7 flex gap-3 border-t border-partner-border pt-6 text-xs leading-5 text-partner-muted">
           <ShieldCheck aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-partner-forest" />
           <p>Passwords and one-time codes are never saved in this browser. Sessions expire after 30 minutes.</p>

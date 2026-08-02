@@ -18,6 +18,8 @@ const portalUser = {
   createdAt: new Date('2026-07-31T12:00:00.000Z'),
   disabledAt: null,
   email: 'operator@decaf.so',
+  emailVerificationRequiredAt: null,
+  emailVerifiedAt: null,
   failedLoginAttempts: 0,
   id: '22222222-2222-4222-8222-222222222222',
   lastLoginAt: null,
@@ -213,6 +215,25 @@ describe('PartnerPortalSessionService', () => {
     }).service
 
     await expect(verifier.verifySession(token)).rejects.toThrow(
+      'Partner portal token verification failed',
+    )
+  })
+
+  it('refuses to mint or verify sessions while public email verification is pending', async () => {
+    const pendingUser: PartnerPortalSessionUser = {
+      ...portalUser,
+      emailVerificationRequiredAt: new Date('2026-08-02T12:00:00.000Z'),
+      emailVerifiedAt: null,
+    }
+    const service = buildService({ foundUser: pendingUser }).service
+
+    await expect(service.createSession(pendingUser)).rejects.toThrow(
+      'Partner portal email verification is required',
+    )
+
+    const activeCreator = buildService().service
+    const historicalToken = (await activeCreator.createSession(portalUser)).accessToken
+    await expect(service.verifySession(historicalToken)).rejects.toThrow(
       'Partner portal token verification failed',
     )
   })

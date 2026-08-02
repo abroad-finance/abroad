@@ -103,6 +103,27 @@ export type PartnerPortalSession = {
   userId: string
 }
 
+export type PartnerPortalSignupAcknowledgement = {
+  status: 'VERIFICATION_REQUIRED'
+}
+
+export type PartnerPortalSignupChallenge = {
+  challengeToken: string
+  expiresAt: string
+  readyAt: string
+}
+
+export type PartnerPortalSignupInput = {
+  challengeToken: string
+  company: string
+  contactWebsite?: string
+  country: string
+  email: string
+  firstName: string
+  lastName: string
+  password: string
+}
+
 export type PartnerPortalUser = {
   createdAt: string
   disabledAt: null | string

@@ -54,6 +54,8 @@ const partner = {
   name: 'Decaf',
   needsKyc: false,
   phone: null,
+  publicSignupIdempotencyHash: null,
+  publicSignupOrganizationHash: null,
   webhookUrl: 'https://decaf.example/webhook',
 } satisfies Partner
 

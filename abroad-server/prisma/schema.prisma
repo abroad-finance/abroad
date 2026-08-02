@@ -16,6 +16,8 @@ model Partner {
   apiKey        String?       @unique
   clientDomain  String?       @unique
   clientDomainHash String?      @unique
+  publicSignupIdempotencyHash String?       @unique
+  publicSignupOrganizationHash String?      @unique
   country       String?
   email         String?       @unique
   phone         String?
@@ -46,6 +48,8 @@ model PartnerPortalUser {
   lockedUntil         DateTime?
   lastLoginAt         DateTime?
   disabledAt          DateTime?
+  emailVerificationRequiredAt DateTime?
+  emailVerifiedAt             DateTime?
   mfaSecretCiphertext        String?
   mfaPendingSecretCiphertext String?
   mfaPendingCreatedAt        DateTime?
@@ -59,6 +63,7 @@ model PartnerPortalUser {
   auditEvents                PartnerPortalAuditEvent[]         @relation("PartnerPortalAuditActor")
   createdResetTokens         PartnerPortalPasswordResetToken[] @relation("PartnerPortalPasswordResetCreator")
   resetTokens                PartnerPortalPasswordResetToken[] @relation("PartnerPortalPasswordResetSubject")
+  emailVerificationTokens    PartnerPortalEmailVerificationToken[]
   mfaRecoveryCodes           PartnerPortalMfaRecoveryCode[]
   initiatedOutboxEvents      OutboxEvent[]                     @relation("OutboxPortalInitiator")
   reconciliationRuns         PartnerReconciliationRun[]        @relation("PartnerReconciliationInitiator")
@@ -132,6 +137,30 @@ model PartnerPortalPasswordResetToken {
   createdAt       DateTime                          @default(now())
 
   @@index([userId, expiresAt])
+}
+
+model PartnerPortalEmailVerificationToken {
+  id                String            @id @default(uuid())
+  userId            String
+  user              PartnerPortalUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash         String            @unique
+  expiresAt         DateTime
+  consumedAt        DateTime?
+  sentAt            DateTime?
+  providerMessageId String?
+  createdAt         DateTime          @default(now())
+
+  @@index([userId, createdAt])
+  @@index([expiresAt, consumedAt])
+}
+
+model PartnerPortalPublicRateLimit {
+  keyHash      String   @id
+  attempts     Int
+  windowEndsAt DateTime
+  updatedAt    DateTime @updatedAt
+
+  @@index([windowEndsAt])
 }
 
 model PartnerPortalAuditEvent {

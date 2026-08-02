@@ -13,12 +13,15 @@ import {
   completePartnerMfaChallenge,
   createPartnerApiKey,
   createPartnerPortalSession,
+  createPartnerPortalSignup,
+  createPartnerPortalSignupChallenge,
   exportPartnerTransactions,
   getPartnerPixReceipt,
   listPartnerTransactions,
   redeliverPartnerWebhook,
   resetPartnerPasswordWithRecoveryCode,
   stagePartnerWebhookUrl,
+  verifyPartnerPortalSignupEmail,
 } from '../services/partnerPortal/partnerPortalApi'
 import {
   clearPartnerPortalSession,
@@ -66,6 +69,65 @@ describe('partner portal API', () => {
     )
 
     expect(session).toEqual(expect.objectContaining({ status: 'AUTHENTICATED' }))
+  })
+
+  it('uses unauthenticated challenge, idempotent signup, and verification contracts', async () => {
+    server.use(
+      http.post('https://api.abroad.finance/partner-portal/signup/challenge', ({ request }) => {
+        expect(request.headers.get('authorization')).toBeNull()
+        return HttpResponse.json({
+          challengeToken: 'signed-challenge',
+          expiresAt: '2026-08-02T15:15:00.000Z',
+          readyAt: '2026-08-02T15:00:01.500Z',
+        })
+      }),
+      http.post('https://api.abroad.finance/partner-portal/signup', async ({ request }) => {
+        expect(request.headers.get('authorization')).toBeNull()
+        expect(request.headers.get('idempotency-key')).toBe('signup-request-001')
+        await expect(request.json()).resolves.toEqual({
+          challengeToken: 'signed-challenge',
+          company: 'Atlas Payments',
+          contactWebsite: '',
+          country: 'BR',
+          email: 'admin@atlas.example',
+          firstName: 'Ana',
+          lastName: 'Silva',
+          password: 'correct horse battery staple',
+        })
+        return HttpResponse.json({ status: 'VERIFICATION_REQUIRED' }, { status: 202 })
+      }),
+      http.post('https://api.abroad.finance/partner-portal/signup/email-verification', async ({ request }) => {
+        expect(request.headers.get('authorization')).toBeNull()
+        await expect(request.json()).resolves.toEqual({ token: 'verification-token' })
+        return HttpResponse.json({
+          accessToken: 'verified-session',
+          email: 'admin@atlas.example',
+          expiresAt: '2099-01-01T00:30:00.000Z',
+          mfaEnabled: false,
+          mfaVerified: false,
+          partnerName: 'Atlas Payments',
+          role: 'ADMIN',
+          userId: 'user-1',
+        })
+      }),
+    )
+
+    await expect(createPartnerPortalSignupChallenge()).resolves.toEqual(
+      expect.objectContaining({ challengeToken: 'signed-challenge' }),
+    )
+    await expect(createPartnerPortalSignup({
+      challengeToken: 'signed-challenge',
+      company: 'Atlas Payments',
+      contactWebsite: '',
+      country: 'BR',
+      email: 'admin@atlas.example',
+      firstName: 'Ana',
+      lastName: 'Silva',
+      password: 'correct horse battery staple',
+    }, 'signup-request-001')).resolves.toEqual({ status: 'VERIFICATION_REQUIRED' })
+    await expect(verifyPartnerPortalSignupEmail('verification-token')).resolves.toEqual(
+      expect.objectContaining({ accessToken: 'verified-session' }),
+    )
   })
 
   it('sends only the portal bearer token and complete filters', async () => {

@@ -12,6 +12,9 @@ import type {
   PartnerPortalResetToken,
   PartnerPortalRole,
   PartnerPortalSession,
+  PartnerPortalSignupAcknowledgement,
+  PartnerPortalSignupChallenge,
+  PartnerPortalSignupInput,
   PartnerPortalUser,
   PartnerPortalWebhookConfiguration,
   PartnerPortalWebhookSecretResult,
@@ -142,6 +145,32 @@ export const createPartnerPortalSession = async (
       email: email.trim().toLowerCase(),
       password,
     }),
+  )
+  return unwrap(result)
+}
+
+export const createPartnerPortalSignup = async (
+  input: PartnerPortalSignupInput,
+  idempotencyKey: string,
+): Promise<PartnerPortalSignupAcknowledgement> => {
+  const result = await bootstrapClient.request<PartnerPortalSignupAcknowledgement, ApiErrorBody>(
+    '/partner-portal/signup',
+    {
+      body: JSON.stringify(input),
+      headers: {
+        'Content-Type': 'application/json',
+        'Idempotency-Key': idempotencyKey,
+      },
+      method: 'POST',
+    },
+  )
+  return unwrap(result)
+}
+
+export const createPartnerPortalSignupChallenge = async (): Promise<PartnerPortalSignupChallenge> => {
+  const result = await bootstrapClient.request<PartnerPortalSignupChallenge, ApiErrorBody>(
+    '/partner-portal/signup/challenge',
+    jsonRequest('POST'),
   )
   return unwrap(result)
 }
@@ -345,6 +374,16 @@ export const updatePartnerPortalUser = async (
   const result = await portalClient.request<PartnerPortalUser, ApiErrorBody>(
     `/partner-portal/team/${encodeURIComponent(userId)}`,
     jsonRequest('PATCH', input),
+  )
+  return unwrap(result)
+}
+
+export const verifyPartnerPortalSignupEmail = async (
+  token: string,
+): Promise<PartnerPortalSession> => {
+  const result = await bootstrapClient.request<PartnerPortalSession, ApiErrorBody>(
+    '/partner-portal/signup/email-verification',
+    jsonRequest('POST', { token }),
   )
   return unwrap(result)
 }

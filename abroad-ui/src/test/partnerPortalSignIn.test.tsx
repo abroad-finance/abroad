@@ -34,6 +34,15 @@ afterEach(() => {
 })
 
 describe('PartnerPortalSignIn', () => {
+  it('links new partners to public production signup', () => {
+    render(<PartnerPortalSignIn />)
+
+    expect(screen.getByRole('link', { name: 'Create a production workspace' })).toHaveAttribute(
+      'href',
+      '/partner/signup',
+    )
+  })
+
   it('stores only the short-lived portal session and clears both credential fields', async () => {
     mocked.createPartnerPortalSession.mockResolvedValue({
       session: {

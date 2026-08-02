@@ -87,7 +87,11 @@ export class PartnerPortalAccountService {
       portalUser.passwordVerifier,
     )
     const now = new Date()
-    if (portalUser.disabledAt || this.isLocked(portalUser, now)) {
+    if (
+      portalUser.disabledAt
+      || this.isLocked(portalUser, now)
+      || (portalUser.emailVerificationRequiredAt && !portalUser.emailVerifiedAt)
+    ) {
       throw new PartnerPortalAuthenticationError()
     }
     if (!passwordMatches) {

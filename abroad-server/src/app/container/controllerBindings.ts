@@ -13,6 +13,7 @@ import { OpsPartnerPortalController } from '../../modules/partners/interfaces/ht
 import { PartnerController } from '../../modules/partners/interfaces/http/PartnerController'
 import { PartnerPortalIdentityController } from '../../modules/partners/interfaces/http/PartnerPortalIdentityController'
 import { PartnerPortalIntegrationController } from '../../modules/partners/interfaces/http/PartnerPortalIntegrationController'
+import { PartnerPortalSignupController } from '../../modules/partners/interfaces/http/PartnerPortalSignupController'
 import { PartnerPortalTeamController } from '../../modules/partners/interfaces/http/PartnerPortalTeamController'
 import { PartnerUserController } from '../../modules/partners/interfaces/http/PartnerUserController'
 import { CeloPaymentsController } from '../../modules/payments/interfaces/http/CeloPaymentsController'
@@ -44,6 +45,7 @@ const controllerBindings: ReadonlyArray<BindingRegistration<unknown>> = [
   { bindSelf: true, identifier: OpsPartnerPortalController, implementation: OpsPartnerPortalController },
   { bindSelf: true, identifier: PartnerPortalIdentityController, implementation: PartnerPortalIdentityController },
   { bindSelf: true, identifier: PartnerPortalIntegrationController, implementation: PartnerPortalIntegrationController },
+  { bindSelf: true, identifier: PartnerPortalSignupController, implementation: PartnerPortalSignupController },
   { bindSelf: true, identifier: PartnerPortalTeamController, implementation: PartnerPortalTeamController },
   { bindSelf: true, identifier: PartnerUserController, implementation: PartnerUserController },
   { bindSelf: true, identifier: QuoteController, implementation: QuoteController },

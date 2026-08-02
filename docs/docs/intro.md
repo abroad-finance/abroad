@@ -26,6 +26,6 @@ Abroad provides a unified API to:
 
 To start integrating with Abroad:
 
-1.  **Get your API Keys**: Contact our sales team to get your API credentials.
+1.  **Create your workspace**: Use the [self-service setup](./self-service-setup) to verify your administrator, enable MFA, and create a production API key.
 2.  **Authenticate**: Learn how to authenticate your requests in the [Authentication](./authentication) guide.
 3.  **Follow the Workflow**: Check out our [Workflows](./workflows/overview) to understand the lifecycle of a transaction.

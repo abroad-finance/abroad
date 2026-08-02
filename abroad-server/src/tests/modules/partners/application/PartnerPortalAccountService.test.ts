@@ -30,6 +30,8 @@ const partner = {
   name: 'Decaf',
   needsKyc: false,
   phone: null,
+  publicSignupIdempotencyHash: null,
+  publicSignupOrganizationHash: null,
   webhookUrl: 'https://api-v3.production.decafapi.com/abroad/webhook',
 } satisfies Partner
 
@@ -37,6 +39,8 @@ const portalUser: PartnerPortalUser = {
   createdAt: new Date('2026-07-31T12:00:00.000Z'),
   disabledAt: null,
   email: 'operator@decaf.so',
+  emailVerificationRequiredAt: null,
+  emailVerifiedAt: null,
   failedLoginAttempts: 0,
   id: '22222222-2222-4222-8222-222222222222',
   lastLoginAt: null,
@@ -257,6 +261,25 @@ describe('PartnerPortalAccountService', () => {
       status: 'MFA_REQUIRED',
     })
     expect(harness.sessionService.createMfaChallenge).toHaveBeenCalledWith(enrolledUser)
+    expect(harness.sessionService.createSession).not.toHaveBeenCalled()
+  })
+
+  it('returns the generic authentication error until a public account verifies its email', async () => {
+    const harness = buildHarness()
+    harness.portalUserFindUnique.mockResolvedValueOnce({
+      ...portalUserWithPartner,
+      emailVerificationRequiredAt: new Date('2026-08-02T12:00:00.000Z'),
+      emailVerifiedAt: null,
+    })
+
+    await expect(harness.service.authenticate({
+      email: portalUser.email,
+      password: 'correct horse battery staple',
+    })).rejects.toThrow(new PartnerPortalAuthenticationError())
+
+    expect(harness.passwordService.verify).toHaveBeenCalled()
+    expect(harness.portalUserUpdate).not.toHaveBeenCalled()
+    expect(harness.sessionService.createMfaChallenge).not.toHaveBeenCalled()
     expect(harness.sessionService.createSession).not.toHaveBeenCalled()
   })
 

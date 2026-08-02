@@ -25,6 +25,8 @@ const portalUser = (
   createdAt: new Date('2026-08-01T12:00:00.000Z'),
   disabledAt: null,
   email: 'admin@decaf.so',
+  emailVerificationRequiredAt: null,
+  emailVerifiedAt: null,
   failedLoginAttempts: 0,
   id: 'user-1',
   lastLoginAt: null,
