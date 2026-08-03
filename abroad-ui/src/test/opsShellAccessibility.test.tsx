@@ -96,6 +96,16 @@ afterEach(() => {
 })
 
 describe('task-oriented Ops shell', () => {
+  test('scopes the visual theme to the mounted Ops shell', () => {
+    const view = renderShell()
+
+    expect(document.documentElement).toHaveAttribute('data-ops-visual-theme', 'clear-current')
+
+    view.unmount()
+
+    expect(document.documentElement).not.toHaveAttribute('data-ops-visual-theme')
+  })
+
   test('renders the exact role-grouped hierarchy, operational chrome, and semantic page structure', async () => {
     renderShell()
 
@@ -126,6 +136,7 @@ describe('task-oriented Ops shell', () => {
     ])
     expect(screen.getByRole('link', { name: 'Skip to operations content' })).toHaveAttribute('href', '#ops-main-content')
     expect(screen.getByRole('main')).toHaveAttribute('id', 'ops-main-content')
+    expect(document.documentElement).toHaveAttribute('data-ops-visual-theme', 'clear-current')
     expect(screen.getByTestId('ops-compact-session')).toHaveTextContent('Ana Administrator')
     expect(screen.queryByRole('heading', { name: 'Sign in with your Abroad account' })).not.toBeInTheDocument()
     expect(screen.getAllByText('Production').length).toBeGreaterThan(0)

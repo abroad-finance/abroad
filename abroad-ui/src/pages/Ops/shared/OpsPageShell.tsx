@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import {
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
 } from 'react'
@@ -25,6 +26,7 @@ import OpsApiKeyPanel from '../OpsApiKeyPanel'
 import { OpsBanner } from './OpsBanner'
 import { OpsNav } from './OpsNav'
 import { useOpsShellStatus } from './OpsShellStatusContext'
+import '../opsTheme.css'
 
 type OpsPageWidth = 'form' | 'full' | 'narrow' | 'wide'
 
@@ -208,6 +210,16 @@ export const OpsPageShell = ({
   const { pathname } = useLocation()
   const navigate = useNavigate()
 
+  useLayoutEffect(() => {
+    const root = document.documentElement
+    const previousTheme = root.dataset.opsVisualTheme
+    root.dataset.opsVisualTheme = 'clear-current'
+    return () => {
+      if (previousTheme) root.dataset.opsVisualTheme = previousTheme
+      else delete root.dataset.opsVisualTheme
+    }
+  }, [])
+
   useEffect(() => {
     document.title = `${typeof title === 'string' ? title : 'Operations'} | Abroad Ops`
   }, [title])
@@ -230,8 +242,7 @@ export const OpsPageShell = ({
         <OpsNav />
         <div className="min-w-0">
           {isAuthenticated && <ShellTopbar />}
-          <main className="relative overflow-hidden" id="ops-main-content" tabIndex={-1}>
-            <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-72 bg-[radial-gradient(circle_at_top,_rgba(27,94,89,0.12),_transparent_65%)]" />
+          <main className="relative" id="ops-main-content" tabIndex={-1}>
             <div className={cn('relative mx-auto px-4 py-6 sm:px-6 sm:py-8 xl:px-8', widthClass[width])}>
               {backLink && (
                 <Link className="inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-ops-brand hover:text-ops-brand-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ops-brand/50" to={backLink.to}>

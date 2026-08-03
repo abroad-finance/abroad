@@ -287,7 +287,7 @@ const TransactionDetail = () => {
                       {humanizeStatus(data.quote.network)}
                     </p>
                   </div>
-                  <div aria-hidden className="hidden h-px flex-1 bg-gradient-to-r from-ops-border via-emerald-300 to-ops-border sm:block" />
+                  <div aria-hidden className="ops-route-divider hidden sm:block" />
                   <div className="sm:text-right">
                     <p className="text-2xl font-semibold text-ops-brand">
                       {formatAmount(data.quote.targetAmount)}
