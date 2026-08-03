@@ -21,7 +21,6 @@ import {
 } from '../../services/partnerPortal/partnerPortalApi'
 import { partnerCountryOptions } from './partnerCountryOptions'
 
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/u
 const RESEND_COOLDOWN_MS = 60_000
 
 const signupSteps = [
@@ -70,11 +69,21 @@ const initialDraft: SignupDraft = {
 }
 
 const createIdempotencyKey = (): string => {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return crypto.randomUUID()
+  if (typeof globalThis.crypto.randomUUID === 'function') {
+    return globalThis.crypto.randomUUID()
   }
-  const randomPart = Math.random().toString(36).slice(2)
+  const randomValues = globalThis.crypto.getRandomValues(new Uint32Array(4))
+  const randomPart = Array.from(randomValues, value => value.toString(36)).join('')
   return `signup-${Date.now().toString(36)}-${randomPart}`
+}
+
+const isValidEmail = (value: string): boolean => {
+  if (/\s/u.test(value)) return false
+  const separatorIndex = value.indexOf('@')
+  if (separatorIndex <= 0 || separatorIndex !== value.lastIndexOf('@')) return false
+  const domain = value.slice(separatorIndex + 1)
+  const domainSeparatorIndex = domain.indexOf('.')
+  return domainSeparatorIndex > 0 && domainSeparatorIndex < domain.length - 1
 }
 
 const waitForChallenge = async (readyAt: string, expiresAt: string): Promise<void> => {
@@ -97,7 +106,7 @@ const validateDraft = (draft: SignupDraft): null | string => {
   if (!draft.firstName.trim() || !draft.lastName.trim()) return 'Enter the administrator’s name.'
   if (!draft.company.trim()) return 'Enter your organization name.'
   if (!draft.country) return 'Select your organization country.'
-  if (!EMAIL_PATTERN.test(draft.email.trim())) return 'Enter a valid administrator email.'
+  if (!isValidEmail(draft.email.trim())) return 'Enter a valid administrator email.'
   if (draft.password.length < 12 || draft.password.length > 128) {
     return 'Password must be between 12 and 128 characters.'
   }
@@ -156,8 +165,8 @@ const PartnerPortalSignup = () => {
       setCanResend(false)
       setSubmitted(true)
     }
-    catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Signup could not be completed')
+    catch (error_) {
+      setError(error_ instanceof Error ? error_.message : 'Signup could not be completed')
     }
     finally {
       setLoading(false)
@@ -166,7 +175,7 @@ const PartnerPortalSignup = () => {
 
   const resend = async () => {
     if (loading) return
-    if (!EMAIL_PATTERN.test(draft.email.trim()) || draft.password.length < 12) {
+    if (!isValidEmail(draft.email.trim()) || draft.password.length < 12) {
       setError('Enter the administrator email and password again.')
       return
     }

@@ -89,6 +89,21 @@ describe('PartnerPortalSignup', () => {
     expect(mocked.createPartnerPortalSignup).not.toHaveBeenCalled()
   })
 
+  it('rejects structurally invalid email before requesting a challenge', async () => {
+    render(<PartnerPortalSignup />)
+    const user = userEvent.setup()
+    await fillSignupForm(user)
+    const emailInput = screen.getByLabelText('Administrator email')
+    await user.clear(emailInput)
+    await user.type(emailInput, 'admin@atlas')
+
+    await user.click(screen.getByRole('button', { name: 'Create workspace' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Enter a valid administrator email')
+    expect(mocked.createPartnerPortalSignupChallenge).not.toHaveBeenCalled()
+    expect(mocked.createPartnerPortalSignup).not.toHaveBeenCalled()
+  })
+
   it('uses the credential-protected recovery endpoint for a bounded resend', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     mocked.createPartnerPortalSignupChallenge.mockResolvedValue({
