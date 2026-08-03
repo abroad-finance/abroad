@@ -11,6 +11,8 @@ export interface IPaymentService {
    */
   getLiquidity: () => Promise<number>
 
+  getPaymentFacts?(providerTransactionId: string): Promise<PaymentFactsResult>
+
   readonly isAsync: boolean
   readonly isEnabled: boolean
   readonly MAX_TOTAL_AMOUNT_PER_DAY: number
@@ -47,6 +49,10 @@ export type PaymentCapability = {
   targetCurrency: TargetCurrency
 }
 
+export type PaymentFactsResult
+  = | { economics?: PaymentSendEconomics, success: true }
+    | { reason: string, success: false }
+
 export type PaymentFailureCode = 'permanent' | 'retriable' | 'validation'
 
 export interface PaymentOnboardResult {
@@ -62,6 +68,13 @@ export type PaymentSendResult
     transactionId?: string
   }
   | {
+    economics?: PaymentSendEconomics
     success: true
     transactionId?: string
   }
+
+type PaymentSendEconomics = {
+  feeCurrency: TargetCurrency
+  feeNative: string
+  netAmountNative: string
+}

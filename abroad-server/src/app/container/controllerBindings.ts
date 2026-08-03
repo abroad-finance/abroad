@@ -8,6 +8,7 @@ import { PublicCorridorController } from '../../modules/flows/interfaces/http/Pu
 import { KycController } from '../../modules/kyc/interfaces/http/KycController'
 import { OpsKycController } from '../../modules/kyc/interfaces/http/OpsKycController'
 import { OpsAdministrationController } from '../../modules/operations/interfaces/http/OpsAdministrationController'
+import { OpsBusinessPerformanceController } from '../../modules/operations/interfaces/http/OpsBusinessPerformanceController'
 import { OpsCasesController } from '../../modules/operations/interfaces/http/OpsCasesController'
 import { OpsConfigurationReleaseController } from '../../modules/operations/interfaces/http/OpsConfigurationReleaseController'
 import { OpsIdentityController } from '../../modules/operations/interfaces/http/OpsIdentityController'
@@ -55,6 +56,7 @@ const controllerBindings: ReadonlyArray<BindingRegistration<unknown>> = [
   { bindSelf: true, identifier: OpsIncidentsController, implementation: OpsIncidentsController },
   { bindSelf: true, identifier: OpsIntegrationsController, implementation: OpsIntegrationsController },
   { bindSelf: true, identifier: OpsAdministrationController, implementation: OpsAdministrationController },
+  { bindSelf: true, identifier: OpsBusinessPerformanceController, implementation: OpsBusinessPerformanceController },
   { bindSelf: true, identifier: OpsCasesController, implementation: OpsCasesController },
   { bindSelf: true, identifier: OpsConfigurationReleaseController, implementation: OpsConfigurationReleaseController },
   { bindSelf: true, identifier: OpsOverviewController, implementation: OpsOverviewController },

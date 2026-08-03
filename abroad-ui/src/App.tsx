@@ -12,6 +12,7 @@ const TransparencyDashboard = lazy(() => import('./pages/Transparency/Transparen
 const WebSwap = lazy(() => import('./pages/WebSwap/WebSwap'))
 const Meridian = lazy(() => import('./pages/Meridian/Meridian'))
 const OpsControlTower = lazy(() => import('./pages/Ops/OpsControlTower'))
+const BusinessPerformance = lazy(() => import('./pages/Ops/BusinessPerformance'))
 const FlowOpsList = lazy(() => import('./pages/Ops/FlowOpsList'))
 const FlowOpsDetail = lazy(() => import('./pages/Ops/FlowOpsDetail'))
 const FlowDefinitions = lazy(() => import('./pages/Ops/FlowDefinitions'))
@@ -71,6 +72,7 @@ function App() {
                 <Route element={<WebSwap />} path="/" />
                 <Route element={<Meridian />} path="/meridian" />
                 <Route element={<OpsControlTower />} path="/ops" />
+                <Route element={<BusinessPerformance />} path="/ops/business-performance" />
                 <Route element={<OpsGlobalSearch />} path="/ops/search" />
                 <Route element={<OpsIncidents />} path="/ops/incidents" />
                 <Route element={<OpsShiftHandoff />} path="/ops/incidents/handoff" />

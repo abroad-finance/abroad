@@ -85,6 +85,7 @@ export class ExchangeSendStepExecutor implements FlowStepExecutor {
           address: addressResult.address,
           amount,
           memo: addressResult.memo ?? null,
+          networkFee: sendResult.networkFee ?? null,
           transactionId: sendResult.transactionId ?? null,
         },
       }

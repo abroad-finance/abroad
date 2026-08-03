@@ -7,10 +7,11 @@ import { TYPES } from '../../../../app/container/types'
 import { createScopedLogger, ScopedLogger } from '../../../../core/logging/scopedLogger'
 import { ILogger } from '../../../../core/logging/types'
 import { TransferoUltraClient, TransferoUltraError } from '../../../transfero/infrastructure/TransferoUltraClient'
-import { transferoUltraBalanceResponseSchema, transferoUltraWithdrawalResponseSchema } from '../../../transfero/infrastructure/transferoUltraSchemas'
+import { transferoUltraBalanceResponseSchema, transferoUltraWithdrawalDetailResponseSchema, transferoUltraWithdrawalResponseSchema } from '../../../transfero/infrastructure/transferoUltraSchemas'
 import {
   IPaymentService,
   PaymentCapability,
+  PaymentFactsResult,
   PaymentFailureCode,
   PaymentOnboardResult,
   PaymentSendResult,
@@ -122,6 +123,33 @@ export class TransferoPaymentService implements IPaymentService {
     }
   }
 
+  public async getPaymentFacts(providerTransactionId: string): Promise<PaymentFactsResult> {
+    try {
+      const response = await this.ultraClient.get(
+        `/api/v1/pix/withdrawals/${encodeURIComponent(providerTransactionId)}`,
+      )
+      const withdrawal = transferoUltraWithdrawalDetailResponseSchema.parse(response)
+      return {
+        ...(withdrawal.fee !== undefined && withdrawal.netAmount !== undefined
+          ? {
+              economics: {
+                feeCurrency: TargetCurrency.BRL,
+                feeNative: String(withdrawal.fee),
+                netAmountNative: String(withdrawal.netAmount),
+              },
+            }
+          : {}),
+        success: true as const,
+      }
+    }
+    catch {
+      return {
+        reason: 'withdrawal_read_failed',
+        success: false as const,
+      }
+    }
+  }
+
   public onboardUser(): Promise<PaymentOnboardResult> {
     return Promise.resolve({
       message: 'Transfero Ultra partner onboarding is managed out of band.',
@@ -188,7 +216,15 @@ export class TransferoPaymentService implements IPaymentService {
           status: withdrawal.status,
           withdrawalId: withdrawal.id,
         })
-        return { success: true, transactionId: withdrawal.id }
+        return {
+          economics: {
+            feeCurrency: TargetCurrency.BRL,
+            feeNative: String(withdrawal.fee),
+            netAmountNative: String(withdrawal.netAmount),
+          },
+          success: true,
+          transactionId: withdrawal.id,
+        }
       }
       catch (error) {
         const failure = this.toPaymentFailure(error)

@@ -115,6 +115,11 @@ describe('TransferoPaymentService', () => {
     })
 
     expect(result).toEqual({
+      economics: {
+        feeCurrency: 'BRL',
+        feeNative: '0.1',
+        netAmountNative: '9.9',
+      },
       success: true,
       transactionId: '11111111-2222-4333-8444-555555555555',
     })
@@ -320,9 +325,37 @@ describe('TransferoPaymentService', () => {
       id: 'transaction-review',
       value: 10,
     })).resolves.toEqual({
+      economics: {
+        feeCurrency: 'BRL',
+        feeNative: '0.1',
+        netAmountNative: '9.9',
+      },
       success: true,
       transactionId: '11111111-2222-4333-8444-555555555555',
     })
+  })
+
+  it('reads historical withdrawal economics without creating a payout', async () => {
+    const { service, ultraClient } = createService()
+    ultraClient.get.mockResolvedValue({
+      endToEndId: null,
+      fee: 0.1,
+      id: '11111111-2222-4333-8444-555555555555',
+      netAmount: 9.9,
+      status: 'SETTLED',
+    })
+
+    await expect(service.getPaymentFacts(
+      '11111111-2222-4333-8444-555555555555',
+    )).resolves.toEqual({
+      economics: {
+        feeCurrency: 'BRL',
+        feeNative: '0.1',
+        netAmountNative: '9.9',
+      },
+      success: true,
+    })
+    expect(ultraClient.post).not.toHaveBeenCalled()
   })
 
   it('opens a local cooldown instead of immediately retrying HTTP 429', async () => {

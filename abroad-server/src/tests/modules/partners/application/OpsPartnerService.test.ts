@@ -90,6 +90,8 @@ const basePartner = (overrides?: Partial<PartnerModel>): PartnerModel => ({
   phone: '123',
   previousApiKey: null,
   previousApiKeyExpiresAt: null,
+  publicSignupIdempotencyHash: null,
+  publicSignupOrganizationHash: null,
   webhookUrl: null,
   ...(overrides ?? {}),
 })

@@ -18,7 +18,7 @@ const operationsMock = jest.fn(() => ({
     call: operationCallMock,
   }),
 }))
-type MockTransactionRecord = { id?: string, source_account?: string }
+type MockTransactionRecord = { fee_charged?: string, id?: string, source_account?: string }
 const existingTx: MockTransactionRecord = { id: 'existing-tx' }
 const transactionLookupMock: jest.Mock<Promise<MockTransactionRecord>, []> = jest.fn(async () => existingTx)
 const transactionsMock = jest.fn(() => ({
@@ -136,6 +136,16 @@ describe('StellarWalletHandler', () => {
     expect(lockManager.withLock).toHaveBeenCalled()
     expect(submitTransactionMock).toHaveBeenCalled()
     expect(result).toEqual({ success: true, transactionId: 'tx-hash' })
+  })
+
+  it('reads the confirmed fee charged by Horizon for historical reconciliation', async () => {
+    transactionLookupMock.mockResolvedValueOnce({ fee_charged: '100', id: 'tx-hash' })
+    const handler = new StellarWalletHandler(secretManager as unknown as ISecretManager, assetConfigService as never, lockManager as unknown as ILockManager, logger)
+
+    await expect(handler.getTransactionFee('tx-hash')).resolves.toEqual({
+      fee: { amount: '0.0000100', currency: 'XLM' },
+      outcome: 'found',
+    })
   })
 
   it('uses response data when send fails', async () => {

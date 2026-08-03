@@ -105,6 +105,7 @@ export class PayoutSendStepExecutor implements FlowStepExecutor {
           correlation: { externalId },
           outcome: 'succeeded',
           output: {
+            ...(paymentResponse.economics ? { economics: paymentResponse.economics } : {}),
             externalId,
             provider: paymentService.provider ?? paymentMethod,
           },
@@ -176,7 +177,13 @@ export class PayoutSendStepExecutor implements FlowStepExecutor {
           prismaClient,
           trigger: 'FlowPayoutSend',
         })
-        return { outcome: 'succeeded', output: { provider: paymentService.provider ?? transaction.quote.paymentMethod } }
+        return {
+          outcome: 'succeeded',
+          output: {
+            ...(paymentResponse.economics ? { economics: paymentResponse.economics } : {}),
+            provider: paymentService.provider ?? transaction.quote.paymentMethod,
+          },
+        }
       }
 
       await this.dispatcher.notifySlack(transactionForNotifications, TransactionStatus.PAYMENT_FAILED, {

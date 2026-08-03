@@ -43,6 +43,8 @@ const buildTransaction = (overrides: Partial<TransactionWithRelations> = {}): Tr
       phone: null,
       previousApiKey: null,
       previousApiKeyExpiresAt: null,
+      publicSignupIdempotencyHash: null,
+      publicSignupOrganizationHash: null,
       webhookUrl: 'http://hook',
     },
     partnerId: 'partner-1',

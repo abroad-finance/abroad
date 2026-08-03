@@ -257,6 +257,53 @@ describe('CeloWalletHandler', () => {
     contractSpy.mockRestore()
   })
 
+  it('captures the confirmed Celo network fee when receipt metadata is available', async () => {
+    const transferMock = jest.fn().mockResolvedValue({
+      hash: '0xsend-with-fee',
+      wait: jest.fn().mockResolvedValue({
+        effectiveGasPrice: ethers.BigNumber.from(1_000_000_000),
+        gasUsed: ethers.BigNumber.from(21_000),
+        status: 1,
+      }),
+    })
+    const contractSpy = jest.spyOn(ethers, 'Contract')
+      .mockImplementation(() => ({ transfer: transferMock }) as unknown as ethers.Contract)
+
+    const handler = buildHandler()
+    const result = await handler.send({
+      address: depositAddress,
+      amount: 1.5,
+      cryptoCurrency: CryptoCurrency.USDC,
+    })
+
+    expect(result).toEqual({
+      networkFee: { amount: '0.000021', currency: 'CELO' },
+      success: true,
+      transactionId: '0xsend-with-fee',
+    })
+    contractSpy.mockRestore()
+  })
+
+  it('reads an authoritative historical Celo fee from the transaction receipt', async () => {
+    const receipt = {
+      effectiveGasPrice: ethers.BigNumber.from(1_000_000_000),
+      gasUsed: ethers.BigNumber.from(21_000),
+      status: 1,
+    } as unknown as ethers.providers.TransactionReceipt
+    const provider = new ethers.providers.JsonRpcProvider(rpcUrl)
+    jest.spyOn(provider, 'getTransactionReceipt').mockResolvedValue(receipt)
+    const handler = buildHandler()
+    ;(handler as unknown as { cachedProvider?: { provider: ethers.providers.JsonRpcProvider, rpcUrl: string } }).cachedProvider = {
+      provider,
+      rpcUrl,
+    }
+
+    await expect(handler.getTransactionFee('0xhistorical')).resolves.toEqual({
+      fee: { amount: '0.000021', currency: 'CELO' },
+      outcome: 'found',
+    })
+  })
+
   it('returns retriable error when the transfer fails on-chain', async () => {
     const transferMock = jest.fn().mockResolvedValue({
       hash: '0xfail',

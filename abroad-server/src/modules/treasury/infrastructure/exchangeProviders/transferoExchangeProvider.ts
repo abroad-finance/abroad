@@ -23,6 +23,8 @@ import {
   ExchangeFailureCode,
   ExchangeOperationResult,
   ExchangeProviderCapability,
+  ExchangeSettlementEconomics,
+  ExchangeSettlementFactsResult,
   ExchangeSettlementReconciliation,
   IExchangeProvider,
 } from '../../application/contracts/IExchangeProvider'
@@ -48,8 +50,8 @@ type ExchangeOperationFailure = Extract<ExchangeOperationResult, { outcome: 'fai
 type ExchangeOperationPending = Extract<ExchangeOperationResult, { outcome: 'pending' }>
 
 type TradeSettlementReadResult
-  = | { failure: ExchangeOperationFailure, success: false }
-    | { settledSourceAmount: string, success: true }
+  = | { economics?: ExchangeSettlementEconomics, settledSourceAmount: string, success: true }
+    | { failure: ExchangeOperationFailure, success: false }
 
 type UltraSaleCurrency = Extract<CryptoCurrency, 'USDC' | 'USDT'>
 
@@ -229,6 +231,40 @@ export class TransferoExchangeProvider implements IExchangeProvider {
     }
   }
 
+  public async getSettlementFacts(params: {
+    providerOperationId: string
+    requestedAmount: number
+    sourceCurrency: CryptoCurrency
+  }): Promise<ExchangeSettlementFactsResult> {
+    if (
+      params.sourceCurrency !== CryptoCurrency.USDC
+      && params.sourceCurrency !== CryptoCurrency.USDT
+    ) {
+      return { reason: 'unsupported_source_currency', success: false }
+    }
+    try {
+      const result = await this.readTradeSettlement({
+        providerOperationId: params.providerOperationId,
+        requestedAmount: params.requestedAmount,
+        sourceCurrency: params.sourceCurrency,
+      })
+      if (!result.success) {
+        return { reason: 'trade_not_settled', success: false }
+      }
+      return {
+        ...(result.economics ? { economics: result.economics } : {}),
+        settledSourceAmount: result.settledSourceAmount,
+        success: true,
+      }
+    }
+    catch {
+      return {
+        reason: 'trade_read_failed',
+        success: false,
+      }
+    }
+  }
+
   private buildAddressFailure(
     code: ExchangeFailureCode,
     reason: string,
@@ -252,6 +288,7 @@ export class TransferoExchangeProvider implements IExchangeProvider {
   }
 
   private buildPendingReconciliation(params: {
+    economics?: ExchangeSettlementEconomics
     nextSettlementAttempt: number
     providerOperationId: string
     settledSourceAmount: string
@@ -259,6 +296,7 @@ export class TransferoExchangeProvider implements IExchangeProvider {
     return {
       outcome: 'pending',
       reconciliation: {
+        ...(params.economics ? { economics: params.economics } : {}),
         nextSettlementAttempt: params.nextSettlementAttempt,
         providerOperationId: params.providerOperationId,
         settledSourceAmount: params.settledSourceAmount,
@@ -267,6 +305,7 @@ export class TransferoExchangeProvider implements IExchangeProvider {
   }
 
   private buildSuccessfulReconciliation(params: {
+    economics?: ExchangeSettlementEconomics
     nextSettlementAttempt: number
     providerOperationId: string
     settledSourceAmount: string
@@ -274,6 +313,7 @@ export class TransferoExchangeProvider implements IExchangeProvider {
     return {
       outcome: 'succeeded',
       reconciliation: {
+        ...(params.economics ? { economics: params.economics } : {}),
         nextSettlementAttempt: params.nextSettlementAttempt,
         providerOperationId: params.providerOperationId,
         settledSourceAmount: params.settledSourceAmount,
@@ -302,6 +342,9 @@ export class TransferoExchangeProvider implements IExchangeProvider {
     if (params.reconciliation) {
       return this.reconcileBookedTrade({
         nextSettlementAttempt: params.reconciliation.nextSettlementAttempt,
+        ...(params.reconciliation.economics
+          ? { economics: params.reconciliation.economics }
+          : {}),
         operationId: params.operationId,
         providerOperationId: params.reconciliation.providerOperationId,
         requestedAmount: params.sourceAmount,
@@ -365,6 +408,11 @@ export class TransferoExchangeProvider implements IExchangeProvider {
     )
 
     return this.reconcileBookedTrade({
+      economics: {
+        lockedRateNativePerUsd: String(session.price),
+        payoutCurrency: TargetCurrency.BRL,
+        providerProceedsNative: String(session.total_brl),
+      },
       nextSettlementAttempt: 0,
       operationId: params.operationId,
       providerOperationId: confirmation.trade.id,
@@ -535,7 +583,20 @@ export class TransferoExchangeProvider implements IExchangeProvider {
         success: false,
       }
     }
+    const lockedRate = this.toPositiveDecimalString(detail.trade.price)
+    const providerProceeds = this.toPositiveDecimalString(
+      detail.trade.totalBrl ?? detail.trade.total_brl,
+    )
     return {
+      ...(lockedRate && providerProceeds
+        ? {
+            economics: {
+              lockedRateNativePerUsd: lockedRate,
+              payoutCurrency: TargetCurrency.BRL,
+              providerProceedsNative: providerProceeds,
+            },
+          }
+        : {}),
       settledSourceAmount: detail.trade.cryptoReceived,
       success: true,
     }
@@ -543,6 +604,7 @@ export class TransferoExchangeProvider implements IExchangeProvider {
 
   private async reconcileBookedTrade(
     params: {
+      economics?: ExchangeSettlementEconomics
       nextSettlementAttempt: number
       operationId: string
       providerOperationId: string
@@ -583,6 +645,7 @@ export class TransferoExchangeProvider implements IExchangeProvider {
       })
       return this.buildSuccessfulReconciliation({
         ...params,
+        economics: beforeSettlement.economics ?? params.economics,
         settledSourceAmount: beforeSettlement.settledSourceAmount,
       })
     }
@@ -641,6 +704,7 @@ export class TransferoExchangeProvider implements IExchangeProvider {
       })
       return this.buildPendingReconciliation({
         ...params,
+        economics: beforeSettlement.economics ?? params.economics,
         nextSettlementAttempt: followingAttempt,
         settledSourceAmount: beforeSettlement.settledSourceAmount,
       })
@@ -662,6 +726,7 @@ export class TransferoExchangeProvider implements IExchangeProvider {
       })
       return this.buildSuccessfulReconciliation({
         ...params,
+        economics: afterSettlement.economics ?? beforeSettlement.economics ?? params.economics,
         nextSettlementAttempt: followingAttempt,
         settledSourceAmount: afterSettlement.settledSourceAmount,
       })
@@ -676,6 +741,7 @@ export class TransferoExchangeProvider implements IExchangeProvider {
     })
     return this.buildPendingReconciliation({
       ...params,
+      economics: afterSettlement.economics ?? beforeSettlement.economics ?? params.economics,
       nextSettlementAttempt: followingAttempt,
       settledSourceAmount: afterSettlement.settledSourceAmount,
     })
@@ -700,5 +766,12 @@ export class TransferoExchangeProvider implements IExchangeProvider {
       'retriable',
       error instanceof Error ? error.message : 'transfero_ultra_otc_unknown_error',
     )
+  }
+
+  private toPositiveDecimalString(value: number | string | undefined): string | undefined {
+    if (value === undefined) return undefined
+    const normalized = String(value)
+    const parsed = transferoUltraDecimalSchema.safeParse(normalized)
+    return parsed.success && Number(normalized) > 0 ? parsed.data : undefined
   }
 }

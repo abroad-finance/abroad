@@ -7,6 +7,7 @@ import {
   Blocks,
   Building2,
   Cable,
+  ChartNoAxesCombined,
   Coins,
   FileClock,
   GitBranch,
@@ -78,11 +79,17 @@ export const OPS_NAV_GROUPS: OpsNavGroup[] = [
     label: 'Work',
   },
   {
-    items: [{
-      icon: WalletCards, label: 'Treasury', permission: 'treasury:read', to: '/ops/treasury',
-    }, {
-      icon: ArrowLeftRight, label: 'Bridge', permission: 'treasury:read', to: '/ops/treasury/bridge',
-    }],
+    items: [
+      {
+        icon: WalletCards, label: 'Treasury', permission: 'treasury:read', to: '/ops/treasury',
+      },
+      {
+        icon: ArrowLeftRight, label: 'Bridge', permission: 'treasury:read', to: '/ops/treasury/bridge',
+      },
+      {
+        icon: ChartNoAxesCombined, label: 'Business Performance', permission: 'overview:read', to: '/ops/business-performance',
+      },
+    ],
     label: 'Money',
   },
   {

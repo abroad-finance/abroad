@@ -86,4 +86,56 @@ describe('RefundCoordinator', () => {
       transactionId: 'tx-2',
     }))
   })
+
+  it('captures a confirmed refund fee under one deterministic reconciliation key', async () => {
+    const costUpsert = jest.fn().mockResolvedValue({})
+    const client = {
+      transaction: {
+        findUnique: jest.fn().mockResolvedValue({
+          quote: {
+            cryptoCurrency: CryptoCurrency.USDC,
+            sourceAmount: 10,
+            targetAmount: 50,
+            targetCurrency: 'BRL',
+          },
+        }),
+      },
+      transactionEconomicCost: { upsert: costUpsert },
+      transactionEconomics: { upsert: jest.fn().mockResolvedValue({}) },
+    }
+    jest.spyOn(TransactionRepository.prototype, 'getClient').mockResolvedValue(client as never)
+    jest.spyOn(TransactionRepository.prototype, 'reserveRefund').mockResolvedValue({ attempts: 1, outcome: 'reserved' })
+    jest.spyOn(TransactionRepository.prototype, 'findDepositAddressFrom').mockResolvedValue('sender-wallet')
+    jest.spyOn(TransactionRepository.prototype, 'recordRefundOutcome').mockResolvedValue(undefined)
+    jest.spyOn(RefundService.prototype, 'refundByOnChainId').mockResolvedValue({
+      networkFee: { amount: '0.000005', currency: 'SOL' },
+      success: true,
+      transactionId: 'refund-1',
+    })
+    const coordinator = new RefundCoordinator(
+      { getClient: jest.fn(async () => client) } as never,
+      { getWalletHandler: jest.fn() } as never,
+      createMockLogger(),
+    )
+
+    await coordinator.refundByOnChainId({
+      amount: 10,
+      cryptoCurrency: CryptoCurrency.USDC,
+      network: BlockchainNetwork.SOLANA,
+      onChainId: 'on-chain-1',
+      reason: 'provider_failed',
+      transactionId: 'tx-1',
+      trigger: 'test',
+    })
+
+    expect(costUpsert).toHaveBeenCalledWith(expect.objectContaining({
+      where: {
+        transactionId_kind_operationKey: {
+          kind: 'REFUND_FEE',
+          operationKey: 'refund_fee',
+          transactionId: 'tx-1',
+        },
+      },
+    }))
+  })
 })

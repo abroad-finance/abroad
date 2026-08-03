@@ -10,6 +10,7 @@ import {
 import {
   Connection,
   Keypair,
+  LAMPORTS_PER_SOL,
   PublicKey,
   TransactionConfirmationStrategy,
   TransactionMessage,
@@ -22,7 +23,7 @@ import { inject, injectable } from 'inversify'
 import { TYPES } from '../../../../app/container/types'
 import { ILogger } from '../../../../core/logging/types'
 import { ISecretManager, Secrets } from '../../../../platform/secrets/ISecretManager'
-import { IWalletHandler, WalletSendParams, WalletSendResult } from '../../application/contracts/IWalletHandler'
+import { IWalletHandler, WalletSendParams, WalletSendResult, WalletTransactionFeeResult } from '../../application/contracts/IWalletHandler'
 import { CryptoAssetConfigService } from '../../application/CryptoAssetConfigService'
 
 function decodeKeypairFromBase58Secret(secretBase58: string): Keypair {
@@ -127,6 +128,29 @@ export class SolanaWalletHandler implements IWalletHandler {
     throw new Error('Solana does not support fetching address from transaction ID')
   }
 
+  public async getTransactionFee(transactionId: string): Promise<WalletTransactionFeeResult> {
+    try {
+      const rpcUrl = await this.secretManager.getSecret(Secrets.SOLANA_RPC_URL)
+      const connection = new Connection(rpcUrl, 'confirmed')
+      const transaction = await connection.getTransaction(transactionId, {
+        commitment: 'confirmed',
+        maxSupportedTransactionVersion: 0,
+      })
+      if (!transaction) return { outcome: 'pending', reason: 'solana_transaction_read_pending' }
+      const feeLamports = transaction.meta?.fee
+      if (feeLamports === undefined || !Number.isSafeInteger(feeLamports) || feeLamports < 0) {
+        return { outcome: 'unavailable', reason: 'solana_fee_unavailable' }
+      }
+      return {
+        fee: { amount: (feeLamports / LAMPORTS_PER_SOL).toFixed(9), currency: 'SOL' },
+        outcome: 'found',
+      }
+    }
+    catch {
+      return { outcome: 'pending', reason: 'solana_transaction_read_pending' }
+    }
+  }
+
   /**
    * Send cryptocurrency to the specified address on the Solana network
    * @param params The parameters for the transaction
@@ -218,7 +242,29 @@ export class SolanaWalletHandler implements IWalletHandler {
         throw new Error(`Solana tx failed: ${JSON.stringify(confirmation.value.err)}`)
       }
 
-      return { success: true, transactionId: signature }
+      let networkFee: undefined | { amount: string, currency: string }
+      try {
+        const confirmedTransaction = await connection.getTransaction(signature, {
+          commitment: 'confirmed',
+          maxSupportedTransactionVersion: 0,
+        })
+        const feeLamports = confirmedTransaction?.meta?.fee
+        if (feeLamports !== undefined) {
+          networkFee = {
+            amount: (feeLamports / LAMPORTS_PER_SOL).toFixed(9),
+            currency: 'SOL',
+          }
+        }
+      }
+      catch {
+        // Fee capture is reporting metadata. A confirmed economic transfer must remain successful.
+        this.logger.warn('Solana network fee capture deferred after confirmed transfer')
+      }
+      return {
+        ...(networkFee ? { networkFee } : {}),
+        success: true,
+        transactionId: signature,
+      }
     }
     catch (error: unknown) {
       const reason = this.describeError(error)

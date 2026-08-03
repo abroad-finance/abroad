@@ -39,7 +39,9 @@ const createTradeDetail = (cryptoReceived: string) => ({
     cryptoReceived,
     currency: 'USDC',
     id: TRADE_ID,
+    price: '5',
     side: 'SELL',
+    total_brl: '25',
   },
 })
 
@@ -179,6 +181,11 @@ describe('TransferoExchangeProvider', () => {
     })).resolves.toEqual({
       outcome: 'succeeded',
       reconciliation: {
+        economics: {
+          lockedRateNativePerUsd: '5',
+          payoutCurrency: TargetCurrency.BRL,
+          providerProceedsNative: '25',
+        },
         nextSettlementAttempt: 1,
         providerOperationId: TRADE_ID,
         settledSourceAmount: '5.00000000',
@@ -280,6 +287,11 @@ describe('TransferoExchangeProvider', () => {
     })).resolves.toEqual({
       outcome: 'pending',
       reconciliation: {
+        economics: {
+          lockedRateNativePerUsd: '5',
+          payoutCurrency: TargetCurrency.BRL,
+          providerProceedsNative: '25',
+        },
         nextSettlementAttempt: 1,
         providerOperationId: TRADE_ID,
         settledSourceAmount: '4.90000000',
@@ -307,6 +319,11 @@ describe('TransferoExchangeProvider', () => {
     })).resolves.toEqual({
       outcome: 'succeeded',
       reconciliation: {
+        economics: {
+          lockedRateNativePerUsd: '5',
+          payoutCurrency: TargetCurrency.BRL,
+          providerProceedsNative: '25',
+        },
         nextSettlementAttempt: 2,
         providerOperationId: TRADE_ID,
         settledSourceAmount: '5.00000000',
@@ -338,6 +355,11 @@ describe('TransferoExchangeProvider', () => {
     })).resolves.toEqual({
       outcome: 'succeeded',
       reconciliation: {
+        economics: {
+          lockedRateNativePerUsd: '5',
+          payoutCurrency: TargetCurrency.BRL,
+          providerProceedsNative: '25',
+        },
         nextSettlementAttempt: 1,
         providerOperationId: TRADE_ID,
         settledSourceAmount: '5.00000000',
@@ -429,11 +451,37 @@ describe('TransferoExchangeProvider', () => {
     })).resolves.toEqual({
       outcome: 'succeeded',
       reconciliation: {
+        economics: {
+          lockedRateNativePerUsd: '5',
+          payoutCurrency: TargetCurrency.BRL,
+          providerProceedsNative: '25',
+        },
         nextSettlementAttempt: 2,
         providerOperationId: TRADE_ID,
         settledSourceAmount: '5.00000000',
       },
     })
+  })
+
+  it('reads settled source amount and locked economics without a mutation', async () => {
+    const { provider, ultraClient } = createProvider()
+    ultraClient.get.mockResolvedValueOnce(createTradeDetail('5.00000000'))
+
+    await expect(provider.getSettlementFacts({
+      providerOperationId: TRADE_ID,
+      requestedAmount: 5,
+      sourceCurrency: CryptoCurrency.USDC,
+    })).resolves.toEqual({
+      economics: {
+        lockedRateNativePerUsd: '5',
+        payoutCurrency: TargetCurrency.BRL,
+        providerProceedsNative: '25',
+      },
+      settledSourceAmount: '5.00000000',
+      success: true,
+    })
+    expect(ultraClient.post).not.toHaveBeenCalled()
+    expect(ultraClient.patch).not.toHaveBeenCalled()
   })
 
   it('does not confirm a session whose locked trade differs from the request', async () => {

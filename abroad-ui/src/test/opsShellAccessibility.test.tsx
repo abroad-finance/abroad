@@ -113,6 +113,7 @@ describe('task-oriented Ops shell', () => {
       'Reconciliation',
       'Treasury',
       'Bridge',
+      'Business Performance',
       'Partners',
       'Credentials',
       'KYC',

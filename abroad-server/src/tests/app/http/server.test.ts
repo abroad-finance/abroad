@@ -63,6 +63,7 @@ const appMock = {
 const logger = {
   error: jest.fn(),
   info: jest.fn(),
+  middleware: jest.fn(() => (_req: unknown, _res: unknown, next?: () => void) => next?.()),
   warn: jest.fn(),
 }
 
@@ -92,6 +93,10 @@ jest.mock('../../../app/http/routes', () => ({
   RegisterRoutes: jest.fn(() => undefined),
 }))
 
+jest.mock('../../../modules/quotes/application/QuoteRequestMetricRecorder', () => ({
+  QuoteRequestMetricRecorder: class QuoteRequestMetricRecorder {},
+}))
+
 jest.mock(require.resolve('../../../app/admin/admin'), () => ({
   initAdmin: jest.fn(async () => {
     throw new Error('init-admin-fail')
@@ -118,6 +123,7 @@ jest.mock('fs', () => ({
 }))
 
 jest.mock('path', () => ({
+  ...jest.requireActual<typeof import('path')>('path'),
   join: jest.fn((...args: string[]) => args.join('/')),
   resolve: jest.fn((...args: string[]) => args.join('/')),
 }))
@@ -206,6 +212,7 @@ describe('server bootstrap', () => {
     await new Promise(resolve => setTimeout(resolve, 25))
 
     expect(appMock.listen).toHaveBeenCalled()
+    expect(logger.middleware).toHaveBeenCalledTimes(1)
     expect(serverMock.close).toHaveBeenCalledTimes(1)
     expect(exitMock.exitSpy).toHaveBeenCalledTimes(1)
     expect(exitMock.exitSpy).toHaveBeenCalledWith(0)

@@ -6,6 +6,8 @@ export interface IWalletHandler {
     transaction: { onChainId?: string }
   ): Promise<string>
 
+  getTransactionFee?(transactionId: string): Promise<WalletTransactionFeeResult>
+
   send(params: WalletSendParams): Promise<WalletSendResult>
 }
 
@@ -18,6 +20,16 @@ export type WalletSendParams = {
 
 export type WalletSendResult
   = | { code?: WalletFailureCode, reason?: string, success: false, transactionId?: string }
-    | { success: true, transactionId?: string }
+    | { networkFee?: WalletNetworkFee, success: true, transactionId?: string }
+
+export type WalletTransactionFeeResult
+  = | { fee: WalletNetworkFee, outcome: 'found' }
+    | { outcome: 'pending', reason: string }
+    | { outcome: 'unavailable', reason: string }
 
 type WalletFailureCode = 'permanent' | 'retriable' | 'validation'
+
+type WalletNetworkFee = {
+  amount: string
+  currency: string
+}

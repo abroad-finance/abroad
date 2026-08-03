@@ -45,8 +45,11 @@ export const transferoUltraWithdrawalResponseSchema = z.object({
 }).loose()
 
 export const transferoUltraWithdrawalDetailResponseSchema = z.object({
+  amount: z.number().finite().positive().optional(),
   endToEndId: z.string().trim().min(1).max(128).nullable(),
+  fee: z.number().finite().nonnegative().optional(),
   id: z.string().uuid(),
+  netAmount: z.number().finite().nonnegative().optional(),
   status: transferoUltraWithdrawalStatusSchema,
 }).loose()
 
@@ -112,7 +115,10 @@ export const transferoUltraOtcTradeDetailResponseSchema = z.object({
     cryptoReceived: transferoUltraDecimalSchema,
     currency: z.enum(['USDC', 'USDT']),
     id: z.string().uuid(),
+    price: z.union([transferoUltraDecimalSchema, z.number().finite().positive()]).optional(),
     side: z.enum(['BUY', 'SELL']),
+    total_brl: z.union([transferoUltraDecimalSchema, z.number().finite().positive()]).optional(),
+    totalBrl: z.union([transferoUltraDecimalSchema, z.number().finite().positive()]).optional(),
   }).loose(),
 }).loose()
 

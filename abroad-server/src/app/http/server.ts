@@ -21,6 +21,7 @@ import { PartnerAiTokenService } from '../../modules/partners/application/Partne
 import { PartnerAiToolService } from '../../modules/partners/application/PartnerAiToolService'
 import { PartnerAiMcpRouter } from '../../modules/partners/interfaces/http/PartnerAiMcpRouter'
 import { PartnerAiOAuthRouter } from '../../modules/partners/interfaces/http/PartnerAiOAuthRouter'
+import { QuoteRequestMetricRecorder } from '../../modules/quotes/application/QuoteRequestMetricRecorder'
 import { TransferoUltraWebhookConfigurationVerifier } from '../../modules/transfero/infrastructure/TransferoUltraWebhookConfigurationVerifier'
 import { initSentry, setupSentryExpressErrorHandler } from '../../platform/observability/sentry'
 import { initAdmin } from '../admin/admin'
@@ -57,6 +58,7 @@ app.use(bodyParser.json({
   verify: captureTransferoUltraRawBody,
 }))
 app.use(requestContextMiddleware)
+app.use(iocContainer.get(QuoteRequestMetricRecorder).middleware())
 
 const partnerAiAbuseProtectionService = iocContainer.get(PartnerAiAbuseProtectionService)
 const partnerAiAuthorizationService = iocContainer.get(PartnerAiAuthorizationService)

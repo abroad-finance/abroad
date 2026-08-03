@@ -27,7 +27,22 @@ export type ExchangeProviderCapability = {
   targetCurrency: TargetCurrency
 }
 
+export type ExchangeSettlementEconomics = {
+  lockedRateNativePerUsd: string
+  payoutCurrency: TargetCurrency
+  providerProceedsNative: string
+}
+
+export type ExchangeSettlementFactsResult
+  = | {
+    economics?: ExchangeSettlementEconomics
+    settledSourceAmount: string
+    success: true
+  }
+  | { reason: string, success: false }
+
 export type ExchangeSettlementReconciliation = {
+  economics?: ExchangeSettlementEconomics
   nextSettlementAttempt: number
   providerOperationId: string
   settledSourceAmount: string
@@ -69,4 +84,10 @@ export interface IExchangeProvider {
     targetAmount: number
     targetCurrency: TargetCurrency
   }): Promise<number>
+
+  getSettlementFacts?(params: {
+    providerOperationId: string
+    requestedAmount: number
+    sourceCurrency: CryptoCurrency
+  }): Promise<ExchangeSettlementFactsResult>
 }

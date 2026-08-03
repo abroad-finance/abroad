@@ -16,7 +16,7 @@ import { createScopedLogger, ScopedLogger } from '../../../../core/logging/scope
 import { ILogger } from '../../../../core/logging/types'
 import { ILockManager } from '../../../../platform/cacheLock/ILockManager'
 import { ISecretManager, Secrets } from '../../../../platform/secrets/ISecretManager'
-import { IWalletHandler, WalletSendParams, WalletSendResult } from '../../application/contracts/IWalletHandler'
+import { IWalletHandler, WalletSendParams, WalletSendResult, WalletTransactionFeeResult } from '../../application/contracts/IWalletHandler'
 import { CryptoAssetConfigService } from '../../application/CryptoAssetConfigService'
 
 // Horizon GET reads (loadAccount/fetchBaseFee) default to no HTTP timeout. Since the
@@ -85,6 +85,25 @@ export class StellarWalletHandler implements IWalletHandler {
     catch (error) {
       this.logger.error('Error fetching Stellar transaction', { error, onChainId })
       throw new Error(`Failed to fetch transaction with ID ${onChainId}`)
+    }
+  }
+
+  public async getTransactionFee(transactionId: string): Promise<WalletTransactionFeeResult> {
+    try {
+      const horizonUrl = await this.secretManager.getSecret(Secrets.STELLAR_HORIZON_URL)
+      const server = new Horizon.Server(horizonUrl)
+      const transaction = await server.transactions().transaction(transactionId).call()
+      const feeStroops = Number(transaction.fee_charged)
+      if (!Number.isSafeInteger(feeStroops) || feeStroops < 0) {
+        return { outcome: 'unavailable', reason: 'stellar_fee_invalid' }
+      }
+      return {
+        fee: { amount: (feeStroops / 10_000_000).toFixed(7), currency: 'XLM' },
+        outcome: 'found',
+      }
+    }
+    catch {
+      return { outcome: 'pending', reason: 'stellar_transaction_read_pending' }
     }
   }
 

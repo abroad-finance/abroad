@@ -1,4 +1,10 @@
-import { BlockchainNetwork, CryptoCurrency } from '@prisma/client'
+import {
+  BlockchainNetwork,
+  CryptoCurrency,
+  Prisma,
+  TransactionEconomicCostKind,
+  TransactionEconomicCostStatus,
+} from '@prisma/client'
 import { inject, injectable } from 'inversify'
 
 import { TYPES } from '../../../app/container/types'
@@ -80,7 +86,22 @@ export class RefundCoordinator {
       })
     }
     catch (error) {
-      this.logger.error('Failed to record refund outcome', error)
+      this.logger.error('Failed to record refund outcome', {
+        error: error instanceof Error ? error.message : 'unknown_error',
+        transactionId: params.transactionId,
+      })
+      return
+    }
+    if (refundResult.success && refundResult.networkFee) {
+      try {
+        await this.recordRefundFee(prismaClient, params.transactionId, refundResult.networkFee)
+      }
+      catch (error) {
+        this.logger.warn('Refund completed but network fee capture was deferred', {
+          error: error instanceof Error ? error.message : 'unknown_error',
+          transactionId: params.transactionId,
+        })
+      }
     }
   }
 
@@ -134,7 +155,71 @@ export class RefundCoordinator {
       })
     }
     catch (error) {
-      this.logger.error('Failed to record refund outcome', error)
+      this.logger.error('Failed to record refund outcome', {
+        error: error instanceof Error ? error.message : 'unknown_error',
+        transactionId: params.transactionId,
+      })
+      return
     }
+    if (refundResult.success && refundResult.networkFee) {
+      try {
+        await this.recordRefundFee(prismaClient, params.transactionId, refundResult.networkFee)
+      }
+      catch (error) {
+        this.logger.warn('Refund completed but network fee capture was deferred', {
+          error: error instanceof Error ? error.message : 'unknown_error',
+          transactionId: params.transactionId,
+        })
+      }
+    }
+  }
+
+  private async recordRefundFee(
+    client: Awaited<ReturnType<TransactionRepository['getClient']>>,
+    transactionId: string,
+    networkFee: { amount: string, currency: string },
+  ): Promise<void> {
+    const transaction = await client.transaction.findUnique({
+      select: { quote: true },
+      where: { id: transactionId },
+    })
+    if (!transaction) return
+
+    await client.transactionEconomics.upsert({
+      create: {
+        customerPayoutNative: new Prisma.Decimal(String(transaction.quote.targetAmount)),
+        payoutCurrency: transaction.quote.targetCurrency,
+        sourceAmountUsd: new Prisma.Decimal(String(transaction.quote.sourceAmount)),
+        sourceCurrency: transaction.quote.cryptoCurrency,
+        transactionId,
+      },
+      update: {},
+      where: { transactionId },
+    })
+    await client.transactionEconomicCost.upsert({
+      create: {
+        kind: TransactionEconomicCostKind.REFUND_FEE,
+        nativeAmount: new Prisma.Decimal(networkFee.amount),
+        nativeCurrency: networkFee.currency,
+        observedAt: new Date(),
+        operationKey: TransactionEconomicCostKind.REFUND_FEE.toLowerCase(),
+        status: TransactionEconomicCostStatus.PENDING,
+        transactionId,
+      },
+      update: {
+        nativeAmount: new Prisma.Decimal(networkFee.amount),
+        nativeCurrency: networkFee.currency,
+        observedAt: new Date(),
+        reasonCode: null,
+        status: TransactionEconomicCostStatus.PENDING,
+      },
+      where: {
+        transactionId_kind_operationKey: {
+          kind: TransactionEconomicCostKind.REFUND_FEE,
+          operationKey: TransactionEconomicCostKind.REFUND_FEE.toLowerCase(),
+          transactionId,
+        },
+      },
+    })
   }
 }

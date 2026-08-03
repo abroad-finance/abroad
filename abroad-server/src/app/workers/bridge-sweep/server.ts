@@ -4,6 +4,7 @@ import http from 'http'
 import { createScopedLogger } from '../../../core/logging/scopedLogger'
 import { ILogger } from '../../../core/logging/types'
 import { FlowRetryWorker } from '../../../modules/flows/application/FlowRetryWorker'
+import { BusinessPerformanceReconciliationWorker } from '../../../modules/operations/application/BusinessPerformanceReconciliationWorker'
 import { OpsConfigurationReleaseWorker } from '../../../modules/operations/application/OpsConfigurationReleaseWorker'
 import { OpsIncidentWorker } from '../../../modules/operations/application/OpsIncidentWorker'
 import { BridgeSweepWorker } from '../../../modules/treasury/application/BridgeSweepWorker'
@@ -37,6 +38,7 @@ let worker: BridgeSweepWorker | null = null
 let retryWorker: FlowRetryWorker | null = null
 let incidentWorker: null | OpsIncidentWorker = null
 let configurationReleaseWorker: null | OpsConfigurationReleaseWorker = null
+let businessPerformanceWorker: BusinessPerformanceReconciliationWorker | null = null
 let snapshotWorker: null | TreasurySnapshotWorker = null
 
 export function startBridgeSweepWorker(): void {
@@ -52,6 +54,8 @@ export function startBridgeSweepWorker(): void {
   incidentWorker.start()
   configurationReleaseWorker = iocContainer.get<OpsConfigurationReleaseWorker>(OpsConfigurationReleaseWorker)
   configurationReleaseWorker.start()
+  businessPerformanceWorker = iocContainer.get<BusinessPerformanceReconciliationWorker>(BusinessPerformanceReconciliationWorker)
+  businessPerformanceWorker.start()
   health.ready = true
 }
 
@@ -59,6 +63,7 @@ export async function stopBridgeSweepWorker(): Promise<void> {
   try {
     await Promise.all([
       configurationReleaseWorker?.stop(),
+      businessPerformanceWorker?.stop(),
       incidentWorker?.stop(),
       retryWorker?.stop(),
       worker?.stop(),
@@ -70,6 +75,7 @@ export async function stopBridgeSweepWorker(): Promise<void> {
     retryWorker = null
     incidentWorker = null
     configurationReleaseWorker = null
+    businessPerformanceWorker = null
     snapshotWorker = null
     health.ready = false
   }

@@ -18,8 +18,12 @@ import { PayoutSendStepExecutor } from '../../modules/flows/application/steps/Pa
 import { TreasuryTransferStepExecutor } from '../../modules/flows/application/steps/TreasuryTransferStepExecutor'
 import { KycSubmissionService } from '../../modules/kyc/application/KycSubmissionService'
 import { OpsKycService } from '../../modules/kyc/application/OpsKycService'
+import { BusinessPerformanceCostReconciler } from '../../modules/operations/application/BusinessPerformanceCostReconciler'
+import { BusinessPerformanceReconciliationService } from '../../modules/operations/application/BusinessPerformanceReconciliationService'
+import { BusinessPerformanceReconciliationWorker } from '../../modules/operations/application/BusinessPerformanceReconciliationWorker'
 import { OpsAdministrationService } from '../../modules/operations/application/OpsAdministrationService'
 import { OpsAuditService } from '../../modules/operations/application/OpsAuditService'
+import { OpsBusinessPerformanceService } from '../../modules/operations/application/OpsBusinessPerformanceService'
 import { OpsCaseService } from '../../modules/operations/application/OpsCaseService'
 import { OpsConfigurationReleaseService } from '../../modules/operations/application/OpsConfigurationReleaseService'
 import { OpsConfigurationReleaseWorker } from '../../modules/operations/application/OpsConfigurationReleaseWorker'
@@ -75,6 +79,7 @@ import { SolanaPaymentVerifier } from '../../modules/payments/infrastructure/wal
 import { SolanaWalletHandler } from '../../modules/payments/infrastructure/wallets/SolanaWalletHandler'
 import { StellarDepositVerifier } from '../../modules/payments/infrastructure/wallets/StellarDepositVerifier'
 import { StellarWalletHandler } from '../../modules/payments/infrastructure/wallets/StellarWalletHandler'
+import { QuoteRequestMetricRecorder } from '../../modules/quotes/application/QuoteRequestMetricRecorder'
 import { QuoteUseCase } from '../../modules/quotes/application/quoteUseCase'
 import { FlowCorridorPricingProvider } from '../../modules/quotes/infrastructure/FlowCorridorPricingProvider'
 import { OpsTransactionQueryService } from '../../modules/transactions/application/OpsTransactionQueryService'
@@ -127,6 +132,7 @@ const domainBindings: ReadonlyArray<BindingRegistration<unknown>> = [
   { identifier: TYPES.IWalletHandlerFactory, implementation: WalletHandlerFactory },
   { identifier: TYPES.IPixQrDecoder, implementation: PixQrDecoder },
   { identifier: TYPES.QuoteUseCase, implementation: QuoteUseCase },
+  { bindSelf: true, identifier: QuoteRequestMetricRecorder, implementation: QuoteRequestMetricRecorder },
   { identifier: TYPES.ICorridorPricingProvider, implementation: FlowCorridorPricingProvider },
   { identifier: TYPES.CeloWalletHandler, implementation: CeloWalletHandler },
   { identifier: TYPES.SolanaPaymentVerifier, implementation: SolanaPaymentVerifier },
@@ -165,6 +171,10 @@ const domainBindings: ReadonlyArray<BindingRegistration<unknown>> = [
   { bindSelf: true, identifier: OpsConfigurationReleaseWorker, implementation: OpsConfigurationReleaseWorker },
   { bindSelf: true, identifier: OpsGlobalSearchService, implementation: OpsGlobalSearchService },
   { bindSelf: true, identifier: OpsAdministrationService, implementation: OpsAdministrationService },
+  { bindSelf: true, identifier: BusinessPerformanceCostReconciler, implementation: BusinessPerformanceCostReconciler },
+  { bindSelf: true, identifier: BusinessPerformanceReconciliationService, implementation: BusinessPerformanceReconciliationService },
+  { bindSelf: true, identifier: BusinessPerformanceReconciliationWorker, implementation: BusinessPerformanceReconciliationWorker },
+  { bindSelf: true, identifier: OpsBusinessPerformanceService, implementation: OpsBusinessPerformanceService },
   { bindSelf: true, identifier: OpsIdentityService, implementation: OpsIdentityService },
   { bindSelf: true, identifier: OpsIncidentDetectionService, implementation: OpsIncidentDetectionService },
   { bindSelf: true, identifier: OpsIncidentService, implementation: OpsIncidentService },

@@ -103,6 +103,11 @@ const exchangeConvertConfigSchema = z.object({
 })
 
 const exchangeSettlementReconciliationSchema = z.object({
+  economics: z.object({
+    lockedRateNativePerUsd: z.string().regex(/^(?:0|[1-9]\d*)(?:\.\d+)?$/),
+    payoutCurrency: z.nativeEnum(TargetCurrency),
+    providerProceedsNative: z.string().regex(/^(?:0|[1-9]\d*)(?:\.\d+)?$/),
+  }).strict().optional(),
   nextSettlementAttempt: z.number().int().nonnegative(),
   providerOperationId: z.string().uuid(),
   settledSourceAmount: z.string().regex(/^(?:0|[1-9]\d*)(?:\.\d+)?$/),

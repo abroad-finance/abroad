@@ -367,6 +367,7 @@ model Quote {
   transaction    Transaction?
 
   @@index([partnerId])
+  @@index([createdAt])
 }
 
 model Transaction {
@@ -391,8 +392,10 @@ model Transaction {
   outboxEvents        OutboxEvent[]
   reconciliationItems PartnerReconciliationItem[]
   opsCase             OpsCase?
+  economics           TransactionEconomics?
 
   @@index([partnerUserId, status, createdAt], name: "transaction_partnerUser_status_createdAt_idx")
+  @@index([createdAt, status], name: "transaction_createdAt_status_idx")
 }
 
 model StellarListenerState {
@@ -921,6 +924,119 @@ enum BridgeBatchStatus {
   SUBMITTED
   CREDITED
   FAILED
+}
+
+enum QuoteRequestDirection {
+  FORWARD
+  REVERSE
+}
+
+enum QuoteRequestOutcome {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
+enum EconomicConversionStatus {
+  PENDING
+  SETTLED
+  FAILED
+  NOT_APPLICABLE
+}
+
+enum EconomicFactCoverageStatus {
+  PENDING
+  COMPLETE
+  UNAVAILABLE
+}
+
+enum TransactionEconomicCostKind {
+  PAYOUT_PROVIDER_FEE
+  BRIDGE_FEE
+  BLOCKCHAIN_FEE
+  REFUND_FEE
+}
+
+enum TransactionEconomicCostStatus {
+  PENDING
+  CONFIRMED
+  UNAVAILABLE
+  VOID
+}
+
+// One PII-free event per quote HTTP request. Successful Quote rows remain the
+// authoritative success ledger; this table supplies the otherwise-unpersisted
+// failed-request side and an explicit ingestion-coverage boundary.
+model QuoteRequestMetric {
+  id          String                @id @default(uuid())
+  direction   QuoteRequestDirection
+  outcome     QuoteRequestOutcome   @default(PENDING)
+  statusCode  Int?
+  requestedAt DateTime              @default(now())
+  completedAt DateTime?
+
+  @@index([requestedAt, outcome])
+}
+
+// Singleton reconciliation watermark and quote-metric coverage boundary.
+model BusinessPerformanceState {
+  id                  String    @id @default("singleton")
+  quoteMetricsFrom    DateTime?
+  lastReconciledAt    DateTime?
+  backfillCompletedAt DateTime?
+  updatedAt           DateTime  @updatedAt
+}
+
+// Exact transaction-level economics. Source stablecoins are nominal USD;
+// payout/proceeds stay in their native settlement currency and are converted
+// transaction-by-transaction with the locked rate below.
+model TransactionEconomics {
+  transactionId            String                   @id
+  transaction              Transaction              @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  sourceCurrency           CryptoCurrency
+  sourceAmountUsd          Decimal                  @db.Decimal(36, 18)
+  payoutCurrency           TargetCurrency
+  customerPayoutNative     Decimal                  @db.Decimal(36, 18)
+  conversionProvider       String?
+  providerOperationId      String?                  @unique
+  conversionStatus         EconomicConversionStatus @default(PENDING)
+  proceedsCoverage         EconomicFactCoverageStatus @default(PENDING)
+  lockedRateNativePerUsd   Decimal?                 @db.Decimal(36, 18)
+  providerProceedsNative   Decimal?                 @db.Decimal(36, 18)
+  proceedsUnavailableReason String?
+  settledAt                DateTime?
+  lastReconciledAt         DateTime?
+  createdAt                DateTime                 @default(now())
+  updatedAt                DateTime                 @updatedAt
+  costs                    TransactionEconomicCost[]
+
+  @@index([conversionStatus, settledAt])
+  @@index([lastReconciledAt])
+  @@index([payoutCurrency, conversionStatus])
+}
+
+// A transaction can incur multiple independently reconcilable costs. The
+// operation key is stable across retries and status transitions, preventing a
+// duplicated financial cost from entering the report.
+model TransactionEconomicCost {
+  id             String                        @id @default(uuid())
+  transactionId  String
+  economics      TransactionEconomics          @relation(fields: [transactionId], references: [transactionId], onDelete: Cascade)
+  kind           TransactionEconomicCostKind
+  operationKey   String
+  status         TransactionEconomicCostStatus @default(PENDING)
+  nativeAmount   Decimal?                      @db.Decimal(36, 18)
+  nativeCurrency String?
+  usdRate        Decimal?                      @db.Decimal(36, 18)
+  usdAmount      Decimal?                      @db.Decimal(36, 18)
+  reasonCode     String?
+  observedAt     DateTime?
+  createdAt      DateTime                      @default(now())
+  updatedAt      DateTime                      @updatedAt
+
+  @@unique([transactionId, kind, operationKey])
+  @@index([kind, status, observedAt])
+  @@index([transactionId, status])
 }
 
 // One per ENQUEUE_BRIDGE step: the USDC a flow deposited at Binance that still

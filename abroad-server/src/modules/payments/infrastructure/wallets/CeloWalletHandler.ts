@@ -5,7 +5,7 @@ import { inject, injectable } from 'inversify'
 import { TYPES } from '../../../../app/container/types'
 import { ILogger } from '../../../../core/logging/types'
 import { ISecretManager, Secrets } from '../../../../platform/secrets/ISecretManager'
-import { IWalletHandler, WalletSendParams, WalletSendResult } from '../../application/contracts/IWalletHandler'
+import { IWalletHandler, WalletSendParams, WalletSendResult, WalletTransactionFeeResult } from '../../application/contracts/IWalletHandler'
 import { CryptoAssetConfigService } from '../../application/CryptoAssetConfigService'
 import { fetchErc20Decimals, parseErc20Transfers, safeNormalizeAddress } from './celoErc20'
 
@@ -83,6 +83,24 @@ export class CeloWalletHandler implements IWalletHandler {
     return sender
   }
 
+  public async getTransactionFee(transactionId: string): Promise<WalletTransactionFeeResult> {
+    try {
+      const rpcUrl = await this.secretManager.getSecret(Secrets.CELO_RPC_URL)
+      const receipt = await this.getOrCreateProvider(rpcUrl).getTransactionReceipt(transactionId)
+      if (!receipt) return { outcome: 'pending', reason: 'celo_transaction_read_pending' }
+      return {
+        fee: {
+          amount: ethers.utils.formatEther(receipt.gasUsed.mul(receipt.effectiveGasPrice)),
+          currency: 'CELO',
+        },
+        outcome: 'found',
+      }
+    }
+    catch {
+      return { outcome: 'pending', reason: 'celo_transaction_read_pending' }
+    }
+  }
+
   public async send({ address, amount, cryptoCurrency }: WalletSendParams): Promise<WalletSendResult> {
     if (!Number.isFinite(amount) || amount <= 0) {
       return { code: 'validation', reason: 'invalid_amount', success: false }
@@ -118,7 +136,22 @@ export class CeloWalletHandler implements IWalletHandler {
         return { code: 'retriable', reason: 'transaction_failed', success: false, transactionId: tx.hash }
       }
 
-      return { success: true, transactionId: tx.hash }
+      let networkFee: undefined | { amount: string, currency: string }
+      try {
+        networkFee = {
+          amount: ethers.utils.formatEther(receipt.gasUsed.mul(receipt.effectiveGasPrice)),
+          currency: 'CELO',
+        }
+      }
+      catch {
+        // The transfer is already confirmed; authoritative fee recovery can run asynchronously.
+        this.logger.warn('Celo network fee capture deferred after confirmed transfer')
+      }
+      return {
+        ...(networkFee ? { networkFee } : {}),
+        success: true,
+        transactionId: tx.hash,
+      }
     }
     catch (error: unknown) {
       const reason = this.describeError(error)
