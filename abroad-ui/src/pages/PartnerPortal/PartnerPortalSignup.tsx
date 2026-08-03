@@ -188,8 +188,8 @@ const PartnerPortalSignup = () => {
       setCanResend(false)
       setResendNotice('If this pending account is eligible, another verification link is now queued.')
     }
-    catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Another link could not be requested')
+    catch (error_) {
+      setError(error_ instanceof Error ? error_.message : 'Another link could not be requested')
     }
     finally {
       setLoading(false)
