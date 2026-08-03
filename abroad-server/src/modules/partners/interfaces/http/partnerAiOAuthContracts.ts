@@ -13,6 +13,7 @@ import { parsePartnerAiScopes, partnerAiScopeNames } from '../../application/par
 
 const BASE64URL_PATTERN = /^[A-Za-z0-9_-]+$/
 const CLIENT_ID_PATTERN = /^[A-Za-z0-9._~-]+$/
+const LOOPBACK_REDIRECT_HOSTS = new Set(['127.0.0.1', '[::1]', 'localhost'])
 const UNSAFE_CLIENT_NAME_PATTERN = /[\u0000-\u001F\u007F-\u009F\u202A-\u202E\u2066-\u2069]/u
 const MAX_REDIRECT_URI_LENGTH = 2_048
 
@@ -20,9 +21,7 @@ export const parsePartnerAiRedirect = (value: string): null | PartnerAiRedirect 
   if (!value || value.length > MAX_REDIRECT_URI_LENGTH || value.includes('#')) return null
   try {
     const url = new URL(value)
-    const loopback = url.protocol === 'http:' && (
-      url.hostname === '127.0.0.1' || url.hostname === '[::1]'
-    )
+    const loopback = url.protocol === 'http:' && LOOPBACK_REDIRECT_HOSTS.has(url.hostname)
     if (
       (url.protocol !== 'https:' && !loopback)
       || url.username.length > 0

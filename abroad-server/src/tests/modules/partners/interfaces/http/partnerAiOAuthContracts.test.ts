@@ -22,10 +22,19 @@ describe('partner AI OAuth contracts', () => {
       destinationHost: 'This device',
       uri: 'http://[::1]:49152/callback',
     })
+    expect(parsePartnerAiRedirect('http://localhost:49152/callback')).toEqual({
+      destinationHost: 'This device',
+      uri: 'http://localhost:49152/callback',
+    })
   })
 
   it.each([
     'http://assistant.example/callback',
+    'http://assistant.localhost/callback',
+    'http://localhost.evil.example/callback',
+    'http://localhost.:49152/callback',
+    'http://user:password@localhost:49152/callback',
+    'http://localhost:49152/callback#fragment',
     'https://user:password@assistant.example/callback',
     'https://assistant.example/callback#fragment',
     'https://assistant.example/callback#',
@@ -57,6 +66,25 @@ describe('partner AI OAuth contracts', () => {
       scopes: ['account:read', 'docs:read', 'offline_access'],
     })
     expect(JSON.stringify(result)).not.toContain('client_secret')
+  })
+
+  it('accepts Claude public-client registration with an ephemeral localhost callback', () => {
+    expect(parsePartnerAiClientRegistration({
+      client_name: 'Claude Code',
+      grant_types: ['authorization_code', 'refresh_token'],
+      redirect_uris: ['http://localhost:54321/callback'],
+      response_types: ['code'],
+      scope: 'account:read offline_access',
+      token_endpoint_auth_method: 'none',
+    })).toEqual({
+      clientName: 'Claude Code',
+      clientUri: undefined,
+      redirectUris: [{
+        destinationHost: 'This device',
+        uri: 'http://localhost:54321/callback',
+      }],
+      scopes: ['account:read', 'offline_access'],
+    })
   })
 
   it.each([

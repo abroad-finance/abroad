@@ -29,6 +29,8 @@ Abroad supports remote MCP clients that implement:
 - PKCE with `S256`.
 - Resource-bound bearer tokens and OAuth refresh-token rotation.
 
+Redirect destinations must use HTTPS, except for local desktop callbacks. Those callbacks may use HTTP with the exact host `localhost`, `127.0.0.1`, or `[::1]` and an ephemeral port. Other HTTP hosts, hostname suffixes, and localhost aliases are rejected.
+
 Abroad publishes client-specific setup cards only after testing that client's complete connection flow. Until a named guide is shown in the portal, use the generic instructions below. Abroad does not provide or endorse unverified installation deep links.
 
 ## Connect another MCP client
