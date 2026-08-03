@@ -171,7 +171,7 @@ describe('OpsBusinessPerformanceService', () => {
     })
   })
 
-  it('returns null rates for zero denominators and never fabricates net earnings with missing costs', async () => {
+  it('returns null rates for zero denominators and exposes confirmed-cost earnings with partial coverage', async () => {
     const incomplete = transaction({
       economics: settledEconomics([]),
     })
@@ -198,9 +198,62 @@ describe('OpsBusinessPerformanceService', () => {
 
     expect(report.comparison.quoteSuccessRate).toBeNull()
     expect(report.comparison.terminalCompletionRate).toBeNull()
-    expect(report.current.netTransactionEarningsUsd).toBeNull()
+    expect(report.current.netTransactionEarningsUsd).toBe(2.2)
+    expect(report.coverage.earnings.missingCostCount).toBe(3)
     expect(report.coverage.earnings.status).toBe('PARTIAL')
+    expect(report.coverage.earnings.warnings).toContain(
+      'Net earnings include only confirmed costs; unresolved provider, bridge, blockchain, or refund costs are excluded and may reduce the value when reconciled.',
+    )
     expect(report.coverage.quotes.complete).toBe(false)
+  })
+
+  it('does not treat a confirmed cost without a USD amount as covered', async () => {
+    const costs = [
+      {
+        kind: TransactionEconomicCostKind.BLOCKCHAIN_FEE,
+        status: TransactionEconomicCostStatus.CONFIRMED,
+        usdAmount: null,
+      },
+      {
+        kind: TransactionEconomicCostKind.BRIDGE_FEE,
+        status: TransactionEconomicCostStatus.VOID,
+        usdAmount: null,
+      },
+      {
+        kind: TransactionEconomicCostKind.PAYOUT_PROVIDER_FEE,
+        status: TransactionEconomicCostStatus.VOID,
+        usdAmount: null,
+      },
+    ]
+    const client = {
+      businessPerformanceState: {
+        findUnique: jest.fn().mockResolvedValue({
+          backfillCompletedAt: new Date(),
+          lastReconciledAt: new Date(),
+          quoteMetricsFrom: new Date('2026-07-01T00:00:00.000Z'),
+        }),
+      },
+      quote: { count: jest.fn() },
+      quoteRequestMetric: { groupBy: jest.fn().mockResolvedValue([]) },
+      transaction: {
+        findMany: jest.fn()
+          .mockResolvedValueOnce([transaction({ economics: settledEconomics(costs) })])
+          .mockResolvedValueOnce([]),
+      },
+    }
+    const service = new OpsBusinessPerformanceService({
+      getClient: jest.fn().mockResolvedValue(client),
+    } as unknown as IDatabaseClientProvider)
+
+    const report = await service.getReport({
+      comparison: { from: new Date('2026-07-31T00:00:00.000Z'), to: new Date('2026-08-01T00:00:00.000Z') },
+      primary: { from: new Date('2026-08-01T00:00:00.000Z'), to: new Date('2026-08-02T00:00:00.000Z') },
+    })
+
+    expect(report.current.costCoverageComplete).toBe(false)
+    expect(report.current.netTransactionEarningsUsd).toBe(2.2)
+    expect(report.coverage.earnings.missingCostCount).toBe(1)
+    expect(report.coverage.earnings.status).toBe('PARTIAL')
   })
 
   it('splits successful quote counting at the durable request-metric boundary', async () => {

@@ -90,7 +90,10 @@ const countMissingCost = (
 ): number => costs.some(cost => (
   cost.kind === kind
   && (
-    cost.status === TransactionEconomicCostStatus.CONFIRMED
+    (
+      cost.status === TransactionEconomicCostStatus.CONFIRMED
+      && cost.usdAmount !== null
+    )
     || cost.status === TransactionEconomicCostStatus.VOID
   )
 ))
@@ -265,13 +268,15 @@ export const summarizeBusinessPerformancePeriod = (params: {
   }
 
   if (missingCostCount > 0) {
-    warnings.add('Net earnings are unavailable where required provider, bridge, blockchain, or refund costs are not confirmed.')
+    warnings.add('Net earnings include only confirmed costs; unresolved provider, bridge, blockchain, or refund costs are excluded and may reduce the value when reconciled.')
   }
 
   const confirmedCosts = totals.allocatedBridgeCostsUsd
     .plus(totals.blockchainAndRefundGasUsd)
     .plus(totals.providerPayoutCostsUsd)
-  const netTransactionEarningsUsd = missingCostCount === 0 && missingEconomicFactCount === 0
+  const hasReportableEarnings = realizedTransactionCount > 0
+    || (missingCostCount === 0 && missingEconomicFactCount === 0)
+  const netTransactionEarningsUsd = hasReportableEarnings
     ? asOutputNumber(totals.grossTransactionMarginUsd.minus(confirmedCosts))
     : null
   const quoteTerminalCount = params.successfulQuotes + failedQuotes

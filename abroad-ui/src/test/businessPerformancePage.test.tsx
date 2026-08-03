@@ -83,7 +83,7 @@ const buildReport = (overrides: Partial<BusinessPerformanceResponse> = {}): Busi
     grossTransactionMarginUsd: 3,
     inFlightTransactions: 0,
     nativeCompletedPayouts: [{ amount: 450, currency: 'BRL' }, { amount: 210_000, currency: 'COP' }],
-    netTransactionEarningsUsd: null,
+    netTransactionEarningsUsd: 2.68,
     providerPayoutCostsUsd: 0,
     quoteRequests: 12,
     quoteSuccessRate: 83.33,
@@ -106,11 +106,11 @@ const buildReport = (overrides: Partial<BusinessPerformanceResponse> = {}): Busi
       unit: 'COUNT',
     },
     {
-      change: null,
+      change: 49.72,
       changeKind: 'PERCENT',
       comparisonValue: 1.79,
       currency: 'USD',
-      currentValue: null,
+      currentValue: 2.68,
       id: 'net-transaction-earnings',
       label: 'Net transaction earnings',
       unit: 'USD',
@@ -164,6 +164,7 @@ describe('BusinessPerformance', () => {
     expect(screen.getAllByText(/inclusive → .* exclusive/)).toHaveLength(2)
     expect(screen.getByText('Partial earnings coverage')).toBeInTheDocument()
     expect(screen.getByText('Two required external costs are unavailable.')).toBeInTheDocument()
+    expect(screen.getByText(/unresolved required costs are excluded—not treated as zero/i)).toBeInTheDocument()
     expect(screen.getByText('BRL', { selector: 'span' })).toBeInTheDocument()
     expect(screen.getByText('USD', { selector: 'span' })).toBeInTheDocument()
     expect(screen.getByText('+5.00 pp')).toBeInTheDocument()

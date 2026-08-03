@@ -232,7 +232,8 @@ const BusinessPerformance = () => {
 
           <p className="text-xs leading-5 text-ops-muted">
             USDC and USDT are reported nominally in USD. Native payout and Ultra amounts remain separated by currency; BRL and COP are never combined.
-            Net earnings include only completed payouts with reconciled settled-conversion economics; completed payouts awaiting conversion settlement remain visible separately.
+            Net earnings recognize revenue only from completed payouts with reconciled settled-conversion economics and subtract confirmed costs across the selected transaction cohort.
+            When coverage is partial, unresolved required costs are excluded—not treated as zero—and the value may decrease after reconciliation; completed payouts awaiting conversion settlement remain visible separately.
           </p>
         </div>
       )}
