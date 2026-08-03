@@ -49,6 +49,7 @@ import { PartnerAiWebhookDiagnosticsService } from '../../modules/partners/appli
 import { PartnerPortalAccountService } from '../../modules/partners/application/PartnerPortalAccountService'
 import { PartnerPortalApiKeyService } from '../../modules/partners/application/PartnerPortalApiKeyService'
 import { PartnerPortalAuditService } from '../../modules/partners/application/PartnerPortalAuditService'
+import { PartnerPortalEmailDeliveryLifecycleService } from '../../modules/partners/application/PartnerPortalEmailDeliveryLifecycleService'
 import { PartnerPortalIdentityService } from '../../modules/partners/application/PartnerPortalIdentityService'
 import { PartnerPortalMfaService } from '../../modules/partners/application/PartnerPortalMfaService'
 import { PartnerPortalPasswordService } from '../../modules/partners/application/PartnerPortalPasswordService'
@@ -57,9 +58,11 @@ import { PartnerPortalSessionService } from '../../modules/partners/application/
 import { PartnerPortalSignupProtectionService } from '../../modules/partners/application/PartnerPortalSignupProtectionService'
 import { PartnerPortalSignupService } from '../../modules/partners/application/PartnerPortalSignupService'
 import { PartnerPortalTeamService } from '../../modules/partners/application/PartnerPortalTeamService'
+import { PartnerPortalVerificationEmailOutboxHandler } from '../../modules/partners/application/PartnerPortalVerificationEmailOutboxHandler'
 import { PartnerPortalWebhookService } from '../../modules/partners/application/PartnerPortalWebhookService'
 import { PartnerWebhookSecretResolver } from '../../modules/partners/application/PartnerWebhookSecretResolver'
 import { ResendPartnerPortalEmailSender } from '../../modules/partners/application/ResendPartnerPortalEmailSender'
+import { ResendWebhookVerifier } from '../../modules/partners/infrastructure/ResendWebhookVerifier'
 import { CryptoAssetConfigService } from '../../modules/payments/application/CryptoAssetConfigService'
 import { DepositVerifierRegistry } from '../../modules/payments/application/DepositVerifierRegistry'
 import { LiquidityCacheService } from '../../modules/payments/application/LiquidityCacheService'
@@ -199,13 +202,16 @@ const domainBindings: ReadonlyArray<BindingRegistration<unknown>> = [
   { bindSelf: true, identifier: PartnerPortalSecretEnvelopeService, implementation: PartnerPortalSecretEnvelopeService },
   { bindSelf: true, identifier: PartnerPortalAuditService, implementation: PartnerPortalAuditService },
   { bindSelf: true, identifier: PartnerPortalIdentityService, implementation: PartnerPortalIdentityService },
+  { bindSelf: true, identifier: PartnerPortalEmailDeliveryLifecycleService, implementation: PartnerPortalEmailDeliveryLifecycleService },
   { bindSelf: true, identifier: PartnerPortalTeamService, implementation: PartnerPortalTeamService },
   { bindSelf: true, identifier: PartnerPortalWebhookService, implementation: PartnerPortalWebhookService },
   { bindSelf: true, identifier: PartnerWebhookSecretResolver, implementation: PartnerWebhookSecretResolver },
   { bindSelf: true, identifier: PartnerPortalSessionService, implementation: PartnerPortalSessionService },
   { bindSelf: true, identifier: PartnerPortalAccountService, implementation: PartnerPortalAccountService },
   { bindSelf: true, identifier: PartnerPortalSignupProtectionService, implementation: PartnerPortalSignupProtectionService },
+  { identifier: TYPES.OutboxDeliveryHandler, implementation: PartnerPortalVerificationEmailOutboxHandler },
   { bindSelf: true, identifier: ResendPartnerPortalEmailSender, implementation: ResendPartnerPortalEmailSender },
+  { bindSelf: true, identifier: ResendWebhookVerifier, implementation: ResendWebhookVerifier },
   { bindSelf: true, identifier: PartnerPortalSignupService, implementation: PartnerPortalSignupService },
   { bindSelf: true, identifier: FlowDefinitionBuilder, implementation: FlowDefinitionBuilder },
   { bindSelf: true, identifier: FlowDefinitionService, implementation: FlowDefinitionService },

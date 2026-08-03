@@ -34,6 +34,7 @@ const typeKeys = [
   'IWebhookNotifier',
   'IWebSocketService',
   'OutboxWorker',
+  'OutboxDeliveryHandler',
   'PaymentStatusUpdatedController',
   'PaymentUseCase',
   'QuoteUseCase',

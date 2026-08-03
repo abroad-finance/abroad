@@ -11,7 +11,7 @@ import { PartnerPortalSignupController } from '../../../../../modules/partners/i
 
 type SignupServiceMock = Pick<
   PartnerPortalSignupService,
-  'createChallenge' | 'signup' | 'verifyEmail'
+  'createChallenge' | 'resendVerificationEmail' | 'signup' | 'verifyEmail'
 >
 
 const request = {
@@ -38,6 +38,10 @@ const buildService = (): jest.Mocked<SignupServiceMock> => ({
     expiresAt: new Date('2026-08-02T15:15:00.000Z'),
     readyAt: new Date('2026-08-02T15:00:01.500Z'),
   })),
+  resendVerificationEmail: jest.fn<
+    ReturnType<PartnerPortalSignupService['resendVerificationEmail']>,
+    Parameters<PartnerPortalSignupService['resendVerificationEmail']>
+  >(async () => ({ status: 'VERIFICATION_REQUIRED' })),
   signup: jest.fn<
     ReturnType<PartnerPortalSignupService['signup']>,
     Parameters<PartnerPortalSignupService['signup']>
@@ -127,6 +131,55 @@ describe('PartnerPortalSignupController', () => {
 
     expect(result).toEqual({ reason: 'Check the signup details and try again' })
     expect(service.signup).not.toHaveBeenCalled()
+  })
+
+  it('accepts credential-protected verification recovery with the same generic response', async () => {
+    const service = buildService()
+    const controller = new PartnerPortalSignupController(
+      service as unknown as PartnerPortalSignupService,
+    )
+
+    const result = await controller.resendVerificationEmail(
+      request,
+      {
+        challengeToken: signupBody.challengeToken,
+        contactWebsite: '',
+        email: signupBody.email,
+        password: signupBody.password,
+      },
+      badRequestResponder(),
+      tooManyRequestsResponder(),
+    )
+
+    expect(result).toEqual({ status: 'VERIFICATION_REQUIRED' })
+    expect(service.resendVerificationEmail).toHaveBeenCalledWith({
+      challengeToken: signupBody.challengeToken,
+      clientIp: '203.0.113.10',
+      email: 'Admin@Atlas.Example',
+      honeypot: '',
+      password: signupBody.password,
+    })
+  })
+
+  it('rejects malformed verification recovery before reading account state', async () => {
+    const service = buildService()
+    const controller = new PartnerPortalSignupController(
+      service as unknown as PartnerPortalSignupService,
+    )
+
+    const result = await controller.resendVerificationEmail(
+      request,
+      {
+        challengeToken: signupBody.challengeToken,
+        email: 'invalid',
+        password: signupBody.password,
+      },
+      badRequestResponder(),
+      tooManyRequestsResponder(),
+    )
+
+    expect(result).toEqual({ reason: 'Check the email and password and try again' })
+    expect(service.resendVerificationEmail).not.toHaveBeenCalled()
   })
 
   it('maps rate limits and verification failures to bounded public errors', async () => {

@@ -21,6 +21,7 @@ import type {
   PartnerPortalSignupChallenge,
   PartnerPortalSignupInput,
   PartnerPortalUser,
+  PartnerPortalVerificationEmailResendInput,
   PartnerPortalWebhookConfiguration,
   PartnerPortalWebhookSecretResult,
   PartnerPortalWebhookTestResult,
@@ -244,6 +245,16 @@ export const createPartnerPortalSignupChallenge = async (): Promise<PartnerPorta
   const result = await bootstrapClient.request<PartnerPortalSignupChallenge, ApiErrorBody>(
     '/partner-portal/signup/challenge',
     jsonRequest('POST'),
+  )
+  return unwrap(result)
+}
+
+export const resendPartnerPortalSignupVerificationEmail = async (
+  input: PartnerPortalVerificationEmailResendInput,
+): Promise<PartnerPortalSignupAcknowledgement> => {
+  const result = await bootstrapClient.request<PartnerPortalSignupAcknowledgement, ApiErrorBody>(
+    '/partner-portal/signup/email-verification/resend',
+    jsonRequest('POST', input),
   )
   return unwrap(result)
 }

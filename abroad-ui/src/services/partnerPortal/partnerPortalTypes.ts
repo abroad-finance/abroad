@@ -204,6 +204,13 @@ export type PartnerPortalUser = {
   role: PartnerPortalRole
 }
 
+export type PartnerPortalVerificationEmailResendInput = {
+  challengeToken: string
+  contactWebsite?: string
+  email: string
+  password: string
+}
+
 export type PartnerPortalWebhookConfiguration = {
   active: {
     managedSecret: boolean

@@ -23,6 +23,7 @@ import {
   listPartnerTransactions,
   recordPartnerAiProductEvent,
   redeliverPartnerWebhook,
+  resendPartnerPortalSignupVerificationEmail,
   resetPartnerPasswordWithRecoveryCode,
   revokePartnerAiConnection,
   stagePartnerWebhookUrl,
@@ -116,6 +117,16 @@ describe('partner portal API', () => {
           userId: 'user-1',
         })
       }),
+      http.post('https://api.abroad.finance/partner-portal/signup/email-verification/resend', async ({ request }) => {
+        expect(request.headers.get('authorization')).toBeNull()
+        await expect(request.json()).resolves.toEqual({
+          challengeToken: 'signed-challenge',
+          contactWebsite: '',
+          email: 'admin@atlas.example',
+          password: 'correct horse battery staple',
+        })
+        return HttpResponse.json({ status: 'VERIFICATION_REQUIRED' }, { status: 202 })
+      }),
     )
 
     await expect(createPartnerPortalSignupChallenge()).resolves.toEqual(
@@ -131,6 +142,12 @@ describe('partner portal API', () => {
       lastName: 'Silva',
       password: 'correct horse battery staple',
     }, 'signup-request-001')).resolves.toEqual({ status: 'VERIFICATION_REQUIRED' })
+    await expect(resendPartnerPortalSignupVerificationEmail({
+      challengeToken: 'signed-challenge',
+      contactWebsite: '',
+      email: 'admin@atlas.example',
+      password: 'correct horse battery staple',
+    })).resolves.toEqual({ status: 'VERIFICATION_REQUIRED' })
     await expect(verifyPartnerPortalSignupEmail('verification-token')).resolves.toEqual(
       expect.objectContaining({ accessToken: 'verified-session' }),
     )

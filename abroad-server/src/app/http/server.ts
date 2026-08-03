@@ -38,24 +38,27 @@ const logger = iocContainer.get<ILogger>(TYPES.ILogger)
 const health = { ready: false }
 app.use(cors())
 
-const captureTransferoUltraRawBody: bodyParser.OptionsJson['verify'] = (
+const captureWebhookRawBody: bodyParser.OptionsJson['verify'] = (
   request,
   _response,
   buffer,
 ) => {
   const incoming = request as typeof request & { originalUrl?: string }
   const pathWithoutQuery = (incoming.originalUrl ?? incoming.url ?? '').split('?', 1)[0]
-  if (pathWithoutQuery === '/webhook/transfero') {
+  if (
+    pathWithoutQuery === '/webhook/transfero'
+    || pathWithoutQuery === '/webhook/resend'
+  ) {
     const rawBodyRequest = request as unknown as RawBodyRequest
     rawBodyRequest.rawBody = Buffer.from(buffer)
   }
 }
 
-app.use(bodyParser.json({ verify: captureTransferoUltraRawBody }))
+app.use(bodyParser.json({ verify: captureWebhookRawBody }))
 // Handle text/json content-type generically (kept small)
 app.use(bodyParser.json({
   type: 'text/json',
-  verify: captureTransferoUltraRawBody,
+  verify: captureWebhookRawBody,
 }))
 app.use(requestContextMiddleware)
 app.use(iocContainer.get(QuoteRequestMetricRecorder).middleware())

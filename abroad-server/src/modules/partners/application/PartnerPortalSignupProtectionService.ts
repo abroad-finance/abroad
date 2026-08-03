@@ -65,6 +65,22 @@ export class PartnerPortalSignupProtectionService {
     private readonly secretManager: ISecretManager,
   ) {}
 
+  public async assertResendAllowed(input: {
+    challengeToken: string
+    clientIp: string
+    email: string
+    honeypot: string
+  }): Promise<void> {
+    await this.consumeRateLimits([
+      { context: 'resend-ip', identifier: input.clientIp, limit: 10, windowMs: ONE_HOUR_MS },
+      { context: 'resend-email', identifier: input.email, limit: 5, windowMs: ONE_HOUR_MS },
+    ])
+    if (input.honeypot.trim().length > 0) {
+      throw new PartnerPortalSignupProtectionError('Signup request could not be verified')
+    }
+    await this.verifyChallenge(input.challengeToken)
+  }
+
   public async assertSignupAllowed(input: {
     challengeToken: string
     clientIp: string

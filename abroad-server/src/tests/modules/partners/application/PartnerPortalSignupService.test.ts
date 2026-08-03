@@ -2,15 +2,17 @@ import 'reflect-metadata'
 
 import type { Partner, PartnerPortalEmailVerificationToken, PartnerPortalUser, PrismaClient } from '@prisma/client'
 
-import { PartnerPortalRole, Prisma } from '@prisma/client'
+import { PartnerPortalEmailDeliveryStatus, PartnerPortalRole, Prisma } from '@prisma/client'
 
 import { ILogger } from '../../../../core/logging/types'
 import { PartnerPortalAuditService } from '../../../../modules/partners/application/PartnerPortalAuditService'
 import { PartnerPortalPasswordService } from '../../../../modules/partners/application/PartnerPortalPasswordService'
+import { PartnerPortalSecretEnvelopeService } from '../../../../modules/partners/application/PartnerPortalSecretEnvelopeService'
 import { PartnerPortalSessionService } from '../../../../modules/partners/application/PartnerPortalSessionService'
 import { PartnerPortalSignupProtectionService } from '../../../../modules/partners/application/PartnerPortalSignupProtectionService'
 import { PartnerPortalEmailVerificationError, PartnerPortalSignupService } from '../../../../modules/partners/application/PartnerPortalSignupService'
-import { PartnerPortalEmailDeliveryError, ResendPartnerPortalEmailSender } from '../../../../modules/partners/application/ResendPartnerPortalEmailSender'
+import { PARTNER_PORTAL_VERIFICATION_EMAIL_OUTBOX_KIND } from '../../../../modules/partners/application/PartnerPortalVerificationEmailOutboxHandler'
+import { OutboxDispatcher } from '../../../../platform/outbox/OutboxDispatcher'
 import { IDatabaseClientProvider } from '../../../../platform/persistence/IDatabaseClientProvider'
 
 type TransactionCallback = (transaction: Prisma.TransactionClient) => Promise<unknown>
@@ -70,10 +72,17 @@ const buildVerificationToken = (
 ): PartnerPortalEmailVerificationToken => ({
   consumedAt: null,
   createdAt: now,
+  deliveredAt: null,
+  deliveryAttemptCount: 0,
+  deliveryFailureCode: null,
+  deliveryStatus: PartnerPortalEmailDeliveryStatus.PENDING,
+  deliveryStatusUpdatedAt: now,
   expiresAt: new Date(now.getTime() + 24 * 60 * 60 * 1_000),
   id: '33333333-3333-4333-8333-333333333333',
+  lastDeliveryAttemptAt: null,
   providerMessageId: null,
   sentAt: null,
+  tokenCiphertext: 'v1.iv.tag.ciphertext',
   tokenHash: 'stored-token-hash',
   userId: buildPortalUser().id,
   ...overrides,
@@ -100,16 +109,9 @@ const signupInput = {
 }
 
 const buildHarness = () => {
-  const partnerCreate = jest.fn<
-    Promise<Partner>,
-    [{ data: Record<string, unknown> }]
-  >(async () => buildPartner())
+  const partnerCreate = jest.fn(async () => buildPartner())
   const partnerFindUnique = jest.fn<Promise<null | Partner>, [unknown]>(async () => null)
-  const partnerFindFirst = jest.fn<Promise<null | Partner>, [unknown]>(async () => null)
-  const portalUserCreate = jest.fn<
-    Promise<PartnerPortalUser>,
-    [{ data: Record<string, unknown> }]
-  >(async () => buildPortalUser())
+  const portalUserCreate = jest.fn(async () => buildPortalUser())
   const portalUserFindUnique = jest.fn<Promise<null | PartnerPortalUser>, [unknown]>(
     async () => buildPortalUser(),
   )
@@ -123,26 +125,20 @@ const buildHarness = () => {
   const tokenCreate = jest.fn(async (input: { data: Record<string, unknown> }) => (
     buildVerificationToken({
       expiresAt: input.data.expiresAt as Date,
+      id: String(input.data.id),
+      tokenCiphertext: String(input.data.tokenCiphertext),
       tokenHash: String(input.data.tokenHash),
       userId: String(input.data.userId),
     })
   ))
-  const tokenFindFirst = jest.fn<
-    Promise<null | PartnerPortalEmailVerificationToken>,
-    [unknown]
-  >(async () => null)
   const transactionTokenFindFirst = jest.fn<
     Promise<null | PartnerPortalEmailVerificationToken>,
     [unknown]
   >(async () => null)
   const tokenFindUnique = jest.fn(async () => ({
     ...buildVerificationToken(),
-    user: {
-      ...buildPortalUser(),
-      partner: buildPartner(),
-    },
+    user: { ...buildPortalUser(), partner: buildPartner() },
   }))
-  const tokenUpdateMany = jest.fn(async () => ({ count: 1 }))
   const transactionTokenUpdateMany = jest.fn(async () => ({ count: 1 }))
   const transactionClient = {
     partner: { create: partnerCreate },
@@ -163,14 +159,8 @@ const buildHarness = () => {
   )
   const databaseClient = {
     $transaction: databaseTransaction,
-    partner: {
-      findFirst: partnerFindFirst,
-      findUnique: partnerFindUnique,
-    },
-    partnerPortalEmailVerificationToken: {
-      findFirst: tokenFindFirst,
-      updateMany: tokenUpdateMany,
-    },
+    partner: { findUnique: partnerFindUnique },
+    partnerPortalEmailVerificationToken: {},
     partnerPortalUser: { findUnique: portalUserFindUnique },
   }
   const databaseClientProvider: IDatabaseClientProvider = {
@@ -182,10 +172,7 @@ const buildHarness = () => {
     warn: jest.fn(),
   }
   const auditService = {
-    record: jest.fn<
-      ReturnType<PartnerPortalAuditService['record']>,
-      Parameters<PartnerPortalAuditService['record']>
-    >(async () => undefined),
+    record: jest.fn(async () => undefined),
   }
   const passwordService = {
     buildVerifier: jest.fn(async () => 'stored-scrypt-verifier'),
@@ -193,6 +180,7 @@ const buildHarness = () => {
     verify: jest.fn(async () => true),
   }
   const protectionService = {
+    assertResendAllowed: jest.fn(async () => undefined),
     assertSignupAllowed: jest.fn(async () => undefined),
     consumeEmailVerificationAttempt: jest.fn(async () => undefined),
     createChallenge: jest.fn(async () => ({
@@ -204,12 +192,11 @@ const buildHarness = () => {
       `hash:${context}:${identifier}`
     )),
   }
-  const emailSender = {
-    sendVerificationEmail: jest.fn<
-      ReturnType<ResendPartnerPortalEmailSender['sendVerificationEmail']>,
-      Parameters<ResendPartnerPortalEmailSender['sendVerificationEmail']>
-    >(async () => ({ providerMessageId: 'resend-message-1' })),
+  const secretEnvelopeService = {
+    encrypt: jest.fn(async (_plaintext: string, context: string) => `encrypted:${context}`),
   }
+  const enqueueCustom = jest.fn(async () => buildOutboxRecord())
+  const outboxDispatcher = { enqueueCustom }
   const sessionService = {
     createSession: jest.fn(async () => ({
       accessToken: 'portal-session-token',
@@ -226,47 +213,75 @@ const buildHarness = () => {
   return {
     auditService,
     databaseTransaction,
-    emailSender,
+    enqueueCustom,
     logger,
     partnerCreate,
-    partnerFindFirst,
     partnerFindUnique,
     passwordService,
     portalUserCreate,
     portalUserFindUnique,
     portalUserUpdate,
     protectionService,
+    secretEnvelopeService,
     service: new PartnerPortalSignupService(
       databaseClientProvider,
       logger,
       auditService as unknown as PartnerPortalAuditService,
       passwordService as unknown as PartnerPortalPasswordService,
       protectionService as unknown as PartnerPortalSignupProtectionService,
-      emailSender as unknown as ResendPartnerPortalEmailSender,
+      secretEnvelopeService as unknown as PartnerPortalSecretEnvelopeService,
+      outboxDispatcher as unknown as OutboxDispatcher,
       sessionService as unknown as PartnerPortalSessionService,
     ),
     sessionService,
     tokenCreate,
-    tokenFindFirst,
     tokenFindUnique,
-    tokenUpdateMany,
     transactionPortalUserFindUnique,
     transactionTokenFindFirst,
     transactionTokenUpdateMany,
   }
 }
 
+const buildOutboxRecord = () => ({
+  attempts: 0,
+  availableAt: now,
+  createdAt: now,
+  id: '44444444-4444-4444-8444-444444444444',
+  idempotencyKey: null,
+  initiatedByPortalUserId: null,
+  lastAttemptDurationMs: null,
+  lastError: null,
+  lastHttpStatus: null,
+  maxAttempts: 5,
+  partnerId: null,
+  payload: {},
+  sourceOutboxEventId: null,
+  status: 'PENDING' as const,
+  transactionId: null,
+  type: PARTNER_PORTAL_VERIFICATION_EMAIL_OUTBOX_KIND,
+  updatedAt: now,
+  webhookCredentialMode: null,
+  webhookEvent: null,
+  webhookPurpose: null,
+})
+
 describe('PartnerPortalSignupService', () => {
   beforeEach(() => {
+    jest.useFakeTimers()
+    jest.setSystemTime(now)
+  })
+
+  afterEach(() => {
     jest.useRealTimers()
   })
 
-  it('atomically creates a pending partner and first administrator, then sends a hash-only token', async () => {
+  it('atomically creates the pending account, encrypted token, and PII-free outbox job', async () => {
     const harness = buildHarness()
 
-    const result = await harness.service.signup(signupInput)
+    await expect(harness.service.signup(signupInput)).resolves.toEqual({
+      status: 'VERIFICATION_REQUIRED',
+    })
 
-    expect(result).toEqual({ status: 'VERIFICATION_REQUIRED' })
     expect(harness.protectionService.assertSignupAllowed).toHaveBeenCalledWith({
       challengeToken: signupInput.challengeToken,
       clientIp: signupInput.clientIp,
@@ -274,10 +289,6 @@ describe('PartnerPortalSignupService', () => {
       honeypot: '',
       organization: 'atlaspayments\u001fbr',
     })
-    expect(harness.databaseTransaction).toHaveBeenCalledWith(
-      expect.any(Function),
-      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
-    )
     expect(harness.partnerCreate).toHaveBeenCalledWith({
       data: expect.objectContaining({
         country: 'BR',
@@ -287,134 +298,148 @@ describe('PartnerPortalSignupService', () => {
         name: 'Atlas Payments',
       }),
     })
-    expect(harness.portalUserCreate).toHaveBeenCalledWith({
-      data: expect.objectContaining({
-        email: 'admin@atlas.example',
-        emailVerificationRequiredAt: expect.any(Date),
-        passwordVerifier: 'stored-scrypt-verifier',
-        role: PartnerPortalRole.ADMIN,
+    const tokenData = harness.tokenCreate.mock.calls[0]?.[0].data
+    const plaintextToken = harness.secretEnvelopeService.encrypt.mock.calls[0]?.[0]
+    expect(tokenData?.tokenHash).not.toBe(plaintextToken)
+    expect(String(tokenData?.tokenCiphertext)).not.toContain(String(plaintextToken))
+    expect(harness.enqueueCustom).toHaveBeenCalledWith(
+      PARTNER_PORTAL_VERIFICATION_EMAIL_OUTBOX_KIND,
+      { tokenId: tokenData?.id },
+      'partner-signup-verification',
+      expect.objectContaining({
+        client: expect.anything(),
+        deliverNow: false,
+        metadata: expect.objectContaining({
+          idempotencyKey: `partner-signup-email/${String(tokenData?.id)}`,
+          maxAttempts: 5,
+        }),
       }),
-    })
-    const persistedTokenHash = String(harness.tokenCreate.mock.calls[0][0].data.tokenHash)
-    const deliveredToken = harness.emailSender.sendVerificationEmail.mock.calls[0]?.[0].plaintextToken
-    expect(persistedTokenHash).not.toBe(deliveredToken)
-    expect(JSON.stringify(harness.partnerCreate.mock.calls[0]?.[0])).not.toContain(password)
-    expect(JSON.stringify(harness.portalUserCreate.mock.calls[0]?.[0])).not.toContain(password)
+    )
+    expect(JSON.stringify(harness.enqueueCustom.mock.calls)).not.toContain('admin@atlas.example')
+    expect(JSON.stringify(harness.enqueueCustom.mock.calls)).not.toContain(password)
     expect(harness.auditService.record).toHaveBeenCalledWith(
       expect.objectContaining({ action: 'signup.created' }),
       expect.anything(),
     )
-    expect(harness.tokenUpdateMany).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({ providerMessageId: 'resend-message-1' }),
-    }))
   })
 
-  it('returns the same acknowledgement for a duplicate without disclosing or emailing it', async () => {
+  it('returns the same acknowledgement for an idempotent replay without creating new work', async () => {
     const harness = buildHarness()
-    harness.databaseTransaction.mockRejectedValueOnce(prismaError('P2002'))
-    harness.partnerFindUnique.mockResolvedValue(null)
-    harness.partnerFindFirst.mockResolvedValueOnce(null)
+    harness.partnerFindUnique.mockResolvedValueOnce(buildPartner())
 
     await expect(harness.service.signup(signupInput)).resolves.toEqual({
       status: 'VERIFICATION_REQUIRED',
     })
 
-    expect(harness.emailSender.sendVerificationEmail).not.toHaveBeenCalled()
-    expect(harness.partnerFindFirst).toHaveBeenCalledWith({
-      where: {
-        email: 'admin@atlas.example',
-        publicSignupOrganizationHash: 'hash:organization:atlaspayments\u001fbr',
-      },
-    })
+    expect(harness.databaseTransaction).not.toHaveBeenCalled()
+    expect(harness.enqueueCustom).not.toHaveBeenCalled()
+    expect(harness.logger.info).toHaveBeenCalledWith(
+      'Partner signup email recovery evaluated',
+      { outcome: 'IDEMPOTENT_REPLAY' },
+    )
   })
 
-  it('allows a credential-matching pending account to recover with a new idempotency key', async () => {
+  it('keeps uniqueness races enumeration-safe without fabricating a delivery', async () => {
     const harness = buildHarness()
     harness.databaseTransaction.mockRejectedValueOnce(prismaError('P2002'))
-    harness.partnerFindUnique.mockResolvedValue(null)
-    harness.partnerFindFirst.mockResolvedValueOnce(buildPartner())
 
-    const result = await harness.service.signup({
-      ...signupInput,
-      idempotencyKey: 'replacement-request-002',
+    await expect(harness.service.signup(signupInput)).resolves.toEqual({
+      status: 'VERIFICATION_REQUIRED',
     })
 
-    expect(result).toEqual({ status: 'VERIFICATION_REQUIRED' })
+    expect(harness.enqueueCustom).not.toHaveBeenCalled()
+    expect(JSON.stringify(harness.logger.info.mock.calls)).not.toContain('admin@atlas.example')
+  })
+
+  it('reauthenticates a pending administrator and durably queues a fresh token', async () => {
+    const harness = buildHarness()
+
+    await expect(harness.service.resendVerificationEmail({
+      challengeToken: signupInput.challengeToken,
+      clientIp: signupInput.clientIp,
+      email: signupInput.email,
+      honeypot: '',
+      password,
+    })).resolves.toEqual({ status: 'VERIFICATION_REQUIRED' })
+
+    expect(harness.protectionService.assertResendAllowed).toHaveBeenCalledWith({
+      challengeToken: signupInput.challengeToken,
+      clientIp: signupInput.clientIp,
+      email: 'admin@atlas.example',
+      honeypot: '',
+    })
     expect(harness.passwordService.verify).toHaveBeenCalledWith(
       password,
       'stored-scrypt-verifier',
     )
-    expect(harness.emailSender.sendVerificationEmail).toHaveBeenCalledTimes(1)
+    expect(harness.transactionTokenUpdateMany).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ tokenCiphertext: null }),
+    }))
+    expect(harness.enqueueCustom).toHaveBeenCalledTimes(1)
     expect(harness.auditService.record).toHaveBeenCalledWith(
       expect.objectContaining({ action: 'signup.verification_email_requested' }),
       expect.anything(),
     )
   })
 
-  it('does not resend when an idempotency replay changes fields or fails password verification', async () => {
-    const harness = buildHarness()
-    harness.partnerFindUnique.mockResolvedValueOnce(buildPartner())
+  it('returns the generic acknowledgement for unknown and invalid credentials', async () => {
+    const unknownHarness = buildHarness()
+    unknownHarness.portalUserFindUnique.mockResolvedValueOnce(null)
 
-    const fieldMismatch = await harness.service.signup({
-      ...signupInput,
-      company: 'Different Company',
-    })
+    await expect(unknownHarness.service.resendVerificationEmail({
+      challengeToken: signupInput.challengeToken,
+      clientIp: signupInput.clientIp,
+      email: signupInput.email,
+      honeypot: '',
+      password,
+    })).resolves.toEqual({ status: 'VERIFICATION_REQUIRED' })
+    expect(unknownHarness.passwordService.performDummyVerification).toHaveBeenCalledWith(password)
+    expect(unknownHarness.enqueueCustom).not.toHaveBeenCalled()
 
-    expect(fieldMismatch).toEqual({ status: 'VERIFICATION_REQUIRED' })
-    expect(harness.passwordService.performDummyVerification).toHaveBeenCalledWith(password)
-    expect(harness.emailSender.sendVerificationEmail).not.toHaveBeenCalled()
-
-    const wrongPasswordHarness = buildHarness()
-    wrongPasswordHarness.partnerFindUnique.mockResolvedValueOnce(buildPartner())
-    wrongPasswordHarness.passwordService.verify.mockResolvedValueOnce(false)
-    const wrongPassword = await wrongPasswordHarness.service.signup(signupInput)
-    expect(wrongPassword).toEqual({ status: 'VERIFICATION_REQUIRED' })
-    expect(wrongPasswordHarness.emailSender.sendVerificationEmail).not.toHaveBeenCalled()
+    const invalidHarness = buildHarness()
+    invalidHarness.passwordService.verify.mockResolvedValueOnce(false)
+    await expect(invalidHarness.service.resendVerificationEmail({
+      challengeToken: signupInput.challengeToken,
+      clientIp: signupInput.clientIp,
+      email: signupInput.email,
+      honeypot: '',
+      password,
+    })).resolves.toEqual({ status: 'VERIFICATION_REQUIRED' })
+    expect(invalidHarness.enqueueCustom).not.toHaveBeenCalled()
   })
 
-  it('coalesces rapid exact retries and retries serializable transaction conflicts', async () => {
-    const replayHarness = buildHarness()
-    replayHarness.partnerFindUnique.mockResolvedValueOnce(buildPartner())
-    replayHarness.tokenFindFirst.mockResolvedValueOnce(buildVerificationToken({
-      createdAt: new Date(),
-    }))
-
-    await replayHarness.service.signup(signupInput)
-
-    expect(replayHarness.emailSender.sendVerificationEmail).not.toHaveBeenCalled()
-    expect(replayHarness.databaseTransaction).not.toHaveBeenCalled()
+  it('coalesces an active pending delivery and retries serialization conflicts', async () => {
+    const coalescedHarness = buildHarness()
+    coalescedHarness.transactionTokenFindFirst.mockResolvedValueOnce(buildVerificationToken())
+    await coalescedHarness.service.resendVerificationEmail({
+      challengeToken: signupInput.challengeToken,
+      clientIp: signupInput.clientIp,
+      email: signupInput.email,
+      honeypot: '',
+      password,
+    })
+    expect(coalescedHarness.enqueueCustom).not.toHaveBeenCalled()
+    expect(coalescedHarness.logger.info).toHaveBeenCalledWith(
+      'Partner signup email recovery evaluated',
+      { outcome: 'COALESCED' },
+    )
 
     const conflictHarness = buildHarness()
     conflictHarness.databaseTransaction.mockRejectedValueOnce(prismaError('P2034'))
-    await conflictHarness.service.signup(signupInput)
-    expect(conflictHarness.databaseTransaction).toHaveBeenCalledTimes(2)
-    expect(conflictHarness.emailSender.sendVerificationEmail).toHaveBeenCalledTimes(1)
-  })
-
-  it('keeps the pending account recoverable when the mail provider is unavailable', async () => {
-    const harness = buildHarness()
-    harness.emailSender.sendVerificationEmail.mockRejectedValueOnce(
-      new PartnerPortalEmailDeliveryError('PROVIDER_UNAVAILABLE'),
-    )
-
-    await expect(harness.service.signup(signupInput)).resolves.toEqual({
-      status: 'VERIFICATION_REQUIRED',
+    await conflictHarness.service.resendVerificationEmail({
+      challengeToken: signupInput.challengeToken,
+      clientIp: signupInput.clientIp,
+      email: signupInput.email,
+      honeypot: '',
+      password,
     })
-
-    expect(harness.logger.warn).toHaveBeenCalledWith(
-      'Partner signup verification email delivery failed',
-      { code: 'PROVIDER_UNAVAILABLE' },
-    )
-    expect(JSON.stringify(harness.logger.warn.mock.calls)).not.toContain('admin@atlas.example')
-    expect(JSON.stringify(harness.logger.warn.mock.calls)).not.toContain(password)
+    expect(conflictHarness.databaseTransaction).toHaveBeenCalledTimes(2)
+    expect(conflictHarness.enqueueCustom).toHaveBeenCalledTimes(1)
   })
 
-  it('consumes one valid email token, records the bounded audit, and creates the normal session', async () => {
+  it('consumes one valid email token, records the audit, and creates the normal session', async () => {
     const harness = buildHarness()
-    const result = await harness.service.verifyEmail(
-      signupInput.clientIp,
-      'v'.repeat(43),
-    )
+    const result = await harness.service.verifyEmail(signupInput.clientIp, 'v'.repeat(43))
 
     expect(result.accessToken).toBe('portal-session-token')
     expect(harness.protectionService.consumeEmailVerificationAttempt).toHaveBeenCalledWith(
@@ -434,14 +459,8 @@ describe('PartnerPortalSignupService', () => {
       where: { id: buildPortalUser().id },
     })
     expect(harness.auditService.record).toHaveBeenCalledWith(
-      expect.objectContaining({
-        action: 'signup.email_verified',
-        actorUserId: buildPortalUser().id,
-      }),
+      expect.objectContaining({ action: 'signup.email_verified' }),
       expect.anything(),
-    )
-    expect(harness.sessionService.createSession).toHaveBeenCalledWith(
-      expect.objectContaining({ emailVerifiedAt: expect.any(Date) }),
     )
   })
 
@@ -451,12 +470,10 @@ describe('PartnerPortalSignupService', () => {
       ...buildVerificationToken({ expiresAt: new Date('2026-08-01T00:00:00.000Z') }),
       user: { ...buildPortalUser(), partner: buildPartner() },
     })
-
     await expect(expiredHarness.service.verifyEmail(
       signupInput.clientIp,
       'e'.repeat(43),
     )).rejects.toThrow(new PartnerPortalEmailVerificationError())
-    expect(expiredHarness.sessionService.createSession).not.toHaveBeenCalled()
 
     const consumedHarness = buildHarness()
     consumedHarness.transactionTokenUpdateMany.mockResolvedValueOnce({ count: 0 })

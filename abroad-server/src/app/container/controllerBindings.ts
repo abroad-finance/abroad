@@ -28,6 +28,7 @@ import { PartnerPortalIntegrationController } from '../../modules/partners/inter
 import { PartnerPortalSignupController } from '../../modules/partners/interfaces/http/PartnerPortalSignupController'
 import { PartnerPortalTeamController } from '../../modules/partners/interfaces/http/PartnerPortalTeamController'
 import { PartnerUserController } from '../../modules/partners/interfaces/http/PartnerUserController'
+import { ResendWebhookController } from '../../modules/partners/interfaces/http/ResendWebhookController'
 import { CeloPaymentsController } from '../../modules/payments/interfaces/http/CeloPaymentsController'
 import { CryptoAssetController } from '../../modules/payments/interfaces/http/CryptoAssetController'
 import { PaymentsController } from '../../modules/payments/interfaces/http/PaymentsController'
@@ -71,6 +72,7 @@ const controllerBindings: ReadonlyArray<BindingRegistration<unknown>> = [
   { bindSelf: true, identifier: PartnerPortalIdentityController, implementation: PartnerPortalIdentityController },
   { bindSelf: true, identifier: PartnerPortalIntegrationController, implementation: PartnerPortalIntegrationController },
   { bindSelf: true, identifier: PartnerPortalSignupController, implementation: PartnerPortalSignupController },
+  { bindSelf: true, identifier: ResendWebhookController, implementation: ResendWebhookController },
   { bindSelf: true, identifier: PartnerPortalTeamController, implementation: PartnerPortalTeamController },
   { bindSelf: true, identifier: PartnerUserController, implementation: PartnerUserController },
   { bindSelf: true, identifier: QuoteController, implementation: QuoteController },

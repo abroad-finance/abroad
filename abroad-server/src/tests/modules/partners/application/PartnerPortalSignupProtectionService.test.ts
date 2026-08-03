@@ -159,6 +159,29 @@ describe('PartnerPortalSignupProtectionService', () => {
     )
   })
 
+  it('protects resend recovery with independent IP and email quotas', async () => {
+    const harness = buildHarness()
+    const challenge = await harness.service.createChallenge('203.0.113.10')
+    jest.advanceTimersByTime(1_500)
+
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      await harness.service.assertResendAllowed({
+        challengeToken: challenge.challengeToken,
+        clientIp: '203.0.113.10',
+        email: 'admin@atlas.example',
+        honeypot: '',
+      })
+    }
+
+    await expect(harness.service.assertResendAllowed({
+      challengeToken: challenge.challengeToken,
+      clientIp: '203.0.113.10',
+      email: 'admin@atlas.example',
+      honeypot: '',
+    })).rejects.toBeInstanceOf(PartnerPortalSignupRateLimitError)
+    expect(JSON.stringify([...harness.states.values()])).not.toContain('admin@atlas.example')
+  })
+
   it('persists only purpose-bound HMACs, never raw abuse-control identifiers', async () => {
     const harness = buildHarness()
     const challenge = await harness.service.createChallenge('203.0.113.10')

@@ -15,11 +15,13 @@ import PartnerPortalSignup from '../pages/PartnerPortal/PartnerPortalSignup'
 const mocked = vi.hoisted(() => ({
   createPartnerPortalSignup: vi.fn(),
   createPartnerPortalSignupChallenge: vi.fn(),
+  resendPartnerPortalSignupVerificationEmail: vi.fn(),
 }))
 
 vi.mock('../services/partnerPortal/partnerPortalApi', () => ({
   createPartnerPortalSignup: mocked.createPartnerPortalSignup,
   createPartnerPortalSignupChallenge: mocked.createPartnerPortalSignupChallenge,
+  resendPartnerPortalSignupVerificationEmail: mocked.resendPartnerPortalSignupVerificationEmail,
 }))
 
 const fillSignupForm = async (user: ReturnType<typeof userEvent.setup>) => {
@@ -52,7 +54,7 @@ describe('PartnerPortalSignup', () => {
 
     await user.click(screen.getByRole('button', { name: 'Create workspace' }))
 
-    expect(await screen.findByRole('heading', { name: 'Check your inbox' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Verification link queued' })).toBeInTheDocument()
     expect(screen.getByRole('status')).toHaveTextContent('After verification')
     expect(screen.queryByText(/already exists/iu)).not.toBeInTheDocument()
     expect(mocked.createPartnerPortalSignup).toHaveBeenCalledWith({
@@ -87,7 +89,7 @@ describe('PartnerPortalSignup', () => {
     expect(mocked.createPartnerPortalSignup).not.toHaveBeenCalled()
   })
 
-  it('reuses the same idempotency key for a bounded resend', async () => {
+  it('uses the credential-protected recovery endpoint for a bounded resend', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     mocked.createPartnerPortalSignupChallenge.mockResolvedValue({
       challengeToken: 'signed-challenge',
@@ -95,17 +97,25 @@ describe('PartnerPortalSignup', () => {
       readyAt: '2000-01-01T00:00:00.000Z',
     })
     mocked.createPartnerPortalSignup.mockResolvedValue({ status: 'VERIFICATION_REQUIRED' })
+    mocked.resendPartnerPortalSignupVerificationEmail.mockResolvedValue({ status: 'VERIFICATION_REQUIRED' })
     render(<PartnerPortalSignup />)
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
     await fillSignupForm(user)
     await user.click(screen.getByRole('button', { name: 'Create workspace' }))
-    await screen.findByRole('heading', { name: 'Check your inbox' })
-    const firstKey = mocked.createPartnerPortalSignup.mock.calls[0]?.[1]
+    await screen.findByRole('heading', { name: 'Verification link queued' })
 
     act(() => vi.advanceTimersByTime(60_000))
     await user.click(screen.getByRole('button', { name: 'Send another link' }))
 
-    await waitFor(() => expect(mocked.createPartnerPortalSignup).toHaveBeenCalledTimes(2))
-    expect(mocked.createPartnerPortalSignup.mock.calls[1]?.[1]).toBe(firstKey)
+    await waitFor(() => expect(mocked.resendPartnerPortalSignupVerificationEmail).toHaveBeenCalledTimes(1))
+    expect(mocked.createPartnerPortalSignup).toHaveBeenCalledTimes(1)
+    expect(mocked.createPartnerPortalSignupChallenge).toHaveBeenCalledTimes(2)
+    expect(mocked.resendPartnerPortalSignupVerificationEmail).toHaveBeenCalledWith({
+      challengeToken: 'signed-challenge',
+      contactWebsite: '',
+      email: 'admin@atlas.example',
+      password: 'correct horse battery staple',
+    })
+    expect(screen.getByText(/another verification link is now queued/iu)).toBeInTheDocument()
   })
 })

@@ -11,6 +11,7 @@ import { SlackNotifier } from '../../platform/notifications/slackNotifier'
 import { SocketIOWebSocketService } from '../../platform/notifications/socketIoWebSocketService'
 import { WebhookNotifier } from '../../platform/notifications/webhookNotifier'
 import { WebhookTargetPolicy } from '../../platform/notifications/WebhookTargetPolicy'
+import { OutboxDeliveryHandlerRegistry } from '../../platform/outbox/OutboxDeliveryHandlerRegistry'
 import { OutboxDispatcher } from '../../platform/outbox/OutboxDispatcher'
 import { OutboxRepository } from '../../platform/outbox/OutboxRepository'
 import { OutboxWorker } from '../../platform/outbox/OutboxWorker'
@@ -22,6 +23,7 @@ import { TYPES } from './types'
 
 const infrastructureBindings: ReadonlyArray<BindingRegistration<unknown>> = [
   { bindSelf: true, identifier: OutboxRepository, implementation: OutboxRepository },
+  { bindSelf: true, identifier: OutboxDeliveryHandlerRegistry, implementation: OutboxDeliveryHandlerRegistry },
   { identifier: TYPES.IOutboxDispatcher, implementation: OutboxDispatcher },
   { identifier: TYPES.OutboxWorker, implementation: OutboxWorker },
   { identifier: TYPES.IQueueHandler, implementation: GCPPubSubQueueHandler },

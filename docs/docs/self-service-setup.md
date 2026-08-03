@@ -18,13 +18,13 @@ Open [Create a production workspace](https://app.abroad.finance/partner/signup) 
 - The organization name and country.
 - A password for the administrator account.
 
-Abroad creates the organization and first administrator together. Repeated or concurrent submissions do not create duplicate workspaces.
+Abroad creates the organization and first administrator together. The verification request is recorded durably with the workspace, so a temporary email-provider interruption does not lose it. Repeated or concurrent submissions do not create duplicate workspaces.
 
 ## 2) Verify the administrator email
 
 Open the single-use verification link sent to the administrator email. The link expires after 24 hours. Sign-in remains disabled until the email address is verified.
 
-If the message does not arrive, use **Send another link** from the signup confirmation screen. For privacy, the signup screen uses the same response whether the details are new or already registered.
+If the message does not arrive, wait one minute and use **Send another link** from the signup confirmation screen. Abroad checks the pending administrator's email and password, queues a fresh single-use link when eligible, and safely coalesces duplicate requests. For privacy, the screen always uses the same acknowledgement and never reveals whether an account exists.
 
 ## 3) Secure privileged access
 

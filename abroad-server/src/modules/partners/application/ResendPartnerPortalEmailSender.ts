@@ -32,9 +32,12 @@ type PartnerPortalVerificationEmailResult = {
 }
 
 export class PartnerPortalEmailDeliveryError extends Error {
+  public readonly retryable: boolean
+
   public constructor(public readonly code: PartnerPortalEmailDeliveryFailureCode) {
     super('Verification email could not be delivered')
     this.name = 'PartnerPortalEmailDeliveryError'
+    this.retryable = code === 'PROVIDER_UNAVAILABLE'
   }
 }
 

@@ -1,6 +1,7 @@
 import { TargetCurrency } from '@prisma/client'
 
 import { QueueName } from '../../../platform/messaging/queues'
+import { OutboxDeliveryError } from '../../../platform/outbox/OutboxDeliveryHandler'
 import { OutboxDispatcher } from '../../../platform/outbox/OutboxDispatcher'
 import { OutboxRecord } from '../../../platform/outbox/OutboxRepository'
 
@@ -46,14 +47,24 @@ describe('OutboxDispatcher', () => {
       notifyWebhook: jest.fn(async () => ({ durationMs: 10, httpStatus: 204 })),
     }
     const logger = { error: jest.fn(), info: jest.fn(), warn: jest.fn() }
+    const deliveryHandlerRegistry = { deliver: jest.fn(async () => undefined) }
     const dispatcher = new OutboxDispatcher(
       repository as never,
       webhookNotifier as never,
       slackNotifier as never,
       queueHandler as never,
+      deliveryHandlerRegistry as never,
       logger as never,
     )
-    return { dispatcher, logger, queueHandler, repository, slackNotifier, webhookNotifier }
+    return {
+      deliveryHandlerRegistry,
+      dispatcher,
+      logger,
+      queueHandler,
+      repository,
+      slackNotifier,
+      webhookNotifier,
+    }
   }
 
   it('delivers slack messages immediately', async () => {
@@ -108,6 +119,55 @@ describe('OutboxDispatcher', () => {
       undefined,
     )
     expect(queueHandler.postMessage).toHaveBeenCalledWith(QueueName.PAYMENT_STATUS_UPDATED, payload)
+  })
+
+  it('persists and routes custom PII-free delivery payloads', async () => {
+    const { deliveryHandlerRegistry, dispatcher, repository } = buildMocks()
+
+    await dispatcher.enqueueCustom(
+      'partner-portal-verification-email',
+      { tokenId: '33333333-3333-4333-8333-333333333333' },
+      'signup-email',
+    )
+
+    expect(repository.create).toHaveBeenCalledWith(
+      'partner-portal-verification-email',
+      {
+        kind: 'partner-portal-verification-email',
+        tokenId: '33333333-3333-4333-8333-333333333333',
+      },
+      expect.any(Date),
+      undefined,
+      undefined,
+    )
+    expect(deliveryHandlerRegistry.deliver).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'partner-portal-verification-email' }),
+    )
+  })
+
+  it('fails a non-retryable custom delivery without rescheduling it', async () => {
+    const { deliveryHandlerRegistry, dispatcher, repository } = buildMocks()
+    const record: OutboxRecord = {
+      ...baseRecord,
+      payload: {
+        kind: 'partner-portal-verification-email',
+        tokenId: '33333333-3333-4333-8333-333333333333',
+      },
+      type: 'partner-portal-verification-email',
+    }
+    deliveryHandlerRegistry.deliver.mockRejectedValueOnce(
+      new OutboxDeliveryError('invalid durable email job', false),
+    )
+
+    await dispatcher.deliver(record, 'signup-email')
+
+    expect(repository.markFailed).toHaveBeenCalledWith(
+      record.id,
+      expect.any(OutboxDeliveryError),
+      undefined,
+      undefined,
+    )
+    expect(repository.reschedule).not.toHaveBeenCalled()
   })
 
   it('publishes a dead letter without posting an operational Slack message when delivery fails permanently', async () => {

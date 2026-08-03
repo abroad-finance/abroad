@@ -17,6 +17,7 @@ import AbroadLogo from '../../assets/Logos/AbroadLogoColored.svg'
 import {
   createPartnerPortalSignup,
   createPartnerPortalSignupChallenge,
+  resendPartnerPortalSignupVerificationEmail,
 } from '../../services/partnerPortal/partnerPortalApi'
 import { partnerCountryOptions } from './partnerCountryOptions'
 
@@ -110,6 +111,7 @@ const PartnerPortalSignup = () => {
   const [error, setError] = useState<null | string>(null)
   const [idempotencyKey] = useState(createIdempotencyKey)
   const [loading, setLoading] = useState(false)
+  const [resendNotice, setResendNotice] = useState<null | string>(null)
   const [showPassword, setShowPassword] = useState(false)
   const [submitted, setSubmitted] = useState(false)
 
@@ -133,6 +135,7 @@ const PartnerPortalSignup = () => {
     }
 
     setError(null)
+    setResendNotice(null)
     setLoading(true)
     try {
       const challenge = await createPartnerPortalSignupChallenge()
@@ -155,6 +158,38 @@ const PartnerPortalSignup = () => {
     }
     catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Signup could not be completed')
+    }
+    finally {
+      setLoading(false)
+    }
+  }
+
+  const resend = async () => {
+    if (loading) return
+    if (!EMAIL_PATTERN.test(draft.email.trim()) || draft.password.length < 12) {
+      setError('Enter the administrator email and password again.')
+      return
+    }
+    setError(null)
+    setResendNotice(null)
+    setLoading(true)
+    try {
+      const challenge = await createPartnerPortalSignupChallenge()
+      await waitForChallenge(challenge.readyAt, challenge.expiresAt)
+      const result = await resendPartnerPortalSignupVerificationEmail({
+        challengeToken: challenge.challengeToken,
+        contactWebsite: draft.contactWebsite,
+        email: draft.email.trim().toLowerCase(),
+        password: draft.password,
+      })
+      if (result.status !== 'VERIFICATION_REQUIRED') {
+        throw new Error('Another link could not be requested. Please try again.')
+      }
+      setCanResend(false)
+      setResendNotice('If this pending account is eligible, another verification link is now queued.')
+    }
+    catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Another link could not be requested')
     }
     finally {
       setLoading(false)
@@ -189,20 +224,21 @@ const PartnerPortalSignup = () => {
                     </div>
                     <p className="partner-eyebrow mt-7">Email verification</p>
                     <h1 className="mt-2 text-3xl font-semibold tracking-[-0.03em] text-partner-ink" id="partner-signup-title">
-                      Check your inbox
+                      Verification link queued
                     </h1>
                     <p className="mt-4 max-w-lg text-sm leading-6 text-partner-muted">
-                      If these details can be registered, we sent a single-use verification link to the administrator email. It expires in 24 hours.
+                      If these details can be registered, a single-use verification link is being prepared for the administrator email. It expires in 24 hours.
                     </p>
                     <div aria-live="polite" className="mt-6 rounded-2xl border border-partner-border bg-partner-ledger px-4 py-4 text-sm leading-6 text-partner-ink" role="status">
                       Open the link on this device or another one. After verification, you will enter the existing partner workspace.
                     </div>
                     {error && <div aria-live="polite" className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800" role="alert">{error}</div>}
+                    {resendNotice && <div aria-live="polite" className="mt-4 rounded-xl border border-partner-border bg-partner-mint px-4 py-3 text-sm text-partner-ink">{resendNotice}</div>}
                     <div className="mt-7 flex flex-col gap-3 sm:flex-row">
                       <button
                         className="partner-button-secondary"
                         disabled={!canResend || loading}
-                        onClick={() => void submit()}
+                        onClick={() => void resend()}
                         type="button"
                       >
                         {loading && <LoaderCircle aria-hidden className="h-4 w-4 animate-spin motion-reduce:animate-none" />}

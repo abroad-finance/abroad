@@ -1,17 +1,21 @@
 import type { PrismaClient } from '@prisma/client'
 
-import { Prisma } from '@prisma/client'
+import { PartnerPortalEmailDeliveryStatus, Prisma } from '@prisma/client'
 import { inject, injectable } from 'inversify'
+import { randomUUID } from 'node:crypto'
 
 import { TYPES } from '../../../app/container/types'
 import { ILogger } from '../../../core/logging/types'
+import { OutboxDispatcher } from '../../../platform/outbox/OutboxDispatcher'
 import { IDatabaseClientProvider } from '../../../platform/persistence/IDatabaseClientProvider'
 import { PartnerPortalAuditService } from './PartnerPortalAuditService'
 import { buildPartnerPortalToken, hashPartnerPortalToken, normalizePartnerPortalEmail, PartnerPortalCredentialValidationError } from './partnerPortalCredentials'
+import { partnerPortalVerificationTokenContext } from './PartnerPortalEmailDeliveryLifecycleService'
 import { PartnerPortalPasswordService, PartnerPortalPasswordValidationError } from './PartnerPortalPasswordService'
+import { PartnerPortalSecretEnvelopeService } from './PartnerPortalSecretEnvelopeService'
 import { PartnerPortalSession, PartnerPortalSessionService } from './PartnerPortalSessionService'
 import { PartnerPortalSignupChallenge, PartnerPortalSignupProtectionService } from './PartnerPortalSignupProtectionService'
-import { PartnerPortalEmailDeliveryError, ResendPartnerPortalEmailSender } from './ResendPartnerPortalEmailSender'
+import { PARTNER_PORTAL_VERIFICATION_EMAIL_OUTBOX_KIND } from './PartnerPortalVerificationEmailOutboxHandler'
 
 const EMAIL_VERIFICATION_TTL_MS = 24 * 60 * 60 * 1_000
 const MAX_COMPANY_LENGTH = 160
@@ -35,12 +39,19 @@ type NormalizedSignupInput = {
   password: string
 }
 
-type VerificationEmailDispatch = {
-  email: string
-  firstName: string
-  plaintextToken: string
-  tokenId: string
+type PreparedVerificationToken = {
+  ciphertext: string
+  expiresAt: Date
+  id: string
+  tokenHash: string
 }
+
+type RecoveryOutcome
+  = | 'ACCOUNT_NOT_ELIGIBLE'
+    | 'COALESCED'
+    | 'CREDENTIALS_INVALID'
+    | 'ENQUEUED'
+    | 'IDEMPOTENT_REPLAY'
 
 const portalUserForVerification = {
   partner: true,
@@ -61,6 +72,14 @@ export type PartnerPortalPublicSignupInput = {
 
 export type PartnerPortalSignupAcknowledgement = {
   status: 'VERIFICATION_REQUIRED'
+}
+
+export type PartnerPortalVerificationEmailResendInput = {
+  challengeToken: string
+  clientIp: string
+  email: string
+  honeypot: string
+  password: string
 }
 
 export class PartnerPortalEmailVerificationError extends Error {
@@ -90,14 +109,121 @@ export class PartnerPortalSignupService {
     private readonly passwordService: PartnerPortalPasswordService,
     @inject(PartnerPortalSignupProtectionService)
     private readonly protectionService: PartnerPortalSignupProtectionService,
-    @inject(ResendPartnerPortalEmailSender)
-    private readonly emailSender: ResendPartnerPortalEmailSender,
+    @inject(PartnerPortalSecretEnvelopeService)
+    private readonly secretEnvelopeService: PartnerPortalSecretEnvelopeService,
+    @inject(TYPES.IOutboxDispatcher)
+    private readonly outboxDispatcher: OutboxDispatcher,
     @inject(PartnerPortalSessionService)
     private readonly sessionService: PartnerPortalSessionService,
   ) {}
 
   public createChallenge(clientIp: string): Promise<PartnerPortalSignupChallenge> {
     return this.protectionService.createChallenge(clientIp)
+  }
+
+  public async resendVerificationEmail(
+    input: PartnerPortalVerificationEmailResendInput,
+  ): Promise<PartnerPortalSignupAcknowledgement> {
+    let email: string
+    try {
+      email = normalizePartnerPortalEmail(input.email)
+    }
+    catch (error) {
+      if (error instanceof PartnerPortalCredentialValidationError) {
+        throw new PartnerPortalSignupValidationError(error.message)
+      }
+      throw error
+    }
+    await this.protectionService.assertResendAllowed({
+      challengeToken: input.challengeToken,
+      clientIp: input.clientIp,
+      email,
+      honeypot: input.honeypot,
+    })
+    const prismaClient = await this.databaseClientProvider.getClient()
+    const portalUser = await prismaClient.partnerPortalUser.findUnique({
+      where: { email },
+    })
+    if (!portalUser?.passwordVerifier) {
+      await this.passwordService.performDummyVerification(input.password)
+      this.logRecoveryOutcome('ACCOUNT_NOT_ELIGIBLE')
+      return { status: 'VERIFICATION_REQUIRED' }
+    }
+    const passwordMatches = await this.passwordService.verify(
+      input.password,
+      portalUser.passwordVerifier,
+    )
+    if (!passwordMatches) {
+      this.logRecoveryOutcome('CREDENTIALS_INVALID')
+      return { status: 'VERIFICATION_REQUIRED' }
+    }
+    if (
+      portalUser.disabledAt
+      || !portalUser.emailVerificationRequiredAt
+      || portalUser.emailVerifiedAt
+    ) {
+      this.logRecoveryOutcome('ACCOUNT_NOT_ELIGIBLE')
+      return { status: 'VERIFICATION_REQUIRED' }
+    }
+
+    const now = new Date()
+    const token = await this.prepareVerificationToken(now)
+    const outcome = await this.executeSerializable(prismaClient, async (transaction) => {
+      const currentPortalUser = await transaction.partnerPortalUser.findUnique({
+        where: { id: portalUser.id },
+      })
+      if (
+        !currentPortalUser
+        || currentPortalUser.passwordVerifier !== portalUser.passwordVerifier
+        || currentPortalUser.disabledAt
+        || !currentPortalUser.emailVerificationRequiredAt
+        || currentPortalUser.emailVerifiedAt
+      ) {
+        return 'ACCOUNT_NOT_ELIGIBLE' as const
+      }
+      const latestToken = await transaction.partnerPortalEmailVerificationToken.findFirst({
+        orderBy: { createdAt: 'desc' },
+        where: {
+          consumedAt: null,
+          expiresAt: { gt: now },
+          userId: portalUser.id,
+        },
+      })
+      if (this.shouldCoalesce(latestToken, now)) {
+        return 'COALESCED' as const
+      }
+      await transaction.partnerPortalEmailVerificationToken.updateMany({
+        data: { expiresAt: now, tokenCiphertext: null },
+        where: {
+          consumedAt: null,
+          expiresAt: { gt: now },
+          userId: portalUser.id,
+        },
+      })
+      const createdToken = await transaction.partnerPortalEmailVerificationToken.create({
+        data: {
+          expiresAt: token.expiresAt,
+          id: token.id,
+          tokenCiphertext: token.ciphertext,
+          tokenHash: token.tokenHash,
+          userId: portalUser.id,
+        },
+      })
+      await this.enqueueVerificationEmail(
+        transaction,
+        createdToken.id,
+        portalUser.partnerId,
+      )
+      await this.auditService.record({
+        action: 'signup.verification_email_requested',
+        partnerId: portalUser.partnerId,
+        resourceId: portalUser.id,
+        resourceType: 'partner_portal_user',
+      }, transaction)
+      return 'ENQUEUED' as const
+    })
+    this.logRecoveryOutcome(outcome)
+    return { status: 'VERIFICATION_REQUIRED' }
   }
 
   public async signup(
@@ -125,12 +251,7 @@ export class PartnerPortalSignupService {
       where: { publicSignupIdempotencyHash: idempotencyHash },
     })
     if (existingPartner) {
-      const dispatch = await this.prepareReplayDelivery(
-        prismaClient,
-        existingPartner,
-        normalized,
-      )
-      await this.deliverVerificationEmail(dispatch)
+      this.logRecoveryOutcome('IDEMPOTENT_REPLAY')
       return { status: 'VERIFICATION_REQUIRED' }
     }
 
@@ -145,11 +266,10 @@ export class PartnerPortalSignupService {
       throw error
     }
 
-    const token = buildPartnerPortalToken()
     const now = new Date()
-    let dispatch: null | VerificationEmailDispatch = null
+    const token = await this.prepareVerificationToken(now)
     try {
-      dispatch = await this.executeSerializable(prismaClient, async (transaction) => {
+      await this.executeSerializable(prismaClient, async (transaction) => {
         const partner = await transaction.partner.create({
           data: {
             country: normalized.country,
@@ -172,53 +292,34 @@ export class PartnerPortalSignupService {
         })
         const verificationToken = await transaction.partnerPortalEmailVerificationToken.create({
           data: {
-            expiresAt: new Date(now.getTime() + EMAIL_VERIFICATION_TTL_MS),
+            expiresAt: token.expiresAt,
+            id: token.id,
+            tokenCiphertext: token.ciphertext,
             tokenHash: token.tokenHash,
             userId: portalUser.id,
           },
         })
+        await this.enqueueVerificationEmail(
+          transaction,
+          verificationToken.id,
+          partner.id,
+        )
         await this.auditService.record({
           action: 'signup.created',
           partnerId: partner.id,
           resourceId: portalUser.id,
           resourceType: 'partner_portal_user',
         }, transaction)
-        return {
-          email: normalized.email,
-          firstName: normalized.firstName,
-          plaintextToken: token.plaintext,
-          tokenId: verificationToken.id,
-        }
       })
+      this.logRecoveryOutcome('ENQUEUED')
     }
     catch (error) {
       if (!this.isUniqueConstraintError(error)) {
         throw error
       }
-      const racedPartner = await prismaClient.partner.findUnique({
-        where: { publicSignupIdempotencyHash: idempotencyHash },
-      })
-      if (racedPartner) {
-        dispatch = await this.prepareReplayDelivery(prismaClient, racedPartner, normalized)
-      }
-      else {
-        const recoverablePartner = await prismaClient.partner.findFirst({
-          where: {
-            email: normalized.email,
-            publicSignupOrganizationHash: organizationHash,
-          },
-        })
-        if (recoverablePartner) {
-          dispatch = await this.prepareReplayDelivery(
-            prismaClient,
-            recoverablePartner,
-            normalized,
-          )
-        }
-      }
+      this.logRecoveryOutcome('IDEMPOTENT_REPLAY')
     }
 
-    await this.deliverVerificationEmail(dispatch)
     return { status: 'VERIFICATION_REQUIRED' }
   }
 
@@ -302,36 +403,25 @@ export class PartnerPortalSignupService {
     return `${canonicalCompany}${ORGANIZATION_SEPARATOR}${country.toLocaleLowerCase('en-US')}`
   }
 
-  private async deliverVerificationEmail(
-    dispatch: null | VerificationEmailDispatch,
+  private async enqueueVerificationEmail(
+    transaction: Prisma.TransactionClient,
+    tokenId: string,
+    partnerId: string,
   ): Promise<void> {
-    if (!dispatch) {
-      return
-    }
-    try {
-      const result = await this.emailSender.sendVerificationEmail(dispatch)
-      try {
-        const prismaClient = await this.databaseClientProvider.getClient()
-        await prismaClient.partnerPortalEmailVerificationToken.updateMany({
-          data: {
-            providerMessageId: result.providerMessageId,
-            sentAt: new Date(),
-          },
-          where: {
-            consumedAt: null,
-            id: dispatch.tokenId,
-          },
-        })
-      }
-      catch {
-        this.logger.error('Partner signup email delivery metadata could not be persisted')
-      }
-    }
-    catch (error) {
-      this.logger.warn('Partner signup verification email delivery failed', {
-        code: error instanceof PartnerPortalEmailDeliveryError ? error.code : 'UNEXPECTED',
-      })
-    }
+    await this.outboxDispatcher.enqueueCustom(
+      PARTNER_PORTAL_VERIFICATION_EMAIL_OUTBOX_KIND,
+      { tokenId },
+      'partner-signup-verification',
+      {
+        client: transaction,
+        deliverNow: false,
+        metadata: {
+          idempotencyKey: `partner-signup-email/${tokenId}`,
+          maxAttempts: 5,
+          partnerId,
+        },
+      },
+    )
   }
 
   private async executeSerializable<TResult>(
@@ -353,31 +443,16 @@ export class PartnerPortalSignupService {
     throw new Error('Serializable partner signup operation did not complete')
   }
 
-  private isExactReplay(
-    partner: {
-      country: null | string
-      email: null | string
-      firstName: null | string
-      lastName: null | string
-      name: string
-    },
-    input: NormalizedSignupInput,
-  ): boolean {
-    return (
-      partner.name === input.company
-      && partner.country === input.country
-      && partner.email === input.email
-      && partner.firstName === input.firstName
-      && partner.lastName === input.lastName
-    )
-  }
-
   private isSerializationError(error: unknown): boolean {
     return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034'
   }
 
   private isUniqueConstraintError(error: unknown): boolean {
     return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002'
+  }
+
+  private logRecoveryOutcome(outcome: RecoveryOutcome): void {
+    this.logger.info('Partner signup email recovery evaluated', { outcome })
   }
 
   private normalizeIdempotencyKey(value: string): string {
@@ -426,110 +501,41 @@ export class PartnerPortalSignupService {
     return normalized
   }
 
-  private async prepareReplayDelivery(
-    prismaClient: PrismaClient,
-    partner: {
-      country: null | string
-      email: null | string
-      firstName: null | string
-      id: string
-      lastName: null | string
-      name: string
-    },
-    input: NormalizedSignupInput,
-  ): Promise<null | VerificationEmailDispatch> {
-    if (!this.isExactReplay(partner, input)) {
-      await this.passwordService.performDummyVerification(input.password)
-      return null
-    }
-    const portalUser = await prismaClient.partnerPortalUser.findUnique({
-      where: { email: input.email },
-    })
-    if (!portalUser || portalUser.partnerId !== partner.id || portalUser.passwordVerifier === null) {
-      await this.passwordService.performDummyVerification(input.password)
-      return null
-    }
-    const passwordMatches = await this.passwordService.verify(
-      input.password,
-      portalUser.passwordVerifier,
-    )
-    if (
-      !passwordMatches
-      || portalUser.disabledAt
-      || !portalUser.emailVerificationRequiredAt
-      || portalUser.emailVerifiedAt
-    ) {
-      return null
-    }
-
-    const now = new Date()
-    const recentToken = await prismaClient.partnerPortalEmailVerificationToken.findFirst({
-      orderBy: { createdAt: 'desc' },
-      where: {
-        consumedAt: null,
-        createdAt: { gte: new Date(now.getTime() - RESEND_COOLDOWN_MS) },
-        userId: portalUser.id,
-      },
-    })
-    if (recentToken) {
-      return null
-    }
-
+  private async prepareVerificationToken(now: Date): Promise<PreparedVerificationToken> {
+    const id = randomUUID()
     const token = buildPartnerPortalToken()
-    const verificationToken = await this.executeSerializable(prismaClient, async (transaction) => {
-      const currentPortalUser = await transaction.partnerPortalUser.findUnique({
-        where: { id: portalUser.id },
-      })
-      if (
-        !currentPortalUser
-        || currentPortalUser.disabledAt
-        || !currentPortalUser.emailVerificationRequiredAt
-        || currentPortalUser.emailVerifiedAt
-        || currentPortalUser.passwordVerifier !== portalUser.passwordVerifier
-      ) {
-        return null
-      }
-      const racedRecentToken = await transaction.partnerPortalEmailVerificationToken.findFirst({
-        orderBy: { createdAt: 'desc' },
-        where: {
-          consumedAt: null,
-          createdAt: { gte: new Date(now.getTime() - RESEND_COOLDOWN_MS) },
-          userId: portalUser.id,
-        },
-      })
-      if (racedRecentToken) {
-        return null
-      }
-      await transaction.partnerPortalEmailVerificationToken.updateMany({
-        data: { expiresAt: now },
-        where: {
-          consumedAt: null,
-          expiresAt: { gt: now },
-          userId: portalUser.id,
-        },
-      })
-      const createdToken = await transaction.partnerPortalEmailVerificationToken.create({
-        data: {
-          expiresAt: new Date(now.getTime() + EMAIL_VERIFICATION_TTL_MS),
-          tokenHash: token.tokenHash,
-          userId: portalUser.id,
-        },
-      })
-      await this.auditService.record({
-        action: 'signup.verification_email_requested',
-        partnerId: partner.id,
-        resourceId: portalUser.id,
-        resourceType: 'partner_portal_user',
-      }, transaction)
-      return createdToken
-    })
-    return verificationToken
-      ? {
-          email: input.email,
-          firstName: input.firstName,
-          plaintextToken: token.plaintext,
-          tokenId: verificationToken.id,
-        }
-      : null
+    return {
+      ciphertext: await this.secretEnvelopeService.encrypt(
+        token.plaintext,
+        partnerPortalVerificationTokenContext(id),
+      ),
+      expiresAt: new Date(now.getTime() + EMAIL_VERIFICATION_TTL_MS),
+      id,
+      tokenHash: token.tokenHash,
+    }
+  }
+
+  private shouldCoalesce(
+    token: null | {
+      createdAt: Date
+      deliveryStatus: PartnerPortalEmailDeliveryStatus
+    },
+    now: Date,
+  ): boolean {
+    if (!token) {
+      return false
+    }
+    if (token.deliveryStatus === PartnerPortalEmailDeliveryStatus.PENDING) {
+      return true
+    }
+    const terminalFailures = new Set<PartnerPortalEmailDeliveryStatus>([
+      PartnerPortalEmailDeliveryStatus.BOUNCED,
+      PartnerPortalEmailDeliveryStatus.COMPLAINED,
+      PartnerPortalEmailDeliveryStatus.FAILED,
+      PartnerPortalEmailDeliveryStatus.SUPPRESSED,
+      PartnerPortalEmailDeliveryStatus.UNAVAILABLE,
+    ])
+    return !terminalFailures.has(token.deliveryStatus)
+      && token.createdAt >= new Date(now.getTime() - RESEND_COOLDOWN_MS)
   }
 }

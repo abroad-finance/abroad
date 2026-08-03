@@ -7,6 +7,8 @@ import { ILogger } from '../../core/logging/types'
 import { IQueueHandler, QueueName, QueuePayloadByName } from '../messaging/queues'
 import { ISlackNotifier } from '../notifications/ISlackNotifier'
 import { IWebhookNotifier, WebhookDeliveryError, WebhookEvent } from '../notifications/IWebhookNotifier'
+import { OutboxDeliveryError } from './OutboxDeliveryHandler'
+import { OutboxDeliveryHandlerRegistry } from './OutboxDeliveryHandlerRegistry'
 import { OutboxCreateMetadata, OutboxDeliveryDiagnostics, OutboxRecord, OutboxRepository } from './OutboxRepository'
 
 type OutboxPayload
@@ -42,6 +44,8 @@ export class OutboxDispatcher {
     @inject(TYPES.IWebhookNotifier) private readonly webhookNotifier: IWebhookNotifier,
     @inject(TYPES.ISlackNotifier) private readonly slackNotifier: ISlackNotifier,
     @inject(TYPES.IQueueHandler) private readonly queueHandler: IQueueHandler,
+    @inject(OutboxDeliveryHandlerRegistry)
+    private readonly deliveryHandlerRegistry: OutboxDeliveryHandlerRegistry,
     @inject(TYPES.ILogger) baseLogger: ILogger,
   ) {
     this.logger = createScopedLogger(baseLogger, { scope: 'OutboxDispatcher' })
@@ -68,6 +72,9 @@ export class OutboxDispatcher {
       else if (payload.kind === 'queue') {
         await this.queueHandler.postMessage(payload.queueName, payload.payload)
       }
+      else {
+        await this.deliveryHandlerRegistry.deliver(record)
+      }
       await this.repository.markDelivered(record.id, client, diagnostics)
     }
     catch (error) {
@@ -77,7 +84,8 @@ export class OutboxDispatcher {
         : undefined
       const attempts = record.attempts + 1
       const backoffMs = Math.min(60_000, Math.max(DEFAULT_DELAY_MS, 2 ** attempts * 1000))
-      if (attempts >= record.maxAttempts) {
+      const retryable = !(error instanceof OutboxDeliveryError) || error.retryable
+      if (!retryable || attempts >= record.maxAttempts) {
         this.logger.error(`[Outbox] delivery failed permanently (${context})`, normalized)
         await this.repository.markFailed(record.id, normalized, client, diagnostics)
         if (record.webhookPurpose !== WebhookDeliveryPurpose.TEST) {
@@ -92,6 +100,30 @@ export class OutboxDispatcher {
       )
       await this.repository.reschedule(record.id, nextAttempt, normalized, client, diagnostics)
     }
+  }
+
+  public async enqueueCustom(
+    kind: string,
+    payload: Prisma.InputJsonObject,
+    context: string,
+    options: EnqueueOptions = {},
+  ): Promise<OutboxRecord> {
+    const normalizedKind = kind.trim()
+    if (!normalizedKind || ['queue', 'slack', 'webhook'].includes(normalizedKind)) {
+      throw new Error('Custom outbox delivery kind is invalid')
+    }
+    const deliverNow = options.deliverNow ?? !options.client
+    const record = await this.repository.create(
+      normalizedKind,
+      this.normalizeJsonValue({ ...payload, kind: normalizedKind }),
+      options.availableAt ?? new Date(),
+      options.client,
+      options.metadata,
+    )
+    if (deliverNow) {
+      await this.deliver(record, context, options.client)
+    }
+    return record
   }
 
   public async enqueueQueue<Name extends QueueName>(

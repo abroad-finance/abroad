@@ -146,18 +146,50 @@ model PartnerPortalPasswordResetToken {
 }
 
 model PartnerPortalEmailVerificationToken {
-  id                String            @id @default(uuid())
-  userId            String
-  user              PartnerPortalUser @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tokenHash         String            @unique
-  expiresAt         DateTime
-  consumedAt        DateTime?
-  sentAt            DateTime?
-  providerMessageId String?
-  createdAt         DateTime          @default(now())
+  id                      String                           @id @default(uuid())
+  userId                  String
+  user                    PartnerPortalUser                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash               String                           @unique
+  tokenCiphertext         String?
+  expiresAt               DateTime
+  consumedAt              DateTime?
+  sentAt                  DateTime?
+  deliveredAt             DateTime?
+  providerMessageId       String?                          @unique
+  deliveryStatus          PartnerPortalEmailDeliveryStatus @default(PENDING)
+  deliveryAttemptCount    Int                              @default(0)
+  lastDeliveryAttemptAt   DateTime?
+  deliveryFailureCode     String?
+  deliveryStatusUpdatedAt DateTime                         @default(now())
+  createdAt               DateTime                         @default(now())
 
   @@index([userId, createdAt])
   @@index([expiresAt, consumedAt])
+  @@index([deliveryStatus, createdAt])
+}
+
+enum PartnerPortalEmailDeliveryStatus {
+  PENDING
+  ACCEPTED
+  DELAYED
+  DELIVERED
+  BOUNCED
+  COMPLAINED
+  FAILED
+  SUPPRESSED
+  UNAVAILABLE
+}
+
+model PartnerPortalEmailWebhookEvent {
+  id                String   @id
+  providerMessageId String
+  eventType         String
+  occurredAt        DateTime
+  processedAt       DateTime?
+  receivedAt        DateTime @default(now())
+
+  @@index([providerMessageId, occurredAt])
+  @@index([processedAt, receivedAt])
 }
 
 model PartnerPortalPublicRateLimit {
