@@ -29,6 +29,7 @@ const transactionsMock = jest.fn(() => ({
 const builtTx = {
   hash: jest.fn(() => Buffer.from('abcd', 'hex')),
   sign: jest.fn(),
+  toXDR: jest.fn(() => 'signed-envelope-xdr'),
 }
 const addMemoMock = jest.fn().mockReturnThis()
 const addOperationMock = jest.fn().mockReturnThis()
@@ -92,6 +93,7 @@ describe('StellarWalletHandler', () => {
     jest.clearAllMocks()
     builtTx.hash.mockClear()
     builtTx.sign.mockClear()
+    builtTx.toXDR.mockClear()
     buildMock.mockClear()
     addMemoMock.mockClear()
     addOperationMock.mockClear()
@@ -148,7 +150,7 @@ describe('StellarWalletHandler', () => {
     })
   })
 
-  it('uses response data when send fails', async () => {
+  it('returns a sanitized permanent failure while preserving the prepared hash', async () => {
     const handler = new StellarWalletHandler(secretManager as unknown as ISecretManager, assetConfigService as never, lockManager as unknown as ILockManager, logger)
     const responseError = Object.assign(new Error('bad request'), {
       response: { data: { error: 'bad request' }, status: 400 },
@@ -163,13 +165,15 @@ describe('StellarWalletHandler', () => {
     })
 
     expect(result).toEqual({
-      code: 'retriable',
-      reason: JSON.stringify({ error: 'bad request' }),
+      code: 'permanent',
+      reason: 'stellar_submission_rejected',
+      reconciliationRequired: true,
       success: false,
+      transactionId: 'abcd',
     })
   })
 
-  it('uses unknown reason when errors have no details', async () => {
+  it('returns a sanitized retriable failure when the provider gives no details', async () => {
     const handler = new StellarWalletHandler(secretManager as unknown as ISecretManager, assetConfigService as never, lockManager as unknown as ILockManager, logger)
     submitTransactionMock.mockRejectedValueOnce({})
 
@@ -182,8 +186,80 @@ describe('StellarWalletHandler', () => {
 
     expect(result).toEqual({
       code: 'retriable',
-      reason: 'unknown',
+      reason: 'stellar_submission_failed',
+      reconciliationRequired: true,
       success: false,
+      transactionId: 'abcd',
+    })
+  })
+
+  it('persists the signed transaction identity before one durable submission', async () => {
+    submitTransactionMock.mockResolvedValueOnce({ hash: 'abcd' })
+    const handler = new StellarWalletHandler(secretManager as unknown as ISecretManager, assetConfigService as never, lockManager as unknown as ILockManager, logger)
+    const persistPrepared = jest.fn(async (prepared) => {
+      expect(submitTransactionMock).not.toHaveBeenCalled()
+      expect(prepared).toEqual(expect.objectContaining({
+        amount: '5.99',
+        signedEnvelopeXdr: 'signed-envelope-xdr',
+        transactionId: 'abcd',
+      }))
+    })
+
+    const result = await handler.sendDurably({
+      address: 'DESTINATION',
+      amount: 5.99,
+      cryptoCurrency: CryptoCurrency.USDC,
+    }, persistPrepared)
+
+    expect(persistPrepared).toHaveBeenCalledTimes(1)
+    expect(submitTransactionMock).toHaveBeenCalledTimes(1)
+    expect(result).toEqual({ outcome: 'confirmed', transactionId: 'abcd' })
+  })
+
+  it('does not resubmit a durable transaction after an ambiguous response', async () => {
+    const timeoutError = Object.assign(new Error('timeout'), { response: { status: 504 } })
+    const notFoundError = Object.assign(new Error('not found'), { response: { status: 404 } })
+    submitTransactionMock.mockRejectedValueOnce(timeoutError)
+    transactionLookupMock.mockRejectedValueOnce(notFoundError)
+    const handler = new StellarWalletHandler(secretManager as unknown as ISecretManager, assetConfigService as never, lockManager as unknown as ILockManager, logger)
+
+    const result = await handler.sendDurably({
+      address: 'DESTINATION',
+      amount: 5.99,
+      cryptoCurrency: CryptoCurrency.USDC,
+    }, async () => undefined)
+
+    expect(submitTransactionMock).toHaveBeenCalledTimes(1)
+    expect(result).toEqual({
+      outcome: 'ambiguous',
+      reason: 'stellar_submission_timeout',
+      transactionId: 'abcd',
+    })
+  })
+
+  it('distinguishes confirmed, failed, absent, and unavailable hash reconciliation', async () => {
+    const handler = new StellarWalletHandler(secretManager as unknown as ISecretManager, assetConfigService as never, lockManager as unknown as ILockManager, logger)
+    transactionLookupMock
+      .mockResolvedValueOnce({ id: 'confirmed', successful: true } as MockTransactionRecord & { successful: boolean })
+      .mockResolvedValueOnce({ id: 'failed', successful: false } as MockTransactionRecord & { successful: boolean })
+      .mockRejectedValueOnce(Object.assign(new Error('not found'), { response: { status: 404 } }))
+      .mockRejectedValueOnce(Object.assign(new Error('down'), { response: { status: 503 } }))
+
+    await expect(handler.reconcileTransaction('confirmed')).resolves.toEqual({ outcome: 'confirmed', transactionId: 'confirmed' })
+    await expect(handler.reconcileTransaction('failed')).resolves.toEqual({ outcome: 'failed', transactionId: 'failed' })
+    await expect(handler.reconcileTransaction('absent')).resolves.toEqual({ outcome: 'absent' })
+    await expect(handler.reconcileTransaction('unavailable')).resolves.toEqual({
+      outcome: 'unavailable', reason: 'stellar_reconciliation_unavailable',
+    })
+  })
+
+  it('rejects malformed Horizon transaction evidence', async () => {
+    const handler = new StellarWalletHandler(secretManager as unknown as ISecretManager, assetConfigService as never, lockManager as unknown as ILockManager, logger)
+    transactionLookupMock.mockResolvedValueOnce({ id: 'malformed' })
+
+    await expect(handler.reconcileTransaction('malformed')).resolves.toEqual({
+      outcome: 'unavailable',
+      reason: 'stellar_reconciliation_invalid_response',
     })
   })
 

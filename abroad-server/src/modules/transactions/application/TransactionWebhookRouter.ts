@@ -6,6 +6,7 @@ import {
   WebhookDeliveryPurpose,
 } from '@prisma/client'
 import { inject, injectable } from 'inversify'
+import { createHash } from 'node:crypto'
 
 import { TYPES } from '../../../app/container/types'
 import { createScopedLogger, ScopedLogger } from '../../../core/logging/scopedLogger'
@@ -18,6 +19,7 @@ import { ISecretManager } from '../../../platform/secrets/ISecretManager'
 type EnqueueOptions = {
   client?: PrismaClientLike
   deliverNow?: boolean
+  idempotencyKey?: string
   partnerId: string
   primaryTarget?: string
   transactionId: string
@@ -83,6 +85,9 @@ export class TransactionWebhookRouter {
           client: options.client,
           deliverNow: options.deliverNow,
           metadata: {
+            idempotencyKey: options.idempotencyKey
+              ? `${options.idempotencyKey}:${this.targetFingerprint(target)}`
+              : undefined,
             partnerId: isPrimaryTarget ? options.partnerId : undefined,
             transactionId: options.transactionId,
             webhookCredentialMode: isPrimaryTarget
@@ -183,6 +188,10 @@ export class TransactionWebhookRouter {
     return configuration?.activeSecretCiphertext
       ? WebhookCredentialMode.PARTNER_CURRENT
       : WebhookCredentialMode.LEGACY_ORIGIN
+  }
+
+  private targetFingerprint(target: string): string {
+    return createHash('sha256').update(target).digest('hex').slice(0, 16)
   }
 
   private targetOrigin(target: string): string {

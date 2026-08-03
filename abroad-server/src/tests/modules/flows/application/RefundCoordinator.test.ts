@@ -1,5 +1,7 @@
 import { BlockchainNetwork, CryptoCurrency } from '@prisma/client'
 
+import type { ILockManager } from '../../../../platform/cacheLock/ILockManager'
+
 import { RefundCoordinator } from '../../../../modules/flows/application/RefundCoordinator'
 import { RefundService } from '../../../../modules/transactions/application/RefundService'
 import { TransactionRepository } from '../../../../modules/transactions/application/TransactionRepository'
@@ -7,6 +9,9 @@ import { createMockLogger } from '../../../setup/mockFactories'
 
 describe('RefundCoordinator', () => {
   const prismaClient = {}
+  const lockManager = {
+    withLock: jest.fn(async (_key: string, _timeout: number, operation: () => Promise<void>) => operation()),
+  }
 
   afterEach(() => {
     jest.restoreAllMocks()
@@ -27,6 +32,7 @@ describe('RefundCoordinator', () => {
     const coordinator = new RefundCoordinator(
       { getClient: jest.fn(async () => prismaClient) } as never,
       { getWalletHandler: jest.fn() } as never,
+      lockManager as unknown as ILockManager,
       createMockLogger(),
     )
 
@@ -64,6 +70,7 @@ describe('RefundCoordinator', () => {
     const coordinator = new RefundCoordinator(
       { getClient: jest.fn(async () => prismaClient) } as never,
       { getWalletHandler: jest.fn() } as never,
+      lockManager as unknown as ILockManager,
       createMockLogger(),
     )
 
@@ -84,6 +91,46 @@ describe('RefundCoordinator', () => {
         transactionId: undefined,
       },
       transactionId: 'tx-2',
+    }))
+  })
+
+  it('keeps an indeterminate Stellar refund reserved for exact-hash reconciliation', async () => {
+    jest.spyOn(TransactionRepository.prototype, 'getClient').mockResolvedValue(prismaClient as never)
+    jest.spyOn(TransactionRepository.prototype, 'reserveRefund').mockResolvedValue({ attempts: 1, outcome: 'reserved' })
+    const recordRefundOutcome = jest.spyOn(TransactionRepository.prototype, 'recordRefundOutcome').mockResolvedValue(undefined)
+    jest.spyOn(RefundService.prototype, 'refundByOnChainId').mockResolvedValue({
+      code: 'retriable',
+      reason: 'stellar_submission_timeout',
+      reconciliationRequired: true,
+      success: false,
+      transactionId: 'prepared-refund-hash',
+    })
+
+    const coordinator = new RefundCoordinator(
+      { getClient: jest.fn(async () => prismaClient) } as never,
+      { getWalletHandler: jest.fn() } as never,
+      lockManager as unknown as ILockManager,
+      createMockLogger(),
+    )
+
+    await coordinator.refundByOnChainId({
+      amount: 5.99,
+      cryptoCurrency: CryptoCurrency.USDC,
+      network: BlockchainNetwork.STELLAR,
+      onChainId: 'deposit-hash',
+      reason: 'provider_failed',
+      transactionId: 'tx-ambiguous',
+      trigger: 'provider_status',
+    })
+
+    expect(recordRefundOutcome).toHaveBeenCalledWith(prismaClient, expect.objectContaining({
+      refundResult: {
+        reason: 'stellar_submission_timeout',
+        reconciliationRequired: true,
+        success: false,
+        transactionId: 'prepared-refund-hash',
+      },
+      transactionId: 'tx-ambiguous',
     }))
   })
 
@@ -115,6 +162,7 @@ describe('RefundCoordinator', () => {
     const coordinator = new RefundCoordinator(
       { getClient: jest.fn(async () => client) } as never,
       { getWalletHandler: jest.fn() } as never,
+      lockManager as unknown as ILockManager,
       createMockLogger(),
     )
 

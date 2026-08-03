@@ -4,12 +4,48 @@ import { adminRequest, unwrapAdminResult } from './adminRequest'
 import {
   OpsReconcileTransactionHashInput,
   OpsReconcileTransactionHashResponse,
+  OpsRefundRecovery,
   OpsTransactionDetail,
   OpsTransactionEvidenceExport,
   OpsTransactionFilteredEvidenceExport,
   OpsTransactionListResponse,
   OpsTransactionSearchFilters,
 } from './transactionAdminTypes'
+
+type OpsRefundRecoveryWire = {
+  amount: null | number
+  asset: string
+  attempts: number
+  block_reason: null | string
+  candidate_hash_fingerprint: null | string
+  canonical_refund_recorded: boolean
+  last_failure_category: null | string
+  last_reconciliation: null | {
+    at: string
+    result: 'ABSENT' | 'AMBIGUOUS' | 'BLOCKED' | 'CONFIRMED'
+  }
+  network: string
+  replacement_eligible: boolean
+  status: OpsRefundRecovery['status']
+  transaction_id: string
+  version: number
+}
+
+const toRefundRecovery = (response: OpsRefundRecoveryWire): OpsRefundRecovery => ({
+  amount: response.amount,
+  asset: response.asset,
+  attempts: response.attempts,
+  blockReason: response.block_reason,
+  candidateHashFingerprint: response.candidate_hash_fingerprint,
+  canonicalRefundRecorded: response.canonical_refund_recorded,
+  lastFailureCategory: response.last_failure_category,
+  lastReconciliation: response.last_reconciliation,
+  network: response.network,
+  replacementEligible: response.replacement_eligible,
+  status: response.status,
+  transactionId: response.transaction_id,
+  version: response.version,
+})
 
 export const searchTransactions = async (
   filters: OpsTransactionSearchFilters,
@@ -52,6 +88,39 @@ export const getTransaction = async (
   })
 
   return unwrapAdminResult(result)
+}
+
+export const getRefundRecovery = async (
+  transactionId: string,
+  signal?: AbortSignal,
+): Promise<OpsRefundRecovery> => {
+  const result = await adminRequest<OpsRefundRecoveryWire>(
+    `/ops/transactions/${encodeURIComponent(transactionId)}/refund-recovery`,
+    { method: 'GET', signal },
+  )
+  return toRefundRecovery(unwrapAdminResult(result))
+}
+
+export const reconcileRefundRecovery = async (
+  transactionId: string,
+  mutation: OpsMutationDetails,
+): Promise<OpsRefundRecovery> => {
+  const result = await adminRequest<OpsRefundRecoveryWire>(
+    `/ops/transactions/${encodeURIComponent(transactionId)}/refund-recovery/reconcile`,
+    { method: 'POST', mutation },
+  )
+  return toRefundRecovery(unwrapAdminResult(result))
+}
+
+export const issueReplacementRefund = async (
+  transactionId: string,
+  mutation: OpsMutationDetails,
+): Promise<OpsRefundRecovery> => {
+  const result = await adminRequest<OpsRefundRecoveryWire>(
+    `/ops/transactions/${encodeURIComponent(transactionId)}/refund-recovery/replace`,
+    { method: 'POST', mutation },
+  )
+  return toRefundRecovery(unwrapAdminResult(result))
 }
 
 export const getTransactionReceipt = async (

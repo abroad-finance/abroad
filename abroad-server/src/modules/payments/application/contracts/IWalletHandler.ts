@@ -8,7 +8,25 @@ export interface IWalletHandler {
 
   getTransactionFee?(transactionId: string): Promise<WalletTransactionFeeResult>
 
+  reconcileTransaction?(transactionId: string): Promise<WalletTransactionReconciliationResult>
+
   send(params: WalletSendParams): Promise<WalletSendResult>
+
+  sendDurably?(
+    params: WalletSendParams,
+    persistPrepared: (prepared: WalletPreparedSend) => Promise<void>,
+  ): Promise<WalletDurableSendResult>
+}
+
+export type WalletDurableSendResult
+  = | { outcome: 'ambiguous', reason: string, transactionId: string }
+    | { outcome: 'confirmed', transactionId: string }
+
+export type WalletPreparedSend = {
+  amount: string
+  expiresAt: Date
+  signedEnvelopeXdr: string
+  transactionId: string
 }
 
 export type WalletSendParams = {
@@ -19,12 +37,31 @@ export type WalletSendParams = {
 }
 
 export type WalletSendResult
-  = | { code?: WalletFailureCode, reason?: string, success: false, transactionId?: string }
-    | { networkFee?: WalletNetworkFee, success: true, transactionId?: string }
+  = | {
+    code?: WalletFailureCode
+    reason?: string
+    reconciliationRequired: true
+    success: false
+    transactionId: string
+  }
+  | {
+    code?: WalletFailureCode
+    reason?: string
+    reconciliationRequired?: false
+    success: false
+    transactionId?: string
+  }
+  | { networkFee?: WalletNetworkFee, success: true, transactionId?: string }
 
 export type WalletTransactionFeeResult
   = | { fee: WalletNetworkFee, outcome: 'found' }
     | { outcome: 'pending', reason: string }
+    | { outcome: 'unavailable', reason: string }
+
+export type WalletTransactionReconciliationResult
+  = | { outcome: 'absent' }
+    | { outcome: 'confirmed', transactionId: string }
+    | { outcome: 'failed', transactionId: string }
     | { outcome: 'unavailable', reason: string }
 
 type WalletFailureCode = 'permanent' | 'retriable' | 'validation'

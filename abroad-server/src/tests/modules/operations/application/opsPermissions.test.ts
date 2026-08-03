@@ -18,6 +18,7 @@ describe('Ops permissions', () => {
       'treasury:read',
     ]))
     expect(permissions).not.toContain('transactions:reconcile')
+    expect(permissions).not.toContain('transactions:refund')
     expect(permissions).not.toContain('configuration:manage')
     expect(permissions).not.toContain('credentials:manage')
   })
@@ -34,11 +35,16 @@ describe('Ops permissions', () => {
     expect(hasOpsPermission(compliance, 'kyc:decide')).toBe(true)
     expect(hasOpsPermission(compliance, 'treasury:read')).toBe(true)
     expect(hasOpsPermission(compliance, 'transactions:reconcile')).toBe(false)
+    expect(hasOpsPermission(compliance, 'transactions:refund')).toBe(false)
 
     expect(hasOpsPermission(finance, 'transactions:reconcile')).toBe(true)
+    expect(hasOpsPermission(finance, 'transactions:refund')).toBe(true)
     expect(hasOpsPermission(finance, 'kyc:reveal')).toBe(false)
 
     expect(hasOpsPermission(operations, 'flows:recover')).toBe(true)
+    expect(hasOpsPermission(operations, 'transactions:refund')).toBe(true)
     expect(hasOpsPermission(operations, 'configuration:approve')).toBe(false)
+
+    expect(hasOpsPermission(getOpsRolePermissions(OpsRole.SUPPORT), 'transactions:refund')).toBe(false)
   })
 })

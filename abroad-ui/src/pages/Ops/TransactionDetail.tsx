@@ -17,7 +17,11 @@ import {
 } from 'react'
 import { Link, useParams } from 'react-router-dom'
 
-import type { OpsTransactionDetail as OpsTransactionDetailData, TransactionStatus } from '../../services/admin/transactionAdminTypes'
+import type {
+  OpsRefundRecovery,
+  OpsTransactionDetail as OpsTransactionDetailData,
+  TransactionStatus,
+} from '../../services/admin/transactionAdminTypes'
 
 import { useOpsApiKey, useOpsSession } from '../../services/admin/opsAuthStore'
 import { listOpsCaseOwners } from '../../services/admin/opsInvestigationApi'
@@ -28,6 +32,7 @@ import {
 } from '../../services/admin/opsTaskTelemetry'
 import {
   exportTransactionEvidence,
+  getRefundRecovery,
   getTransaction,
   getTransactionReceipt,
 } from '../../services/admin/transactionAdminApi'
@@ -43,6 +48,7 @@ import {
 } from './shared'
 import CaseWorkspace from './transactions/CaseWorkspace'
 import EvidenceTimeline from './transactions/EvidenceTimeline'
+import RefundRecoveryPanel from './transactions/RefundRecoveryPanel'
 
 const statusTone: Readonly<Record<TransactionStatus, OpsTone>> = {
   AWAITING_PAYMENT: 'warning',
@@ -102,6 +108,8 @@ const DetailField = ({ children, label }: { children: React.ReactNode, label: st
 const TransactionDetail = () => {
   const { transactionId } = useParams()
   const [data, setData] = useState<null | OpsTransactionDetailData>(null)
+  const [refundRecovery, setRefundRecovery] = useState<null | OpsRefundRecovery>(null)
+  const [refundRecoveryError, setRefundRecoveryError] = useState<null | string>(null)
   const [owners, setOwners] = useState<Awaited<ReturnType<typeof listOpsCaseOwners>>>([])
   const [loading, setLoading] = useState(false)
   const [operation, setOperation] = useState<'diagnostics' | 'evidence' | 'receipt' | null>(null)
@@ -112,17 +120,33 @@ const TransactionDetail = () => {
   const canManageCases = Boolean(session?.kind === 'ops_user' && session.permissions.includes('cases:manage'))
   const canReadProof = Boolean(session?.kind === 'ops_user' && session.permissions.includes('transactions:proof'))
   const canExport = Boolean(session?.kind === 'ops_user' && session.permissions.includes('transactions:export'))
+  const canRecoverRefund = Boolean(session?.kind === 'ops_user' && session.permissions.includes('transactions:refund'))
 
   const load = useCallback(async (signal?: AbortSignal): Promise<void> => {
     if (!transactionId || !opsApiKey) {
       setData(null)
+      setRefundRecovery(null)
+      setRefundRecoveryError(null)
       setLoading(false)
       return
     }
     setLoading(true)
     setError(null)
     try {
-      setData(await getTransaction(transactionId, signal))
+      const [transactionResult, recoveryResult] = await Promise.allSettled([getTransaction(transactionId, signal), getRefundRecovery(transactionId, signal)])
+      if (signal?.aborted) return
+      if (transactionResult.status === 'rejected') throw transactionResult.reason
+      setData(transactionResult.value)
+      if (recoveryResult.status === 'fulfilled') {
+        setRefundRecovery(recoveryResult.value)
+        setRefundRecoveryError(null)
+      }
+      else {
+        setRefundRecovery(null)
+        setRefundRecoveryError(recoveryResult.reason instanceof Error
+          ? recoveryResult.reason.message
+          : 'Refund recovery evidence is unavailable')
+      }
     }
     catch (loadError) {
       if (!signal?.aborted) setError(loadError instanceof Error ? loadError.message : 'Failed to load transaction')
@@ -229,6 +253,11 @@ const TransactionDetail = () => {
     await load()
   }
 
+  const reloadAfterRefundChange = async (next: OpsRefundRecovery): Promise<void> => {
+    setRefundRecovery(next)
+    await load()
+  }
+
   return (
     <OpsPageShell
       actions={data
@@ -284,6 +313,7 @@ const TransactionDetail = () => {
                     </p>
                     <p className="mt-1 text-xs text-ops-muted">
                       Received on
+                      {' '}
                       {humanizeStatus(data.quote.network)}
                     </p>
                   </div>
@@ -296,6 +326,7 @@ const TransactionDetail = () => {
                     </p>
                     <p className="mt-1 text-xs text-ops-muted">
                       Payout via
+                      {' '}
                       {data.provider.label}
                     </p>
                   </div>
@@ -307,6 +338,7 @@ const TransactionDetail = () => {
                 <p className="mt-1 text-sm leading-6 text-ops-muted">{data.latestEvent.description}</p>
                 <p className="mt-3 text-xs text-ops-muted">
                   Age
+                  {' '}
                   {data.sla.ageMinutes}
                   m
                   {data.sla.targetMinutes ? ` · Target ${data.sla.targetMinutes}m` : ''}
@@ -342,6 +374,7 @@ const TransactionDetail = () => {
                 <div>
                   <p className="ops-eyebrow text-rose-700">
                     Normalized failure ·
+                    {' '}
                     {humanizeStatus(data.failure.category)}
                   </p>
                   <h2 className="mt-1 text-lg font-semibold text-rose-950" id="failure-guidance-title">{data.failure.label}</h2>
@@ -355,6 +388,22 @@ const TransactionDetail = () => {
                 </div>
               </div>
             </section>
+          )}
+
+          {refundRecoveryError && (
+            <OpsBanner variant="warning">
+              Refund recovery controls are unavailable:
+              {' '}
+              {refundRecoveryError}
+            </OpsBanner>
+          )}
+
+          {refundRecovery && refundRecovery.status !== 'NOT_REQUIRED' && (
+            <RefundRecoveryPanel
+              canRecover={canRecoverRefund}
+              onChanged={reloadAfterRefundChange}
+              recovery={refundRecovery}
+            />
           )}
 
           <div className="grid gap-6 xl:grid-cols-[minmax(0,1.3fr)_minmax(20rem,0.7fr)]">

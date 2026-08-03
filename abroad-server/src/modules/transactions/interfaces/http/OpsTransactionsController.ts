@@ -31,6 +31,7 @@ import { requireNamedOpsPrincipal, requireOpsPrincipal } from '../../../../app/h
 import { OpsAuditService } from '../../../operations/application/OpsAuditService'
 import { OpsMutationService } from '../../../operations/application/opsMutation'
 import { readOpsMutationEnvelope } from '../../../operations/interfaces/http/opsMutationHeaders'
+import { OpsRefundRecoveryDto, OpsRefundRecoveryService } from '../../application/OpsRefundRecoveryService'
 import {
   OpsAttentionFilter,
   OpsProofSummaryDto,
@@ -52,7 +53,7 @@ import {
   PartnerPixReceiptService,
   PartnerPixReceiptUnavailableError,
 } from '../../application/PartnerPixReceiptService'
-import { OpsReconcileHashRequest, opsReconcileHashRequestSchema, OpsReconcileHashResponse } from './opsContracts'
+import { OpsReconcileHashRequest, opsReconcileHashRequestSchema, OpsReconcileHashResponse, OpsRefundRecoveryResponse } from './opsContracts'
 
 /* eslint-disable perfectionist/sort-classes -- Tsoa preserves controller declaration order; static routes must precede the transaction-id route. */
 
@@ -65,6 +66,8 @@ export class OpsTransactionsController extends Controller {
     private readonly reconciliationService: OpsTransactionReconciliationService,
     @inject(OpsTransactionQueryService)
     private readonly queryService: OpsTransactionQueryService,
+    @inject(OpsRefundRecoveryService)
+    private readonly refundRecoveryService: OpsRefundRecoveryService,
     @inject(OpsMutationService)
     private readonly mutationService: OpsMutationService,
     @inject(PartnerPixReceiptService)
@@ -73,6 +76,82 @@ export class OpsTransactionsController extends Controller {
     private readonly auditService: OpsAuditService,
   ) {
     super()
+  }
+
+  @Get('{transactionId}/refund-recovery')
+  @OperationId('OpsGetRefundRecovery')
+  @Response<404, { reason: string }>(404, 'Not Found')
+  @Security('OpsAuth', ['transactions:read'])
+  public async getRefundRecovery(
+    @Path() transactionId: string,
+  ): Promise<OpsRefundRecoveryResponse> {
+    this.setHeader('Cache-Control', 'private, no-store')
+    return this.toRefundRecoveryResponse(await this.refundRecoveryService.getStatus(transactionId))
+  }
+
+  @OperationId('OpsReconcileRefundRecovery')
+  @Post('{transactionId}/refund-recovery/reconcile')
+  @Response<409, { reason: string }>(409, 'Conflict')
+  @Security('OpsAuth', ['transactions:refund'])
+  @SuccessResponse('200', 'Refund reconciled')
+  public async reconcileRefundRecovery(
+    @Path() transactionId: string,
+    @Request() request: RequestExpress,
+  ): Promise<OpsRefundRecoveryResponse> {
+    const principal = requireNamedOpsPrincipal(request.user)
+    const envelope = readOpsMutationEnvelope(request)
+    const result = await this.mutationService.execute(
+      principal,
+      'transaction.refund.reconcile',
+      { id: transactionId, type: 'transaction_refund' },
+      envelope,
+      () => this.refundRecoveryService.reconcile({
+        expectedVersion: envelope.expectedVersion ?? 0,
+        transactionId,
+      }),
+      value => ({
+        metadata: {
+          canonicalRefundRecorded: value.canonicalRefundRecorded,
+          recoveryStatus: value.status,
+          replacementEligible: value.replacementEligible,
+        },
+        resourceId: value.transactionId,
+      }),
+    )
+    return this.toRefundRecoveryResponse(result)
+  }
+
+  @OperationId('OpsIssueReplacementRefund')
+  @Post('{transactionId}/refund-recovery/replace')
+  @Response<409, { reason: string }>(409, 'Conflict')
+  @Security('OpsAuth', ['transactions:refund'])
+  @SuccessResponse('200', 'Replacement refund submitted')
+  public async issueReplacementRefund(
+    @Path() transactionId: string,
+    @Request() request: RequestExpress,
+  ): Promise<OpsRefundRecoveryResponse> {
+    const principal = requireNamedOpsPrincipal(request.user)
+    const envelope = readOpsMutationEnvelope(request)
+    const result = await this.mutationService.execute(
+      principal,
+      'transaction.refund.replace',
+      { id: transactionId, type: 'transaction_refund' },
+      envelope,
+      () => this.refundRecoveryService.issueReplacement({
+        expectedVersion: envelope.expectedVersion ?? 0,
+        initiatedByOpsUserId: principal.userId,
+        mutationIdempotencyKey: envelope.idempotencyKey,
+        transactionId,
+      }),
+      value => ({
+        metadata: {
+          canonicalRefundRecorded: value.canonicalRefundRecorded,
+          recoveryStatus: value.status,
+        },
+        resourceId: value.transactionId,
+      }),
+    )
+    return this.toRefundRecoveryResponse(result)
   }
 
   @Get('{transactionId}/evidence')
@@ -347,6 +426,24 @@ export class OpsTransactionsController extends Controller {
         return badRequest(400, { reason: error.message })
       }
       throw error
+    }
+  }
+
+  private toRefundRecoveryResponse(value: OpsRefundRecoveryDto): OpsRefundRecoveryResponse {
+    return {
+      amount: value.amount,
+      asset: value.asset,
+      attempts: value.attempts,
+      block_reason: value.blockReason,
+      candidate_hash_fingerprint: value.candidateHashFingerprint,
+      canonical_refund_recorded: value.canonicalRefundRecorded,
+      last_failure_category: value.lastFailureCategory,
+      last_reconciliation: value.lastReconciliation,
+      network: value.network,
+      replacement_eligible: value.replacementEligible,
+      status: value.status,
+      transaction_id: value.transactionId,
+      version: value.version,
     }
   }
 }

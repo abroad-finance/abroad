@@ -83,6 +83,33 @@ export type OpsReconcileTransactionHashResponse = {
   transaction_id: null | string
   transaction_status: null | string
 }
+export type OpsRefundRecovery = {
+  amount: null | number
+  asset: string
+  attempts: number
+  blockReason: null | string
+  candidateHashFingerprint: null | string
+  canonicalRefundRecorded: boolean
+  lastFailureCategory: null | string
+  lastReconciliation: null | {
+    at: string
+    result: 'ABSENT' | 'AMBIGUOUS' | 'BLOCKED' | 'CONFIRMED'
+  }
+  network: string
+  replacementEligible: boolean
+  status: OpsRefundRecoveryPosture
+  transactionId: string
+  version: number
+}
+export type OpsRefundRecoveryPosture
+  = | 'AMBIGUOUS'
+    | 'BLOCKED'
+    | 'COMPLETED'
+    | 'ELIGIBLE'
+    | 'IN_FLIGHT'
+    | 'NEEDS_RECONCILIATION'
+    | 'NOT_REQUIRED'
+    | 'UNSUPPORTED'
 export type OpsRefundStatus = typeof opsRefundStatuses[number]
 export type OpsTransactionCaseDetail = OpsCaseSummary & {
   handoffs: Array<{

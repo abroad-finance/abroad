@@ -45,6 +45,8 @@ export const opsMutationActions = [
   'runbook.create',
   'runbook.update',
   'transaction.reconcile_hash',
+  'transaction.refund.reconcile',
+  'transaction.refund.replace',
   'treasury.threshold.create',
   'treasury.threshold.update',
 ] as const

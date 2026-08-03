@@ -425,6 +425,7 @@ model Transaction {
   reconciliationItems PartnerReconciliationItem[]
   opsCase             OpsCase?
   economics           TransactionEconomics?
+  refundRecovery      RefundRecovery?
 
   @@index([partnerUserId, status, createdAt], name: "transaction_partnerUser_status_createdAt_idx")
   @@index([createdAt, status], name: "transaction_createdAt_status_idx")
@@ -451,6 +452,50 @@ model StellarOrphanRefund {
   reason              String?
   refundTransactionId String?
   status              OrphanRefundStatus
+}
+
+model RefundRecovery {
+  id                    String                      @id @default(uuid())
+  transactionId         String                      @unique
+  transaction           Transaction                 @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  status                RefundRecoveryStatus        @default(NEEDS_RECONCILIATION)
+  version               Int                         @default(1)
+  originalRefundHash    String?                     @unique
+  originalHashExpiresAt DateTime?
+  lastResult            RefundReconciliationResult?
+  lastFailureCode       String?
+  lastReconciledAt      DateTime?
+  createdAt             DateTime                    @default(now())
+  updatedAt             DateTime                    @updatedAt
+  attempts              RefundRecoveryAttempt[]
+
+  @@index([status, updatedAt])
+}
+
+model RefundRecoveryAttempt {
+  id                   String                      @id @default(uuid())
+  recoveryId           String
+  recovery             RefundRecovery              @relation(fields: [recoveryId], references: [id], onDelete: Cascade)
+  attemptNumber        Int
+  operationKey         String                      @unique
+  transactionHash      String                      @unique
+  signedEnvelopeXdr    String                      @db.Text
+  amount               Decimal                     @db.Decimal(36, 18)
+  asset                CryptoCurrency
+  network              BlockchainNetwork
+  status               RefundRecoveryAttemptStatus @default(PREPARED)
+  failureCode          String?
+  expiresAt            DateTime
+  preparedAt           DateTime                    @default(now())
+  submittedAt          DateTime?
+  lastReconciledAt     DateTime?
+  completedAt          DateTime?
+  initiatedByOpsUserId String?
+  initiatedByOpsUser   OpsUser?                    @relation(fields: [initiatedByOpsUserId], references: [id], onDelete: SetNull)
+
+  @@unique([recoveryId, attemptNumber])
+  @@index([recoveryId, status, preparedAt])
+  @@index([initiatedByOpsUserId, preparedAt])
 }
 
 model PendingConversions {
@@ -661,6 +706,29 @@ enum OrphanRefundStatus {
   PENDING
   FAILED
   SUCCEEDED
+}
+
+enum RefundRecoveryStatus {
+  NEEDS_RECONCILIATION
+  ELIGIBLE
+  AMBIGUOUS
+  IN_FLIGHT
+  COMPLETED
+  BLOCKED
+}
+
+enum RefundRecoveryAttemptStatus {
+  PREPARED
+  AMBIGUOUS
+  CONFIRMED
+  ABSENT
+}
+
+enum RefundReconciliationResult {
+  CONFIRMED
+  ABSENT
+  AMBIGUOUS
+  BLOCKED
 }
 
 enum CryptoCurrency {
@@ -1269,6 +1337,7 @@ model OpsUser {
   mutationExecutions             OpsMutationExecution[]
   taskEvents                     OpsTaskEvent[]
   kycReviews                     PartnerUserKyc[]          @relation("OpsKycReviewer")
+  refundRecoveryAttempts         RefundRecoveryAttempt[]
 
   @@index([role, disabledAt])
 }

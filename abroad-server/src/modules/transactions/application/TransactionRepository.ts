@@ -11,8 +11,19 @@ export type PayoutReservation
     | { outcome: 'missing' }
 
 export type RefundAttemptResult
-  = | { reason?: string, success: false, transactionId?: string }
-    | { success: true, transactionId?: string }
+  = | {
+    reason?: string
+    reconciliationRequired: true
+    success: false
+    transactionId: string
+  }
+  | {
+    reason?: string
+    reconciliationRequired?: false
+    success: false
+    transactionId?: string
+  }
+  | { success: true, transactionId?: string }
 
 export type RefundReservation
   = | { attempts: number, outcome: 'in_flight' }
@@ -28,6 +39,7 @@ type PayoutContext = {
 
 type RefundContext = {
   attempts: number
+  candidateTransactionId?: string
   lastError?: string
   reason?: string
   refundTransactionId?: string
@@ -350,11 +362,18 @@ export class TransactionRepository {
       })
 
       const context = this.parseRefundContext(existingTransition?.context)
-      const status: RefundContext['status'] = params.refundResult.success ? 'succeeded' : 'failed'
+      const status: RefundContext['status'] = params.refundResult.success
+        ? 'succeeded'
+        : params.refundResult.reconciliationRequired
+          ? 'pending'
+          : 'failed'
       const attempts = context.attempts > 0 ? context.attempts : 1
       const updatedContext: RefundContext = {
         ...context,
         attempts,
+        candidateTransactionId: params.refundResult.success
+          ? undefined
+          : params.refundResult.transactionId ?? context.candidateTransactionId,
         lastError: params.refundResult.success ? undefined : params.refundResult.reason ?? context.lastError,
         reason: context.reason,
         refundTransactionId: params.refundResult.success
@@ -598,12 +617,16 @@ export class TransactionRepository {
     const status = context.status === 'succeeded' || context.status === 'failed' ? context.status : 'pending'
 
     const refundTransactionId = typeof context.refundTransactionId === 'string' ? context.refundTransactionId : undefined
+    const candidateTransactionId = typeof context.candidateTransactionId === 'string'
+      ? context.candidateTransactionId
+      : undefined
     const reason = typeof context.reason === 'string' ? context.reason : undefined
     const trigger = typeof context.trigger === 'string' ? context.trigger : undefined
     const lastError = typeof context.lastError === 'string' ? context.lastError : undefined
 
     return {
       attempts,
+      candidateTransactionId,
       lastError,
       reason,
       refundTransactionId,
@@ -623,6 +646,7 @@ export class TransactionRepository {
   private serializeRefundContext(context: RefundContext): Prisma.InputJsonValue {
     return {
       attempts: context.attempts,
+      ...(context.candidateTransactionId !== undefined ? { candidateTransactionId: context.candidateTransactionId } : {}),
       ...(context.lastError !== undefined ? { lastError: context.lastError } : {}),
       ...(context.reason !== undefined ? { reason: context.reason } : {}),
       ...(context.refundTransactionId !== undefined ? { refundTransactionId: context.refundTransactionId } : {}),

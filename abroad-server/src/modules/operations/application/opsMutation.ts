@@ -433,6 +433,22 @@ export const OPS_MUTATION_POLICIES = {
     permission: 'transactions:reconcile',
     stepUpMaxAgeMs: DEFAULT_STEP_UP_MAX_AGE_MS,
   },
+  'transaction.refund.reconcile': {
+    approvalClass: 'STEP_UP',
+    confirmation: 'RECONCILE REFUND',
+    expectedVersion: true,
+    impact: 'Checks every durable refund hash and records a confirmed refund or replacement eligibility.',
+    permission: 'transactions:refund',
+    stepUpMaxAgeMs: DEFAULT_STEP_UP_MAX_AGE_MS,
+  },
+  'transaction.refund.replace': {
+    approvalClass: 'STEP_UP',
+    confirmation: 'ISSUE REPLACEMENT REFUND',
+    expectedVersion: true,
+    impact: 'Submits the exact original crypto amount back to its verified sender after fresh absence proof.',
+    permission: 'transactions:refund',
+    stepUpMaxAgeMs: DEFAULT_STEP_UP_MAX_AGE_MS,
+  },
   'treasury.threshold.create': {
     approvalClass: 'STEP_UP',
     confirmation: 'CREATE TREASURY THRESHOLD',

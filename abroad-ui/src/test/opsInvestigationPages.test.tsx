@@ -17,6 +17,7 @@ import {
 import type { FlowInstanceListResponse } from '../services/admin/flowTypes'
 import type { OpsSession } from '../services/admin/opsAuthStore'
 import type {
+  OpsRefundRecovery,
   OpsTransactionDetail,
   OpsTransactionListResponse,
   OpsTransactionSummary,
@@ -33,8 +34,11 @@ import { ImmediateOpsMutationProvider } from './opsMutationTestUtils'
 const transactionMocks = vi.hoisted(() => ({
   exportFilteredTransactionEvidence: vi.fn(),
   exportTransactionEvidence: vi.fn(),
+  getRefundRecovery: vi.fn(),
   getTransaction: vi.fn(),
   getTransactionReceipt: vi.fn(),
+  issueReplacementRefund: vi.fn(),
+  reconcileRefundRecovery: vi.fn(),
   reconcileTransactionHash: vi.fn(),
   searchTransactions: vi.fn(),
 }))
@@ -74,6 +78,7 @@ const session: OpsSession = {
     'transactions:proof',
     'transactions:read',
     'transactions:reconcile',
+    'transactions:refund',
   ],
   role: 'OPERATIONS',
   sessionVersion: 1,
@@ -134,6 +139,22 @@ const transactionList: OpsTransactionListResponse = {
     { count: 0, status: 'WRONG_AMOUNT' },
   ],
   total: 1,
+}
+
+const refundNotRequired: OpsRefundRecovery = {
+  amount: null,
+  asset: 'USDC',
+  attempts: 0,
+  blockReason: null,
+  candidateHashFingerprint: null,
+  canonicalRefundRecorded: false,
+  lastFailureCategory: null,
+  lastReconciliation: null,
+  network: 'STELLAR',
+  replacementEligible: false,
+  status: 'NOT_REQUIRED',
+  transactionId: 'tx-1',
+  version: 1,
 }
 
 const transactionDetail: OpsTransactionDetail = {
@@ -251,6 +272,7 @@ beforeEach(() => {
   investigationMocks.listOpsSavedViews.mockResolvedValue([])
   transactionMocks.searchTransactions.mockResolvedValue(transactionList)
   transactionMocks.getTransaction.mockResolvedValue(transactionDetail)
+  transactionMocks.getRefundRecovery.mockResolvedValue(refundNotRequired)
   flowMocks.listFlowInstances.mockResolvedValue(flowList)
 })
 
@@ -338,6 +360,64 @@ describe('Ops investigation workspace', () => {
     expect(screen.getByText('•••• 0497')).toBeVisible()
     expect(screen.queryByText('private-tax-id')).not.toBeInTheDocument()
     expect(screen.getByText('Provider evidence requested; no recipient data included.')).toBeVisible()
+  })
+
+  test('shows the refund proof ladder and issues a guarded replacement only when eligible', async () => {
+    const eligibleRecovery: OpsRefundRecovery = {
+      amount: 5.99,
+      asset: 'USDC',
+      attempts: 1,
+      blockReason: null,
+      candidateHashFingerprint: '••••abcd1234',
+      canonicalRefundRecorded: false,
+      lastFailureCategory: 'NETWORK_TIMEOUT',
+      lastReconciliation: { at: '2026-08-03T14:00:00.000Z', result: 'ABSENT' },
+      network: 'STELLAR',
+      replacementEligible: true,
+      status: 'ELIGIBLE',
+      transactionId: 'tx-1',
+      version: 2,
+    }
+    const completedRecovery: OpsRefundRecovery = {
+      ...eligibleRecovery,
+      attempts: 2,
+      canonicalRefundRecorded: true,
+      lastReconciliation: { at: '2026-08-03T14:02:00.000Z', result: 'CONFIRMED' },
+      replacementEligible: false,
+      status: 'COMPLETED',
+      version: 4,
+    }
+    transactionMocks.getTransaction.mockResolvedValue({
+      ...transactionDetail,
+      refund: { onChainId: null, status: 'FAILED' },
+      status: 'PAYMENT_FAILED',
+    })
+    transactionMocks.getRefundRecovery
+      .mockResolvedValueOnce(eligibleRecovery)
+      .mockResolvedValue(completedRecovery)
+    transactionMocks.issueReplacementRefund.mockResolvedValue(completedRecovery)
+
+    render(
+      <MemoryRouter initialEntries={['/ops/transactions/tx-1']}>
+        <ImmediateOpsMutationProvider>
+          <Routes>
+            <Route element={<TransactionDetail />} path="/ops/transactions/:transactionId" />
+          </Routes>
+        </ImmediateOpsMutationProvider>
+      </MemoryRouter>,
+    )
+
+    expect(await screen.findByRole('heading', { name: 'Refund recovery' })).toBeVisible()
+    expect(screen.getByText('Replacement eligibility proven')).toBeVisible()
+    expect(screen.getByText('••••abcd1234')).toBeVisible()
+
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: 'Issue replacement refund' }))
+    await waitFor(() => expect(transactionMocks.issueReplacementRefund).toHaveBeenCalledWith(
+      'tx-1',
+      expect.objectContaining({ expectedVersion: 2 }),
+    ))
+    expect(await screen.findByText(/canonical evidence is recorded/i)).toBeVisible()
   })
 
   test('runs global search only after explicit submission and links grouped results', async () => {

@@ -85,6 +85,7 @@ import { StellarWalletHandler } from '../../modules/payments/infrastructure/wall
 import { QuoteRequestMetricRecorder } from '../../modules/quotes/application/QuoteRequestMetricRecorder'
 import { QuoteUseCase } from '../../modules/quotes/application/quoteUseCase'
 import { FlowCorridorPricingProvider } from '../../modules/quotes/infrastructure/FlowCorridorPricingProvider'
+import { OpsRefundRecoveryService } from '../../modules/transactions/application/OpsRefundRecoveryService'
 import { OpsTransactionQueryService } from '../../modules/transactions/application/OpsTransactionQueryService'
 import { OpsTransactionReconciliationService } from '../../modules/transactions/application/OpsTransactionReconciliationService'
 import { PartnerPixReceiptService } from '../../modules/transactions/application/PartnerPixReceiptService'
@@ -159,6 +160,7 @@ const domainBindings: ReadonlyArray<BindingRegistration<unknown>> = [
   { identifier: TYPES.StellarOrphanRefundService, implementation: StellarOrphanRefundService },
   { bindSelf: true, identifier: OpsTransactionReconciliationService, implementation: OpsTransactionReconciliationService },
   { bindSelf: true, identifier: OpsTransactionQueryService, implementation: OpsTransactionQueryService },
+  { bindSelf: true, identifier: OpsRefundRecoveryService, implementation: OpsRefundRecoveryService },
   { bindSelf: true, identifier: PartnerPixReceiptService, implementation: PartnerPixReceiptService },
   { bindSelf: true, identifier: PartnerPixReconciliationService, implementation: PartnerPixReconciliationService },
   { bindSelf: true, identifier: PartnerTransactionQueryService, implementation: PartnerTransactionQueryService },

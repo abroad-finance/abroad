@@ -26,6 +26,7 @@ export const OPS_PERMISSIONS = [
   'transactions:proof',
   'transactions:read',
   'transactions:reconcile',
+  'transactions:refund',
   'treasury:manage',
   'treasury:read',
 ] as const
@@ -61,6 +62,7 @@ const rolePermissions: Readonly<Record<OpsRole, readonly OpsPermission[]>> = {
     'transactions:export',
     'transactions:proof',
     'transactions:reconcile',
+    'transactions:refund',
     'treasury:manage',
   ],
   [OpsRole.OPERATIONS]: [
@@ -73,6 +75,7 @@ const rolePermissions: Readonly<Record<OpsRole, readonly OpsPermission[]>> = {
     'transactions:export',
     'transactions:proof',
     'transactions:reconcile',
+    'transactions:refund',
   ],
   [OpsRole.SUPPORT]: [
     ...viewerPermissions,

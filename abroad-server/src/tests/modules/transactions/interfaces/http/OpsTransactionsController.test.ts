@@ -6,6 +6,7 @@ import { BlockchainNetwork, OpsRole, TransactionStatus } from '@prisma/client'
 
 import { OpsAuditService } from '../../../../../modules/operations/application/OpsAuditService'
 import { OpsMutationService } from '../../../../../modules/operations/application/opsMutation'
+import { OpsRefundRecoveryDto, OpsRefundRecoveryService } from '../../../../../modules/transactions/application/OpsRefundRecoveryService'
 import { OpsTransactionDetailDto, OpsTransactionListResponse, OpsTransactionNotFoundError, OpsTransactionQueryService } from '../../../../../modules/transactions/application/OpsTransactionQueryService'
 import { OpsTransactionReconciliationService } from '../../../../../modules/transactions/application/OpsTransactionReconciliationService'
 import { PartnerPixReceiptService } from '../../../../../modules/transactions/application/PartnerPixReceiptService'
@@ -30,6 +31,26 @@ const request = {
     userId: 'ops-user-1',
   },
 } as unknown as Request
+
+const buildRefundMutationRequest = (confirmation: string): Request => ({
+  header: jest.fn((name: string) => ({
+    'If-Match': '7',
+    'X-Ops-Confirmation': confirmation,
+    'X-Ops-Idempotency-Key': 'f9d3509f-784c-4fb1-ae2d-dc5e6b024a7c',
+    'X-Ops-Reason': 'Original refund is absent after exact-hash reconciliation',
+    'X-Ops-Reference': 'INC-42',
+  }[name])),
+  user: {
+    authTime: new Date(),
+    displayName: 'Finance Operator',
+    email: 'finance@abroad.finance',
+    kind: 'ops_user' as const,
+    permissions: ['transactions:read', 'transactions:refund'] as const,
+    role: OpsRole.FINANCE,
+    sessionVersion: 1,
+    userId: 'ops-user-finance',
+  },
+} as unknown as Request)
 
 const mutationService = {
   execute: jest.fn(async (...parameters: unknown[]) => {
@@ -66,6 +87,26 @@ const buildQueryService = (): jest.Mocked<QueryServiceMock> => ({
 })
 
 const receiptService = { getOpsReceipt: jest.fn() } as unknown as PartnerPixReceiptService
+const refundRecoveryDto: OpsRefundRecoveryDto = {
+  amount: 5.99,
+  asset: 'USDC',
+  attempts: 1,
+  blockReason: null,
+  candidateHashFingerprint: '••••abcd1234',
+  canonicalRefundRecorded: false,
+  lastFailureCategory: 'NETWORK_TIMEOUT',
+  lastReconciliation: null,
+  network: 'STELLAR',
+  replacementEligible: false,
+  status: 'NEEDS_RECONCILIATION',
+  transactionId: 'tx-1',
+  version: 1,
+}
+const refundRecoveryService = {
+  getStatus: jest.fn(async () => refundRecoveryDto),
+  issueReplacement: jest.fn(async () => refundRecoveryDto),
+  reconcile: jest.fn(async () => refundRecoveryDto),
+} as unknown as OpsRefundRecoveryService
 const auditRecord = jest.fn()
 const auditService = { record: auditRecord } as unknown as OpsAuditService
 
@@ -75,6 +116,7 @@ const buildController = (
 ) => new OpsTransactionsController(
   service as unknown as OpsTransactionReconciliationService,
   queryService as unknown as OpsTransactionQueryService,
+  refundRecoveryService,
   mutationService,
   receiptService,
   auditService,
@@ -213,5 +255,70 @@ describe('OpsTransactionsController.getById', () => {
 
     expect(notFound).toHaveBeenCalledWith(404, { reason: 'Transaction not found' })
     expect(response).toEqual({ reason: 'Transaction not found' })
+  })
+})
+
+describe('OpsTransactionsController refund recovery', () => {
+  beforeEach(() => {
+    jest.clearAllMocks()
+  })
+
+  it('maps the read-only recovery status to the external snake-case contract', async () => {
+    const controller = buildController(buildService())
+
+    const response = await controller.getRefundRecovery('tx-1')
+
+    expect(refundRecoveryService.getStatus).toHaveBeenCalledWith('tx-1')
+    expect(response).toEqual({
+      amount: 5.99,
+      asset: 'USDC',
+      attempts: 1,
+      block_reason: null,
+      candidate_hash_fingerprint: '••••abcd1234',
+      canonical_refund_recorded: false,
+      last_failure_category: 'NETWORK_TIMEOUT',
+      last_reconciliation: null,
+      network: 'STELLAR',
+      replacement_eligible: false,
+      status: 'NEEDS_RECONCILIATION',
+      transaction_id: 'tx-1',
+      version: 1,
+    })
+  })
+
+  it('passes the guarded reconciliation envelope and expected version to the recovery service', async () => {
+    const controller = buildController(buildService())
+
+    await controller.reconcileRefundRecovery('tx-1', buildRefundMutationRequest('RECONCILE REFUND'))
+
+    expect(mutationService.execute).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'ops_user', userId: 'ops-user-finance' }),
+      'transaction.refund.reconcile',
+      { id: 'tx-1', type: 'transaction_refund' },
+      expect.objectContaining({
+        expectedVersion: 7,
+        idempotencyKey: 'f9d3509f-784c-4fb1-ae2d-dc5e6b024a7c',
+        reference: 'INC-42',
+      }),
+      expect.any(Function),
+      expect.any(Function),
+    )
+    expect(refundRecoveryService.reconcile).toHaveBeenCalledWith({
+      expectedVersion: 7,
+      transactionId: 'tx-1',
+    })
+  })
+
+  it('derives the replacement actor and operation identity from the named Ops session', async () => {
+    const controller = buildController(buildService())
+
+    await controller.issueReplacementRefund('tx-1', buildRefundMutationRequest('ISSUE REPLACEMENT REFUND'))
+
+    expect(refundRecoveryService.issueReplacement).toHaveBeenCalledWith({
+      expectedVersion: 7,
+      initiatedByOpsUserId: 'ops-user-finance',
+      mutationIdempotencyKey: 'f9d3509f-784c-4fb1-ae2d-dc5e6b024a7c',
+      transactionId: 'tx-1',
+    })
   })
 })

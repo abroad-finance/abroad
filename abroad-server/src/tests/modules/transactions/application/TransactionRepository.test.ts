@@ -269,18 +269,53 @@ describe('TransactionRepository refunds', () => {
 
     await repoWithExisting.recordRefundOutcome(clientWithExisting as never, {
       idempotencyKey: 'refund-2',
-      refundResult: { reason: 'downstream error', success: false },
+      refundResult: { reason: 'downstream error', success: false, transactionId: 'prepared-refund-hash' },
       transactionId: baseTransaction.id,
     })
 
     expect(clientWithExisting.transactionTransition.upsert).toHaveBeenCalledWith(expect.objectContaining({
       update: expect.objectContaining({
-        context: expect.any(Object),
+        context: expect.objectContaining({
+          candidateTransactionId: 'prepared-refund-hash',
+          status: 'failed',
+        }),
         fromStatus: TransactionStatus.PROCESSING_PAYMENT,
         toStatus: TransactionStatus.PROCESSING_PAYMENT,
       }),
     }))
     expect(clientWithExisting.transaction.updateMany).not.toHaveBeenCalled()
+
+    const ambiguousClient = createClient({
+      transaction: {
+        ...defaultTransactionMocks(),
+        findUnique: jest.fn(async () => ({ refundOnChainId: null, status: TransactionStatus.PROCESSING_PAYMENT } as never)),
+      },
+      transactionTransition: {
+        ...defaultTransitionMocks(),
+        findUnique: jest.fn(async () => ({ context: existingContext })),
+      },
+    })
+    const { repository: ambiguousRepository } = createRepository(ambiguousClient)
+
+    await ambiguousRepository.recordRefundOutcome(ambiguousClient as never, {
+      idempotencyKey: 'refund-3',
+      refundResult: {
+        reason: 'stellar_submission_timeout',
+        reconciliationRequired: true,
+        success: false,
+        transactionId: 'ambiguous-refund-hash',
+      },
+      transactionId: baseTransaction.id,
+    })
+
+    expect(ambiguousClient.transactionTransition.upsert).toHaveBeenCalledWith(expect.objectContaining({
+      update: expect.objectContaining({
+        context: expect.objectContaining({
+          candidateTransactionId: 'ambiguous-refund-hash',
+          status: 'pending',
+        }),
+      }),
+    }))
   })
 
   it('reserves refunds across multiple outcomes', async () => {

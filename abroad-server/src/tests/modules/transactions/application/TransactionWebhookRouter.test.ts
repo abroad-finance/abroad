@@ -1,4 +1,5 @@
 import { TransactionOrigin, WebhookCredentialMode, WebhookDeliveryPurpose } from '@prisma/client'
+import { createHash } from 'node:crypto'
 
 import type { ISecretManager } from '../../../../platform/secrets/ISecretManager'
 
@@ -153,6 +154,47 @@ describe('TransactionWebhookRouter', () => {
           webhookPurpose: WebhookDeliveryPurpose.TRANSACTION,
         },
       },
+    )
+  })
+
+  it('scopes a supplied idempotency key independently to every resolved target', async () => {
+    const { outboxDispatcher, router } = buildRouter()
+    const idempotencyKey = 'refund-recovery:completed:transaction-1:refund-hash'
+
+    await router.enqueue(
+      primaryTarget,
+      TransactionOrigin.SEP_24,
+      payload,
+      'ops_refund_recovery',
+      {
+        idempotencyKey,
+        partnerId: 'partner-1',
+        transactionId: 'transaction-1',
+      },
+    )
+
+    const fingerprint = (target: string): string => createHash('sha256').update(target).digest('hex').slice(0, 16)
+    expect(outboxDispatcher.enqueueWebhook).toHaveBeenNthCalledWith(
+      1,
+      primaryTarget,
+      payload,
+      'ops_refund_recovery:https://api-v3.production.decafapi.com',
+      expect.objectContaining({
+        metadata: expect.objectContaining({
+          idempotencyKey: `${idempotencyKey}:${fingerprint(primaryTarget)}`,
+        }),
+      }),
+    )
+    expect(outboxDispatcher.enqueueWebhook).toHaveBeenNthCalledWith(
+      2,
+      sepTarget,
+      payload,
+      'ops_refund_recovery:https://sep-stellar.abroad.finance',
+      expect.objectContaining({
+        metadata: expect.objectContaining({
+          idempotencyKey: `${idempotencyKey}:${fingerprint(sepTarget)}`,
+        }),
+      }),
     )
   })
 

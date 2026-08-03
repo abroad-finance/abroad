@@ -232,4 +232,45 @@ describe('OpsMutationService', () => {
     )).rejects.toBeInstanceOf(OpsMutationReplayError)
     expect(operation).not.toHaveBeenCalled()
   })
+
+  it('requires fresh step-up, exact confirmation, permission, and version for replacement refunds', async () => {
+    const refundEnvelope = {
+      ...envelope,
+      confirmation: 'ISSUE REPLACEMENT REFUND',
+      expectedVersion: 3,
+    }
+    const refundPrincipal: OpsPrincipal = {
+      ...principal,
+      permissions: ['transactions:refund'],
+    }
+
+    const missingVersionHarness = buildHarness()
+    await expect(missingVersionHarness.service.execute(
+      refundPrincipal,
+      'transaction.refund.replace',
+      { id: 'transaction-1', type: 'transaction_refund' },
+      { ...refundEnvelope, expectedVersion: undefined },
+      async () => undefined,
+    )).rejects.toThrow('current resource version')
+
+    const wrongConfirmationHarness = buildHarness()
+    await expect(wrongConfirmationHarness.service.execute(
+      refundPrincipal,
+      'transaction.refund.replace',
+      { id: 'transaction-1', type: 'transaction_refund' },
+      { ...refundEnvelope, confirmation: 'REFUND' },
+      async () => undefined,
+    )).rejects.toThrow('Type “ISSUE REPLACEMENT REFUND”')
+
+    const authorizedHarness = buildHarness()
+    const operation = jest.fn(async () => ({ transactionId: 'transaction-1' }))
+    await expect(authorizedHarness.service.execute(
+      refundPrincipal,
+      'transaction.refund.replace',
+      { id: 'transaction-1', type: 'transaction_refund' },
+      refundEnvelope,
+      operation,
+    )).resolves.toEqual({ transactionId: 'transaction-1' })
+    expect(operation).toHaveBeenCalledTimes(1)
+  })
 })
