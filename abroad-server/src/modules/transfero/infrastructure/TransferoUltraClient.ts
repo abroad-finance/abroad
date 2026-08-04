@@ -83,6 +83,11 @@ export function buildTransferoUltraSignedHeaders(
 @injectable()
 export class TransferoUltraClient {
   private readonly logger: ScopedLogger
+
+  private readonly rateLimitCooldownMs: number
+
+  private readonly rateLimitedUntilByBucket = new Map<string, number>()
+
   private readonly requestTimeoutMs: number
 
   public constructor(
@@ -93,6 +98,10 @@ export class TransferoUltraClient {
     this.requestTimeoutMs = this.readPositiveInteger(
       'TRANSFERO_ULTRA_REQUEST_TIMEOUT_MS',
       8_000,
+    )
+    this.rateLimitCooldownMs = this.readPositiveInteger(
+      'TRANSFERO_ULTRA_CLIENT_RATE_LIMIT_COOLDOWN_MS',
+      60_000,
     )
   }
 
@@ -143,6 +152,20 @@ export class TransferoUltraClient {
     idempotencyKey: string,
   ): Promise<unknown> {
     return (await this.request<unknown>({ body, idempotencyKey, method: 'POST', path })).data
+  }
+
+  /**
+   * Groups requests that share a rate-limit fate. Per-resource ids collapse to
+   * `:id` so one 429 while polling N trades suppresses the other N-1 doomed
+   * polls — but the bucket is per endpoint, so throttling a background
+   * reconciliation loop can never block a customer PIX withdrawal.
+   */
+  private bucketKey(method: TransferoUltraHttpMethod, path: string): string {
+    const normalized = path
+      .split('/')
+      .map(segment => (/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(segment) || /^\d+$/.test(segment) ? ':id' : segment))
+      .join('/')
+    return `${method} ${normalized}`
   }
 
   private buildPathWithQuery(path: string, query: TransferoUltraQuery): string {
@@ -273,6 +296,19 @@ export class TransferoUltraClient {
       })
     }
 
+    const bucket = this.bucketKey(params.method, params.path)
+    const rateLimitedUntil = this.rateLimitedUntilByBucket.get(bucket) ?? 0
+    if (Date.now() < rateLimitedUntil) {
+      // Retrying into an active 429 only keeps the limit tripped, and the
+      // wasted calls starve every other Transfero endpoint of the shared quota.
+      throw new TransferoUltraError({
+        code: 'retriable',
+        message: 'Transfero Ultra request failed: RATE_LIMIT_COOLDOWN',
+        providerCode: 'RATE_LIMIT_COOLDOWN',
+        status: 429,
+      })
+    }
+
     const pathWithQuery = this.buildPathWithQuery(params.path, params.query ?? {})
     const rawBody = this.serializeBody(params.body)
 
@@ -328,16 +364,22 @@ export class TransferoUltraClient {
     }
 
     try {
-      return await axios.request<T>(requestConfig)
+      const response = await axios.request<T>(requestConfig)
+      this.rateLimitedUntilByBucket.delete(bucket)
+      return response
     }
     catch (error) {
       const normalized = this.describeAxiosError(error)
+      if (normalized.status === 429) {
+        this.rateLimitedUntilByBucket.set(bucket, Date.now() + this.rateLimitCooldownMs)
+      }
       this.logger.warn('Transfero Ultra request failed', {
         code: normalized.code,
         method: params.method,
         path: params.path,
         providerCode: normalized.providerCode,
         status: normalized.status,
+        ...(normalized.status === 429 ? { cooldownBucket: bucket, cooldownMs: this.rateLimitCooldownMs } : {}),
       })
       throw normalized
     }

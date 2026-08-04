@@ -266,6 +266,8 @@ describe('TransferoUltraClient', () => {
       expect.stringContaining('Transfero Ultra request failed'),
       {
         code: 'retriable',
+        cooldownBucket: 'GET /api/v1/balance',
+        cooldownMs: 60_000,
         method: 'GET',
         path: '/api/v1/balance',
         providerCode: 'RATE_LIMIT',
@@ -299,6 +301,42 @@ describe('TransferoUltraClient', () => {
       message: expect.stringContaining('HTTPS origin'),
     })
     expect(mockedAxios.request).not.toHaveBeenCalled()
+  })
+
+  it('suppresses repeat calls to a rate-limited endpoint without blocking other endpoints', async () => {
+    const client = new TransferoUltraClient(
+      createSecretManager(),
+      createMockLogger(),
+    )
+    const rateLimited = Object.assign(new Error('rate limited'), {
+      isAxiosError: true,
+      response: { data: { code: 'RATE_LIMIT_EXCEEDED' }, status: 429 },
+    })
+    mockedAxios.isAxiosError.mockReturnValue(true)
+    mockedAxios.request.mockRejectedValueOnce(rateLimited)
+
+    await expect(client.get('/api/v1/otc/trades/bcb1de20-febb-43e8-9958-fb1b5edff65a/detail'))
+      .rejects.toMatchObject({ providerCode: 'RATE_LIMIT_EXCEEDED', status: 429 })
+    expect(mockedAxios.request).toHaveBeenCalledTimes(1)
+
+    // A different trade id shares the bucket, so the other doomed polls in the
+    // same sweep never reach the wire.
+    await expect(client.get('/api/v1/otc/trades/80d350a3-55f6-4957-9aa3-24bc0a8ce8d2/detail'))
+      .rejects.toMatchObject({ providerCode: 'RATE_LIMIT_COOLDOWN' })
+    expect(mockedAxios.request).toHaveBeenCalledTimes(1)
+
+    // A customer payout is a different bucket and must still go out — the whole
+    // point of scoping the cooldown per endpoint.
+    mockedAxios.request.mockResolvedValueOnce({ data: { id: 'w-1' } })
+    await expect(client.post('/api/v1/pix/withdrawals', { amount: 10 }, 'idem-1')).resolves.toEqual({ id: 'w-1' })
+    expect(mockedAxios.request).toHaveBeenCalledTimes(2)
+
+    // Cooldown expires and polling resumes.
+    jest.setSystemTime(new Date('2026-07-27T12:36:56.000Z'))
+    mockedAxios.request.mockResolvedValueOnce({ data: { settled: true } })
+    await expect(client.get('/api/v1/otc/trades/bcb1de20-febb-43e8-9958-fb1b5edff65a/detail'))
+      .resolves.toEqual({ settled: true })
+    expect(mockedAxios.request).toHaveBeenCalledTimes(3)
   })
 
   it('rejects non-serializable bodies and empty credentials before transport', async () => {
