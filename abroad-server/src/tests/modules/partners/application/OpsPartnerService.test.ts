@@ -496,6 +496,20 @@ describe('OpsPartnerService', () => {
     expect(serialized).not.toContain('managed-secret-hash')
   })
 
+  it('turns the partner KYC requirement on and off', async () => {
+    await service.updateKycRequirement('partner-domain', { needsKyc: false })
+    expect(partner.update).toHaveBeenCalledWith({
+      data: { needsKyc: false },
+      where: { id: 'partner-domain' },
+    })
+
+    await service.updateKycRequirement('partner-domain', { needsKyc: true })
+    expect(partner.update).toHaveBeenLastCalledWith({
+      data: { needsKyc: true },
+      where: { id: 'partner-domain' },
+    })
+  })
+
   it('updates a partner client domain using the canonical host', async () => {
     const expectedDomain = normalizeClientDomainInput('https://MiniPay.Abroad.Finance/path')
 

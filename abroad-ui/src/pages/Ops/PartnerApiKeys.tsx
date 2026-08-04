@@ -11,6 +11,7 @@ import {
   revokePartnerApiKey,
   rotatePartnerApiKey,
   updatePartnerClientDomain,
+  updatePartnerKycRequirement,
 } from '../../services/admin/partnerAdminApi'
 import {
   OpsCreatePartnerInput,
@@ -571,6 +572,30 @@ const PartnerApiKeys = () => {
     }
   }
 
+  const handleToggleKyc = async (partner: OpsPartner) => {
+    const key = buildActionKey('toggle-kyc', partner.id)
+    const needsKyc = !partner.needsKyc
+    setActionLoading(key)
+    setError(null)
+
+    try {
+      const updatedPartner = await requestMutation({
+        action: 'partner.kyc_requirement.update',
+        execute: mutation => updatePartnerKycRequirement(partner.id, { needsKyc }, mutation),
+        resourceLabel: `${partner.name} · KYC ${needsKyc ? 'required' : 'not required'}`,
+        title: needsKyc ? 'Require KYC for this partner' : 'Disable KYC for this partner',
+      })
+      updatePartnerRecord(updatedPartner)
+    }
+    catch (toggleError) {
+      if (isOpsMutationCancelledError(toggleError)) return
+      setError(toggleError instanceof Error ? toggleError.message : 'Failed to update the KYC requirement')
+    }
+    finally {
+      setActionLoading(null)
+    }
+  }
+
   const handleClearClientDomain = async (partner: OpsPartner) => {
     const key = buildActionKey('clear-domain', partner.id)
     setActionLoading(key)
@@ -794,6 +819,7 @@ const PartnerApiKeys = () => {
                 const clearDomainKey = buildActionKey('clear-domain', partner.id)
                 const rotateKey = buildActionKey('rotate', partner.id)
                 const revokeKey = buildActionKey('revoke', partner.id)
+                const toggleKycKey = buildActionKey('toggle-kyc', partner.id)
                 const editingAnotherPartner = editingPartnerId !== null && editingPartnerId !== partner.id
 
                 return (
@@ -835,13 +861,21 @@ const PartnerApiKeys = () => {
                         volume={partner.completedVolume}
                       />
 
-                      <div className="flex items-start lg:justify-end">
+                      <div className="flex items-start gap-4 lg:justify-end">
                         <div>
                           <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-ops-label">
                             API Key
                           </div>
                           <OpsStatusBadge tone={partner.hasApiKey ? 'success' : 'danger'}>
                             {partner.hasApiKey ? 'Active' : 'Revoked'}
+                          </OpsStatusBadge>
+                        </div>
+                        <div>
+                          <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-ops-label">
+                            KYC
+                          </div>
+                          <OpsStatusBadge tone={partner.needsKyc ? 'success' : 'warning'}>
+                            {partner.needsKyc ? 'Required' : 'Disabled'}
                           </OpsStatusBadge>
                         </div>
                       </div>
@@ -924,6 +958,16 @@ const PartnerApiKeys = () => {
                                 )}
                               </>
                             )}
+                        <button
+                          className={partner.needsKyc ? 'ops-btn-danger ops-btn-sm' : 'ops-btn-neutral ops-btn-sm'}
+                          disabled={!opsApiKey || partnerBusy || isEditing}
+                          onClick={() => void handleToggleKyc(partner)}
+                          type="button"
+                        >
+                          {actionLoading === toggleKycKey
+                            ? 'Updating...'
+                            : partner.needsKyc ? 'Disable KYC' : 'Require KYC'}
+                        </button>
                         <button
                           className="ops-btn-neutral ops-btn-sm"
                           disabled={!opsApiKey || partnerBusy || isEditing}

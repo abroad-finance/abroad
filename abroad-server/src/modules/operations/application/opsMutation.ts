@@ -385,6 +385,14 @@ export const OPS_MUTATION_POLICIES = {
     permission: 'partners:manage',
     stepUpMaxAgeMs: DEFAULT_STEP_UP_MAX_AGE_MS,
   },
+  'partner.kyc_requirement.update': {
+    approvalClass: 'STEP_UP',
+    confirmation: 'UPDATE KYC',
+    expectedVersion: false,
+    impact: 'Turning this off lets every user of the partner transact unverified at any amount.',
+    permission: 'partners:manage',
+    stepUpMaxAgeMs: DEFAULT_STEP_UP_MAX_AGE_MS,
+  },
   'runbook.create': {
     approvalClass: 'STEP_UP',
     confirmation: 'CREATE RUNBOOK',

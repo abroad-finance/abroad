@@ -64,6 +64,10 @@ export type OpsPartnerCredentialHistory = {
   partner: OpsPartnerSummary
 }
 
+export type OpsPartnerKycRequirementInput = {
+  needsKyc: boolean
+}
+
 export type OpsPartnerListItem = OpsPartnerSummary & {
   completedVolume: OpsPartnerCompletedVolume
 }
@@ -476,6 +480,33 @@ export class OpsPartnerService {
         throw error
       }
       throw new OpsPartnerValidationError('Failed to update partner client domain')
+    }
+  }
+
+  /**
+   * Toggles whether this partner's users are asked to complete KYC.
+   * `shouldRequestKyc` short-circuits on `needsKyc === false`, so turning this
+   * off lets every user of the partner transact unverified at any amount.
+   */
+  public async updateKycRequirement(
+    partnerId: string,
+    input: OpsPartnerKycRequirementInput,
+  ): Promise<OpsPartnerSummary> {
+    const prisma = await this.dbProvider.getClient()
+
+    try {
+      const updatedPartner = await prisma.partner.update({
+        data: { needsKyc: input.needsKyc },
+        where: { id: partnerId },
+      })
+
+      return this.toSummary(updatedPartner)
+    }
+    catch (error) {
+      if (this.isNotFoundError(error)) {
+        throw new OpsPartnerNotFoundError('Partner not found')
+      }
+      throw new OpsPartnerValidationError('Failed to update the partner KYC requirement')
     }
   }
 

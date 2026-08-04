@@ -26,6 +26,7 @@ const mocked = vi.hoisted(() => ({
   revokePartnerApiKey: vi.fn(),
   rotatePartnerApiKey: vi.fn(),
   updatePartnerClientDomain: vi.fn(),
+  updatePartnerKycRequirement: vi.fn(),
 }))
 
 vi.mock('../services/admin/partnerAdminApi', () => ({
@@ -35,6 +36,7 @@ vi.mock('../services/admin/partnerAdminApi', () => ({
   revokePartnerApiKey: mocked.revokePartnerApiKey,
   rotatePartnerApiKey: mocked.rotatePartnerApiKey,
   updatePartnerClientDomain: mocked.updatePartnerClientDomain,
+  updatePartnerKycRequirement: mocked.updatePartnerKycRequirement,
 }))
 
 const administratorSession: OpsSession = {
@@ -242,6 +244,63 @@ describe('PartnerApiKeys page', () => {
     })
     expect(screen.getByText('Revoked')).toBeInTheDocument()
     expect(screen.getByText('315.62')).toBeInTheDocument()
+  })
+
+  it('toggles the partner KYC requirement and reflects the new state', async () => {
+    const basePartner = {
+      clientDomain: undefined,
+      createdAt: new Date('2024-01-01T00:00:00.000Z').toISOString(),
+      email: 'acme@example.com',
+      firstName: 'Ada',
+      hasApiKey: true,
+      id: 'partner-1',
+      isKybApproved: false,
+      lastName: 'Lovelace',
+      name: 'Acme',
+    }
+    mocked.listPartners.mockResolvedValue({
+      items: [{
+        ...basePartner,
+        completedVolume: {
+          completedTransactions: 0,
+          payout: [],
+          source: [],
+          stablecoinAmount: 0,
+        },
+        needsKyc: true,
+      }],
+      maximumStablecoinAmount: 0,
+      page: 1,
+      pageSize: 20,
+      total: 1,
+    })
+    mocked.updatePartnerKycRequirement.mockResolvedValue({ ...basePartner, needsKyc: false })
+
+    const user = userEvent.setup()
+    render(
+      <MemoryRouter>
+        <ImmediateOpsMutationProvider>
+          <PartnerApiKeys />
+        </ImmediateOpsMutationProvider>
+      </MemoryRouter>,
+    )
+
+    await screen.findByText('Acme')
+    expect(screen.getByText('Required')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Disable KYC' }))
+
+    await waitFor(() => {
+      expect(mocked.updatePartnerKycRequirement).toHaveBeenCalledWith(
+        'partner-1',
+        { needsKyc: false },
+        testOpsMutationDetails,
+      )
+    })
+
+    // The row reflects the server's response, and the action flips to re-enable.
+    expect(await screen.findByText('Disabled')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Require KYC' })).toBeInTheDocument()
   })
 
   it('renders a responsive partner ranking with proportional visual rails', async () => {

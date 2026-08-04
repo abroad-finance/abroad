@@ -34,6 +34,9 @@ import {
   OpsUpdatePartnerClientDomainRequest,
   opsUpdatePartnerClientDomainRequestSchema,
   OpsUpdatePartnerClientDomainResponse,
+  OpsUpdatePartnerKycRequest,
+  opsUpdatePartnerKycRequestSchema,
+  OpsUpdatePartnerKycResponse,
   parsePartnerId,
   parsePartnerPagination,
 } from './opsContracts'
@@ -237,6 +240,49 @@ export class OpsPartnerController extends Controller {
         { id: parsedPartnerId.data, type: 'partner' },
         readOpsMutationEnvelope(request),
         () => this.opsPartnerService.updateClientDomain(parsedPartnerId.data, parsedBody.data),
+      )
+    }
+    catch (error) {
+      if (error instanceof OpsPartnerNotFoundError) {
+        return notFound(404, { reason: error.message })
+      }
+      if (error instanceof OpsPartnerValidationError) {
+        return badRequest(400, { reason: error.message })
+      }
+      throw error
+    }
+  }
+
+  @OperationId('UpdatePartnerKycRequirement')
+  @Patch('{partnerId}/kyc')
+  @Response<400, { reason: string }>(400, 'Bad Request')
+  @Response<404, { reason: string }>(404, 'Not Found')
+  @Security('OpsAuth', ['partners:manage'])
+  @SuccessResponse('200', 'Partner KYC requirement updated')
+  public async updateKycRequirement(
+    @Path() partnerId: string,
+    @Body() body: OpsUpdatePartnerKycRequest,
+    @Request() request: RequestExpress,
+    @Res() badRequest: TsoaResponse<400, { reason: string }>,
+    @Res() notFound: TsoaResponse<404, { reason: string }>,
+  ): Promise<OpsUpdatePartnerKycResponse> {
+    const parsedPartnerId = parsePartnerId(partnerId)
+    if ('error' in parsedPartnerId) {
+      return badRequest(400, { reason: parsedPartnerId.error })
+    }
+
+    const parsedBody = opsUpdatePartnerKycRequestSchema.safeParse(body)
+    if (!parsedBody.success) {
+      return badRequest(400, { reason: parsedBody.error.message })
+    }
+
+    try {
+      return await this.mutationService.execute(
+        requireOpsPrincipal(request.user),
+        'partner.kyc_requirement.update',
+        { id: parsedPartnerId.data, type: 'partner' },
+        readOpsMutationEnvelope(request),
+        () => this.opsPartnerService.updateKycRequirement(parsedPartnerId.data, parsedBody.data),
       )
     }
     catch (error) {

@@ -102,3 +102,9 @@ export type OpsUpdatePartnerClientDomainInput = {
 }
 
 export type OpsUpdatePartnerClientDomainResponse = OpsPartner
+
+export type OpsUpdatePartnerKycInput = {
+  needsKyc: boolean
+}
+
+export type OpsUpdatePartnerKycResponse = OpsPartner

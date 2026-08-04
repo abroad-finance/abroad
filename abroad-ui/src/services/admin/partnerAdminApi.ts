@@ -7,6 +7,8 @@ import type {
   OpsRotatePartnerApiKeyResponse,
   OpsUpdatePartnerClientDomainInput,
   OpsUpdatePartnerClientDomainResponse,
+  OpsUpdatePartnerKycInput,
+  OpsUpdatePartnerKycResponse,
 } from './partnerTypes'
 
 import { adminRequest, unwrapAdminResult } from './adminRequest'
@@ -82,6 +84,24 @@ export const updatePartnerClientDomain = async (
 ): Promise<OpsUpdatePartnerClientDomainResponse> => {
   const result = await adminRequest<OpsUpdatePartnerClientDomainResponse>(
     `/ops/partners/${partnerId}/client-domain`,
+    {
+      body: JSON.stringify(payload),
+      headers: { 'Content-Type': 'application/json' },
+      method: 'PATCH',
+      mutation,
+    },
+  )
+
+  return unwrapAdminResult(result)
+}
+
+export const updatePartnerKycRequirement = async (
+  partnerId: string,
+  payload: OpsUpdatePartnerKycInput,
+  mutation: OpsMutationDetails,
+): Promise<OpsUpdatePartnerKycResponse> => {
+  const result = await adminRequest<OpsUpdatePartnerKycResponse>(
+    `/ops/partners/${partnerId}/kyc`,
     {
       body: JSON.stringify(payload),
       headers: { 'Content-Type': 'application/json' },

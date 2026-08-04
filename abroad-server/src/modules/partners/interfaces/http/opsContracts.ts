@@ -5,6 +5,7 @@ import type {
   OpsPartnerCreateInput,
   OpsPartnerCreateResult,
   OpsPartnerCredentialHistory,
+  OpsPartnerKycRequirementInput,
   OpsPartnerListResult,
   OpsPartnerRotateApiKeyResult,
   OpsPartnerSummary,
@@ -24,6 +25,8 @@ export type OpsPartnerListResponse = OpsPartnerListResult
 export type OpsRotatePartnerApiKeyResponse = OpsPartnerRotateApiKeyResult
 export type OpsUpdatePartnerClientDomainRequest = OpsPartnerClientDomainInput
 export type OpsUpdatePartnerClientDomainResponse = OpsPartnerSummary
+export type OpsUpdatePartnerKycRequest = OpsPartnerKycRequirementInput
+export type OpsUpdatePartnerKycResponse = OpsPartnerSummary
 export type OpsUpsertPartnerPortalUserRequest = PartnerPortalCredentials
 export type OpsUpsertPartnerPortalUserResponse = PartnerPortalUserProvisioningResult
 
@@ -35,6 +38,9 @@ const paginationSchema = z.object({
 const updatePartnerClientDomainSchema = z.object({
   clientDomain: z.string().nullable(),
 }).strict() satisfies z.ZodType<OpsUpdatePartnerClientDomainRequest>
+const updatePartnerKycSchema = z.object({
+  needsKyc: z.boolean(),
+}).strict() satisfies z.ZodType<OpsUpdatePartnerKycRequest>
 const upsertPartnerPortalUserSchema = z.object({
   email: z.string().trim().email().max(254),
   password: z.string().min(12).max(128),
@@ -47,6 +53,7 @@ type PaginationInput = {
 
 export const opsCreatePartnerRequestSchema = createPartnerRequestSchema
 export const opsUpdatePartnerClientDomainRequestSchema = updatePartnerClientDomainSchema
+export const opsUpdatePartnerKycRequestSchema = updatePartnerKycSchema
 export const opsUpsertPartnerPortalUserRequestSchema = upsertPartnerPortalUserSchema
 
 export const parsePartnerId = (value: string): { data: string } | { error: string } => {
