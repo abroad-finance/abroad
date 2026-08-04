@@ -152,6 +152,47 @@ describe('LiquidityCacheService', () => {
     expect(logger.error).toHaveBeenCalled()
   })
 
+  it('never overwrites a cached value with an invalid provider reading', async () => {
+    // A provider that reports 0 (or a negative) on failure would otherwise
+    // clobber the last good value; since a stored 0 reads back as "no cache",
+    // that strands every payout on the method until the provider recovers.
+    for (const bogus of [Number.NaN, -1]) {
+      const fetchLiquidity = jest.fn(async () => bogus)
+      const { prisma, service } = buildService({
+        paymentProvider: {
+          findUnique: jest.fn(async () => ({ id: PaymentMethod.BREB, liquidity: 800_000, updatedAt: ancient })),
+        },
+      })
+
+      const result = await service.getLiquidity({ fetchLiquidity, method: PaymentMethod.BREB, now })
+
+      expect(result.liquidity).toBe(800_000)
+      expect(result.success).toBe(false)
+      expect(prisma.paymentProvider.update).not.toHaveBeenCalled()
+    }
+  })
+
+  it('keeps serving a stale value while the provider is failing', async () => {
+    // The COP outage shape: Movii rejects every read, but the last good value
+    // is still inside the max-stale window, so payouts must keep flowing.
+    const fetchLiquidity = jest.fn(async () => {
+      throw new Error('Request failed with status code 429')
+    })
+    const { prisma, service } = buildService({
+      paymentProvider: {
+        findUnique: jest.fn(async () => ({ id: PaymentMethod.BREB, liquidity: 800_000, updatedAt: stale })),
+      },
+    })
+
+    const result = await service.getLiquidity({ fetchLiquidity, method: PaymentMethod.BREB, now })
+
+    expect(result).toEqual({ fromCache: true, liquidity: 800_000, stale: true, success: true })
+
+    await flushPromises()
+
+    expect(prisma.paymentProvider.update).not.toHaveBeenCalled()
+  })
+
   it('deduplicates concurrent stale refreshes (single-flight)', async () => {
     let resolveFetch: ((value: number) => void) | undefined
     const fetchLiquidity = jest.fn(() => new Promise<number>((resolve) => {

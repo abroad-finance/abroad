@@ -103,6 +103,11 @@ const reportEnvelope = (status: string) => ({
 
 const axiosFailure = (payload: unknown) => ({ isAxiosError: true, response: { data: payload } })
 
+// axios rejects with a real Error carrying `response`, which is what the
+// service's `error instanceof Error` rethrow path depends on.
+const httpError = (message: string, status: number, data?: unknown) =>
+  Object.assign(new Error(message), { isAxiosError: true, response: { data, status } })
+
 const getInternals = (service: BrebPaymentService): BrebInternals => service as unknown as BrebInternals
 
 const buildSecretManager = (): ISecretManager => {
@@ -178,6 +183,45 @@ describe('BrebPaymentService', () => {
         message: 'BreB does not require explicit onboarding',
         success: true,
       })
+    })
+
+    it('rejects instead of reporting a zero float when Movii fails', async () => {
+      const { logger, service } = setupService()
+      mockedAxios.isAxiosError = jest.fn(() => true)
+      mockedAxios.get.mockRejectedValueOnce(
+        httpError('Request failed with status code 500', 500, { message: 'boom' }),
+      )
+
+      // Resolving 0 lets the liquidity cache store "no float", which rejects
+      // every COP payout until Movii recovers.
+      await expect(service.getLiquidity()).rejects.toThrow(/status code 500/)
+      expect(logger.error).toHaveBeenCalledWith('[BreB] Error fetching liquidity', expect.objectContaining({ status: 500 }))
+    })
+
+    it('rejects when the balance is missing from an otherwise valid response', async () => {
+      const { service } = setupService()
+      mockedAxios.get.mockResolvedValueOnce({ data: { body: [], statusCode: 200 } })
+
+      await expect(service.getLiquidity()).rejects.toThrow(/usable balance/)
+    })
+
+    it('stops calling Movii for a cooldown once rate limited, then recovers', async () => {
+      const { service } = setupService()
+      mockedAxios.isAxiosError = jest.fn(() => true)
+      mockedAxios.get.mockRejectedValueOnce(httpError('Request failed with status code 429', 429))
+
+      await expect(service.getLiquidity()).rejects.toThrow(/status code 429/)
+      expect(mockedAxios.get).toHaveBeenCalledTimes(1)
+
+      // Inside the cooldown the request is skipped entirely — retrying a 429
+      // only prolongs Movii's rate-limit window.
+      await expect(service.getLiquidity()).rejects.toThrow(/rate limited/)
+      expect(mockedAxios.get).toHaveBeenCalledTimes(1)
+
+      jest.spyOn(Date, 'now').mockReturnValue(Date.now() + 61_000)
+      mockedAxios.get.mockResolvedValueOnce({ data: { body: [{ saldo: '900000' }] } })
+      await expect(service.getLiquidity()).resolves.toBe(900000)
+      jest.spyOn(Date, 'now').mockRestore()
     })
 
     it('masks identifiers and tolerates malformed URLs in logs', () => {

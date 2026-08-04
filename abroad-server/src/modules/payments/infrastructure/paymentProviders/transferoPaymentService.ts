@@ -100,27 +100,33 @@ export class TransferoPaymentService implements IPaymentService {
     )
   }
 
+  /**
+   * Rejects when the balance cannot be read, per the IPaymentService contract —
+   * a provider failure must never be reported as a zero float.
+   */
   public getLiquidity = async (): Promise<number> => {
+    let balances: ReturnType<typeof transferoUltraBalanceResponseSchema.parse>
     try {
       const response = await this.ultraClient.get('/api/v1/balance')
-      const balances = transferoUltraBalanceResponseSchema.parse(response)
-      const brz = balances.find(balance => balance.asset.toUpperCase() === 'BRZ')
-      if (!brz) {
-        this.logger.error('Transfero Ultra balance response omitted BRZ')
-        return 0
-      }
-
-      const amount = Number(brz.available)
-      if (!Number.isFinite(amount)) {
-        this.logger.error('Transfero Ultra BRZ available balance is invalid')
-        return 0
-      }
-      return Math.max(0, amount)
+      balances = transferoUltraBalanceResponseSchema.parse(response)
     }
     catch (error) {
       this.logger.error('Transfero Ultra liquidity request failed', this.describeError(error))
-      return 0
+      throw error instanceof Error ? error : new Error('Transfero Ultra liquidity request failed')
     }
+
+    const brz = balances.find(balance => balance.asset.toUpperCase() === 'BRZ')
+    if (!brz) {
+      this.logger.error('Transfero Ultra balance response omitted BRZ')
+      throw new Error('Transfero Ultra balance response omitted BRZ')
+    }
+
+    const amount = Number(brz.available)
+    if (!Number.isFinite(amount)) {
+      this.logger.error('Transfero Ultra BRZ available balance is invalid')
+      throw new Error('Transfero Ultra BRZ available balance is invalid')
+    }
+    return Math.max(0, amount)
   }
 
   public async getPaymentFacts(providerTransactionId: string): Promise<PaymentFactsResult> {

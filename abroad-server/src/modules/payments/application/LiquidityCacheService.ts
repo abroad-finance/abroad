@@ -106,7 +106,10 @@ export class LiquidityCacheService {
 
   private async refreshCache(prisma: PrismaClientLike, params: GetLiquidityParams): Promise<void> {
     const refreshed = await this.withTimeout(params.fetchLiquidity(), this.syncFetchTimeoutMs)
-    if (!Number.isFinite(refreshed)) {
+    // Throwing here leaves the stored value untouched, so a bad read can never
+    // overwrite the last good one — readCachedLiquidity treats a stored 0 as
+    // "no cache", which would strand every payout on this method.
+    if (!Number.isFinite(refreshed) || refreshed < 0) {
       throw new Error('Provider returned an invalid liquidity value')
     }
     await prisma.paymentProvider.update({

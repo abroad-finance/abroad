@@ -132,6 +132,10 @@ export class BrebPaymentService implements IPaymentService {
   public readonly provider = 'breb'
   private accessTokenCache?: { expiresAt: number, value: string }
 
+  private readonly liquidityRateLimitCooldownMs: number
+
+  private liquidityRateLimitedUntilMs = 0
+
   private readonly liquidityRequestTimeoutMs: number
 
   private readonly mandatoryKeyFields: ReadonlyArray<keyof BrebKeyDetails> = [
@@ -166,46 +170,38 @@ export class BrebPaymentService implements IPaymentService {
     this.maxSendAttempts = this.readNumberFromEnv('BREB_MAX_SEND_ATTEMPTS', 3)
     this.retryDelayMs = this.readNumberFromEnv('BREB_RETRY_DELAY_MS', 500)
     this.liquidityRequestTimeoutMs = this.readNumberFromEnv('BREB_LIQUIDITY_TIMEOUT_MS', 5_000)
+    this.liquidityRateLimitCooldownMs = this.readNumberFromEnv('BREB_LIQUIDITY_RATE_LIMIT_COOLDOWN_MS', 60_000)
   }
 
+  /**
+   * Rejects when the balance cannot be read, per the IPaymentService contract —
+   * a provider failure must never be reported as a zero float.
+   */
   public async getLiquidity(): Promise<number> {
-    try {
-      const { MOVII_BALANCE_ACCOUNT_ID: accountId, MOVII_BALANCE_API_KEY: apiKey } = await this.secretManager.getSecrets([
-        'MOVII_BALANCE_API_KEY',
-        'MOVII_BALANCE_ACCOUNT_ID',
-      ] as const)
-
-      const url = `https://apigw-data.movii.com.co/traguatan/?id=${encodeURIComponent(accountId)}`
-      const headers = {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-      }
-
-      const { data } = await axios.get<MoviiLiquidityResponse>(url, {
-        headers,
-        timeout: this.liquidityRequestTimeoutMs,
-      })
-      const saldoStr = data?.body?.[0]?.saldo
-      const saldo = typeof saldoStr === 'string' ? Number.parseFloat(saldoStr) : Number.NaN
-      if (!Number.isFinite(saldo)) {
-        this.logger.warn('[BreB] Liquidity response missing balance', {
-          accountId: this.maskIdentifier(accountId),
-          statusCode: data?.statusCode ?? null,
-        })
-        return 0
-      }
-
-      return saldo
+    if (Date.now() < this.liquidityRateLimitedUntilMs) {
+      // Movii keeps answering 429 for a while once its limit trips, and every
+      // extra call inside that window prolongs it. Fail fast so the liquidity
+      // cache serves its last good value instead of us hammering the provider.
+      throw new Error('Movii balance endpoint is rate limited; skipping request')
     }
-    catch (error) {
-      const reason = error instanceof Error ? error.message : 'Unknown error'
-      const status = this.extractErrorStatus(error)
-      this.logger.error('[BreB] Error fetching liquidity', {
-        reason,
-        ...(typeof status === 'number' ? { status } : {}),
+
+    const { MOVII_BALANCE_ACCOUNT_ID: accountId, MOVII_BALANCE_API_KEY: apiKey } = await this.secretManager.getSecrets([
+      'MOVII_BALANCE_API_KEY',
+      'MOVII_BALANCE_ACCOUNT_ID',
+    ] as const)
+
+    const data = await this.requestMoviiBalance(accountId, apiKey)
+    const saldoStr = data?.body?.[0]?.saldo
+    const saldo = typeof saldoStr === 'string' ? Number.parseFloat(saldoStr) : Number.NaN
+    if (!Number.isFinite(saldo)) {
+      this.logger.error('[BreB] Liquidity response missing balance', {
+        accountId: this.maskIdentifier(accountId),
+        statusCode: data?.statusCode ?? null,
       })
-      return 0
+      throw new Error('Movii balance response did not include a usable balance')
     }
+
+    return saldo
   }
 
   public async onboardUser(): Promise<PaymentOnboardResult> {
@@ -900,6 +896,37 @@ export class BrebPaymentService implements IPaymentService {
       sanitized[key] = shouldRedact ? '<redacted>' : value
       return sanitized
     }, {})
+  }
+
+  private async requestMoviiBalance(accountId: string, apiKey: string): Promise<MoviiLiquidityResponse> {
+    const url = `https://apigw-data.movii.com.co/traguatan/?id=${encodeURIComponent(accountId)}`
+    try {
+      const { data } = await axios.get<MoviiLiquidityResponse>(url, {
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+        },
+        timeout: this.liquidityRequestTimeoutMs,
+      })
+      this.liquidityRateLimitedUntilMs = 0
+      return data
+    }
+    catch (error) {
+      const reason = error instanceof Error ? error.message : 'Unknown error'
+      const status = this.extractErrorStatus(error)
+      if (status === 429) {
+        this.liquidityRateLimitedUntilMs = Date.now() + this.liquidityRateLimitCooldownMs
+      }
+      this.logger.error('[BreB] Error fetching liquidity', {
+        reason,
+        ...(typeof status === 'number' ? { status } : {}),
+        ...(status === 429 ? { cooldownMs: this.liquidityRateLimitCooldownMs } : {}),
+        responseData: this.sanitizeProviderPayload(
+          axios.isAxiosError(error) ? (error.response?.data ?? null) : null,
+        ),
+      })
+      throw error instanceof Error ? error : new Error(reason)
+    }
   }
 
   private resolveRailForReport(responseRail: unknown, instructedAgent: null | string | undefined): null | string {

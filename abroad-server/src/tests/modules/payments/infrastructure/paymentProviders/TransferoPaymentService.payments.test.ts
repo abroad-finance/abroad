@@ -92,14 +92,16 @@ describe('TransferoPaymentService', () => {
     expect(ultraClient.get).toHaveBeenCalledWith('/api/v1/balance')
   })
 
-  it('returns zero when BRZ is absent or the response schema is invalid', async () => {
+  it('rejects when BRZ is absent or the response schema is invalid', async () => {
     const { logger, service, ultraClient } = createService()
     ultraClient.get
       .mockResolvedValueOnce([balanceRow('USDC', '50.00')])
       .mockResolvedValueOnce([{ asset: 'BRZ', available: 10 }])
 
-    await expect(service.getLiquidity()).resolves.toBe(0)
-    await expect(service.getLiquidity()).resolves.toBe(0)
+    // Resolving 0 here would let the liquidity cache store "no float" and
+    // reject every PIX payout until Transfero recovers.
+    await expect(service.getLiquidity()).rejects.toThrow(/omitted BRZ/)
+    await expect(service.getLiquidity()).rejects.toThrow()
     expect(logger.error).toHaveBeenCalledTimes(2)
   })
 

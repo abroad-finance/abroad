@@ -7,6 +7,10 @@ export interface IPaymentService {
   readonly fixedFee: number
   /**
    * Gets the current liquidity for the payment service.
+   *
+   * Must reject when the balance cannot be read. A failed read is not a zero
+   * balance: resolving 0 lets callers cache "no float" and reject every payout
+   * on this method until the provider recovers.
    * @returns A promise that resolves to the liquidity amount.
    */
   getLiquidity: () => Promise<number>

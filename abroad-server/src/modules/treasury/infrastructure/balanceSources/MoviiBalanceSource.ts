@@ -3,16 +3,16 @@ import { inject, injectable } from 'inversify'
 
 import { TYPES } from '../../../../app/container/types'
 import { IPaymentServiceFactory } from '../../../payments/application/contracts/IPaymentServiceFactory'
+import { LiquidityCacheService } from '../../../payments/application/LiquidityCacheService'
 import { ITreasuryBalanceSource, TreasuryBalance } from '../../application/contracts/ITreasuryBalanceSource'
 
 /**
- * COP float held at Movii, read through the existing BreB payment service's
- * getLiquidity (the same number the payout admission checks use).
+ * COP float held at Movii, read through the same liquidity cache the payout
+ * admission checks use, so the dashboard and the guard can never disagree.
  *
- * Known limitation: IPaymentService.getLiquidity swallows provider failures
- * and returns 0, so this venue can render 0 instead of an error chip when
- * Movii is down. Fixing that means changing the shared payment-service error
- * contract — out of scope here; treat a sudden 0 with suspicion.
+ * Going through the cache also keeps this venue off Movii's rate limit: the
+ * cached value is shared across replicas, so the 5-minute incident scan running
+ * on every pod collapses into at most one provider call per TTL.
  */
 @injectable()
 export class MoviiBalanceSource implements ITreasuryBalanceSource {
@@ -20,12 +20,21 @@ export class MoviiBalanceSource implements ITreasuryBalanceSource {
 
   constructor(
     @inject(TYPES.IPaymentServiceFactory) private readonly paymentServiceFactory: IPaymentServiceFactory,
+    @inject(LiquidityCacheService) private readonly liquidityCacheService: LiquidityCacheService,
   ) {}
 
   public async getBalances(): Promise<TreasuryBalance[]> {
     const service = this.paymentServiceFactory.getPaymentService(PaymentMethod.BREB)
-    const liquidity = await service.getLiquidity()
-    const amount = Number(liquidity) || 0
+    const result = await this.liquidityCacheService.getLiquidity({
+      fetchLiquidity: () => service.getLiquidity(),
+      method: PaymentMethod.BREB,
+    })
+    // Surfacing an error chip beats charting a 0 the provider never reported.
+    if (!result.success) {
+      throw new Error(result.message ?? 'Movii liquidity is unavailable')
+    }
+
+    const amount = result.liquidity
     return [{
       account: '',
       amount,
