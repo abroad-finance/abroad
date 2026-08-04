@@ -67,7 +67,9 @@ describe('consumer UX telemetry', () => {
       initial_destination: 'BRAZIL_PIX_BRL',
       schema_version: 2,
       source_surface: 'home',
-      ui_version: 'development',
+      // Resolves to the Sentry release in CI and 'development' locally, so
+      // assert against the build constant rather than either literal.
+      ui_version: __ABROAD_UI_VERSION__,
     })
     expect(Object.keys(payload)).not.toEqual(expect.arrayContaining([
       'account_number',
