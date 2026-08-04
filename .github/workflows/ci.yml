@@ -5,6 +5,12 @@ on:
     branches: [ main ]
     paths:
       - 'abroad-server/**'
+  # Work lands directly on main, so releases are tagged from commits that no
+  # pull request ever gated. Run the same checks on push.
+  push:
+    branches: [ main ]
+    paths:
+      - 'abroad-server/**'
 
 jobs:
   server:

@@ -7,6 +7,14 @@ on:
       - 'abroad-ui/**'
       - 'package.json'
       - 'package-lock.json'
+  # Work lands directly on main, so releases are tagged from commits that no
+  # pull request ever gated. Run the same checks on push.
+  push:
+    branches: [ main ]
+    paths:
+      - 'abroad-ui/**'
+      - 'package.json'
+      - 'package-lock.json'
 
 jobs:
   frontend:
@@ -32,3 +40,7 @@ jobs:
 
       - name: Build (UI)
         run: npm -w abroad-ui run build --if-present
+
+      # Runs after the build so the orval-generated src/api client exists.
+      - name: Test (UI)
+        run: npm -w abroad-ui run test --if-present
