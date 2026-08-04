@@ -39,6 +39,7 @@ export const opsMutationActions = [
   'kyc.user.disable',
   'kyc.user.enable',
   'partner.create',
+  'partner.kyc_requirement.update',
   'saved_view.create',
   'saved_view.delete',
   'saved_view.update',

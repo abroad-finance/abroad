@@ -199,7 +199,7 @@ const validateDraft = (draft: CreatePartnerDraft): null | string => {
 }
 
 const buildActionKey = (
-  action: 'clear-domain' | 'revoke' | 'rotate' | 'save-domain',
+  action: 'clear-domain' | 'revoke' | 'rotate' | 'save-domain' | 'toggle-kyc',
   partnerId: string,
 ): string => `${action}:${partnerId}`
 
