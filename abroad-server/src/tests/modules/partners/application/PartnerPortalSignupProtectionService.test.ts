@@ -4,6 +4,7 @@ import type { PartnerPortalPublicRateLimit, PrismaClient } from '@prisma/client'
 
 import { Prisma } from '@prisma/client'
 
+import { ILogger } from '../../../../core/logging/types'
 import { PartnerPortalSignupProtectionError, PartnerPortalSignupProtectionService, PartnerPortalSignupRateLimitError } from '../../../../modules/partners/application/PartnerPortalSignupProtectionService'
 import { IDatabaseClientProvider } from '../../../../platform/persistence/IDatabaseClientProvider'
 import { ISecretManager } from '../../../../platform/secrets/ISecretManager'
@@ -76,11 +77,18 @@ const buildHarness = () => {
     getSecrets: jest.fn(),
   }
 
+  const logger: ILogger = {
+    error: jest.fn(),
+    info: jest.fn(),
+    warn: jest.fn(),
+  }
+
   return {
     create,
     databaseTransaction,
+    logger,
     secretManager,
-    service: new PartnerPortalSignupProtectionService(databaseClientProvider, secretManager),
+    service: new PartnerPortalSignupProtectionService(databaseClientProvider, logger, secretManager),
     states,
   }
 }
@@ -101,6 +109,10 @@ describe('PartnerPortalSignupProtectionService', () => {
 
     expect(challenge.readyAt).toEqual(new Date(startTime.getTime() + 1_500))
     expect(challenge.expiresAt).toEqual(new Date(startTime.getTime() + 15 * 60 * 1_000))
+    // Callers wait these durations instead of differencing the absolute stamps
+    // against their own clock, which would break under any skew.
+    expect(challenge.readyInMs).toBe(1_500)
+    expect(challenge.expiresInMs).toBe(15 * 60 * 1_000)
     await expect(harness.service.assertSignupAllowed({
       challengeToken: challenge.challengeToken,
       clientIp: '203.0.113.10',

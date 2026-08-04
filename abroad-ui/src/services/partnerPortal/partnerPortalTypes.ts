@@ -180,7 +180,9 @@ export type PartnerPortalSignupAcknowledgement = {
 export type PartnerPortalSignupChallenge = {
   challengeToken: string
   expiresAt: string
+  expiresInMs: number
   readyAt: string
+  readyInMs: number
 }
 
 export type PartnerPortalSignupInput = {

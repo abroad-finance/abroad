@@ -41,11 +41,67 @@ afterEach(() => {
 })
 
 describe('PartnerPortalSignup', () => {
+  it('waits out the full server dwell even when the visitor clock runs ahead', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    // A visitor clock parked well ahead of the server used to collapse the wait
+    // to zero, so every signup was rejected for dwelling too briefly and the
+    // retries burned the hourly rate limit until the endpoint answered 429.
+    vi.setSystemTime(new Date('2099-06-01T00:00:00.000Z'))
+    mocked.createPartnerPortalSignupChallenge.mockResolvedValue({
+      challengeToken: 'signed-challenge',
+      expiresAt: '2020-01-01T00:15:00.000Z',
+      expiresInMs: 900_000,
+      readyAt: '2020-01-01T00:00:01.500Z',
+      readyInMs: 1_500,
+    })
+    mocked.createPartnerPortalSignup.mockResolvedValue({ status: 'VERIFICATION_REQUIRED' })
+    render(<PartnerPortalSignup />)
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    await fillSignupForm(user)
+
+    await user.click(screen.getByRole('button', { name: 'Create workspace' }))
+    await waitFor(() => expect(mocked.createPartnerPortalSignupChallenge).toHaveBeenCalledTimes(1))
+    expect(mocked.createPartnerPortalSignup).not.toHaveBeenCalled()
+
+    await act(async () => {
+      vi.advanceTimersByTime(1_500)
+    })
+
+    await waitFor(() => expect(mocked.createPartnerPortalSignup).toHaveBeenCalledTimes(1))
+  })
+
+  it('falls back to a fixed dwell when the server omits the duration', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    // A server released before the duration field still answers with only the
+    // absolute stamps, which must not break signup mid-rollout.
+    mocked.createPartnerPortalSignupChallenge.mockResolvedValue({
+      challengeToken: 'signed-challenge',
+      expiresAt: '2099-01-01T00:15:00.000Z',
+      readyAt: '2099-01-01T00:00:01.500Z',
+    })
+    mocked.createPartnerPortalSignup.mockResolvedValue({ status: 'VERIFICATION_REQUIRED' })
+    render(<PartnerPortalSignup />)
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    await fillSignupForm(user)
+
+    await user.click(screen.getByRole('button', { name: 'Create workspace' }))
+    await waitFor(() => expect(mocked.createPartnerPortalSignupChallenge).toHaveBeenCalledTimes(1))
+    expect(mocked.createPartnerPortalSignup).not.toHaveBeenCalled()
+
+    await act(async () => {
+      vi.advanceTimersByTime(2_000)
+    })
+
+    await waitFor(() => expect(mocked.createPartnerPortalSignup).toHaveBeenCalledTimes(1))
+  })
+
   it('creates a normalized idempotent signup and shows the enumeration-safe email state', async () => {
     mocked.createPartnerPortalSignupChallenge.mockResolvedValue({
       challengeToken: 'signed-challenge',
       expiresAt: '2099-01-01T00:15:00.000Z',
-      readyAt: '2000-01-01T00:00:00.000Z',
+      expiresInMs: 900_000,
+      readyAt: '2099-01-01T00:00:01.500Z',
+      readyInMs: 0,
     })
     mocked.createPartnerPortalSignup.mockResolvedValue({ status: 'VERIFICATION_REQUIRED' })
     render(<PartnerPortalSignup />)
@@ -109,7 +165,9 @@ describe('PartnerPortalSignup', () => {
     mocked.createPartnerPortalSignupChallenge.mockResolvedValue({
       challengeToken: 'signed-challenge',
       expiresAt: '2099-01-01T00:15:00.000Z',
-      readyAt: '2000-01-01T00:00:00.000Z',
+      expiresInMs: 900_000,
+      readyAt: '2099-01-01T00:00:01.500Z',
+      readyInMs: 0,
     })
     mocked.createPartnerPortalSignup.mockResolvedValue({ status: 'VERIFICATION_REQUIRED' })
     mocked.resendPartnerPortalSignupVerificationEmail.mockResolvedValue({ status: 'VERIFICATION_REQUIRED' })

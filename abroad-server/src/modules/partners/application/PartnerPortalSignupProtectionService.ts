@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken'
 import { createHmac, randomBytes } from 'node:crypto'
 
 import { TYPES } from '../../../app/container/types'
+import { ILogger } from '../../../core/logging/types'
 import { IDatabaseClientProvider } from '../../../platform/persistence/IDatabaseClientProvider'
 import { ISecretManager } from '../../../platform/secrets/ISecretManager'
 
@@ -20,7 +21,11 @@ const ONE_HOUR_MS = 60 * 60 * 1_000
 export type PartnerPortalSignupChallenge = {
   challengeToken: string
   expiresAt: Date
+  // Durations let the caller wait out the dwell without comparing our clock to
+  // its own; the absolute stamps stay for display and debugging only.
+  expiresInMs: number
   readyAt: Date
+  readyInMs: number
 }
 
 type ChallengePayload = jwt.JwtPayload & {
@@ -38,6 +43,7 @@ type RateLimitRule = {
 
 type RateLimitState = {
   attempts: number
+  context: string
   limit: number
   windowEndsAt: Date
 }
@@ -61,6 +67,8 @@ export class PartnerPortalSignupProtectionService {
   public constructor(
     @inject(TYPES.IDatabaseClientProvider)
     private readonly databaseClientProvider: IDatabaseClientProvider,
+    @inject(TYPES.ILogger)
+    private readonly logger: ILogger,
     @inject(TYPES.ISecretManager)
     private readonly secretManager: ISecretManager,
   ) {}
@@ -128,7 +136,9 @@ export class PartnerPortalSignupProtectionService {
     return {
       challengeToken,
       expiresAt: new Date(issuedAtMs + CHALLENGE_TTL_SECONDS * 1_000),
+      expiresInMs: CHALLENGE_TTL_SECONDS * 1_000,
       readyAt: new Date(issuedAtMs + CHALLENGE_MINIMUM_DWELL_MS),
+      readyInMs: CHALLENGE_MINIMUM_DWELL_MS,
     }
   }
 
@@ -182,6 +192,7 @@ export class PartnerPortalSignupProtectionService {
                   })
             nextStates.push({
               attempts: current.attempts,
+              context: rule.context,
               limit: rule.limit,
               windowEndsAt: current.windowEndsAt,
             })
@@ -205,6 +216,14 @@ export class PartnerPortalSignupProtectionService {
       const retryAfterSeconds = Math.max(...exceeded.map(state => (
         Math.max(1, Math.ceil((state.windowEndsAt.getTime() - now.getTime()) / 1_000))
       )))
+      this.logger.warn('[PartnerPortalSignup] Public signup rate limit exceeded', {
+        exceeded: exceeded.map(state => ({
+          attempts: state.attempts,
+          context: state.context,
+          limit: state.limit,
+        })),
+        retryAfterSeconds,
+      })
       throw new PartnerPortalSignupRateLimitError(retryAfterSeconds)
     }
   }
@@ -252,10 +271,13 @@ export class PartnerPortalSignupProtectionService {
       }
       const ageMs = Date.now() - payload.issuedAtMs
       if (ageMs < CHALLENGE_MINIMUM_DWELL_MS || ageMs > CHALLENGE_TTL_SECONDS * 1_000) {
-        throw new Error('Signup challenge timing is invalid')
+        throw new Error(`Signup challenge timing is invalid (ageMs=${ageMs})`)
       }
     }
-    catch {
+    catch (error) {
+      this.logger.warn('[PartnerPortalSignup] Challenge verification failed', {
+        reason: error instanceof Error ? error.message : 'unknown',
+      })
       throw new PartnerPortalSignupProtectionError('Signup request could not be verified')
     }
   }

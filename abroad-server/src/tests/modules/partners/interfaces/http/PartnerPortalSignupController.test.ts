@@ -36,7 +36,9 @@ const buildService = (): jest.Mocked<SignupServiceMock> => ({
   >(async () => ({
     challengeToken: 'signed-challenge-token',
     expiresAt: new Date('2026-08-02T15:15:00.000Z'),
+    expiresInMs: 900_000,
     readyAt: new Date('2026-08-02T15:00:01.500Z'),
+    readyInMs: 1_500,
   })),
   resendVerificationEmail: jest.fn<
     ReturnType<PartnerPortalSignupService['resendVerificationEmail']>,

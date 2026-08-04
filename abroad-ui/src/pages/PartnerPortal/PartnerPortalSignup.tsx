@@ -21,6 +21,8 @@ import {
 } from '../../services/partnerPortal/partnerPortalApi'
 import { partnerCountryOptions } from './partnerCountryOptions'
 
+const FALLBACK_CHALLENGE_DWELL_MS = 2_000
+const MAX_CHALLENGE_DWELL_MS = 10_000
 const RESEND_COOLDOWN_MS = 60_000
 
 const signupSteps = [
@@ -86,19 +88,21 @@ const isValidEmail = (value: string): boolean => {
   return domainSeparatorIndex > 0 && domainSeparatorIndex < domain.length - 1
 }
 
-const waitForChallenge = async (readyAt: string, expiresAt: string): Promise<void> => {
-  const readyAtMs = Date.parse(readyAt)
-  const expiresAtMs = Date.parse(expiresAt)
-  if (
-    !Number.isFinite(readyAtMs)
-    || !Number.isFinite(expiresAtMs)
-    || readyAtMs >= expiresAtMs
-  ) {
+// The dwell is waited as a duration counted from the moment the challenge
+// response arrives, never as `readyAt - Date.now()`. The server measures the
+// dwell against its own clock, so deriving the wait from an absolute server
+// timestamp makes signup fail for every visitor whose clock runs ahead of ours.
+// Waiting the full duration also absorbs the response leg, which already
+// consumed part of the dwell on the server side.
+const waitForChallenge = async (readyInMs: number | undefined): Promise<void> => {
+  // A server released before the duration field returns only absolute stamps,
+  // so a fixed dwell keeps signup working while a release rolls out.
+  const dwellMs = readyInMs ?? FALLBACK_CHALLENGE_DWELL_MS
+  if (!Number.isFinite(dwellMs) || dwellMs < 0 || dwellMs > MAX_CHALLENGE_DWELL_MS) {
     throw new Error('Secure signup could not be prepared. Please try again.')
   }
-  const remainingMs = Math.max(0, readyAtMs - Date.now())
-  if (remainingMs > 0) {
-    await new Promise(resolve => window.setTimeout(resolve, remainingMs))
+  if (dwellMs > 0) {
+    await new Promise(resolve => window.setTimeout(resolve, dwellMs))
   }
 }
 
@@ -148,7 +152,7 @@ const PartnerPortalSignup = () => {
     setLoading(true)
     try {
       const challenge = await createPartnerPortalSignupChallenge()
-      await waitForChallenge(challenge.readyAt, challenge.expiresAt)
+      await waitForChallenge(challenge.readyInMs)
       const result = await createPartnerPortalSignup({
         challengeToken: challenge.challengeToken,
         company: draft.company.trim().replace(/\s+/gu, ' '),
@@ -184,7 +188,7 @@ const PartnerPortalSignup = () => {
     setLoading(true)
     try {
       const challenge = await createPartnerPortalSignupChallenge()
-      await waitForChallenge(challenge.readyAt, challenge.expiresAt)
+      await waitForChallenge(challenge.readyInMs)
       const result = await resendPartnerPortalSignupVerificationEmail({
         challengeToken: challenge.challengeToken,
         contactWebsite: draft.contactWebsite,
