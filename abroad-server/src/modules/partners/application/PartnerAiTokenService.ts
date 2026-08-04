@@ -5,6 +5,7 @@ import { randomUUID } from 'node:crypto'
 import type { PartnerAiAuthorizationCodeGrant, PartnerAiRefreshTokenGrant, PartnerAiTokenGrant, PartnerAiTokenRevocation } from './PartnerAiOAuthTypes'
 
 import { TYPES } from '../../../app/container/types'
+import { ILogger } from '../../../core/logging/types'
 import { IDatabaseClientProvider } from '../../../platform/persistence/IDatabaseClientProvider'
 import { PartnerAiAbuseProtectionService } from './PartnerAiAbuseProtectionService'
 import { PARTNER_AI_ACCESS_TOKEN_TTL_MS, PARTNER_AI_LAST_USED_WRITE_INTERVAL_MS, PARTNER_AI_MCP_RESOURCE_URL, PARTNER_AI_REFRESH_TOKEN_TTL_MS } from './partnerAiConfiguration'
@@ -55,6 +56,8 @@ export class PartnerAiTokenService {
     private readonly auditService: PartnerPortalAuditService,
     @inject(PartnerAiAbuseProtectionService)
     private readonly abuseProtectionService: PartnerAiAbuseProtectionService,
+    @inject(TYPES.ILogger)
+    private readonly logger: ILogger,
   ) {}
 
   public async authenticateAccessToken(accessToken: string): Promise<PartnerAiAccessPrincipal> {
@@ -81,30 +84,29 @@ export class PartnerAiTokenService {
       throw new PartnerAiOAuthError('invalid_grant', 'The MCP access token is invalid or expired')
     }
 
+    // `lastUsedAt` is portal telemetry, not an authorization input, and the three
+    // conditional updates cost a database round trip each on every MCP message.
+    // Issue them without blocking the caller; they settle while the tool runs.
     const writeThreshold = new Date(now.getTime() - PARTNER_AI_LAST_USED_WRITE_INTERVAL_MS)
-    await Promise.all([
+    const staleLastUsed = { OR: [{ lastUsedAt: null }, { lastUsedAt: { lt: writeThreshold } }] }
+    void Promise.all([
       prismaClient.partnerAiAccessToken.updateMany({
         data: { lastUsedAt: now },
-        where: {
-          id: token.id,
-          OR: [{ lastUsedAt: null }, { lastUsedAt: { lt: writeThreshold } }],
-        },
+        where: { id: token.id, ...staleLastUsed },
       }),
       prismaClient.partnerAiConnection.updateMany({
         data: { lastUsedAt: now },
-        where: {
-          id: token.connectionId,
-          OR: [{ lastUsedAt: null }, { lastUsedAt: { lt: writeThreshold } }],
-        },
+        where: { id: token.connectionId, ...staleLastUsed },
       }),
       prismaClient.partnerAiOAuthClient.updateMany({
         data: { lastUsedAt: now },
-        where: {
-          id: token.connection.oauthClientId,
-          OR: [{ lastUsedAt: null }, { lastUsedAt: { lt: writeThreshold } }],
-        },
+        where: { id: token.connection.oauthClientId, ...staleLastUsed },
       }),
-    ])
+    ]).catch((error: unknown) => {
+      this.logger.warn('[PartnerAiToken] Failed to record AI connection usage', {
+        errorName: error instanceof Error ? error.name : 'UnknownError',
+      })
+    })
 
     return {
       accessTokenId: token.id,

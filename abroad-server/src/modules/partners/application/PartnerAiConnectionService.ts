@@ -5,7 +5,7 @@ import type { PartnerAiAccessPrincipal } from './PartnerAiTokenService'
 
 import { TYPES } from '../../../app/container/types'
 import { IDatabaseClientProvider } from '../../../platform/persistence/IDatabaseClientProvider'
-import { PARTNER_AI_MCP_RESOURCE_URL } from './partnerAiConfiguration'
+import { PARTNER_AI_MCP_RESOURCE_URL, PARTNER_AI_MCP_SERVER_VERSION } from './partnerAiConfiguration'
 import { PartnerAiPortalError } from './PartnerAiErrors'
 import { PartnerAiScopeName, toPartnerAiScopeNames } from './partnerAiScopes'
 import { PartnerPortalAuditService } from './PartnerPortalAuditService'
@@ -49,7 +49,7 @@ export class PartnerAiConnectionService {
       organizationName: principal.partnerName,
       resource: PARTNER_AI_MCP_RESOURCE_URL,
       scopes: principal.scopes,
-      serverVersion: '1.0.0',
+      serverVersion: PARTNER_AI_MCP_SERVER_VERSION,
       status: 'ACTIVE',
     }
   }
@@ -155,7 +155,7 @@ export class PartnerAiConnectionService {
       organizationName: principal.partner.name,
       resource: PARTNER_AI_MCP_RESOURCE_URL,
       scopes: toPartnerAiScopeNames(connection.scopes),
-      serverVersion: '1.0.0',
+      serverVersion: PARTNER_AI_MCP_SERVER_VERSION,
       status: 'ACTIVE',
     }
   }

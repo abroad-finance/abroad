@@ -59,6 +59,13 @@ export class PartnerAiAbuseProtectionService {
     ])
   }
 
+  public async assertToolCallAllowed(connectionId: string, partnerId: string): Promise<void> {
+    await this.consume([
+      { context: 'tool-connection', identifier: connectionId, limit: 600, windowMs: ONE_HOUR_MS },
+      { context: 'tool-partner', identifier: partnerId, limit: 1_200, windowMs: ONE_HOUR_MS },
+    ])
+  }
+
   private async consume(rules: readonly RateLimitRule[]): Promise<void> {
     const now = new Date()
     const keySecret = await this.secretManager.getSecret('PARTNER_PORTAL_JWT_SECRET')

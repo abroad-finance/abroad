@@ -4,6 +4,7 @@ import type { PrismaClient } from '@prisma/client'
 
 import { PartnerAiClientKind, PartnerAiScope, PartnerPortalRole, Prisma } from '@prisma/client'
 
+import { PARTNER_AI_MCP_SERVER_VERSION } from '../../../../modules/partners/application/partnerAiConfiguration'
 import { PartnerAiConnectionService } from '../../../../modules/partners/application/PartnerAiConnectionService'
 import { PartnerAiPortalError } from '../../../../modules/partners/application/PartnerAiErrors'
 import { PartnerPortalAuditService } from '../../../../modules/partners/application/PartnerPortalAuditService'
@@ -146,7 +147,7 @@ describe('PartnerAiConnectionService', () => {
       organizationName: 'Atlas Payments',
       resource: 'https://api.abroad.finance/mcp',
       scopes: ['account:read', 'transactions:read'],
-      serverVersion: '1.0.0',
+      serverVersion: PARTNER_AI_MCP_SERVER_VERSION,
       status: 'ACTIVE',
     })
     expect(JSON.stringify(result)).not.toContain('transactionId')

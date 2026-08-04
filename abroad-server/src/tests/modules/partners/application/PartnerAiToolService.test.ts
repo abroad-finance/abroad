@@ -81,9 +81,46 @@ describe('PartnerAiToolService', () => {
       title: 'Connect Abroad to AI',
       url: 'https://abroad-docs.web.app/ai-integration',
     }))
+    expect(result.matched).toBe(true)
     expect(result.results.length).toBeLessThanOrEqual(5)
     expect(harness.search).not.toHaveBeenCalled()
     expect(harness.getWebhookDiagnostics).not.toHaveBeenCalled()
+  })
+
+  it('hands back the documentation index instead of an empty dead end', () => {
+    const harness = buildHarness()
+
+    const result = harness.service.searchDocumentation('kubernetes sidecar tuning')
+
+    expect(result.matched).toBe(false)
+    expect(result.results).toHaveLength(1)
+    expect(result.results[0].url).toBe('https://abroad-docs.web.app/')
+    expect(result.note).toContain('No catalog entry matched')
+  })
+
+  it('covers the operational topics partners actually ask about', () => {
+    const harness = buildHarness()
+
+    const topics = {
+      'PIX payouts to Brazil': 'Supported assets',
+      'transaction limits per day': 'Limits and validation',
+      'what fields does the quote endpoint take': 'API reference',
+      'which memo do I send on Stellar': 'Send funds',
+    }
+    for (const [query, expectedTitle] of Object.entries(topics)) {
+      const result = harness.service.searchDocumentation(query)
+      expect(result.matched).toBe(true)
+      expect(result.results.map(entry => entry.title)).toContain(expectedTitle)
+    }
+  })
+
+  it('does not let a short keyword match an unrelated word', () => {
+    const harness = buildHarness()
+
+    // "available" contains "ai" and "rapid" contains "api"; neither is a topic hit.
+    const result = harness.service.searchDocumentation('available')
+
+    expect(result.matched).toBe(false)
   })
 
   it('passes the authenticated tenant identity to transaction reads', async () => {

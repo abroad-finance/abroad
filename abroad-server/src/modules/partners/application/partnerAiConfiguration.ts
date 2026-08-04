@@ -1,5 +1,8 @@
 export const PARTNER_AI_MCP_RESOURCE_URL = 'https://api.abroad.finance/mcp'
 export const PARTNER_AI_OAUTH_ISSUER = 'https://api.abroad.finance'
+export const PARTNER_AI_MCP_SERVER_NAME = 'abroad-partner-ai'
+export const PARTNER_AI_MCP_SERVER_VERSION = '1.1.0'
+export const PARTNER_AI_PROTECTED_RESOURCE_METADATA_URL = `${PARTNER_AI_OAUTH_ISSUER}/.well-known/oauth-protected-resource/mcp`
 export const PARTNER_AI_PORTAL_URL = 'https://app.abroad.finance/partner/integration/ai/authorize'
 export const PARTNER_AI_DOCUMENTATION_ORIGIN = 'https://abroad-docs.web.app'
 export const PARTNER_AI_DOCUMENTATION_URL = `${PARTNER_AI_DOCUMENTATION_ORIGIN}/ai-integration`

@@ -5,6 +5,7 @@ import type { PrismaClient } from '@prisma/client'
 import { PartnerAiAuthorizationOutcome, PartnerAiClientKind, PartnerAiScope, Prisma } from '@prisma/client'
 import { createHash } from 'node:crypto'
 
+import { ILogger } from '../../../../core/logging/types'
 import { PartnerAiAbuseProtectionService } from '../../../../modules/partners/application/PartnerAiAbuseProtectionService'
 import { PartnerAiOAuthError } from '../../../../modules/partners/application/PartnerAiErrors'
 import { PartnerAiTokenService } from '../../../../modules/partners/application/PartnerAiTokenService'
@@ -155,6 +156,7 @@ const buildHarness = () => {
       databaseClientProvider,
       { record: auditRecord } as unknown as PartnerPortalAuditService,
       { assertTokenRequestAllowed } as unknown as PartnerAiAbuseProtectionService,
+      { error: jest.fn(), warn: jest.fn() } as unknown as ILogger,
     ),
     transaction,
   }

@@ -19,6 +19,7 @@ import { PartnerAiAuthorizationService } from '../../modules/partners/applicatio
 import { PartnerAiConnectionService } from '../../modules/partners/application/PartnerAiConnectionService'
 import { PartnerAiTokenService } from '../../modules/partners/application/PartnerAiTokenService'
 import { PartnerAiToolService } from '../../modules/partners/application/PartnerAiToolService'
+import { PartnerPortalAuditService } from '../../modules/partners/application/PartnerPortalAuditService'
 import { PartnerAiMcpRouter } from '../../modules/partners/interfaces/http/PartnerAiMcpRouter'
 import { PartnerAiOAuthRouter } from '../../modules/partners/interfaces/http/PartnerAiOAuthRouter'
 import { QuoteRequestMetricRecorder } from '../../modules/quotes/application/QuoteRequestMetricRecorder'
@@ -68,6 +69,7 @@ const partnerAiAuthorizationService = iocContainer.get(PartnerAiAuthorizationSer
 const partnerAiConnectionService = iocContainer.get(PartnerAiConnectionService)
 const partnerAiTokenService = iocContainer.get(PartnerAiTokenService)
 const partnerAiToolService = iocContainer.get(PartnerAiToolService)
+const partnerPortalAuditService = iocContainer.get(PartnerPortalAuditService)
 
 app.use(new PartnerAiOAuthRouter(
   partnerAiAuthorizationService,
@@ -78,6 +80,8 @@ app.use(new PartnerAiMcpRouter(
   partnerAiTokenService,
   partnerAiConnectionService,
   partnerAiToolService,
+  partnerAiAbuseProtectionService,
+  partnerPortalAuditService,
   logger,
 ).router)
 
