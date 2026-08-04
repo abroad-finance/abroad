@@ -373,7 +373,6 @@ const WebSwap: React.FC = () => {
       <main className="flex-1 min-h-0 relative z-10 flex">
         <WebSwapLayout
           disclosure={isMiniPay ? <MiniPayDisclosure isDark={navBar.isDark} /> : null}
-          showJourneyProgress={hasEnteredApp || swapViewProps.isAuthenticated}
           slots={{
             confirmQr: <ConfirmQr {...confirmQrProps} />,
             home: (
@@ -447,7 +446,6 @@ const WebSwap: React.FC = () => {
               />
             ),
           }}
-          targetCurrency={targetCurrency}
           view={view}
         />
       </main>

@@ -1,20 +1,9 @@
 import { render, screen } from '@testing-library/react'
-import {
-  describe, expect, it, vi,
-} from 'vitest'
+import { describe, expect, it } from 'vitest'
+
+import type { SwapView } from '../features/swap/types'
 
 import WebSwapLayout from '../features/swap/components/WebSwapLayout'
-
-vi.mock('@tolgee/react', () => ({
-  useTranslate: () => ({
-    t: (_key: string, fallback: string, params?: Record<string, number | string>) => (
-      Object.entries(params ?? {}).reduce(
-        (translated, [name, value]) => translated.replace(`{${name}}`, String(value)),
-        fallback,
-      )
-    ),
-  }),
-}))
 
 const slots = {
   confirmQr: <p>review view</p>,
@@ -25,32 +14,39 @@ const slots = {
   waitSign: <p>authorization view</p>,
 }
 
-describe('WebSwapLayout journey progress', () => {
-  it('maps each payment surface to a truthful compact progress step', () => {
-    const { rerender } = render(
-      <WebSwapLayout showJourneyProgress slots={slots} targetCurrency="BRL" view="home" />,
-    )
+const surfaces: ReadonlyArray<[SwapView, string]> = [
+  ['confirm-qr', 'review view'],
+  ['home', 'home view'],
+  ['kyc-needed', 'verification view'],
+  ['swap', 'details view'],
+  ['txStatus', 'receipt view'],
+  ['wait-sign', 'authorization view'],
+]
 
-    expect(screen.getByText('Destination and source · Brazil · Pix')).toBeInTheDocument()
-    expect(screen.getByRole('progressbar', { name: /step 1 of 5/i })).toHaveValue(1)
+describe('WebSwapLayout', () => {
+  it('renders the slot belonging to each payment surface', () => {
+    const { rerender } = render(<WebSwapLayout slots={slots} view="home" />)
 
-    rerender(<WebSwapLayout showJourneyProgress slots={slots} targetCurrency="BRL" view="confirm-qr" />)
-    expect(screen.getByText('Review payment')).toBeInTheDocument()
-    expect(screen.getByRole('progressbar', { name: /step 3 of 5/i })).toHaveValue(3)
-
-    rerender(<WebSwapLayout showJourneyProgress slots={slots} targetCurrency="BRL" view="txStatus" />)
-    expect(screen.getByText('Track and receipt')).toBeInTheDocument()
-    expect(screen.getByRole('progressbar', { name: /step 5 of 5/i })).toHaveValue(5)
+    for (const [view, expected] of surfaces) {
+      rerender(<WebSwapLayout slots={slots} view={view} />)
+      expect(screen.getByText(expected)).toBeInTheDocument()
+    }
   })
 
-  it('does not duplicate KYC progress or show progress before onboarding', () => {
-    const { rerender } = render(
-      <WebSwapLayout slots={slots} targetCurrency="COP" view="home" />,
-    )
-    expect(screen.queryByRole('progressbar')).not.toBeInTheDocument()
+  it('does not render a step progress indicator on any surface', () => {
+    const { rerender } = render(<WebSwapLayout slots={slots} view="home" />)
 
-    rerender(<WebSwapLayout showJourneyProgress slots={slots} targetCurrency="COP" view="kyc-needed" />)
-    expect(screen.getByText('verification view')).toBeInTheDocument()
-    expect(screen.queryByRole('progressbar')).not.toBeInTheDocument()
+    for (const [view] of surfaces) {
+      rerender(<WebSwapLayout slots={slots} view={view} />)
+      expect(screen.queryByRole('progressbar')).not.toBeInTheDocument()
+      expect(screen.queryByText(/step \d+ of \d+/i)).not.toBeInTheDocument()
+    }
+  })
+
+  it('renders the disclosure alongside the active slot', () => {
+    render(<WebSwapLayout disclosure={<p>disclosure copy</p>} slots={slots} view="home" />)
+
+    expect(screen.getByText('home view')).toBeInTheDocument()
+    expect(screen.getByText('disclosure copy')).toBeInTheDocument()
   })
 })
