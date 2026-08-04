@@ -250,6 +250,39 @@ describe('ConsumerActivityService.getById', () => {
     expect(result.fee).toBeNull()
   })
 
+  it('derives the effective rate from the base rate rather than the fee-inclusive amounts', async () => {
+    const prisma = makePrisma()
+    prisma.transaction.findFirst.mockResolvedValue({ ...transaction, economics: null })
+
+    const result = await makeService(prisma).getById(
+      'partner-1',
+      'stellar:pubnet:GABC',
+      transaction.id,
+    )
+
+    // 525.4 / 100 would be 5.254, but that source amount already carries the
+    // 1.25 customer fee. The stored base rate inverts to the real rate.
+    expect(result.effectiveRate).toBe('5.2631578947368421053')
+    expect(result.effectiveRate).not.toBe('5.254')
+  })
+
+  it('falls back to the fee-inclusive rate only when no base rate was recorded', async () => {
+    const prisma = makePrisma()
+    prisma.transaction.findFirst.mockResolvedValue({
+      ...transaction,
+      economics: null,
+      quote: { ...transaction.quote, baseRateSourcePerTarget: null },
+    })
+
+    const result = await makeService(prisma).getById(
+      'partner-1',
+      'stellar:pubnet:GABC',
+      transaction.id,
+    )
+
+    expect(result.effectiveRate).toBe('5.254')
+  })
+
   it('does not claim a completed refund without the canonical refund transaction identity', async () => {
     const prisma = makePrisma()
     prisma.transaction.findFirst.mockResolvedValue({

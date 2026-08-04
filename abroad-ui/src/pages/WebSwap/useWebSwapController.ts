@@ -966,7 +966,16 @@ export const useWebSwapController = (): WebSwapControllerProps => {
       return `1 ${selectedAssetLabel} = - ${tc}`
     }
     if (state.quote) {
-      const rate = state.quote.targetAmount / state.quote.sourceAmount
+      // sourceAmount is what the customer pays, so it already contains the
+      // customer fee. Dividing by it folds the fee into the rate and makes it
+      // look far worse than the rate actually quoted, so net the fee off:
+      // sourceAmount - fee == baseRate * targetAmount by construction.
+      const feeAmount = Number(state.quote.fee?.amount ?? 0)
+      const baseSource = Number.isFinite(feeAmount)
+        ? state.quote.sourceAmount - feeAmount
+        : state.quote.sourceAmount
+      const divisor = baseSource > 0 ? baseSource : state.quote.sourceAmount
+      const rate = state.quote.targetAmount / divisor
       return `1 ${selectedAssetLabel} = ${formatTargetNumber(rate)} ${tc}`
     }
     return `1 ${selectedAssetLabel} = - ${tc}`

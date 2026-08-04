@@ -492,6 +492,28 @@ describe('useWebSwapController', () => {
     expect(result.current.view).toBe('swap')
   })
 
+  it('quotes the effective rate without folding in the customer fee', async () => {
+    const { result } = renderHook(() => useWebSwapController(), { wrapper: Wrapper })
+
+    await act(async () => {
+      await Promise.resolve()
+      await mocked.fetchPublicCorridorsMock.mock.results[0]?.value
+    })
+
+    act(() => {
+      result.current.swapViewProps.onTargetChange('5')
+    })
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(50)
+    })
+
+    // The quote charges 10 USDC for 5 BRL and 0.25 of that is the customer
+    // fee, so the rate is 5 / 9.75 rather than the 5 / 10 the charged amount
+    // alone implies.
+    expect(result.current.swapViewProps.exchangeRateDisplay).toBe('1 USDC = 0,51 BRL')
+  })
+
   it('submits a valid BRL PIX quote through the transaction API after confirmation', async () => {
     mocked.acceptTransactionRequestMock.mockResolvedValueOnce({
       data: {

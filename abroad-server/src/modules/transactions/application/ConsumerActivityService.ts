@@ -362,9 +362,17 @@ export class ConsumerActivityService implements IConsumerActivityService {
     if (transaction.economics?.lockedRateNativePerUsd) {
       return transaction.economics.lockedRateNativePerUsd.toString()
     }
+    // The stored base rate excludes customer fees and is kept at full
+    // precision, so prefer it over deriving a rate from the charged amounts.
+    const { baseRateSourcePerTarget } = transaction.quote
+    if (baseRateSourcePerTarget !== null && baseRateSourcePerTarget.greaterThan(0)) {
+      return new Prisma.Decimal(1).dividedBy(baseRateSourcePerTarget).toString()
+    }
     if (transaction.quote.sourceAmount <= 0) {
       return null
     }
+    // Quotes predating the fee snapshot carry no base rate, so the only rate
+    // recoverable is the fee-inclusive one.
     return new Prisma.Decimal(String(transaction.quote.targetAmount))
       .dividedBy(new Prisma.Decimal(String(transaction.quote.sourceAmount)))
       .toString()
