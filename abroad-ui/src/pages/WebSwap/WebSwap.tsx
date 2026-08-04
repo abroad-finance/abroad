@@ -324,8 +324,13 @@ const WebSwap: React.FC = () => {
 
   return (
     <div className="flex h-dvh w-full flex-col overflow-hidden bg-[linear-gradient(135deg,var(--ab-bg),var(--ab-bg-end))]">
-      {/* Shared Navigation */}
-      <div className="relative z-10">
+      {/*
+        Shared Navigation. This wrapper is a stacking context, so the nav's
+        dropdown cannot escape it no matter how high its own z-index is. It has
+        to outrank the main content (z-10) and the connection banner (z-20) or
+        the open menu is painted underneath them and stops being clickable.
+      */}
+      <div className="relative z-30">
         <NavBarResponsive
           {...navBar}
           languageSelector={<LanguageSelector {...languageSelector} />}
