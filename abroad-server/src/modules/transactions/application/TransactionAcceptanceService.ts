@@ -341,8 +341,24 @@ export class TransactionAcceptanceService {
     }
 
     if (!result.success) {
+      // Provider unreadable and no usable cached value. Operations can pin an
+      // assumed float per method so a provider-side outage doesn't halt every
+      // payout; unset (the default) keeps the strict fail-closed behaviour.
+      // Per-transaction and per-day caps still bound the exposure this admits.
+      const fallback = this.readLiquidityFallback(paymentMethod)
+      if (fallback !== null && fallback >= targetAmount) {
+        this.logger.warn('Admitting payout on the configured liquidity fallback: provider balance is unreadable', {
+          fallback,
+          paymentMethod,
+          reason: result.message,
+          targetAmount,
+        })
+        return
+      }
+
       this.logger.error('Unable to verify liquidity for transaction acceptance', {
         cachedLiquidity: result.liquidity,
+        configuredFallback: fallback,
         paymentMethod,
         reason: result.message,
         targetAmount,
@@ -560,6 +576,24 @@ export class TransactionAcceptanceService {
     }
 
     return Math.min(Math.max(parsed, min), max)
+  }
+
+  /**
+   * Assumed available float for a method whose provider balance cannot be read,
+   * e.g. `LIQUIDITY_FALLBACK_BREB=800000000`. Unset means fail closed, so this
+   * only ever loosens admission when someone deliberately pins a number.
+   */
+  private readLiquidityFallback(paymentMethod: PaymentMethod): null | number {
+    const raw = process.env[`LIQUIDITY_FALLBACK_${paymentMethod}`]
+    if (!raw) return null
+
+    const parsed = Number(raw)
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      this.logger.error('Ignoring malformed liquidity fallback', { paymentMethod, raw })
+      return null
+    }
+
+    return parsed
   }
 
   private async reservePartnerDailyLimits(

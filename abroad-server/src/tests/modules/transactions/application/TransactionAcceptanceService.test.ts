@@ -107,6 +107,47 @@ describe('TransactionAcceptanceService helpers', () => {
       .rejects.toThrow('We could not verify available liquidity for this payment method right now. Please try again in a few moments.')
   })
 
+  describe('when the provider balance is unreadable', () => {
+    const enforce = (svc: ReturnType<typeof buildPaymentService>, amount: number) => {
+      const enforceLiquidity = (service as unknown as {
+        enforceLiquidity: (s: ReturnType<typeof buildPaymentService>, m: PaymentMethod, a: number) => Promise<void>
+      }).enforceLiquidity
+      return enforceLiquidity.call(service, svc, PaymentMethod.BREB, amount)
+    }
+    const failingProvider = () => ({
+      ...paymentService,
+      getLiquidity: jest.fn(async () => { throw new Error('Movii balance endpoint is rate limited') }),
+    })
+
+    afterEach(() => {
+      delete process.env.LIQUIDITY_FALLBACK_BREB
+    })
+
+    it('admits the payout when a fallback is configured and covers the amount', async () => {
+      process.env.LIQUIDITY_FALLBACK_BREB = '800000000'
+      await expect(enforce(failingProvider(), 192_273)).resolves.toBeUndefined()
+    })
+
+    it('still rejects when the configured fallback is below the requested amount', async () => {
+      process.env.LIQUIDITY_FALLBACK_BREB = '100000'
+      await expect(enforce(failingProvider(), 192_273))
+        .rejects.toThrow('We could not verify available liquidity')
+    })
+
+    it('fails closed for a method with no fallback configured', async () => {
+      process.env.LIQUIDITY_FALLBACK_PIX = '999999999'
+      await expect(enforce(failingProvider(), 192_273))
+        .rejects.toThrow('We could not verify available liquidity')
+      delete process.env.LIQUIDITY_FALLBACK_PIX
+    })
+
+    it('ignores a malformed fallback rather than admitting on it', async () => {
+      process.env.LIQUIDITY_FALLBACK_BREB = 'not-a-number'
+      await expect(enforce(failingProvider(), 192_273))
+        .rejects.toThrow('We could not verify available liquidity')
+    })
+  })
+
   it('accepts the transaction when cached liquidity covers the requested amount', async () => {
     const enforceLiquidity = (service as unknown as {
       enforceLiquidity: (svc: ReturnType<typeof buildPaymentService>, method: PaymentMethod, amount: number) => Promise<void>
