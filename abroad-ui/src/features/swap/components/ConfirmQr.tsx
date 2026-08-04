@@ -181,8 +181,15 @@ const ConfirmQr: React.FC<ConfirmQrProps> = ({
             <dd className="break-words text-right font-semibold text-ab-text">{exchangeRateDisplay}</dd>
             <dt className="text-ab-text-3">{t('confirm_qr.quote', 'Quote')}</dt>
             <dd className={cn('text-right font-semibold', quoteExpired ? 'text-ab-error' : 'text-ab-text')}>{quoteValidity}</dd>
-            <dt className="text-ab-text-3">{t('confirm_qr.timing', 'Expected timing')}</dt>
-            <dd className="text-right font-semibold text-ab-text">{timingDisplay ?? t('common.unavailable', 'Unavailable')}</dd>
+            {/* See Swap.tsx: the row is omitted until a real estimate exists. */}
+            {timingDisplay
+              ? (
+                  <>
+                    <dt className="text-ab-text-3">{t('confirm_qr.timing', 'Expected timing')}</dt>
+                    <dd className="text-right font-semibold text-ab-text">{timingDisplay}</dd>
+                  </>
+                )
+              : null}
           </dl>
         </section>
 

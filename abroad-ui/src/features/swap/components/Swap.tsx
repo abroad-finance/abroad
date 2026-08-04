@@ -418,11 +418,20 @@ export default function Swap({
             <dd className="text-right font-semibold text-[var(--ab-text)]">{networkLabel || t('common.unavailable', 'Unavailable')}</dd>
             <dt className="text-[var(--ab-text-muted)]">{t('swap.fee', 'Fee')}</dt>
             <dd className="text-right font-semibold text-[var(--ab-text)]">{feeDisplay ?? t('common.unavailable', 'Unavailable')}</dd>
-            <dt className="text-[var(--ab-text-muted)]">{t('swap.expected_timing', 'Expected timing')}</dt>
-            <dd className="flex items-center justify-end gap-1 text-right font-semibold text-[var(--ab-text)]">
-              <Clock3 aria-hidden="true" className="size-4" />
-              {timingDisplay ?? t('common.unavailable', 'Unavailable')}
-            </dd>
+            {/* Only rendered once a real estimate exists; no timing source is
+                wired yet, and an "Unavailable" row next to an irreversible
+                payment is worse than no row at all. */}
+            {timingDisplay
+              ? (
+                  <>
+                    <dt className="text-[var(--ab-text-muted)]">{t('swap.expected_timing', 'Expected timing')}</dt>
+                    <dd className="flex items-center justify-end gap-1 text-right font-semibold text-[var(--ab-text)]">
+                      <Clock3 aria-hidden="true" className="size-4" />
+                      {timingDisplay}
+                    </dd>
+                  </>
+                )
+              : null}
           </dl>
         </section>
 

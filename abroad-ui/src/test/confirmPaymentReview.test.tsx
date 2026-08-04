@@ -51,7 +51,7 @@ describe('payment review', () => {
     expect(screen.getAllByText('10.00 USDC')).toHaveLength(2)
     expect(screen.getByText('R$ 50.00 BRL')).toBeInTheDocument()
     expect(screen.getByText('1 USDC = 5.00 BRL')).toBeInTheDocument()
-    expect(screen.getAllByText('Unavailable')).toHaveLength(2)
+    expect(screen.getAllByText('Unavailable')).toHaveLength(1)
     expect(screen.getByText('Locked quote · expires in 2:05')).toBeInTheDocument()
     expect(screen.queryByText('recipient-fixture-key')).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Confirm and pay 10.00 USDC' })).toBeEnabled()
@@ -74,6 +74,19 @@ describe('payment review', () => {
     expect(screen.getByRole('button', { name: 'Confirm and pay 10.00 USDC' })).toBeDisabled()
     fireEvent.click(screen.getByRole('button', { name: 'Refresh quote' }))
     expect(onRefreshQuote).toHaveBeenCalledTimes(1)
+  })
+
+  it('omits the expected timing row when no estimate is available', () => {
+    render(<ConfirmQr {...baseProps} timingDisplay={null} />)
+
+    expect(screen.queryByText('Expected timing')).not.toBeInTheDocument()
+  })
+
+  it('shows the expected timing row once an estimate is supplied', () => {
+    render(<ConfirmQr {...baseProps} timingDisplay="Under 1 minute" />)
+
+    expect(screen.getByText('Expected timing')).toBeInTheDocument()
+    expect(screen.getByText('Under 1 minute')).toBeInTheDocument()
   })
 
   it('labels the busy authorization state instead of showing a spinner alone', () => {
