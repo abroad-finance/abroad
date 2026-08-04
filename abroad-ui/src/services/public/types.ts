@@ -78,7 +78,8 @@ export const publicCorridorResponseSchema: z.ZodType<PublicCorridorResponse> = z
     maxAmount: z.number().finite().nonnegative().nullable(),
     minAmount: z.number().finite().nonnegative().nullable(),
     notify: z.object({
-      endpoint: z.string().url().max(2_048).nullable(),
+      // The API returns a root-relative path (`/payments/notify`), not an absolute URL.
+      endpoint: z.string().max(2_048).nullable(),
       required: z.boolean(),
     }).strict(),
     paymentMethod: z.string().min(1).max(32),
