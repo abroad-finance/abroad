@@ -1,7 +1,7 @@
 import 'reflect-metadata'
 import { NotFound } from 'http-errors'
 
-import { authRequest, buildMinimalController, createBadRequestResponder } from './transactionControllerTestUtils'
+import { authRequest, buildMinimalController, createBadRequestResponder, walletAuthRequest } from './transactionControllerTestUtils'
 
 const badRequest = createBadRequestResponder()
 
@@ -56,5 +56,23 @@ describe('TransactionController minimal branches', () => {
     })
 
     await expect(controller.getTransactionStatus('tx-2', authRequest('partner-1'))).rejects.toBeInstanceOf(NotFound)
+  })
+
+  it('returns the same not-found response when a wallet requests another wallet transaction', async () => {
+    const { controller, prisma } = buildMinimalController()
+    prisma.transaction.findUnique.mockResolvedValueOnce({
+      id: 'tx-2',
+      onChainId: null,
+      partnerUser: { id: 'pu-1', userId: 'stellar:pubnet:GOTHER' },
+      partnerUserId: 'pu-1',
+      quote: { partnerId: 'partner-1' },
+      status: 'PAYMENT_COMPLETED',
+    })
+
+    await expect(controller.getTransactionStatus(
+      'tx-2',
+      walletAuthRequest('partner-1', 'stellar:pubnet:GREQUESTER'),
+    )).rejects.toBeInstanceOf(NotFound)
+    expect(prisma.partnerUserKyc.findFirst).not.toHaveBeenCalled()
   })
 })

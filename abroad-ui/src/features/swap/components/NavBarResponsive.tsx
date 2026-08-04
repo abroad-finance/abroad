@@ -1,70 +1,59 @@
 import {
-  Info, LogOut, Moon, Sun,
+  CircleUserRound,
+  ExternalLink,
+  History,
+  LogOut,
+  Menu,
+  Moon,
+  Sun,
 } from 'lucide-react'
-import React, { memo } from 'react'
-
-import type { ChainPillChain } from '@/components/ui'
+import React, {
+  memo,
+  useEffect,
+  useRef,
+  useState,
+} from 'react'
 
 import AbroadLogoColored from '@/assets/Logos/AbroadLogoColored.svg'
 import AbroadLogoWhite from '@/assets/Logos/AbroadLogoWhite.svg'
-import { ChainPill, CurrencyToggle } from '@/components/ui'
-import { AB_STYLES, CHAIN_MAP } from '@/shared/constants'
-
-import { cn } from '../../../shared/utils'
-
-/* ── Props ── */
+import { AB_STYLES } from '@/shared/constants'
+import { cn } from '@/shared/utils'
 
 export interface NavBarResponsiveProps {
   address?: null | string
-  balance: string
-  balanceLoading: boolean
   className?: string
   hideWalletButton?: boolean
   infoUrl: string
   isDark?: boolean
   labels: {
+    connected?: string
     connectWallet: string
     connectWalletAria: string
     disconnectAria?: string
+    disconnectFailed?: string
     disconnectTitle?: string
     history?: string
     infoAriaLabel: string
+    language?: string
     notConnected: string
-    walletDetailsAria: string
+    useDarkTheme?: string
+    useLightTheme?: string
+    utilities?: string
   }
   languageSelector?: React.ReactNode
-  languageSelectorMobile?: React.ReactNode
   onDisconnect?: () => Promise<void>
+  onHeaderAction?: (action: 'close' | 'help' | 'open' | 'switch' | 'view_activity') => void
   onHistoryClick?: () => void
-  onOpenChainModal?: () => void
-  onSelectCurrency?: (currency: 'BRL' | 'COP') => void
   onToggleTheme?: () => void
-  onWalletClick: () => void
-  /** When set with onOpenChainModal, shows the chain/token pill (e.g. "USDC on Stellar") */
-  selectedChainKey?: string
-  selectedTokenLabel?: string
-  targetCurrency?: 'BRL' | 'COP'
   walletInfo: {
     icon?: string
     name: string
   }
 }
 
-const NAV_BUTTON_CLASS = 'p-2 rounded-full transition-colors cursor-pointer'
+const MENU_ITEM_CLASS = 'flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-sm font-semibold transition-colors hover:bg-[var(--ab-bg-subtle)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ab-green)]'
 
-const CHAIN_PILL_THEME: Record<string, ChainPillChain> = Object.fromEntries(
-  Object.entries(CHAIN_MAP).map(([key, { icon, name }]) => {
-    const emoji = key === 'celo' ? '🟢' : key === 'solana' ? '🟣' : '⚫'
-    return [key, { icon: emoji, iconUrl: icon, name }]
-  }),
-)
-
-function chainPillChainFromKey(chainKey: string): ChainPillChain {
-  const prefix = chainKey.toLowerCase().split(':')[0]
-  return CHAIN_PILL_THEME[prefix] ?? CHAIN_PILL_THEME.stellar
-}
-
-const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({
+const NavBarResponsive = ({
   address,
   className = '',
   hideWalletButton = false,
@@ -72,147 +61,177 @@ const NavBarResponsive: React.FC<NavBarResponsiveProps> = ({
   isDark = false,
   labels,
   languageSelector,
-  languageSelectorMobile,
   onDisconnect,
-  onOpenChainModal,
-  onSelectCurrency,
+  onHeaderAction,
+  onHistoryClick,
   onToggleTheme,
-  onWalletClick,
-  selectedChainKey,
-  selectedTokenLabel,
-  targetCurrency,
-}) => {
-  const openInfo = () => window.open(infoUrl, '_blank', 'noopener,noreferrer')
+  walletInfo,
+}: Readonly<NavBarResponsiveProps>): React.JSX.Element => {
+  const [utilitiesOpen, setUtilitiesOpen] = useState(false)
+  const [utilityError, setUtilityError] = useState<null | string>(null)
+  const menuContainerRef = useRef<HTMLDivElement>(null)
+  const menuTriggerRef = useRef<HTMLButtonElement>(null)
   const isConnected = Boolean(address)
-  const chainPillChain = selectedChainKey ? chainPillChainFromKey(selectedChainKey) : null
-  const showChainPill = isConnected && chainPillChain && selectedTokenLabel && onOpenChainModal
+  const compactAddress = address && address.length > 10
+    ? `${address.slice(0, 4)}…${address.slice(-4)}`
+    : address
 
-  const renderActionButtons = (includeDesktopControls: boolean) => (
-    <>
-      {onToggleTheme && (
-        <button
-          aria-label="Toggle theme"
-          className={cn(NAV_BUTTON_CLASS, AB_STYLES.textSecondary)}
-          onClick={onToggleTheme}
-          type="button"
-        >
-          {isDark ? <Sun className="w-4.5 h-4.5" /> : <Moon className="w-4.5 h-4.5" />}
-        </button>
-      )}
-      {includeDesktopControls && isConnected && onSelectCurrency && targetCurrency && (
-        <div className="hidden md:block">
-          <CurrencyToggle
-            onChange={onSelectCurrency}
-            value={targetCurrency}
-          />
-        </div>
-      )}
-      {includeDesktopControls && showChainPill && chainPillChain && (
-        <ChainPill
-          chain={chainPillChain}
-          className="hidden md:flex"
-          compact
-          onClick={onOpenChainModal}
-          tokenLabel={selectedTokenLabel}
-        />
-      )}
-      {isConnected && !hideWalletButton && (
-        <button
-          aria-label={labels.walletDetailsAria}
-          className="ab-nav-balance-pill flex shrink-0 items-center justify-center rounded-full border p-1.5 cursor-pointer"
-          onClick={onWalletClick}
-          type="button"
-        >
-          <div
-            className="ab-nav-balance-dot h-2 w-2 shrink-0 rounded-full"
-          />
-        </button>
-      )}
-      {address && !hideWalletButton && (
-        <>
-          {onDisconnect && (
-            <button
-              aria-label={labels.disconnectAria ?? 'Disconnect wallet'}
-              className={cn(NAV_BUTTON_CLASS, AB_STYLES.textSecondary)}
-              onClick={() => {
-                onDisconnect().catch((err) => {
-                  if (import.meta.env.DEV) console.error(err)
-                })
-              }}
-              title={labels.disconnectTitle ?? 'Disconnect wallet'}
-              type="button"
-            >
-              <LogOut className="w-4 h-4" />
-            </button>
-          )}
-        </>
-      )}
-      <button
-        aria-label={labels.infoAriaLabel}
-        className={cn(NAV_BUTTON_CLASS, AB_STYLES.textSecondary)}
-        onClick={openInfo}
-        type="button"
-      >
-        <Info aria-hidden="true" className="w-4.5 h-4.5" />
-      </button>
-    </>
-  )
+  useEffect(() => {
+    if (!utilitiesOpen) return
+
+    const closeOnOutsidePointer = (event: PointerEvent): void => {
+      if (
+        event.target instanceof Node
+        && !menuContainerRef.current?.contains(event.target)
+      ) {
+        setUtilitiesOpen(false)
+      }
+    }
+    const closeOnEscape = (event: KeyboardEvent): void => {
+      if (event.key !== 'Escape') return
+      setUtilitiesOpen(false)
+      menuTriggerRef.current?.focus()
+    }
+    document.addEventListener('pointerdown', closeOnOutsidePointer)
+    document.addEventListener('keydown', closeOnEscape)
+    return () => {
+      document.removeEventListener('pointerdown', closeOnOutsidePointer)
+      document.removeEventListener('keydown', closeOnEscape)
+    }
+  }, [utilitiesOpen])
+
+  const openInfo = (): void => {
+    onHeaderAction?.('help')
+    window.open(infoUrl, '_blank', 'noopener,noreferrer')
+    setUtilitiesOpen(false)
+  }
+
+  const toggleTheme = (): void => {
+    onHeaderAction?.('switch')
+    onToggleTheme?.()
+    setUtilitiesOpen(false)
+  }
 
   return (
     <nav
       className={cn(
-        'ab-nav sticky top-0 z-[100] w-full border-b p-0 backdrop-blur-[6px]',
+        'ab-nav sticky top-0 z-[100] w-full border-b px-3 py-2 backdrop-blur-[6px] sm:px-5',
         className,
       )}
       role="navigation"
     >
-      {/* Mobile: full width bar - only logo and connect button */}
-      <div className="md:hidden px-4 py-1.5">
-        <div className="flex items-center justify-between">
-          <div className="flex flex-shrink-0 items-center">
-            <img
-              alt="Abroad"
-              className="h-6 w-auto"
-              src={isDark ? AbroadLogoWhite : AbroadLogoColored}
-            />
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="md:hidden">{languageSelectorMobile}</div>
-            {!isConnected && (
-              <button
-                className="rounded-xl bg-abroad-dark px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-abroad-dark-hover"
-                onClick={onWalletClick}
-                type="button"
-              >
-                {labels.connectWallet}
-              </button>
-            )}
-            {renderActionButtons(false)}
-          </div>
-        </div>
-      </div>
+      <div className="mx-auto flex min-h-12 w-full items-center justify-between gap-2">
+        <img
+          alt="Abroad"
+          className="h-6 w-auto shrink-0 sm:h-7"
+          src={isDark ? AbroadLogoWhite : AbroadLogoColored}
+        />
 
-      {/* Desktop: flat toolbar */}
-      <div className={cn('hidden md:flex items-center justify-between h-16 px-6 w-full')}>
-        <div className="flex items-center gap-4">
-          <img
-            alt="Abroad"
-            className="h-7 w-auto flex-shrink-0"
-            src={isDark ? AbroadLogoWhite : AbroadLogoColored}
-          />
-        </div>
-        <div className="flex items-center gap-3">
-          <div>{languageSelector}</div>
-          {!isConnected && (
+        <div className="flex min-w-0 items-center gap-1.5 sm:gap-2">
+          {isConnected && onHistoryClick && (
             <button
-              className="rounded-xl bg-abroad-dark px-6 py-2.5 text-sm font-bold text-white transition-colors hover:bg-abroad-dark-hover"
-              onClick={onWalletClick}
+              aria-label={labels.history ?? 'Activity'}
+              className={cn(
+                'inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-xl px-2.5 text-sm font-semibold transition-colors hover:bg-[var(--ab-bg-subtle)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ab-green)] sm:px-3',
+                AB_STYLES.textSecondary,
+              )}
+              onClick={() => {
+                onHeaderAction?.('view_activity')
+                onHistoryClick()
+              }}
               type="button"
             >
-              {labels.connectWallet}
+              <History aria-hidden="true" className="h-4.5 w-4.5" />
+              <span className="hidden sm:inline">{labels.history ?? 'Activity'}</span>
             </button>
           )}
-          {renderActionButtons(true)}
+
+          {isConnected && !hideWalletButton && (
+            <div
+              aria-label={`${labels.connected ?? 'Connected'}: ${walletInfo.name}${compactAddress ? `, ${compactAddress}` : ''}`}
+              className="inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-xl border border-[var(--ab-border)] bg-[var(--ab-bg-subtle)] px-2.5 text-xs font-semibold text-[var(--ab-text-secondary)] sm:px-3"
+              role="status"
+              title={address ?? undefined}
+            >
+              <CircleUserRound aria-hidden="true" className="h-4.5 w-4.5 shrink-0 text-[var(--ab-green)]" />
+              <span className="hidden max-w-28 truncate md:inline">{walletInfo.name}</span>
+              {compactAddress && <span className="hidden font-mono lg:inline">{compactAddress}</span>}
+            </div>
+          )}
+
+          {!isConnected && !hideWalletButton && (
+            <div
+              className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-[var(--ab-border)] bg-[var(--ab-bg-subtle)] px-3 text-xs font-semibold text-[var(--ab-text-secondary)]"
+              role="status"
+            >
+              <CircleUserRound aria-hidden="true" className="h-4.5 w-4.5" />
+              <span className="hidden sm:inline">{labels.notConnected}</span>
+            </div>
+          )}
+
+          <div className="relative" ref={menuContainerRef}>
+            <button
+              aria-expanded={utilitiesOpen}
+              aria-haspopup="menu"
+              aria-label={labels.utilities ?? 'Language, help, and account options'}
+              className={cn(
+                'inline-flex min-h-11 min-w-11 items-center justify-center rounded-xl transition-colors hover:bg-[var(--ab-bg-subtle)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ab-green)]',
+                AB_STYLES.textSecondary,
+              )}
+              onClick={() => setUtilitiesOpen((current) => {
+                onHeaderAction?.(current ? 'close' : 'open')
+                return !current
+              })}
+              ref={menuTriggerRef}
+              type="button"
+            >
+              <Menu aria-hidden="true" className="h-5 w-5" />
+            </button>
+
+            {utilitiesOpen && (
+              <div
+                aria-label={labels.utilities ?? 'Language, help, and account options'}
+                className="absolute right-0 top-[calc(100%+0.5rem)] z-[200] w-72 rounded-2xl border border-[var(--ab-border)] bg-[var(--ab-card)] p-2 shadow-xl"
+                role="menu"
+              >
+                {languageSelector && (
+                  <div className="rounded-xl px-2 py-2" role="none">
+                    <p className="mb-1 text-xs font-bold uppercase tracking-wider text-[var(--ab-text-muted)]">{labels.language ?? 'Language'}</p>
+                    {languageSelector}
+                  </div>
+                )}
+                {onToggleTheme && (
+                  <button className={cn(MENU_ITEM_CLASS, AB_STYLES.textSecondary)} onClick={toggleTheme} role="menuitem" type="button">
+                    {isDark ? <Sun aria-hidden="true" className="h-4.5 w-4.5" /> : <Moon aria-hidden="true" className="h-4.5 w-4.5" />}
+                    {isDark ? (labels.useLightTheme ?? 'Use light theme') : (labels.useDarkTheme ?? 'Use dark theme')}
+                  </button>
+                )}
+                <button className={cn(MENU_ITEM_CLASS, AB_STYLES.textSecondary)} onClick={openInfo} role="menuitem" type="button">
+                  <ExternalLink aria-hidden="true" className="h-4.5 w-4.5" />
+                  {labels.infoAriaLabel}
+                </button>
+                {address && !hideWalletButton && onDisconnect && (
+                  <button
+                    className={cn(MENU_ITEM_CLASS, 'text-red-700')}
+                    onClick={() => {
+                      setUtilityError(null)
+                      setUtilitiesOpen(false)
+                      void onDisconnect().catch(() => {
+                        setUtilityError(labels.disconnectFailed ?? 'Could not disconnect the wallet. Please try again.')
+                        setUtilitiesOpen(true)
+                      })
+                    }}
+                    role="menuitem"
+                    type="button"
+                  >
+                    <LogOut aria-hidden="true" className="h-4.5 w-4.5" />
+                    {labels.disconnectTitle ?? labels.disconnectAria ?? 'Disconnect wallet'}
+                  </button>
+                )}
+                {utilityError && <p className="px-3 py-2 text-sm text-red-700" role="alert">{utilityError}</p>}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </nav>

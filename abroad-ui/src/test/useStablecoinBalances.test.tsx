@@ -53,15 +53,16 @@ describe('useStablecoinBalances', () => {
     it('should return empty balances when no address provided', () => {
       const { result } = renderBalances(null, null)
 
-      expect(result.current.balances).toEqual(ZERO_BALANCES)
+      expect(result.current.balances).toBeNull()
       expect(result.current.isLoading).toBe(false)
       expect(result.current.error).toBe(null)
+      expect(result.current.preference.kind).toBe('unavailable')
     })
 
     it('should return empty balances when address is undefined', () => {
       const { result } = renderBalances(undefined, 'stellar:pubnet')
 
-      expect(result.current.balances).toEqual(ZERO_BALANCES)
+      expect(result.current.balances).toBeNull()
     })
   })
 
@@ -74,8 +75,8 @@ describe('useStablecoinBalances', () => {
         'solana:mainnet',
         'solana',
       )
-      expect(result.current.balances.USDC).toBe('200.00')
-      expect(result.current.balances.USDT).toBe('50.00')
+      expect(result.current.balances?.USDC).toBe('200.00')
+      expect(result.current.balances?.USDT).toBe('50.00')
     })
 
     it('should handle Solana fetch error', async () => {
@@ -87,7 +88,9 @@ describe('useStablecoinBalances', () => {
         expect(result.current.isLoading).toBe(false)
       })
 
-      expect(result.current.balances).toEqual(ZERO_BALANCES)
+      expect(result.current.balances).toBeNull()
+      expect(result.current.error).toBe('Balance unavailable for the selected wallet and network')
+      expect(result.current.preference.kind).toBe('unavailable')
     })
   })
 
@@ -100,8 +103,8 @@ describe('useStablecoinBalances', () => {
         'eip155:42220',
         'evm',
       )
-      expect(result.current.balances.cUSD).toBe('100.00')
-      expect(result.current.balances.USDC).toBe('300.00')
+      expect(result.current.balances?.cUSD).toBe('100.00')
+      expect(result.current.balances?.USDC).toBe('300.00')
     })
   })
 
@@ -155,13 +158,13 @@ describe('useStablecoinBalances', () => {
         expect(result.current.isLoading).toBe(false)
       })
 
-      const initialBalance = result.current.balances.USDC
+      const initialBalance = result.current.balances?.USDC
 
       await act(async () => {
         await result.current.refresh()
       })
 
-      expect(result.current.balances.USDC).not.toBe(initialBalance)
+      expect(result.current.balances?.USDC).not.toBe(initialBalance)
     })
 
     it('should clear balances when address becomes null', async () => {
@@ -178,12 +181,12 @@ describe('useStablecoinBalances', () => {
         expect(result.current.isLoading).toBe(false)
       })
 
-      expect(result.current.balances.USDC).toBe('100.00')
+      expect(result.current.balances?.USDC).toBe('100.00')
 
       rerender({ address: null, chainId: null })
 
       await waitFor(() => {
-        expect(result.current.balances).toEqual(ZERO_BALANCES)
+        expect(result.current.balances).toBeNull()
       })
     })
   })
@@ -231,7 +234,7 @@ describe('useStablecoinBalances', () => {
         expect(result.current.isLoading).toBe(false)
       })
 
-      expect(result.current.balances.USDC).toBe('200.00')
+      expect(result.current.balances?.USDC).toBe('200.00')
     })
   })
 })

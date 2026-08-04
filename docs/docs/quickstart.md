@@ -55,7 +55,12 @@ curl -X POST https://api.abroad.finance/quote \
 ```json
 {
   "quote_id": "550e8400-e29b-41d4-a716-446655440000",
-  "expiration_time": 1732520000,
+  "expiration_time": 1893456000000,
+  "fee": {
+    "amount": "0.5",
+    "currency": "USDC",
+    "type": "combined"
+  },
   "value": 100.5
 }
 ```
@@ -64,7 +69,7 @@ curl -X POST https://api.abroad.finance/quote \
 </Tabs>
 
 :::tip
-`value` is the crypto amount (USDC) you need to send before the `expiration_time` (epoch ms). Copy the `quote_id` for the next step.
+`value` is the total crypto amount (USDC) you need to send before `expiration_time` (Unix epoch milliseconds). `fee.amount` is already included in `value`; do not add it again. Copy the `quote_id` for the next step.
 :::
 
 ## 2) Accept the transaction

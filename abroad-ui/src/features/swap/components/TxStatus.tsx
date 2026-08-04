@@ -1,383 +1,523 @@
 import { useTranslate } from '@tolgee/react'
-import { Check } from 'lucide-react'
-import React, {
-  memo, useCallback, useEffect, useState,
-} from 'react'
-
-import { TransactionStatus as ApiStatus, getTransactionStatus, _36EnumsTargetCurrency as TargetCurrency } from '@/api'
-import { useWebSocketSubscription } from '@/contexts/WebSocketContext'
-import { Button } from '@/shared/components/Button'
-import { IconAnimated } from '@/shared/components/IconAnimated'
 import {
-  CHAIN_ICON_MAP, CURRENCY_FLAG_URL, RAIL_LOGO_MAP, TOKEN_ICONS,
-} from '@/shared/constants'
-import { useWalletAuth } from '@/shared/hooks/useWalletAuth'
+  Check,
+  CircleAlert,
+  Clock3,
+  Copy,
+  ExternalLink,
+  LoaderCircle,
+  RefreshCw,
+} from 'lucide-react'
+import React, {
+  memo, useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
+import { Link } from 'react-router-dom'
+
+import type { PaymentAuthorizationState } from '@/features/swap/model/paymentIntent'
+
+import { ActivityStatusPill } from '@/features/activity/components/ActivityStatusPill'
+import { useConsumerActivityDetail } from '@/features/activity/hooks/useConsumerActivity'
+import {
+  activityStatusPresentation,
+  formatActivityDateTime,
+  formatActivityMoney,
+} from '@/features/activity/shared/activityPresentation'
+import { canRetryWalletAuthorization } from '@/features/swap/model/paymentIntent'
+import {
+  bucketElapsedMilliseconds,
+  type ConsumerUxDimensions,
+  type ConsumerUxEventName,
+  getCheckoutTelemetrySessionKey,
+  normalizeConsumerUxRail,
+  recordConsumerUxEvent,
+} from '@/observability/consumerUxTelemetry'
+import { ABROAD_SUPPORT_URL } from '@/shared/constants'
 import { cn } from '@/shared/utils'
 
-// S6478: component defined at module scope (not inside parent)
-const DetailRow = ({ className, label, value }: { className?: string, label: string, value: React.ReactNode }) => (
-  <div className={cn('flex items-center justify-between border-b border-ab-border pb-[17px]', className)}>
-    <span className="text-base font-normal text-ab-text-3">{label}</span>
-    <span className="text-base font-medium text-ab-text">{value}</span>
-  </div>
-)
-
-// S7776: Set.has() is O(1) vs Array.includes() O(n); defined at module scope to avoid re-creation per render
-const TERMINAL_STATUSES = new Set<ApiStatus>([
-  'PAYMENT_COMPLETED',
-  'PAYMENT_EXPIRED',
-  'PAYMENT_FAILED',
-  'WRONG_AMOUNT',
-])
-
-export type TxStatusDetails = {
-  accountNumber: string
-  cryptoCurrency: string
-  network: string
-  rail: string
-  sourceAmount: string
-  targetAmount: string
-  transferFeeDisplay: string
+type ProgressStep = {
+  label: string
+  state: ProgressStepState
 }
+
+type ProgressStepState = 'current' | 'done' | 'pending' | 'problem'
+type Translate = (key: string, fallback: string) => string
 
 interface TxStatusProps {
+  authorizationState: null | PaymentAuthorizationState
   onNewTransaction: () => void
-  onRetry: () => void
-  targetAmount: string
-  targetCurrency: TargetCurrency
+  onResumeAuthorization: () => Promise<void>
   transactionId: null | string
-  txStatusDetails?: TxStatusDetails
 }
 
-// UI status mapping
-type UiStatus = 'accepted' | 'denied' | 'inProgress'
+const isTerminalStatus = (status: null | string): boolean => (
+  status === 'PAYMENT_COMPLETED'
+  || status === 'PAYMENT_EXPIRED'
+  || status === 'PAYMENT_FAILED'
+  || status === 'WRONG_AMOUNT'
+)
+
+const telemetryStatus = (
+  status: null | string,
+): NonNullable<ConsumerUxDimensions['status']> => {
+  switch (status) {
+    case 'AWAITING_PAYMENT': return 'PENDING'
+    case null: return 'UNKNOWN'
+    case 'PAYMENT_COMPLETED': return 'COMPLETED'
+    case 'PAYMENT_EXPIRED': return 'EXPIRED'
+    case 'PAYMENT_FAILED': return 'FAILED'
+    case 'PROCESSING_PAYMENT': return 'PROCESSING'
+    default: return 'UNKNOWN'
+  }
+}
+
+const telemetryTerminalOutcome = (
+  status: null | string,
+): ConsumerUxDimensions['terminal_outcome'] => {
+  switch (status) {
+    case null: return undefined
+    case 'PAYMENT_COMPLETED': return 'completed'
+    case 'PAYMENT_EXPIRED': return 'expired'
+    case 'PAYMENT_FAILED': return 'failed'
+    case 'WRONG_AMOUNT': return 'manual_review'
+    default: return undefined
+  }
+}
+
+const localAuthorizationMessage = (
+  authorization: null | PaymentAuthorizationState,
+  translate: Translate,
+): null | { body: string, title: string, tone: 'attention' | 'neutral' } => {
+  switch (authorization?.kind) {
+    case 'accepted':
+      return {
+        body: translate('tx_status.authorization.accepted.body', 'Your Abroad request is saved. Resume the wallet authorization for this same request.'),
+        title: translate('tx_status.authorization.accepted.title', 'Payment request created'),
+        tone: 'neutral',
+      }
+    case 'authorizing':
+      return {
+        body: translate('tx_status.authorization.authorizing.body', 'Review the exact amount and network in your wallet. Closing the wallet does not create another Abroad request.'),
+        title: translate('tx_status.authorization.authorizing.title', 'Waiting for wallet authorization'),
+        tone: 'neutral',
+      }
+    case 'broadcast-confirmed':
+      return {
+        body: translate('tx_status.authorization.confirmed.body', 'The wallet returned an on-chain reference. Abroad is confirming the transfer and local payout.'),
+        title: translate('tx_status.authorization.confirmed.title', 'Transfer submitted'),
+        tone: 'neutral',
+      }
+    case 'broadcast-unknown':
+      return {
+        body: translate('tx_status.authorization.unknown.body', 'The transfer may have been submitted. Do not send it again while Abroad reconciles the network and payment state.'),
+        title: translate('tx_status.authorization.unknown.title', 'Transfer outcome is being checked'),
+        tone: 'attention',
+      }
+    case 'wallet-rejected':
+      return {
+        body: translate('tx_status.authorization.rejected.body', 'No funding proof was received. Your Abroad request is saved, so you can resume without creating a duplicate.'),
+        title: translate('tx_status.authorization.rejected.title', 'Wallet authorization cancelled'),
+        tone: 'attention',
+      }
+    case undefined:
+    default:
+      return null
+  }
+}
+
+const progressSteps = (
+  authorization: null | PaymentAuthorizationState,
+  status: null | string,
+  translate: Translate,
+): ProgressStep[] => {
+  const broadcastKnown = authorization?.kind === 'broadcast-confirmed'
+    || status === 'PROCESSING_PAYMENT'
+    || status === 'PAYMENT_COMPLETED'
+  const walletProblem = authorization?.kind === 'wallet-rejected'
+  const broadcastUnknown = authorization?.kind === 'broadcast-unknown'
+  const localPayoutDone = status === 'PAYMENT_COMPLETED'
+  const localPayoutProblem = status === 'PAYMENT_FAILED'
+    || status === 'PAYMENT_EXPIRED'
+    || status === 'WRONG_AMOUNT'
+
+  return [
+    { label: translate('tx_status.step.request', 'Payment request created'), state: 'done' },
+    {
+      label: translate('tx_status.step.authorization', 'Wallet authorization'),
+      state: walletProblem
+        ? 'problem'
+        : authorization?.kind === 'accepted'
+          ? 'current'
+          : authorization
+            ? 'done'
+            : 'pending',
+    },
+    {
+      label: translate('tx_status.step.transfer', 'Stablecoin transfer confirmation'),
+      state: broadcastUnknown
+        ? 'problem'
+        : broadcastKnown
+          ? 'done'
+          : walletProblem || authorization?.kind === 'accepted'
+            ? 'pending'
+            : 'current',
+    },
+    {
+      label: translate('tx_status.step.payout', 'Local payout'),
+      state: localPayoutDone
+        ? 'done'
+        : localPayoutProblem
+          ? 'problem'
+          : status === 'PROCESSING_PAYMENT'
+            ? 'current'
+            : 'pending',
+    },
+  ]
+}
+
+const StepIcon = ({ state }: { state: ProgressStepState }): React.JSX.Element => {
+  if (state === 'done') {
+    return <Check aria-hidden="true" className="h-5 w-5 text-[var(--ab-green)]" />
+  }
+  if (state === 'problem') {
+    return <CircleAlert aria-hidden="true" className="h-5 w-5 text-amber-700" />
+  }
+  if (state === 'current') {
+    return <LoaderCircle aria-hidden="true" className="h-5 w-5 animate-spin text-[var(--ab-green)] motion-reduce:animate-none" />
+  }
+  return <span aria-hidden="true" className="h-3 w-3 rounded-full border-2 border-[var(--ab-border)]" />
+}
 
 const TxStatus = ({
+  authorizationState,
   onNewTransaction,
-  onRetry,
-  targetAmount,
-  targetCurrency,
+  onResumeAuthorization,
   transactionId,
-  txStatusDetails,
-}: TxStatusProps): React.JSX.Element => {
+}: Readonly<TxStatusProps>): React.JSX.Element => {
   const { t } = useTranslate()
-  const { wallet } = useWalletAuth()
-  const [status, setStatus] = useState<UiStatus>('inProgress')
-  const [apiStatus, setApiStatus] = useState<ApiStatus | undefined>(undefined)
-  const [error, setError] = useState<null | string>(null)
-  // no local socket, using app-wide provider
-
-  const mapStatus = useCallback((api?: ApiStatus): UiStatus => {
-    switch (api) {
-      case 'PAYMENT_COMPLETED': return 'accepted'
-
-      case 'PAYMENT_EXPIRED':
-      case 'PAYMENT_FAILED':
-      case 'WRONG_AMOUNT': return 'denied'
-
-      case 'AWAITING_PAYMENT':
-      case 'PROCESSING_PAYMENT':
-      case undefined:
-      default: return 'inProgress'
-    }
-  }, [])
-
-  const getAmount = (currency: TargetCurrency, amount: string) => {
-    if (currency === TargetCurrency.BRL) {
-      return `R$${amount}`
-    }
-    else if (currency === TargetCurrency.COP) {
-      return `$${amount}`
-    }
-    return null
-  }
-
-  const handleTxEvent = useCallback((payload: { id?: string, status?: ApiStatus }) => {
-    if (!transactionId || !wallet?.address || !wallet?.chainId) return
-    if (!payload || payload.id !== transactionId) return
-    const apiStatusValue = payload.status
-    setApiStatus(apiStatusValue)
-    setStatus(mapStatus(apiStatusValue))
-  }, [
-    wallet?.address,
-    wallet?.chainId,
-    mapStatus,
-    transactionId,
-  ])
-
-  useWebSocketSubscription('transaction.created', handleTxEvent)
-  useWebSocketSubscription('transaction.updated', handleTxEvent)
-  useWebSocketSubscription('connect_error', (err) => {
-    setError(err.message || t('errors.ws_connection', 'WS connection error'))
-  })
+  const activity = useConsumerActivityDetail(transactionId ?? '')
+  const [copyState, setCopyState] = useState<'copied' | 'error' | 'idle'>('idle')
+  const [now, setNow] = useState(() => Date.now())
+  const telemetrySessionKeyRef = useRef(getCheckoutTelemetrySessionKey())
+  const crossedDelayBucketsRef = useRef(new Set<string>())
+  const pageExitRecordedRef = useRef(false)
+  const receipt = activity.receipt
+  const locale = document.documentElement.lang || navigator.language || 'en-US'
+  const acceptedAt = receipt ? new Date(receipt.timestamps.acceptedAt).getTime() : null
+  const nonterminal = !isTerminalStatus(receipt?.status ?? null)
+  const isDelayed = acceptedAt !== null
+    && Number.isFinite(acceptedAt)
+    && nonterminal
+    && now - acceptedAt >= 180_000
+  const presentation = receipt
+    ? activityStatusPresentation(receipt.status, (key, fallback) => t(key, fallback))
+    : null
+  const translate = useCallback((key: string, fallback: string): string => t(key, fallback), [t])
+  const authorizationMessage = localAuthorizationMessage(authorizationState, translate)
+  const steps = useMemo(
+    () => progressSteps(authorizationState, receipt?.status ?? null, translate),
+    [
+      authorizationState,
+      receipt?.status,
+      translate,
+    ],
+  )
+  const canResume = Boolean(
+    authorizationState && canRetryWalletAuthorization(authorizationState),
+  )
+  const recordProgressEvent = useCallback((
+    name: ConsumerUxEventName,
+    dimensions?: ConsumerUxDimensions,
+    onceSuffix?: string,
+  ): void => {
+    const sessionKey = telemetrySessionKeyRef.current
+    if (!sessionKey) return
+    recordConsumerUxEvent({
+      dimensions: {
+        rail: normalizeConsumerUxRail(receipt?.quote.paymentMethod),
+        status: telemetryStatus(receipt?.status ?? null),
+        step: 'progress',
+        ...dimensions,
+      },
+      name,
+      session: { key: sessionKey, kind: 'checkout' },
+    }, onceSuffix ? { onceKey: `${sessionKey}:${onceSuffix}` } : undefined)
+  }, [receipt?.quote.paymentMethod, receipt?.status])
 
   useEffect(() => {
-    setApiStatus(undefined)
-    setStatus('inProgress')
+    if (!nonterminal) return
+    const interval = window.setInterval(() => setNow(Date.now()), 30_000)
+    return () => window.clearInterval(interval)
+  }, [nonterminal])
+
+  useEffect(() => {
+    crossedDelayBucketsRef.current.clear()
+    pageExitRecordedRef.current = false
   }, [transactionId])
 
-  // REST polling fallback when WebSocket doesn't deliver (e.g. timeout, disconnect)
-  const pollIntervalMs = 3000
-  const maxPollAttempts = 60 // 3 minutes
-
   useEffect(() => {
-    if (!transactionId || status !== 'inProgress') return
-
-    const isTerminal = (s?: ApiStatus) => s != null && TERMINAL_STATUSES.has(s)
-    let cancelled = false
-    let attempts = 0
-
-    const poll = async () => {
-      if (cancelled || attempts >= maxPollAttempts) return
-
-      attempts += 1
-      const result = await getTransactionStatus(transactionId)
-      if (cancelled) return
-      if (!result.data || result.status !== 200) {
-        scheduleNext()
-        return
-      }
-
-      const { status: apiStatusValue } = result.data
-      if (isTerminal(apiStatusValue)) {
-        setError(null) // clear WebSocket error when we get status via REST
-        setApiStatus(apiStatusValue)
-        setStatus(mapStatus(apiStatusValue))
-        return
-      }
-
-      scheduleNext()
-    }
-
-    let timeoutId: ReturnType<typeof setTimeout> | undefined
-    const scheduleNext = () => {
-      if (cancelled || attempts >= maxPollAttempts) return
-      timeoutId = setTimeout(poll, pollIntervalMs)
-    }
-
-    void poll()
-
-    return () => {
-      cancelled = true
-      if (timeoutId != null) clearTimeout(timeoutId)
-    }
+    if (!transactionId) return
+    recordProgressEvent('processing_state_viewed', {
+      copy_variant: isDelayed ? 'delayed' : 'standard',
+      terminal_outcome: telemetryTerminalOutcome(receipt?.status ?? null),
+    }, `processing-view:${telemetryStatus(receipt?.status ?? null)}:${isDelayed ? 'delayed' : 'standard'}`)
   }, [
+    isDelayed,
+    receipt?.status,
+    recordProgressEvent,
     transactionId,
-    status,
-    mapStatus,
   ])
 
-  const renderIcon = () => {
-    switch (status) {
-      case 'accepted':
-        return (
-          <div className="relative flex items-center justify-center">
-            <div className="absolute inset-0 rounded-full bg-ab-green opacity-20 blur-[12px]" />
-            <div
-              className={cn(
-                'relative flex h-20 w-20 shrink-0 items-center justify-center rounded-full shadow-[0px_0px_20px_0px_rgba(16,185,129,0.3)]',
-                'bg-ab-green',
-              )}
-            >
-              <Check className="h-7 w-9 text-white" strokeWidth={3} />
-            </div>
-          </div>
-        )
-      case 'denied':
-        return (
-          <IconAnimated
-            icon="Denied"
-            key={`icon-${status}`}
-            loop={false}
-            play
-            size={150}
-          />
-        )
-      case 'inProgress':
-        return (
-          <IconAnimated
-            className=""
-            colors="primary:#356E6A,secondary:#26A17B"
-            icon="Coins"
-            key={`icon-${status}`}
-            loop
-            play
-            size={150}
-          />
-        )
+  useEffect(() => {
+    if (!transactionId || acceptedAt === null || !Number.isFinite(acceptedAt) || !nonterminal) return
+    const elapsed = now - acceptedAt
+    const thresholds = [
+      30_000,
+      60_000,
+      120_000,
+      180_000,
+    ] as const
+    thresholds.forEach((threshold) => {
+      const key = String(threshold)
+      if (elapsed < threshold || crossedDelayBucketsRef.current.has(key)) return
+      crossedDelayBucketsRef.current.add(key)
+      recordProgressEvent('processing_delay_bucket_crossed', {
+        copy_variant: threshold >= 180_000 ? 'delayed' : 'standard',
+        elapsed_bucket: bucketElapsedMilliseconds(threshold),
+      })
+    })
+  }, [
+    acceptedAt,
+    nonterminal,
+    now,
+    recordProgressEvent,
+    transactionId,
+  ])
+
+  useEffect(() => {
+    if (!transactionId || !nonterminal) return
+    const recordPageExit = (): void => {
+      if (pageExitRecordedRef.current) return
+      pageExitRecordedRef.current = true
+      recordProgressEvent('processing_exit', {
+        action: 'close',
+        elapsed_bucket: acceptedAt === null
+          ? 'unknown'
+          : bucketElapsedMilliseconds(Date.now() - acceptedAt),
+      })
+    }
+    window.addEventListener('pagehide', recordPageExit)
+    return () => window.removeEventListener('pagehide', recordPageExit)
+  }, [
+    acceptedAt,
+    nonterminal,
+    recordProgressEvent,
+    transactionId,
+  ])
+
+  const copyAbroadId = async (): Promise<void> => {
+    if (!transactionId) return
+    try {
+      await navigator.clipboard.writeText(transactionId)
+      setCopyState('copied')
+      if (completed) {
+        recordProgressEvent('receipt_reference_copied', {
+          action: 'copy',
+          outcome: 'success',
+          reference_available: true,
+          step: 'receipt',
+        })
+      }
+      window.setTimeout(() => setCopyState('idle'), 2_000)
+    }
+    catch {
+      setCopyState('error')
+      if (completed) {
+        recordProgressEvent('receipt_reference_copied', {
+          action: 'copy',
+          outcome: 'error',
+          reference_available: true,
+          step: 'receipt',
+        })
+      }
     }
   }
 
-  if (status === 'accepted' && txStatusDetails) {
-    const merchant = txStatusDetails.accountNumber || '—'
-    const amountStr = getAmount(targetCurrency, targetAmount)
-    const amountDisplay = amountStr ?? `$${targetAmount} ${targetCurrency}`
-
+  if (!transactionId) {
     return (
-      <div className="flex flex-1 flex-col items-center justify-center w-full max-w-[448px]">
-        <div className="flex w-full flex-col items-center">
-          {/* Success icon – Figma 17:93 */}
-          <div className="mb-8">{renderIcon()}</div>
-
-          {/* Title – Figma 17:50 */}
-          <h1 className="mb-2 text-center text-[30px] font-bold leading-9 text-ab-text">
-            {t('tx_status.payment_confirmed', 'Payment Confirmed!')}
-          </h1>
-
-          {/* Subtitle – Figma 17:53 */}
-          <p className="mb-10 text-center text-base font-medium text-ab-text-3">
-            {t('tx_status.settled_via', 'Settled via {rail}', { rail: txStatusDetails.rail })}
-          </p>
-
-          {/* Transaction details card – Figma 17:55 */}
-          <div className="mb-8 w-full overflow-hidden rounded-[24px] border border-ab-border bg-ab-input shadow-[0px_1px_2px_0px_rgba(0,0,0,0.05)]">
-            <div className="flex flex-col gap-5 p-6">
-              <DetailRow
-                label={t('tx_status.merchant', 'Merchant')}
-                value={merchant}
-              />
-              <DetailRow
-                label={t('tx_status.amount', 'Amount')}
-                value={<span className="font-bold">{amountDisplay}</span>}
-              />
-              <DetailRow
-                label={t('tx_status.deducted', 'Deducted')}
-                value={(
-                  <span className="flex items-center gap-1.5 font-bold">
-                    $
-                    {txStatusDetails.sourceAmount}
-                    <img alt={txStatusDetails.cryptoCurrency} className="h-3.5 w-3.5" src={TOKEN_ICONS[txStatusDetails.cryptoCurrency] ?? TOKEN_ICONS.USDC} />
-                  </span>
-                )}
-              />
-              <DetailRow
-                label={t('tx_status.fee', 'Fee')}
-                value={txStatusDetails.transferFeeDisplay}
-              />
-              <DetailRow
-                label={t('tx_status.network', 'Network')}
-                value={(
-                  <span className="flex items-center gap-2">
-                    {CHAIN_ICON_MAP[txStatusDetails.network]
-                      ? (
-                          <img
-                            alt={txStatusDetails.network}
-                            className="h-4 w-4 shrink-0 object-contain"
-                            src={CHAIN_ICON_MAP[txStatusDetails.network]}
-                          />
-                        )
-                      : (
-                          <span className="h-4 w-4 shrink-0 rounded-full bg-ab-text" />
-                        )}
-                    <span>{txStatusDetails.network || 'Stellar'}</span>
-                  </span>
-                )}
-              />
-              <div className="flex items-center justify-between">
-                <span className="text-base font-normal text-ab-text-3">{t('tx_status.rail', 'Rail')}</span>
-                <span className="flex items-center gap-2 text-base font-medium text-ab-text">
-                  {CURRENCY_FLAG_URL[targetCurrency] && (
-                    <img
-                      alt={targetCurrency}
-                      className="h-4 w-4 shrink-0 object-contain"
-                      src={CURRENCY_FLAG_URL[targetCurrency]}
-                    />
-                  )}
-                  {RAIL_LOGO_MAP[targetCurrency] && (
-                    <img
-                      alt={txStatusDetails.rail}
-                      className="h-4 w-auto max-w-[48px] shrink-0 object-contain"
-                      src={RAIL_LOGO_MAP[targetCurrency]}
-                    />
-                  )}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Done button – Figma 17:96 */}
-          <Button
-            className="w-full rounded-2xl bg-ab-green py-4 text-base font-semibold text-white shadow-[0px_10px_15px_-3px_rgba(16,185,129,0.2),0px_4px_6px_-4px_rgba(16,185,129,0.2)] hover:opacity-95"
-            onClick={onNewTransaction}
-            type="button"
-          >
-            {t('tx_status.action.done', 'Done')}
-          </Button>
-        </div>
-      </div>
+      <section className="mx-auto w-full max-w-lg rounded-3xl border border-red-200 bg-red-50 p-6 text-red-900" role="alert">
+        <h1 className="text-xl font-bold">{t('tx_status.missing_id', 'Payment request unavailable')}</h1>
+        <p className="mt-2 text-sm">{t('tx_status.missing_id_body', 'No Abroad ID was recorded, so no payment completion is being claimed.')}</p>
+        <button className="mt-5 min-h-11 rounded-xl border border-current px-4 text-sm font-bold" onClick={onNewTransaction} type="button">
+          {t('tx_status.action.return', 'Return to payment')}
+        </button>
+      </section>
     )
   }
 
-  // inProgress and denied states
-  const renderStatusText = () => {
-    switch (status) {
-      case 'accepted':
-        return t('tx_status.accepted', 'Withdrawal Completed')
-      case 'denied':
-        if (apiStatus === 'PAYMENT_EXPIRED') {
-          return t('tx_status.expired', 'Transaction Expired')
-        }
-        return t('tx_status.denied', 'Transaction Denied')
-      case 'inProgress':
-        return t('tx_status.in_progress', 'Processing Transaction')
-    }
-  }
-
-  const renderSubtitle = () => {
-    switch (status) {
-      case 'accepted':
-        return (
-          <>
-            {t('tx_status.accepted.super', 'Great!')}
-            <br />
-            {t('tx_status.accepted.message', 'Everything went well and your withdrawal was successful.')}
-          </>
-        )
-      case 'denied':
-        if (apiStatus === 'PAYMENT_EXPIRED') {
-          return <>{t('tx_status.expired.message', 'The time to complete the payment has expired and the request was cancelled. You can create a new transaction when ready.')}</>
-        }
-        return <>{t('tx_status.denied.message', 'The request has been denied and your funds have been returned. You can try again later.')}</>
-      case 'inProgress':
-        return (
-          <>
-            {t('tx_status.in_progress.processing', 'Your request is being processed.')}
-            <br />
-            {t('tx_status.in_progress.wait', 'This will take a few seconds.')}
-          </>
-        )
-    }
-  }
+  const completed = receipt?.status === 'PAYMENT_COMPLETED'
+  const terminal = isTerminalStatus(receipt?.status ?? null)
+  const heading = completed
+    ? t('tx_status.completed', 'Payment completed')
+    : terminal
+      ? presentation?.label ?? t('tx_status.tracking', 'Tracking payment')
+      : authorizationMessage?.title
+        ?? (isDelayed
+          ? t('tx_status.delayed', 'Still being checked')
+          : presentation?.label ?? t('tx_status.tracking', 'Tracking payment'))
+  const body = completed
+    ? t('tx_status.completed_body', 'The local payout is confirmed. Open the receipt for its authoritative references and proof status.')
+    : terminal
+      ? presentation?.description ?? t('tx_status.tracking_body', 'Abroad is loading the latest authoritative payment state.')
+      : authorizationMessage?.body
+        ?? (isDelayed
+          ? t('tx_status.delayed_body', 'This payment is still active. Do not submit it again; you can leave this page and continue tracking it in Activity.')
+          : presentation?.description ?? t('tx_status.tracking_body', 'Abroad is loading the latest authoritative payment state.'))
 
   return (
-    <div className="flex flex-1 flex-col items-center justify-center w-full space-y-6">
-      {error && <div className="text-ab-error text-sm">{error}</div>}
+    <article aria-busy={activity.isRefreshing} aria-live="polite" className="mx-auto flex w-full max-w-2xl flex-col gap-5 py-4">
+      <section className="rounded-3xl border border-[var(--ab-border)] bg-[var(--ab-card)] p-5 shadow-sm sm:p-7">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            {presentation && <ActivityStatusPill label={presentation.label} tone={presentation.tone} />}
+            <h1 className="mt-3 text-2xl font-bold text-[var(--ab-text)] sm:text-3xl">
+              {heading}
+            </h1>
+            <p className="mt-2 max-w-xl text-sm leading-6 text-[var(--ab-text-muted)]">
+              {body}
+            </p>
+          </div>
+          <button
+            aria-label={t('tx_status.refresh', 'Check payment status again')}
+            className="inline-flex min-h-11 items-center justify-center gap-2 self-start rounded-xl border border-[var(--ab-border)] px-4 text-sm font-semibold disabled:opacity-60"
+            disabled={activity.isRefreshing}
+            onClick={() => void activity.refresh()}
+            type="button"
+          >
+            <RefreshCw aria-hidden="true" className={cn('h-4 w-4', activity.isRefreshing && 'animate-spin motion-reduce:animate-none')} />
+            {activity.isRefreshing ? t('activity.refreshing', 'Refreshing…') : t('tx_status.check_again', 'Check again')}
+          </button>
+        </div>
 
-      <div
-        className="relative w-full max-w-md min-h-[60vh] rounded-2xl bg-ab-card/5 p-6 backdrop-blur-xl flex flex-col items-center justify-center space-y-4"
-        id="bg-container"
-      >
-        <div>{renderIcon()}</div>
-        <div className="text-center text-2xl font-bold text-ab-text">
-          {renderStatusText()}
+        <div className="mt-6 rounded-2xl bg-[var(--ab-bg-subtle)] p-4">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-xs font-bold uppercase tracking-wider text-[var(--ab-text-muted)]">{t('activity.reference.abroad', 'Abroad ID')}</p>
+              <p className="mt-1 break-all font-mono text-xs text-[var(--ab-text-secondary)]">{transactionId}</p>
+            </div>
+            <button aria-label={t('tx_status.copy_id', 'Copy Abroad ID')} className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-xl hover:bg-[var(--ab-card)]" onClick={() => void copyAbroadId()} type="button">
+              {copyState === 'copied' ? <Check aria-hidden="true" className="h-4 w-4 text-[var(--ab-green)]" /> : <Copy aria-hidden="true" className="h-4 w-4" />}
+            </button>
+          </div>
+          {copyState === 'error' && <p className="mt-2 text-sm text-red-700" role="alert">{t('tx_status.copy_failed', 'Could not copy the Abroad ID. You can select it manually.')}</p>}
         </div>
-        <div className="text-center text-ab-text-3">
-          {renderSubtitle()}
+
+        {receipt && (
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <div className="rounded-2xl border border-[var(--ab-border)] p-4">
+              <p className="text-xs font-bold uppercase tracking-wider text-[var(--ab-text-muted)]">{t('activity.detail.source_amount', 'You sent')}</p>
+              <p className="mt-1 text-lg font-bold tabular-nums">{formatActivityMoney(receipt.quote.sourceAmount, receipt.quote.sourceCurrency, locale)}</p>
+            </div>
+            <div className="rounded-2xl border border-[var(--ab-border)] p-4">
+              <p className="text-xs font-bold uppercase tracking-wider text-[var(--ab-text-muted)]">{t('activity.detail.target_amount', 'Recipient amount')}</p>
+              <p className="mt-1 text-lg font-bold tabular-nums">{formatActivityMoney(receipt.quote.targetAmount, receipt.quote.targetCurrency, locale)}</p>
+            </div>
+          </div>
+        )}
+
+        <ol aria-label={t('tx_status.progress', 'Payment progress')} className="mt-6 space-y-3">
+          {steps.map(step => (
+            <li className="flex min-h-11 items-center gap-3 rounded-xl border border-[var(--ab-border)] px-4" key={step.label}>
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center"><StepIcon state={step.state} /></span>
+              <span className={cn('text-sm font-semibold', step.state === 'pending' && 'text-[var(--ab-text-muted)]')}>{step.label}</span>
+              <span className="sr-only">
+                {step.state === 'done'
+                  ? t('tx_status.step_state.done', 'Completed')
+                  : step.state === 'current'
+                    ? t('tx_status.step_state.current', 'Current step')
+                    : step.state === 'problem'
+                      ? t('tx_status.step_state.problem', 'Needs attention')
+                      : t('tx_status.step_state.pending', 'Pending')}
+              </span>
+            </li>
+          ))}
+        </ol>
+
+        <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-[var(--ab-text-muted)]">
+          <span className="inline-flex items-center gap-1.5">
+            <Clock3 aria-hidden="true" className="h-4 w-4" />
+            {t('tx_status.safe_leave', 'You may leave this page. Activity will keep the payment available.')}
+          </span>
+          {activity.lastUpdatedAt && (
+            <span>
+              {t('tx_status.last_checked', 'Last checked')}
+              :
+              {' '}
+              {formatActivityDateTime(activity.lastUpdatedAt.toISOString(), locale, t('activity.detail.unavailable', 'Unavailable'))}
+            </span>
+          )}
         </div>
+
+        {(activity.status === 'error' || activity.status === 'stale') && (
+          <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900" role="alert">
+            {activity.error ?? t('tx_status.status_unavailable', 'The latest status is unavailable. The Abroad ID remains saved.')}
+          </p>
+        )}
+      </section>
+
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+        {canResume && (
+          <button className="min-h-11 rounded-xl bg-[var(--ab-green)] px-5 text-sm font-bold text-white disabled:opacity-60" disabled={activity.isRefreshing} onClick={() => void onResumeAuthorization()} type="button">
+            {t('tx_status.resume_authorization', 'Resume wallet authorization')}
+          </button>
+        )}
+        <Link
+          className="inline-flex min-h-11 items-center justify-center rounded-xl border border-[var(--ab-border)] bg-[var(--ab-card)] px-5 text-sm font-bold"
+          onClick={() => recordProgressEvent('processing_exit', {
+            action: 'view_activity',
+            elapsed_bucket: acceptedAt === null ? 'unknown' : bucketElapsedMilliseconds(now - acceptedAt),
+            terminal_outcome: telemetryTerminalOutcome(receipt?.status ?? null),
+          })}
+          to={`/activity/${encodeURIComponent(transactionId)}`}
+        >
+          {completed ? t('tx_status.view_receipt', 'View receipt') : t('tx_status.view_activity', 'View in Activity')}
+        </Link>
+        <a
+          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[var(--ab-border)] bg-[var(--ab-card)] px-5 text-sm font-bold"
+          href={ABROAD_SUPPORT_URL}
+          onClick={() => recordProgressEvent('help_opened', {
+            action: 'help',
+            copy_variant: isDelayed ? 'delayed' : 'standard',
+            elapsed_bucket: acceptedAt === null ? 'unknown' : bucketElapsedMilliseconds(now - acceptedAt),
+            terminal_outcome: telemetryTerminalOutcome(receipt?.status ?? null),
+          })}
+          rel="noopener noreferrer"
+          target="_blank"
+        >
+          {t('tx_status.support', 'Contact support')}
+          <ExternalLink aria-hidden="true" className="h-4 w-4" />
+        </a>
+        {terminal && (
+          <button
+            className="min-h-11 rounded-xl border border-[var(--ab-border)] bg-[var(--ab-card)] px-5 text-sm font-bold"
+            onClick={() => {
+              recordProgressEvent('processing_exit', {
+                action: 'new_payment',
+                elapsed_bucket: acceptedAt === null ? 'unknown' : bucketElapsedMilliseconds(now - acceptedAt),
+                terminal_outcome: telemetryTerminalOutcome(receipt?.status ?? null),
+              })
+              onNewTransaction()
+            }}
+            type="button"
+          >
+            {t('tx_status.new_payment', 'New payment')}
+          </button>
+        )}
       </div>
-
-      {status === 'accepted' && !txStatusDetails && (
-        <Button className="mt-4 w-full py-4" onClick={onNewTransaction}>
-          {t('tx_status.action.new_transaction', 'Make another transaction')}
-        </Button>
-      )}
-
-      {status === 'denied' && (
-        <Button className="mt-4 w-full py-4" onClick={onRetry}>
-          {t('tx_status.action.retry', 'Try Again')}
-        </Button>
-      )}
-    </div>
+    </article>
   )
 }
 

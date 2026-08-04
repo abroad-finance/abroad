@@ -33,6 +33,9 @@ export const resolvePreferredMiniPayCorridor = ({ availableCorridors, preference
   availableCorridors: PublicCorridor[]
   preference: StablecoinPreference
 }): null | PublicCorridor => {
+  if (preference.kind === 'unavailable') {
+    return null
+  }
   const preferredToken = preference.preferredSupportedToken
   if (!preferredToken) {
     return null
@@ -53,6 +56,10 @@ export const resolveMiniPayNotice = ({
   preference: StablecoinPreference
 }): MiniPayNotice | null => {
   if (!isMiniPay) {
+    return null
+  }
+
+  if (preference.kind === 'unavailable') {
     return null
   }
 

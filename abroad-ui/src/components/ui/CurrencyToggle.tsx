@@ -14,28 +14,24 @@ export interface CurrencyToggleProps {
   value: CurrencyOption
 }
 
-/**
- * Toggle between COP and BRL – Figma 9:368
- * Segmented control with flags; selected option has white background.
- */
 export const CurrencyToggle: React.FC<CurrencyToggleProps> = ({ className, onChange, value }) => {
   const { t } = useTranslate()
   return (
     <fieldset
       className={cn(
-        'inline-flex items-stretch gap-0.5 rounded-[11px] bg-[#f3f4f6] p-1 shadow-[1px_1px_3.6px_0px_rgba(0,0,0,0.25)]',
+        'grid w-full grid-cols-2 items-stretch gap-1 rounded-xl bg-[var(--ab-bg-subtle)] p-1 shadow-sm sm:w-auto',
         'border-0 m-0',
         className,
       )}
     >
-      <legend className="sr-only">{t('toggle.select_currency', 'Select currency')}</legend>
+      <legend className="sr-only">{t('toggle.select_destination', 'Select destination, payment rail, and settlement currency')}</legend>
       <button
         aria-pressed={value === 'COP'}
         className={cn(
-          'flex h-[26px] items-center justify-center rounded-lg px-3 py-1.5 transition-colors',
+          'flex min-h-11 items-center justify-center gap-2 rounded-lg px-3 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ab-green)]',
           value === 'COP'
-            ? 'border border-[#e5e7eb] bg-white shadow-[0px_1px_2px_0px_rgba(0,0,0,0.05)]'
-            : 'hover:bg-white/50',
+            ? 'border border-[var(--ab-border)] bg-[var(--ab-card)] shadow-sm'
+            : 'hover:bg-[var(--ab-card)]/70',
         )}
         onClick={(e) => {
           e.stopPropagation()
@@ -44,18 +40,21 @@ export const CurrencyToggle: React.FC<CurrencyToggleProps> = ({ className, onCha
         type="button"
       >
         <img
-          alt={t('country.colombia', 'Colombia')}
-          className="h-[13px] w-5 object-contain"
+          alt=""
+          className="h-4 w-6 shrink-0 object-contain"
           src={CURRENCY_FLAG_URL.COP}
         />
+        <span className="min-w-0 text-xs font-semibold leading-tight text-[var(--ab-text-secondary)] sm:text-sm">
+          {t('toggle.colombia_breb_cop', 'Colombia · BRE-B · COP')}
+        </span>
       </button>
       <button
         aria-pressed={value === 'BRL'}
         className={cn(
-          'flex h-[26px] items-center justify-center rounded-lg px-3 py-1.5 transition-colors',
+          'flex min-h-11 items-center justify-center gap-2 rounded-lg px-3 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ab-green)]',
           value === 'BRL'
-            ? 'border border-[#e5e7eb] bg-white shadow-[0px_1px_2px_0px_rgba(0,0,0,0.05)]'
-            : 'hover:bg-white/50',
+            ? 'border border-[var(--ab-border)] bg-[var(--ab-card)] shadow-sm'
+            : 'hover:bg-[var(--ab-card)]/70',
         )}
         onClick={(e) => {
           e.stopPropagation()
@@ -64,10 +63,13 @@ export const CurrencyToggle: React.FC<CurrencyToggleProps> = ({ className, onCha
         type="button"
       >
         <img
-          alt={t('country.brazil', 'Brazil')}
-          className="h-[13px] w-5 object-contain"
+          alt=""
+          className="h-4 w-6 shrink-0 object-contain"
           src={CURRENCY_FLAG_URL.BRL}
         />
+        <span className="min-w-0 text-xs font-semibold leading-tight text-[var(--ab-text-secondary)] sm:text-sm">
+          {t('toggle.brazil_pix_brl', 'Brazil · Pix · BRL')}
+        </span>
       </button>
     </fieldset>
   )

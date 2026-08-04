@@ -23,7 +23,11 @@ export class TransactionStatusService {
     private readonly prismaClientProvider: IDatabaseClientProvider,
   ) {}
 
-  public async getStatus(transactionId: string, partnerId: string): Promise<TransactionStatusResult> {
+  public async getStatus(
+    transactionId: string,
+    partnerId: string,
+    authenticatedSubject?: string,
+  ): Promise<TransactionStatusResult> {
     const prismaClient = await this.prismaClientProvider.getClient()
     const transaction = await prismaClient.transaction.findUnique({
       include: {
@@ -33,7 +37,11 @@ export class TransactionStatusService {
       where: { id: transactionId },
     })
 
-    if (!transaction || transaction.quote.partnerId !== partnerId) {
+    if (
+      !transaction
+      || transaction.quote.partnerId !== partnerId
+      || (authenticatedSubject !== undefined && transaction.partnerUser.userId !== authenticatedSubject)
+    ) {
       throw new NotFound('Transaction not found')
     }
 

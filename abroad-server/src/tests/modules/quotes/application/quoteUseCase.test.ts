@@ -105,12 +105,22 @@ describe('QuoteUseCase', () => {
     expect(prisma.quote.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         country: Country.CO,
+        customerFeeSourceAmount: '2.03',
+        customerFeeSourceCurrency: CryptoCurrency.USDC,
+        customerFeeType: 'COMBINED',
+        exchangeFeePct: '0.01',
+        fixedFeeTargetAmount: '1',
         partnerId: partner.id,
         targetAmount: 100,
       }),
     })
     expect(result.quote_id).toBe('quote-id')
     expect(result.value).toBeCloseTo(103.03, 2)
+    expect(result.fee).toEqual({
+      amount: '2.03',
+      currency: CryptoCurrency.USDC,
+      type: 'combined',
+    })
   })
 
   it('throws when exchange rate is invalid', async () => {
@@ -127,7 +137,7 @@ describe('QuoteUseCase', () => {
       network: BlockchainNetwork.STELLAR,
       paymentMethod: PaymentMethod.BREB,
       targetCurrency: TargetCurrency.COP,
-    })).rejects.toThrow('Invalid exchange rate received')
+    })).rejects.toThrow('A quote is temporarily unavailable')
   })
 
   it('enforces max amount per transaction', async () => {
@@ -182,6 +192,11 @@ describe('QuoteUseCase', () => {
 
     expect(result.quote_id).toBe('reverse-1')
     expect(result.value).toBe(48)
+    expect(result.fee).toEqual({
+      amount: '1.52',
+      currency: CryptoCurrency.USDC,
+      type: 'combined',
+    })
 
     ;(corridorPricingProvider.getPricing as jest.Mock).mockResolvedValue(buildCorridorPricing({ maxAmount: 1 }))
 
@@ -192,6 +207,21 @@ describe('QuoteUseCase', () => {
       sourceAmountInput: 50,
       targetCurrency: TargetCurrency.COP,
     })).rejects.toThrow('The maximum allowed amount for COP is 1 COP')
+  })
+
+  it('stores Brazil as the destination country for BRL quotes', async () => {
+    await quoteUseCase.createQuote({
+      amount: 100,
+      cryptoCurrency: CryptoCurrency.USDC,
+      network: BlockchainNetwork.STELLAR,
+      partner,
+      paymentMethod: PaymentMethod.PIX,
+      targetCurrency: TargetCurrency.BRL,
+    })
+
+    expect(prisma.quote.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ country: Country.BR }),
+    })
   })
 
   it('rejects quotes when the payment method is disabled', async () => {
@@ -282,7 +312,7 @@ describe('QuoteUseCase', () => {
       paymentMethod: PaymentMethod.BREB,
       sourceAmountInput: 10,
       targetCurrency: TargetCurrency.COP,
-    })).rejects.toThrow('Invalid exchange rate received')
+    })).rejects.toThrow('A quote is temporarily unavailable')
   })
 
   it('prefers provided partners over SEP configuration when reversing quotes', async () => {

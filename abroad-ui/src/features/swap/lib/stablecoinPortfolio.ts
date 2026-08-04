@@ -6,6 +6,11 @@ export type StablecoinPreference
     preferredSupportedToken: null | SupportedStablecoinSymbol
   }
   | {
+    highestBalanceToken: null
+    kind: 'unavailable'
+    preferredSupportedToken: null
+  }
+  | {
     highestBalanceToken: StablecoinSymbol
     kind: 'empty'
     preferredSupportedToken: null
@@ -34,11 +39,21 @@ export const EMPTY_STABLECOIN_BALANCES: StablecoinBalances = Object.freeze({
   USDT: '0.00',
 })
 
-export const formatStablecoinBalance = (value: number): string => (
-  Number.isFinite(value)
-    ? value.toLocaleString('en-US', { maximumFractionDigits: 2, minimumFractionDigits: 2 })
-    : '0.00'
-)
+export const UNAVAILABLE_STABLECOIN_PREFERENCE: StablecoinPreference = Object.freeze({
+  highestBalanceToken: null,
+  kind: 'unavailable',
+  preferredSupportedToken: null,
+})
+
+export const formatStablecoinBalance = (value: number): string => {
+  if (!Number.isFinite(value) || value < 0) {
+    throw new Error('Stablecoin balance must be a finite non-negative number')
+  }
+  return value.toLocaleString('en-US', {
+    maximumFractionDigits: 2,
+    minimumFractionDigits: 2,
+  })
+}
 
 export const parseStablecoinBalance = (value: string): number => {
   const normalized = value.replace(/,/g, '')

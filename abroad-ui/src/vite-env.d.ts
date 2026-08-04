@@ -2,6 +2,8 @@
 /// <reference types="vitest" />
 /// <reference types="@testing-library/jest-dom" />
 
+declare const __ABROAD_UI_VERSION__: string
+
 interface EthereumRequestArguments {
   method: string
   params?: Array<unknown> | Record<string, unknown>

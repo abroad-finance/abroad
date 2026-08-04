@@ -1,19 +1,19 @@
-// components/common/LanguageSelector.tsx
-import { AnimatePresence, motion } from 'framer-motion'
 import { X } from 'lucide-react'
-import React from 'react'
-import { createPortal } from 'react-dom'
+import React, {
+  useId,
+  useState,
+} from 'react'
 
 import { BRAND_TITLE_CLASS } from '../constants'
 import { cn } from '../utils'
+import { ModalSurface } from './ModalSurface'
 
 export interface LanguageSelectorProps {
   ariaLabel?: string
   className?: string
-  /** Controlled draft selection inside the modal */
   draft: string
-  /** Text labels overrides */
   labels?: {
+    changeError?: string
     closeAria?: string
     confirm?: string
     hint?: string
@@ -21,46 +21,22 @@ export interface LanguageSelectorProps {
     title?: string
   }
   languages: string[]
-  /** Optional custom mapping for code -> { name, flag } */
-  metaMap?: Record<string, { flag: string
-    name: string }>
-  /** Committed language value + change callback */
-  onChange: (lng: string) => void
-  onDraftChange: (lng: string) => void
+  metaMap?: Record<string, { flag: string, name: string }>
+  onChange: (language: string) => Promise<boolean>
+  onDraftChange: (language: string) => void
   onOpenChange: (open: boolean) => void
-  /** Controlled open state for the side modal */
   open: boolean
   value: string
-  /** Desktop vs mobile trigger styling */
   variant?: 'desktop' | 'mobile'
 }
 
-const DEFAULT_META: Record<string, { flag: string
-  name: string }> = {
-  ar: {
-    flag: 'sa',
-    name: 'العربية',
-  },
-  en: {
-    flag: 'gb',
-    name: 'English',
-  },
-  es: {
-    flag: 'es',
-    name: 'Español',
-  },
-  pt: {
-    flag: 'br',
-    name: 'Português',
-  },
-  ru: {
-    flag: 'ru',
-    name: 'Русский',
-  },
-  zh: {
-    flag: 'cn',
-    name: '中文',
-  },
+const DEFAULT_META: Record<string, { flag: string, name: string }> = {
+  ar: { flag: 'sa', name: 'العربية' },
+  en: { flag: 'gb', name: 'English' },
+  es: { flag: 'es', name: 'Español' },
+  pt: { flag: 'br', name: 'Português' },
+  ru: { flag: 'ru', name: 'Русский' },
+  zh: { flag: 'cn', name: '中文' },
 }
 
 const LanguageSelector: React.FC<LanguageSelectorProps> = ({
@@ -77,178 +53,119 @@ const LanguageSelector: React.FC<LanguageSelectorProps> = ({
   value,
   variant = 'desktop',
 }) => {
-  const currentMeta = metaMap[value] || {
-    flag: value,
-    name: value.toUpperCase(),
-  }
-
-  // Fallbacks (hook can override via `labels`)
-  const title = labels?.title ?? 'Language Settings'
-  const subtitle
-    = labels?.subtitle ?? 'Select your preferred interface language'
-  const confirmLabel = labels?.confirm ?? 'Confirm Selection'
-  const hint
-    = labels?.hint ?? 'Language changes will be applied immediately'
+  const descriptionId = useId()
+  const titleId = useId()
+  const [changeFailed, setChangeFailed] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const currentMeta = metaMap[value] ?? { flag: value, name: value.toUpperCase() }
+  const title = labels?.title ?? 'Language settings'
+  const subtitle = labels?.subtitle ?? 'Select your preferred interface language'
+  const confirmLabel = labels?.confirm ?? 'Confirm selection'
+  const hint = labels?.hint ?? 'The selected language applies across Abroad.'
   const closeAria = labels?.closeAria ?? 'Close'
   const selectLanguageAria = ariaLabel ?? 'Select language'
+  const triggerClasses = variant === 'mobile'
+    ? 'flex min-h-11 items-center gap-2 rounded-xl border border-white/30 bg-abroad-dark/5 px-3 py-2 text-xs font-medium text-abroad-dark hover:bg-abroad-dark/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-abroad-dark/40'
+    : 'flex min-h-11 items-center gap-2 rounded-xl bg-white/20 px-3 py-2 text-sm font-medium hover:bg-white/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40'
 
-  const triggerClasses
-    = variant === 'mobile'
-      ? 'flex items-center gap-1 bg-abroad-dark/5 border border-white/30 text-abroad-dark text-xs font-medium px-2 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-abroad-dark/40 hover:bg-abroad-dark/10'
-      : 'flex items-center gap-2 bg-white/20 text-sm font-medium px-3 py-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-white/40 hover:bg-white/30 cursor-pointer'
-
-  const handleConfirm = () => {
-    if (draft !== value) onChange(draft)
+  const close = (): void => {
+    if (submitting) return
+    setChangeFailed(false)
+    onDraftChange(value)
     onOpenChange(false)
+  }
+
+  const handleConfirm = async (): Promise<void> => {
+    if (submitting) return
+    if (draft === value) {
+      onOpenChange(false)
+      return
+    }
+    setSubmitting(true)
+    setChangeFailed(false)
+    const changed = await onChange(draft)
+    setSubmitting(false)
+    if (changed) onOpenChange(false)
+    else setChangeFailed(true)
   }
 
   return (
     <>
-      {/* Trigger */}
       <button
         aria-label={selectLanguageAria}
-        className={`${triggerClasses} ${className}`}
+        className={cn(triggerClasses, className)}
         onClick={() => onOpenChange(true)}
         type="button"
       >
-        <img
-          alt={currentMeta.name}
-          className="w-5 h-5 rounded-full"
-          loading="lazy"
-          src={`https://hatscripts.github.io/circle-flags/flags/${currentMeta.flag}.svg`}
-        />
-        <span className={cn('hidden md:inline', variant === 'desktop' && BRAND_TITLE_CLASS)}>
-          {currentMeta.name}
-        </span>
+        <img alt="" aria-hidden="true" className="size-5 rounded-full" loading="lazy" src={`https://hatscripts.github.io/circle-flags/flags/${currentMeta.flag}.svg`} />
+        <span className={cn('hidden md:inline', variant === 'desktop' && BRAND_TITLE_CLASS)}>{currentMeta.name}</span>
       </button>
 
-      {/* Side Modal - Portal to document body level */}
-      {createPortal(
-        <AnimatePresence>
-          {open && (
-            <div
-              aria-label={title}
-              aria-modal="true"
-              className="fixed inset-0 z-[9999] flex justify-end items-end md:items-center md:pr-4"
-              role="dialog"
-            >
-              {/* Backdrop - covers entire viewport */}
-              <div
-                className="absolute inset-0 bg-black/40 backdrop-blur-sm"
-                onClick={() => onOpenChange(false)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Escape') onOpenChange(false)
-                }}
-                role="button"
-                tabIndex={0}
-              />
-              {/* Panel */}
-              <motion.div
-                animate={{
-                  opacity: 1,
-                  x: 0,
-                  y: 0,
-                }}
-                className="w-screen md:w-auto md:mx-0 md:ml-auto md:max-w-md md:flex md:items-center fixed md:relative left-0 md:left-auto top-auto md:top-auto bottom-0 md:bottom-auto h-[80vh] md:h-[95vh] z-[10000]"
-                exit={{
-                  opacity: typeof window !== 'undefined' && window.innerWidth >= 768 ? 1 : 0,
-                  x: typeof window !== 'undefined' && window.innerWidth >= 768 ? '100%' : 0,
-                  y: typeof window !== 'undefined' && window.innerWidth >= 768 ? 0 : '100%',
-                }}
-                initial={{
-                  opacity: 1,
-                  x: typeof window !== 'undefined' && window.innerWidth >= 768 ? '100%' : 0,
-                  y: typeof window !== 'undefined' && window.innerWidth >= 768 ? 0 : '100%',
-                }}
-                transition={{
-                  damping: 30,
-                  mass: 0.8,
-                  stiffness: 300,
-                  type: 'spring',
-                }}
-              >
-                <div className="bg-white rounded-t-4xl md:rounded-4xl shadow-lg border border-gray-200 p-3 md:p-4 relative w-full h-full flex flex-col overflow-y-auto pb-[env(safe-area-inset-bottom)]">
-                  <button
-                    aria-label={closeAria}
-                    className="absolute top-4 right-4 p-1 rounded-full hover:bg-gray-100 transition-colors duration-200 cursor-pointer z-10"
-                    onClick={() => onOpenChange(false)}
-                  >
-                    <X className="w-5 h-5 text-gray-400 hover:text-gray-600" />
-                  </button>
-                  {/* Header */}
-                  <div className="mb-6 pr-8 text-center mt-2 md:mt-4">
-                    <h2 className="text-2xl font-semibold text-gray-900">{title}</h2>
-                    <p className="text-md text-gray-600">{subtitle}</p>
-                  </div>
-                  {/* Language Options */}
-                  <div className="flex-1">
-                    <div className="space-y-3">
-                      {languages.map((code) => {
-                        const meta
-                          = metaMap[code] || {
-                            flag: code,
-                            name: code.toUpperCase(),
-                          }
-                        const selected = draft === code
-                        return (
-                          <button
-                            className={`w-full flex items-center justify-between p-4 rounded-xl border transition-all duration-200 hover:bg-gray-50 ${
-                              selected
-                                ? 'border-abroad-dark bg-abroad-dark/10'
-                                : 'border-gray-200 bg-white'
-                            }`}
-                            key={code}
-                            onClick={() => onDraftChange(code)}
-                            type="button"
-                          >
-                            <div className="flex items-center space-x-4">
-                              <img
-                                alt={`${meta.name} flag`}
-                                className="w-6 h-6 rounded-full flex-shrink-0"
-                                loading="lazy"
-                                src={`https://hatscripts.github.io/circle-flags/flags/${meta.flag}.svg`}
-                              />
-                              <span className="text-gray-800 font-medium text-lg">
-                                {meta.name}
-                              </span>
-                            </div>
-                            <div
-                              className={`w-5 h-5 rounded-full border-2 transition-all duration-200 ${
-                                selected ? 'border-abroad-dark bg-abroad-dark' : 'border-gray-300'
-                              }`}
-                            >
-                              {selected && (
-                                <div className="w-full h-full flex items-center justify-center">
-                                  <div className="w-2 h-2 bg-white rounded-full" />
-                                </div>
-                              )}
-                            </div>
-                          </button>
-                        )
-                      })}
-                    </div>
-                  </div>
-                  {/* Confirmation Button */}
-                  <div className="mt-6">
-                    <button
-                      className="bg-gradient-to-r from-abroad-dark to-abroad-light hover:from-[#2a5956] hover:to-[#5fa88d] text-white cursor-pointer text-lg font-medium rounded-xl w-full p-4 transition"
-                      onClick={handleConfirm}
-                      type="button"
-                    >
-                      {confirmLabel}
-                    </button>
-                  </div>
-                  {/* Footer */}
-                  <div className="text-xs text-gray-500 leading-relaxed text-center mt-6 pt-4 border-t border-gray-200">
-                    {hint}
-                  </div>
-                </div>
-              </motion.div>
+      <ModalSurface descriptionId={descriptionId} onClose={close} open={open} titleId={titleId}>
+        <div className="flex max-h-[calc(100dvh-2rem)] w-full max-w-md flex-col overflow-hidden rounded-3xl border border-ab-border bg-[var(--ab-bg-card)] shadow-2xl">
+          <header className="flex items-start justify-between gap-4 border-b border-ab-border p-5">
+            <div>
+              <h2 className="text-xl font-bold text-ab-text" id={titleId}>{title}</h2>
+              <p className="mt-1 text-sm text-ab-text-3" id={descriptionId}>{subtitle}</p>
             </div>
-          )}
-        </AnimatePresence>,
-        document.body,
-      )}
+            <button
+              aria-label={closeAria}
+              className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-[var(--ab-bg-muted)] text-ab-text-3 hover:text-ab-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ab-green)]"
+              data-modal-initial-focus
+              onClick={close}
+              type="button"
+            >
+              <X aria-hidden="true" className="size-5" />
+            </button>
+          </header>
+
+          <fieldset className="min-h-0 overflow-y-auto p-4">
+            <legend className="sr-only">{subtitle}</legend>
+            <div className="space-y-2">
+              {languages.map((code) => {
+                const meta = metaMap[code] ?? { flag: code, name: code.toUpperCase() }
+                const selected = draft === code
+                return (
+                  <label
+                    className={cn(
+                      'flex min-h-14 cursor-pointer items-center gap-4 rounded-2xl border p-4 transition-colors',
+                      selected
+                        ? 'border-[var(--ab-green)] bg-[var(--ab-green)]/10'
+                        : 'border-ab-border bg-[var(--ab-bg-subtle)] hover:bg-[var(--ab-bg-muted)]',
+                    )}
+                    key={code}
+                  >
+                    <input
+                      checked={selected}
+                      className="size-5 accent-[var(--ab-green)]"
+                      name="interface-language"
+                      onChange={() => onDraftChange(code)}
+                      type="radio"
+                      value={code}
+                    />
+                    <img alt="" aria-hidden="true" className="size-6 rounded-full" loading="lazy" src={`https://hatscripts.github.io/circle-flags/flags/${meta.flag}.svg`} />
+                    <span className="text-base font-semibold text-ab-text">{meta.name}</span>
+                  </label>
+                )
+              })}
+            </div>
+          </fieldset>
+
+          <footer className="border-t border-ab-border p-4">
+            {changeFailed && <p className="mb-3 text-sm font-semibold text-ab-error" role="alert">{labels?.changeError ?? 'The language could not be changed. Try again.'}</p>}
+            <button
+              aria-busy={submitting}
+              className="min-h-12 w-full rounded-xl bg-ab-btn px-4 text-base font-semibold text-ab-btn-text disabled:opacity-60"
+              disabled={submitting}
+              onClick={() => void handleConfirm()}
+              type="button"
+            >
+              {submitting ? 'Changing language…' : confirmLabel}
+            </button>
+            <p className="mt-3 text-center text-xs text-ab-text-3">{hint}</p>
+          </footer>
+        </div>
+      </ModalSurface>
     </>
   )
 }

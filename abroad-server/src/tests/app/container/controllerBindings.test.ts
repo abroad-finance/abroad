@@ -8,6 +8,8 @@ import { OpsIdentityController } from '../../../modules/operations/interfaces/ht
 import { OpsOverviewController } from '../../../modules/operations/interfaces/http/OpsOverviewController'
 import { OpsSavedViewsController } from '../../../modules/operations/interfaces/http/OpsSavedViewsController'
 import { OpsSearchController } from '../../../modules/operations/interfaces/http/OpsSearchController'
+import { ConsumerUxTelemetryController } from '../../../modules/telemetry/interfaces/http/ConsumerUxTelemetryController'
+import { ConsumerActivityController } from '../../../modules/transactions/interfaces/http/ConsumerActivityController'
 
 describe('controllerBindings', () => {
   it('registers the operations overview controller for generated routes', () => {
@@ -25,6 +27,8 @@ describe('controllerBindings', () => {
     expect(container.bind).toHaveBeenCalledWith(OpsConfigurationReleaseController)
     expect(container.bind).toHaveBeenCalledWith(OpsSavedViewsController)
     expect(container.bind).toHaveBeenCalledWith(OpsSearchController)
+    expect(container.bind).toHaveBeenCalledWith(ConsumerUxTelemetryController)
+    expect(container.bind).toHaveBeenCalledWith(ConsumerActivityController)
     expect(toSelf).toHaveBeenCalled()
   })
 })

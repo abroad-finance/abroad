@@ -16,7 +16,7 @@ import {
 } from 'tsoa'
 
 import { TYPES } from '../../../../app/container/types'
-import { requireAuthenticatedPartner } from '../../../../app/http/authenticationContext'
+import { requireAuthenticatedPartner, requireAuthenticatedWalletPrincipal } from '../../../../app/http/authenticationContext'
 import { ValidationError } from '../../../../core/errors'
 import { IDatabaseClientProvider } from '../../../../platform/persistence/IDatabaseClientProvider'
 import { KycSubmissionService } from '../../application/KycSubmissionService'
@@ -45,13 +45,17 @@ export class KycController extends Controller {
     @Request() request: RequestExpress,
     @Query() userId: string,
   ): Promise<KycStatusResponse> {
+    this.setHeader('Cache-Control', 'private, no-store')
     const partner = requireAuthenticatedPartner(request.user)
+    const ownedUserId = partner.authenticationSource === 'WALLET'
+      ? requireAuthenticatedWalletPrincipal(request.user).authenticatedSubject
+      : userId
     const prisma = await this.dbProvider.getClient()
 
     const partnerUser = await prisma.partnerUser.findUnique({
       select: { id: true },
       where: {
-        partnerId_userId: { partnerId: String(partner.id), userId },
+        partnerId_userId: { partnerId: String(partner.id), userId: ownedUserId },
       },
     })
     if (!partnerUser) {
@@ -93,7 +97,11 @@ export class KycController extends Controller {
     @FormField() email: string,
     @FormField() phone: string,
   ): Promise<KycSubmitResponse> {
+    this.setHeader('Cache-Control', 'private, no-store')
     const partner = requireAuthenticatedPartner(request.user)
+    const ownedUserId = partner.authenticationSource === 'WALLET'
+      ? requireAuthenticatedWalletPrincipal(request.user).authenticatedSubject
+      : userId
 
     if (!document) {
       throw new ValidationError('Document image is required')
@@ -113,7 +121,7 @@ export class KycController extends Controller {
       fullName,
       nationality,
       phone,
-      userId,
+      userId: ownedUserId,
     })
     if (!parsed.success) {
       throw new ValidationError(parsed.error.issues[0]?.message ?? 'Invalid KYC submission')

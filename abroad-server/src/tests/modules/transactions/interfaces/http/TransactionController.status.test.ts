@@ -1,7 +1,7 @@
 import 'reflect-metadata'
 import { TransactionStatus } from '@prisma/client'
 
-import { authRequest, buildMinimalController, createBadRequestResponder } from './transactionControllerTestUtils'
+import { authRequest, buildMinimalController, createBadRequestResponder, walletAuthRequest } from './transactionControllerTestUtils'
 
 describe('TransactionController status lookup', () => {
   const badRequest = createBadRequestResponder()
@@ -74,5 +74,28 @@ describe('TransactionController status lookup', () => {
     )
 
     expect(response.kycRequired).toBe(false)
+  })
+
+  it('allows a wallet to read its own transaction status', async () => {
+    const transactionId = '11111111-2222-3333-4444-555555555555'
+    const subject = 'stellar:pubnet:GREQUESTER'
+    const { controller, prisma } = buildMinimalController()
+    prisma.transaction.findUnique.mockResolvedValue({
+      id: transactionId,
+      onChainId: null,
+      partnerUser: { id: 'pu-1', partnerId: 'partner-1', userId: subject },
+      partnerUserId: 'pu-1',
+      quote: { partnerId: 'partner-1' },
+      status: TransactionStatus.AWAITING_PAYMENT,
+    })
+    prisma.partnerUserKyc.findFirst.mockResolvedValue(null)
+
+    const response = await controller.getTransactionStatus(
+      transactionId,
+      walletAuthRequest('partner-1', subject),
+    )
+
+    expect(response.id).toBe(transactionId)
+    expect(response.user_id).toBe(subject)
   })
 })

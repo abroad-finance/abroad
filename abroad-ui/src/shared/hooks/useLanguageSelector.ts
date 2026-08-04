@@ -33,8 +33,7 @@ export const useLanguageSelector = (): LanguageSelectorProps => {
   const [value, setValue] = useState<string>(() => tolgee.getLanguage() || 'en')
 
   useEffect(() => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const off = (tolgee as any).on?.(
+    const off = tolgee.on(
       'language',
       (l: { value?: string }) => setValue(l.value || 'en'),
     )
@@ -42,13 +41,14 @@ export const useLanguageSelector = (): LanguageSelectorProps => {
   }, [tolgee])
 
   const onChange = useCallback(
-    (lng: string) => {
+    async (lng: string): Promise<boolean> => {
       try {
-        tolgee.changeLanguage(lng)
-        setValue(lng) // optimistic
+        await tolgee.changeLanguage(lng)
+        setValue(lng)
+        return true
       }
       catch {
-        /* noop */
+        return false
       }
     },
     [tolgee],
@@ -65,6 +65,7 @@ export const useLanguageSelector = (): LanguageSelectorProps => {
 
   // Labels & aria (resolved via i18n here so the component stays dumb)
   const labels = {
+    changeError: t('language_selector.actions.change_error', 'The language could not be changed. Try again.'),
     closeAria: t('language_selector.actions.close', 'Close'),
     confirm: t('language_selector.actions.confirm', 'Confirm Selection'),
     hint: t(

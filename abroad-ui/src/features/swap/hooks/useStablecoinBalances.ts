@@ -9,50 +9,44 @@ import {
 
 import { fetchNonStellarBalances } from '../lib/chainBalanceFetchers'
 import {
-  balanceForStablecoin,
-  EMPTY_STABLECOIN_BALANCES,
   formatStablecoinBalance,
   resolveStablecoinPreference,
   type StablecoinBalances,
   type StablecoinPreference,
   type SupportedStablecoinSymbol,
+  UNAVAILABLE_STABLECOIN_PREFERENCE,
 } from '../lib/stablecoinPortfolio'
 
 const STELLAR_HORIZON_URL = 'https://horizon.stellar.org'
 const STELLAR_USDC_ISSUER = 'GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN'
 
 type StablecoinBalanceState = {
-  balances: StablecoinBalances
-  cUsd: string
+  balances: null | StablecoinBalances
+  cUsd: null | string
   error: null | string
   isLoading: boolean
   preference: StablecoinPreference
   refresh: () => Promise<void>
-  supportedBalanceFor: (symbol: SupportedStablecoinSymbol) => string
-  usdc: string
-  usdt: string
+  supportedBalanceFor: (symbol: SupportedStablecoinSymbol) => null | string
+  usdc: null | string
+  usdt: null | string
 }
 
 const fetchStellarBalances = async (address: string): Promise<StablecoinBalances> => {
-  try {
-    const server = new Horizon.Server(STELLAR_HORIZON_URL)
-    const account = await server.loadAccount(address)
-    const line = account.balances.find(balance => (
-      balance.asset_type !== 'native'
-      && 'asset_code' in balance
-      && 'asset_issuer' in balance
-      && balance.asset_code === 'USDC'
-      && balance.asset_issuer === STELLAR_USDC_ISSUER
-    ))
-    const usdcBalance = line && 'balance' in line ? parseFloat(line.balance) : 0
-    return {
-      cUSD: '0.00',
-      USDC: formatStablecoinBalance(usdcBalance),
-      USDT: '0.00',
-    }
-  }
-  catch {
-    return EMPTY_STABLECOIN_BALANCES
+  const server = new Horizon.Server(STELLAR_HORIZON_URL)
+  const account = await server.loadAccount(address)
+  const line = account.balances.find(balance => (
+    balance.asset_type !== 'native'
+    && 'asset_code' in balance
+    && 'asset_issuer' in balance
+    && balance.asset_code === 'USDC'
+    && balance.asset_issuer === STELLAR_USDC_ISSUER
+  ))
+  const usdcBalance = line && 'balance' in line ? parseFloat(line.balance) : 0
+  return {
+    cUSD: '0.00',
+    USDC: formatStablecoinBalance(usdcBalance),
+    USDT: '0.00',
   }
 }
 
@@ -66,22 +60,28 @@ const fetchBalancesForChain = async (address: string, chainId: string): Promise<
   if (chainId.startsWith('eip155:')) {
     return fetchNonStellarBalances(address, chainId, 'evm')
   }
-  return EMPTY_STABLECOIN_BALANCES
+  throw new Error('Balance queries are not supported for this network')
 }
 
 export const useStablecoinBalances = ({ address, chainId }: {
   address: null | string | undefined
   chainId: null | string | undefined
 }): StablecoinBalanceState => {
-  const [balances, setBalances] = useState<StablecoinBalances>(EMPTY_STABLECOIN_BALANCES)
+  const [snapshot, setSnapshot] = useState<null | {
+    balances: StablecoinBalances
+    identity: string
+  }>(null)
   const [error, setError] = useState<null | string>(null)
   const [isLoading, setIsLoading] = useState(false)
   const requestIdRef = useRef(0)
+  const identity = address && chainId ? `${chainId}:${address}` : null
+  const balances = identity && snapshot?.identity === identity ? snapshot.balances : null
 
   const refresh = useCallback(async () => {
     if (!address || !chainId) {
-      setBalances(EMPTY_STABLECOIN_BALANCES)
+      setSnapshot(null)
       setError(null)
+      setIsLoading(false)
       return
     }
 
@@ -95,14 +95,13 @@ export const useStablecoinBalances = ({ address, chainId }: {
       if (requestIdRef.current !== requestId) {
         return
       }
-      setBalances(nextBalances)
+      setSnapshot({ balances: nextBalances, identity: `${chainId}:${address}` })
     }
-    catch (balanceError) {
+    catch {
       if (requestIdRef.current !== requestId) {
         return
       }
-      setBalances(EMPTY_STABLECOIN_BALANCES)
-      setError(balanceError instanceof Error ? balanceError.message : 'Failed to load stablecoin balances')
+      setError('Balance unavailable for the selected wallet and network')
     }
     finally {
       if (requestIdRef.current === requestId) {
@@ -115,20 +114,22 @@ export const useStablecoinBalances = ({ address, chainId }: {
     void refresh()
   }, [refresh])
 
-  const preference = useMemo(() => resolveStablecoinPreference(balances), [balances])
-  const supportedBalanceFor = useCallback((symbol: SupportedStablecoinSymbol): string => (
-    balanceForStablecoin(balances, symbol)
+  const preference = useMemo(() => (
+    balances ? resolveStablecoinPreference(balances) : UNAVAILABLE_STABLECOIN_PREFERENCE
+  ), [balances])
+  const supportedBalanceFor = useCallback((symbol: SupportedStablecoinSymbol): null | string => (
+    balances?.[symbol] ?? null
   ), [balances])
 
   return {
     balances,
-    cUsd: balances.cUSD,
+    cUsd: balances?.cUSD ?? null,
     error,
     isLoading,
     preference,
     refresh,
     supportedBalanceFor,
-    usdc: balances.USDC,
-    usdt: balances.USDT,
+    usdc: balances?.USDC ?? null,
+    usdt: balances?.USDT ?? null,
   }
 }

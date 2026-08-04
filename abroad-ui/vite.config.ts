@@ -116,6 +116,7 @@ const config: VitestEnabledConfig = {
     sourcemap: enableSentrySourcemaps ? 'hidden' : false,
   },
   define: {
+    '__ABROAD_UI_VERSION__': JSON.stringify(sentryRelease ?? 'development'),
     'global': 'globalThis',
     'process.env': {},
   },

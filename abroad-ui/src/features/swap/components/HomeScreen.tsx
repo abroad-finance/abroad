@@ -1,6 +1,6 @@
 import { useTranslate } from '@tolgee/react'
 import {
-  ChevronDown, ChevronRight, ClipboardPaste, Keyboard, Lock, PiggyBank, QrCode, Store, Wallet, Zap,
+  BadgeCheck, ChevronDown, ChevronRight, Keyboard, ListChecks, Lock, QrCode, Store, Wallet,
 } from 'lucide-react'
 import React from 'react'
 
@@ -8,17 +8,17 @@ import type { OnboardingRates } from '@/features/swap/types'
 
 import BreBLogo from '@/assets/Logos/networks/Bre-b.svg'
 import { CurrencyToggle } from '@/components/ui'
+import { ActivityStatusPill } from '@/features/activity/components/ActivityStatusPill'
+import { activityStatusPresentation } from '@/features/activity/shared/activityPresentation'
 import {
-  CHAIN_CONFIG_ARRAY, CHAIN_MAP, COUNTRIES, CURRENCY_FLAG_URL, RECENT_COUNTRY_CONFIG, TOKEN_ICONS,
+  CHAIN_MAP, COUNTRIES, CURRENCY_FLAG_URL, RECENT_COUNTRY_CONFIG, TOKEN_ICONS,
 } from '@/shared/constants'
 import {
-  cn, isApiTxExpired, localeForCurrency, numberFormatOptions,
+  cn, localeForCurrency, numberFormatOptions,
 } from '@/shared/utils'
 
-import { _36EnumsTargetCurrency as TargetCurrency, type TransactionListItem } from '../../../api'
+import { type ConsumerActivityTransactionDto, _36EnumsTargetCurrency as TargetCurrency } from '../../../api'
 
-// Alias for backwards compatibility
-const CHAIN_CONFIG = CHAIN_CONFIG_ARRAY
 const TOKEN_ICON_URL = TOKEN_ICONS
 
 const PAYMENT_ACTION_CARD_CLASS = 'flex h-full min-h-[clamp(92px,14vh,118px)] w-full flex-col items-center justify-center gap-[clamp(0.25rem,1vh,0.5rem)] rounded-[clamp(1rem,3vh,1.5rem)] p-[clamp(0.5rem,1.5vw,1rem)] text-center transition-[background-color,border-color,box-shadow,opacity] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3ca383] focus-visible:ring-offset-2'
@@ -26,16 +26,13 @@ const PAYMENT_ACTION_ICON_CLASS = 'flex h-[clamp(2.25rem,6vh,3.25rem)] w-[clamp(
 const PAYMENT_ACTION_LABEL_CLASS = 'text-[clamp(0.75rem,1.8vw+0.4vh,1.05rem)] font-bold leading-tight'
 
 const TRUST_BADGE_DATA = [
-  { defaultLabel: '< 3s settlement', i18nKey: 'home.trust_settlement' as const, Icon: Zap },
-  { defaultLabel: 'Low fees', i18nKey: 'home.trust_fees' as const, Icon: PiggyBank },
-  { defaultLabel: 'Non-custodial', i18nKey: 'home.trust_custodial' as const, Icon: Lock },
+  { defaultLabel: 'Track every payment', i18nKey: 'home.trust_tracking' as const, Icon: ListChecks },
+  { defaultLabel: 'Review before paying', i18nKey: 'home.trust_review' as const, Icon: BadgeCheck },
+  { defaultLabel: 'Wallet authorized', i18nKey: 'home.trust_wallet' as const, Icon: Lock },
 ]
 
 export interface HomeScreenProps {
-  balance: string
-  formatDate?: (dateString: string) => string
-  getStatusStyle?: (status: string) => string
-  getStatusText?: (status: string) => string
+  balance: null | string
   hasEnteredApp?: boolean
   isAuthenticated: boolean
   onboardingRates?: OnboardingRates
@@ -43,22 +40,19 @@ export interface HomeScreenProps {
   onGoToManual: () => void
   onHistoryClick: () => void
   onOpenChainModal?: () => void
-  onPasteQr: () => void
   onRequestConnect: () => void
-  onScanQr: () => void
   onSelectCurrency?: (currency: TargetCurrency) => void
-  onSelectTransaction?: (tx: TransactionListItem) => void
-  recentTransactions: TransactionListItem[]
+  onSelectTransaction?: (tx: ConsumerActivityTransactionDto) => void
+  onUseQr: () => void
+  recentTransactions: ConsumerActivityTransactionDto[]
   selectedChainKey?: string
   selectedTokenLabel: string
+  supportedNetworks?: ReadonlyArray<{ icon?: string, key: string, label: string }>
   targetCurrency: TargetCurrency
 }
 
 export default function HomeScreen({
   balance,
-  formatDate,
-  getStatusStyle,
-  getStatusText,
   hasEnteredApp = false,
   isAuthenticated,
   onboardingRates,
@@ -66,18 +60,18 @@ export default function HomeScreen({
   onGoToManual,
   onHistoryClick,
   onOpenChainModal,
-  onPasteQr,
   onRequestConnect,
-  onScanQr,
   onSelectCurrency,
   onSelectTransaction,
+  onUseQr,
   recentTransactions,
   selectedChainKey,
   selectedTokenLabel,
+  supportedNetworks = [],
   targetCurrency,
 }: Readonly<HomeScreenProps>): React.JSX.Element {
   const { t } = useTranslate()
-  const balanceNum = Number.parseFloat(balance.replace(/,/g, '')) || 0
+  const balanceNum = balance === null ? null : Number.parseFloat(balance.replace(/,/g, ''))
 
   // Show onboarding view for non-authenticated users who haven't entered the app
   const showOnboarding = !isAuthenticated && !hasEnteredApp
@@ -98,12 +92,19 @@ export default function HomeScreen({
       label: t(i18nKey, defaultLabel),
     }))
 
+    const ratesUpdatedAt = onboardingRates?.updatedAt
+      ? new Intl.DateTimeFormat(undefined, {
+          hour: '2-digit',
+          minute: '2-digit',
+        }).format(new Date(onboardingRates.updatedAt))
+      : null
+
     return (
-      <main className="flex w-full h-full flex-col items-center justify-center px-4 overflow-hidden">
-        <div className="flex w-full max-w-[min(90vw,667px)] flex-col items-center justify-center">
+      <main className="flex w-full flex-col items-center px-4 py-4">
+        <div className="my-auto flex w-full max-w-[min(90vw,667px)] flex-col items-center justify-center">
           {/* Live badge – Figma 5:13 */}
           <div className="ab-hero-live-badge mb-[clamp(0.5rem,2vh,1rem)] flex shrink-0 items-center gap-2 rounded-full px-[clamp(0.75rem,2vw,1rem)] py-[clamp(0.25rem,1vh,0.375rem)]">
-            <span className="ab-hero-live-dot h-[clamp(0.375rem,1.5vh,0.5rem)] w-[clamp(0.375rem,1.5vh,0.5rem)] shrink-0 rounded-full animate-pulse" />
+            <span className="ab-hero-live-dot h-[clamp(0.375rem,1.5vh,0.5rem)] w-[clamp(0.375rem,1.5vh,0.5rem)] shrink-0 animate-pulse rounded-full motion-reduce:animate-none" />
             <span className="ab-hero-live-text text-[clamp(0.75rem,1.5vw+0.5vh,0.875rem)] font-medium leading-tight">
               {t('home.live_badge', 'Live in Colombia & Brazil')}
             </span>
@@ -123,45 +124,50 @@ export default function HomeScreen({
 
           {/* Subline – Figma 5:22 */}
           <p className="ab-hero-subline mb-[clamp(0.75rem,2.5vh,1.5rem)] max-w-[min(85vw,461px)] text-center text-[clamp(0.875rem,2vw+0.5vh,1.25rem)] font-normal leading-[1.4]">
-            {t('home.subline', 'Connect your wallet, scan a QR code, and pay — the merchant receives local currency instantly.')}
+            {t('home.subline', 'Choose a local payment method, review the quote, and track the payment from your wallet to the recipient.')}
           </p>
 
           {/* Chain badges – Figma 5:24 */}
           <div className="mb-[clamp(0.75rem,2.5vh,1.5rem)] flex shrink-0 flex-wrap items-center justify-center gap-[clamp(0.5rem,1.5vh,0.75rem)]">
-            {CHAIN_CONFIG.map(({ icon, key, label }) => (
-              <div
-                className={cn(
-                  'flex items-center gap-[clamp(0.25rem,1vw,0.5rem)] self-stretch rounded-full px-[clamp(0.5rem,2vw,1rem)] py-[clamp(0.25rem,1vh,0.35rem)]',
-                  key === 'celo' && 'ab-hero-chain-celo',
-                  key === 'solana' && 'ab-hero-chain-solana',
-                  key === 'stellar' && 'ab-hero-chain-stellar',
-                )}
-                key={key}
-              >
-                <img
-                  alt={label}
-                  className="h-[clamp(1rem,2.5vh,1.25rem)] w-[clamp(1rem,2.5vh,1.25rem)] shrink-0 object-contain"
-                  src={icon}
-                />
-                <span
+            {supportedNetworks.map(({ icon, key, label }) => {
+              const chainFamily = key.toLowerCase().split(':')[0] ?? ''
+              return (
+                <div
                   className={cn(
-                    'text-center text-[clamp(0.75rem,1.5vw+0.5vh,0.875rem)] font-medium leading-tight',
-                    key === 'celo' && 'ab-hero-chain-celo-text',
-                    key === 'solana' && 'ab-hero-chain-solana-text',
-                    key === 'stellar' && 'ab-hero-chain-stellar-text',
+                    'flex items-center gap-[clamp(0.25rem,1vw,0.5rem)] self-stretch rounded-full border border-[var(--ab-border)] bg-[var(--ab-card)] px-[clamp(0.5rem,2vw,1rem)] py-[clamp(0.25rem,1vh,0.35rem)]',
+                    chainFamily === 'celo' && 'ab-hero-chain-celo',
+                    chainFamily === 'solana' && 'ab-hero-chain-solana',
+                    chainFamily === 'stellar' && 'ab-hero-chain-stellar',
                   )}
+                  key={key}
                 >
-                  {label}
-                </span>
-              </div>
-            ))}
+                  {icon && (
+                    <img
+                      alt=""
+                      className="h-[clamp(1rem,2.5vh,1.25rem)] w-[clamp(1rem,2.5vh,1.25rem)] shrink-0 object-contain"
+                      src={icon}
+                    />
+                  )}
+                  <span
+                    className={cn(
+                      'text-center text-[clamp(0.75rem,1.5vw+0.5vh,0.875rem)] font-medium leading-tight',
+                      chainFamily === 'celo' && 'ab-hero-chain-celo-text',
+                      chainFamily === 'solana' && 'ab-hero-chain-solana-text',
+                      chainFamily === 'stellar' && 'ab-hero-chain-stellar-text',
+                    )}
+                  >
+                    {label}
+                  </span>
+                </div>
+              )
+            })}
           </div>
 
           {/* Exchange Rates Section */}
           {onboardingRates && (
             <div className="mb-[clamp(0.5rem,2vh,1rem)] w-full max-w-[min(85vw,400px)]">
               <p className="ab-hero-subline text-center text-[clamp(0.75rem,1.5vw+0.5vh,0.875rem)] font-medium mb-[clamp(0.25rem,1vh,0.75rem)]">
-                {t('home.exchange_rates', 'Live Exchange Rates')}
+                {t('home.exchange_rates', 'Indicative exchange rates')}
               </p>
               <div className="grid grid-cols-2 gap-[clamp(0.5rem,1.5vw,0.75rem)]">
                 {/* COP Rates */}
@@ -224,12 +230,17 @@ export default function HomeScreen({
                   </div>
                 </div>
               </div>
+              <p className="mt-2 text-center text-[clamp(0.65rem,1.4vw,0.75rem)] leading-relaxed text-[var(--ab-text-muted)]">
+                {ratesUpdatedAt
+                  ? t('home.exchange_rates_context', 'From Abroad quotes · updated {time}. Your final rate, fees, and amount are confirmed before payment.', { time: ratesUpdatedAt })
+                  : t('home.exchange_rates_unavailable', 'Indicative rates are temporarily unavailable. Your final rate, fees, and amount are confirmed before payment.')}
+              </p>
             </div>
           )}
 
           {/* CTA Button – Figma 5:36 */}
           <button
-            className="ab-hero-cta mb-[clamp(0.5rem,1.5vh,1rem)] flex shrink-0 items-center justify-center gap-[clamp(0.25rem,1vw,0.5rem)] rounded-[clamp(0.75rem,2vh,1rem)] px-[clamp(1.5rem,4vw,2rem)] py-[clamp(0.5rem,1.5vh,1rem)] font-bold text-white shadow-[0px_10px_15px_-3px_rgba(0,0,0,0.1),0px_4px_6px_-4px_rgba(0,0,0,0.1)] transition-opacity hover:opacity-90"
+            className="ab-hero-cta mb-[clamp(0.5rem,1.5vh,1rem)] flex min-h-11 shrink-0 items-center justify-center gap-[clamp(0.25rem,1vw,0.5rem)] rounded-[clamp(0.75rem,2vh,1rem)] px-[clamp(1.5rem,4vw,2rem)] py-[clamp(0.5rem,1.5vh,1rem)] font-bold text-white shadow-[0px_10px_15px_-3px_rgba(0,0,0,0.1),0px_4px_6px_-4px_rgba(0,0,0,0.1)] transition-opacity hover:opacity-90"
             onClick={onEnterApp}
             type="button"
           >
@@ -240,7 +251,7 @@ export default function HomeScreen({
           </button>
 
           {/* Trust badges – Figma 5:41 */}
-          <div className="ab-hero-subline flex w-full flex-nowrap items-center justify-center gap-[clamp(0.5rem,2vw,2rem)]">
+          <div className="ab-hero-subline flex w-full flex-wrap items-center justify-center gap-x-[clamp(0.5rem,2vw,2rem)] gap-y-2">
             {trustBadges.map(({ Icon, label }) => (
               <div
                 className="flex shrink-0 items-center gap-[clamp(0.25rem,1vw,0.5rem)]"
@@ -258,9 +269,14 @@ export default function HomeScreen({
 
   // Dashboard view - Guest mode or Authenticated – Figma 1:3 / 1:42 pixel-perfect
   const c = targetCurrency === TargetCurrency.BRL ? COUNTRIES.BRL : COUNTRIES.COP
-  const localBalance = c.decimals === 0
-    ? Math.round(balanceNum * c.rate).toLocaleString('es-CO')
-    : (balanceNum * c.rate).toFixed(c.decimals)
+  const selectedRate = selectedTokenLabel === 'USDT'
+    ? targetCurrency === TargetCurrency.BRL ? onboardingRates?.brl.USDT : onboardingRates?.cop.USDT
+    : targetCurrency === TargetCurrency.BRL ? onboardingRates?.brl.USDC : onboardingRates?.cop.USDC
+  const localBalance = balanceNum !== null && Number.isFinite(balanceNum) && selectedRate !== null && selectedRate !== undefined
+    ? c.decimals === 0
+      ? Math.round(balanceNum * selectedRate).toLocaleString('es-CO')
+      : (balanceNum * selectedRate).toFixed(c.decimals)
+    : '--'
 
   const chainKey = selectedChainKey?.toLowerCase().split(':')[0] ?? 'stellar'
   const chainInfo = CHAIN_MAP[chainKey] ?? CHAIN_MAP.stellar
@@ -269,19 +285,16 @@ export default function HomeScreen({
   // Only the user's own (scoped) transactions are shown — never partner-wide data.
   const hasTransactions = isAuthenticated && recentTransactions.length > 0
   const isPixRail = targetCurrency === TargetCurrency.BRL
-  const pasteQrLabel = isPixRail
-    ? t('home.pix_copy_paste', 'PIX Copy & Paste')
-    : t('home.breb_copy_paste', 'BRE-B Copy & Paste')
   const paymentKeyLabel = isPixRail
     ? t('home.pay_with_pix_key', 'Pay with PIX key')
-    : t('home.pay_with_breb_key', 'Pay with BRE-B key')
-  const scanQrHint = t('home.scan_pix_qr_hint', 'Use camera or image')
-  const scanQrLabel = isPixRail
-    ? t('home.scan_pix_qr', 'Scan PIX QR')
-    : t('home.scan_breb_qr', 'Scan BRE-B QR')
+    : t('home.pay_with_breb_key', 'Pay with Llave BRE-B')
+  const useQrHint = t('home.use_qr_hint', 'Camera, paste, or screenshot')
+  const useQrLabel = isPixRail
+    ? t('home.use_pix_qr', 'Use a Pix QR code')
+    : t('home.use_breb_qr', 'Use a BRE-B QR code')
 
   return (
-    <div className="flex w-full h-full flex-col items-center px-0 overflow-y-auto">
+    <div className="flex w-full flex-col items-center px-0">
       <div className="w-full max-w-[min(90vw,576px)]">
         {/* Balance - Figma 1:46 */}
         <div className="flex flex-col items-center gap-[clamp(0.25rem,1vh,0.5rem)] py-[clamp(0.25rem,1vh,0.5rem)]">
@@ -315,7 +328,7 @@ export default function HomeScreen({
             )}
             >
               $
-              {isAuthenticated ? balance : '--'}
+              {isAuthenticated ? balance ?? '--' : '--'}
             </span>
           </div>
           <div className="flex items-center justify-center pt-[clamp(0.125rem,0.5vh,0.25rem)]">
@@ -346,10 +359,10 @@ export default function HomeScreen({
           {onOpenChainModal && (
             <button
               className={cn(
-                'flex items-center gap-2 rounded-full border border-[var(--ab-border)] bg-[var(--ab-bg-subtle)] px-[13px] py-[7px] transition-colors hover:opacity-90',
-                !isAuthenticated && 'cursor-not-allowed opacity-70',
+                'flex min-h-11 items-center gap-2 rounded-full border border-[var(--ab-border)] bg-[var(--ab-bg-subtle)] px-[13px] py-[7px] transition-colors hover:opacity-90',
+                !isAuthenticated && 'opacity-80',
               )}
-              onClick={isAuthenticated ? onOpenChainModal : onRequestConnect}
+              onClick={onOpenChainModal}
               type="button"
             >
               <img
@@ -369,66 +382,45 @@ export default function HomeScreen({
           )}
           {onSelectCurrency && (
             <CurrencyToggle
-              className={cn(isAuthenticated && 'md:hidden')}
               onChange={c => onSelectCurrency(c)}
               value={targetCurrency}
             />
           )}
         </div>
 
-        {/* Payment journeys for the selected local rail: QR, copy/paste, or recipient key. */}
-        <div className="mt-[clamp(0.75rem,2.5vh,1.5rem)] grid grid-cols-2 items-stretch gap-[clamp(0.375rem,1.25vw,0.75rem)] sm:grid-cols-4">
+        {/* One QR journey exposes camera, paste, and upload contextually; manual recipient keys stay separate. */}
+        <div className="mt-[clamp(0.75rem,2.5vh,1.5rem)] grid grid-cols-2 items-stretch gap-[clamp(0.375rem,1.25vw,0.75rem)]">
           <button
-            aria-label={scanQrLabel}
+            aria-label={useQrLabel}
             className={cn(
               PAYMENT_ACTION_CARD_CLASS,
-              'col-span-2 flex-row justify-start px-[clamp(1rem,3vw,1.5rem)] text-left',
+              'px-[clamp(0.75rem,2vw,1.25rem)] sm:flex-row sm:justify-start sm:text-left',
               isAuthenticated
                 ? 'bg-[#3ca383] shadow-[0px_0px_15px_0px_rgba(16,185,129,0.3)] hover:opacity-95'
                 : 'bg-[#3ca383]/80 hover:bg-[#3ca383]',
             )}
-            onClick={onScanQr}
+            onClick={onUseQr}
             type="button"
           >
             <div className={cn(PAYMENT_ACTION_ICON_CLASS, 'bg-white/20 backdrop-blur-[2px]')}>
               <QrCode className="h-full w-full p-[clamp(0.375rem,1.5vh,0.5rem)] text-white" strokeWidth={1.5} />
             </div>
-            <span className="flex min-w-0 flex-1 flex-col items-start gap-1">
+            <span className="flex min-w-0 flex-1 flex-col items-center gap-1 sm:items-start">
               <span className={cn(PAYMENT_ACTION_LABEL_CLASS, 'text-white')}>
-                {scanQrLabel}
+                {useQrLabel}
               </span>
               <span className="text-[clamp(0.7rem,1.4vw,0.8rem)] font-medium leading-tight text-white/80">
-                {scanQrHint}
+                {useQrHint}
               </span>
             </span>
             <img
               alt=""
               className={cn(
-                'h-[clamp(1rem,2.5vh,1.25rem)] w-auto shrink-0',
+                'hidden h-[clamp(1rem,2.5vh,1.25rem)] w-auto shrink-0 sm:block',
                 !isPixRail && 'rounded bg-white px-1 py-0.5',
               )}
               src={isPixRail ? '/pix-white.svg' : BreBLogo}
             />
-          </button>
-
-          <button
-            aria-label={pasteQrLabel}
-            className={cn(
-              PAYMENT_ACTION_CARD_CLASS,
-              'border border-[#3ca383]/40 bg-[var(--ab-bg-card)] shadow-[0px_4px_10px_rgba(16,185,129,0.08)] hover:border-[#3ca383]/70 hover:shadow-md',
-            )}
-            onClick={onPasteQr}
-            type="button"
-          >
-            <div className={cn(PAYMENT_ACTION_ICON_CLASS, 'bg-[#3ca383]/15')}>
-              <ClipboardPaste
-                className="h-full w-full p-[clamp(0.375rem,1.5vh,0.5rem)] text-[#3ca383]"
-                strokeWidth={1.5}
-              />
-            </div>
-            <span className={cn(PAYMENT_ACTION_LABEL_CLASS, 'text-[var(--ab-text)]')}>
-              {pasteQrLabel}
-            </span>
           </button>
 
           <button
@@ -458,13 +450,13 @@ export default function HomeScreen({
         {!isAuthenticated && (
           <div className="mt-[clamp(0.75rem,2.5vh,1.5rem)] flex justify-center">
             <button
-              className="ab-hero-cta flex items-center gap-[clamp(0.25rem,1vw,0.5rem)] rounded-[clamp(0.75rem,2vh,1rem)] px-[clamp(1rem,3vw,1.5rem)] py-[clamp(0.5rem,1.5vh,0.75rem)] font-bold text-white shadow-[0px_10px_15px_-3px_rgba(0,0,0,0.1),0px_4px_6px_-4px_rgba(0,0,0,0.1)] transition-opacity hover:opacity-90"
+              className="ab-hero-cta flex min-h-11 items-center gap-[clamp(0.25rem,1vw,0.5rem)] rounded-[clamp(0.75rem,2vh,1rem)] px-[clamp(1rem,3vw,1.5rem)] py-[clamp(0.5rem,1.5vh,0.75rem)] font-bold text-white shadow-[0px_10px_15px_-3px_rgba(0,0,0,0.1),0px_4px_6px_-4px_rgba(0,0,0,0.1)] transition-opacity hover:opacity-90"
               onClick={onRequestConnect}
               type="button"
             >
               <Wallet className="h-[clamp(1rem,2.5vh,1.25rem)] w-[clamp(1rem,2.5vh,1.25rem)]" />
               <span className="text-[clamp(0.875rem,2vw+0.5vh,1rem)] leading-tight">
-                {t('home.cta_connect', 'Connect Wallet')}
+                {t('home.cta_connect', 'Connect wallet to continue')}
               </span>
               <ChevronRight className="h-[clamp(1rem,2.5vh,1.25rem)] w-[clamp(1rem,2.5vh,1.25rem)] shrink-0" />
             </button>
@@ -473,13 +465,13 @@ export default function HomeScreen({
 
         {/* Recent transactions - only when authenticated */}
         {hasTransactions && (
-          <div className="mt-[clamp(0.5rem,2vh,1rem)] flex-1 min-h-0 overflow-y-auto">
+          <div className="mt-[clamp(0.5rem,2vh,1rem)]">
             <div className="mb-4 flex items-center justify-between">
               <span className="text-xs font-bold uppercase leading-4 tracking-[1.2px] text-[var(--ab-text-muted)]">
                 {t('home.recent', 'Recent')}
               </span>
               <button
-                className="text-sm font-medium leading-5 text-[var(--ab-green)]"
+                className="min-h-11 rounded-xl px-2 text-sm font-medium leading-5 text-[var(--ab-green)] hover:bg-[var(--ab-green-soft)]"
                 onClick={onHistoryClick}
                 type="button"
               >
@@ -489,7 +481,7 @@ export default function HomeScreen({
             <div className="divide-y divide-[var(--ab-border)] overflow-hidden rounded-2xl border border-[var(--ab-border)] bg-[var(--ab-bg-card)]">
               {recentTransactions.slice(0, 2).map((tx) => {
                 const countryConfig = RECENT_COUNTRY_CONFIG[tx.quote.targetCurrency] ?? RECENT_COUNTRY_CONFIG.COP
-                const isExpired = isApiTxExpired(tx.status)
+                const statusPresentation = activityStatusPresentation(tx.status, (key, fallback) => t(key, fallback))
                 const localAmount = tx.quote.targetAmount.toLocaleString(
                   localeForCurrency(tx.quote.targetCurrency),
                   numberFormatOptions(tx.quote.targetCurrency),
@@ -510,27 +502,15 @@ export default function HomeScreen({
                       />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div
-                        className={cn(
-                          'text-sm font-semibold',
-                          isExpired ? 'text-[var(--ab-text-muted)] line-through' : 'text-[var(--ab-text)]',
-                        )}
-                      >
-                        {tx.accountNumber}
+                      <div className="text-sm font-semibold text-[var(--ab-text)]">
+                        {tx.recipientHint ?? t('activity.recipient.unavailable', 'Recipient unavailable')}
                       </div>
-                      {formatDate && (
-                        <div className="mt-0.5 text-xs text-[var(--ab-text-muted)]">
-                          {formatDate(tx.createdAt)}
-                        </div>
-                      )}
+                      <div className="mt-0.5 text-xs text-[var(--ab-text-muted)]">
+                        {new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(new Date(tx.timestamps.createdAt))}
+                      </div>
                     </div>
                     <div className="flex flex-col items-end gap-0.5">
-                      <div
-                        className={cn(
-                          'flex items-center gap-1 text-sm font-semibold',
-                          isExpired ? 'text-[var(--ab-text-muted)] line-through' : 'text-[var(--ab-text)]',
-                        )}
-                      >
+                      <div className="flex items-center gap-1 text-sm font-semibold text-[var(--ab-text)]">
                         {countryConfig.symbol}
                         {localAmount}
                         <img alt={countryConfig.currency} className="h-3 w-3 rounded-full" src={countryConfig.flagUrl} />
@@ -538,13 +518,9 @@ export default function HomeScreen({
                       <div className="flex items-center gap-1 text-[11px] text-[var(--ab-text-muted)]">
                         $
                         {tx.quote.sourceAmount.toFixed(2)}
-                        <img alt={tx.quote.cryptoCurrency} className="h-3 w-3" src={TOKEN_ICON_URL[tx.quote.cryptoCurrency] ?? TOKEN_ICON_URL.USDC} />
+                        <img alt={tx.quote.sourceCurrency} className="h-3 w-3" src={TOKEN_ICON_URL[tx.quote.sourceCurrency] ?? TOKEN_ICON_URL.USDC} />
                       </div>
-                      {getStatusStyle && getStatusText && (
-                        <span className={cn('rounded-full px-2 py-0.5 text-[10px] font-medium', getStatusStyle(tx.status))}>
-                          {getStatusText(tx.status)}
-                        </span>
-                      )}
+                      <ActivityStatusPill label={statusPresentation.label} tone={statusPresentation.tone} />
                     </div>
                     <ChevronRight className="h-4 w-4 shrink-0 text-[var(--ab-text-muted)]" />
                   </button>

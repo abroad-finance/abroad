@@ -1,5 +1,5 @@
 import type { OpsExternalIdentity, OpsPrincipal, OpsUserPrincipal } from '../../modules/operations/application/opsIdentity'
-import type { AuthenticatedPartner } from '../../modules/partners/application/contracts/IPartnerService'
+import type { AuthenticatedPartner, AuthenticatedWalletPrincipal } from '../../modules/partners/application/contracts/IPartnerService'
 import type { PartnerPortalPrincipal } from '../../modules/partners/application/PartnerPortalSessionService'
 
 import { ApplicationError } from '../../core/errors'
@@ -19,6 +19,28 @@ export const requireAuthenticatedPartner = (
     throw new Error('Authenticated partner context is unavailable')
   }
   return authentication
+}
+
+const isAuthenticatedWalletPrincipal = (
+  authentication: AuthenticatedPartner,
+): authentication is AuthenticatedWalletPrincipal => (
+  authentication.authenticationSource === 'WALLET'
+  && typeof authentication.authenticatedSubject === 'string'
+  && authentication.authenticatedSubject.trim().length > 0
+)
+
+export const requireAuthenticatedWalletPrincipal = (
+  authentication: RequestAuthentication | undefined,
+): AuthenticatedWalletPrincipal => {
+  const partner = requireAuthenticatedPartner(authentication)
+  if (!isAuthenticatedWalletPrincipal(partner)) {
+    throw new ApplicationError(
+      403,
+      'wallet_authentication_required',
+      'Authenticated wallet context is unavailable',
+    )
+  }
+  return partner
 }
 
 export const requirePartnerPortalPrincipal = (

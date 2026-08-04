@@ -15,17 +15,21 @@ import {
   TargetCurrency,
 } from '.prisma/client'
 
+import type { ILogger } from '../../../../../core/logging/types'
 import type { IPartnerService } from '../../../../../modules/partners/application/contracts/IPartnerService'
 import type { IQuoteUseCase, QuoteResponse } from '../../../../../modules/quotes/application/quoteUseCase'
 
+import { QuoteRequestError } from '../../../../../modules/quotes/application/errors/QuoteRequestError'
 import { QuoteController } from '../../../../../modules/quotes/interfaces/http/QuoteController'
 
 describe('QuoteController', () => {
   let mockQuoteUseCase: jest.Mocked<IQuoteUseCase>
   let mockPartnerService: jest.Mocked<IPartnerService>
+  let mockLogger: jest.Mocked<ILogger>
   let controller: QuoteController
   let req: RequestExpress
   let badRequest: jest.Mock
+  let internalServerError: jest.Mock
 
   const partner = { id: 'partner-1' }
 
@@ -41,9 +45,16 @@ describe('QuoteController', () => {
       getPartnerFromClientDomain: jest.fn(),
     } as unknown as jest.Mocked<IPartnerService>
 
-    controller = new QuoteController(mockQuoteUseCase, mockPartnerService)
+    mockLogger = {
+      error: jest.fn(),
+      info: jest.fn(),
+      warn: jest.fn(),
+    }
+
+    controller = new QuoteController(mockQuoteUseCase, mockPartnerService, mockLogger)
     req = { user: partner } as unknown as RequestExpress
     badRequest = jest.fn((code: number, body: { reason: string }) => body)
+    internalServerError = jest.fn((code: number, body: { reason: string }) => body)
   })
 
   /* ------------------------------------------------------------------
@@ -61,12 +72,13 @@ describe('QuoteController', () => {
     it('returns a quote for a valid request', async () => {
       const quote: QuoteResponse = {
         expiration_time: Date.now() + 60_000,
+        fee: { amount: '1.25', currency: CryptoCurrency.USDC, type: 'combined' },
         quote_id: 'q-123',
         value: 500,
       }
       mockQuoteUseCase.createQuote.mockResolvedValueOnce(quote)
 
-      const result = await controller.getQuote(validQuoteBody, req, badRequest, undefined)
+      const result = await controller.getQuote(validQuoteBody, req, badRequest, internalServerError)
 
       expect(result).toEqual(quote)
       expect(badRequest).not.toHaveBeenCalled()
@@ -83,7 +95,7 @@ describe('QuoteController', () => {
     it('returns 400 when the body fails Zod validation', async () => {
       const invalidBody = { ...validQuoteBody, amount: -10 }
 
-      const result = await controller.getQuote(invalidBody, req, badRequest, undefined)
+      const result = await controller.getQuote(invalidBody, req, badRequest, internalServerError)
 
       expect(badRequest).toHaveBeenCalledWith(
         400,
@@ -96,27 +108,55 @@ describe('QuoteController', () => {
     })
 
     it('maps business errors from createQuote to 400', async () => {
-      mockQuoteUseCase.createQuote.mockRejectedValueOnce(new Error('boom'))
+      mockQuoteUseCase.createQuote.mockRejectedValueOnce(new QuoteRequestError(
+        'minimum',
+        'The minimum allowed amount for COP is 5,000 COP',
+        false,
+        400,
+      ))
 
-      const result = await controller.getQuote(validQuoteBody, req, badRequest, undefined)
+      const result = await controller.getQuote(validQuoteBody, req, badRequest, internalServerError)
 
-      expect(badRequest).toHaveBeenCalledWith(400, { reason: 'boom' })
-      expect(result).toEqual({ reason: 'boom' })
+      expect(badRequest).toHaveBeenCalledWith(400, {
+        code: 'minimum',
+        reason: 'The minimum allowed amount for COP is 5,000 COP',
+        retryable: false,
+      })
+      expect(result).toEqual({
+        code: 'minimum',
+        reason: 'The minimum allowed amount for COP is 5,000 COP',
+        retryable: false,
+      })
     })
 
-    it('returns a 500 fallback on non-Error rejections', async () => {
-      const setStatusSpy = jest.spyOn(controller, 'setStatus')
-      mockQuoteUseCase.createQuote.mockRejectedValueOnce('unknown')
+    it.each([
+      ['ordinary errors', new Error('provider response with internal detail')],
+      ['non-Error rejections', 'unknown'],
+    ])('returns a sanitized 500 fallback on %s', async (_label, rejection) => {
+      mockQuoteUseCase.createQuote.mockRejectedValueOnce(rejection)
 
-      const result = await controller.getQuote(validQuoteBody, req, badRequest, undefined)
+      const result = await controller.getQuote(validQuoteBody, req, badRequest, internalServerError)
 
-      expect(setStatusSpy).toHaveBeenCalledWith(500)
-      expect(result).toEqual({ expiration_time: 0, quote_id: 'error', value: 0 })
+      expect(internalServerError).toHaveBeenCalledWith(500, {
+        code: 'server_error',
+        reason: 'Unable to create quote',
+        retryable: true,
+      })
+      expect(result).toEqual({
+        code: 'server_error',
+        reason: 'Unable to create quote',
+        retryable: true,
+      })
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        '[QuoteController] quote request failed',
+        expect.objectContaining({ errorName: expect.any(String) }),
+      )
     })
 
     it('uses X-API-Key to resolve the partner when no authenticated partner is present', async () => {
       const quote: QuoteResponse = {
         expiration_time: Date.now() + 60_000,
+        fee: { amount: '0', currency: CryptoCurrency.USDC, type: 'none' },
         quote_id: 'q-456',
         value: 600,
       }
@@ -129,6 +169,7 @@ describe('QuoteController', () => {
         validQuoteBody,
         requestWithoutUser,
         badRequest,
+        internalServerError,
         'api-key-123',
       )
 
@@ -151,17 +192,31 @@ describe('QuoteController', () => {
         validQuoteBody,
         {} as unknown as RequestExpress,
         badRequest,
+        internalServerError,
         'bad-key',
       )
 
-      expect(result).toEqual({ reason: 'Invalid API key' })
+      expect(result).toEqual({
+        code: 'authentication_failed',
+        reason: 'Invalid API key',
+        retryable: false,
+      })
       expect(mockQuoteUseCase.createQuote).not.toHaveBeenCalled()
-      expect(badRequest).toHaveBeenCalledWith(400, { reason: 'Invalid API key' })
+      expect(badRequest).toHaveBeenCalledWith(400, {
+        code: 'authentication_failed',
+        reason: 'Invalid API key',
+        retryable: false,
+      })
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        '[QuoteController] quote authentication failed',
+        { errorName: 'Error', method: 'api_key' },
+      )
     })
 
     it('resolves an optional Bearer token for a client-domain SEP quote', async () => {
       const quote: QuoteResponse = {
         expiration_time: Date.now() + 60_000,
+        fee: { amount: '0.5', currency: CryptoCurrency.USDC, type: 'percentage' },
         quote_id: 'q-sep',
         value: 610,
       }
@@ -172,6 +227,7 @@ describe('QuoteController', () => {
         )),
       } as unknown as RequestExpress
       mockPartnerService.authenticateBearerToken.mockResolvedValueOnce({
+        authenticatedSubject: 'sep:synthetic-subject',
         partner: sepPartner,
         source: 'SEP_24',
       })
@@ -181,6 +237,7 @@ describe('QuoteController', () => {
         validQuoteBody,
         bearerRequest,
         badRequest,
+        internalServerError,
         undefined,
       )
 
@@ -207,6 +264,7 @@ describe('QuoteController', () => {
     it('returns a reverse quote for a valid request', async () => {
       const quote: QuoteResponse = {
         expiration_time: Date.now() + 60_000,
+        fee: { amount: '1', currency: CryptoCurrency.USDC, type: 'fixed' },
         quote_id: 'rq-123',
         value: 120,
       }
@@ -216,6 +274,7 @@ describe('QuoteController', () => {
         validReverseBody,
         req,
         badRequest,
+        internalServerError,
         undefined,
       )
 
@@ -238,6 +297,7 @@ describe('QuoteController', () => {
         invalidBody,
         req,
         badRequest,
+        internalServerError,
         undefined,
       )
 

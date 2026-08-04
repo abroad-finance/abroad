@@ -4,10 +4,17 @@ import type { ClientDomain } from '../../domain/clientDomain'
 import type { PartnerApiKeyScopeName } from '../partnerApiKeyScopes'
 
 export type AuthenticatedPartner = Partner & {
+  authenticatedSubject?: string
   authenticationSource: PartnerAuthenticationSource
 }
 
+export type AuthenticatedWalletPrincipal = AuthenticatedPartner & {
+  authenticatedSubject: string
+  authenticationSource: 'WALLET'
+}
+
 export type BearerAuthentication = {
+  authenticatedSubject: string
   partner: Partner
   source: Extract<PartnerAuthenticationSource, 'SEP_24' | 'WALLET'>
 }

@@ -100,7 +100,7 @@ export class PartnerService implements IPartnerService {
       if (clientDomain) {
         const partner = await this.findPartnerByClientDomain(prismaClient, clientDomain)
         if (partner) {
-          return { partner, source }
+          return { authenticatedSubject: decodedToken.sub, partner, source }
         }
       }
 
@@ -110,7 +110,7 @@ export class PartnerService implements IPartnerService {
         throw new Error('Partner not found')
       }
 
-      return { partner, source }
+      return { authenticatedSubject: decodedToken.sub, partner, source }
     }
     catch {
       throw new Error('Bearer JWT verification failed')

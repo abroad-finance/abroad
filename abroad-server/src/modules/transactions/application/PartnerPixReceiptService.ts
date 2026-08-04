@@ -5,6 +5,14 @@ import { TYPES } from '../../../app/container/types'
 import { IDatabaseClientProvider } from '../../../platform/persistence/IDatabaseClientProvider'
 import { TransferoUltraClient, TransferoUltraError } from '../../transfero/infrastructure/TransferoUltraClient'
 
+export interface IPartnerPixReceiptService {
+  getReceipt(
+    partnerId: string,
+    transactionId: string,
+    language: PartnerPixReceiptLanguage,
+  ): Promise<PartnerPixReceiptDto>
+}
+
 export type PartnerPixReceiptDto = {
   contentBase64: string
   contentType: 'application/pdf'
@@ -36,7 +44,7 @@ export class PartnerPixReceiptUnavailableError extends Error {
 }
 
 @injectable()
-export class PartnerPixReceiptService {
+export class PartnerPixReceiptService implements IPartnerPixReceiptService {
   public constructor(
     @inject(TYPES.IDatabaseClientProvider)
     private readonly databaseClientProvider: IDatabaseClientProvider,

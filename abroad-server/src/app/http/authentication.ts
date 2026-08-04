@@ -46,8 +46,10 @@ const resolveBearerToken = (authorizationHeader: string | undefined): null | str
 const withAuthenticationSource = (
   partner: Omit<AuthenticatedPartner, 'authenticationSource'>,
   authenticationSource: PartnerAuthenticationSource,
+  authenticatedSubject?: string,
 ): AuthenticatedPartner => ({
   ...partner,
+  ...(authenticatedSubject ? { authenticatedSubject } : {}),
   authenticationSource,
 })
 
@@ -155,7 +157,11 @@ export async function expressAuthentication(
 
     try {
       const authentication = await partnerService.authenticateBearerToken(token)
-      return withAuthenticationSource(authentication.partner, authentication.source)
+      return withAuthenticationSource(
+        authentication.partner,
+        authentication.source,
+        authentication.authenticatedSubject,
+      )
     }
     catch {
       throw new Error('Invalid token or partner not found')

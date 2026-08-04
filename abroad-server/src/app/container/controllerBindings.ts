@@ -36,7 +36,9 @@ import { PaymentsNotifyController } from '../../modules/payments/interfaces/http
 import { QrDecoderController } from '../../modules/payments/interfaces/http/QrDecoderController'
 import { SolanaPaymentsController } from '../../modules/payments/interfaces/http/SolanaPaymentsController'
 import { QuoteController } from '../../modules/quotes/interfaces/http/QuoteController'
+import { ConsumerUxTelemetryController } from '../../modules/telemetry/interfaces/http/ConsumerUxTelemetryController'
 import { PixCheckoutTelemetryController } from '../../modules/telemetry/interfaces/http/PixCheckoutTelemetryController'
+import { ConsumerActivityController } from '../../modules/transactions/interfaces/http/ConsumerActivityController'
 import { OpsTransactionsController } from '../../modules/transactions/interfaces/http/OpsTransactionsController'
 import { PartnerPortalController } from '../../modules/transactions/interfaces/http/PartnerPortalController'
 import { PublicTransactionsController } from '../../modules/transactions/interfaces/http/PublicTransactionsController'
@@ -76,9 +78,11 @@ const controllerBindings: ReadonlyArray<BindingRegistration<unknown>> = [
   { bindSelf: true, identifier: PartnerPortalTeamController, implementation: PartnerPortalTeamController },
   { bindSelf: true, identifier: PartnerUserController, implementation: PartnerUserController },
   { bindSelf: true, identifier: QuoteController, implementation: QuoteController },
+  { bindSelf: true, identifier: ConsumerUxTelemetryController, implementation: ConsumerUxTelemetryController },
   { bindSelf: true, identifier: PixCheckoutTelemetryController, implementation: PixCheckoutTelemetryController },
   { bindSelf: true, identifier: TransactionController, implementation: TransactionController },
   { bindSelf: true, identifier: TransactionsController, implementation: TransactionsController },
+  { bindSelf: true, identifier: ConsumerActivityController, implementation: ConsumerActivityController },
   { bindSelf: true, identifier: PublicTransactionsController, implementation: PublicTransactionsController },
   { bindSelf: true, identifier: OpsTransactionsController, implementation: OpsTransactionsController },
   { bindSelf: true, identifier: PartnerPortalController, implementation: PartnerPortalController },

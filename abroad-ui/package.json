@@ -55,6 +55,7 @@
     "@types/react": "^19.1.10",
     "@types/react-dom": "^19.1.7",
     "@vitejs/plugin-react": "^5.0.0",
+    "axe-core": "^4.12.1",
     "dependency-cruiser": "^17.0.1",
     "eslint": "^9.33.0",
     "eslint-plugin-import": "^2.32.0",

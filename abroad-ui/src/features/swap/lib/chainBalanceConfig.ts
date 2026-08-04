@@ -1,6 +1,6 @@
 /**
  * RPC and token addresses for non-Stellar chains.
- * Stellar uses USDC only (handled in useWalletDetails).
+ * Stellar uses USDC only (handled by the shared stablecoin balance hook).
  * Solana and EVM (e.g. Celo) show USDC + USDT.
  */
 export interface ChainBalanceConfig {

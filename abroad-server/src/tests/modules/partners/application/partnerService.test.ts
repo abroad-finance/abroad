@@ -249,6 +249,7 @@ describe('PartnerService', () => {
     expect(jwt.verify).toHaveBeenCalledWith('token-123', 'secret-STELLAR_SEP_JWT_SECRET')
     expect(findFirst).toHaveBeenCalledWith({ where: { clientDomainHash: hashedClientDomain } })
     expect(result).toEqual({
+      authenticatedSubject: 'subject',
       partner: partnerFromDomain,
       source: 'SEP_24',
     })
@@ -268,6 +269,7 @@ describe('PartnerService', () => {
     expect(findFirst).toHaveBeenCalledTimes(1)
     expect(findFirst).toHaveBeenCalledWith({ where: { id: 'secret-STELLAR_SEP_PARTNER_ID' } })
     expect(result).toEqual({
+      authenticatedSubject: 'subject',
       partner: defaultPartner,
       source: 'SEP_24',
     })
@@ -281,6 +283,7 @@ describe('PartnerService', () => {
     expect(findFirst).toHaveBeenCalledWith({ where: { clientDomainHash: hashedClientDomain } })
     expect(findFirst).toHaveBeenCalledWith({ where: { id: 'secret-STELLAR_SEP_PARTNER_ID' } })
     expect(result).toEqual({
+      authenticatedSubject: 'subject',
       partner: defaultPartner,
       source: 'SEP_24',
     })
@@ -313,6 +316,7 @@ describe('PartnerService', () => {
     const result = await service.authenticateBearerToken('wallet-token')
 
     expect(result).toEqual({
+      authenticatedSubject: 'stellar:pubnet:GABC',
       partner: defaultPartner,
       source: 'WALLET',
     })
@@ -327,6 +331,7 @@ describe('PartnerService', () => {
 
     const result = await service.authenticateBearerToken('ambiguous-token')
 
+    expect(result.authenticatedSubject).toBe('subject')
     expect(result.source).toBe('WALLET')
   })
 })

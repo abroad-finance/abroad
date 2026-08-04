@@ -1,7 +1,11 @@
 import { useTranslate } from '@tolgee/react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Search, X } from 'lucide-react'
-import React, { useCallback, useMemo, useState } from 'react'
+import React, {
+  useCallback, useId, useMemo, useState,
+} from 'react'
+
+import { ModalSurface } from '@/shared/components/ModalSurface'
 
 import { AB_STYLES, CHAIN_ICON_MAP, CURRENCY_FLAG_URL } from '../../../shared/constants'
 import { cn } from '../../../shared/utils'
@@ -54,6 +58,8 @@ const TokenSelectModal: React.FC<TokenSelectModalProps> = ({
   tokens,
 }) => {
   const { t } = useTranslate()
+  const searchId = useId()
+  const titleId = useId()
   const [search, setSearch] = useState('')
 
   const filteredTokens = useMemo(() => {
@@ -80,33 +86,23 @@ const TokenSelectModal: React.FC<TokenSelectModalProps> = ({
   }, [onClose])
 
   return (
-    <AnimatePresence>
-      {open && (
-        <motion.div
-          animate={{ opacity: 1 }}
-          className="fixed inset-0 z-[1000] flex items-center justify-center p-4"
-          exit={{ opacity: 0 }}
-          initial={{ opacity: 0 }}
-          onClick={handleClose}
-          transition={{ duration: 0.15 }}
-        >
-          {/* Backdrop */}
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
-
-          {/* Modal */}
+    <ModalSurface onClose={handleClose} open={open} titleId={titleId}>
+      <AnimatePresence>
+        {open && (
           <motion.div
             animate={{ opacity: 1, scale: 1, y: 0 }}
             className="relative w-full max-w-sm rounded-3xl p-6 shadow-2xl bg-ab-modal-bg border border-ab-modal-border"
             exit={{ opacity: 0, scale: 0.95, y: 10 }}
             initial={{ opacity: 0, scale: 0.95, y: 10 }}
-            onClick={e => e.stopPropagation()}
             transition={{ duration: 0.2, ease: 'easeOut' }}
           >
             {/* Header */}
             <div className="flex items-center justify-between mb-5">
-              <h2 className={cn('text-xl font-semibold', AB_STYLES.text)}>{title}</h2>
+              <h2 className={cn('text-xl font-semibold', AB_STYLES.text)} id={titleId}>{title}</h2>
               <button
-                className={cn('p-1.5 rounded-full transition-colors cursor-pointer', AB_STYLES.textMuted)}
+                aria-label={t('token_select.close', 'Close selector')}
+                className={cn('flex size-11 items-center justify-center rounded-full transition-colors cursor-pointer', AB_STYLES.textMuted)}
+                data-modal-initial-focus
                 onClick={handleClose}
                 type="button"
               >
@@ -117,8 +113,10 @@ const TokenSelectModal: React.FC<TokenSelectModalProps> = ({
             {/* Search */}
             <div className="flex items-center gap-2 rounded-xl px-3 py-2.5 mb-5 bg-ab-input border border-ab-input-border">
               <Search className={cn('w-4 h-4 shrink-0', AB_STYLES.textMuted)} />
+              <label className="sr-only" htmlFor={searchId}>{t('token_select.search_label', 'Search available options')}</label>
               <input
                 className={cn('w-full bg-transparent text-sm focus:outline-none', AB_STYLES.text)}
+                id={searchId}
                 onChange={e => setSearch(e.target.value)}
                 placeholder={t('token_select.search', 'Search')}
                 type="text"
@@ -212,9 +210,9 @@ const TokenSelectModal: React.FC<TokenSelectModalProps> = ({
               })}
             </div>
           </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
+        )}
+      </AnimatePresence>
+    </ModalSurface>
   )
 }
 

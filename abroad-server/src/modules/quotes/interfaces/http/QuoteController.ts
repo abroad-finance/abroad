@@ -18,18 +18,34 @@ import { z } from 'zod'
 
 import { TYPES } from '../../../../app/container/types'
 import { requireAuthenticatedPartner } from '../../../../app/http/authenticationContext'
+import { ILogger } from '../../../../core/logging/types'
 import { IPartnerService } from '../../../partners/application/contracts/IPartnerService'
+import { CorridorNotConfiguredError } from '../../application/errors/CorridorNotConfiguredError'
+import { QuoteRequestError, QuoteRequestErrorCode } from '../../application/errors/QuoteRequestError'
 import { IQuoteUseCase, QuoteResponse } from '../../application/quoteUseCase'
 import { QuoteRequest, quoteRequestSchema, ReverseQuoteRequest, reverseQuoteRequestSchema } from './contracts'
 
+export type QuoteErrorResponse = {
+  code: QuoteErrorCode
+  reason: string
+  retryable: boolean
+}
+
 type PartnerResolution = { errorReason?: string, partner?: Partner }
+
+type QuoteErrorCode
+  = | 'authentication_failed'
+    | 'invalid_request'
+    | 'server_error'
+    | QuoteRequestErrorCode
 
 const BEARER_PREFIX = 'Bearer '
 
 type QuoteHandlerParams<TPayload> = {
   apiKey?: string
-  badRequestResponse: TsoaResponse<400, { reason: string }>
+  badRequestResponse: TsoaResponse<400, QuoteErrorResponse>
   buildQuote: (payload: TPayload, partner: Partner | undefined) => Promise<QuoteResponse>
+  internalServerErrorResponse: TsoaResponse<500, QuoteErrorResponse>
   request: RequestExpress
   requestBody: unknown
   schema: z.ZodSchema<TPayload>
@@ -42,6 +58,8 @@ export class QuoteController extends Controller {
     private quoteUseCase: IQuoteUseCase,
     @inject(TYPES.IPartnerService)
     private partnerService: IPartnerService,
+    @inject(TYPES.ILogger)
+    private readonly logger: ILogger,
   ) {
     super()
   }
@@ -51,11 +69,13 @@ export class QuoteController extends Controller {
    */
   @Post()
   @Response('400', 'Bad Request')
+  @Response('500', 'Internal Server Error')
   @SuccessResponse('200', 'Quote response')
   public async getQuote(
     @Body() requestBody: QuoteRequest,
     @Request() request: RequestExpress,
-    @Res() badRequestResponse: TsoaResponse<400, { reason: string }>,
+    @Res() badRequestResponse: TsoaResponse<400, QuoteErrorResponse>,
+    @Res() internalServerErrorResponse: TsoaResponse<500, QuoteErrorResponse>,
     @Header('X-API-Key') apiKey?: string,
   ): Promise<QuoteResponse> {
     return this.handleQuoteRequest({
@@ -69,6 +89,7 @@ export class QuoteController extends Controller {
         paymentMethod: payload.payment_method,
         targetCurrency: payload.target_currency,
       }),
+      internalServerErrorResponse,
       request,
       requestBody,
       schema: quoteRequestSchema,
@@ -81,11 +102,13 @@ export class QuoteController extends Controller {
    */
   @Post('/reverse')
   @Response('400', 'Bad Request')
+  @Response('500', 'Internal Server Error')
   @SuccessResponse('200', 'Reverse quote response')
   public async getReverseQuote(
     @Body() requestBody: ReverseQuoteRequest,
     @Request() request: RequestExpress,
-    @Res() badRequestResponse: TsoaResponse<400, { reason: string }>,
+    @Res() badRequestResponse: TsoaResponse<400, QuoteErrorResponse>,
+    @Res() internalServerErrorResponse: TsoaResponse<500, QuoteErrorResponse>,
     @Header('X-API-Key') apiKey?: string,
   ): Promise<QuoteResponse> {
     return this.handleQuoteRequest({
@@ -99,6 +122,7 @@ export class QuoteController extends Controller {
         sourceAmountInput: payload.source_amount,
         targetCurrency: payload.target_currency,
       }),
+      internalServerErrorResponse,
       request,
       requestBody,
       schema: reverseQuoteRequestSchema,
@@ -112,6 +136,7 @@ export class QuoteController extends Controller {
       apiKey,
       badRequestResponse,
       buildQuote,
+      internalServerErrorResponse,
       request,
       requestBody,
       schema,
@@ -119,24 +144,59 @@ export class QuoteController extends Controller {
 
     const parsed = schema.safeParse(requestBody)
     if (!parsed.success) {
-      return badRequestResponse(400, { reason: parsed.error.message })
+      return badRequestResponse(400, {
+        code: 'invalid_request',
+        reason: 'The quote request is invalid',
+        retryable: false,
+      })
     }
 
     const { errorReason, partner } = await this.resolvePartner(request, apiKey)
     if (errorReason) {
-      return badRequestResponse(400, { reason: errorReason })
+      return badRequestResponse(400, {
+        code: 'authentication_failed',
+        reason: errorReason,
+        retryable: false,
+      })
     }
 
     try {
       return await buildQuote(parsed.data, partner)
     }
     catch (error) {
-      if (error instanceof Error) {
-        return badRequestResponse(400, { reason: error.message })
+      if (error instanceof QuoteRequestError) {
+        const response = {
+          code: error.code,
+          reason: error.message,
+          retryable: error.retryable,
+        }
+        return error.status === 400
+          ? badRequestResponse(400, response)
+          : internalServerErrorResponse(500, response)
       }
-      this.setStatus(500)
-      return { expiration_time: 0, quote_id: 'error', value: 0 }
+      if (error instanceof CorridorNotConfiguredError) {
+        return badRequestResponse(400, {
+          code: 'corridor_unavailable',
+          reason: 'The selected payment route is currently unavailable',
+          retryable: false,
+        })
+      }
+      this.logger.error('[QuoteController] quote request failed', {
+        errorName: error instanceof Error ? error.name : typeof error,
+      })
+      return internalServerErrorResponse(500, {
+        code: 'server_error',
+        reason: 'Unable to create quote',
+        retryable: true,
+      })
     }
+  }
+
+  private logAuthenticationFailure(method: 'api_key' | 'bearer', error: unknown): void {
+    this.logger.warn('[QuoteController] quote authentication failed', {
+      errorName: error instanceof Error ? error.name : typeof error,
+      method,
+    })
   }
 
   private async resolvePartner(
@@ -155,8 +215,8 @@ export class QuoteController extends Controller {
         return { partner }
       }
       catch (error) {
-        const reason = error instanceof Error ? error.message : 'Invalid API key'
-        return { errorReason: reason }
+        this.logAuthenticationFailure('api_key', error)
+        return { errorReason: 'Invalid API key' }
       }
     }
 
@@ -172,8 +232,8 @@ export class QuoteController extends Controller {
         return { partner: authentication.partner }
       }
       catch (error) {
-        const reason = error instanceof Error ? error.message : 'Invalid Bearer token'
-        return { errorReason: reason }
+        this.logAuthenticationFailure('bearer', error)
+        return { errorReason: 'Invalid Bearer token' }
       }
     }
 

@@ -17,7 +17,7 @@ import {
 import { Body, Post } from 'tsoa'
 
 import { TYPES } from '../../../../app/container/types'
-import { requireAuthenticatedPartner } from '../../../../app/http/authenticationContext'
+import { requireAuthenticatedPartner, requireAuthenticatedWalletPrincipal } from '../../../../app/http/authenticationContext'
 import { IDatabaseClientProvider } from '../../../../platform/persistence/IDatabaseClientProvider'
 import { PaymentContextService } from '../../../payments/application/PaymentContextService'
 import { TransactionAcceptanceService, TransactionValidationError } from '../../application/TransactionAcceptanceService'
@@ -137,8 +137,16 @@ export class TransactionController extends Controller {
     @Path() transactionId: string,
     @Request() request: RequestExpress,
   ): Promise<TransactionStatusResponse> {
-    const partnerId = String(requireAuthenticatedPartner(request.user).id)
-    const status = await this.transactionStatusService.getStatus(transactionId, partnerId)
+    const principal = requireAuthenticatedPartner(request.user)
+    const partnerId = String(principal.id)
+    const authenticatedSubject = principal.authenticationSource === 'WALLET'
+      ? requireAuthenticatedWalletPrincipal(request.user).authenticatedSubject
+      : undefined
+    const status = await this.transactionStatusService.getStatus(
+      transactionId,
+      partnerId,
+      authenticatedSubject,
+    )
 
     return {
       id: status.id,

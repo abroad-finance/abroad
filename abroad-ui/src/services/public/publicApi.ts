@@ -1,4 +1,5 @@
 import type { TransactionStatus } from '../../api'
+import type { ConsumerUxTelemetryRequest } from '../../observability/consumerUxTelemetry'
 import type { ApiResult } from '../http/types'
 import type {
   AcceptTransactionRequest,
@@ -11,6 +12,7 @@ import type {
 } from './types'
 
 import { httpClient } from '../http/httpClient'
+import { publicCorridorResponseSchema, quoteResponseSchema } from './types'
 
 export type PixCheckoutTelemetryRequest = {
   blockchain: 'CELO' | 'OTHER' | 'SOLANA' | 'STELLAR'
@@ -61,32 +63,57 @@ const jsonHeaders = { 'Content-Type': 'application/json' }
 
 export const fetchPublicCorridors = async (): Promise<PublicCorridorResponse> => {
   const result = await httpClient.request<PublicCorridorResponse>('/public/corridors', { method: 'GET' })
-  if (result.ok) return result.data
+  if (result.ok) {
+    const parsed = publicCorridorResponseSchema.safeParse(result.data)
+    if (parsed.success) return parsed.data
+    throw new Error('Invalid corridor configuration response')
+  }
   throw new Error(result.error.message || 'Failed to fetch corridors')
+}
+
+const validateQuoteResult = (
+  result: ApiResult<QuoteResponse>,
+): ApiResult<QuoteResponse> => {
+  if (!result.ok) return result
+  const parsed = quoteResponseSchema.safeParse(result.data)
+  if (parsed.success) return { ...result, data: parsed.data }
+  return {
+    error: {
+      body: null,
+      message: 'Invalid quote response',
+      status: result.status,
+      type: 'parse',
+    },
+    headers: result.headers,
+    ok: false,
+    status: result.status,
+  }
 }
 
 export const requestQuote = async (
   payload: QuoteRequest,
   options?: { signal?: AbortSignal | null },
 ): Promise<ApiResult<QuoteResponse>> => {
-  return httpClient.request<QuoteResponse>('/quote', {
+  const result = await httpClient.request<QuoteResponse>('/quote', {
     body: JSON.stringify(payload),
     headers: jsonHeaders,
     method: 'POST',
     signal: options?.signal ?? null,
   })
+  return validateQuoteResult(result)
 }
 
 export const requestReverseQuote = async (
   payload: ReverseQuoteRequest,
   options?: { signal?: AbortSignal | null },
 ): Promise<ApiResult<QuoteResponse>> => {
-  return httpClient.request<QuoteResponse>('/quote/reverse', {
+  const result = await httpClient.request<QuoteResponse>('/quote/reverse', {
     body: JSON.stringify(payload),
     headers: jsonHeaders,
     method: 'POST',
     signal: options?.signal ?? null,
   })
+  return validateQuoteResult(result)
 }
 
 export const acceptTransactionRequest = async (
@@ -103,6 +130,17 @@ export const sendPixCheckoutTelemetry = async (
   payload: PixCheckoutTelemetryRequest,
 ): Promise<ApiResult<{ accepted: true }>> => {
   return httpClient.request<{ accepted: true }>('/telemetry/pix-checkout', {
+    body: JSON.stringify(payload),
+    headers: jsonHeaders,
+    keepalive: true,
+    method: 'POST',
+  })
+}
+
+export const sendConsumerUxTelemetry = async (
+  payload: ConsumerUxTelemetryRequest,
+): Promise<ApiResult<{ accepted: true }>> => {
+  return httpClient.request<{ accepted: true }>('/telemetry/consumer-ux', {
     body: JSON.stringify(payload),
     headers: jsonHeaders,
     keepalive: true,

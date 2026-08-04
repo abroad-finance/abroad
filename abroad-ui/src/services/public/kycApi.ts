@@ -1,10 +1,32 @@
+import { z } from 'zod'
+
+import type {
+  KycDocumentType,
+  KycSubmissionStatus,
+} from '../../features/swap/types'
 import type { ApiResult } from '../http/types'
 
 import { httpClient } from '../http/httpClient'
 
+const kycSubmissionStatusSchema = z.enum([
+  'APPROVED',
+  'PENDING',
+  'PENDING_APPROVAL',
+  'REJECTED',
+])
+
+const kycStatusResponseSchema = z.object({
+  hasApproved: z.boolean(),
+  status: kycSubmissionStatusSchema.nullable(),
+}).strict()
+
+const kycSubmitResponseSchema = z.object({
+  status: kycSubmissionStatusSchema,
+}).strict()
+
 export type KycStatusResponse = {
   hasApproved: boolean
-  status: null | string
+  status: KycSubmissionStatus | null
 }
 
 export interface KycSubmissionPayload {
@@ -13,7 +35,7 @@ export interface KycSubmissionPayload {
   dateOfBirth: string // YYYY-MM-DD
   document: File
   documentNumber: string
-  documentType: string
+  documentType: KycDocumentType
   email: string
   fullName: string
   nationality: string
@@ -22,8 +44,20 @@ export interface KycSubmissionPayload {
 }
 
 export type KycSubmitResponse = {
-  status: string
+  status: KycSubmissionStatus
 }
+
+const invalidKycResponse = <T>(result: Extract<ApiResult<T>, { ok: true }>): ApiResult<T> => ({
+  error: {
+    body: null,
+    message: 'Invalid identity verification response',
+    status: result.status,
+    type: 'parse',
+  },
+  headers: result.headers,
+  ok: false,
+  status: result.status,
+})
 
 /**
  * Submits the self-service KYC form as multipart/form-data. The document image
@@ -47,19 +81,25 @@ export const submitKyc = async (
   formData.append('phone', payload.phone)
   formData.append('document', payload.document)
 
-  return httpClient.request<KycSubmitResponse>('/kyc', {
+  const result = await httpClient.request<KycSubmitResponse>('/kyc', {
     body: formData,
     method: 'POST',
   })
+  if (!result.ok) return result
+  const parsed = kycSubmitResponseSchema.safeParse(result.data)
+  return parsed.success ? { ...result, data: parsed.data } : invalidKycResponse(result)
 }
 
 export const getKycStatus = async (
   userId: string,
   options?: { signal?: AbortSignal | null },
 ): Promise<ApiResult<KycStatusResponse>> => {
-  return httpClient.request<KycStatusResponse>('/kyc/status', {
+  const result = await httpClient.request<KycStatusResponse>('/kyc/status', {
     method: 'GET',
     query: { userId },
     signal: options?.signal ?? null,
   })
+  if (!result.ok) return result
+  const parsed = kycStatusResponseSchema.safeParse(result.data)
+  return parsed.success ? { ...result, data: parsed.data } : invalidKycResponse(result)
 }

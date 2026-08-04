@@ -20,4 +20,8 @@ export const tolgee = Tolgee()
       'ru',
     ],
     defaultLanguage: 'en',
+    // English copy is the typed fallback colocated with each consumer surface.
+    // Registering an empty local catalog prevents a failed `/i18n/en.json`
+    // request while keeping those source-controlled fallbacks authoritative.
+    staticData: { en: {} },
   })

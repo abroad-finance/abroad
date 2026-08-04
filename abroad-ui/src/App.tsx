@@ -10,6 +10,8 @@ import { OpsShellStatusProvider } from './pages/Ops/shared/OpsShellStatusContext
 const ProductApplicationShell = lazy(() => import('./ProductApplicationShell'))
 const TransparencyDashboard = lazy(() => import('./pages/Transparency/TransparencyDashboard'))
 const WebSwap = lazy(() => import('./pages/WebSwap/WebSwap'))
+const ActivityListPage = lazy(() => import('./pages/Activity/ActivityListPage'))
+const ActivityDetailPage = lazy(() => import('./pages/Activity/ActivityDetailPage'))
 const Meridian = lazy(() => import('./pages/Meridian/Meridian'))
 const OpsControlTower = lazy(() => import('./pages/Ops/OpsControlTower'))
 const BusinessPerformance = lazy(() => import('./pages/Ops/BusinessPerformance'))
@@ -70,6 +72,8 @@ function App() {
               </Route>
               <Route element={<ProductApplicationShell />}>
                 <Route element={<WebSwap />} path="/" />
+                <Route element={<ActivityListPage />} path="/activity" />
+                <Route element={<ActivityDetailPage />} path="/activity/:transactionId" />
                 <Route element={<Meridian />} path="/meridian" />
                 <Route element={<OpsControlTower />} path="/ops" />
                 <Route element={<BusinessPerformance />} path="/ops/business-performance" />

@@ -208,6 +208,13 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  html:focus-within {
+    scroll-behavior: auto;
+  }
+
+  #root *,
+  #root *::before,
+  #root *::after,
   .partner-page *,
   .partner-page *::before,
   .partner-page *::after,

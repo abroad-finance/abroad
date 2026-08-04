@@ -1,6 +1,8 @@
 import { OpsRole } from '@prisma/client'
 
-import { requireNamedOpsPrincipal } from '../../../app/http/authenticationContext'
+import type { AuthenticatedPartner } from '../../../modules/partners/application/contracts/IPartnerService'
+
+import { requireAuthenticatedWalletPrincipal, requireNamedOpsPrincipal } from '../../../app/http/authenticationContext'
 import { ApplicationError, mapErrorToHttpResponse } from '../../../core/errors'
 import { OpsLegacyPrincipal, OpsUserPrincipal } from '../../../modules/operations/application/opsIdentity'
 
@@ -27,6 +29,17 @@ const namedPrincipal: OpsUserPrincipal = {
 }
 
 describe('authenticationContext', () => {
+  const partner = { id: 'partner-1' } as unknown as import('@prisma/client').Partner
+  const invalidWalletAuthentications: AuthenticatedPartner[] = [
+    { ...partner, authenticationSource: 'API_KEY' },
+    {
+      ...partner,
+      authenticatedSubject: 'stellar:pubnet:GABC',
+      authenticationSource: 'SEP_24',
+    },
+    { ...partner, authenticationSource: 'WALLET' },
+  ]
+
   it('returns the authenticated named Ops principal unchanged', () => {
     expect(requireNamedOpsPrincipal(namedPrincipal)).toBe(namedPrincipal)
   })
@@ -52,4 +65,23 @@ describe('authenticationContext', () => {
       status: 403,
     })
   })
+
+  it('returns a wallet principal only when provenance and verified subject are present', () => {
+    const walletPrincipal: AuthenticatedPartner = {
+      ...partner,
+      authenticatedSubject: 'stellar:pubnet:GABC',
+      authenticationSource: 'WALLET',
+    }
+
+    expect(requireAuthenticatedWalletPrincipal(walletPrincipal)).toBe(walletPrincipal)
+  })
+
+  it.each(invalidWalletAuthentications)(
+    'rejects non-wallet or subjectless partner authentication',
+    (authentication) => {
+      expect(() => requireAuthenticatedWalletPrincipal(authentication)).toThrow(
+        'Authenticated wallet context is unavailable',
+      )
+    },
+  )
 })

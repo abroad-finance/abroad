@@ -73,13 +73,18 @@ const data = await response.json();
 
 ```json
 {
-  "expiration_time": 1732520000,
+  "expiration_time": 1893456000000,
+  "fee": {
+    "amount": "0.5",
+    "currency": "USDC",
+    "type": "combined"
+  },
   "quote_id": "550e8400-e29b-41d4-a716-446655440000",
   "value": 100.5
 }
 ```
 
-`value` is the crypto amount (USDC) you must send before the quote expires.
+`value` is the total crypto amount you must send before the quote expires. `expiration_time` is Unix epoch milliseconds. `fee.amount` is the exact fee portion already included in `value`; do not add it again. `fee.currency` is the source asset and `fee.type` is `none`, `percentage`, `fixed`, or `combined`.
 
 ---
 
@@ -101,13 +106,34 @@ Calculate how much the recipient will receive for a specific crypto amount.
 
 ```json
 {
-  "expiration_time": 1732520000,
+  "expiration_time": 1893456000000,
+  "fee": {
+    "amount": "0.5",
+    "currency": "USDC",
+    "type": "combined"
+  },
   "quote_id": "550e8400-e29b-41d4-a716-446655440000",
   "value": 398500
 }
 ```
 
-`value` is the estimated fiat amount (e.g., COP) after fees.
+`value` is the quoted fiat amount (for example, COP) after fees. The fee snapshot is denominated in the source asset and is already reflected in the quote.
+
+#### Quote error response
+
+Both quote endpoints return the same safe error shape for HTTP `400` and `500` responses:
+
+```json
+{
+  "code": "quote_unavailable",
+  "reason": "A quote is temporarily unavailable",
+  "retryable": true
+}
+```
+
+Supported `code` values are `authentication_failed`, `invalid_request`, `corridor_unavailable`, `minimum`, `maximum`, `quote_unavailable`, and `server_error`. Use `retryable` to decide whether the same request may be attempted again; the response never exposes raw provider errors.
+
+The `fee` and structured error fields are additive response metadata. Partner request fields, transaction statuses, webhook payloads, and optional `tax_id` behavior are unchanged.
 
 ---
 
@@ -307,7 +333,7 @@ Returns the latest known liquidity for a payment method.
 
 | Status Code | Description |
 | :--- | :--- |
-| `400` | **Bad Request**: Invalid parameters, exceeded limits, invalid account, or expired quote. |
+| `400` | **Bad Request**: Invalid parameters, exceeded limits, invalid account, expired quote, or an unavailable route. Quote responses include `code`, `reason`, and `retryable`. |
 | `401` | **Unauthorized**: Missing/invalid `X-API-Key` or bearer token. |
 | `404` | **Not Found**: Resource not found or not associated with your partner. |
-| `500` | **Internal Server Error**: Something went wrong on our end. |
+| `500` | **Internal Server Error**: Something went wrong on our end. Quote responses include a safe `code`, `reason`, and `retryable` value. |

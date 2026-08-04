@@ -44,6 +44,7 @@ describe('expressAuthentication', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     partnerService.authenticateBearerToken.mockResolvedValue({
+      authenticatedSubject: 'stellar:pubnet:GABC',
       partner,
       source: 'SEP_24',
     })
@@ -197,7 +198,11 @@ describe('expressAuthentication', () => {
 
     const result = await expressAuthentication(req, 'BearerAuth')
 
-    expect(result).toEqual({ ...partner, authenticationSource: 'SEP_24' })
+    expect(result).toEqual({
+      ...partner,
+      authenticatedSubject: 'stellar:pubnet:GABC',
+      authenticationSource: 'SEP_24',
+    })
     expect(partnerService.authenticateBearerToken).toHaveBeenCalledWith('jwt-token')
   })
 

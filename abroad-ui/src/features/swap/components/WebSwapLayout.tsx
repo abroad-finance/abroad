@@ -1,4 +1,4 @@
-// WebSwapLayout.tsx
+import { useTranslate } from '@tolgee/react'
 import React, { useMemo } from 'react'
 
 import { _36EnumsTargetCurrency as TargetCurrency } from '../../../api'
@@ -7,14 +7,13 @@ import { SwapView } from '../types'
 
 export interface WebSwapLayoutProps {
   disclosure?: null | React.JSX.Element
-  isMiniPay?: boolean
+  showJourneyProgress?: boolean
   targetCurrency: (typeof TargetCurrency)[keyof typeof TargetCurrency]
   view: SwapView
 }
 
 type WebSwapLayoutSlots = {
   slots: {
-    bankDetails: React.JSX.Element
     confirmQr: React.JSX.Element
     home: React.JSX.Element
     kycNeeded: React.JSX.Element
@@ -24,11 +23,16 @@ type WebSwapLayoutSlots = {
   }
 }
 
-const WebSwapLayout: React.FC<WebSwapLayoutProps & WebSwapLayoutSlots> = ({ disclosure = null, slots, view }) => {
+const WebSwapLayout: React.FC<WebSwapLayoutProps & WebSwapLayoutSlots> = ({
+  disclosure = null,
+  showJourneyProgress = false,
+  slots,
+  targetCurrency,
+  view,
+}) => {
+  const { t } = useTranslate()
   const renderSwap = useMemo(() => {
     switch (view) {
-      case 'bankDetails':
-        return slots.bankDetails
       case 'confirm-qr':
         return slots.confirmQr
       case 'home':
@@ -43,7 +47,6 @@ const WebSwapLayout: React.FC<WebSwapLayoutProps & WebSwapLayoutSlots> = ({ disc
         return slots.waitSign
     }
   }, [
-    slots.bankDetails,
     slots.confirmQr,
     slots.home,
     slots.kycNeeded,
@@ -53,7 +56,32 @@ const WebSwapLayout: React.FC<WebSwapLayoutProps & WebSwapLayoutSlots> = ({ disc
     view,
   ])
 
-  const isMainFlow = view === 'home' || view === 'swap' || view === 'bankDetails'
+  const isMainFlow = view === 'home' || view === 'swap'
+  const journeyStep = useMemo(() => {
+    switch (view) {
+      case 'confirm-qr':
+        return { label: t('journey.progress.review', 'Review payment'), value: 3 }
+      case 'home':
+        return {
+          label: targetCurrency === TargetCurrency.BRL
+            ? t('journey.progress.setup_pix', 'Destination and source · Brazil · Pix')
+            : t('journey.progress.setup_breb', 'Destination and source · Colombia · BRE-B'),
+          value: 1,
+        }
+      case 'kyc-needed':
+        return null
+      case 'swap':
+        return { label: t('journey.progress.details', 'Payment details'), value: 2 }
+      case 'txStatus':
+        return { label: t('journey.progress.receipt', 'Track and receipt'), value: 5 }
+      case 'wait-sign':
+        return { label: t('journey.progress.authorize', 'Authorize in wallet'), value: 4 }
+    }
+  }, [
+    t,
+    targetCurrency,
+    view,
+  ])
 
   return (
     <div
@@ -63,6 +91,29 @@ const WebSwapLayout: React.FC<WebSwapLayoutProps & WebSwapLayoutSlots> = ({ disc
       )}
     >
       <div className={cn('w-full', isMainFlow ? 'max-w-[576px]' : 'max-w-md')}>
+        {showJourneyProgress && journeyStep && (
+          <section aria-label={t('journey.progress.label', 'Payment progress')} className="mb-3 rounded-2xl border border-[var(--ab-border)] bg-[var(--ab-card)] px-4 py-3 shadow-sm">
+            <div className="mb-2 flex items-center justify-between gap-3 text-xs font-semibold">
+              <span className="text-[var(--ab-text)]">{journeyStep.label}</span>
+              <span className="shrink-0 text-[var(--ab-text-muted)]">
+                {t('journey.progress.step', 'Step {current} of {total}', {
+                  current: journeyStep.value,
+                  total: 5,
+                })}
+              </span>
+            </div>
+            <progress
+              aria-label={t('journey.progress.value', '{label}: step {current} of {total}', {
+                current: journeyStep.value,
+                label: journeyStep.label,
+                total: 5,
+              })}
+              className="h-1.5 w-full overflow-hidden rounded-full accent-[var(--ab-green)]"
+              max={5}
+              value={journeyStep.value}
+            />
+          </section>
+        )}
         {renderSwap}
         {disclosure}
       </div>

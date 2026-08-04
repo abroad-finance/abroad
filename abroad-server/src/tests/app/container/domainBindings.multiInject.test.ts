@@ -12,6 +12,7 @@ import { TransferoPayoutStatusAdapter } from '../../../modules/payments/infrastr
 import { CeloPaymentVerifier } from '../../../modules/payments/infrastructure/wallets/CeloPaymentVerifier'
 import { SolanaPaymentVerifier } from '../../../modules/payments/infrastructure/wallets/SolanaPaymentVerifier'
 import { StellarDepositVerifier } from '../../../modules/payments/infrastructure/wallets/StellarDepositVerifier'
+import { ConsumerActivityService } from '../../../modules/transactions/application/ConsumerActivityService'
 import { IDatabaseClientProvider } from '../../../platform/persistence/IDatabaseClientProvider'
 import { ISecretManager, Secret, Secrets } from '../../../platform/secrets/ISecretManager'
 
@@ -73,5 +74,9 @@ describe('domainBindings', () => {
 
     expect(registry.getAdapter('transfero')).toBeInstanceOf(TransferoPayoutStatusAdapter)
     expect(registry.getAdapter('breb')).toBeInstanceOf(BrebPayoutStatusAdapter)
+  })
+
+  it('wires the consumer Activity service for authenticated routes', () => {
+    expect(container.get(ConsumerActivityService)).toBeInstanceOf(ConsumerActivityService)
   })
 })

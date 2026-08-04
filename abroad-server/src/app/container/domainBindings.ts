@@ -85,6 +85,7 @@ import { StellarWalletHandler } from '../../modules/payments/infrastructure/wall
 import { QuoteRequestMetricRecorder } from '../../modules/quotes/application/QuoteRequestMetricRecorder'
 import { QuoteUseCase } from '../../modules/quotes/application/quoteUseCase'
 import { FlowCorridorPricingProvider } from '../../modules/quotes/infrastructure/FlowCorridorPricingProvider'
+import { ConsumerActivityService } from '../../modules/transactions/application/ConsumerActivityService'
 import { OpsRefundRecoveryService } from '../../modules/transactions/application/OpsRefundRecoveryService'
 import { OpsTransactionQueryService } from '../../modules/transactions/application/OpsTransactionQueryService'
 import { OpsTransactionReconciliationService } from '../../modules/transactions/application/OpsTransactionReconciliationService'
@@ -164,6 +165,7 @@ const domainBindings: ReadonlyArray<BindingRegistration<unknown>> = [
   { bindSelf: true, identifier: PartnerPixReceiptService, implementation: PartnerPixReceiptService },
   { bindSelf: true, identifier: PartnerPixReconciliationService, implementation: PartnerPixReconciliationService },
   { bindSelf: true, identifier: PartnerTransactionQueryService, implementation: PartnerTransactionQueryService },
+  { bindSelf: true, identifier: ConsumerActivityService, implementation: ConsumerActivityService },
   { bindSelf: true, identifier: PartnerWebhookRedeliveryService, implementation: PartnerWebhookRedeliveryService },
   { bindSelf: true, identifier: TransparencyMetricsService, implementation: TransparencyMetricsService },
   { identifier: TYPES.PaymentUseCase, implementation: PaymentUseCase },

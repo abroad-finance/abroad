@@ -42,9 +42,6 @@ export const extractReason = (body: unknown): null | string => {
 export const isApiTxExpired = (status: string): boolean =>
   status === 'PAYMENT_EXPIRED' || status === 'PAYMENT_FAILED' || status === 'WRONG_AMOUNT'
 
-/** Whether a TxDetailItem status represents an expired outcome. */
-export const isLocalTxExpired = (status: string): boolean => status === 'expired'
-
 /** Resolve the locale for a target currency code. */
 export const localeForCurrency = (currency: string): string =>
   currency === 'BRL' ? 'pt-BR' : 'es-CO'

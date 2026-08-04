@@ -381,14 +381,20 @@ model PartnerUserKyc {
 }
 
 model Quote {
-  id             String            @id @default(uuid())
-  targetAmount   Float
-  sourceAmount   Float
-  targetCurrency TargetCurrency
-  paymentMethod  PaymentMethod
-  country        Country
-  cryptoCurrency CryptoCurrency
-  network        BlockchainNetwork
+  id                        String            @id @default(uuid())
+  targetAmount              Float
+  sourceAmount              Float
+  targetCurrency            TargetCurrency
+  paymentMethod             PaymentMethod
+  country                   Country
+  cryptoCurrency            CryptoCurrency
+  network                   BlockchainNetwork
+  baseRateSourcePerTarget   Decimal?          @db.Decimal(36, 18)
+  exchangeFeePct            Decimal?          @db.Decimal(18, 12)
+  fixedFeeTargetAmount      Decimal?          @db.Decimal(36, 18)
+  customerFeeSourceAmount   Decimal?          @db.Decimal(36, 18)
+  customerFeeSourceCurrency CryptoCurrency?
+  customerFeeType           CustomerFeeType?
 
   partnerId String
   partner   Partner @relation(fields: [partnerId], references: [id])
@@ -757,7 +763,15 @@ enum BlockchainNetwork {
 }
 
 enum Country {
+  BR
   CO
+}
+
+enum CustomerFeeType {
+  COMBINED
+  FIXED
+  NONE
+  PERCENTAGE
 }
 
 enum PaymentMethod {
@@ -1091,24 +1105,24 @@ model BusinessPerformanceState {
 // payout/proceeds stay in their native settlement currency and are converted
 // transaction-by-transaction with the locked rate below.
 model TransactionEconomics {
-  transactionId            String                   @id
-  transaction              Transaction              @relation(fields: [transactionId], references: [id], onDelete: Cascade)
-  sourceCurrency           CryptoCurrency
-  sourceAmountUsd          Decimal                  @db.Decimal(36, 18)
-  payoutCurrency           TargetCurrency
-  customerPayoutNative     Decimal                  @db.Decimal(36, 18)
-  conversionProvider       String?
-  providerOperationId      String?                  @unique
-  conversionStatus         EconomicConversionStatus @default(PENDING)
-  proceedsCoverage         EconomicFactCoverageStatus @default(PENDING)
-  lockedRateNativePerUsd   Decimal?                 @db.Decimal(36, 18)
-  providerProceedsNative   Decimal?                 @db.Decimal(36, 18)
+  transactionId             String                     @id
+  transaction               Transaction                @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  sourceCurrency            CryptoCurrency
+  sourceAmountUsd           Decimal                    @db.Decimal(36, 18)
+  payoutCurrency            TargetCurrency
+  customerPayoutNative      Decimal                    @db.Decimal(36, 18)
+  conversionProvider        String?
+  providerOperationId       String?                    @unique
+  conversionStatus          EconomicConversionStatus   @default(PENDING)
+  proceedsCoverage          EconomicFactCoverageStatus @default(PENDING)
+  lockedRateNativePerUsd    Decimal?                   @db.Decimal(36, 18)
+  providerProceedsNative    Decimal?                   @db.Decimal(36, 18)
   proceedsUnavailableReason String?
-  settledAt                DateTime?
-  lastReconciledAt         DateTime?
-  createdAt                DateTime                 @default(now())
-  updatedAt                DateTime                 @updatedAt
-  costs                    TransactionEconomicCost[]
+  settledAt                 DateTime?
+  lastReconciledAt          DateTime?
+  createdAt                 DateTime                   @default(now())
+  updatedAt                 DateTime                   @updatedAt
+  costs                     TransactionEconomicCost[]
 
   @@index([conversionStatus, settledAt])
   @@index([lastReconciledAt])

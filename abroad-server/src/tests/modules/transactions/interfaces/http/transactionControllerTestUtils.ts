@@ -19,6 +19,14 @@ export const createBadRequestResponder = () =>
 
 export const authRequest = (partnerId: string) => ({ user: { id: partnerId } } as unknown as import('express').Request)
 
+export const walletAuthRequest = (partnerId: string, authenticatedSubject: string) => ({
+  user: {
+    authenticatedSubject,
+    authenticationSource: 'WALLET',
+    id: partnerId,
+  },
+} as unknown as import('express').Request)
+
 export const buildPaymentService = (overrides?: Partial<jest.Mocked<IPaymentService>>): jest.Mocked<IPaymentService> => ({
   currency: TargetCurrency.COP,
   fixedFee: 0,
