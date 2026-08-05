@@ -107,14 +107,19 @@ export const listPartnerAiConnections = async (): Promise<PartnerAiConnection[]>
   return unwrap(result).items
 }
 
+/**
+ * Fire-and-forget telemetry, so it deliberately does not go through `unwrap`:
+ * that clears the portal session on a 401, which meant a stale token turned an
+ * analytics ping into a silent sign-out. Callers already ignore failures, and
+ * losing a product event must never cost the user their session.
+ */
 export const recordPartnerAiProductEvent = async (
   input: PartnerAiProductEventInput,
 ): Promise<void> => {
-  const result = await portalClient.request<void, ApiErrorBody>(
+  await portalClient.request<void, ApiErrorBody>(
     '/partner-portal/ai/product-events',
     jsonRequest('POST', input),
   )
-  unwrap(result)
 }
 
 export const revokePartnerAiConnection = async (

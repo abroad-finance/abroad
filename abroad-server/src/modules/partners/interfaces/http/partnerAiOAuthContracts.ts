@@ -95,6 +95,11 @@ export const parsePartnerAiClientRegistration = (
   }
 }
 
+// Deliberately not `.strict()`. RFC 6749 section 3.1 requires the authorization
+// endpoint to ignore unrecognized parameters, and real MCP clients send extras
+// the spec allows — `prompt=consent` above all. Rejecting those made every such
+// client look unsupported. Unknown keys are stripped, never forwarded, and
+// every key we do act on is still validated exactly as before.
 const authorizationRequestSchema = z.object({
   client_id: z.string().trim().min(8).max(256).regex(CLIENT_ID_PATTERN),
   code_challenge: z.string().min(43).max(128).regex(BASE64URL_PATTERN),
@@ -104,7 +109,7 @@ const authorizationRequestSchema = z.object({
   response_type: z.literal('code'),
   scope: z.string().trim().min(1).max(512),
   state: z.string().min(1).max(512).optional(),
-}).strict()
+})
 
 export const parsePartnerAiAuthorizationRequest = (
   query: Readonly<Record<string, unknown>>,
@@ -123,6 +128,10 @@ export const parsePartnerAiAuthorizationRequest = (
   }
 }
 
+// Same reasoning as the authorization request above: public PKCE clients
+// routinely post extras such as an empty `client_secret` or a `scope` echo on
+// the code exchange. This is the step immediately after authorization, so
+// leaving it strict would just move the failure one hop later.
 const authorizationCodeGrantSchema = z.object({
   client_id: z.string().trim().min(8).max(256).regex(CLIENT_ID_PATTERN),
   code: z.string().trim().min(32).max(256),
@@ -130,7 +139,7 @@ const authorizationCodeGrantSchema = z.object({
   grant_type: z.literal('authorization_code'),
   redirect_uri: z.string().trim().min(1).max(MAX_REDIRECT_URI_LENGTH),
   resource: z.literal(PARTNER_AI_MCP_RESOURCE_URL),
-}).strict()
+})
 
 const refreshTokenGrantSchema = z.object({
   client_id: z.string().trim().min(8).max(256).regex(CLIENT_ID_PATTERN),
@@ -138,7 +147,7 @@ const refreshTokenGrantSchema = z.object({
   refresh_token: z.string().trim().min(32).max(256),
   resource: z.literal(PARTNER_AI_MCP_RESOURCE_URL),
   scope: z.string().trim().max(512).optional(),
-}).strict()
+})
 
 const partnerAiTokenGrantSchema = z.discriminatedUnion('grant_type', [
   authorizationCodeGrantSchema,
@@ -154,7 +163,7 @@ const tokenRevocationSchema = z.object({
   client_id: z.string().trim().min(8).max(256).regex(CLIENT_ID_PATTERN),
   token: z.string().trim().min(32).max(256),
   token_type_hint: z.enum(['access_token', 'refresh_token']).optional(),
-}).strict()
+})
 
 export const parsePartnerAiTokenRevocation = (value: unknown): null | PartnerAiTokenRevocation => {
   const parsed = tokenRevocationSchema.safeParse(value)

@@ -158,7 +158,58 @@ describe('partner AI OAuth contracts', () => {
     })).toBeNull()
   })
 
-  it('parses strict authorization-code, refresh, and revocation form bodies', () => {
+  it('ignores unrecognized authorization parameters instead of rejecting the client', () => {
+    const input = {
+      client_id: 'abroad_mcp_client_public',
+      code_challenge: codeChallenge,
+      code_challenge_method: 'S256',
+      redirect_uri: 'http://localhost:60922/callback',
+      resource: 'https://api.abroad.finance/mcp',
+      response_type: 'code',
+      scope: 'account:read docs:read requests:validate transactions:read webhooks:read offline_access',
+      state: 'opaque-client-state',
+    }
+
+    // RFC 6749 section 3.1: unrecognized parameters must be ignored. Rejecting
+    // `prompt` made every client that sends it look unsupported.
+    const withExtras = parsePartnerAiAuthorizationRequest({
+      ...input,
+      login_hint: 'someone@example.com',
+      nonce: 'n-0S6_WzA2Mj',
+      prompt: 'consent',
+    })
+
+    expect(withExtras).toEqual(parsePartnerAiAuthorizationRequest(input))
+    expect(withExtras).toEqual(expect.objectContaining({
+      redirectUri: 'http://localhost:60922/callback',
+      scopes: ['account:read', 'docs:read', 'requests:validate', 'transactions:read', 'webhooks:read', 'offline_access'],
+    }))
+    expect(JSON.stringify(withExtras)).not.toContain('consent')
+    expect(JSON.stringify(withExtras)).not.toContain('example.com')
+  })
+
+  it('ignores unrecognized token and revocation parameters', () => {
+    const grant = parsePartnerAiTokenGrant({
+      client_id: 'abroad_mcp_client_public',
+      client_secret: '',
+      code: 'c'.repeat(43),
+      code_verifier: 'v'.repeat(43),
+      grant_type: 'authorization_code',
+      redirect_uri: 'https://assistant.example/callback',
+      resource: 'https://api.abroad.finance/mcp',
+      scope: 'account:read',
+    })
+
+    expect(grant).toEqual(expect.objectContaining({ grant_type: 'authorization_code' }))
+    expect(grant).not.toHaveProperty('client_secret')
+    expect(parsePartnerAiTokenRevocation({
+      client_id: 'abroad_mcp_client_public',
+      client_secret: '',
+      token: 't'.repeat(43),
+    })).toEqual(expect.objectContaining({ client_id: 'abroad_mcp_client_public' }))
+  })
+
+  it('parses authorization-code, refresh, and revocation form bodies', () => {
     expect(parsePartnerAiTokenGrant({
       client_id: 'abroad_mcp_client_public',
       code: 'c'.repeat(43),
@@ -174,11 +225,20 @@ describe('partner AI OAuth contracts', () => {
       resource: 'https://api.abroad.finance/mcp',
       scope: 'account:read',
     })).toEqual(expect.objectContaining({ grant_type: 'refresh_token' }))
+    // An unrecognized key is stripped rather than rejected; the grant is still
+    // required to carry every field we act on.
     expect(parsePartnerAiTokenGrant({
       client_id: 'abroad_mcp_client_public',
       code: 'c'.repeat(43),
       code_verifier: 'v'.repeat(43),
-      extra: 'not allowed',
+      extra: 'ignored',
+      grant_type: 'authorization_code',
+      redirect_uri: 'https://assistant.example/callback',
+      resource: 'https://api.abroad.finance/mcp',
+    })).not.toHaveProperty('extra')
+    expect(parsePartnerAiTokenGrant({
+      client_id: 'abroad_mcp_client_public',
+      code_verifier: 'v'.repeat(43),
       grant_type: 'authorization_code',
       redirect_uri: 'https://assistant.example/callback',
       resource: 'https://api.abroad.finance/mcp',

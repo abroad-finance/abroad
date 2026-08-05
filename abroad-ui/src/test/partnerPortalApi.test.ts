@@ -415,4 +415,31 @@ describe('partner portal API', () => {
       'authorization-code-once',
     )
   })
+
+  it('never signs the user out because a product event failed', async () => {
+    setPartnerPortalSession({
+      accessToken: 'stale-token',
+      email: 'operator@decaf.so',
+      expiresAt: '2099-01-01T00:00:00.000Z',
+      mfaEnabled: true,
+      mfaVerified: true,
+      partnerName: 'Decaf',
+      role: 'ADMIN',
+      userId: 'user-1',
+    })
+    server.use(http.post('https://api.abroad.finance/partner-portal/ai/product-events', () => (
+      HttpResponse.json({ reason: 'Unauthorized' }, { status: 401 })
+    )))
+
+    // The AI authorization page fires this telemetry on entry and ignores the
+    // result. Routing it through the shared 401 handling turned a stale token
+    // into a silent sign-out on a page the user had just been sent to.
+    await expect(recordPartnerAiProductEvent({
+      clientCategory: 'UNSUPPORTED',
+      entryPoint: 'DIRECT',
+      event: 'AI_CONNECTION_STARTED',
+      outcome: 'FAILED',
+    })).resolves.toBeUndefined()
+    expect(getPartnerPortalSession()).not.toBeNull()
+  })
 })
