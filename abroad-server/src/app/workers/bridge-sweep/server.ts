@@ -3,6 +3,7 @@ import http from 'http'
 
 import { createScopedLogger } from '../../../core/logging/scopedLogger'
 import { ILogger } from '../../../core/logging/types'
+import { DeliveryReconciler } from '../../../modules/flows/application/DeliveryReconciler'
 import { FlowRetryWorker } from '../../../modules/flows/application/FlowRetryWorker'
 import { BusinessPerformanceReconciliationWorker } from '../../../modules/operations/application/BusinessPerformanceReconciliationWorker'
 import { OpsConfigurationReleaseWorker } from '../../../modules/operations/application/OpsConfigurationReleaseWorker'
@@ -37,6 +38,7 @@ export const createHealthHandler = (state: { live: boolean, ready: boolean }) =>
 
 let worker: BridgeSweepWorker | null = null
 let retryWorker: FlowRetryWorker | null = null
+let deliveryReconciler: DeliveryReconciler | null = null
 let incidentWorker: null | OpsIncidentWorker = null
 let configurationReleaseWorker: null | OpsConfigurationReleaseWorker = null
 let businessPerformanceWorker: BusinessPerformanceReconciliationWorker | null = null
@@ -52,6 +54,10 @@ export function startBridgeSweepWorker(): void {
   snapshotWorker.start()
   retryWorker = iocContainer.get<FlowRetryWorker>(FlowRetryWorker)
   retryWorker.start()
+  // Resolves deliveries whose submission timed out, so a customer who has paid
+  // is not left waiting on someone reading the chain by hand.
+  deliveryReconciler = iocContainer.get<DeliveryReconciler>(DeliveryReconciler)
+  deliveryReconciler.start()
   incidentWorker = iocContainer.get<OpsIncidentWorker>(OpsIncidentWorker)
   incidentWorker.start()
   configurationReleaseWorker = iocContainer.get<OpsConfigurationReleaseWorker>(OpsConfigurationReleaseWorker)
@@ -72,6 +78,7 @@ export async function stopBridgeSweepWorker(): Promise<void> {
       businessPerformanceWorker?.stop(),
       incidentWorker?.stop(),
       retryWorker?.stop(),
+      deliveryReconciler?.stop(),
       worker?.stop(),
       snapshotWorker?.stop(),
       replenishWorker?.stop(),
@@ -80,6 +87,7 @@ export async function stopBridgeSweepWorker(): Promise<void> {
   finally {
     worker = null
     retryWorker = null
+    deliveryReconciler = null
     incidentWorker = null
     configurationReleaseWorker = null
     businessPerformanceWorker = null

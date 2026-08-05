@@ -1,5 +1,6 @@
 import { Container } from 'inversify'
 
+import { DeliveryReconciler } from '../../modules/flows/application/DeliveryReconciler'
 import { FlowAuditService } from '../../modules/flows/application/FlowAuditService'
 import { FlowCorridorService } from '../../modules/flows/application/FlowCorridorService'
 import { FlowDefinitionBuilder } from '../../modules/flows/application/FlowDefinitionBuilder'
@@ -237,6 +238,7 @@ const domainBindings: ReadonlyArray<BindingRegistration<unknown>> = [
   { bindSelf: true, identifier: FlowAuditService, implementation: FlowAuditService },
   { identifier: TYPES.FlowExecutorRegistry, implementation: FlowExecutorRegistry },
   { identifier: TYPES.FlowOrchestrator, implementation: FlowOrchestrator },
+  { bindSelf: true, identifier: DeliveryReconciler, implementation: DeliveryReconciler },
   { bindSelf: true, identifier: FlowRetryWorker, implementation: FlowRetryWorker },
   { bindSelf: true, identifier: RefundCoordinator, implementation: RefundCoordinator },
   { bindSelf: true, identifier: BridgeFloatService, implementation: BridgeFloatService },

@@ -34,7 +34,16 @@ import { CryptoAssetConfigService } from '../../application/CryptoAssetConfigSer
 // and stall every Stellar send cluster-wide. Bound the shared Horizon client so a hung
 // read aborts the socket. submitTransaction keeps its own 60s cap (submit unchanged).
 const HORIZON_HTTP_TIMEOUT_MS = 30_000
-const STELLAR_TRANSACTION_TIMEOUT_SECONDS = 30
+/**
+ * How long a signed transaction stays includable.
+ *
+ * This was 30s, roughly six ledgers, which is very little room to survive a
+ * congested spell: a transaction outbid for a few ledgers simply expired and
+ * the delivery failed. Longer widens the window in which a submission is
+ * neither confirmed nor dead, which is only tolerable because DeliveryReconciler
+ * now resolves that window on its own instead of a person doing it by hand.
+ */
+const STELLAR_TRANSACTION_TIMEOUT_SECONDS = 180
 
 /**
  * Upper bound on what a single send may bid, in stroops (2 XLM).
