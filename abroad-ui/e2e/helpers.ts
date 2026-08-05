@@ -25,6 +25,10 @@ const KNOWN_NOISE: RegExp[] = [
   // We suppress it here because in this project CORS failures are always Tolgee.
   // If a real fetch fails you'll see a different, more descriptive message first.
   /Failed to load resource: net::ERR_FAILED/,
+  // Chromium's console echo of an unauthenticated request. The `response`
+  // handler below already treats 401 as expected; without the matching console
+  // pattern every anonymous page load fails on the API's own auth challenge.
+  /Failed to load resource: the server responded with a status of 401/,
   // Firebase app initialization warnings in local dev
   /Firebase.*emulator/i,
   /No Firebase App/i,

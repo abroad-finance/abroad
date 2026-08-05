@@ -27,6 +27,12 @@ dist-ssr
 # Firebase
 .firebase
 
+# Playwright
+e2e-results
+e2e-report
+test-results
+playwright/.cache
+
 # Local Claude notes — never commit
 CLAUDE.md
 .claude/

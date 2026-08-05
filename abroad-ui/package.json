@@ -15,6 +15,10 @@
     "lint:fix": "eslint . --fix",
     "test": "vitest --config vite.config.ts --run",
     "test:watch": "vitest watch --config vite.config.ts",
+    "e2e": "playwright test",
+    "e2e:ui": "playwright test --ui",
+    "e2e:report": "playwright show-report e2e-report",
+    "e2e:install": "playwright install chromium",
     "i18n:compare": "tolgee compare",
     "i18n:sync": "tolgee sync -Y"
   },
@@ -47,6 +51,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.33.0",
+    "@playwright/test": "^1.62.1",
     "@stylistic/eslint-plugin": "^5.2.3",
     "@testing-library/dom": "^10.4.0",
     "@testing-library/jest-dom": "^6.6.3",
