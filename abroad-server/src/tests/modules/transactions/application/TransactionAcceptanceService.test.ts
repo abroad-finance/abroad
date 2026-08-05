@@ -63,6 +63,7 @@ describe('TransactionAcceptanceService helpers', () => {
 
   const bridgeFloatService = {
     canSettle: jest.fn(async () => ({ cap: 2000, deficit: 0, ok: true })),
+    getFloatAsset: jest.fn(async () => undefined),
     getOutstandingDeficit: jest.fn(async () => 0),
   } as unknown as import('../../../../modules/treasury/application/BridgeFloatService').BridgeFloatService
 
@@ -566,6 +567,7 @@ describe('TransactionAcceptanceService.acceptTransaction KYC gating', () => {
 
   const bridgeFloatService = {
     canSettle: jest.fn(async () => ({ cap: 2000, deficit: 0, ok: true })),
+    getFloatAsset: jest.fn(async () => undefined),
     getOutstandingDeficit: jest.fn(async () => 0),
   } as unknown as import('../../../../modules/treasury/application/BridgeFloatService').BridgeFloatService
 
@@ -700,5 +702,43 @@ describe('TransactionAcceptanceService.acceptTransaction KYC gating', () => {
     // callback; acceptTransaction re-throws it so the controller can surface 403.
     await expect(service.acceptTransaction(request, partner)).rejects.toThrow(DisabledUserError)
     expect(prisma.transaction.create).not.toHaveBeenCalled()
+  })
+
+  // The guard must follow the corridor's flow definition, not a chain name.
+  // A non-Celo corridor that bridges is exactly the case that went unguarded
+  // after the Transfero Ultra migration re-routed it onto the float.
+  describe('bridge float admission control', () => {
+    beforeEach(() => {
+      // The harness shares one mock across tests, so call history has to be
+      // cleared too — not just the resolved value.
+      (bridgeFloatService.getFloatAsset as jest.Mock).mockClear().mockResolvedValue(undefined);
+      (bridgeFloatService.canSettle as jest.Mock).mockClear().mockResolvedValue({ cap: 2000, deficit: 0, ok: true })
+    })
+
+    afterEach(() => {
+      (bridgeFloatService.getFloatAsset as jest.Mock).mockResolvedValue(undefined);
+      (bridgeFloatService.canSettle as jest.Mock).mockResolvedValue({ cap: 2000, deficit: 0, ok: true })
+    })
+
+    it('rejects a bridged corridor at capacity, whatever chain it runs on', async () => {
+      (bridgeFloatService.getFloatAsset as jest.Mock).mockResolvedValue('USDC');
+      (bridgeFloatService.canSettle as jest.Mock).mockResolvedValue({ cap: 1000, deficit: 1263.78, ok: false })
+      const { partner, prisma, service } = buildHarness({ sourceAmount: 10 })
+
+      await expect(service.acceptTransaction(request, partner)).rejects.toThrow(/temporarily unavailable/)
+      expect(bridgeFloatService.getFloatAsset).toHaveBeenCalledWith(expect.objectContaining({ blockchain: 'STELLAR' }))
+      expect(prisma.transaction.create).not.toHaveBeenCalled()
+    })
+
+    it('does not consult the float for a corridor that settles directly', async () => {
+      (bridgeFloatService.getFloatAsset as jest.Mock).mockResolvedValue(undefined)
+      const { partner, prisma, service } = buildHarness({ sourceAmount: 10 })
+
+      const result = await service.acceptTransaction(request, partner)
+
+      expect(result.id).toBe('t-1')
+      expect(bridgeFloatService.canSettle).not.toHaveBeenCalled()
+      expect(prisma.transaction.create).toHaveBeenCalled()
+    })
   })
 })

@@ -234,4 +234,34 @@ describe('BridgeSweepService.reconcile', () => {
     expect(batchUpdate).not.toHaveBeenCalled()
     expect(updateMany).not.toHaveBeenCalled()
   })
+
+  // Binance truncates a withdrawal's applyTime to whole seconds while
+  // batch.createdAt carries milliseconds, and the sweep withdraws well under a
+  // second after creating the batch. An unpadded startTime therefore excluded
+  // the batch's own withdrawal and stranded it SUBMITTED forever, holding its
+  // legs on the float deficit.
+  it('pads the withdraw lookback so a same-second withdrawal stays in window', async () => {
+    withdrawHistoryMock.mockResolvedValue({ data: async () => ([{ status: 6, withdrawOrderId: 'b-sub' }]) })
+    const createdAt = new Date('2026-08-03T20:35:51.010Z')
+    const { service } = makeService({ submitted: [{ createdAt, id: 'b-sub' }] })
+
+    await service.reconcile()
+
+    const { startTime } = withdrawHistoryMock.mock.calls[0][0] as { startTime: number }
+    expect(startTime).toBeLessThan(Math.floor(createdAt.getTime() / 1_000) * 1_000)
+  })
+
+  it('ignores another batch withdrawal in the window instead of adopting its status', async () => {
+    // The padded window legitimately contains neighbouring batches; taking the
+    // first row would credit this batch on someone else's outcome.
+    withdrawHistoryMock.mockResolvedValue({ data: async () => ([{ status: 6, withdrawOrderId: 'other-batch' }]) })
+    const { batchUpdate, service, updateMany } = makeService({ submitted: [{ createdAt: new Date(), id: 'b-sub' }] })
+
+    const result = await service.reconcile()
+
+    expect(result.credited).toBe(0)
+    expect(result.failed).toBe(0)
+    expect(batchUpdate).not.toHaveBeenCalled()
+    expect(updateMany).not.toHaveBeenCalled()
+  })
 })

@@ -1,4 +1,4 @@
-import { CryptoCurrency } from '@prisma/client'
+import { BlockchainNetwork, CryptoCurrency, FlowStepType, TargetCurrency } from '@prisma/client'
 import { inject, injectable } from 'inversify'
 
 import { TYPES } from '../../../app/container/types'
@@ -54,6 +54,42 @@ export class BridgeFloatService {
    */
   public getCapUsdc(): number | undefined {
     return this.capUsdc
+  }
+
+  /**
+   * The bridge asset a corridor fronts float for, or undefined when it never
+   * enqueues a bridge leg.
+   *
+   * Derived from the corridor's own flow definition rather than a hardcoded
+   * chain list, because whether a corridor consumes float is a property of its
+   * step graph and changes whenever the corridor is re-routed. The Transfero
+   * Ultra migration moved EVERY USDC->BRL corridor onto the bridge; a predicate
+   * naming one chain silently stopped guarding the rest, so their exposure ran
+   * past the cap and the rejections landed on the one corridor still named.
+   */
+  public async getFloatAsset(corridor: {
+    blockchain: BlockchainNetwork
+    cryptoCurrency: CryptoCurrency
+    targetCurrency: TargetCurrency
+  }): Promise<CryptoCurrency | undefined> {
+    const client = await this.dbProvider.getClient()
+    const definition = await client.flowDefinition.findUnique({
+      select: {
+        steps: {
+          select: { config: true },
+          where: { stepType: FlowStepType.ENQUEUE_BRIDGE },
+        },
+      },
+      where: { flow_corridor_unique: corridor },
+    })
+
+    for (const step of definition?.steps ?? []) {
+      const asset = (step.config as null | { asset?: string })?.asset
+      if (typeof asset === 'string' && asset in CryptoCurrency) {
+        return asset as CryptoCurrency
+      }
+    }
+    return undefined
   }
 
   public async getOutstandingDeficit(asset: CryptoCurrency): Promise<number> {

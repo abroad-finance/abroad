@@ -41,6 +41,15 @@ type BridgeMemberRow = { amount: number }
 // or a >7-day Binance withdrawHistory lookback gap), instead of silently stuck.
 const STALE_SUBMITTED_MS = 60 * 60_000
 
+// Binance stores a withdrawal's applyTime truncated to whole seconds, while
+// batch.createdAt carries milliseconds. The sweep withdraws well under a second
+// after creating the batch, so an unpadded startTime = createdAt excludes the
+// batch's OWN withdrawal whenever both land in the same second — the record is
+// filtered out, the status never resolves, and the batch stays SUBMITTED
+// forever while its legs hold the float deficit. Pad the lookback so the
+// withdrawal is always inside the window.
+const WITHDRAW_LOOKBACK_PAD_MS = 5 * 60_000
+
 /**
  * Bridges pooled small-tx USDC across Binance->Transfero Ultra (Polygon). Each flow
  * records its source obligation before conversion; this drains the PENDING
@@ -209,12 +218,16 @@ export class BridgeSweepService {
       // minutes, and a stale-SUBMITTED alert covers the rare >7-day case.
       const params: { coin: string, startTime?: number, withdrawOrderId: string } = { coin: BRIDGE_ASSET, withdrawOrderId }
       if (since instanceof Date) {
-        params.startTime = since.getTime()
+        params.startTime = Math.max(0, since.getTime() - WITHDRAW_LOOKBACK_PAD_MS)
       }
       const response = await wallet.restAPI.withdrawHistory(params)
       const data = await response.data()
       const items = Array.isArray(data) ? data as { status?: number, withdrawOrderId?: string }[] : []
-      const match = items.find(item => item?.withdrawOrderId === withdrawOrderId) ?? items[0]
+      // Match the withdrawOrderId EXACTLY. Never fall back to the first row:
+      // the window can legitimately contain other batches' withdrawals, and
+      // adopting one of those would credit or fail this batch on another
+      // batch's outcome.
+      const match = items.find(item => item?.withdrawOrderId === withdrawOrderId)
       return typeof match?.status === 'number' ? match.status : undefined
     }
     catch (error) {

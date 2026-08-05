@@ -298,11 +298,12 @@ export class TransactionAcceptanceService {
   }
 
   /**
-   * Admission control for the bridge float. A CELO->BRL flow settles
-   * immediately against the Transfero USDC float and only later replenishes it
-   * via the batched sweep, so we must not accept one if the float can't front
-   * it — the recipient is paid first, so this guard cannot live in the flow.
-   * Other corridors settle directly and have no float to over-draw.
+   * Admission control for the bridge float. A bridged flow settles immediately
+   * against the Transfero USDC float and only later replenishes it via the
+   * batched sweep, so we must not accept one if the float can't front it — the
+   * recipient is paid first, so this guard cannot live in the flow. Corridors
+   * that settle directly have no float to over-draw, so the corridor's own flow
+   * definition decides whether the guard applies.
    */
   private async enforceBridgeFloat(quote: {
     cryptoCurrency: CryptoCurrency
@@ -310,17 +311,25 @@ export class TransactionAcceptanceService {
     sourceAmount: number
     targetCurrency: TargetCurrency
   }): Promise<void> {
-    if (quote.network !== BlockchainNetwork.CELO || quote.targetCurrency !== TargetCurrency.BRL) {
+    const asset = await this.bridgeFloatService.getFloatAsset({
+      blockchain: quote.network,
+      cryptoCurrency: quote.cryptoCurrency,
+      targetCurrency: quote.targetCurrency,
+    })
+    if (!asset) {
       return
     }
-    // The bridge asset is always USDC (USDT corridors convert to USDC on Binance
-    // before bridging); stablecoin source amounts are ~1:1 in USDC terms.
-    const check = await this.bridgeFloatService.canSettle({ amount: quote.sourceAmount, asset: CryptoCurrency.USDC })
+    // Stablecoin source amounts are ~1:1 in bridge-asset terms (USDT corridors
+    // convert to the bridge asset on Binance before bridging).
+    const check = await this.bridgeFloatService.canSettle({ amount: quote.sourceAmount, asset })
     if (!check.ok) {
-      this.logger.warn('Rejecting CELO->BRL transaction: bridge float at capacity', {
+      this.logger.warn('Rejecting bridged transaction: bridge float at capacity', {
+        asset,
         cap: check.cap,
         deficit: check.deficit,
+        network: quote.network,
         sourceAmount: quote.sourceAmount,
+        targetCurrency: quote.targetCurrency,
       })
       throw new TransactionValidationError('This payout is temporarily unavailable while we rebalance liquidity. Please try again shortly or use a smaller amount.')
     }

@@ -55,3 +55,45 @@ describe('BridgeFloatService', () => {
     expect(await service.getOutstandingDeficit('USDC' as never)).toBe(0)
   })
 })
+
+describe('BridgeFloatService.getFloatAsset', () => {
+  const corridor = {
+    blockchain: 'STELLAR' as never,
+    cryptoCurrency: 'USDC' as never,
+    targetCurrency: 'BRL' as never,
+  }
+
+  const makeWithDefinition = (definition: unknown) => {
+    const findUnique = jest.fn(async () => definition)
+    const dbProvider = { getClient: jest.fn(async () => ({ flowDefinition: { findUnique } })) }
+    return { findUnique, service: new BridgeFloatService(dbProvider as never, baseLogger as never) }
+  }
+
+  // The corridor that consumes float is whatever the flow definition bridges —
+  // not a hardcoded chain. After the Transfero Ultra migration re-routed every
+  // USDC->BRL corridor onto the bridge, a chain-specific predicate stopped
+  // guarding them and their exposure ran past the cap.
+  it('returns the bridge asset for any corridor whose definition enqueues a bridge leg', async () => {
+    const { findUnique, service } = makeWithDefinition({ steps: [{ config: { asset: 'USDC', destNetwork: 'MATIC' } }] })
+
+    expect(await service.getFloatAsset(corridor)).toBe('USDC')
+    expect(findUnique).toHaveBeenCalledWith(expect.objectContaining({
+      where: { flow_corridor_unique: corridor },
+    }))
+  })
+
+  it('returns undefined for a corridor that settles directly without a bridge leg', async () => {
+    const { service } = makeWithDefinition({ steps: [] })
+    expect(await service.getFloatAsset(corridor)).toBeUndefined()
+  })
+
+  it('returns undefined when the corridor has no flow definition', async () => {
+    const { service } = makeWithDefinition(null)
+    expect(await service.getFloatAsset(corridor)).toBeUndefined()
+  })
+
+  it('ignores a bridge step whose config carries no recognisable asset', async () => {
+    const { service } = makeWithDefinition({ steps: [{ config: { destNetwork: 'MATIC' } }, { config: { asset: 'NOT_AN_ASSET' } }] })
+    expect(await service.getFloatAsset(corridor)).toBeUndefined()
+  })
+})

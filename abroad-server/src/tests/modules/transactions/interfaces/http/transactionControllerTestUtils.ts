@@ -94,6 +94,7 @@ export const buildMinimalController = () => {
 
   const bridgeFloatService = {
     canSettle: jest.fn(async () => ({ cap: 2000, deficit: 0, ok: true })),
+    getFloatAsset: jest.fn(async () => undefined),
     getOutstandingDeficit: jest.fn(async () => 0),
   } as unknown as import('../../../../../modules/treasury/application/BridgeFloatService').BridgeFloatService
 
