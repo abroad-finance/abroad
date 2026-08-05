@@ -21,55 +21,63 @@ export type ActivityStatusTone
     | 'unknown'
     | 'wrong-amount'
 
+/**
+ * The translator these presenters borrow from their caller.
+ *
+ * Callers pass the `t` from `useTranslate()` straight in, and every parameter
+ * holding one is named `t` on purpose: Tolgee's extractor collects key literals
+ * from calls on a binding of that name, so renaming it makes these strings
+ * invisible to the extractor and unreachable for translators.
+ */
 export type ActivityTranslate = (key: string, fallback: string) => string
 
 const defaultTranslate: ActivityTranslate = (_key, fallback) => fallback
 
 export const activityStatusPresentation = (
   status: string,
-  translate: ActivityTranslate = defaultTranslate,
+  t: ActivityTranslate = defaultTranslate,
 ): ActivityStatusPresentation => {
   switch (status) {
     case 'AWAITING_PAYMENT':
       return {
-        description: translate('activity.status.awaiting.description', 'Waiting for the wallet transfer.'),
-        label: translate('activity.status.awaiting.label', 'Awaiting payment'),
+        description: t('activity.status.awaiting.description', 'Waiting for the wallet transfer.'),
+        label: t('activity.status.awaiting.label', 'Awaiting payment'),
         tone: 'awaiting',
       }
     case 'PAYMENT_COMPLETED':
       return {
-        description: translate('activity.status.completed.description', 'The local payout is confirmed.'),
-        label: translate('activity.status.completed.label', 'Completed'),
+        description: t('activity.status.completed.description', 'The local payout is confirmed.'),
+        label: t('activity.status.completed.label', 'Completed'),
         tone: 'completed',
       }
     case 'PAYMENT_EXPIRED':
       return {
-        description: translate('activity.status.expired.description', 'The payment window expired.'),
-        label: translate('activity.status.expired.label', 'Expired'),
+        description: t('activity.status.expired.description', 'The payment window expired.'),
+        label: t('activity.status.expired.label', 'Expired'),
         tone: 'expired',
       }
     case 'PAYMENT_FAILED':
       return {
-        description: translate('activity.status.failed.description', 'The local payout did not complete.'),
-        label: translate('activity.status.failed.label', 'Payment failed'),
+        description: t('activity.status.failed.description', 'The local payout did not complete.'),
+        label: t('activity.status.failed.label', 'Payment failed'),
         tone: 'failed',
       }
     case 'PROCESSING_PAYMENT':
       return {
-        description: translate('activity.status.processing.description', 'Funds received; the local payout is being processed.'),
-        label: translate('activity.status.processing.label', 'Processing payment'),
+        description: t('activity.status.processing.description', 'Funds received; the local payout is being processed.'),
+        label: t('activity.status.processing.label', 'Processing payment'),
         tone: 'processing',
       }
     case 'WRONG_AMOUNT':
       return {
-        description: translate('activity.status.wrong_amount.description', 'The received amount needs review.'),
-        label: translate('activity.status.wrong_amount.label', 'Amount needs review'),
+        description: t('activity.status.wrong_amount.description', 'The received amount needs review.'),
+        label: t('activity.status.wrong_amount.label', 'Amount needs review'),
         tone: 'wrong-amount',
       }
     default:
       return {
-        description: translate('activity.status.unknown.description', 'We cannot verify the latest payment state right now.'),
-        label: translate('activity.status.unknown.label', 'Status unavailable'),
+        description: t('activity.status.unknown.description', 'We cannot verify the latest payment state right now.'),
+        label: t('activity.status.unknown.label', 'Status unavailable'),
         tone: 'unknown',
       }
   }
@@ -136,46 +144,46 @@ export const formatActivityRate = (
 
 export const activityReferenceRows = (
   receipt: Pick<ConsumerActivityReceiptDto, 'references'>,
-  translate: ActivityTranslate = defaultTranslate,
+  t: ActivityTranslate = defaultTranslate,
 ): ActivityReferenceRow[] => {
   const rows: Array<ActivityReferenceRow | null> = [
     {
       key: 'abroad',
-      label: translate('activity.reference.abroad', 'Abroad ID'),
+      label: t('activity.reference.abroad', 'Abroad ID'),
       value: receipt.references.abroadId,
     },
     receipt.references.pixEndToEndId
       ? {
           key: 'pix',
-          label: translate('activity.reference.pix', 'PIX end-to-end ID'),
+          label: t('activity.reference.pix', 'PIX end-to-end ID'),
           value: receipt.references.pixEndToEndId,
         }
       : null,
     receipt.references.brebId
       ? {
           key: 'breb',
-          label: translate('activity.reference.breb', 'BRE-B reference'),
+          label: t('activity.reference.breb', 'BRE-B reference'),
           value: receipt.references.brebId,
         }
       : null,
     receipt.references.providerId
       ? {
           key: 'provider',
-          label: translate('activity.reference.provider', 'Provider reference'),
+          label: t('activity.reference.provider', 'Provider reference'),
           value: receipt.references.providerId,
         }
       : null,
     receipt.references.onChainId
       ? {
           key: 'on-chain',
-          label: translate('activity.reference.on_chain', 'On-chain transaction'),
+          label: t('activity.reference.on_chain', 'On-chain transaction'),
           value: receipt.references.onChainId,
         }
       : null,
     receipt.references.refundOnChainId
       ? {
           key: 'refund',
-          label: translate('activity.reference.refund', 'Refund transaction'),
+          label: t('activity.reference.refund', 'Refund transaction'),
           value: receipt.references.refundOnChainId,
         }
       : null,

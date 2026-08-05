@@ -60,8 +60,6 @@ const currentLocale = (): string => document.documentElement.lang || navigator.l
 
 const ActivityListPage = (): React.JSX.Element => {
   const { t } = useTranslate()
-  // @tolgee-ignore
-  const translateActivity = (key: string, fallback: string): string => t(key, fallback)
   const [searchParams, setSearchParams] = useSearchParams()
   const page = readPage(searchParams.get('page'))
   const status = readAllowed(searchParams.get('status'), transactionStatuses)
@@ -200,7 +198,7 @@ const ActivityListPage = (): React.JSX.Element => {
               <select className="min-h-11 rounded-xl border border-[var(--ab-border)] bg-[var(--ab-bg)] px-3 text-sm" onChange={event => setParameter('status', event.target.value)} value={status ?? ''}>
                 <option value="">{t('activity.filters.all_statuses', 'All statuses')}</option>
                 {transactionStatuses.map(value => (
-                  <option key={value} value={value}>{activityStatusPresentation(value, translateActivity).label}</option>
+                  <option key={value} value={value}>{activityStatusPresentation(value, t).label}</option>
                 ))}
               </select>
             </label>
@@ -292,7 +290,7 @@ const ActivityListPage = (): React.JSX.Element => {
           <section aria-label={t('activity.list.label', 'Payment Activity')} className="overflow-hidden rounded-3xl border border-[var(--ab-border)] bg-[var(--ab-card)] shadow-sm">
             <div className="divide-y divide-[var(--ab-border)]">
               {activity.items.map((item) => {
-                const presentation = activityStatusPresentation(item.status, translateActivity)
+                const presentation = activityStatusPresentation(item.status, t)
                 const targetAmount = formatActivityMoney(item.quote.targetAmount, item.quote.targetCurrency, locale)
                 const sourceAmount = formatActivityMoney(item.quote.sourceAmount, item.quote.sourceCurrency, locale)
                 const returnValue = returnSearch ? `?${returnSearch}` : ''

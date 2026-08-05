@@ -1,3 +1,4 @@
+import { useTranslate } from '@tolgee/react'
 import {
   ArrowLeft,
   Loader,
@@ -27,23 +28,24 @@ type BuyCryptoFormProps = {
   onBack: () => void
   onSubmit: (values: { fiatAmount: number }) => void
   submissionError: null | string
-  translate: (key: string, fallback: string) => string
 }
 
+// `t` is borrowed from the caller's `useTranslate()`; the name is what Tolgee's
+// extractor looks for when collecting these key literals.
 const describeAmountError = (
   error: NonNullable<OnrampFormErrors['fiatAmount']>,
   limits: OnrampFormLimits,
-  translate: BuyCryptoFormProps['translate'],
+  t: (key: string, fallback: string) => string,
 ): string => {
   switch (error) {
     case 'above-maximum':
-      return `${translate('buyCrypto.form.aboveMaximum', 'The most you can buy at once is')} ${limits.maxAmount ?? ''} BRL`
+      return `${t('buyCrypto.form.aboveMaximum', 'The most you can buy at once is')} ${limits.maxAmount ?? ''} BRL`
     case 'below-minimum':
-      return `${translate('buyCrypto.form.belowMinimum', 'The least you can buy is')} ${limits.minAmount ?? ''} BRL`
+      return `${t('buyCrypto.form.belowMinimum', 'The least you can buy is')} ${limits.minAmount ?? ''} BRL`
     case 'malformed':
-      return translate('buyCrypto.form.malformedAmount', 'Enter an amount in Reais, for example 500,00')
+      return t('buyCrypto.form.malformedAmount', 'Enter an amount in Reais, for example 500,00')
     case 'required':
-      return translate('buyCrypto.form.amountRequired', 'Enter how much you want to spend')
+      return t('buyCrypto.form.amountRequired', 'Enter how much you want to spend')
   }
 }
 
@@ -69,8 +71,8 @@ export default function BuyCryptoForm({
   onBack,
   onSubmit,
   submissionError,
-  translate,
 }: BuyCryptoFormProps) {
+  const { t } = useTranslate()
   const [fiatAmount, setFiatAmount] = useState('')
   const [errors, setErrors] = useState<OnrampFormErrors>({})
 
@@ -90,7 +92,7 @@ export default function BuyCryptoForm({
   ])
 
   const canSubmit = Boolean(destinationAddress) && !isSubmitting
-  const asset = assetLabel ?? translate('buyCrypto.form.genericAsset', 'crypto')
+  const asset = assetLabel ?? t('buyCrypto.form.genericAsset', 'crypto')
   const limitsHint = limits.minAmount !== null && limits.maxAmount !== null
     ? `${formatLimit(limits.minAmount)} – ${formatLimit(limits.maxAmount)}`
     : null
@@ -103,7 +105,7 @@ export default function BuyCryptoForm({
       >
         <header className="flex items-center gap-3">
           <button
-            aria-label={translate('buyCrypto.form.backAria', 'Go back')}
+            aria-label={t('buyCrypto.form.backAria', 'Go back')}
             className="flex size-11 shrink-0 items-center justify-center rounded-2xl transition-colors hover:bg-ab-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ab-green)]"
             onClick={onBack}
             type="button"
@@ -115,7 +117,7 @@ export default function BuyCryptoForm({
               Brazil · Pix · BRL
             </p>
             <h1 className="text-xl font-bold leading-7 text-ab-text" id="buy-crypto-form-heading">
-              {`${translate('buyCrypto.form.title', 'Buy')} ${asset}`}
+              {`${t('buyCrypto.form.title', 'Buy')} ${asset}`}
             </h1>
           </div>
         </header>
@@ -125,7 +127,7 @@ export default function BuyCryptoForm({
             className="text-xs font-bold uppercase tracking-wide text-ab-text-3"
             htmlFor="buy-crypto-amount"
           >
-            {translate('buyCrypto.form.amountLabel', 'You pay')}
+            {t('buyCrypto.form.amountLabel', 'You pay')}
           </label>
           <div
             className={cn(
@@ -150,12 +152,12 @@ export default function BuyCryptoForm({
           {errors.fiatAmount
             ? (
                 <p className="text-sm font-medium text-ab-error" id="buy-crypto-amount-error" role="alert">
-                  {describeAmountError(errors.fiatAmount, limits, translate)}
+                  {describeAmountError(errors.fiatAmount, limits, t)}
                 </p>
               )
             : limitsHint && (
               <p className="text-sm text-ab-text-3" id="buy-crypto-amount-hint">
-                {translate('buyCrypto.form.limits', 'Between')}
+                {t('buyCrypto.form.limits', 'Between')}
                 {' '}
                 {limitsHint}
               </p>
@@ -170,7 +172,7 @@ export default function BuyCryptoForm({
             className="text-xs font-bold uppercase tracking-wide text-ab-text-3"
             id="buy-crypto-destination-heading"
           >
-            {translate('buyCrypto.form.destinationHeading', 'Delivered to')}
+            {t('buyCrypto.form.destinationHeading', 'Delivered to')}
           </h2>
           {destinationAddress
             ? (
@@ -178,7 +180,7 @@ export default function BuyCryptoForm({
                   <div className="flex flex-col gap-1">
                     <span className="flex items-center gap-2 text-sm text-ab-text-3">
                       <Wallet aria-hidden="true" className="size-4" />
-                      {translate('buyCrypto.form.wallet', 'Wallet')}
+                      {t('buyCrypto.form.wallet', 'Wallet')}
                     </span>
                     {/* Shown in full: this is where the money lands, and a
                         truncated address cannot be checked against a wallet. */}
@@ -192,7 +194,7 @@ export default function BuyCryptoForm({
                   {(assetLabel || networkLabel) && (
                     <div className="flex min-w-0 items-center justify-between gap-3">
                       <span className="shrink-0 text-sm text-ab-text-3">
-                        {translate('buyCrypto.form.network', 'Network')}
+                        {t('buyCrypto.form.network', 'Network')}
                       </span>
                       <span className="flex min-w-0 items-center justify-end gap-2 text-right text-sm font-semibold text-ab-text">
                         {assetLabel && (
@@ -211,7 +213,7 @@ export default function BuyCryptoForm({
               )
             : (
                 <p className="mt-3 text-sm leading-5 text-ab-text-3" role="alert">
-                  {translate(
+                  {t(
                     'buyCrypto.form.connectWallet',
                     'Connect a wallet first so we know where to send your crypto.',
                   )}
@@ -233,7 +235,7 @@ export default function BuyCryptoForm({
           onClick={onBack}
           type="button"
         >
-          {translate('buyCrypto.form.back', 'Back')}
+          {t('buyCrypto.form.back', 'Back')}
         </button>
         <button
           aria-busy={isSubmitting}
@@ -244,8 +246,8 @@ export default function BuyCryptoForm({
         >
           {isSubmitting && <Loader aria-hidden="true" className="size-5 animate-spin motion-reduce:animate-none" />}
           {isSubmitting
-            ? translate('buyCrypto.form.submitting', 'Getting your PIX code…')
-            : translate('buyCrypto.form.submit', 'Continue')}
+            ? t('buyCrypto.form.submitting', 'Getting your PIX code…')
+            : t('buyCrypto.form.submit', 'Continue')}
         </button>
       </div>
     </main>

@@ -65,20 +65,23 @@ const inputClass = 'min-h-12 w-full rounded-xl border border-[var(--ab-border)] 
 
 const fieldErrorClass = 'border-red-500 focus:border-red-500 focus:ring-red-200'
 
-const documentTypeFallbacks: Record<KycDocumentType, string> = {
-  DRIVERS_LICENSE: 'Driver\'s license',
-  FOREIGN_ID: 'Foreign ID',
-  NATIONAL_ID: 'National ID',
-  OTHER: 'Other',
-  PASSPORT: 'Passport',
-}
-
-const documentTypeTranslationKeys: Record<KycDocumentType, string> = {
-  DRIVERS_LICENSE: 'kyc_form.doc_type.drivers_license',
-  FOREIGN_ID: 'kyc_form.doc_type.foreign_id',
-  NATIONAL_ID: 'kyc_form.doc_type.national_id',
-  OTHER: 'kyc_form.doc_type.other',
-  PASSPORT: 'kyc_form.doc_type.passport',
+/**
+ * Spelled out per document type instead of indexing a table of key names: a key
+ * that only exists as a lookup is invisible to Tolgee's extractor, so it never
+ * reaches a translator. The parameter is named `t` for the same reason — that is
+ * the binding the extractor reads literals from.
+ */
+const documentTypeLabel = (
+  type: KycDocumentType,
+  t: (key: string, fallback: string) => string,
+): string => {
+  switch (type) {
+    case 'DRIVERS_LICENSE': return t('kyc_form.doc_type.drivers_license', 'Driver\'s license')
+    case 'FOREIGN_ID': return t('kyc_form.doc_type.foreign_id', 'Foreign ID')
+    case 'NATIONAL_ID': return t('kyc_form.doc_type.national_id', 'National ID')
+    case 'OTHER': return t('kyc_form.doc_type.other', 'Other')
+    case 'PASSPORT': return t('kyc_form.doc_type.passport', 'Passport')
+  }
 }
 
 const stepIndex = (step: KycStep): number => STEPS.indexOf(step)
@@ -734,10 +737,7 @@ const KycForm = ({ canResumePayment, onClose, onSubmit }: KycFormProps): React.J
               >
                 <option value="">{t('kyc_form.document_type_placeholder', 'Select a document type')}</option>
                 {KYC_DOCUMENT_TYPES.map(type => (
-                  <option key={type} value={type}>
-                    {/* @tolgee-ignore */}
-                    {t(documentTypeTranslationKeys[type], documentTypeFallbacks[type])}
-                  </option>
+                  <option key={type} value={type}>{documentTypeLabel(type, t)}</option>
                 ))}
               </select>
               {errors.documentType && <p className="text-sm text-red-600" id="kyc-documentType-error">{errorMessage(errors.documentType)}</p>}

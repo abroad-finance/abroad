@@ -46,11 +46,18 @@ function tokenIconUrl(tokenIdOrLabel: string): string | undefined {
   return TOKEN_ICONS[token]
 }
 
-function tokenSubtitle(tokenLabel: string): string {
-  const t = tokenLabel.toUpperCase()
-  if (t === 'USDC') return 'USD Coin'
-  if (t === 'USDT') return 'Tether USD'
-  return tokenLabel
+/**
+ * Spelled out per token rather than building the key from the label: a key
+ * assembled at runtime is invisible to Tolgee's extractor, so it never reaches a
+ * translator. An unlisted token still shows its own label, exactly as the
+ * generated key did when it resolved to nothing.
+ */
+function tokenSubtitle(tokenLabel: string, t: (key: string, fallback: string) => string): string {
+  switch (tokenLabel.toUpperCase()) {
+    case 'USDC': return t('chain_selector.token.usdc', 'USD Coin')
+    case 'USDT': return t('chain_selector.token.usdt', 'Tether USD')
+    default: return tokenLabel
+  }
 }
 
 /**
@@ -180,8 +187,7 @@ export const ChainSelectorModal: React.FC<ChainSelectorModalProps> = ({
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="text-sm font-semibold text-ab-text">{token.label}</div>
-                  {/* @tolgee-ignore */}
-                  <div className="text-xs text-ab-text-2">{t(`chain_selector.token.${token.label.toLowerCase()}`, tokenSubtitle(token.label))}</div>
+                  <div className="text-xs text-ab-text-2">{tokenSubtitle(token.label, t)}</div>
                 </div>
                 <div className="text-right">
                   <div className="text-sm font-semibold text-ab-text">

@@ -25,12 +25,6 @@ const PAYMENT_ACTION_CARD_CLASS = 'flex h-full min-h-[clamp(92px,14vh,118px)] w-
 const PAYMENT_ACTION_ICON_CLASS = 'flex h-[clamp(2.25rem,6vh,3.25rem)] w-[clamp(2.25rem,6vh,3.25rem)] shrink-0 items-center justify-center rounded-[clamp(0.5rem,1.5vh,0.875rem)]'
 const PAYMENT_ACTION_LABEL_CLASS = 'text-[clamp(0.75rem,1.8vw+0.4vh,1.05rem)] font-bold leading-tight'
 
-const TRUST_BADGE_DATA = [
-  { defaultLabel: 'Track every payment', i18nKey: 'home.trust_tracking' as const, Icon: ListChecks },
-  { defaultLabel: 'Review before paying', i18nKey: 'home.trust_review' as const, Icon: BadgeCheck },
-  { defaultLabel: 'Wallet authorized', i18nKey: 'home.trust_wallet' as const, Icon: Lock },
-]
-
 export interface HomeScreenProps {
   balance: null | string
   hasEnteredApp?: boolean
@@ -89,11 +83,13 @@ export default function HomeScreen({
 
   // Onboarding view - Figma node 5:2 pixel-perfect
   if (showOnboarding) {
-    const trustBadges = TRUST_BADGE_DATA.map(({ defaultLabel, i18nKey, Icon }) => ({
-      Icon,
-      // @tolgee-ignore
-      label: t(i18nKey, defaultLabel),
-    }))
+    // Written out one key at a time rather than mapped over a table of key
+    // names: Tolgee's extractor reads the literals, so these stay translatable.
+    const trustBadges = [
+      { Icon: ListChecks, label: t('home.trust_tracking', 'Track every payment') },
+      { Icon: BadgeCheck, label: t('home.trust_review', 'Review before paying') },
+      { Icon: Lock, label: t('home.trust_wallet', 'Wallet authorized') },
+    ]
 
     const ratesUpdatedAt = onboardingRates?.updatedAt
       ? new Intl.DateTimeFormat(undefined, {
@@ -509,8 +505,7 @@ export default function HomeScreen({
             <div className="divide-y divide-[var(--ab-border)] overflow-hidden rounded-2xl border border-[var(--ab-border)] bg-[var(--ab-bg-card)]">
               {recentTransactions.slice(0, 2).map((tx) => {
                 const countryConfig = RECENT_COUNTRY_CONFIG[tx.quote.targetCurrency] ?? RECENT_COUNTRY_CONFIG.COP
-                // @tolgee-ignore
-                const statusPresentation = activityStatusPresentation(tx.status, (key, fallback) => t(key, fallback))
+                const statusPresentation = activityStatusPresentation(tx.status, t)
                 const localAmount = tx.quote.targetAmount.toLocaleString(
                   localeForCurrency(tx.quote.targetCurrency),
                   numberFormatOptions(tx.quote.targetCurrency),

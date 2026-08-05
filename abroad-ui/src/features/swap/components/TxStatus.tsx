@@ -44,6 +44,12 @@ type ProgressStep = {
 }
 
 type ProgressStepState = 'current' | 'done' | 'pending' | 'problem'
+
+/**
+ * The `t` from `useTranslate()`, handed to the copy builders below. Every
+ * parameter holding it is named `t` because Tolgee's extractor only collects
+ * key literals from calls on a binding of that name.
+ */
 type Translate = (key: string, fallback: string) => string
 
 interface TxStatusProps {
@@ -89,37 +95,37 @@ const telemetryTerminalOutcome = (
 
 const localAuthorizationMessage = (
   authorization: null | PaymentAuthorizationState,
-  translate: Translate,
+  t: Translate,
 ): null | { body: string, title: string, tone: 'attention' | 'neutral' } => {
   switch (authorization?.kind) {
     case 'accepted':
       return {
-        body: translate('tx_status.authorization.accepted.body', 'Your Abroad request is saved. Resume the wallet authorization for this same request.'),
-        title: translate('tx_status.authorization.accepted.title', 'Payment request created'),
+        body: t('tx_status.authorization.accepted.body', 'Your Abroad request is saved. Resume the wallet authorization for this same request.'),
+        title: t('tx_status.authorization.accepted.title', 'Payment request created'),
         tone: 'neutral',
       }
     case 'authorizing':
       return {
-        body: translate('tx_status.authorization.authorizing.body', 'Review the exact amount and network in your wallet. Closing the wallet does not create another Abroad request.'),
-        title: translate('tx_status.authorization.authorizing.title', 'Waiting for wallet authorization'),
+        body: t('tx_status.authorization.authorizing.body', 'Review the exact amount and network in your wallet. Closing the wallet does not create another Abroad request.'),
+        title: t('tx_status.authorization.authorizing.title', 'Waiting for wallet authorization'),
         tone: 'neutral',
       }
     case 'broadcast-confirmed':
       return {
-        body: translate('tx_status.authorization.confirmed.body', 'The wallet returned an on-chain reference. Abroad is confirming the transfer and local payout.'),
-        title: translate('tx_status.authorization.confirmed.title', 'Transfer submitted'),
+        body: t('tx_status.authorization.confirmed.body', 'The wallet returned an on-chain reference. Abroad is confirming the transfer and local payout.'),
+        title: t('tx_status.authorization.confirmed.title', 'Transfer submitted'),
         tone: 'neutral',
       }
     case 'broadcast-unknown':
       return {
-        body: translate('tx_status.authorization.unknown.body', 'The transfer may have been submitted. Do not send it again while Abroad reconciles the network and payment state.'),
-        title: translate('tx_status.authorization.unknown.title', 'Transfer outcome is being checked'),
+        body: t('tx_status.authorization.unknown.body', 'The transfer may have been submitted. Do not send it again while Abroad reconciles the network and payment state.'),
+        title: t('tx_status.authorization.unknown.title', 'Transfer outcome is being checked'),
         tone: 'attention',
       }
     case 'wallet-rejected':
       return {
-        body: translate('tx_status.authorization.rejected.body', 'No funding proof was received. Your Abroad request is saved, so you can resume without creating a duplicate.'),
-        title: translate('tx_status.authorization.rejected.title', 'Wallet authorization cancelled'),
+        body: t('tx_status.authorization.rejected.body', 'No funding proof was received. Your Abroad request is saved, so you can resume without creating a duplicate.'),
+        title: t('tx_status.authorization.rejected.title', 'Wallet authorization cancelled'),
         tone: 'attention',
       }
     case undefined:
@@ -131,7 +137,7 @@ const localAuthorizationMessage = (
 const progressSteps = (
   authorization: null | PaymentAuthorizationState,
   status: null | string,
-  translate: Translate,
+  t: Translate,
 ): ProgressStep[] => {
   const broadcastKnown = authorization?.kind === 'broadcast-confirmed'
     || status === 'PROCESSING_PAYMENT'
@@ -144,9 +150,9 @@ const progressSteps = (
     || status === 'WRONG_AMOUNT'
 
   return [
-    { label: translate('tx_status.step.request', 'Payment request created'), state: 'done' },
+    { label: t('tx_status.step.request', 'Payment request created'), state: 'done' },
     {
-      label: translate('tx_status.step.authorization', 'Wallet authorization'),
+      label: t('tx_status.step.authorization', 'Wallet authorization'),
       state: walletProblem
         ? 'problem'
         : authorization?.kind === 'accepted'
@@ -156,7 +162,7 @@ const progressSteps = (
             : 'pending',
     },
     {
-      label: translate('tx_status.step.transfer', 'Stablecoin transfer confirmation'),
+      label: t('tx_status.step.transfer', 'Stablecoin transfer confirmation'),
       state: broadcastUnknown
         ? 'problem'
         : broadcastKnown
@@ -166,7 +172,7 @@ const progressSteps = (
             : 'current',
     },
     {
-      label: translate('tx_status.step.payout', 'Local payout'),
+      label: t('tx_status.step.payout', 'Local payout'),
       state: localPayoutDone
         ? 'done'
         : localPayoutProblem
@@ -213,18 +219,15 @@ const TxStatus = ({
     && nonterminal
     && now - acceptedAt >= 180_000
   const presentation = receipt
-    // @tolgee-ignore
-    ? activityStatusPresentation(receipt.status, (key, fallback) => t(key, fallback))
+    ? activityStatusPresentation(receipt.status, t)
     : null
-  // @tolgee-ignore
-  const translate = useCallback((key: string, fallback: string): string => t(key, fallback), [t])
-  const authorizationMessage = localAuthorizationMessage(authorizationState, translate)
+  const authorizationMessage = localAuthorizationMessage(authorizationState, t)
   const steps = useMemo(
-    () => progressSteps(authorizationState, receipt?.status ?? null, translate),
+    () => progressSteps(authorizationState, receipt?.status ?? null, t),
     [
       authorizationState,
       receipt?.status,
-      translate,
+      t,
     ],
   )
   const canResume = Boolean(

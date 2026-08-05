@@ -405,8 +405,6 @@ const WebSwap: React.FC = () => {
                     ? t('buyCrypto.form.failed', 'We could not start this purchase. Please try again.')
                     : null
                 }
-                // @tolgee-ignore
-                translate={(key, fallback) => t(key, fallback)}
               />
             ),
             buyCryptoPix: buyCrypto.state.instructions && buyCrypto.state.quote
@@ -416,8 +414,6 @@ const WebSwap: React.FC = () => {
                     onExpired={() => undefined}
                     onStartOver={buyCrypto.start}
                     quote={buyCrypto.state.quote}
-                    // @tolgee-ignore
-                    translate={(key, fallback) => t(key, fallback)}
                   />
                 )
               : <></>,

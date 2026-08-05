@@ -7,7 +7,9 @@ import {
 import BuyCryptoForm from '../features/swap/components/BuyCryptoForm'
 import { parseFiatAmount, validateOnrampForm } from '../features/swap/shared/onrampFormModel'
 
-const translate = (_key: string, fallback: string) => fallback
+vi.mock('@tolgee/react', () => ({
+  useTranslate: () => ({ t: (_key: string, fallback: string) => fallback }),
+}))
 
 const WALLET = '0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed'
 
@@ -30,7 +32,6 @@ const renderForm = (overrides?: {
       onBack={vi.fn()}
       onSubmit={onSubmit}
       submissionError={overrides?.submissionError ?? null}
-      translate={translate}
     />,
   )
   return { onSubmit }

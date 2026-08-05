@@ -1,3 +1,4 @@
+import { useTranslate } from '@tolgee/react'
 import {
   Check,
   Clock,
@@ -29,7 +30,6 @@ type BuyCryptoPixCodeProps = {
   onExpired: () => void
   onStartOver: () => void
   quote: OnrampQuoteView
-  translate: (key: string, fallback: string) => string
 }
 
 const COUNTDOWN_TICK_MS = 1_000
@@ -58,8 +58,8 @@ export default function BuyCryptoPixCode({
   onExpired,
   onStartOver,
   quote,
-  translate,
 }: BuyCryptoPixCodeProps) {
+  const { t } = useTranslate()
   const [copied, setCopied] = useState(false)
   const [remainingMs, setRemainingMs] = useState<null | number>(
     () => millisecondsUntilExpiry(instructions),
@@ -115,7 +115,7 @@ export default function BuyCryptoPixCode({
             Brazil · Pix · BRL
           </p>
           <h1 className="text-xl font-bold leading-7 text-ab-text" id="buy-crypto-pix-heading">
-            {translate('buyCrypto.pix.title', 'Pay this Pix to finish')}
+            {t('buyCrypto.pix.title', 'Pay this Pix to finish')}
           </h1>
         </header>
 
@@ -139,7 +139,7 @@ export default function BuyCryptoPixCode({
           ? (
               <div className="rounded-2xl border border-ab-error/40 bg-ab-error/10 p-4" role="alert">
                 <p className="text-sm font-semibold text-ab-error">
-                  {translate(
+                  {t(
                     'buyCrypto.pix.expired',
                     'This payment code expired before it was paid. Start again to get a fresh one.',
                   )}
@@ -149,7 +149,7 @@ export default function BuyCryptoPixCode({
                   onClick={onStartOver}
                   type="button"
                 >
-                  {translate('buyCrypto.pix.startOver', 'Start again')}
+                  {t('buyCrypto.pix.startOver', 'Start again')}
                 </button>
               </div>
             )
@@ -165,7 +165,7 @@ export default function BuyCryptoPixCode({
                     }`}
                   >
                     <Clock aria-hidden="true" className="size-4" />
-                    {translate('buyCrypto.pix.expiresIn', 'Expires in')}
+                    {t('buyCrypto.pix.expiresIn', 'Expires in')}
                     {' '}
                     {formatExpiryCountdown(remainingMs)}
                   </div>
@@ -179,7 +179,7 @@ export default function BuyCryptoPixCode({
                 <div className="flex justify-center">
                   <div className="rounded-2xl bg-white p-4 shadow-[0px_4px_12px_-4px_rgba(0,0,0,0.12)]">
                     <QRCodeSVG
-                      aria-label={translate('buyCrypto.pix.qrAlt', 'PIX QR code for this payment')}
+                      aria-label={t('buyCrypto.pix.qrAlt', 'PIX QR code for this payment')}
                       bgColor="#ffffff"
                       className="h-auto w-full max-w-[13.5rem]"
                       data-testid="buy-crypto-qr"
@@ -201,7 +201,7 @@ export default function BuyCryptoPixCode({
                     className="text-xs font-bold uppercase tracking-wide text-ab-text-3"
                     id="buy-crypto-code-heading"
                   >
-                    {translate('buyCrypto.pix.codeHeading', 'Pix copy and paste')}
+                    {t('buyCrypto.pix.codeHeading', 'Pix copy and paste')}
                   </h2>
                   <p
                     className="mt-3 max-h-32 select-all overflow-y-auto break-all rounded-xl bg-[var(--ab-bg-card)] p-3 font-mono text-xs leading-5 text-ab-text"
@@ -220,14 +220,14 @@ export default function BuyCryptoPixCode({
                     ? <Check aria-hidden="true" className="size-5" />
                     : <Copy aria-hidden="true" className="size-5" />}
                   {copied
-                    ? translate('buyCrypto.pix.copied', 'Copied')
-                    : translate('buyCrypto.pix.copy', 'Copy PIX code')}
+                    ? t('buyCrypto.pix.copied', 'Copied')
+                    : t('buyCrypto.pix.copy', 'Copy PIX code')}
                 </button>
 
                 <div className="flex gap-3 rounded-2xl bg-ab-separator/60 p-4">
                   <Info aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-ab-text" />
                   <p className="text-sm leading-5 text-ab-text-3">
-                    {translate(
+                    {t(
                       'buyCrypto.pix.settlementNotice',
                       'We release the crypto to your wallet once the payment settles.',
                     )}

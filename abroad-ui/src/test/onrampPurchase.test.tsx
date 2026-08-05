@@ -16,7 +16,9 @@ import {
   millisecondsUntilExpiry,
 } from '../features/swap/shared/onrampPresentation'
 
-const translate = (_key: string, fallback: string) => fallback
+vi.mock('@tolgee/react', () => ({
+  useTranslate: () => ({ t: (_key: string, fallback: string) => fallback }),
+}))
 
 const quote = {
   sourceAmount: 91.482,
@@ -79,7 +81,6 @@ describe('BuyCryptoPixCode', () => {
       onExpired={handlers?.onExpired ?? vi.fn()}
       onStartOver={handlers?.onStartOver ?? vi.fn()}
       quote={quote}
-      translate={translate}
     />,
   )
 

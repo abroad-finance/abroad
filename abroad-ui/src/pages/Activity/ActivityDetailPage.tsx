@@ -53,10 +53,6 @@ const ActivityDetailPage = (): React.JSX.Element => {
   const rawReturn = searchParams.get('return')
   const safeReturn = rawReturn?.startsWith('?') && rawReturn.length <= 1_000 ? rawReturn : ''
   const backTarget = `/activity${safeReturn}`
-  const translateActivity = useCallback((key: string, fallback: string): string => (
-    // @tolgee-ignore
-    t(key, fallback)
-  ), [t])
 
   const recordReceiptAction = useCallback((
     name: ConsumerUxEventName,
@@ -202,11 +198,11 @@ const ActivityDetailPage = (): React.JSX.Element => {
 
         {activity.receipt && (() => {
           const receipt = activity.receipt
-          const presentation = activityStatusPresentation(receipt.status, translateActivity)
+          const presentation = activityStatusPresentation(receipt.status, t)
           const targetAmount = formatActivityMoney(receipt.quote.targetAmount, receipt.quote.targetCurrency, locale)
           const sourceAmount = formatActivityMoney(receipt.quote.sourceAmount, receipt.quote.sourceCurrency, locale)
           const rate = formatActivityRate(receipt.effectiveRate, receipt.quote.sourceCurrency, receipt.quote.targetCurrency, locale)
-          const references = activityReferenceRows(receipt, translateActivity)
+          const references = activityReferenceRows(receipt, t)
           const numericFee = receipt.fee ? Number(receipt.fee.amount) : null
           const feeDisplay = receipt.fee && numericFee !== null && Number.isFinite(numericFee) && numericFee >= 0
             ? formatActivityMoney(numericFee, receipt.fee.currency, locale)
