@@ -197,13 +197,14 @@ substitutions:
   # exposure at transaction acceptance; if unset the guard fails OPEN, so it is
   # pinned here (re-applied on every deploy) rather than set by hand once.
   #
-  # TEMPORARILY 3000 for the 5.6.93 drain window. 43 batches stranded by the
-  # withdraw-status lookup bug hold 1263.78 USDC of deficit that the fixed sweep
-  # worker has to release, and this release also widens the guard to the
-  # Stellar/Solana corridors the Ultra migration moved onto the bridge. At 1000
-  # the guard would reject every BRL payout until the drain completes. Restore
-  # to a right-sized value once the deficit reflects real in-flight exposure.
-  _BRIDGE_FLOAT_CAP_USDC: "3000"
+  # Sized against measured exposure once 5.6.95 fixed the withdraw-status lookup
+  # that had stranded batches on the deficit. Reconstructing outstanding legs
+  # from 30 days of prod logs, with a healthy sweep the TRUE peak in-flight
+  # exposure was 682.92 USDC (2026-08-01, the busiest day). Batches credit
+  # ~10 min after sweep (p50 617s, p90 652s, max 814s), so exposure drains
+  # quickly and the peak is a genuine ceiling rather than a growing balance.
+  # 1000 leaves the peak at ~68% utilization.
+  _BRIDGE_FLOAT_CAP_USDC: "1000"
 
 tags:
   - gcp-cloud-build-deploy-cloud-run
