@@ -7,9 +7,10 @@ import {
   TreasuryReplenishStatus,
 } from '@prisma/client'
 
+import type { ExchangeAddressResult } from '../../../../modules/treasury/application/contracts/IExchangeProvider'
+import type { IExchangeProviderFactory } from '../../../../modules/treasury/application/contracts/IExchangeProviderFactory'
 import type { TransferoCryptoPurchaseService } from '../../../../modules/treasury/infrastructure/exchangeProviders/transferoCryptoPurchaseService'
 import type { IDatabaseClientProvider } from '../../../../platform/persistence/IDatabaseClientProvider'
-import type { ISecretManager } from '../../../../platform/secrets/ISecretManager'
 
 import { TreasuryReplenishService } from '../../../../modules/treasury/application/TreasuryReplenishService'
 import { createMockLogger } from '../../../setup/mockFactories'
@@ -26,8 +27,8 @@ const leg = (overrides: Record<string, unknown> = {}) => ({
 const buildHarness = (opts?: {
   batches?: Record<string, unknown>[]
   buy?: jest.Mock
+  depositAddress?: ExchangeAddressResult
   pending?: Record<string, unknown>[]
-  treasuryAddress?: string
   withdraw?: jest.Mock
 }) => {
   const createdBatches: Record<string, unknown>[] = []
@@ -73,19 +74,31 @@ const buildHarness = (opts?: {
       ?? jest.fn(async () => ({ success: true, withdrawalId: 'wd-1' })),
   } as unknown as TransferoCryptoPurchaseService
 
-  const secretManager = {
-    getSecret: jest.fn(async () => opts?.treasuryAddress ?? '0xtreasury'),
-    getSecrets: jest.fn(),
-  } as unknown as ISecretManager
+  const getExchangeAddress = jest.fn(async () => (
+    opts?.depositAddress ?? { address: '0xbinance-usdc-polygon', success: true as const }
+  ))
+  const exchangeProviderFactory = {
+    getExchangeProvider: jest.fn(),
+    getExchangeProviderById: jest.fn(() => ({ getExchangeAddress })),
+  } as unknown as IExchangeProviderFactory
 
   const service = new TreasuryReplenishService(
     { getClient: jest.fn(async () => prisma) } as unknown as IDatabaseClientProvider,
     purchaseService,
-    secretManager,
+    exchangeProviderFactory,
     createMockLogger(),
   )
 
-  return { claimedLegs, createdBatches, prisma, purchaseService, service, updatedBatches }
+  return {
+    claimedLegs,
+    createdBatches,
+    exchangeProviderFactory,
+    getExchangeAddress,
+    prisma,
+    purchaseService,
+    service,
+    updatedBatches,
+  }
 }
 
 describe('TreasuryReplenishService', () => {
@@ -225,14 +238,19 @@ describe('TreasuryReplenishService', () => {
       withdrawalId: null,
     }
 
-    it('withdraws to the configured treasury address and settles the legs', async () => {
-      const { claimedLegs, purchaseService, service, updatedBatches } = buildHarness({
+    it('withdraws to the venue deposit address and settles the legs', async () => {
+      const { claimedLegs, getExchangeAddress, purchaseService, service, updatedBatches } = buildHarness({
         batches: [boughtBatch],
       })
 
       expect(await service.withdrawBoughtBatches()).toBe(1)
+      // Resolved from Binance for this asset on Polygon, never hardcoded.
+      expect(getExchangeAddress).toHaveBeenCalledWith({
+        blockchain: 'POLYGON',
+        cryptoCurrency: CryptoCurrency.USDC,
+      })
       expect(purchaseService.withdrawToTreasury).toHaveBeenCalledWith({
-        address: '0xtreasury',
+        address: '0xbinance-usdc-polygon',
         amount: 18.2,
         asset: CryptoCurrency.USDC,
         network: 'POLYGON',
@@ -249,16 +267,28 @@ describe('TreasuryReplenishService', () => {
       }))
     })
 
-    // The crypto is genuinely held at the provider; a missing address is a
-    // configuration gap, not a reason to mark the batch failed.
-    it('leaves batches bought when no treasury address is configured', async () => {
+    // The crypto is genuinely held at the provider; an unresolvable destination
+    // is a temporary gap, not a reason to mark the batch failed.
+    it('leaves batches bought when the venue cannot issue a deposit address', async () => {
       const { service, updatedBatches } = buildHarness({
         batches: [boughtBatch],
-        treasuryAddress: '   ',
+        depositAddress: { reason: 'binance_unavailable', success: false },
       })
 
       expect(await service.withdrawBoughtBatches()).toBe(0)
       expect(updatedBatches).toHaveLength(0)
+    })
+
+    // Ultra's vault withdrawal carries no memo field, so crediting a venue that
+    // needs one would strand the funds at the exchange.
+    it('refuses a deposit address that requires a memo', async () => {
+      const { purchaseService, service } = buildHarness({
+        batches: [boughtBatch],
+        depositAddress: { address: '0xshared', memo: '12345', success: true },
+      })
+
+      expect(await service.withdrawBoughtBatches()).toBe(0)
+      expect(purchaseService.withdrawToTreasury).not.toHaveBeenCalled()
     })
 
     it('does not withdraw a batch whose bought quantity is unknown', async () => {

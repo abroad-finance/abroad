@@ -11,8 +11,8 @@ import { TYPES } from '../../../app/container/types'
 import { createScopedLogger, ScopedLogger } from '../../../core/logging/scopedLogger'
 import { ILogger } from '../../../core/logging/types'
 import { IDatabaseClientProvider } from '../../../platform/persistence/IDatabaseClientProvider'
-import { ISecretManager } from '../../../platform/secrets/ISecretManager'
 import { TransferoCryptoPurchaseService } from '../infrastructure/exchangeProviders/transferoCryptoPurchaseService'
+import { IExchangeProviderFactory } from './contracts/IExchangeProviderFactory'
 
 /**
  * Transfero settles crypto on Polygon only, so a replenish withdrawal always
@@ -53,7 +53,8 @@ export class TreasuryReplenishService {
     @inject(TYPES.IDatabaseClientProvider) private readonly dbProvider: IDatabaseClientProvider,
     @inject(TransferoCryptoPurchaseService)
     private readonly purchaseService: TransferoCryptoPurchaseService,
-    @inject(TYPES.ISecretManager) private readonly secretManager: ISecretManager,
+    @inject(TYPES.IExchangeProviderFactory)
+    private readonly exchangeProviderFactory: IExchangeProviderFactory,
     @inject(TYPES.ILogger) baseLogger: ILogger,
   ) {
     this.logger = createScopedLogger(baseLogger, { scope: 'TreasuryReplenish' })
@@ -179,18 +180,17 @@ export class TreasuryReplenishService {
       return 0
     }
 
-    const address = await this.resolveTreasuryAddress()
-    if (!address) {
-      this.logger.error('Bought replenish batches cannot be withdrawn: no treasury address configured', {
-        batches: bought.length,
-      })
-      return 0
-    }
-
     let withdrawn = 0
     for (const batch of bought) {
       if (!batch.boughtAmount || batch.boughtAmount <= 0) {
         this.logger.error('Bought replenish batch carries no usable quantity', { batchId: batch.id })
+        continue
+      }
+
+      const address = await this.resolveTreasuryAddress(batch.asset)
+      if (!address) {
+        // The crypto is genuinely held at the provider and only needs a
+        // destination, so the batch stays BOUGHT for the next tick.
         continue
       }
 
@@ -262,13 +262,44 @@ export class TreasuryReplenishService {
     return groups
   }
 
-  private async resolveTreasuryAddress(): Promise<null | string> {
+  /**
+   * Asks Binance for the deposit address of this asset on Polygon, the same way
+   * the bridge resolves its own destination.
+   *
+   * Nothing is hardcoded or stored: an address only has value while someone
+   * holds its key, and a stale or mistyped constant would send real USDC
+   * somewhere unrecoverable. Landing the funds at Binance is also where the
+   * existing bridge already picks USDC up to reach the hot wallets that paid
+   * the customer, so the loop closes without a second bridge.
+   */
+  private async resolveTreasuryAddress(asset: CryptoCurrency): Promise<null | string> {
     try {
-      const address = await this.secretManager.getSecret('TREASURY_POLYGON_ADDRESS')
-      return address.trim() || null
+      const provider = this.exchangeProviderFactory.getExchangeProviderById('binance')
+      const result = await provider.getExchangeAddress({
+        blockchain: ULTRA_WITHDRAWAL_NETWORK,
+        cryptoCurrency: asset,
+      })
+      if (!result.success) {
+        this.logger.error('Binance deposit address unavailable for replenish', {
+          asset,
+          code: result.code,
+          reason: result.reason,
+        })
+        return null
+      }
+      // A memo would mean the venue cannot be credited by address alone, which
+      // Ultra's withdrawal contract has no way to carry.
+      if (result.memo) {
+        this.logger.error('Binance deposit address requires a memo, which a vault withdrawal cannot carry', {
+          asset,
+        })
+        return null
+      }
+      return result.address.trim() || null
     }
     catch (error) {
-      this.logger.error('Could not read the treasury withdrawal address', {
+      this.logger.error('Could not resolve the treasury withdrawal address', {
+        asset,
         reason: error instanceof Error ? error.message : 'unknown_error',
       })
       return null
