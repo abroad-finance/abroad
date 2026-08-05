@@ -1,3 +1,4 @@
+import { FlowDirection } from '@prisma/client'
 import { inject, injectable } from 'inversify'
 
 import { FlowDefinitionService } from '../../flows/application/FlowDefinitionService'
@@ -12,7 +13,12 @@ export class FlowCorridorPricingProvider implements ICorridorPricingProvider {
   ) {}
 
   public async getPricing(corridor: CorridorIdentifier): Promise<CorridorPricing> {
-    const definition = await this.flowDefinitionService.findActiveByCorridor(corridor)
+    const definition = await this.flowDefinitionService.findActiveByCorridor({
+      blockchain: corridor.blockchain,
+      cryptoCurrency: corridor.cryptoCurrency,
+      direction: corridor.direction ?? FlowDirection.CRYPTO_TO_FIAT,
+      targetCurrency: corridor.targetCurrency,
+    })
     if (!definition) {
       throw new CorridorNotConfiguredError(corridor)
     }

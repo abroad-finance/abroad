@@ -19,6 +19,23 @@ export type QuoteRequest = {
   target_currency: TargetCurrency
 }
 
+export const onrampQuoteRequestSchema = z.object({
+  crypto_currency: z.enum(CryptoCurrency),
+  // The fiat the customer pays. The crypto they receive is derived from it.
+  fiat_amount: z.number().positive(),
+  network: z.enum(BlockchainNetwork),
+  payment_method: z.enum(SUPPORTED_PAYMENT_METHODS),
+  target_currency: z.enum(TargetCurrency),
+})
+
+export type OnrampQuoteRequest = {
+  crypto_currency: CryptoCurrency
+  fiat_amount: number
+  network: BlockchainNetwork
+  payment_method: SupportedPaymentMethod
+  target_currency: TargetCurrency
+}
+
 export const reverseQuoteRequestSchema = z.object({
   crypto_currency: z.enum(CryptoCurrency),
   network: z.enum(BlockchainNetwork),

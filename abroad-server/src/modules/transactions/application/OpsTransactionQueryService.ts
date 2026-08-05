@@ -158,9 +158,13 @@ export type OpsTransactionDetailDto = OpsTransactionSummaryDto & {
   evidence: OpsEvidenceEventDto[]
   failure: null | OpsFailureGuidance
   identifiers: {
+    /** On-chain destination of a FIAT_TO_CRYPTO delivery. Null on a payout. */
+    destinationAddress: null | string
     externalId: null | string
     flowInstanceId: null | string
     onChainId: null | string
+    /** Provider deposit backing a FIAT_TO_CRYPTO transaction. Null on a payout. */
+    pixDepositId: null | string
     pixEndToEndId: null | string
     quoteId: string
     refundOnChainId: null | string
@@ -339,9 +343,11 @@ export class OpsTransactionQueryService {
       evidence,
       failure,
       identifiers: {
+        destinationAddress: transaction.destinationAddress,
         externalId: transaction.externalId,
         flowInstanceId: flow?.id ?? null,
         onChainId: transaction.onChainId,
+        pixDepositId: transaction.pixDepositId,
         pixEndToEndId: transaction.pixEndToEndId,
         quoteId: transaction.quoteId,
         refundOnChainId: transaction.refundOnChainId,

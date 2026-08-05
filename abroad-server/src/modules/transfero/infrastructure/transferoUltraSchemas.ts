@@ -122,6 +122,79 @@ export const transferoUltraOtcTradeDetailResponseSchema = z.object({
   }).loose(),
 }).loose()
 
+// Ultra deposit lifecycle. PENDING is an unpaid QR; PAID means the PIX arrived
+// but is not necessarily ours yet; only COMPLETED means the BRZ credit landed
+// and the balance is spendable.
+const transferoUltraDepositStatusSchema = z.enum([
+  'PENDING',
+  'PROCESSING',
+  'PAID',
+  'COMPLETED',
+  'EXPIRED',
+  'REFUNDED',
+  'FAILED',
+])
+
+const transferoUltraDepositPayerSchema = z.object({
+  bankCode: z.string().min(1).nullable(),
+  name: z.string().min(1).nullable(),
+  taxId: z.string().min(1).nullable(),
+}).loose()
+
+export const transferoUltraDynamicQrResponseSchema = z.object({
+  amount: z.union([transferoUltraDecimalSchema, z.number().finite().positive()]),
+  // The copy-paste EMV payload the customer pays. Ultra has shipped this under
+  // both names, so accept either and normalise at the call site.
+  brCode: z.string().min(1).optional(),
+  depositId: z.string().min(1),
+  emvPayload: z.string().min(1).optional(),
+  endUserId: z.string().min(1).nullable().optional(),
+  expiresAt: z.string().min(1).nullable().optional(),
+  status: transferoUltraDepositStatusSchema,
+  txid: z.string().min(26).max(35),
+}).loose()
+
+export const transferoUltraDepositDetailResponseSchema = z.object({
+  amount: z.union([transferoUltraDecimalSchema, z.number().finite().nonnegative()]),
+  confirmedAt: z.string().min(1).nullable().optional(),
+  currency: z.literal('BRL'),
+  depositId: z.string().min(1),
+  endToEndId: z.string().trim().min(1).max(128).nullable().optional(),
+  endUserId: z.string().min(1).nullable().optional(),
+  expiresAt: z.string().min(1).nullable().optional(),
+  paidAt: z.string().min(1).nullable().optional(),
+  payer: transferoUltraDepositPayerSchema.nullable().optional(),
+  qrCodeType: z.enum(['DYNAMIC', 'STATIC']).nullable().optional(),
+  refundedAt: z.string().min(1).nullable().optional(),
+  status: transferoUltraDepositStatusSchema,
+}).loose()
+
+export const transferoUltraRefundResponseSchema = z.object({
+  amount: z.union([transferoUltraDecimalSchema, z.number().finite().positive()]).optional(),
+  depositId: z.string().min(1).optional(),
+  id: z.string().min(1),
+  status: z.string().min(1),
+}).loose()
+
+export const transferoUltraCryptoWithdrawalResponseSchema = z.object({
+  amount: z.union([transferoUltraDecimalSchema, z.number().finite().positive()]),
+  asset: z.enum(['USDC', 'USDT']),
+  blockchain: z.string().min(1),
+  fee: z.union([transferoUltraDecimalSchema, z.number().finite().nonnegative()]).optional(),
+  status: z.enum([
+    'PENDING_APPROVAL',
+    'SUBMITTED',
+    'BROADCASTING',
+    'CONFIRMING',
+    'COMPLETED',
+    'FAILED',
+    'CANCELLED',
+  ]),
+  toAddress: z.string().min(1),
+  transactionId: z.string().min(1),
+  txHash: z.string().min(1).nullable().optional(),
+}).loose()
+
 const transferoUltraVaultAddressSchema = z.object({
   address: z.string().min(1),
   asset: z.string().min(1),

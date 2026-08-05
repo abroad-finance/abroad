@@ -2,11 +2,15 @@ import {
   BlockchainNetwork,
   Country,
   CryptoCurrency,
+  CustomerFeeType,
+  FlowDirection,
   Partner,
   PaymentMethod,
   TargetCurrency,
 } from '.prisma/client'
 
+import type { IFiatDepositService } from '../../../../modules/payments/application/contracts/IFiatDepositService'
+import type { IFiatDepositServiceFactory } from '../../../../modules/payments/application/contracts/IFiatDepositServiceFactory'
 import type { IPaymentService } from '../../../../modules/payments/application/contracts/IPaymentService'
 import type { IPaymentServiceFactory } from '../../../../modules/payments/application/contracts/IPaymentServiceFactory'
 import type { CorridorPricing, ICorridorPricingProvider } from '../../../../modules/quotes/application/contracts/ICorridorPricingProvider'
@@ -15,6 +19,7 @@ import type { IDatabaseClientProvider } from '../../../../platform/persistence/I
 import type { ISecretManager } from '../../../../platform/secrets/ISecretManager'
 
 import { CorridorNotConfiguredError } from '../../../../modules/quotes/application/errors/CorridorNotConfiguredError'
+import { QuoteRequestError } from '../../../../modules/quotes/application/errors/QuoteRequestError'
 import { QuoteUseCase } from '../../../../modules/quotes/application/quoteUseCase'
 
 const buildPaymentService = (overrides?: Partial<IPaymentService>): IPaymentService => ({
@@ -43,6 +48,26 @@ const buildCorridorPricing = (overrides?: Partial<CorridorPricing>): CorridorPri
   ...(overrides ?? {}),
 })
 
+const buildFiatDepositService = (
+  overrides?: Partial<IFiatDepositService>,
+): IFiatDepositService => ({
+  capability: { method: PaymentMethod.PIX, targetCurrency: TargetCurrency.BRL },
+  createDeposit: async () => ({
+    brCode: '00020126BRCODE',
+    expiresAt: null,
+    providerDepositId: 'dep-1',
+    success: true,
+  }),
+  currency: TargetCurrency.BRL,
+  getDepositFacts: async () => ({ reason: 'not_stubbed', success: false }),
+  isEnabled: true,
+  MAX_USER_AMOUNT_PER_TRANSACTION: Number.POSITIVE_INFINITY,
+  MIN_USER_AMOUNT_PER_TRANSACTION: 1,
+  provider: 'transfero',
+  refundDeposit: async () => ({ reason: 'not_stubbed', success: false }),
+  ...(overrides ?? {}),
+})
+
 describe('QuoteUseCase', () => {
   let dbProvider: IDatabaseClientProvider
   let paymentServiceFactory: IPaymentServiceFactory
@@ -50,6 +75,8 @@ describe('QuoteUseCase', () => {
   let secretManager: ISecretManager
   let quoteUseCase: QuoteUseCase
   let corridorPricingProvider: ICorridorPricingProvider
+  let fiatDepositService: IFiatDepositService
+  let fiatDepositServiceFactory: IFiatDepositServiceFactory
   const partner: Partner = { id: 'partner-1' } as Partner
   const sepPartner: Partner = { id: 'sep-partner' } as Partner
   const prisma = {
@@ -87,7 +114,18 @@ describe('QuoteUseCase', () => {
     corridorPricingProvider = {
       getPricing: jest.fn(async () => buildCorridorPricing()),
     }
-    quoteUseCase = new QuoteUseCase(dbProvider, paymentServiceFactory, exchangeProviderFactory, secretManager, corridorPricingProvider)
+    fiatDepositService = buildFiatDepositService()
+    fiatDepositServiceFactory = {
+      getForCapability: jest.fn(() => fiatDepositService),
+    }
+    quoteUseCase = new QuoteUseCase(
+      dbProvider,
+      paymentServiceFactory,
+      exchangeProviderFactory,
+      secretManager,
+      corridorPricingProvider,
+      fiatDepositServiceFactory,
+    )
   })
 
   it('creates a quote using provided partner and applies fees', async () => {
@@ -493,5 +531,115 @@ describe('QuoteUseCase', () => {
     })
 
     expect(result.quote_id).toBe('no-limit')
+  })
+
+  describe('createOnrampQuote', () => {
+    const onrampParams = {
+      cryptoCurrency: CryptoCurrency.USDC,
+      fiatAmount: 101,
+      network: BlockchainNetwork.CELO,
+      partner,
+      paymentMethod: PaymentMethod.PIX,
+      targetCurrency: TargetCurrency.BRL,
+    }
+
+    it('stores the fiat leg as targetAmount and the crypto leg as sourceAmount', async () => {
+      const result = await quoteUseCase.createOnrampQuote(onrampParams)
+
+      const { data } = prisma.quote.create.mock.calls.at(-1)![0]
+      expect(data.direction).toBe(FlowDirection.FIAT_TO_CRYPTO)
+      expect(data.targetAmount).toBe(101)
+      expect(data.targetCurrency).toBe(TargetCurrency.BRL)
+      expect(data.cryptoCurrency).toBe(CryptoCurrency.USDC)
+      // 1 BRL fixed fee off the fiat leg, then 100 BRL converts at the
+      // 1.01 desk rate marked down by the 1% corridor fee: 100 * 1.01/1.01.
+      expect(data.sourceAmount).toBeCloseTo(100, 6)
+      // The customer's decision variable is the crypto they receive.
+      expect(result.value).toBeCloseTo(100, 6)
+    })
+
+    // The spread must not flip sign with direction: an onramp marks the crypto
+    // delivered down by the same percentage a payout marks the crypto owed up.
+    it('reduces the delivered crypto as the corridor fee rises', async () => {
+      ;(corridorPricingProvider.getPricing as jest.Mock).mockResolvedValue(
+        buildCorridorPricing({ exchangeFeePct: 0.05, fixedFee: 0 }),
+      )
+
+      await quoteUseCase.createOnrampQuote(onrampParams)
+
+      const { data } = prisma.quote.create.mock.calls.at(-1)![0]
+      // 101 BRL at 1.01 crypto-per-BRL, divided by the 5% markup.
+      expect(data.sourceAmount).toBeCloseTo((101 * 1.01) / 1.05, 6)
+      expect(data.sourceAmount).toBeLessThan(101 * 1.01)
+    })
+
+    it('reads the buy side of the desk rather than the payout side', async () => {
+      await quoteUseCase.createOnrampQuote(onrampParams)
+
+      const exchangeProvider = (exchangeProviderFactory.getExchangeProvider as jest.Mock).mock.results[0]?.value
+        ?? (exchangeProviderFactory.getExchangeProvider as jest.Mock).mock.results.at(-1)?.value
+      expect(exchangeProvider.getExchangeRate).toHaveBeenCalledWith(
+        expect.objectContaining({ direction: FlowDirection.FIAT_TO_CRYPTO }),
+      )
+      expect(corridorPricingProvider.getPricing).toHaveBeenCalledWith(
+        expect.objectContaining({ direction: FlowDirection.FIAT_TO_CRYPTO }),
+      )
+    })
+
+    it('records the fee in the crypto leg as the shortfall against the raw desk rate', async () => {
+      await quoteUseCase.createOnrampQuote(onrampParams)
+
+      const { data } = prisma.quote.create.mock.calls.at(-1)![0]
+      expect(data.customerFeeSourceCurrency).toBe(CryptoCurrency.USDC)
+      expect(data.customerFeeType).toBe(CustomerFeeType.COMBINED)
+      // Raw desk rate would have delivered 101 * 1.01; the customer gets 100.
+      expect(Number(data.customerFeeSourceAmount)).toBeCloseTo(101 * 1.01 - 100, 5)
+    })
+
+    // Quoting an amount that cannot cover the fixed fee would hand the customer
+    // a QR that buys them nothing.
+    it('refuses an amount that does not cover the fixed fee', async () => {
+      ;(corridorPricingProvider.getPricing as jest.Mock).mockResolvedValue(
+        buildCorridorPricing({ fixedFee: 20 }),
+      )
+
+      await expect(
+        quoteUseCase.createOnrampQuote({ ...onrampParams, fiatAmount: 20 }),
+      ).rejects.toThrow(QuoteRequestError)
+    })
+
+    it('enforces the corridor limits against the fiat the customer pays', async () => {
+      ;(corridorPricingProvider.getPricing as jest.Mock).mockResolvedValue(
+        buildCorridorPricing({ maxAmount: 50 }),
+      )
+
+      await expect(
+        quoteUseCase.createOnrampQuote(onrampParams),
+      ).rejects.toThrow(QuoteRequestError)
+    })
+
+    it('rejects a corridor with no active onramp definition', async () => {
+      ;(corridorPricingProvider.getPricing as jest.Mock).mockRejectedValue(
+        new CorridorNotConfiguredError({
+          blockchain: BlockchainNetwork.CELO,
+          cryptoCurrency: CryptoCurrency.USDC,
+          direction: FlowDirection.FIAT_TO_CRYPTO,
+          targetCurrency: TargetCurrency.BRL,
+        }),
+      )
+
+      await expect(
+        quoteUseCase.createOnrampQuote(onrampParams),
+      ).rejects.toThrow(CorridorNotConfiguredError)
+    })
+
+    it('refuses to quote a collection rail that is switched off', async () => {
+      fiatDepositService = buildFiatDepositService({ isEnabled: false })
+      ;(fiatDepositServiceFactory.getForCapability as jest.Mock).mockReturnValue(fiatDepositService)
+
+      await expect(
+        quoteUseCase.createOnrampQuote(onrampParams),
+      ).rejects.toThrow(QuoteRequestError)
+    })
   })
 })

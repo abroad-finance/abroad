@@ -1,6 +1,6 @@
 import { useTranslate } from '@tolgee/react'
 import {
-  BadgeCheck, ChevronDown, ChevronRight, Keyboard, ListChecks, Lock, QrCode, Store, Wallet,
+  ArrowDownToLine, BadgeCheck, ChevronDown, ChevronRight, Keyboard, ListChecks, Lock, QrCode, Store, Wallet,
 } from 'lucide-react'
 import React from 'react'
 
@@ -36,6 +36,7 @@ export interface HomeScreenProps {
   hasEnteredApp?: boolean
   isAuthenticated: boolean
   onboardingRates?: OnboardingRates
+  onBuyCrypto?: () => void
   onEnterApp?: () => void
   onGoToManual: () => void
   onHistoryClick: () => void
@@ -56,6 +57,7 @@ export default function HomeScreen({
   hasEnteredApp = false,
   isAuthenticated,
   onboardingRates,
+  onBuyCrypto,
   onEnterApp,
   onGoToManual,
   onHistoryClick,
@@ -288,6 +290,7 @@ export default function HomeScreen({
   const paymentKeyLabel = isPixRail
     ? t('home.pay_with_pix_key', 'Pay with PIX key')
     : t('home.pay_with_breb_key', 'Pay with Llave BRE-B')
+  const buyCryptoLabel = t('home.buy_crypto', 'Buy crypto with PIX')
   const useQrHint = t('home.use_qr_hint', 'Camera, paste, or screenshot')
   const useQrLabel = isPixRail
     ? t('home.use_pix_qr', 'Use a Pix QR code')
@@ -444,6 +447,30 @@ export default function HomeScreen({
               {paymentKeyLabel}
             </span>
           </button>
+
+          {onBuyCrypto && isPixRail && (
+            <button
+              aria-label={buyCryptoLabel}
+              className={cn(
+                PAYMENT_ACTION_CARD_CLASS,
+                isAuthenticated
+                  ? 'bg-[var(--ab-bg-card)] shadow-[0px_4px_6px_-1px_rgba(0,0,0,0.02),0px_2px_4px_-1px_rgba(0,0,0,0.02)] hover:shadow-md'
+                  : 'bg-[var(--ab-bg-subtle)] border border-[var(--ab-border)]',
+              )}
+              onClick={onBuyCrypto}
+              type="button"
+            >
+              <div className={cn(PAYMENT_ACTION_ICON_CLASS, 'bg-[var(--ab-bg-subtle)]')}>
+                <ArrowDownToLine
+                  className="h-full w-full p-[clamp(0.375rem,1.5vh,0.5rem)] text-[var(--ab-text-secondary)]"
+                  strokeWidth={1.5}
+                />
+              </div>
+              <span className={cn(PAYMENT_ACTION_LABEL_CLASS, 'text-[var(--ab-text)]')}>
+                {buyCryptoLabel}
+              </span>
+            </button>
+          )}
         </div>
 
         {/* Connect wallet hint - shown when not authenticated */}

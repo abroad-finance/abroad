@@ -188,12 +188,12 @@ enum PartnerPortalEmailDeliveryStatus {
 }
 
 model PartnerPortalEmailWebhookEvent {
-  id                String   @id
+  id                String    @id
   providerMessageId String
   eventType         String
   occurredAt        DateTime
   processedAt       DateTime?
-  receivedAt        DateTime @default(now())
+  receivedAt        DateTime  @default(now())
 
   @@index([providerMessageId, occurredAt])
   @@index([processedAt, receivedAt])
@@ -396,6 +396,7 @@ model Quote {
   country                   Country
   cryptoCurrency            CryptoCurrency
   network                   BlockchainNetwork
+  direction                 FlowDirection     @default(CRYPTO_TO_FIAT)
   baseRateSourcePerTarget   Decimal?          @db.Decimal(36, 18)
   exchangeFeePct            Decimal?          @db.Decimal(18, 12)
   fixedFeeTargetAmount      Decimal?          @db.Decimal(36, 18)
@@ -419,17 +420,31 @@ model Transaction {
   id                  String                      @id @default(uuid())
   partnerUserId       String
   partnerUser         PartnerUser                 @relation(fields: [partnerUserId], references: [id])
-  accountNumber       String
+  // Fiat destination. Populated for CRYPTO_TO_FIAT payouts; empty on
+  // FIAT_TO_CRYPTO, where destinationAddress carries the destination instead.
+  accountNumber       String                      @default("")
   bankCode            String                      @default("")
+  // On-chain destination for FIAT_TO_CRYPTO deliveries. Null on payouts.
+  destinationAddress  String?
   status              TransactionStatus
   createdAt           DateTime                    @default(now())
   quoteId             String                      @unique
   quote               Quote                       @relation(fields: [quoteId], references: [id])
+  // On a payout this is the customer's inbound deposit. On an onramp it is our
+  // outbound delivery to destinationAddress.
   onChainId           String?                     @unique
   refundOnChainId     String?                     @unique
   pixEndToEndId       String?                     @unique
+  // Ultra deposit id backing a FIAT_TO_CRYPTO transaction's dynamic QR. Unique
+  // so a replayed pix.deposit.* delivery can never credit two transactions.
+  pixDepositId        String?                     @unique
+  // CPF/CNPJ the incoming PIX was actually paid from. Recorded for
+  // reconciliation; the payer is not required to be the recipient.
+  pixPayerTaxId       String?
   taxId               String?
   externalId          String?                     @unique
+  // On a payout this is the PIX QR we pay. On an onramp it is the BR Code the
+  // customer pays.
   qrCode              String?
   exchangeHandoffAt   DateTime?
   origin              TransactionOrigin           @default(LEGACY)
@@ -803,6 +818,16 @@ enum FlowCorridorStatus {
   UNSUPPORTED
 }
 
+// Which leg of a corridor the customer pays. The amount columns stay bound to
+// their currency fields in both directions: sourceAmount is always denominated
+// in cryptoCurrency and targetAmount always in targetCurrency. Direction only
+// decides who pays which leg — CRYPTO_TO_FIAT takes sourceAmount from the
+// customer and pays out targetAmount, FIAT_TO_CRYPTO does the reverse.
+enum FlowDirection {
+  CRYPTO_TO_FIAT
+  FIAT_TO_CRYPTO
+}
+
 enum FlowStepType {
   PAYOUT_SEND
   EXCHANGE_SEND
@@ -811,6 +836,8 @@ enum FlowStepType {
   AWAIT_PROVIDER_STATUS
   AWAIT_EXCHANGE_BALANCE
   ENQUEUE_BRIDGE
+  CRYPTO_SEND
+  ENQUEUE_TREASURY_REPLENISH
 }
 
 enum FlowStepCompletionPolicy {
@@ -895,10 +922,12 @@ view TransactionQuoteView {
   partnerUserId        String
   accountNumber        String
   bankCode             String
+  destinationAddress   String?
   transactionCreatedAt DateTime
   quoteId              String
   onChainId            String?
   refundOnChainId      String?
+  pixDepositId         String?
   taxId                String?
   externalId           String?
   qrCode               String?
@@ -910,6 +939,7 @@ view TransactionQuoteView {
   country              Country
   cryptoCurrency       CryptoCurrency
   network              BlockchainNetwork
+  direction            FlowDirection
   expirationDate       DateTime
   quoteCreatedAt       DateTime
   quoteUpdatedAt       DateTime
@@ -925,6 +955,9 @@ model FlowDefinition {
   cryptoCurrency  CryptoCurrency
   blockchain      BlockchainNetwork
   targetCurrency  TargetCurrency
+  direction       FlowDirection        @default(CRYPTO_TO_FIAT)
+  // The payout rail for CRYPTO_TO_FIAT, and the collection rail the customer
+  // pays on for FIAT_TO_CRYPTO.
   payoutProvider  PaymentMethod
   pricingProvider FlowPricingProvider
   exchangeFeePct  Float                @default(0)
@@ -937,7 +970,7 @@ model FlowDefinition {
   version         Int                  @default(1)
   steps           FlowStepDefinition[]
 
-  @@unique([cryptoCurrency, blockchain, targetCurrency], name: "flow_corridor_unique")
+  @@unique([cryptoCurrency, blockchain, targetCurrency, direction], name: "flow_corridor_unique", map: "FlowDefinition_corridor_direction_key")
 }
 
 model FlowCorridor {
@@ -945,13 +978,14 @@ model FlowCorridor {
   cryptoCurrency CryptoCurrency
   blockchain     BlockchainNetwork
   targetCurrency TargetCurrency
+  direction      FlowDirection      @default(CRYPTO_TO_FIAT)
   status         FlowCorridorStatus @default(UNSUPPORTED)
   reason         String?
   createdAt      DateTime           @default(now())
   updatedAt      DateTime           @updatedAt
   version        Int                @default(1)
 
-  @@unique([cryptoCurrency, blockchain, targetCurrency], name: "flow_corridor_status_unique")
+  @@unique([cryptoCurrency, blockchain, targetCurrency, direction], name: "flow_corridor_status_unique", map: "FlowCorridor_corridor_direction_key")
 }
 
 model CryptoAssetConfig {
@@ -1043,6 +1077,25 @@ enum BridgeLegStatus {
 enum BridgeBatchStatus {
   OPEN
   SUBMITTED
+  CREDITED
+  FAILED
+}
+
+enum ReplenishLegStatus {
+  PENDING
+  BATCHED
+  SETTLED
+  FAILED
+}
+
+// Ultra settles the BUY and the vault withdrawal as two independent money
+// movements, so the batch walks both stages instead of one submitted/credited
+// pair: OPEN -> BOUGHT (trade settled, crypto held at Transfero) -> WITHDRAWN
+// (vault withdrawal accepted) -> CREDITED (landed in Abroad custody).
+enum TreasuryReplenishStatus {
+  OPEN
+  BOUGHT
+  WITHDRAWN
   CREDITED
   FAILED
 }
@@ -1198,6 +1251,61 @@ model BridgeBatch {
   updatedAt   DateTime                @updatedAt
   settledAt   DateTime?
 
+  @@index([asset, destNetwork, status])
+}
+
+// A FIAT_TO_CRYPTO transaction has already paid its customer from Abroad's hot
+// wallet; this records the BRL that landed at Transfero and still owes the hot
+// wallet a top-up. Enrolment is the only thing the customer flow does — nothing
+// here can block or reverse a delivery that already settled on chain.
+model TreasuryReplenishRequest {
+  id            String                  @id @default(uuid())
+  transactionId String
+  stepOrder     Int
+  // BRL credited at Transfero by the customer's PIX, and the asset/network the
+  // hot wallet paid out and must be topped back up on.
+  fiatAmount    Float
+  fiatCurrency  TargetCurrency
+  asset         CryptoCurrency
+  destNetwork   BlockchainNetwork
+  status        ReplenishLegStatus      @default(PENDING)
+  batchId       String?
+  batch         TreasuryReplenishBatch? @relation(fields: [batchId], references: [id])
+  createdAt     DateTime                @default(now())
+  updatedAt     DateTime                @updatedAt
+
+  // (transactionId, stepOrder) is the idempotency anchor: re-running the
+  // ENQUEUE_TREASURY_REPLENISH step never double-enrolls a leg.
+  @@unique([transactionId, stepOrder])
+  @@index([asset, destNetwork, status])
+  @@index([batchId])
+}
+
+// One pooled BRZ -> crypto OTC BUY plus vault withdrawal that replenishes many
+// TreasuryReplenishRequest legs. Ultra never chains money movements, so each
+// stage is recorded separately and reconciled before the next one starts.
+model TreasuryReplenishBatch {
+  id            String                     @id @default(uuid())
+  asset         CryptoCurrency
+  destNetwork   BlockchainNetwork
+  fiatAmount    Float
+  fiatCurrency  TargetCurrency
+  // Bought quantity as reported by the settled trade, not as requested.
+  boughtAmount  Float?
+  // Ultra OTC trade id, then the vault withdrawal id. Persisted before each
+  // call is considered complete so an ambiguous response reconciles read-only.
+  tradeId       String?
+  withdrawalId  String?
+  withdrawFee   Float?
+  status        TreasuryReplenishStatus    @default(OPEN)
+  failureReason String?
+  members       TreasuryReplenishRequest[]
+  createdAt     DateTime                   @default(now())
+  updatedAt     DateTime                   @updatedAt
+  settledAt     DateTime?
+
+  @@unique([tradeId])
+  @@unique([withdrawalId])
   @@index([asset, destNetwork, status])
 }
 

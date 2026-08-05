@@ -2,6 +2,7 @@ import {
   BlockchainNetwork,
   CryptoCurrency,
   FlowCorridorStatus,
+  FlowDirection,
   PaymentMethod,
   Prisma,
   TargetCurrency,
@@ -34,6 +35,7 @@ export class FlowCorridorService {
         select: {
           blockchain: true,
           cryptoCurrency: true,
+          direction: true,
           enabled: true,
           id: true,
           name: true,
@@ -55,11 +57,14 @@ export class FlowCorridorService {
       version: number
     }>()
     overrides.forEach((item) => {
-      overrideMap.set(this.key(item.cryptoCurrency, item.blockchain, item.targetCurrency), {
-        reason: item.reason ?? null,
-        status: item.status,
-        version: item.version,
-      })
+      overrideMap.set(
+        this.key(item.cryptoCurrency, item.blockchain, item.targetCurrency, item.direction),
+        {
+          reason: item.reason ?? null,
+          status: item.status,
+          version: item.version,
+        },
+      )
     })
 
     const definitionMap = new Map<string, {
@@ -72,67 +77,76 @@ export class FlowCorridorService {
     }>()
 
     definitions.forEach((def) => {
-      definitionMap.set(this.key(def.cryptoCurrency, def.blockchain, def.targetCurrency), {
-        enabled: def.enabled,
-        id: def.id,
-        name: def.name,
-        payoutProvider: def.payoutProvider,
-        updatedAt: def.updatedAt,
-        version: def.version,
-      })
+      definitionMap.set(
+        this.key(def.cryptoCurrency, def.blockchain, def.targetCurrency, def.direction),
+        {
+          enabled: def.enabled,
+          id: def.id,
+          name: def.name,
+          payoutProvider: def.payoutProvider,
+          updatedAt: def.updatedAt,
+          version: def.version,
+        },
+      )
     })
 
     const corridors: FlowCorridorDto[] = []
 
     const targetValues = Object.values(TargetCurrency) as TargetCurrency[]
+    const directionValues = this.enumeratedDirections(definitions, overrides)
 
     for (const asset of enabledAssets) {
       const { blockchain, cryptoCurrency } = asset
       for (const targetCurrency of targetValues) {
-        const corridorKey = this.key(cryptoCurrency, blockchain, targetCurrency)
-        const override = overrideMap.get(corridorKey)
-        const definition = definitionMap.get(corridorKey)
+        for (const direction of directionValues) {
+          const corridorKey = this.key(cryptoCurrency, blockchain, targetCurrency, direction)
+          const override = overrideMap.get(corridorKey)
+          const definition = definitionMap.get(corridorKey)
 
-        if (override?.status === FlowCorridorStatus.UNSUPPORTED) {
+          if (override?.status === FlowCorridorStatus.UNSUPPORTED) {
+            corridors.push({
+              blockchain,
+              cryptoCurrency,
+              direction,
+              status: 'UNSUPPORTED',
+              targetCurrency,
+              unsupportedReason: override.reason,
+              version: override.version,
+            })
+            continue
+          }
+
+          if (definition && definition.enabled) {
+            corridors.push({
+              blockchain,
+              cryptoCurrency,
+              definitionId: definition.id,
+              definitionName: definition.name,
+              direction,
+              enabled: definition.enabled,
+              payoutProvider: definition.payoutProvider,
+              status: 'DEFINED',
+              targetCurrency,
+              updatedAt: definition.updatedAt,
+              version: override?.version ?? 1,
+            })
+            continue
+          }
+
           corridors.push({
             blockchain,
             cryptoCurrency,
-            status: 'UNSUPPORTED',
+            definitionId: definition?.id ?? null,
+            definitionName: definition?.name ?? null,
+            direction,
+            enabled: definition?.enabled,
+            payoutProvider: definition?.payoutProvider ?? null,
+            status: 'MISSING',
             targetCurrency,
-            unsupportedReason: override.reason,
-            version: override.version,
-          })
-          continue
-        }
-
-        if (definition && definition.enabled) {
-          corridors.push({
-            blockchain,
-            cryptoCurrency,
-            definitionId: definition.id,
-            definitionName: definition.name,
-            enabled: definition.enabled,
-            payoutProvider: definition.payoutProvider,
-            status: 'DEFINED',
-            targetCurrency,
-            updatedAt: definition.updatedAt,
+            updatedAt: definition?.updatedAt ?? null,
             version: override?.version ?? 1,
           })
-          continue
         }
-
-        corridors.push({
-          blockchain,
-          cryptoCurrency,
-          definitionId: definition?.id ?? null,
-          definitionName: definition?.name ?? null,
-          enabled: definition?.enabled,
-          payoutProvider: definition?.payoutProvider ?? null,
-          status: 'MISSING',
-          targetCurrency,
-          updatedAt: definition?.updatedAt ?? null,
-          version: override?.version ?? 1,
-        })
       }
     }
 
@@ -168,6 +182,7 @@ export class FlowCorridorService {
     const key = {
       blockchain: payload.blockchain,
       cryptoCurrency: payload.cryptoCurrency,
+      direction: payload.direction ?? FlowDirection.CRYPTO_TO_FIAT,
       targetCurrency: payload.targetCurrency,
     }
     const current = await client.flowCorridor.findUnique({
@@ -212,6 +227,7 @@ export class FlowCorridorService {
       item.blockchain === payload.blockchain
       && item.cryptoCurrency === payload.cryptoCurrency
       && item.targetCurrency === payload.targetCurrency
+      && item.direction === key.direction
     ))
 
     if (!match) {
@@ -221,11 +237,29 @@ export class FlowCorridorService {
     return match
   }
 
+  /**
+   * Which directions the corridor grid enumerates. CRYPTO_TO_FIAT is always
+   * present because it is the platform default; a second direction only appears
+   * once something has actually been configured for it, so operators never page
+   * through a grid of corridors nobody has asked for.
+   */
+  private enumeratedDirections(
+    definitions: readonly { direction: FlowDirection }[],
+    overrides: readonly { direction: FlowDirection }[],
+  ): FlowDirection[] {
+    const configured = new Set<FlowDirection>([FlowDirection.CRYPTO_TO_FIAT])
+    definitions.forEach(item => configured.add(item.direction))
+    overrides.forEach(item => configured.add(item.direction))
+    return (Object.values(FlowDirection) as FlowDirection[])
+      .filter(direction => configured.has(direction))
+  }
+
   private key(
     cryptoCurrency: CryptoCurrency,
     blockchain: BlockchainNetwork,
     targetCurrency: TargetCurrency,
+    direction: FlowDirection,
   ): string {
-    return `${cryptoCurrency}-${blockchain}-${targetCurrency}`
+    return `${cryptoCurrency}-${blockchain}-${targetCurrency}-${direction}`
   }
 }

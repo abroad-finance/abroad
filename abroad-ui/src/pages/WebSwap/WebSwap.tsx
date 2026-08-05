@@ -9,8 +9,10 @@ import type { WalletSourceOption } from '../../components/ui'
 import type { ConfirmQrProps } from '../../features/swap/components/ConfirmQr'
 import type { SwapProps } from '../../features/swap/components/Swap'
 import type { ChainOption, TokenOption } from '../../features/swap/components/TokenSelectModal'
+import type { OnrampPurchaseState } from '../../features/swap/hooks/useOnrampPurchase'
 import type { PaymentAuthorizationState } from '../../features/swap/model/paymentIntent'
 import type { WalletConnectionIssue } from '../../features/swap/model/walletConnection'
+import type { OnrampFormLimits } from '../../features/swap/shared/onrampFormModel'
 import type {
   KycFormValues, KycSubmitOutcome, OnboardingRates, QrEntryMode, SwapView,
 } from '../../features/swap/types'
@@ -18,6 +20,8 @@ import type {
 import { _36EnumsTargetCurrency as TargetCurrency } from '../../api/index'
 import { ChainSelectorModal, ConnectWalletChainModal, ModalSurface } from '../../components/ui'
 import { useConsumerActivityList } from '../../features/activity/hooks/useConsumerActivity'
+import BuyCryptoForm from '../../features/swap/components/BuyCryptoForm'
+import BuyCryptoPixCode from '../../features/swap/components/BuyCryptoPixCode'
 import ConfirmQr from '../../features/swap/components/ConfirmQr'
 import HomeScreen from '../../features/swap/components/HomeScreen'
 import KycForm from '../../features/swap/components/KycForm'
@@ -52,6 +56,15 @@ export interface WebSwapControllerProps {
   assetOptions: Array<{ key: string, label: string }>
   authorizationState: null | PaymentAuthorizationState
   balancesByAsset: Readonly<{ USDC: null | string, USDT: null | string }>
+  /** The PIX onramp journey: price, accept, then show the payable code. */
+  buyCrypto: {
+    cancel: () => void
+    destinationAddress: null | string
+    limits: OnrampFormLimits
+    start: () => void
+    state: OnrampPurchaseState
+    submit: (values: { fiatAmount: number, taxId: string }) => Promise<void>
+  }
   cancelDestinationChange: () => void
   chainOptions: Array<{ key: string, label: string }>
   clearWalletConnectionIssue: () => void
@@ -105,6 +118,7 @@ const WebSwap: React.FC = () => {
     assetOptions,
     authorizationState,
     balancesByAsset,
+    buyCrypto,
     cancelDestinationChange,
     chainOptions,
     clearWalletConnectionIssue,
@@ -374,6 +388,33 @@ const WebSwap: React.FC = () => {
         <WebSwapLayout
           disclosure={isMiniPay ? <MiniPayDisclosure isDark={navBar.isDark} /> : null}
           slots={{
+            buyCrypto: (
+              <BuyCryptoForm
+                assetLabel={swapViewProps.selectedAssetLabel}
+                destinationAddress={buyCrypto.destinationAddress}
+                isSubmitting={buyCrypto.state.isSubmitting}
+                limits={buyCrypto.limits}
+                onBack={buyCrypto.cancel}
+                onSubmit={values => void buyCrypto.submit(values)}
+                submissionError={
+                  buyCrypto.state.issue
+                    ? t('buyCrypto.form.failed', 'We could not start this purchase. Please try again.')
+                    : null
+                }
+                translate={(key, fallback) => t(key, fallback)}
+              />
+            ),
+            buyCryptoPix: buyCrypto.state.instructions && buyCrypto.state.quote
+              ? (
+                  <BuyCryptoPixCode
+                    instructions={buyCrypto.state.instructions}
+                    onExpired={() => undefined}
+                    onStartOver={buyCrypto.start}
+                    quote={buyCrypto.state.quote}
+                    translate={(key, fallback) => t(key, fallback)}
+                  />
+                )
+              : <></>,
             confirmQr: <ConfirmQr {...confirmQrProps} />,
             home: (
               <HomeScreen
@@ -381,6 +422,7 @@ const WebSwap: React.FC = () => {
                 hasEnteredApp={hasEnteredApp}
                 isAuthenticated={swapViewProps.isAuthenticated}
                 onboardingRates={onboardingRates}
+                onBuyCrypto={buyCrypto.start}
                 onEnterApp={handleEnterApp}
                 onGoToManual={goToManual}
                 onHistoryClick={openActivity}

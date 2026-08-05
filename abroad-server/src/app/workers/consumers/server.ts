@@ -4,6 +4,7 @@ import http from 'http'
 import { createScopedLogger } from '../../../core/logging/scopedLogger'
 import { ILogger } from '../../../core/logging/types'
 import { PaymentStatusUpdatedController } from '../../../modules/payments/interfaces/queue/PaymentStatusUpdatedController'
+import { FiatDepositReceivedController } from '../../../modules/transactions/interfaces/queue/FiatDepositReceivedController'
 import { ReceivedCryptoTransactionController } from '../../../modules/transactions/interfaces/queue/ReceivedCryptoTransactionController'
 import { ExchangeBalanceUpdatedController } from '../../../modules/treasury/interfaces/queue/ExchangeBalanceUpdatedController'
 import { DeadLetterController } from '../../../platform/messaging/DeadLetterController'
@@ -46,6 +47,7 @@ export const createHealthHandler = (state: { live: boolean, ready: boolean }) =>
 const running: {
   deadLetter?: DeadLetterController
   exchangeBalanceUpdated?: ExchangeBalanceUpdatedController
+  fiatDepositReceived?: FiatDepositReceivedController
   paymentStatus?: PaymentStatusUpdatedController
   received?: ReceivedCryptoTransactionController
 } = {}
@@ -60,6 +62,9 @@ export function startConsumers(): void {
   const exchangeBalanceUpdated = iocContainer.get<ExchangeBalanceUpdatedController>(
     TYPES.ExchangeBalanceUpdatedController,
   )
+  const fiatDepositReceived = iocContainer.get<FiatDepositReceivedController>(
+    TYPES.FiatDepositReceivedController,
+  )
   const deadLetter = iocContainer.get<DeadLetterController>(
     TYPES.DeadLetterController,
   )
@@ -67,12 +72,14 @@ export function startConsumers(): void {
   running.received = received
   running.paymentStatus = paymentStatus
   running.exchangeBalanceUpdated = exchangeBalanceUpdated
+  running.fiatDepositReceived = fiatDepositReceived
   running.deadLetter = deadLetter
 
   deadLetter.registerConsumers()
   received.registerConsumers()
   paymentStatus.registerConsumers()
   exchangeBalanceUpdated.registerConsumers()
+  fiatDepositReceived.registerConsumers()
 
   // Mark ready after consumers and auth init are set up
   health.ready = true
@@ -89,6 +96,7 @@ export async function stopConsumers(): Promise<void> {
     running.received = undefined
     running.paymentStatus = undefined
     running.exchangeBalanceUpdated = undefined
+    running.fiatDepositReceived = undefined
     running.deadLetter = undefined
   }
 }

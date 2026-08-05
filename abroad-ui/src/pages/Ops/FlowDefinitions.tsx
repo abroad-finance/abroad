@@ -15,6 +15,7 @@ import {
   FlowCorridorSupportStatus,
   FlowDefinition,
   FlowDefinitionInput,
+  FlowDirection,
   FlowPricingProvider,
   FlowVenue,
   PaymentMethod,
@@ -84,8 +85,20 @@ type ValidationErrorMap = Record<string, string>
 const buildCorridorKey = (corridor: {
   blockchain: string
   cryptoCurrency: string
+  direction?: FlowDirection
   targetCurrency: string
-}): string => `${corridor.cryptoCurrency}:${corridor.blockchain}:${corridor.targetCurrency}`
+}): string => [
+  corridor.cryptoCurrency,
+  corridor.blockchain,
+  corridor.targetCurrency,
+  // A corridor without a stated direction is the payout the platform started
+  // with; including it keeps the two directions of one pair distinct.
+  corridor.direction ?? 'CRYPTO_TO_FIAT',
+].join(':')
+
+const describeDirection = (direction?: FlowDirection): string => (
+  direction === 'FIAT_TO_CRYPTO' ? 'Onramp' : 'Payout'
+)
 
 const defaultPayoutProvider = (targetCurrency: string): PaymentMethod => (
   targetCurrency === 'BRL' ? 'PIX' : 'BREB'
@@ -740,6 +753,7 @@ const FlowDefinitions = () => {
                 <code className="mt-1 block break-all text-[10px] text-ops-muted">{buildCorridorKey(corridor)}</code>
                 <div className="mt-1 flex items-center gap-2 text-[11px] text-ops-muted">
                   <OpsStatusBadge label={humanizeStatus(corridor.status)} tone={corridorStatusTone[corridor.status]} />
+                  <span>{describeDirection(corridor.direction)}</span>
                   {corridor.definitionName && (
                     <span>{corridor.definitionName}</span>
                   )}

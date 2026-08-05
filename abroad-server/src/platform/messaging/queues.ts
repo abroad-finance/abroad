@@ -8,6 +8,8 @@ import {
   DeadLetterMessageSchema,
   ExchangeBalanceUpdatedMessage,
   ExchangeBalanceUpdatedMessageSchema,
+  FiatDepositReceivedMessage,
+  FiatDepositReceivedMessageSchema,
   PaymentStatusUpdatedMessage,
   PaymentStatusUpdatedMessageSchema,
   ReceivedCryptoTransactionMessage,
@@ -20,6 +22,7 @@ export enum QueueName {
   BINANCE_BALANCE_UPDATED = 'binance-balance-updated',
   DEAD_LETTER = 'dead-letter',
   EXCHANGE_BALANCE_UPDATED = 'exchange-balance-updated',
+  FIAT_DEPOSIT_RECEIVED = 'fiat-deposit-received',
   PAYMENT_STATUS_UPDATED = 'payment-status-updated',
   RECEIVED_CRYPTO_TRANSACTION = 'received-crypto-transaction',
   USER_NOTIFICATION = 'user-notification',
@@ -51,6 +54,7 @@ export type QueuePayloadByName = {
   [QueueName.BINANCE_BALANCE_UPDATED]: BinanceBalanceUpdatedMessage
   [QueueName.DEAD_LETTER]: DeadLetterMessage
   [QueueName.EXCHANGE_BALANCE_UPDATED]: ExchangeBalanceUpdatedMessage
+  [QueueName.FIAT_DEPOSIT_RECEIVED]: FiatDepositReceivedMessage
   [QueueName.PAYMENT_STATUS_UPDATED]: PaymentStatusUpdatedMessage
   [QueueName.RECEIVED_CRYPTO_TRANSACTION]: ReceivedCryptoTransactionMessage
   [QueueName.USER_NOTIFICATION]: UserNotificationMessage
@@ -64,6 +68,7 @@ export const QueuePayloadSchemaByName: QueuePayloadSchemaMap = {
   [QueueName.BINANCE_BALANCE_UPDATED]: BinanceBalanceUpdatedMessageSchema,
   [QueueName.DEAD_LETTER]: DeadLetterMessageSchema,
   [QueueName.EXCHANGE_BALANCE_UPDATED]: ExchangeBalanceUpdatedMessageSchema,
+  [QueueName.FIAT_DEPOSIT_RECEIVED]: FiatDepositReceivedMessageSchema,
   [QueueName.PAYMENT_STATUS_UPDATED]: PaymentStatusUpdatedMessageSchema,
   [QueueName.RECEIVED_CRYPTO_TRANSACTION]: ReceivedCryptoTransactionMessageSchema,
   [QueueName.USER_NOTIFICATION]: UserNotificationMessageSchema,

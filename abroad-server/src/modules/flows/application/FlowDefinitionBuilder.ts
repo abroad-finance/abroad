@@ -1,4 +1,5 @@
 import {
+  FlowDirection,
   FlowStepCompletionPolicy,
   FlowStepType,
   PaymentMethod,
@@ -41,6 +42,10 @@ export class FlowDefinitionBuilder {
 
   public build(input: FlowDefinitionInput): FlowSystemStep[] {
     this.ensurePayoutFirst(input.steps)
+
+    if (input.direction === FlowDirection.FIAT_TO_CRYPTO) {
+      return this.buildOnrampSteps(input)
+    }
 
     const payoutService = this.paymentServiceFactory.getPaymentServiceForCapability?.({
       paymentMethod: input.payoutProvider,
@@ -104,6 +109,40 @@ export class FlowDefinitionBuilder {
       stepOrder: 1,
       stepType: FlowStepType.ENQUEUE_BRIDGE,
     }
+  }
+
+  /**
+   * An onramp mirrors the payout shape: pay the customer from float first, then
+   * enrol the top-up that makes treasury whole. The customer's fiat has already
+   * settled by the time the flow starts, so there is nothing to await before
+   * delivering.
+   *
+   * The replenish itself is deliberately not modelled as further flow steps.
+   * Ultra settles the BUY and the vault withdrawal as independent movements
+   * that are batched across many transactions, so it belongs to the worker, not
+   * to one customer's flow.
+   */
+  private buildOnrampSteps(input: FlowDefinitionInput): FlowSystemStep[] {
+    if (input.steps.length > 1) {
+      throw new FlowDefinitionBuilderError(
+        'A fiat-to-crypto flow takes only the customer delivery step; treasury replenish is batched',
+      )
+    }
+
+    return [
+      {
+        completionPolicy: FlowStepCompletionPolicy.SYNC,
+        config: {},
+        stepOrder: 1,
+        stepType: FlowStepType.CRYPTO_SEND,
+      },
+      {
+        completionPolicy: FlowStepCompletionPolicy.SYNC,
+        config: {},
+        stepOrder: 2,
+        stepType: FlowStepType.ENQUEUE_TREASURY_REPLENISH,
+      },
+    ]
   }
 
   private buildPayoutStep(paymentMethod: PaymentMethod): FlowSystemStep {

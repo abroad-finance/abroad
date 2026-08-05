@@ -84,6 +84,7 @@ export type FlowCorridor = {
   cryptoCurrency: string
   definitionId?: null | string
   definitionName?: null | string
+  direction: FlowDirection
   enabled?: boolean | null
   payoutProvider?: null | PaymentMethod
   status: FlowCorridorStatus
@@ -112,6 +113,7 @@ export type FlowCorridorSupportStatus = 'SUPPORTED' | 'UNSUPPORTED'
 export type FlowCorridorUpdateInput = {
   blockchain: string
   cryptoCurrency: string
+  direction?: FlowDirection
   reason?: string
   status: FlowCorridorSupportStatus
   targetCurrency: string
@@ -121,6 +123,7 @@ export type FlowDefinition = {
   blockchain: string
   createdAt: string
   cryptoCurrency: string
+  direction: FlowDirection
   enabled: boolean
   exchangeFeePct: number
   fixedFee: number
@@ -150,6 +153,12 @@ export type FlowDefinitionInput = {
   steps: FlowBusinessStep[]
   targetCurrency: string
 }
+
+/**
+ * Which leg of a corridor the customer pays. CRYPTO_TO_FIAT is the payout this
+ * platform started with; FIAT_TO_CRYPTO is the PIX onramp.
+ */
+export type FlowDirection = 'CRYPTO_TO_FIAT' | 'FIAT_TO_CRYPTO'
 
 export type FlowFailureFilter = 'FAILED_FLOW' | 'FAILED_STEP' | 'STUCK_WAITING'
 

@@ -1,4 +1,4 @@
-import { CryptoCurrency, TargetCurrency } from '@prisma/client'
+import { CryptoCurrency, FlowDirection, TargetCurrency } from '@prisma/client'
 import { inject, injectable } from 'inversify'
 import { createHash } from 'node:crypto'
 import { z, ZodError } from 'zod'
@@ -31,6 +31,7 @@ import {
 
 const ULTRA_SETTLEMENT = 'D0'
 const ULTRA_SIDE = 'SELL'
+const ULTRA_BUY_SIDE = 'BUY'
 const ULTRA_TRADE_ID_SCHEMA = z.string().uuid()
 const ULTRA_QUOTE_VALIDITY_SECONDS = 10
 const ULTRA_SETTLEMENT_LOCK_KEY = 'transfero-ultra:otc-sale'
@@ -196,30 +197,37 @@ export class TransferoExchangeProvider implements IExchangeProvider {
   }
 
   public getExchangeRate: IExchangeProvider['getExchangeRate'] = async ({
+    direction,
     sourceCurrency,
     targetCurrency,
   }): Promise<number> => {
     if (targetCurrency !== TargetCurrency.BRL) {
-      throw new Error('Transfero Ultra only quotes stablecoin sales into BRL')
+      throw new Error('Transfero Ultra only quotes stablecoin trades against BRL')
     }
+
+    // A payout sells our stablecoin to the desk; an onramp buys stablecoin with
+    // the customer's BRL. The desk prices the two sides differently, so the
+    // corridor's direction picks the side rather than reusing one for both.
+    const side = direction === FlowDirection.FIAT_TO_CRYPTO ? ULTRA_BUY_SIDE : ULTRA_SIDE
 
     try {
       const response = await this.ultraClient.get('/api/v1/otc/prices', {
-        side: ULTRA_SIDE,
+        side,
       })
       const prices = transferoUltraOtcPricesResponseSchema.parse(response)
       const brlPerStablecoin = prices.prices[sourceCurrency]?.D0.price
       if (!brlPerStablecoin || !Number.isFinite(brlPerStablecoin)) {
-        throw new Error(`Transfero Ultra D0 SELL price missing for ${sourceCurrency}`)
+        throw new Error(`Transfero Ultra D0 ${side} price missing for ${sourceCurrency}`)
       }
 
       // QuoteUseCase consumes stablecoin-per-fiat. Ultra publishes the inverse:
-      // BRL per stablecoin, so invert the all-in D0 SELL desk price once.
+      // BRL per stablecoin, so invert the all-in D0 desk price once.
       return 1 / brlPerStablecoin
     }
     catch (error) {
       this.logger.error('Transfero Ultra exchange-rate request failed', {
         error: error instanceof Error ? error.message : 'unknown_error',
+        side,
         sourceCurrency,
         targetCurrency,
       })

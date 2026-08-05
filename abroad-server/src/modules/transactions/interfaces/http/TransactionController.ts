@@ -67,6 +67,7 @@ export class TransactionController extends Controller {
     }
     const {
       account_number: accountNumber,
+      destination_address: destinationAddress,
       qr_code: qrCode,
       quote_id: quoteId,
       redirectUrl: redirectUrl,
@@ -75,6 +76,7 @@ export class TransactionController extends Controller {
     } = parsed.data
     const normalizedAccountNumber = accountNumber?.trim() ?? ''
     const normalizedQrCode = qrCode?.trim() || null
+    const normalizedDestinationAddress = destinationAddress?.trim() || null
 
     const partner = requireAuthenticatedPartner(request.user)
     const partnerContext = {
@@ -91,6 +93,7 @@ export class TransactionController extends Controller {
       const response = await this.transactionAcceptanceService.acceptTransaction(
         {
           accountNumber: normalizedAccountNumber,
+          destinationAddress: normalizedDestinationAddress,
           qrCode: normalizedQrCode,
           quoteId,
           redirectUrl,
@@ -108,6 +111,12 @@ export class TransactionController extends Controller {
         id: response.id,
         kycRequired: response.kycRequired,
         payment_context: paymentContext,
+        payment_instructions: response.paymentInstructions
+          ? {
+              br_code: response.paymentInstructions.brCode,
+              expires_at: response.paymentInstructions.expiresAt?.getTime() ?? null,
+            }
+          : null,
         transaction_reference: response.transactionReference,
       }
     }

@@ -10,6 +10,8 @@ export interface WebSwapLayoutProps {
 
 type WebSwapLayoutSlots = {
   slots: {
+    buyCrypto: React.JSX.Element
+    buyCryptoPix: React.JSX.Element
     confirmQr: React.JSX.Element
     home: React.JSX.Element
     kycNeeded: React.JSX.Element
@@ -22,6 +24,10 @@ type WebSwapLayoutSlots = {
 const WebSwapLayout: React.FC<WebSwapLayoutProps & WebSwapLayoutSlots> = ({ disclosure = null, slots, view }) => {
   const renderSwap = useMemo(() => {
     switch (view) {
+      case 'buy-crypto':
+        return slots.buyCrypto
+      case 'buy-crypto-pix':
+        return slots.buyCryptoPix
       case 'confirm-qr':
         return slots.confirmQr
       case 'home':
@@ -36,6 +42,8 @@ const WebSwapLayout: React.FC<WebSwapLayoutProps & WebSwapLayoutSlots> = ({ disc
         return slots.waitSign
     }
   }, [
+    slots.buyCrypto,
+    slots.buyCryptoPix,
     slots.confirmQr,
     slots.home,
     slots.kycNeeded,

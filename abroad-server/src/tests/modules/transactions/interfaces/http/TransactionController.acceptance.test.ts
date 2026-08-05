@@ -112,7 +112,7 @@ describe('TransactionController acceptance flows', () => {
     )
 
     expect(kycService.hasApprovedKyc).toHaveBeenCalled()
-    expect(response).toEqual({ id: null, kycRequired: true, payment_context: null, transaction_reference: null })
+    expect(response).toEqual({ id: null, kycRequired: true, payment_context: null, payment_instructions: null, transaction_reference: null })
   })
 
   it('skips KYC when the user already has an approved submission', async () => {
@@ -131,6 +131,7 @@ describe('TransactionController acceptance flows', () => {
       id: '11111111-2222-3333-4444-555555555555',
       kycRequired: false,
       payment_context: null,
+      payment_instructions: null,
       transaction_reference: Buffer.from('11111111222233334444555555555555', 'hex').toString('base64'),
     })
   })
@@ -150,6 +151,7 @@ describe('TransactionController acceptance flows', () => {
       id: '11111111-2222-3333-4444-555555555555',
       kycRequired: false,
       payment_context: null,
+      payment_instructions: null,
       transaction_reference: expectedReference,
     })
   })

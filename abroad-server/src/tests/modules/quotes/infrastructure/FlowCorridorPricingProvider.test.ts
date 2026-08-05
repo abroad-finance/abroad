@@ -1,4 +1,4 @@
-import { BlockchainNetwork, CryptoCurrency, TargetCurrency } from '@prisma/client'
+import { BlockchainNetwork, CryptoCurrency, FlowDirection, TargetCurrency } from '@prisma/client'
 
 import type { FlowDefinitionService } from '../../../../modules/flows/application/FlowDefinitionService'
 
@@ -30,7 +30,12 @@ describe('FlowCorridorPricingProvider', () => {
 
     const pricing = await provider.getPricing(corridor)
 
-    expect(findActiveByCorridor).toHaveBeenCalledWith(corridor)
+    // A corridor with no stated direction resolves to the payout side rather
+    // than matching whichever direction happens to be configured first.
+    expect(findActiveByCorridor).toHaveBeenCalledWith({
+      ...corridor,
+      direction: FlowDirection.CRYPTO_TO_FIAT,
+    })
     expect(pricing).toEqual({
       exchangeFeePct: 0.0085,
       fixedFee: 0,

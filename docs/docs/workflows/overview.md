@@ -41,4 +41,10 @@ sequenceDiagram
 
 Abroad also emits [webhooks](../reference/webhooks) at each step, so you do not have to poll.
 
+## The other direction
+
+The flow above moves crypto into local currency. To let a user **buy** crypto by
+paying a PIX in Brazilian Reais, see [Buy crypto with PIX](./buy-crypto) — the
+same three steps, with the legs swapped.
+
 For status definitions and webhook behavior, see [Status lifecycle](./status-lifecycle) and [Webhooks](../reference/webhooks).

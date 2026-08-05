@@ -100,6 +100,53 @@ export class TransactionRepository {
     })
   }
 
+  /**
+   * The FIAT_TO_CRYPTO mirror of {@link applyDepositReceived}: the customer's
+   * PIX credited, so the transaction may start delivering crypto.
+   *
+   * `pixDepositId` is unique, so a replayed provider delivery can never credit
+   * a second transaction, and the transition's idempotency key makes a repeat
+   * of the same delivery a no-op rather than a second state change.
+   */
+  public async applyFiatDepositReceived(
+    prismaClient: TransactionClient,
+    params: {
+      endToEndId: null | string
+      idempotencyKey: string
+      payerTaxId: null | string
+      providerDepositId: string
+      transactionId: string
+    },
+  ): Promise<
+    | undefined
+    | { transaction: TransactionWithRelations, transitionApplied: boolean }
+  > {
+    const wasAlreadyApplied = await this.hasTransition(prismaClient, {
+      idempotencyKey: params.idempotencyKey,
+      transactionId: params.transactionId,
+    })
+
+    if (wasAlreadyApplied) {
+      const existingTransaction = await this.loadTransaction(prismaClient, params.transactionId)
+      return existingTransaction
+        ? { transaction: existingTransaction, transitionApplied: false }
+        : undefined
+    }
+
+    const updated = await this.applyTransition(prismaClient, {
+      data: {
+        pixDepositId: params.providerDepositId,
+        ...(params.endToEndId ? { pixEndToEndId: params.endToEndId } : {}),
+        ...(params.payerTaxId ? { pixPayerTaxId: params.payerTaxId } : {}),
+      },
+      idempotencyKey: params.idempotencyKey,
+      name: 'deposit_received',
+      transactionId: params.transactionId,
+    })
+
+    return updated ? { transaction: updated, transitionApplied: true } : undefined
+  }
+
   public async applyTransition(
     prismaClient: TransactionClient,
     params: {

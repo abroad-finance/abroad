@@ -33,7 +33,7 @@ describe('TransactionController minimal branches', () => {
     )
 
     expect(response).toEqual(expect.objectContaining({
-      reason: expect.stringContaining('Account number or QR code is required'),
+      reason: expect.stringContaining('Account number, QR code, or destination address is required'),
     }))
   })
 

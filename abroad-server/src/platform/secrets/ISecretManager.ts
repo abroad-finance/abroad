@@ -36,6 +36,10 @@ const secretEntries = [
   ['STELLAR_SEP_JWT_SECRET', 'STELLAR_SEP_JWT_SECRET'],
   ['STELLAR_SEP_PARTNER_ID', 'STELLAR_SEP_PARTNER_ID'],
   ['STELLAR_WEB_AUTH_DOMAIN', 'STELLAR_WEB_AUTH_DOMAIN'],
+  // Whitelisted destination for onramp replenish withdrawals. Transfero settles
+  // crypto on Polygon only, so replenished float lands here before the existing
+  // treasury bridge moves it to the chain that paid the customer.
+  ['TREASURY_POLYGON_ADDRESS', 'TREASURY_POLYGON_ADDRESS'],
   ['MOVII_BALANCE_ACCOUNT_ID', 'MOVII_BALANCE_ACCOUNT_ID'],
   ['MOVII_BALANCE_API_KEY', 'MOVII_BALANCE_API_KEY'],
   ['OPS_API_KEY', 'OPS_API_KEY'],

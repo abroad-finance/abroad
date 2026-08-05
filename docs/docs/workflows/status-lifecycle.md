@@ -18,3 +18,17 @@ Use this table to interpret `status` values from `GET /transaction/{id}` or webh
 These six values are the complete set; a transaction is always in exactly one of them.
 
 If `kycRequired` is `true` on the acceptance response, no transaction was created and there is no status to track yet — the user must complete [KYC](../reference/api#submit-kyc-post-kyc) first, after which you retry with a fresh quote.
+
+## Reading these on an onramp
+
+The same statuses describe a [PIX onramp](./buy-crypto), with the legs swapped:
+
+| Status | On an onramp it means |
+| :--- | :--- |
+| `AWAITING_PAYMENT` | The BR Code has been issued and is waiting for your user's PIX. |
+| `PROCESSING_PAYMENT` | The PIX settled and Abroad is delivering the crypto. |
+| `PAYMENT_COMPLETED` | The crypto reached the destination wallet; `on_chain_tx_hash` is the delivery. |
+| `PAYMENT_FAILED` | The delivery could not be made; the BRL is returned to the payer. |
+| `PAYMENT_EXPIRED` | The BR Code expired before it was paid. |
+
+`WRONG_AMOUNT` does not occur on an onramp: the BR Code encodes an exact amount.

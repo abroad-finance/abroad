@@ -25,6 +25,7 @@ import {
 } from '../../api'
 import { useNotices } from '../../contexts/NoticeContext'
 import { BRL_BACKGROUND_IMAGE } from '../../features/swap/constants'
+import { useOnrampPurchase } from '../../features/swap/hooks/useOnrampPurchase'
 import { useStablecoinBalances } from '../../features/swap/hooks/useStablecoinBalances'
 import {
   isSupportedStablecoinSymbol,
@@ -1028,6 +1029,56 @@ export const useWebSwapController = (): WebSwapControllerProps => {
   const isAuthenticated = isWalletConnected
   const resolvedChainId = wallet?.chainId ?? selectedCorridor?.chainId ?? null
   const walletUserId = buildWalletUserId(resolvedChainId, wallet?.address ?? null)
+
+  // A PIX onramp is its own short journey: price, accept, then show the code.
+  // It shares the wallet and corridor context but none of the payout state, so
+  // it lives beside the reducer rather than inside it.
+  const onramp = useOnrampPurchase()
+
+  const startBuyCrypto = useCallback(() => {
+    onramp.reset()
+    dispatch({ type: 'SET_VIEW', view: 'buy-crypto' })
+  }, [onramp])
+
+  const cancelBuyCrypto = useCallback(() => {
+    onramp.reset()
+    dispatch({ type: 'SET_VIEW', view: 'home' })
+  }, [onramp])
+
+  const submitBuyCrypto = useCallback(async (values: {
+    fiatAmount: number
+    taxId: string
+  }) => {
+    const destinationAddress = wallet?.address ?? null
+    const corridor = selectedCorridor
+    if (!destinationAddress || !walletUserId || !corridor) return
+
+    await onramp.startPurchase({
+      cryptoCurrency: corridor.cryptoCurrency === 'USDT' ? 'USDT' : 'USDC',
+      destinationAddress,
+      fiatAmount: values.fiatAmount,
+      network: corridor.blockchain,
+      taxId: values.taxId,
+      userId: walletUserId,
+    })
+  }, [
+    onramp,
+    selectedCorridor,
+    wallet?.address,
+    walletUserId,
+  ])
+
+  // The code screen is reached only once there is something payable to show;
+  // a KYC requirement routes to verification instead, matching the payout flow.
+  useEffect(() => {
+    if (onramp.state.instructions) {
+      dispatch({ type: 'SET_VIEW', view: 'buy-crypto-pix' })
+      return
+    }
+    if (onramp.state.kycRequired) {
+      dispatch({ type: 'SET_VIEW', view: 'kyc-needed' })
+    }
+  }, [onramp.state.instructions, onramp.state.kycRequired])
   const hasKycRecipientData = state.destination.currency === TargetCurrency.BRL
     ? Boolean(state.pixKey.trim() || state.qrCode)
     : Boolean(state.accountNumber.trim() || state.qrCode)
@@ -2574,6 +2625,17 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     balancesByAsset: {
       USDC: stablecoinBalances.usdc,
       USDT: stablecoinBalances.usdt,
+    },
+    buyCrypto: {
+      cancel: cancelBuyCrypto,
+      destinationAddress: wallet?.address ?? null,
+      limits: {
+        maxAmount: selectedCorridor?.maxAmount ?? null,
+        minAmount: selectedCorridor?.minAmount ?? null,
+      },
+      start: startBuyCrypto,
+      state: onramp.state,
+      submit: submitBuyCrypto,
     },
     cancelDestinationChange,
     chainOptions,

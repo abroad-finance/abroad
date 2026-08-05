@@ -1,6 +1,7 @@
 import {
   BlockchainNetwork,
   CryptoCurrency,
+  FlowDirection,
   PaymentMethod,
   Prisma,
   TargetCurrency,
@@ -18,16 +19,22 @@ import { WebhookEvent } from '../../../platform/notifications/IWebhookNotifier'
 import { OutboxDispatcher } from '../../../platform/outbox/OutboxDispatcher'
 import { IDatabaseClientProvider } from '../../../platform/persistence/IDatabaseClientProvider'
 import { IKycService } from '../../kyc/application/contracts/IKycService'
+import { IFiatDepositService } from '../../payments/application/contracts/IFiatDepositService'
+import { IFiatDepositServiceFactory } from '../../payments/application/contracts/IFiatDepositServiceFactory'
 import { IPaymentServiceFactory } from '../../payments/application/contracts/IPaymentServiceFactory'
+import { validateDestinationAddress } from '../../payments/application/destinationAddress'
 import { LiquidityCacheService } from '../../payments/application/LiquidityCacheService'
 import { assertPartnerUserEnabled, DisabledUserError } from '../../shared/partnerUserAccess'
 import { BridgeFloatService } from '../../treasury/application/BridgeFloatService'
+import { CryptoInventoryService } from '../../treasury/application/CryptoInventoryService'
 import { uuidToBase64 } from '../infrastructure/transactionEncoding'
 import { toWebhookTransactionPayload } from './transactionPayload'
 import { TransactionWebhookRouter } from './TransactionWebhookRouter'
 
 interface AcceptTransactionRequest {
   accountNumber: string
+  /** Wallet the crypto is delivered to. Required for FIAT_TO_CRYPTO only. */
+  destinationAddress?: null | string
   qrCode?: null | string
   quoteId: string
   redirectUrl?: string
@@ -38,10 +45,21 @@ interface AcceptTransactionRequest {
 interface AcceptTransactionResponse {
   id: null | string
   kycRequired: boolean
+  /**
+   * The BR Code a FIAT_TO_CRYPTO customer pays. Null on a payout, where the
+   * customer sends crypto against `transactionReference` instead.
+   */
+  paymentInstructions: null | { brCode: string, expiresAt: Date | null }
   transactionReference: null | string
 }
 
 type DatabaseClient = Awaited<ReturnType<IDatabaseClientProvider['getClient']>>
+
+type OnrampPreflight = {
+  depositService: IFiatDepositService
+  /** Canonicalised for the chain, so what we persist is what we can pay. */
+  destinationAddress: string
+}
 
 type PartnerUserContext = {
   id: string
@@ -84,6 +102,9 @@ export class TransactionAcceptanceService {
     private readonly transactionWebhookRouter: TransactionWebhookRouter,
     @inject(LiquidityCacheService) private readonly liquidityCacheService: LiquidityCacheService,
     @inject(BridgeFloatService) private readonly bridgeFloatService: BridgeFloatService,
+    @inject(TYPES.IFiatDepositServiceFactory)
+    private readonly fiatDepositServiceFactory: IFiatDepositServiceFactory,
+    @inject(CryptoInventoryService) private readonly cryptoInventoryService: CryptoInventoryService,
     @inject(TYPES.ILogger) logger: ILogger,
   ) {
     this.logger = createScopedLogger(logger, { scope: 'TransactionAcceptance' })
@@ -106,10 +127,21 @@ export class TransactionAcceptanceService {
     // would gain no real consistency and would re-introduce the deadlock
     // this fix removed.
     const preflightQuote = await this.fetchQuote(prismaClient, request.quoteId, partner.id)
-    const preflightPaymentService = this.resolvePaymentService(preflightQuote)
-    this.assertPaymentServiceIsEnabled(preflightPaymentService, preflightQuote.paymentMethod)
-    await this.enforceLiquidity(preflightPaymentService, preflightQuote.paymentMethod, preflightQuote.targetAmount)
-    await this.enforceBridgeFloat(preflightQuote)
+    const isOnramp = preflightQuote.direction === FlowDirection.FIAT_TO_CRYPTO
+
+    // An onramp promises the customer crypto out of our own float, so it is
+    // gated on hot-wallet inventory rather than on payout-rail liquidity, and
+    // the bridge float — which only bounds CELO->BRL payouts — does not apply.
+    let onrampPreflight: null | OnrampPreflight = null
+    if (isOnramp) {
+      onrampPreflight = await this.preflightOnramp(preflightQuote, request)
+    }
+    else {
+      const preflightPaymentService = this.resolvePaymentService(preflightQuote)
+      this.assertPaymentServiceIsEnabled(preflightPaymentService, preflightQuote.paymentMethod)
+      await this.enforceLiquidity(preflightPaymentService, preflightQuote.paymentMethod, preflightQuote.targetAmount)
+      await this.enforceBridgeFloat(preflightQuote)
+    }
     const webhookTargets = await this.resolveWebhookTargets(partner)
 
     let decision: TransactionDecision
@@ -121,12 +153,16 @@ export class TransactionAcceptanceService {
         await this.lockPaymentMethod(tx, quote.paymentMethod)
 
         this.enforceTransactionAmountBounds(quote, paymentService, quote.paymentMethod)
-        // For PIX QR payouts, the BR Code is the authoritative destination:
-        // Ultra previews and submits it without using the separately supplied
-        // manual PIX key. Every other payout path still requires account
-        // validation before any transaction or limit reservation is persisted.
-        if (quote.paymentMethod !== PaymentMethod.PIX || !request.qrCode?.trim()) {
-          await this.ensureAccountIsValid(paymentService, request.accountNumber)
+        // An onramp has no bank destination to verify; its wallet destination
+        // was already validated and canonicalised during preflight.
+        if (!isOnramp) {
+          // For PIX QR payouts, the BR Code is the authoritative destination:
+          // Ultra previews and submits it without using the separately supplied
+          // manual PIX key. Every other payout path still requires account
+          // validation before any transaction or limit reservation is persisted.
+          if (quote.paymentMethod !== PaymentMethod.PIX || !request.qrCode?.trim()) {
+            await this.ensureAccountIsValid(paymentService, request.accountNumber)
+          }
         }
 
         const partnerUser = await tx.partnerUser.upsert({
@@ -173,10 +209,16 @@ export class TransactionAcceptanceService {
 
         const transaction = await tx.transaction.create({
           data: {
-            accountNumber: request.accountNumber,
+            // An onramp pays a wallet, not a bank account, so accountNumber
+            // stays at its empty default and destinationAddress carries the
+            // canonicalised destination from preflight.
+            accountNumber: isOnramp ? '' : request.accountNumber,
+            destinationAddress: onrampPreflight?.destinationAddress ?? null,
             origin: partner.origin,
             partnerUserId: partnerUser.id,
-            qrCode: request.qrCode,
+            // The onramp's BR Code is not known until the deposit is opened
+            // after this transaction commits.
+            qrCode: isOnramp ? null : request.qrCode,
             quoteId: quote.id,
             status: TransactionStatus.AWAITING_PAYMENT,
             taxId: request.taxId,
@@ -234,14 +276,32 @@ export class TransactionAcceptanceService {
       return {
         id: null,
         kycRequired: true,
+        paymentInstructions: null,
         transactionReference: null,
       }
     }
 
     const transactionReference = uuidToBase64(decision.transaction.id)
+
+    if (onrampPreflight) {
+      const paymentInstructions = await this.openOnrampDeposit(
+        prismaClient,
+        onrampPreflight,
+        decision.transaction.id,
+        preflightQuote.targetAmount,
+      )
+      return {
+        id: decision.transaction.id,
+        kycRequired: false,
+        paymentInstructions,
+        transactionReference,
+      }
+    }
+
     return {
       id: decision.transaction.id,
       kycRequired: false,
+      paymentInstructions: null,
       transactionReference,
     }
   }
@@ -548,6 +608,105 @@ export class TransactionAcceptanceService {
 
   private normalizeCountCap(value: number): number {
     return Number.isFinite(value) ? value : TransactionAcceptanceService.UNBOUNDED_COUNT_CAP
+  }
+
+  /**
+   * Opens the deposit the customer pays, after the transaction exists so the
+   * provider can be keyed on its id. Ultra dedupes on that key, so a retry
+   * re-presents the same instrument instead of opening a second payable one.
+   */
+  private async openOnrampDeposit(
+    prismaClient: DatabaseClient,
+    preflight: OnrampPreflight,
+    transactionId: string,
+    fiatAmount: number,
+  ): Promise<{ brCode: string, expiresAt: Date | null }> {
+    const deposit = await preflight.depositService.createDeposit({
+      amount: fiatAmount,
+      reference: transactionId,
+      transactionId,
+    })
+
+    if (!deposit.success) {
+      this.logger.error('Could not open the onramp deposit for an accepted transaction', {
+        code: deposit.code,
+        reason: deposit.reason,
+        transactionId,
+      })
+      throw new TransactionValidationError('We could not generate your payment code right now. Please try again in a few moments.')
+    }
+
+    await prismaClient.transaction.update({
+      data: {
+        pixDepositId: deposit.providerDepositId,
+        qrCode: deposit.brCode,
+      },
+      where: { id: transactionId },
+    })
+
+    return { brCode: deposit.brCode, expiresAt: deposit.expiresAt }
+  }
+
+  /**
+   * Everything an onramp must settle before the customer is given something to
+   * pay: a destination we can actually deliver to, a collection rail that is
+   * up, and enough hot-wallet float to honour the promise.
+   */
+  private async preflightOnramp(
+    quote: {
+      cryptoCurrency: CryptoCurrency
+      network: BlockchainNetwork
+      paymentMethod: PaymentMethod
+      sourceAmount: number
+      targetCurrency: TargetCurrency
+    },
+    request: AcceptTransactionRequest,
+  ): Promise<OnrampPreflight> {
+    const destination = validateDestinationAddress({
+      address: request.destinationAddress ?? '',
+      network: quote.network,
+    })
+    if (!destination.valid) {
+      throw new TransactionValidationError(
+        destination.reason === 'empty'
+          ? 'A destination wallet address is required to receive this payment.'
+          : 'That destination wallet address is not valid for the selected network. Please check it and try again.',
+      )
+    }
+
+    const depositService = this.fiatDepositServiceFactory.getForCapability({
+      paymentMethod: quote.paymentMethod,
+      targetCurrency: quote.targetCurrency,
+    })
+    if (!depositService.isEnabled) {
+      throw new TransactionValidationError('This payment method is temporarily unavailable. Please try again shortly.')
+    }
+
+    const inventory = await this.cryptoInventoryService.getAvailable({
+      cryptoCurrency: quote.cryptoCurrency,
+      network: quote.network,
+    })
+    if (!inventory.success) {
+      // Never treat an unreadable balance as available float: we would be
+      // promising coins we cannot prove we hold.
+      this.logger.error('Rejecting onramp: hot wallet inventory is unreadable', {
+        cryptoCurrency: quote.cryptoCurrency,
+        network: quote.network,
+        reason: inventory.reason,
+      })
+      throw new TransactionValidationError('We could not verify available liquidity for this asset right now. Please try again in a few moments.')
+    }
+    if (inventory.available < quote.sourceAmount) {
+      this.logger.warn('Rejecting onramp: hot wallet inventory below the quoted delivery', {
+        available: inventory.available,
+        cryptoCurrency: quote.cryptoCurrency,
+        network: quote.network,
+        requested: quote.sourceAmount,
+      })
+      throw new TransactionValidationError('This purchase is temporarily unavailable while we rebalance liquidity. Please try again shortly or use a smaller amount.')
+    }
+
+    return { depositService, destinationAddress: destination.address }
   }
 
   private async publishUserNotification(

@@ -135,9 +135,13 @@ export type OpsTransactionDetail = OpsTransactionSummary & {
   evidence: OpsEvidenceEvent[]
   failure: null | OpsFailureGuidance
   identifiers: {
+    /** On-chain destination of an onramp delivery. Null on a payout. */
+    destinationAddress: null | string
     externalId: null | string
     flowInstanceId: null | string
     onChainId: null | string
+    /** Provider deposit backing an onramp. Null on a payout. */
+    pixDepositId: null | string
     pixEndToEndId: null | string
     quoteId: string
     refundOnChainId: null | string

@@ -193,9 +193,11 @@ const transactionDetail: OpsTransactionDetail = {
   }],
   failure: null,
   identifiers: {
+    destinationAddress: null,
     externalId: 'provider-ref-1',
     flowInstanceId: 'flow-1',
     onChainId: 'chain-1',
+    pixDepositId: null,
     pixEndToEndId: null,
     quoteId: 'quote-1',
     refundOnChainId: null,

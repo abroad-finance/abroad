@@ -1,4 +1,4 @@
-import { BlockchainNetwork, CryptoCurrency, TargetCurrency } from '@prisma/client'
+import { BlockchainNetwork, CryptoCurrency, FlowDirection, TargetCurrency } from '@prisma/client'
 
 export type ExchangeAddressResult
   = | { address: string, memo?: string, success: true }
@@ -73,12 +73,20 @@ export interface IExchangeProvider {
     cryptoCurrency: CryptoCurrency
   }): Promise<ExchangeAddressResult>
 
+  /**
+   * Stablecoin per unit of fiat, always. `direction` selects the side of the
+   * desk the rate is read from — a payout sells crypto into fiat, an onramp
+   * buys it — and the two sides carry different prices, so it is never
+   * inferred. Omitted means the payout side this platform started with.
+   */
   getExchangeRate(params: {
+    direction?: FlowDirection
     sourceAmount: number
     sourceCurrency: CryptoCurrency
     targetAmount?: undefined
     targetCurrency: TargetCurrency
   } | {
+    direction?: FlowDirection
     sourceAmount?: undefined
     sourceCurrency: CryptoCurrency
     targetAmount: number

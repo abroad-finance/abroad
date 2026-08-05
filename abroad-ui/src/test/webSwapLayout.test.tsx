@@ -6,6 +6,8 @@ import type { SwapView } from '../features/swap/types'
 import WebSwapLayout from '../features/swap/components/WebSwapLayout'
 
 const slots = {
+  buyCrypto: <p>buy crypto form view</p>,
+  buyCryptoPix: <p>buy crypto code view</p>,
   confirmQr: <p>review view</p>,
   home: <p>home view</p>,
   kycNeeded: <p>verification view</p>,
@@ -15,6 +17,8 @@ const slots = {
 }
 
 const surfaces: ReadonlyArray<[SwapView, string]> = [
+  ['buy-crypto', 'buy crypto form view'],
+  ['buy-crypto-pix', 'buy crypto code view'],
   ['confirm-qr', 'review view'],
   ['home', 'home view'],
   ['kyc-needed', 'verification view'],

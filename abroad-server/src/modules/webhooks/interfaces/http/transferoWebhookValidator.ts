@@ -1,7 +1,7 @@
 import { TargetCurrency } from '@prisma/client'
 import { z } from 'zod'
 
-import { PaymentStatusUpdatedMessage } from '../../../../platform/messaging/queueSchema'
+import { FiatDepositReceivedMessage, PaymentStatusUpdatedMessage } from '../../../../platform/messaging/queueSchema'
 import { transferoUltraDecimalSchema, transferoUltraWithdrawalStatusSchema } from '../../../transfero/infrastructure/transferoUltraSchemas'
 
 const transferoUltraWebhookEnvelopeSchema = z.object({
@@ -40,6 +40,22 @@ const transferoUltraCryptoDepositConfirmedDataSchema = z.object({
   status: z.literal('CONFIRMED'),
   transactionId: z.string().min(1),
   txHash: z.string().min(1),
+}).loose()
+
+const transferoUltraPixDepositDataSchema = z.object({
+  amount: transferoUltraDecimalSchema,
+  currency: z.literal('BRL'),
+  depositId: z.string().min(1),
+  endToEndId: z.string().nullable(),
+  // Ultra's own attribution field, which we set to our transaction id when the
+  // dynamic QR is created. Nullable by contract, so it is never assumed.
+  endUserId: z.string().min(1).nullable().optional(),
+  payer: z.object({
+    bankCode: z.string().nullable(),
+    name: z.string().nullable(),
+    taxId: z.string().nullable(),
+  }).loose().nullable().optional(),
+  status: z.string().min(1),
 }).loose()
 
 const transferoUltraCryptoDepositCreditFailedDataSchema = z.object({
@@ -81,6 +97,12 @@ type TransferoUltraWebhookAction
     action: 'exchange-balance-updated'
     eventId: string
     eventType: string
+  }
+  | {
+    action: 'fiat-deposit-received'
+    eventId: string
+    eventType: string
+    message: FiatDepositReceivedMessage
   }
   | {
     action: 'ignored'
@@ -153,6 +175,11 @@ export function parseTransferoWebhook(
         success: true,
       }
     }
+    // Only a completed deposit is spendable. `pix.deposit.paid` means the money
+    // arrived but the credit has not landed, so it deliberately does not start
+    // a delivery — Ultra docs §10.
+    case 'pix.deposit.completed':
+      return parsePixDeposit(envelope)
     case 'pix.withdrawal.failed':
       return parsePixWithdrawal(envelope, failedStatuses)
     case 'pix.withdrawal.returned':
@@ -177,6 +204,63 @@ export function parseTransferoWebhook(
 function normalizeProviderFailureReason(value: null | string): null | string {
   const normalized = value?.trim()
   return normalized ? normalized.slice(0, MAX_PROVIDER_FAILURE_REASON_LENGTH) : null
+}
+
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+function parsePixDeposit(
+  envelope: z.infer<typeof transferoUltraWebhookEnvelopeSchema>,
+): TransferoUltraWebhookValidationResult {
+  const parsed = transferoUltraPixDepositDataSchema.safeParse(envelope.data)
+  if (!parsed.success) {
+    return { errors: JSON.stringify(parsed.error.issues), success: false }
+  }
+  if (parsed.data.status !== 'COMPLETED') {
+    return {
+      errors: `Webhook event ${envelope.eventType} carried status ${parsed.data.status}`,
+      success: false,
+    }
+  }
+
+  // Attribution is best-effort by contract, so an unattributed deposit is
+  // routed nowhere rather than guessed at. It still credited our balance; ops
+  // reconciles it from the provider side.
+  const transactionId = parsed.data.endUserId?.trim()
+  if (!transactionId || !UUID_PATTERN.test(transactionId)) {
+    return {
+      action: {
+        action: 'ignored',
+        eventId: envelope.eventId,
+        eventType: envelope.eventType,
+      },
+      attempt: envelope.attempt,
+      success: true,
+    }
+  }
+
+  const amount = Number(parsed.data.amount)
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return { errors: 'Deposit amount is not a finite positive number', success: false }
+  }
+
+  return {
+    action: {
+      action: 'fiat-deposit-received',
+      eventId: envelope.eventId,
+      eventType: envelope.eventType,
+      message: {
+        amount,
+        currency: TargetCurrency.BRL,
+        endToEndId: parsed.data.endToEndId?.trim() || null,
+        payerTaxId: parsed.data.payer?.taxId?.replace(/\D+/g, '') || null,
+        provider: 'transfero',
+        providerDepositId: parsed.data.depositId,
+        transactionId,
+      },
+    },
+    attempt: envelope.attempt,
+    success: true,
+  }
 }
 
 function parsePixWithdrawal(

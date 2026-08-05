@@ -6,7 +6,7 @@ import type { LiquidityCacheService } from '../../../../modules/payments/applica
 import { DisabledUserError } from '../../../../modules/shared/partnerUserAccess'
 import { TransactionAcceptanceService } from '../../../../modules/transactions/application/TransactionAcceptanceService'
 import { TransactionWebhookRouter } from '../../../../modules/transactions/application/TransactionWebhookRouter'
-import { createMockLogger } from '../../../setup/mockFactories'
+import { createMockCryptoInventoryService, createMockFiatDepositServiceFactory, createMockLogger } from '../../../setup/mockFactories'
 
 const buildPaymentService = () => ({
   currency: TargetCurrency.COP,
@@ -75,6 +75,8 @@ describe('TransactionAcceptanceService helpers', () => {
     transactionWebhookRouter,
     liquidityCacheService,
     bridgeFloatService,
+    createMockFiatDepositServiceFactory(),
+    createMockCryptoInventoryService() as never,
     logger,
   )
 
@@ -234,6 +236,8 @@ describe('TransactionAcceptanceService helpers', () => {
       transactionWebhookRouter,
       liquidityCacheService,
       bridgeFloatService,
+      createMockFiatDepositServiceFactory(),
+      createMockCryptoInventoryService() as never,
       logger,
     )
 
@@ -647,6 +651,8 @@ describe('TransactionAcceptanceService.acceptTransaction KYC gating', () => {
       transactionWebhookRouter,
       liquidityCacheService,
       bridgeFloatService,
+      createMockFiatDepositServiceFactory(),
+      createMockCryptoInventoryService() as never,
       logger,
     )
 
@@ -668,7 +674,12 @@ describe('TransactionAcceptanceService.acceptTransaction KYC gating', () => {
 
     const result = await service.acceptTransaction(request, partner)
 
-    expect(result).toEqual({ id: null, kycRequired: true, transactionReference: null })
+    expect(result).toEqual({
+      id: null,
+      kycRequired: true,
+      paymentInstructions: null,
+      transactionReference: null,
+    })
     expect(kycService.hasApprovedKyc).toHaveBeenCalledWith('pu-1', prisma)
     expect(prisma.transaction.create).not.toHaveBeenCalled()
   })

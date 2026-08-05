@@ -45,4 +45,4 @@ export type QrEntryMode = 'camera' | 'paste' | 'upload'
 
 // Extend views to include transaction status screen shown right after user signs the tx
 // and a confirmation screen for decoded QR data
-export type SwapView = 'confirm-qr' | 'home' | 'kyc-needed' | 'swap' | 'txStatus' | 'wait-sign'
+export type SwapView = 'buy-crypto' | 'buy-crypto-pix' | 'confirm-qr' | 'home' | 'kyc-needed' | 'swap' | 'txStatus' | 'wait-sign'

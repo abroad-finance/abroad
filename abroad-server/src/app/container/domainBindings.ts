@@ -11,7 +11,9 @@ import { PublicCorridorService } from '../../modules/flows/application/PublicCor
 import { RefundCoordinator } from '../../modules/flows/application/RefundCoordinator'
 import { AwaitExchangeBalanceStepExecutor } from '../../modules/flows/application/steps/AwaitExchangeBalanceStepExecutor'
 import { AwaitProviderStatusStepExecutor } from '../../modules/flows/application/steps/AwaitProviderStatusStepExecutor'
+import { CryptoSendStepExecutor } from '../../modules/flows/application/steps/CryptoSendStepExecutor'
 import { EnqueueBridgeStepExecutor } from '../../modules/flows/application/steps/EnqueueBridgeStepExecutor'
+import { EnqueueTreasuryReplenishStepExecutor } from '../../modules/flows/application/steps/EnqueueTreasuryReplenishStepExecutor'
 import { ExchangeConvertStepExecutor } from '../../modules/flows/application/steps/ExchangeConvertStepExecutor'
 import { ExchangeSendStepExecutor } from '../../modules/flows/application/steps/ExchangeSendStepExecutor'
 import { PayoutSendStepExecutor } from '../../modules/flows/application/steps/PayoutSendStepExecutor'
@@ -65,6 +67,7 @@ import { ResendPartnerPortalEmailSender } from '../../modules/partners/applicati
 import { ResendWebhookVerifier } from '../../modules/partners/infrastructure/ResendWebhookVerifier'
 import { CryptoAssetConfigService } from '../../modules/payments/application/CryptoAssetConfigService'
 import { DepositVerifierRegistry } from '../../modules/payments/application/DepositVerifierRegistry'
+import { FiatDepositServiceFactory } from '../../modules/payments/application/FiatDepositServiceFactory'
 import { LiquidityCacheService } from '../../modules/payments/application/LiquidityCacheService'
 import { PaymentContextService } from '../../modules/payments/application/PaymentContextService'
 import { PaymentServiceFactory } from '../../modules/payments/application/PaymentServiceFactory'
@@ -75,6 +78,7 @@ import { BrebPayoutStatusAdapter } from '../../modules/payments/infrastructure/B
 import { BrebPaymentService } from '../../modules/payments/infrastructure/paymentProviders/brebPaymentService'
 import { PixQrDecoder } from '../../modules/payments/infrastructure/paymentProviders/PixQrDecoder'
 import { TransferoPaymentService } from '../../modules/payments/infrastructure/paymentProviders/transferoPaymentService'
+import { TransferoPixDepositService } from '../../modules/payments/infrastructure/paymentProviders/transferoPixDepositService'
 import { TransferoPayoutStatusAdapter } from '../../modules/payments/infrastructure/TransferoPayoutStatusAdapter'
 import { CeloPaymentVerifier } from '../../modules/payments/infrastructure/wallets/CeloPaymentVerifier'
 import { CeloWalletHandler } from '../../modules/payments/infrastructure/wallets/CeloWalletHandler'
@@ -86,6 +90,7 @@ import { QuoteRequestMetricRecorder } from '../../modules/quotes/application/Quo
 import { QuoteUseCase } from '../../modules/quotes/application/quoteUseCase'
 import { FlowCorridorPricingProvider } from '../../modules/quotes/infrastructure/FlowCorridorPricingProvider'
 import { ConsumerActivityService } from '../../modules/transactions/application/ConsumerActivityService'
+import { FiatDepositReceivedUseCase } from '../../modules/transactions/application/fiatDepositReceivedUseCase'
 import { OpsRefundRecoveryService } from '../../modules/transactions/application/OpsRefundRecoveryService'
 import { OpsTransactionQueryService } from '../../modules/transactions/application/OpsTransactionQueryService'
 import { OpsTransactionReconciliationService } from '../../modules/transactions/application/OpsTransactionReconciliationService'
@@ -105,10 +110,13 @@ import { TransparencyMetricsService } from '../../modules/transparency/applicati
 import { BridgeFloatService } from '../../modules/treasury/application/BridgeFloatService'
 import { BridgeSweepService } from '../../modules/treasury/application/BridgeSweepService'
 import { BridgeSweepWorker } from '../../modules/treasury/application/BridgeSweepWorker'
+import { CryptoInventoryService } from '../../modules/treasury/application/CryptoInventoryService'
 import { ExchangeProviderFactory } from '../../modules/treasury/application/ExchangeProviderFactory'
 import { OpsBridgeService } from '../../modules/treasury/application/OpsBridgeService'
 import { OpsTreasuryService } from '../../modules/treasury/application/OpsTreasuryService'
 import { OpsTreasuryThresholdService } from '../../modules/treasury/application/OpsTreasuryThresholdService'
+import { TreasuryReplenishService } from '../../modules/treasury/application/TreasuryReplenishService'
+import { TreasuryReplenishWorker } from '../../modules/treasury/application/TreasuryReplenishWorker'
 import { TreasurySnapshotWorker } from '../../modules/treasury/application/TreasurySnapshotWorker'
 import { BinanceBalanceSource } from '../../modules/treasury/infrastructure/balanceSources/BinanceBalanceSource'
 import { CeloBalanceSource } from '../../modules/treasury/infrastructure/balanceSources/CeloBalanceSource'
@@ -118,6 +126,7 @@ import { StellarBalanceSource } from '../../modules/treasury/infrastructure/bala
 import { TransferoBalanceSource } from '../../modules/treasury/infrastructure/balanceSources/TransferoBalanceSource'
 import { BinanceExchangeProvider } from '../../modules/treasury/infrastructure/exchangeProviders/binanceExchangeProvider'
 import { BinanceBrlExchangeProvider } from '../../modules/treasury/infrastructure/exchangeProviders/binanceExchangeProvider'
+import { TransferoCryptoPurchaseService } from '../../modules/treasury/infrastructure/exchangeProviders/transferoCryptoPurchaseService'
 import { TransferoExchangeProvider } from '../../modules/treasury/infrastructure/exchangeProviders/transferoExchangeProvider'
 import { StellarListener } from '../../modules/treasury/interfaces/listeners/StellarListener'
 import { BindingRegistration, registerBindings } from './bindingSupport'
@@ -146,6 +155,9 @@ const domainBindings: ReadonlyArray<BindingRegistration<unknown>> = [
   { identifier: TYPES.StellarWalletHandler, implementation: StellarWalletHandler },
   { identifier: TYPES.IPaymentService, implementation: BrebPaymentService, name: 'breb' },
   { identifier: TYPES.IPaymentService, implementation: TransferoPaymentService, name: 'transfero' },
+  { identifier: TYPES.IFiatDepositService, implementation: TransferoPixDepositService, name: 'transfero' },
+  { identifier: TYPES.IFiatDepositServiceFactory, implementation: FiatDepositServiceFactory },
+  { bindSelf: true, identifier: CryptoInventoryService, implementation: CryptoInventoryService },
   { identifier: TYPES.CeloPaymentVerifier, implementation: CeloPaymentVerifier },
   { identifier: TYPES.IDepositVerifier, implementation: SolanaPaymentVerifier },
   { identifier: TYPES.IDepositVerifier, implementation: CeloPaymentVerifier },
@@ -170,6 +182,7 @@ const domainBindings: ReadonlyArray<BindingRegistration<unknown>> = [
   { bindSelf: true, identifier: TransparencyMetricsService, implementation: TransparencyMetricsService },
   { identifier: TYPES.PaymentUseCase, implementation: PaymentUseCase },
   { identifier: TYPES.ReceivedCryptoTransactionUseCase, implementation: ReceivedCryptoTransactionUseCase },
+  { identifier: TYPES.FiatDepositReceivedUseCase, implementation: FiatDepositReceivedUseCase },
   { bindSelf: true, identifier: KycSubmissionService, implementation: KycSubmissionService },
   { bindSelf: true, identifier: OpsKycService, implementation: OpsKycService },
   { bindSelf: true, identifier: OpsAuditService, implementation: OpsAuditService },
@@ -229,6 +242,9 @@ const domainBindings: ReadonlyArray<BindingRegistration<unknown>> = [
   { bindSelf: true, identifier: BridgeFloatService, implementation: BridgeFloatService },
   { bindSelf: true, identifier: BridgeSweepService, implementation: BridgeSweepService },
   { bindSelf: true, identifier: BridgeSweepWorker, implementation: BridgeSweepWorker },
+  { bindSelf: true, identifier: TransferoCryptoPurchaseService, implementation: TransferoCryptoPurchaseService },
+  { bindSelf: true, identifier: TreasuryReplenishService, implementation: TreasuryReplenishService },
+  { bindSelf: true, identifier: TreasuryReplenishWorker, implementation: TreasuryReplenishWorker },
   { bindSelf: true, identifier: OpsBridgeService, implementation: OpsBridgeService },
   { identifier: TYPES.ITreasuryBalanceSource, implementation: BinanceBalanceSource },
   { identifier: TYPES.ITreasuryBalanceSource, implementation: TransferoBalanceSource },
@@ -240,6 +256,8 @@ const domainBindings: ReadonlyArray<BindingRegistration<unknown>> = [
   { bindSelf: true, identifier: OpsTreasuryThresholdService, implementation: OpsTreasuryThresholdService },
   { bindSelf: true, identifier: TreasurySnapshotWorker, implementation: TreasurySnapshotWorker },
   { identifier: TYPES.FlowStepExecutor, implementation: PayoutSendStepExecutor },
+  { identifier: TYPES.FlowStepExecutor, implementation: CryptoSendStepExecutor },
+  { identifier: TYPES.FlowStepExecutor, implementation: EnqueueTreasuryReplenishStepExecutor },
   { identifier: TYPES.FlowStepExecutor, implementation: AwaitProviderStatusStepExecutor },
   { identifier: TYPES.FlowStepExecutor, implementation: ExchangeSendStepExecutor },
   { identifier: TYPES.FlowStepExecutor, implementation: ExchangeConvertStepExecutor },

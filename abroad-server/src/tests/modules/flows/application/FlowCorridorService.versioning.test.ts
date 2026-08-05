@@ -1,6 +1,12 @@
 import type { PrismaClient } from '@prisma/client'
 
-import { BlockchainNetwork, CryptoCurrency, FlowCorridorStatus, TargetCurrency } from '@prisma/client'
+import {
+  BlockchainNetwork,
+  CryptoCurrency,
+  FlowCorridorStatus,
+  FlowDirection,
+  TargetCurrency,
+} from '@prisma/client'
 
 import type { IDatabaseClientProvider } from '../../../../platform/persistence/IDatabaseClientProvider'
 
@@ -15,9 +21,13 @@ const payload = {
 }
 
 const buildService = (version: number, updateCount = 1) => {
+  // `payload` carries no direction, so this also pins the rule that an update
+  // input without one resolves to the platform default rather than missing the
+  // stored corridor.
   const current = {
     ...payload,
     createdAt: new Date('2026-08-02T14:00:00.000Z'),
+    direction: FlowDirection.CRYPTO_TO_FIAT,
     id: 'corridor-1',
     updatedAt: new Date('2026-08-02T15:00:00.000Z'),
     version,

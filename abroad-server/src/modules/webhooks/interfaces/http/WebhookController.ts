@@ -136,6 +136,12 @@ export class WebhookController extends Controller {
           { provider: 'transfero' },
         )
         return
+      case 'fiat-deposit-received':
+        await this.queueHandler.postMessage(
+          QueueName.FIAT_DEPOSIT_RECEIVED,
+          action.message,
+        )
+        return
       case 'payment-status-updated':
         await this.queueHandler.postMessage(
           QueueName.PAYMENT_STATUS_UPDATED,

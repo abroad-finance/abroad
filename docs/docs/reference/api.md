@@ -88,6 +88,37 @@ const data = await response.json();
 
 ---
 
+### Onramp Quote (`POST /quote/onramp`)
+
+Prices the reverse direction: your user pays fiat and receives crypto. See
+[Buy crypto with PIX](../workflows/buy-crypto) for the full flow.
+
+**Request**
+
+| Field | Type | Description |
+| :--- | :--- | :--- |
+| `fiat_amount` | number | The local currency your user pays. |
+| `target_currency` | string | `BRL`. |
+| `crypto_currency` | string | Asset the user receives, e.g. `USDC`. |
+| `network` | string | `STELLAR`, `SOLANA`, or `CELO`. |
+| `payment_method` | string | `PIX`. |
+
+```bash
+curl -X POST https://api.abroad.finance/quote/onramp \
+  -H "X-API-Key: YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "fiat_amount": 500,
+    "target_currency": "BRL",
+    "crypto_currency": "USDC",
+    "network": "CELO",
+    "payment_method": "PIX"
+  }'
+```
+
+**Response** — identical in shape to `POST /quote`, but `value` is the crypto
+amount the user receives and `fee` is denominated in that crypto.
+
 ### Reverse Quote (`POST /quote/reverse`)
 
 Calculate how much the recipient will receive for a specific crypto amount.

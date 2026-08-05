@@ -8,6 +8,7 @@ import { BusinessPerformanceReconciliationWorker } from '../../../modules/operat
 import { OpsConfigurationReleaseWorker } from '../../../modules/operations/application/OpsConfigurationReleaseWorker'
 import { OpsIncidentWorker } from '../../../modules/operations/application/OpsIncidentWorker'
 import { BridgeSweepWorker } from '../../../modules/treasury/application/BridgeSweepWorker'
+import { TreasuryReplenishWorker } from '../../../modules/treasury/application/TreasuryReplenishWorker'
 import { TreasurySnapshotWorker } from '../../../modules/treasury/application/TreasurySnapshotWorker'
 import { initSentry } from '../../../platform/observability/sentry'
 import { iocContainer } from '../../container'
@@ -40,6 +41,7 @@ let incidentWorker: null | OpsIncidentWorker = null
 let configurationReleaseWorker: null | OpsConfigurationReleaseWorker = null
 let businessPerformanceWorker: BusinessPerformanceReconciliationWorker | null = null
 let snapshotWorker: null | TreasurySnapshotWorker = null
+let replenishWorker: null | TreasuryReplenishWorker = null
 
 export function startBridgeSweepWorker(): void {
   worker = iocContainer.get<BridgeSweepWorker>(BridgeSweepWorker)
@@ -56,6 +58,10 @@ export function startBridgeSweepWorker(): void {
   configurationReleaseWorker.start()
   businessPerformanceWorker = iocContainer.get<BusinessPerformanceReconciliationWorker>(BusinessPerformanceReconciliationWorker)
   businessPerformanceWorker.start()
+  // Onramp float replenish rides the same lifecycle as the bridge sweep: both
+  // are periodic treasury loops with no customer-facing latency.
+  replenishWorker = iocContainer.get<TreasuryReplenishWorker>(TreasuryReplenishWorker)
+  replenishWorker.start()
   health.ready = true
 }
 
@@ -68,6 +74,7 @@ export async function stopBridgeSweepWorker(): Promise<void> {
       retryWorker?.stop(),
       worker?.stop(),
       snapshotWorker?.stop(),
+      replenishWorker?.stop(),
     ])
   }
   finally {
@@ -77,6 +84,7 @@ export async function stopBridgeSweepWorker(): Promise<void> {
     configurationReleaseWorker = null
     businessPerformanceWorker = null
     snapshotWorker = null
+    replenishWorker = null
     health.ready = false
   }
 }

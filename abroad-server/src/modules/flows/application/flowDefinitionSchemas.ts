@@ -2,6 +2,7 @@ import {
   BlockchainNetwork,
   CryptoCurrency,
   FlowCorridorStatus,
+  FlowDirection,
   FlowPricingProvider,
   FlowStepCompletionPolicy,
   FlowStepType,
@@ -57,6 +58,9 @@ export const flowBusinessStepSchema = z.discriminatedUnion('type', [
 export type FlowDefinitionInput = {
   blockchain: BlockchainNetwork
   cryptoCurrency: CryptoCurrency
+  // Omitted by callers that predate the onramp; a corridor without an explicit
+  // direction is the crypto-to-fiat payout this platform started with.
+  direction?: FlowDirection
   enabled?: boolean
   exchangeFeePct?: number
   fixedFee?: number
@@ -88,6 +92,7 @@ export const flowStepDefinitionSchema: z.ZodType<FlowStepDefinitionInput> = z.ob
 export const flowDefinitionSchema: z.ZodType<FlowDefinitionInput> = z.object({
   blockchain: z.nativeEnum(BlockchainNetwork),
   cryptoCurrency: z.nativeEnum(CryptoCurrency),
+  direction: z.nativeEnum(FlowDirection).optional(),
   enabled: z.boolean().optional(),
   exchangeFeePct: z.number().min(0).optional(),
   fixedFee: z.number().min(0).optional(),
@@ -103,6 +108,9 @@ export const flowDefinitionSchema: z.ZodType<FlowDefinitionInput> = z.object({
 export const flowSnapshotSchema = z.object({
   blockchain: z.nativeEnum(BlockchainNetwork),
   cryptoCurrency: z.nativeEnum(CryptoCurrency),
+  // Snapshots taken before the onramp shipped carry no direction; they are all
+  // crypto-to-fiat, so the running flow keeps executing as it was defined.
+  direction: z.nativeEnum(FlowDirection).default(FlowDirection.CRYPTO_TO_FIAT),
   exchangeFeePct: z.number().min(0),
   fixedFee: z.number().min(0),
   maxAmount: z.number().min(0).optional(),
@@ -119,6 +127,7 @@ export type FlowCorridorDto = {
   cryptoCurrency: CryptoCurrency
   definitionId?: null | string
   definitionName?: null | string
+  direction: FlowDirection
   enabled?: boolean
   payoutProvider?: null | PaymentMethod
   status: 'DEFINED' | 'MISSING' | 'UNSUPPORTED'
@@ -143,6 +152,7 @@ export type FlowCorridorSummaryDto = {
 export type FlowCorridorUpdateInput = {
   blockchain: BlockchainNetwork
   cryptoCurrency: CryptoCurrency
+  direction?: FlowDirection
   reason?: string
   status: FlowCorridorStatus
   targetCurrency: TargetCurrency
@@ -152,6 +162,7 @@ export type FlowDefinitionDto = {
   blockchain: BlockchainNetwork
   createdAt: Date
   cryptoCurrency: CryptoCurrency
+  direction: FlowDirection
   enabled: boolean
   exchangeFeePct: number
   fixedFee: number
@@ -184,6 +195,7 @@ export type FlowStepDefinitionDto = {
 export const flowCorridorUpdateSchema: z.ZodType<FlowCorridorUpdateInput> = z.object({
   blockchain: z.nativeEnum(BlockchainNetwork),
   cryptoCurrency: z.nativeEnum(CryptoCurrency),
+  direction: z.nativeEnum(FlowDirection).optional(),
   reason: z.string().min(1).optional(),
   status: z.nativeEnum(FlowCorridorStatus),
   targetCurrency: z.nativeEnum(TargetCurrency),

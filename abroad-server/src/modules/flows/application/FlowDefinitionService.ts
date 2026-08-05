@@ -1,4 +1,4 @@
-import { Prisma } from '@prisma/client'
+import { FlowDirection, Prisma } from '@prisma/client'
 import { inject, injectable } from 'inversify'
 import { z } from 'zod'
 
@@ -84,6 +84,7 @@ export class FlowDefinitionService {
   public async findActiveByCorridor(corridor: {
     blockchain: FlowDefinitionDto['blockchain']
     cryptoCurrency: FlowDefinitionDto['cryptoCurrency']
+    direction?: FlowDefinitionDto['direction']
     targetCurrency: FlowDefinitionDto['targetCurrency']
   }): Promise<FlowDefinitionDto | null> {
     const client = await this.dbProvider.getClient()
@@ -91,6 +92,9 @@ export class FlowDefinitionService {
       where: {
         blockchain: corridor.blockchain,
         cryptoCurrency: corridor.cryptoCurrency,
+        // Never widen this to "any direction": the onramp and the payout for
+        // one asset pair are separate corridors with separate economics.
+        direction: corridor.direction ?? FlowDirection.CRYPTO_TO_FIAT,
         enabled: true,
         targetCurrency: corridor.targetCurrency,
       },
@@ -202,6 +206,7 @@ export class FlowDefinitionService {
     blockchain: FlowDefinitionDto['blockchain']
     createdAt: Date
     cryptoCurrency: FlowDefinitionDto['cryptoCurrency']
+    direction: FlowDefinitionDto['direction']
     enabled: boolean
     exchangeFeePct: number
     fixedFee: number
@@ -220,6 +225,7 @@ export class FlowDefinitionService {
       blockchain: definition.blockchain,
       createdAt: definition.createdAt,
       cryptoCurrency: definition.cryptoCurrency,
+      direction: definition.direction,
       enabled: definition.enabled,
       exchangeFeePct: definition.exchangeFeePct,
       fixedFee: definition.fixedFee,

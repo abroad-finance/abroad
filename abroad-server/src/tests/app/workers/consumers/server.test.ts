@@ -7,6 +7,7 @@ const receivedController = { registerConsumers: jest.fn() }
 const paymentStatusController = { registerConsumers: jest.fn() }
 const exchangeBalanceUpdatedController = { registerConsumers: jest.fn() }
 const deadLetterController = { registerConsumers: jest.fn() }
+const fiatDepositReceivedController = { registerConsumers: jest.fn() }
 let queueHandler: MockQueueHandler
 
 jest.mock('../../../../app/container', () => {
@@ -31,6 +32,8 @@ describe('consumers lifecycle', () => {
           return deadLetterController
         case TYPES.ExchangeBalanceUpdatedController:
           return exchangeBalanceUpdatedController
+        case TYPES.FiatDepositReceivedController:
+          return fiatDepositReceivedController
         case TYPES.IQueueHandler:
           return queueHandler
         case TYPES.PaymentStatusUpdatedController:
@@ -50,6 +53,7 @@ describe('consumers lifecycle', () => {
     expect(paymentStatusController.registerConsumers).toHaveBeenCalled()
     expect(exchangeBalanceUpdatedController.registerConsumers).toHaveBeenCalled()
     expect(deadLetterController.registerConsumers).toHaveBeenCalled()
+    expect(fiatDepositReceivedController.registerConsumers).toHaveBeenCalled()
 
     await stopConsumers()
     expect(queueHandler.closeAllSubscriptions).toHaveBeenCalled()

@@ -23,7 +23,14 @@ import { IPartnerService } from '../../../partners/application/contracts/IPartne
 import { CorridorNotConfiguredError } from '../../application/errors/CorridorNotConfiguredError'
 import { QuoteRequestError, QuoteRequestErrorCode } from '../../application/errors/QuoteRequestError'
 import { IQuoteUseCase, QuoteResponse } from '../../application/quoteUseCase'
-import { QuoteRequest, quoteRequestSchema, ReverseQuoteRequest, reverseQuoteRequestSchema } from './contracts'
+import {
+  OnrampQuoteRequest,
+  onrampQuoteRequestSchema,
+  QuoteRequest,
+  quoteRequestSchema,
+  ReverseQuoteRequest,
+  reverseQuoteRequestSchema,
+} from './contracts'
 
 export type QuoteErrorResponse = {
   code: QuoteErrorCode
@@ -62,6 +69,39 @@ export class QuoteController extends Controller {
     private readonly logger: ILogger,
   ) {
     super()
+  }
+
+  /**
+   * Retrieves an onramp quote: given the fiat amount the user will pay, it
+   * returns the crypto amount they receive. `value` is the crypto amount.
+   */
+  @Post('/onramp')
+  @Response('400', 'Bad Request')
+  @Response('500', 'Internal Server Error')
+  @SuccessResponse('200', 'Onramp quote response')
+  public async getOnrampQuote(
+    @Body() requestBody: OnrampQuoteRequest,
+    @Request() request: RequestExpress,
+    @Res() badRequestResponse: TsoaResponse<400, QuoteErrorResponse>,
+    @Res() internalServerErrorResponse: TsoaResponse<500, QuoteErrorResponse>,
+    @Header('X-API-Key') apiKey?: string,
+  ): Promise<QuoteResponse> {
+    return this.handleQuoteRequest({
+      apiKey,
+      badRequestResponse,
+      buildQuote: async (payload, partner) => this.quoteUseCase.createOnrampQuote({
+        cryptoCurrency: payload.crypto_currency,
+        fiatAmount: payload.fiat_amount,
+        network: payload.network,
+        partner,
+        paymentMethod: payload.payment_method,
+        targetCurrency: payload.target_currency,
+      }),
+      internalServerErrorResponse,
+      request,
+      requestBody,
+      schema: onrampQuoteRequestSchema,
+    })
   }
 
   /**

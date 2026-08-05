@@ -452,6 +452,15 @@ const TransactionDetail = () => {
                   <DetailField label="On-chain ID"><CopyIdentifier label="on-chain ID" value={data.identifiers.onChainId} /></DetailField>
                   <DetailField label="Provider reference"><CopyIdentifier label="provider reference" value={data.identifiers.externalId} /></DetailField>
                   <DetailField label="Refund on-chain ID"><CopyIdentifier label="refund ID" value={data.identifiers.refundOnChainId} /></DetailField>
+                  {/* Onramp-only. Both stay null on a payout, where the
+                      destination is a bank account and the customer funds the
+                      transaction on chain instead. */}
+                  {data.identifiers.destinationAddress && (
+                    <DetailField label="Destination wallet"><CopyIdentifier label="destination wallet" value={data.identifiers.destinationAddress} /></DetailField>
+                  )}
+                  {data.identifiers.pixDepositId && (
+                    <DetailField label="PIX deposit ID"><CopyIdentifier label="PIX deposit ID" value={data.identifiers.pixDepositId} /></DetailField>
+                  )}
                   <DetailField label="Flow ID"><CopyIdentifier label="flow ID" value={data.identifiers.flowInstanceId} /></DetailField>
                 </dl>
               </section>

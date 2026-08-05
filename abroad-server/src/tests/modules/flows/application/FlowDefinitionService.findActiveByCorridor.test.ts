@@ -1,4 +1,4 @@
-import { BlockchainNetwork, CryptoCurrency, TargetCurrency } from '@prisma/client'
+import { BlockchainNetwork, CryptoCurrency, FlowDirection, TargetCurrency } from '@prisma/client'
 
 import type { IDatabaseClientProvider } from '../../../../platform/persistence/IDatabaseClientProvider'
 
@@ -47,10 +47,13 @@ describe('FlowDefinitionService.findActiveByCorridor', () => {
 
     const result = await service.findActiveByCorridor(corridor)
 
+    // A lookup without a stated direction resolves to the payout corridor
+    // rather than matching an onramp definition for the same asset pair.
     expect(findFirst).toHaveBeenCalledWith({
       where: {
         blockchain: BlockchainNetwork.STELLAR,
         cryptoCurrency: CryptoCurrency.USDC,
+        direction: FlowDirection.CRYPTO_TO_FIAT,
         enabled: true,
         targetCurrency: TargetCurrency.COP,
       },

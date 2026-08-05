@@ -37,6 +37,15 @@ The `network` you send in the quote defines which crypto rail you will fund on-c
 
 `NEQUI` and `MOVII` appear in historical records only; they are not accepted in new requests.
 
+## Direction
+
+| Direction | Currencies | Networks |
+| :--- | :--- | :--- |
+| Crypto to fiat (payout) | USDC to COP via `BREB`, USDC to BRL via `PIX` | Stellar, Solana, Celo |
+| Fiat to crypto (onramp) | BRL via `PIX` to USDC | Stellar, Solana, Celo |
+
+Onramp is Brazil-only today. See [Buy crypto with PIX](../workflows/buy-crypto).
+
 ## Coming soon
 
 ### Countries and currencies

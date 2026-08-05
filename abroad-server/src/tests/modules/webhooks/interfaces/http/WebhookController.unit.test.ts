@@ -91,6 +91,33 @@ const buildCryptoCreditFailedEnvelope = (): Record<string, unknown> => buildEnve
   },
 )
 
+const ONRAMP_TRANSACTION_ID = 'dddddddd-eeee-4fff-8aaa-bbbbbbbbbbbb'
+
+const buildPixDepositEnvelope = (
+  overrides: {
+    endUserId?: null | string
+    eventType?: string
+    payerTaxId?: null | string
+    status?: string
+  } = {},
+): Record<string, unknown> => buildEnvelope(
+  overrides.eventType ?? 'pix.deposit.completed',
+  {
+    amount: '150.00',
+    createdAt: '2026-08-04T12:30:00.000Z',
+    currency: 'BRL',
+    depositId: 'dep-9001',
+    endToEndId: 'E12345678202608041230abcdef01',
+    endUserId: overrides.endUserId === undefined ? ONRAMP_TRANSACTION_ID : overrides.endUserId,
+    payer: {
+      bankCode: '20018183',
+      name: 'Joana Silva',
+      taxId: overrides.payerTaxId === undefined ? '12345678901' : overrides.payerTaxId,
+    },
+    status: overrides.status ?? 'COMPLETED',
+  },
+)
+
 describe('WebhookController Transfero Ultra webhook', () => {
   let controller: WebhookController
   let logger: MockLogger
@@ -386,6 +413,107 @@ describe('WebhookController Transfero Ultra webhook', () => {
       success: false,
     })
     expect(queueHandler.postMessage).not.toHaveBeenCalled()
+  })
+
+  it('publishes a completed PIX deposit as an onramp deposit credit', async () => {
+    const body = buildPixDepositEnvelope()
+    const { badRequest, serverError, unauthorized } = responders()
+
+    const response = await controller.handleTransferoWebhook(
+      body,
+      buildRequest(body),
+      badRequest,
+      unauthorized,
+      serverError,
+    )
+
+    expect(response).toEqual({ message: 'Webhook processed successfully', success: true })
+    expect(queueHandler.postMessage).toHaveBeenCalledWith(
+      QueueName.FIAT_DEPOSIT_RECEIVED,
+      {
+        amount: 150,
+        currency: 'BRL',
+        endToEndId: 'E12345678202608041230abcdef01',
+        payerTaxId: '12345678901',
+        provider: 'transfero',
+        providerDepositId: 'dep-9001',
+        transactionId: ONRAMP_TRANSACTION_ID,
+      },
+    )
+  })
+
+  // A paid deposit has arrived but is not yet credited, so it must not start a
+  // crypto delivery. Ultra only guarantees spendable balance on completed.
+  it('does not release an onramp delivery on a merely paid deposit', async () => {
+    const body = buildPixDepositEnvelope({ eventType: 'pix.deposit.paid', status: 'PAID' })
+    const { badRequest, serverError, unauthorized } = responders()
+
+    const response = await controller.handleTransferoWebhook(
+      body,
+      buildRequest(body, { 'x-ultra-signature': 'HMAC-SHA256 t=1,sig=signature', 'x-ultra-webhook-event': 'pix.deposit.paid' }),
+      badRequest,
+      unauthorized,
+      serverError,
+    )
+
+    expect(response).toEqual({ message: 'Webhook processed successfully', success: true })
+    expect(queueHandler.postMessage).not.toHaveBeenCalled()
+  })
+
+  it('rejects a completed deposit event whose body carries a non-completed status', async () => {
+    const body = buildPixDepositEnvelope({ status: 'PENDING' })
+    const { badRequest, serverError, unauthorized } = responders()
+
+    const response = await controller.handleTransferoWebhook(
+      body,
+      buildRequest(body),
+      badRequest,
+      unauthorized,
+      serverError,
+    )
+
+    expect(response).toEqual({ message: 'Invalid webhook payload', success: false })
+    expect(queueHandler.postMessage).not.toHaveBeenCalled()
+  })
+
+  // Attribution is best-effort by contract. An unattributed deposit still
+  // credited our balance, so it is acknowledged and left for reconciliation
+  // rather than guessed onto a transaction.
+  it.each([
+    ['a missing endUserId', null],
+    ['an endUserId that is not one of our transaction ids', 'not-a-uuid'],
+  ])('acknowledges a completed deposit with %s without routing it', async (_label, endUserId) => {
+    const body = buildPixDepositEnvelope({ endUserId })
+    const { badRequest, serverError, unauthorized } = responders()
+
+    const response = await controller.handleTransferoWebhook(
+      body,
+      buildRequest(body),
+      badRequest,
+      unauthorized,
+      serverError,
+    )
+
+    expect(response).toEqual({ message: 'Webhook processed successfully', success: true })
+    expect(queueHandler.postMessage).not.toHaveBeenCalled()
+  })
+
+  it('carries a null payer tax id through rather than inventing one', async () => {
+    const body = buildPixDepositEnvelope({ payerTaxId: null })
+    const { badRequest, serverError, unauthorized } = responders()
+
+    await controller.handleTransferoWebhook(
+      body,
+      buildRequest(body),
+      badRequest,
+      unauthorized,
+      serverError,
+    )
+
+    expect(queueHandler.postMessage).toHaveBeenCalledWith(
+      QueueName.FIAT_DEPOSIT_RECEIVED,
+      expect.objectContaining({ payerTaxId: null }),
+    )
   })
 
   it('returns server error when queue dispatch fails after verification', async () => {

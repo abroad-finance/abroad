@@ -11,6 +11,10 @@ export {
   ExchangeBalanceUpdatedMessageSchema,
 } from './exchangeBalanceUpdatedMessage'
 export {
+  FiatDepositReceivedMessage,
+  FiatDepositReceivedMessageSchema,
+} from './fiatDepositReceivedMessage'
+export {
   PaymentStatusUpdatedMessage,
   PaymentStatusUpdatedMessageSchema,
 } from './paymentStatusUpdatedMessage'

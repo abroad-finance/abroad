@@ -10,7 +10,7 @@ import { TransactionAcceptanceService } from '../../../../../modules/transaction
 import { TransactionStatusService } from '../../../../../modules/transactions/application/TransactionStatusService'
 import { TransactionWebhookRouter } from '../../../../../modules/transactions/application/TransactionWebhookRouter'
 import { TransactionController } from '../../../../../modules/transactions/interfaces/http/TransactionController'
-import { createMockLogger } from '../../../../setup/mockFactories'
+import { createMockCryptoInventoryService, createMockFiatDepositServiceFactory, createMockLogger } from '../../../../setup/mockFactories'
 import { buildPaymentService } from './transactionControllerTestUtils'
 
 export const partner = {
@@ -144,6 +144,8 @@ export const buildAcceptController = (
     transactionWebhookRouter,
     liquidityCacheService,
     bridgeFloatService,
+    createMockFiatDepositServiceFactory(),
+    createMockCryptoInventoryService() as never,
     logger,
   )
   const statusService = new TransactionStatusService(dbProvider)
