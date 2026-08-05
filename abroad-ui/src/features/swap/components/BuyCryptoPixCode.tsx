@@ -4,6 +4,7 @@ import {
   Copy,
   Info,
 } from 'lucide-react'
+import { QRCodeSVG } from 'qrcode.react'
 import {
   useCallback,
   useEffect,
@@ -169,6 +170,28 @@ export default function BuyCryptoPixCode({
                     {formatExpiryCountdown(remainingMs)}
                   </div>
                 )}
+
+                {/* Generated from the BR Code rather than loaded from the
+                    provider's image URL: it survives a reload, needs no third
+                    party to be reachable, and does not tell that third party
+                    who is looking at the code. Always dark-on-white with a
+                    quiet zone, whatever the page theme, or scanners fail. */}
+                <div className="flex justify-center">
+                  <div className="rounded-2xl bg-white p-4 shadow-[0px_4px_12px_-4px_rgba(0,0,0,0.12)]">
+                    <QRCodeSVG
+                      aria-label={translate('buyCrypto.pix.qrAlt', 'PIX QR code for this payment')}
+                      bgColor="#ffffff"
+                      className="h-auto w-full max-w-[13.5rem]"
+                      data-testid="buy-crypto-qr"
+                      fgColor="#000000"
+                      level="M"
+                      marginSize={2}
+                      role="img"
+                      size={216}
+                      value={instructions.brCode}
+                    />
+                  </div>
+                </div>
 
                 <section
                   aria-labelledby="buy-crypto-code-heading"

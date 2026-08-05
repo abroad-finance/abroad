@@ -97,6 +97,34 @@ describe('BuyCryptoPixCode', () => {
     expect(screen.getByTestId('buy-crypto-br-code')).toHaveTextContent(BR_CODE)
   })
 
+  // Most people pay a PIX by scanning, so the code has to be offered both ways.
+  it('renders a scannable QR of the same code, not a provider image', () => {
+    renderCode(null)
+
+    const qr = screen.getByTestId('buy-crypto-qr')
+    expect(qr.tagName.toLowerCase()).toBe('svg')
+    expect(qr).toHaveAccessibleName('PIX QR code for this payment')
+    // Drawn locally from the BR Code — nothing is fetched from a third party.
+    expect(document.querySelector('img[src*="starkinfra"]')).toBeNull()
+  })
+
+  // A scanner needs dark-on-light regardless of the page theme, so the QR keeps
+  // its own colours instead of inheriting them.
+  it('draws the QR dark-on-white whatever the theme', () => {
+    renderCode(null)
+
+    const qr = screen.getByTestId('buy-crypto-qr')
+    expect(qr.querySelector('path[fill="#ffffff"]')).not.toBeNull()
+    expect(qr.querySelector('path[fill="#000000"]')).not.toBeNull()
+  })
+
+  it('withdraws the QR once the code expires', () => {
+    renderCode(Date.now() - 1_000)
+
+    expect(screen.queryByTestId('buy-crypto-qr')).not.toBeInTheDocument()
+    expect(screen.getByText(/expired before it was paid/)).toBeInTheDocument()
+  })
+
   it('copies the code to the clipboard and confirms it', async () => {
     const writeText = vi.fn(async () => undefined)
     Object.assign(navigator, { clipboard: { writeText } })
