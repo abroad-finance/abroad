@@ -9,7 +9,11 @@ const transferoUltraWebhookEnvelopeSchema = z.object({
   data: z.unknown(),
   deliveredAt: z.string().min(1),
   endClientId: z.string().min(1).optional(),
-  eventId: z.string().uuid(),
+  // Ultra does not use a bare UUID for every event. PIX withdrawals arrive as
+  // a plain UUID, but crypto and deposit events are prefixed with the event
+  // name (`crypto_deposit_confirmed_<uuid>`). Requiring a UUID here rejected
+  // every crypto.deposit.confirmed delivery with a 400.
+  eventId: z.string().min(1).max(200),
   eventType: z.string().min(1),
   occurredAt: z.string().min(1),
   partnerId: z.string().min(1),

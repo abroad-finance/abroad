@@ -516,6 +516,85 @@ describe('WebhookController Transfero Ultra webhook', () => {
     )
   })
 
+  // Verbatim envelope from a production delivery that Ultra recorded as
+  // "exhausted / 400" on 2026-08-05. Ultra prefixes crypto and deposit event
+  // ids with the event name rather than sending a bare UUID; requiring a UUID
+  // rejected every one of these, so the exchange balance signal never arrived
+  // and the flow silently fell back to periodic reconciliation.
+  it('accepts the prefixed event id Ultra actually sends for crypto deposits', async () => {
+    const body = {
+      data: {
+        amount: '30.43',
+        asset: 'USDC',
+        blockchain: 'POLYGON',
+        confirmedAt: '2026-08-05T13:48:59.982Z',
+        fromAddress: '0xEe7aE85f2Fe2239E27D9c1E23fFFe168D63b4055',
+        status: 'CONFIRMED',
+        transactionId: '80120143-3227-4d19-b982-fa22bb3ec1eb',
+        txHash: '0x257a6f01dbf3d1a9ecc7a487a8b7e6d6ee5d4d1159dffa2efa74165c5254f53e',
+      },
+      deliveredAt: '2026-08-05T13:49:00.426Z',
+      eventId: 'crypto_deposit_confirmed_80120143-3227-4d19-b982-fa22bb3ec1eb',
+      eventType: 'crypto.deposit.confirmed',
+      occurredAt: '2026-08-05T13:49:00.426Z',
+      partnerId: 'ptr_07fee120-a9e1-4f64-874a-2a670ce78f0e',
+      ...{ attempt: 1 },
+    }
+    const { badRequest, serverError, unauthorized } = responders()
+
+    const response = await controller.handleTransferoWebhook(
+      body,
+      buildRequest(body),
+      badRequest,
+      unauthorized,
+      serverError,
+    )
+
+    expect(response).toEqual({ message: 'Webhook processed successfully', success: true })
+    expect(queueHandler.postMessage).toHaveBeenCalledWith(
+      QueueName.EXCHANGE_BALANCE_UPDATED,
+      { provider: 'transfero' },
+    )
+  })
+
+  it('still accepts a bare UUID event id, as PIX withdrawals send', async () => {
+    const body = buildPixEnvelope()
+    const { badRequest, serverError, unauthorized } = responders()
+
+    const response = await controller.handleTransferoWebhook(
+      body,
+      buildRequest(body),
+      badRequest,
+      unauthorized,
+      serverError,
+    )
+
+    expect(response).toEqual({ message: 'Webhook processed successfully', success: true })
+  })
+
+  // The onramp's deposit event will arrive prefixed the same way.
+  it('accepts a prefixed event id on the onramp deposit event', async () => {
+    const body = {
+      ...buildPixDepositEnvelope(),
+      eventId: `pix_deposit_completed_${EVENT_ID}`,
+    }
+    const { badRequest, serverError, unauthorized } = responders()
+
+    const response = await controller.handleTransferoWebhook(
+      body,
+      buildRequest(body),
+      badRequest,
+      unauthorized,
+      serverError,
+    )
+
+    expect(response).toEqual({ message: 'Webhook processed successfully', success: true })
+    expect(queueHandler.postMessage).toHaveBeenCalledWith(
+      QueueName.FIAT_DEPOSIT_RECEIVED,
+      expect.objectContaining({ transactionId: ONRAMP_TRANSACTION_ID }),
+    )
+  })
+
   it('returns server error when queue dispatch fails after verification', async () => {
     const body = buildPixEnvelope()
     queueHandler.postMessage.mockRejectedValue(new Error('queue down'))
