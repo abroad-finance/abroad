@@ -23,7 +23,6 @@ Abroad sends JSON webhooks to notify your application about transaction lifecycl
     "status": "PROCESSING_PAYMENT",
     "quoteId": "550e8400-e29b-41d4-a716-446655440000",
     "accountNumber": "3001234567",
-    "bankCode": "9101",
     "onChainId": "2bebb7...",
     "refundOnChainId": null,
     "taxId": "123456789",
@@ -33,12 +32,24 @@ Abroad sends JSON webhooks to notify your application about transaction lifecycl
 }
 ```
 
-`data` mirrors the transaction record and may include nested quote fields on some events. To derive the memo for reconciliation, compute `transaction_reference` from `id` (Base64) or call `GET /transaction/{id}`.
+`data` mirrors the transaction record and may include nested quote fields on some events. Internal routing fields are stripped from every payload: `bankCode` and `origin` are never sent.
+
+To derive the memo for reconciliation, compute `transaction_reference` from `id` (Base64) or call `GET /transaction/{id}`.
 For Stellar and Celo payments, `onChainId` is the transaction hash. For Solana payments, it is the transaction signature.
+
+## Configuring the destination
+
+Administrators manage the webhook destination and its signing secret from **Integration** in the partner portal. The flow is staged rather than immediate:
+
+1. **Stage** a draft URL.
+2. **Test** the draft — Abroad sends a test delivery so you can confirm your receiver accepts it before it takes live traffic.
+3. **Activate** the draft to promote it to the live destination, or discard it.
+
+You can rotate the signing secret independently of the URL. Both the secret and the URL change take effect without redeploying anything on the Abroad side.
 
 ## Authenticating webhooks
 
-When configured, Abroad sends an `X-Abroad-Webhook-Secret` header. Verify it against your expected value before processing the payload.
+Abroad sends an `X-Abroad-Webhook-Secret` header. Verify it against your expected value before processing the payload.
 
 ```javascript
 app.post('/webhooks/abroad', express.json(), (req, res) => {
@@ -56,6 +67,19 @@ app.post('/webhooks/abroad', express.json(), (req, res) => {
 
 ## Handling & retries
 
-- Respond with `2xx` as soon as you validate the signature; do downstream work asynchronously if possible.  
-- If your receiver is down, senders currently do not automatically retry. Use `GET /transaction/{id}` and `GET /transactions/list` as a fallback to catch up on missed events.  
-- Store the latest `status` per transaction and ignore duplicates; events may be sent more than once.
+Deliveries go through a durable outbox, so a failed delivery is retried automatically:
+
+- Up to **5 attempts** per event.
+- Exponential backoff between attempts (roughly 2s, 4s, 8s, 16s…), capped at **60 seconds**.
+- Only retryable failures are re-attempted. A rejected target or an unavailable signing credential fails immediately.
+
+Practical guidance:
+
+- Respond with `2xx` as soon as you validate the secret; do downstream work asynchronously.  
+- Make handlers **idempotent** — retries and lifecycle transitions mean the same `id` can arrive more than once. Store the latest `status` per transaction and ignore stale or duplicate events.  
+- Abroad follows no redirects and caps the response body it will read, so answer directly with a small `2xx` body.  
+- If your receiver was down past the retry budget, reconcile with `GET /transaction/{id}` and `GET /transactions/list`.
+
+## Delivery diagnostics
+
+Delivery health — attempt counts, HTTP status, and duration per event — is visible in the partner portal, and an administrator can redeliver a failed event from there. A connected AI assistant with the `webhooks:read` permission can read aggregate delivery health (never payloads, URLs, or secrets); see [Connect Abroad to AI](../ai-integration).

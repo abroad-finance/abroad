@@ -15,4 +15,6 @@ Use this table to interpret `status` values from `GET /transaction/{id}` or webh
 | `PAYMENT_EXPIRED` | The quote expired before funds arrived. | Create a fresh quote and transaction, then resend funds. | `transaction.updated` (after expiry job) |
 | `WRONG_AMOUNT` | Funds arrived but were below the quoted amount; we attempt an on-chain refund. | Inform the sender and create a new quote/transaction with the correct amount. | `transaction.created` |
 
-If `kycLink` is present in the transaction payload, the user must complete KYC before the payout continues.
+These six values are the complete set; a transaction is always in exactly one of them.
+
+If `kycRequired` is `true` on the acceptance response, no transaction was created and there is no status to track yet — the user must complete [KYC](../reference/api#submit-kyc-post-kyc) first, after which you retry with a fresh quote.

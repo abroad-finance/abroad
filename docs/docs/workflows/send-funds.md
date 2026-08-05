@@ -4,47 +4,63 @@ sidebar_position: 4
 
 # 3. Send Funds
 
-The final step for you (or your user) is to send the crypto funds to Abroad's wallet address.
+The final step for you (or your user) is to send the crypto funds to Abroad's deposit address.
+
+## Where to send: `payment_context`
+
+`POST /transaction` returns a `payment_context` object with everything the transfer needs. Read the deposit target from it on every transaction — addresses differ per chain and can be rotated, so a hard-coded address will eventually send funds nowhere.
+
+```json
+{
+  "amount": 100.5,
+  "blockchain": "SOLANA",
+  "chainFamily": "solana",
+  "chainId": "solana:mainnet",
+  "cryptoCurrency": "USDC",
+  "decimals": 6,
+  "depositAddress": "7x...",
+  "memo": null,
+  "memoType": null,
+  "mintAddress": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+  "notify": { "endpoint": "/payments/notify", "required": true },
+  "rpcUrl": "https://api.mainnet-beta.solana.com"
+}
+```
+
+Send exactly `amount` of `cryptoCurrency` to `depositAddress`. On Solana and Celo, transfer the token at `mintAddress` using `decimals` for the smallest-unit conversion.
 
 ## How to tell us about the payment
 
-When sending funds on Stellar you **must** include the `transaction_reference` from the previous step as the memo.
+### Stellar: use the memo
+
+Include `payment_context.memo` — identical to `transaction_reference` — as the transaction memo. `memoType` is `text`.
 
 :::danger Critical: Missing Memo
 If you send Stellar funds without the correct memo/reference, our system **cannot** automatically match the deposit to your transaction. This will result in delays or potential loss of funds.
 :::
 
-For Solana and Celo there is no memo. After broadcasting the transaction, call the appropriate payment notification endpoint so we can confirm it on-chain and start the payout:
+Stellar deposits are picked up automatically; there is nothing to notify.
+
+### Solana and Celo: notify us
+
+There is no memo. `payment_context.notify.required` is `true`, so after broadcasting call the notify endpoint with the chain and hash:
 
 ```bash
-curl -X POST https://api.abroad.finance/solana/payments/notify \
+curl -X POST https://api.abroad.finance/payments/notify \
   -H "X-API-Key: YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
+    "blockchain": "SOLANA",
     "transaction_id": "TRANSACTION_ID_FROM_ACCEPT",
     "on_chain_tx": "SOLANA_TRANSACTION_SIGNATURE"
   }'
 ```
 
-```bash
-curl -X POST https://api.abroad.finance/celo/payments/notify \
-  -H "X-API-Key: YOUR_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "transaction_id": "TRANSACTION_ID_FROM_ACCEPT",
-    "on_chain_tx": "CELO_TRANSACTION_HASH"
-  }'
-```
+Set `blockchain` to `CELO` and pass the transaction hash for Celo. A successful call returns `202` with `{ "enqueued": true }`. A `404` means we could not find that transfer on-chain yet — retry after the transaction confirms.
 
-## Deposit Addresses
-
-| Network | Asset | Address |
-| :--- | :--- | :--- |
-| **Stellar** | USDC | `G... (Your Stellar Deposit Address)` |
-| **Solana** | USDC | `... (Your Solana Deposit Address)` |
-| **Celo** | USDC | `0x... (Your Celo Deposit Address)` |
-
-*Note: Please contact support or check your dashboard for the current production deposit addresses.*
+:::note Per-chain endpoints
+`POST /solana/payments/notify` and `POST /celo/payments/notify` still work and omit the `blockchain` field. Prefer `/payments/notify` for new integrations.
+:::
 
 ## Track status
 
@@ -58,7 +74,7 @@ curl -X GET https://api.abroad.finance/transaction/{transactionId} \
 Statuses and recommended actions are listed in [Status lifecycle](./status-lifecycle).
 
 Status flow:
-1.  `AWAITING_PAYMENT`: Waiting for on-chain deposit (or KYC completion if `kycLink` was returned).
+1.  `AWAITING_PAYMENT`: Waiting for the on-chain deposit.
 2.  `PROCESSING_PAYMENT`: Deposit received, processing payout.
 3.  `PAYMENT_COMPLETED`: Fiat funds sent to user.
 4.  `PAYMENT_FAILED`: Something went wrong (e.g., invalid account number).

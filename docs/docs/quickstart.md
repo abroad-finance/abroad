@@ -86,8 +86,7 @@ curl -X POST https://api.abroad.finance/transaction \
   -d '{
     "quote_id": "550e8400-e29b-41d4-a716-446655440000",
     "user_id": "test-user-01",
-    "account_number": "3001234567",
-    "bank_code": "9101"
+    "account_number": "3001234567"
   }'
 ```
 
@@ -97,29 +96,43 @@ curl -X POST https://api.abroad.finance/transaction \
 ```json
 {
   "id": "f4a96c4c-4d1e-4ab2-a6ec-2e1b5070c5db",
+  "kycRequired": false,
   "transaction_reference": "9KlsTE0eSrKm7C4bUHDF2w==",
-  "kycLink": null
+  "payment_context": {
+    "amount": 100.5,
+    "blockchain": "STELLAR",
+    "chainFamily": "stellar",
+    "chainId": "stellar:pubnet",
+    "cryptoCurrency": "USDC",
+    "decimals": 7,
+    "depositAddress": "GA...",
+    "memo": "9KlsTE0eSrKm7C4bUHDF2w==",
+    "memoType": "text",
+    "mintAddress": null,
+    "notify": { "endpoint": null, "required": false },
+    "rpcUrl": "https://horizon.stellar.org"
+  }
 }
 ```
 
 </TabItem>
 </Tabs>
 
-:::warning KYC Requirement
-If `kycLink` is not `null`, you **must** redirect the user to that URL to complete identity verification before the transaction can proceed.
+:::warning KYC requirement
+If `kycRequired` is `true`, **no transaction was created** — `id`, `transaction_reference`, and `payment_context` come back null. Submit the user's identity details to `POST /kyc` and retry with a fresh quote. See [Limits and validation](./resources/limits#kyc-gating).
 :::
 
-**Bank code note:** `bank_code` is optional for supported methods. Include it only if a specific rail or bank identifier is required for the payout.
+**Account note:** send `account_number`, or `qr_code` for a PIX QR payload. There is no `bank_code` field — the rail is resolved server-side.
 
 ## 3) Send funds on-chain
 
-Send the `value` amount of crypto to the Abroad deposit address for the chosen `network`.
+`payment_context` carries everything you need: the `depositAddress`, the exact `amount`, the `memo` when one applies, and the `mintAddress` for token transfers. Read it from the response instead of hard-coding addresses.
 
 :::danger Critical (Stellar only)
-You **must** include the `transaction_reference` exactly as the memo/note in your Stellar transfer. Failure to do so will result in lost funds.
+You **must** include `payment_context.memo` (identical to `transaction_reference`) as the memo/note in your Stellar transfer. Funds sent without it cannot be matched automatically.
 :::
 
-For **Solana** or **Celo**, there is no memo. After broadcasting, call the corresponding notify endpoint so we can confirm the payment.
+For **Solana** and **Celo** there is no memo. `payment_context.notify.required` is `true` for those chains — after broadcasting, POST the hash to `/payments/notify` so we can confirm the deposit and start the payout.
 
 See [Send Funds](./workflows/send-funds) for detailed instructions.
 

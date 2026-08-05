@@ -17,10 +17,11 @@ Abroad provides a unified API to:
 
 ## Key Features
 
--   **Instant Quotes**: Get real-time exchange rates for conversions.
+-   **Instant Quotes**: Get real-time exchange rates for conversions, with an exact fee snapshot in the source asset.
 -   **Local Payouts**: Disburse funds directly to bank accounts and mobile wallets in Colombia and Brazil.
+-   **Self-describing funding**: Every accepted transaction returns a `payment_context` with the deposit address, memo, token mint, and chain metadata — no hard-coded addresses.
 -   **Compliance First**: Built-in KYC and KYB checks to ensure regulatory compliance.
--   **Developer Friendly**: Simple REST API with comprehensive webhooks.
+-   **Developer Friendly**: Simple REST API with retrying, signed webhooks.
 
 ## Getting Started
 

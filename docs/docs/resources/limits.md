@@ -27,4 +27,17 @@ Abroad enforces payment-method limits and compliance checks during quote creatio
 - **Payment rail availability:** If a payment rail is temporarily unavailable, the API responds with `reason: "Payments via <METHOD> are temporarily unavailable. Please try another method or retry shortly."`.  
 - **Daily caps:** When per-user or payment-method daily limits are exceeded, responses use phrases such as `reason: "This payment method already reached today's payout limit. Please try again tomorrow or use another method."` or `reason: "You reached the maximum number of transactions allowed today. Please try again tomorrow."`.  
 - **Partner KYB cap:** Partners without KYB approval are limited to a cumulative **100 units of source currency** across completed transactions. Exceeding that threshold returns `reason: "This partner is limited to a total of $100 until KYB is approved. Please complete KYB to raise the limit."`  
-- **KYC gating:** If `needsKyc` is enabled for your partner, users can move up to **$25 in source volume (rolling 30 days)** without KYC. Once above that threshold, a `kycLink` is returned and the transaction will not progress until the user completes that flow.
+- **Disabled users:** A user disabled by Abroad operations returns `403` with code `user_disabled`. Retrying will not clear it.
+
+## KYC gating
+
+KYC enforcement is configured per partner and can be toggled by Abroad operations. When it is enabled for your partner:
+
+- A user can move up to **$25 of source volume in the current calendar month** without verifying. The threshold is measured in the source asset, which maps 1:1 to USD.
+- Above that, `POST /transaction` returns `kycRequired: true` and **creates no transaction** — `id`, `transaction_reference`, and `payment_context` are all `null`.
+- Submit the user's identity details and document to [`POST /kyc`](../reference/api#submit-kyc-post-kyc). A complete submission is **approved immediately**; there is no manual review queue and no redirect to an external verification provider.
+- Check [`GET /kyc/status`](../reference/api#get-kyc-status-get-kycstatus) before presenting the form, and retry acceptance with a **fresh quote** once the status is `APPROVED`.
+
+:::note Replaces `kycLink`
+Earlier versions returned a `kycLink` URL pointing at a hosted third-party verification flow. That field no longer exists — the boolean `kycRequired` plus the self-service `POST /kyc` form replace it entirely.
+:::

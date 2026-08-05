@@ -63,6 +63,18 @@ The client sees only tools covered by the approved scopes. Every tool independen
 | `webhooks:read` | `get_webhook_diagnostics` | Destination host and aggregate delivery health, with no URL path/query, payload, signing secret, test, replay, or configuration change. Requires administrator MFA. |
 | `offline_access` | No tool | Lets the client refresh the approved connection without asking you to sign in for every session. |
 
+Tools return **structured content** validated against a declared output schema, so a client receives typed results rather than a JSON string.
+
+## Guided prompt
+
+Beyond tools, the server publishes a `diagnose_failed_transaction` prompt that takes a `transactionId` and walks the assistant through Abroad's support playbook: read the status and failure reason, check refund progress, distinguish an unfunded transaction from a failed one, and separate a payout failure from a webhook-delivery failure on your side. The prompt is gated on the scopes you approved, so it never directs the client at a tool it cannot call.
+
+## Rate limits and auditing
+
+Tool calls are metered per connection and per organization. When a client exceeds its allowance, Abroad answers `429` with a `Retry-After` header and the retry interval in the JSON-RPC error data — a well-behaved client backs off rather than retrying immediately.
+
+Reads of your tenant data are recorded. `list_transactions`, `get_transaction`, and `get_webhook_diagnostics` write an audit entry each time they run. `search_documentation` and `validate_api_request` touch no tenant data and are deliberately not recorded.
+
 ## Example prompts
 
 - “Validate this create-quote request and explain any missing fields.”

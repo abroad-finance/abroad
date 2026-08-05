@@ -6,12 +6,18 @@ sidebar_position: 1
 
 Abroad supports a specific set of blockchains, cryptocurrencies, and fiat currencies.
 
+:::tip Check coverage programmatically
+Routes are configured per corridor and change without a documentation release. `GET /public/corridors` is the authoritative, unauthenticated list of what is enabled right now — including per-corridor `minAmount`/`maxAmount` and whether a notify call is required. Use it instead of hard-coding the tables below. A request for a route that is not enabled returns `corridor_unavailable`.
+:::
+
 ## Cryptocurrencies
 
 | Asset | Symbol | Networks | Notes |
 | :--- | :--- | :--- | :--- |
-| USD Coin | **USDC** | Stellar, Solana, Celo | Primary asset used for quotes today. |
-| Tether | **USDT** | Celo | Coming soon. |
+| USD Coin | **USDC** | Stellar, Solana, Celo | Primary asset used for quotes. |
+| Tether | **USDT** | Celo | Supported. USDT routes convert to USDC internally before settlement; this is invisible to you. |
+
+An asset/network pair is quotable only when it has an active token mint configured, which `GET /public/corridors` reflects.
 
 ## Fiat Currencies
 
@@ -22,12 +28,14 @@ Abroad supports a specific set of blockchains, cryptocurrencies, and fiat curren
 
 ## Payment methods at a glance
 
-| Method | Payout currency | Recipient location | Crypto networks you can fund with |
+| Method | Payout currency | Recipient location | Recipient identifier |
 | :--- | :--- | :--- | :--- |
-| `BREB` | COP | Colombia | Stellar, Solana, Celo |
-| `PIX` | BRL | Brazil | Stellar, Solana, Celo |
+| `BREB` | COP | Colombia | `account_number` (BreB key) |
+| `PIX` | BRL | Brazil | `account_number` (PIX key) or `qr_code` |
 
 The `network` you send in the quote defines which crypto rail you will fund on-chain. The payout is still in the local currency for the selected `payment_method`.
+
+`NEQUI` and `MOVII` appear in historical records only; they are not accepted in new requests.
 
 ## Coming soon
 
@@ -49,9 +57,16 @@ The `network` you send in the quote defines which crypto rail you will fund on-c
 
 ## Limits
 
-| Currency | Min Amount | Max Amount (Daily) |
-| :--- | :--- | :--- |
-| COP | 10,000 COP | 20,000,000 COP |
-| BRL | 10 BRL | 10,000 BRL |
+Per-corridor minimums and maximums are configured per route and returned by `GET /public/corridors` as `minAmount` and `maxAmount`, expressed in the corridor's `targetCurrency`. A `null` value means no bound is configured for that route.
 
-*Note: Limits may vary based on your partnership tier, payment method, and user KYC level. See [Limits and validation](./limits) for method-specific caps.*
+Breaching a bound at quote time returns a structured error:
+
+```json
+{
+  "code": "minimum",
+  "reason": "The minimum allowed amount for BRL is 1 BRL",
+  "retryable": false
+}
+```
+
+Separate from corridor bounds, each payment method enforces per-transaction and per-day caps, and partners without KYB approval have a cumulative cap. See [Limits and validation](./limits) for those and for KYC gating.
