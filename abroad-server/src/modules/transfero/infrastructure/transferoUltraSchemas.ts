@@ -141,29 +141,33 @@ const transferoUltraDepositPayerSchema = z.object({
   taxId: z.string().min(1).nullable(),
 }).loose()
 
+// Pinned against the live endpoint, which returns
+// { id, amount, qrCode, qrCodeBase64, expiresAt, status, blockchainFee, endUserId }.
+// The deposit id is `id`, not `depositId`, and the payable EMV payload is
+// `qrCode` — there is no `brCode`/`emvPayload` field and no `txid` anywhere in
+// the exchange: the txid the PIX spec talks about is minted by Ultra, and
+// sending one is rejected outright as an unrecognised key.
 export const transferoUltraDynamicQrResponseSchema = z.object({
   amount: z.union([transferoUltraDecimalSchema, z.number().finite().positive()]),
-  // The copy-paste EMV payload the customer pays. Ultra has shipped this under
-  // both names, so accept either and normalise at the call site.
-  brCode: z.string().min(1).optional(),
-  depositId: z.string().min(1),
-  emvPayload: z.string().min(1).optional(),
   endUserId: z.string().min(1).nullable().optional(),
   expiresAt: z.string().min(1).nullable().optional(),
+  id: z.string().min(1),
+  qrCode: z.string().min(1),
   status: transferoUltraDepositStatusSchema,
-  txid: z.string().min(26).max(35),
 }).loose()
 
+// Pinned against the live endpoint. Note the expiry is `qrCodeExpiresAt` here
+// even though the creation response calls the same instant `expiresAt`.
 export const transferoUltraDepositDetailResponseSchema = z.object({
   amount: z.union([transferoUltraDecimalSchema, z.number().finite().nonnegative()]),
   confirmedAt: z.string().min(1).nullable().optional(),
   currency: z.literal('BRL'),
-  depositId: z.string().min(1),
   endToEndId: z.string().trim().min(1).max(128).nullable().optional(),
   endUserId: z.string().min(1).nullable().optional(),
-  expiresAt: z.string().min(1).nullable().optional(),
+  id: z.string().min(1),
   paidAt: z.string().min(1).nullable().optional(),
   payer: transferoUltraDepositPayerSchema.nullable().optional(),
+  qrCodeExpiresAt: z.string().min(1).nullable().optional(),
   qrCodeType: z.enum(['DYNAMIC', 'STATIC']).nullable().optional(),
   refundedAt: z.string().min(1).nullable().optional(),
   status: transferoUltraDepositStatusSchema,

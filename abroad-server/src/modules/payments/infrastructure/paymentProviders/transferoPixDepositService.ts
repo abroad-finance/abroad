@@ -18,13 +18,6 @@ import {
   IFiatDepositService,
 } from '../../application/contracts/IFiatDepositService'
 
-/**
- * Ultra requires a dynamic QR's txid to be 26–35 characters. Our transaction id
- * is a 36-character UUID, so the hyphens are stripped to land on exactly 32.
- */
-const MIN_ULTRA_DYNAMIC_TXID_LENGTH = 26
-const MAX_ULTRA_DYNAMIC_TXID_LENGTH = 35
-
 const DEPOSIT_STATUS_BY_ULTRA_STATUS: Readonly<Record<string, FiatDepositStatus>> = {
   COMPLETED: 'COMPLETED',
   EXPIRED: 'EXPIRED',
@@ -66,40 +59,25 @@ export class TransferoPixDepositService implements IFiatDepositService {
       return { code: 'validation', reason: 'transfero_ultra_deposit_amount_invalid', success: false }
     }
 
-    const txid = this.buildDynamicTxid(params.transactionId)
-    if (!txid) {
-      return { code: 'validation', reason: 'transfero_ultra_deposit_txid_invalid', success: false }
-    }
-
     try {
       const response = await this.ultraClient.post(
         '/api/v1/pix/qr-codes/dynamic',
         {
+          // The endpoint accepts exactly `amount` and `endUserId`; the txid the
+          // PIX spec describes is minted by Ultra, and sending one is rejected
+          // as an unrecognised key. Idempotency is carried by the header alone.
           amount: params.amount,
           // Attribution for the deposit reads and every pix.deposit.* webhook.
           endUserId: params.reference,
-          txid,
         },
         this.buildIdempotencyKey('pix-deposit', params.transactionId),
       )
       const parsed = transferoUltraDynamicQrResponseSchema.parse(response)
-      const brCode = parsed.brCode ?? parsed.emvPayload
-      if (!brCode) {
-        this.logger.error('Transfero Ultra dynamic QR response carried no BR Code', {
-          depositId: parsed.depositId,
-          transactionId: params.transactionId,
-        })
-        return {
-          code: 'permanent',
-          reason: 'transfero_ultra_deposit_missing_brcode',
-          success: false,
-        }
-      }
 
       return {
-        brCode,
+        brCode: parsed.qrCode,
         expiresAt: this.parseDate(parsed.expiresAt),
-        providerDepositId: parsed.depositId,
+        providerDepositId: parsed.id,
         success: true,
       }
     }
@@ -141,7 +119,7 @@ export class TransferoPixDepositService implements IFiatDepositService {
           amount,
           endToEndId: parsed.endToEndId?.trim() || null,
           payerTaxId: parsed.payer?.taxId?.replace(/\D+/g, '') || null,
-          providerDepositId: parsed.depositId,
+          providerDepositId: parsed.id,
           status,
         },
         success: true,
@@ -168,25 +146,6 @@ export class TransferoPixDepositService implements IFiatDepositService {
     catch (error) {
       return this.toFailure(error, 'deposit_refund')
     }
-  }
-
-  /**
-   * Deterministic per transaction, so a retried acceptance re-presents the same
-   * QR instead of opening a second one the customer could also pay.
-   */
-  private buildDynamicTxid(transactionId: string): null | string {
-    const candidate = transactionId.replace(/[^0-9a-zA-Z]/g, '')
-    if (
-      candidate.length >= MIN_ULTRA_DYNAMIC_TXID_LENGTH
-      && candidate.length <= MAX_ULTRA_DYNAMIC_TXID_LENGTH
-    ) {
-      return candidate
-    }
-    if (candidate.length > MAX_ULTRA_DYNAMIC_TXID_LENGTH) {
-      return candidate.slice(0, MAX_ULTRA_DYNAMIC_TXID_LENGTH)
-    }
-    const digest = createHash('sha256').update(transactionId).digest('hex')
-    return digest.slice(0, 32)
   }
 
   private buildIdempotencyKey(operation: string, transactionId: string): string {

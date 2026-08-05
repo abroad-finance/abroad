@@ -22,24 +22,32 @@ const buildService = (client: UltraClientMock) => new TransferoPixDepositService
   createMockLogger(),
 )
 
+// Mirrors the live 201 from POST /api/v1/pix/qr-codes/dynamic: the deposit id
+// is `id` and the payable EMV payload is `qrCode`. There is no `depositId`,
+// `brCode`, `emvPayload` or `txid` anywhere in this exchange.
 const dynamicQrResponse = (overrides: Record<string, unknown> = {}) => ({
-  amount: '150.00',
-  brCode: '00020126580014BR.GOV.BCB.PIX',
-  depositId: DEPOSIT_ID,
+  amount: 150,
+  blockchainFee: '0.00',
   endUserId: TRANSACTION_ID,
   expiresAt: '2026-08-04T13:30:00.000Z',
+  id: DEPOSIT_ID,
+  qrCode: '00020126580014BR.GOV.BCB.PIX',
+  qrCodeBase64: 'https://brcode.starkinfra.com/dynamic-qrcode/abc.png',
   status: 'PENDING',
-  txid: 'ddddddddeeee4fff8aaabbbbbbbbbbbb',
   ...overrides,
 })
 
+// Mirrors the live 200 from GET /api/v1/pix/deposits/:id, which also keys the
+// deposit as `id` and names the expiry `qrCodeExpiresAt`.
 const depositDetailResponse = (overrides: Record<string, unknown> = {}) => ({
   amount: '150.00',
   currency: 'BRL',
-  depositId: DEPOSIT_ID,
   endToEndId: 'E12345678202608041230abcdef01',
   endUserId: TRANSACTION_ID,
+  id: DEPOSIT_ID,
   payer: { bankCode: '20018183', name: 'Joana Silva', taxId: '123.456.789-01' },
+  qrCodeExpiresAt: '2026-08-04T13:30:00.000Z',
+  qrCodeType: 'DYNAMIC',
   status: 'COMPLETED',
   ...overrides,
 })
@@ -64,17 +72,50 @@ describe('TransferoPixDepositService', () => {
       })
       const [path, body, idempotencyKey] = client.post.mock.calls[0]
       expect(path).toBe('/api/v1/pix/qr-codes/dynamic')
+      // The endpoint's schema is strict: it accepts exactly these two keys.
       expect(body).toEqual({
         amount: 150,
         endUserId: TRANSACTION_ID,
-        txid: 'ddddddddeeee4fff8aaabbbbbbbbbbbb',
       })
       expect(idempotencyKey).toBe(`abroad:pix-deposit:${TRANSACTION_ID}`)
     })
 
+    // Sending a txid is rejected outright with
+    // `body/ Unrecognized key: "txid"`, which took the whole onramp down: every
+    // acceptance failed at code generation. The txid the PIX spec describes is
+    // minted by Ultra, not supplied by us.
+    it('never sends a txid', async () => {
+      const client = createUltraClient()
+      client.post.mockResolvedValue(dynamicQrResponse())
+
+      await buildService(client).createDeposit({
+        amount: 150,
+        reference: TRANSACTION_ID,
+        transactionId: TRANSACTION_ID,
+      })
+
+      expect(client.post.mock.calls[0][1]).not.toHaveProperty('txid')
+    })
+
+    // The endpoint rejects a string amount with
+    // `body/amount Invalid input: expected number, received string`.
+    it('sends the amount as a number', async () => {
+      const client = createUltraClient()
+      client.post.mockResolvedValue(dynamicQrResponse())
+
+      await buildService(client).createDeposit({
+        amount: 150,
+        reference: TRANSACTION_ID,
+        transactionId: TRANSACTION_ID,
+      })
+
+      const body = client.post.mock.calls[0][1] as { amount: unknown }
+      expect(typeof body.amount).toBe('number')
+    })
+
     // A retried acceptance must never leave the customer holding two payable
     // QRs for one transaction.
-    it('derives the same txid and idempotency key on a retry', async () => {
+    it('derives the same idempotency key on a retry', async () => {
       const client = createUltraClient()
       client.post.mockResolvedValue(dynamicQrResponse())
       const service = buildService(client)
@@ -86,43 +127,11 @@ describe('TransferoPixDepositService', () => {
       expect(client.post.mock.calls[0]).toEqual(client.post.mock.calls[1])
     })
 
-    it('keeps the generated txid inside the 26-35 character dynamic QR range', async () => {
-      const client = createUltraClient()
-      client.post.mockResolvedValue(dynamicQrResponse())
-
-      await buildService(client).createDeposit({
-        amount: 150,
-        reference: 'short-ref',
-        transactionId: 'short-id',
-      })
-
-      const body = client.post.mock.calls[0][1] as { txid: string }
-      expect(body.txid.length).toBeGreaterThanOrEqual(26)
-      expect(body.txid.length).toBeLessThanOrEqual(35)
-    })
-
-    it('accepts the emvPayload spelling of the BR Code', async () => {
-      const client = createUltraClient()
-      client.post.mockResolvedValue(
-        dynamicQrResponse({ brCode: undefined, emvPayload: '00020126PAYLOAD' }),
-      )
-
-      const result = await buildService(client).createDeposit({
-        amount: 150,
-        reference: TRANSACTION_ID,
-        transactionId: TRANSACTION_ID,
-      })
-
-      expect(result).toEqual(expect.objectContaining({ brCode: '00020126PAYLOAD', success: true }))
-    })
-
     // Without a payable code there is nothing to show the customer, so this is
     // a hard failure rather than a half-created transaction.
     it('fails permanently when the provider returns no payable code', async () => {
       const client = createUltraClient()
-      client.post.mockResolvedValue(
-        dynamicQrResponse({ brCode: undefined, emvPayload: undefined }),
-      )
+      client.post.mockResolvedValue(dynamicQrResponse({ qrCode: undefined }))
 
       const result = await buildService(client).createDeposit({
         amount: 150,
@@ -132,7 +141,7 @@ describe('TransferoPixDepositService', () => {
 
       expect(result).toEqual({
         code: 'permanent',
-        reason: 'transfero_ultra_deposit_missing_brcode',
+        reason: 'transfero_ultra_deposit_create_schema_mismatch',
         success: false,
       })
     })
@@ -171,7 +180,7 @@ describe('TransferoPixDepositService', () => {
 
     it('treats a malformed provider response as permanent rather than retrying it', async () => {
       const client = createUltraClient()
-      client.post.mockResolvedValue({ depositId: DEPOSIT_ID })
+      client.post.mockResolvedValue({ id: DEPOSIT_ID })
 
       const result = await buildService(client).createDeposit({
         amount: 150,

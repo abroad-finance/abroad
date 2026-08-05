@@ -9,6 +9,12 @@ import { ISecretManager, Secrets } from '../../../platform/secrets/ISecretManage
 
 type TransferoUltraErrorPayload = {
   code?: string
+  /**
+   * Ultra's field-level explanation, e.g. `body/ Unrecognized key: "txid"`.
+   * Without it every rejected request looks identical in the logs, which is
+   * exactly how a wrong request shape stayed invisible in production.
+   */
+  detail?: string
 }
 type TransferoUltraFailureCode = 'permanent' | 'retriable' | 'validation'
 type TransferoUltraHttpMethod = 'GET' | 'PATCH' | 'POST'
@@ -40,11 +46,13 @@ type TransferoUltraSignedHeaders = {
 
 export class TransferoUltraError extends Error {
   public readonly code: TransferoUltraFailureCode
+  public readonly detail?: string
   public readonly providerCode?: string
   public readonly status?: number
 
   public constructor(params: {
     code: TransferoUltraFailureCode
+    detail?: string
     message: string
     providerCode?: string
     status?: number
@@ -52,6 +60,7 @@ export class TransferoUltraError extends Error {
     super(params.message)
     this.name = 'TransferoUltraError'
     this.code = params.code
+    this.detail = params.detail
     this.providerCode = params.providerCode
     this.status = params.status
   }
@@ -211,6 +220,7 @@ export class TransferoUltraClient {
 
     return new TransferoUltraError({
       code: this.classifyStatus(status),
+      detail: payload.detail,
       message: `Transfero Ultra request failed: ${descriptor}`,
       providerCode,
       status,
@@ -263,7 +273,10 @@ export class TransferoUltraClient {
       ? record.error as Record<string, unknown>
       : record
 
-    return { code: typeof nested.code === 'string' ? nested.code : undefined }
+    return {
+      code: typeof nested.code === 'string' ? nested.code : undefined,
+      detail: typeof nested.detail === 'string' ? nested.detail : undefined,
+    }
   }
 
   private readPositiveInteger(envKey: string, fallback: number): number {
@@ -375,6 +388,9 @@ export class TransferoUltraClient {
       }
       this.logger.warn('Transfero Ultra request failed', {
         code: normalized.code,
+        // Names the offending field on a rejected request; Ultra puts no
+        // account data in it.
+        ...(normalized.detail ? { detail: normalized.detail } : {}),
         method: params.method,
         path: params.path,
         providerCode: normalized.providerCode,
