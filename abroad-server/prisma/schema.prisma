@@ -10,41 +10,41 @@ datasource db {
 }
 
 model Partner {
-  id                           String                          @id @default(uuid())
+  id                           String    @id @default(uuid())
   name                         String
-  createdAt                    DateTime                        @default(now())
-  apiKey                       String?                         @unique
-  previousApiKey               String?                         @unique
+  createdAt                    DateTime  @default(now())
+  apiKey                       String?   @unique
+  previousApiKey               String?   @unique
   previousApiKeyExpiresAt      DateTime?
-  clientDomain                 String?                         @unique
-  clientDomainHash             String?                         @unique
-  publicSignupIdempotencyHash  String?                         @unique
-  publicSignupOrganizationHash String?                         @unique
+  clientDomain                 String?   @unique
+  clientDomainHash             String?   @unique
+  publicSignupIdempotencyHash  String?   @unique
+  publicSignupOrganizationHash String?   @unique
   country                      String?
-  email                        String?                         @unique
+  email                        String?   @unique
   phone                        String?
   firstName                    String?
   lastName                     String?
-  isKybApproved                Boolean?                        @default(false)
-  needsKyc                     Boolean?                        @default(true)
+  isKybApproved                Boolean?  @default(false)
+  needsKyc                     Boolean?  @default(true)
   webhookUrl                   String?
 
   // Partner-wide suspension (operator action from the Ops dashboard).
   // disabledAt == null means the partner is active. Blocks every API key and
   // client-domain session for the partner at once.
-  disabledAt                   DateTime?
-  disabledReason               String?
-  disabledBy                   String?
-  users                        PartnerUser[]
-  portalUsers                  PartnerPortalUser[]
-  portalApiKeys                PartnerApiKey[]
-  portalAuditEvents            PartnerPortalAuditEvent[]
-  aiAuthorizationRequests      PartnerAiAuthorizationRequest[]
-  aiConnections                PartnerAiConnection[]
-  webhookConfiguration         PartnerWebhookConfiguration?
-  outboxEvents                 OutboxEvent[]
-  reconciliationRuns           PartnerReconciliationRun[]
-  quotes                       Quote[]
+  disabledAt              DateTime?
+  disabledReason          String?
+  disabledBy              String?
+  users                   PartnerUser[]
+  portalUsers             PartnerPortalUser[]
+  portalApiKeys           PartnerApiKey[]
+  portalAuditEvents       PartnerPortalAuditEvent[]
+  aiAuthorizationRequests PartnerAiAuthorizationRequest[]
+  aiConnections           PartnerAiConnection[]
+  webhookConfiguration    PartnerWebhookConfiguration?
+  outboxEvents            OutboxEvent[]
+  reconciliationRuns      PartnerReconciliationRun[]
+  quotes                  Quote[]
 }
 
 model PartnerPortalUser {
@@ -431,7 +431,10 @@ model Transaction {
   quoteId             String                      @unique
   quote               Quote                       @relation(fields: [quoteId], references: [id])
   // On a payout this is the customer's inbound deposit. On an onramp it is our
-  // outbound delivery to destinationAddress.
+  // outbound delivery to destinationAddress, and it is set ONLY once that
+  // delivery is confirmed on chain. A prepared-but-unconfirmed hash lives on
+  // DeliveryAttempt: writing one here made the executor's "already delivered"
+  // short-circuit report success for a transaction that never landed.
   onChainId           String?                     @unique
   refundOnChainId     String?                     @unique
   pixEndToEndId       String?                     @unique
@@ -454,9 +457,51 @@ model Transaction {
   opsCase             OpsCase?
   economics           TransactionEconomics?
   refundRecovery      RefundRecovery?
+  deliveryAttempts    DeliveryAttempt[]
 
   @@index([partnerUserId, status, createdAt], name: "transaction_partnerUser_status_createdAt_idx")
   @@index([createdAt, status], name: "transaction_createdAt_status_idx")
+}
+
+/**
+ * One attempt at delivering crypto to a FIAT_TO_CRYPTO customer.
+ * The signed envelope and its expiry are kept so a submission that timed out
+ * can be resolved without guesswork: past `expiresAt` the transaction can
+ * never be included, so an attempt still unconfirmed then is provably dead and
+ * the next attempt is safe. Re-submitting the stored envelope is equally safe,
+ * since it carries the same hash and cannot pay twice.
+ * This mirrors RefundRecoveryAttempt, which gives refunds the same guarantee.
+ */
+model DeliveryAttempt {
+  id                String                @id @default(uuid())
+  transactionId     String
+  transaction       Transaction           @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  attemptNumber     Int
+  transactionHash   String                @unique
+  signedEnvelopeXdr String?               @db.Text
+  amount            Decimal               @db.Decimal(36, 18)
+  asset             CryptoCurrency
+  network           BlockchainNetwork
+  feeStroops        BigInt?
+  status            DeliveryAttemptStatus @default(PREPARED)
+  failureCode       String?
+  expiresAt         DateTime
+  preparedAt        DateTime              @default(now())
+  submittedAt       DateTime?
+  lastReconciledAt  DateTime?
+  confirmedAt       DateTime?
+
+  @@unique([transactionId, attemptNumber])
+  @@index([status, expiresAt])
+  @@index([transactionId, status])
+}
+
+enum DeliveryAttemptStatus {
+  PREPARED
+  SUBMITTED
+  CONFIRMED
+  EXPIRED
+  FAILED
 }
 
 model StellarListenerState {

@@ -152,9 +152,14 @@ describe('CryptoSendStepExecutor', () => {
     })
   })
 
-  // An ambiguous send may or may not have landed. Retrying it blind could pay
-  // twice, so the hash is persisted and the step fails for reconciliation.
-  it('records the hash and stops when a send is ambiguous', async () => {
+  /*
+   * An ambiguous send may or may not have landed, so the step stops for
+   * reconciliation rather than retrying blind. The hash must NOT be written to
+   * transaction.onChainId: that field means "delivered", and putting an
+   * unconfirmed hash in it made the executor's short-circuit report success for
+   * a transaction that never landed. It lives on the DeliveryAttempt instead.
+   */
+  it('does not mark the transaction delivered when a send is ambiguous', async () => {
     const send = jest.fn(async () => ({
       reason: 'timeout',
       reconciliationRequired: true as const,
@@ -165,11 +170,12 @@ describe('CryptoSendStepExecutor', () => {
 
     const result = await run()
 
-    expect(recordOnChainIdIfMissing).toHaveBeenCalledWith(expect.anything(), TRANSACTION_ID, '0xambiguous')
+    expect(recordOnChainIdIfMissing).not.toHaveBeenCalled()
     expect(applyTransition).not.toHaveBeenCalled()
     expect(result).toEqual(expect.objectContaining({
       error: 'crypto_send_ambiguous',
       outcome: 'failed',
+      output: expect.objectContaining({ preparedHash: '0xambiguous' }),
     }))
   })
 

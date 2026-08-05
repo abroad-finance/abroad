@@ -1,4 +1,13 @@
-import { FlowStepType, PaymentMethod, TargetCurrency, TransactionStatus } from '@prisma/client'
+import {
+  BlockchainNetwork,
+  CryptoCurrency,
+  DeliveryAttemptStatus,
+  FlowStepType,
+  PaymentMethod,
+  Prisma,
+  TargetCurrency,
+  TransactionStatus,
+} from '@prisma/client'
 import { inject, injectable } from 'inversify'
 
 import { TYPES } from '../../../../app/container/types'
@@ -7,6 +16,7 @@ import { ILogger } from '../../../../core/logging/types'
 import { WebhookEvent } from '../../../../platform/notifications/IWebhookNotifier'
 import { OutboxDispatcher } from '../../../../platform/outbox/OutboxDispatcher'
 import { IDatabaseClientProvider } from '../../../../platform/persistence/IDatabaseClientProvider'
+import { IWalletHandler, WalletSendParams, WalletSendResult } from '../../../payments/application/contracts/IWalletHandler'
 import { IWalletHandlerFactory } from '../../../payments/application/contracts/IWalletHandlerFactory'
 import { TransactionEventDispatcher } from '../../../transactions/application/TransactionEventDispatcher'
 import { TransactionRepository } from '../../../transactions/application/TransactionRepository'
@@ -75,8 +85,11 @@ export class CryptoSendStepExecutor implements FlowStepExecutor {
       return { error: 'Transaction not found for crypto send', outcome: 'failed' }
     }
 
-    // A delivery already recorded on chain must never be repeated, whatever
-    // state the flow believes it is in.
+    // A delivery already CONFIRMED on chain must never be repeated, whatever
+    // state the flow believes it is in. `onChainId` is now written only on
+    // confirmation — a prepared-but-unconfirmed hash lives on DeliveryAttempt.
+    // While both shared this field, a retry after a submission timeout took
+    // this branch and reported success for a transaction that never landed.
     if (transaction.onChainId) {
       this.logger.info('Crypto delivery already recorded; not sending again', {
         transactionId: transaction.id,
@@ -94,15 +107,23 @@ export class CryptoSendStepExecutor implements FlowStepExecutor {
 
     const walletHandler = this.walletHandlerFactory.getWalletHandler(transaction.quote.network)
 
+    const sendParams = {
+      address: destinationAddress,
+      amount: transaction.quote.sourceAmount,
+      // Escalates the inclusion bid on chains that auction block space, so a
+      // retry after an outbid timeout does not simply lose again.
+      attempt: params.attempt,
+      cryptoCurrency: transaction.quote.cryptoCurrency,
+    }
+
     try {
-      const result = await walletHandler.send({
-        address: destinationAddress,
-        amount: transaction.quote.sourceAmount,
-        // Escalates the inclusion bid on chains that auction block space, so a
-        // retry after an outbid timeout does not simply lose again.
-        attempt: params.attempt,
-        cryptoCurrency: transaction.quote.cryptoCurrency,
-      })
+      // Durable send where the chain supports it: the signed envelope and its
+      // expiry are persisted BEFORE broadcast, so a submission that times out
+      // is resolvable rather than a mystery. Past the expiry the transaction
+      // can never be included, which is what makes a further attempt safe.
+      const result = walletHandler.sendDurably
+        ? await this.sendDurably(prismaClient, walletHandler, transaction, sendParams, params.attempt)
+        : await walletHandler.send(sendParams)
 
       if (result.success) {
         return this.completeDelivery(prismaClient, transaction, result.transactionId)
@@ -124,16 +145,16 @@ export class CryptoSendStepExecutor implements FlowStepExecutor {
           + ` Prepared ${result.transactionId ?? 'unknown'} on ${transaction.quote.network};`
           + ` attempt ${params.attempt} of ${params.maxAttempts}. The customer has paid and holds nothing.`,
         )
-        await this.repository.recordOnChainIdIfMissing(
-          prismaClient,
-          transaction.id,
-          result.transactionId,
-        )
+        // Deliberately NOT written to transaction.onChainId. That field means
+        // "delivered", and writing an unconfirmed hash into it made the
+        // short-circuit above report success for a transaction that never
+        // landed — a silent total loss for a customer who had already paid.
+        // The hash lives on the DeliveryAttempt until reconciliation decides.
         return {
           correlation: { transactionId: transaction.id },
           error: 'crypto_send_ambiguous',
           outcome: 'failed',
-          output: { onChainId: result.transactionId, reason: result.reason ?? null },
+          output: { preparedHash: result.transactionId, reason: result.reason ?? null },
         }
       }
 
@@ -288,6 +309,73 @@ export class CryptoSendStepExecutor implements FlowStepExecutor {
       this.logger.warn('Could not raise the crypto delivery alert', {
         error: error instanceof Error ? error.message : 'unknown_error',
       })
+    }
+  }
+
+  /**
+   * Runs the wallet's durable send and records the attempt around it.
+   *
+   * The prepared envelope is written before broadcast, so a submission that
+   * never returns still leaves something to reconcile against: the hash to
+   * look up and the instant past which it can no longer be included. The
+   * result is translated back into the ordinary send shape so the rest of the
+   * step is indifferent to which path ran.
+   */
+  private async sendDurably(
+    prismaClient: Awaited<ReturnType<TransactionRepository['getClient']>>,
+    walletHandler: IWalletHandler,
+    transaction: {
+      id: string
+      quote: { cryptoCurrency: CryptoCurrency, network: BlockchainNetwork, sourceAmount: number }
+    },
+    sendParams: WalletSendParams,
+    attemptNumber: number,
+  ): Promise<WalletSendResult> {
+    const durable = await walletHandler.sendDurably!(sendParams, async (prepared) => {
+      await prismaClient.deliveryAttempt.upsert({
+        create: {
+          amount: new Prisma.Decimal(prepared.amount),
+          asset: transaction.quote.cryptoCurrency,
+          attemptNumber,
+          expiresAt: prepared.expiresAt,
+          network: transaction.quote.network,
+          signedEnvelopeXdr: prepared.signedEnvelopeXdr,
+          status: DeliveryAttemptStatus.PREPARED,
+          transactionHash: prepared.transactionId,
+          transactionId: transaction.id,
+        },
+        // A replayed step must not open a second attempt under one number.
+        update: { expiresAt: prepared.expiresAt, transactionHash: prepared.transactionId },
+        where: {
+          transactionId_attemptNumber: { attemptNumber, transactionId: transaction.id },
+        },
+      })
+    })
+
+    if (durable.outcome === 'confirmed') {
+      await prismaClient.deliveryAttempt.updateMany({
+        data: { confirmedAt: new Date(), status: DeliveryAttemptStatus.CONFIRMED, submittedAt: new Date() },
+        where: { transactionHash: durable.transactionId },
+      })
+      return { success: true, transactionId: durable.transactionId }
+    }
+
+    // Submitted but unresolved. It stays SUBMITTED until reconciliation proves
+    // it landed or lets it expire; nothing here writes onChainId.
+    await prismaClient.deliveryAttempt.updateMany({
+      data: {
+        failureCode: durable.reason,
+        status: DeliveryAttemptStatus.SUBMITTED,
+        submittedAt: new Date(),
+      },
+      where: { transactionHash: durable.transactionId },
+    })
+    return {
+      code: 'retriable',
+      reason: durable.reason,
+      reconciliationRequired: true,
+      success: false,
+      transactionId: durable.transactionId,
     }
   }
 }
