@@ -133,15 +133,20 @@ export class TransferoCryptoPurchaseService {
     }
 
     try {
+      // Shape verified against the API's own validation errors: `amount` is a
+      // decimal string, the destination field is `destinationAddress`, and this
+      // endpoint requires `idempotencyKey` in the body as well as the header.
+      const idempotencyKey = this.buildIdempotencyKey(params.operationId, 'treasury-withdrawal')
       const response = await this.ultraClient.post(
         '/api/v1/vault/withdrawals',
         {
-          amount: params.amount,
+          amount: params.amount.toString(),
           asset: params.asset,
           blockchain: params.network,
-          toAddress: params.address,
+          destinationAddress: params.address,
+          idempotencyKey,
         },
-        this.buildIdempotencyKey(params.operationId, 'treasury-withdrawal'),
+        idempotencyKey,
       )
       const parsed = transferoUltraCryptoWithdrawalResponseSchema.parse(response)
 
