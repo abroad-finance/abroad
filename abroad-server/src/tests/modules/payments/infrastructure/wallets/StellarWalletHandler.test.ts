@@ -164,7 +164,36 @@ describe('StellarWalletHandler', () => {
 
     await sendOnce()
 
-    expect(Number(builderOptions.at(-1)?.fee)).toBe(1_000_000)
+    expect(Number(builderOptions.at(-1)?.fee)).toBe(20_000_000)
+  })
+
+  /*
+   * Re-offering the number that just lost is not a retry. The first cap shipped
+   * at 1,000,000 — which turned out to be exactly the prevailing p90, leaving
+   * no headroom at all — so an outbid delivery would keep losing at the same
+   * price however many times it ran.
+   */
+  it('escalates the bid on a later attempt', async () => {
+    feeStatsMock.mockResolvedValue({ max_fee: { p90: '1000' } })
+    ;(secretManager.getSecret as jest.Mock).mockResolvedValueOnce('https://horizon.test')
+    ;(secretManager.getSecret as jest.Mock).mockResolvedValueOnce('secret-key')
+    const handler = new StellarWalletHandler(secretManager as unknown as ISecretManager, assetConfigService as never, lockManager as unknown as ILockManager, logger)
+
+    await handler.send({ address: 'DESTINATION', amount: 1, attempt: 3, cryptoCurrency: CryptoCurrency.USDC })
+
+    // 1000 * 4^(3-1)
+    expect(builderOptions.at(-1)?.fee).toBe('16000')
+  })
+
+  it('still respects the cap while escalating', async () => {
+    feeStatsMock.mockResolvedValue({ max_fee: { p90: '19000000' } })
+    ;(secretManager.getSecret as jest.Mock).mockResolvedValueOnce('https://horizon.test')
+    ;(secretManager.getSecret as jest.Mock).mockResolvedValueOnce('secret-key')
+    const handler = new StellarWalletHandler(secretManager as unknown as ISecretManager, assetConfigService as never, lockManager as unknown as ILockManager, logger)
+
+    await handler.send({ address: 'DESTINATION', amount: 1, attempt: 5, cryptoCurrency: CryptoCurrency.USDC })
+
+    expect(Number(builderOptions.at(-1)?.fee)).toBe(20_000_000)
   })
 
   it('never bids below the ledger base fee', async () => {

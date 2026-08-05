@@ -44,6 +44,8 @@ const buildHarness = (opts?: {
 
   const prisma = { transaction: { findUnique: jest.fn(async () => transaction) } }
   const refundFiatDeposit = jest.fn(async () => undefined)
+  const enqueueSlack = jest.fn() as jest.Mock<Promise<void>, [string, string]>
+  enqueueSlack.mockResolvedValue(undefined)
   const refundCoordinator = { refundFiatDeposit } as unknown as RefundCoordinator
 
   const send = opts?.send ?? jest.fn(async () => ({ success: true, transactionId: '0xdelivery' }))
@@ -55,11 +57,7 @@ const buildHarness = (opts?: {
     { getClient: jest.fn(async () => prisma) } as unknown as IDatabaseClientProvider,
     walletHandlerFactory,
     createMockLogger(),
-    {
-      enqueueQueue: jest.fn(),
-      enqueueSlack: jest.fn(),
-      enqueueWebhook: jest.fn(),
-    } as unknown as OutboxDispatcher,
+    { enqueueQueue: jest.fn(), enqueueSlack, enqueueWebhook: jest.fn() } as unknown as OutboxDispatcher,
     {
       enqueueTargets: jest.fn(async () => undefined),
       resolveTargets: jest.fn(async () => []),
@@ -94,7 +92,7 @@ const buildHarness = (opts?: {
     stepOrder: 1,
   })
 
-  return { applyTransition, executor, recordOnChainIdIfMissing, refundFiatDeposit, run, send, walletHandlerFactory }
+  return { applyTransition, enqueueSlack, executor, recordOnChainIdIfMissing, refundFiatDeposit, run, send, walletHandlerFactory }
 }
 
 describe('CryptoSendStepExecutor', () => {
@@ -106,6 +104,7 @@ describe('CryptoSendStepExecutor', () => {
     expect(send).toHaveBeenCalledWith({
       address: WALLET,
       amount: 100,
+      attempt: 1,
       cryptoCurrency: CryptoCurrency.USDC,
     })
     expect(recordOnChainIdIfMissing).toHaveBeenCalledWith(expect.anything(), TRANSACTION_ID, '0xdelivery')
@@ -267,6 +266,63 @@ describe('CryptoSendStepExecutor', () => {
     await run()
 
     expect(refundFiatDeposit).not.toHaveBeenCalled()
+  })
+
+  /*
+   * Both of these leave a customer who has paid and holds nothing. On
+   * 2026-08-05 two deliveries timed out this way, were logged at ERROR, and
+   * went unnoticed until someone read the logs by hand.
+   */
+  it('raises an alert when a delivery is left unresolved', async () => {
+    const send = jest.fn(async () => ({
+      reason: 'stellar_submission_timeout',
+      reconciliationRequired: true as const,
+      success: false as const,
+      transactionId: '0xambiguous',
+    }))
+    const { enqueueSlack, run } = buildHarness({ send })
+
+    await run()
+
+    expect(enqueueSlack).toHaveBeenCalledWith(
+      expect.stringContaining(TRANSACTION_ID),
+      'crypto_send_alert',
+    )
+    expect(enqueueSlack.mock.calls[0][0]).toContain('stellar_submission_timeout')
+  })
+
+  it('raises an alert when a delivery fails for good', async () => {
+    const send = jest.fn(async () => ({
+      code: 'permanent' as const,
+      reason: 'destination rejected',
+      success: false as const,
+    }))
+    const { enqueueSlack, run } = buildHarness({ send })
+
+    await run()
+
+    expect(enqueueSlack).toHaveBeenCalledWith(expect.stringContaining(TRANSACTION_ID), 'crypto_send_alert')
+  })
+
+  // The routine "payment completed" notice goes out on the same channel, so
+  // this asserts on the alert context rather than on silence.
+  it('does not alert on a successful delivery', async () => {
+    const { enqueueSlack, run } = buildHarness()
+
+    await run()
+
+    expect(enqueueSlack).not.toHaveBeenCalledWith(expect.anything(), 'crypto_send_alert')
+  })
+
+  // A page that fails must not take the delivery down with it.
+  it('completes the step even when the alert cannot be sent', async () => {
+    const send = jest.fn(async () => ({
+      code: 'permanent' as const, reason: 'destination rejected', success: false as const,
+    }))
+    const harness = buildHarness({ send })
+    harness.enqueueSlack.mockRejectedValue(new Error('slack down'))
+
+    await expect(harness.run()).resolves.toEqual(expect.objectContaining({ outcome: 'failed' }))
   })
 
   it('fails when the transaction carries no destination address', async () => {

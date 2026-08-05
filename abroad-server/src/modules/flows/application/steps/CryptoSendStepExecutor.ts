@@ -38,7 +38,7 @@ export class CryptoSendStepExecutor implements FlowStepExecutor {
     @inject(TYPES.IDatabaseClientProvider) dbProvider: IDatabaseClientProvider,
     @inject(TYPES.IWalletHandlerFactory) private readonly walletHandlerFactory: IWalletHandlerFactory,
     @inject(TYPES.ILogger) baseLogger: ILogger,
-    @inject(TYPES.IOutboxDispatcher) outboxDispatcher: OutboxDispatcher,
+    @inject(TYPES.IOutboxDispatcher) private readonly outboxDispatcher: OutboxDispatcher,
     @inject(TransactionWebhookRouter)
     transactionWebhookRouter: TransactionWebhookRouter,
     @inject(RefundCoordinator) private readonly refundCoordinator: RefundCoordinator,
@@ -98,6 +98,9 @@ export class CryptoSendStepExecutor implements FlowStepExecutor {
       const result = await walletHandler.send({
         address: destinationAddress,
         amount: transaction.quote.sourceAmount,
+        // Escalates the inclusion bid on chains that auction block space, so a
+        // retry after an outbid timeout does not simply lose again.
+        attempt: params.attempt,
         cryptoCurrency: transaction.quote.cryptoCurrency,
       })
 
@@ -113,6 +116,14 @@ export class CryptoSendStepExecutor implements FlowStepExecutor {
           reason: result.reason,
           transactionId: transaction.id,
         })
+        // A customer has paid and is waiting, and this state needs a human to
+        // resolve. Logging it at ERROR was not enough: two deliveries failed
+        // this way on 2026-08-05 and nobody knew until someone read the logs.
+        await this.raiseDeliveryAlert(
+          `Onramp delivery unresolved for transaction ${transaction.id}: ${result.reason ?? 'unknown'}.`
+          + ` Prepared ${result.transactionId ?? 'unknown'} on ${transaction.quote.network};`
+          + ` attempt ${params.attempt} of ${params.maxAttempts}. The customer has paid and holds nothing.`,
+        )
         await this.repository.recordOnChainIdIfMissing(
           prismaClient,
           transaction.id,
@@ -149,6 +160,10 @@ export class CryptoSendStepExecutor implements FlowStepExecutor {
         }
       }
 
+      await this.raiseDeliveryAlert(
+        `Onramp delivery failed for transaction ${transaction.id}: ${result.reason ?? 'wallet_send_failed'}.`
+        + ' Refunding the customer\'s deposit.',
+      )
       return this.failDelivery(prismaClient, transaction, result.reason ?? 'wallet_send_failed')
     }
     catch (error) {
@@ -262,5 +277,17 @@ export class CryptoSendStepExecutor implements FlowStepExecutor {
       SEND_RETRY_MAX_DELAY_MS,
     )
     return new Date(Date.now() + delay)
+  }
+
+  private async raiseDeliveryAlert(message: string): Promise<void> {
+    try {
+      await this.outboxDispatcher.enqueueSlack(message, 'crypto_send_alert')
+    }
+    catch (error) {
+      // Never let the alert be the thing that fails the step.
+      this.logger.warn('Could not raise the crypto delivery alert', {
+        error: error instanceof Error ? error.message : 'unknown_error',
+      })
+    }
   }
 }

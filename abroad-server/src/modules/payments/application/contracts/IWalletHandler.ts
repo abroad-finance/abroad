@@ -32,6 +32,12 @@ export type WalletPreparedSend = {
 export type WalletSendParams = {
   address: string
   amount: number
+  /**
+   * 1-based delivery attempt. Chains that bid for inclusion use it to escalate
+   * the bid, so a send that timed out because it was outbid competes harder
+   * next time instead of re-offering the number that just lost.
+   */
+  attempt?: number
   cryptoCurrency: CryptoCurrency
   memo?: string
 }

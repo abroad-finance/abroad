@@ -37,13 +37,23 @@ const HORIZON_HTTP_TIMEOUT_MS = 30_000
 const STELLAR_TRANSACTION_TIMEOUT_SECONDS = 30
 
 /**
- * Upper bound on what a single send may bid, in stroops (0.1 XLM).
+ * Upper bound on what a single send may bid, in stroops (2 XLM).
  *
- * Stellar charges the market-clearing fee, not the bid, so bidding high is
- * free in the ordinary case and only matters under surge. The cap exists so a
- * fee spike cannot drain the hot wallet's XLM one transaction at a time.
+ * Stellar charges the market-clearing fee, not the bid, so a high bid is
+ * almost free: while the p90 *bid* sat at 1,000,000 the p90 fee actually
+ * charged was 13,936. The first cap here was 1,000,000, which turned out to
+ * be exactly the prevailing p90 — no headroom at all, and still short of the
+ * p99 of 20,000,000. This clears p99 with room while still bounding what one
+ * transaction can cost, so a runaway market cannot drain the wallet's XLM.
  */
-const MAX_STELLAR_FEE_STROOPS = 1_000_000
+const MAX_STELLAR_FEE_STROOPS = 20_000_000
+
+/**
+ * Re-bidding the number that just lost is not a retry. Each attempt multiplies
+ * the bid so a delivery that timed out because it was outbid competes harder
+ * the next time, up to the cap.
+ */
+const STELLAR_FEE_ATTEMPT_MULTIPLIER = 4
 const STELLAR_WITHDRAWAL_LOCK_TIMEOUT_MS = 20_000
 const stellarTransactionReconciliationSchema = z.object({ successful: z.boolean() }).passthrough()
 
@@ -182,6 +192,7 @@ export class StellarWalletHandler implements IWalletHandler {
   async send({
     address,
     amount,
+    attempt = 1,
     cryptoCurrency,
     memo,
   }: WalletSendParams): Promise<WalletSendResult> {
@@ -205,7 +216,7 @@ export class StellarWalletHandler implements IWalletHandler {
       // 🔒 Serialize all txs per source account across ALL nodes
       const result = await this.lockManager.withLock(sourcePublicKey, STELLAR_WITHDRAWAL_LOCK_TIMEOUT_MS, async () => {
         const sourceAccount = await server.loadAccount(sourcePublicKey)
-        const fee = await this.resolveFeeStroops(server)
+        const fee = await this.resolveFeeStroops(server, attempt)
 
         const stellarAsset = new Asset(cryptoCurrency, assetConfig.mintAddress)
         const amountStr = toStellarAmount(amount)
@@ -254,7 +265,7 @@ export class StellarWalletHandler implements IWalletHandler {
   }
 
   public async sendDurably(
-    { address, amount, cryptoCurrency, memo }: WalletSendParams,
+    { address, amount, attempt = 1, cryptoCurrency, memo }: WalletSendParams,
     persistPrepared: (prepared: WalletPreparedSend) => Promise<void>,
   ): Promise<WalletDurableSendResult> {
     const assetConfig = await this.assetConfigService.getActiveMint({
@@ -273,7 +284,7 @@ export class StellarWalletHandler implements IWalletHandler {
 
     return this.lockManager.withLock(sourcePublicKey, STELLAR_WITHDRAWAL_LOCK_TIMEOUT_MS, async () => {
       const sourceAccount = await server.loadAccount(sourcePublicKey)
-      const fee = await this.resolveFeeStroops(server)
+      const fee = await this.resolveFeeStroops(server, attempt)
       const stellarAsset = new Asset(cryptoCurrency, assetConfig.mintAddress)
       const amountString = toStellarAmount(amount)
       const builder = new TransactionBuilder(sourceAccount, {
@@ -380,18 +391,21 @@ export class StellarWalletHandler implements IWalletHandler {
    * a runaway market cannot drain the wallet, and falls back to a multiple of
    * the base fee if fee stats are unavailable.
    */
-  private async resolveFeeStroops(server: Horizon.Server): Promise<number> {
+  private async resolveFeeStroops(server: Horizon.Server, attempt = 1): Promise<number> {
     const baseFee = await server.fetchBaseFee().catch(() => 100)
+    const escalation = STELLAR_FEE_ATTEMPT_MULTIPLIER ** Math.max(0, attempt - 1)
+    let candidate: number
     try {
       const stats = await server.feeStats()
       const p90 = Number(stats.max_fee.p90)
-      const candidate = Number.isFinite(p90) && p90 > 0 ? p90 : baseFee * 100
-      return Math.max(baseFee, Math.min(candidate, MAX_STELLAR_FEE_STROOPS))
+      candidate = Number.isFinite(p90) && p90 > 0 ? p90 : baseFee * 100
     }
     catch {
-      // Fee stats are advisory; losing them must not force a floor bid.
-      return Math.max(baseFee, Math.min(baseFee * 100, MAX_STELLAR_FEE_STROOPS))
+      // Fee stats are advisory; losing them must not force a floor bid, which
+      // is the failure this whole strategy exists to prevent.
+      candidate = baseFee * 100
     }
+    return Math.max(baseFee, Math.min(candidate * escalation, MAX_STELLAR_FEE_STROOPS))
   }
 
   /** Submit once; on 504 or timeout, check by hash and then resubmit the SAME envelope once. */
