@@ -1,4 +1,10 @@
-import { BlockchainNetwork, CryptoCurrency, FlowStepType, TargetCurrency } from '@prisma/client'
+import {
+  BlockchainNetwork,
+  CryptoCurrency,
+  FlowDirection,
+  FlowStepType,
+  TargetCurrency,
+} from '@prisma/client'
 import { inject, injectable } from 'inversify'
 
 import { TYPES } from '../../../app/container/types'
@@ -80,7 +86,12 @@ export class BridgeFloatService {
           where: { stepType: FlowStepType.ENQUEUE_BRIDGE },
         },
       },
-      where: { flow_corridor_unique: corridor },
+      // Bridge steps only ever exist on a payout flow, so this pins the
+      // direction rather than matching whichever corridor shares the asset
+      // pair — an onramp corridor has no bridge leg to fund.
+      where: {
+        flow_corridor_unique: { ...corridor, direction: FlowDirection.CRYPTO_TO_FIAT },
+      },
     })
 
     for (const step of definition?.steps ?? []) {

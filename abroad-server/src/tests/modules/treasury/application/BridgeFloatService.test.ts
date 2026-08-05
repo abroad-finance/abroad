@@ -1,3 +1,5 @@
+import { FlowDirection } from '@prisma/client'
+
 import { BridgeFloatService } from '../../../../modules/treasury/application/BridgeFloatService'
 
 const baseLogger = { error: jest.fn(), info: jest.fn(), warn: jest.fn() }
@@ -77,8 +79,12 @@ describe('BridgeFloatService.getFloatAsset', () => {
     const { findUnique, service } = makeWithDefinition({ steps: [{ config: { asset: 'USDC', destNetwork: 'MATIC' } }] })
 
     expect(await service.getFloatAsset(corridor)).toBe('USDC')
+    // Pinned to the payout direction: an onramp corridor for the same asset
+    // pair has no bridge leg and must never be matched here.
     expect(findUnique).toHaveBeenCalledWith(expect.objectContaining({
-      where: { flow_corridor_unique: corridor },
+      where: {
+        flow_corridor_unique: { ...corridor, direction: FlowDirection.CRYPTO_TO_FIAT },
+      },
     }))
   })
 
