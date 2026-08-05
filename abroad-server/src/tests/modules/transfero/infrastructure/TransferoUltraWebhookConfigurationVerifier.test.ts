@@ -37,6 +37,20 @@ const endpoint = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 })
 
+describe('REQUIRED_TRANSFERO_ULTRA_WEBHOOK_EVENTS', () => {
+  // The onramp has no other delivery trigger: without this subscription a
+  // customer's PIX settles and nothing ever sends them crypto.
+  it('subscribes the onramp deposit completion event', () => {
+    expect(REQUIRED_TRANSFERO_ULTRA_WEBHOOK_EVENTS).toContain('pix.deposit.completed')
+  })
+
+  // A paid deposit has arrived but is not yet spendable; subscribing it would
+  // invite releasing crypto against a credit that has not landed.
+  it('does not subscribe the merely-paid deposit event', () => {
+    expect(REQUIRED_TRANSFERO_ULTRA_WEBHOOK_EVENTS).not.toContain('pix.deposit.paid')
+  })
+})
+
 describe('TransferoUltraWebhookConfigurationVerifier', () => {
   it('accepts the exact active endpoint with every required Ultra event', async () => {
     const ultraClient = createUltraClient()
@@ -97,16 +111,18 @@ describe('TransferoUltraWebhookConfigurationVerifier', () => {
       'crypto.deposit.credit_failed',
     )
 
+    // A deposit that is merely paid is not yet spendable, so subscribing it
+    // would invite releasing crypto against a credit that has not landed.
     ultraClient.get.mockResolvedValueOnce({
       items: [endpoint({
         eventTypes: [
           ...REQUIRED_TRANSFERO_ULTRA_WEBHOOK_EVENTS,
-          'pix.deposit.completed',
+          'pix.deposit.paid',
         ],
       })],
     })
     await expect(verifier.verify()).rejects.toThrow(
-      'pix.deposit.completed',
+      'pix.deposit.paid',
     )
   })
 })

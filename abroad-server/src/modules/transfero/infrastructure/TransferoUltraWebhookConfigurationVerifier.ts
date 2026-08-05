@@ -14,6 +14,10 @@ export const REQUIRED_TRANSFERO_ULTRA_WEBHOOK_EVENTS = [
   'pix.withdrawal.failed',
   'crypto.deposit.confirmed',
   'crypto.deposit.credit_failed',
+  // The onramp's only delivery trigger. Only `completed` is subscribed:
+  // `pix.deposit.paid` means the money arrived but is not yet spendable, so
+  // acting on it would release crypto against a credit that has not landed.
+  'pix.deposit.completed',
 ] as const
 
 @injectable()
