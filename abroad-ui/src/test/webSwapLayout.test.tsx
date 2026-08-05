@@ -53,4 +53,32 @@ describe('WebSwapLayout', () => {
     expect(screen.getByText('home view')).toBeInTheDocument()
     expect(screen.getByText('disclosure copy')).toBeInTheDocument()
   })
+
+  /*
+   * jsdom does no layout, so this guards the cause rather than the symptom.
+   *
+   * The scrolling column must not centre with `justify-center`: when a view is
+   * taller than the viewport that overflows equally in both directions and the
+   * top becomes unreachable, because scrolling stops at scrollTop 0. Adding the
+   * Pix QR pushed the code screen over that line and hid its heading. Auto
+   * margins centre identically when the content fits and collapse to zero when
+   * it does not, so the view simply starts at the top and scrolls.
+   */
+  it('centres the scrolling column with auto margins, never justify-center', () => {
+    const { container, rerender } = render(<WebSwapLayout slots={slots} view="buy-crypto-pix" />)
+
+    for (const [view] of surfaces) {
+      rerender(<WebSwapLayout slots={slots} view={view} />)
+      const scroller = container.querySelector('.overflow-y-auto')
+      expect(scroller).not.toBeNull()
+      expect(scroller?.className).not.toContain('justify-center')
+    }
+  })
+
+  it('keeps the secondary surfaces vertically centred when they fit', () => {
+    const { container } = render(<WebSwapLayout slots={slots} view="buy-crypto-pix" />)
+
+    const inner = container.querySelector('.overflow-y-auto')?.firstElementChild
+    expect(inner?.className).toContain('my-auto')
+  })
 })
