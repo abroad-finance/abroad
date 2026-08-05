@@ -8,6 +8,8 @@ import { StellarWalletHandler } from '../../../../../modules/payments/infrastruc
 import { createMockLogger } from '../../../../setup/mockFactories'
 
 const fetchBaseFeeMock = jest.fn(async () => 100)
+const feeStatsMock = jest.fn(async () => ({ max_fee: { p90: '1000' } }))
+const builderOptions: Array<{ fee?: string }> = []
 const loadAccountMock = jest.fn(async () => ({ accountId: 'source-account' }))
 const submitTransactionMock = jest.fn()
 const operationCallMock: jest.Mock<Promise<{ source_account?: string }>, []> = jest.fn(async () => ({
@@ -46,6 +48,8 @@ var memoTextMock: jest.Mock
 jest.mock('@stellar/stellar-sdk', () => {
   memoTextMock = jest.fn((m: string) => ({ memo: m }))
   class MockServer {
+    feeStats = feeStatsMock
+
     fetchBaseFee = fetchBaseFeeMock
 
     loadAccount = loadAccountMock
@@ -62,7 +66,9 @@ jest.mock('@stellar/stellar-sdk', () => {
     addOperation = addOperationMock
     build = buildMock
     setTimeout = setTimeoutMock
-    public constructor() {}
+    public constructor(_account: unknown, options: { fee?: string }) {
+      builderOptions.push(options)
+    }
   }
 
   return {
@@ -100,6 +106,9 @@ describe('StellarWalletHandler', () => {
     setTimeoutMock.mockClear()
     memoTextMock.mockClear()
     fetchBaseFeeMock.mockClear()
+    feeStatsMock.mockClear()
+    feeStatsMock.mockResolvedValue({ max_fee: { p90: '1000' } })
+    builderOptions.length = 0
     loadAccountMock.mockClear()
     operationCallMock.mockClear()
     transactionLookupMock.mockClear()
@@ -121,6 +130,61 @@ describe('StellarWalletHandler', () => {
 
     expect(result.success).toBe(false)
     expect(submitTransactionMock).not.toHaveBeenCalled()
+  })
+
+  /*
+   * `fetchBaseFee()` reports the ledger floor (100 stroops), not the going
+   * rate. Bidding the floor under surge means the transaction is never
+   * included and dies when its timebound lapses — Horizon answers 504 and it
+   * reads as a network fault. Observed in production 2026-08-05 with ledger
+   * capacity at 1.14 and a median competing bid near 144,000 stroops: two
+   * consecutive customer deliveries failed against a completely healthy
+   * network.
+   */
+  const sendOnce = async () => {
+    ;(secretManager.getSecret as jest.Mock).mockResolvedValueOnce('https://horizon.test')
+    ;(secretManager.getSecret as jest.Mock).mockResolvedValueOnce('secret-key')
+    const handler = new StellarWalletHandler(secretManager as unknown as ISecretManager, assetConfigService as never, lockManager as unknown as ILockManager, logger)
+    return handler.send({ address: 'DESTINATION', amount: 1, cryptoCurrency: CryptoCurrency.USDC })
+  }
+
+  it('bids the network rate rather than the ledger floor', async () => {
+    feeStatsMock.mockResolvedValue({ max_fee: { p90: '144395' } })
+
+    await sendOnce()
+
+    expect(builderOptions.at(-1)?.fee).toBe('144395')
+  })
+
+  // Stellar charges the clearing price, not the bid, so a high bid is free in
+  // the ordinary case — but an unbounded one would let a fee spike drain the
+  // wallet's XLM one send at a time.
+  it('caps the bid so a fee spike cannot drain the wallet', async () => {
+    feeStatsMock.mockResolvedValue({ max_fee: { p90: '364757672' } })
+
+    await sendOnce()
+
+    expect(Number(builderOptions.at(-1)?.fee)).toBe(1_000_000)
+  })
+
+  it('never bids below the ledger base fee', async () => {
+    feeStatsMock.mockResolvedValue({ max_fee: { p90: '10' } })
+    fetchBaseFeeMock.mockResolvedValue(100)
+
+    await sendOnce()
+
+    expect(Number(builderOptions.at(-1)?.fee)).toBeGreaterThanOrEqual(100)
+  })
+
+  // Fee stats are advisory; losing them must not silently drop us back to a
+  // floor bid, which is the exact failure this replaced.
+  it('still bids above the floor when fee stats are unavailable', async () => {
+    feeStatsMock.mockRejectedValue(new Error('horizon unavailable'))
+    fetchBaseFeeMock.mockResolvedValue(100)
+
+    await sendOnce()
+
+    expect(Number(builderOptions.at(-1)?.fee)).toBeGreaterThan(100)
   })
 
   it('sends USDC payments and returns transaction id', async () => {

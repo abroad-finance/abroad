@@ -35,6 +35,15 @@ import { CryptoAssetConfigService } from '../../application/CryptoAssetConfigSer
 // read aborts the socket. submitTransaction keeps its own 60s cap (submit unchanged).
 const HORIZON_HTTP_TIMEOUT_MS = 30_000
 const STELLAR_TRANSACTION_TIMEOUT_SECONDS = 30
+
+/**
+ * Upper bound on what a single send may bid, in stroops (0.1 XLM).
+ *
+ * Stellar charges the market-clearing fee, not the bid, so bidding high is
+ * free in the ordinary case and only matters under surge. The cap exists so a
+ * fee spike cannot drain the hot wallet's XLM one transaction at a time.
+ */
+const MAX_STELLAR_FEE_STROOPS = 1_000_000
 const STELLAR_WITHDRAWAL_LOCK_TIMEOUT_MS = 20_000
 const stellarTransactionReconciliationSchema = z.object({ successful: z.boolean() }).passthrough()
 
@@ -196,7 +205,7 @@ export class StellarWalletHandler implements IWalletHandler {
       // 🔒 Serialize all txs per source account across ALL nodes
       const result = await this.lockManager.withLock(sourcePublicKey, STELLAR_WITHDRAWAL_LOCK_TIMEOUT_MS, async () => {
         const sourceAccount = await server.loadAccount(sourcePublicKey)
-        const fee = await server.fetchBaseFee()
+        const fee = await this.resolveFeeStroops(server)
 
         const stellarAsset = new Asset(cryptoCurrency, assetConfig.mintAddress)
         const amountStr = toStellarAmount(amount)
@@ -264,7 +273,7 @@ export class StellarWalletHandler implements IWalletHandler {
 
     return this.lockManager.withLock(sourcePublicKey, STELLAR_WITHDRAWAL_LOCK_TIMEOUT_MS, async () => {
       const sourceAccount = await server.loadAccount(sourcePublicKey)
-      const fee = await server.fetchBaseFee()
+      const fee = await this.resolveFeeStroops(server)
       const stellarAsset = new Asset(cryptoCurrency, assetConfig.mintAddress)
       const amountString = toStellarAmount(amount)
       const builder = new TransactionBuilder(sourceAccount, {
@@ -353,6 +362,35 @@ export class StellarWalletHandler implements IWalletHandler {
         transactionHashSuffix: transactionFingerprint(transactionId),
       })
       return { outcome: 'unavailable', reason: 'stellar_reconciliation_unavailable' }
+    }
+  }
+
+  /**
+   * What to bid for inclusion, in stroops.
+   *
+   * `fetchBaseFee()` reports the ledger's base fee — 100 stroops — which is the
+   * floor, not the going rate. Under surge (ledger capacity above 1.0) the
+   * competing bids run orders of magnitude higher, a floor bid is simply never
+   * included, and the transaction dies when its timebound lapses: Horizon
+   * answers 504 and the send looks like a network fault rather than an
+   * outbid transaction. Observed 2026-08-05, when capacity sat at 1.14 and the
+   * median competing bid was ~144,000 stroops.
+   *
+   * The bid tracks the network's own p90 so it holds during a spike, capped so
+   * a runaway market cannot drain the wallet, and falls back to a multiple of
+   * the base fee if fee stats are unavailable.
+   */
+  private async resolveFeeStroops(server: Horizon.Server): Promise<number> {
+    const baseFee = await server.fetchBaseFee().catch(() => 100)
+    try {
+      const stats = await server.feeStats()
+      const p90 = Number(stats.max_fee.p90)
+      const candidate = Number.isFinite(p90) && p90 > 0 ? p90 : baseFee * 100
+      return Math.max(baseFee, Math.min(candidate, MAX_STELLAR_FEE_STROOPS))
+    }
+    catch {
+      // Fee stats are advisory; losing them must not force a floor bid.
+      return Math.max(baseFee, Math.min(baseFee * 100, MAX_STELLAR_FEE_STROOPS))
     }
   }
 
