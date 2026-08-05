@@ -273,14 +273,16 @@ export class RefundCoordinator {
     try {
       await this.repository.recordRefundOutcome(prismaClient, {
         idempotencyKey,
+        // Every failure here is recorded as plainly failed, never as awaiting
+        // reconciliation. A reservation left pending is never picked up again —
+        // `reserveRefund` reports it as in-flight and the next attempt skips —
+        // so parking a refund there strands the customer's money silently. That
+        // is safe to avoid because the provider call carries an idempotency key
+        // derived from the transaction: a retry after any failure, including one
+        // that did reach the provider, cannot refund twice.
         refundResult: result.success
           ? { success: true, transactionId: result.providerRefundId }
-          // A retriable failure is not settled either way: the money may still
-          // be with the provider, so it is left for reconciliation rather than
-          // written off as refused.
-          : result.code === 'retriable'
-            ? { reason: result.reason, reconciliationRequired: true, success: false, transactionId: params.providerDepositId }
-            : { reason: result.reason, success: false },
+          : { reason: result.reason, success: false },
         transactionId: params.transactionId,
       })
     }

@@ -248,18 +248,41 @@ describe('RefundCoordinator', () => {
       )
     })
 
-    // Money that may still be moving must not be written off as refused.
-    it('flags a retriable provider failure for reconciliation', async () => {
+    /*
+     * A reservation left pending is never picked up again: reserveRefund
+     * reports it as in-flight and every later attempt skips. Recording a
+     * failure as awaiting-reconciliation therefore strands the customer's
+     * money silently, which is exactly what a provider rate-limit did on the
+     * first real refund. Failures must stay plainly failed so the next attempt
+     * re-reserves; the provider call is idempotency-keyed, so retrying one that
+     * did reach the provider still cannot refund twice.
+     */
+    it.each([
+      ['retriable', 'rate_limited'],
+      ['permanent', 'deposit_not_refundable'],
+    ])('records a %s failure as retryable, never as pending reconciliation', async (code, reason) => {
       jest.spyOn(TransactionRepository.prototype, 'getClient').mockResolvedValue(prismaClient as never)
       jest.spyOn(TransactionRepository.prototype, 'reserveRefund').mockResolvedValue({ attempts: 1, outcome: 'reserved' })
       const record = jest.spyOn(TransactionRepository.prototype, 'recordRefundOutcome').mockResolvedValue(undefined)
-      const refundDeposit = jest.fn(async () => ({ code: 'retriable', reason: 'desk_unavailable', success: false }))
+      const refundDeposit = jest.fn(async () => ({ code, reason, success: false }))
 
       await buildCoordinator(refundDeposit).refundFiatDeposit(params)
 
-      expect(record).toHaveBeenCalledWith(prismaClient, expect.objectContaining({
-        refundResult: expect.objectContaining({ reconciliationRequired: true, success: false }),
-      }))
+      const recorded = record.mock.calls[0][1].refundResult
+      expect(recorded).toEqual({ reason, success: false })
+      expect(recorded).not.toHaveProperty('reconciliationRequired')
+    })
+
+    // The skip that stranded the first refund, pinned: once a reservation is
+    // pending nothing retries it, so nothing may leave one behind.
+    it('does not act on a reservation another attempt already holds', async () => {
+      jest.spyOn(TransactionRepository.prototype, 'getClient').mockResolvedValue(prismaClient as never)
+      jest.spyOn(TransactionRepository.prototype, 'reserveRefund').mockResolvedValue({ attempts: 1, outcome: 'in_flight' })
+      const refundDeposit = jest.fn()
+
+      await buildCoordinator(refundDeposit).refundFiatDeposit(params)
+
+      expect(refundDeposit).not.toHaveBeenCalled()
     })
   })
 })
