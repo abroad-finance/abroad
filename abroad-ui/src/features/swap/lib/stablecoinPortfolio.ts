@@ -33,12 +33,6 @@ type RankedSupportedStablecoinBalance = Readonly<{
   token: SupportedStablecoinSymbol
 }>
 
-export const EMPTY_STABLECOIN_BALANCES: StablecoinBalances = Object.freeze({
-  cUSD: '0.00',
-  USDC: '0.00',
-  USDT: '0.00',
-})
-
 export const UNAVAILABLE_STABLECOIN_PREFERENCE: StablecoinPreference = Object.freeze({
   highestBalanceToken: null,
   kind: 'unavailable',
@@ -64,11 +58,6 @@ export const parseStablecoinBalance = (value: string): number => {
 export const isSupportedStablecoinSymbol = (value: string): value is SupportedStablecoinSymbol => (
   value === 'USDC' || value === 'USDT'
 )
-
-export const balanceForStablecoin = (
-  balances: StablecoinBalances,
-  symbol: StablecoinSymbol,
-): string => balances[symbol]
 
 const rankStablecoinBalances = (
   balances: StablecoinBalances,

@@ -5,14 +5,13 @@ import {
   OpsCase,
   OpsCaseCreateInput,
   OpsCaseHandoffInput,
-  OpsCaseListResponse,
   OpsCaseUpdateInput,
   OpsGlobalSearchResponse,
   OpsSavedView,
   OpsSavedViewFilters,
   OpsSavedViewResource,
 } from './opsInvestigationTypes'
-import { OpsCasePriority, OpsCaseStatus, OpsCaseUser } from './transactionAdminTypes'
+import { OpsCaseUser } from './transactionAdminTypes'
 
 export const globalOpsSearch = async (
   query: string,
@@ -28,22 +27,6 @@ export const globalOpsSearch = async (
 
 export const listOpsCaseOwners = async (): Promise<OpsCaseUser[]> => {
   const result = await adminRequest<OpsCaseUser[]>('/ops/cases/owner-options', { method: 'GET' })
-  return unwrapAdminResult(result)
-}
-
-export const listOpsCases = async (filters: {
-  ownerUserId?: string
-  page?: number
-  pageSize?: number
-  priority?: OpsCasePriority
-  status?: OpsCaseStatus
-  team?: string
-  transactionId?: string
-}): Promise<OpsCaseListResponse> => {
-  const result = await adminRequest<OpsCaseListResponse>('/ops/cases', {
-    method: 'GET',
-    query: filters,
-  })
   return unwrapAdminResult(result)
 }
 

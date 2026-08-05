@@ -80,7 +80,7 @@ const dsn = readEnv('VITE_SENTRY_DSN')
 const environment = readEnv('VITE_SENTRY_ENVIRONMENT') ?? import.meta.env.MODE ?? 'development'
 const release = readEnv('VITE_SENTRY_RELEASE')
 
-export const sentryEnabled = Boolean(dsn) && import.meta.env.MODE !== 'test'
+const sentryEnabled = Boolean(dsn) && import.meta.env.MODE !== 'test'
 
 if (sentryEnabled && dsn) {
   type SentryOptions = Parameters<typeof Sentry.init>[0]

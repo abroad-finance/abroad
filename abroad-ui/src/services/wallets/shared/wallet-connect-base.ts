@@ -102,10 +102,3 @@ export function toBase64(bytes: Uint8Array): string {
   })
   return btoa(binary)
 }
-
-/**
- * Codifica string a Uint8Array
- */
-export function toUint8Array(value: string): Uint8Array {
-  return new TextEncoder().encode(value)
-}

@@ -1,4 +1,3 @@
-import type { TransactionStatus } from '../../api'
 import type { ConsumerUxTelemetryRequest } from '../../observability/consumerUxTelemetry'
 import type { ApiResult } from '../http/types'
 import type {
@@ -48,15 +47,6 @@ export type PixCheckoutTelemetryRequest = {
     | 'unexpected'
   targetCurrency: 'BRL'
   walletSurface: 'minipay' | 'web'
-}
-
-export type TransactionStatusResponse = {
-  id: string
-  kycRequired: boolean
-  on_chain_tx_hash: null | string
-  status: TransactionStatus
-  transaction_reference: null | string
-  user_id: string
 }
 
 const jsonHeaders = { 'Content-Type': 'application/json' }
@@ -162,15 +152,5 @@ export const notifyPayment = async (
     body: JSON.stringify(payload),
     headers: jsonHeaders,
     method: 'POST',
-  })
-}
-
-export const getTransactionStatus = async (
-  transactionId: string,
-  options?: { signal?: AbortSignal | null },
-): Promise<ApiResult<TransactionStatusResponse>> => {
-  return httpClient.request<TransactionStatusResponse>(`/transaction/${encodeURIComponent(transactionId)}`, {
-    method: 'GET',
-    signal: options?.signal ?? null,
   })
 }

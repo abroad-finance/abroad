@@ -1,6 +1,20 @@
 {
-    "entry": "src/main.tsx",
+    "$schema": "https://unpkg.com/knip@^5/schema.json",
+    "entry": [
+        "src/main.tsx",
+        "orval.config.ts"
+    ],
     "ignoreDependencies": [
         "tailwindcss"
+    ],
+    "ignoreBinaries": [
+        "depcruise",
+        "dot",
+        "eslint",
+        "orval",
+        "tolgee",
+        "tsc",
+        "vite",
+        "vitest"
     ]
 }

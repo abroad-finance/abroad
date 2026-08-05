@@ -33,11 +33,6 @@ export const getTreasurySnapshots = async (days: number): Promise<OpsTreasurySna
   return unwrapAdminResult(result)
 }
 
-export const listTreasuryThresholds = async (): Promise<OpsTreasuryThreshold[]> => {
-  const result = await adminRequest<OpsTreasuryThreshold[]>('/ops/treasury/thresholds', { method: 'GET' })
-  return unwrapAdminResult(result)
-}
-
 export const createTreasuryThreshold = async (
   input: OpsTreasuryThresholdInput,
   mutation: OpsMutationDetails,

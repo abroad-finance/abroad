@@ -2,10 +2,12 @@
   "$schema": "https://unpkg.com/knip@^5/schema.json",
   "entry": [
     "src/app/http/server.ts",
+    "src/app/workers/bridge-sweep/server.ts",
     "src/app/workers/consumers/server.ts",
     "src/app/workers/listeners/server.ts",
     "src/app/workers/outbox/server.ts",
     "src/app/workers/websocket/server.ts",
+    "scripts/auditCorridorPricing.ts",
     "scripts/maintainability-report.ts",
     "scripts/seed-dev.ts"
   ],

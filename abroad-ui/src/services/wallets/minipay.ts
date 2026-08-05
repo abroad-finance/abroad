@@ -43,13 +43,6 @@ const getMiniPaySessionStore = (): MiniPaySessionStore | null => {
   }
 }
 
-export const isMiniPayEnvironment = (): boolean => {
-  if (!hasWindow()) {
-    return false
-  }
-  return window.ethereum?.isMiniPay === true
-}
-
 export const getMiniPayProvider = (
   provider: MiniPayEthereumProvider | undefined = hasWindow() ? window.ethereum : undefined,
 ): MiniPayEthereumProvider => {

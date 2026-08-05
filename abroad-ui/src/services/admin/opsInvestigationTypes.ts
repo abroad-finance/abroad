@@ -4,18 +4,6 @@ import type {
   OpsCaseUser,
 } from './transactionAdminTypes'
 
-export const opsCasePriorities = [
-  'LOW',
-  'NORMAL',
-  'HIGH',
-  'CRITICAL',
-] as const
-export const opsCaseStatuses = [
-  'OPEN',
-  'ACKNOWLEDGED',
-  'RESOLVED',
-] as const
-
 export type OpsCase = {
   createdAt: string
   handoffs: OpsCaseHandoff[]

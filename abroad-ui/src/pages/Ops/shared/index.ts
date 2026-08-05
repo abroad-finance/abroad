@@ -11,7 +11,6 @@ export {
   humanizeStatus,
 } from './opsFormat'
 export { OpsLoading } from './OpsLoading'
-export { OpsNav } from './OpsNav'
 export { OpsPageShell } from './OpsPageShell'
 export { OpsPagination } from './OpsPagination'
 export { OpsStatusBadge } from './opsStatus'
