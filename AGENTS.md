@@ -214,6 +214,45 @@ Validation expectations:
 - If a rollout or financial mutation becomes ambiguous, stop further mutation and reconcile authoritative external and internal state before deciding whether any retry is safe.
 - Do not call work “done” when the user's requested deployment or release has not completed successfully.
 
+## Cloud access for agents
+
+A shared, non-interactive GCP identity exists for agent sessions. It is not tied to any particular assistant — any agent or tool may use it.
+
+**This repository is public, so the account email is deliberately not recorded here.** All identity values live in an untracked local file outside the repository:
+
+```
+~/.config/abroad-agent/env      # project, region, cluster, account email, key path
+~/.config/abroad-agent/gcp-key.json
+```
+
+Both are mode `600`. Load them, never inline the values:
+
+```
+source ~/.config/abroad-agent/env
+gcloud auth activate-service-account --key-file="$GOOGLE_APPLICATION_CREDENTIALS"
+```
+
+Pass `--account="$ABROAD_GCP_SA" --project="$ABROAD_GCP_PROJECT"` explicitly on every command rather than relying on the active gcloud profile, so a session can never act as a human operator's identity by accident. If a command needs an interactive user account instead, say so and stop.
+
+Tools that read Application Default Credentials (Terraform, client libraries, other agents) pick the identity up from `GOOGLE_APPLICATION_CREDENTIALS` with no further setup.
+
+### What it can do
+
+- **Read everything in the project**, including Secret Manager payloads, private/Data Access logs, IAM policies, asset inventory, BigQuery data, and Cloud Build history.
+- **Operate normally**: GKE workloads via `container.developer`, Cloud Run deploys and job execution, Cloud Build, Artifact Registry pushes, Secret Manager writes, Pub/Sub, Cloud Storage, Cloud SQL client access, Cloud Scheduler, Firebase Hosting, logging/monitoring configuration, and attaching service accounts to workloads.
+
+### What it deliberately cannot do
+
+It holds no IAM-policy admin, no service-account admin, and no service-account key or token creation. Those roles let an identity grant itself anything and would make its blast radius unbounded. If a task genuinely needs one, ask for a scoped, temporary grant instead of widening this account.
+
+### Rules
+
+- Default to read-only. Broad write capability is not authorization; the rules in *Production operations and releases* still apply, and a request to inspect or fix code never authorizes a production mutation.
+- Never print, log, echo, or paste a secret payload. Assert on length, hash, or presence instead. The identity can read every production credential, so a single careless `echo` is a disclosure.
+- Never write the account email, the key, or their contents into the repository, commit messages, PRs, issues, or screenshots.
+- GKE access must use a task-scoped `KUBECONFIG`; never modify the default kubeconfig or the active gcloud profile. Restore both if a command changes them.
+- Treat the key as a long-lived credential: rotate it if it is copied off this machine, shared, or exposed. Rotation is `gcloud iam service-accounts keys create` into the same path, then delete the prior key id.
+
 ## Working method and definition of done
 
 For complex work, maintain the gitignored `task_plan.md`, `findings.md`, and `progress.md` files. Record decisions, evidence, validation, and errors as the work proceeds; do not put secrets or raw PII in them.
