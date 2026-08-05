@@ -30,6 +30,82 @@ const buildRow = () => ({
   version: 1,
 })
 
+describe('FlowDefinitionService.create persists direction', () => {
+  const buildService = () => {
+    const create = jest.fn(async ({ data }: { data: Record<string, unknown> }) => ({
+      blockchain: data.blockchain,
+      createdAt: new Date(),
+      cryptoCurrency: data.cryptoCurrency,
+      direction: data.direction,
+      enabled: true,
+      exchangeFeePct: 0,
+      fixedFee: 0,
+      id: 'flow-1',
+      maxAmount: null,
+      minAmount: null,
+      name: data.name,
+      payoutProvider: data.payoutProvider,
+      pricingProvider: data.pricingProvider,
+      targetCurrency: data.targetCurrency,
+      updatedAt: new Date(),
+      userSteps: [{ type: 'PAYOUT' }],
+      version: 1,
+    }))
+    const provider = {
+      getClient: jest.fn(async () => ({ flowDefinition: { create } })),
+    } as unknown as IDatabaseClientProvider
+    const paymentServiceFactory = {
+      getPaymentService: () => ({ isAsync: true }),
+      getPaymentServiceForCapability: () => ({ isAsync: true }),
+    }
+    const service = new FlowDefinitionService(
+      provider,
+      new FlowDefinitionBuilder(paymentServiceFactory as never),
+    )
+    return { create, service }
+  }
+
+  // Omitting direction made every row fall back to the CRYPTO_TO_FIAT default,
+  // so an onramp definition collided with the payout corridor for the same
+  // asset pair and could never be created.
+  it('writes FIAT_TO_CRYPTO when the payload asks for it', async () => {
+    const { create, service } = buildService()
+
+    await service.create({
+      blockchain: BlockchainNetwork.STELLAR,
+      cryptoCurrency: CryptoCurrency.USDC,
+      direction: FlowDirection.FIAT_TO_CRYPTO,
+      name: 'USDC · STELLAR <- BRL',
+      payoutProvider: 'PIX',
+      pricingProvider: 'TRANSFERO',
+      steps: [{ type: 'PAYOUT' }],
+      targetCurrency: TargetCurrency.BRL,
+    })
+
+    expect(create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ direction: FlowDirection.FIAT_TO_CRYPTO }),
+    }))
+  })
+
+  it('defaults to CRYPTO_TO_FIAT when the payload omits direction', async () => {
+    const { create, service } = buildService()
+
+    await service.create({
+      blockchain: BlockchainNetwork.STELLAR,
+      cryptoCurrency: CryptoCurrency.USDC,
+      name: 'USDC · STELLAR -> BRL',
+      payoutProvider: 'PIX',
+      pricingProvider: 'TRANSFERO',
+      steps: [{ type: 'PAYOUT' }],
+      targetCurrency: TargetCurrency.BRL,
+    })
+
+    expect(create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ direction: FlowDirection.CRYPTO_TO_FIAT }),
+    }))
+  })
+})
+
 describe('FlowDefinitionService.findActiveByCorridor', () => {
   const findFirst = jest.fn()
   const prisma = { flowDefinition: { findFirst } }

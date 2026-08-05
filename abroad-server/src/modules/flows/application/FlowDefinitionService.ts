@@ -52,6 +52,7 @@ export class FlowDefinitionService {
         data: {
           blockchain: payload.blockchain,
           cryptoCurrency: payload.cryptoCurrency,
+          direction: payload.direction ?? FlowDirection.CRYPTO_TO_FIAT,
           enabled: payload.enabled ?? true,
           exchangeFeePct: payload.exchangeFeePct ?? 0,
           fixedFee: payload.fixedFee ?? 0,
@@ -152,6 +153,7 @@ export class FlowDefinitionService {
         data: {
           blockchain: payload.blockchain,
           cryptoCurrency: payload.cryptoCurrency,
+          direction: payload.direction ?? FlowDirection.CRYPTO_TO_FIAT,
           enabled: payload.enabled ?? true,
           exchangeFeePct: payload.exchangeFeePct ?? 0,
           fixedFee: payload.fixedFee ?? 0,
