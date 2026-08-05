@@ -1,7 +1,14 @@
 import 'reflect-metadata'
-import { BlockchainNetwork, CryptoCurrency, TargetCurrency, TransactionStatus } from '@prisma/client'
+import {
+  BlockchainNetwork,
+  CryptoCurrency,
+  PaymentMethod,
+  TargetCurrency,
+  TransactionStatus,
+} from '@prisma/client'
 
 import type { FlowStepRuntimeContext } from '../../../../../modules/flows/application/flowTypes'
+import type { RefundCoordinator } from '../../../../../modules/flows/application/RefundCoordinator'
 import type { IWalletHandler } from '../../../../../modules/payments/application/contracts/IWalletHandler'
 import type { IWalletHandlerFactory } from '../../../../../modules/payments/application/contracts/IWalletHandlerFactory'
 import type { TransactionWebhookRouter } from '../../../../../modules/transactions/application/TransactionWebhookRouter'
@@ -23,16 +30,21 @@ const buildHarness = (opts?: {
         destinationAddress: WALLET,
         id: TRANSACTION_ID,
         onChainId: null,
+        pixDepositId: 'dep-1',
         quote: {
           cryptoCurrency: CryptoCurrency.USDC,
           network: BlockchainNetwork.CELO,
+          paymentMethod: PaymentMethod.PIX,
           sourceAmount: 100,
+          targetCurrency: TargetCurrency.BRL,
         },
         status: TransactionStatus.PROCESSING_PAYMENT,
       }
     : opts.transaction
 
   const prisma = { transaction: { findUnique: jest.fn(async () => transaction) } }
+  const refundFiatDeposit = jest.fn(async () => undefined)
+  const refundCoordinator = { refundFiatDeposit } as unknown as RefundCoordinator
 
   const send = opts?.send ?? jest.fn(async () => ({ success: true, transactionId: '0xdelivery' }))
   const walletHandlerFactory = {
@@ -52,6 +64,7 @@ const buildHarness = (opts?: {
       enqueueTargets: jest.fn(async () => undefined),
       resolveTargets: jest.fn(async () => []),
     } as unknown as TransactionWebhookRouter,
+    refundCoordinator,
   )
 
   const applyTransition = jest.fn(async () => ({
@@ -81,7 +94,7 @@ const buildHarness = (opts?: {
     stepOrder: 1,
   })
 
-  return { applyTransition, executor, recordOnChainIdIfMissing, run, send, walletHandlerFactory }
+  return { applyTransition, executor, recordOnChainIdIfMissing, refundFiatDeposit, run, send, walletHandlerFactory }
 }
 
 describe('CryptoSendStepExecutor', () => {
@@ -205,6 +218,55 @@ describe('CryptoSendStepExecutor', () => {
       expect.objectContaining({ name: 'payment_failed' }),
     )
     expect(result).toEqual(expect.objectContaining({ outcome: 'failed' }))
+  })
+
+  /*
+   * An onramp collects the customer's money before it delivers anything, so a
+   * failed delivery without this leaves them paid-up and empty-handed — which
+   * is exactly what happened to the first real purchase.
+   */
+  it('returns the customer fiat when delivery fails for good', async () => {
+    const send = jest.fn(async () => ({
+      code: 'permanent' as const,
+      reason: 'destination rejected',
+      success: false as const,
+    }))
+    const { refundFiatDeposit, run } = buildHarness({ send })
+
+    await run()
+
+    expect(refundFiatDeposit).toHaveBeenCalledWith({
+      paymentMethod: PaymentMethod.PIX,
+      providerDepositId: 'dep-1',
+      reason: 'delivery_failed',
+      targetCurrency: TargetCurrency.BRL,
+      transactionId: TRANSACTION_ID,
+      trigger: 'flow_crypto_send',
+    })
+  })
+
+  // A retriable failure still has attempts left; refunding here would return
+  // money for a delivery that is about to be tried again.
+  it('does not refund while a retry is still pending', async () => {
+    const send = jest.fn(async () => ({
+      code: 'retriable' as const,
+      reason: 'congested',
+      success: false as const,
+    }))
+    const { refundFiatDeposit, run } = buildHarness({ send })
+
+    await run()
+
+    expect(refundFiatDeposit).not.toHaveBeenCalled()
+  })
+
+  // A successful delivery must never also hand the money back.
+  it('does not refund when the delivery succeeds', async () => {
+    const { refundFiatDeposit, run } = buildHarness()
+
+    await run()
+
+    expect(refundFiatDeposit).not.toHaveBeenCalled()
   })
 
   it('fails when the transaction carries no destination address', async () => {

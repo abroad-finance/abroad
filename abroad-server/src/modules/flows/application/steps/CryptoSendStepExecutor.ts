@@ -1,4 +1,4 @@
-import { FlowStepType, TransactionStatus } from '@prisma/client'
+import { FlowStepType, PaymentMethod, TargetCurrency, TransactionStatus } from '@prisma/client'
 import { inject, injectable } from 'inversify'
 
 import { TYPES } from '../../../../app/container/types'
@@ -12,6 +12,7 @@ import { TransactionEventDispatcher } from '../../../transactions/application/Tr
 import { TransactionRepository } from '../../../transactions/application/TransactionRepository'
 import { TransactionWebhookRouter } from '../../../transactions/application/TransactionWebhookRouter'
 import { FlowStepExecutionResult, FlowStepExecutor, FlowStepRuntimeContext } from '../flowTypes'
+import { RefundCoordinator } from '../RefundCoordinator'
 
 const SEND_RETRY_BASE_DELAY_MS = 30_000
 const SEND_RETRY_MAX_DELAY_MS = 5 * 60_000
@@ -40,6 +41,7 @@ export class CryptoSendStepExecutor implements FlowStepExecutor {
     @inject(TYPES.IOutboxDispatcher) outboxDispatcher: OutboxDispatcher,
     @inject(TransactionWebhookRouter)
     transactionWebhookRouter: TransactionWebhookRouter,
+    @inject(RefundCoordinator) private readonly refundCoordinator: RefundCoordinator,
   ) {
     this.repository = new TransactionRepository(dbProvider)
     this.dispatcher = new TransactionEventDispatcher(
@@ -205,7 +207,11 @@ export class CryptoSendStepExecutor implements FlowStepExecutor {
 
   private async failDelivery(
     prismaClient: Awaited<ReturnType<TransactionRepository['getClient']>>,
-    transaction: { id: string },
+    transaction: {
+      id: string
+      pixDepositId: null | string
+      quote: { paymentMethod: PaymentMethod, targetCurrency: TargetCurrency }
+    },
     reason: string,
   ): Promise<FlowStepExecutionResult> {
     const updated = await this.repository.applyTransition(prismaClient, {
@@ -223,6 +229,28 @@ export class CryptoSendStepExecutor implements FlowStepExecutor {
         'flow_crypto_send',
         { deliverNow: false, prismaClient },
       )
+    }
+
+    // The customer's fiat settled before this step ran, so a failed delivery
+    // leaves them paid-up with nothing to show for it. Give the money back,
+    // exactly as a failed payout returns the crypto its sender put in.
+    if (transaction.pixDepositId) {
+      await this.refundCoordinator.refundFiatDeposit({
+        paymentMethod: transaction.quote.paymentMethod,
+        providerDepositId: transaction.pixDepositId,
+        reason: 'delivery_failed',
+        targetCurrency: transaction.quote.targetCurrency,
+        transactionId: transaction.id,
+        trigger: 'flow_crypto_send',
+      })
+    }
+    else {
+      // Nothing was collected through a deposit we can reverse; a human has to
+      // decide what the customer is owed.
+      this.logger.error('Crypto delivery failed with no deposit to refund', {
+        reason,
+        transactionId: transaction.id,
+      })
     }
 
     return { error: reason, outcome: 'failed', output: { reason } }

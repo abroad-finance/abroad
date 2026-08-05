@@ -1,12 +1,15 @@
 import {
   BlockchainNetwork,
   CryptoCurrency,
+  PaymentMethod,
   Prisma,
+  TargetCurrency,
   TransactionEconomicCostKind,
   TransactionEconomicCostStatus,
 } from '@prisma/client'
 import { inject, injectable } from 'inversify'
 
+import type { FiatDepositRefundResult } from '../../payments/application/contracts/IFiatDepositService'
 import type { RefundResult } from '../../transactions/application/RefundService'
 
 import { TYPES } from '../../../app/container/types'
@@ -14,6 +17,7 @@ import { createScopedLogger, ScopedLogger } from '../../../core/logging/scopedLo
 import { ILogger } from '../../../core/logging/types'
 import { ILockManager } from '../../../platform/cacheLock/ILockManager'
 import { IDatabaseClientProvider } from '../../../platform/persistence/IDatabaseClientProvider'
+import { IFiatDepositServiceFactory } from '../../payments/application/contracts/IFiatDepositServiceFactory'
 import { IWalletHandlerFactory } from '../../payments/application/contracts/IWalletHandlerFactory'
 import { REFUND_LOCK_ACQUIRE_TIMEOUT_MS, refundLockKey } from '../../transactions/application/refundLock'
 import { RefundService } from '../../transactions/application/RefundService'
@@ -30,6 +34,8 @@ export class RefundCoordinator {
     @inject(TYPES.IWalletHandlerFactory) walletHandlerFactory: IWalletHandlerFactory,
     @inject(TYPES.ILockManager) private readonly lockManager: ILockManager,
     @inject(TYPES.ILogger) baseLogger: ILogger,
+    @inject(TYPES.IFiatDepositServiceFactory)
+    private readonly fiatDepositServiceFactory: IFiatDepositServiceFactory,
   ) {
     this.repository = new TransactionRepository(dbProvider)
     this.refundService = new RefundService(walletHandlerFactory, baseLogger)
@@ -49,6 +55,31 @@ export class RefundCoordinator {
       refundLockKey(params.transactionId),
       REFUND_LOCK_ACQUIRE_TIMEOUT_MS,
       async () => this.refundByOnChainIdWhileLocked(params),
+    )
+  }
+
+  /**
+   * Returns a settled fiat deposit to whoever paid it — the onramp counterpart
+   * of refunding crypto to its sender.
+   *
+   * An onramp takes the customer's money before it delivers anything, so a
+   * delivery that fails without this leaves them paid-up and empty-handed. It
+   * shares the payout refund's lock, reservation and outcome recording so the
+   * two directions cannot both act on one transaction, and so a retried step
+   * cannot refund twice.
+   */
+  public async refundFiatDeposit(params: {
+    paymentMethod: PaymentMethod
+    providerDepositId: string
+    reason: string
+    targetCurrency: TargetCurrency
+    transactionId: string
+    trigger: string
+  }): Promise<void> {
+    await this.lockManager.withLock(
+      refundLockKey(params.transactionId),
+      REFUND_LOCK_ACQUIRE_TIMEOUT_MS,
+      async () => this.refundFiatDepositWhileLocked(params),
     )
   }
 
@@ -195,6 +226,69 @@ export class RefundCoordinator {
           transactionId: params.transactionId,
         })
       }
+    }
+  }
+
+  private async refundFiatDepositWhileLocked(params: {
+    paymentMethod: PaymentMethod
+    providerDepositId: string
+    reason: string
+    targetCurrency: TargetCurrency
+    transactionId: string
+    trigger: string
+  }): Promise<void> {
+    const prismaClient = await this.repository.getClient()
+    const idempotencyKey = `flow:refund:${params.transactionId}:${params.reason}`
+    const reservation = await this.repository.reserveRefund(prismaClient, {
+      idempotencyKey,
+      reason: params.reason,
+      transactionId: params.transactionId,
+      trigger: params.trigger,
+    })
+
+    if (reservation.outcome !== 'reserved') {
+      this.logger.info('Skipping fiat refund; already handled', {
+        outcome: reservation.outcome,
+        transactionId: params.transactionId,
+      })
+      return
+    }
+
+    let result: FiatDepositRefundResult
+    try {
+      const depositService = this.fiatDepositServiceFactory.getForCapability({
+        paymentMethod: params.paymentMethod,
+        targetCurrency: params.targetCurrency,
+      })
+      result = await depositService.refundDeposit({
+        providerDepositId: params.providerDepositId,
+        transactionId: params.transactionId,
+      })
+    }
+    catch (error) {
+      const reason = error instanceof Error ? error.message : 'unknown_fiat_refund_error'
+      result = { code: 'retriable', reason, success: false }
+    }
+
+    try {
+      await this.repository.recordRefundOutcome(prismaClient, {
+        idempotencyKey,
+        refundResult: result.success
+          ? { success: true, transactionId: result.providerRefundId }
+          // A retriable failure is not settled either way: the money may still
+          // be with the provider, so it is left for reconciliation rather than
+          // written off as refused.
+          : result.code === 'retriable'
+            ? { reason: result.reason, reconciliationRequired: true, success: false, transactionId: params.providerDepositId }
+            : { reason: result.reason, success: false },
+        transactionId: params.transactionId,
+      })
+    }
+    catch (error) {
+      this.logger.error('Failed to record fiat refund outcome', {
+        error: error instanceof Error ? error.message : 'unknown_error',
+        transactionId: params.transactionId,
+      })
     }
   }
 
