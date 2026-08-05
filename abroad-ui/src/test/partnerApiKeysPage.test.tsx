@@ -26,7 +26,11 @@ const mocked = vi.hoisted(() => ({
   revokePartnerApiKey: vi.fn(),
   rotatePartnerApiKey: vi.fn(),
   updatePartnerClientDomain: vi.fn(),
+  updatePartnerKybApproval: vi.fn(),
   updatePartnerKycRequirement: vi.fn(),
+  updatePartnerProfile: vi.fn(),
+  updatePartnerStatus: vi.fn(),
+  updatePartnerWebhookUrl: vi.fn(),
 }))
 
 vi.mock('../services/admin/partnerAdminApi', () => ({
@@ -36,7 +40,11 @@ vi.mock('../services/admin/partnerAdminApi', () => ({
   revokePartnerApiKey: mocked.revokePartnerApiKey,
   rotatePartnerApiKey: mocked.rotatePartnerApiKey,
   updatePartnerClientDomain: mocked.updatePartnerClientDomain,
+  updatePartnerKybApproval: mocked.updatePartnerKybApproval,
   updatePartnerKycRequirement: mocked.updatePartnerKycRequirement,
+  updatePartnerProfile: mocked.updatePartnerProfile,
+  updatePartnerStatus: mocked.updatePartnerStatus,
+  updatePartnerWebhookUrl: mocked.updatePartnerWebhookUrl,
 }))
 
 const administratorSession: OpsSession = {
@@ -301,6 +309,107 @@ describe('PartnerApiKeys page', () => {
     // The row reflects the server's response, and the action flips to re-enable.
     expect(await screen.findByText('Disabled')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Require KYC' })).toBeInTheDocument()
+  })
+
+  it('approves KYB, edits the profile, sets a webhook, and suspends the partner', async () => {
+    const basePartner = {
+      clientDomain: undefined,
+      createdAt: new Date('2024-01-01T00:00:00.000Z').toISOString(),
+      email: 'acme@example.com',
+      firstName: 'Ada',
+      hasApiKey: true,
+      id: 'partner-1',
+      isKybApproved: false,
+      lastName: 'Lovelace',
+      name: 'Acme',
+      needsKyc: true,
+    }
+    mocked.listPartners.mockResolvedValue({
+      items: [{
+        ...basePartner,
+        completedVolume: {
+          completedTransactions: 0, payout: [], source: [], stablecoinAmount: 0,
+        },
+      }],
+      maximumStablecoinAmount: 0,
+      page: 1,
+      pageSize: 20,
+      total: 1,
+    })
+    mocked.updatePartnerKybApproval.mockResolvedValue({ ...basePartner, isKybApproved: true })
+    mocked.updatePartnerProfile.mockResolvedValue({ ...basePartner, isKybApproved: true, name: 'Acme Global' })
+    mocked.updatePartnerWebhookUrl.mockResolvedValue({
+      ...basePartner,
+      isKybApproved: true,
+      name: 'Acme Global',
+      webhookUrl: 'https://hooks.acme.test/abroad',
+    })
+    mocked.updatePartnerStatus.mockResolvedValue({
+      ...basePartner,
+      disabledAt: new Date('2026-08-04T12:00:00.000Z').toISOString(),
+      disabledBy: 'administrator@abroad.finance',
+      disabledReason: 'fraud review',
+      isKybApproved: true,
+      name: 'Acme Global',
+    })
+    vi.spyOn(window, 'prompt').mockReturnValue('fraud review')
+
+    const user = userEvent.setup()
+    render(
+      <MemoryRouter>
+        <ImmediateOpsMutationProvider>
+          <PartnerApiKeys />
+        </ImmediateOpsMutationProvider>
+      </MemoryRouter>,
+    )
+
+    await screen.findByText('Acme')
+    expect(screen.getByText('$100 cap')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Approve KYB' }))
+    await waitFor(() => {
+      expect(mocked.updatePartnerKybApproval).toHaveBeenCalledWith(
+        'partner-1',
+        { isKybApproved: true },
+        testOpsMutationDetails,
+      )
+    })
+    expect(await screen.findByText('Approved')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Edit Profile' }))
+    const nameInput = screen.getByLabelText('Company name for Acme')
+    await user.clear(nameInput)
+    await user.type(nameInput, 'Acme Global')
+    await user.click(screen.getByRole('button', { name: 'Save Profile' }))
+    await waitFor(() => {
+      expect(mocked.updatePartnerProfile).toHaveBeenCalledWith(
+        'partner-1',
+        expect.objectContaining({ name: 'Acme Global' }),
+        testOpsMutationDetails,
+      )
+    })
+
+    await user.click(screen.getByRole('button', { name: 'Set Webhook' }))
+    await user.type(screen.getByLabelText('Webhook URL for Acme Global'), 'https://hooks.acme.test/abroad')
+    await user.click(screen.getByRole('button', { name: 'Save Webhook' }))
+    await waitFor(() => {
+      expect(mocked.updatePartnerWebhookUrl).toHaveBeenCalledWith(
+        'partner-1',
+        { webhookUrl: 'https://hooks.acme.test/abroad' },
+        testOpsMutationDetails,
+      )
+    })
+
+    await user.click(screen.getByRole('button', { name: 'Suspend Partner' }))
+    await waitFor(() => {
+      expect(mocked.updatePartnerStatus).toHaveBeenCalledWith(
+        'partner-1',
+        { disabled: true, reason: 'fraud review' },
+        testOpsMutationDetails,
+      )
+    })
+    expect(await screen.findByText('Suspended')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Restore Partner' })).toBeInTheDocument()
   })
 
   it('renders a responsive partner ranking with proportional visual rails', async () => {

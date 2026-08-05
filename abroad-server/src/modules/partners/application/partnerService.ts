@@ -8,6 +8,7 @@ import jwt from 'jsonwebtoken'
 import { TYPES } from '../../../app/container/types'
 import { IDatabaseClientProvider } from '../../../platform/persistence/IDatabaseClientProvider'
 import { ISecretManager } from '../../../platform/secrets/ISecretManager'
+import { assertPartnerEnabled, DisabledPartnerError } from '../../shared/partnerUserAccess'
 import { type ClientDomain, hashClientDomain, parseClientDomain as parseClientDomainValue } from '../domain/clientDomain'
 import { BearerAuthentication, IPartnerService, PartnerApiKeyAuthentication } from './contracts/IPartnerService'
 import { hashPartnerApiKey } from './partnerApiKey'
@@ -64,6 +65,7 @@ export class PartnerService implements IPartnerService {
           },
         })
       }
+      assertPartnerEnabled(managedKey.partner)
       return {
         keyId: managedKey.id,
         kind: 'MANAGED',
@@ -76,6 +78,7 @@ export class PartnerService implements IPartnerService {
     if (!partner) {
       throw new Error('Partner not found')
     }
+    assertPartnerEnabled(partner)
     return { kind: 'LEGACY', partner }
   }
 
@@ -100,6 +103,7 @@ export class PartnerService implements IPartnerService {
       if (clientDomain) {
         const partner = await this.findPartnerByClientDomain(prismaClient, clientDomain)
         if (partner) {
+          assertPartnerEnabled(partner)
           return { authenticatedSubject: decodedToken.sub, partner, source }
         }
       }
@@ -110,9 +114,15 @@ export class PartnerService implements IPartnerService {
         throw new Error('Partner not found')
       }
 
+      assertPartnerEnabled(partner)
       return { authenticatedSubject: decodedToken.sub, partner, source }
     }
-    catch {
+    catch (error) {
+      // A suspended partner is an authorization outcome, not a malformed token;
+      // collapsing it into the generic failure would report 401 instead of 403.
+      if (error instanceof DisabledPartnerError) {
+        throw error
+      }
       throw new Error('Bearer JWT verification failed')
     }
   }
@@ -127,6 +137,7 @@ export class PartnerService implements IPartnerService {
     if (!partner) {
       throw new Error('Partner not found')
     }
+    assertPartnerEnabled(partner)
     return partner
   }
 

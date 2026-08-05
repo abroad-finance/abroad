@@ -121,6 +121,48 @@ describe('PartnerService', () => {
     })
   })
 
+  describe('suspended partners', () => {
+    // A suspension has to bite at every place a Partner is resolved from a
+    // credential, otherwise one unguarded path leaves the integration live.
+    const suspend = (partner: PartnerModel) => ({
+      ...partner,
+      disabledAt: new Date('2026-08-04T00:00:00.000Z'),
+    } as unknown as PartnerModel)
+
+    it('blocks a legacy API key', async () => {
+      partnersByApiKey[hashedApiKey] = suspend(partnerFromApiKey)
+      await expect(service.getPartnerFromApiKey('api-key')).rejects.toThrow(/suspended/i)
+    })
+
+    it('blocks a managed API key', async () => {
+      managedFindUnique.mockResolvedValue({
+        expiresAt: null,
+        id: 'managed-1',
+        lastUsedAt: new Date(),
+        partner: suspend(partnerFromApiKey),
+        revokedAt: null,
+        scopes: [],
+      } as never)
+      await expect(service.authenticateApiKey('api-key')).rejects.toThrow(/suspended/i)
+    })
+
+    it('blocks a client-domain session', async () => {
+      partnersByClientDomainHash[hashedClientDomain] = suspend(partnerFromDomain)
+      await expect(service.getPartnerFromClientDomain(
+        parseClientDomain('client.example.com')!,
+      )).rejects.toThrow(/suspended/i)
+    })
+
+    it('blocks a SEP bearer token without collapsing into a generic auth failure', async () => {
+      partnersByClientDomainHash[hashedClientDomain] = suspend(partnerFromDomain)
+      await expect(service.authenticateBearerToken('token')).rejects.toThrow(/suspended/i)
+    })
+
+    it('still admits an active partner', async () => {
+      await expect(service.getPartnerFromApiKey('api-key')).resolves.toBe(partnerFromApiKey)
+    })
+  })
+
   it('hashes and retrieves partner by API key', async () => {
     const result = await service.getPartnerFromApiKey('api-key')
 

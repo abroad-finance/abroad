@@ -11,7 +11,11 @@ import {
   revokePartnerApiKey,
   rotatePartnerApiKey,
   updatePartnerClientDomain,
+  updatePartnerKybApproval,
   updatePartnerKycRequirement,
+  updatePartnerProfile,
+  updatePartnerStatus,
+  updatePartnerWebhookUrl,
 } from '../../services/admin/partnerAdminApi'
 import {
   OpsCreatePartnerInput,
@@ -199,9 +203,36 @@ const validateDraft = (draft: CreatePartnerDraft): null | string => {
 }
 
 const buildActionKey = (
-  action: 'clear-domain' | 'revoke' | 'rotate' | 'save-domain' | 'toggle-kyc',
+  action: 'clear-domain' | 'revoke' | 'rotate' | 'save-domain' | 'save-profile' | 'save-webhook' | 'toggle-kyb' | 'toggle-kyc' | 'toggle-status',
   partnerId: string,
 ): string => `${action}:${partnerId}`
+
+type ProfileDraft = {
+  country: string
+  email: string
+  firstName: string
+  lastName: string
+  name: string
+  phone: string
+}
+
+const emptyProfileDraft: ProfileDraft = {
+  country: '',
+  email: '',
+  firstName: '',
+  lastName: '',
+  name: '',
+  phone: '',
+}
+
+const toProfileDraft = (partner: OpsPartner): ProfileDraft => ({
+  country: partner.country ?? '',
+  email: partner.email ?? '',
+  firstName: partner.firstName ?? '',
+  lastName: partner.lastName ?? '',
+  name: partner.name,
+  phone: partner.phone ?? '',
+})
 
 type CompletedVolumeProps = {
   maximumAmount: number
@@ -342,6 +373,10 @@ const PartnerApiKeys = () => {
   const [actionLoading, setActionLoading] = useState<null | string>(null)
   const [editingPartnerId, setEditingPartnerId] = useState<null | string>(null)
   const [editingClientDomain, setEditingClientDomain] = useState('')
+  const [editingProfileId, setEditingProfileId] = useState<null | string>(null)
+  const [profileDraft, setProfileDraft] = useState<ProfileDraft>(emptyProfileDraft)
+  const [editingWebhookId, setEditingWebhookId] = useState<null | string>(null)
+  const [editingWebhookUrl, setEditingWebhookUrl] = useState('')
   const [error, setError] = useState<null | string>(null)
   const [draft, setDraft] = useState<CreatePartnerDraft>(emptyDraft)
   const [revealedKey, setRevealedKey] = useState<null | RevealedKey>(null)
@@ -566,6 +601,110 @@ const PartnerApiKeys = () => {
     catch (saveError) {
       if (isOpsMutationCancelledError(saveError)) return
       setError(saveError instanceof Error ? saveError.message : 'Failed to save client domain')
+    }
+    finally {
+      setActionLoading(null)
+    }
+  }
+
+  const handleToggleKyb = async (partner: OpsPartner) => {
+    const isKybApproved = !partner.isKybApproved
+    setActionLoading(buildActionKey('toggle-kyb', partner.id))
+    setError(null)
+
+    try {
+      const updatedPartner = await requestMutation({
+        action: 'partner.kyb_approval.update',
+        execute: mutation => updatePartnerKybApproval(partner.id, { isKybApproved }, mutation),
+        resourceLabel: `${partner.name} · KYB ${isKybApproved ? 'approved' : 'revoked'}`,
+        title: isKybApproved ? 'Approve KYB (lifts the $100 cap)' : 'Revoke KYB approval',
+      })
+      updatePartnerRecord(updatedPartner)
+    }
+    catch (kybError) {
+      if (isOpsMutationCancelledError(kybError)) return
+      setError(kybError instanceof Error ? kybError.message : 'Failed to update KYB approval')
+    }
+    finally {
+      setActionLoading(null)
+    }
+  }
+
+  const handleToggleStatus = async (partner: OpsPartner) => {
+    const disabled = !partner.disabledAt
+    // Only ask for a reason when suspending; restoring clears it anyway.
+    const reason = disabled
+      ? window.prompt(`Reason for suspending ${partner.name}? (optional)`) ?? undefined
+      : undefined
+    setActionLoading(buildActionKey('toggle-status', partner.id))
+    setError(null)
+
+    try {
+      const updatedPartner = await requestMutation({
+        action: 'partner.status.update',
+        execute: mutation => updatePartnerStatus(partner.id, { disabled, reason }, mutation),
+        resourceLabel: `${partner.name} · ${disabled ? 'suspended' : 'restored'}`,
+        title: disabled ? 'Suspend this partner' : 'Restore this partner',
+      })
+      updatePartnerRecord(updatedPartner)
+    }
+    catch (statusError) {
+      if (isOpsMutationCancelledError(statusError)) return
+      setError(statusError instanceof Error ? statusError.message : 'Failed to update the partner status')
+    }
+    finally {
+      setActionLoading(null)
+    }
+  }
+
+  const handleSaveProfile = async (partner: OpsPartner, draft: ProfileDraft) => {
+    setActionLoading(buildActionKey('save-profile', partner.id))
+    setError(null)
+
+    try {
+      const updatedPartner = await requestMutation({
+        action: 'partner.profile.update',
+        execute: mutation => updatePartnerProfile(partner.id, {
+          country: draft.country.trim() || null,
+          email: draft.email.trim() || null,
+          firstName: draft.firstName.trim() || null,
+          lastName: draft.lastName.trim() || null,
+          name: draft.name.trim(),
+          phone: draft.phone.trim() || null,
+        }, mutation),
+        resourceLabel: partner.name,
+        title: 'Update partner profile',
+      })
+      updatePartnerRecord(updatedPartner)
+      setEditingProfileId(null)
+    }
+    catch (profileError) {
+      if (isOpsMutationCancelledError(profileError)) return
+      setError(profileError instanceof Error ? profileError.message : 'Failed to update the partner profile')
+    }
+    finally {
+      setActionLoading(null)
+    }
+  }
+
+  const handleSaveWebhook = async (partner: OpsPartner) => {
+    setActionLoading(buildActionKey('save-webhook', partner.id))
+    setError(null)
+
+    try {
+      const webhookUrl = editingWebhookUrl.trim() || null
+      const updatedPartner = await requestMutation({
+        action: 'partner.webhook.update',
+        execute: mutation => updatePartnerWebhookUrl(partner.id, { webhookUrl }, mutation),
+        resourceLabel: `${partner.name} · ${webhookUrl ?? 'No webhook'}`,
+        title: 'Update partner webhook endpoint',
+      })
+      updatePartnerRecord(updatedPartner)
+      setEditingWebhookId(null)
+    }
+    catch (webhookError) {
+      if (isOpsMutationCancelledError(webhookError)) return
+      setError(webhookError instanceof Error ? webhookError.message : 'Failed to update the webhook URL')
     }
     finally {
       setActionLoading(null)
@@ -820,6 +959,10 @@ const PartnerApiKeys = () => {
                 const rotateKey = buildActionKey('rotate', partner.id)
                 const revokeKey = buildActionKey('revoke', partner.id)
                 const toggleKycKey = buildActionKey('toggle-kyc', partner.id)
+                const toggleKybKey = buildActionKey('toggle-kyb', partner.id)
+                const toggleStatusKey = buildActionKey('toggle-status', partner.id)
+                const saveProfileKey = buildActionKey('save-profile', partner.id)
+                const saveWebhookKey = buildActionKey('save-webhook', partner.id)
                 const editingAnotherPartner = editingPartnerId !== null && editingPartnerId !== partner.id
 
                 return (
@@ -876,6 +1019,22 @@ const PartnerApiKeys = () => {
                           </div>
                           <OpsStatusBadge tone={partner.needsKyc ? 'success' : 'warning'}>
                             {partner.needsKyc ? 'Required' : 'Disabled'}
+                          </OpsStatusBadge>
+                        </div>
+                        <div>
+                          <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-ops-label">
+                            KYB
+                          </div>
+                          <OpsStatusBadge tone={partner.isKybApproved ? 'success' : 'warning'}>
+                            {partner.isKybApproved ? 'Approved' : '$100 cap'}
+                          </OpsStatusBadge>
+                        </div>
+                        <div>
+                          <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-ops-label">
+                            Status
+                          </div>
+                          <OpsStatusBadge tone={partner.disabledAt ? 'danger' : 'success'}>
+                            {partner.disabledAt ? 'Suspended' : 'Active'}
                           </OpsStatusBadge>
                         </div>
                       </div>
@@ -959,6 +1118,40 @@ const PartnerApiKeys = () => {
                               </>
                             )}
                         <button
+                          className="ops-btn-neutral ops-btn-sm"
+                          disabled={!opsApiKey || partnerBusy || isEditing}
+                          onClick={() => {
+                            setEditingProfileId(partner.id)
+                            setProfileDraft(toProfileDraft(partner))
+                            setError(null)
+                          }}
+                          type="button"
+                        >
+                          Edit Profile
+                        </button>
+                        <button
+                          className="ops-btn-neutral ops-btn-sm"
+                          disabled={!opsApiKey || partnerBusy || isEditing}
+                          onClick={() => {
+                            setEditingWebhookId(partner.id)
+                            setEditingWebhookUrl(partner.webhookUrl ?? '')
+                            setError(null)
+                          }}
+                          type="button"
+                        >
+                          {partner.webhookUrl ? 'Edit Webhook' : 'Set Webhook'}
+                        </button>
+                        <button
+                          className={partner.isKybApproved ? 'ops-btn-neutral ops-btn-sm' : 'ops-btn-primary ops-btn-sm'}
+                          disabled={!opsApiKey || partnerBusy || isEditing}
+                          onClick={() => void handleToggleKyb(partner)}
+                          type="button"
+                        >
+                          {actionLoading === toggleKybKey
+                            ? 'Updating...'
+                            : partner.isKybApproved ? 'Revoke KYB' : 'Approve KYB'}
+                        </button>
+                        <button
                           className={partner.needsKyc ? 'ops-btn-danger ops-btn-sm' : 'ops-btn-neutral ops-btn-sm'}
                           disabled={!opsApiKey || partnerBusy || isEditing}
                           onClick={() => void handleToggleKyc(partner)}
@@ -993,8 +1186,94 @@ const PartnerApiKeys = () => {
                         >
                           {actionLoading === revokeKey ? 'Revoking...' : 'Revoke'}
                         </button>
+                        <button
+                          className={partner.disabledAt ? 'ops-btn-primary ops-btn-sm' : 'ops-btn-danger ops-btn-sm'}
+                          disabled={!opsApiKey || partnerBusy || isEditing}
+                          onClick={() => void handleToggleStatus(partner)}
+                          type="button"
+                        >
+                          {actionLoading === toggleStatusKey
+                            ? 'Updating...'
+                            : partner.disabledAt ? 'Restore Partner' : 'Suspend Partner'}
+                        </button>
                       </div>
                     </div>
+                    {partner.disabledAt && (
+                      <OpsBanner className="mt-4" variant="error">
+                        {`Suspended ${formatDateTime(partner.disabledAt)}`}
+                        {partner.disabledBy && ` by ${partner.disabledBy}`}
+                        {partner.disabledReason && ` · ${partner.disabledReason}`}
+                        {' — every API key and client-domain session for this partner is refused.'}
+                      </OpsBanner>
+                    )}
+                    {editingProfileId === partner.id && (
+                      <div className="mt-4 grid gap-3 border-t border-ops-border pt-4 sm:grid-cols-2">
+                        {([
+                          ['name', 'Company name'],
+                          ['email', 'Email'],
+                          ['firstName', 'First name'],
+                          ['lastName', 'Last name'],
+                          ['phone', 'Phone'],
+                          ['country', 'Country (ISO-2)'],
+                        ] as Array<[keyof ProfileDraft, string]>).map(([field, label]) => (
+                          <label className="min-w-0 text-xs text-ops-muted" key={field}>
+                            <span className="mb-1 block font-semibold text-ops-label">{label}</span>
+                            <input
+                              aria-label={`${label} for ${partner.name}`}
+                              className="ops-input h-10 w-full min-w-0"
+                              onChange={event => setProfileDraft(current => ({ ...current, [field]: event.target.value }))}
+                              value={profileDraft[field]}
+                            />
+                          </label>
+                        ))}
+                        <div className="flex flex-wrap gap-2 sm:col-span-2">
+                          <button
+                            className="ops-btn-primary ops-btn-sm"
+                            disabled={partnerBusy || !profileDraft.name.trim()}
+                            onClick={() => void handleSaveProfile(partner, profileDraft)}
+                            type="button"
+                          >
+                            {actionLoading === saveProfileKey ? 'Saving...' : 'Save Profile'}
+                          </button>
+                          <button
+                            className="ops-btn-neutral ops-btn-sm"
+                            onClick={() => setEditingProfileId(null)}
+                            type="button"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                    {editingWebhookId === partner.id && (
+                      <div className="mt-4 flex flex-wrap items-end gap-2 border-t border-ops-border pt-4">
+                        <label className="min-w-0 flex-1 text-xs text-ops-muted">
+                          <span className="mb-1 block font-semibold text-ops-label">Webhook endpoint (https)</span>
+                          <input
+                            aria-label={`Webhook URL for ${partner.name}`}
+                            className="ops-input h-10 w-full min-w-0"
+                            onChange={event => setEditingWebhookUrl(event.target.value)}
+                            placeholder="https://partner.example.com/abroad/webhook"
+                            value={editingWebhookUrl}
+                          />
+                        </label>
+                        <button
+                          className="ops-btn-primary ops-btn-sm"
+                          disabled={partnerBusy}
+                          onClick={() => void handleSaveWebhook(partner)}
+                          type="button"
+                        >
+                          {actionLoading === saveWebhookKey ? 'Saving...' : 'Save Webhook'}
+                        </button>
+                        <button
+                          className="ops-btn-neutral ops-btn-sm"
+                          onClick={() => setEditingWebhookId(null)}
+                          type="button"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    )}
                     {historyPartnerId === partner.id && (
                       <div aria-live="polite">
                         {historyLoading && <div className="mt-4"><OpsLoading label="Loading credential history…" /></div>}

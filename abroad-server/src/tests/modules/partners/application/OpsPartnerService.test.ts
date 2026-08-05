@@ -80,6 +80,9 @@ const basePartner = (overrides?: Partial<PartnerModel>): PartnerModel => ({
   clientDomainHash: null,
   country: 'CO',
   createdAt: new Date('2024-01-01T00:00:00.000Z'),
+  disabledAt: null,
+  disabledBy: null,
+  disabledReason: null,
   email: 'partner@example.com',
   firstName: 'Pat',
   id: 'partner-1',
@@ -494,6 +497,70 @@ describe('OpsPartnerService', () => {
     expect(serialized).not.toContain('current-secret-hash')
     expect(serialized).not.toContain('previous-secret-hash')
     expect(serialized).not.toContain('managed-secret-hash')
+  })
+
+  it('approves and revokes KYB', async () => {
+    await service.updateKybApproval('partner-domain', { isKybApproved: true })
+    expect(partner.update).toHaveBeenCalledWith({
+      data: { isKybApproved: true },
+      where: { id: 'partner-domain' },
+    })
+  })
+
+  it('updates only the profile fields provided, normalizing them', async () => {
+    await service.updateProfile('partner-domain', {
+      country: 'co',
+      email: '  New@Example.COM ',
+      name: '  Acme Corp  ',
+    })
+
+    expect(partner.update).toHaveBeenCalledWith({
+      data: { country: 'CO', email: 'new@example.com', name: 'Acme Corp' },
+      where: { id: 'partner-domain' },
+    })
+  })
+
+  it('clears a profile field when explicitly passed null', async () => {
+    await service.updateProfile('partner-domain', { phone: null })
+    expect(partner.update).toHaveBeenCalledWith({
+      data: { phone: null },
+      where: { id: 'partner-domain' },
+    })
+  })
+
+  it('rejects a profile update with no fields', async () => {
+    await expect(service.updateProfile('partner-domain', {})).rejects
+      .toThrow(new OpsPartnerValidationError('No partner profile fields were provided'))
+    expect(partner.update).not.toHaveBeenCalled()
+  })
+
+  it('suspends a partner with an actor and reason, then restores it', async () => {
+    await service.updateStatus('partner-domain', { disabled: true, reason: '  fraud review  ' }, 'ops@abroad.finance')
+    expect(partner.update).toHaveBeenCalledWith({
+      data: {
+        disabledAt: expect.any(Date),
+        disabledBy: 'ops@abroad.finance',
+        disabledReason: 'fraud review',
+      },
+      where: { id: 'partner-domain' },
+    })
+
+    await service.updateStatus('partner-domain', { disabled: false }, 'ops@abroad.finance')
+    expect(partner.update).toHaveBeenLastCalledWith({
+      data: { disabledAt: null, disabledBy: null, disabledReason: null },
+      where: { id: 'partner-domain' },
+    })
+  })
+
+  it('accepts an https webhook URL and rejects anything else', async () => {
+    await service.updateWebhookUrl('partner-domain', { webhookUrl: ' https://hooks.example.com/abroad ' })
+    expect(partner.update).toHaveBeenCalledWith({
+      data: { webhookUrl: 'https://hooks.example.com/abroad' },
+      where: { id: 'partner-domain' },
+    })
+
+    await expect(service.updateWebhookUrl('partner-domain', { webhookUrl: 'http://insecure.example.com' }))
+      .rejects.toThrow(/https/)
   })
 
   it('turns the partner KYC requirement on and off', async () => {

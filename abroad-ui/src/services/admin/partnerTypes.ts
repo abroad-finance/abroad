@@ -17,6 +17,9 @@ export type OpsPartner = {
   clientDomain?: string
   country?: string
   createdAt: string
+  disabledAt?: string
+  disabledBy?: string
+  disabledReason?: string
   email?: string
   firstName?: string
   hasApiKey: boolean
@@ -27,6 +30,7 @@ export type OpsPartner = {
   name: string
   needsKyc: boolean
   phone?: string
+  webhookUrl?: string
 }
 
 export type OpsPartnerCompletedVolume = {
@@ -103,8 +107,39 @@ export type OpsUpdatePartnerClientDomainInput = {
 
 export type OpsUpdatePartnerClientDomainResponse = OpsPartner
 
+export type OpsUpdatePartnerKybInput = {
+  isKybApproved: boolean
+}
+
+export type OpsUpdatePartnerKybResponse = OpsPartner
+
 export type OpsUpdatePartnerKycInput = {
   needsKyc: boolean
 }
 
 export type OpsUpdatePartnerKycResponse = OpsPartner
+
+/** Omitted keys are left untouched; `null` clears the field. */
+export type OpsUpdatePartnerProfileInput = {
+  country?: null | string
+  email?: null | string
+  firstName?: null | string
+  lastName?: null | string
+  name?: string
+  phone?: null | string
+}
+
+export type OpsUpdatePartnerProfileResponse = OpsPartner
+
+export type OpsUpdatePartnerStatusInput = {
+  disabled: boolean
+  reason?: null | string
+}
+
+export type OpsUpdatePartnerStatusResponse = OpsPartner
+
+export type OpsUpdatePartnerWebhookInput = {
+  webhookUrl: null | string
+}
+
+export type OpsUpdatePartnerWebhookResponse = OpsPartner

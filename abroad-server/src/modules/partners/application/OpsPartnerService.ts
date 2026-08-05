@@ -64,6 +64,10 @@ export type OpsPartnerCredentialHistory = {
   partner: OpsPartnerSummary
 }
 
+export type OpsPartnerKybApprovalInput = {
+  isKybApproved: boolean
+}
+
 export type OpsPartnerKycRequirementInput = {
   needsKyc: boolean
 }
@@ -104,6 +108,16 @@ export type OpsPartnerPayoutVolume = {
   currency: TargetCurrency
 }
 
+/** Every field optional: omitted keys are left untouched, `null` clears. */
+export type OpsPartnerProfileInput = {
+  country?: null | string
+  email?: null | string
+  firstName?: null | string
+  lastName?: null | string
+  name?: string
+  phone?: null | string
+}
+
 export type OpsPartnerRotateApiKeyResult = {
   apiKey: string
   partner: OpsPartnerSummary
@@ -114,10 +128,18 @@ export type OpsPartnerSourceVolume = {
   currency: CryptoCurrency
 }
 
+export type OpsPartnerStatusInput = {
+  disabled: boolean
+  reason?: null | string
+}
+
 export type OpsPartnerSummary = {
   clientDomain?: string
   country?: string
   createdAt: Date
+  disabledAt?: Date
+  disabledBy?: string
+  disabledReason?: string
   email?: string
   firstName?: string
   hasApiKey: boolean
@@ -128,6 +150,11 @@ export type OpsPartnerSummary = {
   name: string
   needsKyc: boolean
   phone?: string
+  webhookUrl?: string
+}
+
+export type OpsPartnerWebhookInput = {
+  webhookUrl: null | string
 }
 
 type MutablePartnerVolume = {
@@ -484,6 +511,18 @@ export class OpsPartnerService {
   }
 
   /**
+   * Approves or revokes KYB. While unapproved, enforcePartnerKybThreshold caps
+   * the partner at $100 of lifetime completed volume, so this is what lets a
+   * newly onboarded partner transact at full size.
+   */
+  public async updateKybApproval(
+    partnerId: string,
+    input: OpsPartnerKybApprovalInput,
+  ): Promise<OpsPartnerSummary> {
+    return this.applyPartnerUpdate(partnerId, { isKybApproved: input.isKybApproved }, 'Failed to update KYB approval')
+  }
+
+  /**
    * Toggles whether this partner's users are asked to complete KYC.
    * `shouldRequestKyc` short-circuits on `needsKyc === false`, so turning this
    * off lets every user of the partner transact unverified at any amount.
@@ -510,12 +549,109 @@ export class OpsPartnerService {
     }
   }
 
+  /**
+   * Edits the partner's descriptive fields. Credentials, KYB, KYC and status
+   * each have their own endpoint so a profile edit can never change them by
+   * accident; omitted keys are left untouched and `null` clears a value.
+   */
+  public async updateProfile(
+    partnerId: string,
+    input: OpsPartnerProfileInput,
+  ): Promise<OpsPartnerSummary> {
+    const data: Prisma.PartnerUpdateInput = {}
+    if (input.name !== undefined) data.name = input.name.trim()
+    if (input.email !== undefined) data.email = this.normalizeOptionalText(input.email)?.toLowerCase() ?? null
+    if (input.phone !== undefined) data.phone = this.normalizeOptionalText(input.phone) ?? null
+    if (input.firstName !== undefined) data.firstName = this.normalizeOptionalText(input.firstName) ?? null
+    if (input.lastName !== undefined) data.lastName = this.normalizeOptionalText(input.lastName) ?? null
+    if (input.country !== undefined) data.country = this.normalizeOptionalText(input.country)?.toUpperCase() ?? null
+
+    if (Object.keys(data).length === 0) {
+      throw new OpsPartnerValidationError('No partner profile fields were provided')
+    }
+
+    try {
+      const prisma = await this.dbProvider.getClient()
+      return this.toSummary(await prisma.partner.update({ data, where: { id: partnerId } }))
+    }
+    catch (error) {
+      if (this.isNotFoundError(error)) {
+        throw new OpsPartnerNotFoundError('Partner not found')
+      }
+      if (this.isUniqueConstraintFor(error, 'email')) {
+        throw new OpsPartnerValidationError('Another partner already uses that email')
+      }
+      throw new OpsPartnerValidationError('Failed to update the partner profile')
+    }
+  }
+
+  /**
+   * Suspends or restores the whole partner. Every API key and client-domain
+   * session for it stops authenticating while `disabledAt` is set.
+   */
+  public async updateStatus(
+    partnerId: string,
+    input: OpsPartnerStatusInput,
+    actor: null | string,
+  ): Promise<OpsPartnerSummary> {
+    const data = input.disabled
+      ? {
+          disabledAt: new Date(),
+          disabledBy: actor ?? null,
+          disabledReason: this.normalizeOptionalText(input.reason) ?? null,
+        }
+      : { disabledAt: null, disabledBy: null, disabledReason: null }
+
+    return this.applyPartnerUpdate(partnerId, data, 'Failed to update the partner status')
+  }
+
+  /**
+   * Sets the partner-wide webhook endpoint used for transaction callbacks.
+   */
+  public async updateWebhookUrl(
+    partnerId: string,
+    input: OpsPartnerWebhookInput,
+  ): Promise<OpsPartnerSummary> {
+    const webhookUrl = this.normalizeOptionalText(input.webhookUrl) ?? null
+    if (webhookUrl !== null && !this.isHttpsUrl(webhookUrl)) {
+      throw new OpsPartnerValidationError('Webhook URL must be an absolute https:// URL')
+    }
+
+    return this.applyPartnerUpdate(partnerId, { webhookUrl }, 'Failed to update the partner webhook URL')
+  }
+
+  private async applyPartnerUpdate(
+    partnerId: string,
+    data: Prisma.PartnerUpdateInput,
+    failureMessage: string,
+  ): Promise<OpsPartnerSummary> {
+    try {
+      const prisma = await this.dbProvider.getClient()
+      return this.toSummary(await prisma.partner.update({ data, where: { id: partnerId } }))
+    }
+    catch (error) {
+      if (this.isNotFoundError(error)) {
+        throw new OpsPartnerNotFoundError('Partner not found')
+      }
+      throw new OpsPartnerValidationError(failureMessage)
+    }
+  }
+
   private emptyCompletedVolume(): OpsPartnerCompletedVolume {
     return {
       completedTransactions: 0,
       payout: [],
       source: [],
       stablecoinAmount: 0,
+    }
+  }
+
+  private isHttpsUrl(value: string): boolean {
+    try {
+      return new URL(value).protocol === 'https:'
+    }
+    catch {
+      return false
     }
   }
 
@@ -553,6 +689,12 @@ export class OpsPartnerService {
       const message = error instanceof Error ? error.message : 'Client domain is invalid'
       throw new OpsPartnerValidationError(message)
     }
+  }
+
+  private normalizeOptionalText(value: null | string | undefined): string | undefined {
+    if (value === null || value === undefined) return undefined
+    const trimmed = value.trim()
+    return trimmed.length > 0 ? trimmed : undefined
   }
 
   private async readCompletedVolume(
@@ -650,6 +792,9 @@ export class OpsPartnerService {
       clientDomain: partner.clientDomain ?? undefined,
       country: partner.country ?? undefined,
       createdAt: partner.createdAt,
+      disabledAt: partner.disabledAt ?? undefined,
+      disabledBy: partner.disabledBy ?? undefined,
+      disabledReason: partner.disabledReason ?? undefined,
       email: partner.email ?? undefined,
       firstName: partner.firstName ?? undefined,
       hasApiKey: Boolean(partner.apiKey),
@@ -664,6 +809,7 @@ export class OpsPartnerService {
       name: partner.name,
       needsKyc: partner.needsKyc ?? false,
       phone: partner.phone ?? undefined,
+      webhookUrl: partner.webhookUrl ?? undefined,
     }
   }
 }

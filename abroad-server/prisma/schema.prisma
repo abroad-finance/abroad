@@ -28,6 +28,13 @@ model Partner {
   isKybApproved                Boolean?                        @default(false)
   needsKyc                     Boolean?                        @default(true)
   webhookUrl                   String?
+
+  // Partner-wide suspension (operator action from the Ops dashboard).
+  // disabledAt == null means the partner is active. Blocks every API key and
+  // client-domain session for the partner at once.
+  disabledAt                   DateTime?
+  disabledReason               String?
+  disabledBy                   String?
   users                        PartnerUser[]
   portalUsers                  PartnerPortalUser[]
   portalApiKeys                PartnerApiKey[]
