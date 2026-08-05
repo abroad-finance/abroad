@@ -1,0 +1,19 @@
+// Typecheck the test suite the way CI does.
+//
+// tsconfig.json excludes src/tests/**, and ts-jest reports diagnostics only for
+// the files a given run transforms -- so a local `jest <one-file>` can pass
+// while CI's full run fails to compile an untouched suite. That is exactly how
+// a schema change slips through: every fixture building a full Prisma model
+// needs the new columns, but nothing local typechecks them together.
+//
+// `npm run typecheck:tests` closes that gap. Run it after any schema change.
+{
+  "extends": "./tsconfig.json",
+  "exclude": [
+    "node_modules",
+    "dist"
+  ],
+  "include": [
+    "src/**/*"
+  ]
+}

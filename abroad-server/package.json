@@ -19,6 +19,7 @@
     "dev": "concurrently -n api,tsoa -c auto \"tsx watch src/app/http/server.ts\" \"nodemon --watch src --watch tsoa.json --ext ts,tsx,json --delay 200ms --exec \\\"tsoa spec-and-routes\\\"\"",
     "typecheck": "tsc --noEmit",
     "test": "jest",
+    "typecheck:tests": "tsc --noEmit -p tsconfig.testcheck.json",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "test:mutation": "stryker run",
