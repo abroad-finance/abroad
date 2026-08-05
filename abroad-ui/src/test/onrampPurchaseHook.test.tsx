@@ -15,7 +15,6 @@ const params = {
   destinationAddress: '0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed',
   fiatAmount: 500,
   network: 'CELO',
-  taxId: '52998224725',
   userId: 'user-1',
 }
 

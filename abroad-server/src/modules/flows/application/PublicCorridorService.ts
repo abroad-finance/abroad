@@ -2,6 +2,7 @@ import {
   BlockchainNetwork,
   CryptoCurrency,
   FlowCorridorStatus,
+  FlowDirection,
   PaymentMethod,
   TargetCurrency,
 } from '@prisma/client'
@@ -38,7 +39,19 @@ export class PublicCorridorService {
     private readonly dbProvider: IDatabaseClientProvider,
   ) {}
 
-  public async list(): Promise<PublicCorridorResponse> {
+  /**
+   * Lists corridors for one direction at a time.
+   *
+   * The two directions of an asset pair are separate corridors with separate
+   * economics and separate limits, and they collide on every field this DTO
+   * exposes. Listing them together produced two indistinguishable entries for
+   * the same pair, letting an onramp's limits be applied to a payout. The
+   * parameter defaults to payouts so that callers written before the onramp
+   * existed keep receiving exactly the corridors they always did.
+   */
+  public async list(
+    direction: FlowDirection = FlowDirection.CRYPTO_TO_FIAT,
+  ): Promise<PublicCorridorResponse> {
     const client = await this.dbProvider.getClient()
 
     const [definitions, unsupported, enabledAssets] = await Promise.all([
@@ -52,11 +65,13 @@ export class PublicCorridorService {
           payoutProvider: true,
           targetCurrency: true,
         },
-        where: { enabled: true },
+        where: { direction, enabled: true },
       }),
       client.flowCorridor.findMany({
         select: { blockchain: true, cryptoCurrency: true, targetCurrency: true },
-        where: { status: FlowCorridorStatus.UNSUPPORTED },
+        // Suppression is per direction too: an unsupported payout says nothing
+        // about whether the same pair can be bought.
+        where: { direction, status: FlowCorridorStatus.UNSUPPORTED },
       }),
       client.cryptoAssetConfig.findMany({
         select: { blockchain: true, cryptoCurrency: true },

@@ -481,6 +481,9 @@ export const useWebSwapController = (): WebSwapControllerProps => {
   const jwtOnMount = useRef(walletAuthentication?.jwtToken)
 
   const [corridors, setCorridors] = useState<PublicCorridor[]>([])
+  // Onramps are a separate corridor list with their own limits; a payout
+  // corridor says nothing about whether the same pair can be bought.
+  const [onrampCorridors, setOnrampCorridors] = useState<PublicCorridor[]>([])
   const [corridorError, setCorridorError] = useState<null | string>(null)
   const [chainKey, setChainKey] = useState('')
   const [pendingConnectAfterSourceSelect, setPendingConnectAfterSourceSelect] = useState(false)
@@ -652,6 +655,21 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     }
   }, [fetchOnboardingRates])
 
+  // Failure here only hides the buy option; it must never block payouts.
+  useEffect(() => {
+    let active = true
+    fetchPublicCorridors('FIAT_TO_CRYPTO')
+      .then((data) => {
+        if (active) setOnrampCorridors(data.corridors)
+      })
+      .catch(() => {
+        if (active) setOnrampCorridors([])
+      })
+    return () => {
+      active = false
+    }
+  }, [])
+
   const targetLocale = useMemo(
     () => (state.destination.currency === TargetCurrency.BRL ? 'pt-BR' : 'es-CO'),
     [state.destination.currency],
@@ -680,6 +698,21 @@ export const useWebSwapController = (): WebSwapControllerProps => {
     chainKey,
     state.corridorKey,
   ])
+  /**
+   * The onramp corridor for exactly the asset and chain already selected.
+   *
+   * Requiring an exact match keeps the delivery address honest: the connected
+   * wallet was chosen for the selected corridor's chain, so buying anything
+   * else would hand the customer an address on the wrong network.
+   */
+  const onrampCorridor = useMemo(() => {
+    if (!selectedCorridor) return null
+    return onrampCorridors.find(corridor => (
+      corridor.blockchain === selectedCorridor.blockchain
+      && corridor.cryptoCurrency === selectedCorridor.cryptoCurrency
+      && corridor.targetCurrency === selectedCorridor.targetCurrency
+    )) ?? null
+  }, [onrampCorridors, selectedCorridor])
   const activeChainKey = useMemo(() => (
     chainKey || (selectedCorridor ? chainKeyOf(selectedCorridor) : '')
   ), [chainKey, selectedCorridor])
@@ -1047,10 +1080,9 @@ export const useWebSwapController = (): WebSwapControllerProps => {
 
   const submitBuyCrypto = useCallback(async (values: {
     fiatAmount: number
-    taxId: string
   }) => {
     const destinationAddress = wallet?.address ?? null
-    const corridor = selectedCorridor
+    const corridor = onrampCorridor
     if (!destinationAddress || !walletUserId || !corridor) return
 
     await onramp.startPurchase({
@@ -1058,12 +1090,11 @@ export const useWebSwapController = (): WebSwapControllerProps => {
       destinationAddress,
       fiatAmount: values.fiatAmount,
       network: corridor.blockchain,
-      taxId: values.taxId,
       userId: walletUserId,
     })
   }, [
     onramp,
-    selectedCorridor,
+    onrampCorridor,
     wallet?.address,
     walletUserId,
   ])
@@ -2627,12 +2658,18 @@ export const useWebSwapController = (): WebSwapControllerProps => {
       USDT: stablecoinBalances.usdt,
     },
     buyCrypto: {
+      // The corridor decides which asset is actually delivered, so the heading
+      // names it even before a wallet picks a token.
+      assetLabel: onrampCorridor?.cryptoCurrency ?? null,
       cancel: cancelBuyCrypto,
       destinationAddress: wallet?.address ?? null,
+      // Offered only where the selected asset and chain can actually be bought.
+      isAvailable: onrampCorridor !== null,
       limits: {
-        maxAmount: selectedCorridor?.maxAmount ?? null,
-        minAmount: selectedCorridor?.minAmount ?? null,
+        maxAmount: onrampCorridor?.maxAmount ?? null,
+        minAmount: onrampCorridor?.minAmount ?? null,
       },
+      networkLabel: onrampCorridor ? buildChainLabel(onrampCorridor, false) : null,
       start: startBuyCrypto,
       state: onramp.state,
       submit: submitBuyCrypto,

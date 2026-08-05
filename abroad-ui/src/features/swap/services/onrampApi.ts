@@ -28,8 +28,6 @@ const acceptOnrampResponseSchema = z.object({
 export type AcceptOnrampParams = {
   destinationAddress: string
   quoteId: string
-  /** Optional in the public contract; omitted from the request when blank. */
-  taxId: string
   userId: string
 }
 
@@ -67,7 +65,6 @@ export const acceptOnrampTransaction = async (
     body: JSON.stringify({
       destination_address: params.destinationAddress,
       quote_id: params.quoteId,
-      ...(params.taxId.trim() ? { tax_id: params.taxId.trim() } : {}),
       user_id: params.userId,
     }),
     headers: { 'Content-Type': 'application/json' },

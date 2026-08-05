@@ -61,8 +61,15 @@ export type TransactionStatusResponse = {
 
 const jsonHeaders = { 'Content-Type': 'application/json' }
 
-export const fetchPublicCorridors = async (): Promise<PublicCorridorResponse> => {
-  const result = await httpClient.request<PublicCorridorResponse>('/public/corridors', { method: 'GET' })
+/**
+ * Lists corridors for one direction. Payouts and onramps are separate corridors
+ * with separate limits, so asking for both at once cannot tell them apart.
+ */
+export const fetchPublicCorridors = async (
+  direction?: 'FIAT_TO_CRYPTO',
+): Promise<PublicCorridorResponse> => {
+  const path = direction ? `/public/corridors?direction=${direction}` : '/public/corridors'
+  const result = await httpClient.request<PublicCorridorResponse>(path, { method: 'GET' })
   if (result.ok) {
     const parsed = publicCorridorResponseSchema.safeParse(result.data)
     if (parsed.success) return parsed.data

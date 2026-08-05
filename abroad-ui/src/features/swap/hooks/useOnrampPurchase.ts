@@ -19,7 +19,6 @@ type StartPurchaseParams = {
   destinationAddress: string
   fiatAmount: number
   network: string
-  taxId: string
   userId: string
 }
 
@@ -63,7 +62,6 @@ export const useOnrampPurchase = () => {
     const acceptResult = await acceptOnrampTransaction({
       destinationAddress: params.destinationAddress,
       quoteId: quoteResult.data.id,
-      taxId: params.taxId,
       userId: params.userId,
     })
     if (!acceptResult.ok) {

@@ -1,4 +1,10 @@
 import {
+  Check,
+  Clock,
+  Copy,
+  Info,
+} from 'lucide-react'
+import {
   useCallback,
   useEffect,
   useMemo,
@@ -10,6 +16,7 @@ import type {
   PaymentInstructionsView,
 } from '../shared/onrampPresentation'
 
+import { TOKEN_ICONS } from '../../../shared/constants'
 import {
   arePaymentInstructionsExpired,
   formatExpiryCountdown,
@@ -25,6 +32,9 @@ type BuyCryptoPixCodeProps = {
 }
 
 const COUNTDOWN_TICK_MS = 1_000
+
+/** Below this the countdown turns red: the customer needs to act now. */
+const URGENT_REMAINING_MS = 60_000
 
 const formatCrypto = (amount: number, currency: string): string =>
   `${amount.toFixed(6).replace(/\.?0+$/, '')} ${currency}`
@@ -91,65 +101,118 @@ export default function BuyCryptoPixCode({
     }
   }, [instructions.brCode])
 
+  const urgent = remainingMs !== null && remainingMs <= URGENT_REMAINING_MS
+
   return (
-    <section aria-labelledby="buy-crypto-pix-heading" className="flex flex-col gap-4">
-      <h2 className="text-lg font-semibold" id="buy-crypto-pix-heading">
-        {translate('buyCrypto.pix.title', 'Pay this PIX to finish')}
-      </h2>
+    <main className="mx-auto flex w-full max-w-lg flex-col gap-4 px-4 py-4 sm:py-8">
+      <section
+        aria-labelledby="buy-crypto-pix-heading"
+        className="flex flex-col gap-6 rounded-3xl border border-[var(--ab-border)] bg-[var(--ab-bg-card)] p-5 shadow-[0px_4px_20px_-2px_rgba(0,0,0,0.05)] sm:p-8"
+      >
+        <header className="flex flex-col gap-1">
+          <p className="text-xs font-semibold uppercase tracking-wide text-ab-text-3">
+            Brazil · Pix · BRL
+          </p>
+          <h1 className="text-xl font-bold leading-7 text-ab-text" id="buy-crypto-pix-heading">
+            {translate('buyCrypto.pix.title', 'Pay this Pix to finish')}
+          </h1>
+        </header>
 
-      <dl className="flex flex-col gap-1 text-sm">
-        <div className="flex justify-between">
-          <dt>{translate('buyCrypto.pix.youPay', 'You pay')}</dt>
-          <dd>{formatFiat(quote.targetAmount, quote.targetCurrency)}</dd>
+        <div className="flex flex-col items-center gap-2 text-center">
+          <span className="break-all text-4xl font-extrabold tracking-tight text-ab-text sm:text-5xl">
+            {formatFiat(quote.targetAmount, quote.targetCurrency)}
+          </span>
+          <div className="flex items-center gap-2 text-lg font-medium text-ab-text-3">
+            <span aria-hidden="true">=</span>
+            <img
+              alt=""
+              aria-hidden="true"
+              className="size-5 shrink-0 object-contain"
+              src={TOKEN_ICONS[quote.sourceCurrency] ?? TOKEN_ICONS.USDC}
+            />
+            <span>{formatCrypto(quote.sourceAmount, quote.sourceCurrency)}</span>
+          </div>
         </div>
-        <div className="flex justify-between">
-          <dt>{translate('buyCrypto.pix.youReceive', 'You receive')}</dt>
-          <dd>{formatCrypto(quote.sourceAmount, quote.sourceCurrency)}</dd>
-        </div>
-      </dl>
 
-      {expired
-        ? (
-            <div className="flex flex-col gap-3" role="alert">
-              <p>
-                {translate(
-                  'buyCrypto.pix.expired',
-                  'This payment code expired before it was paid. Start again to get a fresh one.',
-                )}
-              </p>
-              <button onClick={onStartOver} type="button">
-                {translate('buyCrypto.pix.startOver', 'Start again')}
-              </button>
-            </div>
-          )
-        : (
-            <>
-              <p className="break-all font-mono text-xs" data-testid="buy-crypto-br-code">
-                {instructions.brCode}
-              </p>
-
-              <button onClick={() => void handleCopy()} type="button">
-                {copied
-                  ? translate('buyCrypto.pix.copied', 'Copied')
-                  : translate('buyCrypto.pix.copy', 'Copy PIX code')}
-              </button>
-
-              {remainingMs !== null && (
-                <p aria-live="polite">
-                  {translate('buyCrypto.pix.expiresIn', 'Expires in')}
-                  {' '}
-                  {formatExpiryCountdown(remainingMs)}
+        {expired
+          ? (
+              <div className="rounded-2xl border border-ab-error/40 bg-ab-error/10 p-4" role="alert">
+                <p className="text-sm font-semibold text-ab-error">
+                  {translate(
+                    'buyCrypto.pix.expired',
+                    'This payment code expired before it was paid. Start again to get a fresh one.',
+                  )}
                 </p>
-              )}
-
-              <p className="text-xs">
-                {translate(
-                  'buyCrypto.pix.settlementNotice',
-                  'We release the crypto to your wallet once the payment settles.',
+                <button
+                  className="mt-3 min-h-11 rounded-xl border border-ab-error/40 px-4 text-sm font-semibold text-ab-error transition-colors hover:bg-ab-error/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ab-error"
+                  onClick={onStartOver}
+                  type="button"
+                >
+                  {translate('buyCrypto.pix.startOver', 'Start again')}
+                </button>
+              </div>
+            )
+          : (
+              <>
+                {remainingMs !== null && (
+                  <div
+                    aria-live="polite"
+                    className={`flex items-center justify-center gap-2 rounded-2xl border px-4 py-2 text-sm font-semibold tabular-nums ${
+                      urgent
+                        ? 'border-ab-error/40 bg-ab-error/10 text-ab-error'
+                        : 'border-ab-border bg-[var(--ab-bg-muted)] text-ab-text-3'
+                    }`}
+                  >
+                    <Clock aria-hidden="true" className="size-4" />
+                    {translate('buyCrypto.pix.expiresIn', 'Expires in')}
+                    {' '}
+                    {formatExpiryCountdown(remainingMs)}
+                  </div>
                 )}
-              </p>
-            </>
-          )}
-    </section>
+
+                <section
+                  aria-labelledby="buy-crypto-code-heading"
+                  className="rounded-2xl border border-ab-border bg-[var(--ab-bg-muted)] p-4"
+                >
+                  <h2
+                    className="text-xs font-bold uppercase tracking-wide text-ab-text-3"
+                    id="buy-crypto-code-heading"
+                  >
+                    {translate('buyCrypto.pix.codeHeading', 'Pix copy and paste')}
+                  </h2>
+                  <p
+                    className="mt-3 max-h-32 select-all overflow-y-auto break-all rounded-xl bg-[var(--ab-bg-card)] p-3 font-mono text-xs leading-5 text-ab-text"
+                    data-testid="buy-crypto-br-code"
+                  >
+                    {instructions.brCode}
+                  </p>
+                </section>
+
+                <button
+                  className="flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-ab-green px-4 text-base font-semibold text-white shadow-[0px_10px_15px_-3px_rgba(15,190,123,0.3)] transition-opacity hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ab-green)] focus-visible:ring-offset-2"
+                  onClick={() => void handleCopy()}
+                  type="button"
+                >
+                  {copied
+                    ? <Check aria-hidden="true" className="size-5" />
+                    : <Copy aria-hidden="true" className="size-5" />}
+                  {copied
+                    ? translate('buyCrypto.pix.copied', 'Copied')
+                    : translate('buyCrypto.pix.copy', 'Copy PIX code')}
+                </button>
+
+                <div className="flex gap-3 rounded-2xl bg-ab-separator/60 p-4">
+                  <Info aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-ab-text" />
+                  <p className="text-sm leading-5 text-ab-text-3">
+                    {translate(
+                      'buyCrypto.pix.settlementNotice',
+                      'We release the crypto to your wallet once the payment settles.',
+                    )}
+                  </p>
+                </div>
+              </>
+            )}
+      </section>
+    </main>
   )
 }

@@ -2,10 +2,9 @@
  * Validation for what an onramp needs from the customer beyond a payout: how
  * much BRL they will pay.
  *
- * A tax id may be supplied but is never validated or required here. It is
- * optional in the public transaction contract, the payer does not have to be
- * the person receiving the crypto, and the delivery goes to whatever wallet was
- * given.
+ * Nothing identifying the payer is collected. The payer does not have to be the
+ * person receiving the crypto, and the delivery goes to whatever wallet was
+ * given, so there is nothing here to match a tax id against.
  */
 
 export type OnrampAmountError = 'above-maximum' | 'below-minimum' | 'malformed' | 'required'
@@ -38,8 +37,6 @@ export const parseFiatAmount = (value: string): null | number => {
   if (!Number.isFinite(parsed) || parsed <= 0) return null
   return Math.round(parsed * 100) / 100
 }
-
-export const normalizeTaxId = (value: string): string => value.replace(/\D+/g, '')
 
 export const validateOnrampForm = (
   input: { fiatAmount: string },

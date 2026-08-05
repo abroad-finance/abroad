@@ -86,8 +86,8 @@ describe('BuyCryptoPixCode', () => {
   it('shows both legs of the purchase so the customer sees what they get', () => {
     renderCode(null)
 
-    expect(screen.getByText('You pay')).toBeInTheDocument()
-    expect(screen.getByText('You receive')).toBeInTheDocument()
+    // The BRL leg leads, since that is the number the customer is about to pay.
+    expect(screen.getByText(/500,00/)).toBeInTheDocument()
     expect(screen.getByText(/91\.482 USDC/)).toBeInTheDocument()
   })
 

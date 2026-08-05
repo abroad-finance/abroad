@@ -58,12 +58,15 @@ export interface WebSwapControllerProps {
   balancesByAsset: Readonly<{ USDC: null | string, USDT: null | string }>
   /** The PIX onramp journey: price, accept, then show the payable code. */
   buyCrypto: {
+    assetLabel: null | string
     cancel: () => void
     destinationAddress: null | string
+    isAvailable: boolean
     limits: OnrampFormLimits
+    networkLabel: null | string
     start: () => void
     state: OnrampPurchaseState
-    submit: (values: { fiatAmount: number, taxId: string }) => Promise<void>
+    submit: (values: { fiatAmount: number }) => Promise<void>
   }
   cancelDestinationChange: () => void
   chainOptions: Array<{ key: string, label: string }>
@@ -390,10 +393,11 @@ const WebSwap: React.FC = () => {
           slots={{
             buyCrypto: (
               <BuyCryptoForm
-                assetLabel={swapViewProps.selectedAssetLabel}
+                assetLabel={buyCrypto.assetLabel}
                 destinationAddress={buyCrypto.destinationAddress}
                 isSubmitting={buyCrypto.state.isSubmitting}
                 limits={buyCrypto.limits}
+                networkLabel={buyCrypto.networkLabel}
                 onBack={buyCrypto.cancel}
                 onSubmit={values => void buyCrypto.submit(values)}
                 submissionError={
@@ -422,7 +426,7 @@ const WebSwap: React.FC = () => {
                 hasEnteredApp={hasEnteredApp}
                 isAuthenticated={swapViewProps.isAuthenticated}
                 onboardingRates={onboardingRates}
-                onBuyCrypto={buyCrypto.start}
+                onBuyCrypto={buyCrypto.isAvailable ? buyCrypto.start : undefined}
                 onEnterApp={handleEnterApp}
                 onGoToManual={goToManual}
                 onHistoryClick={openActivity}

@@ -119,9 +119,19 @@ describe('acceptOnrampTransaction', () => {
   const params = {
     destinationAddress: '0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed',
     quoteId: 'quote-1',
-    taxId: '12345678901',
     userId: 'user-1',
   }
+
+  // Nothing about the payer is collected, so nothing about the payer may leave
+  // the browser.
+  it('never sends a tax id', async () => {
+    const request = mockRequest(acceptResponse())
+
+    await acceptOnrampTransaction(params)
+
+    const [, config] = request.mock.calls[0]
+    expect(String((config as { body: string }).body)).not.toContain('tax_id')
+  })
 
   it('sends the wallet destination rather than an account number', async () => {
     const request = mockRequest(acceptResponse())
