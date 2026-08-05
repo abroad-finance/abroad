@@ -10,7 +10,7 @@
     "preview": "vite preview --host",
     "generate:api": "npm -w abroad run prisma:generate && npm -w abroad run generate && orval --config orval.config.ts",
     "depcruise:graph": "depcruise src --include-only '^src' --config --output-type dot | dot -T svg > dependency-graph.svg",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc -b --force",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "test": "vitest --config vite.config.ts --run",
