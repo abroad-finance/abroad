@@ -31,6 +31,9 @@ export class PixQrDecoder implements IPixQrDecoder {
     if (!result.success) {
       this.logger.warn('Transfero Ultra PIX QR preview rejected', {
         code: result.code,
+        // Without the reason a rate limit, an expired charge and a foreign
+        // currency are one indistinguishable line in the logs.
+        reason: result.reason,
       })
       return null
     }
@@ -46,6 +49,8 @@ export class PixQrDecoder implements IPixQrDecoder {
         '/api/v1/pix/brcode-previews',
         { brcode: params.qrCode },
         params.idempotencyKey,
+        // Someone is holding a phone at a QR code waiting for this answer.
+        { interactive: true },
       )
       const preview = transferoUltraQrPreviewResponseSchema.parse(response)
       const status = preview.status?.trim().toUpperCase() || null
@@ -70,7 +75,7 @@ export class PixQrDecoder implements IPixQrDecoder {
 
       return {
         decoded: {
-          account: preview.pixKey,
+          account: preview.pixKey ?? undefined,
           amount: preview.amount === null || preview.amount === undefined
             ? undefined
             : preview.amount.toFixed(2),

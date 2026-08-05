@@ -364,6 +364,30 @@ describe('useWebSwapController', () => {
     expect(result.current.qrEntryMode).toBe('upload')
   })
 
+  it('blames the provider, not the QR code, when the preview is rate limited', async () => {
+    mocked.decodeQrCodeBRMock.mockResolvedValueOnce({
+      data: { reason: 'The payment provider is busy. Retry in a moment.' },
+      headers: new Headers(),
+      ok: false,
+      status: 429,
+    } as never)
+    const { result } = renderHook(() => useWebSwapController(), { wrapper: Wrapper })
+    await act(async () => {
+      await Promise.resolve()
+      await mocked.fetchPublicCorridorsMock.mock.results[0]?.value
+    })
+
+    // Telling a customer to "check the code and try again" over a provider
+    // throttle is what made them rescan into the same limit.
+    await act(async () => {
+      await expect(result.current.handleQrResult('00020101021226850014br.gov.bcb.pix'))
+        .rejects.toMatchObject({
+          code: 'rate-limited',
+          message: expect.stringContaining('busy'),
+        })
+    })
+  })
+
   it('surfaces wallet rejection as a recoverable bounded state', async () => {
     vi.mocked(mockKit.connect).mockRejectedValueOnce(
       Object.assign(new Error('User rejected wallet connection'), { code: 4001 }),

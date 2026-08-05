@@ -1,7 +1,9 @@
 export type QrInputErrorCode
   = | 'below-minimum'
     | 'invalid-payload'
+    | 'provider-unavailable'
     | 'quote-unavailable'
+    | 'rate-limited'
     | 'unsupported-currency'
     | 'wallet-connection'
     | 'wrong-rail'

@@ -268,6 +268,7 @@ describe('TransferoUltraClient', () => {
         code: 'retriable',
         cooldownBucket: 'GET /api/v1/balance',
         cooldownMs: 60_000,
+        interactive: false,
         method: 'GET',
         path: '/api/v1/balance',
         providerCode: 'RATE_LIMIT',
@@ -337,6 +338,73 @@ describe('TransferoUltraClient', () => {
     await expect(client.get('/api/v1/otc/trades/bcb1de20-febb-43e8-9958-fb1b5edff65a/detail'))
       .resolves.toEqual({ settled: true })
     expect(mockedAxios.request).toHaveBeenCalledTimes(3)
+  })
+
+  it('lets an interactive request through a cooldown a background loop tripped', async () => {
+    const client = new TransferoUltraClient(
+      createSecretManager(),
+      createMockLogger(),
+    )
+    mockedAxios.isAxiosError.mockReturnValue(true)
+    mockedAxios.request.mockRejectedValueOnce(Object.assign(new Error('rate limited'), {
+      isAxiosError: true,
+      response: { data: { code: 'RATE_LIMIT_EXCEEDED' }, status: 429 },
+    }))
+
+    await expect(client.post('/api/v1/pix/brcode-previews', { brcode: 'a' }, 'idem-a'))
+      .rejects.toMatchObject({ providerCode: 'RATE_LIMIT_EXCEEDED' })
+
+    // Background work waits its turn.
+    await expect(client.post('/api/v1/pix/brcode-previews', { brcode: 'b' }, 'idem-b'))
+      .rejects.toMatchObject({ providerCode: 'RATE_LIMIT_COOLDOWN' })
+    expect(mockedAxios.request).toHaveBeenCalledTimes(1)
+
+    // A customer scanning a QR code does not: Ultra's account-wide quota
+    // refills in seconds, so refusing locally would fail a scan that works.
+    mockedAxios.request.mockResolvedValueOnce({ data: { pixKey: 'k' } })
+    await expect(client.post(
+      '/api/v1/pix/brcode-previews',
+      { brcode: 'c' },
+      'idem-c',
+      { interactive: true },
+    )).resolves.toEqual({ pixKey: 'k' })
+    expect(mockedAxios.request).toHaveBeenCalledTimes(2)
+  })
+
+  it('honours Retry-After instead of parking the bucket for a fixed minute', async () => {
+    const logger = createMockLogger()
+    const client = new TransferoUltraClient(createSecretManager(), logger)
+    mockedAxios.isAxiosError.mockReturnValue(true)
+    mockedAxios.request.mockRejectedValueOnce(Object.assign(new Error('rate limited'), {
+      isAxiosError: true,
+      response: {
+        data: { code: 'RATE_LIMIT_EXCEEDED' },
+        headers: { 'retry-after': '2' },
+        status: 429,
+      },
+    }))
+
+    await expect(client.get('/api/v1/balance')).rejects.toMatchObject({
+      retryAfterSeconds: 2,
+      status: 429,
+    })
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.stringContaining('Transfero Ultra request failed'),
+      expect.objectContaining({ cooldownMs: 2_000 }),
+    )
+
+    // Still gated inside the provider's own window...
+    await expect(client.get('/api/v1/balance')).rejects.toMatchObject({
+      providerCode: 'RATE_LIMIT_COOLDOWN',
+    })
+    expect(mockedAxios.request).toHaveBeenCalledTimes(1)
+
+    // ...and free again 3s later, where the old fixed cooldown still had 57s
+    // of blanket failures to serve.
+    jest.setSystemTime(new Date('2026-07-27T12:34:59.000Z'))
+    mockedAxios.request.mockResolvedValueOnce({ data: { balance: 1 } })
+    await expect(client.get('/api/v1/balance')).resolves.toEqual({ balance: 1 })
+    expect(mockedAxios.request).toHaveBeenCalledTimes(2)
   })
 
   it('rejects non-serializable bodies and empty credentials before transport', async () => {

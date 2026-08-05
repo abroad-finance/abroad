@@ -54,7 +54,33 @@ describe('PixQrDecoder', () => {
       '/api/v1/pix/brcode-previews',
       { brcode: 'br-code' },
       'abroad:pix-preview:transaction-1',
+      { interactive: true },
     )
+  })
+
+  it('accepts a preview Ultra resolves without a PIX key', async () => {
+    const ultraClient = createUltraClient()
+    const logger = createMockLogger()
+    ultraClient.post.mockResolvedValue({ ...payablePreview, pixKey: null })
+    const decoder = new PixQrDecoder(
+      ultraClient as unknown as TransferoUltraClient,
+      logger,
+    )
+
+    await expect(decoder.validateForPayment({
+      idempotencyKey: 'preview-no-key',
+      qrCode: 'keyless-code',
+    })).resolves.toEqual({
+      decoded: {
+        account: undefined,
+        amount: '25.50',
+        currency: 'BRL',
+        name: 'Alice',
+        taxId: null,
+      },
+      success: true,
+    })
+    expect(logger.error).not.toHaveBeenCalled()
   })
 
   it('accepts a static QR preview when Ultra has no charge status', async () => {

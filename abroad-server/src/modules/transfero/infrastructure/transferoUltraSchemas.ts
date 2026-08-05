@@ -58,7 +58,10 @@ export const transferoUltraQrPreviewResponseSchema = z.object({
   currency: z.string().min(1),
   merchantCity: z.string().min(1).nullable().optional(),
   merchantName: z.string().min(1).nullable().optional(),
-  pixKey: z.string().min(1),
+  // Ultra omits the key on previews it resolves by location instead of by key
+  // (payment-initiator BR codes), so a null here is a normal payable preview,
+  // not a schema drift. Demanding a string rejected valid QR codes outright.
+  pixKey: z.string().min(1).nullable(),
   status: z.string().min(1).nullable(),
   txid: z.string().min(1).nullable().optional(),
   type: z.enum(['dynamic', 'static']),

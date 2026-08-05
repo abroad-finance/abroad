@@ -2042,6 +2042,15 @@ export const useWebSwapController = (): WebSwapControllerProps => {
         if (controller.signal.aborted) {
           throw new QrInputError('invalid-payload', t('swap.qr_decode_cancelled', 'QR checking was interrupted. Try again.'))
         }
+        // A busy or broken provider is not a bad QR code. Telling the customer
+        // to check a code that is perfectly valid only makes them rescan, which
+        // is what kept the provider busy in the first place.
+        if (response.status === 429) {
+          throw new QrInputError('rate-limited', t('swap.qr_provider_busy', 'Our payment provider is busy right now. Wait a moment and scan again.'))
+        }
+        if (response.status >= 500) {
+          throw new QrInputError('provider-unavailable', t('swap.qr_provider_unavailable', 'We could not reach the payment provider. Please try again shortly.'))
+        }
         if (!response.ok) {
           const reason = extractReason(response.data) || t('swap.qr_decode_error', 'We could not verify this Pix QR code. Check the code and try again.')
           throw new QrInputError('invalid-payload', reason)

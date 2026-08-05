@@ -19,6 +19,8 @@ type TransferoUltraErrorPayload = {
 type TransferoUltraFailureCode = 'permanent' | 'retriable' | 'validation'
 type TransferoUltraHttpMethod = 'GET' | 'PATCH' | 'POST'
 
+const MAX_TRANSFERO_ULTRA_COOLDOWN_SECONDS = 60
+
 const MAX_TRANSFERO_ULTRA_PDF_BYTES = 2 * 1024 * 1024
 
 export type TransferoUltraPdfResponse = {
@@ -48,6 +50,7 @@ export class TransferoUltraError extends Error {
   public readonly code: TransferoUltraFailureCode
   public readonly detail?: string
   public readonly providerCode?: string
+  public readonly retryAfterSeconds?: number
   public readonly status?: number
 
   public constructor(params: {
@@ -55,6 +58,7 @@ export class TransferoUltraError extends Error {
     detail?: string
     message: string
     providerCode?: string
+    retryAfterSeconds?: number
     status?: number
   }) {
     super(params.message)
@@ -62,6 +66,7 @@ export class TransferoUltraError extends Error {
     this.code = params.code
     this.detail = params.detail
     this.providerCode = params.providerCode
+    this.retryAfterSeconds = params.retryAfterSeconds
     this.status = params.status
   }
 }
@@ -159,15 +164,27 @@ export class TransferoUltraClient {
     path: string,
     body: unknown,
     idempotencyKey: string,
+    options: { interactive?: boolean } = {},
   ): Promise<unknown> {
-    return (await this.request<unknown>({ body, idempotencyKey, method: 'POST', path })).data
+    return (await this.request<unknown>({
+      body,
+      idempotencyKey,
+      interactive: options.interactive,
+      method: 'POST',
+      path,
+    })).data
   }
 
   /**
    * Groups requests that share a rate-limit fate. Per-resource ids collapse to
    * `:id` so one 429 while polling N trades suppresses the other N-1 doomed
-   * polls — but the bucket is per endpoint, so throttling a background
-   * reconciliation loop can never block a customer PIX withdrawal.
+   * polls.
+   *
+   * The bucket is per endpoint, but Ultra's quota is NOT: a 429 is issued
+   * account-wide, so a throttled background reconciliation loop and a customer
+   * QR preview trip on the same limit. The per-endpoint bucket therefore only
+   * keeps our own local backoff from spreading; it grants no real isolation.
+   * That is why interactive requests skip the gate entirely — see `request`.
    */
   private bucketKey(method: TransferoUltraHttpMethod, path: string): string {
     const normalized = path
@@ -223,6 +240,7 @@ export class TransferoUltraClient {
       detail: payload.detail,
       message: `Transfero Ultra request failed: ${descriptor}`,
       providerCode,
+      retryAfterSeconds: this.readRetryAfterSeconds(error.response?.headers),
       status,
     })
   }
@@ -284,9 +302,32 @@ export class TransferoUltraClient {
     return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : fallback
   }
 
+  /**
+   * Ultra's own backoff window. Preferring it over a fixed cooldown keeps a
+   * short provider throttle from being inflated into a minute-long local
+   * outage; the clamp stops a hostile or absurd header from parking the bucket.
+   */
+  private readRetryAfterSeconds(headers: unknown): number | undefined {
+    if (!headers || typeof headers !== 'object') {
+      return undefined
+    }
+    const raw = (headers as Record<string, unknown>)['retry-after']
+    const seconds = Number(typeof raw === 'string' ? raw.trim() : raw)
+    if (!Number.isFinite(seconds) || seconds <= 0) {
+      return undefined
+    }
+    return Math.min(Math.ceil(seconds), MAX_TRANSFERO_ULTRA_COOLDOWN_SECONDS)
+  }
+
   private async request<T>(params: {
     body?: unknown
     idempotencyKey?: string
+    /**
+     * Set only for calls a customer is actively waiting on. Exempts the request
+     * from the local rate-limit cooldown so a background loop's 429 cannot fail
+     * it before Ultra has been asked.
+     */
+    interactive?: boolean
     method: TransferoUltraHttpMethod
     path: string
     query?: TransferoUltraQuery
@@ -311,13 +352,18 @@ export class TransferoUltraClient {
 
     const bucket = this.bucketKey(params.method, params.path)
     const rateLimitedUntil = this.rateLimitedUntilByBucket.get(bucket) ?? 0
-    if (Date.now() < rateLimitedUntil) {
-      // Retrying into an active 429 only keeps the limit tripped, and the
-      // wasted calls starve every other Transfero endpoint of the shared quota.
+    // Retrying into an active 429 only keeps the limit tripped, and the wasted
+    // calls starve every other Transfero endpoint of the shared quota. But a
+    // customer waiting on a QR preview cannot be made to serve that budget:
+    // refusing locally guarantees the scan fails, while attempting it usually
+    // succeeds, because Ultra's window refills long before our cooldown ends.
+    // Only background work pays the cooldown.
+    if (!params.interactive && Date.now() < rateLimitedUntil) {
       throw new TransferoUltraError({
         code: 'retriable',
         message: 'Transfero Ultra request failed: RATE_LIMIT_COOLDOWN',
         providerCode: 'RATE_LIMIT_COOLDOWN',
+        retryAfterSeconds: Math.max(1, Math.ceil((rateLimitedUntil - Date.now()) / 1000)),
         status: 429,
       })
     }
@@ -383,19 +429,24 @@ export class TransferoUltraClient {
     }
     catch (error) {
       const normalized = this.describeAxiosError(error)
+      let cooldownMs: null | number = null
       if (normalized.status === 429) {
-        this.rateLimitedUntilByBucket.set(bucket, Date.now() + this.rateLimitCooldownMs)
+        cooldownMs = normalized.retryAfterSeconds === undefined
+          ? this.rateLimitCooldownMs
+          : normalized.retryAfterSeconds * 1000
+        this.rateLimitedUntilByBucket.set(bucket, Date.now() + cooldownMs)
       }
       this.logger.warn('Transfero Ultra request failed', {
         code: normalized.code,
         // Names the offending field on a rejected request; Ultra puts no
         // account data in it.
         ...(normalized.detail ? { detail: normalized.detail } : {}),
+        interactive: params.interactive === true,
         method: params.method,
         path: params.path,
         providerCode: normalized.providerCode,
         status: normalized.status,
-        ...(normalized.status === 429 ? { cooldownBucket: bucket, cooldownMs: this.rateLimitCooldownMs } : {}),
+        ...(cooldownMs === null ? {} : { cooldownBucket: bucket, cooldownMs }),
       })
       throw normalized
     }
