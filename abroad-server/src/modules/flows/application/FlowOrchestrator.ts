@@ -299,10 +299,18 @@ export class FlowOrchestrator {
       throw new FlowNotFoundError('Transaction not found')
     }
 
+    // One asset pair now has two corridors — a payout and an onramp — that
+    // differ in nothing this query used to look at. Without the direction the
+    // lookup returns whichever row comes first, which put a fiat-to-crypto
+    // purchase onto the payout pipeline and tried to pay out the customer's own
+    // deposit QR.
+    const { direction } = transaction.quote
+
     const unsupported = await prisma.flowCorridor.findFirst({
       where: {
         blockchain: transaction.quote.network,
         cryptoCurrency: transaction.quote.cryptoCurrency,
+        direction,
         status: FlowCorridorStatus.UNSUPPORTED,
         targetCurrency: transaction.quote.targetCurrency,
       },
@@ -317,6 +325,7 @@ export class FlowOrchestrator {
       where: {
         blockchain: transaction.quote.network,
         cryptoCurrency: transaction.quote.cryptoCurrency,
+        direction,
         enabled: true,
         targetCurrency: transaction.quote.targetCurrency,
       },

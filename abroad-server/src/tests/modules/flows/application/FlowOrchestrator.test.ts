@@ -1,5 +1,11 @@
 import 'reflect-metadata'
-import { FlowInstanceStatus, FlowStepCompletionPolicy, FlowStepStatus, FlowStepType } from '@prisma/client'
+import {
+  FlowDirection,
+  FlowInstanceStatus,
+  FlowStepCompletionPolicy,
+  FlowStepStatus,
+  FlowStepType,
+} from '@prisma/client'
 
 import type { IDatabaseClientProvider } from '../../../../platform/persistence/IDatabaseClientProvider'
 
@@ -112,6 +118,7 @@ const buildTransaction = () => ({
   qrCode: null,
   quote: {
     cryptoCurrency: 'USDC',
+    direction: FlowDirection.CRYPTO_TO_FIAT as FlowDirection,
     network: 'STELLAR',
     paymentMethod: 'BREB',
     sourceAmount: 100,
@@ -153,6 +160,39 @@ describe('FlowOrchestrator', () => {
       const steps = createCall.data.steps.create
       expect(steps[0].status).toBe(FlowStepStatus.READY)
       expect(steps[1].status).toBe(FlowStepStatus.NOT_STARTED)
+    })
+
+    /*
+     * One asset pair has two enabled corridors that differ only by direction.
+     * Looking a definition up without it returned whichever row came first, so
+     * a customer's fiat-to-crypto purchase was put on the payout pipeline and
+     * the first step tried to pay out the customer's own deposit QR. The money
+     * had already settled, so the purchase failed with the fiat taken.
+     */
+    it.each([
+      [FlowDirection.FIAT_TO_CRYPTO],
+      [FlowDirection.CRYPTO_TO_FIAT],
+    ])('resolves the %s definition for a quote in that direction', async (direction) => {
+      const transaction = buildTransaction()
+      transaction.quote.direction = direction
+      mockPrisma.flowInstance.findUnique.mockResolvedValue(null)
+      mockPrisma.transaction.findUnique.mockResolvedValue(transaction)
+      mockPrisma.flowDefinition.findFirst.mockResolvedValue(buildFlowDefinition())
+      mockPrisma.flowInstance.create.mockImplementation(async (args: { data: Record<string, unknown> }) => ({
+        id: 'fi-1', ...args.data, steps: [],
+      }))
+      mockPrisma.$queryRawUnsafe.mockResolvedValue([])
+
+      await orchestrator.startFlow('tx-1')
+
+      expect(mockPrisma.flowDefinition.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({ where: expect.objectContaining({ direction }) }),
+      )
+      // Suspending one direction must not suspend the other, so the
+      // unsupported-corridor check is scoped the same way.
+      expect(mockPrisma.flowCorridor.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({ where: expect.objectContaining({ direction }) }),
+      )
     })
 
     it('does not resume an existing terminal flow', async () => {
