@@ -60,6 +60,7 @@ const currentLocale = (): string => document.documentElement.lang || navigator.l
 
 const ActivityListPage = (): React.JSX.Element => {
   const { t } = useTranslate()
+  // @tolgee-ignore
   const translateActivity = (key: string, fallback: string): string => t(key, fallback)
   const [searchParams, setSearchParams] = useSearchParams()
   const page = readPage(searchParams.get('page'))

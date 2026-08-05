@@ -213,8 +213,10 @@ const TxStatus = ({
     && nonterminal
     && now - acceptedAt >= 180_000
   const presentation = receipt
+    // @tolgee-ignore
     ? activityStatusPresentation(receipt.status, (key, fallback) => t(key, fallback))
     : null
+  // @tolgee-ignore
   const translate = useCallback((key: string, fallback: string): string => t(key, fallback), [t])
   const authorizationMessage = localAuthorizationMessage(authorizationState, translate)
   const steps = useMemo(

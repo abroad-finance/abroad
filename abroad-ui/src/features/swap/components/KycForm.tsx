@@ -734,7 +734,10 @@ const KycForm = ({ canResumePayment, onClose, onSubmit }: KycFormProps): React.J
               >
                 <option value="">{t('kyc_form.document_type_placeholder', 'Select a document type')}</option>
                 {KYC_DOCUMENT_TYPES.map(type => (
-                  <option key={type} value={type}>{t(documentTypeTranslationKeys[type], documentTypeFallbacks[type])}</option>
+                  <option key={type} value={type}>
+                    {/* @tolgee-ignore */}
+                    {t(documentTypeTranslationKeys[type], documentTypeFallbacks[type])}
+                  </option>
                 ))}
               </select>
               {errors.documentType && <p className="text-sm text-red-600" id="kyc-documentType-error">{errorMessage(errors.documentType)}</p>}

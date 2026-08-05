@@ -180,6 +180,7 @@ export const ChainSelectorModal: React.FC<ChainSelectorModalProps> = ({
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="text-sm font-semibold text-ab-text">{token.label}</div>
+                  {/* @tolgee-ignore */}
                   <div className="text-xs text-ab-text-2">{t(`chain_selector.token.${token.label.toLowerCase()}`, tokenSubtitle(token.label))}</div>
                 </div>
                 <div className="text-right">

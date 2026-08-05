@@ -91,6 +91,7 @@ export default function HomeScreen({
   if (showOnboarding) {
     const trustBadges = TRUST_BADGE_DATA.map(({ defaultLabel, i18nKey, Icon }) => ({
       Icon,
+      // @tolgee-ignore
       label: t(i18nKey, defaultLabel),
     }))
 
@@ -508,6 +509,7 @@ export default function HomeScreen({
             <div className="divide-y divide-[var(--ab-border)] overflow-hidden rounded-2xl border border-[var(--ab-border)] bg-[var(--ab-bg-card)]">
               {recentTransactions.slice(0, 2).map((tx) => {
                 const countryConfig = RECENT_COUNTRY_CONFIG[tx.quote.targetCurrency] ?? RECENT_COUNTRY_CONFIG.COP
+                // @tolgee-ignore
                 const statusPresentation = activityStatusPresentation(tx.status, (key, fallback) => t(key, fallback))
                 const localAmount = tx.quote.targetAmount.toLocaleString(
                   localeForCurrency(tx.quote.targetCurrency),

@@ -54,6 +54,7 @@ const ActivityDetailPage = (): React.JSX.Element => {
   const safeReturn = rawReturn?.startsWith('?') && rawReturn.length <= 1_000 ? rawReturn : ''
   const backTarget = `/activity${safeReturn}`
   const translateActivity = useCallback((key: string, fallback: string): string => (
+    // @tolgee-ignore
     t(key, fallback)
   ), [t])
 
