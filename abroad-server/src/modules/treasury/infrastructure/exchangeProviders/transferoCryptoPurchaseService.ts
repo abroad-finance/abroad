@@ -8,20 +8,11 @@ import { ILogger } from '../../../../core/logging/types'
 import { buildIdempotencyKey } from '../../../../platform/http/idempotencyKey'
 import { TransferoUltraClient, TransferoUltraError } from '../../../transfero/infrastructure/TransferoUltraClient'
 import { transferoUltraCryptoWithdrawalResponseSchema, transferoUltraOtcConfirmationResponseSchema, transferoUltraOtcSessionResponseSchema, transferoUltraOtcTradeDetailResponseSchema } from '../../../transfero/infrastructure/transferoUltraSchemas'
+import { CryptoPurchaseResult, CryptoWithdrawalResult, ICryptoPurchaseService, PurchaseFailureCode } from '../../application/contracts/ICryptoPurchaseService'
 
 const ULTRA_SETTLEMENT = 'D0'
 const ULTRA_SIDE = 'BUY'
 const ULTRA_QUOTE_VALIDITY_SECONDS = 10
-
-type CryptoPurchaseResult
-  = | { code: PurchaseFailureCode, reason: string, success: false }
-    | { quantity: number, success: true, tradeId: string }
-
-type CryptoWithdrawalResult
-  = | { code: PurchaseFailureCode, reason: string, success: false }
-    | { success: true, withdrawalId: string }
-
-type PurchaseFailureCode = 'permanent' | 'retriable' | 'validation'
 
 /**
  * Buys stablecoin with the BRL a batch of onramps credited, and withdraws it to
@@ -33,7 +24,7 @@ type PurchaseFailureCode = 'permanent' | 'retriable' | 'validation'
  * the caller persists before treating it as done.
  */
 @injectable()
-export class TransferoCryptoPurchaseService {
+export class TransferoCryptoPurchaseService implements ICryptoPurchaseService {
   private readonly logger: ScopedLogger
 
   public constructor(

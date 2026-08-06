@@ -244,7 +244,7 @@ const domainBindings: ReadonlyArray<BindingRegistration<unknown>> = [
   { bindSelf: true, identifier: BridgeFloatService, implementation: BridgeFloatService },
   { bindSelf: true, identifier: BridgeSweepService, implementation: BridgeSweepService },
   { bindSelf: true, identifier: BridgeSweepWorker, implementation: BridgeSweepWorker },
-  { bindSelf: true, identifier: TransferoCryptoPurchaseService, implementation: TransferoCryptoPurchaseService },
+  { identifier: TYPES.ICryptoPurchaseService, implementation: TransferoCryptoPurchaseService },
   { bindSelf: true, identifier: TreasuryReplenishService, implementation: TreasuryReplenishService },
   { bindSelf: true, identifier: TreasuryReplenishWorker, implementation: TreasuryReplenishWorker },
   { bindSelf: true, identifier: OpsBridgeService, implementation: OpsBridgeService },

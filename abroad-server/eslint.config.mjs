@@ -25,7 +25,7 @@ const tsconfigRootDir = path.dirname(new URL(import.meta.url).pathname)
 const modulesWithCleanApplicationLayer = [
   'auth', 'flows', 'kyc', 'operations', 'partners', 'payments',
   'quotes', 'realtime', 'shared', 'telemetry', 'transfero',
-  'transparency', 'webhooks',
+  'transparency', 'treasury', 'webhooks',
 ]
 
 const modulesWithCleanTransportBoundary = [
@@ -38,9 +38,11 @@ const applicationGlobs = names => names.map(name => `./src/modules/${name}/appli
 
 const boundaryZones = [
   {
-    // Omits `transactions` and `treasury`: PartnerPixReconciliationService,
-    // PartnerPixReceiptService and TreasuryReplenishService still reach for a
-    // concrete adapter. Adding their ports lets both modules join this list.
+    // Omits `transactions`: PartnerPixReconciliationService and
+    // PartnerPixReceiptService still hold a concrete TransferoUltraClient.
+    // Their port has to be domain-shaped (a receipt fetch and a withdrawal
+    // read) rather than a raw HTTP client, which also moves the response
+    // parsing into the adapter — a change worth doing on its own.
     from: './src/modules/*/infrastructure/**/*',
     message: 'application may not depend on infrastructure. Declare a port in application/contracts and bind the adapter in app/container.',
     target: applicationGlobs(modulesWithCleanApplicationLayer),

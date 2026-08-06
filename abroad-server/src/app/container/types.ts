@@ -16,6 +16,7 @@ const typeKeys = [
   'IFiatDepositService',
   'IFiatDepositServiceFactory',
   'ICorridorPricingProvider',
+  'ICryptoPurchaseService',
   'IKycService',
   'IKycDocumentStorage',
   'ILockManager',

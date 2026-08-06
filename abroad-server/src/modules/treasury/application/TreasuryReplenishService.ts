@@ -11,7 +11,7 @@ import { TYPES } from '../../../app/container/types'
 import { createScopedLogger, ScopedLogger } from '../../../core/logging/scopedLogger'
 import { ILogger } from '../../../core/logging/types'
 import { IDatabaseClientProvider } from '../../../platform/persistence/IDatabaseClientProvider'
-import { TransferoCryptoPurchaseService } from '../infrastructure/exchangeProviders/transferoCryptoPurchaseService'
+import { ICryptoPurchaseService } from './contracts/ICryptoPurchaseService'
 import { IExchangeProviderFactory } from './contracts/IExchangeProviderFactory'
 
 /**
@@ -51,8 +51,8 @@ export class TreasuryReplenishService {
 
   public constructor(
     @inject(TYPES.IDatabaseClientProvider) private readonly dbProvider: IDatabaseClientProvider,
-    @inject(TransferoCryptoPurchaseService)
-    private readonly purchaseService: TransferoCryptoPurchaseService,
+    @inject(TYPES.ICryptoPurchaseService)
+    private readonly purchaseService: ICryptoPurchaseService,
     @inject(TYPES.IExchangeProviderFactory)
     private readonly exchangeProviderFactory: IExchangeProviderFactory,
     @inject(TYPES.ILogger) baseLogger: ILogger,
