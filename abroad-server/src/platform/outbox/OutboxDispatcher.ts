@@ -2,6 +2,7 @@ import { Prisma, PrismaClient, WebhookDeliveryPurpose } from '@prisma/client'
 import { inject, injectable } from 'inversify'
 
 import { TYPES } from '../../app/container/types'
+import { toError } from '../../core/errors/toError'
 import { createScopedLogger, ScopedLogger } from '../../core/logging/scopedLogger'
 import { ILogger } from '../../core/logging/types'
 import { IQueueHandler, QueueName, QueuePayloadByName } from '../messaging/queues'
@@ -78,7 +79,7 @@ export class OutboxDispatcher {
       await this.repository.markDelivered(record.id, client, diagnostics)
     }
     catch (error) {
-      const normalized = error instanceof Error ? error : new Error(String(error))
+      const normalized = toError(error)
       const diagnostics = error instanceof WebhookDeliveryError
         ? { durationMs: error.durationMs, httpStatus: error.httpStatus }
         : undefined

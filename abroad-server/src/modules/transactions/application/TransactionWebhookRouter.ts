@@ -9,6 +9,7 @@ import { inject, injectable } from 'inversify'
 import { createHash } from 'node:crypto'
 
 import { TYPES } from '../../../app/container/types'
+import { toError } from '../../../core/errors/toError'
 import { createScopedLogger, ScopedLogger } from '../../../core/logging/scopedLogger'
 import { ILogger } from '../../../core/logging/types'
 import { WebhookEvent } from '../../../platform/notifications/IWebhookNotifier'
@@ -116,7 +117,7 @@ export class TransactionWebhookRouter {
     }
     catch (error) {
       this.sepWebhookTargetPromise = undefined
-      const normalizedError = error instanceof Error ? error : new Error(String(error))
+      const normalizedError = toError(error)
 
       if (options.requireSepTarget) {
         throw normalizedError

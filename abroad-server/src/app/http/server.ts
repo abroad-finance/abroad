@@ -12,6 +12,7 @@ import type { RawBodyRequest } from '../../modules/webhooks/interfaces/http/Webh
 
 import packageJson from '../../../package.json'
 import { mapErrorToHttpResponse } from '../../core/errors'
+import { toError } from '../../core/errors/toError'
 import { ILogger } from '../../core/logging/types'
 import { requestContextMiddleware } from '../../core/requestContext'
 import { PartnerAiAbuseProtectionService } from '../../modules/partners/application/PartnerAiAbuseProtectionService'
@@ -224,7 +225,7 @@ async function start() {
     await initAdmin(app)
   }
   catch (e) {
-    const error = e instanceof Error ? e : new Error(String(e))
+    const error = toError(e)
     logger.warn('AdminJS failed to initialize', error)
     // Preserve legacy console warning for operational visibility and tests
     console.warn('AdminJS failed to initialize:', error)
@@ -245,14 +246,14 @@ async function start() {
       void verifier.verify().catch((error: unknown) => {
         logger.error(
           'Transfero Ultra webhook configuration verification failed',
-          error instanceof Error ? error : new Error(String(error)),
+          toError(error),
         )
       })
     }
     catch (e) {
       logger.error(
         'Failed to start Transfero Ultra webhook configuration verification',
-        e instanceof Error ? e : new Error(String(e)),
+        toError(e),
       )
     }
   }

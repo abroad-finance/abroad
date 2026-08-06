@@ -4,6 +4,7 @@ import { inject, injectable } from 'inversify'
 
 import { RuntimeConfiguration } from '../../app/config/runtime'
 import { TYPES } from '../../app/container/types'
+import { toError } from '../../core/errors/toError'
 import { ILogger } from '../../core/logging/types'
 import { ISecretManager } from '../secrets/ISecretManager'
 import { ISlackNotifier } from './ISlackNotifier'
@@ -29,7 +30,7 @@ export class SlackNotifier implements ISlackNotifier {
       this.logger.info('Message sent to Slack', { length: message.length })
     }
     catch (error) {
-      const normalizedError = error instanceof Error ? error : new Error(String(error))
+      const normalizedError = toError(error)
       this.logger.warn('Failed to send message to Slack', normalizedError)
     }
   }

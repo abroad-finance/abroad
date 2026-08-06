@@ -2,6 +2,7 @@ import { inject, injectable } from 'inversify'
 import { Pool } from 'pg'
 
 import { TYPES } from '../../app/container/types'
+import { toError } from '../../core/errors/toError'
 import { ILogger } from '../../core/logging/types'
 import { ISecretManager } from '../secrets/ISecretManager'
 import { ILockManager } from './ILockManager'
@@ -73,7 +74,7 @@ export class PostgresAdvisoryLockManager implements ILockManager {
           // Postgres auto-releases the session lock; never return it to the pool locked.
           this.logger.error(
             '[pg-lock] advisory unlock failed; destroying connection',
-            unlockErr instanceof Error ? unlockErr : new Error(String(unlockErr)),
+            toError(unlockErr),
           )
           client.release(true)
         }
@@ -102,7 +103,7 @@ export class PostgresAdvisoryLockManager implements ILockManager {
 
     pool.on('error', (err) => {
       // Errors on idle clients in the pool are non-fatal; log and let pg recycle them.
-      this.logger.error('[pg-lock] idle pool client error', err instanceof Error ? err : new Error(String(err)))
+      this.logger.error('[pg-lock] idle pool client error', toError(err))
     })
 
     this.pool = pool

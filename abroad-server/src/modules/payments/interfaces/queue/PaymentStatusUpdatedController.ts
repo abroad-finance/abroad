@@ -2,6 +2,7 @@ import { inject } from 'inversify'
 
 import { TYPES } from '../../../../app/container/types'
 import { ValidationError } from '../../../../core/errors'
+import { toError } from '../../../../core/errors/toError'
 import { createScopedLogger } from '../../../../core/logging/scopedLogger'
 import { ILogger } from '../../../../core/logging/types'
 import { getCorrelationId } from '../../../../core/requestContext'
@@ -96,7 +97,7 @@ export class PaymentStatusUpdatedController {
       })
     }
     catch (error) {
-      const normalizedError = error instanceof Error ? error : new Error(String(error))
+      const normalizedError = toError(error)
       scopedLogger.error('[PaymentStatusUpdated queue]: Error updating flow:', normalizedError)
       throw normalizedError
     }

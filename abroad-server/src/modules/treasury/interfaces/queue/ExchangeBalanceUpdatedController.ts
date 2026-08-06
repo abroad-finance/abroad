@@ -3,6 +3,7 @@ import { inject, injectable } from 'inversify'
 
 import { TYPES } from '../../../../app/container/types'
 import { ValidationError } from '../../../../core/errors'
+import { toError } from '../../../../core/errors/toError'
 import { createScopedLogger } from '../../../../core/logging/scopedLogger'
 import { ILogger } from '../../../../core/logging/types'
 import { getCorrelationId } from '../../../../core/requestContext'
@@ -101,7 +102,7 @@ export class ExchangeBalanceUpdatedController {
           })
         }
         catch (error) {
-          const normalized = error instanceof Error ? error : new Error(String(error))
+          const normalized = toError(error)
           errors.push(normalized)
           scopedLogger.error('[ExchangeBalanceUpdated queue]: Error updating flow for transaction', {
             error: normalized,
