@@ -1,7 +1,6 @@
 import { Wallet } from '@binance/wallet'
 import { BlockchainNetwork, CryptoCurrency, TargetCurrency } from '@prisma/client'
 import axios from 'axios'
-import crypto from 'crypto'
 
 import { BinanceBrlExchangeProvider, BinanceExchangeProvider } from '../../../../../modules/treasury/infrastructure/exchangeProviders/binanceExchangeProvider'
 import { ISecretManager, Secret } from '../../../../../platform/secrets/ISecretManager'
@@ -226,19 +225,5 @@ describe('BinanceExchangeProvider', () => {
         targetCurrency: TargetCurrency.COP,
       })).rejects.toThrow('Invalid price data received from Binance')
     })
-  })
-
-  it('creates Binance signatures for authenticated requests', () => {
-    const provider = createProvider()
-    const internal = provider as unknown as { generateSignature: (queryString: string, apiSecret: string) => string }
-    const queryString = 'timestamp=1'
-    const apiSecret = 'top-secret'
-
-    const expected = crypto
-      .createHmac('sha256', apiSecret)
-      .update(queryString)
-      .digest('hex')
-
-    expect(internal.generateSignature(queryString, apiSecret)).toBe(expected)
   })
 })

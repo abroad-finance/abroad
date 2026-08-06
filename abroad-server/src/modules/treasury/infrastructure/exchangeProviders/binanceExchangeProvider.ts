@@ -3,7 +3,6 @@
 import { Wallet } from '@binance/wallet'
 import { BlockchainNetwork, CryptoCurrency, TargetCurrency } from '@prisma/client'
 import axios from 'axios'
-import crypto from 'crypto'
 import { inject, injectable } from 'inversify'
 
 import { TYPES } from '../../../../app/container/types'
@@ -188,19 +187,6 @@ export class BinanceExchangeProvider implements IExchangeProvider {
     const status = typeof maybeAxios?.response?.status === 'number' ? maybeAxios.response.status : undefined
     if (status && status >= 400 && status < 500) return 'permanent'
     return 'retriable'
-  }
-
-  /**
-   * Generates HMAC SHA256 signature for Binance API
-   * @param queryString The query string to sign
-   * @param apiSecret The Binance API secret
-   * @returns The signature as a hexadecimal string
-   */
-  private generateSignature(queryString: string, apiSecret: string): string {
-    return crypto
-      .createHmac('sha256', apiSecret)
-      .update(queryString)
-      .digest('hex')
   }
 
   /**
