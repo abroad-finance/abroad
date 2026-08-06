@@ -93,66 +93,14 @@ export type OpsAttentionFilter
     | 'PROOF_MISSING'
     | 'REFUND_PENDING'
     | 'WEBHOOK_FAILED'
-type OpsCaseSummaryDto = {
-  id: string
-  owner: null | { displayName: string, id: string }
-  priority: OpsPriority
-  status: OpsWorkStatus
-  team: null | string
-  updatedAt: Date
-  version: number
-}
-type OpsEvidenceEventDto = {
-  category: 'CASE' | 'CHAIN' | 'FLOW' | 'PROOF' | 'PROVIDER' | 'QUOTE' | 'REFUND' | 'TRANSACTION' | 'WEBHOOK'
-  description: string
-  id: string
-  occurredAt: Date
-  state: 'FAILED' | 'INFO' | 'PENDING' | 'SUCCEEDED' | 'WARNING'
-  title: string
-}
-type OpsFlowSummaryDto = {
-  currentStepOrder: null | number
-  id: string
-  status: FlowInstanceStatus
-  updatedAt: Date
-}
-
 export type OpsProofSummaryDto = {
   receiptEligible: boolean
   status: 'AVAILABLE' | 'MISSING' | 'NOT_APPLICABLE' | 'PENDING'
 }
-
 export type OpsRefundSummaryDto = {
   onChainId: null | string
   status: 'COMPLETED' | 'FAILED' | 'NOT_APPLICABLE' | 'NOT_STARTED' | 'PROCESSING'
 }
-
-type OpsSlaDto = {
-  ageMinutes: number
-  state: 'AT_RISK' | 'BREACHED' | 'COMPLETE' | 'WITHIN_TARGET'
-  targetMinutes: null | number
-}
-
-type OpsTransactionCaseDetailDto = OpsCaseSummaryDto & {
-  handoffs: Array<{
-    actor: { displayName: string, id: string }
-    createdAt: Date
-    fromTeam: null | string
-    fromUser: null | { displayName: string, id: string }
-    id: string
-    note: string
-    toTeam: null | string
-    toUser: null | { displayName: string, id: string }
-  }>
-  notes: Array<{
-    author: { displayName: string, id: string }
-    body: string
-    createdAt: Date
-    id: string
-    kind: 'ESCALATION' | 'NOTE' | 'RESOLUTION'
-  }>
-}
-
 export type OpsTransactionDetailDto = OpsTransactionSummaryDto & {
   case: null | OpsTransactionCaseDetailDto
   evidence: OpsEvidenceEventDto[]
@@ -213,6 +161,77 @@ export type OpsTransactionListResponse = {
   total: number
 }
 
+type CorrelatedTransactionIds = {
+  failedFlow: string[]
+  query: string[]
+}
+
+type DeliveryRow = Prisma.OutboxEventGetPayload<{ select: typeof deliverySelect }>
+
+type DetailRow = Prisma.TransactionGetPayload<{ include: typeof detailInclude }>
+
+type FlowRow = Prisma.FlowInstanceGetPayload<{ include: typeof flowInclude }>
+
+type NormalizedFilters = Omit<OpsTransactionSearchFilters, 'createdFrom' | 'createdTo' | 'page' | 'pageSize' | 'query'> & {
+  createdFrom?: Date
+  createdTo?: Date
+  page: number
+  pageSize: number
+  query?: string
+}
+
+type OpsCaseSummaryDto = {
+  id: string
+  owner: null | { displayName: string, id: string }
+  priority: OpsPriority
+  status: OpsWorkStatus
+  team: null | string
+  updatedAt: Date
+  version: number
+}
+
+type OpsEvidenceEventDto = {
+  category: 'CASE' | 'CHAIN' | 'FLOW' | 'PROOF' | 'PROVIDER' | 'QUOTE' | 'REFUND' | 'TRANSACTION' | 'WEBHOOK'
+  description: string
+  id: string
+  occurredAt: Date
+  state: 'FAILED' | 'INFO' | 'PENDING' | 'SUCCEEDED' | 'WARNING'
+  title: string
+}
+
+type OpsFlowSummaryDto = {
+  currentStepOrder: null | number
+  id: string
+  status: FlowInstanceStatus
+  updatedAt: Date
+}
+
+type OpsSlaDto = {
+  ageMinutes: number
+  state: 'AT_RISK' | 'BREACHED' | 'COMPLETE' | 'WITHIN_TARGET'
+  targetMinutes: null | number
+}
+
+type OpsTransactionCaseDetailDto = OpsCaseSummaryDto & {
+  handoffs: Array<{
+    actor: { displayName: string, id: string }
+    createdAt: Date
+    fromTeam: null | string
+    fromUser: null | { displayName: string, id: string }
+    id: string
+    note: string
+    toTeam: null | string
+    toUser: null | { displayName: string, id: string }
+  }>
+  notes: Array<{
+    author: { displayName: string, id: string }
+    body: string
+    createdAt: Date
+    id: string
+    kind: 'ESCALATION' | 'NOTE' | 'RESOLUTION'
+  }>
+}
+
 type OpsTransactionQuoteDto = {
   country: string
   cryptoCurrency: CryptoCurrency
@@ -265,25 +284,6 @@ type OpsWebhookSummaryDto = {
   httpStatus: null | number
   lastAttemptAt: Date | null
   status: 'FAILED' | 'NONE' | 'PENDING' | 'SUCCEEDED'
-}
-
-type CorrelatedTransactionIds = {
-  failedFlow: string[]
-  query: string[]
-}
-
-type DeliveryRow = Prisma.OutboxEventGetPayload<{ select: typeof deliverySelect }>
-
-type DetailRow = Prisma.TransactionGetPayload<{ include: typeof detailInclude }>
-
-type FlowRow = Prisma.FlowInstanceGetPayload<{ include: typeof flowInclude }>
-
-type NormalizedFilters = Omit<OpsTransactionSearchFilters, 'createdFrom' | 'createdTo' | 'page' | 'pageSize' | 'query'> & {
-  createdFrom?: Date
-  createdTo?: Date
-  page: number
-  pageSize: number
-  query?: string
 }
 
 type SummaryContext = {

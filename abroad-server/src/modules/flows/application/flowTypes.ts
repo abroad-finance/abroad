@@ -8,8 +8,6 @@ import {
   TargetCurrency,
 } from '@prisma/client'
 
-type CorrelationKeys = Record<string, boolean | number | string>
-
 export type FlowContext = {
   accountNumber: string
   bankCode: string
@@ -104,3 +102,5 @@ export type FlowStepRuntimeContext = {
 }
 
 export type FlowStepSignalResult = FlowStepExecutionResult
+
+type CorrelationKeys = Record<string, boolean | number | string>

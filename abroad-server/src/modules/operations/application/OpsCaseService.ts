@@ -74,31 +74,10 @@ export type OpsCaseDto = {
   version: number
 }
 
-type OpsCaseHandoffDto = {
-  actor: OpsCaseUserDto
-  createdAt: Date
-  fromTeam: null | string
-  fromUser: null | OpsCaseUserDto
-  id: string
-  note: string
-  toTeam: null | string
-  toUser: null | OpsCaseUserDto
-}
-
 export type OpsCaseHandoffInput = {
   note: string
   toTeam?: null | string
   toUserId?: null | string
-}
-
-type OpsCaseListFilters = {
-  ownerUserId?: string
-  page?: number
-  pageSize?: number
-  priority?: OpsPriority
-  status?: OpsWorkStatus
-  team?: string
-  transactionId?: string
 }
 
 export type OpsCaseListResponse = {
@@ -106,14 +85,6 @@ export type OpsCaseListResponse = {
   page: number
   pageSize: number
   total: number
-}
-
-type OpsCaseNoteDto = {
-  author: OpsCaseUserDto
-  body: string
-  createdAt: Date
-  id: string
-  kind: OpsNoteKind
 }
 
 export type OpsCaseNoteInput = {
@@ -132,18 +103,40 @@ export type OpsCaseUpdateInput = {
   team?: null | string
 }
 
+type CaseRow = Prisma.OpsCaseGetPayload<{ include: typeof caseInclude }>
+
+type OpsCaseHandoffDto = {
+  actor: OpsCaseUserDto
+  createdAt: Date
+  fromTeam: null | string
+  fromUser: null | OpsCaseUserDto
+  id: string
+  note: string
+  toTeam: null | string
+  toUser: null | OpsCaseUserDto
+}
+
+type OpsCaseListFilters = {
+  ownerUserId?: string
+  page?: number
+  pageSize?: number
+  priority?: OpsPriority
+  status?: OpsWorkStatus
+  team?: string
+  transactionId?: string
+}
+
+type OpsCaseNoteDto = {
+  author: OpsCaseUserDto
+  body: string
+  createdAt: Date
+  id: string
+  kind: OpsNoteKind
+}
+
 type OpsCaseUserDto = {
   displayName: string
   id: string
-}
-
-type CaseRow = Prisma.OpsCaseGetPayload<{ include: typeof caseInclude }>
-
-export class OpsCaseConflictError extends ApplicationError {
-  public constructor(message = 'This case changed after it was loaded; refresh before trying again') {
-    super(409, 'ops_case_conflict', message)
-    this.name = 'OpsCaseConflictError'
-  }
 }
 
 class OpsCaseNotFoundError extends ApplicationError {
@@ -157,6 +150,13 @@ class OpsCaseValidationError extends ApplicationError {
   public constructor(message: string) {
     super(400, 'ops_case_invalid', message)
     this.name = 'OpsCaseValidationError'
+  }
+}
+
+export class OpsCaseConflictError extends ApplicationError {
+  public constructor(message = 'This case changed after it was loaded; refresh before trying again') {
+    super(409, 'ops_case_conflict', message)
+    this.name = 'OpsCaseConflictError'
   }
 }
 

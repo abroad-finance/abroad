@@ -6,12 +6,6 @@ import { IDatabaseClientProvider } from '../../../platform/persistence/IDatabase
 import { assertPartnerUserEnabled } from '../../shared/partnerUserAccess'
 import { IKycDocumentStorage } from './contracts/IKycDocumentStorage'
 
-interface KycDocumentInput {
-  buffer: Buffer
-  contentType: string
-  fileExtension: string
-}
-
 export interface KycSubmissionInput {
   address: string
   city: string
@@ -25,6 +19,12 @@ export interface KycSubmissionInput {
   partnerId: string
   phone: string
   userId: string
+}
+
+interface KycDocumentInput {
+  buffer: Buffer
+  contentType: string
+  fileExtension: string
 }
 
 interface KycSubmissionResult {

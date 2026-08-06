@@ -9,6 +9,30 @@ import { BridgeFloatService } from './BridgeFloatService'
 import { IExchangeProviderFactory } from './contracts/IExchangeProviderFactory'
 import { ITreasuryBalanceSource } from './contracts/ITreasuryBalanceSource'
 
+export type OpsTreasuryBalancesResponse = {
+  capturedAt: Date
+  cells: OpsTreasuryBalanceCell[]
+  errors: OpsTreasuryVenueError[]
+  /** Bridge float gauge. Outstanding legs are USDC already counted at Binance, so this is context, not an addend. */
+  float: OpsTreasuryFloatDto
+  freshness: OpsTreasuryFreshness
+  fxRates: OpsTreasuryFxRate[]
+  totalUsd: number
+  /** True when a venue errored or a cell had no FX rate — totalUsd is then a lower bound. */
+  totalUsdIsPartial: boolean
+}
+
+export type OpsTreasuryMovementsResponse = {
+  days: OpsTreasuryMovementDay[]
+  recent: OpsTreasuryMovementEvent[]
+}
+
+export type OpsTreasurySnapshotsResponse = {
+  from: Date
+  series: OpsTreasurySnapshotSeries[]
+  to: Date
+}
+
 type OpsTreasuryBalanceCell = {
   account: string
   amount: number
@@ -22,19 +46,6 @@ type OpsTreasuryBalanceCell = {
   usdRate: null | number
   usdValue: null | number
   venue: string
-}
-
-export type OpsTreasuryBalancesResponse = {
-  capturedAt: Date
-  cells: OpsTreasuryBalanceCell[]
-  errors: OpsTreasuryVenueError[]
-  /** Bridge float gauge. Outstanding legs are USDC already counted at Binance, so this is context, not an addend. */
-  float: OpsTreasuryFloatDto
-  freshness: OpsTreasuryFreshness
-  fxRates: OpsTreasuryFxRate[]
-  totalUsd: number
-  /** True when a venue errored or a cell had no FX rate — totalUsd is then a lower bound. */
-  totalUsdIsPartial: boolean
 }
 
 type OpsTreasuryCellPosture = {
@@ -92,11 +103,6 @@ type OpsTreasuryMovementEvent = {
   reference: string
 }
 
-export type OpsTreasuryMovementsResponse = {
-  days: OpsTreasuryMovementDay[]
-  recent: OpsTreasuryMovementEvent[]
-}
-
 type OpsTreasurySnapshotPoint = {
   capturedAt: Date
   usdValue: null | number
@@ -105,12 +111,6 @@ type OpsTreasurySnapshotPoint = {
 type OpsTreasurySnapshotSeries = {
   points: OpsTreasurySnapshotPoint[]
   venue: string
-}
-
-export type OpsTreasurySnapshotsResponse = {
-  from: Date
-  series: OpsTreasurySnapshotSeries[]
-  to: Date
 }
 
 type OpsTreasuryVenueError = {

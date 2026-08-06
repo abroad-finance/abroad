@@ -62,63 +62,15 @@ export type OpsHandoffBoardDto = {
 }
 export type OpsHandoffScope = 'ALL' | 'MINE' | 'UNOWNED'
 
-type OpsHandoffWorkItemDto = {
-  ageSeconds: number
-  href: string
-  id: string
-  latestEscalation: null | {
-    at: Date
-    author: string
-    summary: string
-  }
-  owner: null | OpsIncidentUserDto
-  priority: string
-  resourceType: 'CASE' | 'INCIDENT'
-  status: OpsWorkStatus
-  subtitle: string
-  team: null | string
-  title: string
-  updatedAt: Date
-  version: number
-}
-
-type OpsIncidentCountDto<TValue extends string> = {
-  count: number
-  value: TValue
-}
-
 export type OpsIncidentDetailDto = OpsIncidentSummaryDto & {
   handoffs: OpsIncidentHandoffDto[]
   notes: OpsIncidentNoteDto[]
-}
-
-type OpsIncidentHandoffDto = {
-  actor: OpsIncidentUserDto
-  createdAt: Date
-  fromTeam: null | string
-  fromUser: null | OpsIncidentUserDto
-  id: string
-  note: string
-  toTeam: null | string
-  toUser: null | OpsIncidentUserDto
 }
 
 export type OpsIncidentHandoffInput = {
   note: string
   toTeam?: null | string
   toUserId?: null | string
-}
-
-type OpsIncidentListFilters = {
-  kind?: string
-  ownerUserId?: string
-  page?: number
-  pageSize?: number
-  query?: string
-  severity?: OpsIncidentSeverity
-  status?: OpsWorkStatus
-  team?: string
-  unowned?: boolean
 }
 
 export type OpsIncidentListResponse = {
@@ -128,14 +80,6 @@ export type OpsIncidentListResponse = {
   severityCounts: OpsIncidentCountDto<OpsIncidentSeverity>[]
   statusCounts: OpsIncidentCountDto<OpsWorkStatus>[]
   total: number
-}
-
-type OpsIncidentNoteDto = {
-  author: OpsIncidentUserDto
-  body: string
-  createdAt: Date
-  id: string
-  kind: OpsNoteKind
 }
 
 export type OpsIncidentNoteInput = {
@@ -163,6 +107,73 @@ export type OpsIncidentRunbookDto = {
   url: string
 }
 
+export type OpsIncidentUpdateInput = {
+  ownerUserId?: null | string
+  runbookId?: null | string
+  status?: OpsWorkStatus
+  team?: null | string
+}
+
+type IncidentDetailRow = Prisma.OpsIncidentGetPayload<{ include: typeof incidentDetailInclude }>
+
+type IncidentSummaryRow = Prisma.OpsIncidentGetPayload<{ include: typeof incidentSummaryInclude }>
+
+type OpsHandoffWorkItemDto = {
+  ageSeconds: number
+  href: string
+  id: string
+  latestEscalation: null | {
+    at: Date
+    author: string
+    summary: string
+  }
+  owner: null | OpsIncidentUserDto
+  priority: string
+  resourceType: 'CASE' | 'INCIDENT'
+  status: OpsWorkStatus
+  subtitle: string
+  team: null | string
+  title: string
+  updatedAt: Date
+  version: number
+}
+
+type OpsIncidentCountDto<TValue extends string> = {
+  count: number
+  value: TValue
+}
+
+type OpsIncidentHandoffDto = {
+  actor: OpsIncidentUserDto
+  createdAt: Date
+  fromTeam: null | string
+  fromUser: null | OpsIncidentUserDto
+  id: string
+  note: string
+  toTeam: null | string
+  toUser: null | OpsIncidentUserDto
+}
+
+type OpsIncidentListFilters = {
+  kind?: string
+  ownerUserId?: string
+  page?: number
+  pageSize?: number
+  query?: string
+  severity?: OpsIncidentSeverity
+  status?: OpsWorkStatus
+  team?: string
+  unowned?: boolean
+}
+
+type OpsIncidentNoteDto = {
+  author: OpsIncidentUserDto
+  body: string
+  createdAt: Date
+  id: string
+  kind: OpsNoteKind
+}
+
 type OpsIncidentSummaryDto = {
   acknowledgedAt: Date | null
   affectedCount: number
@@ -185,21 +196,10 @@ type OpsIncidentSummaryDto = {
   version: number
 }
 
-export type OpsIncidentUpdateInput = {
-  ownerUserId?: null | string
-  runbookId?: null | string
-  status?: OpsWorkStatus
-  team?: null | string
-}
-
 type OpsIncidentUserDto = {
   displayName: string
   id: string
 }
-
-type IncidentDetailRow = Prisma.OpsIncidentGetPayload<{ include: typeof incidentDetailInclude }>
-
-type IncidentSummaryRow = Prisma.OpsIncidentGetPayload<{ include: typeof incidentSummaryInclude }>
 
 class OpsIncidentConflictError extends ApplicationError {
   public constructor(message = 'This incident changed after it was loaded; refresh before trying again') {

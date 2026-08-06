@@ -24,7 +24,6 @@ const MAX_PARTNER_PAGE_SIZE = 100
 export type OpsCreatePartnerRequest = OpsPartnerCreateInput
 export type OpsCreatePartnerResponse = OpsPartnerCreateResult
 export type OpsPartnerCredentialHistoryResponse = OpsPartnerCredentialHistory
-type OpsPartnerDto = OpsPartnerSummary
 export type OpsPartnerListResponse = OpsPartnerListResult
 export type OpsRotatePartnerApiKeyResponse = OpsPartnerRotateApiKeyResult
 export type OpsUpdatePartnerClientDomainRequest = OpsPartnerClientDomainInput

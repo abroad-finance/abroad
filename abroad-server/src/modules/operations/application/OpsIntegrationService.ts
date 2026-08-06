@@ -23,13 +23,6 @@ export type OpsIntegrationCatalogDto = {
   runbooks: OpsRunbookDto[]
 }
 
-type OpsIntegrationConfigurationInput = {
-  destinationLabel?: null | string
-  eventKinds?: string[]
-  healthcheckName?: null | string
-  provider?: null | string
-}
-
 export type OpsIntegrationDto = {
   configuration: OpsIntegrationConfigurationInput
   createdAt: Date
@@ -72,6 +65,13 @@ export type OpsRunbookInput = {
   name: string
   slug: string
   url: string
+}
+
+type OpsIntegrationConfigurationInput = {
+  destinationLabel?: null | string
+  eventKinds?: string[]
+  healthcheckName?: null | string
+  provider?: null | string
 }
 
 class OpsIntegrationConflictError extends ApplicationError {

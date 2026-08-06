@@ -18,12 +18,6 @@ const MAX_PAGE_SIZE = 100
 const MAX_EFFECTIVE_DELAY_MS = 93 * 24 * 60 * 60 * 1_000
 const MAX_DIFF_ENTRIES = 100
 
-type OpsConfigurationDiffEntry = {
-  after: null | string
-  before: null | string
-  field: string
-}
-
 export type OpsConfigurationDraftInput = {
   effectiveAt?: Date
   payload: OpsConfigurationPayload
@@ -80,6 +74,23 @@ export type OpsConfigurationReleaseList = {
   total: number
 }
 
+type ConfigurationSnapshot = {
+  baseVersion: number
+  payload: null | OpsConfigurationPayload
+  targetKey: string
+  targetType: OpsConfigurationTargetType
+}
+
+type OpsConfigurationApprovalPolicy
+  = | 'DIFFERENT_ADMIN_REQUIRED'
+    | 'SOLE_ADMIN_SELF_APPROVAL_ALLOWED'
+
+type OpsConfigurationDiffEntry = {
+  after: null | string
+  before: null | string
+  field: string
+}
+
 type OpsConfigurationReleaseQuery = {
   page: number
   pageSize: number
@@ -92,17 +103,6 @@ type OpsConfigurationReleaseUser = {
   displayName: string
   id: string
 }
-
-type ConfigurationSnapshot = {
-  baseVersion: number
-  payload: null | OpsConfigurationPayload
-  targetKey: string
-  targetType: OpsConfigurationTargetType
-}
-
-type OpsConfigurationApprovalPolicy
-  = | 'DIFFERENT_ADMIN_REQUIRED'
-    | 'SOLE_ADMIN_SELF_APPROVAL_ALLOWED'
 
 type ReleaseWithUsers = Prisma.OpsConfigurationReleaseGetPayload<{
   include: {

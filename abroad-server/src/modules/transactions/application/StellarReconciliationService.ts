@@ -20,14 +20,6 @@ export type CheckUnprocessedStellarResponse = {
   startPagingToken: null | string
 }
 
-type SingleStellarReconciliationResponse = {
-  paymentId: string
-  reason?: PaymentReconciliationReason
-  refundTransactionId?: null | string
-  result: 'alreadyProcessed' | 'enqueued' | 'failed' | 'invalid' | 'irrelevant' | 'missing' | 'notFound'
-  transactionId: null | string
-}
-
 type PaymentLookupResult
   = | { payment: Horizon.ServerApi.PaymentOperationRecord, status: 'found' }
     | { status: 'failed' }
@@ -39,6 +31,14 @@ type PaymentProcessingOutcome
   = | { cursor: string, reason?: PaymentReconciliationReason, refundTransactionId?: null | string, result: 'invalid' | 'irrelevant' }
     | { cursor: string, reason?: PaymentReconciliationReason, result: 'alreadyProcessed' | 'enqueued' | 'missing', transactionId: string }
     | { cursor: string, reason?: PaymentReconciliationReason, result: 'halt', transactionId?: string }
+
+type SingleStellarReconciliationResponse = {
+  paymentId: string
+  reason?: PaymentReconciliationReason
+  refundTransactionId?: null | string
+  result: 'alreadyProcessed' | 'enqueued' | 'failed' | 'invalid' | 'irrelevant' | 'missing' | 'notFound'
+  transactionId: null | string
+}
 
 type StellarPaymentContext = {
   accountId: string

@@ -26,16 +26,6 @@ export type PartnerPortalResetTokenResult = {
   user: PartnerPortalUserSummary
 }
 
-type PartnerPortalTeamUpdateInput = {
-  disabled?: boolean
-  role?: PartnerPortalRole
-}
-
-type PartnerPortalUserCreateInput = {
-  email: string
-  role: PartnerPortalRole
-}
-
 export type PartnerPortalUserSummary = {
   createdAt: Date
   disabledAt: Date | null
@@ -43,6 +33,16 @@ export type PartnerPortalUserSummary = {
   id: string
   lastLoginAt: Date | null
   mfaEnabled: boolean
+  role: PartnerPortalRole
+}
+
+type PartnerPortalTeamUpdateInput = {
+  disabled?: boolean
+  role?: PartnerPortalRole
+}
+
+type PartnerPortalUserCreateInput = {
+  email: string
   role: PartnerPortalRole
 }
 

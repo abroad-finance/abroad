@@ -13,17 +13,17 @@ type EnabledCryptoAsset = {
   mintAddress: string
 }
 
-export class CryptoAssetConfigConflictError extends ApplicationError {
-  constructor() {
-    super(409, 'crypto_asset_version_conflict', 'This crypto asset changed after it was loaded')
-    this.name = 'CryptoAssetConfigConflictError'
-  }
-}
-
 class CryptoAssetConfigError extends Error {
   constructor(message: string) {
     super(message)
     this.name = 'CryptoAssetConfigError'
+  }
+}
+
+export class CryptoAssetConfigConflictError extends ApplicationError {
+  constructor() {
+    super(409, 'crypto_asset_version_conflict', 'This crypto asset changed after it was loaded')
+    this.name = 'CryptoAssetConfigConflictError'
   }
 }
 

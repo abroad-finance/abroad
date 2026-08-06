@@ -30,25 +30,16 @@ const opsMutationEnvelopeSchema = z.object({
   reference: z.string().trim().max(120).optional(),
 }).strict()
 
-type OpsApprovalClass = 'CONFIRMATION' | 'DIRECT' | 'SECOND_APPROVER' | 'STEP_UP'
-
 export type OpsMutationAction = keyof typeof OPS_MUTATION_POLICIES
 
 export type OpsMutationEnvelope = z.infer<typeof opsMutationEnvelopeSchema>
-
-type OpsMutationPolicy = {
-  approvalClass: OpsApprovalClass
-  confirmation: string
-  expectedVersion: boolean
-  impact: string
-  permission: OpsPermission
-  stepUpMaxAgeMs: null | number
-}
 
 type MutationOutcome = {
   metadata?: Prisma.InputJsonObject
   resourceId?: string
 }
+
+type OpsApprovalClass = 'CONFIRMATION' | 'DIRECT' | 'SECOND_APPROVER' | 'STEP_UP'
 
 type OpsMutationContext = {
   action: OpsMutationAction
@@ -57,6 +48,15 @@ type OpsMutationContext = {
   policy: OpsMutationPolicy
   principal: OpsUserPrincipal
   resource: OpsMutationResource
+}
+
+type OpsMutationPolicy = {
+  approvalClass: OpsApprovalClass
+  confirmation: string
+  expectedVersion: boolean
+  impact: string
+  permission: OpsPermission
+  stepUpMaxAgeMs: null | number
 }
 
 type OpsMutationResource = {

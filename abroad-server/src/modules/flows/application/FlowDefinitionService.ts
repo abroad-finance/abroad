@@ -14,17 +14,17 @@ import {
   FlowDefinitionUpdateInput,
 } from './flowDefinitionSchemas'
 
-export class FlowDefinitionConflictError extends ApplicationError {
-  constructor() {
-    super(409, 'flow_definition_version_conflict', 'This flow definition changed after it was loaded')
-    this.name = 'FlowDefinitionConflictError'
-  }
-}
-
 class FlowDefinitionValidationError extends Error {
   constructor(message: string) {
     super(message)
     this.name = 'FlowDefinitionValidationError'
+  }
+}
+
+export class FlowDefinitionConflictError extends ApplicationError {
+  constructor() {
+    super(409, 'flow_definition_version_conflict', 'This flow definition changed after it was loaded')
+    this.name = 'FlowDefinitionConflictError'
   }
 }
 

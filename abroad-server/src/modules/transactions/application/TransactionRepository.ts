@@ -4,6 +4,12 @@ import { IDatabaseClientProvider } from '../../../platform/persistence/IDatabase
 import { transactionNotificationInclude, TransactionWithRelations } from './transactionNotificationTypes'
 import { InvalidTransactionTransitionError, resolveTransition, TransactionTransitionName } from './TransactionStateMachine'
 
+type PayoutContext = {
+  attempts: number
+  lastError?: string
+  status: 'completed' | 'failed' | 'pending'
+}
+
 type PayoutReservation
   = | { attempts: number, outcome: 'completed' }
     | { attempts: number, outcome: 'in_flight' }
@@ -25,18 +31,6 @@ type RefundAttemptResult
   }
   | { success: true, transactionId?: string }
 
-type RefundReservation
-  = | { attempts: number, outcome: 'in_flight' }
-    | { attempts: number, outcome: 'reserved' }
-    | { outcome: 'already_refunded', refundOnChainId?: string }
-    | { outcome: 'missing' }
-
-type PayoutContext = {
-  attempts: number
-  lastError?: string
-  status: 'completed' | 'failed' | 'pending'
-}
-
 type RefundContext = {
   attempts: number
   candidateTransactionId?: string
@@ -46,6 +40,12 @@ type RefundContext = {
   status: 'failed' | 'pending' | 'succeeded'
   trigger?: string
 }
+
+type RefundReservation
+  = | { attempts: number, outcome: 'in_flight' }
+    | { attempts: number, outcome: 'reserved' }
+    | { outcome: 'already_refunded', refundOnChainId?: string }
+    | { outcome: 'missing' }
 
 type TransactionClient = Awaited<ReturnType<IDatabaseClientProvider['getClient']>> | Prisma.TransactionClient
 

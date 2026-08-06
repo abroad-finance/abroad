@@ -142,13 +142,6 @@ export type FlowCorridorListDto = {
   summary: FlowCorridorSummaryDto
 }
 
-type FlowCorridorSummaryDto = {
-  defined: number
-  missing: number
-  total: number
-  unsupported: number
-}
-
 export type FlowCorridorUpdateInput = {
   blockchain: BlockchainNetwork
   cryptoCurrency: CryptoCurrency
@@ -180,16 +173,11 @@ export type FlowDefinitionDto = {
 
 export type FlowDefinitionUpdateInput = FlowDefinitionInput
 
-type FlowStepDefinitionDto = {
-  completionPolicy: FlowStepCompletionPolicy
-  config: Record<string, unknown>
-  createdAt: Date
-  flowDefinitionId: string
-  id: string
-  signalMatch?: null | Record<string, unknown>
-  stepOrder: number
-  stepType: FlowStepType
-  updatedAt: Date
+type FlowCorridorSummaryDto = {
+  defined: number
+  missing: number
+  total: number
+  unsupported: number
 }
 
 export const flowCorridorUpdateSchema: z.ZodType<FlowCorridorUpdateInput> = z.object({

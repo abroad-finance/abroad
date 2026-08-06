@@ -5,14 +5,6 @@ import { TYPES } from '../../../app/container/types'
 import { ILogger } from '../../../core/logging/types'
 import { IDatabaseClientProvider } from '../../../platform/persistence/IDatabaseClientProvider'
 
-type LiquidityCacheResult = {
-  fromCache: boolean
-  liquidity: number
-  message?: string
-  stale?: boolean
-  success: boolean
-}
-
 type CachedLiquidity = {
   liquidity: number
   updatedAt: Date
@@ -22,6 +14,14 @@ type GetLiquidityParams = {
   fetchLiquidity: () => Promise<number>
   method: PaymentMethod
   now?: number
+}
+
+type LiquidityCacheResult = {
+  fromCache: boolean
+  liquidity: number
+  message?: string
+  stale?: boolean
+  success: boolean
 }
 
 type PrismaClientLike = Awaited<ReturnType<IDatabaseClientProvider['getClient']>>

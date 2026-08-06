@@ -10,6 +10,18 @@ import { IDatabaseClientProvider } from '../../../platform/persistence/IDatabase
 import { ISecretManager, Secrets } from '../../../platform/secrets/ISecretManager'
 import { IDepositVerifierRegistry } from '../../payments/application/contracts/IDepositVerifier'
 
+export type OpsTransactionReconciliationResultCode
+  = 'alreadyProcessed'
+    | 'enqueued'
+    | 'failed'
+    | 'invalid'
+    | 'notFound'
+    | 'unresolved'
+
+type DerivedTransactionId
+  = | { reason: string, result: OpsTransactionReconciliationResultCode, status: 'error' }
+    | { status: 'ok', transactionId: string }
+
 type OpsTransactionReconciliationInput = {
   blockchain: BlockchainNetwork
   onChainTx: string
@@ -24,18 +36,6 @@ type OpsTransactionReconciliationResult = {
   transactionId: null | string
   transactionStatus: null | TransactionStatus
 }
-
-export type OpsTransactionReconciliationResultCode
-  = 'alreadyProcessed'
-    | 'enqueued'
-    | 'failed'
-    | 'invalid'
-    | 'notFound'
-    | 'unresolved'
-
-type DerivedTransactionId
-  = | { reason: string, result: OpsTransactionReconciliationResultCode, status: 'error' }
-    | { status: 'ok', transactionId: string }
 
 @injectable()
 export class OpsTransactionReconciliationService {

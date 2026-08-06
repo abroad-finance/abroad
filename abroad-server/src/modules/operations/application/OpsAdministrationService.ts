@@ -32,36 +32,11 @@ export const opsUserRoleUpdateSchema: z.ZodType<OpsUserRoleUpdateInput> = z.obje
   role: z.nativeEnum(OpsRole),
 }).strict()
 
-type OpsAuditEventDto = {
-  action: string
-  actorKind: string
-  actorLabel: string
-  actorUserId: null | string
-  createdAt: Date
-  id: string
-  metadata: null | Record<string, boolean | null | number | string>
-  reason: null | string
-  reference: null | string
-  resourceId: null | string
-  resourceType: string
-}
-
 export type OpsAuditListDto = {
   items: OpsAuditEventDto[]
   page: number
   pageSize: number
   total: number
-}
-
-type OpsAuditQuery = {
-  action?: string
-  actor?: string
-  createdFrom?: Date
-  createdTo?: Date
-  page: number
-  pageSize: number
-  resourceId?: string
-  resourceType?: string
 }
 
 export type OpsUserDto = {
@@ -84,6 +59,31 @@ export type OpsUserListDto = {
   items: OpsUserDto[]
 }
 
+type OpsAuditEventDto = {
+  action: string
+  actorKind: string
+  actorLabel: string
+  actorUserId: null | string
+  createdAt: Date
+  id: string
+  metadata: null | Record<string, boolean | null | number | string>
+  reason: null | string
+  reference: null | string
+  resourceId: null | string
+  resourceType: string
+}
+
+type OpsAuditQuery = {
+  action?: string
+  actor?: string
+  createdFrom?: Date
+  createdTo?: Date
+  page: number
+  pageSize: number
+  resourceId?: string
+  resourceType?: string
+}
+
 type UserMutationOptions = {
   data: Prisma.OpsUserUpdateManyMutationInput
   expectedVersion: number
@@ -91,17 +91,17 @@ type UserMutationOptions = {
   validate?: (transaction: Prisma.TransactionClient, user: OpsUser) => Promise<void>
 }
 
-export class OpsAdministrationConflictError extends ApplicationError {
-  public constructor(message = 'This Ops user changed after it was loaded') {
-    super(409, 'ops_administration_conflict', message)
-    this.name = 'OpsAdministrationConflictError'
-  }
-}
-
 class OpsAdministrationNotFoundError extends ApplicationError {
   public constructor() {
     super(404, 'ops_user_not_found', 'Ops user not found')
     this.name = 'OpsAdministrationNotFoundError'
+  }
+}
+
+export class OpsAdministrationConflictError extends ApplicationError {
+  public constructor(message = 'This Ops user changed after it was loaded') {
+    super(409, 'ops_administration_conflict', message)
+    this.name = 'OpsAdministrationConflictError'
   }
 }
 

@@ -37,6 +37,31 @@ export type OpsKycDetail = {
   version: number
 }
 
+export type OpsKycListResult = {
+  items: OpsKycSummary[]
+  page: number
+  pageSize: number
+  total: number
+}
+
+export type OpsKycReviewer = {
+  displayName: string
+  id: string
+  role: OpsRole
+}
+
+export type OpsKycUserState = {
+  disabledAt: Date | null
+  partnerUserId: string
+}
+
+type KycWithRelations = Prisma.PartnerUserKycGetPayload<{
+  include: {
+    opsReviewer: { select: { displayName: true, id: true, role: true } }
+    partnerUser: { include: { partner: true } }
+  }
+}>
+
 type OpsKycDisableInput = {
   disabledBy?: string
   partnerUserId: string
@@ -57,19 +82,6 @@ type OpsKycListParams = {
   status?: KycStatus
 }
 
-export type OpsKycListResult = {
-  items: OpsKycSummary[]
-  page: number
-  pageSize: number
-  total: number
-}
-
-export type OpsKycReviewer = {
-  displayName: string
-  id: string
-  role: OpsRole
-}
-
 type OpsKycSummary = {
   disabledAt: Date | null
   documentNumberMasked: null | string
@@ -88,18 +100,6 @@ type OpsKycSummary = {
   submittedAt: Date
   version: number
 }
-
-export type OpsKycUserState = {
-  disabledAt: Date | null
-  partnerUserId: string
-}
-
-type KycWithRelations = Prisma.PartnerUserKycGetPayload<{
-  include: {
-    opsReviewer: { select: { displayName: true, id: true, role: true } }
-    partnerUser: { include: { partner: true } }
-  }
-}>
 
 class OpsKycConflictError extends ApplicationError {
   public constructor() {

@@ -37,6 +37,37 @@ const activityInclude = {
   },
 } satisfies Prisma.TransactionInclude
 
+export type ConsumerActivityListResponse = {
+  items: ConsumerActivityTransactionDto[]
+  page: number
+  pageSize: number
+  total: number
+}
+
+export type ConsumerActivityReceiptDto = ConsumerActivityTransactionDto & {
+  effectiveRate: null | string
+  fee: ConsumerActivityFeeDto | null
+  lifecycle: ConsumerActivityLifecycleDto[]
+  references: ConsumerActivityReferencesDto
+}
+
+export type ConsumerActivitySort = 'newest' | 'oldest'
+
+export interface IConsumerActivityService {
+  getById(
+    partnerId: string,
+    authenticatedSubject: string,
+    transactionId: string,
+  ): Promise<ConsumerActivityReceiptDto>
+  list(
+    partnerId: string,
+    authenticatedSubject: string,
+    filters: ConsumerActivityFilters,
+  ): Promise<ConsumerActivityListResponse>
+}
+
+type ActivityRow = Prisma.TransactionGetPayload<{ include: typeof activityInclude }>
+
 type ConsumerActivityFeeDto = {
   amount: string
   currency: string
@@ -61,13 +92,6 @@ type ConsumerActivityLifecycleDto = {
   type: 'CREATED' | 'STATUS_CHANGED'
 }
 
-export type ConsumerActivityListResponse = {
-  items: ConsumerActivityTransactionDto[]
-  page: number
-  pageSize: number
-  total: number
-}
-
 type ConsumerActivityProofDto = {
   receiptAvailable: boolean
   status: 'AVAILABLE' | 'MISSING' | 'NOT_APPLICABLE' | 'PENDING'
@@ -83,13 +107,6 @@ type ConsumerActivityQuoteDto = {
   targetCurrency: TargetCurrency
 }
 
-export type ConsumerActivityReceiptDto = ConsumerActivityTransactionDto & {
-  effectiveRate: null | string
-  fee: ConsumerActivityFeeDto | null
-  lifecycle: ConsumerActivityLifecycleDto[]
-  references: ConsumerActivityReferencesDto
-}
-
 type ConsumerActivityReferencesDto = {
   abroadId: string
   brebId: null | string
@@ -103,8 +120,6 @@ type ConsumerActivityRefundDto = {
   reference: null | string
   status: 'COMPLETED' | 'FAILED' | 'NOT_APPLICABLE' | 'NOT_STARTED' | 'PROCESSING' | 'UNKNOWN'
 }
-
-export type ConsumerActivitySort = 'newest' | 'oldest'
 
 type ConsumerActivityTimestampsDto = {
   acceptedAt: Date
@@ -124,21 +139,6 @@ type ConsumerActivityTransactionDto = {
   status: TransactionStatus
   timestamps: ConsumerActivityTimestampsDto
 }
-
-export interface IConsumerActivityService {
-  getById(
-    partnerId: string,
-    authenticatedSubject: string,
-    transactionId: string,
-  ): Promise<ConsumerActivityReceiptDto>
-  list(
-    partnerId: string,
-    authenticatedSubject: string,
-    filters: ConsumerActivityFilters,
-  ): Promise<ConsumerActivityListResponse>
-}
-
-type ActivityRow = Prisma.TransactionGetPayload<{ include: typeof activityInclude }>
 
 type NormalizedFilters = {
   createdFrom?: Date

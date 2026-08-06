@@ -29,12 +29,6 @@ export interface IQuoteUseCase {
   createReverseQuote(params: CreateReverseQuoteParams): Promise<QuoteResponse>
 }
 
-interface QuoteFeeResponse {
-  amount: string
-  currency: CryptoCurrency
-  type: 'combined' | 'fixed' | 'none' | 'percentage'
-}
-
 export interface QuoteResponse {
   expiration_time: number
   fee: QuoteFeeResponse
@@ -78,6 +72,12 @@ type CustomerFeeSnapshot = {
   currency: CryptoCurrency
   databaseType: CustomerFeeType
   wireType: QuoteFeeResponse['type']
+}
+
+interface QuoteFeeResponse {
+  amount: string
+  currency: CryptoCurrency
+  type: 'combined' | 'fixed' | 'none' | 'percentage'
 }
 
 @injectable()

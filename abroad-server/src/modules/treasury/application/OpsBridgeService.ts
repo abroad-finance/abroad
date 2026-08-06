@@ -12,6 +12,17 @@ export type OpsBridgeBatchDetailDto = {
   providerReference: null | string
 }
 
+export type OpsBridgeOverview = {
+  batches: OpsBridgeBatchDto[]
+  float: OpsBridgeFloatDto
+  legs: {
+    byStatus: OpsBridgeLegGroupDto[]
+    oldestPendingAt: Date | null
+    recent: OpsBridgeLegDto[]
+    total: number
+  }
+}
+
 type OpsBridgeBatchDto = {
   asset: CryptoCurrency
   createdAt: Date
@@ -63,17 +74,6 @@ type OpsBridgeLegGroupDto = {
   amount: number
   count: number
   status: BridgeLegStatus
-}
-
-export type OpsBridgeOverview = {
-  batches: OpsBridgeBatchDto[]
-  float: OpsBridgeFloatDto
-  legs: {
-    byStatus: OpsBridgeLegGroupDto[]
-    oldestPendingAt: Date | null
-    recent: OpsBridgeLegDto[]
-    total: number
-  }
 }
 
 type OpsBridgeReconciliationState = 'ACTION_REQUIRED' | 'AWAITING_PROVIDER' | 'COLLECTING' | 'RECONCILED'

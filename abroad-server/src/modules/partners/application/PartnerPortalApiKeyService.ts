@@ -14,12 +14,6 @@ const MAX_NAME_LENGTH = 64
 const MIN_EXPIRY_MS = 5 * 60 * 1_000
 const ROTATION_OVERLAP_MS = 24 * 60 * 60 * 1_000
 
-type PartnerPortalApiKeyCreateInput = {
-  expiresAt?: Date
-  name: string
-  scopes: readonly string[]
-}
-
 export type PartnerPortalApiKeyList = {
   items: PartnerPortalApiKeySummary[]
   legacyKeyActive: boolean
@@ -40,6 +34,12 @@ export type PartnerPortalApiKeySummary = {
   revokedAt: Date | null
   scopes: PartnerApiKeyScopeName[]
   status: 'ACTIVE' | 'EXPIRED' | 'REVOKED'
+}
+
+type PartnerPortalApiKeyCreateInput = {
+  expiresAt?: Date
+  name: string
+  scopes: readonly string[]
 }
 
 export class PartnerPortalApiKeyNotFoundError extends Error {

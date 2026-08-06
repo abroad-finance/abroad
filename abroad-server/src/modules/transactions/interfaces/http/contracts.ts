@@ -53,13 +53,6 @@ export interface AcceptTransactionResponse {
   transaction_reference: null | string
 }
 
-interface PaymentInstructions {
-  /** EMV copy-paste PIX payload. */
-  br_code: string
-  /** Epoch milliseconds, or null when the code does not expire. */
-  expires_at: null | number
-}
-
 export interface TransactionStatusResponse {
   id: string
   kycRequired: boolean
@@ -67,4 +60,11 @@ export interface TransactionStatusResponse {
   status: TransactionStatus
   transaction_reference: string
   user_id: string
+}
+
+interface PaymentInstructions {
+  /** EMV copy-paste PIX payload. */
+  br_code: string
+  /** Epoch milliseconds, or null when the code does not expire. */
+  expires_at: null | number
 }

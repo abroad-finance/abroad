@@ -4,13 +4,13 @@ import type { PartnerPortalPrincipal } from '../../modules/partners/application/
 
 import { ApplicationError } from '../../core/errors'
 
-type OpsExternalAuthentication = OpsExternalIdentity & { kind: 'ops_external' }
-
 export type RequestAuthentication
   = | AuthenticatedPartner
     | OpsExternalAuthentication
     | OpsPrincipal
     | PartnerPortalPrincipal
+
+type OpsExternalAuthentication = OpsExternalIdentity & { kind: 'ops_external' }
 
 export const requireAuthenticatedPartner = (
   authentication: RequestAuthentication | undefined,

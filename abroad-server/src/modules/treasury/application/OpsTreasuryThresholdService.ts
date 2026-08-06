@@ -43,17 +43,17 @@ export type OpsTreasuryThresholdInput = {
 
 type ThresholdRow = Prisma.OpsTreasuryThresholdGetPayload<{ include: typeof thresholdInclude }>
 
-export class OpsTreasuryThresholdConflictError extends ApplicationError {
-  public constructor(message = 'This treasury threshold changed after it was loaded; refresh before trying again') {
-    super(409, 'ops_treasury_threshold_conflict', message)
-    this.name = 'OpsTreasuryThresholdConflictError'
-  }
-}
-
 class OpsTreasuryThresholdNotFoundError extends ApplicationError {
   public constructor() {
     super(404, 'ops_treasury_threshold_not_found', 'Treasury threshold not found')
     this.name = 'OpsTreasuryThresholdNotFoundError'
+  }
+}
+
+export class OpsTreasuryThresholdConflictError extends ApplicationError {
+  public constructor(message = 'This treasury threshold changed after it was loaded; refresh before trying again') {
+    super(409, 'ops_treasury_threshold_conflict', message)
+    this.name = 'OpsTreasuryThresholdConflictError'
   }
 }
 

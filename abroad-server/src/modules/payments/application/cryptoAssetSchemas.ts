@@ -17,19 +17,19 @@ export type CryptoAssetCoverageResponse = {
   summary: CryptoAssetCoverageSummary
 }
 
-type CryptoAssetCoverageSummary = {
-  configured: number
-  enabled: number
-  missing: number
-  total: number
-}
-
 export type CryptoAssetUpdateInput = {
   blockchain: BlockchainNetwork
   cryptoCurrency: CryptoCurrency
   decimals?: null | number
   enabled: boolean
   mintAddress?: null | string
+}
+
+type CryptoAssetCoverageSummary = {
+  configured: number
+  enabled: number
+  missing: number
+  total: number
 }
 
 export const cryptoAssetUpdateSchema: z.ZodType<CryptoAssetUpdateInput> = z.object({

@@ -32,12 +32,6 @@ import {
   reverseQuoteRequestSchema,
 } from './contracts'
 
-type QuoteErrorResponse = {
-  code: QuoteErrorCode
-  reason: string
-  retryable: boolean
-}
-
 type PartnerResolution = { errorReason?: string, partner?: Partner }
 
 type QuoteErrorCode
@@ -45,6 +39,12 @@ type QuoteErrorCode
     | 'invalid_request'
     | 'server_error'
     | QuoteRequestErrorCode
+
+type QuoteErrorResponse = {
+  code: QuoteErrorCode
+  reason: string
+  retryable: boolean
+}
 
 const BEARER_PREFIX = 'Bearer '
 

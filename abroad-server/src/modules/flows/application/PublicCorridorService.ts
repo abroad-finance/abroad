@@ -12,6 +12,10 @@ import { TYPES } from '../../../app/container/types'
 import { IDatabaseClientProvider } from '../../../platform/persistence/IDatabaseClientProvider'
 import { type ChainFamily, resolveChainMetadata, type WalletConnectMetadata } from '../../shared/chainMetadata'
 
+export type PublicCorridorResponse = {
+  corridors: PublicCorridorDto[]
+}
+
 type PublicCorridorDto = {
   blockchain: BlockchainNetwork
   chainFamily: ChainFamily
@@ -26,10 +30,6 @@ type PublicCorridorDto = {
   paymentMethod: PaymentMethod
   targetCurrency: TargetCurrency
   walletConnect: WalletConnectMetadata
-}
-
-export type PublicCorridorResponse = {
-  corridors: PublicCorridorDto[]
 }
 
 @injectable()

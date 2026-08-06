@@ -58,20 +58,6 @@ const detailInclude = {
   transitions: { orderBy: [{ createdAt: 'asc' as const }, { id: 'asc' as const }] },
 } satisfies Prisma.TransactionInclude
 
-type PartnerTransactionDeliveryDto = {
-  attempts: number
-  canRedeliver: boolean
-  durationMs: null | number
-  event: 'unknown' | WebhookEvent
-  failureCode: null | string
-  httpStatus: null | number
-  id: string
-  lastAttemptAt: Date
-  nextAttemptAt: Date | null
-  purpose: WebhookDeliveryPurpose
-  sourceDeliveryId: null | string
-  status: OutboxStatus
-}
 export type PartnerTransactionDetailDto = PartnerTransactionSummaryDto & {
   deliveries: PartnerTransactionDeliveryDto[]
   failureReason: null | string
@@ -80,40 +66,12 @@ export type PartnerTransactionDetailDto = PartnerTransactionSummaryDto & {
   pixEndToEndId: null | string
   refund: null | PartnerTransactionRefundDto
 }
-
-type PartnerTransactionExport = {
-  csv: string
-  rowCount: number
-  truncated: boolean
-}
-
-type PartnerTransactionLifecycleDto = {
-  occurredAt: Date
-  status: TransactionStatus
-  type: 'CREATED' | 'STATUS_CHANGED'
-}
-
 export type PartnerTransactionListResponse = {
   items: PartnerTransactionSummaryDto[]
   page: number
   pageSize: number
   statusCounts: PartnerTransactionStatusCountDto[]
   total: number
-}
-
-type PartnerTransactionQuoteDto = {
-  country: string
-  cryptoCurrency: string
-  network: string
-  paymentMethod: string
-  sourceAmount: number
-  targetAmount: number
-  targetCurrency: string
-}
-
-type PartnerTransactionRefundDto = {
-  onChainId: null | string
-  status: 'COMPLETED' | 'FAILED' | 'NOT_STARTED' | 'PROCESSING'
 }
 
 export type PartnerTransactionSearchFilters = {
@@ -123,11 +81,6 @@ export type PartnerTransactionSearchFilters = {
   pageSize?: number
   query?: string
   status?: TransactionStatus
-}
-
-type PartnerTransactionStatusCountDto = {
-  count: number
-  status: TransactionStatus
 }
 
 export type PartnerTransactionSummaryDto = {
@@ -148,6 +101,53 @@ type NormalizedFilters = {
   pageSize: number
   query?: string
   status?: TransactionStatus
+}
+
+type PartnerTransactionDeliveryDto = {
+  attempts: number
+  canRedeliver: boolean
+  durationMs: null | number
+  event: 'unknown' | WebhookEvent
+  failureCode: null | string
+  httpStatus: null | number
+  id: string
+  lastAttemptAt: Date
+  nextAttemptAt: Date | null
+  purpose: WebhookDeliveryPurpose
+  sourceDeliveryId: null | string
+  status: OutboxStatus
+}
+
+type PartnerTransactionExport = {
+  csv: string
+  rowCount: number
+  truncated: boolean
+}
+
+type PartnerTransactionLifecycleDto = {
+  occurredAt: Date
+  status: TransactionStatus
+  type: 'CREATED' | 'STATUS_CHANGED'
+}
+
+type PartnerTransactionQuoteDto = {
+  country: string
+  cryptoCurrency: string
+  network: string
+  paymentMethod: string
+  sourceAmount: number
+  targetAmount: number
+  targetCurrency: string
+}
+
+type PartnerTransactionRefundDto = {
+  onChainId: null | string
+  status: 'COMPLETED' | 'FAILED' | 'NOT_STARTED' | 'PROCESSING'
+}
+
+type PartnerTransactionStatusCountDto = {
+  count: number
+  status: TransactionStatus
 }
 
 type SummaryRow = Prisma.TransactionGetPayload<{ include: typeof summaryInclude }>

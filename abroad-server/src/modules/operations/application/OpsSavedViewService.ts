@@ -64,6 +64,12 @@ export type OpsSavedViewDto = {
   version: number
 }
 
+export type OpsSavedViewUpdateInput = {
+  filters?: OpsSavedViewFiltersDto
+  name?: string
+  scope?: OpsSavedViewScope
+}
+
 type OpsSavedViewFiltersDto = {
   attention?: string
   blockchain?: string
@@ -98,12 +104,6 @@ type OpsSavedViewFiltersDto = {
   webhookStatus?: string
 }
 
-export type OpsSavedViewUpdateInput = {
-  filters?: OpsSavedViewFiltersDto
-  name?: string
-  scope?: OpsSavedViewScope
-}
-
 class OpsSavedViewConflictError extends ApplicationError {
   public constructor(message = 'This saved view changed after it was loaded; refresh before trying again') {
     super(409, 'ops_saved_view_conflict', message)
@@ -111,17 +111,17 @@ class OpsSavedViewConflictError extends ApplicationError {
   }
 }
 
-export class OpsSavedViewNotFoundError extends ApplicationError {
-  public constructor() {
-    super(404, 'ops_saved_view_not_found', 'Saved view not found')
-    this.name = 'OpsSavedViewNotFoundError'
-  }
-}
-
 class OpsSavedViewValidationError extends ApplicationError {
   public constructor(message: string) {
     super(400, 'ops_saved_view_invalid', message)
     this.name = 'OpsSavedViewValidationError'
+  }
+}
+
+export class OpsSavedViewNotFoundError extends ApplicationError {
+  public constructor() {
+    super(404, 'ops_saved_view_not_found', 'Saved view not found')
+    this.name = 'OpsSavedViewNotFoundError'
   }
 }
 

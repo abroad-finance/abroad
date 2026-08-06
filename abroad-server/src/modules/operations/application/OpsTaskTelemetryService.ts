@@ -16,7 +16,6 @@ const taskActionMap = {
   PROOF_RETRIEVAL: ['REQUESTED', 'COMPLETED'],
 } as const
 
-type OpsTaskTelemetryAction = typeof taskActionMap[keyof typeof taskActionMap][number]
 export type OpsTaskTelemetryInput = {
   action: OpsTaskTelemetryAction
   durationMs?: number
@@ -28,6 +27,14 @@ export type OpsTaskTelemetryInput = {
   result: OpsTaskResult
   task: OpsTaskTelemetryTask
 }
+export type OpsTaskTelemetrySummary = {
+  from: Date
+  metrics: OpsTaskTelemetryMetric[]
+  to: Date
+  truncated: boolean
+}
+type OpsTaskTelemetryAction = typeof taskActionMap[keyof typeof taskActionMap][number]
+
 type OpsTaskTelemetryMetric = {
   abandoned: number
   action: string
@@ -37,13 +44,6 @@ type OpsTaskTelemetryMetric = {
   task: string
   total: number
   viewport: OpsTaskTelemetryViewport
-}
-
-export type OpsTaskTelemetrySummary = {
-  from: Date
-  metrics: OpsTaskTelemetryMetric[]
-  to: Date
-  truncated: boolean
 }
 
 type OpsTaskTelemetryTask = keyof typeof taskActionMap

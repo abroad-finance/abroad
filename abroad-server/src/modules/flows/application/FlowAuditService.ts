@@ -26,12 +26,6 @@ export type FlowBulkRetryResult = {
 
 export type FlowFailureFilter = 'FAILED_FLOW' | 'FAILED_STEP' | 'STUCK_WAITING'
 
-type FlowInstanceCurrentStepDto = {
-  status: FlowStepStatus
-  stepOrder: number
-  stepType: FlowStepType
-}
-
 export type FlowInstanceDetailDto = {
   createdAt: Date
   currentStepOrder: null | number
@@ -44,6 +38,38 @@ export type FlowInstanceDetailDto = {
   transaction: FlowTransactionDetailDto | null
   transactionId: string
   updatedAt: Date
+}
+
+export type FlowInstanceListResponse = {
+  items: FlowInstanceSummaryDto[]
+  page: number
+  pageSize: number
+  statusCounts: Array<{ count: number, status: FlowInstanceStatus }>
+  total: number
+}
+
+export type FlowStepInstanceDto = {
+  attempts: number
+  correlation: null | Record<string, unknown>
+  createdAt: Date
+  endedAt: Date | null
+  error: null | Record<string, unknown>
+  flowInstanceId: string
+  id: string
+  input: null | Record<string, unknown>
+  maxAttempts: number
+  output: null | Record<string, unknown>
+  startedAt: Date | null
+  status: FlowStepStatus
+  stepOrder: number
+  stepType: FlowStepType
+  updatedAt: Date
+}
+
+type FlowInstanceCurrentStepDto = {
+  status: FlowStepStatus
+  stepOrder: number
+  stepType: FlowStepType
 }
 
 type FlowInstanceListFilters = {
@@ -61,14 +87,6 @@ type FlowInstanceListFilters = {
   stuckMinutes?: number
   targetCurrency?: TargetCurrency
   transactionId?: string
-}
-
-export type FlowInstanceListResponse = {
-  items: FlowInstanceSummaryDto[]
-  page: number
-  pageSize: number
-  statusCounts: Array<{ count: number, status: FlowInstanceStatus }>
-  total: number
 }
 
 type FlowInstanceSummaryDto = {
@@ -109,24 +127,6 @@ type FlowSnapshotDefinitionDto = {
 }
 
 type FlowStepAction = 'requeue' | 'retry'
-
-export type FlowStepInstanceDto = {
-  attempts: number
-  correlation: null | Record<string, unknown>
-  createdAt: Date
-  endedAt: Date | null
-  error: null | Record<string, unknown>
-  flowInstanceId: string
-  id: string
-  input: null | Record<string, unknown>
-  maxAttempts: number
-  output: null | Record<string, unknown>
-  startedAt: Date | null
-  status: FlowStepStatus
-  stepOrder: number
-  stepType: FlowStepType
-  updatedAt: Date
-}
 
 type FlowStepSummaryDto = {
   failed: number

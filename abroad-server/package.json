@@ -104,6 +104,7 @@
     "concurrently": "^9.2.0",
     "depcheck": "^1.4.7",
     "dependency-cruiser": "^17.0.1",
+    "eslint-import-resolver-typescript": "^4.4.5",
     "eslint-plugin-import": "^2.32.0",
     "eslint-plugin-import-newlines": "^1.4.0",
     "eslint-plugin-perfectionist": "^4.15.0",
