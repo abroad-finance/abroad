@@ -12,7 +12,7 @@ import { QueueName, UserNotificationMessage } from '../../../platform/messaging/
 import { WebhookEvent } from '../../../platform/notifications/IWebhookNotifier'
 import { OutboxDispatcher } from '../../../platform/outbox/OutboxDispatcher'
 import { IDatabaseClientProvider } from '../../../platform/persistence/IDatabaseClientProvider'
-import { toWebhookTransactionPayload } from './transactionPayload'
+import { toUserTransactionPayload, toWebhookTransactionPayload } from './transactionPayload'
 import { TransactionRepository } from './TransactionRepository'
 import { TransactionWebhookRouter } from './TransactionWebhookRouter'
 
@@ -125,7 +125,9 @@ export class ExpiredTransactionService {
     const webhookTarget = transaction.partnerUser.partner.webhookUrl
     const webhookPayload = toWebhookTransactionPayload(transaction)
     const queueMessage: UserNotificationMessage = {
-      payload: JSON.stringify(webhookPayload),
+      // Deliberately not webhookPayload — that one carries the partner's API
+      // key and this message ends up in a customer's browser.
+      payload: JSON.stringify(toUserTransactionPayload(transaction)),
       type: 'transaction.updated',
       userId: transaction.partnerUser.userId,
     }

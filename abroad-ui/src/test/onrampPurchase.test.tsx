@@ -9,12 +9,15 @@ import {
   vi,
 } from 'vitest'
 
+import type { OnrampTransactionStatus } from '../features/swap/shared/onrampSettlement'
+
 import BuyCryptoPixCode from '../features/swap/components/BuyCryptoPixCode'
 import {
   arePaymentInstructionsExpired,
   formatExpiryCountdown,
   millisecondsUntilExpiry,
 } from '../features/swap/shared/onrampPresentation'
+import { toSettlementStage } from '../features/swap/shared/onrampSettlement'
 
 vi.mock('@tolgee/react', () => ({
   useTranslate: () => ({ t: (_key: string, fallback: string) => fallback }),
@@ -72,15 +75,23 @@ describe('BuyCryptoPixCode', () => {
     vi.restoreAllMocks()
   })
 
+  const AWAITING: OnrampTransactionStatus = {
+    onChainTxHash: null,
+    stage: 'awaiting-payment',
+    status: 'AWAITING_PAYMENT',
+  }
+
   const renderCode = (expiresAt: null | number, handlers?: {
     onExpired?: () => void
     onStartOver?: () => void
+    status?: OnrampTransactionStatus
   }) => render(
     <BuyCryptoPixCode
       instructions={{ brCode: BR_CODE, expiresAt }}
       onExpired={handlers?.onExpired ?? vi.fn()}
       onStartOver={handlers?.onStartOver ?? vi.fn()}
       quote={quote}
+      status={handlers?.status ?? AWAITING}
     />,
   )
 
@@ -184,5 +195,60 @@ describe('BuyCryptoPixCode', () => {
     renderCode(null)
 
     expect(screen.getByText(/once the payment settles/)).toBeInTheDocument()
+  })
+
+  it('swaps the code for live progress once the payment is detected', () => {
+    renderCode(null, {
+      status: { onChainTxHash: null, stage: 'delivering', status: 'PROCESSING_PAYMENT' },
+    })
+
+    expect(screen.getByText('Payment received')).toBeInTheDocument()
+    expect(screen.getByText(/sending the crypto to your wallet/)).toBeInTheDocument()
+    // The code is spent — leaving it on screen invites a second payment.
+    expect(screen.queryByTestId('buy-crypto-br-code')).not.toBeInTheDocument()
+  })
+
+  it('confirms delivery without the customer refreshing', () => {
+    renderCode(null, {
+      status: { onChainTxHash: '0xabc', stage: 'delivered', status: 'PAYMENT_COMPLETED' },
+    })
+
+    expect(screen.getByText('Crypto delivered')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Buy again' })).toBeInTheDocument()
+  })
+
+  it('does not call a paid transaction expired when the browser clock lapses', () => {
+    const onExpired = vi.fn()
+    // The customer paid in the final seconds: the countdown is done, but the
+    // backend has the money. Showing "expired" here would be a lie that sends
+    // them to pay a second time.
+    renderCode(Date.now() - 1, {
+      onExpired,
+      status: { onChainTxHash: null, stage: 'delivering', status: 'PROCESSING_PAYMENT' },
+    })
+
+    expect(screen.queryByText(/expired before it was paid/)).not.toBeInTheDocument()
+    expect(screen.getByText('Payment received')).toBeInTheDocument()
+    expect(onExpired).not.toHaveBeenCalled()
+  })
+
+  it('surfaces a failed delivery instead of leaving the customer on a paid code', () => {
+    renderCode(null, {
+      status: { onChainTxHash: null, stage: 'failed', status: 'PAYMENT_FAILED' },
+    })
+
+    expect(screen.getByText('We could not complete this purchase')).toBeInTheDocument()
+  })
+})
+
+describe('toSettlementStage', () => {
+  it('maps every backend status to a stage the screen can render', () => {
+    expect(toSettlementStage('AWAITING_PAYMENT')).toBe('awaiting-payment')
+    expect(toSettlementStage('PROCESSING_PAYMENT')).toBe('delivering')
+    expect(toSettlementStage('PAYMENT_COMPLETED')).toBe('delivered')
+    expect(toSettlementStage('PAYMENT_FAILED')).toBe('failed')
+    expect(toSettlementStage('PAYMENT_EXPIRED')).toBe('expired')
+    expect(toSettlementStage('WRONG_AMOUNT')).toBe('wrong-amount')
+    expect(toSettlementStage(null)).toBe('unknown')
   })
 })

@@ -6,7 +6,7 @@ import { QueueName } from '../../../platform/messaging/queues'
 import { WebhookEvent } from '../../../platform/notifications/IWebhookNotifier'
 import { OutboxDispatcher } from '../../../platform/outbox/OutboxDispatcher'
 import { TransactionWithRelations } from './transactionNotificationTypes'
-import { toWebhookTransactionPayload } from './transactionPayload'
+import { toUserTransactionPayload, toWebhookTransactionPayload } from './transactionPayload'
 import { buildTransactionSlackMessage } from './transactionSlackFormatter'
 import { TransactionWebhookRouter } from './TransactionWebhookRouter'
 
@@ -51,7 +51,8 @@ export class TransactionEventDispatcher {
 
     try {
       await this.outboxDispatcher.enqueueQueue(QueueName.USER_NOTIFICATION, {
-        payload: JSON.stringify(payload),
+        // Not `payload`: that one is the partner's and carries their API key.
+        payload: JSON.stringify(toUserTransactionPayload(transaction)),
         type,
         userId: transaction.partnerUser.userId,
       }, `user-notification:${context}`, { client: options.prismaClient, deliverNow: options.deliverNow })

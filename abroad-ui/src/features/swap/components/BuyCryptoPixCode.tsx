@@ -1,9 +1,12 @@
 import { useTranslate } from '@tolgee/react'
 import {
+  AlertCircle,
   Check,
+  CheckCircle2,
   Clock,
   Copy,
   Info,
+  Loader,
 } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import {
@@ -17,6 +20,7 @@ import type {
   OnrampQuoteView,
   PaymentInstructionsView,
 } from '../shared/onrampPresentation'
+import type { OnrampTransactionStatus } from '../shared/onrampSettlement'
 
 import { TOKEN_ICONS } from '../../../shared/constants'
 import {
@@ -30,6 +34,7 @@ type BuyCryptoPixCodeProps = {
   onExpired: () => void
   onStartOver: () => void
   quote: OnrampQuoteView
+  status: OnrampTransactionStatus
 }
 
 const COUNTDOWN_TICK_MS = 1_000
@@ -58,6 +63,7 @@ export default function BuyCryptoPixCode({
   onExpired,
   onStartOver,
   quote,
+  status,
 }: BuyCryptoPixCodeProps) {
   const { t } = useTranslate()
   const [copied, setCopied] = useState(false)
@@ -65,12 +71,21 @@ export default function BuyCryptoPixCode({
     () => millisecondsUntilExpiry(instructions),
   )
 
-  const expired = useMemo(
+  const clockExpired = useMemo(
     () => arePaymentInstructionsExpired(instructions),
     // Recomputed on every countdown tick so the view flips the moment it lapses.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [instructions, remainingMs],
   )
+
+  // Once the backend has seen the money, it owns the truth. A customer who pays
+  // in the last seconds would otherwise be told their payment expired while it
+  // was in fact already settling — the browser clock cannot see a PIX in flight.
+  const settling = status.stage === 'delivering'
+    || status.stage === 'delivered'
+    || status.stage === 'failed'
+    || status.stage === 'wrong-amount'
+  const expired = status.stage === 'expired' || (clockExpired && !settling)
 
   useEffect(() => {
     if (instructions.expiresAt === null) return undefined
@@ -135,106 +150,175 @@ export default function BuyCryptoPixCode({
           </div>
         </div>
 
-        {expired
+        {settling
           ? (
-              <div className="rounded-2xl border border-ab-error/40 bg-ab-error/10 p-4" role="alert">
-                <p className="text-sm font-semibold text-ab-error">
-                  {t(
-                    'buyCrypto.pix.expired',
-                    'This payment code expired before it was paid. Start again to get a fresh one.',
-                  )}
-                </p>
-                <button
-                  className="mt-3 min-h-11 rounded-xl border border-ab-error/40 px-4 text-sm font-semibold text-ab-error transition-colors hover:bg-ab-error/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ab-error"
-                  onClick={onStartOver}
-                  type="button"
-                >
-                  {t('buyCrypto.pix.startOver', 'Start again')}
-                </button>
-              </div>
-            )
-          : (
-              <>
-                {remainingMs !== null && (
-                  <div
-                    aria-live="polite"
-                    className={`flex items-center justify-center gap-2 rounded-2xl border px-4 py-2 text-sm font-semibold tabular-nums ${
-                      urgent
-                        ? 'border-ab-error/40 bg-ab-error/10 text-ab-error'
-                        : 'border-ab-border bg-[var(--ab-bg-muted)] text-ab-text-3'
-                    }`}
-                  >
-                    <Clock aria-hidden="true" className="size-4" />
-                    {t('buyCrypto.pix.expiresIn', 'Expires in')}
-                    {' '}
-                    {formatExpiryCountdown(remainingMs)}
-                  </div>
+              <div
+                aria-live="polite"
+                className="flex flex-col gap-3 rounded-2xl border border-ab-border bg-[var(--ab-bg-muted)] p-5"
+                data-testid="buy-crypto-settlement"
+                role="status"
+              >
+                {status.stage === 'delivering' && (
+                  <>
+                    <div className="flex items-center gap-3">
+                      <Loader aria-hidden="true" className="size-5 shrink-0 animate-spin text-ab-green motion-reduce:animate-none" />
+                      <p className="text-base font-semibold text-ab-text">
+                        {t('buyCrypto.pix.paymentReceived', 'Payment received')}
+                      </p>
+                    </div>
+                    <p className="text-sm leading-5 text-ab-text-3">
+                      {t(
+                        'buyCrypto.pix.deliveringCrypto',
+                        'We are sending the crypto to your wallet now. You can leave this page open — it updates on its own.',
+                      )}
+                    </p>
+                  </>
                 )}
 
-                {/* Generated from the BR Code rather than loaded from the
+                {status.stage === 'delivered' && (
+                  <>
+                    <div className="flex items-center gap-3">
+                      <CheckCircle2 aria-hidden="true" className="size-5 shrink-0 text-ab-green" />
+                      <p className="text-base font-semibold text-ab-text">
+                        {t('buyCrypto.pix.delivered', 'Crypto delivered')}
+                      </p>
+                    </div>
+                    <p className="text-sm leading-5 text-ab-text-3">
+                      {t(
+                        'buyCrypto.pix.deliveredDetail',
+                        'Your purchase is complete and the funds are in your wallet.',
+                      )}
+                    </p>
+                    <button
+                      className="mt-1 min-h-11 rounded-xl bg-ab-green px-4 text-sm font-semibold text-white transition-opacity hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ab-green)]"
+                      onClick={onStartOver}
+                      type="button"
+                    >
+                      {t('buyCrypto.pix.buyAgain', 'Buy again')}
+                    </button>
+                  </>
+                )}
+
+                {(status.stage === 'failed' || status.stage === 'wrong-amount') && (
+                  <>
+                    <div className="flex items-center gap-3">
+                      <AlertCircle aria-hidden="true" className="size-5 shrink-0 text-ab-error" />
+                      <p className="text-base font-semibold text-ab-error">
+                        {status.stage === 'wrong-amount'
+                          ? t('buyCrypto.pix.wrongAmount', 'The amount paid did not match')
+                          : t('buyCrypto.pix.failed', 'We could not complete this purchase')}
+                      </p>
+                    </div>
+                    <p className="text-sm leading-5 text-ab-text-3">
+                      {t(
+                        'buyCrypto.pix.failedDetail',
+                        'Your payment is safe and our team is on it. Contact support if you do not hear back shortly.',
+                      )}
+                    </p>
+                  </>
+                )}
+              </div>
+            )
+          : expired
+            ? (
+                <div className="rounded-2xl border border-ab-error/40 bg-ab-error/10 p-4" role="alert">
+                  <p className="text-sm font-semibold text-ab-error">
+                    {t(
+                      'buyCrypto.pix.expired',
+                      'This payment code expired before it was paid. Start again to get a fresh one.',
+                    )}
+                  </p>
+                  <button
+                    className="mt-3 min-h-11 rounded-xl border border-ab-error/40 px-4 text-sm font-semibold text-ab-error transition-colors hover:bg-ab-error/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ab-error"
+                    onClick={onStartOver}
+                    type="button"
+                  >
+                    {t('buyCrypto.pix.startOver', 'Start again')}
+                  </button>
+                </div>
+              )
+            : (
+                <>
+                  {remainingMs !== null && (
+                    <div
+                      aria-live="polite"
+                      className={`flex items-center justify-center gap-2 rounded-2xl border px-4 py-2 text-sm font-semibold tabular-nums ${
+                        urgent
+                          ? 'border-ab-error/40 bg-ab-error/10 text-ab-error'
+                          : 'border-ab-border bg-[var(--ab-bg-muted)] text-ab-text-3'
+                      }`}
+                    >
+                      <Clock aria-hidden="true" className="size-4" />
+                      {t('buyCrypto.pix.expiresIn', 'Expires in')}
+                      {' '}
+                      {formatExpiryCountdown(remainingMs)}
+                    </div>
+                  )}
+
+                  {/* Generated from the BR Code rather than loaded from the
                     provider's image URL: it survives a reload, needs no third
                     party to be reachable, and does not tell that third party
                     who is looking at the code. Always dark-on-white with a
                     quiet zone, whatever the page theme, or scanners fail. */}
-                <div className="flex justify-center">
-                  <div className="rounded-2xl bg-white p-4 shadow-[0px_4px_12px_-4px_rgba(0,0,0,0.12)]">
-                    <QRCodeSVG
-                      aria-label={t('buyCrypto.pix.qrAlt', 'PIX QR code for this payment')}
-                      bgColor="#ffffff"
-                      className="h-auto w-full max-w-[13.5rem]"
-                      data-testid="buy-crypto-qr"
-                      fgColor="#000000"
-                      level="M"
-                      marginSize={2}
-                      role="img"
-                      size={216}
-                      value={instructions.brCode}
-                    />
+                  <div className="flex justify-center">
+                    <div className="rounded-2xl bg-white p-4 shadow-[0px_4px_12px_-4px_rgba(0,0,0,0.12)]">
+                      <QRCodeSVG
+                        aria-label={t('buyCrypto.pix.qrAlt', 'PIX QR code for this payment')}
+                        bgColor="#ffffff"
+                        className="h-auto w-full max-w-[13.5rem]"
+                        data-testid="buy-crypto-qr"
+                        fgColor="#000000"
+                        level="M"
+                        marginSize={2}
+                        role="img"
+                        size={216}
+                        value={instructions.brCode}
+                      />
+                    </div>
                   </div>
-                </div>
 
-                <section
-                  aria-labelledby="buy-crypto-code-heading"
-                  className="rounded-2xl border border-ab-border bg-[var(--ab-bg-muted)] p-4"
-                >
-                  <h2
-                    className="text-xs font-bold uppercase tracking-wide text-ab-text-3"
-                    id="buy-crypto-code-heading"
+                  <section
+                    aria-labelledby="buy-crypto-code-heading"
+                    className="rounded-2xl border border-ab-border bg-[var(--ab-bg-muted)] p-4"
                   >
-                    {t('buyCrypto.pix.codeHeading', 'Pix copy and paste')}
-                  </h2>
-                  <p
-                    className="mt-3 max-h-32 select-all overflow-y-auto break-all rounded-xl bg-[var(--ab-bg-card)] p-3 font-mono text-xs leading-5 text-ab-text"
-                    data-testid="buy-crypto-br-code"
+                    <h2
+                      className="text-xs font-bold uppercase tracking-wide text-ab-text-3"
+                      id="buy-crypto-code-heading"
+                    >
+                      {t('buyCrypto.pix.codeHeading', 'Pix copy and paste')}
+                    </h2>
+                    <p
+                      className="mt-3 max-h-32 select-all overflow-y-auto break-all rounded-xl bg-[var(--ab-bg-card)] p-3 font-mono text-xs leading-5 text-ab-text"
+                      data-testid="buy-crypto-br-code"
+                    >
+                      {instructions.brCode}
+                    </p>
+                  </section>
+
+                  <button
+                    className="flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-ab-green px-4 text-base font-semibold text-white shadow-[0px_10px_15px_-3px_rgba(15,190,123,0.3)] transition-opacity hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ab-green)] focus-visible:ring-offset-2"
+                    onClick={() => void handleCopy()}
+                    type="button"
                   >
-                    {instructions.brCode}
-                  </p>
-                </section>
+                    {copied
+                      ? <Check aria-hidden="true" className="size-5" />
+                      : <Copy aria-hidden="true" className="size-5" />}
+                    {copied
+                      ? t('buyCrypto.pix.copied', 'Copied')
+                      : t('buyCrypto.pix.copy', 'Copy PIX code')}
+                  </button>
 
-                <button
-                  className="flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-ab-green px-4 text-base font-semibold text-white shadow-[0px_10px_15px_-3px_rgba(15,190,123,0.3)] transition-opacity hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ab-green)] focus-visible:ring-offset-2"
-                  onClick={() => void handleCopy()}
-                  type="button"
-                >
-                  {copied
-                    ? <Check aria-hidden="true" className="size-5" />
-                    : <Copy aria-hidden="true" className="size-5" />}
-                  {copied
-                    ? t('buyCrypto.pix.copied', 'Copied')
-                    : t('buyCrypto.pix.copy', 'Copy PIX code')}
-                </button>
-
-                <div className="flex gap-3 rounded-2xl bg-ab-separator/60 p-4">
-                  <Info aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-ab-text" />
-                  <p className="text-sm leading-5 text-ab-text-3">
-                    {t(
-                      'buyCrypto.pix.settlementNotice',
-                      'We release the crypto to your wallet once the payment settles.',
-                    )}
-                  </p>
-                </div>
-              </>
-            )}
+                  <div className="flex gap-3 rounded-2xl bg-ab-separator/60 p-4">
+                    <Info aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-ab-text" />
+                    <p className="text-sm leading-5 text-ab-text-3">
+                      {t(
+                        'buyCrypto.pix.settlementNotice',
+                        'We release the crypto to your wallet once the payment settles.',
+                      )}
+                    </p>
+                  </div>
+                </>
+              )}
       </section>
     </main>
   )

@@ -28,7 +28,7 @@ import { assertPartnerUserEnabled, DisabledUserError } from '../../shared/partne
 import { BridgeFloatService } from '../../treasury/application/BridgeFloatService'
 import { CryptoInventoryService } from '../../treasury/application/CryptoInventoryService'
 import { uuidToBase64 } from '../infrastructure/transactionEncoding'
-import { toWebhookTransactionPayload } from './transactionPayload'
+import { toUserTransactionPayload, toWebhookTransactionPayload } from './transactionPayload'
 import { TransactionWebhookRouter } from './TransactionWebhookRouter'
 
 interface AcceptTransactionRequest {
@@ -724,7 +724,9 @@ export class TransactionAcceptanceService {
       })
 
       await this.outboxDispatcher.enqueueQueue(QueueName.USER_NOTIFICATION, {
-        payload: JSON.stringify(full ? toWebhookTransactionPayload(full) : { id: transactionId }),
+        // User-facing channel: never the webhook payload, which carries the
+        // partner's API key. See toUserTransactionPayload.
+        payload: JSON.stringify(full ? toUserTransactionPayload(full) : { id: transactionId }),
         type: 'transaction.created',
         userId,
       }, 'transaction.created', { client: prismaClient, deliverNow: false })

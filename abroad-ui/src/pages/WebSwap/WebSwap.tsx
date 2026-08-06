@@ -13,6 +13,7 @@ import type { OnrampPurchaseState } from '../../features/swap/hooks/useOnrampPur
 import type { PaymentAuthorizationState } from '../../features/swap/model/paymentIntent'
 import type { WalletConnectionIssue } from '../../features/swap/model/walletConnection'
 import type { OnrampFormLimits } from '../../features/swap/shared/onrampFormModel'
+import type { OnrampTransactionStatus } from '../../features/swap/shared/onrampSettlement'
 import type {
   KycFormValues, KycSubmitOutcome, OnboardingRates, QrEntryMode, SwapView,
 } from '../../features/swap/types'
@@ -66,6 +67,8 @@ export interface WebSwapControllerProps {
     networkLabel: null | string
     start: () => void
     state: OnrampPurchaseState
+    /** Live settlement state for the accepted transaction, if there is one. */
+    status: OnrampTransactionStatus
     submit: (values: { fiatAmount: number }) => Promise<void>
   }
   cancelDestinationChange: () => void
@@ -414,6 +417,7 @@ const WebSwap: React.FC = () => {
                     onExpired={() => undefined}
                     onStartOver={buyCrypto.start}
                     quote={buyCrypto.state.quote}
+                    status={buyCrypto.status}
                   />
                 )
               : <></>,

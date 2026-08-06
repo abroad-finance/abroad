@@ -26,6 +26,7 @@ import {
 import { useNotices } from '../../contexts/NoticeContext'
 import { BRL_BACKGROUND_IMAGE } from '../../features/swap/constants'
 import { useOnrampPurchase } from '../../features/swap/hooks/useOnrampPurchase'
+import { useOnrampTransactionStatus } from '../../features/swap/hooks/useOnrampTransactionStatus'
 import { useStablecoinBalances } from '../../features/swap/hooks/useStablecoinBalances'
 import {
   isSupportedStablecoinSymbol,
@@ -1067,6 +1068,10 @@ export const useWebSwapController = (): WebSwapControllerProps => {
   // It shares the wallet and corridor context but none of the payout state, so
   // it lives beside the reducer rather than inside it.
   const onramp = useOnrampPurchase()
+  // The customer is holding a payment code and has no other way to learn the
+  // money arrived; this is what turns the code screen from a dead end into a
+  // live one.
+  const onrampStatus = useOnrampTransactionStatus(onramp.state.transactionId)
 
   const startBuyCrypto = useCallback(() => {
     onramp.reset()
@@ -2681,6 +2686,7 @@ export const useWebSwapController = (): WebSwapControllerProps => {
       networkLabel: onrampCorridor ? buildChainLabel(onrampCorridor, false) : null,
       start: startBuyCrypto,
       state: onramp.state,
+      status: onrampStatus,
       submit: submitBuyCrypto,
     },
     cancelDestinationChange,

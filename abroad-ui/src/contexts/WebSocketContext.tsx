@@ -78,13 +78,14 @@ const normalizePayload = <E extends EventName>(event: E, payload: unknown): WebS
 }
 
 export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { wallet } = useWalletAuth()
+  const { wallet, walletAuthentication } = useWalletAuth()
   const socketRef = useRef<null | Socket>(null)
   const listenersRef = useRef<Map<EventName, Set<ListenerEntry<EventName>>>>(new Map())
   const [connected, setConnected] = useState(false)
   const [error, setError] = useState<null | string>(null)
   const [reconnecting, setReconnecting] = useState(false)
   const [reconnectFailed, setReconnectFailed] = useState(false)
+  const authToken = walletAuthentication?.jwtToken ?? null
 
   const attachStoredListeners = useCallback((socket: Socket) => {
     listenersRef.current.forEach((entries, event) => {
@@ -124,7 +125,11 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   // Inline socket lifecycle — no intermediate callback in deps to avoid re-creation races
   useEffect(() => {
-    if (!wallet?.address || !wallet?.chainId) {
+    // The room is derived server-side from the JWT subject, so a socket without
+    // a token has nothing to join and the server refuses it. Reconnect whenever
+    // the token changes: a refreshed token must replace the handshake, and a
+    // cleared one must drop the stream.
+    if (!wallet?.address || !wallet?.chainId || !authToken) {
       setConnected(false)
       setError(null)
       setReconnecting(false)
@@ -134,10 +139,9 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       return
     }
 
-    const userId = `${wallet.chainId}:${wallet.address}`
     const url = resolveWsUrl()
     const socket = io(url, {
-      auth: { userId },
+      auth: { token: authToken },
       autoConnect: true,
       reconnection: true,
       reconnectionAttempts: 10,
@@ -183,6 +187,7 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   }, [
     wallet?.address,
     wallet?.chainId,
+    authToken,
     attachStoredListeners,
   ])
 

@@ -73,7 +73,55 @@ afterEach(() => {
   fakeSocket.listeners.clear()
 })
 
+const renderProvider = (jwtToken: null | string) => render(
+  <WalletAuthContext.Provider value={{
+    miniPay: {
+      isActive: false,
+      isReady: false,
+      isResolving: false,
+      status: 'inactive',
+    },
+    wallet: mockKit,
+    walletAuthentication: {
+      authenticate: vi.fn(),
+      getAuthToken: vi.fn(),
+      getChallengeMessage: vi.fn(),
+      jwtToken,
+      refreshAuthToken: vi.fn(),
+      setJwtToken: vi.fn(),
+    },
+  }}
+  >
+    <WebSocketProvider>
+      <TestSubscriber onEvent={() => undefined} />
+    </WebSocketProvider>
+  </WalletAuthContext.Provider>,
+)
+
 describe('WebSocketProvider', () => {
+  it('sends the wallet token so the server can derive the room itself', async () => {
+    const { io } = await import('socket.io-client')
+    vi.mocked(io).mockClear()
+
+    renderProvider('a-wallet-jwt')
+
+    expect(vi.mocked(io)).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ auth: { token: 'a-wallet-jwt' } }),
+    )
+  })
+
+  it('does not open a socket without a token', async () => {
+    const { io } = await import('socket.io-client')
+    vi.mocked(io).mockClear()
+
+    // A client that cannot prove who it is has no room to join: the address in
+    // the old handshake was public, so asserting it proved nothing.
+    renderProvider(null)
+
+    expect(vi.mocked(io)).not.toHaveBeenCalled()
+  })
+
   it('replays listeners after reconnect', () => {
     const received: unknown[] = []
 
