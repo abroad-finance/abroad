@@ -20,7 +20,7 @@ module.exports = {
   preset: 'ts-jest',
   setupFilesAfterEnv: ['<rootDir>/src/tests/setup/jest.setup.ts'],
   testEnvironment: 'node',
-  testMatch: ['<rootDir>/src/tests/**/*.ts?(x)'],
+  testMatch: ['<rootDir>/src/tests/**/*.test.ts?(x)'],
   transform: {
     '^.+\\.ts?$': ['ts-jest', { tsconfig: 'tsconfig.json' }],
   },
