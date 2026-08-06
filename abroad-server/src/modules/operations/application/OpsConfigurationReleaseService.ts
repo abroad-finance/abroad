@@ -18,7 +18,7 @@ const MAX_PAGE_SIZE = 100
 const MAX_EFFECTIVE_DELAY_MS = 93 * 24 * 60 * 60 * 1_000
 const MAX_DIFF_ENTRIES = 100
 
-export type OpsConfigurationDiffEntry = {
+type OpsConfigurationDiffEntry = {
   after: null | string
   before: null | string
   field: string
@@ -80,7 +80,7 @@ export type OpsConfigurationReleaseList = {
   total: number
 }
 
-export type OpsConfigurationReleaseQuery = {
+type OpsConfigurationReleaseQuery = {
   page: number
   pageSize: number
   query?: string
@@ -88,7 +88,7 @@ export type OpsConfigurationReleaseQuery = {
   targetType?: OpsConfigurationTargetType
 }
 
-export type OpsConfigurationReleaseUser = {
+type OpsConfigurationReleaseUser = {
   displayName: string
   id: string
 }
@@ -164,7 +164,7 @@ const configurationPayloadSchema: z.ZodType<OpsConfigurationPayload> = z.discrim
   flowDefinitionPayloadSchema,
 ])
 
-export const opsConfigurationDraftInputSchema: z.ZodType<OpsConfigurationDraftInput> = z.object({
+const opsConfigurationDraftInputSchema: z.ZodType<OpsConfigurationDraftInput> = z.object({
   effectiveAt: z.date().optional(),
   payload: configurationPayloadSchema,
   title: z.string().trim().min(3).max(160),
@@ -180,14 +180,14 @@ const storedDiffSchema: z.ZodType<StoredDiff> = z.object({
   })).max(MAX_DIFF_ENTRIES),
 }).strict()
 
-export class OpsConfigurationReleaseConflictError extends ApplicationError {
+class OpsConfigurationReleaseConflictError extends ApplicationError {
   public constructor(message = 'This configuration release changed after it was loaded') {
     super(409, 'ops_configuration_release_conflict', message)
     this.name = 'OpsConfigurationReleaseConflictError'
   }
 }
 
-export class OpsConfigurationReleaseNotFoundError extends ApplicationError {
+class OpsConfigurationReleaseNotFoundError extends ApplicationError {
   public constructor() {
     super(404, 'ops_configuration_release_not_found', 'Configuration release not found')
     this.name = 'OpsConfigurationReleaseNotFoundError'

@@ -2,7 +2,7 @@ import { BlockchainNetwork } from '@prisma/client'
 
 export type ChainFamily = 'evm' | 'solana' | 'stellar'
 
-export type ChainMetadata = {
+type ChainMetadata = {
   chainId: string
   family: ChainFamily
   walletConnect: WalletConnectMetadata

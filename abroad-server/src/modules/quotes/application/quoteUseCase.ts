@@ -29,7 +29,7 @@ export interface IQuoteUseCase {
   createReverseQuote(params: CreateReverseQuoteParams): Promise<QuoteResponse>
 }
 
-export interface QuoteFeeResponse {
+interface QuoteFeeResponse {
   amount: string
   currency: CryptoCurrency
   type: 'combined' | 'fixed' | 'none' | 'percentage'

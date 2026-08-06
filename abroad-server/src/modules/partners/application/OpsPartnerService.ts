@@ -22,7 +22,7 @@ export type OpsPartnerClientDomainInput = {
   clientDomain: null | string
 }
 
-export type OpsPartnerCompletedVolume = {
+type OpsPartnerCompletedVolume = {
   completedTransactions: number
   payout: OpsPartnerPayoutVolume[]
   source: OpsPartnerSourceVolume[]
@@ -44,7 +44,7 @@ export type OpsPartnerCreateResult = {
   partner: OpsPartnerSummary
 }
 
-export type OpsPartnerCredentialEvent = {
+type OpsPartnerCredentialEvent = {
   action: string
   actorLabel: string
   createdAt: Date
@@ -72,11 +72,11 @@ export type OpsPartnerKycRequirementInput = {
   needsKyc: boolean
 }
 
-export type OpsPartnerListItem = OpsPartnerSummary & {
+type OpsPartnerListItem = OpsPartnerSummary & {
   completedVolume: OpsPartnerCompletedVolume
 }
 
-export type OpsPartnerListParams = {
+type OpsPartnerListParams = {
   page: number
   pageSize: number
 }
@@ -89,7 +89,7 @@ export type OpsPartnerListResult = {
   total: number
 }
 
-export type OpsPartnerManagedCredential = {
+type OpsPartnerManagedCredential = {
   createdAt: Date
   displayPrefix: string
   expiresAt?: Date
@@ -103,7 +103,7 @@ export type OpsPartnerManagedCredential = {
   status: 'ACTIVE' | 'EXPIRED' | 'REVOKED'
 }
 
-export type OpsPartnerPayoutVolume = {
+type OpsPartnerPayoutVolume = {
   amount: number
   currency: TargetCurrency
 }
@@ -123,7 +123,7 @@ export type OpsPartnerRotateApiKeyResult = {
   partner: OpsPartnerSummary
 }
 
-export type OpsPartnerSourceVolume = {
+type OpsPartnerSourceVolume = {
   amount: number
   currency: CryptoCurrency
 }

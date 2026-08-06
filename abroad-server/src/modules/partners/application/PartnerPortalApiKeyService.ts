@@ -14,7 +14,7 @@ const MAX_NAME_LENGTH = 64
 const MIN_EXPIRY_MS = 5 * 60 * 1_000
 const ROTATION_OVERLAP_MS = 24 * 60 * 60 * 1_000
 
-export type PartnerPortalApiKeyCreateInput = {
+type PartnerPortalApiKeyCreateInput = {
   expiresAt?: Date
   name: string
   scopes: readonly string[]

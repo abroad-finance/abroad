@@ -26,7 +26,7 @@ export type FlowBulkRetryResult = {
 
 export type FlowFailureFilter = 'FAILED_FLOW' | 'FAILED_STEP' | 'STUCK_WAITING'
 
-export type FlowInstanceCurrentStepDto = {
+type FlowInstanceCurrentStepDto = {
   status: FlowStepStatus
   stepOrder: number
   stepType: FlowStepType
@@ -46,7 +46,7 @@ export type FlowInstanceDetailDto = {
   updatedAt: Date
 }
 
-export type FlowInstanceListFilters = {
+type FlowInstanceListFilters = {
   blockchain?: BlockchainNetwork
   createdFrom?: string
   createdTo?: string
@@ -71,7 +71,7 @@ export type FlowInstanceListResponse = {
   total: number
 }
 
-export type FlowInstanceSummaryDto = {
+type FlowInstanceSummaryDto = {
   createdAt: Date
   currentStep: FlowInstanceCurrentStepDto | null
   currentStepOrder: null | number
@@ -84,7 +84,7 @@ export type FlowInstanceSummaryDto = {
   updatedAt: Date
 }
 
-export type FlowSignalDto = {
+type FlowSignalDto = {
   consumedAt: Date | null
   correlationKeys: Record<string, unknown>
   createdAt: Date
@@ -94,7 +94,7 @@ export type FlowSignalDto = {
   stepInstanceId: null | string
 }
 
-export type FlowSnapshotDefinitionDto = {
+type FlowSnapshotDefinitionDto = {
   blockchain: BlockchainNetwork
   cryptoCurrency: CryptoCurrency
   exchangeFeePct: number
@@ -108,7 +108,7 @@ export type FlowSnapshotDefinitionDto = {
   targetCurrency: TargetCurrency
 }
 
-export type FlowStepAction = 'requeue' | 'retry'
+type FlowStepAction = 'requeue' | 'retry'
 
 export type FlowStepInstanceDto = {
   attempts: number
@@ -128,7 +128,7 @@ export type FlowStepInstanceDto = {
   updatedAt: Date
 }
 
-export type FlowStepSummaryDto = {
+type FlowStepSummaryDto = {
   failed: number
   ready: number
   running: number
@@ -138,7 +138,7 @@ export type FlowStepSummaryDto = {
   waiting: number
 }
 
-export type FlowTransactionDetailDto = FlowTransactionSummaryDto & {
+type FlowTransactionDetailDto = FlowTransactionSummaryDto & {
   accountNumber: string
   bankCode: string
   createdAt: Date
@@ -153,7 +153,7 @@ export type FlowTransactionDetailDto = FlowTransactionSummaryDto & {
   taxId: null | string
 }
 
-export type FlowTransactionSummaryDto = {
+type FlowTransactionSummaryDto = {
   externalId: null | string
   id: string
   onChainId: null | string

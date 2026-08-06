@@ -73,7 +73,7 @@ export type FlowDefinitionInput = {
   targetCurrency: TargetCurrency
 }
 
-export type FlowStepDefinitionInput = {
+type FlowStepDefinitionInput = {
   completionPolicy: FlowStepCompletionPolicy
   config: Record<string, unknown>
   signalMatch?: Record<string, unknown>
@@ -81,7 +81,7 @@ export type FlowStepDefinitionInput = {
   stepType: FlowStepType
 }
 
-export const flowStepDefinitionSchema: z.ZodType<FlowStepDefinitionInput> = z.object({
+const flowStepDefinitionSchema: z.ZodType<FlowStepDefinitionInput> = z.object({
   completionPolicy: z.nativeEnum(FlowStepCompletionPolicy),
   config: configSchema,
   signalMatch: signalMatchSchema.optional(),
@@ -142,7 +142,7 @@ export type FlowCorridorListDto = {
   summary: FlowCorridorSummaryDto
 }
 
-export type FlowCorridorSummaryDto = {
+type FlowCorridorSummaryDto = {
   defined: number
   missing: number
   total: number
@@ -180,7 +180,7 @@ export type FlowDefinitionDto = {
 
 export type FlowDefinitionUpdateInput = FlowDefinitionInput
 
-export type FlowStepDefinitionDto = {
+type FlowStepDefinitionDto = {
   completionPolicy: FlowStepCompletionPolicy
   config: Record<string, unknown>
   createdAt: Date

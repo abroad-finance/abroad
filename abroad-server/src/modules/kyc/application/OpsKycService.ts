@@ -37,13 +37,13 @@ export type OpsKycDetail = {
   version: number
 }
 
-export type OpsKycDisableInput = {
+type OpsKycDisableInput = {
   disabledBy?: string
   partnerUserId: string
   reason?: string
 }
 
-export type OpsKycListParams = {
+type OpsKycListParams = {
   ageHoursGte?: number
   createdFrom?: Date
   createdTo?: Date
@@ -70,7 +70,7 @@ export type OpsKycReviewer = {
   role: OpsRole
 }
 
-export type OpsKycSummary = {
+type OpsKycSummary = {
   disabledAt: Date | null
   documentNumberMasked: null | string
   documentType: DocumentType | null
@@ -101,14 +101,14 @@ type KycWithRelations = Prisma.PartnerUserKycGetPayload<{
   }
 }>
 
-export class OpsKycConflictError extends ApplicationError {
+class OpsKycConflictError extends ApplicationError {
   public constructor() {
     super(409, 'ops_kyc_conflict', 'This KYC review changed after it was loaded')
     this.name = 'OpsKycConflictError'
   }
 }
 
-export class OpsKycValidationError extends ApplicationError {
+class OpsKycValidationError extends ApplicationError {
   public constructor(message: string) {
     super(400, 'ops_kyc_invalid', message)
     this.name = 'OpsKycValidationError'

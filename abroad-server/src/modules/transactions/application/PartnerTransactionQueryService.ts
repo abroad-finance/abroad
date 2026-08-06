@@ -58,7 +58,7 @@ const detailInclude = {
   transitions: { orderBy: [{ createdAt: 'asc' as const }, { id: 'asc' as const }] },
 } satisfies Prisma.TransactionInclude
 
-export type PartnerTransactionDeliveryDto = {
+type PartnerTransactionDeliveryDto = {
   attempts: number
   canRedeliver: boolean
   durationMs: null | number
@@ -81,13 +81,13 @@ export type PartnerTransactionDetailDto = PartnerTransactionSummaryDto & {
   refund: null | PartnerTransactionRefundDto
 }
 
-export type PartnerTransactionExport = {
+type PartnerTransactionExport = {
   csv: string
   rowCount: number
   truncated: boolean
 }
 
-export type PartnerTransactionLifecycleDto = {
+type PartnerTransactionLifecycleDto = {
   occurredAt: Date
   status: TransactionStatus
   type: 'CREATED' | 'STATUS_CHANGED'
@@ -101,7 +101,7 @@ export type PartnerTransactionListResponse = {
   total: number
 }
 
-export type PartnerTransactionQuoteDto = {
+type PartnerTransactionQuoteDto = {
   country: string
   cryptoCurrency: string
   network: string
@@ -111,7 +111,7 @@ export type PartnerTransactionQuoteDto = {
   targetCurrency: string
 }
 
-export type PartnerTransactionRefundDto = {
+type PartnerTransactionRefundDto = {
   onChainId: null | string
   status: 'COMPLETED' | 'FAILED' | 'NOT_STARTED' | 'PROCESSING'
 }
@@ -125,7 +125,7 @@ export type PartnerTransactionSearchFilters = {
   status?: TransactionStatus
 }
 
-export type PartnerTransactionStatusCountDto = {
+type PartnerTransactionStatusCountDto = {
   count: number
   status: TransactionStatus
 }

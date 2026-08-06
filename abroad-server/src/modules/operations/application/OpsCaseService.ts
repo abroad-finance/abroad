@@ -74,7 +74,7 @@ export type OpsCaseDto = {
   version: number
 }
 
-export type OpsCaseHandoffDto = {
+type OpsCaseHandoffDto = {
   actor: OpsCaseUserDto
   createdAt: Date
   fromTeam: null | string
@@ -91,7 +91,7 @@ export type OpsCaseHandoffInput = {
   toUserId?: null | string
 }
 
-export type OpsCaseListFilters = {
+type OpsCaseListFilters = {
   ownerUserId?: string
   page?: number
   pageSize?: number
@@ -108,7 +108,7 @@ export type OpsCaseListResponse = {
   total: number
 }
 
-export type OpsCaseNoteDto = {
+type OpsCaseNoteDto = {
   author: OpsCaseUserDto
   body: string
   createdAt: Date
@@ -132,7 +132,7 @@ export type OpsCaseUpdateInput = {
   team?: null | string
 }
 
-export type OpsCaseUserDto = {
+type OpsCaseUserDto = {
   displayName: string
   id: string
 }
@@ -146,14 +146,14 @@ export class OpsCaseConflictError extends ApplicationError {
   }
 }
 
-export class OpsCaseNotFoundError extends ApplicationError {
+class OpsCaseNotFoundError extends ApplicationError {
   public constructor(message = 'Operations case not found') {
     super(404, 'ops_case_not_found', message)
     this.name = 'OpsCaseNotFoundError'
   }
 }
 
-export class OpsCaseValidationError extends ApplicationError {
+class OpsCaseValidationError extends ApplicationError {
   public constructor(message: string) {
     super(400, 'ops_case_invalid', message)
     this.name = 'OpsCaseValidationError'

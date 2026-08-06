@@ -23,7 +23,7 @@ export type OpsIntegrationCatalogDto = {
   runbooks: OpsRunbookDto[]
 }
 
-export type OpsIntegrationConfigurationInput = {
+type OpsIntegrationConfigurationInput = {
   destinationLabel?: null | string
   eventKinds?: string[]
   healthcheckName?: null | string
@@ -74,14 +74,14 @@ export type OpsRunbookInput = {
   url: string
 }
 
-export class OpsIntegrationConflictError extends ApplicationError {
+class OpsIntegrationConflictError extends ApplicationError {
   public constructor(message = 'This integration changed after it was loaded; refresh before trying again') {
     super(409, 'ops_integration_conflict', message)
     this.name = 'OpsIntegrationConflictError'
   }
 }
 
-export class OpsIntegrationNotFoundError extends ApplicationError {
+class OpsIntegrationNotFoundError extends ApplicationError {
   public constructor(resource = 'Integration') {
     super(404, 'ops_integration_not_found', `${resource} not found`)
     this.name = 'OpsIntegrationNotFoundError'

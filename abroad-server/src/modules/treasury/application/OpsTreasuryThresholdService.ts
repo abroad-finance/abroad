@@ -50,7 +50,7 @@ export class OpsTreasuryThresholdConflictError extends ApplicationError {
   }
 }
 
-export class OpsTreasuryThresholdNotFoundError extends ApplicationError {
+class OpsTreasuryThresholdNotFoundError extends ApplicationError {
   public constructor() {
     super(404, 'ops_treasury_threshold_not_found', 'Treasury threshold not found')
     this.name = 'OpsTreasuryThresholdNotFoundError'

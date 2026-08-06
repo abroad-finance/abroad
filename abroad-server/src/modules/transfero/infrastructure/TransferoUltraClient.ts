@@ -23,7 +23,7 @@ const MAX_TRANSFERO_ULTRA_COOLDOWN_SECONDS = 60
 
 const MAX_TRANSFERO_ULTRA_PDF_BYTES = 2 * 1024 * 1024
 
-export type TransferoUltraPdfResponse = {
+type TransferoUltraPdfResponse = {
   contentType: 'application/pdf'
   data: Buffer
 }

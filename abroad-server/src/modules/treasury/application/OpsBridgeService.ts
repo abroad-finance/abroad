@@ -12,7 +12,7 @@ export type OpsBridgeBatchDetailDto = {
   providerReference: null | string
 }
 
-export type OpsBridgeBatchDto = {
+type OpsBridgeBatchDto = {
   asset: CryptoCurrency
   createdAt: Date
   destNetwork: string
@@ -31,14 +31,14 @@ export type OpsBridgeBatchDto = {
   withdrawId: null | string
 }
 
-export type OpsBridgeFloatDto = {
+type OpsBridgeFloatDto = {
   available: null | number
   cap: null | number
   deficit: number
   enabled: boolean
 }
 
-export type OpsBridgeLegDto = {
+type OpsBridgeLegDto = {
   amount: number
   asset: CryptoCurrency
   batchId: null | string
@@ -59,7 +59,7 @@ export type OpsBridgeLegDto = {
   updatedAt: Date
 }
 
-export type OpsBridgeLegGroupDto = {
+type OpsBridgeLegGroupDto = {
   amount: number
   count: number
   status: BridgeLegStatus
@@ -76,9 +76,9 @@ export type OpsBridgeOverview = {
   }
 }
 
-export type OpsBridgeReconciliationState = 'ACTION_REQUIRED' | 'AWAITING_PROVIDER' | 'COLLECTING' | 'RECONCILED'
+type OpsBridgeReconciliationState = 'ACTION_REQUIRED' | 'AWAITING_PROVIDER' | 'COLLECTING' | 'RECONCILED'
 
-export type OpsBridgeSlaState = 'BREACHED' | 'MET' | 'ON_TRACK'
+type OpsBridgeSlaState = 'BREACHED' | 'MET' | 'ON_TRACK'
 
 const BATCH_BOARD_LIMIT = 25
 const LEG_BOARD_LIMIT = 50

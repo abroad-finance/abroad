@@ -9,7 +9,7 @@ import { BridgeFloatService } from './BridgeFloatService'
 import { IExchangeProviderFactory } from './contracts/IExchangeProviderFactory'
 import { ITreasuryBalanceSource } from './contracts/ITreasuryBalanceSource'
 
-export type OpsTreasuryBalanceCell = {
+type OpsTreasuryBalanceCell = {
   account: string
   amount: number
   availableAmount: null | number
@@ -37,7 +37,7 @@ export type OpsTreasuryBalancesResponse = {
   totalUsdIsPartial: boolean
 }
 
-export type OpsTreasuryCellPosture = {
+type OpsTreasuryCellPosture = {
   alertPath: string
   averageDailyOutflow: null | number
   ownerTeam: null | string
@@ -52,30 +52,30 @@ export type OpsTreasuryCellPosture = {
   }
 }
 
-export type OpsTreasuryFloatDto = {
+type OpsTreasuryFloatDto = {
   available: null | number
   cap: null | number
   deficit: number
   enabled: boolean
 }
 
-export type OpsTreasuryFreshness = {
+type OpsTreasuryFreshness = {
   staleAt: Date
   state: 'FRESH' | 'PARTIAL'
 }
 
-export type OpsTreasuryFxRate = {
+type OpsTreasuryFxRate = {
   currency: string
   /** Indicative mid/ask taken at read time. */
   usdPerUnit: number
 }
 
-export type OpsTreasuryMovementBucket = {
+type OpsTreasuryMovementBucket = {
   amount: number
   currency: string
 }
 
-export type OpsTreasuryMovementDay = {
+type OpsTreasuryMovementDay = {
   bridgeSettledUsdc: number
   /** UTC calendar date, YYYY-MM-DD. */
   date: string
@@ -83,7 +83,7 @@ export type OpsTreasuryMovementDay = {
   outboundFiat: OpsTreasuryMovementBucket[]
 }
 
-export type OpsTreasuryMovementEvent = {
+type OpsTreasuryMovementEvent = {
   amount: number
   at: Date
   currency: string
@@ -97,12 +97,12 @@ export type OpsTreasuryMovementsResponse = {
   recent: OpsTreasuryMovementEvent[]
 }
 
-export type OpsTreasurySnapshotPoint = {
+type OpsTreasurySnapshotPoint = {
   capturedAt: Date
   usdValue: null | number
 }
 
-export type OpsTreasurySnapshotSeries = {
+type OpsTreasurySnapshotSeries = {
   points: OpsTreasurySnapshotPoint[]
   venue: string
 }
@@ -113,12 +113,12 @@ export type OpsTreasurySnapshotsResponse = {
   to: Date
 }
 
-export type OpsTreasuryVenueError = {
+type OpsTreasuryVenueError = {
   message: string
   venue: string
 }
 
-export type TreasurySnapshotCaptureResult = {
+type TreasurySnapshotCaptureResult = {
   cells: number
   errors: OpsTreasuryVenueError[]
   skipped: boolean

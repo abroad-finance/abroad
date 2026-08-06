@@ -13,12 +13,12 @@ export type OpsIncidentContext = {
   filters: OpsIncidentFilterLink[]
 }
 
-export type OpsIncidentDimension = {
+type OpsIncidentDimension = {
   label: string
   value: string
 }
 
-export type OpsIncidentFilterLink = {
+type OpsIncidentFilterLink = {
   label: string
   path: string
 }

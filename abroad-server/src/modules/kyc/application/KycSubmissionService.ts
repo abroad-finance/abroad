@@ -6,7 +6,7 @@ import { IDatabaseClientProvider } from '../../../platform/persistence/IDatabase
 import { assertPartnerUserEnabled } from '../../shared/partnerUserAccess'
 import { IKycDocumentStorage } from './contracts/IKycDocumentStorage'
 
-export interface KycDocumentInput {
+interface KycDocumentInput {
   buffer: Buffer
   contentType: string
   fileExtension: string
@@ -27,7 +27,7 @@ export interface KycSubmissionInput {
   userId: string
 }
 
-export interface KycSubmissionResult {
+interface KycSubmissionResult {
   status: KycStatus
 }
 

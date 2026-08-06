@@ -17,7 +17,7 @@ export type CryptoAssetCoverageResponse = {
   summary: CryptoAssetCoverageSummary
 }
 
-export type CryptoAssetCoverageSummary = {
+type CryptoAssetCoverageSummary = {
   configured: number
   enabled: number
   missing: number

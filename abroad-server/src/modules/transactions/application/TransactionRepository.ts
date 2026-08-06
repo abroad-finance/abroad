@@ -4,13 +4,13 @@ import { IDatabaseClientProvider } from '../../../platform/persistence/IDatabase
 import { transactionNotificationInclude, TransactionWithRelations } from './transactionNotificationTypes'
 import { InvalidTransactionTransitionError, resolveTransition, TransactionTransitionName } from './TransactionStateMachine'
 
-export type PayoutReservation
+type PayoutReservation
   = | { attempts: number, outcome: 'completed' }
     | { attempts: number, outcome: 'in_flight' }
     | { attempts: number, outcome: 'reserved' }
     | { outcome: 'missing' }
 
-export type RefundAttemptResult
+type RefundAttemptResult
   = | {
     reason?: string
     reconciliationRequired: true
@@ -25,7 +25,7 @@ export type RefundAttemptResult
   }
   | { success: true, transactionId?: string }
 
-export type RefundReservation
+type RefundReservation
   = | { attempts: number, outcome: 'in_flight' }
     | { attempts: number, outcome: 'reserved' }
     | { outcome: 'already_refunded', refundOnChainId?: string }

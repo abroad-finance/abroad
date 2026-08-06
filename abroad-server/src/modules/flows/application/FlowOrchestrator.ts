@@ -26,7 +26,7 @@ const TERMINAL_FLOW_STATUSES = new Set<FlowInstanceStatus>([
   FlowInstanceStatus.FAILED,
 ])
 
-export class FlowNotFoundError extends Error {
+class FlowNotFoundError extends Error {
   constructor(message: string) {
     super(message)
     this.name = 'FlowNotFoundError'

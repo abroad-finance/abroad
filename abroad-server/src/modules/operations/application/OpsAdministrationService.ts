@@ -32,7 +32,7 @@ export const opsUserRoleUpdateSchema: z.ZodType<OpsUserRoleUpdateInput> = z.obje
   role: z.nativeEnum(OpsRole),
 }).strict()
 
-export type OpsAuditEventDto = {
+type OpsAuditEventDto = {
   action: string
   actorKind: string
   actorLabel: string
@@ -53,7 +53,7 @@ export type OpsAuditListDto = {
   total: number
 }
 
-export type OpsAuditQuery = {
+type OpsAuditQuery = {
   action?: string
   actor?: string
   createdFrom?: Date
@@ -98,7 +98,7 @@ export class OpsAdministrationConflictError extends ApplicationError {
   }
 }
 
-export class OpsAdministrationNotFoundError extends ApplicationError {
+class OpsAdministrationNotFoundError extends ApplicationError {
   public constructor() {
     super(404, 'ops_user_not_found', 'Ops user not found')
     this.name = 'OpsAdministrationNotFoundError'

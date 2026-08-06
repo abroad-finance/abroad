@@ -4,7 +4,7 @@ import type { PartnerPortalPrincipal } from '../../modules/partners/application/
 
 import { ApplicationError } from '../../core/errors'
 
-export type OpsExternalAuthentication = OpsExternalIdentity & { kind: 'ops_external' }
+type OpsExternalAuthentication = OpsExternalIdentity & { kind: 'ops_external' }
 
 export type RequestAuthentication
   = | AuthenticatedPartner

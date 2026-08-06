@@ -26,12 +26,12 @@ export type PartnerPortalResetTokenResult = {
   user: PartnerPortalUserSummary
 }
 
-export type PartnerPortalTeamUpdateInput = {
+type PartnerPortalTeamUpdateInput = {
   disabled?: boolean
   role?: PartnerPortalRole
 }
 
-export type PartnerPortalUserCreateInput = {
+type PartnerPortalUserCreateInput = {
   email: string
   role: PartnerPortalRole
 }

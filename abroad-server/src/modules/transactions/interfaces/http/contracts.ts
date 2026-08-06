@@ -53,7 +53,7 @@ export interface AcceptTransactionResponse {
   transaction_reference: null | string
 }
 
-export interface PaymentInstructions {
+interface PaymentInstructions {
   /** EMV copy-paste PIX payload. */
   br_code: string
   /** Epoch milliseconds, or null when the code does not expire. */

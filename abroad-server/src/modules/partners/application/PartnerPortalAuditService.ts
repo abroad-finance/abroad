@@ -4,7 +4,7 @@ import { inject, injectable } from 'inversify'
 import { TYPES } from '../../../app/container/types'
 import { IDatabaseClientProvider } from '../../../platform/persistence/IDatabaseClientProvider'
 
-export type PartnerPortalAuditInput = {
+type PartnerPortalAuditInput = {
   action: string
   actorUserId?: string
   metadata?: Prisma.InputJsonValue

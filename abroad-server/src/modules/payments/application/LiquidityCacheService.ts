@@ -5,7 +5,7 @@ import { TYPES } from '../../../app/container/types'
 import { ILogger } from '../../../core/logging/types'
 import { IDatabaseClientProvider } from '../../../platform/persistence/IDatabaseClientProvider'
 
-export type LiquidityCacheResult = {
+type LiquidityCacheResult = {
   fromCache: boolean
   liquidity: number
   message?: string

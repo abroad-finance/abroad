@@ -39,11 +39,11 @@ import {
   FlowStepNotFoundError,
 } from '../../application/FlowAuditService'
 
-export type FlowBulkRetryRequest = {
+type FlowBulkRetryRequest = {
   flowInstanceIds: string[]
 }
 
-export type FlowBulkRetryResponse = {
+type FlowBulkRetryResponse = {
   failed: number
   results: FlowBulkRetryResult[]
   succeeded: number

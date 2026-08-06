@@ -22,7 +22,7 @@ export const OPS_MUTATION_HEADERS = {
   reference: 'X-Ops-Reference',
 } as const
 
-export const opsMutationEnvelopeSchema = z.object({
+const opsMutationEnvelopeSchema = z.object({
   confirmation: z.string().trim().min(1).max(100),
   expectedVersion: z.number().int().positive().optional(),
   idempotencyKey: z.string().uuid(),
@@ -30,13 +30,13 @@ export const opsMutationEnvelopeSchema = z.object({
   reference: z.string().trim().max(120).optional(),
 }).strict()
 
-export type OpsApprovalClass = 'CONFIRMATION' | 'DIRECT' | 'SECOND_APPROVER' | 'STEP_UP'
+type OpsApprovalClass = 'CONFIRMATION' | 'DIRECT' | 'SECOND_APPROVER' | 'STEP_UP'
 
 export type OpsMutationAction = keyof typeof OPS_MUTATION_POLICIES
 
 export type OpsMutationEnvelope = z.infer<typeof opsMutationEnvelopeSchema>
 
-export type OpsMutationPolicy = {
+type OpsMutationPolicy = {
   approvalClass: OpsApprovalClass
   confirmation: string
   expectedVersion: boolean

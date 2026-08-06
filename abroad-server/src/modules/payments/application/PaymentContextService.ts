@@ -21,7 +21,7 @@ export type PaymentContext = {
   rpcUrl: null | string
 }
 
-export type PaymentNotifyContext = {
+type PaymentNotifyContext = {
   endpoint: null | string
   required: boolean
 }

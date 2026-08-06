@@ -37,13 +37,13 @@ const activityInclude = {
   },
 } satisfies Prisma.TransactionInclude
 
-export type ConsumerActivityFeeDto = {
+type ConsumerActivityFeeDto = {
   amount: string
   currency: string
   type: 'COMBINED' | 'FIXED' | 'NETWORK' | 'NONE' | 'PERCENTAGE'
 }
 
-export type ConsumerActivityFilters = {
+type ConsumerActivityFilters = {
   createdFrom?: string
   createdTo?: string
   network?: BlockchainNetwork
@@ -55,7 +55,7 @@ export type ConsumerActivityFilters = {
   targetCurrency?: TargetCurrency
 }
 
-export type ConsumerActivityLifecycleDto = {
+type ConsumerActivityLifecycleDto = {
   occurredAt: Date
   status: TransactionStatus
   type: 'CREATED' | 'STATUS_CHANGED'
@@ -68,12 +68,12 @@ export type ConsumerActivityListResponse = {
   total: number
 }
 
-export type ConsumerActivityProofDto = {
+type ConsumerActivityProofDto = {
   receiptAvailable: boolean
   status: 'AVAILABLE' | 'MISSING' | 'NOT_APPLICABLE' | 'PENDING'
 }
 
-export type ConsumerActivityQuoteDto = {
+type ConsumerActivityQuoteDto = {
   country: Country
   network: BlockchainNetwork
   paymentMethod: PaymentMethod
@@ -90,7 +90,7 @@ export type ConsumerActivityReceiptDto = ConsumerActivityTransactionDto & {
   references: ConsumerActivityReferencesDto
 }
 
-export type ConsumerActivityReferencesDto = {
+type ConsumerActivityReferencesDto = {
   abroadId: string
   brebId: null | string
   onChainId: null | string
@@ -99,14 +99,14 @@ export type ConsumerActivityReferencesDto = {
   refundOnChainId: null | string
 }
 
-export type ConsumerActivityRefundDto = {
+type ConsumerActivityRefundDto = {
   reference: null | string
   status: 'COMPLETED' | 'FAILED' | 'NOT_APPLICABLE' | 'NOT_STARTED' | 'PROCESSING' | 'UNKNOWN'
 }
 
 export type ConsumerActivitySort = 'newest' | 'oldest'
 
-export type ConsumerActivityTimestampsDto = {
+type ConsumerActivityTimestampsDto = {
   acceptedAt: Date
   completedAt: Date | null
   createdAt: Date
@@ -115,7 +115,7 @@ export type ConsumerActivityTimestampsDto = {
   updatedAt: Date
 }
 
-export type ConsumerActivityTransactionDto = {
+type ConsumerActivityTransactionDto = {
   id: string
   proof: ConsumerActivityProofDto
   quote: ConsumerActivityQuoteDto

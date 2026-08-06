@@ -27,7 +27,7 @@ const FIREBASE_CONFIG_PATH = '/__/firebase/init.json'
 const OPS_EMAIL_DOMAIN = 'abroad.finance'
 const STEP_UP_MAX_AGE_SECONDS = 10 * 60
 
-export type OpsIdentityConfigDto = {
+type OpsIdentityConfigDto = {
   allowedEmailDomain: string
   firebaseConfigPath: string
   mutationPolicies: OpsMutationPolicyDto[]
@@ -35,7 +35,7 @@ export type OpsIdentityConfigDto = {
   stepUpMaxAgeSeconds: number
 }
 
-export type OpsMutationPolicyDto = {
+type OpsMutationPolicyDto = {
   action: string
   approvalClass: string
   confirmation: string
@@ -45,7 +45,7 @@ export type OpsMutationPolicyDto = {
   stepUpRequired: boolean
 }
 
-export type OpsSessionDto = {
+type OpsSessionDto = {
   authenticatedAt: Date | null
   bootstrapRequired: boolean
   displayName: string

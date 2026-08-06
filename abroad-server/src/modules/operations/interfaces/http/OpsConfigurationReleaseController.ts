@@ -31,13 +31,13 @@ import {
 import { OpsMutationService } from '../../application/opsMutation'
 import { readOpsMutationEnvelope } from './opsMutationHeaders'
 
-export type OpsConfigurationDraftHttpInput = {
+type OpsConfigurationDraftHttpInput = {
   effectiveAt?: string
   payload: OpsConfigurationPayload
   title: string
 }
 
-export type OpsConfigurationRejectInput = {
+type OpsConfigurationRejectInput = {
   rejectionReason: string
 }
 

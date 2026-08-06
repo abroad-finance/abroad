@@ -62,7 +62,7 @@ export type OpsHandoffBoardDto = {
 }
 export type OpsHandoffScope = 'ALL' | 'MINE' | 'UNOWNED'
 
-export type OpsHandoffWorkItemDto = {
+type OpsHandoffWorkItemDto = {
   ageSeconds: number
   href: string
   id: string
@@ -82,7 +82,7 @@ export type OpsHandoffWorkItemDto = {
   version: number
 }
 
-export type OpsIncidentCountDto<TValue extends string> = {
+type OpsIncidentCountDto<TValue extends string> = {
   count: number
   value: TValue
 }
@@ -92,7 +92,7 @@ export type OpsIncidentDetailDto = OpsIncidentSummaryDto & {
   notes: OpsIncidentNoteDto[]
 }
 
-export type OpsIncidentHandoffDto = {
+type OpsIncidentHandoffDto = {
   actor: OpsIncidentUserDto
   createdAt: Date
   fromTeam: null | string
@@ -109,7 +109,7 @@ export type OpsIncidentHandoffInput = {
   toUserId?: null | string
 }
 
-export type OpsIncidentListFilters = {
+type OpsIncidentListFilters = {
   kind?: string
   ownerUserId?: string
   page?: number
@@ -130,7 +130,7 @@ export type OpsIncidentListResponse = {
   total: number
 }
 
-export type OpsIncidentNoteDto = {
+type OpsIncidentNoteDto = {
   author: OpsIncidentUserDto
   body: string
   createdAt: Date
@@ -163,7 +163,7 @@ export type OpsIncidentRunbookDto = {
   url: string
 }
 
-export type OpsIncidentSummaryDto = {
+type OpsIncidentSummaryDto = {
   acknowledgedAt: Date | null
   affectedCount: number
   ageSeconds: number
@@ -192,7 +192,7 @@ export type OpsIncidentUpdateInput = {
   team?: null | string
 }
 
-export type OpsIncidentUserDto = {
+type OpsIncidentUserDto = {
   displayName: string
   id: string
 }
@@ -201,21 +201,21 @@ type IncidentDetailRow = Prisma.OpsIncidentGetPayload<{ include: typeof incident
 
 type IncidentSummaryRow = Prisma.OpsIncidentGetPayload<{ include: typeof incidentSummaryInclude }>
 
-export class OpsIncidentConflictError extends ApplicationError {
+class OpsIncidentConflictError extends ApplicationError {
   public constructor(message = 'This incident changed after it was loaded; refresh before trying again') {
     super(409, 'ops_incident_conflict', message)
     this.name = 'OpsIncidentConflictError'
   }
 }
 
-export class OpsIncidentNotFoundError extends ApplicationError {
+class OpsIncidentNotFoundError extends ApplicationError {
   public constructor() {
     super(404, 'ops_incident_not_found', 'Operations incident not found')
     this.name = 'OpsIncidentNotFoundError'
   }
 }
 
-export class OpsIncidentValidationError extends ApplicationError {
+class OpsIncidentValidationError extends ApplicationError {
   public constructor(message: string) {
     super(400, 'ops_incident_invalid', message)
     this.name = 'OpsIncidentValidationError'

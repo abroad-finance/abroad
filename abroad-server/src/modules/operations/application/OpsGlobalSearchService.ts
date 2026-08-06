@@ -15,7 +15,7 @@ export type OpsGlobalSearchResponse = {
   truncated: boolean
 }
 
-export type OpsGlobalSearchResultDto = {
+type OpsGlobalSearchResultDto = {
   context: string
   kind: 'CASE' | 'FLOW' | 'PARTNER' | 'TRANSACTION'
   matchedFields: string[]

@@ -136,25 +136,6 @@ const readEnv = (key: string): string | undefined => {
   return trimmed ? trimmed : undefined
 }
 
-export function captureException(error: unknown, context?: { extra?: Record<string, unknown>, tags?: Record<string, string> }): void {
-  const Sentry = loadSentry()
-  if (!Sentry?.isEnabled()) return
-  if (!context) {
-    Sentry.captureException(error)
-    return
-  }
-
-  Sentry.withScope((scope) => {
-    if (context.tags) {
-      scope.setTags(context.tags)
-    }
-    if (context.extra) {
-      scope.setExtras(context.extra)
-    }
-    Sentry.captureException(error)
-  })
-}
-
 export function initSentry(params: SentryInitParams): SentryInitResult {
   if (cachedInit) {
     return cachedInit

@@ -24,7 +24,7 @@ const PROVIDER_RECORD_SETTLING_WINDOW_MS = 60 * 60 * 1_000
 
 const providerWithdrawalIdSchema = z.string().uuid()
 
-export type PartnerPixReconciliationItemDto = {
+type PartnerPixReconciliationItemDto = {
   failureCode: null | string
   status: PartnerReconciliationItemStatus
   transactionId: string

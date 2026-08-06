@@ -10,13 +10,13 @@ import { IDatabaseClientProvider } from '../../../platform/persistence/IDatabase
 import { ISecretManager, Secrets } from '../../../platform/secrets/ISecretManager'
 import { IDepositVerifierRegistry } from '../../payments/application/contracts/IDepositVerifier'
 
-export type OpsTransactionReconciliationInput = {
+type OpsTransactionReconciliationInput = {
   blockchain: BlockchainNetwork
   onChainTx: string
   transactionId?: string
 }
 
-export type OpsTransactionReconciliationResult = {
+type OpsTransactionReconciliationResult = {
   blockchain: BlockchainNetwork
   onChainTx: string
   reason?: string

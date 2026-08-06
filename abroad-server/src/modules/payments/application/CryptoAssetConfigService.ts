@@ -6,7 +6,7 @@ import { ApplicationError } from '../../../core/errors'
 import { IDatabaseClientProvider } from '../../../platform/persistence/IDatabaseClientProvider'
 import { CryptoAssetCoverageDto, CryptoAssetCoverageResponse, CryptoAssetUpdateInput } from './cryptoAssetSchemas'
 
-export type EnabledCryptoAsset = {
+type EnabledCryptoAsset = {
   blockchain: BlockchainNetwork
   cryptoCurrency: CryptoCurrency
   decimals: null | number
@@ -20,7 +20,7 @@ export class CryptoAssetConfigConflictError extends ApplicationError {
   }
 }
 
-export class CryptoAssetConfigError extends Error {
+class CryptoAssetConfigError extends Error {
   constructor(message: string) {
     super(message)
     this.name = 'CryptoAssetConfigError'

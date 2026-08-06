@@ -14,12 +14,12 @@ import { IDatabaseClientProvider } from '../../../platform/persistence/IDatabase
 export const OPS_PARTNER_ANALYTICS_RANGES = ['24h', '7d', '30d', '90d'] as const
 export type OpsPartnerActivityFilter = 'ACTIVE' | 'INACTIVE'
 export type OpsPartnerAnalyticsRange = typeof OPS_PARTNER_ANALYTICS_RANGES[number]
-export type OpsPartnerCurrencyAmount = {
+type OpsPartnerCurrencyAmount = {
   amount: number
   currency: string
 }
 
-export type OpsPartnerDirectoryItem = {
+type OpsPartnerDirectoryItem = {
   completedTransactions: number
   country: null | string
   createdAt: Date
@@ -34,7 +34,7 @@ export type OpsPartnerDirectoryItem = {
   totalTransactions: number
 }
 
-export type OpsPartnerDirectoryParams = {
+type OpsPartnerDirectoryParams = {
   activity?: OpsPartnerActivityFilter
   country?: string
   lifecycle?: OpsPartnerLifecycleFilter

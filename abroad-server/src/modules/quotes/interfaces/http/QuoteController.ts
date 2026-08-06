@@ -32,7 +32,7 @@ import {
   reverseQuoteRequestSchema,
 } from './contracts'
 
-export type QuoteErrorResponse = {
+type QuoteErrorResponse = {
   code: QuoteErrorCode
   reason: string
   retryable: boolean

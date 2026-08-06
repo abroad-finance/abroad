@@ -10,7 +10,7 @@ import { ISecretManager, Secrets } from '../../../platform/secrets/ISecretManage
 import { IExchangeProviderFactory } from '../application/contracts/IExchangeProviderFactory'
 import { mapBlockchainToBinanceNetwork } from '../infrastructure/exchangeProviders/binanceNetworkMap'
 
-export type BridgeSweepResult = {
+type BridgeSweepResult = {
   amount?: number
   batchId?: string
   count?: number

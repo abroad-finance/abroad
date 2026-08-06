@@ -8,7 +8,7 @@ import {
   TargetCurrency,
 } from '@prisma/client'
 
-export type CorrelationKeys = Record<string, boolean | number | string>
+type CorrelationKeys = Record<string, boolean | number | string>
 
 export type FlowContext = {
   accountNumber: string

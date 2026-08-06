@@ -20,7 +20,7 @@ export type CheckUnprocessedStellarResponse = {
   startPagingToken: null | string
 }
 
-export type SingleStellarReconciliationResponse = {
+type SingleStellarReconciliationResponse = {
   paymentId: string
   reason?: PaymentReconciliationReason
   refundTransactionId?: null | string

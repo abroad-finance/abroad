@@ -12,7 +12,7 @@ import { TYPES } from '../../../app/container/types'
 import { IDatabaseClientProvider } from '../../../platform/persistence/IDatabaseClientProvider'
 import { type ChainFamily, resolveChainMetadata, type WalletConnectMetadata } from '../../shared/chainMetadata'
 
-export type PublicCorridorDto = {
+type PublicCorridorDto = {
   blockchain: BlockchainNetwork
   chainFamily: ChainFamily
   chainId: string

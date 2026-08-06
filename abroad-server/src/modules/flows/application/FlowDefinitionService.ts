@@ -21,7 +21,7 @@ export class FlowDefinitionConflictError extends ApplicationError {
   }
 }
 
-export class FlowDefinitionValidationError extends Error {
+class FlowDefinitionValidationError extends Error {
   constructor(message: string) {
     super(message)
     this.name = 'FlowDefinitionValidationError'

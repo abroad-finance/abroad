@@ -15,6 +15,6 @@ export function assertSupportedPaymentMethod(method: PaymentMethod): asserts met
   }
 }
 
-export function isSupportedPaymentMethod(method: PaymentMethod): method is SupportedPaymentMethod {
+function isSupportedPaymentMethod(method: PaymentMethod): method is SupportedPaymentMethod {
   return SUPPORTED_PAYMENT_METHODS.includes(method as SupportedPaymentMethod)
 }

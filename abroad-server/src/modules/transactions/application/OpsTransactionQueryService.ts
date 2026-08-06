@@ -93,7 +93,7 @@ export type OpsAttentionFilter
     | 'PROOF_MISSING'
     | 'REFUND_PENDING'
     | 'WEBHOOK_FAILED'
-export type OpsCaseSummaryDto = {
+type OpsCaseSummaryDto = {
   id: string
   owner: null | { displayName: string, id: string }
   priority: OpsPriority
@@ -102,7 +102,7 @@ export type OpsCaseSummaryDto = {
   updatedAt: Date
   version: number
 }
-export type OpsEvidenceEventDto = {
+type OpsEvidenceEventDto = {
   category: 'CASE' | 'CHAIN' | 'FLOW' | 'PROOF' | 'PROVIDER' | 'QUOTE' | 'REFUND' | 'TRANSACTION' | 'WEBHOOK'
   description: string
   id: string
@@ -110,7 +110,7 @@ export type OpsEvidenceEventDto = {
   state: 'FAILED' | 'INFO' | 'PENDING' | 'SUCCEEDED' | 'WARNING'
   title: string
 }
-export type OpsFlowSummaryDto = {
+type OpsFlowSummaryDto = {
   currentStepOrder: null | number
   id: string
   status: FlowInstanceStatus
@@ -127,13 +127,13 @@ export type OpsRefundSummaryDto = {
   status: 'COMPLETED' | 'FAILED' | 'NOT_APPLICABLE' | 'NOT_STARTED' | 'PROCESSING'
 }
 
-export type OpsSlaDto = {
+type OpsSlaDto = {
   ageMinutes: number
   state: 'AT_RISK' | 'BREACHED' | 'COMPLETE' | 'WITHIN_TARGET'
   targetMinutes: null | number
 }
 
-export type OpsTransactionCaseDetailDto = OpsCaseSummaryDto & {
+type OpsTransactionCaseDetailDto = OpsCaseSummaryDto & {
   handoffs: Array<{
     actor: { displayName: string, id: string }
     createdAt: Date
@@ -213,7 +213,7 @@ export type OpsTransactionListResponse = {
   total: number
 }
 
-export type OpsTransactionQuoteDto = {
+type OpsTransactionQuoteDto = {
   country: string
   cryptoCurrency: CryptoCurrency
   network: BlockchainNetwork
@@ -224,7 +224,7 @@ export type OpsTransactionQuoteDto = {
   targetCurrency: TargetCurrency
 }
 
-export type OpsTransactionSearchFilters = {
+type OpsTransactionSearchFilters = {
   attention?: OpsAttentionFilter
   caseOwnerId?: string
   caseStatus?: OpsWorkStatus
@@ -244,7 +244,7 @@ export type OpsTransactionSearchFilters = {
   webhookStatus?: OutboxStatus
 }
 
-export type OpsTransactionSummaryDto = {
+type OpsTransactionSummaryDto = {
   attentionReasons: Array<'FLOW_FAILED' | 'PAYMENT_FAILED' | 'PROOF_MISSING' | 'REFUND_PENDING' | 'WEBHOOK_FAILED'>
   case: null | OpsCaseSummaryDto
   createdAt: Date
@@ -260,7 +260,7 @@ export type OpsTransactionSummaryDto = {
   webhook: OpsWebhookSummaryDto
 }
 
-export type OpsWebhookSummaryDto = {
+type OpsWebhookSummaryDto = {
   attempts: number
   httpStatus: null | number
   lastAttemptAt: Date | null

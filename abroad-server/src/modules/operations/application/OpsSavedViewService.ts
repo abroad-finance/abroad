@@ -64,7 +64,7 @@ export type OpsSavedViewDto = {
   version: number
 }
 
-export type OpsSavedViewFiltersDto = {
+type OpsSavedViewFiltersDto = {
   attention?: string
   blockchain?: string
   caseOwnerId?: string
@@ -104,7 +104,7 @@ export type OpsSavedViewUpdateInput = {
   scope?: OpsSavedViewScope
 }
 
-export class OpsSavedViewConflictError extends ApplicationError {
+class OpsSavedViewConflictError extends ApplicationError {
   public constructor(message = 'This saved view changed after it was loaded; refresh before trying again') {
     super(409, 'ops_saved_view_conflict', message)
     this.name = 'OpsSavedViewConflictError'
@@ -118,7 +118,7 @@ export class OpsSavedViewNotFoundError extends ApplicationError {
   }
 }
 
-export class OpsSavedViewValidationError extends ApplicationError {
+class OpsSavedViewValidationError extends ApplicationError {
   public constructor(message: string) {
     super(400, 'ops_saved_view_invalid', message)
     this.name = 'OpsSavedViewValidationError'

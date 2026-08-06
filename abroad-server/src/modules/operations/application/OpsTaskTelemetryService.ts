@@ -16,7 +16,7 @@ const taskActionMap = {
   PROOF_RETRIEVAL: ['REQUESTED', 'COMPLETED'],
 } as const
 
-export type OpsTaskTelemetryAction = typeof taskActionMap[keyof typeof taskActionMap][number]
+type OpsTaskTelemetryAction = typeof taskActionMap[keyof typeof taskActionMap][number]
 export type OpsTaskTelemetryInput = {
   action: OpsTaskTelemetryAction
   durationMs?: number
@@ -28,7 +28,7 @@ export type OpsTaskTelemetryInput = {
   result: OpsTaskResult
   task: OpsTaskTelemetryTask
 }
-export type OpsTaskTelemetryMetric = {
+type OpsTaskTelemetryMetric = {
   abandoned: number
   action: string
   averageDurationMs: null | number
@@ -46,9 +46,9 @@ export type OpsTaskTelemetrySummary = {
   truncated: boolean
 }
 
-export type OpsTaskTelemetryTask = keyof typeof taskActionMap
+type OpsTaskTelemetryTask = keyof typeof taskActionMap
 
-export type OpsTaskTelemetryViewport = 'DESKTOP' | 'MOBILE' | 'TABLET'
+type OpsTaskTelemetryViewport = 'DESKTOP' | 'MOBILE' | 'TABLET'
 
 const metadataSchema = z.object({
   entryPoint: z.enum(['CASE', 'FLOW', 'INCIDENT', 'PARTNER', 'TRANSACTION']).optional(),

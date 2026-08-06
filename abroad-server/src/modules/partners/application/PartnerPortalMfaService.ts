@@ -10,13 +10,13 @@ const TOTP_SECRET_BYTES = 20
 const TOTP_STEP_SECONDS = 30
 const TOTP_WINDOW = 1
 
-export type PartnerPortalMfaEnrollment = {
+type PartnerPortalMfaEnrollment = {
   manualEntryKey: string
   otpauthUri: string
   secret: string
 }
 
-export type PartnerPortalRecoveryCode = {
+type PartnerPortalRecoveryCode = {
   codeHash: string
   plaintext: string
 }

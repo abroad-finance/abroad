@@ -18,13 +18,13 @@ import type { PartnerPortalCredentials, PartnerPortalUserProvisioningResult } fr
 
 import { createPartnerRequestSchema } from './contracts'
 
-export const DEFAULT_PARTNER_PAGE_SIZE = 20
+const DEFAULT_PARTNER_PAGE_SIZE = 20
 const MAX_PARTNER_PAGE_SIZE = 100
 
 export type OpsCreatePartnerRequest = OpsPartnerCreateInput
 export type OpsCreatePartnerResponse = OpsPartnerCreateResult
 export type OpsPartnerCredentialHistoryResponse = OpsPartnerCredentialHistory
-export type OpsPartnerDto = OpsPartnerSummary
+type OpsPartnerDto = OpsPartnerSummary
 export type OpsPartnerListResponse = OpsPartnerListResult
 export type OpsRotatePartnerApiKeyResponse = OpsPartnerRotateApiKeyResult
 export type OpsUpdatePartnerClientDomainRequest = OpsPartnerClientDomainInput

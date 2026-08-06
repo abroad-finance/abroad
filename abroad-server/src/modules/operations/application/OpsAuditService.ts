@@ -6,7 +6,7 @@ import { TYPES } from '../../../app/container/types'
 import { IDatabaseClientProvider } from '../../../platform/persistence/IDatabaseClientProvider'
 import { OpsPrincipal } from './opsIdentity'
 
-export type OpsAuditInput = {
+type OpsAuditInput = {
   action: string
   metadata?: Prisma.InputJsonValue
   reason?: string

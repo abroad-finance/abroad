@@ -12,7 +12,7 @@ import { createScopedLogger, ScopedLogger } from '../../../core/logging/scopedLo
 import { ILogger } from '../../../core/logging/types'
 import { IDatabaseClientProvider } from '../../../platform/persistence/IDatabaseClientProvider'
 
-export type FloatCheck = { cap: number, deficit: number, ok: boolean }
+type FloatCheck = { cap: number, deficit: number, ok: boolean }
 
 /**
  * Admission control for the bridge float. Small CELO->BRL flows settle
