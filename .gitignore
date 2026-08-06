@@ -129,9 +129,6 @@ dist
 .yarn/install-state.gz
 .pnp.*
 
-# Generated tsoa files
-abroad-server/src/routes.ts
-abroad-server/src/swagger.json
 concatenated.txt
 abroad-server/dependency-graph.svg
 .env*
@@ -142,6 +139,8 @@ transactions-report.csv
 abroad-server/tmp/maintainability-report.json
 stryker-tmp/
 abroad-server/reports/
+
+# Generated tsoa files
 abroad-server/src/app/http/swagger.json
 abroad-server/src/app/http/routes.ts
 *key.json

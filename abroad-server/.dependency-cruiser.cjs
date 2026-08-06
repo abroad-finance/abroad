@@ -265,7 +265,7 @@ module.exports = {
     /* Which modules to exclude */
     exclude: {
       /* path: an array of regular expressions in strings to match against */
-      path: ['src/ioc.ts', 'src/types.ts'],
+      path: ['^src/app/http/routes\\.ts$'],
     },
 
     /* list of extensions to scan that aren't javascript or compile-to-javascript.

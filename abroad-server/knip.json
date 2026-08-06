@@ -16,7 +16,6 @@
     "scripts/**/*.ts"
   ],
   "ignore": [
-    "src/scripts/**",
     "dist/**",
     "coverage/**",
     "reports/**",
