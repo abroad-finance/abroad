@@ -18,7 +18,17 @@ export default tseslint.config(
   { ignores: ['dist', 'src/api/index.ts'] },
 
   {
-    files: ['**/src/**/*.{ts,tsx}'],
+    // e2e/ matched no config object before, so the Playwright suite was
+    // silently unlinted. vite/playwright configs join it because they belong to
+    // tsconfig.node.json and tsconfig.e2e.json respectively; eslint.config.js
+    // and orval.config.ts stay out because no tsconfig project covers them and
+    // typed linting cannot parse them.
+    files: [
+      '**/src/**/*.{ts,tsx}',
+      'e2e/**/*.{ts,tsx}',
+      'vite.config.ts',
+      'playwright.config.ts',
+    ],
     extends: [
       js.configs.recommended,
       ...tseslint.configs.recommended,

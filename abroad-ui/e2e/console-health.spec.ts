@@ -14,10 +14,7 @@ import { attachIssues, watchPage } from './helpers'
 const SETTLE_MS = 1_500 // ms to wait after networkidle for late React errors
 
 // Routes accessible without authentication
-const publicRoutes = [
-  { name: 'Swap (root)', path: '/' },
-  { name: 'WebSwap embed', path: '/web-swap' },
-]
+const publicRoutes = [{ name: 'Swap (root)', path: '/' }, { name: 'WebSwap embed', path: '/web-swap' }]
 
 // Ops routes – no auth, but components still mount and CSS must resolve
 const opsRoutes = [
@@ -30,7 +27,12 @@ const opsRoutes = [
 
 for (const { name, path } of [...publicRoutes, ...opsRoutes]) {
   test(`no console errors on "${name}"`, async ({ page }, testInfo) => {
-    const { errors, warnings, networkErrors, allErrors } = watchPage(page)
+    const {
+      allErrors,
+      errors,
+      networkErrors,
+      warnings,
+    } = watchPage(page)
 
     await page.goto(path)
     await page.waitForLoadState('networkidle')

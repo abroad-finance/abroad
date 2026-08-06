@@ -33,55 +33,17 @@ export function generateMockJwt(payload: {
 }
 
 /**
- * Sets up a mock wallet session in page localStorage via addInitScript.
- * Must be called BEFORE page.goto().
- */
-export function setupSession(
-  page: Page,
-  options: {
-    address?: string
-    chainId?: string
-    walletId?: string
-    expOffset?: number // seconds from now; negative = expired
-  } = {},
-): void {
-  const {
-    address = 'GTEST123456789',
-    chainId = 'stellar:pubnet',
-    walletId = 'stellar-kit',
-    expOffset = 3600,
-  } = options
-  const jwt = generateMockJwt({ address, chainId, exp: Math.floor(Date.now() / 1000) + expOffset })
-  page.addInitScript(({ address, chainId, walletId, jwt }) => {
-    localStorage.clear()
-    localStorage.setItem('wallet_session', JSON.stringify({ address, chainId, walletId }))
-    localStorage.setItem('auth_token', jwt)
-  }, { address, chainId, walletId, jwt })
-}
-
-/**
  * Mock challenge response for wallet auth.
  */
 export function mockChallengeResponse(challengeToken?: string): {
   challengeToken?: string
-  message: string
   format: 'utf8' | 'xdr'
+  message: string
 } {
   return {
     challengeToken: challengeToken ?? `challenge-${Date.now()}`,
-    message: `Sign this message to authenticate: ${Date.now()}`,
     format: 'utf8',
-  }
-}
-
-/**
- * Mock verify response with JWT token.
- */
-export function mockVerifyResponse(address: string, chainId: string): {
-  token: string
-} {
-  return {
-    token: generateMockJwt({ address, chainId }),
+    message: `Sign this message to authenticate: ${Date.now()}`,
   }
 }
 
@@ -102,9 +64,55 @@ export function mockRefreshResponse(oldToken: string): {
         exp: Math.floor(Date.now() / 1000) + 3600,
       }),
     }
-  } catch {
+  }
+  catch {
     return {
       token: generateMockJwt({}),
     }
   }
+}
+
+/**
+ * Mock verify response with JWT token.
+ */
+export function mockVerifyResponse(address: string, chainId: string): {
+  token: string
+} {
+  return {
+    token: generateMockJwt({ address, chainId }),
+  }
+}
+
+/**
+ * Sets up a mock wallet session in page localStorage via addInitScript.
+ * Must be called BEFORE page.goto().
+ */
+export function setupSession(
+  page: Page,
+  options: {
+    address?: string
+    chainId?: string
+    expOffset?: number // seconds from now; negative = expired
+    walletId?: string
+  } = {},
+): void {
+  const {
+    address = 'GTEST123456789',
+    chainId = 'stellar:pubnet',
+    expOffset = 3600,
+    walletId = 'stellar-kit',
+  } = options
+  const jwt = generateMockJwt({ address, chainId, exp: Math.floor(Date.now() / 1000) + expOffset })
+  page.addInitScript(({
+    address,
+    chainId,
+    jwt,
+    walletId,
+  }) => {
+    localStorage.clear()
+    localStorage.setItem('wallet_session', JSON.stringify({ address, chainId, walletId }))
+    localStorage.setItem('auth_token', jwt)
+  }, {
+    address, chainId, jwt, walletId,
+  })
 }

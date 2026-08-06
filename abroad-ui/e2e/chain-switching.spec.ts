@@ -98,7 +98,11 @@ test.describe('Multi-Chain Connection Flow', () => {
   test('should support multiple chains in corridor list', async ({ page }) => {
     const { errors } = watchPage(page)
 
-    await mockCorridors(page, [STELLAR_COP, CELO_BRL, SOLANA_COP])
+    await mockCorridors(page, [
+      STELLAR_COP,
+      CELO_BRL,
+      SOLANA_COP,
+    ])
 
     await page.goto('/')
     await page.waitForLoadState('domcontentloaded')

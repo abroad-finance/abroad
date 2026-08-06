@@ -1,24 +1,25 @@
+import type { PluginOption, UserConfig } from 'vite'
+
+import { sentryVitePlugin } from '@sentry/vite-plugin'
 /// <reference types="vitest" />
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
-import { sentryVitePlugin } from '@sentry/vite-plugin'
-import type { PluginOption, UserConfig } from 'vite'
-import { defineConfig } from 'vite'
 import crypto from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
+import { defineConfig } from 'vite'
 
 // https://vite.dev/config/
 // Helper to create (stable within one build) random hashes for each file.
 const hashCache = new Map<string, string>()
+type VitestEnabledConfig = UserConfig & { test?: import('vitest/config').UserConfig['test'] }
+
 function randomHash(key: string): string {
   if (!hashCache.has(key)) {
     hashCache.set(key, crypto.randomBytes(8).toString('hex')) // 16 hex chars
   }
   return hashCache.get(key) as string
 }
-
-type VitestEnabledConfig = UserConfig & { test?: import('vitest/config').UserConfig['test'] }
 
 const plugins: PluginOption[] = [
   react({ include: '**/*.tsx' }),
@@ -76,26 +77,25 @@ if (enableSentrySourcemaps && sentryAuthToken && sentryOrg && sentryProject && s
 }
 
 const config: VitestEnabledConfig = {
-  root: __dirname,
   build: {
     chunkSizeWarningLimit: 1200,
     rollupOptions: {
       output: {
-        // Custom file name patterns with random (non-content) hashes
-        entryFileNames: (chunk) => {
-          const key = chunk.facadeModuleId || chunk.name
-          return `assets/${chunk.name}.${randomHash(key)}.js`
+        assetFileNames: (assetInfo) => {
+          const originalName = assetInfo.name || 'asset'
+          const ext = path.extname(originalName)
+          const base = path.basename(originalName, ext)
+          return `assets/${base}.${randomHash(originalName)}${ext}`
         },
         chunkFileNames: (chunk) => {
           // Use sorted module ids as key to stay stable within this build run
           const key = [...chunk.moduleIds].sort().join('|') || chunk.name
           return `assets/${chunk.name}.${randomHash(key)}.js`
         },
-        assetFileNames: (assetInfo) => {
-          const originalName = assetInfo.name || 'asset'
-          const ext = path.extname(originalName)
-          const base = path.basename(originalName, ext)
-          return `assets/${base}.${randomHash(originalName)}${ext}`
+        // Custom file name patterns with random (non-content) hashes
+        entryFileNames: (chunk) => {
+          const key = chunk.facadeModuleId || chunk.name
+          return `assets/${chunk.name}.${randomHash(key)}.js`
         },
         manualChunks: {
           icons: ['lucide-react'],
@@ -120,13 +120,14 @@ const config: VitestEnabledConfig = {
     'global': 'globalThis',
     'process.env': {},
   },
+  plugins,
   resolve: {
     alias: {
       '@': path.resolve(__dirname, 'src'),
       '@/': path.resolve(__dirname, 'src'),
     },
   },
-  plugins,
+  root: __dirname,
   server: {
     allowedHosts: process.env.VITE_ALLOW_ALL_HOSTS === 'true' ? true : [],
     watch: {
@@ -139,15 +140,15 @@ const config: VitestEnabledConfig = {
       '@/': path.resolve(__dirname, 'src'),
     },
     environment: 'jsdom',
-    globals: true,
-    restoreMocks: true,
-    setupFiles: ['./src/test/setupTests.ts'],
     exclude: [
       '**/node_modules/**',
       '**/dist/**',
       '**/e2e/**',
       '**/*.spec.{ts,tsx}',
     ],
+    globals: true,
+    restoreMocks: true,
+    setupFiles: ['./src/test/setupTests.ts'],
   },
 }
 

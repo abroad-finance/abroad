@@ -1,7 +1,9 @@
 import { expect, test } from '@playwright/test'
 
 import { attachConsoleAndNetwork, readSession, watchPage } from './helpers'
-import { CELO_COP, mockCorridors, SOLANA_COP, STELLAR_COP } from './mocks/corridors'
+import {
+  CELO_COP, mockCorridors, SOLANA_COP, STELLAR_COP,
+} from './mocks/corridors'
 import { generateMockJwt, setupSession } from './mocks/wallet-auth'
 
 /**
@@ -76,7 +78,11 @@ test.describe('Wallet Connection', () => {
     await page.goto('/')
     await page.waitForLoadState('domcontentloaded')
 
-    await mockCorridors(page, [STELLAR_COP, CELO_COP, SOLANA_COP])
+    await mockCorridors(page, [
+      STELLAR_COP,
+      CELO_COP,
+      SOLANA_COP,
+    ])
 
     await page.waitForTimeout(2000)
 
