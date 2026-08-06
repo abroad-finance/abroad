@@ -13,6 +13,11 @@ export class DepositVerifierRegistry implements IDepositVerifierRegistry {
   ) {
     this.verifiers = new Map()
     for (const verifier of verifiers) {
+      // One verifier per network. Silently replacing an existing one would let a
+      // newly registered adapter take over a network's deposits unnoticed.
+      if (this.verifiers.has(verifier.supportedNetwork)) {
+        throw new Error(`Duplicate deposit verifier registered for ${verifier.supportedNetwork}`)
+      }
       this.verifiers.set(verifier.supportedNetwork, verifier)
     }
   }

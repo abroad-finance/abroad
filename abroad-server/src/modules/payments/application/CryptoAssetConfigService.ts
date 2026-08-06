@@ -6,6 +6,13 @@ import { ApplicationError } from '../../../core/errors'
 import { IDatabaseClientProvider } from '../../../platform/persistence/IDatabaseClientProvider'
 import { CryptoAssetCoverageDto, CryptoAssetCoverageResponse, CryptoAssetUpdateInput } from './cryptoAssetSchemas'
 
+/** A confidential-token deployment that is enabled to receive deposits. */
+type EnabledConfidentialAsset = {
+  contractAddress: string
+  decimals: number
+  depositContractAddress: string
+}
+
 type EnabledCryptoAsset = {
   blockchain: BlockchainNetwork
   cryptoCurrency: CryptoCurrency
@@ -33,6 +40,38 @@ export class CryptoAssetConfigService {
     @inject(TYPES.IDatabaseClientProvider)
     private readonly dbProvider: IDatabaseClientProvider,
   ) {}
+
+  /**
+   * Resolves the confidential-token deployment that may receive deposits for an
+   * asset, or `null` when none is configured or the configured one is disabled.
+   *
+   * A `null` here is what keeps the confidential path inert: no row, no deposits.
+   */
+  public async getActiveConfidentialAsset(params: {
+    blockchain: BlockchainNetwork
+    cryptoCurrency: CryptoCurrency
+  }): Promise<EnabledConfidentialAsset | null> {
+    const client = await this.dbProvider.getClient()
+    const config = await client.confidentialAssetConfig.findFirst({
+      where: {
+        blockchain: params.blockchain,
+        cryptoCurrency: params.cryptoCurrency,
+        enabled: true,
+      },
+    })
+
+    // Without a wrapper there is no way to attribute a deposit, so an asset
+    // configured without one is not usable and reads as unconfigured.
+    if (!config?.depositContractAddress) {
+      return null
+    }
+
+    return {
+      contractAddress: config.contractAddress,
+      decimals: config.decimals,
+      depositContractAddress: config.depositContractAddress,
+    }
+  }
 
   public async getActiveMint(params: {
     blockchain: BlockchainNetwork
@@ -143,6 +182,16 @@ export class CryptoAssetConfigService {
     })
 
     return assets
+  }
+
+  /** Every confidential-token contract enabled to receive deposits on a network. */
+  public async listEnabledConfidentialContracts(blockchain: BlockchainNetwork): Promise<string[]> {
+    const client = await this.dbProvider.getClient()
+    const configs = await client.confidentialAssetConfig.findMany({
+      where: { blockchain, enabled: true },
+    })
+
+    return [...new Set(configs.map(config => config.contractAddress))]
   }
 
   public async requireActiveMint(params: {

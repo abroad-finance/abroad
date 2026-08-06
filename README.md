@@ -4,6 +4,14 @@ This repository hosts the full-stack Abroad Platform as a simple monorepo with:
 - `abroad-server`: TypeScript Node.js API (TSOA, Prisma, Express)
 - `abroad-ui`: React + Vite frontend
 
+## Confidential deposits
+
+A confidential-token deposit path — amounts hidden on-chain, verified against their Pedersen
+commitment before any payout is released, then settled as BRL by the existing PIX rail. It ships
+disabled and stays inert until a `ConfidentialAssetConfig` row is enabled. See [EVENT.md](./EVENT.md)
+for what it adds and how it is verified; the Soroban contracts and the payer client live in
+[`confidential/`](./confidential), whose README reproduces the testnet run.
+
 ## Prerequisites
 
 - Docker & Docker Compose (for dev container)

@@ -1,0 +1,21 @@
+[workspace]
+resolver = "2"
+members = ["verifier", "token", "deposit"]
+
+[workspace.package]
+edition = "2021"
+version = "0.1.0"
+
+[workspace.dependencies]
+soroban-sdk = { version = "27.0.2", features = ["experimental_spec_shaking_v2"] }
+stellar-tokens = { path = "../oz/packages/tokens" }
+stellar-access = { path = "../oz/packages/access" }
+stellar-macros = { path = "../oz/packages/macros" }
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+overflow-checks = true

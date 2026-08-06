@@ -1,5 +1,7 @@
 const stellarStartMock = jest.fn()
 const stellarStopMock = jest.fn()
+const confidentialStartMock = jest.fn()
+const confidentialStopMock = jest.fn()
 const binanceStartMock = jest.fn()
 let bindMock: jest.Mock
 let getMock: jest.Mock
@@ -14,6 +16,13 @@ jest.mock('../../../../../modules/treasury/interfaces/listeners/StellarListener'
   StellarListener: jest.fn(() => ({
     start: stellarStartMock,
     stop: stellarStopMock,
+  })),
+}))
+
+jest.mock('../../../../../modules/treasury/interfaces/listeners/StellarConfidentialListener', () => ({
+  StellarConfidentialListener: jest.fn(() => ({
+    start: confidentialStartMock,
+    stop: confidentialStopMock,
   })),
 }))
 
@@ -49,9 +58,11 @@ describe('startListeners', () => {
     jest.clearAllMocks()
     stellarStartMock.mockResolvedValue(undefined)
     stellarStopMock.mockResolvedValue(undefined)
+    confidentialStartMock.mockResolvedValue(undefined)
     binanceStartMock.mockResolvedValue(undefined)
     getMock.mockImplementation((key: unknown) => {
       if (key === TYPES.StellarListener) return { start: stellarStartMock, stop: stellarStopMock }
+      if (key === TYPES.StellarConfidentialListener) return { start: confidentialStartMock, stop: confidentialStopMock }
       if (key === 'BinanceListener') return { start: binanceStartMock }
       if (key === TYPES.ILogger) return logger
       return {}
@@ -66,6 +77,7 @@ describe('startListeners', () => {
     expect(getMock).toHaveBeenCalledWith(TYPES.StellarListener)
     expect(getMock).toHaveBeenCalledWith('BinanceListener')
     expect(stellarStartMock).toHaveBeenCalled()
+    expect(confidentialStartMock).toHaveBeenCalled()
     expect(binanceStartMock).toHaveBeenCalled()
   })
 })

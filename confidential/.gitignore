@@ -1,0 +1,9 @@
+# Build output
+target/
+node_modules/
+
+# Anything holding key material or a live deployment's local state.
+*.secret.json
+stellar-config/
+*.hex
+payer-state.json
