@@ -1,6 +1,56 @@
 /** @type {import('dependency-cruiser').IConfiguration} */
 module.exports = {
   forbidden: [
+    // ---------------------------------------------------------------
+    // Architecture rules for this repository.
+    // These mirror the import/no-restricted-paths zones in
+    // eslint.config.mjs so the boundaries hold whether a change is
+    // checked by the editor or by CI. Everything below this block is
+    // the stock dependency-cruiser ruleset.
+    // ---------------------------------------------------------------
+    {
+      comment:
+        'A domain module reached into another module\'s infrastructure. Depend on a '
+        + 'contract in that module\'s application/contracts instead, and let the '
+        + 'container bind the adapter.',
+      from: { path: '^src/modules/([^/]+)/' },
+      name: 'no-cross-module-infrastructure',
+      severity: 'error',
+      to: {
+        path: '^src/modules/([^/]+)/infrastructure/',
+        pathNot: [
+          '^src/modules/$1/',
+          // Pending ports; tracked as the remaining exceptions in eslint.config.mjs.
+          '^src/modules/transfero/infrastructure/',
+          '^src/modules/treasury/infrastructure/exchangeProviders/transferoCryptoPurchaseService',
+        ],
+      },
+    },
+    {
+      comment:
+        'Infrastructure depends on the transport layer. Adapters implement application '
+        + 'ports; they must not know about controllers or wire contracts.',
+      from: { path: '^src/modules/[^/]+/infrastructure/' },
+      name: 'no-infrastructure-to-interfaces',
+      severity: 'error',
+      to: { path: '^src/modules/[^/]+/interfaces/' },
+    },
+    {
+      comment:
+        'core is the innermost layer. It may not depend on modules or platform.',
+      from: { path: '^src/core/' },
+      name: 'core-depends-on-nothing',
+      severity: 'error',
+      to: { path: '^src/(modules|platform)/' },
+    },
+    {
+      comment:
+        'A cycle between domain modules. Invert one edge through a contract.',
+      from: { path: '^src/modules/' },
+      name: 'no-circular-modules',
+      severity: 'error',
+      to: { circular: true, path: '^src/modules/' },
+    },
     {
       comment:
         'This dependency is part of a circular relationship. You might want to revise '
@@ -94,6 +144,10 @@ module.exports = {
           'npm-no-pkg',
           'npm-unknown',
         ],
+        // `@prisma/client` re-exports the client Prisma generates into
+        // node_modules/.prisma. That path is not in any package.json by
+        // design, so it is not an undeclared dependency.
+        pathNot: 'node_modules/[.]prisma/',
       },
     },
     {
