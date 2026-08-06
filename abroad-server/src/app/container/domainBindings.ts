@@ -83,6 +83,7 @@ import { TransferoPixDepositService } from '../../modules/payments/infrastructur
 import { TransferoPayoutStatusAdapter } from '../../modules/payments/infrastructure/TransferoPayoutStatusAdapter'
 import { CeloPaymentVerifier } from '../../modules/payments/infrastructure/wallets/CeloPaymentVerifier'
 import { CeloWalletHandler } from '../../modules/payments/infrastructure/wallets/CeloWalletHandler'
+import { ConfidentialDepositVerifier } from '../../modules/payments/infrastructure/wallets/ConfidentialDepositVerifier'
 import { SolanaPaymentVerifier } from '../../modules/payments/infrastructure/wallets/SolanaPaymentVerifier'
 import { SolanaWalletHandler } from '../../modules/payments/infrastructure/wallets/SolanaWalletHandler'
 import { StellarDepositVerifier } from '../../modules/payments/infrastructure/wallets/StellarDepositVerifier'
@@ -129,6 +130,7 @@ import { BinanceExchangeProvider } from '../../modules/treasury/infrastructure/e
 import { BinanceBrlExchangeProvider } from '../../modules/treasury/infrastructure/exchangeProviders/binanceExchangeProvider'
 import { TransferoCryptoPurchaseService } from '../../modules/treasury/infrastructure/exchangeProviders/transferoCryptoPurchaseService'
 import { TransferoExchangeProvider } from '../../modules/treasury/infrastructure/exchangeProviders/transferoExchangeProvider'
+import { StellarConfidentialListener } from '../../modules/treasury/interfaces/listeners/StellarConfidentialListener'
 import { StellarListener } from '../../modules/treasury/interfaces/listeners/StellarListener'
 import { BindingRegistration, registerBindings } from './bindingSupport'
 import { TYPES } from './types'
@@ -152,6 +154,7 @@ const domainBindings: ReadonlyArray<BindingRegistration<unknown>> = [
   { identifier: TYPES.CeloWalletHandler, implementation: CeloWalletHandler },
   { identifier: TYPES.SolanaPaymentVerifier, implementation: SolanaPaymentVerifier },
   { identifier: TYPES.SolanaWalletHandler, implementation: SolanaWalletHandler },
+  { identifier: TYPES.StellarConfidentialListener, implementation: StellarConfidentialListener },
   { identifier: TYPES.StellarListener, implementation: StellarListener },
   { identifier: TYPES.StellarWalletHandler, implementation: StellarWalletHandler },
   { identifier: TYPES.IPaymentService, implementation: BrebPaymentService, name: 'breb' },
@@ -163,6 +166,9 @@ const domainBindings: ReadonlyArray<BindingRegistration<unknown>> = [
   { identifier: TYPES.IDepositVerifier, implementation: SolanaPaymentVerifier },
   { identifier: TYPES.IDepositVerifier, implementation: CeloPaymentVerifier },
   { identifier: TYPES.IDepositVerifier, implementation: StellarDepositVerifier },
+  // Not an IDepositVerifier binding: the registry keys on network, and this shares
+  // BlockchainNetwork.STELLAR with the classic verifier above.
+  { identifier: TYPES.IConfidentialDepositVerifier, implementation: ConfidentialDepositVerifier },
   { bindSelf: true, identifier: CryptoAssetConfigService, implementation: CryptoAssetConfigService },
   { bindSelf: true, identifier: PaymentContextService, implementation: PaymentContextService },
   { identifier: TYPES.IExchangeProvider, implementation: BinanceExchangeProvider, name: 'binance' },

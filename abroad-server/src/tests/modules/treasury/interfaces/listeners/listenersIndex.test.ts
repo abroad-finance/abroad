@@ -4,6 +4,7 @@ import { TYPES } from '../../../../../app/container/types'
 
 describe('listeners/index', () => {
   const stellar = { start: jest.fn(), stop: jest.fn() }
+  const stellarConfidential = { start: jest.fn(), stop: jest.fn() }
   const binance = { start: jest.fn() }
   const bind = jest.fn()
   const get = jest.fn()
@@ -17,6 +18,7 @@ describe('listeners/index', () => {
     }))
     get.mockImplementation((identifier: unknown) => {
       if (identifier === TYPES.StellarListener || identifier === 'StellarListener') return stellar
+      if (identifier === TYPES.StellarConfidentialListener) return stellarConfidential
       if (identifier === 'BinanceListener') return binance
       if (identifier === TYPES.ILogger) return logger
       throw new Error(`Unknown identifier ${String(identifier)}`)
@@ -24,6 +26,7 @@ describe('listeners/index', () => {
 
     jest.doMock('../../../../../app/container', () => ({ __esModule: true, iocContainer: mockContainer }))
     jest.doMock('../../../../../modules/treasury/interfaces/listeners/StellarListener', () => ({ __esModule: true, StellarListener: class { public start = stellar.start; public stop = stellar.stop } }))
+    jest.doMock('../../../../../modules/treasury/interfaces/listeners/StellarConfidentialListener', () => ({ __esModule: true, StellarConfidentialListener: class { public start = stellarConfidential.start; public stop = stellarConfidential.stop } }))
     jest.doMock('../../../../../modules/treasury/interfaces/listeners/BinanceListener', () => ({ __esModule: true, BinanceListener: class { public start = binance.start } }))
 
     return import('../../../../../modules/treasury/interfaces/listeners')
@@ -33,6 +36,7 @@ describe('listeners/index', () => {
     jest.resetModules()
     jest.clearAllMocks()
     stellar.start.mockResolvedValue(undefined)
+    stellarConfidential.start.mockResolvedValue(undefined)
     binance.start.mockResolvedValue(undefined)
   })
 
@@ -44,6 +48,7 @@ describe('listeners/index', () => {
     expect(get).toHaveBeenCalledWith(TYPES.StellarListener)
     expect(get).toHaveBeenCalledWith('BinanceListener')
     expect(stellar.start).toHaveBeenCalled()
+    expect(stellarConfidential.start).toHaveBeenCalled()
     expect(binance.start).toHaveBeenCalled()
   })
 

@@ -24,4 +24,14 @@ describe('DepositVerifierRegistry', () => {
 
     expect(() => registry.getVerifier(BlockchainNetwork.SOLANA)).toThrow('No deposit verifier registered for SOLANA')
   })
+
+  it('refuses to let a second verifier take over a network', () => {
+    // Two verifiers can legitimately exist for one network — the classic and the
+    // confidential Stellar paths — but only one may be reachable through here,
+    // and a silent replacement would reroute deposits without anyone noticing.
+    expect(() => new DepositVerifierRegistry([
+      buildVerifier(BlockchainNetwork.STELLAR),
+      buildVerifier(BlockchainNetwork.STELLAR),
+    ])).toThrow('Duplicate deposit verifier registered for STELLAR')
+  })
 })

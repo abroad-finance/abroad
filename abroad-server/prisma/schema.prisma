@@ -510,6 +510,16 @@ model StellarListenerState {
   updatedAt       DateTime @updatedAt
 }
 
+/// Cursor for the Soroban `getEvents` poll that finds confidential deposits.
+/// Separate from StellarListenerState because a confidential transfer is a
+/// contract invocation, not a Horizon payment, and the two streams page
+/// independently.
+model StellarConfidentialListenerState {
+  id         String   @id @default("singleton")
+  lastCursor String
+  updatedAt  DateTime @updatedAt
+}
+
 model SolanaListenerState {
   id                String    @id
   lastSignature     String?
@@ -1045,6 +1055,26 @@ model CryptoAssetConfig {
   version        Int               @default(1)
 
   @@unique([cryptoCurrency, blockchain], name: "crypto_asset_unique")
+}
+
+/// Confidential-token deployment backing a crypto asset, kept apart from
+/// CryptoAssetConfig because a confidential asset is a wrapper contract rather
+/// than an issuer/mint, and because it must stay disabled until its deployment is
+/// audited. `enabled` defaults to false for that reason.
+model ConfidentialAssetConfig {
+  id              String            @id @default(uuid())
+  cryptoCurrency  CryptoCurrency
+  blockchain      BlockchainNetwork
+  contractAddress String
+  /// Abroad's deposit wrapper, which carries the transaction reference a
+  /// Soroban transaction cannot carry as a memo. Deposits must arrive through it.
+  depositContractAddress String?
+  decimals        Int
+  enabled         Boolean           @default(false)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  @@unique([cryptoCurrency, blockchain], name: "confidential_asset_unique")
 }
 
 model FlowStepDefinition {

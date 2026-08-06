@@ -27,6 +27,7 @@ The project targets Node.js 22 and uses npm.
 - `abroad-server` — npm workspace named `abroad`; TypeScript, Express, TSOA, Prisma, Inversify, Jest.
 - `abroad-ui` — npm workspace named `abroad-ui`; React 19, Vite, Orval, Tailwind, Vitest.
 - `docs` — separate Docusaurus package with its own lockfile; it is not a root npm workspace.
+- `confidential` — Soroban contracts and the payer client for the confidential deposit path; a separate Rust workspace and Node package, not a root npm workspace. Testnet only.
 - `abroad-server/prisma` — schema and immutable migration history.
 - `abroad-server/cloud` — backend Cloud Build configuration.
 - `abroad-server/k8s` — GKE workers for consumers, listeners, outbox, and bridge sweep.

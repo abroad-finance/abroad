@@ -1,0 +1,14 @@
+[package]
+name = "abroad-confidential-verifier"
+edition.workspace = true
+version.workspace = true
+
+[lib]
+crate-type = ["cdylib"]
+doctest = false
+
+[dependencies]
+soroban-sdk = { workspace = true }
+stellar-tokens = { workspace = true }
+stellar-access = { workspace = true }
+stellar-macros = { workspace = true }
