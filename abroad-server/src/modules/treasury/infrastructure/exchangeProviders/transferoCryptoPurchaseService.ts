@@ -1,11 +1,11 @@
 import { CryptoCurrency } from '@prisma/client'
 import { inject, injectable } from 'inversify'
-import { createHash } from 'node:crypto'
 import { ZodError } from 'zod'
 
 import { TYPES } from '../../../../app/container/types'
 import { createScopedLogger, ScopedLogger } from '../../../../core/logging/scopedLogger'
 import { ILogger } from '../../../../core/logging/types'
+import { buildIdempotencyKey } from '../../../../platform/http/idempotencyKey'
 import { TransferoUltraClient, TransferoUltraError } from '../../../transfero/infrastructure/TransferoUltraClient'
 import { transferoUltraCryptoWithdrawalResponseSchema, transferoUltraOtcConfirmationResponseSchema, transferoUltraOtcSessionResponseSchema, transferoUltraOtcTradeDetailResponseSchema } from '../../../transfero/infrastructure/transferoUltraSchemas'
 
@@ -67,7 +67,7 @@ export class TransferoCryptoPurchaseService {
           side: ULTRA_SIDE,
           validity_seconds: ULTRA_QUOTE_VALIDITY_SECONDS,
         },
-        this.buildIdempotencyKey(params.operationId, 'buy-session'),
+        buildIdempotencyKey(['abroad', 'buy-session'], params.operationId),
       )
       const session = transferoUltraOtcSessionResponseSchema.parse(sessionResponse)
 
@@ -93,7 +93,7 @@ export class TransferoCryptoPurchaseService {
           side: ULTRA_SIDE,
           source: 'api',
         },
-        this.buildIdempotencyKey(params.operationId, 'buy-confirmation'),
+        buildIdempotencyKey(['abroad', 'buy-confirmation'], params.operationId),
       )
       const confirmation = transferoUltraOtcConfirmationResponseSchema.parse(confirmationResponse)
       const tradeId = confirmation.trade.id
@@ -136,7 +136,7 @@ export class TransferoCryptoPurchaseService {
       // Shape verified against the API's own validation errors: `amount` is a
       // decimal string, the destination field is `destinationAddress`, and this
       // endpoint requires `idempotencyKey` in the body as well as the header.
-      const idempotencyKey = this.buildIdempotencyKey(params.operationId, 'treasury-withdrawal')
+      const idempotencyKey = buildIdempotencyKey(['abroad', 'treasury-withdrawal'], params.operationId)
       const response = await this.ultraClient.post(
         '/api/v1/vault/withdrawals',
         {
@@ -163,15 +163,6 @@ export class TransferoCryptoPurchaseService {
     catch (error) {
       return this.toFailure(error, 'withdrawal')
     }
-  }
-
-  private buildIdempotencyKey(operationId: string, phase: string): string {
-    const candidate = `abroad:${phase}:${operationId}`
-    if (candidate.length <= 255) {
-      return candidate
-    }
-    const digest = createHash('sha256').update(operationId).digest('hex')
-    return `abroad:${phase}:${digest}`
   }
 
   private async readSettledQuantity(tradeId: string): Promise<null | number> {

@@ -1,11 +1,11 @@
 import { PaymentMethod, TargetCurrency } from '@prisma/client'
 import { inject, injectable } from 'inversify'
-import { createHash } from 'node:crypto'
 import { ZodError } from 'zod'
 
 import { TYPES } from '../../../../app/container/types'
 import { createScopedLogger, ScopedLogger } from '../../../../core/logging/scopedLogger'
 import { ILogger } from '../../../../core/logging/types'
+import { buildIdempotencyKey } from '../../../../platform/http/idempotencyKey'
 import { TransferoUltraClient, TransferoUltraError } from '../../../transfero/infrastructure/TransferoUltraClient'
 import { transferoUltraDepositDetailResponseSchema, transferoUltraDynamicQrResponseSchema, transferoUltraRefundResponseSchema } from '../../../transfero/infrastructure/transferoUltraSchemas'
 import {
@@ -70,7 +70,7 @@ export class TransferoPixDepositService implements IFiatDepositService {
           // Attribution for the deposit reads and every pix.deposit.* webhook.
           endUserId: params.reference,
         },
-        this.buildIdempotencyKey('pix-deposit', params.transactionId),
+        buildIdempotencyKey(['abroad', 'pix-deposit'], params.transactionId),
       )
       const parsed = transferoUltraDynamicQrResponseSchema.parse(response)
 
@@ -138,7 +138,7 @@ export class TransferoPixDepositService implements IFiatDepositService {
       const response = await this.ultraClient.post(
         '/api/v1/pix/refunds',
         { depositId: params.providerDepositId },
-        this.buildIdempotencyKey('pix-refund', params.transactionId),
+        buildIdempotencyKey(['abroad', 'pix-refund'], params.transactionId),
       )
       const parsed = transferoUltraRefundResponseSchema.parse(response)
       return { providerRefundId: parsed.id, success: true }
@@ -146,15 +146,6 @@ export class TransferoPixDepositService implements IFiatDepositService {
     catch (error) {
       return this.toFailure(error, 'deposit_refund')
     }
-  }
-
-  private buildIdempotencyKey(operation: string, transactionId: string): string {
-    const candidate = `abroad:${operation}:${transactionId}`
-    if (candidate.length <= 255) {
-      return candidate
-    }
-    const digest = createHash('sha256').update(transactionId).digest('hex')
-    return `abroad:${operation}:${digest}`
   }
 
   private describeError(error: unknown): string {

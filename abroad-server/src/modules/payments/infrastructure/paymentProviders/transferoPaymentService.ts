@@ -1,11 +1,11 @@
 import { PaymentMethod, TargetCurrency } from '@prisma/client'
 import { inject, injectable } from 'inversify'
-import { createHash } from 'node:crypto'
 import { ZodError } from 'zod'
 
 import { TYPES } from '../../../../app/container/types'
 import { createScopedLogger, ScopedLogger } from '../../../../core/logging/scopedLogger'
 import { ILogger } from '../../../../core/logging/types'
+import { buildIdempotencyKey } from '../../../../platform/http/idempotencyKey'
 import { TransferoUltraClient, TransferoUltraError } from '../../../transfero/infrastructure/TransferoUltraClient'
 import { transferoUltraBalanceResponseSchema, transferoUltraWithdrawalDetailResponseSchema, transferoUltraWithdrawalResponseSchema } from '../../../transfero/infrastructure/transferoUltraSchemas'
 import {
@@ -176,7 +176,7 @@ export class TransferoPaymentService implements IPaymentService {
       return this.buildFailure('validation', 'pix_key_required')
     }
 
-    const withdrawalKey = this.buildIdempotencyKey('pix-withdrawal', params.id)
+    const withdrawalKey = buildIdempotencyKey(['abroad', 'pix-withdrawal'], params.id)
     const requestResult = await this.buildWithdrawalRequest({
       ...params,
       withdrawalKey,
@@ -267,15 +267,6 @@ export class TransferoPaymentService implements IPaymentService {
     return { code, reason, success: false }
   }
 
-  private buildIdempotencyKey(operation: string, transactionId: string): string {
-    const candidate = `abroad:${operation}:${transactionId}`
-    if (candidate.length <= 255) {
-      return candidate
-    }
-    const digest = createHash('sha256').update(transactionId).digest('hex')
-    return `abroad:${operation}:${digest}`
-  }
-
   private buildPixDestination(account: string): null | {
     pixKey: string
     pixKeyType: TransferoUltraPixKeyType
@@ -336,7 +327,7 @@ export class TransferoPaymentService implements IPaymentService {
     }
 
     const preview = await this.pixQrDecoder.validateForPayment({
-      idempotencyKey: this.buildIdempotencyKey('pix-preview', params.id),
+      idempotencyKey: buildIdempotencyKey(['abroad', 'pix-preview'], params.id),
       qrCode: params.qrCode,
     })
     if (!preview.success) {

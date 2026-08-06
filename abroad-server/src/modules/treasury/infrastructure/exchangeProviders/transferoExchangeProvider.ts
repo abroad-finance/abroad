@@ -1,12 +1,12 @@
 import { CryptoCurrency, FlowDirection, TargetCurrency } from '@prisma/client'
 import { inject, injectable } from 'inversify'
-import { createHash } from 'node:crypto'
 import { z, ZodError } from 'zod'
 
 import { TYPES } from '../../../../app/container/types'
 import { createScopedLogger, ScopedLogger } from '../../../../core/logging/scopedLogger'
 import { ILogger } from '../../../../core/logging/types'
 import { ILockManager } from '../../../../platform/cacheLock/ILockManager'
+import { buildIdempotencyKey } from '../../../../platform/http/idempotencyKey'
 import { TransferoUltraClient, TransferoUltraError } from '../../../transfero/infrastructure/TransferoUltraClient'
 import {
   transferoUltraBalanceResponseSchema,
@@ -280,14 +280,6 @@ export class TransferoExchangeProvider implements IExchangeProvider {
     return { code, reason, success: false }
   }
 
-  private buildIdempotencyKey(operationId: string, phase: string): string {
-    const candidate = `abroad:otc:${operationId}:${phase}`
-    if (candidate.length <= 255) {
-      return candidate
-    }
-    return `abroad:otc:${createHash('sha256').update(operationId).digest('hex')}:${phase}`
-  }
-
   private buildOperationFailure(
     code: ExchangeFailureCode,
     reason: string,
@@ -386,7 +378,7 @@ export class TransferoExchangeProvider implements IExchangeProvider {
         side: ULTRA_SIDE,
         validity_seconds: ULTRA_QUOTE_VALIDITY_SECONDS,
       },
-      this.buildIdempotencyKey(params.operationId, 'session'),
+      buildIdempotencyKey(['abroad', 'otc'], params.operationId, ['session']),
     )
     const session = transferoUltraOtcSessionResponseSchema.parse(sessionResponse)
     const sessionMismatch = this.describeSessionMismatch(session, params)
@@ -409,7 +401,7 @@ export class TransferoExchangeProvider implements IExchangeProvider {
         side: ULTRA_SIDE,
         source: 'api',
       },
-      this.buildIdempotencyKey(params.operationId, 'confirmation'),
+      buildIdempotencyKey(['abroad', 'otc'], params.operationId, ['confirmation']),
     )
     const confirmation = transferoUltraOtcConfirmationResponseSchema.parse(
       confirmationResponse,
@@ -671,9 +663,10 @@ export class TransferoExchangeProvider implements IExchangeProvider {
       const settlementResponse = await this.ultraClient.post(
         `/api/v1/otc/trades/${encodeURIComponent(params.providerOperationId)}/settle-from-holdings`,
         undefined,
-        this.buildIdempotencyKey(
+        buildIdempotencyKey(
+          ['abroad', 'otc'],
           params.operationId,
-          `settlement:${params.nextSettlementAttempt}`,
+          [`settlement:${params.nextSettlementAttempt}`],
         ),
       )
       const parsedSettlement = transferoUltraHoldingsSettlementResponseSchema.safeParse(
