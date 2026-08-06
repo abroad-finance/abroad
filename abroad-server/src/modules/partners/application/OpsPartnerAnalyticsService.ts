@@ -9,41 +9,12 @@ import {
 import { inject, injectable } from 'inversify'
 
 import { TYPES } from '../../../app/container/types'
+import { roundToDecimals } from '../../../platform/money/round'
 import { IDatabaseClientProvider } from '../../../platform/persistence/IDatabaseClientProvider'
 
 export const OPS_PARTNER_ANALYTICS_RANGES = ['24h', '7d', '30d', '90d'] as const
 export type OpsPartnerActivityFilter = 'ACTIVE' | 'INACTIVE'
 export type OpsPartnerAnalyticsRange = typeof OPS_PARTNER_ANALYTICS_RANGES[number]
-type OpsPartnerCurrencyAmount = {
-  amount: number
-  currency: string
-}
-
-type OpsPartnerDirectoryItem = {
-  completedTransactions: number
-  country: null | string
-  createdAt: Date
-  failedTransactions: number
-  id: string
-  lifecycle: OpsPartnerLifecycleFilter
-  name: string
-  payoutVolume: OpsPartnerCurrencyAmount[]
-  sourceVolume: OpsPartnerCurrencyAmount[]
-  stablecoinAmount: number
-  successRatePct: null | number
-  totalTransactions: number
-}
-
-type OpsPartnerDirectoryParams = {
-  activity?: OpsPartnerActivityFilter
-  country?: string
-  lifecycle?: OpsPartnerLifecycleFilter
-  page: number
-  pageSize: number
-  query?: string
-  range: OpsPartnerAnalyticsRange
-}
-
 export type OpsPartnerDirectoryResponse = {
   filterOptions: { countries: string[] }
   from: Date
@@ -138,6 +109,36 @@ type MutableActivity = {
   statusCounts: Map<TransactionStatus, number>
 }
 
+type OpsPartnerCurrencyAmount = {
+  amount: number
+  currency: string
+}
+
+type OpsPartnerDirectoryItem = {
+  completedTransactions: number
+  country: null | string
+  createdAt: Date
+  failedTransactions: number
+  id: string
+  lifecycle: OpsPartnerLifecycleFilter
+  name: string
+  payoutVolume: OpsPartnerCurrencyAmount[]
+  sourceVolume: OpsPartnerCurrencyAmount[]
+  stablecoinAmount: number
+  successRatePct: null | number
+  totalTransactions: number
+}
+
+type OpsPartnerDirectoryParams = {
+  activity?: OpsPartnerActivityFilter
+  country?: string
+  lifecycle?: OpsPartnerLifecycleFilter
+  page: number
+  pageSize: number
+  query?: string
+  range: OpsPartnerAnalyticsRange
+}
+
 type PartnerRecord = {
   apiKey: null | string
   country: null | string
@@ -172,7 +173,7 @@ const rangeMilliseconds: Record<OpsPartnerAnalyticsRange, number> = {
   '90d': 90 * 24 * 60 * 60 * 1_000,
 }
 
-const roundAmount = (value: number): number => Math.round((value + Number.EPSILON) * 1_000_000) / 1_000_000
+const roundAmount = (value: number): number => roundToDecimals(value, 6)
 
 const toAmounts = (amounts: Map<string, number>): OpsPartnerCurrencyAmount[] => (
   [...amounts.entries()]

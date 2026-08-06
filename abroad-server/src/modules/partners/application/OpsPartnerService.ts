@@ -9,6 +9,7 @@ import {
 import { inject, injectable } from 'inversify'
 
 import { TYPES } from '../../../app/container/types'
+import { roundToDecimals } from '../../../platform/money/round'
 import { IDatabaseClientProvider } from '../../../platform/persistence/IDatabaseClientProvider'
 import { normalizeClientDomainInput } from '../domain/clientDomain'
 import { buildPartnerApiKeyCandidate } from './partnerApiKey'
@@ -20,13 +21,6 @@ const MAX_CREDENTIAL_HISTORY_EVENTS = 100
 
 export type OpsPartnerClientDomainInput = {
   clientDomain: null | string
-}
-
-type OpsPartnerCompletedVolume = {
-  completedTransactions: number
-  payout: OpsPartnerPayoutVolume[]
-  source: OpsPartnerSourceVolume[]
-  stablecoinAmount: number
 }
 
 export type OpsPartnerCreateInput = {
@@ -42,16 +36,6 @@ export type OpsPartnerCreateInput = {
 export type OpsPartnerCreateResult = {
   apiKey: string
   partner: OpsPartnerSummary
-}
-
-type OpsPartnerCredentialEvent = {
-  action: string
-  actorLabel: string
-  createdAt: Date
-  id: string
-  reason?: string
-  reference?: string
-  source: 'OPS' | 'PARTNER_PORTAL'
 }
 
 export type OpsPartnerCredentialHistory = {
@@ -72,40 +56,12 @@ export type OpsPartnerKycRequirementInput = {
   needsKyc: boolean
 }
 
-type OpsPartnerListItem = OpsPartnerSummary & {
-  completedVolume: OpsPartnerCompletedVolume
-}
-
-type OpsPartnerListParams = {
-  page: number
-  pageSize: number
-}
-
 export type OpsPartnerListResult = {
   items: OpsPartnerListItem[]
   maximumStablecoinAmount: number
   page: number
   pageSize: number
   total: number
-}
-
-type OpsPartnerManagedCredential = {
-  createdAt: Date
-  displayPrefix: string
-  expiresAt?: Date
-  id: string
-  lastUsedAt?: Date
-  name: string
-  revokedAt?: Date
-  rotatedFromId?: string
-  rotatedToId?: string
-  scopes: PartnerApiKeyScopeName[]
-  status: 'ACTIVE' | 'EXPIRED' | 'REVOKED'
-}
-
-type OpsPartnerPayoutVolume = {
-  amount: number
-  currency: TargetCurrency
 }
 
 /** Every field optional: omitted keys are left untouched, `null` clears. */
@@ -121,11 +77,6 @@ export type OpsPartnerProfileInput = {
 export type OpsPartnerRotateApiKeyResult = {
   apiKey: string
   partner: OpsPartnerSummary
-}
-
-type OpsPartnerSourceVolume = {
-  amount: number
-  currency: CryptoCurrency
 }
 
 export type OpsPartnerStatusInput = {
@@ -164,6 +115,56 @@ type MutablePartnerVolume = {
   stablecoinAmount: number
 }
 
+type OpsPartnerCompletedVolume = {
+  completedTransactions: number
+  payout: OpsPartnerPayoutVolume[]
+  source: OpsPartnerSourceVolume[]
+  stablecoinAmount: number
+}
+
+type OpsPartnerCredentialEvent = {
+  action: string
+  actorLabel: string
+  createdAt: Date
+  id: string
+  reason?: string
+  reference?: string
+  source: 'OPS' | 'PARTNER_PORTAL'
+}
+
+type OpsPartnerListItem = OpsPartnerSummary & {
+  completedVolume: OpsPartnerCompletedVolume
+}
+
+type OpsPartnerListParams = {
+  page: number
+  pageSize: number
+}
+
+type OpsPartnerManagedCredential = {
+  createdAt: Date
+  displayPrefix: string
+  expiresAt?: Date
+  id: string
+  lastUsedAt?: Date
+  name: string
+  revokedAt?: Date
+  rotatedFromId?: string
+  rotatedToId?: string
+  scopes: PartnerApiKeyScopeName[]
+  status: 'ACTIVE' | 'EXPIRED' | 'REVOKED'
+}
+
+type OpsPartnerPayoutVolume = {
+  amount: number
+  currency: TargetCurrency
+}
+
+type OpsPartnerSourceVolume = {
+  amount: number
+  currency: CryptoCurrency
+}
+
 type RankedPartnerPage = {
   ids: string[]
   maximumStablecoinAmount: number
@@ -188,9 +189,7 @@ export class OpsPartnerValidationError extends Error {
   }
 }
 
-const roundAmount = (value: number): number => (
-  Math.round((value + Number.EPSILON) * 1_000_000) / 1_000_000
-)
+const roundAmount = (value: number): number => roundToDecimals(value, 6)
 
 const addAmount = <TCurrency extends string>(
   amounts: Map<TCurrency, number>,

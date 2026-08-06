@@ -10,6 +10,7 @@ import {
 import { inject, injectable } from 'inversify'
 
 import { TYPES } from '../../../app/container/types'
+import { roundToDecimals } from '../../../platform/money/round'
 import { IDatabaseClientProvider } from '../../../platform/persistence/IDatabaseClientProvider'
 import { OpsBridgeOverview, OpsBridgeService } from '../../treasury/application/OpsBridgeService'
 import { OpsTreasuryBalancesResponse, OpsTreasuryService } from '../../treasury/application/OpsTreasuryService'
@@ -245,13 +246,9 @@ const incrementBucket = (date: Date, unit: OpsOverviewSeriesUnit): Date => (
   new Date(date.getTime() + (unit === 'HOUR' ? 60 * 60 * 1_000 : DAY_MS))
 )
 
-const roundAmount = (value: number): number => (
-  Math.round((value + Number.EPSILON) * 1_000_000) / 1_000_000
-)
+const roundAmount = (value: number): number => roundToDecimals(value, 6)
 
-const roundPercent = (value: number): number => (
-  Math.round((value + Number.EPSILON) * 100) / 100
-)
+const roundPercent = (value: number): number => roundToDecimals(value, 2)
 
 const toPayoutVolume = (
   amounts: Map<TargetCurrency, number>,

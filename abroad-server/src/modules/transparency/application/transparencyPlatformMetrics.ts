@@ -3,6 +3,7 @@ import { CryptoCurrency, type PrismaClient, TransactionStatus } from '@prisma/cl
 import type { PublicCorridorService } from '../../flows/application/PublicCorridorService'
 import type { TransparencyCoverage, TransparencyPlatformSnapshot, TransparencyStatusCount, TransparencyVolume } from './transparencyContracts'
 
+import { roundToDecimals } from '../../../platform/money/round'
 import { readDailyStatusCounts, readMonthlyStatusCounts, toDailyOutcomes, toHistoricalOutcomes } from './transparencyOutcomeHistory'
 
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -64,13 +65,9 @@ const readStatusCounts = async (
   }))
 }
 
-const roundAmount = (value: number): number => (
-  Math.round((value + Number.EPSILON) * 1_000_000) / 1_000_000
-)
+const roundAmount = (value: number): number => roundToDecimals(value, 6)
 
-const roundRate = (value: number): number => (
-  Math.round((value + Number.EPSILON) * 10) / 10
-)
+const roundRate = (value: number): number => roundToDecimals(value, 1)
 
 const startOfUtcDay = (date: Date): Date => (
   new Date(Date.UTC(
