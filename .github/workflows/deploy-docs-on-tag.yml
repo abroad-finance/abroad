@@ -29,13 +29,16 @@ jobs:
         run: |
           set -euo pipefail
           echo "Tag: ${GITHUB_REF#refs/tags/} -> $GITHUB_SHA"
-          git fetch --no-tags --depth=1 origin main
+          # NOT --depth=1: a shallow fetch grafts main's tip with no parents, so
+          # `--is-ancestor` cannot walk back to the tag and reports "not on
+          # main" for any tag that is even one commit behind the tip.
+          git fetch --no-tags origin main
           if git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
             echo "on_main=true" >> "$GITHUB_OUTPUT"
             echo "Tag commit is contained in main. Proceeding."
           else
             echo "on_main=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::Tag commit is NOT contained in main. Skipping."
+            echo "::warning::Tag commit is NOT contained in main. NOTHING WAS DEPLOYED by this run."
           fi
 
       - id: docs_changes
