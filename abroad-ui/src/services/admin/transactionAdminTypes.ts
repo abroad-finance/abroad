@@ -41,6 +41,7 @@ export const opsWebhookStatuses = [
   'FAILED',
   'PENDING',
 ] as const
+export const opsFlowDirections = ['CRYPTO_TO_FIAT', 'FIAT_TO_CRYPTO'] as const
 
 export type OpsAttentionFilter = typeof opsAttentionFilters[number]
 export type OpsCasePriority = 'CRITICAL' | 'HIGH' | 'LOW' | 'NORMAL'
@@ -69,6 +70,7 @@ export type OpsFailureGuidance = {
   label: string
   recommendedAction: string
 }
+export type OpsFlowDirection = typeof opsFlowDirections[number]
 export type OpsProofStatus = typeof opsProofStatuses[number]
 export type OpsReconcileTransactionHashInput = {
   blockchain: typeof reconciliationBlockchains[number]
@@ -189,6 +191,8 @@ export type OpsTransactionListResponse = {
 export type OpsTransactionQuote = {
   country: string
   cryptoCurrency: 'USDC' | 'USDT'
+  /** CRYPTO_TO_FIAT is a payout; FIAT_TO_CRYPTO is an onramp delivery. */
+  direction: OpsFlowDirection
   network: 'CELO' | 'SOLANA' | 'STELLAR'
   paymentMethod: 'BREB' | 'MOVII' | 'NEQUI' | 'PIX'
   quoteId: string
@@ -203,6 +207,7 @@ export type OpsTransactionSearchFilters = {
   createdFrom?: string
   createdTo?: string
   cryptoCurrency?: OpsTransactionQuote['cryptoCurrency']
+  direction?: OpsFlowDirection
   network?: OpsTransactionQuote['network']
   page?: number
   pageSize?: number

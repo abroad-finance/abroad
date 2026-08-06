@@ -46,10 +46,20 @@ const shortId = (value: string): string => value.length > 16
 
 const TransactionSummaryCard = ({ transaction }: { transaction: OpsTransactionSummary }) => {
   const slaActive = transaction.sla.state !== 'COMPLETE'
+  // The headline is what the customer receives. On a payout that is the fiat
+  // leg; on an onramp it is the crypto, and showing the fiat there reads the
+  // transaction backwards.
+  const isOnramp = transaction.quote.direction === 'FIAT_TO_CRYPTO'
+  const receives = isOnramp
+    ? { amount: transaction.quote.sourceAmount, currency: transaction.quote.cryptoCurrency }
+    : { amount: transaction.quote.targetAmount, currency: transaction.quote.targetCurrency }
+  const pays = isOnramp
+    ? { amount: transaction.quote.targetAmount, currency: transaction.quote.targetCurrency }
+    : { amount: transaction.quote.sourceAmount, currency: transaction.quote.cryptoCurrency }
   return (
     <article className="ops-card-interactive group relative overflow-hidden">
       <Link
-        aria-label={`Investigate ${transaction.quote.targetAmount} ${transaction.quote.targetCurrency} transaction for ${transaction.partner.name}`}
+        aria-label={`Investigate ${receives.amount} ${receives.currency} ${isOnramp ? 'onramp' : 'payout'} for ${transaction.partner.name}`}
         className="block p-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ops-brand sm:p-6"
         to={`/ops/transactions/${encodeURIComponent(transaction.id)}`}
       >
@@ -57,6 +67,7 @@ const TransactionSummaryCard = ({ transaction }: { transaction: OpsTransactionSu
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2.5">
               <OpsStatusBadge label={humanizeStatus(transaction.status)} tone={statusTone[transaction.status]} />
+              <OpsStatusBadge label={isOnramp ? 'Onramp' : 'Payout'} tone={isOnramp ? 'info' : 'neutral'} />
               <span className="text-xs font-semibold text-ops-muted">
                 {transaction.provider.label}
                 {' · '}
@@ -67,16 +78,16 @@ const TransactionSummaryCard = ({ transaction }: { transaction: OpsTransactionSu
             </div>
             <div className="mt-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
               <h2 className="text-xl font-semibold tracking-tight text-ops-text">
-                {formatAmount(transaction.quote.targetAmount)}
+                {formatAmount(receives.amount)}
                 {' '}
-                {transaction.quote.targetCurrency}
+                {receives.currency}
               </h2>
               <span className="text-sm text-ops-muted">
                 from
                 {' '}
-                {formatAmount(transaction.quote.sourceAmount)}
+                {formatAmount(pays.amount)}
                 {' '}
-                {transaction.quote.cryptoCurrency}
+                {pays.currency}
               </span>
             </div>
             <p className="mt-2 truncate text-sm font-medium text-ops-text">{transaction.partner.name}</p>

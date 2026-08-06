@@ -111,6 +111,7 @@ const transactionSummary: OpsTransactionSummary = {
   quote: {
     country: 'CO',
     cryptoCurrency: 'USDC',
+    direction: 'CRYPTO_TO_FIAT',
     network: 'STELLAR',
     paymentMethod: 'PIX',
     quoteId: 'quote-1',

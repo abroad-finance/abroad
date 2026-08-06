@@ -102,7 +102,14 @@ const TransactionFiltersPanel = ({
           <OpsField label="Partner ID">
             <input autoComplete="off" className="ops-input" name="transaction-partner" onChange={event => onChange(setField(draft, 'partnerId', event.target.value))} placeholder="Partner UUID" value={draft.partnerId} />
           </OpsField>
-          <OpsField label="Payout provider">
+          <OpsField label="Direction">
+            <select className="ops-input" name="transaction-direction" onChange={event => onChange(setField(draft, 'direction', event.target.value as TransactionFilterDraft['direction']))} value={draft.direction}>
+              <option value="">Both directions</option>
+              <option value="CRYPTO_TO_FIAT">Payout (crypto → fiat)</option>
+              <option value="FIAT_TO_CRYPTO">Onramp (fiat → crypto)</option>
+            </select>
+          </OpsField>
+          <OpsField label="Fiat rail">
             <select className="ops-input" name="transaction-provider" onChange={event => onChange(setField(draft, 'paymentMethod', event.target.value as TransactionFilterDraft['paymentMethod']))} value={draft.paymentMethod}>
               <option value="">All providers</option>
               <option value="PIX">Transfero Ultra (PIX)</option>
@@ -111,14 +118,14 @@ const TransactionFiltersPanel = ({
               <option value="MOVII">Movii (legacy)</option>
             </select>
           </OpsField>
-          <OpsField label="Source asset">
+          <OpsField label="Crypto asset">
             <select className="ops-input" name="transaction-asset" onChange={event => onChange(setField(draft, 'cryptoCurrency', event.target.value as TransactionFilterDraft['cryptoCurrency']))} value={draft.cryptoCurrency}>
               <option value="">Any asset</option>
               <option value="USDC">USDC</option>
               <option value="USDT">USDT</option>
             </select>
           </OpsField>
-          <OpsField label="Source network">
+          <OpsField label="Crypto network">
             <select className="ops-input" name="transaction-network" onChange={event => onChange(setField(draft, 'network', event.target.value as TransactionFilterDraft['network']))} value={draft.network}>
               <option value="">Any network</option>
               <option value="STELLAR">Stellar</option>

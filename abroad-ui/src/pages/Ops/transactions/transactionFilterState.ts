@@ -2,6 +2,7 @@ import type { OpsSavedViewFilters } from '../../../services/admin/opsInvestigati
 import type {
   OpsAttentionFilter,
   OpsCaseStatus,
+  OpsFlowDirection,
   OpsProofStatus,
   OpsRefundStatus,
   OpsTransactionSearchFilters,
@@ -10,6 +11,7 @@ import type {
 
 import {
   opsAttentionFilters,
+  opsFlowDirections,
   opsProofStatuses,
   opsRefundStatuses,
   opsWebhookStatuses,
@@ -42,6 +44,7 @@ export type TransactionFilterDraft = {
   createdFrom: string
   createdTo: string
   cryptoCurrency: '' | NonNullable<OpsTransactionSearchFilters['cryptoCurrency']>
+  direction: '' | OpsFlowDirection
   network: '' | NonNullable<OpsTransactionSearchFilters['network']>
   partnerId: string
   paymentMethod: '' | NonNullable<OpsTransactionSearchFilters['paymentMethod']>
@@ -60,6 +63,7 @@ export const emptyTransactionFilterDraft: TransactionFilterDraft = {
   createdFrom: '',
   createdTo: '',
   cryptoCurrency: '',
+  direction: '',
   network: '',
   partnerId: '',
   paymentMethod: '',
@@ -98,6 +102,7 @@ export const readTransactionFilterDraft = (params: URLSearchParams): Transaction
   createdFrom: readText(params, 'createdFrom'),
   createdTo: readText(params, 'createdTo'),
   cryptoCurrency: readChoice(params, 'cryptoCurrency', cryptoCurrencies),
+  direction: readChoice(params, 'direction', opsFlowDirections),
   network: readChoice(params, 'network', networks),
   partnerId: readText(params, 'partnerId'),
   paymentMethod: readChoice(params, 'paymentMethod', paymentMethods),
@@ -125,6 +130,7 @@ export const toTransactionFilters = (
   createdFrom: draft.createdFrom || undefined,
   createdTo: draft.createdTo || undefined,
   cryptoCurrency: draft.cryptoCurrency || undefined,
+  direction: draft.direction || undefined,
   network: draft.network || undefined,
   page,
   pageSize,
@@ -160,6 +166,7 @@ export const transactionFiltersToDraft = (
   createdFrom: readSavedText(filters.createdFrom),
   createdTo: readSavedText(filters.createdTo),
   cryptoCurrency: readSavedChoice(filters.cryptoCurrency, cryptoCurrencies),
+  direction: readSavedChoice(filters.direction, opsFlowDirections),
   network: readSavedChoice(filters.network, networks),
   partnerId: readSavedText(filters.partnerId),
   paymentMethod: readSavedChoice(filters.paymentMethod, paymentMethods),

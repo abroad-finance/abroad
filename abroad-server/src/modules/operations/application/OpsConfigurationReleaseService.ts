@@ -1,4 +1,10 @@
-import { OpsConfigurationReleaseStatus, OpsConfigurationTargetType, OpsRole, Prisma } from '@prisma/client'
+import {
+  FlowDirection,
+  OpsConfigurationReleaseStatus,
+  OpsConfigurationTargetType,
+  OpsRole,
+  Prisma,
+} from '@prisma/client'
 import { inject, injectable } from 'inversify'
 import { z } from 'zod'
 
@@ -17,6 +23,15 @@ import { OpsMutationEnvelope } from './opsMutation'
 const MAX_PAGE_SIZE = 100
 const MAX_EFFECTIVE_DELAY_MS = 93 * 24 * 60 * 60 * 1_000
 const MAX_DIFF_ENTRIES = 100
+
+/**
+ * Releases stored before corridors carried a direction were all authored
+ * against the payout corridor, which is the only one that existed then, so
+ * reading them as CRYPTO_TO_FIAT keeps their meaning.
+ */
+const corridorDirection = (value: FlowCorridorUpdateInput): FlowDirection => (
+  value.direction ?? FlowDirection.CRYPTO_TO_FIAT
+)
 
 export type OpsConfigurationDraftInput = {
   effectiveAt?: Date
@@ -843,10 +858,15 @@ export class OpsConfigurationReleaseService {
 
     if (payload.kind === 'FLOW_CORRIDOR') {
       const list = await this.flowCorridorService.list(client)
+      // An asset pair exists once per direction, so matching without the
+      // direction resolves whichever row happens to come first and silently
+      // retargets the release at the other corridor.
+      const direction = corridorDirection(payload.value)
       const current = list.corridors.find(item => (
         item.blockchain === payload.value.blockchain
         && item.cryptoCurrency === payload.value.cryptoCurrency
         && item.targetCurrency === payload.value.targetCurrency
+        && item.direction === direction
       ))
       if (!current) throw new OpsConfigurationReleaseValidationError('Flow corridor not found')
       return {
@@ -856,6 +876,7 @@ export class OpsConfigurationReleaseService {
           value: {
             blockchain: current.blockchain,
             cryptoCurrency: current.cryptoCurrency,
+            direction: current.direction,
             reason: current.unsupportedReason ?? undefined,
             status: current.status === 'UNSUPPORTED' ? 'UNSUPPORTED' : 'SUPPORTED',
             targetCurrency: current.targetCurrency,
@@ -900,7 +921,9 @@ export class OpsConfigurationReleaseService {
         ?? `new:${payload.value.cryptoCurrency}:${payload.value.blockchain}:${payload.value.targetCurrency}`
     }
     if (payload.kind === 'FLOW_CORRIDOR') {
-      return `${payload.value.cryptoCurrency}:${payload.value.blockchain}:${payload.value.targetCurrency}`
+      // Direction belongs in the key: without it the two corridors of one asset
+      // pair share an optimistic-locking target and one audit trail.
+      return `${payload.value.cryptoCurrency}:${payload.value.blockchain}:${payload.value.targetCurrency}:${corridorDirection(payload.value)}`
     }
     return `${payload.value.cryptoCurrency}:${payload.value.blockchain}`
   }

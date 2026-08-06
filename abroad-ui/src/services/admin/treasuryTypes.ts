@@ -62,6 +62,10 @@ export type OpsTreasuryMovementDay = {
   bridgeSettledUsdc: number
   date: string
   inboundCrypto: OpsTreasuryMovementBucket[]
+  /** Fiat the onramp collected from customers. */
+  inboundFiat: OpsTreasuryMovementBucket[]
+  /** Crypto the onramp delivered out of a hot wallet. */
+  outboundCrypto: OpsTreasuryMovementBucket[]
   outboundFiat: OpsTreasuryMovementBucket[]
 }
 
@@ -70,7 +74,7 @@ export type OpsTreasuryMovementEvent = {
   at: string
   currency: string
   direction: 'IN' | 'OUT'
-  kind: 'BRIDGE_SETTLED' | 'CRYPTO_IN' | 'FIAT_PAYOUT'
+  kind: 'BRIDGE_SETTLED' | 'CRYPTO_IN' | 'CRYPTO_OUT' | 'FIAT_IN' | 'FIAT_PAYOUT'
   reference: string
 }
 

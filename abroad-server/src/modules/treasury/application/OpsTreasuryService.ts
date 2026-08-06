@@ -1,4 +1,4 @@
-import { CryptoCurrency, Prisma, TargetCurrency } from '@prisma/client'
+import { CryptoCurrency, FlowDirection, Prisma, TargetCurrency } from '@prisma/client'
 import { inject, injectable, multiInject } from 'inversify'
 
 import { TYPES } from '../../../app/container/types'
@@ -91,6 +91,10 @@ type OpsTreasuryMovementDay = {
   /** UTC calendar date, YYYY-MM-DD. */
   date: string
   inboundCrypto: OpsTreasuryMovementBucket[]
+  /** Fiat the onramp collected from customers. */
+  inboundFiat: OpsTreasuryMovementBucket[]
+  /** Crypto the onramp delivered out of a hot wallet. */
+  outboundCrypto: OpsTreasuryMovementBucket[]
   outboundFiat: OpsTreasuryMovementBucket[]
 }
 
@@ -99,7 +103,7 @@ type OpsTreasuryMovementEvent = {
   at: Date
   currency: string
   direction: 'IN' | 'OUT'
-  kind: 'BRIDGE_SETTLED' | 'CRYPTO_IN' | 'FIAT_PAYOUT'
+  kind: 'BRIDGE_SETTLED' | 'CRYPTO_IN' | 'CRYPTO_OUT' | 'FIAT_IN' | 'FIAT_PAYOUT'
   reference: string
 }
 
@@ -242,6 +246,7 @@ export class OpsTreasuryService {
           quote: {
             select: {
               cryptoCurrency: true,
+              direction: true,
               sourceAmount: true,
               targetAmount: true,
               targetCurrency: true,
@@ -261,7 +266,14 @@ export class OpsTreasuryService {
       const key = at.toISOString().slice(0, 10)
       let day = dayMap.get(key)
       if (!day) {
-        day = { bridgeSettledUsdc: 0, date: key, inboundCrypto: [], outboundFiat: [] }
+        day = {
+          bridgeSettledUsdc: 0,
+          date: key,
+          inboundCrypto: [],
+          inboundFiat: [],
+          outboundCrypto: [],
+          outboundFiat: [],
+        }
         dayMap.set(key, day)
       }
       return day
@@ -280,22 +292,34 @@ export class OpsTreasuryService {
 
     for (const transaction of transactions) {
       const day = dayFor(transaction.createdAt)
-      bump(day.inboundCrypto, transaction.quote.cryptoCurrency, transaction.quote.sourceAmount)
-      bump(day.outboundFiat, transaction.quote.targetCurrency, transaction.quote.targetAmount)
+      // An onramp is the mirror image of a payout: the customer sends fiat and
+      // we deliver crypto. Booking both the same way puts onramp volume on the
+      // wrong side of every chart.
+      const isOnramp = transaction.quote.direction === FlowDirection.FIAT_TO_CRYPTO
+      bump(
+        isOnramp ? day.outboundCrypto : day.inboundCrypto,
+        transaction.quote.cryptoCurrency,
+        transaction.quote.sourceAmount,
+      )
+      bump(
+        isOnramp ? day.inboundFiat : day.outboundFiat,
+        transaction.quote.targetCurrency,
+        transaction.quote.targetAmount,
+      )
       events.push({
         amount: transaction.quote.sourceAmount,
         at: transaction.createdAt,
         currency: transaction.quote.cryptoCurrency,
-        direction: 'IN',
-        kind: 'CRYPTO_IN',
+        direction: isOnramp ? 'OUT' : 'IN',
+        kind: isOnramp ? 'CRYPTO_OUT' : 'CRYPTO_IN',
         reference: transaction.id,
       })
       events.push({
         amount: transaction.quote.targetAmount,
         at: transaction.createdAt,
         currency: transaction.quote.targetCurrency,
-        direction: 'OUT',
-        kind: 'FIAT_PAYOUT',
+        direction: isOnramp ? 'IN' : 'OUT',
+        kind: isOnramp ? 'FIAT_IN' : 'FIAT_PAYOUT',
         reference: transaction.id,
       })
     }
@@ -498,15 +522,31 @@ export class OpsTreasuryService {
           warningRunwayHours: true,
         },
       }),
+      // What leaves the business depends on the direction: a payout spends
+      // fiat, an onramp spends crypto out of a hot wallet. Summing targetAmount
+      // for both inflates the fiat denominator with onramp receipts and leaves
+      // delivery inventory with no outflow history at all, so its runway — and
+      // every runway alert that depends on it — can never be computed.
       client.$queryRaw<CurrencyOutflowRow[]>(Prisma.sql`
         SELECT
-          q."targetCurrency"::text AS "currency",
-          SUM(q."targetAmount")::double precision / ${RUNWAY_WINDOW_DAYS} AS "averageDailyOutflow"
-        FROM "Transaction" t
-        INNER JOIN "Quote" q ON q."id" = t."quoteId"
-        WHERE t."status" = 'PAYMENT_COMPLETED'
-          AND t."createdAt" >= ${runwaySince}
-        GROUP BY q."targetCurrency"
+          "currency",
+          SUM("amount")::double precision / ${RUNWAY_WINDOW_DAYS} AS "averageDailyOutflow"
+        FROM (
+          SELECT
+            CASE
+              WHEN q."direction" = 'FIAT_TO_CRYPTO' THEN q."cryptoCurrency"::text
+              ELSE q."targetCurrency"::text
+            END AS "currency",
+            CASE
+              WHEN q."direction" = 'FIAT_TO_CRYPTO' THEN q."sourceAmount"
+              ELSE q."targetAmount"
+            END AS "amount"
+          FROM "Transaction" t
+          INNER JOIN "Quote" q ON q."id" = t."quoteId"
+          WHERE t."status" = 'PAYMENT_COMPLETED'
+            AND t."createdAt" >= ${runwaySince}
+        ) outflow
+        GROUP BY "currency"
       `),
     ])
     const outflowByCurrency = new Map(

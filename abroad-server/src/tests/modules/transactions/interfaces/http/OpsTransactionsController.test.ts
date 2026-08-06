@@ -2,7 +2,7 @@ import 'reflect-metadata'
 import type { TsoaResponse } from '@tsoa/runtime'
 import type { Request } from 'express'
 
-import { BlockchainNetwork, OpsRole, TransactionStatus } from '@prisma/client'
+import { BlockchainNetwork, FlowDirection, OpsRole, TransactionStatus } from '@prisma/client'
 
 import { OpsAuditService } from '../../../../../modules/operations/application/OpsAuditService'
 import { OpsMutationService } from '../../../../../modules/operations/application/opsMutation'
@@ -175,6 +175,7 @@ describe('OpsTransactionsController.search', () => {
       undefined,
       undefined,
       undefined,
+      FlowDirection.FIAT_TO_CRYPTO,
       undefined,
       undefined,
       undefined,
@@ -189,6 +190,7 @@ describe('OpsTransactionsController.search', () => {
       attention: 'PROOF_MISSING',
       createdFrom: '2026-08-01',
       createdTo: '2026-08-02',
+      direction: FlowDirection.FIAT_TO_CRYPTO,
       page: 2,
       pageSize: 10,
       partnerId: 'partner-1',

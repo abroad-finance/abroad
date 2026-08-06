@@ -258,6 +258,10 @@ const TransactionDetail = () => {
     await load()
   }
 
+  // An onramp runs the corridor the other way, so the two legs, the delivery
+  // destination and the provider's role all swap meaning on this page.
+  const isOnramp = data?.quote.direction === 'FIAT_TO_CRYPTO'
+
   return (
     <OpsPageShell
       actions={data
@@ -282,7 +286,9 @@ const TransactionDetail = () => {
       keyRequiredMessage="Sign in to investigate this transaction."
       subtitle={data?.summary ?? 'Review canonical transaction evidence without exposing recipient details.'}
       title={data
-        ? `${formatAmount(data.quote.targetAmount)} ${data.quote.targetCurrency} payout`
+        ? isOnramp
+          ? `${formatAmount(data.quote.sourceAmount)} ${data.quote.cryptoCurrency} onramp`
+          : `${formatAmount(data.quote.targetAmount)} ${data.quote.targetCurrency} payout`
         : <span className="break-all">{transactionId}</span>}
       width="full"
     >
@@ -296,6 +302,7 @@ const TransactionDetail = () => {
               <div>
                 <div className="flex flex-wrap items-center gap-3">
                   <OpsStatusBadge label={humanizeStatus(data.status)} tone={statusTone[data.status]} />
+                  <OpsStatusBadge label={isOnramp ? 'Onramp' : 'Payout'} tone={isOnramp ? 'info' : 'neutral'} />
                   <span className="text-xs font-semibold text-ops-muted">
                     {data.provider.label}
                     {' '}
@@ -312,7 +319,7 @@ const TransactionDetail = () => {
                       {data.quote.cryptoCurrency}
                     </p>
                     <p className="mt-1 text-xs text-ops-muted">
-                      Received on
+                      {isOnramp ? 'Delivered on' : 'Received on'}
                       {' '}
                       {humanizeStatus(data.quote.network)}
                     </p>
@@ -325,7 +332,7 @@ const TransactionDetail = () => {
                       {data.quote.targetCurrency}
                     </p>
                     <p className="mt-1 text-xs text-ops-muted">
-                      Payout via
+                      {isOnramp ? 'Collected via' : 'Payout via'}
                       {' '}
                       {data.provider.label}
                     </p>
@@ -349,7 +356,7 @@ const TransactionDetail = () => {
             <dl className="grid gap-5 border-t border-ops-border p-5 sm:grid-cols-2 sm:p-6 lg:grid-cols-4">
               <DetailField label="Created">{formatDateTime(data.createdAt)}</DetailField>
               <DetailField label="Partner">{data.partner.name}</DetailField>
-              <DetailField label="Payout destination">{data.payoutDestinationHint ?? 'Not recorded'}</DetailField>
+              <DetailField label={isOnramp ? 'Delivery destination' : 'Payout destination'}>{data.payoutDestinationHint ?? 'Not recorded'}</DetailField>
               <DetailField label="Proof state">{humanizeStatus(data.proof.status)}</DetailField>
               <DetailField label="Refund state">{humanizeStatus(data.refund.status)}</DetailField>
               <DetailField label="Webhook state">

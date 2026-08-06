@@ -1,6 +1,7 @@
 import {
   BlockchainNetwork,
   CryptoCurrency,
+  FlowDirection,
   FlowInstanceStatus,
   FlowStepStatus,
   OpsPriority,
@@ -235,6 +236,8 @@ type OpsTransactionCaseDetailDto = OpsCaseSummaryDto & {
 type OpsTransactionQuoteDto = {
   country: string
   cryptoCurrency: CryptoCurrency
+  /** CRYPTO_TO_FIAT is a payout; FIAT_TO_CRYPTO is an onramp delivery. */
+  direction: FlowDirection
   network: BlockchainNetwork
   paymentMethod: PaymentMethod
   quoteId: string
@@ -250,6 +253,7 @@ type OpsTransactionSearchFilters = {
   createdFrom?: string
   createdTo?: string
   cryptoCurrency?: CryptoCurrency
+  direction?: FlowDirection
   network?: BlockchainNetwork
   page?: number
   pageSize?: number
@@ -354,7 +358,7 @@ export class OpsTransactionQueryService {
         transactionId: transaction.id,
       },
       latestEvent: evidence.at(-1) ?? this.createdEvidence(transaction),
-      payoutDestinationHint: this.maskDestination(transaction.accountNumber),
+      payoutDestinationHint: this.destinationHint(transaction),
       summary: this.toHumanSummary(transaction),
       webhookDeliveries: transactionDeliveries.map(delivery => ({
         attempts: Math.max(1, delivery.attempts),
@@ -533,13 +537,16 @@ export class OpsTransactionQueryService {
     })))
 
     if (transaction.externalId) {
+      const isOnrampReference = transaction.quote.direction === FlowDirection.FIAT_TO_CRYPTO
       events.push({
         category: 'PROVIDER',
-        description: `${this.providerLabel(transaction.quote.paymentMethod)} assigned a payout reference`,
+        description: isOnrampReference
+          ? `${this.providerLabel(transaction.quote.paymentMethod)} assigned a deposit reference`
+          : `${this.providerLabel(transaction.quote.paymentMethod)} assigned a payout reference`,
         id: `provider:${transaction.id}`,
         occurredAt: transaction.exchangeHandoffAt ?? transaction.createdAt,
         state: transaction.status === TransactionStatus.PAYMENT_FAILED ? 'FAILED' : 'INFO',
-        title: 'Provider payout tracked',
+        title: isOnrampReference ? 'Provider deposit tracked' : 'Provider payout tracked',
       })
     }
     if (flow) {
@@ -656,10 +663,17 @@ export class OpsTransactionQueryService {
     if (filters.partnerId) and.push({ partnerUser: { partnerId: filters.partnerId } })
     if (filters.caseOwnerId) and.push({ opsCase: { ownerUserId: filters.caseOwnerId } })
     if (filters.caseStatus) and.push({ opsCase: { status: filters.caseStatus } })
-    if (filters.cryptoCurrency || filters.network || filters.paymentMethod || filters.targetCurrency) {
+    if (
+      filters.cryptoCurrency
+      || filters.direction
+      || filters.network
+      || filters.paymentMethod
+      || filters.targetCurrency
+    ) {
       and.push({
         quote: {
           cryptoCurrency: filters.cryptoCurrency,
+          direction: filters.direction,
           network: filters.network,
           paymentMethod: filters.paymentMethod,
           targetCurrency: filters.targetCurrency,
@@ -711,14 +725,28 @@ export class OpsTransactionQueryService {
   }
 
   private createdEvidence(transaction: DetailRow): OpsEvidenceEventDto {
+    const isOnramp = transaction.quote.direction === FlowDirection.FIAT_TO_CRYPTO
     return {
       category: 'TRANSACTION',
-      description: `${this.providerLabel(transaction.quote.paymentMethod)} payout requested`,
+      description: isOnramp
+        ? `${this.providerLabel(transaction.quote.paymentMethod)} deposit requested`
+        : `${this.providerLabel(transaction.quote.paymentMethod)} payout requested`,
       id: `transaction:${transaction.id}`,
       occurredAt: transaction.createdAt,
       state: 'INFO',
       title: 'Transaction created',
     }
+  }
+
+  /**
+   * Where the money lands. A payout names a bank account; an onramp names the
+   * chain address instead, and its accountNumber is always the empty default,
+   * so reading accountNumber alone renders every onramp as "Not recorded".
+   */
+  private destinationHint(transaction: DetailRow | SummaryRow): null | string {
+    return transaction.quote.direction === FlowDirection.FIAT_TO_CRYPTO
+      ? this.maskDestination(transaction.destinationAddress ?? '')
+      : this.maskDestination(transaction.accountNumber)
   }
 
   private humanize(value: string): string {
@@ -976,7 +1004,13 @@ export class OpsTransactionQueryService {
       : transaction.status === TransactionStatus.PAYMENT_FAILED
         ? 'failed'
         : 'is in progress'
-    return `${transaction.quote.targetAmount} ${transaction.quote.targetCurrency} ${this.providerLabel(transaction.quote.paymentMethod)} payout ${action} for ${transaction.partnerUser.partner.name}.`
+    const partner = transaction.partnerUser.partner.name
+    // The customer-facing leg is the fiat payout one way and the crypto
+    // delivery the other; naming the wrong one misreports what is at stake.
+    if (transaction.quote.direction === FlowDirection.FIAT_TO_CRYPTO) {
+      return `${transaction.quote.sourceAmount} ${transaction.quote.cryptoCurrency} onramp delivery on ${transaction.quote.network}, funded by ${this.providerLabel(transaction.quote.paymentMethod)}, ${action} for ${partner}.`
+    }
+    return `${transaction.quote.targetAmount} ${transaction.quote.targetCurrency} ${this.providerLabel(transaction.quote.paymentMethod)} payout ${action} for ${partner}.`
   }
 
   private toProof(transaction: DetailRow | SummaryRow): OpsProofSummaryDto {
@@ -1060,6 +1094,7 @@ export class OpsTransactionQueryService {
       quote: {
         country: transaction.quote.country,
         cryptoCurrency: transaction.quote.cryptoCurrency,
+        direction: transaction.quote.direction,
         network: transaction.quote.network,
         paymentMethod: transaction.quote.paymentMethod,
         quoteId: transaction.quoteId,

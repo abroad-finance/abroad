@@ -3,7 +3,12 @@ import {
 } from 'react'
 import { Link } from 'react-router-dom'
 
-import type { OpsTreasuryBalanceCell, OpsTreasuryThresholdInput } from '../../services/admin/treasuryTypes'
+import type {
+  OpsTreasuryBalanceCell,
+  OpsTreasuryMovementBucket,
+  OpsTreasuryMovementDay,
+  OpsTreasuryThresholdInput,
+} from '../../services/admin/treasuryTypes'
 
 import { useOpsApiKey, useOpsSession } from '../../services/admin/opsAuthStore'
 import {
@@ -418,6 +423,8 @@ const BarChart = ({ color, data, title }: { color: string, data: BarDatum[], tit
 const eventKindLabels: Record<string, string> = {
   BRIDGE_SETTLED: 'Bridge settled',
   CRYPTO_IN: 'Crypto in',
+  CRYPTO_OUT: 'Crypto delivered',
+  FIAT_IN: 'Fiat collected',
   FIAT_PAYOUT: 'Fiat payout',
 }
 
@@ -553,22 +560,44 @@ const TreasuryDashboard = () => {
   }, [snapshots])
 
   const movementCharts = useMemo(() => {
-    if (!movements) return { fiat: [] as { currency: string, data: BarDatum[] }[], stables: [] as BarDatum[] }
+    const empty = {
+      delivered: [] as BarDatum[],
+      fiat: [] as { currency: string, data: BarDatum[] }[],
+      fiatCollected: [] as { currency: string, data: BarDatum[] }[],
+      stables: [] as BarDatum[],
+    }
+    if (!movements) return empty
+    const sumStables = (buckets: OpsTreasuryMovementBucket[]): number => buckets
+      .filter(bucket => bucket.currency === 'USDC' || bucket.currency === 'USDT')
+      .reduce((sum, bucket) => sum + bucket.amount, 0)
+    const byCurrency = (
+      pick: (day: OpsTreasuryMovementDay) => OpsTreasuryMovementBucket[],
+    ): { currency: string, data: BarDatum[] }[] => {
+      const currencies = [...new Set(movements.days.flatMap(day => pick(day).map(bucket => bucket.currency)))].sort()
+      return currencies.map(currency => ({
+        currency,
+        data: movements.days.map(day => ({
+          label: day.date,
+          value: pick(day).find(bucket => bucket.currency === currency)?.amount ?? 0,
+        })),
+      }))
+    }
     const stables: BarDatum[] = movements.days.map(day => ({
       label: day.date,
-      value: day.inboundCrypto
-        .filter(bucket => bucket.currency === 'USDC' || bucket.currency === 'USDT')
-        .reduce((sum, bucket) => sum + bucket.amount, 0),
+      value: sumStables(day.inboundCrypto),
     }))
-    const currencies = [...new Set(movements.days.flatMap(day => day.outboundFiat.map(bucket => bucket.currency)))].sort()
-    const fiat = currencies.map(currency => ({
-      currency,
-      data: movements.days.map(day => ({
-        label: day.date,
-        value: day.outboundFiat.find(bucket => bucket.currency === currency)?.amount ?? 0,
-      })),
+    const delivered: BarDatum[] = movements.days.map(day => ({
+      label: day.date,
+      value: sumStables(day.outboundCrypto),
     }))
-    return { fiat, stables }
+    return {
+      // Onramp series stay out of the grid until the corridor has actually
+      // moved something, so an offramp-only deployment sees no flat charts.
+      delivered: delivered.some(point => point.value > 0) ? delivered : [],
+      fiat: byCurrency(day => day.outboundFiat),
+      fiatCollected: byCurrency(day => day.inboundFiat),
+      stables,
+    }
   }, [movements])
 
   const float = balances?.float
@@ -867,6 +896,12 @@ const TreasuryDashboard = () => {
             <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               <BarChart color="#2a78d6" data={movementCharts.stables} title="Stablecoins received per day (USD)" />
               {movementCharts.fiat.map(chart => <BarChart color="#1baf7a" data={chart.data} key={chart.currency} title={`Fiat paid out per day (${chart.currency})`} />)}
+              {movementCharts.delivered.length > 0 && (
+                <BarChart color="#a855f7" data={movementCharts.delivered} title="Stablecoins delivered per day (onramp)" />
+              )}
+              {movementCharts.fiatCollected.map(chart => (
+                <BarChart color="#f59e0b" data={chart.data} key={`collected-${chart.currency}`} title={`Fiat collected per day (${chart.currency})`} />
+              ))}
             </div>
             <div className="mt-4 grid gap-3 md:grid-cols-2">
               {movements.recent.map(event => (

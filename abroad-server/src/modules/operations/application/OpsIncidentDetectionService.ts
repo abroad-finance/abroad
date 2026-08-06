@@ -3,6 +3,8 @@ import type { Prisma } from '@prisma/client'
 import {
   BridgeBatchStatus,
   BridgeLegStatus,
+  DeliveryAttemptStatus,
+  FlowDirection,
   FlowInstanceStatus,
   OpsIncidentSeverity,
   OpsWorkStatus,
@@ -78,6 +80,10 @@ const labelForCategory: Readonly<Record<OpsFailureCategory, string>> = {
   WEBHOOK: 'Webhook failures',
 }
 
+const describeDirection = (direction: FlowDirection): string => (
+  direction === FlowDirection.FIAT_TO_CRYPTO ? 'Onramp' : 'Payout'
+)
+
 const isJsonObject = (value: Prisma.JsonValue): value is Prisma.JsonObject => (
   typeof value === 'object' && value !== null && !Array.isArray(value)
 )
@@ -86,6 +92,18 @@ const jsonString = (value: Prisma.JsonValue, key: string): null | string => {
   if (!isJsonObject(value)) return null
   const candidate = value[key]
   return typeof candidate === 'string' && candidate.length <= 80 ? candidate : null
+}
+
+/**
+ * A flow snapshot is shaped `{ definition, steps }`, so provider fields have to
+ * be read a level down. Reading them off the root silently yields null and
+ * collapses every flow incident into a single `UNKNOWN` provider group.
+ */
+const snapshotDefinitionString = (value: Prisma.JsonValue, key: string): null | string => {
+  if (!isJsonObject(value)) return null
+  const definition = value.definition
+  if (definition === undefined) return null
+  return jsonString(definition, key)
 }
 
 const encodeQuery = (path: string, values: Readonly<Record<string, string>>): string => {
@@ -115,6 +133,8 @@ export class OpsIncidentDetectionService {
       failedWebhooks,
       bridgeLegs,
       failedBatches,
+      deliveryAttempts,
+      onrampObligations,
       treasury,
     ] = await Promise.all([
       client.flowInstance.findMany({
@@ -146,7 +166,7 @@ export class OpsIncidentDetectionService {
         select: {
           createdAt: true,
           id: true,
-          quote: { select: { paymentMethod: true } },
+          quote: { select: { direction: true, paymentMethod: true } },
         },
         take: MAX_SOURCE_ROWS,
         where: { createdAt: { gte: since }, status: TransactionStatus.PAYMENT_FAILED },
@@ -183,6 +203,46 @@ export class OpsIncidentDetectionService {
         take: MAX_SOURCE_ROWS,
         where: { status: BridgeBatchStatus.FAILED, updatedAt: { gte: since } },
       }),
+      // The onramp's delivery leg has no other ops surface: a dead or stranded
+      // attempt is otherwise only visible as a generic stale flow.
+      client.deliveryAttempt.findMany({
+        orderBy: { preparedAt: 'desc' },
+        select: {
+          asset: true,
+          expiresAt: true,
+          failureCode: true,
+          id: true,
+          network: true,
+          preparedAt: true,
+          status: true,
+          transactionId: true,
+        },
+        take: MAX_SOURCE_ROWS,
+        where: {
+          OR: [
+            {
+              preparedAt: { gte: since },
+              status: { in: [DeliveryAttemptStatus.FAILED, DeliveryAttemptStatus.EXPIRED] },
+            },
+            {
+              expiresAt: { lt: now },
+              status: { in: [DeliveryAttemptStatus.PREPARED, DeliveryAttemptStatus.SUBMITTED] },
+            },
+          ],
+        },
+      }),
+      client.transaction.findMany({
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true,
+          quote: { select: { cryptoCurrency: true, network: true, sourceAmount: true } },
+        },
+        take: MAX_SOURCE_ROWS,
+        where: {
+          quote: { direction: FlowDirection.FIAT_TO_CRYPTO },
+          status: TransactionStatus.PROCESSING_PAYMENT,
+        },
+      }),
       this.treasuryService.getBalances(),
     ])
 
@@ -194,8 +254,8 @@ export class OpsIncidentDetectionService {
         ? null
         : classifyOpsFailure(flow.steps.map(step => step.error))
       const category = isStale ? 'QUEUE' : failure?.category ?? 'UNKNOWN'
-      const provider = jsonString(flow.flowSnapshot, 'payoutProvider')
-        ?? jsonString(flow.flowSnapshot, 'pricingProvider')
+      const provider = snapshotDefinitionString(flow.flowSnapshot, 'payoutProvider')
+        ?? snapshotDefinitionString(flow.flowSnapshot, 'pricingProvider')
         ?? 'UNKNOWN'
       const groupKey = `${category}:${provider}`
       this.addToGroup(flowGroups, groupKey, {
@@ -233,9 +293,13 @@ export class OpsIncidentDetectionService {
     const paymentGroups = new Map<string, GroupAccumulator>()
     for (const transaction of failedTransactions) {
       const provider = transaction.quote.paymentMethod
-      this.addToGroup(paymentGroups, provider, {
+      const direction = transaction.quote.direction
+      // Grouping on the provider alone reports an onramp delivery failure as a
+      // payout failure on the same rail, which sends the operator to the wrong
+      // side of the corridor.
+      this.addToGroup(paymentGroups, `${direction}:${provider}`, {
         at: transaction.createdAt,
-        dimensions: { Provider: provider },
+        dimensions: { Direction: describeDirection(direction), Provider: provider },
         resource: {
           id: transaction.id,
           label: `Transaction ${transaction.id.slice(0, 8)}`,
@@ -244,18 +308,26 @@ export class OpsIncidentDetectionService {
         },
       })
     }
-    for (const [provider, group] of paymentGroups) {
+    for (const [groupKey, group] of paymentGroups) {
+      const [direction, provider] = groupKey.split(':')
+      const isOnramp = direction === FlowDirection.FIAT_TO_CRYPTO
       detected.push(this.buildDetection({
         baselineSeverity: OpsIncidentSeverity.HIGH,
         filters: [{
-          label: 'Open failed transactions',
-          path: encodeQuery('/ops/transactions', { provider, status: TransactionStatus.PAYMENT_FAILED }),
+          label: isOnramp ? 'Open failed onramps' : 'Open failed transactions',
+          path: encodeQuery('/ops/transactions', {
+            direction,
+            provider,
+            status: TransactionStatus.PAYMENT_FAILED,
+          }),
         }],
-        fingerprint: `payment:${provider}`,
+        fingerprint: `payment:${direction}:${provider}`,
         group,
         kind: 'PROVIDER',
-        summary: `${group.occurrences} recent payout transaction${group.occurrences === 1 ? '' : 's'} failed for ${provider}.`,
-        title: `Failed ${provider} payouts`,
+        summary: isOnramp
+          ? `${group.occurrences} recent onramp transaction${group.occurrences === 1 ? '' : 's'} funded through ${provider} failed to deliver.`
+          : `${group.occurrences} recent payout transaction${group.occurrences === 1 ? '' : 's'} failed for ${provider}.`,
+        title: isOnramp ? `Failed ${provider} onramp deliveries` : `Failed ${provider} payouts`,
       }))
     }
 
@@ -332,6 +404,91 @@ export class OpsIncidentDetectionService {
         kind: 'BRIDGE',
         summary: `${group.occurrences} bridge item${group.occurrences === 1 ? '' : 's'} ${mode === 'FAILED' ? 'failed' : 'exceeded the expected pending SLA'} on ${network}.`,
         title: mode === 'FAILED' ? `Failed ${network} bridge settlement` : `Delayed ${network} bridge settlement`,
+      }))
+    }
+
+    const deliveryGroups = new Map<string, GroupAccumulator>()
+    for (const attempt of deliveryAttempts) {
+      const isStranded = attempt.status === DeliveryAttemptStatus.PREPARED
+        || attempt.status === DeliveryAttemptStatus.SUBMITTED
+      const mode = isStranded ? 'STRANDED' : attempt.status
+      this.addToGroup(deliveryGroups, `${mode}:${attempt.network}:${attempt.asset}`, {
+        at: attempt.preparedAt,
+        dimensions: {
+          'Asset': attempt.asset,
+          'Failure code': attempt.failureCode ?? 'None recorded',
+          'Network': attempt.network,
+        },
+        resource: {
+          id: attempt.transactionId,
+          label: `Transaction ${attempt.transactionId.slice(0, 8)}`,
+          path: `/ops/transactions/${encodeURIComponent(attempt.transactionId)}`,
+          type: 'TRANSACTION',
+        },
+      })
+    }
+    for (const [groupKey, group] of deliveryGroups) {
+      const [mode, network, asset] = groupKey.split(':')
+      const isStranded = mode === 'STRANDED'
+      detected.push(this.buildDetection({
+        // A stranded envelope is past its expiry, so the delivery can never be
+        // included on chain: the customer has paid and holds nothing.
+        baselineSeverity: isStranded ? OpsIncidentSeverity.CRITICAL : OpsIncidentSeverity.HIGH,
+        filters: [{
+          label: 'Open affected onramps',
+          path: encodeQuery('/ops/transactions', {
+            direction: FlowDirection.FIAT_TO_CRYPTO,
+            network,
+          }),
+        }],
+        fingerprint: `delivery:${mode}:${network}:${asset}`,
+        group,
+        kind: 'DELIVERY',
+        summary: isStranded
+          ? `${group.occurrences} onramp ${asset} deliver${group.occurrences === 1 ? 'y' : 'ies'} on ${network} passed the envelope expiry without confirming and need reconciliation.`
+          : `${group.occurrences} onramp ${asset} deliver${group.occurrences === 1 ? 'y' : 'ies'} on ${network} ${mode === 'EXPIRED' ? 'expired' : 'failed'}.`,
+        title: isStranded
+          ? `Stranded ${asset} onramp deliveries · ${network}`
+          : `Failed ${asset} onramp deliveries · ${network}`,
+      }))
+    }
+
+    const obligationsByWallet = new Map<string, { amount: number, ids: string[] }>()
+    for (const transaction of onrampObligations) {
+      const key = `${transaction.quote.network}:${transaction.quote.cryptoCurrency}`
+      const entry = obligationsByWallet.get(key) ?? { amount: 0, ids: [] }
+      entry.amount += Number(transaction.quote.sourceAmount)
+      entry.ids.push(transaction.id)
+      obligationsByWallet.set(key, entry)
+    }
+    for (const [key, entry] of obligationsByWallet) {
+      const [network, asset] = key.split(':')
+      const cell = treasury.cells.find(item => (
+        item.venue === `${network}_HOT_WALLET` && item.currency === asset
+      ))
+      // Only a successful balance read can prove a shortfall; an unreadable
+      // venue already raises its own incident and must not be read as zero.
+      if (!cell) continue
+      const held = cell.availableAmount ?? cell.amount
+      if (held >= entry.amount) continue
+      const group = this.singleGroup(now, {
+        Asset: asset,
+        Held: held.toFixed(6),
+        Network: network,
+        Owed: entry.amount.toFixed(6),
+      })
+      group.occurrences = entry.ids.length
+      detected.push(this.buildDetection({
+        baselineSeverity: OpsIncidentSeverity.CRITICAL,
+        filters: [{
+          label: 'Open treasury venue',
+          path: encodeQuery('/ops/treasury', { venue: `${network}_HOT_WALLET` }),
+        }],
+        fingerprint: `onramp-inventory:${network}:${asset}`,
+        group,
+        kind: 'TREASURY',
+        summary: `${entry.ids.length} accepted onramp${entry.ids.length === 1 ? '' : 's'} owe ${entry.amount.toFixed(6)} ${asset} but the ${network} hot wallet holds ${held.toFixed(6)}.`,
+        title: `${asset} onramp delivery float short · ${network}`,
       }))
     }
 

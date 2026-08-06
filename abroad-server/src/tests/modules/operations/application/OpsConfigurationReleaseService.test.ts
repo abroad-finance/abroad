@@ -2,7 +2,14 @@ import 'reflect-metadata'
 
 import type { OpsConfigurationRelease, Prisma, PrismaClient } from '@prisma/client'
 
-import { BlockchainNetwork, CryptoCurrency, OpsConfigurationReleaseStatus, OpsRole } from '@prisma/client'
+import {
+  BlockchainNetwork,
+  CryptoCurrency,
+  FlowDirection,
+  OpsConfigurationReleaseStatus,
+  OpsRole,
+  TargetCurrency,
+} from '@prisma/client'
 
 import type { OpsUserPrincipal } from '../../../../modules/operations/application/opsIdentity'
 import type { IDatabaseClientProvider } from '../../../../platform/persistence/IDatabaseClientProvider'
@@ -231,10 +238,36 @@ const buildHarness = (options: HarnessOptions = {}) => {
     record: jest.fn(async () => undefined),
     recordSystem: jest.fn(async () => undefined),
   }
+  // One asset pair, both directions: the two corridors are distinguishable
+  // only by direction, which is exactly what the release path has to carry.
+  const corridors = [
+    {
+      blockchain: BlockchainNetwork.STELLAR,
+      cryptoCurrency: CryptoCurrency.USDC,
+      direction: FlowDirection.CRYPTO_TO_FIAT,
+      status: 'DEFINED' as const,
+      targetCurrency: TargetCurrency.BRL,
+      unsupportedReason: null as null | string,
+      version: 5,
+    },
+    {
+      blockchain: BlockchainNetwork.STELLAR,
+      cryptoCurrency: CryptoCurrency.USDC,
+      direction: FlowDirection.FIAT_TO_CRYPTO,
+      status: 'DEFINED' as const,
+      targetCurrency: TargetCurrency.BRL,
+      unsupportedReason: null as null | string,
+      version: 9,
+    },
+  ]
+  const flowCorridorService = {
+    list: jest.fn(async () => ({ corridors, summary: { defined: 2, missing: 0, total: 2, unsupported: 0 } })),
+    updateStatusInTransaction: jest.fn(async () => corridors[1]),
+  }
   const service = new OpsConfigurationReleaseService(
     databaseClientProvider,
     {} as never,
-    {} as never,
+    flowCorridorService as never,
     cryptoAssetService as never,
     auditService as never,
   )
@@ -242,6 +275,7 @@ const buildHarness = (options: HarnessOptions = {}) => {
     asset,
     auditService,
     cryptoAssetService,
+    flowCorridorService,
     opsUser,
     records,
     runTransaction,
@@ -275,6 +309,49 @@ describe('OpsConfigurationReleaseService', () => {
 
   afterEach(() => {
     jest.useRealTimers()
+  })
+
+  it('targets the corridor direction the operator selected instead of the other side of the pair', async () => {
+    const harness = buildHarness()
+
+    const draft = await harness.service.createDraft(requester, {
+      payload: {
+        kind: 'FLOW_CORRIDOR' as const,
+        value: {
+          blockchain: BlockchainNetwork.STELLAR,
+          cryptoCurrency: CryptoCurrency.USDC,
+          direction: FlowDirection.FIAT_TO_CRYPTO,
+          reason: 'Delivery float exhausted',
+          status: 'UNSUPPORTED' as const,
+          targetCurrency: TargetCurrency.BRL,
+        },
+      },
+      title: 'Pause the USDC onramp corridor',
+    }, envelope('00000000-0000-4000-8000-0000000000c1'))
+
+    // Version 9 is the onramp corridor; 5 would mean the payout was resolved.
+    expect(draft.baseVersion).toBe(9)
+    expect(draft.targetKey).toBe('USDC:STELLAR:BRL:FIAT_TO_CRYPTO')
+  })
+
+  it('keeps a corridor release without a stated direction on the payout corridor', async () => {
+    const harness = buildHarness()
+
+    const draft = await harness.service.createDraft(requester, {
+      payload: {
+        kind: 'FLOW_CORRIDOR' as const,
+        value: {
+          blockchain: BlockchainNetwork.STELLAR,
+          cryptoCurrency: CryptoCurrency.USDC,
+          status: 'UNSUPPORTED' as const,
+          targetCurrency: TargetCurrency.BRL,
+        },
+      },
+      title: 'Pause the legacy corridor',
+    }, envelope('00000000-0000-4000-8000-0000000000c2'))
+
+    expect(draft.baseVersion).toBe(5)
+    expect(draft.targetKey).toBe('USDC:STELLAR:BRL:CRYPTO_TO_FIAT')
   })
 
   it('requires a different reviewer and applies a due release atomically', async () => {

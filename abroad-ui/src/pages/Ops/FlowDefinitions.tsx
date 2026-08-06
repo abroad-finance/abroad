@@ -602,6 +602,9 @@ const FlowDefinitions = () => {
             value: {
               blockchain: selectedCorridor.blockchain,
               cryptoCurrency: selectedCorridor.cryptoCurrency,
+              // Without this the server resolves the asset pair alone and
+              // pauses whichever direction it finds first.
+              direction: selectedCorridor.direction,
               reason: unsupportedReason.trim() || undefined,
               status,
               targetCurrency: selectedCorridor.targetCurrency,
@@ -624,8 +627,10 @@ const FlowDefinitions = () => {
     }
   }
 
+  // The direction belongs in the title: an approver reviewing a pause draft
+  // otherwise sees the same label for both corridors of one asset pair.
   const corridorTitle = (corridor: FlowCorridor): string => (
-    `${corridor.cryptoCurrency} · ${humanizeStatus(corridor.blockchain)} → ${corridor.targetCurrency}`
+    `${corridor.cryptoCurrency} · ${humanizeStatus(corridor.blockchain)} → ${corridor.targetCurrency} (${describeDirection(corridor.direction)})`
   )
 
   const applyFilters = (): void => {

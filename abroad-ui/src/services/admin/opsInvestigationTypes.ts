@@ -99,6 +99,7 @@ export type OpsSavedViewFilters = {
   createdFrom?: string
   createdTo?: string
   cryptoCurrency?: string
+  direction?: string
   failure?: string
   failureCategory?: string
   kind?: string
