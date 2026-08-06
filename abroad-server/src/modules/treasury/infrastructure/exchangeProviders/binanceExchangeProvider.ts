@@ -9,6 +9,7 @@ import { TYPES } from '../../../../app/container/types'
 import { createScopedLogger, ScopedLogger } from '../../../../core/logging/scopedLogger'
 import { ILogger } from '../../../../core/logging/types'
 import { ISecretManager } from '../../../../platform/secrets/ISecretManager'
+import { mapBlockchainToBinanceNetwork } from '../../application/binanceNetworkMap'
 import {
   ExchangeAddressResult,
   ExchangeFailureCode,
@@ -17,7 +18,6 @@ import {
   ExchangeProviderCapability,
   IExchangeProvider,
 } from '../../application/contracts/IExchangeProvider'
-import { mapBlockchainToBinanceNetwork } from './binanceNetworkMap'
 
 type BinanceBookTickerResponse = {
   askPrice: string

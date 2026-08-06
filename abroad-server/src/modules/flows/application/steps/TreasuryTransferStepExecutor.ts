@@ -8,7 +8,7 @@ import { createScopedLogger, ScopedLogger } from '../../../../core/logging/scope
 import { ILogger } from '../../../../core/logging/types'
 import { ISecretManager, Secrets } from '../../../../platform/secrets/ISecretManager'
 import { EXCHANGE_PROVIDER_IDS, IExchangeProviderFactory } from '../../../treasury/application/contracts/IExchangeProviderFactory'
-import { mapBlockchainToBinanceNetwork } from '../../../treasury/infrastructure/exchangeProviders/binanceNetworkMap'
+import { mapBlockchainToBinanceNetwork } from '../../../treasury/application/binanceNetworkMap'
 import { AmountSource, amountSourceSchema, resolveAmount } from '../flowAmountResolver'
 import { FlowStepExecutionResult, FlowStepExecutor, FlowStepRuntimeContext } from '../flowTypes'
 

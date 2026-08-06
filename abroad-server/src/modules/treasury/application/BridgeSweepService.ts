@@ -8,7 +8,7 @@ import { ILogger } from '../../../core/logging/types'
 import { IDatabaseClientProvider } from '../../../platform/persistence/IDatabaseClientProvider'
 import { ISecretManager, Secrets } from '../../../platform/secrets/ISecretManager'
 import { IExchangeProviderFactory } from '../application/contracts/IExchangeProviderFactory'
-import { mapBlockchainToBinanceNetwork } from '../infrastructure/exchangeProviders/binanceNetworkMap'
+import { mapBlockchainToBinanceNetwork } from './binanceNetworkMap'
 
 type BridgeSweepResult = {
   amount?: number

@@ -5,7 +5,7 @@ import { inject, injectable } from 'inversify'
 import { isKycTemporarilyDisabled } from '../../../app/config/kyc'
 import { TYPES } from '../../../app/container/types'
 import { IDatabaseClientProvider } from '../../../platform/persistence/IDatabaseClientProvider'
-import { uuidToBase64 } from '../infrastructure/transactionEncoding'
+import { uuidToBase64 } from './transactionEncoding'
 
 interface TransactionStatusResult {
   id: string

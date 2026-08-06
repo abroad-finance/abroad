@@ -27,7 +27,7 @@ import { LiquidityCacheService } from '../../payments/application/LiquidityCache
 import { assertPartnerUserEnabled, DisabledUserError } from '../../shared/partnerUserAccess'
 import { BridgeFloatService } from '../../treasury/application/BridgeFloatService'
 import { CryptoInventoryService } from '../../treasury/application/CryptoInventoryService'
-import { uuidToBase64 } from '../infrastructure/transactionEncoding'
+import { uuidToBase64 } from './transactionEncoding'
 import { toUserTransactionPayload, toWebhookTransactionPayload } from './transactionPayload'
 import { TransactionWebhookRouter } from './TransactionWebhookRouter'
 

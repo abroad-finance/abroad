@@ -1,6 +1,6 @@
 import { BlockchainNetwork } from '@prisma/client'
 
-import { ExchangeNetwork } from '../../application/contracts/IExchangeProvider'
+import { ExchangeNetwork } from './contracts/IExchangeProvider'
 
 /**
  * Binance network token for a blockchain, used for BOTH deposit-address lookup
