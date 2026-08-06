@@ -8,12 +8,14 @@ import type { OpsTreasuryBalanceCell, OpsTreasuryThresholdInput } from '../../se
 import { useOpsApiKey, useOpsSession } from '../../services/admin/opsAuthStore'
 import {
   createTreasuryThreshold,
+  getStablebondPosition,
   getTreasuryBalances,
   getTreasuryMovements,
   getTreasurySnapshots,
   updateTreasuryThreshold,
 } from '../../services/admin/treasuryAdminApi'
 import {
+  OpsStablebondResponse,
   OpsTreasuryBalancesResponse,
   OpsTreasuryMovementsResponse,
   OpsTreasurySnapshotsResponse,
@@ -32,6 +34,7 @@ import {
   UtilizationMeter,
 } from './shared'
 import { isOpsMutationCancelledError, useOpsMutation } from './shared/opsMutationContext'
+import { StablebondPanel } from './treasury/StablebondPanel'
 
 // Categorical palette (validated: worst adjacent CVD dE 24.2, light surface).
 // Color follows the venue entity, never its rank — a missing venue must not
@@ -41,6 +44,7 @@ const VENUE_COLORS: Record<string, string> = {
   CELO_HOT_WALLET: '#008300',
   MOVII: '#e34948',
   SOLANA_HOT_WALLET: '#4a3aa7',
+  STABLEBOND_POSITION: '#8a5cd1',
   STELLAR_HOT_WALLET: '#eda100',
   TRANSFERO: '#1baf7a',
 }
@@ -51,6 +55,7 @@ const VENUE_LABELS: Record<string, string> = {
   CELO_HOT_WALLET: 'Celo hot wallet',
   MOVII: 'Movii (COP)',
   SOLANA_HOT_WALLET: 'Solana hot wallet',
+  STABLEBOND_POSITION: 'Stablebond position',
   STELLAR_HOT_WALLET: 'Stellar hot wallet',
   TRANSFERO: 'Transfero',
 }
@@ -425,13 +430,16 @@ const TreasuryDashboard = () => {
   const [balances, setBalances] = useState<null | OpsTreasuryBalancesResponse>(null)
   const [movements, setMovements] = useState<null | OpsTreasuryMovementsResponse>(null)
   const [snapshots, setSnapshots] = useState<null | OpsTreasurySnapshotsResponse>(null)
+  const [stablebond, setStablebond] = useState<null | OpsStablebondResponse>(null)
   const [rangeDays, setRangeDays] = useState<number>(7)
   const [balanceLoading, setBalanceLoading] = useState(false)
   const [movementLoading, setMovementLoading] = useState(false)
   const [snapshotLoading, setSnapshotLoading] = useState(false)
+  const [stablebondLoading, setStablebondLoading] = useState(false)
   const [balanceError, setBalanceError] = useState<null | string>(null)
   const [movementError, setMovementError] = useState<null | string>(null)
   const [snapshotError, setSnapshotError] = useState<null | string>(null)
+  const [stablebondError, setStablebondError] = useState<null | string>(null)
   const [thresholdEditor, setThresholdEditor] = useState<null | {
     id?: string
     input: OpsTreasuryThresholdInput
@@ -445,6 +453,7 @@ const TreasuryDashboard = () => {
   const balanceRequestSeq = useRef(0)
   const movementRequestSeq = useRef(0)
   const snapshotRequestSeq = useRef(0)
+  const stablebondRequestSeq = useRef(0)
 
   const loadBalances = useCallback(async () => {
     const seq = ++balanceRequestSeq.current
@@ -509,9 +518,34 @@ const TreasuryDashboard = () => {
     }
   }, [opsApiKey, rangeDays])
 
+  const loadStablebond = useCallback(async () => {
+    const seq = ++stablebondRequestSeq.current
+    if (!opsApiKey) {
+      setStablebond(null)
+      setStablebondLoading(false)
+      return
+    }
+    setStablebondLoading(true)
+    setStablebondError(null)
+    try {
+      const result = await getStablebondPosition()
+      if (seq === stablebondRequestSeq.current) setStablebond(result)
+    }
+    catch (err) {
+      if (seq === stablebondRequestSeq.current) setStablebondError(err instanceof Error ? err.message : 'Yield position could not be loaded')
+    }
+    finally {
+      if (seq === stablebondRequestSeq.current) setStablebondLoading(false)
+    }
+  }, [opsApiKey])
+
   useEffect(() => {
     void loadBalances()
   }, [loadBalances])
+
+  useEffect(() => {
+    void loadStablebond()
+  }, [loadStablebond])
 
   useEffect(() => {
     void loadMovements()
@@ -621,7 +655,7 @@ const TreasuryDashboard = () => {
     }
   }
 
-  const refreshing = balanceLoading || movementLoading || snapshotLoading
+  const refreshing = balanceLoading || movementLoading || snapshotLoading || stablebondLoading
 
   return (
     <OpsPageShell
@@ -633,6 +667,7 @@ const TreasuryDashboard = () => {
             void loadBalances()
             void loadMovements()
             void loadSnapshots()
+            void loadStablebond()
           }}
           type="button"
         >
@@ -787,6 +822,15 @@ const TreasuryDashboard = () => {
         )}
         {balanceLoading && !balances && <OpsLoading className="mt-6" label="Loading current balances…" />}
       </section>
+
+      <StablebondPanel
+        canManage={canManageThresholds}
+        error={stablebondError}
+        loading={stablebondLoading}
+        onChanged={loadStablebond}
+        onRetry={() => void loadStablebond()}
+        overview={stablebond}
+      />
 
       <section aria-labelledby="balance-history-title" className="mt-12">
         <div className="flex flex-wrap items-end justify-between gap-3">

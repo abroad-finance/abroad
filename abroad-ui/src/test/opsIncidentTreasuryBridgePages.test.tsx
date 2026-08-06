@@ -59,6 +59,7 @@ const bridgeMocks = vi.hoisted(() => ({
 
 const treasuryMocks = vi.hoisted(() => ({
   createTreasuryThreshold: vi.fn(),
+  getStablebondPosition: vi.fn(),
   getTreasuryBalances: vi.fn(),
   getTreasuryMovements: vi.fn(),
   getTreasurySnapshots: vi.fn(),
@@ -255,6 +256,15 @@ beforeEach(() => {
     batch: bridgeOverview.batches[0],
     members: bridgeOverview.legs.recent,
     providerReference: 'withdrawal-1',
+  })
+  // Ship-dark default: the yield position is off, so the panel renders its
+  // "off" state and every other treasury assertion is unaffected.
+  treasuryMocks.getStablebondPosition.mockResolvedValue({
+    disabledReason: 'STABLEBOND_JIT_UNWIND_CAP_USDC is not set',
+    enabled: false,
+    error: null,
+    position: null,
+    recentUnwinds: [],
   })
   treasuryMocks.getTreasuryBalances.mockResolvedValue(balances)
   treasuryMocks.getTreasuryMovements.mockResolvedValue({ days: [], recent: [] })

@@ -27,6 +27,7 @@ import { LiquidityCacheService } from '../../payments/application/LiquidityCache
 import { assertPartnerUserEnabled, DisabledUserError } from '../../shared/partnerUserAccess'
 import { BridgeFloatService } from '../../treasury/application/BridgeFloatService'
 import { CryptoInventoryService } from '../../treasury/application/CryptoInventoryService'
+import { JustInTimeUnwindService } from '../../treasury/application/JustInTimeUnwindService'
 import { uuidToBase64 } from './transactionEncoding'
 import { toUserTransactionPayload, toWebhookTransactionPayload } from './transactionPayload'
 import { TransactionWebhookRouter } from './TransactionWebhookRouter'
@@ -102,6 +103,7 @@ export class TransactionAcceptanceService {
     private readonly transactionWebhookRouter: TransactionWebhookRouter,
     @inject(LiquidityCacheService) private readonly liquidityCacheService: LiquidityCacheService,
     @inject(BridgeFloatService) private readonly bridgeFloatService: BridgeFloatService,
+    @inject(JustInTimeUnwindService) private readonly justInTimeUnwindService: JustInTimeUnwindService,
     @inject(TYPES.IFiatDepositServiceFactory)
     private readonly fiatDepositServiceFactory: IFiatDepositServiceFactory,
     @inject(CryptoInventoryService) private readonly cryptoInventoryService: CryptoInventoryService,
@@ -696,12 +698,41 @@ export class TransactionAcceptanceService {
       })
       throw new TransactionValidationError('We could not verify available liquidity for this asset right now. Please try again in a few moments.')
     }
+    // The liquid inventory alone is short. Before refusing, ask whether the
+    // Stablebond position can cover the gap: the delivery inventory earns yield
+    // until the instant a customer buys, and this is that instant. The position
+    // sits on the SAME Stellar account this delivery pays from, so an unwind
+    // lands the USDC exactly where it is about to be spent.
+    //
+    // The check is live — a real quote against the real order book, bounded by
+    // the configured slippage tolerance — and every uncertainty in it answers
+    // "no", so a thin book or an unreadable position refuses exactly as before.
+    // It runs ONLY on the path that was already about to be rejected, and is a
+    // no-op until STABLEBOND_JIT_UNWIND_CAP_USDC is configured.
     if (inventory.available < quote.sourceAmount) {
+      const shortfall = new Prisma.Decimal(String(quote.sourceAmount))
+        .minus(new Prisma.Decimal(String(inventory.available)))
+      const feasibility = await this.justInTimeUnwindService.assessFeasibility(shortfall)
+      let unwindRefusal = 'stablebond_position_disabled'
+      if (feasibility.enabled) {
+        if (feasibility.feasible) {
+          this.logger.info('Admitting onramp on a feasible just-in-time unwind', {
+            cryptoCurrency: quote.cryptoCurrency,
+            network: quote.network,
+            shortfall: shortfall.toFixed(),
+            spreadBps: feasibility.spreadBps,
+          })
+          return { depositService, destinationAddress: destination.address }
+        }
+        unwindRefusal = feasibility.reason
+      }
+
       this.logger.warn('Rejecting onramp: hot wallet inventory below the quoted delivery', {
         available: inventory.available,
         cryptoCurrency: quote.cryptoCurrency,
         network: quote.network,
         requested: quote.sourceAmount,
+        unwindRefusal,
       })
       throw new TransactionValidationError('This purchase is temporarily unavailable while we rebalance liquidity. Please try again shortly or use a smaller amount.')
     }

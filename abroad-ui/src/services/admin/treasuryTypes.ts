@@ -1,3 +1,78 @@
+export type OpsStablebondExecutionResult = {
+  executionId: null | string
+  onChainId: null | string
+  outcome: string
+  reason: null | string
+  receivedAmount: null | number
+  spreadBps: null | number
+}
+
+export type OpsStablebondPosition = {
+  accruedFiat: number
+  accruedUsd: number
+  annualYieldBps: number
+  assetCode: string
+  effectiveAnnualBps: null | number
+  entryNavFiat: null | number
+  fiatCurrency: string
+  heldTokens: number
+  issuer: string
+  jitUnwindCapUsdc: number
+  maxSlippageBps: number
+  navFiat: number
+  navObservedAt: string
+  navUsd: number
+  openedAt: null | string
+  principalFiat: null | number
+  status: string
+  symbol: string
+  unwindable: OpsStablebondUnwindability
+  valueFiat: number
+  valueUsd: number
+  venue: string
+}
+
+export type OpsStablebondResponse = {
+  disabledReason: null | string
+  enabled: boolean
+  error: null | string
+  position: null | OpsStablebondPosition
+  recentUnwinds: OpsStablebondUnwind[]
+}
+
+export type OpsStablebondTrustline = {
+  balance: null | number
+  limit: null | number
+  onChainId: null | string
+  outcome: string
+  reason: null | string
+}
+
+export type OpsStablebondUnwind = {
+  direction: string
+  failureReason: null | string
+  id: string
+  minReceive: number
+  navUsdPerToken: number
+  onChainId: null | string
+  quotedAt: string
+  quotedReceive: number
+  receiveAsset: string
+  receivedAmount: null | number
+  sendAmount: number
+  sendAsset: string
+  settledAt: null | string
+  spreadBps: null | number
+  status: string
+}
+
+export type OpsStablebondUnwindability = {
+  feasible: boolean
+  reason: null | string
+  spreadBps: null | number
+  testedUsdc: number
+}
+
 export type OpsTreasuryBalanceCell = {
   account: string
   amount: number

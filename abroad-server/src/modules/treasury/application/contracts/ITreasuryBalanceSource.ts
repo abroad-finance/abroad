@@ -31,5 +31,12 @@ export type TreasuryVenue
     | 'CELO_HOT_WALLET'
     | 'MOVII'
     | 'SOLANA_HOT_WALLET'
+    /**
+     * Yield-bearing Stablebond holdings. Distinct from STELLAR_HOT_WALLET even
+     * though the same account holds the trustline: this balance is not spendable
+     * until it is unwound, and rolling it into the hot wallet's cell would
+     * present a bond position as immediately available float.
+     */
+    | 'STABLEBOND_POSITION'
     | 'STELLAR_HOT_WALLET'
     | 'TRANSFERO'
