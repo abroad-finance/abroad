@@ -29,9 +29,9 @@ const modulesWithCleanApplicationLayer = [
 ]
 
 const modulesWithCleanTransportBoundary = [
-  'auth', 'flows', 'kyc', 'operations', 'payments', 'quotes', 'realtime',
-  'shared', 'telemetry', 'transactions', 'transfero', 'transparency',
-  'treasury', 'webhooks',
+  'auth', 'flows', 'kyc', 'operations', 'partners', 'payments', 'quotes',
+  'realtime', 'shared', 'telemetry', 'transactions', 'transfero',
+  'transparency', 'treasury', 'webhooks',
 ]
 
 const applicationGlobs = names => names.map(name => `./src/modules/${name}/application/**/*`)
@@ -51,9 +51,7 @@ const boundaryZones = [
     target: './src/modules/*/infrastructure/**/*',
   },
   {
-    // Omits `partners`: PartnerAiToolService reuses the REST request schemas
-    // for its MCP tool surface. Moving those schemas down into application and
-    // re-exporting them from interfaces/http lets it join this list.
+    // Every module. No application file imports transport code.
     from: './src/modules/*/interfaces/**/*',
     message: 'application may not depend on transport contracts. Move the shared schema into application and re-export it from interfaces/http.',
     target: applicationGlobs(modulesWithCleanTransportBoundary),

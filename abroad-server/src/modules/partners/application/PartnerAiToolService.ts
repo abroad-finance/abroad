@@ -3,9 +3,9 @@ import { z } from 'zod'
 
 import type { PartnerAiAccessPrincipal } from './PartnerAiTokenService'
 
-import { quoteRequestSchema, reverseQuoteRequestSchema } from '../../quotes/interfaces/http/contracts'
+import { quoteRequestSchema, reverseQuoteRequestSchema } from '../../quotes/application/quoteRequestSchemas'
+import { acceptTransactionRequestSchema } from '../../transactions/application/acceptTransactionSchema'
 import { PartnerTransactionDetailDto, PartnerTransactionListResponse, PartnerTransactionQueryService, PartnerTransactionSearchFilters } from '../../transactions/application/PartnerTransactionQueryService'
-import { acceptTransactionRequestSchema } from '../../transactions/interfaces/http/contracts'
 import { PARTNER_AI_DOCUMENTATION_ORIGIN, PARTNER_AI_DOCUMENTATION_URL } from './partnerAiConfiguration'
 import { PartnerAiWebhookDiagnostics, PartnerAiWebhookDiagnosticsService } from './PartnerAiWebhookDiagnosticsService'
 

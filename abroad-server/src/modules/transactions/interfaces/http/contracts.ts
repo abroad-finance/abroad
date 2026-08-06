@@ -1,34 +1,10 @@
 import { TransactionStatus } from '@prisma/client'
-import { z } from 'zod'
 
 import { PaymentContext } from '../../../payments/application/PaymentContextService'
 
-const hasDestinationValue = (value: null | string | undefined): boolean =>
-  typeof value === 'string' && value.trim().length > 0
-
-export const acceptTransactionRequestSchema = z.object({
-  account_number: z.string().optional(),
-  // Wallet the crypto is delivered to. Required for a fiat-to-crypto quote and
-  // meaningless for a payout, where the destination is a bank account.
-  destination_address: z.string().optional(),
-  qr_code: z.string().nullable().optional(),
-  quote_id: z.string().min(1, 'Quote ID is required'),
-  redirectUrl: z.string().optional(),
-  tax_id: z.string().optional(),
-  user_id: z.string().min(1, 'User ID is required'),
-}).superRefine((request, context) => {
-  if (
-    !hasDestinationValue(request.account_number)
-    && !hasDestinationValue(request.qr_code)
-    && !hasDestinationValue(request.destination_address)
-  ) {
-    context.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: 'Account number, QR code, or destination address is required',
-      path: ['account_number'],
-    })
-  }
-})
+// The runtime schema lives in application so both this transport and the
+// partner MCP tool surface can validate against the same object.
+export { acceptTransactionRequestSchema } from '../../application/acceptTransactionSchema'
 
 export interface AcceptTransactionRequest {
   account_number?: string
