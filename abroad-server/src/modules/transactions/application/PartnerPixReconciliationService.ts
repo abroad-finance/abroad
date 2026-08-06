@@ -15,6 +15,12 @@ const MAX_BATCH_SIZE = 5
 const MIN_BATCH_SIZE = 1
 const RECONCILIATION_LEASE_MS = 2 * 60 * 1_000
 const ULTRA_PRODUCTION_CUTOVER_AT = new Date('2026-07-28T15:35:27.000Z')
+/**
+ * How long Ultra gets to become consistent about a withdrawal id it just
+ * issued. Inside this window a 404 is read-after-write lag; outside it the
+ * record does not exist and never will.
+ */
+const PROVIDER_RECORD_SETTLING_WINDOW_MS = 60 * 60 * 1_000
 
 const providerWithdrawalIdSchema = z.string().uuid()
 
@@ -50,8 +56,21 @@ type ReconciliationFailureCode
     | 'INVALID_PROVIDER_RESPONSE'
     | 'INVALID_WITHDRAWAL_ID'
     | 'PROVIDER_RECORD_NOT_FOUND'
+    | 'PROVIDER_RECORD_PENDING'
     | 'PROVIDER_UNAVAILABLE'
     | 'WITHDRAWAL_NOT_SETTLED'
+
+/**
+ * Outcomes no later sweep can change: a non-UUID `externalId` is never
+ * rewritten, and a withdrawal id Ultra disowns past its settling window stays
+ * disowned. Recording one retires the candidate for good — every other
+ * ineligible outcome (an unsettled withdrawal, a 404 still inside the window)
+ * stays in scope so a later run can still resolve it.
+ */
+const TERMINAL_INELIGIBLE_FAILURE_CODES: ReconciliationFailureCode[] = [
+  'INVALID_WITHDRAWAL_ID',
+  'PROVIDER_RECORD_NOT_FOUND',
+]
 
 type ReconciliationOutcome = {
   failureCode: null | ReconciliationFailureCode
@@ -279,6 +298,13 @@ export class PartnerPixReconciliationService {
         partnerUser: { partnerId: params.partnerId },
         pixEndToEndId: null,
         quote: { paymentMethod: PaymentMethod.PIX },
+        // A candidate already proven unresolvable never becomes resolvable, so
+        // it must not consume a batch slot or an Ultra call again. Without this
+        // every run re-walked the same dead ids from the cutover date: ~1166
+        // withdrawals Ultra will never know, re-read >1000 times in 48h,
+        // burning quota that Transfero meters account-wide and that
+        // customer-facing calls therefore have to share.
+        reconciliationItems: { none: { failureCode: { in: TERMINAL_INELIGIBLE_FAILURE_CODES } } },
       },
     })
   }
@@ -342,6 +368,7 @@ export class PartnerPixReconciliationService {
   }
 
   private async reconcileCandidate(candidate: {
+    createdAt: Date
     externalId: null | string
     id: string
   }): Promise<ReconciliationOutcome> {
@@ -357,7 +384,15 @@ export class PartnerPixReconciliationService {
     }
     catch (error) {
       if (error instanceof TransferoUltraError && error.status === 404) {
-        return { failureCode: 'PROVIDER_RECORD_NOT_FOUND', status: PartnerReconciliationItemStatus.INELIGIBLE }
+        // Ultra mints the withdrawal id when it accepts the payout, so once it
+        // has had time to become consistent a 404 on an id we already stored is
+        // permanent. Retiring the candidate only past that window keeps a
+        // freshly created withdrawal from being stranded by replication lag.
+        const settled = Date.now() - candidate.createdAt.getTime() >= PROVIDER_RECORD_SETTLING_WINDOW_MS
+        return {
+          failureCode: settled ? 'PROVIDER_RECORD_NOT_FOUND' : 'PROVIDER_RECORD_PENDING',
+          status: PartnerReconciliationItemStatus.INELIGIBLE,
+        }
       }
       return { failureCode: 'PROVIDER_UNAVAILABLE', status: PartnerReconciliationItemStatus.FAILED }
     }

@@ -59,10 +59,20 @@ export class ExchangeBalanceUpdatedController {
       const resumableStepTypes = provider === 'transfero'
         ? [FlowStepType.AWAIT_EXCHANGE_BALANCE, FlowStepType.EXCHANGE_CONVERT]
         : [FlowStepType.AWAIT_EXCHANGE_BALANCE]
+      // The periodic sweep fires whether or not anything moved, so honour the
+      // backoff each step scheduled for itself. Without this gate one parked
+      // conversion re-read the provider every tick forever, and Transfero
+      // meters its rate limit account-wide — those reads are taken straight
+      // out of the budget customer-facing calls depend on. A webhook is real
+      // evidence the balance changed, so it still resumes everything at once.
+      const dueFilter = parsed.data.trigger === 'speculative'
+        ? { OR: [{ retryAt: null }, { retryAt: { lte: new Date() } }] }
+        : {}
       const waitingSteps = await prisma.flowStepInstance.findMany({
         distinct: ['flowInstanceId'],
         select: { flowInstance: { select: { transactionId: true } } },
         where: {
+          ...dueFilter,
           correlation: { equals: provider, path: ['provider'] },
           status: FlowStepStatus.WAITING,
           stepType: { in: resumableStepTypes },

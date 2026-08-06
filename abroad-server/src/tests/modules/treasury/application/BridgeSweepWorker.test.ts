@@ -29,7 +29,9 @@ describe('BridgeSweepWorker', () => {
     expect(service.sweep).toHaveBeenCalledTimes(1)
     expect(queueHandler.postMessage).toHaveBeenCalledWith(
       QueueName.EXCHANGE_BALANCE_UPDATED,
-      { provider: 'transfero' },
+      // The periodic tick is speculative: it carries no evidence a balance
+      // moved, so waiting steps apply their own backoff to it.
+      { provider: 'transfero', trigger: 'speculative' },
     )
   })
 
@@ -48,7 +50,9 @@ describe('BridgeSweepWorker', () => {
     expect(service.sweep).not.toHaveBeenCalled() // reconcile threw; tick caught it
     expect(queueHandler.postMessage).toHaveBeenCalledWith(
       QueueName.EXCHANGE_BALANCE_UPDATED,
-      { provider: 'transfero' },
+      // The periodic tick is speculative: it carries no evidence a balance
+      // moved, so waiting steps apply their own backoff to it.
+      { provider: 'transfero', trigger: 'speculative' },
     )
   })
 

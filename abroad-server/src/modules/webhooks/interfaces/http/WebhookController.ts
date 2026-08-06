@@ -133,7 +133,7 @@ export class WebhookController extends Controller {
       case 'exchange-balance-updated':
         await this.queueHandler.postMessage(
           QueueName.EXCHANGE_BALANCE_UPDATED,
-          { provider: 'transfero' },
+          { provider: 'transfero', trigger: 'observed' },
         )
         return
       case 'fiat-deposit-received':

@@ -411,8 +411,55 @@ describe('ExchangeConvertStepExecutor Transfero venue routing', () => {
         provider: 'transfero',
         sourceCurrency: 'USDC',
         targetCurrency: 'BRL',
+        waitAttempt: 1,
       },
+      retryAt: expect.any(Date),
     })
+  })
+
+  it('backs a repeatedly parked conversion off from one sweep tick up to an hourly ceiling', async () => {
+    jest.useFakeTimers()
+    jest.setSystemTime(new Date('2026-08-01T12:00:00.000Z'))
+    try {
+      const { executor, transferoProvider } = makeExecutor()
+      transferoProvider.createMarketOrder.mockResolvedValue({
+        code: 'insufficient_balance',
+        outcome: 'failed',
+        reason: 'transfero_ultra_insufficient_available_holdings',
+      })
+      const runWithWaitAttempt = async (waitAttempt: number) => executor.execute({
+        config: { provider: 'transfero', sourceCurrency: 'USDC', targetCurrency: 'BRL' },
+        runtime: {
+          context: { sourceAmount: 10, transactionId: 'transaction-parked' },
+          stepOutputs: new Map([[6, { waitAttempt }]]),
+        } as never,
+        stepOrder: 6,
+      })
+
+      // Doubles from the sweep's own 5-minute tick, then holds at one hour so a
+      // trade the provider will never settle stops burning the shared quota.
+      const minutesFor = async (waitAttempt: number) => {
+        const result = await runWithWaitAttempt(waitAttempt)
+        const retryAt = 'retryAt' in result ? result.retryAt : undefined
+        return retryAt === undefined ? undefined : (retryAt.getTime() - Date.now()) / 60_000
+      }
+
+      await expect(minutesFor(0)).resolves.toBe(5)
+      await expect(minutesFor(1)).resolves.toBe(10)
+      await expect(minutesFor(2)).resolves.toBe(20)
+      await expect(minutesFor(3)).resolves.toBe(40)
+      await expect(minutesFor(4)).resolves.toBe(60)
+      await expect(minutesFor(50)).resolves.toBe(60)
+
+      // The counter advances even though the reconciliation journal does not,
+      // which is what keeps a provider read that keeps failing from pinning the
+      // backoff at its shortest interval forever.
+      const parked = await runWithWaitAttempt(7)
+      expect(parked.output).toEqual(expect.objectContaining({ waitAttempt: 8 }))
+    }
+    finally {
+      jest.useRealTimers()
+    }
   })
 
   it('re-executes a waiting Transfero conversion on its correlated balance signal', async () => {
@@ -504,7 +551,9 @@ describe('ExchangeConvertStepExecutor Transfero venue routing', () => {
         reconciliation,
         sourceCurrency: 'USDC',
         targetCurrency: 'BRL',
+        waitAttempt: 1,
       },
+      retryAt: expect.any(Date),
     })
 
     await expect(executor.handleSignal({

@@ -344,7 +344,9 @@ describe('WebhookController Transfero Ultra webhook', () => {
 
     expect(queueHandler.postMessage).toHaveBeenCalledWith(
       QueueName.EXCHANGE_BALANCE_UPDATED,
-      { provider: 'transfero' },
+      // A webhook is real evidence, so it must stay on the fast path and
+      // bypass the waiting steps' backoff.
+      { provider: 'transfero', trigger: 'observed' },
     )
   })
 
@@ -553,7 +555,9 @@ describe('WebhookController Transfero Ultra webhook', () => {
     expect(response).toEqual({ message: 'Webhook processed successfully', success: true })
     expect(queueHandler.postMessage).toHaveBeenCalledWith(
       QueueName.EXCHANGE_BALANCE_UPDATED,
-      { provider: 'transfero' },
+      // A webhook is real evidence, so it must stay on the fast path and
+      // bypass the waiting steps' backoff.
+      { provider: 'transfero', trigger: 'observed' },
     )
   })
 

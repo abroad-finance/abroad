@@ -94,6 +94,53 @@ describe('ExchangeBalanceUpdatedController', () => {
     })
   })
 
+  it('honours each step backoff on the speculative sweep but not on an observed webhook', async () => {
+    const speculative = createDbProvider([{ flowInstance: { transactionId: 'tx-1' } }])
+    const speculativeController = buildController({ dbProvider: speculative })
+    const runSpeculative = speculativeController.controller as unknown as {
+      onBalanceUpdated: (msg: unknown) => Promise<void>
+    }
+
+    await runSpeculative.onBalanceUpdated({ provider: 'transfero', trigger: 'speculative' })
+
+    // The periodic tick is evidence of nothing, so a step that scheduled a
+    // later retry stays parked instead of re-reading the provider.
+    const speculativePrisma = await speculative.getClient()
+    expect(speculativePrisma.flowStepInstance.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        OR: [{ retryAt: null }, { retryAt: { lte: expect.any(Date) } }],
+      }),
+    }))
+
+    const observed = createDbProvider([{ flowInstance: { transactionId: 'tx-1' } }])
+    const observedController = buildController({ dbProvider: observed })
+    const runObserved = observedController.controller as unknown as {
+      onBalanceUpdated: (msg: unknown) => Promise<void>
+    }
+
+    await runObserved.onBalanceUpdated({ provider: 'transfero', trigger: 'observed' })
+
+    // A real balance movement must never be delayed by the backoff.
+    const observedPrisma = await observed.getClient()
+    expect(observedPrisma.flowStepInstance.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.not.objectContaining({ OR: expect.anything() }),
+    }))
+    expect(observedController.orchestrator.handleSignal).toHaveBeenCalledTimes(1)
+  })
+
+  it('treats a message published without a trigger as observed', async () => {
+    const dbProvider = createDbProvider([{ flowInstance: { transactionId: 'tx-1' } }])
+    const { controller } = buildController({ dbProvider })
+    const runner = controller as unknown as { onBalanceUpdated: (msg: unknown) => Promise<void> }
+
+    await runner.onBalanceUpdated({ provider: 'transfero' })
+
+    const prisma = await dbProvider.getClient()
+    expect(prisma.flowStepInstance.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.not.objectContaining({ OR: expect.anything() }),
+    }))
+  })
+
   it('does not wake conversion steps for Binance balance updates', async () => {
     const dbProvider = createDbProvider()
     const { controller } = buildController({ dbProvider })

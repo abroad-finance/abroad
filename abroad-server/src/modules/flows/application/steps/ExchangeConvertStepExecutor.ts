@@ -91,6 +91,18 @@ class BinanceOrderConstraintError extends Error {
   }
 }
 
+/**
+ * Backoff for a conversion parked on provider settlement. The first wait
+ * matches the periodic sweep's own tick, so nothing gets slower than it is
+ * today; from there it doubles, because a trade the provider has not settled
+ * in half an hour is not going to settle in the next five minutes, and every
+ * speculative re-read spends rate limit Transfero meters account-wide. A
+ * provider webhook bypasses this entirely, so real settlement still resumes at
+ * once.
+ */
+const CONVERSION_WAIT_BASE_DELAY_MS = 5 * 60 * 1_000
+const CONVERSION_WAIT_MAX_DELAY_MS = 60 * 60 * 1_000
+
 const exchangeConvertConfigSchema = z.object({
   amountSource: amountSourceSchema.optional(),
   fromAsset: z.string().min(2).optional(),
@@ -180,6 +192,7 @@ export class ExchangeConvertStepExecutor implements FlowStepExecutor {
 
         const buildOutput = (
           settlementReconciliation?: ExchangeSettlementReconciliation,
+          waitAttempt?: number,
         ): Record<string, unknown> => ({
           amount,
           provider: 'transfero',
@@ -188,7 +201,16 @@ export class ExchangeConvertStepExecutor implements FlowStepExecutor {
             : {}),
           sourceCurrency: config.sourceCurrency,
           targetCurrency: config.targetCurrency,
+          ...(waitAttempt === undefined ? {} : { waitAttempt }),
         })
+
+        // Counts consecutive waits, not settlement attempts: a provider read
+        // that fails is exactly the case where `reconciliation` is replayed
+        // unchanged, so `nextSettlementAttempt` stands still and cannot pace
+        // the retries it is meant to bound.
+        const nextWaitAttempt = (typeof persistedOutput?.waitAttempt === 'number'
+          ? persistedOutput.waitAttempt
+          : 0) + 1
 
         if (result.outcome === 'failed') {
           if (
@@ -203,7 +225,8 @@ export class ExchangeConvertStepExecutor implements FlowStepExecutor {
             return {
               correlation: { provider: 'transfero' },
               outcome: 'waiting',
-              output: buildOutput(reconciliation),
+              output: buildOutput(reconciliation, nextWaitAttempt),
+              retryAt: this.nextConversionRetryAt(nextWaitAttempt),
             }
           }
           return { error: result.reason ?? result.code ?? 'transfero_convert_failed', outcome: 'failed' }
@@ -212,7 +235,8 @@ export class ExchangeConvertStepExecutor implements FlowStepExecutor {
           return {
             correlation: { provider: 'transfero' },
             outcome: 'waiting',
-            output: buildOutput(result.reconciliation),
+            output: buildOutput(result.reconciliation, nextWaitAttempt),
+            retryAt: this.nextConversionRetryAt(nextWaitAttempt),
           }
         }
 
@@ -660,6 +684,15 @@ export class ExchangeConvertStepExecutor implements FlowStepExecutor {
     return code === -1121
       || text.includes('invalid symbol')
       || text.includes('exchangeinfo missing for symbol')
+  }
+
+  private nextConversionRetryAt(waitAttempt: number): Date {
+    const exponent = Math.max(0, waitAttempt - 1)
+    const delayMs = Math.min(
+      CONVERSION_WAIT_BASE_DELAY_MS * 2 ** exponent,
+      CONVERSION_WAIT_MAX_DELAY_MS,
+    )
+    return new Date(Date.now() + delayMs)
   }
 
   private parseNumber(value: string | undefined): number | undefined {

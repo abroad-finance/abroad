@@ -58,7 +58,7 @@ export class BridgeSweepWorker {
       // webhook without creating another trade or bridge obligation.
       await this.queueHandler.postMessage(
         QueueName.EXCHANGE_BALANCE_UPDATED,
-        { provider: 'transfero' },
+        { provider: 'transfero', trigger: 'speculative' },
       )
     }
     catch (error) {

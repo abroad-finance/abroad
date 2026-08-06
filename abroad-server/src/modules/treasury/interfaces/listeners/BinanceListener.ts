@@ -64,7 +64,7 @@ export class BinanceListener {
           eventTime: data.eventTime,
           eventType: data.eventType,
         })
-        void this.queueHandler.postMessage(QueueName.EXCHANGE_BALANCE_UPDATED, { provider: 'binance' })
+        void this.queueHandler.postMessage(QueueName.EXCHANGE_BALANCE_UPDATED, { provider: 'binance', trigger: 'observed' })
       }
       else {
         this.logger.info('user data event received', {
@@ -122,7 +122,7 @@ export class BinanceListener {
         else {
           this.logger.info('raw message received', { streamName: data?.streamName, wsKey: data?.wsKey })
         }
-        void this.queueHandler.postMessage(QueueName.EXCHANGE_BALANCE_UPDATED, { provider: 'binance' })
+        void this.queueHandler.postMessage(QueueName.EXCHANGE_BALANCE_UPDATED, { provider: 'binance', trigger: 'observed' })
       })
     })
 
@@ -130,7 +130,7 @@ export class BinanceListener {
     wsClient.on('open', (data) => {
       this.logger.info('connection opened', { wsKey: data.wsKey })
       // Trigger an initial balance sync on connect
-      void this.queueHandler.postMessage(QueueName.EXCHANGE_BALANCE_UPDATED, { provider: 'binance' })
+      void this.queueHandler.postMessage(QueueName.EXCHANGE_BALANCE_UPDATED, { provider: 'binance', trigger: 'observed' })
     })
     wsClient.on('reconnecting', (data) => {
       this.logger.warn('reconnecting', { wsKey: data.wsKey })
@@ -138,7 +138,7 @@ export class BinanceListener {
     wsClient.on('reconnected', (data) => {
       this.logger.info('reconnected', { wsKey: data.wsKey })
       // Trigger a balance sync after reconnection
-      void this.queueHandler.postMessage(QueueName.EXCHANGE_BALANCE_UPDATED, { provider: 'binance' })
+      void this.queueHandler.postMessage(QueueName.EXCHANGE_BALANCE_UPDATED, { provider: 'binance', trigger: 'observed' })
     })
     wsClient.on('close', (data) => {
       this.logger.warn('connection closed', { wsKey: data.wsKey })

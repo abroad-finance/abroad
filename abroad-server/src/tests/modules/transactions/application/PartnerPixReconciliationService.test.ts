@@ -11,6 +11,8 @@ import { TransferoUltraClient, TransferoUltraError } from '../../../../modules/t
 import { IDatabaseClientProvider } from '../../../../platform/persistence/IDatabaseClientProvider'
 
 const now = new Date('2026-08-01T12:00:00.000Z')
+/** Older than the one-hour window Ultra gets to become consistent. */
+const settledLongAgo = new Date('2026-07-30T00:00:00.000Z')
 const runId = '11111111-1111-4111-8111-111111111111'
 const transactionId = '22222222-2222-4222-8222-222222222222'
 const withdrawalId = '33333333-3333-4333-8333-333333333333'
@@ -196,6 +198,9 @@ describe('PartnerPixReconciliationService', () => {
         partnerUser: { partnerId: partner.id },
         pixEndToEndId: null,
         quote: { paymentMethod: 'PIX' },
+        reconciliationItems: {
+          none: { failureCode: { in: ['INVALID_WITHDRAWAL_ID', 'PROVIDER_RECORD_NOT_FOUND'] } },
+        },
       }),
     }))
     expect(harness.transferoGet).toHaveBeenCalledWith(
@@ -274,8 +279,13 @@ describe('PartnerPixReconciliationService', () => {
     expect(harness.transferoGet).not.toHaveBeenCalled()
   })
 
-  it('records missing/invalid provider records as safe item outcomes without transaction writes', async () => {
+  it('retires a settled candidate Ultra disowns so later sweeps never re-read it', async () => {
     const harness = buildHarness()
+    harness.transactionFindMany.mockResolvedValueOnce([{
+      createdAt: settledLongAgo,
+      externalId: withdrawalId,
+      id: transactionId,
+    }])
     harness.transferoGet.mockRejectedValueOnce(new TransferoUltraError({
       code: 'validation',
       message: 'provider detail',
@@ -299,6 +309,32 @@ describe('PartnerPixReconciliationService', () => {
     expect(harness.itemUpsert).toHaveBeenCalledWith(expect.objectContaining({
       create: expect.objectContaining({
         failureCode: 'PROVIDER_RECORD_NOT_FOUND',
+        status: PartnerReconciliationItemStatus.INELIGIBLE,
+      }),
+    }))
+    expect(harness.transactionUpdateMany).not.toHaveBeenCalled()
+  })
+
+  it('keeps a just-created candidate in scope when Ultra 404s inside its settling window', async () => {
+    const harness = buildHarness()
+    harness.transactionFindMany.mockResolvedValueOnce([{
+      createdAt: new Date(now.getTime() - 60_000),
+      externalId: withdrawalId,
+      id: transactionId,
+    }])
+    harness.transferoGet.mockRejectedValueOnce(new TransferoUltraError({
+      code: 'validation',
+      message: 'provider detail',
+      status: 404,
+    }))
+    harness.itemGroupBy.mockResolvedValueOnce([{ _count: { _all: 1 }, status: PartnerReconciliationItemStatus.INELIGIBLE }])
+
+    await harness.service.continue(principal, runId)
+
+    // A non-terminal code: read-after-write lag must not strand the E2E ID.
+    expect(harness.itemUpsert).toHaveBeenCalledWith(expect.objectContaining({
+      create: expect.objectContaining({
+        failureCode: 'PROVIDER_RECORD_PENDING',
         status: PartnerReconciliationItemStatus.INELIGIBLE,
       }),
     }))
