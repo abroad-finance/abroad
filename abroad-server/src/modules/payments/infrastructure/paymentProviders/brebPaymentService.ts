@@ -140,6 +140,14 @@ export class BrebPaymentService implements IPaymentService {
   public readonly provider = 'breb'
   private accessTokenCache?: { expiresAt: number, value: string }
 
+  // Movii answers a key lookup for an unregistered or badly formatted Bre-B key
+  // with HTTP 400 and one of these codes. That is the customer mistyping their
+  // key, not the rail failing, so it must not page anyone.
+  private readonly customerInputResponseCodes: ReadonlySet<string> = new Set([
+    'SR08', // Key format not supported
+    'U804', // La llave y/o documento no existe o esta inactiva
+  ])
+
   private readonly liquidityRateLimitCooldownMs: number
 
   private liquidityRateLimitedUntilMs = 0
@@ -735,6 +743,11 @@ export class BrebPaymentService implements IPaymentService {
     return 'pending'
   }
 
+  private isCustomerInputResponseCode(responseCode: null | string | undefined): boolean {
+    return typeof responseCode === 'string'
+      && this.customerInputResponseCodes.has(responseCode.toUpperCase())
+  }
+
   private isKeyUsable(keyDetails: BrebKeyDetails | null): keyDetails is BrebKeyDetails & { instructedAgent: BrebRail } {
     if (!keyDetails) {
       return false
@@ -774,7 +787,7 @@ export class BrebPaymentService implements IPaymentService {
   }): void {
     if (axios.isAxiosError(error)) {
       const envelopeMetadata = this.extractEnvelopeMetadata(error.response?.data)
-      this.logger.error(`[BreB] ${operation}`, {
+      const payload = {
         endpoint: this.sanitizeUrlForLogs(endpoint),
         message: error.message,
         method,
@@ -782,7 +795,12 @@ export class BrebPaymentService implements IPaymentService {
         ...(envelopeMetadata ? { responseCode: envelopeMetadata.responseCode, responseMessage: envelopeMetadata.responseMessage } : {}),
         status: error.response?.status ?? null,
         ...(metadata ? { metadata } : {}),
-      })
+      }
+      if (this.isCustomerInputResponseCode(envelopeMetadata?.responseCode)) {
+        this.logger.warn(`[BreB] ${operation}`, payload)
+        return
+      }
+      this.logger.error(`[BreB] ${operation}`, payload)
       return
     }
 

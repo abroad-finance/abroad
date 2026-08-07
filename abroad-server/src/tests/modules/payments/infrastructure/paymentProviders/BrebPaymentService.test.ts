@@ -422,6 +422,25 @@ describe('BrebPaymentService', () => {
       )
     })
 
+    it.each([
+      ['U804', 'La llave y/o documento no existe o esta inactiva.'],
+      ['SR08', 'Key format not supported'],
+    ])('logs an unregistered key (%s) as a warning, not an error', async (code, message) => {
+      const { logger, service } = setupService()
+      mockedAxios.isAxiosError.mockReturnValue(true)
+
+      primeAccessToken()
+      mockedAxios.get.mockRejectedValueOnce(axiosFailure({ code, message }))
+
+      const verified = await service.verifyAccount({ account: defaultKeyDetails.accountNumber })
+      expect(verified).toBe(false)
+      expect(logger.warn).toHaveBeenCalledWith(
+        '[BreB] Failed to fetch key',
+        expect.objectContaining({ responseCode: code }),
+      )
+      expect(logger.error).not.toHaveBeenCalled()
+    })
+
     it('captures non-axios key lookup errors', async () => {
       const { logger, service } = setupService()
 

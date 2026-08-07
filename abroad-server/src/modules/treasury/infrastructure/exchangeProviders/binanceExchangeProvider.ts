@@ -134,8 +134,9 @@ export class BinanceExchangeProvider implements IExchangeProvider {
         throw new Error(`Unsupported symbol: ${symbol}`)
       }
 
-      this.logger.warn('Falling back to USDT pairs', { sourceCurrency, targetCurrency })
-
+      // Every supported pair is priced by crossing through USDT; there is no
+      // direct-pair branch left to fall back *from*, so the old warning fired
+      // on the happy path ~260 times a day.
       let sourcePrice: number
       if (sourceCurrency === CryptoCurrency.USDT) {
         sourcePrice = 1
