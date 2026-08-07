@@ -22,6 +22,7 @@ const typeKeys = [
   'ILockManager',
   'IOutboxDispatcher',
   'ILogger',
+  'IPartnerPixProvider',
   'IPartnerService',
   'IOpsAuthService',
   'IOpsIdentityProvider',

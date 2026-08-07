@@ -104,6 +104,7 @@ import { StellarOrphanRefundService } from '../../modules/transactions/applicati
 import { TransactionAcceptanceService } from '../../modules/transactions/application/TransactionAcceptanceService'
 import { TransactionStatusService } from '../../modules/transactions/application/TransactionStatusService'
 import { TransactionWebhookRouter } from '../../modules/transactions/application/TransactionWebhookRouter'
+import { TransferoPartnerPixProvider } from '../../modules/transactions/infrastructure/TransferoPartnerPixProvider'
 import { TransferoUltraClient } from '../../modules/transfero/infrastructure/TransferoUltraClient'
 import { TransferoUltraWebhookConfigurationVerifier } from '../../modules/transfero/infrastructure/TransferoUltraWebhookConfigurationVerifier'
 import { TransferoUltraWebhookVerifier } from '../../modules/transfero/infrastructure/TransferoUltraWebhookVerifier'
@@ -177,6 +178,7 @@ const domainBindings: ReadonlyArray<BindingRegistration<unknown>> = [
   { bindSelf: true, identifier: OpsRefundRecoveryService, implementation: OpsRefundRecoveryService },
   { bindSelf: true, identifier: PartnerPixReceiptService, implementation: PartnerPixReceiptService },
   { bindSelf: true, identifier: PartnerPixReconciliationService, implementation: PartnerPixReconciliationService },
+  { identifier: TYPES.IPartnerPixProvider, implementation: TransferoPartnerPixProvider },
   { bindSelf: true, identifier: PartnerTransactionQueryService, implementation: PartnerTransactionQueryService },
   { bindSelf: true, identifier: ConsumerActivityService, implementation: ConsumerActivityService },
   { bindSelf: true, identifier: PartnerWebhookRedeliveryService, implementation: PartnerWebhookRedeliveryService },

@@ -6,8 +6,8 @@ import { PartnerPortalRole, PartnerReconciliationItemStatus, PartnerReconciliati
 
 import { PartnerPortalAuditService } from '../../../../modules/partners/application/PartnerPortalAuditService'
 import { PartnerPortalPrincipal } from '../../../../modules/partners/application/PartnerPortalSessionService'
+import { IPartnerPixProvider, PixWithdrawalReadResult } from '../../../../modules/transactions/application/contracts/IPartnerPixProvider'
 import { PartnerPixReconciliationNotFoundError, PartnerPixReconciliationService, PartnerPixReconciliationValidationError } from '../../../../modules/transactions/application/PartnerPixReconciliationService'
-import { TransferoUltraClient, TransferoUltraError } from '../../../../modules/transfero/infrastructure/TransferoUltraClient'
 import { IDatabaseClientProvider } from '../../../../platform/persistence/IDatabaseClientProvider'
 
 const now = new Date('2026-08-01T12:00:00.000Z')
@@ -147,21 +147,25 @@ const buildHarness = () => {
   const databaseClientProvider: IDatabaseClientProvider = {
     getClient: jest.fn(async () => prisma as unknown as PrismaClient),
   }
-  const transferoGet = jest.fn<Promise<unknown>, [string, unknown?]>(async () => ({
-    endToEndId: 'E47133056202607301830abcdef54321',
-    id: withdrawalId,
-    status: 'SETTLED',
+  const readWithdrawalDetail = jest.fn<Promise<PixWithdrawalReadResult>, [string]>(async () => ({
+    detail: {
+      endToEndId: 'E47133056202607301830abcdef54321',
+      id: withdrawalId,
+      status: 'SETTLED',
+    },
+    success: true,
   }))
   const auditRecord = jest.fn(async () => undefined)
   const service = new PartnerPixReconciliationService(
     databaseClientProvider,
-    { get: transferoGet } as unknown as TransferoUltraClient,
+    { fetchWithdrawalReceipt: jest.fn(), readWithdrawalDetail } satisfies IPartnerPixProvider,
     { record: auditRecord } as unknown as PartnerPortalAuditService,
   )
   return {
     auditRecord,
     itemGroupBy,
     itemUpsert,
+    readWithdrawalDetail,
     runFindFirst,
     runFindMany,
     runUpdateMany,
@@ -169,7 +173,6 @@ const buildHarness = () => {
     transactionFindMany,
     transactionFindUnique,
     transactionUpdateMany,
-    transferoGet,
   }
 }
 
@@ -203,9 +206,7 @@ describe('PartnerPixReconciliationService', () => {
         },
       }),
     }))
-    expect(harness.transferoGet).toHaveBeenCalledWith(
-      `/api/v1/pix/withdrawals/${withdrawalId}`,
-    )
+    expect(harness.readWithdrawalDetail).toHaveBeenCalledWith(withdrawalId)
     expect(harness.transactionUpdateMany).toHaveBeenCalledWith({
       data: { pixEndToEndId: 'E47133056202607301830abcdef54321' },
       where: { id: transactionId, pixEndToEndId: null },
@@ -236,7 +237,7 @@ describe('PartnerPixReconciliationService', () => {
     await expect(harness.service.start(principal, 6)).rejects.toThrow(
       new PartnerPixReconciliationValidationError('Batch size must be between 1 and 5'),
     )
-    expect(harness.transferoGet).not.toHaveBeenCalled()
+    expect(harness.readWithdrawalDetail).not.toHaveBeenCalled()
   })
 
   it('keeps tenant ownership on run listing', async () => {
@@ -257,7 +258,7 @@ describe('PartnerPixReconciliationService', () => {
     await expect(harness.service.continue(principal, runId)).rejects.toThrow(
       new PartnerPixReconciliationNotFoundError(),
     )
-    expect(harness.transferoGet).not.toHaveBeenCalled()
+    expect(harness.readWithdrawalDetail).not.toHaveBeenCalled()
   })
 
   it('rejects a concurrent lease and a completed run without provider reads', async () => {
@@ -276,7 +277,7 @@ describe('PartnerPixReconciliationService', () => {
     await expect(harness.service.continue(principal, runId)).rejects.toThrow(
       new PartnerPixReconciliationValidationError('This reconciliation run is complete'),
     )
-    expect(harness.transferoGet).not.toHaveBeenCalled()
+    expect(harness.readWithdrawalDetail).not.toHaveBeenCalled()
   })
 
   it('retires a settled candidate Ultra disowns so later sweeps never re-read it', async () => {
@@ -286,11 +287,7 @@ describe('PartnerPixReconciliationService', () => {
       externalId: withdrawalId,
       id: transactionId,
     }])
-    harness.transferoGet.mockRejectedValueOnce(new TransferoUltraError({
-      code: 'validation',
-      message: 'provider detail',
-      status: 404,
-    }))
+    harness.readWithdrawalDetail.mockResolvedValueOnce({ reason: 'not_found', success: false })
     harness.itemGroupBy.mockResolvedValueOnce([{ _count: { _all: 1 }, status: PartnerReconciliationItemStatus.INELIGIBLE }])
     harness.runFindFirst.mockResolvedValueOnce({
       ...runRecord,
@@ -322,11 +319,7 @@ describe('PartnerPixReconciliationService', () => {
       externalId: withdrawalId,
       id: transactionId,
     }])
-    harness.transferoGet.mockRejectedValueOnce(new TransferoUltraError({
-      code: 'validation',
-      message: 'provider detail',
-      status: 404,
-    }))
+    harness.readWithdrawalDetail.mockResolvedValueOnce({ reason: 'not_found', success: false })
     harness.itemGroupBy.mockResolvedValueOnce([{ _count: { _all: 1 }, status: PartnerReconciliationItemStatus.INELIGIBLE }])
 
     await harness.service.continue(principal, runId)
@@ -377,15 +370,18 @@ describe('PartnerPixReconciliationService', () => {
       externalId: `${index + 1}`.padStart(8, '0') + '-3333-4333-8333-333333333333',
       id: `${index + 1}`.padStart(8, '0') + '-2222-4222-8222-222222222222',
     })))
-    harness.transferoGet.mockImplementation(async (path: string) => ({
-      endToEndId: `E${path.slice(-36).replaceAll('-', '')}`,
-      id: path.slice(-36),
-      status: 'SETTLED',
+    harness.readWithdrawalDetail.mockImplementation(async (id: string) => ({
+      detail: {
+        endToEndId: `E${id.replaceAll('-', '')}`,
+        id,
+        status: 'SETTLED',
+      },
+      success: true,
     }))
 
     await harness.service.continue(principal, runId)
 
-    expect(harness.transferoGet).toHaveBeenCalledTimes(5)
+    expect(harness.readWithdrawalDetail).toHaveBeenCalledTimes(5)
     expect(harness.runUpdateMany).toHaveBeenLastCalledWith(expect.objectContaining({
       data: expect.objectContaining({
         completedAt: null,

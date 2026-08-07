@@ -4,8 +4,8 @@ import type { PrismaClient } from '@prisma/client'
 
 import { TransactionStatus } from '@prisma/client'
 
+import { IPartnerPixProvider, PixReceiptResult } from '../../../../modules/transactions/application/contracts/IPartnerPixProvider'
 import { PartnerPixReceiptNotFoundError, PartnerPixReceiptProviderError, PartnerPixReceiptService, PartnerPixReceiptUnavailableError } from '../../../../modules/transactions/application/PartnerPixReceiptService'
-import { TransferoUltraClient, TransferoUltraError } from '../../../../modules/transfero/infrastructure/TransferoUltraClient'
 import { IDatabaseClientProvider } from '../../../../platform/persistence/IDatabaseClientProvider'
 
 const transactionId = '11111111-1111-4111-8111-111111111111'
@@ -26,19 +26,23 @@ const buildHarness = () => {
       transaction: { findFirst: transactionFindFirst },
     }) as unknown as PrismaClient),
   }
-  const getPdf = jest.fn<Promise<{
-    contentType: 'application/pdf'
-    data: Buffer
-  }>, [string, unknown?]>(async () => ({
-    contentType: 'application/pdf' as const,
+  const fetchWithdrawalReceipt = jest.fn<Promise<PixReceiptResult>, [{
+    language: string
+    withdrawalId: string
+  }]>(async () => ({
+    contentType: 'application/pdf',
     data: Buffer.from('%PDF-1.7 receipt'),
+    success: true,
   }))
-  const transferoUltraClient = { getPdf } as unknown as TransferoUltraClient
+  const pixProvider: IPartnerPixProvider = {
+    fetchWithdrawalReceipt,
+    readWithdrawalDetail: jest.fn(),
+  }
   return {
-    getPdf,
+    fetchWithdrawalReceipt,
     service: new PartnerPixReceiptService(
       databaseClientProvider,
-      transferoUltraClient,
+      pixProvider,
     ),
     transactionFindFirst,
   }
@@ -72,9 +76,8 @@ describe('PartnerPixReceiptService', () => {
         quote: { paymentMethod: 'PIX' },
       },
     })
-    expect(harness.getPdf).toHaveBeenCalledWith(
-      `/api/v1/pix/withdrawals/${withdrawalId}/receipt`,
-      { lang: 'en' },
+    expect(harness.fetchWithdrawalReceipt).toHaveBeenCalledWith(
+      { language: 'en', withdrawalId },
     )
     expect(result).toEqual({
       contentBase64: Buffer.from('%PDF-1.7 receipt').toString('base64'),
@@ -93,7 +96,7 @@ describe('PartnerPixReceiptService', () => {
       transactionId,
       'pt-BR',
     )).rejects.toThrow(new PartnerPixReceiptNotFoundError())
-    expect(harness.getPdf).not.toHaveBeenCalled()
+    expect(harness.fetchWithdrawalReceipt).not.toHaveBeenCalled()
 
     harness.transactionFindFirst.mockResolvedValueOnce({
       externalId: null,
@@ -104,7 +107,7 @@ describe('PartnerPixReceiptService', () => {
       transactionId,
       'pt-BR',
     )).rejects.toThrow(new PartnerPixReceiptNotFoundError())
-    expect(harness.getPdf).not.toHaveBeenCalled()
+    expect(harness.fetchWithdrawalReceipt).not.toHaveBeenCalled()
   })
 
   it('does not call Ultra until the local transaction is complete', async () => {
@@ -119,17 +122,16 @@ describe('PartnerPixReceiptService', () => {
       transactionId,
       'pt-BR',
     )).rejects.toThrow(new PartnerPixReceiptUnavailableError())
-    expect(harness.getPdf).not.toHaveBeenCalled()
+    expect(harness.fetchWithdrawalReceipt).not.toHaveBeenCalled()
   })
 
-  it('maps provider 404/409 to unavailable and other failures to a sanitized gateway error', async () => {
+  // Which provider status maps to which reason is the adapter's job and is
+  // covered in TransferoPartnerPixProvider.test.ts. What matters here is that
+  // the service turns each reason into the right partner-facing error and never
+  // leaks provider detail into the message.
+  it('maps an unavailable receipt and a provider failure to distinct sanitized errors', async () => {
     const harness = buildHarness()
-    harness.getPdf.mockRejectedValueOnce(new TransferoUltraError({
-      code: 'validation',
-      message: 'provider response detail',
-      providerCode: 'RECEIPT_NOT_AVAILABLE',
-      status: 409,
-    }))
+    harness.fetchWithdrawalReceipt.mockResolvedValueOnce({ reason: 'unavailable', success: false })
 
     await expect(harness.service.getReceipt(
       'partner-1',
@@ -137,7 +139,7 @@ describe('PartnerPixReceiptService', () => {
       'pt-BR',
     )).rejects.toThrow(new PartnerPixReceiptUnavailableError())
 
-    harness.getPdf.mockRejectedValueOnce(new Error('secret provider detail'))
+    harness.fetchWithdrawalReceipt.mockResolvedValueOnce({ reason: 'provider_error', success: false })
     await expect(harness.service.getReceipt(
       'partner-1',
       transactionId,

@@ -16,36 +16,25 @@ const tsconfigRootDir = path.dirname(new URL(import.meta.url).pathname)
  * Machine-checks the module boundaries AGENTS.md describes, which until now were
  * documentation only.
  *
- * Two zones are enforced across every module because they are already clean.
- * The other three still have known violations, so they list the modules they
- * cover explicitly and omit the offenders, named below with what closes them.
- * A module may only ever be ADDED to these lists — if enforcement is in your
- * way, fix the import, do not remove the module.
+ * Every module zone is now enforced with no exceptions; the one remaining
+ * carve-out is platform/notifications, noted at its zone. A module must never
+ * be removed from `allModules` to make a build pass — fix the import instead.
+ * Adding a module here is the only direction this list should move.
  */
-const modulesWithCleanApplicationLayer = [
+const allModules = [
   'auth', 'flows', 'kyc', 'operations', 'partners', 'payments',
-  'quotes', 'realtime', 'shared', 'telemetry', 'transfero',
-  'transparency', 'treasury', 'webhooks',
-]
-
-const modulesWithCleanTransportBoundary = [
-  'auth', 'flows', 'kyc', 'operations', 'partners', 'payments', 'quotes',
-  'realtime', 'shared', 'telemetry', 'transactions', 'transfero',
-  'transparency', 'treasury', 'webhooks',
+  'quotes', 'realtime', 'shared', 'telemetry', 'transactions',
+  'transfero', 'transparency', 'treasury', 'webhooks',
 ]
 
 const applicationGlobs = names => names.map(name => `./src/modules/${name}/application/**/*`)
 
 const boundaryZones = [
   {
-    // Omits `transactions`: PartnerPixReconciliationService and
-    // PartnerPixReceiptService still hold a concrete TransferoUltraClient.
-    // Their port has to be domain-shaped (a receipt fetch and a withdrawal
-    // read) rather than a raw HTTP client, which also moves the response
-    // parsing into the adapter — a change worth doing on its own.
+    // Every module. No application file imports infrastructure.
     from: './src/modules/*/infrastructure/**/*',
     message: 'application may not depend on infrastructure. Declare a port in application/contracts and bind the adapter in app/container.',
-    target: applicationGlobs(modulesWithCleanApplicationLayer),
+    target: applicationGlobs(allModules),
   },
   {
     from: './src/modules/*/interfaces/**/*',
@@ -56,7 +45,7 @@ const boundaryZones = [
     // Every module. No application file imports transport code.
     from: './src/modules/*/interfaces/**/*',
     message: 'application may not depend on transport contracts. Move the shared schema into application and re-export it from interfaces/http.',
-    target: applicationGlobs(modulesWithCleanTransportBoundary),
+    target: applicationGlobs(allModules),
   },
   {
     // Omits notifications/: webhookNotifier resolves partner webhook secrets

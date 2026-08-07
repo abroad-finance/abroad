@@ -7,8 +7,7 @@ import { TYPES } from '../../../app/container/types'
 import { IDatabaseClientProvider } from '../../../platform/persistence/IDatabaseClientProvider'
 import { PartnerPortalAuditService } from '../../partners/application/PartnerPortalAuditService'
 import { PartnerPortalPrincipal } from '../../partners/application/PartnerPortalSessionService'
-import { TransferoUltraClient, TransferoUltraError } from '../../transfero/infrastructure/TransferoUltraClient'
-import { transferoUltraWithdrawalDetailResponseSchema } from '../../transfero/infrastructure/transferoUltraSchemas'
+import { IPartnerPixProvider } from './contracts/IPartnerPixProvider'
 
 const DEFAULT_BATCH_SIZE = 5
 const MAX_BATCH_SIZE = 5
@@ -96,8 +95,8 @@ export class PartnerPixReconciliationService {
   public constructor(
     @inject(TYPES.IDatabaseClientProvider)
     private readonly databaseClientProvider: IDatabaseClientProvider,
-    @inject(TransferoUltraClient)
-    private readonly transferoUltraClient: TransferoUltraClient,
+    @inject(TYPES.IPartnerPixProvider)
+    private readonly pixProvider: IPartnerPixProvider,
     @inject(PartnerPortalAuditService)
     private readonly auditService: PartnerPortalAuditService,
   ) {}
@@ -376,14 +375,9 @@ export class PartnerPixReconciliationService {
     if (!withdrawalId.success) {
       return { failureCode: 'INVALID_WITHDRAWAL_ID', status: PartnerReconciliationItemStatus.INELIGIBLE }
     }
-    let rawDetail: unknown
-    try {
-      rawDetail = await this.transferoUltraClient.get(
-        `/api/v1/pix/withdrawals/${withdrawalId.data}`,
-      )
-    }
-    catch (error) {
-      if (error instanceof TransferoUltraError && error.status === 404) {
+    const read = await this.pixProvider.readWithdrawalDetail(withdrawalId.data)
+    if (!read.success) {
+      if (read.reason === 'not_found') {
         // Ultra mints the withdrawal id when it accepts the payout, so once it
         // has had time to become consistent a 404 on an id we already stored is
         // permanent. Retiring the candidate only past that window keeps a
@@ -394,23 +388,23 @@ export class PartnerPixReconciliationService {
           status: PartnerReconciliationItemStatus.INELIGIBLE,
         }
       }
+      if (read.reason === 'invalid_response') {
+        return { failureCode: 'INVALID_PROVIDER_RESPONSE', status: PartnerReconciliationItemStatus.FAILED }
+      }
       return { failureCode: 'PROVIDER_UNAVAILABLE', status: PartnerReconciliationItemStatus.FAILED }
     }
-    const detail = transferoUltraWithdrawalDetailResponseSchema.safeParse(rawDetail)
-    if (!detail.success || detail.data.id !== withdrawalId.data) {
-      return { failureCode: 'INVALID_PROVIDER_RESPONSE', status: PartnerReconciliationItemStatus.FAILED }
-    }
-    if (detail.data.status !== 'SETTLED') {
+    const detail = read.detail
+    if (detail.status !== 'SETTLED') {
       return { failureCode: 'WITHDRAWAL_NOT_SETTLED', status: PartnerReconciliationItemStatus.INELIGIBLE }
     }
-    if (!detail.data.endToEndId) {
+    if (!detail.endToEndId) {
       return { failureCode: 'E2E_MISSING', status: PartnerReconciliationItemStatus.FAILED }
     }
 
     const prismaClient = await this.databaseClientProvider.getClient()
     try {
       const updated = await prismaClient.transaction.updateMany({
-        data: { pixEndToEndId: detail.data.endToEndId },
+        data: { pixEndToEndId: detail.endToEndId },
         where: { id: candidate.id, pixEndToEndId: null },
       })
       if (updated.count === 1) {
@@ -426,7 +420,7 @@ export class PartnerPixReconciliationService {
       select: { pixEndToEndId: true },
       where: { id: candidate.id },
     })
-    if (current?.pixEndToEndId === detail.data.endToEndId) {
+    if (current?.pixEndToEndId === detail.endToEndId) {
       return { failureCode: null, status: PartnerReconciliationItemStatus.UNCHANGED }
     }
     return { failureCode: 'E2E_CONFLICT', status: PartnerReconciliationItemStatus.FAILED }

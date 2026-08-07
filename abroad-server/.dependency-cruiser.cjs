@@ -10,21 +10,15 @@ module.exports = {
     // ---------------------------------------------------------------
     {
       comment:
-        'A domain module reached into another module\'s infrastructure. Depend on a '
-        + 'contract in that module\'s application/contracts instead, and let the '
-        + 'container bind the adapter.',
-      from: { path: '^src/modules/([^/]+)/' },
-      name: 'no-cross-module-infrastructure',
+        'An application service reached into infrastructure. Depend on a contract in '
+        + 'application/contracts instead, and let the container bind the adapter. '
+        + 'Note this covers the application layer only: one adapter composing another '
+        + '(a payout adapter using the shared Transfero client) is infrastructure '
+        + 'talking to infrastructure, which is how adapters are meant to be built.',
+      from: { path: '^src/modules/[^/]+/application/' },
+      name: 'no-application-to-infrastructure',
       severity: 'error',
-      to: {
-        path: '^src/modules/([^/]+)/infrastructure/',
-        pathNot: [
-          '^src/modules/$1/',
-          // Pending ports; tracked as the remaining exceptions in eslint.config.mjs.
-          '^src/modules/transfero/infrastructure/',
-          '^src/modules/treasury/infrastructure/exchangeProviders/transferoCryptoPurchaseService',
-        ],
-      },
+      to: { path: '^src/modules/[^/]+/infrastructure/' },
     },
     {
       comment:
