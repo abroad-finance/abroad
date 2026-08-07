@@ -202,8 +202,16 @@ setupSentryExpressErrorHandler(app)
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
-  logger.error('API error', err)
   const { body, status } = mapErrorToHttpResponse(err)
+  // A rejected credential or a malformed body is the caller's problem, not a
+  // service fault. Logging those at ERROR buried genuine failures roughly 9:1
+  // under unauthenticated scanner traffic.
+  if (status >= 500) {
+    logger.error('API error', err)
+  }
+  else {
+    logger.warn('API error', err)
+  }
   res.status(status).json(body)
 })
 
@@ -223,22 +231,30 @@ async function start() {
   }
 
   // Ultra returns webhook secrets only once, so endpoint creation belongs in
-  // deployment provisioning. Startup verifies the pre-provisioned endpoint
-  // without mutating provider state or risking secret loss.
-  try {
-    const verifier = iocContainer.get(TransferoUltraWebhookConfigurationVerifier)
-    void verifier.verify().catch((error: unknown) => {
+  // deployment provisioning. Verification reads the pre-provisioned endpoint
+  // without mutating provider state.
+  //
+  // It is opt-in because Ultra's rate limit is account-wide, not per-endpoint:
+  // running this on every boot meant every Cloud Run instance spent shared
+  // quota, and a deploy burst on 2026-08-05 pushed quoting into
+  // RATE_LIMIT_COOLDOWN for five minutes. Set the flag on a provisioning job
+  // that runs once per deployment, not on the serving revision.
+  if (RuntimeConfig.transfero.verifyWebhookOnBoot) {
+    try {
+      const verifier = iocContainer.get(TransferoUltraWebhookConfigurationVerifier)
+      void verifier.verify().catch((error: unknown) => {
+        logger.error(
+          'Transfero Ultra webhook configuration verification failed',
+          error instanceof Error ? error : new Error(String(error)),
+        )
+      })
+    }
+    catch (e) {
       logger.error(
-        'Transfero Ultra webhook configuration verification failed',
-        error instanceof Error ? error : new Error(String(error)),
+        'Failed to start Transfero Ultra webhook configuration verification',
+        e instanceof Error ? e : new Error(String(e)),
       )
-    })
-  }
-  catch (e) {
-    logger.error(
-      'Failed to start Transfero Ultra webhook configuration verification',
-      e instanceof Error ? e : new Error(String(e)),
-    )
+    }
   }
 
   const port = RuntimeConfig.server.port

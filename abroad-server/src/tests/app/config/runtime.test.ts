@@ -35,4 +35,17 @@ describe('RuntimeConfig', () => {
     expect(config.websocket.port).toBe(8080)
     expect(config.secrets.cacheTtlMs).toBe(300_000)
   })
+
+  // Ultra's rate limit is account-wide, so this must stay off unless a
+  // provisioning job asks for it. Defaulting on burns quota per instance boot.
+  it('leaves the Ultra webhook check off unless explicitly enabled', async () => {
+    delete process.env.TRANSFERO_ULTRA_VERIFY_WEBHOOK_ON_BOOT
+    expect((await importConfig()).transfero.verifyWebhookOnBoot).toBe(false)
+
+    process.env.TRANSFERO_ULTRA_VERIFY_WEBHOOK_ON_BOOT = 'false'
+    expect((await importConfig()).transfero.verifyWebhookOnBoot).toBe(false)
+
+    process.env.TRANSFERO_ULTRA_VERIFY_WEBHOOK_ON_BOOT = 'true'
+    expect((await importConfig()).transfero.verifyWebhookOnBoot).toBe(true)
+  })
 })

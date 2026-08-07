@@ -11,6 +11,9 @@ const toPositiveNumber = (value: unknown, fallback: number): number => {
 const positiveNumberWithDefault = (fallback: number) =>
   z.preprocess(value => toPositiveNumber(value, fallback), z.number())
 
+const toBoolean = (value: unknown): boolean =>
+  typeof value === 'string' && ['1', 'true', 'yes'].includes(value.trim().toLowerCase())
+
 const envSchema = z.object({
   AXIOS_TIMEOUT_MS: positiveNumberWithDefault(10_000),
   HEALTH_PORT: z.unknown().optional(),
@@ -20,6 +23,7 @@ const envSchema = z.object({
   PUBSUB_SUBSCRIPTION_SUFFIX: z.string().trim().optional(),
   SECRET_CACHE_TTL_MS: positiveNumberWithDefault(300_000),
   SHUTDOWN_TIMEOUT_MS: positiveNumberWithDefault(10_000),
+  TRANSFERO_ULTRA_VERIFY_WEBHOOK_ON_BOOT: z.unknown().optional(),
   WS_PORT: positiveNumberWithDefault(8080),
 }).transform((env): RuntimeConfiguration => {
   const serverPort = env.PORT
@@ -38,6 +42,9 @@ const envSchema = z.object({
       healthPort,
       port: serverPort,
       shutdownTimeoutMs: env.SHUTDOWN_TIMEOUT_MS,
+    },
+    transfero: {
+      verifyWebhookOnBoot: toBoolean(env.TRANSFERO_ULTRA_VERIFY_WEBHOOK_ON_BOOT),
     },
     websocket: {
       port: env.WS_PORT,
@@ -58,6 +65,9 @@ export type RuntimeConfiguration = {
     healthPort: number
     port: number
     shutdownTimeoutMs: number
+  }
+  transfero: {
+    verifyWebhookOnBoot: boolean
   }
   websocket: {
     port: number
