@@ -120,11 +120,19 @@ export class BrebPaymentService implements IPaymentService {
   public readonly isAsync = false
   public readonly isEnabled = true
 
-  public readonly MAX_TOTAL_AMOUNT_PER_DAY = 25_000_000
-  public readonly MAX_USER_AMOUNT_PER_DAY = 25_000_000
-  public readonly MAX_USER_AMOUNT_PER_TRANSACTION = 5_000_000
-  public readonly MAX_USER_TRANSACTIONS_PER_DAY = 15
+  // Bre-B imposes no amount or count ceiling of its own, and the platform's
+  // own caps were counting accepted transactions that were never paid: an
+  // abandoned checkout consumed the allowance permanently, because the daily
+  // and monthly counters are only ever incremented. That exhausted a partner's
+  // day on transactions that moved no money. The corridor's own minAmount and
+  // maxAmount remain the amount bound, and liquidity is still checked per
+  // payout, so removing these leaves the real guards in place.
+  public readonly MAX_TOTAL_AMOUNT_PER_DAY = Number.POSITIVE_INFINITY
+  public readonly MAX_USER_AMOUNT_PER_DAY = Number.POSITIVE_INFINITY
+  public readonly MAX_USER_AMOUNT_PER_TRANSACTION = Number.POSITIVE_INFINITY
+  public readonly MAX_USER_TRANSACTIONS_PER_DAY = Number.POSITIVE_INFINITY
 
+  // Kept: this is the rail's own floor, not a platform-imposed cap.
   public readonly MIN_USER_AMOUNT_PER_TRANSACTION = 5_000
 
   public readonly percentageFee = 0

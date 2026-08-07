@@ -172,13 +172,17 @@ describe('BrebPaymentService', () => {
   describe('service basics', () => {
     it('exposes static liquidity and onboarding responses', async () => {
       const { service } = setupService()
+      // A literal balance, not a limit constant: the two are unrelated, and
+      // borrowing one as the other broke this test the moment the daily cap
+      // stopped being a finite number.
+      const balance = 25_000_000
       mockedAxios.get.mockResolvedValueOnce({
         data: {
-          body: [{ saldo: String(service.MAX_TOTAL_AMOUNT_PER_DAY) }],
+          body: [{ saldo: String(balance) }],
         },
       })
 
-      await expect(service.getLiquidity()).resolves.toBe(service.MAX_TOTAL_AMOUNT_PER_DAY)
+      await expect(service.getLiquidity()).resolves.toBe(balance)
       await expect(service.onboardUser()).resolves.toEqual({
         message: 'BreB does not require explicit onboarding',
         success: true,
