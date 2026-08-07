@@ -224,7 +224,7 @@ describe('server bootstrap', () => {
       err: unknown,
       req: RequestStub,
       res: ResponseStub,
-      next?: () => void
+      next?: () => void,
     ) => void
     const json = jest.fn()
     const status = jest.fn(() => ({ json }))

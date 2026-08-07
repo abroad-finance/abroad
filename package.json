@@ -7,6 +7,16 @@
     "abroad-server",
     "abroad-ui"
   ],
+  "overridesReason": {
+    "@ledgerhq/devices": "8.17.0 dropped the hid-framing subpath that @ledgerhq/hw-transport-webusb@6.29.4 still imports, which fails the UI build. Reached via @creit.tech/stellar-wallets-kit; drop this pin when that moves to v2.",
+    "rpc-websockets": "9.3.9 switched to uuid@14, which is ESM-only and cannot be required by the CommonJS server under jest. rpc-websockets only calls uuid.v1(), which uuid@11 provides. Drop this pin when abroad-server moves to ESM."
+  },
+  "overrides": {
+    "@ledgerhq/devices": "8.5.1",
+    "rpc-websockets": {
+      "uuid": "^11"
+    }
+  },
   "scripts": {
     "dev:server": "npm -w abroad run dev",
     "build:server": "npm -w abroad run build",

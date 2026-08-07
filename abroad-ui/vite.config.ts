@@ -34,6 +34,7 @@ function versionFilePlugin(): PluginOption {
     apply: 'build',
     closeBundle() {
       const outPath = path.resolve(__dirname, 'dist', 'version.json')
+      fs.mkdirSync(path.dirname(outPath), { recursive: true })
       fs.writeFileSync(outPath, JSON.stringify({ version: buildVersion }))
     },
     name: 'version-file',
