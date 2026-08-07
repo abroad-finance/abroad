@@ -8,10 +8,35 @@ import { TransactionRepository } from '../../../../modules/transactions/applicat
 import { createMockLogger } from '../../../setup/mockFactories'
 
 describe('RefundCoordinator', () => {
-  const prismaClient = {}
+  // Shaped like the row the notification reads back: the refund's on-chain id is
+  // the field a partner has no other push-based way of learning.
+  const refundedTransaction = {
+    bankCode: 'internal-only',
+    id: 'tx-1',
+    origin: 'DIRECT',
+    partnerUser: { partner: { id: 'partner-1', webhookUrl: 'https://partner.test/hook' }, userId: 'user-1' },
+    quote: { cryptoCurrency: CryptoCurrency.USDC, sourceAmount: 10, targetAmount: 50, targetCurrency: 'BRL' },
+    refundOnChainId: 'refund-1',
+    status: 'PAYMENT_EXPIRED',
+  }
+  const prismaClient = { transaction: { findUnique: jest.fn(async () => refundedTransaction) } }
   const lockManager = {
     withLock: jest.fn(async (_key: string, _timeout: number, operation: () => Promise<void>) => operation()),
   }
+  const enqueueWebhook = jest.fn()
+  const enqueueUserNotification = jest.fn()
+  const outboxDispatcher = { enqueueQueue: enqueueUserNotification } as never
+  const webhookRouter = { enqueue: enqueueWebhook } as never
+
+  const buildCoordinator = (overrides: { client?: unknown, refundDeposit?: jest.Mock } = {}) => new RefundCoordinator(
+    { getClient: jest.fn(async () => overrides.client ?? prismaClient) } as never,
+    { getWalletHandler: jest.fn() } as never,
+    lockManager as unknown as ILockManager,
+    createMockLogger(),
+    { getForCapability: jest.fn(() => ({ refundDeposit: overrides.refundDeposit })) } as never,
+    outboxDispatcher,
+    webhookRouter,
+  )
 
   afterEach(() => {
     jest.restoreAllMocks()
@@ -29,13 +54,7 @@ describe('RefundCoordinator', () => {
       transactionId: 'refund-1',
     })
 
-    const coordinator = new RefundCoordinator(
-      { getClient: jest.fn(async () => prismaClient) } as never,
-      { getWalletHandler: jest.fn() } as never,
-      lockManager as unknown as ILockManager,
-      createMockLogger(),
-      { getForCapability: jest.fn() } as never,
-    )
+    const coordinator = buildCoordinator()
 
     await coordinator.refundByOnChainId({
       amount: 10,
@@ -68,13 +87,7 @@ describe('RefundCoordinator', () => {
       new Error('Unable to refund Solana transaction: missing source address (addressFrom) in transaction context'),
     )
 
-    const coordinator = new RefundCoordinator(
-      { getClient: jest.fn(async () => prismaClient) } as never,
-      { getWalletHandler: jest.fn() } as never,
-      lockManager as unknown as ILockManager,
-      createMockLogger(),
-      { getForCapability: jest.fn() } as never,
-    )
+    const coordinator = buildCoordinator()
 
     await coordinator.refundByOnChainId({
       amount: 10,
@@ -108,13 +121,7 @@ describe('RefundCoordinator', () => {
       transactionId: 'prepared-refund-hash',
     })
 
-    const coordinator = new RefundCoordinator(
-      { getClient: jest.fn(async () => prismaClient) } as never,
-      { getWalletHandler: jest.fn() } as never,
-      lockManager as unknown as ILockManager,
-      createMockLogger(),
-      { getForCapability: jest.fn() } as never,
-    )
+    const coordinator = buildCoordinator()
 
     await coordinator.refundByOnChainId({
       amount: 5.99,
@@ -140,16 +147,7 @@ describe('RefundCoordinator', () => {
   it('captures a confirmed refund fee under one deterministic reconciliation key', async () => {
     const costUpsert = jest.fn().mockResolvedValue({})
     const client = {
-      transaction: {
-        findUnique: jest.fn().mockResolvedValue({
-          quote: {
-            cryptoCurrency: CryptoCurrency.USDC,
-            sourceAmount: 10,
-            targetAmount: 50,
-            targetCurrency: 'BRL',
-          },
-        }),
-      },
+      transaction: { findUnique: jest.fn().mockResolvedValue(refundedTransaction) },
       transactionEconomicCost: { upsert: costUpsert },
       transactionEconomics: { upsert: jest.fn().mockResolvedValue({}) },
     }
@@ -162,13 +160,7 @@ describe('RefundCoordinator', () => {
       success: true,
       transactionId: 'refund-1',
     })
-    const coordinator = new RefundCoordinator(
-      { getClient: jest.fn(async () => client) } as never,
-      { getWalletHandler: jest.fn() } as never,
-      lockManager as unknown as ILockManager,
-      createMockLogger(),
-      { getForCapability: jest.fn() } as never,
-    )
+    const coordinator = buildCoordinator({ client })
 
     await coordinator.refundByOnChainId({
       amount: 10,
@@ -191,15 +183,86 @@ describe('RefundCoordinator', () => {
     }))
   })
 
-  describe('refundFiatDeposit', () => {
-    const buildCoordinator = (refundDeposit: jest.Mock) => new RefundCoordinator(
-      { getClient: jest.fn(async () => prismaClient) } as never,
-      { getWalletHandler: jest.fn() } as never,
-      lockManager as unknown as ILockManager,
-      createMockLogger(),
-      { getForCapability: jest.fn(() => ({ refundDeposit })) } as never,
-    )
+  /*
+   * The failure's own `transaction.updated` is enqueued before the refund is
+   * attempted, so it carries `refundOnChainId: null`. These pin the second
+   * notification — without it a completed refund is never pushed to the partner
+   * at all and can only be found by polling.
+   */
+  describe('refund notifications', () => {
+    const refundToSender = {
+      addressFrom: 'sender-wallet',
+      amount: 10,
+      blockchain: BlockchainNetwork.STELLAR,
+      cryptoCurrency: CryptoCurrency.USDC,
+      reason: 'expired_transaction',
+      transactionId: 'tx-1',
+      trigger: 'non_awaiting_deposit',
+    }
 
+    beforeEach(() => {
+      jest.spyOn(TransactionRepository.prototype, 'getClient').mockResolvedValue(prismaClient as never)
+      jest.spyOn(TransactionRepository.prototype, 'reserveRefund').mockResolvedValue({ attempts: 1, outcome: 'reserved' })
+      jest.spyOn(TransactionRepository.prototype, 'recordRefundOutcome').mockResolvedValue(undefined)
+    })
+
+    it('announces a completed refund with its on-chain id', async () => {
+      jest.spyOn(RefundService.prototype, 'refundToSender').mockResolvedValue({ success: true, transactionId: 'refund-1' })
+
+      await buildCoordinator().refundToSender(refundToSender)
+
+      expect(enqueueWebhook).toHaveBeenCalledWith(
+        'https://partner.test/hook',
+        'DIRECT',
+        { data: expect.objectContaining({ refundOnChainId: 'refund-1' }), event: 'transaction.updated' },
+        'flow_refund',
+        expect.objectContaining({ partnerId: 'partner-1', transactionId: 'tx-1' }),
+      )
+    })
+
+    it('stays silent when the refund did not go through', async () => {
+      jest.spyOn(RefundService.prototype, 'refundToSender').mockResolvedValue({ reason: 'horizon_unavailable', success: false })
+
+      await buildCoordinator().refundToSender(refundToSender)
+
+      expect(enqueueWebhook).not.toHaveBeenCalled()
+    })
+
+    // An onramp took the customer's money up front, so its refund is the one
+    // they are most anxious about; it reaches the partner the same way.
+    it('announces a returned fiat deposit', async () => {
+      const refundDeposit = jest.fn(async () => ({ providerRefundId: 'rf-1', success: true }))
+
+      await buildCoordinator({ refundDeposit }).refundFiatDeposit({
+        paymentMethod: PaymentMethod.PIX,
+        providerDepositId: 'dep-1',
+        reason: 'delivery_failed',
+        targetCurrency: TargetCurrency.BRL,
+        transactionId: 'tx-1',
+        trigger: 'flow_crypto_send',
+      })
+
+      expect(enqueueWebhook).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.anything(),
+        expect.objectContaining({ event: 'transaction.updated' }),
+        'flow_fiat_refund',
+        expect.anything(),
+      )
+    })
+
+    // A refund that already moved money must not be reported as failed because
+    // the announcement of it broke.
+    it('keeps the refund when the notification cannot be built', async () => {
+      jest.spyOn(RefundService.prototype, 'refundToSender').mockResolvedValue({ success: true, transactionId: 'refund-1' })
+      prismaClient.transaction.findUnique.mockRejectedValueOnce(new Error('database unavailable'))
+
+      await expect(buildCoordinator().refundToSender(refundToSender)).resolves.toBeUndefined()
+      expect(enqueueWebhook).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('refundFiatDeposit', () => {
     const params = {
       paymentMethod: PaymentMethod.PIX,
       providerDepositId: 'dep-1',
@@ -215,7 +278,7 @@ describe('RefundCoordinator', () => {
       const record = jest.spyOn(TransactionRepository.prototype, 'recordRefundOutcome').mockResolvedValue(undefined)
       const refundDeposit = jest.fn(async () => ({ providerRefundId: 'rf-1', success: true }))
 
-      await buildCoordinator(refundDeposit).refundFiatDeposit(params)
+      await buildCoordinator({ refundDeposit }).refundFiatDeposit(params)
 
       expect(refundDeposit).toHaveBeenCalledWith({ providerDepositId: 'dep-1', transactionId: 'tx-1' })
       expect(record).toHaveBeenCalledWith(prismaClient, expect.objectContaining({
@@ -231,7 +294,7 @@ describe('RefundCoordinator', () => {
       jest.spyOn(TransactionRepository.prototype, 'reserveRefund').mockResolvedValue({ outcome: 'already_refunded', refundOnChainId: 'rf-0' })
       const refundDeposit = jest.fn()
 
-      await buildCoordinator(refundDeposit).refundFiatDeposit(params)
+      await buildCoordinator({ refundDeposit }).refundFiatDeposit(params)
 
       expect(refundDeposit).not.toHaveBeenCalled()
     })
@@ -241,7 +304,7 @@ describe('RefundCoordinator', () => {
       jest.spyOn(TransactionRepository.prototype, 'reserveRefund').mockResolvedValue({ attempts: 1, outcome: 'reserved' })
       jest.spyOn(TransactionRepository.prototype, 'recordRefundOutcome').mockResolvedValue(undefined)
 
-      await buildCoordinator(jest.fn(async () => ({ providerRefundId: 'rf-1', success: true }))).refundFiatDeposit(params)
+      await buildCoordinator({ refundDeposit: jest.fn(async () => ({ providerRefundId: 'rf-1', success: true })) }).refundFiatDeposit(params)
 
       expect(lockManager.withLock).toHaveBeenCalledWith(
         expect.stringContaining('tx-1'), expect.any(Number), expect.any(Function),
@@ -266,7 +329,7 @@ describe('RefundCoordinator', () => {
       const record = jest.spyOn(TransactionRepository.prototype, 'recordRefundOutcome').mockResolvedValue(undefined)
       const refundDeposit = jest.fn(async () => ({ code, reason, success: false }))
 
-      await buildCoordinator(refundDeposit).refundFiatDeposit(params)
+      await buildCoordinator({ refundDeposit }).refundFiatDeposit(params)
 
       const recorded = record.mock.calls[0][1].refundResult
       expect(recorded).toEqual({ reason, success: false })
@@ -280,7 +343,7 @@ describe('RefundCoordinator', () => {
       jest.spyOn(TransactionRepository.prototype, 'reserveRefund').mockResolvedValue({ attempts: 1, outcome: 'in_flight' })
       const refundDeposit = jest.fn()
 
-      await buildCoordinator(refundDeposit).refundFiatDeposit(params)
+      await buildCoordinator({ refundDeposit }).refundFiatDeposit(params)
 
       expect(refundDeposit).not.toHaveBeenCalled()
     })

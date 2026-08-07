@@ -16,15 +16,21 @@ import { TYPES } from '../../../app/container/types'
 import { createScopedLogger, ScopedLogger } from '../../../core/logging/scopedLogger'
 import { ILogger } from '../../../core/logging/types'
 import { ILockManager } from '../../../platform/cacheLock/ILockManager'
+import { WebhookEvent } from '../../../platform/notifications/IWebhookNotifier'
+import { OutboxDispatcher } from '../../../platform/outbox/OutboxDispatcher'
 import { IDatabaseClientProvider } from '../../../platform/persistence/IDatabaseClientProvider'
 import { IFiatDepositServiceFactory } from '../../payments/application/contracts/IFiatDepositServiceFactory'
 import { IWalletHandlerFactory } from '../../payments/application/contracts/IWalletHandlerFactory'
 import { REFUND_LOCK_ACQUIRE_TIMEOUT_MS, refundLockKey } from '../../transactions/application/refundLock'
 import { RefundService } from '../../transactions/application/RefundService'
+import { TransactionEventDispatcher } from '../../transactions/application/TransactionEventDispatcher'
+import { transactionNotificationInclude } from '../../transactions/application/transactionNotificationTypes'
 import { TransactionRepository } from '../../transactions/application/TransactionRepository'
+import { TransactionWebhookRouter } from '../../transactions/application/TransactionWebhookRouter'
 
 @injectable()
 export class RefundCoordinator {
+  private readonly dispatcher: TransactionEventDispatcher
   private readonly logger: ScopedLogger
   private readonly refundService: RefundService
   private readonly repository: TransactionRepository
@@ -36,9 +42,16 @@ export class RefundCoordinator {
     @inject(TYPES.ILogger) baseLogger: ILogger,
     @inject(TYPES.IFiatDepositServiceFactory)
     private readonly fiatDepositServiceFactory: IFiatDepositServiceFactory,
+    @inject(TYPES.IOutboxDispatcher) outboxDispatcher: OutboxDispatcher,
+    @inject(TransactionWebhookRouter) transactionWebhookRouter: TransactionWebhookRouter,
   ) {
     this.repository = new TransactionRepository(dbProvider)
     this.refundService = new RefundService(walletHandlerFactory, baseLogger)
+    this.dispatcher = new TransactionEventDispatcher(
+      outboxDispatcher,
+      transactionWebhookRouter,
+      baseLogger,
+    )
     this.logger = createScopedLogger(baseLogger, { scope: 'FlowRefundCoordinator' })
   }
 
@@ -97,6 +110,48 @@ export class RefundCoordinator {
       REFUND_LOCK_ACQUIRE_TIMEOUT_MS,
       async () => this.refundToSenderWhileLocked(params),
     )
+  }
+
+  /**
+   * Tells the partner the money went back.
+   *
+   * The `transaction.updated` for the *failure* is enqueued before the refund is
+   * even attempted, so it always carries `refundOnChainId: null`. Without a
+   * second notification here a completed refund is never announced at all, and a
+   * partner can only discover it by polling `GET /transactions/list`. Emitting
+   * once the outcome is recorded means the payload carries the refund's on-chain
+   * (or provider) id.
+   *
+   * The refund reservation is what holds this to one delivery per refund. A
+   * notification must never undo a refund that already succeeded, so failures
+   * here are logged rather than propagated.
+   */
+  private async notifyRefundCompleted(
+    client: Awaited<ReturnType<TransactionRepository['getClient']>>,
+    transactionId: string,
+    context: string,
+  ): Promise<void> {
+    try {
+      const transaction = await client.transaction.findUnique({
+        include: transactionNotificationInclude,
+        where: { id: transactionId },
+      })
+      if (!transaction) return
+
+      await this.dispatcher.notifyPartnerAndUser(
+        transaction,
+        WebhookEvent.TRANSACTION_UPDATED,
+        'transaction.updated',
+        context,
+        { deliverNow: false, prismaClient: client },
+      )
+    }
+    catch (error) {
+      this.logger.warn('Refund completed but partner notification was not enqueued', {
+        error: error instanceof Error ? error.message : 'unknown_error',
+        transactionId,
+      })
+    }
   }
 
   private async recordRefundFee(
@@ -227,6 +282,10 @@ export class RefundCoordinator {
         })
       }
     }
+
+    if (refundResult.success) {
+      await this.notifyRefundCompleted(prismaClient, params.transactionId, 'flow_refund')
+    }
   }
 
   private async refundFiatDepositWhileLocked(params: {
@@ -291,6 +350,11 @@ export class RefundCoordinator {
         error: error instanceof Error ? error.message : 'unknown_error',
         transactionId: params.transactionId,
       })
+      return
+    }
+
+    if (result.success) {
+      await this.notifyRefundCompleted(prismaClient, params.transactionId, 'flow_fiat_refund')
     }
   }
 
@@ -367,6 +431,10 @@ export class RefundCoordinator {
           transactionId: params.transactionId,
         })
       }
+    }
+
+    if (refundResult.success) {
+      await this.notifyRefundCompleted(prismaClient, params.transactionId, 'flow_refund')
     }
   }
 }

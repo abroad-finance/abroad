@@ -11,7 +11,18 @@ Abroad sends JSON webhooks to notify your application about transaction lifecycl
 | Event name | When it is sent | Notes |
 | :--- | :--- | :--- |
 | `transaction.created` | A transaction was accepted and is waiting for funds, or the system detected an on-chain payment (including wrong-amount cases). | May fire multiple times for the same `id` as the transaction progresses. |
-| `transaction.updated` | The transaction status changed (processing, completed, failed, or expired). | Used for payout and expiry updates. |
+| `transaction.updated` | The transaction status changed (processing, completed, failed, or expired), **or** a refund for it completed. | Used for payout, expiry, and refund updates. |
+
+## Refunds
+
+A refund does not have its own event or its own status — it arrives as a second `transaction.updated`.
+
+When a transaction fails, expires, or is paid in the wrong amount, you first get a `transaction.updated` carrying that status. Abroad then returns the funds, and once the return settles you get **another** `transaction.updated` for the same `id`. The status is unchanged between the two; what changes is `refundOnChainId`, which is `null` in the first and carries the refund's identifier in the second:
+
+- crypto sent back to its sender — the refund's on-chain transaction hash or signature;
+- a fiat deposit returned to its payer (onramp) — the provider's refund id.
+
+So treat a non-null `refundOnChainId` as "the money is back", not the status field. Handlers must already be idempotent for repeated events on one `id` — this is one of those repeats.
 
 ## Payload structure
 
