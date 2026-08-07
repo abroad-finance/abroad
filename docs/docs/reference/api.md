@@ -152,7 +152,7 @@ Calculate how much the recipient will receive for a specific crypto amount.
 
 #### Quote error response
 
-Both quote endpoints return the same safe error shape for HTTP `400` and `500` responses:
+Both quote endpoints return the same safe error shape for HTTP `400`, `401`, and `500` responses:
 
 ```json
 {
@@ -163,6 +163,8 @@ Both quote endpoints return the same safe error shape for HTTP `400` and `500` r
 ```
 
 Supported `code` values are `authentication_failed`, `invalid_request`, `corridor_unavailable`, `minimum`, `maximum`, `quote_unavailable`, and `server_error`. Use `retryable` to decide whether the same request may be attempted again; the response never exposes raw provider errors.
+
+`authentication_failed` is returned with HTTP `401` — the credential was rejected, so re-authenticate rather than changing the request. Every other `code` uses `400` or `500`.
 
 The `fee` and structured error fields are additive response metadata. Partner request fields, transaction statuses, webhook payloads, and optional `tax_id` behavior are unchanged.
 

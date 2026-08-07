@@ -30,6 +30,7 @@ describe('QuoteController', () => {
   let req: RequestExpress
   let badRequest: jest.Mock
   let internalServerError: jest.Mock
+  let unauthorized: jest.Mock
 
   const partner = { id: 'partner-1' }
 
@@ -55,6 +56,7 @@ describe('QuoteController', () => {
     req = { user: partner } as unknown as RequestExpress
     badRequest = jest.fn((code: number, body: { reason: string }) => body)
     internalServerError = jest.fn((code: number, body: { reason: string }) => body)
+    unauthorized = jest.fn((code: number, body: { reason: string }) => body)
   })
 
   /* ------------------------------------------------------------------
@@ -78,7 +80,7 @@ describe('QuoteController', () => {
       }
       mockQuoteUseCase.createQuote.mockResolvedValueOnce(quote)
 
-      const result = await controller.getQuote(validQuoteBody, req, badRequest, internalServerError)
+      const result = await controller.getQuote(validQuoteBody, req, badRequest, unauthorized, internalServerError)
 
       expect(result).toEqual(quote)
       expect(badRequest).not.toHaveBeenCalled()
@@ -95,7 +97,7 @@ describe('QuoteController', () => {
     it('returns 400 when the body fails Zod validation', async () => {
       const invalidBody = { ...validQuoteBody, amount: -10 }
 
-      const result = await controller.getQuote(invalidBody, req, badRequest, internalServerError)
+      const result = await controller.getQuote(invalidBody, req, badRequest, unauthorized, internalServerError)
 
       expect(badRequest).toHaveBeenCalledWith(
         400,
@@ -115,7 +117,7 @@ describe('QuoteController', () => {
         400,
       ))
 
-      const result = await controller.getQuote(validQuoteBody, req, badRequest, internalServerError)
+      const result = await controller.getQuote(validQuoteBody, req, badRequest, unauthorized, internalServerError)
 
       expect(badRequest).toHaveBeenCalledWith(400, {
         code: 'minimum',
@@ -135,7 +137,7 @@ describe('QuoteController', () => {
     ])('returns a sanitized 500 fallback on %s', async (_label, rejection) => {
       mockQuoteUseCase.createQuote.mockRejectedValueOnce(rejection)
 
-      const result = await controller.getQuote(validQuoteBody, req, badRequest, internalServerError)
+      const result = await controller.getQuote(validQuoteBody, req, badRequest, unauthorized, internalServerError)
 
       expect(internalServerError).toHaveBeenCalledWith(500, {
         code: 'server_error',
@@ -169,6 +171,7 @@ describe('QuoteController', () => {
         validQuoteBody,
         requestWithoutUser,
         badRequest,
+        unauthorized,
         internalServerError,
         'api-key-123',
       )
@@ -185,13 +188,14 @@ describe('QuoteController', () => {
       })
     })
 
-    it('returns 400 when the provided X-API-Key is invalid', async () => {
+    it('returns 401 when the provided X-API-Key is invalid', async () => {
       mockPartnerService.getPartnerFromApiKey.mockRejectedValueOnce(new Error('Invalid API key'))
 
       const result = await controller.getQuote(
         validQuoteBody,
         {} as unknown as RequestExpress,
         badRequest,
+        unauthorized,
         internalServerError,
         'bad-key',
       )
@@ -202,11 +206,12 @@ describe('QuoteController', () => {
         retryable: false,
       })
       expect(mockQuoteUseCase.createQuote).not.toHaveBeenCalled()
-      expect(badRequest).toHaveBeenCalledWith(400, {
+      expect(unauthorized).toHaveBeenCalledWith(401, {
         code: 'authentication_failed',
         reason: 'Invalid API key',
         retryable: false,
       })
+      expect(badRequest).not.toHaveBeenCalled()
       expect(mockLogger.warn).toHaveBeenCalledWith(
         '[QuoteController] quote authentication failed',
         { errorName: 'Error', method: 'api_key' },
@@ -237,6 +242,7 @@ describe('QuoteController', () => {
         validQuoteBody,
         bearerRequest,
         badRequest,
+        unauthorized,
         internalServerError,
         undefined,
       )
@@ -274,6 +280,7 @@ describe('QuoteController', () => {
         validReverseBody,
         req,
         badRequest,
+        unauthorized,
         internalServerError,
         undefined,
       )
@@ -297,6 +304,7 @@ describe('QuoteController', () => {
         invalidBody,
         req,
         badRequest,
+        unauthorized,
         internalServerError,
         undefined,
       )

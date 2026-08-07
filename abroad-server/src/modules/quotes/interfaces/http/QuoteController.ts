@@ -56,6 +56,7 @@ type QuoteHandlerParams<TPayload> = {
   request: RequestExpress
   requestBody: unknown
   schema: z.ZodSchema<TPayload>
+  unauthorizedResponse: TsoaResponse<401, QuoteErrorResponse>
 }
 
 @Route('quote')
@@ -77,12 +78,14 @@ export class QuoteController extends Controller {
    */
   @Post('/onramp')
   @Response('400', 'Bad Request')
+  @Response('401', 'Unauthorized')
   @Response('500', 'Internal Server Error')
   @SuccessResponse('200', 'Onramp quote response')
   public async getOnrampQuote(
     @Body() requestBody: OnrampQuoteRequest,
     @Request() request: RequestExpress,
     @Res() badRequestResponse: TsoaResponse<400, QuoteErrorResponse>,
+    @Res() unauthorizedResponse: TsoaResponse<401, QuoteErrorResponse>,
     @Res() internalServerErrorResponse: TsoaResponse<500, QuoteErrorResponse>,
     @Header('X-API-Key') apiKey?: string,
   ): Promise<QuoteResponse> {
@@ -101,6 +104,7 @@ export class QuoteController extends Controller {
       request,
       requestBody,
       schema: onrampQuoteRequestSchema,
+      unauthorizedResponse,
     })
   }
 
@@ -109,12 +113,14 @@ export class QuoteController extends Controller {
    */
   @Post()
   @Response('400', 'Bad Request')
+  @Response('401', 'Unauthorized')
   @Response('500', 'Internal Server Error')
   @SuccessResponse('200', 'Quote response')
   public async getQuote(
     @Body() requestBody: QuoteRequest,
     @Request() request: RequestExpress,
     @Res() badRequestResponse: TsoaResponse<400, QuoteErrorResponse>,
+    @Res() unauthorizedResponse: TsoaResponse<401, QuoteErrorResponse>,
     @Res() internalServerErrorResponse: TsoaResponse<500, QuoteErrorResponse>,
     @Header('X-API-Key') apiKey?: string,
   ): Promise<QuoteResponse> {
@@ -133,6 +139,7 @@ export class QuoteController extends Controller {
       request,
       requestBody,
       schema: quoteRequestSchema,
+      unauthorizedResponse,
     })
   }
 
@@ -142,12 +149,14 @@ export class QuoteController extends Controller {
    */
   @Post('/reverse')
   @Response('400', 'Bad Request')
+  @Response('401', 'Unauthorized')
   @Response('500', 'Internal Server Error')
   @SuccessResponse('200', 'Reverse quote response')
   public async getReverseQuote(
     @Body() requestBody: ReverseQuoteRequest,
     @Request() request: RequestExpress,
     @Res() badRequestResponse: TsoaResponse<400, QuoteErrorResponse>,
+    @Res() unauthorizedResponse: TsoaResponse<401, QuoteErrorResponse>,
     @Res() internalServerErrorResponse: TsoaResponse<500, QuoteErrorResponse>,
     @Header('X-API-Key') apiKey?: string,
   ): Promise<QuoteResponse> {
@@ -166,6 +175,7 @@ export class QuoteController extends Controller {
       request,
       requestBody,
       schema: reverseQuoteRequestSchema,
+      unauthorizedResponse,
     })
   }
 
@@ -180,6 +190,7 @@ export class QuoteController extends Controller {
       request,
       requestBody,
       schema,
+      unauthorizedResponse,
     } = params
 
     const parsed = schema.safeParse(requestBody)
@@ -193,7 +204,11 @@ export class QuoteController extends Controller {
 
     const { errorReason, partner } = await this.resolvePartner(request, apiKey)
     if (errorReason) {
-      return badRequestResponse(400, {
+      // 401, not 400: a stale bearer token is a credential problem the caller
+      // can fix by re-authenticating. Returned as 400 the web app had no way to
+      // tell it apart from a bad payload, so it never cleared the dead token
+      // and every quote on the screen kept failing.
+      return unauthorizedResponse(401, {
         code: 'authentication_failed',
         reason: errorReason,
         retryable: false,

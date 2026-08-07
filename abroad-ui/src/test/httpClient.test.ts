@@ -9,6 +9,7 @@ import {
   test,
 } from 'vitest'
 
+import { authTokenStore } from '../services/auth/authTokenStore.ts'
 import { HttpClient } from '../services/http/httpClient.ts'
 
 const server = setupServer()
@@ -29,6 +30,54 @@ describe('httpClient', () => {
       expect(result.data.value).toBe(42)
       expect(result.status).toBe(200)
     }
+  })
+
+  test('discards a token the server rejects with 401', async () => {
+    server.use(http.get('http://localhost/guarded', () => new HttpResponse(null, { status: 401 })))
+    let cleared = false
+    const authed = new HttpClient({
+      baseUrl: 'http://localhost',
+      getAuthToken: () => 'stale-token',
+      onUnauthorized: () => {
+        cleared = true
+      },
+    })
+
+    const result = await authed.request('/guarded', { method: 'GET' })
+
+    expect(result.ok).toBe(false)
+    expect(cleared).toBe(true)
+  })
+
+  test('leaves the shared store alone for clients with their own token source', async () => {
+    server.use(http.get('http://localhost/guarded', () => new HttpResponse(null, { status: 401 })))
+    authTokenStore.setToken('consumer-token')
+    const portalLike = new HttpClient({
+      baseUrl: 'http://localhost',
+      getAuthToken: () => 'portal-token',
+    })
+
+    await portalLike.request('/guarded', { method: 'GET' })
+
+    expect(authTokenStore.getToken()).toBe('consumer-token')
+    authTokenStore.setToken(null)
+  })
+
+  test('leaves the token alone when an anonymous request is rejected', async () => {
+    server.use(http.get('http://localhost/guarded', () => new HttpResponse(null, { status: 401 })))
+    let cleared = false
+    const anonymous = new HttpClient({
+      baseUrl: 'http://localhost',
+      getAuthToken: () => null,
+      onUnauthorized: () => {
+        cleared = true
+      },
+    })
+
+    const result = await anonymous.request('/guarded', { method: 'GET' })
+
+    expect(result.ok).toBe(false)
+    expect(cleared).toBe(false)
   })
 
   test('marks aborted requests explicitly', async () => {

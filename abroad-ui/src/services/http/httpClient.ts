@@ -8,6 +8,7 @@ type HttpClientOptions = {
   baseUrl?: string
   getAuthToken?: () => null | string
   headers?: HeadersInit
+  onUnauthorized?: () => void
 }
 
 const defaultBaseUrl = import.meta.env.VITE_API_URL || 'https://api.abroad.finance'
@@ -46,10 +47,17 @@ export class HttpClient {
 
   private readonly getAuthToken?: () => null | string
 
+  private readonly onUnauthorized?: () => void
+
   constructor(options: HttpClientOptions = {}) {
     this.baseUrl = options.baseUrl || defaultBaseUrl
     this.getAuthToken = options.getAuthToken || (() => authTokenStore.getToken())
     this.defaultHeaders = options.headers
+    // Only a client reading the shared store may clear it. Callers that supply
+    // their own token source (the partner portal has a separate session) own
+    // their own invalidation and must not have the consumer token wiped for them.
+    this.onUnauthorized = options.onUnauthorized
+      ?? (options.getAuthToken ? undefined : () => authTokenStore.setToken(null))
   }
 
   async request<TData, TError = unknown>(path: string, config: HttpRequestConfig): Promise<ApiResult<TData, TError>> {
@@ -124,6 +132,12 @@ export class HttpClient {
 
     const payload = await parsePayload()
     if (!ok) {
+      // A token the server rejects will keep being rejected. Dropping it here
+      // lets the next request fall back to anonymous access and lets the app
+      // prompt for a fresh sign-in, instead of replaying a dead credential.
+      if (status === 401 && token) {
+        this.onUnauthorized?.()
+      }
       const error: ApiFailure<TError> = {
         error: {
           body: (payload as TError) ?? null,

@@ -84,3 +84,5 @@ Quote failures return a bounded error body instead of provider details:
 ```
 
 `code` is one of `authentication_failed`, `invalid_request`, `corridor_unavailable`, `minimum`, `maximum`, `quote_unavailable`, or `server_error`. Retry only when `retryable` is `true`; otherwise correct the request or choose a supported route first.
+
+`authentication_failed` arrives with HTTP `401` and means the API key or Bearer token was rejected — re-authenticate instead of adjusting the quote request.
