@@ -33,6 +33,8 @@ const typeKeys = [
   'IQueueHandler',
   'ISecretManager',
   'ISlackNotifier',
+  'IStablebondOracle',
+  'IStablebondVenue',
   'ITreasuryBalanceSource',
   'IWalletHandlerFactory',
   'IWebhookNotifier',

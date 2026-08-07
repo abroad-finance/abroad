@@ -42,6 +42,11 @@ export class CryptoInventoryService {
   }
 
   public async getAvailable(params: {
+    /**
+     * Skip the cache. The just-in-time unwind sizes itself from this number, and
+     * a stale read would under-convert and leave the delivery short.
+     */
+    bypassCache?: boolean
     cryptoCurrency: CryptoCurrency
     network: BlockchainNetwork
     now?: number
@@ -57,7 +62,7 @@ export class CryptoInventoryService {
 
     const now = params.now ?? Date.now()
     const key = `${venue}:${params.cryptoCurrency}`
-    const cached = this.cache.get(key)
+    const cached = params.bypassCache ? undefined : this.cache.get(key)
     if (cached && now - cached.fetchedAt <= this.ttlMs) {
       return { available: cached.available, success: true }
     }

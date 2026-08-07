@@ -18,6 +18,7 @@ import { EnqueueTreasuryReplenishStepExecutor } from '../../modules/flows/applic
 import { ExchangeConvertStepExecutor } from '../../modules/flows/application/steps/ExchangeConvertStepExecutor'
 import { ExchangeSendStepExecutor } from '../../modules/flows/application/steps/ExchangeSendStepExecutor'
 import { PayoutSendStepExecutor } from '../../modules/flows/application/steps/PayoutSendStepExecutor'
+import { StablebondUnwindStepExecutor } from '../../modules/flows/application/steps/StablebondUnwindStepExecutor'
 import { TreasuryTransferStepExecutor } from '../../modules/flows/application/steps/TreasuryTransferStepExecutor'
 import { KycSubmissionService } from '../../modules/kyc/application/KycSubmissionService'
 import { OpsKycService } from '../../modules/kyc/application/OpsKycService'
@@ -114,22 +115,29 @@ import { BridgeSweepService } from '../../modules/treasury/application/BridgeSwe
 import { BridgeSweepWorker } from '../../modules/treasury/application/BridgeSweepWorker'
 import { CryptoInventoryService } from '../../modules/treasury/application/CryptoInventoryService'
 import { ExchangeProviderFactory } from '../../modules/treasury/application/ExchangeProviderFactory'
+import { JustInTimeUnwindService } from '../../modules/treasury/application/JustInTimeUnwindService'
 import { OpsBridgeService } from '../../modules/treasury/application/OpsBridgeService'
+import { OpsStablebondService } from '../../modules/treasury/application/OpsStablebondService'
 import { OpsTreasuryService } from '../../modules/treasury/application/OpsTreasuryService'
 import { OpsTreasuryThresholdService } from '../../modules/treasury/application/OpsTreasuryThresholdService'
+import { StablebondPositionService } from '../../modules/treasury/application/StablebondPositionService'
 import { TreasuryReplenishService } from '../../modules/treasury/application/TreasuryReplenishService'
 import { TreasuryReplenishWorker } from '../../modules/treasury/application/TreasuryReplenishWorker'
 import { TreasurySnapshotWorker } from '../../modules/treasury/application/TreasurySnapshotWorker'
+import { YieldAccrualService } from '../../modules/treasury/application/YieldAccrualService'
 import { BinanceBalanceSource } from '../../modules/treasury/infrastructure/balanceSources/BinanceBalanceSource'
 import { CeloBalanceSource } from '../../modules/treasury/infrastructure/balanceSources/CeloBalanceSource'
 import { MoviiBalanceSource } from '../../modules/treasury/infrastructure/balanceSources/MoviiBalanceSource'
 import { SolanaBalanceSource } from '../../modules/treasury/infrastructure/balanceSources/SolanaBalanceSource'
+import { StablebondBalanceSource } from '../../modules/treasury/infrastructure/balanceSources/StablebondBalanceSource'
 import { StellarBalanceSource } from '../../modules/treasury/infrastructure/balanceSources/StellarBalanceSource'
 import { TransferoBalanceSource } from '../../modules/treasury/infrastructure/balanceSources/TransferoBalanceSource'
 import { BinanceExchangeProvider } from '../../modules/treasury/infrastructure/exchangeProviders/binanceExchangeProvider'
 import { BinanceBrlExchangeProvider } from '../../modules/treasury/infrastructure/exchangeProviders/binanceExchangeProvider'
 import { TransferoCryptoPurchaseService } from '../../modules/treasury/infrastructure/exchangeProviders/transferoCryptoPurchaseService'
 import { TransferoExchangeProvider } from '../../modules/treasury/infrastructure/exchangeProviders/transferoExchangeProvider'
+import { EtherfuseStablebondClient } from '../../modules/treasury/infrastructure/stablebond/EtherfuseStablebondClient'
+import { StellarDexVenue } from '../../modules/treasury/infrastructure/stablebond/StellarDexVenue'
 import { StellarListener } from '../../modules/treasury/interfaces/listeners/StellarListener'
 import { BindingRegistration, registerBindings } from './bindingSupport'
 import { TYPES } from './types'
@@ -256,12 +264,20 @@ const domainBindings: ReadonlyArray<BindingRegistration<unknown>> = [
   { identifier: TYPES.ITreasuryBalanceSource, implementation: CeloBalanceSource },
   { identifier: TYPES.ITreasuryBalanceSource, implementation: SolanaBalanceSource },
   { identifier: TYPES.ITreasuryBalanceSource, implementation: MoviiBalanceSource },
+  { identifier: TYPES.ITreasuryBalanceSource, implementation: StablebondBalanceSource },
+  { identifier: TYPES.IStablebondOracle, implementation: EtherfuseStablebondClient },
+  { identifier: TYPES.IStablebondVenue, implementation: StellarDexVenue },
+  { bindSelf: true, identifier: StablebondPositionService, implementation: StablebondPositionService },
+  { bindSelf: true, identifier: YieldAccrualService, implementation: YieldAccrualService },
+  { bindSelf: true, identifier: JustInTimeUnwindService, implementation: JustInTimeUnwindService },
+  { bindSelf: true, identifier: OpsStablebondService, implementation: OpsStablebondService },
   { bindSelf: true, identifier: OpsTreasuryService, implementation: OpsTreasuryService },
   { bindSelf: true, identifier: OpsTreasuryThresholdService, implementation: OpsTreasuryThresholdService },
   { bindSelf: true, identifier: TreasurySnapshotWorker, implementation: TreasurySnapshotWorker },
   { identifier: TYPES.FlowStepExecutor, implementation: PayoutSendStepExecutor },
   { identifier: TYPES.FlowStepExecutor, implementation: CryptoSendStepExecutor },
   { identifier: TYPES.FlowStepExecutor, implementation: EnqueueTreasuryReplenishStepExecutor },
+  { identifier: TYPES.FlowStepExecutor, implementation: StablebondUnwindStepExecutor },
   { identifier: TYPES.FlowStepExecutor, implementation: AwaitProviderStatusStepExecutor },
   { identifier: TYPES.FlowStepExecutor, implementation: ExchangeSendStepExecutor },
   { identifier: TYPES.FlowStepExecutor, implementation: ExchangeConvertStepExecutor },
