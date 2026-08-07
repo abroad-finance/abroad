@@ -31,6 +31,9 @@ import { uuidToBase64 } from './transactionEncoding'
 import { toUserTransactionPayload, toWebhookTransactionPayload } from './transactionPayload'
 import { TransactionWebhookRouter } from './TransactionWebhookRouter'
 
+/** Total source amount a partner may move before KYB approval, in USD. */
+const KYB_UNAPPROVED_TOTAL_CAP = 100
+
 interface AcceptTransactionRequest {
   accountNumber: string
   /** Wallet the crypto is delivered to. Required for FIAT_TO_CRYPTO only. */
@@ -457,8 +460,15 @@ export class TransactionAcceptanceService {
       },
     })
     const partnerTotalAmount = aggregate.sourceAmount
-    if (partnerTotalAmount + sourceAmount > 100) {
-      throw new TransactionValidationError('This partner is limited to a total of $100 until KYB is approved. Please complete KYB to raise the limit.')
+    if (partnerTotalAmount + sourceAmount > KYB_UNAPPROVED_TOTAL_CAP) {
+      this.rejectAtLimit('This partner is limited to a total of $100 until KYB is approved. Please complete KYB to raise the limit.', {
+        cap: KYB_UNAPPROVED_TOTAL_CAP,
+        limit: 'KYB_UNAPPROVED_TOTAL',
+        observed: partnerTotalAmount,
+        partnerId,
+        requested: sourceAmount,
+        scope: 'PARTNER',
+      })
     }
   }
 
@@ -479,7 +489,14 @@ export class TransactionAcceptanceService {
     })
     const totalAmountToday = aggregate.targetAmount
     if (totalAmountToday + quote.targetAmount > paymentService.MAX_TOTAL_AMOUNT_PER_DAY) {
-      throw new TransactionValidationError('This payment method already reached today\'s payout limit. Please try again tomorrow or use another method.')
+      this.rejectAtLimit('This payment method already reached today\'s payout limit. Please try again tomorrow or use another method.', {
+        cap: paymentService.MAX_TOTAL_AMOUNT_PER_DAY,
+        limit: 'METHOD_DAILY_AMOUNT',
+        observed: totalAmountToday,
+        paymentMethod: quote.paymentMethod,
+        requested: quote.targetAmount,
+        scope: 'PLATFORM',
+      })
     }
   }
 
@@ -489,11 +506,23 @@ export class TransactionAcceptanceService {
     paymentMethod: PaymentMethod,
   ): void {
     if (quote.targetAmount < paymentService.MIN_USER_AMOUNT_PER_TRANSACTION) {
-      throw new TransactionValidationError(`Payouts via ${paymentMethod} must be at least ${paymentService.MIN_USER_AMOUNT_PER_TRANSACTION} ${quote.targetCurrency}. Increase the amount and try again.`)
+      this.rejectAtLimit(`Payouts via ${paymentMethod} must be at least ${paymentService.MIN_USER_AMOUNT_PER_TRANSACTION} ${quote.targetCurrency}. Increase the amount and try again.`, {
+        cap: paymentService.MIN_USER_AMOUNT_PER_TRANSACTION,
+        limit: 'TRANSACTION_MIN_AMOUNT',
+        paymentMethod,
+        requested: quote.targetAmount,
+        scope: 'TRANSACTION',
+      })
     }
 
     if (quote.targetAmount > paymentService.MAX_USER_AMOUNT_PER_TRANSACTION) {
-      throw new TransactionValidationError(`Payouts via ${paymentMethod} cannot exceed ${paymentService.MAX_USER_AMOUNT_PER_TRANSACTION} ${quote.targetCurrency}. Lower the amount or choose another method.`)
+      this.rejectAtLimit(`Payouts via ${paymentMethod} cannot exceed ${paymentService.MAX_USER_AMOUNT_PER_TRANSACTION} ${quote.targetCurrency}. Lower the amount or choose another method.`, {
+        cap: paymentService.MAX_USER_AMOUNT_PER_TRANSACTION,
+        limit: 'TRANSACTION_MAX_AMOUNT',
+        paymentMethod,
+        requested: quote.targetAmount,
+        scope: 'TRANSACTION',
+      })
     }
   }
 
@@ -517,12 +546,27 @@ export class TransactionAcceptanceService {
 
     const count = aggregate.count
     if (count >= paymentService.MAX_USER_TRANSACTIONS_PER_DAY) {
-      throw new TransactionValidationError('You reached the maximum number of transactions allowed today. Please try again tomorrow.')
+      this.rejectAtLimit('You reached the maximum number of transactions allowed today. Please try again tomorrow.', {
+        cap: paymentService.MAX_USER_TRANSACTIONS_PER_DAY,
+        limit: 'USER_DAILY_COUNT',
+        observed: count,
+        partnerUserId,
+        paymentMethod: quote.paymentMethod,
+        scope: 'PARTNER_USER',
+      })
     }
 
     const totalUserAmount = aggregate.targetAmount
     if (totalUserAmount + quote.targetAmount > paymentService.MAX_TOTAL_AMOUNT_PER_DAY) {
-      throw new TransactionValidationError('This transaction would exceed your daily limit for this payment method. Lower the amount or try again tomorrow.')
+      this.rejectAtLimit('This transaction would exceed your daily limit for this payment method. Lower the amount or try again tomorrow.', {
+        cap: paymentService.MAX_TOTAL_AMOUNT_PER_DAY,
+        limit: 'USER_DAILY_AMOUNT',
+        observed: totalUserAmount,
+        partnerUserId,
+        paymentMethod: quote.paymentMethod,
+        requested: quote.targetAmount,
+        scope: 'PARTNER_USER',
+      })
     }
   }
 
@@ -766,6 +810,34 @@ export class TransactionAcceptanceService {
     return parsed
   }
 
+  /**
+   * Every cap refusal goes through here. A limit rejection used to be the only
+   * refusal with no trace at all: the validation error reaches the caller as a
+   * bare 400 and nothing reached the logs, so a partner throttled for hours was
+   * invisible until somebody read the counter tables by hand.
+   */
+  private rejectAtLimit(
+    message: string,
+    context: {
+      cap?: number
+      limit: string
+      observed?: number
+      partnerId?: string
+      partnerUserId?: string
+      paymentMethod?: PaymentMethod
+      requested?: number
+      scope: 'PARTNER' | 'PARTNER_USER' | 'PLATFORM' | 'TRANSACTION'
+    },
+  ): never {
+    this.logger.warn('Transaction rejected at a configured limit', {
+      ...context,
+      // Infinity is not JSON-representable and would serialise to null, which
+      // reads as "no cap recorded" rather than "this cap is unbounded".
+      cap: context.cap === undefined || Number.isFinite(context.cap) ? context.cap : 'UNBOUNDED',
+    })
+    throw new TransactionValidationError(message)
+  }
+
   private async reservePartnerDailyLimits(
     prismaClient: SerializableTx,
     partnerId: string,
@@ -787,7 +859,14 @@ export class TransactionAcceptanceService {
     `
 
     if (Number(updated) === 0) {
-      throw new TransactionValidationError('This payment method reached today\'s partner limit. Please try again tomorrow or use another method.')
+      this.rejectAtLimit('This payment method reached today\'s partner limit. Please try again tomorrow or use another method.', {
+        cap: this.dailyAmountCap(paymentService),
+        limit: 'PARTNER_DAILY_RESERVATION',
+        partnerId,
+        paymentMethod,
+        requested: targetAmount,
+        scope: 'PARTNER',
+      })
     }
   }
 
@@ -812,7 +891,14 @@ export class TransactionAcceptanceService {
     `
 
     if (Number(updated) === 0) {
-      throw new TransactionValidationError('This payment method reached this month\'s partner limit. Please try again next month or use another method.')
+      this.rejectAtLimit('This payment method reached this month\'s partner limit. Please try again next month or use another method.', {
+        cap: this.monthlyAmountCap(paymentService),
+        limit: 'PARTNER_MONTHLY_RESERVATION',
+        partnerId,
+        paymentMethod,
+        requested: targetAmount,
+        scope: 'PARTNER',
+      })
     }
   }
 
@@ -837,7 +923,14 @@ export class TransactionAcceptanceService {
     `
 
     if (Number(updated) === 0) {
-      throw new TransactionValidationError('You reached today\'s limit for this payment method. Try again tomorrow or choose another method.')
+      this.rejectAtLimit('You reached today\'s limit for this payment method. Try again tomorrow or choose another method.', {
+        cap: this.dailyAmountCap(paymentService),
+        limit: 'USER_DAILY_RESERVATION',
+        partnerUserId,
+        paymentMethod,
+        requested: targetAmount,
+        scope: 'PARTNER_USER',
+      })
     }
   }
 
@@ -862,7 +955,14 @@ export class TransactionAcceptanceService {
     `
 
     if (Number(updated) === 0) {
-      throw new TransactionValidationError('You reached this month\'s limit for this payment method. Try again next month or choose another method.')
+      this.rejectAtLimit('You reached this month\'s limit for this payment method. Try again next month or choose another method.', {
+        cap: this.monthlyAmountCap(paymentService),
+        limit: 'USER_MONTHLY_RESERVATION',
+        partnerUserId,
+        paymentMethod,
+        requested: targetAmount,
+        scope: 'PARTNER_USER',
+      })
     }
   }
 

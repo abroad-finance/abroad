@@ -256,13 +256,15 @@ describe('TransactionAcceptanceService helpers', () => {
   })
 
   it('enforces per-transaction amount bounds', () => {
+    // Bound to the service: the helper reports the refusal through the
+    // instance logger before throwing, so an unbound call loses `this`.
     const enforceAmountBounds = (service as unknown as {
       enforceTransactionAmountBounds: (
         quote: { targetAmount: number, targetCurrency: TargetCurrency },
         svc: ReturnType<typeof buildPaymentService>,
         method: PaymentMethod,
       ) => void
-    }).enforceTransactionAmountBounds
+    }).enforceTransactionAmountBounds.bind(service)
 
     expect(() => enforceAmountBounds(
       { targetAmount: 5, targetCurrency: TargetCurrency.COP },
@@ -275,6 +277,57 @@ describe('TransactionAcceptanceService helpers', () => {
       { ...paymentService, MAX_USER_AMOUNT_PER_TRANSACTION: 100 },
       PaymentMethod.BREB,
     )).toThrow('Payouts via BREB cannot exceed 100 COP. Lower the amount or choose another method.')
+  })
+
+  it('records the cap that refused a transaction instead of failing silently', () => {
+    const enforceAmountBounds = (service as unknown as {
+      enforceTransactionAmountBounds: (
+        quote: { targetAmount: number, targetCurrency: TargetCurrency },
+        svc: ReturnType<typeof buildPaymentService>,
+        method: PaymentMethod,
+      ) => void
+    }).enforceTransactionAmountBounds.bind(service)
+
+    expect(() => enforceAmountBounds(
+      { targetAmount: 150, targetCurrency: TargetCurrency.COP },
+      { ...paymentService, MAX_USER_AMOUNT_PER_TRANSACTION: 100 },
+      PaymentMethod.BREB,
+    )).toThrow()
+
+    // Without this the refusal reaches the partner as a bare 400 and leaves no
+    // trace, so a throttled partner is only discoverable by reading counters.
+    expect(logger.warn).toHaveBeenCalledWith(
+      '[TransactionAcceptance] Transaction rejected at a configured limit',
+      expect.objectContaining({
+        cap: 100,
+        limit: 'TRANSACTION_MAX_AMOUNT',
+        paymentMethod: PaymentMethod.BREB,
+        requested: 150,
+        scope: 'TRANSACTION',
+      }),
+    )
+  })
+
+  it('reports an unbounded cap as such rather than as a missing value', () => {
+    const enforceAmountBounds = (service as unknown as {
+      enforceTransactionAmountBounds: (
+        quote: { targetAmount: number, targetCurrency: TargetCurrency },
+        svc: ReturnType<typeof buildPaymentService>,
+        method: PaymentMethod,
+      ) => void
+    }).enforceTransactionAmountBounds.bind(service)
+
+    expect(() => enforceAmountBounds(
+      { targetAmount: 5, targetCurrency: TargetCurrency.COP },
+      { ...paymentService, MIN_USER_AMOUNT_PER_TRANSACTION: Number.POSITIVE_INFINITY },
+      PaymentMethod.BREB,
+    )).toThrow()
+
+    // Infinity JSON-serialises to null, which would read as "no cap recorded".
+    expect(logger.warn).toHaveBeenCalledWith(
+      '[TransactionAcceptance] Transaction rejected at a configured limit',
+      expect.objectContaining({ cap: 'UNBOUNDED' }),
+    )
   })
 
   it('enforces payment method daily caps via aggregates', async () => {
