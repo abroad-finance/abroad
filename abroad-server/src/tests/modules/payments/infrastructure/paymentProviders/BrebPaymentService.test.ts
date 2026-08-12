@@ -103,6 +103,28 @@ const reportEnvelope = (status: string) => ({
 
 const axiosFailure = (payload: unknown) => ({ isAxiosError: true, response: { data: payload } })
 
+// BTB CO GET BALANCE PASSWORD SUBSCRIBER always answers HTTP 200 and puts the
+// real outcome in the body. `code` comes back as a JSON number, not a string.
+const balanceResponse = (
+  data: unknown,
+  code: number | string = 200,
+  message: string = 'Transacción exitosa',
+) => ({
+  data: { code, correlationId: 'a1b2c3d4-0000-4000-8000-000000000000', data, message },
+  status: 200,
+})
+
+// Verbatim shape captured from the live endpoint.
+const liveBalanceData = (balance: number) => ({
+  BALANCE: balance,
+  FICBALANCE: 0,
+  OTHERWALLETS: '',
+  TRID: '3999999027202608120929F19687',
+  TXNID: 'CB260812.0929.F06442',
+  TXNSTATUS: 200,
+  TYPE: 'ALLWCBLREQ',
+})
+
 // axios rejects with a real Error carrying `response`, which is what the
 // service's `error instanceof Error` rethrow path depends on.
 const httpError = (message: string, status: number, data?: unknown) =>
@@ -110,7 +132,7 @@ const httpError = (message: string, status: number, data?: unknown) =>
 
 const getInternals = (service: BrebPaymentService): BrebInternals => service as unknown as BrebInternals
 
-const buildSecretManager = (): ISecretManager => {
+const buildSecretManager = (overrides: Partial<Record<Secret, string>> = {}): ISecretManager => {
   const secrets: Partial<Record<Secret, string>> = {
     BREB_API_BASE_URL: 'https://breb.example.com/api',
     BREB_AUTH_URL: 'https://breb-auth.example.com/token',
@@ -118,6 +140,12 @@ const buildSecretManager = (): ISecretManager => {
     BREB_CLIENT_SECRET: 'client-secret',
     BREB_DAD_ACCOUNT: '1234567890',
     BREB_PRODUCT_CODE: 'SR11231',
+    MOVII_BALANCE_API_BASE_URL: 'https://btb-balance.example.com',
+    MOVII_BALANCE_AUTH_URL: 'https://btb-auth.example.com/oauth2/token',
+    MOVII_BALANCE_AUTHORIZATION: 'Ga5vY2c7ySl4+Fg4CasaWg==:zlLVB39CT6AAV5gBDv/Cfg==',
+    MOVII_BALANCE_CLIENT_ID: 'balance-client-id',
+    MOVII_BALANCE_CLIENT_SECRET: 'balance-client-secret',
+    ...overrides,
   }
 
   return {
@@ -139,9 +167,9 @@ const buildLogger = (): ILogger => ({
   warn: jest.fn(),
 })
 
-const setupService = () => {
+const setupService = (secretOverrides: Partial<Record<Secret, string>> = {}) => {
   const logger = buildLogger()
-  const service = new BrebPaymentService(buildSecretManager(), logger)
+  const service = new BrebPaymentService(buildSecretManager(secretOverrides), logger)
   return { internals: getInternals(service), logger, service }
 }
 
@@ -176,11 +204,8 @@ describe('BrebPaymentService', () => {
       // borrowing one as the other broke this test the moment the daily cap
       // stopped being a finite number.
       const balance = 25_000_000
-      mockedAxios.get.mockResolvedValueOnce({
-        data: {
-          body: [{ saldo: String(balance) }],
-        },
-      })
+      primeAccessToken()
+      mockedAxios.get.mockResolvedValueOnce(balanceResponse(liveBalanceData(balance)))
 
       await expect(service.getLiquidity()).resolves.toBe(balance)
       await expect(service.onboardUser()).resolves.toEqual({
@@ -189,8 +214,81 @@ describe('BrebPaymentService', () => {
       })
     })
 
+    it('calls the BTB get-balance route with both documented auth headers', async () => {
+      const { service } = setupService()
+      primeAccessToken('token-9')
+      mockedAxios.get.mockResolvedValueOnce(balanceResponse({ balance: 1_500 }))
+
+      await expect(service.getLiquidity()).resolves.toBe(1_500)
+
+      // BTB is a separate Movii product: its bearer must come from its own
+      // OAuth client, not the Bre-B payment one.
+      expect(mockedAxios.post.mock.calls[0][0]).toBe('https://btb-auth.example.com/oauth2/token')
+
+      const [url, options] = mockedAxios.get.mock.calls[0]
+      expect(url).toBe(
+        'https://btb-balance.example.com/core/co/btb-balance-password-subscriber/get-balance',
+      )
+      expect(options.headers).toMatchObject({
+        'authorization': 'Ga5vY2c7ySl4+Fg4CasaWg==:zlLVB39CT6AAV5gBDv/Cfg==',
+        'authorizationApi': 'Bearer token-9',
+        'Content-Type': 'text/plain',
+      })
+      // Movii's example uses a 16-digit numeric correlation id.
+      expect(options.headers.correlationid).toMatch(/^\d{16}$/)
+    })
+
+    it('uses a configured gateway URL verbatim instead of appending the spec path', async () => {
+      // Movii's OCI API Gateway publishes its own deployment path; appending the
+      // spec's in-cluster route on top of it produced a doubled path and a 404.
+      const { service } = setupService({
+        MOVII_BALANCE_API_BASE_URL:
+          'https://apigw.example.com/api-manager/movii/btb-ns/api/get-balance',
+      })
+      primeAccessToken()
+      mockedAxios.get.mockResolvedValueOnce(balanceResponse({ balance: 10 }))
+
+      await expect(service.getLiquidity()).resolves.toBe(10)
+      expect(mockedAxios.get.mock.calls[0][0]).toBe(
+        'https://apigw.example.com/api-manager/movii/btb-ns/api/get-balance',
+      )
+    })
+
+    it('reads BALANCE and never the unrelated FICBALANCE beside it', async () => {
+      const { service } = setupService()
+      primeAccessToken()
+      // Live shape: BALANCE is the float, FICBALANCE is a different figure that
+      // is 0 here — picking it would report no liquidity at all.
+      mockedAxios.get.mockResolvedValueOnce(balanceResponse(liveBalanceData(3_156_118.38)))
+
+      await expect(service.getLiquidity()).resolves.toBe(3_156_118.38)
+    })
+
+    it('accepts the success code as a number or a string', async () => {
+      const { service } = setupService()
+      primeAccessToken()
+      mockedAxios.get.mockResolvedValueOnce(balanceResponse(liveBalanceData(100), 200))
+      await expect(service.getLiquidity()).resolves.toBe(100)
+
+      mockedAxios.get.mockResolvedValueOnce(balanceResponse(liveBalanceData(200), '00'))
+      await expect(service.getLiquidity()).resolves.toBe(200)
+    })
+
+    it('rejects a numeric error code instead of letting it slip past the check', async () => {
+      const { service } = setupService()
+      primeAccessToken()
+      // `code` arrives as a JSON number; reading it as a string skipped this
+      // guard entirely and reported the failure as a missing balance.
+      mockedAxios.get.mockResolvedValueOnce(
+        balanceResponse({ TXNSTATUS: 404 }, 404, 'USER NOT FOUND, NOT VALID'),
+      )
+
+      await expect(service.getLiquidity()).rejects.toThrow(/code 404/)
+    })
+
     it('rejects instead of reporting a zero float when Movii fails', async () => {
       const { logger, service } = setupService()
+      primeAccessToken()
       mockedAxios.isAxiosError = jest.fn(() => true)
       mockedAxios.get.mockRejectedValueOnce(
         httpError('Request failed with status code 500', 500, { message: 'boom' }),
@@ -204,13 +302,65 @@ describe('BrebPaymentService', () => {
 
     it('rejects when the balance is missing from an otherwise valid response', async () => {
       const { service } = setupService()
-      mockedAxios.get.mockResolvedValueOnce({ data: { body: [], statusCode: 200 } })
+      primeAccessToken()
+      mockedAxios.get.mockResolvedValueOnce(balanceResponse({ accountId: '123' }))
 
       await expect(service.getLiquidity()).rejects.toThrow(/usable balance/)
     })
 
+    it('refuses a locale-grouped balance rather than under-reading it', async () => {
+      const { service } = setupService()
+      primeAccessToken()
+      // parseFloat would turn this into 1.234 — a thousand-fold under-read.
+      mockedAxios.get.mockResolvedValueOnce(balanceResponse({ balance: '1.234.567,89' }))
+
+      await expect(service.getLiquidity()).rejects.toThrow(/usable balance/)
+    })
+
+    it('rejects a non-success body code and re-authenticates after a 401', async () => {
+      const { service } = setupService()
+      primeAccessToken('stale-token')
+      mockedAxios.get.mockResolvedValueOnce(
+        balanceResponse(null, '401', 'AUTHORZATION INVALID, HEADER AUTHORIZATION INVALID'),
+      )
+
+      // The endpoint answers HTTP 200 even when it refuses the request, so the
+      // body code is the only signal that this is not a real balance.
+      await expect(service.getLiquidity()).rejects.toThrow(/code 401/)
+
+      primeAccessToken('fresh-token')
+      mockedAxios.get.mockResolvedValueOnce(balanceResponse({ balance: 42 }))
+      await expect(service.getLiquidity()).resolves.toBe(42)
+
+      // The rejected bearer must not be replayed.
+      expect(mockedAxios.get.mock.calls[1][1].headers.authorizationApi).toBe('Bearer fresh-token')
+    })
+
+    it('keeps the balance bearer separate from the payment bearer', async () => {
+      const { service } = setupService()
+      primeAccessToken('balance-token')
+      mockedAxios.get.mockResolvedValueOnce(
+        balanceResponse(null, '401', 'AUTHORZATION INVALID, HEADER AUTHORIZATION INVALID'),
+      )
+      await expect(service.getLiquidity()).rejects.toThrow(/code 401/)
+
+      // Dropping the rejected balance bearer must not force the payment client
+      // to re-authenticate: they are different Movii OAuth clients.
+      primeAccessToken('payment-token')
+      primeKeyLookup()
+      primeSend('tx-100')
+      primeReport('ACSC')
+      await expect(service.sendPayment({ account: 'key', id: 'id-1', value: 10_000 }))
+        .resolves.toEqual({ success: true, transactionId: 'tx-100' })
+
+      const paymentTokenCalls = mockedAxios.post.mock.calls
+        .filter(call => String(call[0]).includes('breb-auth.example.com'))
+      expect(paymentTokenCalls).toHaveLength(1)
+    })
+
     it('stops calling Movii for a cooldown once rate limited, then recovers', async () => {
       const { service } = setupService()
+      primeAccessToken()
       mockedAxios.isAxiosError = jest.fn(() => true)
       mockedAxios.get.mockRejectedValueOnce(httpError('Request failed with status code 429', 429))
 
@@ -223,7 +373,7 @@ describe('BrebPaymentService', () => {
       expect(mockedAxios.get).toHaveBeenCalledTimes(1)
 
       jest.spyOn(Date, 'now').mockReturnValue(Date.now() + 61_000)
-      mockedAxios.get.mockResolvedValueOnce({ data: { body: [{ saldo: '900000' }] } })
+      mockedAxios.get.mockResolvedValueOnce(balanceResponse({ balance: '900000' }))
       await expect(service.getLiquidity()).resolves.toBe(900000)
       jest.spyOn(Date, 'now').mockRestore()
     })

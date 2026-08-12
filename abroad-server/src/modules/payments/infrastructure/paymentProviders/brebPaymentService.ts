@@ -1,6 +1,7 @@
 import { PaymentMethod, TargetCurrency } from '@prisma/client'
 import axios from 'axios'
 import { inject, injectable } from 'inversify'
+import { randomInt } from 'node:crypto'
 
 import { TYPES } from '../../../../app/container/types'
 import { ILogger } from '../../../../core/logging/types'
@@ -102,9 +103,37 @@ interface BrebTransactionStatusInfo {
   TransactionStatusRsnInf?: string
 }
 
-interface MoviiLiquidityResponse {
-  body?: Array<{ saldo: string }>
-  statusCode?: number
+/**
+ * BTB get-balance is a separate Movii product with its own OAuth client, so it
+ * carries its own host and credentials rather than borrowing the Bre-B ones.
+ */
+interface MoviiBalanceConfig {
+  authorization: string
+  authUrl: string
+  clientId: string
+  clientSecret: string
+  endpoint: string
+}
+
+/**
+ * BTB CO GET BALANCE PASSWORD SUBSCRIBER always answers HTTP 200 and carries the
+ * real outcome in `code`/`message`, so the body is the only thing worth reading.
+ *
+ * Observed success body:
+ *   { "code": 200, "message": "Transacción exitosa",
+ *     "correlationId": "<uuid>",
+ *     "data": { "TYPE": "ALLWCBLREQ", "TXNID": "...", "BALANCE": 3156118.38,
+ *               "TXNSTATUS": 200, "FICBALANCE": 0, "OTHERWALLETS": "",
+ *               "TRID": "..." } }
+ *
+ * Note `code` arrives as a JSON number even though the spec types it as text(3).
+ */
+interface MoviiBalanceEnvelope {
+  code?: number | string
+  /** The provider's own id, unrelated to the correlationid we send. */
+  correlationId?: string
+  data?: unknown
+  message?: string
 }
 
 @injectable()
@@ -140,6 +169,15 @@ export class BrebPaymentService implements IPaymentService {
   public readonly provider = 'breb'
   private accessTokenCache?: { expiresAt: number, value: string }
 
+  // Confirmed against the live endpoint: the float arrives as `BALANCE`.
+  // Matched case-insensitively, and deliberately an exact name — the same
+  // object also carries `FICBALANCE`, which is a different figure.
+  private readonly balanceFieldNames: ReadonlySet<string> = new Set(['balance'])
+
+  // The response table calls '00' success; the error table lists '200'. Movii
+  // ships both spellings, so honour both rather than betting on one.
+  private readonly balanceSuccessCodes: ReadonlySet<string> = new Set(['00', '000', '200'])
+
   // Movii answers a key lookup for an unregistered or badly formatted Bre-B key
   // with HTTP 400 and one of these codes. That is the customer mistyping their
   // key, not the rail failing, so it must not page anyone.
@@ -169,6 +207,16 @@ export class BrebPaymentService implements IPaymentService {
   ]
 
   private readonly maxSendAttempts: number
+
+  private moviiBalanceConfig?: MoviiBalanceConfig
+
+  // Versioned here rather than folded into the secret: the host moves between
+  // environments, the route is part of the contract this file implements.
+  private readonly moviiBalancePath = '/core/co/btb-balance-password-subscriber/get-balance'
+
+  // Kept apart from accessTokenCache: a rejected balance bearer must not
+  // invalidate the payment client's token, and vice versa.
+  private moviiBalanceTokenCache?: { expiresAt: number, value: string }
 
   private readonly pollConfig = {
     delayMs: 2_000,
@@ -201,23 +249,39 @@ export class BrebPaymentService implements IPaymentService {
       throw new Error('Movii balance endpoint is rate limited; skipping request')
     }
 
-    const { MOVII_BALANCE_ACCOUNT_ID: accountId, MOVII_BALANCE_API_KEY: apiKey } = await this.secretManager.getSecrets([
-      'MOVII_BALANCE_API_KEY',
-      'MOVII_BALANCE_ACCOUNT_ID',
-    ] as const)
+    const config = await this.getMoviiBalanceConfig()
+    const token = await this.getMoviiBalanceAccessToken(config)
+    const envelope = await this.requestMoviiBalance(config, token)
 
-    const data = await this.requestMoviiBalance(accountId, apiKey)
-    const saldoStr = data?.body?.[0]?.saldo
-    const saldo = typeof saldoStr === 'string' ? Number.parseFloat(saldoStr) : Number.NaN
-    if (!Number.isFinite(saldo)) {
+    // Movii sends `code` as a number despite the spec typing it as text, so
+    // normalise before comparing — reading it as a string only skipped the
+    // check, letting a numeric error code through unexamined.
+    const code = this.normalizeResponseCode(envelope.code)
+    if (code && !this.balanceSuccessCodes.has(code)) {
+      // '401 AUTHORZATION INVALID' means the bearer we cached is no longer
+      // accepted; drop it so the next read re-authenticates instead of
+      // replaying a token Movii has already rejected.
+      if (code === '401') {
+        this.moviiBalanceTokenCache = undefined
+      }
+      this.logger.error('[BreB] Liquidity request rejected by Movii', {
+        responseCode: code,
+        responseMessage: envelope.message ?? null,
+      })
+      throw new Error(`Movii balance request failed with code ${code}: ${envelope.message ?? 'no message'}`)
+    }
+
+    const balance = this.extractBalance(envelope.data)
+    if (balance === null) {
       this.logger.error('[BreB] Liquidity response missing balance', {
-        accountId: this.maskIdentifier(accountId),
-        statusCode: data?.statusCode ?? null,
+        responseCode: code,
+        responseFields: this.describeBalanceFields(envelope.data),
+        responseMessage: envelope.message ?? null,
       })
       throw new Error('Movii balance response did not include a usable balance')
     }
 
-    return saldo
+    return balance
   }
 
   public async onboardUser(): Promise<PaymentOnboardResult> {
@@ -340,6 +404,13 @@ export class BrebPaymentService implements IPaymentService {
     }
   }
 
+  private buildCorrelationId(): string {
+    // Movii's own example uses a 16-digit numeric id; keep the width exact
+    // rather than sending a uuid the gateway may reject on length.
+    const half = () => randomInt(0, 100_000_000).toString().padStart(8, '0')
+    return `${half()}${half()}`
+  }
+
   private buildFailure(code: PaymentFailureCode, reason?: string, transactionId?: null | string): PaymentSendResult {
     return {
       code,
@@ -390,6 +461,15 @@ export class BrebPaymentService implements IPaymentService {
     }
 
     return payload
+  }
+
+  private describeBalanceFields(data: unknown): null | string[] {
+    const candidate = Array.isArray(data) ? data[0] : data
+    if (!candidate || typeof candidate !== 'object') {
+      return null
+    }
+    // Key names only — the values are balances, and this runs on the error path.
+    return Object.keys(candidate as Record<string, unknown>)
   }
 
   private async dispatchPayment(
@@ -447,6 +527,25 @@ export class BrebPaymentService implements IPaymentService {
       })
       throw error
     }
+  }
+
+  private extractBalance(data: unknown): null | number {
+    const candidate = Array.isArray(data) ? data[0] : data
+    if (candidate === null || typeof candidate !== 'object') {
+      return this.toFiniteNumber(candidate)
+    }
+
+    for (const [key, value] of Object.entries(candidate as Record<string, unknown>)) {
+      if (!this.balanceFieldNames.has(key.toLowerCase())) {
+        continue
+      }
+      const parsed = this.toFiniteNumber(value)
+      if (parsed !== null) {
+        return parsed
+      }
+    }
+
+    return null
   }
 
   private extractEnvelopeMetadata(envelope: BrebApiEnvelope<unknown> | null | undefined): null | {
@@ -632,65 +731,10 @@ export class BrebPaymentService implements IPaymentService {
       return this.accessTokenCache.value
     }
 
-    const params = new URLSearchParams()
-    params.append('grant_type', 'client_credentials')
-
-    const basicAuth = Buffer.from(`${config.clientId}:${config.clientSecret}`).toString('base64')
-    const requestStartedAt = Date.now()
-
-    this.logBrebRequest({
-      endpoint: config.authUrl,
-      headers: {
-        'Authorization': `Basic ${basicAuth}`,
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      metadata: {
-        grantType: 'client_credentials',
-      },
-      method: 'POST',
-      payload: {
-        grant_type: 'client_credentials',
-      },
-    })
-    try {
-      const response = await axios.post<BrebTokenResponse>(
-        config.authUrl,
-        params,
-        {
-          headers: {
-            'Authorization': `Basic ${basicAuth}`,
-            'Content-Type': 'application/x-www-form-urlencoded',
-          },
-        },
-      )
-      const data = response.data
-      this.logBrebResponse({
-        endpoint: config.authUrl,
-        metadata: {
-          durationMs: Date.now() - requestStartedAt,
-          tokenReceived: Boolean(data?.access_token),
-          tokenTtlSeconds: data?.expires_in ?? null,
-        },
-        method: 'POST',
-        status: response.status,
-      })
-
-      const expiresAt = now + Math.max(data.expires_in - 30, 0) * 1000
-      this.accessTokenCache = { expiresAt, value: data.access_token }
-      return data.access_token
-    }
-    catch (error) {
-      this.logBrebError({
-        endpoint: config.authUrl,
-        error,
-        metadata: {
-          durationMs: Date.now() - requestStartedAt,
-        },
-        method: 'POST',
-        operation: 'Failed to obtain access token',
-      })
-      throw error instanceof Error ? error : new Error('BreB authentication failed')
-    }
+    const data = await this.requestClientCredentialsToken(config, 'BreB authentication failed')
+    const expiresAt = now + Math.max(data.expires_in - 30, 0) * 1000
+    this.accessTokenCache = { expiresAt, value: data.access_token }
+    return data.access_token
   }
 
   private async getConfig(): Promise<BrebServiceConfig> {
@@ -717,6 +761,42 @@ export class BrebPaymentService implements IPaymentService {
     }
 
     return this.serviceConfig
+  }
+
+  private async getMoviiBalanceAccessToken(config: MoviiBalanceConfig): Promise<string> {
+    const now = Date.now()
+    if (this.moviiBalanceTokenCache && this.moviiBalanceTokenCache.expiresAt > now) {
+      return this.moviiBalanceTokenCache.value
+    }
+
+    const data = await this.requestClientCredentialsToken(config, 'Movii balance authentication failed')
+    const expiresAt = now + Math.max(data.expires_in - 30, 0) * 1000
+    this.moviiBalanceTokenCache = { expiresAt, value: data.access_token }
+    return data.access_token
+  }
+
+  private async getMoviiBalanceConfig(): Promise<MoviiBalanceConfig> {
+    if (this.moviiBalanceConfig) {
+      return this.moviiBalanceConfig
+    }
+
+    const secrets = await this.secretManager.getSecrets([
+      'MOVII_BALANCE_API_BASE_URL',
+      'MOVII_BALANCE_AUTHORIZATION',
+      'MOVII_BALANCE_AUTH_URL',
+      'MOVII_BALANCE_CLIENT_ID',
+      'MOVII_BALANCE_CLIENT_SECRET',
+    ] as const)
+
+    this.moviiBalanceConfig = {
+      authorization: secrets.MOVII_BALANCE_AUTHORIZATION,
+      authUrl: secrets.MOVII_BALANCE_AUTH_URL,
+      clientId: secrets.MOVII_BALANCE_CLIENT_ID,
+      clientSecret: secrets.MOVII_BALANCE_CLIENT_SECRET,
+      endpoint: this.resolveMoviiBalanceEndpoint(secrets.MOVII_BALANCE_API_BASE_URL),
+    }
+
+    return this.moviiBalanceConfig
   }
 
   private hasValue(value: BrebKeyDetails[keyof BrebKeyDetails]): value is string {
@@ -881,6 +961,17 @@ export class BrebPaymentService implements IPaymentService {
     return trimmed.length > 0 ? trimmed : null
   }
 
+  private normalizeResponseCode(value: unknown): null | string {
+    if (typeof value === 'number') {
+      return Number.isFinite(value) ? String(value) : null
+    }
+    if (typeof value !== 'string') {
+      return null
+    }
+    const trimmed = value.trim()
+    return trimmed.length > 0 ? trimmed : null
+  }
+
   private async pollTransactionReport(
     transactionId: string,
     rail: BrebRail,
@@ -924,18 +1015,110 @@ export class BrebPaymentService implements IPaymentService {
     }, {})
   }
 
-  private async requestMoviiBalance(accountId: string, apiKey: string): Promise<MoviiLiquidityResponse> {
-    const url = `https://apigw-data.movii.com.co/traguatan/?id=${encodeURIComponent(accountId)}`
+  /**
+   * Shared client_credentials exchange. Both Movii OAuth clients (Bre-B payments
+   * and BTB balance) speak the same grant against different hosts, so the wire
+   * format lives here and the callers own only their own token cache.
+   */
+  private async requestClientCredentialsToken(
+    config: { authUrl: string, clientId: string, clientSecret: string },
+    failureMessage: string,
+  ): Promise<BrebTokenResponse> {
+    const params = new URLSearchParams()
+    params.append('grant_type', 'client_credentials')
+
+    const basicAuth = Buffer.from(`${config.clientId}:${config.clientSecret}`).toString('base64')
+    const requestStartedAt = Date.now()
+    const headers = {
+      'Authorization': `Basic ${basicAuth}`,
+      'Content-Type': 'application/x-www-form-urlencoded',
+    }
+
+    this.logBrebRequest({
+      endpoint: config.authUrl,
+      headers,
+      metadata: {
+        grantType: 'client_credentials',
+      },
+      method: 'POST',
+      payload: {
+        grant_type: 'client_credentials',
+      },
+    })
     try {
-      const { data } = await axios.get<MoviiLiquidityResponse>(url, {
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': apiKey,
+      const response = await axios.post<BrebTokenResponse>(
+        config.authUrl,
+        params,
+        { headers },
+      )
+      const data = response.data
+      this.logBrebResponse({
+        endpoint: config.authUrl,
+        metadata: {
+          durationMs: Date.now() - requestStartedAt,
+          tokenReceived: Boolean(data?.access_token),
+          tokenTtlSeconds: data?.expires_in ?? null,
         },
+        method: 'POST',
+        status: response.status,
+      })
+      return data
+    }
+    catch (error) {
+      this.logBrebError({
+        endpoint: config.authUrl,
+        error,
+        metadata: {
+          durationMs: Date.now() - requestStartedAt,
+        },
+        method: 'POST',
+        operation: 'Failed to obtain access token',
+      })
+      throw error instanceof Error ? error : new Error(failureMessage)
+    }
+  }
+
+  private async requestMoviiBalance(config: MoviiBalanceConfig, token: string): Promise<MoviiBalanceEnvelope> {
+    const endpoint = config.endpoint
+    const correlationId = this.buildCorrelationId()
+    // Both auth headers are mandatory per the spec's business-service header
+    // table: `authorizationApi` carries the OAuth2 bearer, `authorization`
+    // the static credential Movii issues per subscriber.
+    const headers: Record<string, string> = {
+      'authorization': config.authorization,
+      'authorizationApi': `Bearer ${token}`,
+      'Content-Type': 'text/plain',
+      'correlationid': correlationId,
+    }
+    const requestStartedAt = Date.now()
+
+    this.logBrebRequest({
+      endpoint,
+      headers,
+      metadata: { correlationId },
+      method: 'GET',
+    })
+
+    try {
+      const { data, status } = await axios.get<MoviiBalanceEnvelope>(endpoint, {
+        headers,
         timeout: this.liquidityRequestTimeoutMs,
       })
+      this.logBrebResponse({
+        endpoint,
+        metadata: {
+          correlationId,
+          durationMs: Date.now() - requestStartedAt,
+          // Movii mints its own id per response; keep it for support tickets.
+          providerCorrelationId: data?.correlationId ?? null,
+          responseCode: this.normalizeResponseCode(data?.code),
+          responseMessage: data?.message ?? null,
+        },
+        method: 'GET',
+        status,
+      })
       this.liquidityRateLimitedUntilMs = 0
-      return data
+      return data ?? {}
     }
     catch (error) {
       const reason = error instanceof Error ? error.message : 'Unknown error'
@@ -944,6 +1127,7 @@ export class BrebPaymentService implements IPaymentService {
         this.liquidityRateLimitedUntilMs = Date.now() + this.liquidityRateLimitCooldownMs
       }
       this.logger.error('[BreB] Error fetching liquidity', {
+        correlationId,
         reason,
         ...(typeof status === 'number' ? { status } : {}),
         ...(status === 429 ? { cooldownMs: this.liquidityRateLimitCooldownMs } : {}),
@@ -953,6 +1137,18 @@ export class BrebPaymentService implements IPaymentService {
       })
       throw error instanceof Error ? error : new Error(reason)
     }
+  }
+
+  /**
+   * Movii fronts this service with an OCI API Gateway whose deployment path is
+   * environment-specific and bears no relation to the internal route in the
+   * spec (the spec's path is the in-cluster one from its dev example). So when
+   * the configured URL already names the operation, it *is* the endpoint;
+   * only a bare origin gets the documented path appended.
+   */
+  private resolveMoviiBalanceEndpoint(baseUrl: string): string {
+    const trimmed = baseUrl.trim().replace(/\/$/, '')
+    return trimmed.endsWith('/get-balance') ? trimmed : `${trimmed}${this.moviiBalancePath}`
   }
 
   private resolveRailForReport(responseRail: unknown, instructedAgent: null | string | undefined): null | string {
@@ -1088,5 +1284,25 @@ export class BrebPaymentService implements IPaymentService {
       transactionDirectoryId: report.TransactionDirectoryId ?? null,
       transactionId: report.TransactionID ?? null,
     }
+  }
+
+  private toFiniteNumber(value: unknown): null | number {
+    if (typeof value === 'number') {
+      return Number.isFinite(value) ? value : null
+    }
+    if (typeof value !== 'string') {
+      return null
+    }
+
+    const trimmed = value.trim()
+    // A grouped string like "1.234.567,89" parses to 1.234 — a thousand-fold
+    // under-read of the float that would silently reject every COP payout.
+    // Refuse anything that isn't a plain decimal rather than guess the locale.
+    if (!/^-?\d+(?:\.\d+)?$/.test(trimmed)) {
+      return null
+    }
+
+    const parsed = Number.parseFloat(trimmed)
+    return Number.isFinite(parsed) ? parsed : null
   }
 }
