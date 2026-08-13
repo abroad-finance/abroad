@@ -113,7 +113,6 @@ export default function HomeScreen({
           <h1 className="mb-[clamp(0.5rem,2vh,1rem)] text-center text-[clamp(1.75rem,4vw+2vh,3.75rem)] font-extrabold leading-[1.1] tracking-[-0.02em]">
             <span className="ab-hero-heading-dark">
               {t('home.headline_1', 'Spend your stablecoins at')}
-              <br />
             </span>
             <br />
             <span className="ab-hero-heading-accent">

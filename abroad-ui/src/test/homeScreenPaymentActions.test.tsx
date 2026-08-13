@@ -28,6 +28,22 @@ const createProps = (
 })
 
 describe('HomeScreen payment actions', () => {
+  it('uses a single line break between the onboarding headline lines', () => {
+    render(
+      <HomeScreen
+        {...createProps()}
+        hasEnteredApp={false}
+        isAuthenticated={false}
+      />,
+    )
+
+    const heading = screen.getByRole('heading', {
+      name: 'Spend your stablecoins at local merchants.',
+    })
+
+    expect(heading.querySelectorAll('br')).toHaveLength(1)
+  })
+
   it('has no automated accessibility violations in the returning-user entry surface', async () => {
     const { container } = render(<HomeScreen {...createProps()} />)
 
