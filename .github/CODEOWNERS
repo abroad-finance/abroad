@@ -1,0 +1,39 @@
+# Install as .github/CODEOWNERS
+#
+# This is the agent-agnostic half of the frontend boundary. The PreToolUse hook only
+# constrains Claude Code; a different agent, a script, or a person is unaffected by
+# it. Code ownership is enforced by GitHub, so it holds no matter what produced the
+# change.
+#
+# It only takes effect once branch protection requires code-owner review --
+# see apply-branch-protection.sh. Without that, this file is advisory.
+#
+# No default owner is set on purpose: frontend changes should not need a named
+# reviewer, which is the whole point of scoping an agent to abroad-ui/.
+
+# Backend, data and anything that can reach production state.
+/abroad-server/                 @abroad-finance/senior-dev
+
+# CI and deployment definitions. A change here can redefine what "deploy" means,
+# which is why it is owned even though it is not backend code.
+/.github/                       @abroad-finance/senior-dev
+
+# Agent guard configuration. A boundary an agent can edit is not a boundary.
+/.claude/                       @abroad-finance/senior-dev
+
+# Repository-wide instructions and the shared workspace manifests.
+/AGENTS.md                      @abroad-finance/senior-dev
+/package.json                   @abroad-finance/senior-dev
+/package-lock.json              @abroad-finance/senior-dev
+
+# Inside the frontend, but not frontend source: these decide what gets built and
+# where it is published, so they are an escape from the boundary itself.
+/abroad-ui/package.json         @abroad-finance/senior-dev
+/abroad-ui/package-lock.json    @abroad-finance/senior-dev
+/abroad-ui/vite.config.ts       @abroad-finance/senior-dev
+/abroad-ui/orval.config.ts      @abroad-finance/senior-dev
+/abroad-ui/firebase.json        @abroad-finance/senior-dev
+/abroad-ui/.firebaserc          @abroad-finance/senior-dev
+
+# Generated from the server contract; edit the contract, not the output.
+/abroad-ui/src/api/index.ts     @abroad-finance/senior-dev

@@ -1,0 +1,133 @@
+name: Deploy Frontend Only
+
+# Install as .github/workflows/deploy-frontend.yml.
+#
+# Frontend-only release path, separate from the tag-based one on purpose.
+#
+# Pushing a tag matches `.*` in deploy-on-tag.yml, deploy-docs-on-tag.yml AND the
+# Cloud Build trigger `abroad-server-trigger` (region us-east1 -- it does not appear
+# in the `global` trigger list, which makes it easy to miss). So a tag runs database
+# migrations and rolls out the API, the WebSocket service and the GKE workers. That
+# is a full production release and far more than a UI change needs.
+#
+# This deploys Firebase Hosting and nothing else: no tag, no migration, no backend.
+# It exists so an agent can ship a frontend change without acquiring the power to
+# release the backend.
+#
+# The build secrets stay in GitHub, which is also what keeps the artifact
+# reproducible -- a local build without UI_DOTENV silently ships a misconfigured app.
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Branch or SHA to build and deploy'
+        required: false
+        default: 'main'
+      channel:
+        description: 'live = customer-facing. Any other value becomes a preview channel of that name.'
+        required: false
+        default: 'live'
+
+concurrency:
+  group: deploy-frontend
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      CI: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+          fetch-depth: 0
+
+      - name: Report what is being deployed
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "ref:     ${{ inputs.ref }}"
+          echo "sha:     $(git rev-parse HEAD)"
+          echo "channel: ${{ inputs.channel }}"
+          # Deploying a ref that is not on main puts unreviewed code in front of
+          # customers. Allowed, but never silently.
+          if git merge-base --is-ancestor HEAD origin/main 2>/dev/null; then
+            echo "This commit IS contained in main."
+          else
+            echo "::warning::This commit is NOT contained in main - unreviewed code is being deployed."
+          fi
+
+      # Server-side backstop. The agent-side hook only constrains the agent it runs
+      # in; this refuses the deploy itself if anything outside the frontend changed.
+      - name: Verify the diff against main touches only the frontend
+        if: inputs.ref != 'main'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin main
+          changed="$(git diff --name-only origin/main...HEAD || true)"
+          [ -z "$changed" ] && { echo "No differences from main."; exit 0; }
+          echo "Changed files:"; echo "$changed" | sed 's/^/  /'
+          # Generated artifacts are rebuilt during the build, so a diff in them is
+          # noise rather than a backend change.
+          offending="$(echo "$changed" | grep -vE '^abroad-ui/' \
+            | grep -vE '^abroad-server/src/app/http/(routes\.ts|swagger\.json)$' || true)"
+          if [ -n "$offending" ]; then
+            echo "::error::Non-frontend changes present; this workflow deploys frontend only."
+            echo "$offending" | sed 's/^/  /'
+            exit 1
+          fi
+          echo "Frontend-only. Proceeding."
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: |
+            package-lock.json
+            abroad-ui/package-lock.json
+            abroad-server/package-lock.json
+
+      - name: Create .env for UI
+        working-directory: abroad-ui
+        env:
+          UI_DOTENV: ${{ secrets.UI_DOTENV }}
+          VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
+        run: |
+          set -euo pipefail
+          if [ -z "${UI_DOTENV:-}" ]; then
+            echo "::error::UI_DOTENV secret is not set or empty"
+            exit 1
+          fi
+          if [ -z "${VITE_SENTRY_DSN:-}" ]; then
+            echo "::error::VITE_SENTRY_DSN secret is not set or empty"
+            exit 1
+          fi
+          printf "%s" "$UI_DOTENV" > .env
+          if grep -q '^VITE_SENTRY_DSN=' .env; then
+            sed -i "s|^VITE_SENTRY_DSN=.*$|VITE_SENTRY_DSN=${VITE_SENTRY_DSN}|" .env
+          else
+            printf "\nVITE_SENTRY_DSN=%s\n" "$VITE_SENTRY_DSN" >> .env
+          fi
+
+      # Root install: the UI build runs prisma:generate and TSOA generation in the
+      # server workspace before orval can read swagger.json, so the frontend cannot
+      # be built from abroad-ui alone.
+      - name: Install workspace deps
+        run: npm ci --no-audit --no-fund
+
+      - name: Build UI
+        run: npm -w abroad-ui run build
+
+      - name: Deploy to Firebase Hosting
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          projectId: ${{ secrets.FIREBASE_PROJECT_ID }}
+          channelId: ${{ inputs.channel }}
+          entryPoint: abroad-ui
