@@ -28,6 +28,7 @@ const kycMocks = vi.hoisted(() => ({
   enableKycUser: vi.fn(),
   fetchKycDocument: vi.fn(),
   getKycSubmission: vi.fn(),
+  getTransactionKycLink: vi.fn(),
   listKycReviewers: vi.fn(),
   listKycSubmissions: vi.fn(),
   rejectKyc: vi.fn(),
@@ -196,6 +197,23 @@ describe('KYC review queue', () => {
         { ...testOpsMutationDetails, expectedVersion: 3 },
       )
     })
+  })
+
+  test('opens a single linked submission and offers the way back to the queue', async () => {
+    renderPage(`/ops/kyc?kycId=${maskedSubmission.id}`)
+
+    await screen.findByRole('heading', { name: 'A•• L••' })
+    expect(kycMocks.listKycSubmissions).toHaveBeenCalledWith(expect.objectContaining({
+      kycId: maskedSubmission.id,
+    }))
+    expect(screen.getByText(/Showing one linked submission/)).toBeVisible()
+
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: 'Return to the full queue' }))
+    await waitFor(() => expect(kycMocks.listKycSubmissions).toHaveBeenLastCalledWith(expect.objectContaining({
+      kycId: undefined,
+    })))
+    expect(screen.queryByText(/Showing one linked submission/)).not.toBeInTheDocument()
   })
 
   test('does not query the compliance queue for unauthorized roles', async () => {

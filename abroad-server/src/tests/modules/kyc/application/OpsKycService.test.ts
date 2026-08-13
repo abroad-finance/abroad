@@ -55,6 +55,9 @@ const buildHarness = () => {
       update: jest.fn(),
       updateMany: jest.fn(),
     },
+    transaction: {
+      findUnique: jest.fn(),
+    },
   }
   prisma.$transaction.mockImplementation(async (
     callback: (transaction: typeof prisma) => Promise<unknown>,
@@ -148,6 +151,96 @@ describe('OpsKycService', () => {
         status: KycStatus.PENDING_APPROVAL,
       }))
       expect(call.where.OR).toHaveLength(4)
+    })
+
+    it('resolves an explicit id even for a historical row carrying no document', async () => {
+      const { prisma, service } = buildHarness()
+      prisma.partnerUserKyc.findMany.mockResolvedValue([
+        buildKycRecord({ documentImagePath: null, fullName: null }),
+      ])
+      prisma.partnerUserKyc.count.mockResolvedValue(1)
+
+      const result = await service.listSubmissions({ kycId: 'kyc-1', page: 1, pageSize: 20 })
+
+      expect(prisma.partnerUserKyc.findMany).toHaveBeenCalledWith(expect.objectContaining({
+        where: { documentImagePath: undefined, id: 'kyc-1' },
+      }))
+      expect(result.items[0]).toMatchObject({ fullNameMasked: null, hasDocument: false, id: 'kyc-1' })
+    })
+  })
+
+  describe('getTransactionKyc', () => {
+    const transactionRow = {
+      createdAt: new Date('2024-06-01T00:00:00Z'),
+      partnerUser: {
+        disabledAt: null,
+        id: 'pu-1',
+        partner: { name: 'Acme Inc' },
+        partnerId: 'partner-1',
+        userId: 'user-1',
+      },
+    }
+
+    it('masks the linked submissions and names the one on file at transaction time', async () => {
+      const { prisma, service } = buildHarness()
+      prisma.transaction.findUnique.mockResolvedValue(transactionRow)
+      prisma.partnerUserKyc.findMany.mockResolvedValue([
+        buildKycRecord({ createdAt: new Date('2024-07-01T00:00:00Z'), id: 'kyc-resubmitted' }),
+        buildKycRecord({ createdAt: new Date('2024-05-01T00:00:00Z'), id: 'kyc-original' }),
+      ])
+
+      const result = await service.getTransactionKyc('tx-1')
+
+      expect(prisma.partnerUserKyc.findMany).toHaveBeenCalledWith(expect.objectContaining({
+        orderBy: { createdAt: 'desc' },
+        where: { partnerUserId: 'pu-1' },
+      }))
+      expect(result).toMatchObject({
+        effectiveSubmissionId: 'kyc-original',
+        partnerUser: {
+          disabledAt: null,
+          id: 'pu-1',
+          partnerId: 'partner-1',
+          partnerName: 'Acme Inc',
+          userId: 'user-1',
+        },
+        transactionId: 'tx-1',
+      })
+      expect(result.submissions.map(submission => submission.id)).toEqual(['kyc-resubmitted', 'kyc-original'])
+      expect(result.submissions[0]).toMatchObject({ fullNameMasked: 'A•• L••' })
+      expect(result.submissions[0]).not.toHaveProperty('fullName')
+      expect(result.submissions[0]).not.toHaveProperty('documentNumber')
+    })
+
+    it('leaves the effective submission null when KYC only arrived after the transaction', async () => {
+      const { prisma, service } = buildHarness()
+      prisma.transaction.findUnique.mockResolvedValue(transactionRow)
+      prisma.partnerUserKyc.findMany.mockResolvedValue([
+        buildKycRecord({ createdAt: new Date('2024-07-01T00:00:00Z'), id: 'kyc-later' }),
+      ])
+
+      const result = await service.getTransactionKyc('tx-1')
+
+      expect(result.effectiveSubmissionId).toBeNull()
+      expect(result.submissions).toHaveLength(1)
+    })
+
+    it('reports an empty linkage when the user never submitted KYC', async () => {
+      const { prisma, service } = buildHarness()
+      prisma.transaction.findUnique.mockResolvedValue(transactionRow)
+      prisma.partnerUserKyc.findMany.mockResolvedValue([])
+
+      const result = await service.getTransactionKyc('tx-1')
+
+      expect(result).toMatchObject({ effectiveSubmissionId: null, submissions: [] })
+    })
+
+    it('throws when the transaction is missing', async () => {
+      const { prisma, service } = buildHarness()
+      prisma.transaction.findUnique.mockResolvedValue(null)
+
+      await expect(service.getTransactionKyc('missing')).rejects.toThrow(NotFoundError)
+      expect(prisma.partnerUserKyc.findMany).not.toHaveBeenCalled()
     })
   })
 

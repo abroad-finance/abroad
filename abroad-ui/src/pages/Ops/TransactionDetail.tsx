@@ -9,6 +9,7 @@ import {
   RadioTower,
   RefreshCw,
   ShieldAlert,
+  UserRoundSearch,
 } from 'lucide-react'
 import {
   useCallback,
@@ -17,12 +18,14 @@ import {
 } from 'react'
 import { Link, useParams } from 'react-router-dom'
 
+import type { OpsKycTransactionLink } from '../../services/admin/kycAdminTypes'
 import type {
   OpsRefundRecovery,
   OpsTransactionDetail as OpsTransactionDetailData,
   TransactionStatus,
 } from '../../services/admin/transactionAdminTypes'
 
+import { getTransactionKycLink } from '../../services/admin/kycAdminApi'
 import { useOpsApiKey, useOpsSession } from '../../services/admin/opsAuthStore'
 import { listOpsCaseOwners } from '../../services/admin/opsInvestigationApi'
 import {
@@ -36,6 +39,7 @@ import {
   getTransaction,
   getTransactionReceipt,
 } from '../../services/admin/transactionAdminApi'
+import { kycSubmissionPath } from './kyc/kycLinks'
 import {
   formatAmount,
   formatDateTime,
@@ -47,6 +51,7 @@ import {
   OpsTone,
 } from './shared'
 import CaseWorkspace from './transactions/CaseWorkspace'
+import CustomerIdentityPanel from './transactions/CustomerIdentityPanel'
 import EvidenceTimeline from './transactions/EvidenceTimeline'
 import RefundRecoveryPanel from './transactions/RefundRecoveryPanel'
 
@@ -108,6 +113,8 @@ const DetailField = ({ children, label }: { children: React.ReactNode, label: st
 const TransactionDetail = () => {
   const { transactionId } = useParams()
   const [data, setData] = useState<null | OpsTransactionDetailData>(null)
+  const [identity, setIdentity] = useState<null | OpsKycTransactionLink>(null)
+  const [identityError, setIdentityError] = useState<null | string>(null)
   const [refundRecovery, setRefundRecovery] = useState<null | OpsRefundRecovery>(null)
   const [refundRecoveryError, setRefundRecoveryError] = useState<null | string>(null)
   const [owners, setOwners] = useState<Awaited<ReturnType<typeof listOpsCaseOwners>>>([])
@@ -121,10 +128,13 @@ const TransactionDetail = () => {
   const canReadProof = Boolean(session?.kind === 'ops_user' && session.permissions.includes('transactions:proof'))
   const canExport = Boolean(session?.kind === 'ops_user' && session.permissions.includes('transactions:export'))
   const canRecoverRefund = Boolean(session?.kind === 'ops_user' && session.permissions.includes('transactions:refund'))
+  const canReadKyc = Boolean(session?.kind === 'ops_user' && session.permissions.includes('kyc:read'))
 
   const load = useCallback(async (signal?: AbortSignal): Promise<void> => {
     if (!transactionId || !opsApiKey) {
       setData(null)
+      setIdentity(null)
+      setIdentityError(null)
       setRefundRecovery(null)
       setRefundRecoveryError(null)
       setLoading(false)
@@ -133,7 +143,15 @@ const TransactionDetail = () => {
     setLoading(true)
     setError(null)
     try {
-      const [transactionResult, recoveryResult] = await Promise.allSettled([getTransaction(transactionId, signal), getRefundRecovery(transactionId, signal)])
+      const [
+        transactionResult,
+        recoveryResult,
+        identityResult,
+      ] = await Promise.allSettled([
+        getTransaction(transactionId, signal),
+        getRefundRecovery(transactionId, signal),
+        canReadKyc ? getTransactionKycLink(transactionId, signal) : Promise.resolve(null),
+      ])
       if (signal?.aborted) return
       if (transactionResult.status === 'rejected') throw transactionResult.reason
       setData(transactionResult.value)
@@ -147,6 +165,16 @@ const TransactionDetail = () => {
           ? recoveryResult.reason.message
           : 'Refund recovery evidence is unavailable')
       }
+      if (identityResult.status === 'fulfilled') {
+        setIdentity(identityResult.value)
+        setIdentityError(null)
+      }
+      else {
+        setIdentity(null)
+        setIdentityError(identityResult.reason instanceof Error
+          ? identityResult.reason.message
+          : 'Customer identity linkage is unavailable')
+      }
     }
     catch (loadError) {
       if (!signal?.aborted) setError(loadError instanceof Error ? loadError.message : 'Failed to load transaction')
@@ -154,7 +182,11 @@ const TransactionDetail = () => {
     finally {
       if (!signal?.aborted) setLoading(false)
     }
-  }, [opsApiKey, transactionId])
+  }, [
+    canReadKyc,
+    opsApiKey,
+    transactionId,
+  ])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -267,6 +299,12 @@ const TransactionDetail = () => {
       actions={data
         ? (
             <>
+              {identity?.effectiveSubmissionId && (
+                <Link className="ops-btn-neutral min-h-11" to={kycSubmissionPath(identity.effectiveSubmissionId)}>
+                  <UserRoundSearch aria-hidden size={16} />
+                  View KYC
+                </Link>
+              )}
               {data.identifiers.flowInstanceId && (
                 <Link className="ops-btn-neutral min-h-11" to={`/ops/flows/${encodeURIComponent(data.identifiers.flowInstanceId)}`}>
                   <GitBranch aria-hidden size={16} />
@@ -417,6 +455,12 @@ const TransactionDetail = () => {
             <EvidenceTimeline events={data.evidence} />
 
             <div className="space-y-6">
+              <CustomerIdentityPanel
+                identity={identity}
+                loadError={identityError}
+                permitted={canReadKyc}
+              />
+
               <section aria-labelledby="proof-title" className="ops-card p-5 sm:p-6">
                 <div className="flex items-center gap-2 text-ops-brand">
                   <FileCheck2 aria-hidden size={18} />

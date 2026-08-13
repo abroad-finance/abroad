@@ -50,6 +50,26 @@ export type OpsKycReviewer = {
   role: OpsRole
 }
 
+/** The customer identity behind a transaction, masked as the queue is. */
+export type OpsKycTransactionLink = {
+  /**
+   * The submission on file when the transaction was created — what the
+   * transaction was actually accepted against. A later resubmission is still
+   * listed, but it is not the evidence behind this transaction. Null when the
+   * user only ever submitted KYC after the transaction.
+   */
+  effectiveSubmissionId: null | string
+  partnerUser: {
+    disabledAt: Date | null
+    id: string
+    partnerId: string
+    partnerName: string
+    userId: string
+  }
+  submissions: OpsKycSummary[]
+  transactionId: string
+}
+
 export type OpsKycUserState = {
   disabledAt: Date | null
   partnerUserId: string
@@ -73,6 +93,7 @@ type OpsKycListParams = {
   createdFrom?: Date
   createdTo?: Date
   documentType?: DocumentType
+  kycId?: string
   nationality?: string
   page: number
   pageSize: number
@@ -228,6 +249,46 @@ export class OpsKycService {
     return this.toDetail(record)
   }
 
+  /**
+   * Resolves who is behind a transaction. Everything returned is masked to the
+   * same degree as the review queue: identifying the customer is a `kyc:read`
+   * task, reading their identity evidence stays a separate audited reveal.
+   */
+  public async getTransactionKyc(transactionId: string): Promise<OpsKycTransactionLink> {
+    const prisma = await this.dbProvider.getClient()
+    const transaction = await prisma.transaction.findUnique({
+      select: {
+        createdAt: true,
+        partnerUser: { include: { partner: true } },
+      },
+      where: { id: transactionId },
+    })
+    if (!transaction) throw new NotFoundError('Transaction not found')
+
+    const records = await prisma.partnerUserKyc.findMany({
+      include: {
+        opsReviewer: { select: { displayName: true, id: true, role: true } },
+        partnerUser: { include: { partner: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+      where: { partnerUserId: transaction.partnerUser.id },
+    })
+    const effective = records.find(record => record.createdAt <= transaction.createdAt)
+
+    return {
+      effectiveSubmissionId: effective?.id ?? null,
+      partnerUser: {
+        disabledAt: transaction.partnerUser.disabledAt,
+        id: transaction.partnerUser.id,
+        partnerId: transaction.partnerUser.partnerId,
+        partnerName: transaction.partnerUser.partner.name,
+        userId: transaction.partnerUser.userId,
+      },
+      submissions: records.map(record => this.toSummary(record)),
+      transactionId,
+    }
+  }
+
   public async listReviewers(): Promise<OpsKycReviewer[]> {
     const prisma = await this.dbProvider.getClient()
     return prisma.opsUser.findMany({
@@ -256,8 +317,13 @@ export class OpsKycService {
       createdAt: params.createdFrom || upperCreatedAt
         ? { gte: params.createdFrom, lte: upperCreatedAt }
         : undefined,
-      documentImagePath: { not: null },
+      // The queue is self-service review work, which always stores a document.
+      // An explicit id is a targeted lookup instead — following the link from a
+      // transaction, say — so it must also resolve the historical rows that
+      // predate the self-service form and carry no document.
+      documentImagePath: params.kycId ? undefined : { not: null },
       documentType: params.documentType,
+      id: params.kycId,
       nationality: params.nationality
         ? { equals: params.nationality, mode: 'insensitive' }
         : undefined,

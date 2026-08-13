@@ -52,6 +52,7 @@ const detail: OpsKycDetail = {
 const buildHarness = () => {
   const opsKycService = {
     getSubmission: jest.fn(),
+    getTransactionKyc: jest.fn(),
     listSubmissions: jest.fn(),
   }
   const auditService = { record: jest.fn() }
@@ -75,6 +76,7 @@ describe('OpsKycController sensitive read evidence', () => {
 
     const result = await controller.listSubmissions(
       request,
+      undefined,
       undefined,
       undefined,
       undefined,
@@ -104,5 +106,41 @@ describe('OpsKycController sensitive read evidence', () => {
       resourceId: detail.id,
       resourceType: 'kyc_submission',
     })
+  })
+
+  it('returns the masked transaction linkage and audits the correlation read', async () => {
+    const { auditService, controller, opsKycService } = buildHarness()
+    const transactionId = '44444444-4444-4444-8444-444444444444'
+    opsKycService.getTransactionKyc.mockResolvedValue({
+      effectiveSubmissionId: detail.id,
+      partnerUser: {
+        disabledAt: null,
+        id: detail.partnerUserId,
+        partnerId: detail.partnerId,
+        partnerName: 'Acme Partner',
+        userId: 'external-user-1',
+      },
+      submissions: [{ fullNameMasked: 'A•• L••', id: detail.id }],
+      transactionId,
+    })
+
+    const result = await controller.getTransactionKyc(transactionId, request)
+
+    expect(opsKycService.getTransactionKyc).toHaveBeenCalledWith(transactionId)
+    expect(result.effectiveSubmissionId).toBe(detail.id)
+    expect(auditService.record).toHaveBeenCalledWith(principal, {
+      action: 'kyc.transaction_link.viewed',
+      metadata: { submissionCount: 1 },
+      resourceId: transactionId,
+      resourceType: 'transaction',
+    })
+  })
+
+  it('rejects a transaction id that is not a UUID before reading anything', async () => {
+    const { auditService, controller, opsKycService } = buildHarness()
+
+    await expect(controller.getTransactionKyc('not-a-uuid', request)).rejects.toThrow('Invalid id')
+    expect(opsKycService.getTransactionKyc).not.toHaveBeenCalled()
+    expect(auditService.record).not.toHaveBeenCalled()
   })
 })

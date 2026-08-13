@@ -32,6 +32,7 @@ import {
   OpsKycListResponse,
   OpsKycRejectResponse,
   OpsKycReviewerListResponse,
+  OpsKycTransactionLinkResponse,
   OpsKycUserStateResponse,
 } from './opsKycContracts'
 
@@ -190,6 +191,32 @@ export class OpsKycController extends Controller {
     return detail
   }
 
+  /**
+   * Names the customer behind a transaction so an investigation can reach their
+   * KYC directly. The payload stays masked; revealing the identity evidence
+   * remains the separate `kyc:reveal` read.
+   */
+  @Get('by-transaction/{transactionId}')
+  @Response<400, { reason: string }>(400, 'Bad Request')
+  @Response<404, { reason: string }>(404, 'Not Found')
+  @Security('OpsAuth', ['kyc:read'])
+  @SuccessResponse('200', 'Transaction KYC linkage retrieved')
+  public async getTransactionKyc(
+    @Path() transactionId: string,
+    @Request() request: RequestExpress,
+  ): Promise<OpsKycTransactionLinkResponse> {
+    const parsedId = opsKycIdSchema.safeParse(transactionId)
+    if (!parsedId.success) throw new ValidationError('Invalid id')
+    const link = await this.opsKycService.getTransactionKyc(parsedId.data)
+    await this.auditService.record(requireNamedOpsPrincipal(request.user), {
+      action: 'kyc.transaction_link.viewed',
+      metadata: { submissionCount: link.submissions.length },
+      resourceId: parsedId.data,
+      resourceType: 'transaction',
+    })
+    return link
+  }
+
   @Get()
   @Response<400, { reason: string }>(400, 'Bad Request')
   @Security('OpsAuth', ['kyc:read'])
@@ -200,6 +227,7 @@ export class OpsKycController extends Controller {
     @Query() createdFrom?: Date,
     @Query() createdTo?: Date,
     @Query() documentType?: string,
+    @Query() kycId?: string,
     @Query() nationality?: string,
     @Query() page?: number,
     @Query() pageSize?: number,
@@ -213,6 +241,7 @@ export class OpsKycController extends Controller {
       createdFrom,
       createdTo,
       documentType,
+      kycId,
       nationality,
       page,
       pageSize,

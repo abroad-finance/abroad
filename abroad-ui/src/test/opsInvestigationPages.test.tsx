@@ -15,6 +15,7 @@ import {
 } from 'vitest'
 
 import type { FlowInstanceListResponse } from '../services/admin/flowTypes'
+import type { OpsKycTransactionLink } from '../services/admin/kycAdminTypes'
 import type { OpsSession } from '../services/admin/opsAuthStore'
 import type {
   OpsRefundRecovery,
@@ -58,10 +59,14 @@ const flowMocks = vi.hoisted(() => ({
   bulkRetryFlowInstances: vi.fn(),
   listFlowInstances: vi.fn(),
 }))
+const kycMocks = vi.hoisted(() => ({
+  getTransactionKycLink: vi.fn(),
+}))
 
 vi.mock('../services/admin/transactionAdminApi', () => transactionMocks)
 vi.mock('../services/admin/opsInvestigationApi', () => investigationMocks)
 vi.mock('../services/admin/flowAdminApi', () => flowMocks)
+vi.mock('../services/admin/kycAdminApi', () => kycMocks)
 
 const session: OpsSession = {
   authenticatedAt: '2026-08-02T15:00:00.000Z',
@@ -217,6 +222,36 @@ const transactionDetail: OpsTransactionDetail = {
   webhookDeliveries: [],
 }
 
+const kycLink: OpsKycTransactionLink = {
+  effectiveSubmissionId: 'kyc-1',
+  partnerUser: {
+    disabledAt: null,
+    id: 'partner-user-1',
+    partnerId: 'partner-1',
+    partnerName: 'Decaf',
+    userId: 'external-user-1',
+  },
+  submissions: [{
+    disabledAt: null,
+    documentNumberMasked: '•••• 1234',
+    documentType: 'NATIONAL_ID',
+    emailMasked: 'a•••@example.com',
+    fullNameMasked: 'A•• L••',
+    hasDocument: true,
+    id: 'kyc-1',
+    nationality: 'BR',
+    partnerId: 'partner-1',
+    partnerName: 'Decaf',
+    partnerUserId: 'partner-user-1',
+    reviewedAt: null,
+    reviewer: null,
+    status: 'APPROVED',
+    submittedAt: '2026-07-30T10:00:00.000Z',
+    version: 1,
+  }],
+  transactionId: 'tx-1',
+}
+
 const flowList: FlowInstanceListResponse = {
   items: [{
     createdAt: '2026-08-02T15:00:00.000Z',
@@ -276,6 +311,7 @@ beforeEach(() => {
   transactionMocks.searchTransactions.mockResolvedValue(transactionList)
   transactionMocks.getTransaction.mockResolvedValue(transactionDetail)
   transactionMocks.getRefundRecovery.mockResolvedValue(refundNotRequired)
+  kycMocks.getTransactionKycLink.mockResolvedValue(kycLink)
   flowMocks.listFlowInstances.mockResolvedValue(flowList)
 })
 
@@ -363,6 +399,68 @@ describe('Ops investigation workspace', () => {
     expect(screen.getByText('•••• 0497')).toBeVisible()
     expect(screen.queryByText('private-tax-id')).not.toBeInTheDocument()
     expect(screen.getByText('Provider evidence requested; no recipient data included.')).toBeVisible()
+  })
+
+  test('withholds the customer identity from roles without compliance access', async () => {
+    render(
+      <MemoryRouter initialEntries={['/ops/transactions/tx-1']}>
+        <ImmediateOpsMutationProvider>
+          <Routes>
+            <Route element={<TransactionDetail />} path="/ops/transactions/:transactionId" />
+          </Routes>
+        </ImmediateOpsMutationProvider>
+      </MemoryRouter>,
+    )
+
+    expect(await screen.findByRole('heading', { name: 'Customer identity' })).toBeVisible()
+    expect(screen.getByText(/requires a compliance review role/i)).toBeVisible()
+    expect(kycMocks.getTransactionKycLink).not.toHaveBeenCalled()
+    expect(screen.queryByRole('link', { name: 'View KYC' })).not.toBeInTheDocument()
+  })
+
+  test('links a compliance investigation to the KYC behind the transaction, still masked', async () => {
+    setOpsSession({
+      ...session,
+      permissions: [...session.permissions, 'kyc:read'],
+    })
+    render(
+      <MemoryRouter initialEntries={['/ops/transactions/tx-1']}>
+        <ImmediateOpsMutationProvider>
+          <Routes>
+            <Route element={<TransactionDetail />} path="/ops/transactions/:transactionId" />
+          </Routes>
+        </ImmediateOpsMutationProvider>
+      </MemoryRouter>,
+    )
+
+    const kycLinks = await screen.findAllByRole('link', { name: /View KYC/ })
+    expect(kycLinks.length).toBe(2)
+    kycLinks.forEach(link => expect(link).toHaveAttribute('href', '/ops/kyc?kycId=kyc-1'))
+    expect(kycMocks.getTransactionKycLink).toHaveBeenCalledWith('tx-1', expect.any(AbortSignal))
+    expect(screen.getByText('A•• L••')).toBeVisible()
+    expect(screen.getByText('external-user-1')).toBeVisible()
+    expect(screen.getByText('On file at payment')).toBeVisible()
+    expect(screen.queryByText('Ada Lovelace')).not.toBeInTheDocument()
+  })
+
+  test('keeps the transaction readable when the identity linkage fails', async () => {
+    setOpsSession({
+      ...session,
+      permissions: [...session.permissions, 'kyc:read'],
+    })
+    kycMocks.getTransactionKycLink.mockRejectedValue(new Error('Identity service unavailable'))
+    render(
+      <MemoryRouter initialEntries={['/ops/transactions/tx-1']}>
+        <ImmediateOpsMutationProvider>
+          <Routes>
+            <Route element={<TransactionDetail />} path="/ops/transactions/:transactionId" />
+          </Routes>
+        </ImmediateOpsMutationProvider>
+      </MemoryRouter>,
+    )
+
+    expect(await screen.findByText(/Identity service unavailable/)).toBeVisible()
+    expect(screen.getByRole('heading', { name: 'Completion proof' })).toBeVisible()
   })
 
   test('shows the refund proof ladder and issues a guarded replacement only when eligible', async () => {

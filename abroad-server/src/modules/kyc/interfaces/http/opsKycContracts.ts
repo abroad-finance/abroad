@@ -6,6 +6,7 @@ import type {
   OpsKycDetail,
   OpsKycListResult,
   OpsKycReviewer,
+  OpsKycTransactionLink,
   OpsKycUserState,
 } from '../../application/OpsKycService'
 
@@ -27,6 +28,8 @@ export interface OpsKycRejectResponse {
 
 export type OpsKycReviewerListResponse = { items: OpsKycReviewer[] }
 
+export type OpsKycTransactionLinkResponse = OpsKycTransactionLink
+
 export type OpsKycUserStateResponse = OpsKycUserState
 
 const DEFAULT_KYC_PAGE_SIZE = 20
@@ -37,6 +40,7 @@ export const opsKycListQuerySchema = z.object({
   createdFrom: z.coerce.date().optional(),
   createdTo: z.coerce.date().optional(),
   documentType: z.nativeEnum(DocumentType).optional(),
+  kycId: z.string().uuid().optional(),
   nationality: z.string().trim().min(2).max(3).optional(),
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(MAX_KYC_PAGE_SIZE).default(DEFAULT_KYC_PAGE_SIZE),

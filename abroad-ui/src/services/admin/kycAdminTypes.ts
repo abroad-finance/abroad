@@ -44,6 +44,8 @@ export interface OpsKycListFilters {
   createdFrom?: string
   createdTo?: string
   documentType?: OpsKycDocumentType
+  /** Deep link to a single submission, e.g. the KYC behind a transaction. */
+  kycId?: string
   nationality?: string
   page?: number
   pageSize?: number
@@ -85,6 +87,25 @@ export interface OpsKycSummary {
   status: OpsKycStatus
   submittedAt: string
   version: number
+}
+
+/** The customer identity behind a transaction, masked as the queue is. */
+export interface OpsKycTransactionLink {
+  /**
+   * The submission on file when the transaction was created — what the
+   * transaction was accepted against. Null when the user only submitted KYC
+   * afterwards, or never did.
+   */
+  effectiveSubmissionId: null | string
+  partnerUser: {
+    disabledAt: null | string
+    id: string
+    partnerId: string
+    partnerName: string
+    userId: string
+  }
+  submissions: OpsKycSummary[]
+  transactionId: string
 }
 
 export interface OpsKycUserState {

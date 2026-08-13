@@ -5,6 +5,7 @@ import type {
   OpsKycListResponse,
   OpsKycReviewer,
   OpsKycStatus,
+  OpsKycTransactionLink,
   OpsKycUserState,
 } from './kycAdminTypes'
 import type { OpsMutationDetails } from './opsMutationTypes'
@@ -38,6 +39,18 @@ export const getKycSubmission = async (kycId: string): Promise<OpsKycDetail> => 
   return unwrapAdminResult(result)
 }
 
+/** Masked identity behind a transaction; revealing it stays a separate read. */
+export const getTransactionKycLink = async (
+  transactionId: string,
+  signal?: AbortSignal,
+): Promise<OpsKycTransactionLink> => {
+  const result = await adminRequest<OpsKycTransactionLink>(
+    `/ops/kyc/by-transaction/${encodeURIComponent(transactionId)}`,
+    { method: 'GET', signal },
+  )
+  return unwrapAdminResult(result)
+}
+
 export const listKycReviewers = async (): Promise<OpsKycReviewer[]> => {
   const result = await adminRequest<{ items: OpsKycReviewer[] }>('/ops/kyc/reviewer-options', {
     method: 'GET',
@@ -55,6 +68,7 @@ export const listKycSubmissions = async (
       createdFrom: params.createdFrom,
       createdTo: params.createdTo,
       documentType: params.documentType,
+      kycId: params.kycId,
       nationality: params.nationality,
       page: params.page,
       pageSize: params.pageSize,

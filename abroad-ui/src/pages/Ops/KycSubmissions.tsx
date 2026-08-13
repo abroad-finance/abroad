@@ -77,6 +77,11 @@ type FilterDraft = {
   createdFrom: string
   createdTo: string
   documentType: '' | OpsKycDocumentType
+  /**
+   * Set only by a deep link — following the KYC link on a transaction, say —
+   * so it has no filter input; it rides along in the URL until cleared.
+   */
+  kycId: string
   nationality: string
   partnerId: string
   query: string
@@ -89,6 +94,7 @@ const emptyFilters: FilterDraft = {
   createdFrom: '',
   createdTo: '',
   documentType: '',
+  kycId: '',
   nationality: '',
   partnerId: '',
   query: '',
@@ -101,6 +107,7 @@ const readFilters = (params: URLSearchParams): FilterDraft => ({
   createdFrom: params.get('createdFrom') ?? '',
   createdTo: params.get('createdTo') ?? '',
   documentType: (params.get('documentType') ?? '') as '' | OpsKycDocumentType,
+  kycId: params.get('kycId') ?? '',
   nationality: params.get('nationality') ?? '',
   partnerId: params.get('partnerId') ?? '',
   query: params.get('query') ?? '',
@@ -251,6 +258,7 @@ const KycSubmissions = () => {
       createdFrom: toIsoDate(appliedFilters.createdFrom),
       createdTo: toIsoDate(appliedFilters.createdTo),
       documentType: appliedFilters.documentType || undefined,
+      kycId: appliedFilters.kycId || undefined,
       nationality: appliedFilters.nationality || undefined,
       page,
       pageSize: PAGE_SIZE,
@@ -482,6 +490,17 @@ const KycSubmissions = () => {
       {session && !canRead && (
         <OpsBanner className="mt-6" variant="warning">
           Your role does not include compliance review access.
+        </OpsBanner>
+      )}
+
+      {canRead && appliedFilters.kycId && (
+        <OpsBanner className="mt-6" variant="info">
+          <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            Showing one linked submission rather than the review queue.
+            <button className="font-semibold underline" onClick={clearFilters} type="button">
+              Return to the full queue
+            </button>
+          </span>
         </OpsBanner>
       )}
 
