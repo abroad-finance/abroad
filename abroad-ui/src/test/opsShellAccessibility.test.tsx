@@ -129,6 +129,7 @@ describe('task-oriented Ops shell', () => {
       'KYC',
       'Corridors',
       'Assets',
+      'Region Restriction',
       'History',
       'Users',
       'Audit',

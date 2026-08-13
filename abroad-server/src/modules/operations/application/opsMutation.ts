@@ -177,6 +177,14 @@ export const OPS_MUTATION_POLICIES = {
     permission: 'configuration:manage',
     stepUpMaxAgeMs: DEFAULT_STEP_UP_MAX_AGE_MS,
   },
+  'configuration.geo_restriction.update': {
+    approvalClass: 'STEP_UP',
+    confirmation: 'UPDATE REGION RESTRICTION',
+    expectedVersion: true,
+    impact: 'Disabling lets visitors from every restricted country reach the product; enabling refuses them again.',
+    permission: 'configuration:manage',
+    stepUpMaxAgeMs: DEFAULT_STEP_UP_MAX_AGE_MS,
+  },
   'configuration.release.approve': {
     approvalClass: 'SECOND_APPROVER',
     confirmation: 'APPROVE CONFIG RELEASE',

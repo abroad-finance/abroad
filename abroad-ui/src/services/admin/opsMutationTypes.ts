@@ -19,6 +19,7 @@ export const opsMutationActions = [
   'configuration.corridor.update',
   'configuration.definition.create',
   'configuration.definition.update',
+  'configuration.geo_restriction.update',
   'configuration.release.approve',
   'configuration.release.create',
   'configuration.release.reject',

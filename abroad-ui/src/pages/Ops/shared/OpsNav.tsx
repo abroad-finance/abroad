@@ -11,6 +11,7 @@ import {
   Coins,
   FileClock,
   GitBranch,
+  Globe,
   History,
   Home,
   KeyRound,
@@ -121,6 +122,9 @@ export const OPS_NAV_GROUPS: OpsNavGroup[] = [
         label: 'Assets',
         permission: 'configuration:read',
         to: '/ops/configuration/assets',
+      },
+      {
+        icon: Globe, label: 'Region Restriction', permission: 'configuration:read', to: '/ops/configuration/region-restriction',
       },
       {
         icon: History, label: 'History', permission: 'configuration:read', to: '/ops/configuration/history',

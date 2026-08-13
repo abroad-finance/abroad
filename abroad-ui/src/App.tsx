@@ -30,6 +30,7 @@ const BridgeOps = lazy(() => import('./pages/Ops/BridgeOps'))
 const TreasuryDashboard = lazy(() => import('./pages/Ops/TreasuryDashboard'))
 const OpsAuditLog = lazy(() => import('./pages/Ops/OpsAuditLog'))
 const OpsConfigurationHistory = lazy(() => import('./pages/Ops/OpsConfigurationHistory'))
+const GeoRestriction = lazy(() => import('./pages/Ops/GeoRestriction'))
 const OpsUsers = lazy(() => import('./pages/Ops/OpsUsers'))
 const OpsGlobalSearch = lazy(() => import('./pages/Ops/OpsGlobalSearch'))
 const OpsIncidents = lazy(() => import('./pages/Ops/OpsIncidents'))
@@ -87,6 +88,7 @@ function App() {
                 <Route element={<FlowDefinitions />} path="/ops/configuration/corridors" />
                 <Route element={<CryptoAssets />} path="/ops/crypto-assets" />
                 <Route element={<CryptoAssets />} path="/ops/configuration/assets" />
+                <Route element={<GeoRestriction />} path="/ops/configuration/region-restriction" />
                 <Route element={<OpsConfigurationHistory />} path="/ops/configuration/history" />
                 <Route element={<OpsPartners />} path="/ops/partners" />
                 <Route element={<PartnerApiKeys />} path="/ops/partners/credentials" />

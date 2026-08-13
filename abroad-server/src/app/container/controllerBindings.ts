@@ -11,6 +11,7 @@ import { OpsAdministrationController } from '../../modules/operations/interfaces
 import { OpsBusinessPerformanceController } from '../../modules/operations/interfaces/http/OpsBusinessPerformanceController'
 import { OpsCasesController } from '../../modules/operations/interfaces/http/OpsCasesController'
 import { OpsConfigurationReleaseController } from '../../modules/operations/interfaces/http/OpsConfigurationReleaseController'
+import { OpsGeoRestrictionController } from '../../modules/operations/interfaces/http/OpsGeoRestrictionController'
 import { OpsIdentityController } from '../../modules/operations/interfaces/http/OpsIdentityController'
 import { OpsIncidentsController } from '../../modules/operations/interfaces/http/OpsIncidentsController'
 import { OpsIntegrationsController } from '../../modules/operations/interfaces/http/OpsIntegrationsController'
@@ -57,6 +58,7 @@ const controllerBindings: ReadonlyArray<BindingRegistration<unknown>> = [
   { bindSelf: true, identifier: OpsKycController, implementation: OpsKycController },
   { bindSelf: true, identifier: OpsIdentityController, implementation: OpsIdentityController },
   { bindSelf: true, identifier: OpsIncidentsController, implementation: OpsIncidentsController },
+  { bindSelf: true, identifier: OpsGeoRestrictionController, implementation: OpsGeoRestrictionController },
   { bindSelf: true, identifier: OpsIntegrationsController, implementation: OpsIntegrationsController },
   { bindSelf: true, identifier: OpsAdministrationController, implementation: OpsAdministrationController },
   { bindSelf: true, identifier: OpsBusinessPerformanceController, implementation: OpsBusinessPerformanceController },

@@ -24,6 +24,7 @@ import { OpsKycService } from '../../modules/kyc/application/OpsKycService'
 import { BusinessPerformanceCostReconciler } from '../../modules/operations/application/BusinessPerformanceCostReconciler'
 import { BusinessPerformanceReconciliationService } from '../../modules/operations/application/BusinessPerformanceReconciliationService'
 import { BusinessPerformanceReconciliationWorker } from '../../modules/operations/application/BusinessPerformanceReconciliationWorker'
+import { GeoRestrictionService } from '../../modules/operations/application/GeoRestrictionService'
 import { OpsAdministrationService } from '../../modules/operations/application/OpsAdministrationService'
 import { OpsAuditService } from '../../modules/operations/application/OpsAuditService'
 import { OpsBusinessPerformanceService } from '../../modules/operations/application/OpsBusinessPerformanceService'
@@ -192,6 +193,7 @@ const domainBindings: ReadonlyArray<BindingRegistration<unknown>> = [
   { bindSelf: true, identifier: OpsCaseService, implementation: OpsCaseService },
   { bindSelf: true, identifier: OpsConfigurationReleaseService, implementation: OpsConfigurationReleaseService },
   { bindSelf: true, identifier: OpsConfigurationReleaseWorker, implementation: OpsConfigurationReleaseWorker },
+  { bindSelf: true, identifier: GeoRestrictionService, implementation: GeoRestrictionService },
   { bindSelf: true, identifier: OpsGlobalSearchService, implementation: OpsGlobalSearchService },
   { bindSelf: true, identifier: OpsAdministrationService, implementation: OpsAdministrationService },
   { bindSelf: true, identifier: BusinessPerformanceCostReconciler, implementation: BusinessPerformanceCostReconciler },

@@ -1512,6 +1512,7 @@ model OpsUser {
   taskEvents                     OpsTaskEvent[]
   kycReviews                     PartnerUserKyc[]          @relation("OpsKycReviewer")
   refundRecoveryAttempts         RefundRecoveryAttempt[]
+  geoRestrictionUpdates          GeoRestrictionSetting[]   @relation("GeoRestrictionSettingUpdatedBy")
 
   @@index([role, disabledAt])
 }
@@ -1761,6 +1762,20 @@ model OpsTaskEvent {
 
   @@index([task, action, createdAt])
   @@index([actorUserId, createdAt])
+}
+
+/// Platform-wide region gate consulted by GET /geo/country. Exactly one row
+/// exists, keyed by GEO_RESTRICTION_SETTING_ID, so `enabled` is a single kill
+/// switch rather than per-tenant state. The restricted country list stays in
+/// code; this row only decides whether it is applied.
+model GeoRestrictionSetting {
+  id              String   @id
+  enabled         Boolean  @default(true)
+  version         Int      @default(1)
+  updatedByUserId String?
+  updatedBy       OpsUser? @relation("GeoRestrictionSettingUpdatedBy", fields: [updatedByUserId], references: [id], onDelete: Restrict)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 }
 
 model OpsMutationExecution {

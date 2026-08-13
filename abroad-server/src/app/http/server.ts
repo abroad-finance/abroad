@@ -4,7 +4,6 @@ import cors from 'cors'
 import dotenv from 'dotenv'
 import express, { NextFunction, Request, Response } from 'express'
 import fs from 'fs'
-import geoip from 'geoip-lite'
 import path from 'path'
 import swaggerUi from 'swagger-ui-express'
 
@@ -15,6 +14,7 @@ import { mapErrorToHttpResponse } from '../../core/errors'
 import { toError } from '../../core/errors/toError'
 import { ILogger } from '../../core/logging/types'
 import { requestContextMiddleware } from '../../core/requestContext'
+import { GeoRestrictionService } from '../../modules/operations/application/GeoRestrictionService'
 import { PartnerAiAbuseProtectionService } from '../../modules/partners/application/PartnerAiAbuseProtectionService'
 import { PartnerAiAuthorizationService } from '../../modules/partners/application/PartnerAiAuthorizationService'
 import { PartnerAiConnectionService } from '../../modules/partners/application/PartnerAiConnectionService'
@@ -30,6 +30,7 @@ import { initAdmin } from '../admin/admin'
 import { RuntimeConfig } from '../config/runtime'
 import { iocContainer } from '../container'
 import { TYPES } from '../container/types'
+import { createGeoCountryHandler } from './geoCountryHandler'
 import { RegisterRoutes } from './routes'
 
 dotenv.config()
@@ -157,23 +158,7 @@ app.get('/healthz', (_req: Request, res: Response) => {
   res.status(200).json({ status: 'ok' })
 })
 
-// Geo lookup used by the UI to gate access from blocked regions.
-// Reads the client IP from X-Forwarded-For (the load balancer / Cloud Run
-// frontend prepends the original client IP) and falls back to the socket
-// address. Returns the resolved country and a `blocked` boolean; the UI is
-// responsible for the redirect / 451 page. Fails open on lookup errors.
-const BLOCKED_COUNTRIES = new Set<string>(['US'])
-app.get('/geo/country', (req: Request, res: Response) => {
-  const xff = req.header('x-forwarded-for')
-  const ip = (xff?.split(',')[0]?.trim()) || req.socket.remoteAddress || ''
-  const lookup = ip ? geoip.lookup(ip) : null
-  const country = lookup?.country ?? null
-  res.set('Cache-Control', 'private, no-store')
-  res.status(200).json({
-    blocked: country !== null && BLOCKED_COUNTRIES.has(country),
-    country,
-  })
-})
+app.get('/geo/country', createGeoCountryHandler(iocContainer.get(GeoRestrictionService)))
 
 app.get('/readyz', (_req: Request, res: Response) => {
   const status = health.ready ? 200 : 503
