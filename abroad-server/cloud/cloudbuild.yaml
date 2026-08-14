@@ -55,6 +55,8 @@ steps:
       - REPO_NAME=$REPO_NAME
       - _SERVICE_NAME=$_SERVICE_NAME
       - _SENTRY_ENVIRONMENT=$_SENTRY_ENVIRONMENT
+      - _STABLEBOND_ISSUER=$_STABLEBOND_ISSUER
+      - _STABLEBOND_JIT_UNWIND_CAP_USDC=$_STABLEBOND_JIT_UNWIND_CAP_USDC
     waitFor: ["-"]
 
   # 3. Apply database migrations via Cloud Run Job using the freshly-built image
@@ -94,7 +96,7 @@ steps:
       - --image=$_AR_HOSTNAME/$PROJECT_ID/cloud-run-source-deploy/$REPO_NAME/$_SERVICE_NAME:$COMMIT_SHA
       - --labels=managed-by=gcp-cloud-build-deploy-cloud-run,commit-sha=$COMMIT_SHA,gcb-build-id=$BUILD_ID,gcb-trigger-id=$_TRIGGER_ID
       - --region=$_DEPLOY_REGION
-      - --update-env-vars=SENTRY_ENVIRONMENT=$_SENTRY_ENVIRONMENT,SENTRY_RELEASE=$COMMIT_SHA,BRIDGE_FLOAT_CAP_USDC=$_BRIDGE_FLOAT_CAP_USDC
+      - --update-env-vars=SENTRY_ENVIRONMENT=$_SENTRY_ENVIRONMENT,SENTRY_RELEASE=$COMMIT_SHA,BRIDGE_FLOAT_CAP_USDC=$_BRIDGE_FLOAT_CAP_USDC,STABLEBOND_ISSUER=$_STABLEBOND_ISSUER,STABLEBOND_JIT_UNWIND_CAP_USDC=$_STABLEBOND_JIT_UNWIND_CAP_USDC
       - --update-secrets=SENTRY_DSN=SENTRY_DSN:latest
       - --quiet
       - --async
@@ -205,6 +207,24 @@ substitutions:
   # quickly and the peak is a genuine ceiling rather than a growing balance.
   # 1000 leaves the peak at ~68% utilization.
   _BRIDGE_FLOAT_CAP_USDC: "1000"
+  # Etherfuse Stablebond position. Both values are pinned here rather than set by
+  # hand because the admission gate (abroad-api) and the STABLEBOND_UNWIND flow
+  # step (abroad-consumers, and abroad-bridge-sweep via FlowRetryWorker) MUST
+  # agree on whether the position is enabled. If the gate were on while the step
+  # was off it would admit a purchase on the strength of an unwind that then
+  # never happens, and the delivery would fail on chain for insufficient balance.
+  #
+  # An empty cap disables the feature everywhere, which is the ship-dark default
+  # and the way to switch it off again. The issuer is stated explicitly because
+  # Etherfuse warn that the Stellar issuer differs between sandbox and
+  # production; there is deliberately no fallback for it.
+  #
+  # Sized against measured book depth on 2026-08-06: the TESOURO/USDC bid side
+  # carried 53,428 TESOURO (~13,000 USDC) within 0.12% of top of book, so a 100
+  # USDC unwind clears inside the top level at ~5 bps. It is also bounded by the
+  # Stellar hot wallet's own USDC, which is live onramp delivery inventory.
+  _STABLEBOND_ISSUER: "GCRYUGD5NVARGXT56XEZI5CIFCQETYHAPQQTHO2O3IQZTHDH4LATMYWC"
+  _STABLEBOND_JIT_UNWIND_CAP_USDC: "100"
 
 tags:
   - gcp-cloud-build-deploy-cloud-run

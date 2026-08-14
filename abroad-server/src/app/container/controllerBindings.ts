@@ -47,6 +47,7 @@ import { TransactionController } from '../../modules/transactions/interfaces/htt
 import { TransactionsController } from '../../modules/transactions/interfaces/http/TransactionsController'
 import { TransparencyMetricsController } from '../../modules/transparency/interfaces/http/TransparencyMetricsController'
 import { OpsBridgeController } from '../../modules/treasury/interfaces/http/OpsBridgeController'
+import { OpsStablebondController } from '../../modules/treasury/interfaces/http/OpsStablebondController'
 import { OpsTreasuryController } from '../../modules/treasury/interfaces/http/OpsTreasuryController'
 import { OpsTreasuryThresholdController } from '../../modules/treasury/interfaces/http/OpsTreasuryThresholdController'
 import { WebhookController } from '../../modules/webhooks/interfaces/http/WebhookController'
@@ -101,6 +102,7 @@ const controllerBindings: ReadonlyArray<BindingRegistration<unknown>> = [
   { bindSelf: true, identifier: PublicCorridorController, implementation: PublicCorridorController },
   { bindSelf: true, identifier: FlowInstanceController, implementation: FlowInstanceController },
   { bindSelf: true, identifier: OpsBridgeController, implementation: OpsBridgeController },
+  { bindSelf: true, identifier: OpsStablebondController, implementation: OpsStablebondController },
   { bindSelf: true, identifier: OpsTreasuryController, implementation: OpsTreasuryController },
   { bindSelf: true, identifier: OpsTreasuryThresholdController, implementation: OpsTreasuryThresholdController },
 ] as const

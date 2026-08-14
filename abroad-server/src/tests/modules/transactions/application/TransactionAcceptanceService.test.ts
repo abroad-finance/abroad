@@ -6,7 +6,7 @@ import type { LiquidityCacheService } from '../../../../modules/payments/applica
 import { DisabledUserError } from '../../../../modules/shared/partnerUserAccess'
 import { TransactionAcceptanceService } from '../../../../modules/transactions/application/TransactionAcceptanceService'
 import { TransactionWebhookRouter } from '../../../../modules/transactions/application/TransactionWebhookRouter'
-import { createMockCryptoInventoryService, createMockFiatDepositServiceFactory, createMockLogger } from '../../../setup/mockFactories'
+import { createMockCryptoInventoryService, createMockFiatDepositServiceFactory, createMockJustInTimeUnwindService, createMockLogger } from '../../../setup/mockFactories'
 
 const buildPaymentService = () => ({
   currency: TargetCurrency.COP,
@@ -75,6 +75,7 @@ describe('TransactionAcceptanceService helpers', () => {
     transactionWebhookRouter,
     liquidityCacheService,
     bridgeFloatService,
+    createMockJustInTimeUnwindService() as never,
     createMockFiatDepositServiceFactory(),
     createMockCryptoInventoryService() as never,
     logger,
@@ -236,6 +237,7 @@ describe('TransactionAcceptanceService helpers', () => {
       transactionWebhookRouter,
       liquidityCacheService,
       bridgeFloatService,
+      createMockJustInTimeUnwindService() as never,
       createMockFiatDepositServiceFactory(),
       createMockCryptoInventoryService() as never,
       logger,
@@ -704,6 +706,7 @@ describe('TransactionAcceptanceService.acceptTransaction KYC gating', () => {
       transactionWebhookRouter,
       liquidityCacheService,
       bridgeFloatService,
+      createMockJustInTimeUnwindService() as never,
       createMockFiatDepositServiceFactory(),
       createMockCryptoInventoryService() as never,
       logger,

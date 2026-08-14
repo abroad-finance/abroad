@@ -53,6 +53,10 @@ export const opsMutationActions = [
   'transaction.reconcile_hash',
   'transaction.refund.reconcile',
   'transaction.refund.replace',
+  'treasury.stablebond.acquire',
+  'treasury.stablebond.open_trustline',
+  'treasury.stablebond.register_basis',
+  'treasury.stablebond.unwind',
   'treasury.threshold.create',
   'treasury.threshold.update',
 ] as const

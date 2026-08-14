@@ -4,6 +4,7 @@ import {
   CryptoCurrency,
   FlowDirection,
   PaymentMethod,
+  Prisma,
   TargetCurrency,
   TransactionOrigin,
 } from '@prisma/client'
@@ -13,16 +14,24 @@ import type { IPaymentServiceFactory } from '../../../../modules/payments/applic
 import type { LiquidityCacheService } from '../../../../modules/payments/application/LiquidityCacheService'
 import type { BridgeFloatService } from '../../../../modules/treasury/application/BridgeFloatService'
 import type { CryptoInventoryService } from '../../../../modules/treasury/application/CryptoInventoryService'
+import type { JustInTimeUnwindService } from '../../../../modules/treasury/application/JustInTimeUnwindService'
 import type { IDatabaseClientProvider } from '../../../../platform/persistence/IDatabaseClientProvider'
 
 import { TransactionAcceptanceService } from '../../../../modules/transactions/application/TransactionAcceptanceService'
 import { TransactionWebhookRouter } from '../../../../modules/transactions/application/TransactionWebhookRouter'
-import { createMockCryptoInventoryService, createMockFiatDepositService, createMockFiatDepositServiceFactory, createMockLogger } from '../../../setup/mockFactories'
+import {
+  createMockCryptoInventoryService,
+  createMockFiatDepositService,
+  createMockFiatDepositServiceFactory,
+  createMockJustInTimeUnwindService,
+  createMockLogger,
+} from '../../../setup/mockFactories'
 
 const CELO_WALLET = '0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed'
 
 const buildHarness = (opts?: {
   depositService?: ReturnType<typeof createMockFiatDepositService>
+  feasibility?: Awaited<ReturnType<JustInTimeUnwindService['assessFeasibility']>>
   inventory?: Awaited<ReturnType<CryptoInventoryService['getAvailable']>>
   sourceAmount?: number
 }) => {
@@ -110,6 +119,11 @@ const buildHarness = (opts?: {
     cryptoInventoryService.getAvailable.mockResolvedValue(opts.inventory)
   }
 
+  const justInTimeUnwindService = createMockJustInTimeUnwindService()
+  if (opts?.feasibility) {
+    justInTimeUnwindService.assessFeasibility.mockResolvedValue(opts.feasibility)
+  }
+
   const liquidityCacheService = {
     getLiquidity: jest.fn(async () => ({
       fromCache: false,
@@ -136,6 +150,7 @@ const buildHarness = (opts?: {
     transactionWebhookRouter,
     liquidityCacheService,
     bridgeFloatService,
+    justInTimeUnwindService as never,
     fiatDepositServiceFactory,
     cryptoInventoryService as never,
     createMockLogger(),
@@ -153,6 +168,7 @@ const buildHarness = (opts?: {
     bridgeFloatService,
     cryptoInventoryService,
     depositService,
+    justInTimeUnwindService,
     liquidityCacheService,
     partner,
     prisma,
@@ -305,5 +321,68 @@ describe('TransactionAcceptanceService onramp acceptance', () => {
 
     await expect(service.acceptTransaction(request, partner)).rejects.toThrow()
     expect(prisma.transaction.create).not.toHaveBeenCalled()
+  })
+})
+
+describe('TransactionAcceptanceService onramp just-in-time unwind gate', () => {
+  const SHORT_INVENTORY = { available: 4, success: true as const }
+
+  // The ship-dark contract: with the position off, an onramp short of inventory
+  // is refused exactly as it was before this shipped.
+  it('rejects a short onramp when the position is disabled', async () => {
+    const { justInTimeUnwindService, partner, service } = buildHarness({ inventory: SHORT_INVENTORY })
+
+    await expect(service.acceptTransaction(request, partner))
+      .rejects.toThrow('This purchase is temporarily unavailable')
+    expect(justInTimeUnwindService.assessFeasibility).toHaveBeenCalled()
+  })
+
+  it('admits a short onramp when the shortfall can be unwound in time', async () => {
+    const { justInTimeUnwindService, partner, service } = buildHarness({
+      feasibility: {
+        enabled: true,
+        feasible: true,
+        sellTokens: new Prisma.Decimal('25'),
+        spreadBps: 4,
+      },
+      inventory: SHORT_INVENTORY,
+    })
+
+    await expect(service.acceptTransaction(request, partner)).resolves.toEqual(
+      expect.objectContaining({ kycRequired: false }),
+    )
+    // Only the gap is asked of the position: 10 quoted less 4 held.
+    expect(justInTimeUnwindService.assessFeasibility.mock.calls[0][0].toFixed()).toBe('6')
+  })
+
+  it('refuses before anything moves when the unwind cannot clear', async () => {
+    const { partner, service } = buildHarness({
+      feasibility: { enabled: true, feasible: false, reason: 'slippage_bound_exceeded' },
+      inventory: SHORT_INVENTORY,
+    })
+
+    await expect(service.acceptTransaction(request, partner))
+      .rejects.toThrow('This purchase is temporarily unavailable')
+  })
+
+  it('never consults the position when inventory already covers the delivery', async () => {
+    const { justInTimeUnwindService, partner, service } = buildHarness()
+
+    await service.acceptTransaction(request, partner)
+
+    // The gate must add no latency to an onramp that was always going to pass.
+    expect(justInTimeUnwindService.assessFeasibility).not.toHaveBeenCalled()
+  })
+
+  // An unreadable balance cannot size a shortfall, so there is nothing safe to
+  // quote against. It must refuse without reaching the position at all.
+  it('refuses an unreadable inventory read without consulting the position', async () => {
+    const { justInTimeUnwindService, partner, service } = buildHarness({
+      inventory: { reason: 'horizon_unreachable', success: false },
+    })
+
+    await expect(service.acceptTransaction(request, partner))
+      .rejects.toThrow('We could not verify available liquidity')
+    expect(justInTimeUnwindService.assessFeasibility).not.toHaveBeenCalled()
   })
 })

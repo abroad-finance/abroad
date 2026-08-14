@@ -883,6 +883,7 @@ enum FlowStepType {
   ENQUEUE_BRIDGE
   CRYPTO_SEND
   ENQUEUE_TREASURY_REPLENISH
+  STABLEBOND_UNWIND
 }
 
 enum FlowStepCompletionPolicy {
@@ -1373,6 +1374,111 @@ model TreasuryBalanceSnapshot {
 
   @@index([venue, currency, capturedAt])
   @@index([capturedAt])
+}
+
+// OPEN accrues yield; CLOSED is a lot we stopped holding, kept for the audit
+// trail rather than deleted.
+enum StablebondPositionStatus {
+  OPEN
+  CLOSED
+}
+
+// ACQUIRE spends the quote asset for bond tokens; UNWIND is the reverse. With no
+// issuer relationship the same public venue is the only route in and the only
+// route out, so both sides share one ledger and one set of safety rules.
+enum StablebondExecutionDirection {
+  ACQUIRE
+  UNWIND
+}
+
+// QUOTED -> SUBMITTED -> CONFIRMED is the happy path. The row exists at QUOTED,
+// before the venue is ever asked to execute, so an execution that never returns
+// can be reconciled by hash instead of re-executed. AMBIGUOUS is the state that
+// must never be retried blindly.
+enum StablebondExecutionStatus {
+  QUOTED
+  SUBMITTED
+  CONFIRMED
+  FAILED
+  AMBIGUOUS
+}
+
+// An Etherfuse Stablebond position held as a trustline on one treasury venue.
+//
+// The token balance itself is on chain and is always read from the chain — it is
+// deliberately NOT mirrored here, because a mirrored balance is a reconciliation
+// liability. What the chain cannot tell us is the cost basis, and without a basis
+// there is no way to attribute yield to a timestamp. That is what this row owns.
+model StablebondPosition {
+  id              String                      @id @default(uuid())
+  // Etherfuse bond symbol (TESOURO), the Stellar asset code and issuer that
+  // identify the same bond on chain, and the venue holding the trustline.
+  symbol          String
+  assetCode       String
+  issuer          String
+  venue           String
+  // The bond's sovereign currency (BRL for TESOURO). Yield accrues in this
+  // currency, which is the point: a BRL payout float earning a BRL bond yield
+  // carries no currency mismatch.
+  fiatCurrency    String
+  status          StablebondPositionStatus    @default(OPEN)
+  // Cost basis. principalFiat is what the lot cost at entryNavFiat; accrued
+  // yield is (tokens read from chain * current NAV) - principalFiat.
+  principalTokens Decimal                     @db.Decimal(36, 18)
+  principalFiat   Decimal                     @db.Decimal(36, 18)
+  entryNavFiat    Decimal                     @db.Decimal(36, 18)
+  openedAt        DateTime                    @default(now())
+  closedAt        DateTime?
+  createdAt       DateTime                    @default(now())
+  updatedAt       DateTime                    @updatedAt
+  executions      StablebondExecution[]
+
+  // One lot per bond per venue. Acquiring more adjusts the basis of the existing
+  // lot rather than opening a second row, so the just-in-time unwind always has
+  // exactly one row to lock and can never split a position across two locks.
+  @@unique([symbol, venue])
+  @@index([status, symbol])
+}
+
+// One execution against the venue, in either direction: the quote that was taken,
+// the slippage floor it was bounded by, and what the venue actually returned.
+model StablebondExecution {
+  id              String                       @id @default(uuid())
+  positionId      String
+  position        StablebondPosition           @relation(fields: [positionId], references: [id], onDelete: Restrict)
+  direction       StablebondExecutionDirection
+  // Derived from the business identifier that caused the execution, so a retried
+  // caller re-attaches to the existing row instead of trading twice.
+  idempotencyKey  String                       @unique
+  status          StablebondExecutionStatus    @default(QUOTED)
+  // What was spent, what was quoted for it, and the floor below which the venue
+  // must not fill. minReceive is what actually goes on chain: it is the slippage
+  // bound, enforced by the network rather than by us re-checking after the fact.
+  sendAsset       String
+  sendAmount      Decimal                      @db.Decimal(36, 18)
+  receiveAsset    String
+  quotedReceive   Decimal                      @db.Decimal(36, 18)
+  minReceive      Decimal                      @db.Decimal(36, 18)
+  receivedAmount  Decimal?                     @db.Decimal(36, 18)
+  // NAV at quote time, so the spread actually paid stays computable long after
+  // the market has moved.
+  navFiatPerToken Decimal                      @db.Decimal(36, 18)
+  navUsdPerToken  Decimal                      @db.Decimal(36, 18)
+  // Executed price against NAV, in basis points. Positive is always the cost
+  // direction: an unwind that sold below NAV, or an acquisition that paid above
+  // it. That is the normal sign, and it is the price of being liquid.
+  spreadBps       Int?
+  // Known before submission (a Stellar transaction hash is a property of the
+  // signed envelope), which is what makes reconcile-by-hash possible.
+  onChainId       String?                      @unique
+  failureReason   String?
+  quotedAt        DateTime                     @default(now())
+  settledAt       DateTime?
+  createdAt       DateTime                     @default(now())
+  updatedAt       DateTime                     @updatedAt
+
+  @@index([positionId, quotedAt])
+  @@index([direction, status, quotedAt])
 }
 
 enum OpsRole {

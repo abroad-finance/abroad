@@ -1,9 +1,10 @@
-import { PaymentMethod, TargetCurrency } from '@prisma/client'
+import { PaymentMethod, Prisma, TargetCurrency } from '@prisma/client'
 
 import type { ILogger } from '../../core/logging/types'
 import type { IFiatDepositService } from '../../modules/payments/application/contracts/IFiatDepositService'
 import type { IFiatDepositServiceFactory } from '../../modules/payments/application/contracts/IFiatDepositServiceFactory'
 import type { CryptoInventoryService } from '../../modules/treasury/application/CryptoInventoryService'
+import type { JustInTimeUnwindService } from '../../modules/treasury/application/JustInTimeUnwindService'
 import type { IQueueHandler } from '../../platform/messaging/queues'
 
 export type MockLogger = jest.Mocked<ILogger>
@@ -49,6 +50,19 @@ export const createMockFiatDepositServiceFactory = (
       return service
     },
   ),
+})
+
+/**
+ * The just-in-time unwind gate, disabled — the ship-dark default every existing
+ * payout test runs against. `enabled: false` makes the gate a no-op, so the
+ * pre-Stablebond behaviour of `enforceBridgeFloat` is what these suites assert.
+ */
+export const createMockJustInTimeUnwindService = (
+): jest.Mocked<Pick<JustInTimeUnwindService, 'assessFeasibility'>> => ({
+  assessFeasibility: jest.fn(async (requiredUsdc: Prisma.Decimal) => {
+    void requiredUsdc
+    return { enabled: false as const }
+  }),
 })
 
 export const createMockCryptoInventoryService = (

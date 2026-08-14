@@ -35,6 +35,10 @@ spec:
               value: "${_SENTRY_ENVIRONMENT}"
             - name: SENTRY_RELEASE
               value: "${COMMIT_SHA}"
+            - name: STABLEBOND_ISSUER
+              value: "${_STABLEBOND_ISSUER}"
+            - name: STABLEBOND_JIT_UNWIND_CAP_USDC
+              value: "${_STABLEBOND_JIT_UNWIND_CAP_USDC}"
           resources:
             # Right-sized to measured 7-day usage (steady ~165m CPU / 175Mi). Autopilot
             # bills on requests; cluster supports bursting so limits stay high for burst.
